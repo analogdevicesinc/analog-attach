@@ -22,16 +22,11 @@ Switching Editors
 You can switch between editors for the current file in two ways:
 
 - Right-click the file tab and select ``Reopen Editor With...``
-
-  .. note::
-
-     Insert screenshot: Reopen Editor With...
-
 - Open the Analog Attach side panel and click ``Switch View``
 
-  .. note::
-
-     Insert screenshot: Switch View in the left panel
+.. image:: https://raw.githubusercontent.com/analogdevicesinc/analog-attach/doc_resources/resources/common-switch-view.png
+  :alt: Switch view
+  :align: center
 
 Settings
 --------
@@ -98,10 +93,6 @@ behaviors can be easy to miss at first:
   behavior, the parent can remain enabled and still be printed in the DTS/DTSO
   output.
 
-.. note::
-
-   Insert screenshot or callout: automatic merge and validation behaviors.
-
 Sidebar (Analog Attach Panel)
 -----------------------------
 
@@ -116,10 +107,6 @@ Buttons
 - **Deploy Device Tree**: Deploy the compiled device tree to the target.
 - **Open Settings**: Open Analog Attach settings.
 - **Switch View**: Switch between Plug and Play and Tree Config views.
-
-.. note::
-
-   Insert screenshot: Analog Attach side panel with buttons.
 
 Remote Settings
 ~~~~~~~~~~~~~~~

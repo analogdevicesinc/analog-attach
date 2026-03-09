@@ -15,9 +15,9 @@ See :doc:`Switching Editors <../common/index>` for how to change views.
 The Plug and Play view is the default editor for ``.dtso`` files.
 To open it, create a ``.dtso`` file and open that file in VS Code.
 
-.. note::
-
-   Insert screenshot: initial Plug and Play editor view.
+.. image:: https://raw.githubusercontent.com/analogdevicesinc/analog-attach/doc_resources/resources/pnp-initial-screen.png
+  :alt: Initial Plug and Play editor view.
+  :align: center
 
 Setup (Merge DTS Into DTSO)
 ---------------------------
@@ -27,9 +27,9 @@ You can do this by pressing ``Ctrl+Shift+P`` and selecting the command, or by
 clicking the Analog Attach (AA) icon in the left panel and choosing
 ``merge dts into dtso``.
 
-.. note::
-
-   Insert screenshot: left panel AA icon and merge action.
+.. image:: https://raw.githubusercontent.com/analogdevicesinc/analog-attach/doc_resources/resources/pnp-sidepanel-merge-action.png
+  :alt: Left panel AA icon and merge action.
+  :align: center
 
 This provides Analog Attach with the required information to suggest valid
 parents and property values for the overlay.
@@ -40,9 +40,9 @@ Adding Devices
 On the left side, you will see a list of supported devices, grouped by category.
 Use the search bar to find a device and click the plus icon to add it.
 
-.. note::
-
-   Insert screenshot: device list, search bar, and add button.
+.. image:: https://raw.githubusercontent.com/analogdevicesinc/analog-attach/doc_resources/resources/pnp-add-node.png
+  :alt: Device list, search bar, and add button.
+  :align: center
 
 Selecting a Parent
 ------------------
@@ -67,9 +67,9 @@ After every modification, the updated ``.dtso`` is saved to the file.
 Each device card shows the parent node name and provides an enable/disable
 toggle. The card also includes actions for configuring or deleting the device.
 
-.. note::
-
-   Insert screenshot: device card with parent tag, toggle, and actions.
+.. image:: https://raw.githubusercontent.com/analogdevicesinc/analog-attach/doc_resources/resources/pnp-added-device-screen.png
+  :alt: Device card with parent tag, toggle, and actions.
+  :align: center
 
 Channels
 --------
@@ -88,9 +88,9 @@ When the maximum number of channels is reached, the **+** button is disabled.
 The channel list can be expanded to show individual channels, along with any
 validation errors they may have.
 
-.. note::
-
-   Insert screenshot: channel count, add button, and expanded channels.
+.. image:: https://raw.githubusercontent.com/analogdevicesinc/analog-attach/doc_resources/resources/pnp-add-channels.png
+  :alt: Channel count, add button, and expanded channels.
+  :align: center
 
 Configuration and Validation
 ----------------------------

@@ -25,9 +25,9 @@ When you press **+**, a list of possible devices is shown, with an option to
 add a custom node. A custom node is not interpreted and no validation is
 performed for it; only custom properties can be added.
 
-.. note::
-
-   Insert screenshot: add node dialog with device list and custom node option.
+.. image:: https://raw.githubusercontent.com/analogdevicesinc/analog-attach/doc_resources/resources/tc-select-node-to-add.png
+  :alt: Add node dialog with device list and custom node option.
+  :align: center
 
 Search
 ------
@@ -35,9 +35,9 @@ Search
 The search bar matches against the full node path. Selecting a result focuses
 the node in the tree.
 
-.. note::
-
-   Insert screenshot: tree search results.
+.. image:: https://raw.githubusercontent.com/analogdevicesinc/analog-attach/doc_resources/resources/tc-search-node.png
+  :alt: Tree search results.
+  :align: center
 
 Configuration
 -------------
@@ -45,9 +45,9 @@ Configuration
 The configuration panel supports device aliases with built-in validation.
 Custom properties can be added and removed from the configuration list.
 
-.. note::
-
-   Insert screenshot: configuration panel with alias and custom properties.
+.. image:: https://raw.githubusercontent.com/analogdevicesinc/analog-attach/doc_resources/resources/tc-search-node.png
+  :alt: Configuration panel with alias and custom properties.
+  :align: center
 
 Hidden Features
 ---------------
@@ -63,9 +63,9 @@ that node in the tree and opens its configuration.
 
 This feature is only available in the Tree Config view.
 
-.. note::
-
-   Insert screenshot: hyperlink dropdown with the go-to button on the right.
+.. image:: https://raw.githubusercontent.com/analogdevicesinc/analog-attach/doc_resources/resources/tc-goto-node.png
+  :alt: Hyperlink dropdown with the go-to button on the right.
+  :align: center
 
 Topics
 ------
