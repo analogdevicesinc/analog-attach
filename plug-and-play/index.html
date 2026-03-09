@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta content="This section covers the Plug and Play editor experience. Content will be expanded step by step." name="description" />
+
+    <title>Plug and Play View &#8212; Analog Attach  documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=8e8a900e" />
+    <link rel="stylesheet" type="text/css" href="../_static/app.min.css?v=a525f648" />
+    <script async="async" src="../_static/app.umd.js?v=fcf3088a"></script>
+    <link rel="icon" href="../_static/icon.svg"/>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Tree Config View" href="../tree-config/index.html" />
+    <link rel="prev" title="Analog Attach" href="../index.html" />
+   
+  
+  
+  <meta name="repository" content="documentation">
+  <meta name="version" content="">
+  
+    <meta name="page_source_suffix" content=".rst">
+  
+  
+  
+
+
+<style>
+  body {
+    
+  }
+
+  body.dark {
+    
+  }
+
+  @media (prefers-color-scheme: dark) {
+    body:not(.light) {
+      
+    }
+  }
+</style>
+  </head>
+  
+    <body>
+  
+  <input type="checkbox" id="input-show-toc">
+  <input type="checkbox" id="input-show-localtoc">
+  <input type="checkbox" id="input-show-repotoc">
+
+  
+  <div class="search-area">
+    <form action="" method="get">
+      <input type="text" name="q" aria-labelledby="search-documentation" value="" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" role="search" placeholder="Search"/>
+      <button class="icon"></button>
+    </form>
+  </div>
+  
+
+  <header>
+    <div id="left">
+      <label id="show-sidebar" class="icon" for="input-show-toc" title="Show/hide index"></label>
+    </div>
+    <div id="right">
+      <span>
+        <a id="logo-org" href="https://analog.com" aria-label="Analog Devices Inc. landing page"></a>
+        <div class="vertical-divider"></div>
+        
+        <label id="show-repotoc" for="input-show-repotoc" title="Show/hide docs" tabindex="0">Docs</label>
+        
+        <a id="logo" href="../index.html">
+          <div>System Level</div>
+        </a>
+      </span>
+      <span class="reverse">
+        <label id="show-localtoc" class="icon" for="input-show-localtoc" title="Show/hide contents"></label>
+      </span>
+    </div>
+  </header>
+
+
+  <div class="repotoc-tree overlay">
+    <root>
+  <a href="../index.html" class="current">System Level</a>
+</root>
+
+  </div>
+    <div class="localtoc">
+      <div class="tocwrapper">
+        <div class="header localtoc-header">
+          <a id="scroll-up" href="#top-anchor" title="Back to top"></a>
+        </div>
+        <nav>
+          <ul>
+<li><a class="reference internal" href="#">Plug and Play View</a><ul>
+<li><a class="reference internal" href="#overview">Overview</a></li>
+<li><a class="reference internal" href="#setup-merge-dts-into-dtso">Setup (Merge DTS Into DTSO)</a></li>
+<li><a class="reference internal" href="#adding-devices">Adding Devices</a></li>
+<li><a class="reference internal" href="#selecting-a-parent">Selecting a Parent</a></li>
+<li><a class="reference internal" href="#managing-the-device">Managing the Device</a></li>
+<li><a class="reference internal" href="#channels">Channels</a></li>
+<li><a class="reference internal" href="#configuration-and-validation">Configuration and Validation</a></li>
+<li><a class="reference internal" href="#topics">Topics</a></li>
+</ul>
+</li>
+</ul>
+
+        </nav>
+      </div>
+    </div>
+
+  
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+    <a id="no-logo" href="../index.html">
+      Analog Attach
+    </a><input id="input-switch-toc" type="checkbox">
+<label id="show-repotoc" for="input-switch-toc">
+All content
+</label>
+<label id="show-toc" for="input-switch-toc">
+Content on this topic
+</label>
+<div class="repotoc-tree">
+  <root>
+  <a href="../index.html" class="current">System Level</a>
+</root>
+
+</div>
+<div class="toc-tree">
+  <p class="caption" role="heading">
+  <span class="caption-text">Plug and Play View</span>
+</p>
+
+<ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Plug and Play View</a></li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">Tree Config View</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../tree-config/index.html">Tree Config View</a></li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">Common</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../common/index.html">Common</a></li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">Debugging and Common Issues</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../debugging/index.html">Debugging and Common Issues</a></li>
+</ul>
+
+
+</div>
+        </div>
+      </div>
+
+  <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper" id="top-anchor">
+          <div class="body-header">
+  <nav class="breadcrumb empty"><ol></ol></nav>
+</div>
+          <div class="body" role="main">
+            
+  <section id="plug-and-play-view">
+<h1>Plug and Play View<a class="headerlink" href="#plug-and-play-view" title="Link to this heading"></a></h1>
+<p>This section covers the Plug and Play editor experience. Content will be
+expanded step by step.</p>
+<section id="overview">
+<h2>Overview<a class="headerlink" href="#overview" title="Link to this heading"></a></h2>
+<p>The Plug and Play view is a minimal, more user friendly editor with more limited
+control. For advanced or fine-grained control, use the Tree Config View instead:
+<a class="reference internal" href="../tree-config/index.html"><span class="doc">Tree Config View</span></a>.
+See <a class="reference internal" href="../common/index.html"><span class="doc">Switching Editors</span></a> for how to change views.</p>
+<p>The Plug and Play view is the default editor for <code class="docutils literal notranslate"><span class="pre">.dtso</span></code> files.
+To open it, create a <code class="docutils literal notranslate"><span class="pre">.dtso</span></code> file and open that file in VS Code.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Insert screenshot: initial Plug and Play editor view.</p>
+</div>
+</section>
+<section id="setup-merge-dts-into-dtso">
+<h2>Setup (Merge DTS Into DTSO)<a class="headerlink" href="#setup-merge-dts-into-dtso" title="Link to this heading"></a></h2>
+<p>First, run the command <code class="docutils literal notranslate"><span class="pre">Analog</span> <span class="pre">Attach:</span> <span class="pre">Add</span> <span class="pre">Device</span> <span class="pre">Tree</span> <span class="pre">file</span> <span class="pre">to</span> <span class="pre">current</span> <span class="pre">overlay</span></code>.
+You can do this by pressing <code class="docutils literal notranslate"><span class="pre">Ctrl+Shift+P</span></code> and selecting the command, or by
+clicking the Analog Attach (AA) icon in the left panel and choosing
+<code class="docutils literal notranslate"><span class="pre">merge</span> <span class="pre">dts</span> <span class="pre">into</span> <span class="pre">dtso</span></code>.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Insert screenshot: left panel AA icon and merge action.</p>
+</div>
+<p>This provides Analog Attach with the required information to suggest valid
+parents and property values for the overlay.</p>
+</section>
+<section id="adding-devices">
+<h2>Adding Devices<a class="headerlink" href="#adding-devices" title="Link to this heading"></a></h2>
+<p>On the left side, you will see a list of supported devices, grouped by category.
+Use the search bar to find a device and click the plus icon to add it.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Insert screenshot: device list, search bar, and add button.</p>
+</div>
+</section>
+<section id="selecting-a-parent">
+<h2>Selecting a Parent<a class="headerlink" href="#selecting-a-parent" title="Link to this heading"></a></h2>
+<p>After adding a device, Analog Attach parses the binding and suggests possible
+parents. If no parents are shown, it means no valid parent was found.</p>
+<p>If you believe this is a mistake, let the developers know, or switch to the
+Tree Config View for more control:
+<a class="reference internal" href="../tree-config/index.html"><span class="doc">Tree Config View</span></a>.
+See <a class="reference internal" href="../common/index.html"><span class="doc">Switching Editors</span></a> for how to change views.</p>
+</section>
+<section id="managing-the-device">
+<h2>Managing the Device<a class="headerlink" href="#managing-the-device" title="Link to this heading"></a></h2>
+<p>After selecting a parent, the device appears in the middle part of the screen.
+From there, you can enable or delete it, open the configuration, and add
+channels (when the device supports channels).</p>
+<p>After every modification, the updated <code class="docutils literal notranslate"><span class="pre">.dtso</span></code> is saved to the file.</p>
+<p>Each device card shows the parent node name and provides an enable/disable
+toggle. The card also includes actions for configuring or deleting the device.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Insert screenshot: device card with parent tag, toggle, and actions.</p>
+</div>
+</section>
+<section id="channels">
+<h2>Channels<a class="headerlink" href="#channels" title="Link to this heading"></a></h2>
+<p>If the device supports channels, the number of channels is shown under the
+device name in the middle panel. Click the <strong>+</strong> button in the Channels
+dropdown to add one. The right panel will prompt you to enter a channel name
+and, optionally, an alias.</p>
+<p>You can select a name from the list or enter a custom name, but it must match
+the regex shown in the info tooltip next to the channel name field. Once a
+valid name is provided, the <strong>Add channel</strong> button becomes available and the
+channel configuration opens.</p>
+<p>When the maximum number of channels is reached, the <strong>+</strong> button is disabled.
+The channel list can be expanded to show individual channels, along with any
+validation errors they may have.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Insert screenshot: channel count, add button, and expanded channels.</p>
+</div>
+</section>
+<section id="configuration-and-validation">
+<h2>Configuration and Validation<a class="headerlink" href="#configuration-and-validation" title="Link to this heading"></a></h2>
+<p>The configuration panel may show validation errors. This means required
+properties are missing or invalid.</p>
+<p>Some properties are interdependent. Changing one property can make other
+properties required or optional, or change their expected type and size.</p>
+<p>From the configuration panel you can:</p>
+<ul class="simple">
+<li><p>Change the parent</p></li>
+<li><p>Set the alias</p></li>
+<li><p>Add values to properties</p></li>
+<li><p>Add new, custom properties (bottom of the properties list)</p></li>
+</ul>
+<p>Only properties that contain values are written to the file. To remove a
+property, clear its input or select <code class="docutils literal notranslate"><span class="pre">None</span></code> for dropdowns.</p>
+</section>
+<section id="topics">
+<h2>Topics<a class="headerlink" href="#topics" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p>Overview (what the view is for)</p></li>
+<li><p>Device list and search</p></li>
+<li><p>Device configuration workflow</p></li>
+<li><p>Channels and parent selection</p></li>
+<li><p>Validation feedback</p></li>
+</ul>
+</section>
+</section>
+
+
+          </div>
+              <div class="related">
+                &nbsp;
+    <a href="../index.html" title="Previous document (Alt+Shift+LeftArrow)" class="prev">Analog Attach</a>
+    <a href="../tree-config/index.html" title="Next document (Alt+Shift+RightArrow)" class="next">Tree Config View</a>
+              </div>
+          
+        </div>
+      </div>
+  </div>
+
+  <label id="cancel-area-show-toc" for="input-show-toc"></label>
+  <label id="cancel-area-show-localtoc" for="input-show-localtoc"></label>
+    <footer>
+      &#169;2025, Analog Devices, Inc.
+      
+      |
+      Made with <a href="https://www.sphinx-doc.org/">Sphinx</a>
+      &amp; <a href="https://github.com/analogdevicesinc/doctools">Doctools</a>
+      
+    </footer>
+  </body>
+</html>
