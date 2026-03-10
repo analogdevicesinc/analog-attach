@@ -7,8 +7,10 @@ import {
     CompatibleMapping,
     get_compatible_mapping,
     write_compatible_mappings_to_file,
-    read_compatible_mappings_from_file
+    read_compatible_mappings_from_file,
+    ProgressCallback
 } from "../utilities";
+import { AnalogAttachLogger } from "../AnalogAttachLogger";
 
 /**
  * Manages schema caching and indexing for device tree bindings.
@@ -28,6 +30,29 @@ export class SchemaCache {
         this.global_state = global_state;
     }
 
+    private async updateCache(linux_bindings_folder: string, dt_schema_schemas_path: string, compatible_mapping_path: string) {
+        await vscode.window.withProgress({
+            location: vscode.ProgressLocation.Notification,
+            title: "Analog Attach",
+            cancellable: false
+        }, async (progress) => {
+            progress.report({ message: "Indexing device tree bindings..." });
+            await new Promise(resolve => setImmediate(resolve));
+
+            await this.updateSchemaCache(
+                linux_bindings_folder,
+                dt_schema_schemas_path,
+                compatible_mapping_path,
+                (message) => {
+                    progress.report({ message });
+                }
+            );
+
+            progress.report({ message: "Computing checksums..." });
+            await new Promise(resolve => setImmediate(resolve));
+        });
+    }
+
     /**
      * Ensures schemas are cached and up-to-date.
      * Returns the compatible mappings for the cached schemas.
@@ -45,20 +70,29 @@ export class SchemaCache {
         const stored_linux_bindings_md5 = this.global_state.get<string>("linux_bindings_md5");
         const stored_global_storage_md5 = this.global_state.get<string>("global_storage_md5");
 
-        const current_linux_bindings_md5 = get_directory_md5_sync(linux_bindings_folder);
-        const current_global_storage_md5 = get_directory_md5_sync(this.storage_path);
+        // On fresh install, skip expensive MD5 check - we know we need to index
+        const is_fresh_install = !stored_linux_bindings_md5 || !stored_global_storage_md5;
 
-        if (!stored_linux_bindings_md5 ||
-            !stored_global_storage_md5 ||
-            stored_linux_bindings_md5 !== current_linux_bindings_md5 ||
-            stored_global_storage_md5 !== current_global_storage_md5) {
+        if (is_fresh_install) {
+            AnalogAttachLogger.info("Fresh install detected, starting initial index!");
 
-            console.log("Detected changes, started reindex!");
+            await this.updateCache(linux_bindings_folder, dt_schema_schemas_path, compatible_mapping_path);
+            const current_linux_bindings_md5 = get_directory_md5_sync(linux_bindings_folder);
+            await this.global_state.update("linux_bindings_md5", current_linux_bindings_md5);
+            await this.global_state.update('global_storage_md5', get_directory_md5_sync(this.storage_path));
+        } else {
+            // For subsequent runs, check if bindings changed
+            const current_linux_bindings_md5 = get_directory_md5_sync(linux_bindings_folder);
+            const current_global_storage_md5 = get_directory_md5_sync(this.storage_path);
 
-            await this.updateSchemaCache(linux_bindings_folder, dt_schema_schemas_path, compatible_mapping_path);
+            if (stored_linux_bindings_md5 !== current_linux_bindings_md5 ||
+                stored_global_storage_md5 !== current_global_storage_md5) {
+                AnalogAttachLogger.info("Detected changes, started reindex!");
 
-            this.global_state.update("linux_bindings_md5", current_linux_bindings_md5);
-            this.global_state.update('global_storage_md5', get_directory_md5_sync(this.storage_path));
+                await this.updateCache(linux_bindings_folder, dt_schema_schemas_path, compatible_mapping_path);
+                await this.global_state.update("linux_bindings_md5", current_linux_bindings_md5);
+                await this.global_state.update('global_storage_md5', get_directory_md5_sync(this.storage_path));
+            }
         }
 
         return read_compatible_mappings_from_file(compatible_mapping_path);
@@ -70,9 +104,15 @@ export class SchemaCache {
     private async updateSchemaCache(
         linux_bindings_folder: string,
         dt_schema_schemas_path: string,
-        compatible_mapping_path: string
+        compatible_mapping_path: string,
+        onProgress?: ProgressCallback
     ): Promise<void> {
         const storage_bindings_folder_path = path.join(this.storage_path, 'schemas');
+
+        if (onProgress) {
+            onProgress("Cleaning up existing schemas...");
+            await new Promise(resolve => setImmediate(resolve));
+        }
 
         // Clean up existing schemas
         if (fs.existsSync(storage_bindings_folder_path)) {
@@ -81,6 +121,11 @@ export class SchemaCache {
 
         if (!fs.existsSync(storage_bindings_folder_path)) {
             fs.mkdirSync(storage_bindings_folder_path);
+        }
+
+        if (onProgress) {
+            onProgress("Copying Linux kernel bindings...");
+            await new Promise(resolve => setImmediate(resolve));
         }
 
         // Copy Linux kernel bindings
@@ -96,6 +141,11 @@ export class SchemaCache {
             }
         );
 
+        if (onProgress) {
+            onProgress("Copying dt-schema schemas...");
+            await new Promise(resolve => setImmediate(resolve));
+        }
+
         // Copy dt-schema schemas
         fs.cpSync(
             dt_schema_schemas_path,
@@ -110,8 +160,13 @@ export class SchemaCache {
         );
 
         // Generate and cache compatible mappings
-        const compatible_mapping = await get_compatible_mapping(linux_bindings_folder, this.linux_path, this.dt_schema_path);
-        console.log(compatible_mapping);
+        const compatible_mapping = await get_compatible_mapping(
+            linux_bindings_folder,
+            this.linux_path,
+            this.dt_schema_path,
+            onProgress
+        );
+        AnalogAttachLogger.debug("Compatible mapping:", compatible_mapping);
         write_compatible_mappings_to_file(compatible_mapping_path, compatible_mapping);
     }
 

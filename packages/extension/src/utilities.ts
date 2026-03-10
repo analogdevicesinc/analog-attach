@@ -94,19 +94,30 @@ export function get_all_file_paths(directory: string): string[] {
     return results.sort(); // Sort to make hash order-independent
 }
 
+export type ProgressCallback = (message: string, increment?: number) => void;
+
 export async function get_compatible_mapping(
     bindings_folder: string,
     linux_path: string,
     dt_schema_path: string,
+    onProgress?: ProgressCallback
 ): Promise<CompatibleMapping[]> {
 
     const all_files = get_all_file_paths(bindings_folder);
+    const yaml_files = all_files.filter(file => file.endsWith(".yaml"));
+    const total_files = yaml_files.length;
     const compatible_mapping: CompatibleMapping[] = [];
 
-    for (const file of all_files) {
-        if (!file.endsWith(".yaml")) {
-            continue;
+    for (const [index, file] of yaml_files.entries()) {
+
+        if (onProgress) {
+            onProgress(`Indexing bindings (${index + 1}/${total_files})`);
+            // Yield every 10 files to allow progress UI to update
+            if (index % 10 === 0) {
+                await new Promise(resolve => setImmediate(resolve));
+            }
         }
+
         const attach = Attach.new();
         //TODO Do we really care about having this dereferenced?
         const binding = await attach.parse_binding(file, linux_path, dt_schema_path);
