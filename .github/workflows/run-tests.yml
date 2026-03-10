@@ -1,0 +1,57 @@
+name: Run Application Tests
+
+on: [push, pull_request]
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GH_TOKEN }}
+
+      - name: Install dtc (Device Tree Compiler)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y device-tree-compiler
+          dtc --version
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: yarn
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Clone Linux
+        run: |
+         cd packages/attach-lib/test
+         git clone --depth 1 -b rpi-6.12.y https://github.com/analogdevicesinc/linux
+         cd ../../../
+
+      - name: Clone dt-schema
+        run: | 
+         cd packages/attach-lib/test
+         git clone --depth 1 -b main https://github.com/devicetree-org/dt-schema
+         cd ../../../
+
+      - name: Symlink linux and dt-schema to message API tests
+        run: |
+          ln -sfn "$(pwd)/packages/attach-lib/test/linux" packages/extension/test
+          ln -sfn "$(pwd)/packages/attach-lib/test/dt-schema" packages/extension/test
+
+
+      - name: Install dependencies
+        run: yarn install --immutable
+
+      - name: Build
+        run: yarn build:all
+
+      - name: Test
+        run: xvfb-run --auto-servernum yarn test-clean

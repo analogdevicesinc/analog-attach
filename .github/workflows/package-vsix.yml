@@ -1,0 +1,51 @@
+name: Build VSIX
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GH_TOKEN }}
+          submodules: true
+
+      - name: Install dtc (Device Tree Compiler)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y device-tree-compiler
+          dtc --version
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: yarn
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Install dependencies
+        run: yarn install --immutable
+
+      - name: Build bundles
+        run: yarn build:all
+
+      - name: Package VSIX
+        run: |
+          echo "Starting the packaging process (might take a while, do not worry if it looks stuck)"
+          npx @vscode/vsce@3.6.2 package --no-yarn --no-dependencies --allow-missing-repository --out analog-attach.vsix
+
+      - name: Upload VSIX artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: analog-attach.vsix
+          path: analog-attach.vsix

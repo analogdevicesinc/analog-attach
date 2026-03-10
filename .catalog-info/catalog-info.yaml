@@ -1,0 +1,20 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  title: Analog Attach VSCode Extension 0.1.0
+  name: analog-attach-vscode-extension-0.1.0
+  version: 0.1.0
+  description: Analog Attach is a Visual Studio Code plugin that streamlines
+    initial configuration of parts connected to a target embedded system.
+  classification: software
+  license:
+    - Apache-2.0
+  links: []
+  tags: []
+  annotations:
+    backstage.io/source-location: url:https://github.com/adi-partners/analog-attach
+spec:
+  type: source
+  lifecycle: execution
+  owner: user:default/asuciu
+  subcomponentOf: component:default/analog-attach-vscode-extension-main

@@ -1,0 +1,72 @@
+{
+  "files.exclude": {
+    "out": false, // set this to true to hide the "out" folder with the compiled JS files
+    "dist": false // set this to true to hide the "dist" folder with the compiled JS files
+  },
+  "search.exclude": {
+    "out": true, // set this to false to include "out" folder in search results
+    "dist": true // set this to false to include "dist" folder in search results
+    ,
+    "**/.yarn": true,
+    "**/.pnp.*": true
+  },
+  "typescript.tsc.autoDetect": "off",
+  "cSpell.words": [
+    "adxl",
+    "apidevtools",
+    "brcm",
+    "bytestring",
+    "cpha",
+    "decomp",
+    "Decompiled",
+    "decompiling",
+    "devicetree",
+    "dtbo",
+    "dtos",
+    "dtoverlay",
+    "dtschema",
+    "dtsi",
+    "Dtso",
+    "femto",
+    "femtofarads",
+    "fixedregulator",
+    "fixuped",
+    "INTZ",
+    "kpascal",
+    "mclk",
+    "memreserve",
+    "memreserves",
+    "microamp",
+    "microwatts",
+    "milli",
+    "millicelsius",
+    "milliwatts",
+    "nanoamp",
+    "mpic",
+    "nosources",
+    "nostdinc",
+    "Phandle",
+    "phandles",
+    "pico",
+    "picoamp",
+    "prepro",
+    "refin",
+    "repr",
+    "rvell",
+    "spidev",
+    "spirx",
+    "sshpass",
+    "VDDIOH",
+    "vref",
+    "vscodeignore",
+    "VSEL",
+    "wakeup"
+  ],
+  "eslint.useFlatConfig": true,
+  "eslint.validate": [
+    "typescript"
+  ],
+  "eslint.run": "onType",
+  "typescript.tsdk": ".yarn/sdks/typescript/lib",
+  "typescript.enablePromptUseWorkspaceTsdk": true
+}
