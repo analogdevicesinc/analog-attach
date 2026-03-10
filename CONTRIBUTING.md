@@ -1,47 +1,109 @@
-# Types of contributions
+# Contributing to Analog Attach
 
-Include information on what kinds of contributions your project is looking for; for example:
+Thank you for your interest in contributing to Analog Attach! This document
+provides guidelines for contributing to the project.
+
+## Types of Contributions
+
+We welcome the following types of contributions:
 
 - Bug reports
-- Help with answering user questions
-- Documentation improvements
 - Bug fixes
+- Documentation improvements
 - New feature implementations
+- Test coverage improvements
 
-# Bug reports
+## Bug Reports
 
-Include information on how to submit bug reports; for example:
+When submitting a bug report, please include:
 
-- Details the project needs to reproduce and fix issues
-- Commonly found misconfigurations that look like bugs
-- What contributors can expect in terms of time to first response and process after that
+1. **VS Code version** and **extension version**
+2. **Operating system** (Linux distribution, macOS, Windows)
+3. **Steps to reproduce** the issue
+4. **Expected behavior** vs **actual behavior**
+5. **Sample DTS/DTSO file** (if applicable)
+6. **Screenshots** (if UI-related)
+7. **Error messages** from the Output panel (View > Output > Extension Host)
 
-# Feature requests
+Submit bug reports via [GitHub Issues](https://github.com/analogdevicesinc/analog-attach/issues).
 
-Include information on how to submit feature requests and what contributors can expect in terms of time to first response and process after that.
+## Feature Requests
 
-# Contributing documentation
+For feature requests:
 
-Include information on:
+1. Check existing issues to avoid duplicates
+2. Describe the use case and why it would be valuable
+3. Provide examples of how the feature would work
 
-- Documentation best practices your project follows
-- How to build documentation
-- Checks to run
-- How to submit changes back to the project
+## Contributing Code
 
-# Contributing source code
+### Getting Started
 
-Include information on:
+1. Fork the repository
+2. Clone your fork with submodules:
+   ```bash
+   git clone --recursive <your-fork-url>
+   ```
+3. Follow the setup instructions in [DEVELOPMENT.md](DEVELOPMENT.md)
 
-- How to access the project source code
-- General project layout
-- Requirements for the development environment
-- Code formatting guidelines
-- How to run the test suite
-- How to become a Trusted Committer
+### Development Workflow
 
-Make the process for becoming a Trusted Committer explicit if that route is open to contributors.
+1. Create a branch for your changes:
+   ```bash
+   git checkout -b feature/your-feature-name
+   ```
 
-# How to nominate Trusted Committers
+2. Make your changes following the code style guidelines below
 
-Explain to new Trusted Committers and remind existing ones how to add others to the host team. Ideally this information is identical for all projects in the organization, so you can link from here to a central information source.
+3. Run tests:
+   ```bash
+   yarn test
+   ```
+
+4. Run linting:
+   ```bash
+   yarn lint
+   ```
+
+5. Commit your changes with Signed-off-by and with a clear message:
+   ```bash
+   git commit -sm "feat: add new feature description"
+   ```
+
+6. Push and create a Pull Request
+
+### Code Style
+
+- Use TypeScript for all new code
+- Follow existing code patterns and conventions
+- Use meaningful variable and function names
+- Add comments for complex logic
+- Keep functions focused and small
+
+### Commit Messages
+
+Follow conventional commit format:
+
+- `feat:` - New features
+- `fix:` - Bug fixes
+- `docs:` - Documentation changes
+- `refactor:` - Code refactoring
+- `test:` - Adding or updating tests
+- `chore:` - Maintenance tasks
+
+### Pull Request Guidelines
+
+1. Keep PRs focused on a single change
+2. Update documentation if needed
+3. Add tests for new functionality
+4. Ensure all tests pass
+5. Ensure linting passes
+6. Provide a clear description of the changes
+
+## Project Structure
+
+See [DEVELOPMENT.md](DEVELOPMENT.md) for details on the project structure and build process.
+
+## Questions?
+
+If you have questions about contributing, feel free to open a discussion on GitHub.
