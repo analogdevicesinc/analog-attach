@@ -1,11 +1,8 @@
-Debugging and Common Issues
-===========================
+Topics
+------
 
 This section collects debugging tips, logs, and common problems. Content will be
 expanded step by step.
-
-Topics
-------
 
 - Logs and where to find them
 

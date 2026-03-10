@@ -4,16 +4,17 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
-<meta content="This section collects debugging tips, logs, and common problems. Content will be expanded step by step." name="description" />
+<meta content="Analog Attach requires a valid Linux kernel repository (for example, analogdevicesinc/linux) to be configured in settings before the extension can function." name="description" />
 
-    <title>Topics &#8212; Analog Attach  documentation</title>
+    <title>Requirements &#8212; Analog Attach  documentation</title>
     <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=8e8a900e" />
     <link rel="stylesheet" type="text/css" href="../_static/app.min.css?v=a525f648" />
     <script async="async" src="../_static/app.umd.js?v=fcf3088a"></script>
     <link rel="icon" href="../_static/icon.svg"/>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
-    <link rel="prev" title="Topics" href="../common/index.html" />
+    <link rel="next" title="Overview" href="../plug-and-play/index.html" />
+    <link rel="prev" title="Analog Attach" href="../index.html" />
    
   
   
@@ -93,8 +94,8 @@
         </div>
         <nav>
           <ul>
-<li><a class="reference internal" href="#">Topics</a></li>
-<li><a class="reference internal" href="#logs">Logs</a></li>
+<li><a class="reference internal" href="#">Requirements</a></li>
+<li><a class="reference internal" href="#getting-the-extension">Getting the Extension</a></li>
 </ul>
 
         </nav>
@@ -124,9 +125,9 @@ Content on this topic
   <span class="caption-text">How to install</span>
 </p>
 
-<ul>
-<li class="toctree-l1"><a class="reference internal" href="../install-steps/index.html">Requirements</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../install-steps/index.html#getting-the-extension">Getting the Extension</a></li>
+<ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Requirements</a></li>
+<li class="toctree-l1"><a class="reference internal" href="#getting-the-extension">Getting the Extension</a></li>
 </ul>
 
 <p class="caption" role="heading">
@@ -173,9 +174,9 @@ Content on this topic
   <span class="caption-text">Debugging and Common Issues</span>
 </p>
 
-<ul class="current">
-<li class="toctree-l1 current"><a class="current reference internal" href="#">Topics</a></li>
-<li class="toctree-l1"><a class="reference internal" href="#logs">Logs</a></li>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../debugging/index.html">Topics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../debugging/index.html#logs">Logs</a></li>
 </ul>
 
 
@@ -191,27 +192,48 @@ Content on this topic
 </div>
           <div class="body" role="main">
             
-  <section id="topics">
-<h1>Topics<a class="headerlink" href="#topics" title="Link to this heading"></a></h1>
-<p>This section collects debugging tips, logs, and common problems. Content will be
-expanded step by step.</p>
-<ul class="simple">
-<li><p>Logs and where to find them</p></li>
-</ul>
+  <section id="requirements">
+<h1>Requirements<a class="headerlink" href="#requirements" title="Link to this heading"></a></h1>
+<div class="admonition important">
+<p class="admonition-title">Important</p>
+<p>Analog Attach requires a valid Linux kernel repository (for example,
+<code class="docutils literal notranslate"><span class="pre">analogdevicesinc/linux</span></code>) to be configured in settings before the
+extension can function.</p>
+</div>
+<div class="admonition important">
+<p class="admonition-title">Important</p>
+<p>Analog Attach also requires the following packages to enable all
+features:</p>
+<ol class="arabic simple">
+<li><p>C compiler (gcc). Needed for precompiling dts/dtso files if needed <code class="docutils literal notranslate"><span class="pre">sudo</span> <span class="pre">apt</span> <span class="pre">install</span> <span class="pre">gcc</span></code></p></li>
+<li><p>Device Tree Compiler (dtc). Can be installed with <code class="docutils literal notranslate"><span class="pre">sudo</span> <span class="pre">apt</span> <span class="pre">install</span> <span class="pre">device-tree-compiler</span></code></p></li>
+<li><p>Ssh for connecting to a device. <code class="docutils literal notranslate"><span class="pre">sudo</span> <span class="pre">apt</span> <span class="pre">install</span> <span class="pre">ssh</span></code></p></li>
+<li><p>Ssh password authentication (sshpass). Needed for deploying to a device <code class="docutils literal notranslate"><span class="pre">sudo</span> <span class="pre">apt</span> <span class="pre">install</span> <span class="pre">sshpass</span></code>.</p></li>
+</ol>
+</div>
 </section>
-<section id="logs">
-<h1>Logs<a class="headerlink" href="#logs" title="Link to this heading"></a></h1>
-<p>Analog Attach writes logs to the VS Code extension log directory. You can find
-the log file named <code class="docutils literal notranslate"><span class="pre">analog-attach.log</span></code> in the extension’s log folder. The
-path is also printed in the <strong>Extension Host</strong> output at startup.</p>
+<section id="getting-the-extension">
+<h1>Getting the Extension<a class="headerlink" href="#getting-the-extension" title="Link to this heading"></a></h1>
+<p>Analog Attach can be installed in two ways:</p>
+<ol class="arabic simple">
+<li><p>VS Code Marketplace (upcoming).</p></li>
+<li><p>From a VSIX built by this project:</p>
+<ul class="simple">
+<li><p>Download a VSIX from the project build artifacts.</p></li>
+<li><p>In VS Code, open the Extensions view, click the three‑dot menu, and select
+<code class="docutils literal notranslate"><span class="pre">Install</span> <span class="pre">from</span> <span class="pre">VSIX...</span></code>.</p></li>
+<li><p>Choose the downloaded VSIX file to install.</p></li>
+</ul>
+</li>
+</ol>
 </section>
 
 
           </div>
               <div class="related">
                 &nbsp;
-    <a href="../common/index.html" title="Previous document (Alt+Shift+LeftArrow)" class="prev">Topics</a>
-    <div></div>
+    <a href="../index.html" title="Previous document (Alt+Shift+LeftArrow)" class="prev">Analog Attach</a>
+    <a href="../plug-and-play/index.html" title="Next document (Alt+Shift+RightArrow)" class="next">Overview</a>
               </div>
           
         </div>

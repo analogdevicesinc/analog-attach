@@ -6,15 +6,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 <meta content="This section covers the Plug and Play editor experience. Content will be expanded step by step." name="description" />
 
-    <title>Plug and Play View &#8212; Analog Attach  documentation</title>
+    <title>Overview &#8212; Analog Attach  documentation</title>
     <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=8e8a900e" />
     <link rel="stylesheet" type="text/css" href="../_static/app.min.css?v=a525f648" />
     <script async="async" src="../_static/app.umd.js?v=fcf3088a"></script>
     <link rel="icon" href="../_static/icon.svg"/>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
-    <link rel="next" title="Tree Config View" href="../tree-config/index.html" />
-    <link rel="prev" title="Analog Attach" href="../index.html" />
+    <link rel="next" title="Overview" href="../tree-config/index.html" />
+    <link rel="prev" title="Requirements" href="../install-steps/index.html" />
    
   
   
@@ -94,8 +94,7 @@
         </div>
         <nav>
           <ul>
-<li><a class="reference internal" href="#">Plug and Play View</a><ul>
-<li><a class="reference internal" href="#overview">Overview</a></li>
+<li><a class="reference internal" href="#">Overview</a></li>
 <li><a class="reference internal" href="#setup-merge-dts-into-dtso">Setup (Merge DTS Into DTSO)</a></li>
 <li><a class="reference internal" href="#adding-devices">Adding Devices</a></li>
 <li><a class="reference internal" href="#selecting-a-parent">Selecting a Parent</a></li>
@@ -103,8 +102,6 @@
 <li><a class="reference internal" href="#channels">Channels</a></li>
 <li><a class="reference internal" href="#configuration-and-validation">Configuration and Validation</a></li>
 <li><a class="reference internal" href="#topics">Topics</a></li>
-</ul>
-</li>
 </ul>
 
         </nav>
@@ -131,11 +128,27 @@ Content on this topic
 </div>
 <div class="toc-tree">
   <p class="caption" role="heading">
+  <span class="caption-text">How to install</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../install-steps/index.html">Requirements</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../install-steps/index.html#getting-the-extension">Getting the Extension</a></li>
+</ul>
+
+<p class="caption" role="heading">
   <span class="caption-text">Plug and Play View</span>
 </p>
 
 <ul class="current">
-<li class="toctree-l1 current"><a class="current reference internal" href="#">Plug and Play View</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="#setup-merge-dts-into-dtso">Setup (Merge DTS Into DTSO)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="#adding-devices">Adding Devices</a></li>
+<li class="toctree-l1"><a class="reference internal" href="#selecting-a-parent">Selecting a Parent</a></li>
+<li class="toctree-l1"><a class="reference internal" href="#managing-the-device">Managing the Device</a></li>
+<li class="toctree-l1"><a class="reference internal" href="#channels">Channels</a></li>
+<li class="toctree-l1"><a class="reference internal" href="#configuration-and-validation">Configuration and Validation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="#topics">Topics</a></li>
 </ul>
 
 <p class="caption" role="heading">
@@ -143,7 +156,12 @@ Content on this topic
 </p>
 
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="../tree-config/index.html">Tree Config View</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tree-config/index.html">Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tree-config/index.html#using-the-tree">Using the Tree</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tree-config/index.html#search">Search</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tree-config/index.html#configuration">Configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tree-config/index.html#hidden-features">Hidden Features</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tree-config/index.html#topics">Topics</a></li>
 </ul>
 
 <p class="caption" role="heading">
@@ -151,7 +169,11 @@ Content on this topic
 </p>
 
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="../common/index.html">Common</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../common/index.html">Topics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../common/index.html#switching-editors">Switching Editors</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../common/index.html#settings">Settings</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../common/index.html#behind-the-scenes-helpful-behaviors">Behind the Scenes (Helpful Behaviors)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../common/index.html#sidebar-analog-attach-panel">Sidebar (Analog Attach Panel)</a></li>
 </ul>
 
 <p class="caption" role="heading">
@@ -159,7 +181,8 @@ Content on this topic
 </p>
 
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="../debugging/index.html">Debugging and Common Issues</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../debugging/index.html">Topics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../debugging/index.html#logs">Logs</a></li>
 </ul>
 
 
@@ -175,12 +198,10 @@ Content on this topic
 </div>
           <div class="body" role="main">
             
-  <section id="plug-and-play-view">
-<h1>Plug and Play View<a class="headerlink" href="#plug-and-play-view" title="Link to this heading"></a></h1>
+  <section id="overview">
+<h1>Overview<a class="headerlink" href="#overview" title="Link to this heading"></a></h1>
 <p>This section covers the Plug and Play editor experience. Content will be
 expanded step by step.</p>
-<section id="overview">
-<h2>Overview<a class="headerlink" href="#overview" title="Link to this heading"></a></h2>
 <p>The Plug and Play view is a minimal, more user friendly editor with more limited
 control. For advanced or fine-grained control, use the Tree Config View instead:
 <a class="reference internal" href="../tree-config/index.html"><span class="doc">Tree Config View</span></a>.
@@ -190,7 +211,7 @@ To open it, create a <code class="docutils literal notranslate"><span class="pre
 <img alt="Initial Plug and Play editor view." class="align-center" src="https://raw.githubusercontent.com/analogdevicesinc/analog-attach/doc_resources/resources/pnp-initial-screen.png" />
 </section>
 <section id="setup-merge-dts-into-dtso">
-<h2>Setup (Merge DTS Into DTSO)<a class="headerlink" href="#setup-merge-dts-into-dtso" title="Link to this heading"></a></h2>
+<h1>Setup (Merge DTS Into DTSO)<a class="headerlink" href="#setup-merge-dts-into-dtso" title="Link to this heading"></a></h1>
 <p>First, run the command <code class="docutils literal notranslate"><span class="pre">Analog</span> <span class="pre">Attach:</span> <span class="pre">Add</span> <span class="pre">Device</span> <span class="pre">Tree</span> <span class="pre">file</span> <span class="pre">to</span> <span class="pre">current</span> <span class="pre">overlay</span></code>.
 You can do this by pressing <code class="docutils literal notranslate"><span class="pre">Ctrl+Shift+P</span></code> and selecting the command, or by
 clicking the Analog Attach (AA) icon in the left panel and choosing
@@ -200,13 +221,13 @@ clicking the Analog Attach (AA) icon in the left panel and choosing
 parents and property values for the overlay.</p>
 </section>
 <section id="adding-devices">
-<h2>Adding Devices<a class="headerlink" href="#adding-devices" title="Link to this heading"></a></h2>
+<h1>Adding Devices<a class="headerlink" href="#adding-devices" title="Link to this heading"></a></h1>
 <p>On the left side, you will see a list of supported devices, grouped by category.
 Use the search bar to find a device and click the plus icon to add it.</p>
 <img alt="Device list, search bar, and add button." class="align-center" src="https://raw.githubusercontent.com/analogdevicesinc/analog-attach/doc_resources/resources/pnp-add-node.png" />
 </section>
 <section id="selecting-a-parent">
-<h2>Selecting a Parent<a class="headerlink" href="#selecting-a-parent" title="Link to this heading"></a></h2>
+<h1>Selecting a Parent<a class="headerlink" href="#selecting-a-parent" title="Link to this heading"></a></h1>
 <p>After adding a device, Analog Attach parses the binding and suggests possible
 parents. If no parents are shown, it means no valid parent was found.</p>
 <p>If you believe this is a mistake, let the developers know, or switch to the
@@ -215,7 +236,7 @@ Tree Config View for more control:
 See <a class="reference internal" href="../common/index.html"><span class="doc">Switching Editors</span></a> for how to change views.</p>
 </section>
 <section id="managing-the-device">
-<h2>Managing the Device<a class="headerlink" href="#managing-the-device" title="Link to this heading"></a></h2>
+<h1>Managing the Device<a class="headerlink" href="#managing-the-device" title="Link to this heading"></a></h1>
 <p>After selecting a parent, the device appears in the middle part of the screen.
 From there, you can enable or delete it, open the configuration, and add
 channels (when the device supports channels).</p>
@@ -225,7 +246,7 @@ toggle. The card also includes actions for configuring or deleting the device.</
 <img alt="Device card with parent tag, toggle, and actions." class="align-center" src="https://raw.githubusercontent.com/analogdevicesinc/analog-attach/doc_resources/resources/pnp-added-device-screen.png" />
 </section>
 <section id="channels">
-<h2>Channels<a class="headerlink" href="#channels" title="Link to this heading"></a></h2>
+<h1>Channels<a class="headerlink" href="#channels" title="Link to this heading"></a></h1>
 <p>If the device supports channels, the number of channels is shown under the
 device name in the middle panel. Click the <strong>+</strong> button in the Channels
 dropdown to add one. The right panel will prompt you to enter a channel name
@@ -240,7 +261,7 @@ validation errors they may have.</p>
 <img alt="Channel count, add button, and expanded channels." class="align-center" src="https://raw.githubusercontent.com/analogdevicesinc/analog-attach/doc_resources/resources/pnp-add-channels.png" />
 </section>
 <section id="configuration-and-validation">
-<h2>Configuration and Validation<a class="headerlink" href="#configuration-and-validation" title="Link to this heading"></a></h2>
+<h1>Configuration and Validation<a class="headerlink" href="#configuration-and-validation" title="Link to this heading"></a></h1>
 <p>The configuration panel may show validation errors. This means required
 properties are missing or invalid.</p>
 <p>Some properties are interdependent. Changing one property can make other
@@ -256,7 +277,7 @@ properties required or optional, or change their expected type and size.</p>
 property, clear its input or select <code class="docutils literal notranslate"><span class="pre">None</span></code> for dropdowns.</p>
 </section>
 <section id="topics">
-<h2>Topics<a class="headerlink" href="#topics" title="Link to this heading"></a></h2>
+<h1>Topics<a class="headerlink" href="#topics" title="Link to this heading"></a></h1>
 <ul class="simple">
 <li><p>Overview (what the view is for)</p></li>
 <li><p>Device list and search</p></li>
@@ -265,14 +286,13 @@ property, clear its input or select <code class="docutils literal notranslate"><
 <li><p>Validation feedback</p></li>
 </ul>
 </section>
-</section>
 
 
           </div>
               <div class="related">
                 &nbsp;
-    <a href="../index.html" title="Previous document (Alt+Shift+LeftArrow)" class="prev">Analog Attach</a>
-    <a href="../tree-config/index.html" title="Next document (Alt+Shift+RightArrow)" class="next">Tree Config View</a>
+    <a href="../install-steps/index.html" title="Previous document (Alt+Shift+LeftArrow)" class="prev">Requirements</a>
+    <a href="../tree-config/index.html" title="Next document (Alt+Shift+RightArrow)" class="next">Overview</a>
               </div>
           
         </div>

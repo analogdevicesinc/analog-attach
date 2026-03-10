@@ -4,7 +4,6 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
-<meta content="Analog Attach requires a valid Linux kernel repository (for example, analogdevicesinc/linux) to be configured in settings before the extension can function." name="description" />
 
     <title>Analog Attach &#8212; Analog Attach  documentation</title>
     <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=8e8a900e" />
@@ -13,7 +12,7 @@
     <link rel="icon" href="_static/icon.svg"/>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
-    <link rel="next" title="Plug and Play View" href="plug-and-play/index.html" />
+    <link rel="next" title="Requirements" href="install-steps/index.html" />
    
   
   
@@ -94,7 +93,6 @@
         <nav>
           <ul>
 <li><a class="reference internal" href="#">Analog Attach</a><ul>
-<li><a class="reference internal" href="#getting-the-extension">Getting the Extension</a></li>
 <li><a class="reference internal" href="#contents">Contents</a><ul>
 </ul>
 </li>
@@ -126,11 +124,27 @@ Content on this topic
 </div>
 <div class="toc-tree">
   <p class="caption" role="heading">
+  <span class="caption-text">How to install</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="install-steps/index.html">Requirements</a></li>
+<li class="toctree-l1"><a class="reference internal" href="install-steps/index.html#getting-the-extension">Getting the Extension</a></li>
+</ul>
+
+<p class="caption" role="heading">
   <span class="caption-text">Plug and Play View</span>
 </p>
 
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="plug-and-play/index.html">Plug and Play View</a></li>
+<li class="toctree-l1"><a class="reference internal" href="plug-and-play/index.html">Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="plug-and-play/index.html#setup-merge-dts-into-dtso">Setup (Merge DTS Into DTSO)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="plug-and-play/index.html#adding-devices">Adding Devices</a></li>
+<li class="toctree-l1"><a class="reference internal" href="plug-and-play/index.html#selecting-a-parent">Selecting a Parent</a></li>
+<li class="toctree-l1"><a class="reference internal" href="plug-and-play/index.html#managing-the-device">Managing the Device</a></li>
+<li class="toctree-l1"><a class="reference internal" href="plug-and-play/index.html#channels">Channels</a></li>
+<li class="toctree-l1"><a class="reference internal" href="plug-and-play/index.html#configuration-and-validation">Configuration and Validation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="plug-and-play/index.html#topics">Topics</a></li>
 </ul>
 
 <p class="caption" role="heading">
@@ -138,7 +152,12 @@ Content on this topic
 </p>
 
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="tree-config/index.html">Tree Config View</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tree-config/index.html">Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tree-config/index.html#using-the-tree">Using the Tree</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tree-config/index.html#search">Search</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tree-config/index.html#configuration">Configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tree-config/index.html#hidden-features">Hidden Features</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tree-config/index.html#topics">Topics</a></li>
 </ul>
 
 <p class="caption" role="heading">
@@ -146,7 +165,11 @@ Content on this topic
 </p>
 
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="common/index.html">Common</a></li>
+<li class="toctree-l1"><a class="reference internal" href="common/index.html">Topics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="common/index.html#switching-editors">Switching Editors</a></li>
+<li class="toctree-l1"><a class="reference internal" href="common/index.html#settings">Settings</a></li>
+<li class="toctree-l1"><a class="reference internal" href="common/index.html#behind-the-scenes-helpful-behaviors">Behind the Scenes (Helpful Behaviors)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="common/index.html#sidebar-analog-attach-panel">Sidebar (Analog Attach Panel)</a></li>
 </ul>
 
 <p class="caption" role="heading">
@@ -154,7 +177,8 @@ Content on this topic
 </p>
 
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="debugging/index.html">Debugging and Common Issues</a></li>
+<li class="toctree-l1"><a class="reference internal" href="debugging/index.html">Topics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="debugging/index.html#logs">Logs</a></li>
 </ul>
 
 
@@ -172,73 +196,52 @@ Content on this topic
             
   <section id="analog-attach">
 <h1>Analog Attach<a class="headerlink" href="#analog-attach" title="Link to this heading"></a></h1>
-<div class="admonition important">
-<p class="admonition-title">Important</p>
-<p>Analog Attach requires a valid Linux kernel repository (for example,
-<code class="docutils literal notranslate"><span class="pre">analogdevicesinc/linux</span></code>) to be configured in settings before the
-extension can function.</p>
-</div>
-<p>The System Level documentation provides developers using Analog Devices
-products with software and documentation, including HDL interface code,
-software drivers, and reference project examples for FPGA connectivity.
-It also contains user guides for some Analog Devices evaluation boards to help
-developers get up and running fast.</p>
-<section id="getting-the-extension">
-<h2>Getting the Extension<a class="headerlink" href="#getting-the-extension" title="Link to this heading"></a></h2>
-<p>Analog Attach can be installed in two ways:</p>
-<ol class="arabic simple">
-<li><p>VS Code Marketplace (upcoming).</p></li>
-<li><p>From a VSIX built by this project:</p>
-<ul class="simple">
-<li><p>Download a VSIX from the project build artifacts.</p></li>
-<li><p>In VS Code, open the Extensions view, click the three‑dot menu, and select
-<code class="docutils literal notranslate"><span class="pre">Install</span> <span class="pre">from</span> <span class="pre">VSIX...</span></code>.</p></li>
-<li><p>Choose the downloaded VSIX file to install.</p></li>
-</ul>
-</li>
-</ol>
-</section>
 <section id="contents">
 <h2>Contents<a class="headerlink" href="#contents" title="Link to this heading"></a></h2>
 <div class="toctree-wrapper compound">
+<p class="caption" role="heading"><span class="caption-text">How to install</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="install-steps/index.html">Requirements</a></li>
+<li class="toctree-l1"><a class="reference internal" href="install-steps/index.html#getting-the-extension">Getting the Extension</a></li>
+</ul>
+</div>
+<div class="toctree-wrapper compound">
 <p class="caption" role="heading"><span class="caption-text">Plug and Play View</span></p>
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="plug-and-play/index.html">Plug and Play View</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="plug-and-play/index.html#overview">Overview</a></li>
-<li class="toctree-l2"><a class="reference internal" href="plug-and-play/index.html#setup-merge-dts-into-dtso">Setup (Merge DTS Into DTSO)</a></li>
-<li class="toctree-l2"><a class="reference internal" href="plug-and-play/index.html#adding-devices">Adding Devices</a></li>
-<li class="toctree-l2"><a class="reference internal" href="plug-and-play/index.html#selecting-a-parent">Selecting a Parent</a></li>
-<li class="toctree-l2"><a class="reference internal" href="plug-and-play/index.html#managing-the-device">Managing the Device</a></li>
-<li class="toctree-l2"><a class="reference internal" href="plug-and-play/index.html#channels">Channels</a></li>
-<li class="toctree-l2"><a class="reference internal" href="plug-and-play/index.html#configuration-and-validation">Configuration and Validation</a></li>
-<li class="toctree-l2"><a class="reference internal" href="plug-and-play/index.html#topics">Topics</a></li>
-</ul>
-</li>
+<li class="toctree-l1"><a class="reference internal" href="plug-and-play/index.html">Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="plug-and-play/index.html#setup-merge-dts-into-dtso">Setup (Merge DTS Into DTSO)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="plug-and-play/index.html#adding-devices">Adding Devices</a></li>
+<li class="toctree-l1"><a class="reference internal" href="plug-and-play/index.html#selecting-a-parent">Selecting a Parent</a></li>
+<li class="toctree-l1"><a class="reference internal" href="plug-and-play/index.html#managing-the-device">Managing the Device</a></li>
+<li class="toctree-l1"><a class="reference internal" href="plug-and-play/index.html#channels">Channels</a></li>
+<li class="toctree-l1"><a class="reference internal" href="plug-and-play/index.html#configuration-and-validation">Configuration and Validation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="plug-and-play/index.html#topics">Topics</a></li>
 </ul>
 </div>
 <div class="toctree-wrapper compound">
 <p class="caption" role="heading"><span class="caption-text">Tree Config View</span></p>
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="tree-config/index.html">Tree Config View</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="tree-config/index.html#overview">Overview</a></li>
-<li class="toctree-l2"><a class="reference internal" href="tree-config/index.html#using-the-tree">Using the Tree</a></li>
-<li class="toctree-l2"><a class="reference internal" href="tree-config/index.html#search">Search</a></li>
-<li class="toctree-l2"><a class="reference internal" href="tree-config/index.html#configuration">Configuration</a></li>
-<li class="toctree-l2"><a class="reference internal" href="tree-config/index.html#hidden-features">Hidden Features</a></li>
-<li class="toctree-l2"><a class="reference internal" href="tree-config/index.html#topics">Topics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tree-config/index.html">Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tree-config/index.html#using-the-tree">Using the Tree</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tree-config/index.html#search">Search</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tree-config/index.html#configuration">Configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tree-config/index.html#hidden-features">Hidden Features</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="tree-config/index.html#go-to-node">Go To Node</a></li>
 </ul>
 </li>
+<li class="toctree-l1"><a class="reference internal" href="tree-config/index.html#topics">Topics</a></li>
 </ul>
 </div>
 <div class="toctree-wrapper compound">
 <p class="caption" role="heading"><span class="caption-text">Common</span></p>
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="common/index.html">Common</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="common/index.html#topics">Topics</a></li>
-<li class="toctree-l2"><a class="reference internal" href="common/index.html#switching-editors">Switching Editors</a></li>
-<li class="toctree-l2"><a class="reference internal" href="common/index.html#settings">Settings</a></li>
-<li class="toctree-l2"><a class="reference internal" href="common/index.html#behind-the-scenes-helpful-behaviors">Behind the Scenes (Helpful Behaviors)</a></li>
-<li class="toctree-l2"><a class="reference internal" href="common/index.html#sidebar-analog-attach-panel">Sidebar (Analog Attach Panel)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="common/index.html">Topics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="common/index.html#switching-editors">Switching Editors</a></li>
+<li class="toctree-l1"><a class="reference internal" href="common/index.html#settings">Settings</a></li>
+<li class="toctree-l1"><a class="reference internal" href="common/index.html#behind-the-scenes-helpful-behaviors">Behind the Scenes (Helpful Behaviors)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="common/index.html#sidebar-analog-attach-panel">Sidebar (Analog Attach Panel)</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="common/index.html#buttons">Buttons</a></li>
+<li class="toctree-l2"><a class="reference internal" href="common/index.html#remote-settings">Remote Settings</a></li>
 </ul>
 </li>
 </ul>
@@ -246,11 +249,8 @@ developers get up and running fast.</p>
 <div class="toctree-wrapper compound">
 <p class="caption" role="heading"><span class="caption-text">Debugging and Common Issues</span></p>
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="debugging/index.html">Debugging and Common Issues</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="debugging/index.html#topics">Topics</a></li>
-<li class="toctree-l2"><a class="reference internal" href="debugging/index.html#logs">Logs</a></li>
-</ul>
-</li>
+<li class="toctree-l1"><a class="reference internal" href="debugging/index.html">Topics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="debugging/index.html#logs">Logs</a></li>
 </ul>
 </div>
 </section>
@@ -261,7 +261,7 @@ developers get up and running fast.</p>
               <div class="related">
                 &nbsp;
     <div></div>
-    <a href="plug-and-play/index.html" title="Next document (Alt+Shift+RightArrow)" class="next">Plug and Play View</a>
+    <a href="install-steps/index.html" title="Next document (Alt+Shift+RightArrow)" class="next">Requirements</a>
               </div>
           
         </div>
