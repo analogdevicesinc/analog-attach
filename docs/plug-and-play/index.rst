@@ -1,11 +1,8 @@
-Plug and Play View
-==================
+Overview
+--------
 
 This section covers the Plug and Play editor experience. Content will be
 expanded step by step.
-
-Overview
---------
 
 The Plug and Play view is a minimal, more user friendly editor with more limited
 control. For advanced or fine-grained control, use the Tree Config View instead:

@@ -1,10 +1,7 @@
-Common
-======
-
-This section contains shared workflows and UI concepts.
-
 Topics
 ------
+
+This section contains shared workflows and UI concepts.
 
 - Commands and command palette
 - Left side panel

@@ -1,11 +1,8 @@
-Tree Config View
-================
+Overview
+--------
 
 This section covers the Tree Config (advanced) editor. Content will be
 expanded step by step.
-
-Overview
---------
 
 The Tree Config view is the default editor for ``.dts`` files. It displays the
 full device tree structure for the opened file.
