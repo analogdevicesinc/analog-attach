@@ -153,10 +153,18 @@ export function activate(context: vscode.ExtensionContext) {
             const config = vscode.workspace.getConfiguration('analog-attach');
             const compileCommand = config.get<string>('compileDtsFileCommand', 'dtc -O dtb -I dts');
 
-            // Determine output file path (replace .dts/.dtso with .dtb)
+            // Determine output file path (replace .dts/.dtso with .dtb/.dtbo)
             const fileDirectory = path.dirname(filePath);
             const baseName = path.basename(filePath, fileExtension);
-            const outputPath = path.join(fileDirectory, `${baseName}.${fileExtension === ".dts" ? "dtb" : "dtbo"}`);
+            let outputExtension: string;
+
+            if (fileExtension === ".dtso") {
+                outputExtension = "dtbo";
+            } else {
+                const fileContent = fs.readFileSync(filePath, 'utf8');
+                outputExtension = /\/plugin\//.test(fileContent) ? "dtbo" : "dtb";
+            }
+            const outputPath = path.join(fileDirectory, `${baseName}.${outputExtension}`);
 
             // Show progress notification
             await vscode.window.withProgress({
@@ -431,10 +439,10 @@ export function activate(context: vscode.ExtensionContext) {
 
     const navigateBack = vscode.commands.registerCommand('analog-attach.navigateBack', () => {
         const panel = dtsProvider.getActivePanel()
-        if(!panel) {
+        if (!panel) {
             return;
         }
-        
+
         panel?.webview.postMessage({
             command: NavigationCommands.navigateBack,
             type: 'notification',
@@ -444,7 +452,7 @@ export function activate(context: vscode.ExtensionContext) {
 
     const navigateForward = vscode.commands.registerCommand('analog-attach.navigateForward', () => {
         const panel = dtsProvider.getActivePanel()
-        if(!panel) {
+        if (!panel) {
             return;
         }
 
