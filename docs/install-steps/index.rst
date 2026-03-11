@@ -22,7 +22,7 @@ Getting the Extension
 
 Analog Attach can be installed in two ways:
 
-1. VS Code Marketplace (upcoming).
+1. `VS Code Marketplace <https://marketplace.visualstudio.com/items?itemName=AnalogDevices.analog-attach&ssr=false#review-details>`__
 2. From a VSIX built by this project:
 
    - Download a VSIX from the project build artifacts.
