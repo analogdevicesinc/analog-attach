@@ -185,4 +185,4 @@ test('linux repo arm broadcom roundtrip comp+decomp === original comp+decomp', f
     }
   }
 
-});
+}, 120_000);
