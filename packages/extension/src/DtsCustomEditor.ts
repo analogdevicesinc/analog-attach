@@ -186,7 +186,7 @@ export class DtsCustomEditorProvider implements vscode.CustomTextEditorProvider 
                     <h1>DTS Editor</h1>
                     <div class="error-message">${message}</div>
                     <div class="instructions">
-                        Use Ctrl+Shift+P and run "Attach Linux Repo" to initialize the device tree session.
+                        Something did not initialize correctly, please reopen the file and if the issue persists, contact the developers at https://github.com/analogdevicesinc/analog-attach/issues/new
                     </div>
                 </div>
             </body>
