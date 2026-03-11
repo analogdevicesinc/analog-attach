@@ -11,6 +11,12 @@ Contents
    install-steps/index
 
 .. toctree::
+   :caption: Getting Started
+   :maxdepth: 2
+
+   my-first-dts/index
+
+.. toctree::
    :caption: Plug and Play View
    :maxdepth: 2
 
