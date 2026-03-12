@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useDeviceInstanceStore } from "../../../store/useDeviceInstanceStore";
-import { VscodeTextfield, VscodeSingleSelect, VscodeOption, VscodeLabel } from "hds-react";
+import { VscodeTextfield, VscodeSingleSelect, VscodeOption, VscodeLabel, VscodeTooltip } from "hds-react";
 import styles from "./DetailsSection.module.scss";
 import { useParentNodeStore } from "@/store";
 import { isValidAlias } from "attach-ui-lib";
@@ -106,18 +106,20 @@ export default function DetailsSection() {
 						<VscodeLabel>Alias</VscodeLabel>
 						<div className={styles.optionalBadge}>Optional</div>
 					</div>
-					<VscodeTextfield
-						type="text"
-						value={alias}
-						placeholder="Enter alias"
-						onInput={handleAliasChange}
-						invalid={aliasError}
-					/>
-					{aliasError && (
-						<div className={styles.errorBadge}>
-							Alias must start with a letter and contain only alphanumeric characters
-						</div>
-					)}
+					<VscodeTooltip label="The node alias allows properties to reference the node as a phandle reference." position="bottom">
+						<VscodeTextfield
+							type="text"
+							value={alias}
+							placeholder="Enter alias"
+							onInput={handleAliasChange}
+							invalid={aliasError}
+						/>
+						{aliasError && (
+							<div className={styles.errorBadge}>
+								Alias must start with a letter and contain only alphanumeric characters
+							</div>
+						)}
+					</VscodeTooltip>
 				</div>
 			</div>
 		</div>

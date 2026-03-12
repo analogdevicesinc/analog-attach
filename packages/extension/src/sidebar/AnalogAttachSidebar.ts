@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import * as path from "path";
+import * as path from "node:path";
 import { EventCommands } from "extension-protocol";
 import { EXTENSION_ID } from "../constants";
 import { AttachSessionManager } from "../AttachSession/AttachSessionManager";
@@ -206,7 +206,7 @@ export class AnalogAttachSidebarProvider implements vscode.WebviewViewProvider {
 <body>
   <div class="section">
     <h2>Commands</h2>
-    <button data-cmd="merge">Merge DTS into DTSO</button>
+    <button data-cmd="merge" title="Selects a DTS to be the parent of the DTSO. DTSO nodes can then be attached to DTS nodes, and DTS phandles used by the DTSO nodes.">Merge DTS into DTSO</button>
     <button data-cmd="compile">Compile Device Tree</button>
     <button data-cmd="deploy">Deploy Device Tree</button>
     <button data-cmd="openSettings">Open Settings</button>
