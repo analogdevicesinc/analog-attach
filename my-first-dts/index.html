@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta content="This tutorial walks you through creating your first device tree overlay using Analog Attach. By the end, you will have a working overlay that configures an AD7124-8 ADC on SPI, complete with clock and voltage regulator definitions." name="description" />
+
+    <title>My First DTS &#8212; Analog Attach  documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=8e8a900e" />
+    <link rel="stylesheet" type="text/css" href="../_static/app.min.css?v=a525f648" />
+    <script async="async" src="../_static/app.umd.js?v=fcf3088a"></script>
+    <link rel="icon" href="../_static/icon.svg"/>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Overview" href="../plug-and-play/index.html" />
+    <link rel="prev" title="Requirements" href="../install-steps/index.html" />
+   
+  
+  
+  <meta name="repository" content="documentation">
+  <meta name="version" content="">
+  
+    <meta name="page_source_suffix" content=".rst">
+  
+  
+  
+
+
+<style>
+  body {
+    
+  }
+
+  body.dark {
+    
+  }
+
+  @media (prefers-color-scheme: dark) {
+    body:not(.light) {
+      
+    }
+  }
+</style>
+  </head>
+  
+    <body>
+  
+  <input type="checkbox" id="input-show-toc">
+  <input type="checkbox" id="input-show-localtoc">
+  <input type="checkbox" id="input-show-repotoc">
+
+  
+  <div class="search-area">
+    <form action="" method="get">
+      <input type="text" name="q" aria-labelledby="search-documentation" value="" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" role="search" placeholder="Search"/>
+      <button class="icon"></button>
+    </form>
+  </div>
+  
+
+  <header>
+    <div id="left">
+      <label id="show-sidebar" class="icon" for="input-show-toc" title="Show/hide index"></label>
+    </div>
+    <div id="right">
+      <span>
+        <a id="logo-org" href="https://analog.com" aria-label="Analog Devices Inc. landing page"></a>
+        <div class="vertical-divider"></div>
+        
+        <label id="show-repotoc" for="input-show-repotoc" title="Show/hide docs" tabindex="0">Docs</label>
+        
+        <a id="logo" href="../index.html">
+          <div>System Level</div>
+        </a>
+      </span>
+      <span class="reverse">
+        <label id="show-localtoc" class="icon" for="input-show-localtoc" title="Show/hide contents"></label>
+      </span>
+    </div>
+  </header>
+
+
+  <div class="repotoc-tree overlay">
+    <root>
+  <a href="../index.html" class="current">System Level</a>
+</root>
+
+  </div>
+    <div class="localtoc">
+      <div class="tocwrapper">
+        <div class="header localtoc-header">
+          <a id="scroll-up" href="#top-anchor" title="Back to top"></a>
+        </div>
+        <nav>
+          <ul>
+<li><a class="reference internal" href="#">My First DTS</a><ul>
+<li><a class="reference internal" href="#final-result">Final Result</a></li>
+</ul>
+</li>
+</ul>
+
+        </nav>
+      </div>
+    </div>
+
+  
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+    <a id="no-logo" href="../index.html">
+      Analog Attach
+    </a><input id="input-switch-toc" type="checkbox">
+<label id="show-repotoc" for="input-switch-toc">
+All content
+</label>
+<label id="show-toc" for="input-switch-toc">
+Content on this topic
+</label>
+<div class="repotoc-tree">
+  <root>
+  <a href="../index.html" class="current">System Level</a>
+</root>
+
+</div>
+<div class="toc-tree">
+  <p class="caption" role="heading">
+  <span class="caption-text">How to install</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../install-steps/index.html">Requirements</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../install-steps/index.html#getting-the-extension">Getting the Extension</a></li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">Getting Started</span>
+</p>
+
+<ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">My First DTS</a></li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">Plug and Play View</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../plug-and-play/index.html">Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../plug-and-play/index.html#setup-merge-dts-into-dtso">Setup (Merge DTS Into DTSO)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../plug-and-play/index.html#adding-devices">Adding Devices</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../plug-and-play/index.html#selecting-a-parent">Selecting a Parent</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../plug-and-play/index.html#managing-the-device">Managing the Device</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../plug-and-play/index.html#channels">Channels</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../plug-and-play/index.html#configuration-and-validation">Configuration and Validation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../plug-and-play/index.html#topics">Topics</a></li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">Tree Config View</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../tree-config/index.html">Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tree-config/index.html#using-the-tree">Using the Tree</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tree-config/index.html#search">Search</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tree-config/index.html#configuration">Configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tree-config/index.html#hidden-features">Hidden Features</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tree-config/index.html#topics">Topics</a></li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">Common</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../common/index.html">Topics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../common/index.html#switching-editors">Switching Editors</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../common/index.html#settings">Settings</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../common/index.html#behind-the-scenes-helpful-behaviors">Behind the Scenes (Helpful Behaviors)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../common/index.html#sidebar-analog-attach-panel">Sidebar (Analog Attach Panel)</a></li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">Debugging and Common Issues</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../debugging/index.html">Topics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../debugging/index.html#logs">Logs</a></li>
+</ul>
+
+
+</div>
+        </div>
+      </div>
+
+  <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper" id="top-anchor">
+          <div class="body-header">
+  <nav class="breadcrumb empty"><ol></ol></nav>
+</div>
+          <div class="body" role="main">
+            
+  <section id="my-first-dts">
+<h1>My First DTS<a class="headerlink" href="#my-first-dts" title="Link to this heading"></a></h1>
+<p>This tutorial walks you through creating your first device tree overlay using
+Analog Attach. By the end, you will have a working overlay that configures an
+AD7124-8 ADC on SPI, complete with clock and voltage regulator definitions.</p>
+<p>The video below demonstrates the complete workflow for creating an AD7124 overlay
+using the Plug and Play editor.</p>
+<div class="embed-video"><video class="only-screen" controls="controls"><source src="https://raw.githubusercontent.com/analogdevicesinc/analog-attach/doc_resources/resources/ad7124-overlay-creation-with-AA.mp4" type="video/mp4"></source></video><span class="only-screen"><p>Step by step guide to creating a dtso file with Analog Attach</p>
+</span><div class="admonition video only-print"><p class="admonition-title">Video</p>
+<p>Step by step guide to creating a dtso file with Analog Attach</p>
+<p><a href="https://raw.githubusercontent.com/analogdevicesinc/analog-attach/doc_resources/resources/ad7124-overlay-creation-with-AA.mp4"><span>https://raw.githubusercontent.com/analogdevicesinc/analog-attach/doc_resources/resources/ad7124-overlay-creation-with-AA.mp4</span></a></p>
+</div></div><section id="final-result">
+<h2>Final Result<a class="headerlink" href="#final-result" title="Link to this heading"></a></h2>
+<p>After following the steps in the video, your <code class="docutils literal notranslate"><span class="pre">.dtso</span></code> file should look like this:</p>
+<div class="highlight-dts notranslate"><div class="highlight"><pre><span></span><span class="cp">/dts-v1/</span><span class="p">;</span>
+<span class="cp">/plugin/</span><span class="p">;</span>
+
+<span class="o">&amp;</span><span class="na">spi0</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kr">status</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;okay&quot;</span><span class="p">;</span>
+<span class="w">    </span><span class="nf">ad7124-8</span><span class="o">@</span><span class="mi">1</span><span class="cm"> </span><span class="p">{</span>
+<span class="w">        </span><span class="kr">status</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;okay&quot;</span><span class="p">;</span>
+<span class="w">        </span><span class="kr">compatible</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;adi,ad7124-8&quot;</span><span class="p">;</span>
+<span class="w">        </span><span class="kr">reg</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">&lt;</span><span class="mi">1</span><span class="o">&gt;</span><span class="p">;</span>
+<span class="w">        </span><span class="n">clocks</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">&lt;&amp;</span><span class="na">ad7124_mclk</span><span class="o">&gt;</span><span class="p">;</span>
+<span class="w">        </span><span class="n">clock-names</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;mclk&quot;</span><span class="p">;</span>
+<span class="w">        </span><span class="n">interrupts</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">&lt;</span><span class="mi">25</span><span class="w"> </span><span class="mi">2</span><span class="o">&gt;</span><span class="p">;</span>
+<span class="w">        </span><span class="n">interrupt-parent</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">&lt;&amp;</span><span class="na">gpio</span><span class="o">&gt;</span><span class="p">;</span>
+<span class="w">        </span><span class="n">refin1-supply</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">&lt;&amp;</span><span class="na">vref</span><span class="o">&gt;</span><span class="p">;</span>
+<span class="w">        </span><span class="n">spi-max-frequency</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">&lt;</span><span class="mi">500000</span><span class="o">&gt;</span><span class="p">;</span>
+
+<span class="w">        </span><span class="nf">channel</span><span class="o">@</span><span class="mi">0</span><span class="cm"> </span><span class="p">{</span>
+<span class="w">            </span><span class="kr">reg</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">&lt;</span><span class="mi">0</span><span class="o">&gt;</span><span class="p">;</span>
+<span class="w">            </span><span class="n">diff-channels</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">&lt;</span><span class="mi">0</span><span class="w"> </span><span class="mi">19</span><span class="o">&gt;</span><span class="p">;</span>
+<span class="w">        </span><span class="p">};</span>
+
+<span class="w">        </span><span class="nf">channel</span><span class="o">@</span><span class="mi">1</span><span class="cm"> </span><span class="p">{</span>
+<span class="w">            </span><span class="kr">reg</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">&lt;</span><span class="mi">1</span><span class="o">&gt;</span><span class="p">;</span>
+<span class="w">            </span><span class="n">diff-channels</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">&lt;</span><span class="mi">1</span><span class="w"> </span><span class="mi">19</span><span class="o">&gt;</span><span class="p">;</span>
+<span class="w">        </span><span class="p">};</span>
+<span class="w">    </span><span class="p">};</span>
+<span class="p">};</span>
+
+<span class="o">&amp;</span><span class="p">{</span><span class="o">/</span><span class="nf">clocks}</span><span class="cm"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kr">status</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;okay&quot;</span><span class="p">;</span>
+<span class="w">    </span><span class="nl">ad7124_mclk</span><span class="p">:</span><span class="w"> </span><span class="nf">fixed-clock</span><span class="cm"> </span><span class="p">{</span>
+<span class="w">        </span><span class="kr">status</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;okay&quot;</span><span class="p">;</span>
+<span class="w">        </span><span class="kr">compatible</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;fixed-clock&quot;</span><span class="p">;</span>
+<span class="w">        </span><span class="o">#</span><span class="n">clock-cells</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">&lt;</span><span class="mi">0</span><span class="o">&gt;</span><span class="p">;</span>
+<span class="w">        </span><span class="n">clock-frequency</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">&lt;</span><span class="mi">614400</span><span class="o">&gt;</span><span class="p">;</span>
+<span class="w">    </span><span class="p">};</span>
+<span class="p">};</span>
+
+<span class="o">&amp;</span><span class="p">{</span><span class="o">/</span><span class="nf">}</span><span class="cm"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kr">status</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;okay&quot;</span><span class="p">;</span>
+<span class="w">    </span><span class="nl">vref</span><span class="p">:</span><span class="w"> </span><span class="nf">regulator-fixed</span><span class="cm"> </span><span class="p">{</span>
+<span class="w">        </span><span class="kr">status</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;okay&quot;</span><span class="p">;</span>
+<span class="w">        </span><span class="kr">compatible</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;regulator-fixed&quot;</span><span class="p">;</span>
+<span class="w">        </span><span class="n">regulator-name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;fixed-supply&quot;</span><span class="p">;</span>
+<span class="w">        </span><span class="n">regulator-min-microvolt</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">&lt;</span><span class="mi">2500000</span><span class="o">&gt;</span><span class="p">;</span>
+<span class="w">        </span><span class="n">regulator-max-microvolt</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">&lt;</span><span class="mi">2500000</span><span class="o">&gt;</span><span class="p">;</span>
+<span class="w">        </span><span class="n">regulator-boot-on</span><span class="p">;</span>
+<span class="w">    </span><span class="p">};</span>
+<span class="p">};</span>
+</pre></div>
+</div>
+<p>This overlay:</p>
+<ul class="simple">
+<li><p>Attaches an AD7124-8 ADC to <code class="docutils literal notranslate"><span class="pre">spi0</span></code> at chip select 1</p></li>
+<li><p>Configures two differential input channels</p></li>
+<li><p>Defines a fixed clock source for the ADC</p></li>
+<li><p>Creates a fixed voltage regulator for the reference input</p></li>
+</ul>
+</section>
+</section>
+
+
+          </div>
+              <div class="related">
+                &nbsp;
+    <a href="../install-steps/index.html" title="Previous document (Alt+Shift+LeftArrow)" class="prev">Requirements</a>
+    <a href="../plug-and-play/index.html" title="Next document (Alt+Shift+RightArrow)" class="next">Overview</a>
+              </div>
+          
+        </div>
+      </div>
+  </div>
+
+  <label id="cancel-area-show-toc" for="input-show-toc"></label>
+  <label id="cancel-area-show-localtoc" for="input-show-localtoc"></label>
+    <footer>
+      &#169;2025, Analog Devices, Inc.
+      
+      |
+      Made with <a href="https://www.sphinx-doc.org/">Sphinx</a>
+      &amp; <a href="https://github.com/analogdevicesinc/doctools">Doctools</a>
+      
+    </footer>
+  </body>
+</html>
