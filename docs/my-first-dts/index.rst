@@ -8,12 +8,9 @@ AD7124-8 ADC on SPI, complete with clock and voltage regulator definitions.
 The video below demonstrates the complete workflow for creating an AD7124 overlay
 using the Plug and Play editor.
 
-.. raw:: html
+.. video:: https://raw.githubusercontent.com/analogdevicesinc/analog-attach/doc_resources/resources/ad7124-overlay-creation-with-AA.mp4
 
-   <video width="100%" controls>
-     <source src="https://raw.githubusercontent.com/analogdevicesinc/analog-attach/doc_resources/resources/ad7124-overlay-creation-with-AA.mp4" type="video/mp4">
-     Your browser does not support the video tag.
-   </video>
+   Step by step guide to creating a dtso file with Analog Attach
 
 Final Result
 ------------
