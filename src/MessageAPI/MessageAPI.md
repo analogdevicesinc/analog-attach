@@ -2,8 +2,7 @@
 
 ## Overview
 
-This document defines the message API for communication between the Analog Attach Visual Studio Code Extension frontend and backend. The API targets the
-PlugAndPlay version of Analog Attach.
+This document defines the message API for communication between the Analog Attach Visual Studio Code Extension frontend and backend. The API is used by both the Plug and Play editor and the Advanced Device Tree Editor.
 
 ## Table of Contents
 
@@ -19,29 +18,43 @@ PlugAndPlay version of Analog Attach.
   - [3. Device Management](#3-device-management)
     - [Get Potential Parent Nodes](#get-potential-parent-nodes)
     - [Set Parent Node](#set-parent-node)
+    - [Set Node Active](#set-node-active)
     - [Delete Device](#delete-device)
   - [4. Configuration Management](#4-configuration-management)
     - [Get Device Configuration](#get-device-configuration)
     - [Update Device Configuration](#update-device-configuration)
-  - [5. File System Events](#5-file-system-events)
+  - [5. Tree View](#5-tree-view)
+    - [Get Device Tree](#get-device-tree)
+  - [6. Settings Management](#6-settings-management)
+    - [Get Setting](#get-setting)
+    - [Update Setting](#update-setting)
+  - [7. Event Notifications](#7-event-notifications)
     - [File Changed Notification](#file-changed-notification)
+  - [8. Navigation Notifications](#8-navigation-notifications)
+    - [Navigate Back](#navigate-back)
+    - [Navigate Forward](#navigate-forward)
 - [Data Types](#data-types)
   - [Device](#device)
   - [ParentNode](#parentnode)
   - [Attached Device](#attached-device)
+  - [Device Channel Summary](#device-channel-summary)
   - [Validation Types](#validation-types)
     - [Numeric Range Validation](#numeric-range-validation)
     - [Dropdown Validation](#dropdown-validation)
-    - [Array Length Validation](#array-length-validation)
+    - [Array Validation](#array-validation)
+      - [Array Number Validation](#array-number-validation)
+      - [Array String Validation](#array-string-validation)
+      - [Array Hyperlink Validation](#array-hyperlink-validation)
+      - [Array Mixed Type Validation](#array-mixed-type-validation)
     - [Matrix Validation](#matrix-validation)
   - [FormElement Types](#formelement-types)
     - [Flag](#flag)
     - [FormArray](#formarray)
     - [FormMatrix](#formmatrix)
     - [Generic](#generic)
-    - [ChooseOne](#chooseone)
     - [FormObject](#formobject)
-    - [CustomProperty](#customproperty)
+    - [Custom Properties](#custom-properties)
+  - [Device Configuration Form Object](#device-configuration-form-object)
   - [Error (Configuration Item)](#error-configuration-item)
 
 ## Message Structure
@@ -121,26 +134,27 @@ Retrieves the current state of all attached devices in the session.
 {
     "data": [
         {
-            "device": {
-                "id": "string",
-                "name": "string",
-                "deviceUID": "string",
-                "alias": "string",
-                "active": "boolean",
-                "hasErrors": "boolean",
-                "parentNode": {
-                    "ID": "string",
-                    "name": "string"
-                },
-                "maxChannels": "number",
-                "channels": [
-                    {
-                        "name": "string",
-                        "alias": "string",
-                        "hasErrors": "boolean"
-                    }
-                ]
-            }
+            "type": "AttachedDeviceState",
+            "compatible": "string",         // e.g., "adi,ad7124-8"
+            "deviceUID": "string",          // UUID of the device instance
+            "name": "string",               // Device name
+            "alias": "string",              // [OPTIONAL] Custom alias for the device
+            "active": "boolean",            // [OPTIONAL] Whether the device is active
+            "isExpanded": "boolean",        // [OPTIONAL] UI state for tree expansion
+            "hasErrors": "boolean",         // Whether the device configuration has errors
+            "hasChannels": "boolean",       // Whether the device has channel support
+            "parentNode": {
+                "uuid": "string",           // UUID of the parent node
+                "name": "string"            // Parent node name
+            },
+            "maxChannels": "number",        // [OPTIONAL] Maximum number of channels supported
+            "channels": [
+                {
+                    "name": "string",       // Channel name
+                    "alias": "string",      // Channel alias
+                    "hasErrors": "boolean"  // Whether the channel has errors
+                }
+            ]
         }
     ]
 }
@@ -192,8 +206,8 @@ Retrieves the list of potential parent nodes where a specific device can be atta
 {
     "potentialParentNodes": [
         {
-            "name": "string",    // e.g., "spi0"
-            "ID": "string"       // e.g., "spi0-0"
+            "uuid": "string",    // UUID of the parent node
+            "name": "string"     // Parent node name (e.g., "spi0")
         }
     ]
 }
@@ -208,7 +222,10 @@ Attaches a device to a specified parent node.
 ```json
 {
     "deviceId": "string",      // Device identifier (e.g., "adi,ad7124-8")
-    "parentNodeId": "string"   // Parent node identifier (e.g., "spi0-0")
+    "parentNode": {            // Parent node object
+        "uuid": "string",      // UUID of the parent node
+        "name": "string"       // Parent node name
+    }
 }
 ```
 
@@ -217,7 +234,30 @@ Attaches a device to a specified parent node.
 - **Payload:**
 ```json
 {
-    "deviceUID": "string"      // Unique identifier for the attached device instance
+    "deviceUID": "string"      // Unique identifier for the attached device instance (UUID)
+}
+```
+
+#### Set Node Active
+Sets the active state of a device node.
+
+**Frontend Request:**
+- **Command:** `device.setNodeActive`
+- **Payload:**
+```json
+{
+    "uuid": "string",          // Device UID (UUID)
+    "active": "boolean"        // New active state
+}
+```
+
+**Backend Response:**
+- **Status:** `success | error`
+- **Payload:**
+```json
+{
+    "uuid": "string",          // Device UID (UUID)
+    "active": "boolean"        // Confirmed active state
 }
 ```
 
@@ -287,23 +327,11 @@ deviceConfiguration
         │
         ├── Generic (for basic input elements)
         │   ├── key (property identifier)
-        │   ├── inputType (text, number, dropdown, etc.)
+        │   ├── inputType (text, number, dropdown, custom, custom-flag)
         │   ├── required
         │   ├── setValue (current value)
         │   ├── defaultValue (optional)
         │   ├── validationType (optional)
-        │   └── error (optional)
-        │
-        ├── ChooseOne (for mutually exclusive property selection)
-        │   ├── key (instance identifier, e.g., "ChooseOne@0")
-        │   ├── required
-        │   ├── setValue (selected property key, optional)
-        │   ├── config (array of form elements to choose from)
-        │   └── error (optional)
-        │
-        ├── CustomProperty (for specialized property handling)
-        │   ├── key (property identifier)
-        │   ├── setValue (current string value)
         │   └── error (optional)
         │
         └── FormObject
@@ -332,95 +360,225 @@ deviceConfiguration
 ```json
 {
     "deviceConfiguration": {
-        "devConfiSpecificProperty": "any",    // [OPTIONAL] One or more device configuration specific properties
-        "config": {                           // FormObject containing all form elements
-            "alias": "string",                // [OPTIONAL] Device alias
-            "active": "boolean",              // [OPTIONAL] Device active state
-            "maxChannels": "number",          // [OPTIONAL] Maximum channels
-            "channelRegexes": string[],       // [OPTIONAL] Array of name property patterns
-            "config": [                       // Array of FormElement discriminated union
+        "config": {                                   // DeviceConfigurationFormObject
+            "type": "DeviceConfigurationFormObject",
+            "alias": "",                              // [OPTIONAL] Device alias
+            "active": true,                           // [OPTIONAL] Device active state (used for initial read only)
+            "parentNode": {                           // Parent node information (NOTE: if different from current parent, backend will move the node first)
+                "uuid": "041a0470-bf3d-4596-aca9-fb5b62e94174",  // UUID of the parent node
+                "name": "spi"                         // Parent node name
+            },
+            "channelRegexes": ["^channel@([0-9]|1[0-5])$"],  // [OPTIONAL] Regex patterns for channel names
+            "generatedChannelRegexEntries": [         // [OPTIONAL] Pre-generated channel name options for dropdown
+                "channel@0", "channel@1", "channel@2", "channel@3",
+                "channel@4", "channel@5", "channel@6", "channel@7"
+            ],
+            "genericErrors": [],                      // [OPTIONAL] Global configuration errors not tied to specific form elements
+            "config": [                               // Array of FormElement discriminated union
                 {
-                    "type": "Flag",           // FormElement type for boolean properties
-                    "key": "active",          // Property identifier
-                    "required": false,        // Whether the property is required to be configured or not
-                    "setValue": true,         // [OPTIONAL] The value that the property was set to
-                    "defaultValue": false,    // [OPTIONAL] The default property value
-                    "error": {                // [OPTIONAL] present only when property invalid
-                        "code": "string",
-                        "message": "string",
-                        "details": "string"
-                    }
-                },
-                {
-                    "type": "Generic",          // FormElement type for basic input elements
-                    "key": "compatible",        // Property identifier
-                    "inputType": "text",        // The type of data that the generic form element accepts
-                    "required": true,           // Whether the property is required to be configured or not
-                    "setValue": "adi,ad7124-8", // [OPTIONAL]
-                    "defaultValue": "",         // [OPTIONAL]
-                    "validationType": {         // [OPTIONAL]
-                        "list": ["adi,ad7124-8", "adi,ad7124-4"]
-                    }
-                },
-                {
-                    "type": "FormArray",      // FormElement type for array properties - Needs more work!
-                    "key": "reg",
+                    "type": "FormArray",              // Note: 'compatible' is FormArray, not Generic
+                    "key": "compatible",
                     "required": true,
-                    "setValue": [0],
-                    "defaultValue": [],
+                    "setValue": ["adi,ad7124-8"],
                     "validationType": {
+                        "type": "ArrayStringValidation",
                         "minLength": 1,
                         "maxLength": 1,
-                        "minValue": 0
+                        "enum": ["adi,ad7124-4", "adi,ad7124-8"],
+                        "enumType": "string"
                     }
                 },
                 {
-                    "type": "FormMatrix",     // FormElement type for matrix properties (array of arrays)
-                    "key": "interrupts",
-                    "required": false,
-                    "setValue": [
-                        [57, "IRQ_TYPE_EDGE_FALLING"],
-                        [58, "IRQ_TYPE_EDGE_FALLING"]
-                    ],
+                    "type": "FormMatrix",             // Note: 'reg' is FormMatrix (array of arrays)
+                    "key": "reg",
+                    "required": true,
+                    "description": "SPI chip select number for the device",
+                    "setValue": [["0"]],              // Matrix format: [[value]]
                     "validationType": {
                         "minRows": 1,
-                        "maxRows": 8,
-                        "minColumns": 2,
-                        "maxColumns": 2,
-                        "columnValidation": [
-                            {
-                                "columnIndex": 0,
-                                "validationType": {
-                                    "minValue": 0,
-                                    "maxValue": 255
+                        "maxRows": 1,
+                        "definition": {
+                            "type": "ArrayNumberValidation",
+                            "minLength": 1,
+                            "maxLength": 1,
+                            "minValue": 0,
+                            "maxValue": 256
+                        }
+                    }
+                },
+                {
+                    "type": "FormMatrix",
+                    "key": "clocks",
+                    "required": true,
+                    "validationType": {
+                        "minRows": 1,
+                        "maxRows": 1,
+                        "definition": {
+                            "type": "ArrayMixedTypeValidation",
+                            "minPrefixItems": 1,
+                            "maxPrefixItems": 1,
+                            "prefixItems": [
+                                {
+                                    "type": "StringList",
+                                    "enum": ["clk_osc", "clk_usb", "clk_27MHz", "clk_108MHz", "cam1_clk", "cam0_clk"],
+                                    "enumType": "phandle"
                                 }
-                            },
-                            {
-                                "columnIndex": 1,
-                                "validationType": {
-                                    "list": ["IRQ_TYPE_NONE", "IRQ_TYPE_EDGE_RISING", "IRQ_TYPE_EDGE_FALLING"]
-                                }
-                            }
+                            ]
+                        }
+                    },
+                    "error": {                        // Example of validation error
+                        "code": "missing_required",
+                        "message": "must have required property 'clocks'",
+                        "details": "Missing required property clocks"
+                    }
+                },
+                {
+                    "type": "FormArray",
+                    "key": "clock-names",
+                    "required": true,
+                    "defaultValue": ["mclk"],
+                    "validationType": {
+                        "type": "ArrayStringValidation",
+                        "minLength": 1,
+                        "maxLength": 1,
+                        "enum": ["mclk"],
+                        "enumType": "string"
+                    },
+                    "error": {
+                        "code": "missing_required",
+                        "message": "must have required property 'clock-names'",
+                        "details": "Missing required property clock-names"
+                    }
+                },
+                {
+                    "type": "FormArray",
+                    "key": "interrupts",
+                    "required": true,
+                    "description": "IRQ line for the ADC",
+                    "validationType": {
+                        "type": "ArrayStringValidation",
+                        "minLength": 1,
+                        "maxLength": 1
+                    },
+                    "error": {
+                        "code": "missing_required",
+                        "message": "must have required property 'interrupts'",
+                        "details": "Missing required property interrupts"
+                    }
+                },
+                {
+                    "type": "FormArray",
+                    "key": "interrupt-parent",
+                    "required": false,
+                    "validationType": {
+                        "type": "ArrayHyperlinkValidation",
+                        "minLength": 1,
+                        "maxLength": 1,
+                        "enum": [
+                            {"type": "HyperlinkItem", "name": "gpio", "gotoUID": "d2c2cee1-9125-400b-aa4b-8f80341d6c91"},
+                            {"type": "HyperlinkItem", "name": "gicv2", "gotoUID": "65ae6687-90f0-475b-b39e-214fdeb2e202"},
+                            {"type": "HyperlinkItem", "name": "aon_intr", "gotoUID": "ed523353-643b-43e6-a1b0-cb6e6fda392c"}
                         ]
                     }
+                },
+                {
+                    "type": "Generic",
+                    "key": "#address-cells",
+                    "inputType": "dropdown",
+                    "required": false,
+                    "validationType": {
+                        "type": "DropdownValidation",
+                        "list": [1]
+                    }
+                },
+                {
+                    "type": "FormArray",
+                    "key": "refin1-supply",
+                    "required": false,
+                    "validationType": {
+                        "type": "ArrayHyperlinkValidation",
+                        "minLength": 1,
+                        "maxLength": 1,
+                        "enum": [
+                            {"type": "HyperlinkItem", "name": "sd_vcc_reg", "gotoUID": "413be033-616e-44c3-a75e-0d88d0ccbc26"},
+                            {"type": "HyperlinkItem", "name": "vdd_3v3_reg", "gotoUID": "66f42821-104c-4e96-a2b3-7bfaf03ff455"}
+                        ]
+                    }
+                },
+                {
+                    "type": "Flag",
+                    "key": "spi-cs-high",
+                    "required": false,
+                    "defaultValue": false,
+                    "description": "The device requires the chip select active high."
+                },
+                {
+                    "type": "Generic",
+                    "key": "spi-max-frequency",
+                    "inputType": "number",
+                    "required": false,
+                    "description": "Maximum SPI clocking speed of the device in Hz.",
+                    "defaultValue": null,
+                    "validationType": {
+                        "type": "NumericRangeValidation",
+                        "minValue": 0,
+                        "maxValue": 4294967295
+                    }
+                },
+                {
+                    "type": "FormArray",
+                    "key": "spi-cs-setup-delay-ns",
+                    "required": false,
+                    "description": "Delay in nanoseconds to be introduced by the controller after CS is asserted.",
+                    "validationType": {
+                        "type": "ArrayNumberValidation",
+                        "minLength": 1,
+                        "maxLength": 1,
+                        "minValue": "0",              // Note: Large value as string
+                        "maxValue": "4294967295"      // Note: Large value as string
+                    }
+                },
+                {
+                    "type": "Generic",
+                    "key": "spi-rx-bus-width",
+                    "inputType": "dropdown",
+                    "required": false,
+                    "description": "Bus width to the SPI bus used for read transfers.",
+                    "defaultValue": 1,
+                    "validationType": {
+                        "type": "DropdownValidation",
+                        "list": [0, 1, 2, 4, 8]
+                    }
+                },
+                {
+                    "type": "FormObject",
+                    "key": "controller-data",
+                    "required": false,
+                    "config": [
+                        {
+                            "type": "Generic",
+                            "key": "samsung,spi-feedback-delay",
+                            "inputType": "dropdown",
+                            "required": false,
+                            "description": "The sampling phase shift to be applied on the miso line",
+                            "defaultValue": 0,
+                            "validationType": {
+                                "type": "DropdownValidation",
+                                "list": [0, 1, 2, 3]
+                            }
+                        }
+                    ]
                 },
                 {
                     "type": "FormObject",
                     "key": "channel@0",
                     "required": false,
+                    "channelName": "channel0",        // [OPTIONAL] Channel name matching a regex from channelRegexes
+                    "alias": "MyChannel",             // [OPTIONAL] Channel alias
                     "config": [
                         {
                             "type": "Flag",
-                            "key": "deviceAttached",
-                            "label": "Channel Attached",
-                            "required": false,
-                            "setValue": true,
-                            "defaultValue": false
-                        },
-                        {
-                            "type": "Flag",
                             "key": "bipolar",
-                            "label": "Bipolar Mode",
                             "required": false,
                             "setValue": false,
                             "defaultValue": true
@@ -428,53 +586,13 @@ deviceConfiguration
                         {
                             "type": "Generic",
                             "key": "adi,reference-select",
-                            "label": "Reference Select",
                             "inputType": "dropdown",
                             "required": false,
                             "setValue": 0,
                             "defaultValue": 0,
                             "validationType": {
+                                "type": "DropdownValidation",
                                 "list": [0, 1, 3]
-                            }
-                        }
-                    ]
-                },
-                {
-                    "type": "ChooseOne",         // FormElement type for choosing between multiple properties
-                    "key": "voltage-reference",  // Name of the ChooseOne instance
-                    "required": false,           // Whether it is required to make a selection
-                    "setValue": "refin1-supply", // [OPTIONAL] The key of the currently selected property
-                    "description": "Select one voltage reference source for the device",
-                    "config": [                  // Array of FormElement options to choose from
-                        {
-                            "type": "Generic",
-                            "key": "refin1-supply",
-                            "inputType": "dropdown",
-                            "required": false,
-                            "setValue": "vref",
-                            "defaultValue": "undefined",
-                            "validationType": {
-                                "list": ["vref", "sd_vcc_reg"]
-                            }
-                        },
-                        {
-                            "type": "Generic",
-                            "key": "refin2-supply",
-                            "inputType": "dropdown",
-                            "required": false,
-                            "defaultValue": "undefined",
-                            "validationType": {
-                                "list": ["vref", "sd_vcc_reg"]
-                            }
-                        },
-                        {
-                            "type": "Generic",
-                            "key": "avdd-supply",
-                            "inputType": "dropdown",
-                            "required": false,
-                            "defaultValue": "undefined",
-                            "validationType": {
-                                "list": ["vref", "sd_vcc_reg"]
                             }
                         }
                     ]
@@ -496,13 +614,22 @@ Updates the configuration of an attached device with new property values. The fr
 
 ```json
 {
-    "deviceUID": "string",                    // Unique identifier of the device instance
-    "config": {                               // FormObject containing updated form elements
+    "deviceUID": "string",                    // Unique identifier of the device instance (UUID)
+    "config": {                               // DeviceConfigurationFormObject with updated values
+        "type": "DeviceConfigurationFormObject",
+        "alias": "string",                    // [OPTIONAL] Updated device alias
+        "active": true,                       // [OPTIONAL] Updated device active state
+        "maxChannels": 8,                     // [OPTIONAL] Maximum channels
+        "parentNode": {                       // Parent node (if different, backend will move the node)
+            "uuid": "string",
+            "name": "string"
+        },
+        "channelRegexes": ["channel@[0-7]"], // [OPTIONAL]
         "config": [                           // Array of FormElement updates
             {
-                "type": "Flag",               // FormElement type
-                "key": "active",              // Property identifier
-                "setValue": true              // New configured value
+                "type": "Flag",
+                "key": "active",
+                "setValue": true
             },
             {
                 "type": "Generic",
@@ -526,6 +653,8 @@ Updates the configuration of an attached device with new property values. The fr
             {
                 "type": "FormObject",
                 "key": "channel@0",
+                "channelName": "channel0",
+                "alias": "MyChannel",
                 "config": [
                     {
                         "type": "Flag",
@@ -543,24 +672,8 @@ Updates the configuration of an attached device with new property values. The fr
                         "setValue": 1
                     }
                 ]
-            },
-            {
-                "type": "ChooseOne",
-                "key": "voltage-reference",
-                "setValue": "refin1-supply",
-                "config": [
-                    {
-                        "type": "Generic",
-                        "key": "refin1-supply",
-                        "setValue": "vref"
-                    }
-                ]
             }
         ]
-    },
-    "parentNode": {
-        "ID": "string",       // Parent node ID
-        "name": "string"      // Parent node name
     }
 }
 ```
@@ -575,26 +688,132 @@ Updates the configuration of an attached device with new property values. The fr
     "deviceConfiguration": {
         // Same structure as Get Device Configuration response
         // Returns updated configuration with new values applied
-    }
+    },
+    "deviceUID": "string"      // [OPTIONAL] Device UID confirmation
 }
 ```
 
-### 5. File System Events
+### 5. Tree View
+
+#### Get Device Tree
+
+Retrieves the complete device tree structure for the tree view editor.
+
+**Frontend Request:**
+- **Command:** `tree.getDeviceTree`
+- **Payload:** `{}` (empty)
+
+**Backend Response:**
+- **Status:** `success | error`
+- **Payload:**
+```json
+{
+    "deviceTree": {
+        // FormElement representing the root of the device tree
+        // Typically a FormObject with nested device configurations
+        "type": "FormObject",
+        "key": "root",
+        "required": false,
+        "deviceUID": "string",   // [OPTIONAL] UUID for tree view elements
+        "config": [
+            // Nested FormElement array representing the tree structure
+        ]
+    },
+    "isReadOnly": "boolean",     // Whether the tree is read-only
+    "isDtso": "boolean"          // Whether this is a device tree overlay (.dtso)
+}
+```
+
+### 6. Settings Management
+
+#### Get Setting
+
+Retrieves a specific setting value.
+
+**Frontend Request:**
+- **Command:** `settings.get`
+- **Payload:**
+```json
+{
+    "key": "string"              // Setting key identifier
+}
+```
+
+**Backend Response:**
+- **Status:** `success | error`
+- **Payload:**
+```json
+{
+    "key": "string",             // Setting key
+    "value": "unknown"           // Setting value (can be any JSON type)
+}
+```
+
+#### Update Setting
+
+Updates a specific setting value.
+
+**Frontend Request:**
+- **Command:** `settings.update`
+- **Payload:**
+```json
+{
+    "key": "string",             // Setting key identifier
+    "value": "unknown"           // New setting value (can be any JSON type)
+}
+```
+
+**Backend Response:**
+- **Status:** `success | error`
+- **Payload:**
+```json
+{
+    "key": "string",             // Setting key
+    "value": "unknown"           // Confirmed setting value
+}
+```
+
+### 7. Event Notifications
 
 #### File Changed Notification
 
-Backend notification sent when the device tree file is modified externally.
+Backend notification sent when the device tree file is modified.
 
 **Backend Notification:**
 
-- **Command:** `event.attachedDevicesStateChanged`
+- **Command:** `event.fileChanged`
 - **Payload:**
 
 ```json
 {
-    "changeSource": "external | extension"   // Source of the change
+    "filePath": "string",                     // Path to the changed file
+    "changeSource": "external | extension"    // Source of the change
 }
 ```
+
+**Change Source Values:**
+- `external`: File was modified outside the extension (e.g., direct file edit)
+- `extension`: File was modified by the extension itself
+
+### 8. Navigation Notifications
+
+#### Navigate Back
+
+Backend notification sent when the user requests navigation backward.
+
+**Backend Notification:**
+
+- **Command:** `navigation.back`
+- **Payload:** `{}` (empty)
+
+#### Navigate Forward
+
+Backend notification sent when the user requests navigation forward.
+
+**Backend Notification:**
+
+- **Command:** `navigation.forward`
+- **Payload:** `{}` (empty)
 
 ## Data Types
 
@@ -617,41 +836,56 @@ Represents a parent node in the device tree:
 
 ```json
 {
-    "ID": "string",           // Unique node identifier
+    "uuid": "string",         // Unique node identifier (UUID)
     "name": "string"          // Node name
 }
 ```
 
 ### Attached Device
 
-Represents an attached device instance:
+Represents an attached device instance (AttachedDeviceState):
 
 ```json
 {
-    "device": {
-        "id": "string",           // Device identifier
-        "name": "string",         // Device name
-        "deviceUID": "string",    // Device unique ID generated by backend
-        "alias": "string",        // Optional custom alias for the device
-        "active": "boolean",      // Whether the device is currently active
-        "parentNode": {
-            "ID": "string",       // Parent node ID
-            "name": "string"      // Parent node name
-        },
-        "maxChannels": "number",  // Maximum number of channels supported by the device
-        "channels": [
-            {
-                "name": "string",     // Channel name
-                "alias": "string",    // Optional custom alias for the channel
-            }
-        ]
-    }
+    "type": "AttachedDeviceState",
+    "compatible": "string",       // Device compatible string (e.g., "adi,ad7124-8")
+    "deviceUID": "string",        // Device unique ID (UUID) generated by backend
+    "name": "string",             // Device name
+    "alias": "string",            // [OPTIONAL] Custom alias for the device
+    "active": "boolean",          // [OPTIONAL] Whether the device is currently active
+    "isExpanded": "boolean",      // [OPTIONAL] UI state for tree expansion
+    "hasErrors": "boolean",       // Whether the device configuration has errors
+    "hasChannels": "boolean",     // Whether the device has channel support
+    "parentNode": {
+        "uuid": "string",         // Parent node UUID
+        "name": "string"          // Parent node name
+    },
+    "maxChannels": "number",      // [OPTIONAL] Maximum number of channels supported
+    "channels": [
+        {
+            "name": "string",     // Channel name
+            "alias": "string",    // Channel alias
+            "hasErrors": "boolean" // Whether the channel has errors
+        }
+    ]
+}
+```
+
+### Device Channel Summary
+
+Represents a summary of a device channel:
+
+```json
+{
+    "name": "string",             // Channel name
+    "alias": "string",            // Channel alias
+    "hasErrors": "boolean"        // Whether the channel configuration has errors
 }
 ```
 
 ### Validation Types
 
-These validations are type-specific constraints that can ensure proper user input validation. Each property can include a `validation` object with type-specific validation rules.
+These validations are type-specific constraints that can ensure proper user input validation. Each property can include a `validationType` object with type-specific validation rules. All validation types use a discriminated union pattern with a `type` field.
 
 #### Numeric Range Validation
 
@@ -660,84 +894,217 @@ Used for properties that accept numeric input within a specific range (e.g., GPI
 **Structure:**
 ```json
 {
-    "validation": {
-        "minValue": "number",          // [OPTIONAL] Minimum allowed value
-        "maxValue": "number",          // [OPTIONAL] Maximum allowed value
-    }
+    "type": "NumericRangeValidation",
+    "minValue": "number | string",  // [OPTIONAL] Minimum allowed value
+    "maxValue": "number | string"   // [OPTIONAL] Maximum allowed value
 }
 ```
 
 **Examples:**
-- SPI register address: `{"minValue": 0}`
-- Clock cells: `{"minValue": 0, "maxValue": 0}`
-- SPI frequency: `{"minValue": 1}`
+- SPI register address: `{"type": "NumericRangeValidation", "minValue": 0}`
+- Clock cells: `{"type": "NumericRangeValidation", "minValue": 0, "maxValue": 0}`
+- SPI frequency: `{"type": "NumericRangeValidation", "minValue": 1}`
+- Large values: `{"type": "NumericRangeValidation", "minValue": 0, "maxValue": "4294967295"}`
+
+**JSON Serialization Notes:**
+- Values are internally represented as JavaScript bigint types to support large device tree values (up to 64-bit integers)
+- In JSON messages, values are serialized as:
+  - **number**: For small values that fit in JavaScript's safe integer range (≤ 2^53-1)
+  - **string**: For large values that exceed JavaScript's safe integer range
+- Frontend implementations should handle both number and string representations
 
 #### Dropdown Validation
 
-Used for properties where users must select from a predefined set of valid options (e.g., interrupt types, clock sources).
+Used for properties where users must select from a predefined set of valid options (e.g., interrupt types, clock sources, compatible strings).
 
 **Structure:**
 ```json
 {
-    "validation": {
-        "list": ["item1", "item2"]     // Array of valid options (can be strings, numbers, etc.)
-    }
+    "type": "DropdownValidation",
+    "list": ["item1", "item2"]     // Array of valid options (strings, numbers, or booleans)
 }
 ```
 
 **Examples:**
-- Interrupt types: `{"list": ["IRQ_TYPE_NONE", "IRQ_TYPE_EDGE_RISING", "IRQ_TYPE_EDGE_FALLING"]}`
-- Reference selection: `{"list": [0, 1, 3]}`
+- Interrupt types: `{"type": "DropdownValidation", "list": ["IRQ_TYPE_NONE", "IRQ_TYPE_EDGE_RISING", "IRQ_TYPE_EDGE_FALLING"]}`
+- Reference selection: `{"type": "DropdownValidation", "list": [0, 1, 3]}`
+- Compatible strings: `{"type": "DropdownValidation", "list": ["adi,ad7124-8", "adi,ad7124-4"]}`
 
-#### Array Length Validation
+**Note:** While internally list items may be bigints, they are serialized in JSON as numbers (for small values) or strings (for large values).
 
-Used for properties that accept arrays with specific length constraints (e.g., differential channel pairs, coordinate arrays).
+#### Array Validation
+
+Array validation types are used for FormArray elements and provide constraints on array length and element values. There are multiple types of array validation based on the element types.
+
+##### Array Number Validation
+
+Used for arrays containing only numeric values.
 
 **Structure:**
 ```json
 {
-    "validation": {
-        "minLength": "number",         // Minimum number of array elements
-        "maxLength": "number",         // Maximum number of array elements
-        "minValue": "number",          // [OPTIONAL] Minimum value for array elements
-        "maxValue": "number"           // [OPTIONAL] Maximum value for array elements
-    }
+    "type": "ArrayNumberValidation",
+    "minLength": "number",         // [OPTIONAL] Minimum number of array elements
+    "maxLength": "number",         // [OPTIONAL] Maximum number of array elements
+    "minValue": "number | string", // [OPTIONAL] Minimum value for numeric elements
+    "maxValue": "number | string"  // [OPTIONAL] Maximum value for numeric elements
 }
 ```
 
 **Examples:**
-- Differential channels: `{"minLength": 2, "maxLength": 2, "minValue": 0, "maxValue": 15}`
-- Multi-value configurations: `{"minLength": 1, "maxLength": 4}`
+- Register address: `{"type": "ArrayNumberValidation", "minLength": 1, "maxLength": 1, "minValue": 0}`
+- GPIO pins: `{"type": "ArrayNumberValidation", "minLength": 1, "maxLength": 4, "minValue": 0, "maxValue": 255}`
+- Large values: `{"type": "ArrayNumberValidation", "minLength": 1, "maxLength": 1, "minValue": "0", "maxValue": "4294967295"}`
+
+**Note:** Like NumericRangeValidation, `minValue`/`maxValue` are serialized as number for small values and string for large values that exceed JavaScript's safe integer range.
+
+##### Array String Validation
+
+Used for arrays containing string values, optionally with enumerated choices.
+
+**Structure:**
+```json
+{
+    "type": "ArrayStringValidation",
+    "minLength": "number",              // [OPTIONAL] Minimum number of array elements
+    "maxLength": "number",              // [OPTIONAL] Maximum number of array elements
+    "enum": "Array<string | string[]>", // [OPTIONAL] Array of valid string choices (can be nested arrays)
+    "enumType": "string"                // [OPTIONAL] Type of enum values: "macro" | "string" | "phandle" | "number"
+}
+```
+
+**Examples:**
+- Clock names: `{"type": "ArrayStringValidation", "minLength": 1, "maxLength": 3, "enum": ["mclk", "adc_clk", "sync_clk"], "enumType": "string"}`
+- Phandle references: `{"type": "ArrayStringValidation", "enum": ["&gpio0", "&gpio1"], "enumType": "phandle"}`
+
+**Enum Type Values:**
+- `"macro"`: Device tree macro constants (e.g., IRQ_TYPE_EDGE_FALLING)
+- `"string"`: Regular string values
+- `"phandle"`: Device tree phandle references (e.g., &gpio0)
+- `"number"`: Numeric values represented as strings
+
+##### Array Hyperlink Validation
+
+Used for arrays containing phandle references that can be navigated to in the UI.
+
+**Structure:**
+```json
+{
+    "type": "ArrayHyperlinkValidation",
+    "minLength": "number",         // [OPTIONAL] Minimum number of array elements
+    "maxLength": "number",         // [OPTIONAL] Maximum number of array elements
+    "enum": [                      // [OPTIONAL] Array of HyperlinkItem objects
+        {
+            "type": "HyperlinkItem",
+            "name": "string",      // Display name for the hyperlink
+            "gotoUID": "string"    // [OPTIONAL] UUID to navigate to (undefined if unresolvable)
+        }
+    ]
+}
+```
+
+**Examples:**
+- GPIO references: `{"type": "ArrayHyperlinkValidation", "enum": [{"type": "HyperlinkItem", "name": "&gpio0", "gotoUID": "uuid-1234"}]}`
+
+##### Array Mixed Type Validation
+
+Used for arrays that contain elements of different types in a specific order (e.g., clock specifiers with phandle + numeric parameters).
+
+**Structure:**
+```json
+{
+    "type": "ArrayMixedTypeValidation",
+    "minPrefixItems": "number",    // Minimum number of prefix items required
+    "maxPrefixItems": "number",    // Maximum number of prefix items allowed
+    "prefixItems": [               // Array of MixedTypeValidation defining each position
+        {
+            "type": "Number",
+            "minValue": "bigint",  // [OPTIONAL]
+            "maxValue": "bigint"   // [OPTIONAL]
+        },
+        {
+            "type": "StringList",
+            "enum": ["string[]"],
+            "enumType": "string"   // [OPTIONAL] "macro" | "string" | "phandle" | "number"
+        },
+        {
+            "type": "NumberList",
+            "enum": ["number[]"]
+        }
+    ]
+}
+```
+
+**MixedTypeValidation Types:**
+- `MixedArrayNumber`: `{"type": "Number", "minValue"?: number | string, "maxValue"?: number | string}`
+- `MixedArrayStringList`: `{"type": "StringList", "enum": string[], "enumType"?: EnumValueType}`
+- `MixedArrayNumberList`: `{"type": "NumberList", "enum": number[]}`
+
+**Note:** Number min/max values follow the same serialization rules as NumericRangeValidation (number for small values, string for large values).
+
+**Examples:**
+- Clock specifier (phandle + index): `{"type": "ArrayMixedTypeValidation", "minPrefixItems": 2, "maxPrefixItems": 2, "prefixItems": [{"type": "StringList", "enum": ["&clk0"], "enumType": "phandle"}, {"type": "Number", "minValue": 0, "maxValue": 7}]}`
 
 #### Matrix Validation
 
-Used for properties that accept matrices (array of arrays) with specific row/column constraints and optional per-column or per-element validation (e.g., interrupts, GPIO matrices).
+Used for FormMatrix elements that accept matrices (array of arrays) with specific row constraints and row-level validation. The new structure validates each row using an ArrayValidation or ArrayMixedTypeValidation.
 
 **Structure:**
 ```json
 {
-    "validation": {
-        "minRows": "number",           // [OPTIONAL] Minimum number of rows
-        "maxRows": "number",           // [OPTIONAL] Maximum number of rows
-        "minColumns": "number",        // [OPTIONAL] Minimum columns per row
-        "maxColumns": "number",        // [OPTIONAL] Maximum columns per row
-        "columnValidation": [          // [OPTIONAL] Specific validation per column
-            {
-                "columnIndex": "number",
-                "validationType": {}   // Any validationType (list, range, etc.)
-            }
-        ],
-        "elementValidation": {         // [OPTIONAL] Validation applied to all elements
-            "minValue": "number",
-            "maxValue": "number"
-        }
+    "minRows": "number",           // [OPTIONAL] Minimum number of rows
+    "maxRows": "number",           // [OPTIONAL] Maximum number of rows
+    "definition": {}               // ArrayValidation or ArrayMixedTypeValidation for each row
+}
+```
+
+The `definition` field can be any of:
+- `ArrayNumberValidation`: All rows contain numbers
+- `ArrayStringValidation`: All rows contain strings
+- `ArrayHyperlinkValidation`: All rows contain hyperlink references
+- `ArrayMixedTypeValidation`: Rows contain mixed types in a specific order
+
+**Examples:**
+
+**Numeric matrix (e.g., GPIO pins):**
+```json
+{
+    "minRows": 1,
+    "maxRows": 4,
+    "definition": {
+        "type": "ArrayNumberValidation",
+        "minLength": 3,
+        "maxLength": 3,
+        "minValue": 0,
+        "maxValue": 255
     }
 }
 ```
 
-**Examples:**
-- Interrupts with mixed types: `{"minRows": 1, "maxRows": 8, "minColumns": 2, "maxColumns": 2, "columnValidation": [{"columnIndex": 0, "validationType": {"minValue": 0, "maxValue": 255}}, {"columnIndex": 1, "validationType": {"list": ["IRQ_TYPE_NONE", "IRQ_TYPE_EDGE_RISING", "IRQ_TYPE_EDGE_FALLING"]}}]}`
-- GPIO matrix: `{"minRows": 1, "maxRows": 4, "minColumns": 3, "maxColumns": 3, "elementValidation": {"minValue": 0}}`
+**Mixed-type matrix (e.g., interrupts with number + macro):**
+```json
+{
+    "minRows": 1,
+    "maxRows": 8,
+    "definition": {
+        "type": "ArrayMixedTypeValidation",
+        "minPrefixItems": 2,
+        "maxPrefixItems": 2,
+        "prefixItems": [
+            {
+                "type": "Number",
+                "minValue": 0,
+                "maxValue": 255
+            },
+            {
+                "type": "StringList",
+                "enum": ["IRQ_TYPE_NONE", "IRQ_TYPE_EDGE_RISING", "IRQ_TYPE_EDGE_FALLING", "IRQ_TYPE_LEVEL_HIGH", "IRQ_TYPE_LEVEL_LOW"],
+                "enumType": "macro"
+            }
+        ]
+    }
+}
+```
 
 ### FormElement Types
 
@@ -771,13 +1138,13 @@ Represents an array-based configuration property with list interface.
 ```json
 {
     "type": "FormArray",
-    "key": "string",              // Property identifier (e.g., "reg", "interrupts")
+    "key": "string",              // Property identifier (e.g., "reg", "clocks")
     "required": "boolean",        // Whether this property is required
     "setValue": "array",          // [OPTIONAL] Current configured array value
     "defaultValue": "array",      // [OPTIONAL] Default array value if not configured
     "description": "string",      // [OPTIONAL] Help text for UI
     "deprecated": "boolean",      // [OPTIONAL] Indicates deprecated property
-    "validationType": {},         // [OPTIONAL] Array validation rules
+    "validationType": {},         // [OPTIONAL] ArrayValidation or ArrayMixedTypeValidation
     "error": {                    // [OPTIONAL] Present only when property is invalid
         "code": "string",
         "message": "string",
@@ -785,6 +1152,12 @@ Represents an array-based configuration property with list interface.
     }
 }
 ```
+
+**Validation Type Options:**
+- `ArrayNumberValidation`: For numeric arrays
+- `ArrayStringValidation`: For string arrays
+- `ArrayHyperlinkValidation`: For phandle reference arrays
+- `ArrayMixedTypeValidation`: For arrays with mixed element types
 
 #### FormMatrix
 
@@ -799,7 +1172,7 @@ Represents a matrix-based configuration property (array of arrays) with table/gr
     "defaultValue": "array[]",    // [OPTIONAL] Default matrix value if not configured
     "description": "string",      // [OPTIONAL] Help text for UI
     "deprecated": "boolean",      // [OPTIONAL] Indicates deprecated property
-    "validationType": {},         // [OPTIONAL] Matrix validation rules
+    "validationType": {},         // [OPTIONAL] MatrixValidation with row/definition constraints
     "error": {                    // [OPTIONAL] Present only when property is invalid
         "code": "string",
         "message": "string",
@@ -808,7 +1181,7 @@ Represents a matrix-based configuration property (array of arrays) with table/gr
 }
 ```
 
-**Example - Interrupts with types:**
+**Example - Interrupts with mixed types:**
 ```json
 {
     "type": "FormMatrix",
@@ -821,42 +1194,42 @@ Represents a matrix-based configuration property (array of arrays) with table/gr
     "validationType": {
         "minRows": 1,
         "maxRows": 8,
-        "minColumns": 2,
-        "maxColumns": 2,
-        "columnValidation": [
-            {
-                "columnIndex": 0,
-                "validationType": {
+        "definition": {
+            "type": "ArrayMixedTypeValidation",
+            "minPrefixItems": 2,
+            "maxPrefixItems": 2,
+            "prefixItems": [
+                {
+                    "type": "Number",
                     "minValue": 0,
                     "maxValue": 255
+                },
+                {
+                    "type": "StringList",
+                    "enum": ["IRQ_TYPE_NONE", "IRQ_TYPE_EDGE_RISING", "IRQ_TYPE_EDGE_FALLING", "IRQ_TYPE_LEVEL_HIGH", "IRQ_TYPE_LEVEL_LOW"],
+                    "enumType": "macro"
                 }
-            },
-            {
-                "columnIndex": 1,
-                "validationType": {
-                    "list": ["IRQ_TYPE_NONE", "IRQ_TYPE_EDGE_RISING", "IRQ_TYPE_EDGE_FALLING", "IRQ_TYPE_LEVEL_HIGH", "IRQ_TYPE_LEVEL_LOW"]
-                }
-            }
-        ]
+            ]
+        }
     }
 }
 ```
 
 #### Generic
 
-Represents a general input element (text, number, dropdown, etc.).
+Represents a general input element (text, number, dropdown, custom properties, etc.).
 
 ```json
 {
     "type": "Generic",
     "key": "string",              // Property identifier (e.g., "compatible", "clock-frequency")
-    "inputType": "string",        // Input type: "text", "number", "dropdown", etc.
+    "inputType": "string",        // Input type: "text" | "number" | "dropdown" | "custom" | "custom-flag"
     "required": "boolean",        // Whether this property is required
     "setValue": "any",            // [OPTIONAL] Current configured value
     "defaultValue": "any",        // [OPTIONAL] Default value if not configured
     "description": "string",      // [OPTIONAL] Help text for UI
     "deprecated": "boolean",      // [OPTIONAL] Indicates deprecated property
-    "validationType": {},         // [OPTIONAL] Validation rules (dropdown, range, etc.)
+    "validationType": {},         // [OPTIONAL] Validation rules (NumericRangeValidation or DropdownValidation)
     "error": {                    // [OPTIONAL] Present only when property is invalid
         "code": "string",
         "message": "string",
@@ -865,42 +1238,31 @@ Represents a general input element (text, number, dropdown, etc.).
 }
 ```
 
-#### ChooseOne
+**Input Type Values:**
+- `"text"`: Text input field
+- `"number"`: Numeric input field
+- `"dropdown"`: Dropdown/select with predefined options (requires DropdownValidation)
+- `"custom"`: User-defined custom property (text-based) - see [Custom Properties](#custom-properties)
+- `"custom-flag"`: User-defined custom property (boolean flag) - see [Custom Properties](#custom-properties)
 
-Represents a mutually exclusive selection where the user can choose only one property from a set of available options. This is useful for cases where multiple properties serve the same purpose but only one should be configured (e.g., voltage reference sources).
-
-```json
-{
-    "type": "ChooseOne",
-    "key": "string",              // Instance identifier (e.g., "voltage-reference")
-    "required": "boolean",        // Whether a selection is required
-    "setValue": "string",         // [OPTIONAL] Key of the currently selected property
-    "description": "string",      // [OPTIONAL] Help text for UI
-    "config": [],                 // Array of FormElement objects to choose from
-    "error": {                    // [OPTIONAL] Present only when selection is invalid
-        "code": "string",
-        "message": "string",
-        "details": "string"
-    }
-}
-```
-
-**Usage Notes:**
-- Only one property from the `config` array can be selected at a time
-- When a property is selected, its key should be set as the `setValue` value
-- Unselected properties should not have their `setValue` field set
+**Validation Type Options:**
+- `NumericRangeValidation`: For numeric inputs with min/max constraints
+- `DropdownValidation`: For dropdown inputs with predefined list of options
 
 #### FormObject
 
-Represents a nested object structure containing other FormElements (e.g., channels, complex configurations).
+Represents a nested object structure containing other FormElements (e.g., channels, complex configurations, device tree nodes).
 
 ```json
 {
     "type": "FormObject",
-    "key": "string",              // Object identifier (e.g., "channel@0")
+    "key": "string",              // Object identifier (e.g., "channel@0", "root")
     "required": "boolean",        // Whether this object is required
     "description": "string",      // [OPTIONAL] Help text for UI
-    "channelName": "string",      // [OPTIONAL] Channel name matched against an available regex
+    "alias": "string",            // [OPTIONAL] Alias for the object
+    "active": "boolean",          // [OPTIONAL] Active state of the object
+    "channelName": "string",      // [OPTIONAL] Channel name matching a regex from channelRegexes
+    "deviceUID": "string",        // [OPTIONAL] Device UUID for tree view elements
     "config": [],                 // Array of FormElement objects
     "error": {                    // [OPTIONAL] Present only when object is invalid
         "code": "string",
@@ -910,16 +1272,24 @@ Represents a nested object structure containing other FormElements (e.g., channe
 }
 ```
 
-#### CustomProperty
+**Usage Notes:**
+- `channelName`: Used when the FormObject represents a device channel. Must match one of the regex patterns in the parent DeviceConfigurationFormObject's `channelRegexes` array.
+- `deviceUID`: Used in tree view contexts to identify device tree nodes.
+- `alias` and `active`: Used for device/channel configuration state.
 
-Represents a custom property configuration element with specific input type and value constraints.
+#### Custom Properties
 
+Custom properties allow users to add arbitrary device tree properties that are not defined in the device bindings. They are implemented as `Generic` FormElements with special `inputType` values.
+
+**Text-based Custom Property:**
 ```json
 {
-    "type": "CustomProperty",
-    "key": "string",              // Property identifier
-    "setValue": "string",         // Current configured value as string
-    "error": {                    // [OPTIONAL] Present only when property is invalid
+    "type": "Generic",
+    "key": "my-custom-property",  // User-defined property name
+    "inputType": "custom",        // Identifies this as a custom text property
+    "required": false,
+    "setValue": "custom-value",   // User-entered string value
+    "error": {                    // [OPTIONAL]
         "code": "string",
         "message": "string",
         "details": "string"
@@ -927,18 +1297,84 @@ Represents a custom property configuration element with specific input type and 
 }
 ```
 
-### Error (Configuration Item)
-
-Represents a validation error for a property:
-
+**Boolean Custom Property (Flag):**
 ```json
 {
-  "code": "string",    // Machine-readable code (e.g. UNSET_PROPERTY)
-  "message": "string", // Human readable explanation for UI
-  "details": "string"  // [OPTIONAL] Additional context
+    "type": "Generic",
+    "key": "my-custom-flag",      // User-defined property name
+    "inputType": "custom-flag",   // Identifies this as a custom boolean property
+    "required": false,
+    "setValue": true,             // User-selected boolean value
+    "error": {                    // [OPTIONAL]
+        "code": "string",
+        "message": "string",
+        "details": "string"
+    }
 }
 ```
 
-Notes:
+**Usage Notes:**
+- Custom properties use `inputType: "custom"` for text values and `inputType: "custom-flag"` for boolean flags
+- The `key` field contains the user-defined property name
+- No `validationType` is applied to custom properties
+- Custom properties do not have `defaultValue` fields
 
-- Absence of this object means the property is valid.
+### Device Configuration Form Object
+
+The DeviceConfigurationFormObject is a special container type that wraps the device configuration and provides metadata about the device, channels, and parent node.
+
+```json
+{
+    "type": "DeviceConfigurationFormObject",
+    "alias": "string",                        // [OPTIONAL] Device alias
+    "active": "boolean",                      // [OPTIONAL] Device active state (used for initial read only)
+    "maxChannels": "number",                  // [OPTIONAL] Maximum number of channels supported
+    "parentNode": {                           // Parent node information
+        "uuid": "string",                     // UUID of the parent node
+        "name": "string"                      // Parent node name
+    },
+    "channelRegexes": ["string"],            // [OPTIONAL] Array of regex patterns for valid channel names
+    "generatedChannelRegexEntries": ["string"], // [OPTIONAL] Regex patterns to display as dropdown options
+    "genericErrors": [                        // [OPTIONAL] Errors not tied to specific form elements
+        {
+            "code": "string",
+            "message": "string",
+            "details": "string"               // [OPTIONAL]
+        }
+    ],
+    "config": []                              // Array of FormElement objects
+}
+```
+
+**Field Descriptions:**
+- `alias`: Custom name for the device instance
+- `active`: Whether the device is currently active in the device tree
+- `maxChannels`: Maximum number of channels this device supports (used for devices with channel support)
+- `parentNode`: The parent device tree node where this device is attached. **Note:** If the parentNode differs from the current parent during an update, the backend will move the node first.
+- `channelRegexes`: Regex patterns that define valid channel names (e.g., `["channel@[0-7]"]`). Channel FormObjects must have a `channelName` that matches one of these patterns.
+- `generatedChannelRegexEntries`: Pre-generated channel names that match the `channelRegexes`, displayed as dropdown options in the UI
+- `genericErrors`: Validation errors that apply to the device configuration as a whole, not tied to a specific form element
+- `config`: Array of FormElement objects representing the device properties and channels
+
+**Usage in API:**
+- `device.getConfiguration`: Returns a DeviceConfiguration with `config: DeviceConfigurationFormObject`
+- `device.updateConfiguration`: Accepts a DeviceConfigurationFormObject in the request payload
+
+### Error (Configuration Item)
+
+Represents a validation error for a property or configuration item:
+
+```json
+{
+  "code": "string",    // Machine-readable error code (e.g., "UNSET_PROPERTY", "INVALID_VALUE")
+  "message": "string", // Human-readable error message for UI display
+  "details": "string"  // [OPTIONAL] Additional error context or debugging information
+}
+```
+
+**Usage Notes:**
+- Absence of the `error` field in a FormElement means the property is valid
+- Errors can appear on individual FormElements or in the `genericErrors` array of DeviceConfigurationFormObject
+- The `code` field enables programmatic error handling
+- The `message` field should be displayed to users
+- The `details` field provides additional context for debugging
