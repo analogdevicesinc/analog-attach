@@ -41,14 +41,14 @@ export class Attach {
         const reference_resolved = await resolve_references(binding_path, reference_parser, linux_path, dt_schema_path);
 
         if (typeof reference_resolved === 'string') {
-            console.log(`ERROR: ${binding_path} with ${reference_resolved}`);
+            //console.log(`ERROR: ${binding_path} with ${reference_resolved}`);
             return;
         }
 
         const property_resolved = await resolve_properties(reference_resolved, reference_parser, linux_path, dt_schema_path);
 
         if (typeof property_resolved === 'string') {
-            console.log(`ERROR: ${binding_path} with ${property_resolved}`);
+            //console.log(`ERROR: ${binding_path} with ${property_resolved}`);
             return;
         }
 
@@ -111,8 +111,8 @@ export class Attach {
             ajv.addKeyword(typeSizeKeyword);
 
             this.validation_function = ajv.compile(this.original_binding as Object);
-        } catch (error) {
-            console.log(error instanceof Error ? error.message : "Failed to compile validation function");
+        } catch {
+            //console.log(error instanceof Error ? error.message : "Failed to compile validation function");
             return undefined;
         }
 
