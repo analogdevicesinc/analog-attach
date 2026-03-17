@@ -195,7 +195,7 @@
     "test-clean": "yarn run pretest && yarn workspace @analog-attach/extension exec vscode-test && yarn workspace attach-lib test --run",
     "clean": "yarn workspaces foreach -A run clean",
     "clean:all": "yarn run clean && rm -rf node_modules",
-    "build:all": "yarn run build:extension-protocol && yarn run build:attach-lib && yarn run build:hds-react && yarn run build:attach-ui-lib && yarn run build:pnp-webview && yarn run build:tree-editor-webview && yarn run build:extension",
+    "build:all": "yarn run build:extension-protocol && yarn run build:attach-lib && yarn run build:attach-cli && yarn run build:hds-react && yarn run build:attach-ui-lib && yarn run build:pnp-webview && yarn run build:tree-editor-webview && yarn run build:extension",
     "build:hds-react": "yarn workspace hds-react build",
     "build:pnp-webview": "yarn workspace pnp-webview build",
     "build:attach-lib": "yarn workspace attach-lib build",

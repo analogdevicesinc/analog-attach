@@ -1,0 +1,48 @@
+{
+    "name": "attach",
+    "author": "",
+    "description": "Stricli command line application",
+    "license": "MIT",
+    "type": "module",
+    "version": "0.0.0",
+    "files": [
+        "dist"
+    ],
+    "bin": {
+        "__attach_bash_complete": "dist/bash-complete.js",
+        "attach": "dist/cli.js"
+    },
+    "engines": {
+        "node": ">=25"
+    },
+    "scripts": {
+        "prebuild": "tsc -p src/tsconfig.json",
+        "build": "tsup --silent --dts",
+        "prepublishOnly": "npm run build",
+        "postinstall": "attach install",
+        "clean": "rm -rf dist tsconfig.tsbuildinfo node_modules"
+    },
+    "tsup": {
+        "entry": [
+            "src/bin/cli.ts",
+            "src/bin/bash-complete.ts"
+        ],
+        "format": [
+            "esm"
+        ],
+        "tsconfig": "src/tsconfig.json",
+        "clean": true,
+        "splitting": true,
+        "minify": true
+    },
+    "dependencies": {
+        "attach-lib": "*",
+        "@stricli/auto-complete": "^1.2.6",
+        "@stricli/core": "^1.2.6"
+    },
+    "devDependencies": {
+        "@types/node": "25.x",
+        "tsup": "^6.7.0",
+        "typescript": "5.6.x"
+    }
+}
