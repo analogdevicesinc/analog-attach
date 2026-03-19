@@ -10,6 +10,7 @@ import type {
     DeviceUID,
     DeviceConfigurationFormObject,
     FormElement,
+    FormObjectElement,
     GenericFormElement
 } from 'extension-protocol';
 import { useVscodeStore } from 'attach-ui-lib';
@@ -39,7 +40,8 @@ function updateFormElementInArray(
             // No parentKey, looking for element at current level
             if (element.key === elementKey) {
                 return { ...element, setValue: newValue } as FormElement;
-            } else if (element.type === 'FormObject') {
+            } else if (element.type === 'FormObject' && !(element as FormObjectElement).channelName) {
+                // Continue searching in nested FormObjects, but skip channels
                 return {
                     ...element,
                     config: updateFormElementInArray(element.config, elementKey, newValue),

@@ -142,8 +142,8 @@ function updateFormElementInArray(
                     ...element,
                     setValue: newValue,
                 } as FormElement;
-            } else if (element.type === 'FormObject') {
-                // Continue searching in nested FormObjects (without parentKey, search all levels)
+            } else if (element.type === 'FormObject' && !(element as FormObjectElement).channelName) {
+                // Continue searching in nested FormObjects, but skip channels
                 return {
                     ...element,
                     config: updateFormElementInArray(element.config, elementKey, newValue),
