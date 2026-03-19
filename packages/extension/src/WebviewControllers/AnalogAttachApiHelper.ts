@@ -1338,11 +1338,36 @@ export class AnalogAttachApiHelper {
 
     private createChannelNode(segment: string): DtsNode {
         const [name, unitAddr] = segment.split("@", 2);
+        let properties: DtsProperty[] = [];
+
+        // Also add the reg property in case we have a unitAddr
+        if (unitAddr !== undefined) {
+            const parsed = unitAddr.startsWith("0x") ? Number.parseInt(unitAddr, 16) : Number.parseInt(unitAddr, 10);
+
+            if (!Number.isNaN(parsed)) {
+                const dtsValueComponent: DtsValueComponent | undefined = this.buildArrayComponent([parsed]);
+                if (dtsValueComponent) {
+                    const regProperty: DtsProperty = {
+                        labels: [],
+                        name: "reg",
+                        value: {
+                            components: [dtsValueComponent]
+                        },
+                        modified_by_user: true,
+                        deleted: false,
+                    };
+                    properties.push(regProperty);
+                } else {
+                    AnalogAttachLogger.warn("Cannot create reg property based on unit_addr for", segment);
+                }
+            }
+        }
+
         return {
             name,
             unit_addr: unitAddr,
             _uuid: crypto.randomUUID(),
-            properties: [],
+            properties: properties,
             children: [],
             modified_by_user: true,
             created_by_user: true,
