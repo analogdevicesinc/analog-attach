@@ -19,7 +19,6 @@
         "prebuild": "tsc -p src/tsconfig.json",
         "build": "tsup --silent --dts",
         "prepublishOnly": "npm run build",
-        "postinstall": "attach install",
         "clean": "rm -rf dist tsconfig.tsbuildinfo node_modules"
     },
     "tsup": {
