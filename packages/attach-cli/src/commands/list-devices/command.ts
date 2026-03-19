@@ -2,6 +2,8 @@ import { buildCommand } from "@stricli/core";
 import { Attach, extract_compatible } from "attach-lib";
 
 import path from "node:path";
+import * as fs from 'node:fs';
+
 import { get_all_file_paths } from "../../utilities";
 
 type Flags = {
@@ -36,7 +38,22 @@ export const list_devices_command = buildCommand({
     async func(flags: Flags) {
         const { linux, dtSchema, includesWord } = flags;
 
+        if (!fs.existsSync(linux)) {
+            console.log(`Missing: ${linux}`);
+            return;
+        }
+
+        if (!fs.existsSync(dtSchema)) {
+            console.log(`Missing: ${dtSchema}`);
+            return;
+        }
+
         const bindings_folder = path.resolve(linux, "Documentation", "devicetree", "bindings");
+
+        if (!fs.existsSync(bindings_folder)) {
+            console.log(`Missing: ${bindings_folder}`);
+            return;
+        }
 
         const all_files = get_all_file_paths(bindings_folder);
         const yaml_files = all_files.filter(file => file.endsWith(".yaml"));

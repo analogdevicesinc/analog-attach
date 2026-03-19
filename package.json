@@ -199,6 +199,7 @@
     "build:hds-react": "yarn workspace hds-react build",
     "build:pnp-webview": "yarn workspace pnp-webview build",
     "build:attach-lib": "yarn workspace attach-lib build",
+    "build:attach-cli": "yarn workspace attach-cli build",
     "build:attach-ui-lib": "yarn workspace attach-ui-lib build",
     "build:tree-editor-webview": "yarn workspace tree-editor-webview build",
     "build:extension": "yarn workspace @analog-attach/extension build",

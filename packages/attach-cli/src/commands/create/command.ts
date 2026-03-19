@@ -1,18 +1,20 @@
 import { buildCommand } from "@stricli/core";
-import { Attach, extract_compatible, parse_dts, suggest_parents } from "attach-lib";
 
 import * as fs from 'node:fs';
 import path from "node:path";
+
 import { get_all_file_paths } from "../../utilities";
+import { Attach, extract_compatible } from "attach-lib";
 
 type Flags = {
     linux: string,
     dtSchema: string,
-    context: string,
     compatible: string,
+    parent?: string,
+    output: string,
 }
 
-export const suggest_parents_command = buildCommand({
+export const create_command = buildCommand({
     parameters: {
         flags: {
             linux: {
@@ -25,12 +27,18 @@ export const suggest_parents_command = buildCommand({
                 parse: String,
                 brief: "Path to dt-schema repo"
             },
-            context: {
+            compatible: {
                 kind: "parsed",
                 parse: String,
-                brief: "The target dts"
+                brief: "Compatible string of the desired device binding"
             },
-            compatible: {
+            parent: {
+                kind: "parsed",
+                parse: String,
+                brief: "Compatible string of the desired device binding",
+                optional: true
+            },
+            output: {
                 kind: "parsed",
                 parse: String,
                 brief: "Compatible string of the desired device binding"
@@ -38,60 +46,56 @@ export const suggest_parents_command = buildCommand({
         }
     },
     docs: {
-        brief: "List available devices in linux repo"
+        brief: "Create dtso of the node with set compatible"
     },
     async func(flags: Flags) {
-        const { linux, dtSchema, context, compatible } = flags;
+        const { linux, dtSchema, compatible, parent, output } = flags;
 
-        if (!fs.existsSync(context)) {
-            console.log(`Missing: ${context}`);
-            return;
-        }
         if (!fs.existsSync(linux)) {
             console.log(`Missing: ${linux}`);
             return;
         }
         if (!fs.existsSync(dtSchema)) {
-            console.log(`Missing: ${linux}`);
+            console.log(`Missing: ${dtSchema}`);
             return;
         }
 
-        const context_content = fs.readFileSync(context, 'utf8');
+        const schema = await find_binding(linux, dtSchema, compatible);
 
-        const document = (() => {
-            try {
-                return parse_dts(context_content);
-            } catch {
-                return;
+        if (schema === undefined) {
+            console.log(`Failed to find schema for ${compatible}`);
+            return;
+        }
+
+        // TODO: could also check to find parent in context
+
+        const path = (() => {
+            if (parent === undefined) {
+                return `/`;
             }
+
+            if (parent.startsWith("/")) {
+                return `&{${parent}}`;
+            }
+
+            return `&${parent}`;
         })();
 
-        if (document === undefined) {
-            console.log(`Failed to parse dts ${context}`);
-            return;
-        }
+        const dtso = String.raw`/dts-v1/;
+/plugin/;
 
-        const binding_path = await find_binding(linux, dtSchema, compatible);
+${path} {
+        ${compatible} {
+            compatible = "${compatible}";
+        };
+};
+`;
 
-        if (binding_path === undefined) {
-            console.log(`Failed to find binding for ${compatible}`);
-            return;
-        }
-
-        let attach = Attach.new();
-
-        const binding = await attach.parse_binding(binding_path, linux, dtSchema);
-
-        if (binding === undefined) {
-            console.log(`Failed to parse binding ${binding_path}`);
-            return;
-        }
-
-        const parents = suggest_parents(document, binding.parsed_binding);
-
-        console.log(JSON.stringify(parents));
+        fs.writeFileSync(output, dtso);
+        console.log(`Wrote ${output}`);
     }
 });
+
 
 async function find_binding(linux: string, dtSchema: string, compatible_to_find: string): Promise<string | undefined> {
     const bindings_folder = path.resolve(linux, "Documentation", "devicetree", "bindings");
