@@ -2647,6 +2647,22 @@ __metadata:
   languageName: node
   linkType: hard
 
+"attach-cli@workspace:packages/attach-cli":
+  version: 0.0.0-use.local
+  resolution: "attach-cli@workspace:packages/attach-cli"
+  dependencies:
+    "@stricli/auto-complete": "npm:^1.2.6"
+    "@stricli/core": "npm:^1.2.6"
+    "@types/node": "npm:25.x"
+    attach-lib: "npm:*"
+    tsup: "npm:^6.7.0"
+    typescript: "npm:5.6.x"
+  bin:
+    __attach_bash_complete: dist/bash-complete.js
+    attach: dist/cli.js
+  languageName: unknown
+  linkType: soft
+
 "attach-lib@npm:*, attach-lib@workspace:packages/attach-lib":
   version: 0.0.0-use.local
   resolution: "attach-lib@workspace:packages/attach-lib"
@@ -2683,21 +2699,6 @@ __metadata:
     extension-protocol: "workspace:*"
     hds-react: "workspace:*"
     react: ^19.0.0
-  languageName: unknown
-  linkType: soft
-
-"attach@workspace:packages/attach-cli":
-  version: 0.0.0-use.local
-  resolution: "attach@workspace:packages/attach-cli"
-  dependencies:
-    "@stricli/auto-complete": "npm:^1.2.6"
-    "@stricli/core": "npm:^1.2.6"
-    "@types/node": "npm:25.x"
-    tsup: "npm:^6.7.0"
-    typescript: "npm:5.6.x"
-  bin:
-    __attach_bash_complete: dist/bash-complete.js
-    attach: dist/cli.js
   languageName: unknown
   linkType: soft
 
