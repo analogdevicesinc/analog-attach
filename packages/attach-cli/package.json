@@ -1,5 +1,5 @@
 {
-    "name": "attach",
+    "name": "attach-cli",
     "author": "",
     "description": "Stricli command line application",
     "license": "MIT",
@@ -36,9 +36,9 @@
         "minify": true
     },
     "dependencies": {
-        "attach-lib": "*",
         "@stricli/auto-complete": "^1.2.6",
-        "@stricli/core": "^1.2.6"
+        "@stricli/core": "^1.2.6",
+        "attach-lib": "*"
     },
     "devDependencies": {
         "@types/node": "25.x",

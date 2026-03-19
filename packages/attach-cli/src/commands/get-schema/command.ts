@@ -3,6 +3,7 @@ import { Attach, extract_compatible, insert_known_structures, parse_dts, query_d
 
 import * as fs from 'node:fs';
 import path from "node:path";
+
 import { get_all_file_paths } from "../../utilities";
 
 type Flags = {
@@ -48,11 +49,11 @@ export const get_schema_command = buildCommand({
             return;
         }
         if (!fs.existsSync(linux)) {
-            console.log(`Missing: ${context}`);
+            console.log(`Missing: ${linux}`);
             return;
         }
         if (!fs.existsSync(dtSchema)) {
-            console.log(`Missing: ${context}`);
+            console.log(`Missing: ${dtSchema}`);
             return;
         }
 
