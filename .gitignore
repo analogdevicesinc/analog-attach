@@ -10,6 +10,8 @@ packages/extension/test/cache
 venv/
 docs/_build
 
+coverage/
+
 # Yarn
 .yarn/*
 !.yarn/patches
