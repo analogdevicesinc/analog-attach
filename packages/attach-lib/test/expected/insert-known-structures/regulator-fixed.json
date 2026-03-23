@@ -240,8 +240,7 @@
                 "minimum": 0,
                 "maximum": 4294967295,
                 "typeSize": 32,
-                "description": "Offset applied to voltages to compensate for voltage drops",
-                "default": null
+                "description": "Offset applied to voltages to compensate for voltage drops"
             }
         },
         {
@@ -312,8 +311,7 @@
                 "minimum": 0,
                 "maximum": 4294967295,
                 "typeSize": 32,
-                "description": "ramp delay for regulator(in uV/us) For hardware which supports disabling ramp rate, it should be explicitly initialised to zero (regulator-ramp-delay = <0>) for disabling ramp delay.",
-                "default": null
+                "description": "ramp delay for regulator(in uV/us) For hardware which supports disabling ramp rate, it should be explicitly initialised to zero (regulator-ramp-delay = <0>) for disabling ramp delay."
             }
         },
         {
@@ -323,8 +321,7 @@
                 "minimum": 0,
                 "maximum": 4294967295,
                 "typeSize": 32,
-                "description": "The time taken, in microseconds, for the supply rail to reach the target voltage, plus/minus whatever tolerance the board design requires. This property describes the total system ramp time required due to the combination of internal ramping of the regulator itself, and board design issues such as trace capacitance and load on the supply.",
-                "default": null
+                "description": "The time taken, in microseconds, for the supply rail to reach the target voltage, plus/minus whatever tolerance the board design requires. This property describes the total system ramp time required due to the combination of internal ramping of the regulator itself, and board design issues such as trace capacitance and load on the supply."
             }
         },
         {
@@ -374,8 +371,7 @@
                 "minimum": 0,
                 "maximum": 4294967295,
                 "typeSize": 32,
-                "description": "initial operating mode. The set of possible operating modes depends on the capabilities of every hardware so each device binding documentation explains which values the regulator supports.",
-                "default": null
+                "description": "initial operating mode. The set of possible operating modes depends on the capabilities of every hardware so each device binding documentation explains which values the regulator supports."
             }
         },
         {
@@ -396,8 +392,7 @@
                 "minimum": 0,
                 "maximum": 4294967295,
                 "typeSize": 32,
-                "description": "Load in uA present on regulator that is not captured by any consumer request.",
-                "default": null
+                "description": "Load in uA present on regulator that is not captured by any consumer request."
             }
         },
         {
@@ -566,8 +561,7 @@
                     1
                 ],
                 "typeSize": 32,
-                "description": "tristate, enable/disable active discharge of regulators. The values are:\n0: Disable active discharge.\n1: Enable active discharge.\nAbsence of this property will leave configuration to default.\n",
-                "default": null
+                "description": "tristate, enable/disable active discharge of regulators. The values are:\n0: Disable active discharge.\n1: Enable active discharge.\nAbsence of this property will leave configuration to default.\n"
             }
         },
         {

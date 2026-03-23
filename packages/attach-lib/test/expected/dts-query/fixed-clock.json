@@ -38,8 +38,7 @@
                 "minimum": 0,
                 "maximum": 4294967295,
                 "typeSize": 32,
-                "description": "accuracy of clock in ppb (parts per billion).",
-                "default": null
+                "description": "accuracy of clock in ppb (parts per billion)."
             }
         },
         {
