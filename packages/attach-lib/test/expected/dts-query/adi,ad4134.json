@@ -180,8 +180,7 @@
             "key": "spi-max-frequency",
             "value": {
                 "_t": "integer",
-                "maximum": 1000000,
-                "default": null
+                "maximum": 1000000
             }
         },
         {

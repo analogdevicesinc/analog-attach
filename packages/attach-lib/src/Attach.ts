@@ -439,7 +439,7 @@ function narrow_object(object: any): AttachType {
                     const maximum = "maximum" in object ? object.maximum : undefined;
                     const typeSize = "typeSize" in object ? object.typeSize : undefined;
                     const description = "description" in object ? object.description : undefined;
-                    const default_value = "default" in object ? object.default : Number.NaN;
+                    const default_value = "default" in object ? object.default : undefined;
 
                     if ("enum" in object) {
 
