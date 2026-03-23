@@ -124,7 +124,7 @@ async function find_binding(linux: string, dtSchema: string, compatible_to_find:
         }
 
         for (const entry of compatible) {
-            // TODO fix why entry could be undefined
+            // TODO: fix why entry could be undefined
             // arm/actions.yaml
             if (entry !== undefined && entry === compatible_to_find) {
                 return file;
