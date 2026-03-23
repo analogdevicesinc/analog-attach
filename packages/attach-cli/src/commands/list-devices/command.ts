@@ -9,7 +9,7 @@ import { get_all_file_paths } from "../../utilities";
 type Flags = {
     linux: string,
     dtSchema: string,
-    includesWord: string,
+    includesWord?: string,
 }
 
 export const list_devices_command = buildCommand({
@@ -28,7 +28,8 @@ export const list_devices_command = buildCommand({
             includesWord: {
                 kind: "parsed",
                 parse: String,
-                brief: "word to be present in device name"
+                brief: "word to be present in device name",
+                optional: true
             }
         }
     },
@@ -76,8 +77,12 @@ export const list_devices_command = buildCommand({
             for (const entry of compatible) {
                 // TODO fix why entry could be undefined
                 // arm/actions.yaml
-                if (entry !== undefined && entry.includes(includesWord)) {
-                    console.log(`${entry}`);
+                if (entry !== undefined) {
+                    if (includesWord !== undefined && entry.includes(includesWord)) {
+                        console.log(`${entry}`);
+                    } else if (includesWord === undefined) {
+                        console.log(`${entry}`);
+                    }
                 }
             }
         }
