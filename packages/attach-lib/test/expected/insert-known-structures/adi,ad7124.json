@@ -235,8 +235,7 @@
                 "minimum": 0,
                 "maximum": 4294967295,
                 "typeSize": 32,
-                "description": "Maximum SPI clocking speed of the device in Hz.",
-                "default": null
+                "description": "Maximum SPI clocking speed of the device in Hz."
             }
         },
         {
@@ -382,8 +381,7 @@
                     2
                 ],
                 "typeSize": 32,
-                "description": "SPI interface type",
-                "default": null
+                "description": "SPI interface type"
             }
         },
         {
@@ -407,8 +405,7 @@
                 "minimum": 0,
                 "maximum": 4,
                 "typeSize": 32,
-                "description": "Rx FIFO watermark level",
-                "default": null
+                "description": "Rx FIFO watermark level"
             }
         },
         {
@@ -418,8 +415,7 @@
                 "minimum": 0,
                 "maximum": 4,
                 "typeSize": 32,
-                "description": "Tx FIFO watermark level",
-                "default": null
+                "description": "Tx FIFO watermark level"
             }
         },
         {
@@ -429,8 +425,7 @@
                 "minimum": 3,
                 "maximum": 31,
                 "typeSize": 32,
-                "description": "Microwire interface - Control length",
-                "default": null
+                "description": "Microwire interface - Control length"
             }
         },
         {
@@ -442,8 +437,7 @@
                     1
                 ],
                 "typeSize": 32,
-                "description": "Microwire interface - Wait state",
-                "default": null
+                "description": "Microwire interface - Wait state"
             }
         },
         {
@@ -455,8 +449,7 @@
                     1
                 ],
                 "typeSize": 32,
-                "description": "Microwire interface - Full/Half duplex",
-                "default": null
+                "description": "Microwire interface - Full/Half duplex"
             }
         },
         {
@@ -466,8 +459,7 @@
                 "minimum": 0,
                 "maximum": 4294967295,
                 "typeSize": 32,
-                "description": "Delay for read capture logic, in clock cycles.",
-                "default": null
+                "description": "Delay for read capture logic, in clock cycles."
             }
         },
         {
@@ -521,8 +513,7 @@
                 "minimum": 0,
                 "maximum": 4294967295,
                 "typeSize": 32,
-                "description": "Delay in nanoseconds between activating chip select and the start of clock signal, at the start of a transfer.",
-                "default": null
+                "description": "Delay in nanoseconds between activating chip select and the start of clock signal, at the start of a transfer."
             }
         },
         {
@@ -532,8 +523,7 @@
                 "minimum": 0,
                 "maximum": 4294967295,
                 "typeSize": 32,
-                "description": "Delay in nanoseconds between stopping the clock signal and deactivating chip select, at the end of a transfer.",
-                "default": null
+                "description": "Delay in nanoseconds between stopping the clock signal and deactivating chip select, at the end of a transfer."
             }
         },
         {
@@ -566,8 +556,7 @@
                 "minimum": 0,
                 "maximum": 31,
                 "typeSize": 32,
-                "description": "Delays the clock going out to device with this tap value. Tap value varies based on platform design trace lengths from Tegra QSPI to corresponding slave device.",
-                "default": null
+                "description": "Delays the clock going out to device with this tap value. Tap value varies based on platform design trace lengths from Tegra QSPI to corresponding slave device."
             }
         },
         {
@@ -577,8 +566,7 @@
                 "minimum": 0,
                 "maximum": 255,
                 "typeSize": 32,
-                "description": "Delays the clock coming in from the device with this tap value. Tap value varies based on platform design trace lengths from Tegra QSPI to corresponding slave device.",
-                "default": null
+                "description": "Delays the clock coming in from the device with this tap value. Tap value varies based on platform design trace lengths from Tegra QSPI to corresponding slave device."
             }
         }
     ],
@@ -615,8 +603,7 @@
                             3
                         ],
                         "typeSize": 32,
-                        "description": "Select the reference source to use when converting on\nthe specific channel. Valid values are:\n0: REFIN1(+)/REFIN1(−).\n1: REFIN2(+)/REFIN2(−).\n3: AVDD\nIf this field is left empty, internal reference is selected.\n",
-                        "default": null
+                        "description": "Select the reference source to use when converting on\nthe specific channel. Valid values are:\n0: REFIN1(+)/REFIN1(−).\n1: REFIN2(+)/REFIN2(−).\n3: AVDD\nIf this field is left empty, internal reference is selected.\n"
                     }
                 },
                 {
