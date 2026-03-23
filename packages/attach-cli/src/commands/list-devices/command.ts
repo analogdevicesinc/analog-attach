@@ -61,6 +61,10 @@ export const list_devices_command = buildCommand({
 
         for (const file of yaml_files) {
 
+            if (includesWord !== undefined && !fs.readFileSync(file, 'utf8').includes(includesWord)) {
+                continue;
+            }
+
             const attach = Attach.new();
             const binding = await attach.parse_binding(file, linux, dtSchema);
 
