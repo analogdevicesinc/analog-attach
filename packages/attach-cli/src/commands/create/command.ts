@@ -11,7 +11,7 @@ type Flags = {
     dtSchema: string,
     compatible: string,
     parent?: string,
-    output: string,
+    output?: string,
 }
 
 export const create_command = buildCommand({
@@ -41,7 +41,8 @@ export const create_command = buildCommand({
             output: {
                 kind: "parsed",
                 parse: String,
-                brief: "Compatible string of the desired device binding"
+                brief: "Compatible string of the desired device binding",
+                optional: true
             }
         }
     },
@@ -91,8 +92,13 @@ ${path} {
 };
 `;
 
-        fs.writeFileSync(output, dtso);
-        console.log(`Wrote ${output}`);
+        if (output === undefined) {
+            console.log(dtso);
+        }
+        else {
+            fs.writeFileSync(output, dtso);
+            console.log(`Wrote ${output}`);
+        }
     }
 });
 
