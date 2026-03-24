@@ -1,9 +1,9 @@
 import { buildCommand } from "@stricli/core";
-import { Attach, parse_dts, parseDtso, type CellArrayElement, type DtsNode, type DtsValue, type DtsValueComponent } from "attach-lib";
+import { Attach, parse_dts, parseDtso, type CellArrayElement, type DtsNode, type DtsValue, type DtsValueComponent, type ParsedBinding } from "attach-lib";
 
 import * as fs from 'node:fs';
 
-import { find_binding } from "../../utilities";
+import { bigIntReplacer, find_binding } from "../../utilities";
 
 type Flags = {
     linux: string,
@@ -146,7 +146,7 @@ export const validate_command = buildCommand({
             return;
         }
 
-        const input_data = parseNodeValues(node_to_validate);
+        const input_data = parse_dts_node(node_to_validate, binding.parsed_binding);
         console.log(JSON.stringify(Object.fromEntries(input_data), bigIntReplacer));
 
         const update = attach.update_binding_by_changes(JSON.stringify(Object.fromEntries(input_data), bigIntReplacer));
@@ -156,36 +156,100 @@ export const validate_command = buildCommand({
             return;
         }
 
+        console.log(`============= UPDATED BINDING =============`);
+        console.log(JSON.stringify(update.binding));
+        console.log(`============= VALIDATION ERRORS =============`);
         console.log(JSON.stringify(update.errors));
     }
 });
 
-
-function bigIntReplacer(_key: string, value: any): any {
-    return typeof value === 'bigint' ? value.toString() : value;
-}
-
-function parseNodeValues(node: DtsNode): Map<string, unknown> {
+function parse_dts_node(node: DtsNode, parsed_binding: ParsedBinding): Map<string, unknown> {
     const map = new Map<string, unknown>();
     for (const property of node.properties) {
         if (property.name === "status") {
             continue;
         }
-        map.set(property.name, property.value ? parseDtsValue(property.value) : true);
+
+        const value = parse_dts_value(property.value);
+
+        const definition = parsed_binding.properties.find((value) => value.key === property.name);
+
+        if (definition === undefined) {
+            map.set(property.name, value);
+            continue;
+        }
+
+        const definition_type = definition.value._t;
+        switch (definition_type) {
+            case "array":
+            case "enum_array":
+            case "fixed_index":
+            case "number_array":
+            case "string_array": {
+
+                if (Array.isArray(value)) {
+                    map.set(property.name, value);
+                    continue;
+                }
+
+                map.set(property.name, [value]);
+                continue;
+            }
+            case "matrix": {
+
+                if (Array.isArray(value)) {
+
+                    if (value.every((entry) => Array.isArray(entry))) {
+                        map.set(property.name, value);
+                        continue;
+                    }
+
+                    map.set(property.name, value.map((entry) => [entry]));
+                    continue;
+                } else {
+                    map.set(property.name, [[value]]);
+                    continue;
+                }
+            }
+            case "boolean":
+            case "const":
+            case "enum_integer":
+            case "generic":
+            case "integer": {
+                map.set(property.name, value);
+                continue;
+            }
+            case "object": {
+                // TODO: finish?
+                continue;
+            }
+
+            default: {
+                const _x: never = definition_type;
+                throw new Error("Exhaustion check failed!");
+            }
+        }
     }
     return map;
 }
 
-function parseDtsValue(value: DtsValue): unknown {
-    if (value.components.length === 1 && value.components[0] !== undefined) {
-        return parseValueComponent(value.components[0]);
+function parse_dts_value(value: DtsValue | undefined): unknown {
+
+    if (value === undefined) {
+        return true;
     }
 
-    return value.components.map((component) => parseValueComponent(component));
+    if (value.components.length === 1 && value.components[0] !== undefined) {
+        return parse_dts_value_component(value.components[0]);
+    }
+
+    return value.components.map((component) => parse_dts_value_component(component));
 }
 
-function parseValueComponent(component: DtsValueComponent): string | number[] | (string | bigint | undefined)[] | undefined {
-    switch (component.kind) {
+function parse_dts_value_component(component: DtsValueComponent): string | number[] | (string | bigint)[] {
+    const kind = component.kind;
+
+    switch (kind) {
         case "string": {
             return component.value;
         }
@@ -196,33 +260,35 @@ function parseValueComponent(component: DtsValueComponent): string | number[] | 
             return component.bytes.map((byte) => byte.value);
         }
         case "array": {
-            return component.elements.map((element) => parseArrayElement(element));
+            return component.elements.map((element) => parse_cell_array_element(element));
         }
         default: {
-            return;
+            const _x: never = kind;
+            throw new Error("Exhaustion check failed!");
         }
     }
 }
 
-function parseArrayElement(element: CellArrayElement): string | bigint | undefined {
-    const { item } = element;
+function parse_cell_array_element(element: CellArrayElement): string | bigint {
+    const kind = element.item.kind;
 
-    switch (item.kind) {
+    switch (kind) {
         case "number":
         case "u64": {
-            return BigInt(item.value);
+            return BigInt(element.item.value);
         }
         case "macro": {
-            return item.value;
+            return element.item.value;
         }
         case "ref": {
-            return item.ref.kind === "label" ? item.ref.name : item.ref.path;
+            return element.item.ref.kind === "label" ? element.item.ref.name : element.item.ref.path;
         }
         case "expression": {
-            return item.value;
+            return element.item.value;
         }
         default: {
-            return undefined;
+            const _x: never = kind;
+            throw new Error("Exhaustive check failed!");
         }
     }
 }

@@ -1,9 +1,8 @@
 import { buildCommand } from "@stricli/core";
-import { Attach, extract_compatible, parse_dts, suggest_parents } from "attach-lib";
+import { Attach, parse_dts, suggest_parents } from "attach-lib";
 
 import * as fs from 'node:fs';
-import path from "node:path";
-import { get_all_file_paths } from "../../utilities";
+import { find_binding } from "../../utilities";
 
 type Flags = {
     linux: string,
@@ -92,42 +91,3 @@ export const suggest_parents_command = buildCommand({
         console.log(JSON.stringify(parents));
     }
 });
-
-async function find_binding(linux: string, dtSchema: string, compatible_to_find: string): Promise<string | undefined> {
-    const bindings_folder = path.resolve(linux, "Documentation", "devicetree", "bindings");
-
-    if (!fs.existsSync(bindings_folder)) {
-        console.log(`Missing ${bindings_folder}`);
-        return;
-    }
-
-    const all_files = get_all_file_paths(bindings_folder);
-    const yaml_files = all_files.filter(file => file.endsWith(".yaml"));
-
-    for (const file of yaml_files) {
-
-        const attach = Attach.new();
-        const binding = await attach.parse_binding(file, linux, dtSchema);
-
-        if (binding === undefined) {
-            continue;
-        }
-
-        const compatible = extract_compatible(binding.parsed_binding);
-
-        if (compatible === undefined) {
-            continue;
-        }
-
-        for (const entry of compatible) {
-            // TODO fix why entry could be undefined
-            // arm/actions.yaml
-            if (entry !== undefined && entry === compatible_to_find) {
-                return file;
-            }
-        }
-
-    }
-
-    return;
-}
