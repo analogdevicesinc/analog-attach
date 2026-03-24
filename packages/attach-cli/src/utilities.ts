@@ -2,6 +2,10 @@ import { Attach, extract_compatible } from 'attach-lib';
 import * as fs from 'node:fs';
 import path from "node:path";
 
+export function bigIntReplacer(_key: string, value: any): any {
+    return typeof value === 'bigint' ? value.toString() : value;
+}
+
 export function get_all_file_paths(directory: string): string[] {
     let results: string[] = [];
     const list = fs.readdirSync(directory);
