@@ -3,7 +3,7 @@ import { Attach, insert_known_structures, parse_dts, query_devicetree } from "at
 
 import * as fs from 'node:fs';
 
-import { find_binding } from "../../utilities";
+import { bigIntReplacer, find_binding } from "../../utilities";
 
 type Flags = {
     linux: string,
@@ -124,8 +124,3 @@ export const get_schema_command = buildCommand({
         console.log(JSON.stringify(binding.parsed_binding, bigIntReplacer));
     }
 });
-
-function bigIntReplacer(_key: string, value: any): any {
-    return typeof value === 'bigint' ? value.toString() : value;
-}
-
