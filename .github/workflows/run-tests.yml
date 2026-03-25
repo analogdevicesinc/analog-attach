@@ -32,8 +32,14 @@ jobs:
       - name: Clone Linux
         run: |
          cd packages/attach-lib/test
-         git clone --depth 1 -b rpi-6.12.y https://github.com/analogdevicesinc/linux
-         cd ../../../
+         # Version lock this commit from rpi-6.12.y
+         # This will be changed back after release (and test patch)
+         git init linux/
+         cd linux/
+         git remote add origin https://github.com/analogdevicesinc/linux
+         git fetch --depth 1 origin 3a020df09ceee7cbeb1c3adce2cdc86d2af61353
+         git checkout FETCH_HEAD
+         cd ../../../../
 
       - name: Clone dt-schema
         run: | 
@@ -45,7 +51,6 @@ jobs:
         run: |
           ln -sfn "$(pwd)/packages/attach-lib/test/linux" packages/extension/test
           ln -sfn "$(pwd)/packages/attach-lib/test/dt-schema" packages/extension/test
-
 
       - name: Install dependencies
         run: yarn install --immutable
