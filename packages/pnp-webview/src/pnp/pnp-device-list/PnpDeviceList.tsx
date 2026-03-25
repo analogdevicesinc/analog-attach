@@ -26,7 +26,7 @@ import styles from './PnpDeviceList.module.scss';
 function PnpDeviceList() {
     const { deviceGroups, isLoading, error } = useDeviceStore();
 
-    const [connectingNode, setConnectingNode] = useState<string | undefined>(undefined);
+    const [connectingNode, setConnectingNode] = useState<string | undefined>();
     const resetConnectingNode = () => setConnectingNode(undefined);
 
     // Load devices on mount if not already loaded

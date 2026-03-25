@@ -11,7 +11,7 @@ export default function DetailsSection() {
 	const updateDeviceConfiguration = useDeviceInstanceStore((state) => state.updateDeviceConfiguration);
 
 	if (!EditableDeviceInstance) {
-		return null;
+		return undefined;
 	}
 
 	const deviceInstance = deviceInstances.find((di) => di.deviceUID === EditableDeviceInstance.deviceUID);

@@ -1,7 +1,6 @@
 import { create } from 'zustand';
 import { DeviceCommands } from 'extension-protocol';
 import type { GetPotentialParentNodesResponse, ParentNode } from 'extension-protocol';
-import { mockParentNodes } from '../mockData';
 import { useVscodeStore } from 'attach-ui-lib';
 
 interface ParentNodeState {
@@ -11,8 +10,6 @@ interface ParentNodeState {
     error: string | undefined;
 
     // Actions
-    setLoading: (loading: boolean) => void;
-    setError: (error: string | undefined) => void;
     loadParentNodes: (deviceId: string, forceReload?: boolean) => Promise<void>;
     getParentNodes: (deviceId: string) => ParentNode[];
     reset: () => void;
@@ -26,12 +23,6 @@ const initialState = {
 
 export const useParentNodeStore = create<ParentNodeState>((set, get) => ({
     ...initialState,
-
-    setLoading: (isLoading) =>
-        set({ isLoading }),
-
-    setError: (error) =>
-        set({ error, isLoading: false }),
 
     getParentNodes: (deviceId: string) => {
         const state = get();
@@ -52,20 +43,6 @@ export const useParentNodeStore = create<ParentNodeState>((set, get) => ({
         console.log('Loading parent nodes for device:', deviceId);
 
         try {
-            // Only use mock data when VS Code backend is not available
-            if (!useVscodeStore.getState().isConnected) {
-                console.warn('VS Code API not initialized, using mock parent nodes for development');
-                set((currentState) => ({
-                    parentNodes: {
-                        ...currentState.parentNodes,
-                        [deviceId]: mockParentNodes,
-                    },
-                    isLoading: false,
-                    error: undefined,
-                }));
-                return;
-            }
-
             // Fetch parent nodes from backend using device.getPotentialParentNodes
             const response = await useVscodeStore.getState().sendRequest<GetPotentialParentNodesResponse>({
                 command: DeviceCommands.getPotentialParentNodes,

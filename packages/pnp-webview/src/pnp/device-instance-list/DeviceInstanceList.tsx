@@ -4,11 +4,11 @@ import { DeviceInstanceItem } from './DeviceInstanceItem';
 import { useDeviceInstanceStore } from '../../store';
 import { type AttachedDeviceState } from "extension-protocol";
 
-interface DeviceInstanceListProps {
+interface DeviceInstanceListProperties {
 	deviceInstances: AttachedDeviceState[];
 }
 
-function DeviceInstanceListComponent({ deviceInstances }: DeviceInstanceListProps) {
+function DeviceInstanceListComponent({ deviceInstances }: DeviceInstanceListProperties) {
 	const EditableDeviceInstance = useDeviceInstanceStore((state) => state.EditableDeviceInstance);
 
 	const editableDeviceUID = EditableDeviceInstance?.deviceUID;

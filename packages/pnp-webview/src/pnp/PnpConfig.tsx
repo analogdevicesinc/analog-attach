@@ -37,15 +37,15 @@ export default function PnpConfig() {
         const timeoutId = setTimeout(() => {
             // Find all elements with mainContentArea class
             const mainContentAreas = document.querySelectorAll<HTMLElement>(`.${styles.mainContentArea}`);
-            mainContentAreas.forEach((element) => {
+            for (const element of mainContentAreas) {
                 const cleanup = observeElement(element);
                 observers.push(cleanup);
-            });
+            }
         }, 0);
 
         return () => {
             clearTimeout(timeoutId);
-            observers.forEach((cleanup) => cleanup());
+            for (const cleanup of observers) {cleanup();}
         };
     }, [EditableDeviceInstance]);
 
@@ -81,7 +81,11 @@ export default function PnpConfig() {
                         </div>
                     </Allotment.Pane>
                     <Allotment.Pane>
-                        {EditableDeviceInstance !== undefined ? (
+                        {EditableDeviceInstance === undefined ? (
+                            <div className={styles.mainContentArea}>
+                                <ActiveSensorList />
+                            </div>
+                        ) : (
                             <Allotment className={styles.allotmentContainer}>
                                 <Allotment.Pane className={styles.mainContentArea}>
                                     <ActiveSensorList />
@@ -92,14 +96,10 @@ export default function PnpConfig() {
                                     </div>
                                 </Allotment.Pane>
                             </Allotment>
-                        ) : (
-                            <div className={styles.mainContentArea}>
-                                <ActiveSensorList />
-                            </div>
                         )}
                     </Allotment.Pane>
                 </Allotment>
             </div>
         </div>
-    )
+    );
 }

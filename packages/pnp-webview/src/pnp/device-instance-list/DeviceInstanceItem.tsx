@@ -11,7 +11,7 @@ import {
 import { memo } from "react";
 import styles from "./DeviceInstanceList.module.scss";
 
-interface DeviceInstanceControlsProps {
+interface DeviceInstanceControlsProperties {
 	deviceInstance: AttachedDeviceState;
 }
 
@@ -20,7 +20,7 @@ interface DeviceInstanceControlsProps {
  * @param deviceInstance - The device instance to render the controls for
  * @returns A div containing the controls for the sensor
  */
-function DeviceInstanceControls({ deviceInstance }: DeviceInstanceControlsProps) {
+function DeviceInstanceControls({ deviceInstance }: DeviceInstanceControlsProperties) {
  const { loadDeviceConfiguration, setDeviceToDelete } = useDeviceInstanceStore();
  const errorCount = useErrorStore((state) => state.getDeviceErrors(deviceInstance.deviceUID));
  const hasErrors = errorCount > 0;
@@ -47,7 +47,7 @@ function DeviceInstanceControls({ deviceInstance }: DeviceInstanceControlsProps)
 				<GhostButton icon="trash" size="medium" onClick={handleDeleteClick} />
 			</VscodeTooltip>
 		</div>
-	)
+	);
 }
 
 /**
@@ -102,16 +102,16 @@ function ChannelItem({
 				</VscodeTooltip>
 			</div>
 		</div>
-	)
+	);
 }
 
 
-interface DeviceInstanceItemProps {
+interface DeviceInstanceItemProperties {
 	deviceInstance: AttachedDeviceState;
 	highlighted?: boolean;
 }
 
-function DeviceInstanceItemComponent({ deviceInstance, highlighted = false }: DeviceInstanceItemProps) {
+function DeviceInstanceItemComponent({ deviceInstance, highlighted = false }: DeviceInstanceItemProperties) {
 	const setDeviceActive = useDeviceInstanceStore((state) => state.setDeviceActive);
 	const setIsExpanded = useDeviceInstanceStore((state) => state.setIsExpanded);
 	const { startCreatingChannel } = useDeviceInstanceStore();
@@ -122,7 +122,7 @@ function DeviceInstanceItemComponent({ deviceInstance, highlighted = false }: De
 
 	const handleExpand = () => {
 		setIsExpanded(deviceInstance.deviceUID, !deviceInstance.isExpanded);
-	}
+	};
 
 	const handleActiveToggle = () => {
 		console.log('handleActiveToggle', deviceInstance.deviceUID, !deviceInstance.active);

@@ -21,21 +21,23 @@ import { VscodeIcon, VscodeScrollable, VscodeTextfield } from 'hds-react';
 import { containsSearch, SearchResult } from './helpers';
 import { CatalogDevice } from 'extension-protocol';
 
-type PnpNavigationProps = Readonly<{
+type PnpNavigationProperties = Readonly<{
     deviceGroups: DeviceGroupData[];
     onConnectNode: (node: string) => void;
 }>;
 
 type DeviceWithSearchResult = CatalogDevice & { searchResult?: SearchResult };
 
-function PnpNavigation({ deviceGroups, onConnectNode }: PnpNavigationProps) {
+function PnpNavigation({ deviceGroups, onConnectNode }: PnpNavigationProperties) {
     const [searchValue, setSearchValue] = useState('');
 
     const filteredDeviceGroups = useMemo(() => {
         if (!searchValue) {
             return deviceGroups;
         }
-        return deviceGroups.reduce<(DeviceGroupData & { searchResult?: SearchResult })[]>((acc, group) => {
+
+        const result: (DeviceGroupData & { searchResult?: SearchResult })[] = [];
+        for (const group of deviceGroups) {
             const groupNameSearchResult = group.group ? containsSearch(group.group, searchValue) : { match: false, ranges: [] };
 
             // search inside matched group names
@@ -47,26 +49,25 @@ function PnpNavigation({ deviceGroups, onConnectNode }: PnpNavigationProps) {
                 const matchedDevices = devicesWithPossibleMatch.filter(device => device.searchResult?.match);
                 const nonMatchedDevices = devicesWithPossibleMatch.filter(device => !device.searchResult?.match);
                 const prioritizedDevices = [...matchedDevices, ...nonMatchedDevices];
-                acc.push({ ...group, devices: prioritizedDevices, searchResult: groupNameSearchResult });
-                return acc;
+                result.push({ ...group, devices: prioritizedDevices, searchResult: groupNameSearchResult });
+                continue;
             }
 
             // search devices when group name does not match
-            const matchedDevices = group.devices.reduce<DeviceWithSearchResult[]>((devices, device) => {
+            const matchedDevices: DeviceWithSearchResult[] = [];
+            for (const device of group.devices) {
                 const searchResult = containsSearch(device.name, searchValue);
                 if (searchResult.match) {
-                    devices.push({ ...device, searchResult });
+                    matchedDevices.push({ ...device, searchResult });
                 }
-                return devices;
-            }, []);
-
-            if (matchedDevices.length > 0) {
-                acc.push({ ...group, devices: matchedDevices });
             }
 
-            return acc;
-        }, []);
+            if (matchedDevices.length > 0) {
+                result.push({ ...group, devices: matchedDevices });
+            }
+        }
 
+        return result;
     }, [searchValue, deviceGroups]);
 
     if (deviceGroups.length === 0) {
@@ -76,11 +77,11 @@ function PnpNavigation({ deviceGroups, onConnectNode }: PnpNavigationProps) {
 
     const handleConnectNode = (deviceId: string) => {
         onConnectNode(deviceId);
-    }
+    };
 
     const handleSearch = (event: any) => {
         setSearchValue(event.currentTarget.value);
-    }
+    };
 
     const highlightMatches = (name: string, searchResult: SearchResult | undefined) => {
         if (!searchResult || !searchResult.match) {
@@ -91,13 +92,13 @@ function PnpNavigation({ deviceGroups, onConnectNode }: PnpNavigationProps) {
         let lastIndex = 0;
         for (const [start, end] of ranges) {
             if (start > lastIndex) {
-                parts.push(name.substring(lastIndex, start));
+                parts.push(name.slice(lastIndex, start));
             }
-            parts.push(<mark className={styles.highlight} key={start}>{name.substring(start, end)}</mark>);
+            parts.push(<mark className={styles.highlight} key={start}>{name.slice(start, end)}</mark>);
             lastIndex = end;
         }
         if (lastIndex < name.length) {
-            parts.push(name.substring(lastIndex));
+            parts.push(name.slice(Math.max(0, lastIndex)));
         }
         return parts;
     };

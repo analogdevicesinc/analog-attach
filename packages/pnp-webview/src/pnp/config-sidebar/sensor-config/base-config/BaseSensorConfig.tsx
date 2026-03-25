@@ -16,7 +16,7 @@ export default function BaseSensorConfig() {
     const deleteCustomProperty = useDeviceInstanceStore((state) => state.deleteCustomProperty);
 
     if (!EditableDeviceInstance) {
-        return null;
+        return undefined;
     }
 
     let formElements: FormElement[];
@@ -24,21 +24,21 @@ export default function BaseSensorConfig() {
     if (editingChannelName) {
         // Channel edit mode: Find the channel FormObjectElement and render its config array
         const channelElement = EditableDeviceInstance.payload.config.config.find(
-            (el) => el.type === "FormObject" && (el as FormObjectElement).channelName === editingChannelName
+            (element) => element.type === "FormObject" && (element as FormObjectElement).channelName === editingChannelName
         ) as FormObjectElement | undefined;
 
         formElements = channelElement?.config || [];
     } else {
         // Device edit mode: Filter out channel FormObjectElements
         formElements = EditableDeviceInstance.payload.config.config.filter(
-            (el) => el.type !== "FormObject" || !(el as FormObjectElement).channelName
+            (element) => element.type !== "FormObject" || !(element as FormObjectElement).channelName
         );
     }
 
     const handleFormElementChange = (elementKey: string, newValue: unknown, parentKey?: string) => {
         // If we're editing a channel, pass the channel name as the parent key
         // so the update happens within the channel's FormObjectElement
-        const effectiveParentKey = editingChannelName ? editingChannelName : parentKey;
+        const effectiveParentKey = editingChannelName ?? parentKey;
 
         // Update the form element value in the store
         // Note: updateFormElementValue now automatically triggers debounced update
@@ -73,5 +73,5 @@ export default function BaseSensorConfig() {
                 )}
             </div>
         </div>
-    )
+    );
 }

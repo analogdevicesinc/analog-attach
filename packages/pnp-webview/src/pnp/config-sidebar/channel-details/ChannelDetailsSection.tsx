@@ -9,12 +9,12 @@ export default function ChannelDetailsSection() {
     const updateChannelAlias = useDeviceInstanceStore((state) => state.updateChannelAlias);
 
     if (!EditableDeviceInstance || !editingChannelName) {
-        return null;
+        return undefined;
     }
 
     // Find the channel FormObjectElement
     const channelElement = EditableDeviceInstance.payload.config.config.find(
-        (el) => el.type === "FormObject" && (el as FormObjectElement).channelName === editingChannelName
+        (element) => element.type === "FormObject" && (element as FormObjectElement).channelName === editingChannelName
     ) as FormObjectElement | undefined;
 
     const handleAliasChange = (event: React.FormEvent) => {

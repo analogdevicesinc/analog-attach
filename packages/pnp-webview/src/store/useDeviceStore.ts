@@ -2,36 +2,21 @@ import { create } from 'zustand';
 import type { DeviceGroupData } from './types';
 import { CatalogCommands } from 'extension-protocol';
 import type { GetDevicesResponse, CatalogDevice } from 'extension-protocol';
-import { getMockDeviceGroups } from '../mockData';
 import { useVscodeStore } from 'attach-ui-lib';
-
-// should be removed when the extension-protocol CatalogDevice is updated to have an optional group property
-export type Device = {
-    deviceId: string;
-    name: string;
-    description: string;
-    group: string | undefined;
-};
 
 interface DeviceState {
     // State
     deviceGroups: DeviceGroupData[];
-    selectedDevice: string | undefined;
     isLoading: boolean;
     error: string | undefined;
 
     // Actions
-    setDeviceGroups: (deviceGroups: DeviceGroupData[]) => void;
-    selectDevice: (deviceName: string | undefined) => void;
-    setLoading: (loading: boolean) => void;
-    setError: (error: string | undefined) => void;
     loadDevices: () => Promise<void>;
     reset: () => void;
 }
 
 const initialState = {
     deviceGroups: [],
-    selectedDevice: undefined,
     isLoading: false,
     error: undefined,
 };
@@ -39,29 +24,10 @@ const initialState = {
 export const useDeviceStore = create<DeviceState>((set) => ({
     ...initialState,
 
-    setDeviceGroups: (deviceGroups) =>
-        set({ deviceGroups, error: undefined }),
-
-    selectDevice: (deviceName) =>
-        set({ selectedDevice: deviceName }),
-
-    setLoading: (isLoading) =>
-        set({ isLoading }),
-
-    setError: (error) =>
-        set({ error, isLoading: false }),
-
     loadDevices: async () => {
         set({ isLoading: true, error: undefined });
 
         try {
-            // Only use mock data when VS Code backend is not available
-            if (!useVscodeStore.getState().isConnected) {
-                console.warn('VS Code API not initialized, using mock data for development');
-                set({ deviceGroups: getMockDeviceGroups(), isLoading: false, error: undefined });
-                return;
-            }
-
             // Get devices from backend using new API
             const response = await useVscodeStore.getState().sendRequest<GetDevicesResponse>({
                 command: CatalogCommands.getDevices,
@@ -91,11 +57,10 @@ export const useDeviceStore = create<DeviceState>((set) => ({
                     const deviceGroups: DeviceGroupData[] = [...groups.entries()].map(
                         ([group, devices]) => ({
                             group,
-                            // Convert CatalogDevice to Device (group can be undefined)
                             devices: devices.map(d => ({
                                 ...d,
                                 group: d.group === "" ? undefined : d.group
-                            })) as Device[]
+                            })) as CatalogDevice[]
                         })
                     );
 

@@ -7,7 +7,6 @@
 
 export { useDeviceStore } from './useDeviceStore';
 export { useVscodeStore } from 'attach-ui-lib';
-export { useUIStore } from './useUIStore';
 export { useDeviceInstanceStore } from './useDeviceInstanceStore';
 export { useParentNodeStore } from './useParentNodeStore';
 export { useErrorStore } from './useErrorStore';

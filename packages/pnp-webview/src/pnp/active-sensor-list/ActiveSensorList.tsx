@@ -52,15 +52,14 @@ export function ActiveSensorList() {
 
 	useEffect(() => {
 		loadDeviceInstances();
-		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, []);
+	}, []); // intentional: run once on mount
 
 	const handleCloseDeleteModal = () => {
 		setDeviceToDelete(undefined);
 	};
 
 	const handleConfirmDelete = async () => {
-		if (!deviceToDelete) return;
+		if (!deviceToDelete) {return;}
 
 		try {
 			const priorEditableUID = EditableDeviceInstance?.deviceUID;
@@ -98,7 +97,7 @@ export function ActiveSensorList() {
 	};
 
 	const handleConfirmChannelDelete = async () => {
-		if (!channelToDelete) return;
+		if (!channelToDelete) {return;}
 
 		try {
 			await deleteChannelFromDevice(channelToDelete.deviceUID, channelToDelete.channelName);

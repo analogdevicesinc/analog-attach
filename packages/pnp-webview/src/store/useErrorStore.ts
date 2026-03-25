@@ -8,8 +8,6 @@ interface ErrorStoreState {
     // Actions
     setDeviceErrors: (deviceUID: DeviceUID, errorCount: number) => void;
     getDeviceErrors: (deviceUID: DeviceUID) => number;
-    clearDeviceErrors: (deviceUID: DeviceUID) => void;
-    clearAllErrors: () => void;
 }
 
 export const useErrorStore = create<ErrorStoreState>((set, get) => ({
@@ -25,17 +23,5 @@ export const useErrorStore = create<ErrorStoreState>((set, get) => ({
 
     getDeviceErrors: (deviceUID: DeviceUID) => {
         return get().deviceErrors.get(deviceUID) ?? 0;
-    },
-
-    clearDeviceErrors: (deviceUID: DeviceUID) => {
-        set((state) => {
-            const newErrors = new Map(state.deviceErrors);
-            newErrors.delete(deviceUID);
-            return { deviceErrors: newErrors };
-        });
-    },
-
-    clearAllErrors: () => {
-        set({ deviceErrors: new Map<DeviceUID, number>() });
     },
 }));

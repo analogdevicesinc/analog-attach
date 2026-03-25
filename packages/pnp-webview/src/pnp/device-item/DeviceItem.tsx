@@ -17,17 +17,17 @@ import { GhostButton } from 'attach-ui-lib';
 import { memo } from 'react';
 import styles from './DeviceItem.module.scss';
 
-type DeviceItemProps = Readonly<{
+type DeviceItemProperties = Readonly<{
     name: string | React.ReactNode;
     onConnectNode: (node: string) => void;
     hasParent?: boolean;
     originalName: string;
 }>;
 
-function DeviceItem({ name, onConnectNode, hasParent, originalName }: DeviceItemProps) {
+function DeviceItem({ name, onConnectNode, hasParent, originalName }: DeviceItemProperties) {
     const clickHandler = () => {
         onConnectNode(originalName);
-    }
+    };
     
     return (
         <div

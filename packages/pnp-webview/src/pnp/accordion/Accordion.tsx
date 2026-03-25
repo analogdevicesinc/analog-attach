@@ -16,7 +16,7 @@ import React, { useEffect, useRef } from 'react';
 import { VscodeIcon } from '../../../../hds-react/src/react-wrappers';
 import styles from './Accordion.module.scss';
 
-type AccordionProps = Readonly<{
+type AccordionProperties = Readonly<{
     title: React.ReactNode;
     body: React.ReactNode;
     isOpen: boolean;
@@ -32,22 +32,22 @@ export default function Accordion({
     highlight,
     isOpen,
     toggleExpand
-}: AccordionProps) {
-    const accordionRef = useRef<HTMLDivElement>(null);
+}: AccordionProperties) {
+    const accordionReference = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
         if (isOpen) {
             setTimeout(() => {
-                if (!accordionRef.current) return;
+                if (!accordionReference.current) {return;}
 
-                const parentContainer = accordionRef.current.parentElement;
+                const parentContainer = accordionReference.current.parentElement;
 
                 if (parentContainer) {
                     const parentContainerBottom =
                         parentContainer.getBoundingClientRect().bottom;
 
                     const accordionBottom =
-                        accordionRef.current.getBoundingClientRect().bottom;
+                        accordionReference.current.getBoundingClientRect().bottom;
 
                     const offsetFromBottom = 50;
 
@@ -66,7 +66,7 @@ export default function Accordion({
 
     return (
         <div
-            ref={accordionRef}
+            ref={accordionReference}
             className={`${styles.container} ${isOpen ? styles.hasBorder : ''}`}
             data-test={`accordion:${title}`}
         >
