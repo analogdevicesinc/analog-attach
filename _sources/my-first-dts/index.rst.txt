@@ -72,6 +72,6 @@ After following the steps in the video, your ``.dtso`` file should look like thi
 This overlay:
 
 - Attaches an AD7124-8 ADC to ``spi0`` at chip select 1
-- Configures two differential input channels
+- Configures two pseudo differential input channels
 - Defines a fixed clock source for the ADC
 - Creates a fixed voltage regulator for the reference input
