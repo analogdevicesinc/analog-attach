@@ -3,7 +3,6 @@ import { SessionCommands, DeviceCommands } from 'extension-protocol';
 import type { AttachedDeviceState, DeviceChannelSummary } from 'extension-protocol';
 import type { GetAttachedDevicesStateResponse, GetDeviceConfigurationResponse, UpdateDeviceConfigurationResponse, SetNodeActiveResponse } from 'extension-protocol';
 import type { ConfigTemplatePayload, DeviceUID, DeviceConfigurationFormObject, FormElement, FormObjectElement } from '../../../extension-protocol/src/api-commands/payloads';
-import { mockDeviceInstances, getMockConfiguration } from '../mockData';
 import { useVscodeStore } from 'attach-ui-lib';
 import { useParentNodeStore } from './useParentNodeStore';
 import { useErrorStore } from './useErrorStore';
@@ -37,8 +36,6 @@ interface DeviceInstanceState {
     editingChannelName: string | undefined;
 
     // Actions
-    setDeviceInstances: (deviceInstances: AttachedDeviceState[]) => void;
-    setLoading: (loading: boolean) => void;
     setError: (error: string | undefined) => void;
     loadDeviceInstances: () => Promise<void>;
     setEditableDeviceInstance: (config: EditableDeviceConfiguration | undefined) => void;
@@ -196,12 +193,6 @@ const triggerDebouncedConfigUpdate = (get: () => DeviceInstanceState) => {
 export const useDeviceInstanceStore = create<DeviceInstanceState>((set, get) => ({
     ...initialState,
 
-    setDeviceInstances: (deviceInstances) =>
-        set({ deviceInstances, error: undefined }),
-
-    setLoading: (isLoading) =>
-        set({ isLoading }),
-
     setError: (error) =>
         set({ error, isLoading: false }),
 
@@ -216,25 +207,6 @@ export const useDeviceInstanceStore = create<DeviceInstanceState>((set, get) => 
             for (const device of currentState.deviceInstances) {
                 activeStateMap.set(device.deviceUID, device.active ?? true);
                 expandedStateMap.set(device.deviceUID, device.isExpanded ?? false);
-            }
-
-            // Only use mock data when VS Code backend is not available
-            if (!useVscodeStore.getState().isConnected) {
-                console.warn('VS Code API not initialized, using mock data for development');
-                // Preserve active states for mock data too
-                const mockInstances = mockDeviceInstances.map(device => ({
-                    ...device,
-                    active: activeStateMap.get(device.deviceUID) ?? device.active ?? true,
-                    isExpanded: expandedStateMap.get(device.deviceUID) ?? device.isExpanded ?? false,
-                }));
-                set({ deviceInstances: mockInstances, isLoading: false, error: undefined });
-
-                // Load parent nodes for all device instances using the ParentNodeStore
-                const parentNodeStore = useParentNodeStore.getState();
-                for (const deviceInstance of mockInstances) {
-                    await parentNodeStore.loadParentNodes(deviceInstance.compatible);
-                }
-                return;
             }
 
             // Get device instances from backend using new API
@@ -407,18 +379,6 @@ export const useDeviceInstanceStore = create<DeviceInstanceState>((set, get) => 
         set({ isLoading: true, error: undefined });
 
         try {
-            // Only use mock data when VS Code backend is not available
-            if (!useVscodeStore.getState().isConnected) {
-                console.warn('VS Code API not initialized, using mock configuration data for development');
-                set({
-                    EditableDeviceInstance: getMockConfiguration(deviceUID),
-                    isLoading: false,
-                    error: undefined,
-                    ...clearChannelState()
-                });
-                return;
-            }
-
             // Get device configuration from backend using new API
             const response = await useVscodeStore.getState().sendRequest<GetDeviceConfigurationResponse>({
                 command: DeviceCommands.getConfiguration,

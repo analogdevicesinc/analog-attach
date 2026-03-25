@@ -33,13 +33,13 @@ export default function ConfigHeader() {
 	} else if (editingChannelName) {
 		// Channel edit mode
 		const channelElement = EditableDeviceInstance?.payload.config.config.find(
-			(el) => el.type === "FormObject" && (el as FormObjectElement).channelName === editingChannelName
+			(element) => element.type === "FormObject" && (element as FormObjectElement).channelName === editingChannelName
 		) as FormObjectElement | undefined;
 
 		displayName = channelElement?.alias || editingChannelName || 'Unknown Channel';
 		secondaryName = channelElement?.alias ? (editingChannelName ?? "Unknown Channel") : '';
 
-		errorCount = channelElement?.config.filter(el => el.error).length ?? 0; // count all the channel errors
+		errorCount = channelElement?.config.filter(element => element.error).length ?? 0; // count all the channel errors
 	} else {
 		// Normal device edit mode
 		displayName = deviceInstance ? (deviceInstance.alias || deviceInstance.name) : "Unknown Device";
@@ -87,10 +87,10 @@ export default function ConfigHeader() {
 							</div>
 							{genericErrors.length > 0 && genericErrorsExpanded && (
 									<div className={styles.genericErrorList}>
-										{genericErrors.map((err, index) => (
+										{genericErrors.map((error_, index) => (
 										<div key={index} className={styles.genericErrorItem}>
-											<span className={styles.genericErrorMessage}>{err.message}</span>
-											{err.details && <span className={styles.genericErrorDetails}>{err.details}</span>}
+											<span className={styles.genericErrorMessage}>{error_.message}</span>
+											{error_.details && <span className={styles.genericErrorDetails}>{error_.details}</span>}
 										</div>
 									))}
 								</div>
@@ -106,5 +106,5 @@ export default function ConfigHeader() {
 				</div>
 			</div>
 		</div>
-	)
+	);
 }

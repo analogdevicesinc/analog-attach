@@ -1,3 +1,4 @@
+/* eslint-disable unicorn/prevent-abbreviations -- vite-env.d.ts is a required Vite convention */
 /// <reference types="vite/client" />
 
 // Type declarations for CSS/SCSS modules

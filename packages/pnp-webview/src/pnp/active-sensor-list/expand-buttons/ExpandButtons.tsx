@@ -3,6 +3,13 @@ import styles from './ExpandButtons.module.scss';
 import classNames from 'classnames';
 import { useDeviceInstanceStore } from '@/store';
 
+function handleKeyDown(event: React.KeyboardEvent, handler: () => void) {
+	if (event.key === 'Enter' || event.key === ' ') {
+		event.preventDefault();
+		handler();
+	}
+}
+
 export function ExpandButtons() {
 	const expandAllDevices = useDeviceInstanceStore((state) => state.expandAllDevices);
 
@@ -14,20 +21,13 @@ export function ExpandButtons() {
 		expandAllDevices(false);
 	};
 
-	const handleKeyDown = (event: React.KeyboardEvent, handler: () => void) => {
-		if (event.key === 'Enter' || event.key === ' ') {
-			event.preventDefault();
-			handler();
-		}
-	};
-
 	return (
 		<div className={styles.container}>
 			<div
 				className={classNames(styles.button)}
 				tabIndex={0}
 				onClick={handleExpand}
-				onKeyDown={(e) => handleKeyDown(e, handleExpand)}
+				onKeyDown={(event) => handleKeyDown(event, handleExpand)}
 				role="button"
 				aria-label="Expand all devices"
 			>
@@ -37,7 +37,7 @@ export function ExpandButtons() {
 				className={styles.button}
 				tabIndex={0}
 				onClick={handleCollapse}
-				onKeyDown={(e) => handleKeyDown(e, handleCollapse)}
+				onKeyDown={(event) => handleKeyDown(event, handleCollapse)}
 				role="button"
 				aria-label="Collapse all devices"
 			>

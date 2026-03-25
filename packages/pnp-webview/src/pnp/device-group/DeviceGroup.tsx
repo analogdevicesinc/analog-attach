@@ -16,13 +16,13 @@ import { memo, useCallback, useState, useEffect } from 'react';
 import Accordion from '../accordion/Accordion';
 import styles from './DeviceGroup.module.scss';
 
-type DeviceGroupProps = Readonly<{
+type DeviceGroupProperties = Readonly<{
     group: string | React.ReactNode;
     children: React.ReactNode;
     forceOpen?: boolean;
 }>;
 
-function DeviceGroup({ group, children, forceOpen }: DeviceGroupProps) {
+function DeviceGroup({ group, children, forceOpen }: DeviceGroupProperties) {
     const [isOpen, setIsOpen] = useState(forceOpen || false);
 
     useEffect(() => {
@@ -30,7 +30,7 @@ function DeviceGroup({ group, children, forceOpen }: DeviceGroupProps) {
     }, [forceOpen]);
 
     const toggleExpand = useCallback(() => {
-        setIsOpen(prev => !prev);
+        setIsOpen(previous => !previous);
     }, []);
 
 

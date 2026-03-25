@@ -63,5 +63,5 @@ export default function DeviceParentSelection({ onFinish, connectingNode }: { on
 				</div>
 			)}
 		</div>
-	)
+	);
 }

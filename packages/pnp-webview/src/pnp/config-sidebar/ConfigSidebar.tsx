@@ -41,5 +41,5 @@ export default function ConfigSidebar() {
     }
 
     // No configuration active
-    return null;
+    return undefined;
 }

@@ -12,18 +12,18 @@ import { FormObjectElement } from "extension-protocol";
 export default function ChannelCreateForm() {
     const [channelName, setChannelName] = useState('');
     const [isValid, setIsValid] = useState(false);
-    const [error, setError] = useState<string | null>(null);
+    const [error, setError] = useState<string | undefined>(undefined);
     const [alias, setAlias] = useState('');
-    const [aliasError, setAliasError] = useState<string | null>(null);
+    const [aliasError, setAliasError] = useState<string | undefined>(undefined);
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     const EditableDeviceInstance = useDeviceInstanceStore((state) => state.EditableDeviceInstance);
     const addChannelToDevice = useDeviceInstanceStore((state) => state.addChannelToDevice);
 
-    const channels = EditableDeviceInstance?.payload.config.config.filter(el => el.type === 'FormObject' && el.channelName);
-    const channelNames = channels?.map(el => (el as FormObjectElement).channelName);
+    const channels = EditableDeviceInstance?.payload.config.config.filter(element => element.type === 'FormObject' && element.channelName);
+    const channelNames = channels?.map(element => (element as FormObjectElement).channelName);
     const channelRegexes = EditableDeviceInstance?.payload.config.channelRegexes || [];
-    const generatedChannelRegexEntries = EditableDeviceInstance?.payload.config.generatedChannelRegexEntries?.filter(el => !channelNames?.includes(el)) || [];
+    const generatedChannelRegexEntries = EditableDeviceInstance?.payload.config.generatedChannelRegexEntries?.filter(element => !channelNames?.includes(element)) || [];
 
     const validateChannelName = (name: string): boolean => {
         if (!name.trim()) {
@@ -47,16 +47,16 @@ export default function ChannelCreateForm() {
     };
 
     const handleAliasChange = (event: React.FormEvent) => {
-        setAliasError(null);
+        setAliasError(undefined);
         setIsValid(true);
         const target = event.target as HTMLInputElement;
         setAlias(target.value);
 
         if(target.value.trim() === '') {
-            setAliasError(null); // Alias is optional, so empty value is valid
+            setAliasError(undefined); // Alias is optional, so empty value is valid
             setAlias('');
             return;
-        } 
+        }
         
         if (!isValidAlias(target.value)) {
             setAliasError('Alias can only contain letters, numbers, underscores, and hyphens');
@@ -77,7 +77,7 @@ export default function ChannelCreateForm() {
         }
 
         setIsSubmitting(true);
-        setError(null);
+        setError(undefined);
 
         try {
             await addChannelToDevice(
@@ -86,8 +86,8 @@ export default function ChannelCreateForm() {
                 alias || undefined
             );
             // Success - store will handle transition to edit mode
-        } catch (err) {
-            setError(err instanceof Error ? err.message : 'Failed to create channel');
+        } catch (error_) {
+            setError(error_ instanceof Error ? error_.message : 'Failed to create channel');
             setIsSubmitting(false);
         }
     };
