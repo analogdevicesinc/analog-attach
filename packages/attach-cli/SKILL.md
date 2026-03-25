@@ -2,6 +2,30 @@
 
 You are helping a user configure Linux device tree overlays for hardware devices using the `attach` CLI tool.
 
+## Interaction Style: Use Interactive Selection Questions
+
+**IMPORTANT**: When asking the user questions, always prefer using **interactive selection questions** (form-style questions with selectable options) instead of plain text questions. This provides a better user experience by:
+- Presenting clear choices the user can select from
+- Reducing typing effort for the user
+- Showing valid options based on schema data
+
+**When to use selection questions**:
+- Choosing a device from `list-devices` results
+- Selecting a parent bus from `suggest-parents` results
+- Choosing values for enum properties (when schema provides valid options)
+- Selecting which optional properties to configure
+- Asking which channels to set up
+- Any question where there are known valid options
+
+**Always include an "Other" option** so users can provide custom input if needed.
+
+**Example scenarios for selection questions**:
+- "Which SPI bus is your device connected to?" → Present `spi0`, `spi1`, etc. as selectable options
+- "Which interrupt type should be used?" → Present `IRQ_TYPE_EDGE_FALLING`, `IRQ_TYPE_EDGE_RISING`, etc.
+- "Select the properties you want to configure:" → Multi-select from available optional properties
+
+---
+
 ## Prerequisites
 
 Before using any commands, gather the **Linux kernel source path** (`--linux`) from the user. This is a directory containing a Linux kernel repository with `Documentation/devicetree/bindings/`.
@@ -194,10 +218,12 @@ attach create --linux <path> --compatible <string> --parent <node> --output <fil
 ```
 
 **Next Steps After Create**:
-1. Read the generated file
-2. Use `get-schema` output to add required properties
-3. Add optional properties based on user needs
-4. Validate with `validate` command
+1. Read the generated file to verify structure
+2. Use `get-schema` to identify required and optional properties
+3. Use `set-prop` to add all required properties
+4. Use `set-prop` to add optional properties based on user needs
+5. Validate with `validate` command
+6. Fix any errors using `set-prop`, repeat validation until clean
 
 ---
 
@@ -242,9 +268,117 @@ attach validate --linux <path> --context <dts-file> --node <name> --input <dtso-
 
 **Interpretation Strategy**:
 1. Empty array `[]` = validation passed
-2. For `missing_required`: add the property to the overlay
-3. For `number_limit`: adjust value to be within bounds
-4. For `failed_dependency`: add the missing dependent property
+2. For `missing_required`: add the property to the overlay using `set-prop`
+3. For `number_limit`: adjust value to be within bounds using `set-prop`
+4. For `failed_dependency`: add the missing dependent property using `set-prop`
+
+---
+
+### 6. `get-prop` - Read Property Value
+
+**Purpose**: Read the current value of a property from a node in a `.dtso` file.
+
+**Syntax**:
+```bash
+attach get-prop --linux <path> --context <dts-file> --node <name> --input <dtso-file> --property <prop-name>
+```
+
+**Parameters**:
+| Parameter | Required | Description |
+|-----------|----------|-------------|
+| `--linux` | Yes | Path to Linux kernel repository |
+| `--dt-schema` | No | Path to dt-schema repository (uses bundled version by default) |
+| `--context` | Yes | Path to base `.dts` file |
+| `--node` | Yes | Name of node containing the property (e.g., `adi,ad7124-8`) |
+| `--input` | Yes | Path to `.dtso` file containing the node |
+| `--property` | Yes | Name of the property to read |
+
+**Output Format**: Plain text value printed to stdout.
+
+**Examples**:
+```bash
+# Get the reg property value
+attach get-prop --linux ~/linux --context ~/linux/arch/arm/boot/dts/broadcom/bcm2837-rpi-3-b.dts --node adi,ad7124-8 --input overlay.dtso --property reg
+# Output: <0x00>
+
+# Get a boolean/flag property (returns "true" if present)
+attach get-prop --linux ~/linux --context ~/linux/arch/arm/boot/dts/broadcom/bcm2837-rpi-3-b.dts --node adi,ad7124-8 --input overlay.dtso --property spi-cpha
+# Output: true
+```
+
+**Error Cases**:
+- Node not found: `Couldn't find <node> in <input>`
+- Property not found: `Couldn't find <property> in <node> in <input>`
+
+---
+
+### 7. `set-prop` - Set Property Value
+
+**Purpose**: Set or update a property value in a node within a `.dtso` file. **This is the required method for configuring device properties.**
+
+**Syntax**:
+```bash
+attach set-prop --linux <path> --context <dts-file> --node <name> --input <dtso-file> --property <prop-name> --value <value>
+```
+
+**Parameters**:
+| Parameter | Required | Description |
+|-----------|----------|-------------|
+| `--linux` | Yes | Path to Linux kernel repository |
+| `--dt-schema` | No | Path to dt-schema repository (uses bundled version by default) |
+| `--context` | Yes | Path to base `.dts` file |
+| `--node` | Yes | Name of node to modify (e.g., `adi,ad7124-8`) |
+| `--input` | Yes | Path to `.dtso` file to modify (file is updated in place) |
+| `--property` | Yes | Name of the property to set |
+| `--value` | Yes | Value to set (see Value Formats below) |
+
+**Value Formats**:
+
+| Format | Example | Description |
+|--------|---------|-------------|
+| Single number | `0` | Integer value |
+| Single string | `adi,ad7124-8` | String value |
+| Boolean | `true` or `false` | For flag properties (true = add flag, false = remove flag) |
+| Array | `[0; 1; 2]` | Array of values separated by `;` |
+| Mixed array | `[25; IRQ_FALLING_EDGE]` | Array with numbers and macros |
+| Matrix/nested | `[0; 1], [2; 3]` | Multiple arrays separated by `,` |
+| Phandle ref | `gpio` | Reference to another node (used with `<&gpio>` syntax) |
+
+**Examples**:
+```bash
+# Set a simple integer property
+attach set-prop --linux ~/linux --context ~/ctx.dts --node adi,ad7124-8 --input overlay.dtso --property reg --value 0
+
+# Set SPI frequency
+attach set-prop --linux ~/linux --context ~/ctx.dts --node adi,ad7124-8 --input overlay.dtso --property spi-max-frequency --value 5000000
+
+# Enable a boolean flag
+attach set-prop --linux ~/linux --context ~/ctx.dts --node adi,ad7124-8 --input overlay.dtso --property spi-cpha --value true
+
+# Disable/remove a boolean flag
+attach set-prop --linux ~/linux --context ~/ctx.dts --node adi,ad7124-8 --input overlay.dtso --property spi-cpha --value false
+
+# Set an interrupt array
+attach set-prop --linux ~/linux --context ~/ctx.dts --node adi,ad7124-8 --input overlay.dtso --property interrupts --value "[25; IRQ_TYPE_EDGE_FALLING]"
+
+# Set a phandle reference for interrupt-parent
+attach set-prop --linux ~/linux --context ~/ctx.dts --node adi,ad7124-8 --input overlay.dtso --property interrupt-parent --value gpio
+
+# Set string array (e.g., clock-names)
+attach set-prop --linux ~/linux --context ~/ctx.dts --node adi,ad7124-8 --input overlay.dtso --property clock-names --value "[spi; pclk]"
+```
+
+**Validation**: The command validates the value against the device binding schema before applying. If the value is invalid, an error message is displayed explaining the valid options.
+
+**Error Examples**:
+```
+Property reg in binding demands numbers
+Values for property io-channel-ranges are ["IO_CHANNEL_RANGE_1", "IO_CHANNEL_RANGE_2"]
+Property spi-max-frequency accepts values <= 5000000
+```
+
+**Limitations**:
+- **Channel/subnode properties are NOT supported** - The `set-prop` command currently only works on properties of the main device node. Properties inside child nodes (e.g., `channel@0`, `channel@1`) cannot be set using this command. For channel configuration, you must manually edit the `.dtso` file.
 
 ---
 
@@ -286,20 +420,26 @@ attach validate --linux <path> --context <dts-file> --node <name> --input <dtso-
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
-│ 6. CONFIGURE                                                │
-│    Edit the .dtso file to add properties from schema        │
-│    - Add all required_properties                            │
-│    - Add user-requested optional properties                 │
-│    - Configure channels if pattern_properties exists        │
+│ 6. CONFIGURE (using set-prop command)                       │
+│    attach set-prop --property <name> --value <value> ...    │
+│    - Set all required_properties                            │
+│    - Set user-requested optional properties                 │
+│    - For channels: manually edit .dtso (set-prop unsupported)│
+│    NOTE: Always use set-prop for main node properties!      │
 └─────────────────────────────────────────────────────────────┘
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
 │ 7. VALIDATE                                                 │
 │    attach validate --node <name> --input <file.dtso>        │
-│    → Fix any errors, repeat until clean                     │
+│    → Fix any errors with set-prop, repeat until clean       │
 └─────────────────────────────────────────────────────────────┘
 ```
+
+**IMPORTANT**: When configuring device tree overlays, you MUST use the `set-prop` command to set property values. Do NOT manually edit the `.dtso` file directly. The `set-prop` command:
+- Validates values against the device binding schema
+- Handles proper formatting of different value types (numbers, strings, arrays, phandles)
+- Ensures correct device tree syntax
 
 ---
 
@@ -324,6 +464,10 @@ node-name {
     // Array of numbers
     interrupts = <0 42 4>;
 
+    // Interrupt with parent specified (required for proper validation)
+    interrupt-parent = <&gpio>;
+    interrupts = <25 2>;
+
     // Reference to another node
     clocks = <&clk_spi>;
 
@@ -347,16 +491,24 @@ node-name {
 | `Missing: <path>` | File/directory doesn't exist | Verify path with user |
 | `Failed to parse dts` | Invalid device tree syntax | Check for syntax errors in .dts file |
 | `Failed to find binding` | Compatible string not found | Use `list-devices` to find valid strings |
-| `missing_required` error | Required property not set | Add the property from schema |
-| `number_limit` error | Value outside valid range | Check schema for min/max bounds |
+| `missing_required` error | Required property not set | Use `set-prop` to add the property |
+| `number_limit` error | Value outside valid range | Use `set-prop` with a value within schema bounds |
+| `interrupts` size error | Wrong number of cells in interrupts array | Use `set-prop --property interrupt-parent --value gpio` to specify the interrupt controller. The number of cells required depends on the interrupt controller's `#interrupt-cells` property. |
+| `Property in binding demands numbers` | Wrong value type for property | Check `get-schema` output and use correct type with `set-prop` |
+| `Values for property X are [...]` | Invalid enum value | Use one of the listed valid values with `set-prop` |
 
 ---
 
 ## Tips for Effective Assistance
 
-1. **Always validate before declaring success** - Run `validate` to catch issues
-2. **Use schema descriptions** - They explain what each property does
-3. **Check required vs optional** - Only required properties must be set
-4. **Pattern properties = channels** - If present, help user configure each channel
-5. **Phandle references** - Properties referencing other nodes need `<&label>` syntax
-6. **Macros need includes** - If schema shows macros, the overlay may need `#include` directives
+1. **Use interactive selection questions** - Always prefer form-style questions with selectable options over plain text questions
+2. **Always use `set-prop` for main node properties** - Use `set-prop` for all property changes on the main device node
+3. **Channel properties require manual editing** - `set-prop` does not support child nodes; edit `.dtso` directly for channels
+4. **Always validate before declaring success** - Run `validate` to catch issues
+5. **Use `get-prop` to check current values** - Before modifying, verify current state
+6. **Use schema descriptions** - They explain what each property does
+7. **Check required vs optional** - Only required properties must be set
+8. **Pattern properties = channels** - If present, help user configure each channel (manual editing required)
+9. **Phandle references** - When setting phandle properties with `set-prop`, just use the label name (e.g., `--value gpio`)
+10. **Macros need includes** - If schema shows macros, the overlay may need `#include` directives
+11. **Interrupts need interrupt-parent** - When using the `interrupts` property, first set `interrupt-parent` using `set-prop --property interrupt-parent --value <controller>` (e.g., `--value gpio`). The interrupt controller determines how many cells are needed in the `interrupts` array.
