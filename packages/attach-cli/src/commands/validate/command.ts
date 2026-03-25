@@ -1,5 +1,5 @@
 import { buildCommand } from "@stricli/core";
-import { Attach, parse_dts, parseDtso, type CellArrayElement, type DtsNode, type DtsValue, type DtsValueComponent, type ParsedBinding } from "attach-lib";
+import { Attach, parse_dts, parseDtso, search_node_in_dts, search_node_in_unresolved_overlays, type CellArrayElement, type DtsNode, type DtsValue, type DtsValueComponent, type ParsedBinding } from "attach-lib";
 
 import * as fs from 'node:fs';
 
@@ -100,10 +100,10 @@ export const validate_command = buildCommand({
             return;
         }
 
-        let node_to_validate = input_document.unresolved_overlays.find((value) => value.overlay_node.name === node)?.overlay_node;
+        let node_to_validate = search_node_in_unresolved_overlays(input_document.unresolved_overlays, node);
 
         if (node_to_validate === undefined) {
-            node_to_validate = input_document.root.children.find((value) => value.name === node);
+            node_to_validate = search_node_in_dts(input_document, node);
             if (node_to_validate === undefined) {
                 console.log(`Couldn't find ${node} in ${input}`);
                 return;
