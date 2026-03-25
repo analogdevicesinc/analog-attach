@@ -1,9 +1,9 @@
 import { buildCommand } from "@stricli/core";
-import { Attach, parse_dts, parseDtso, search_node_in_dts, search_node_in_unresolved_overlays, type CellArrayElement, type DtsNode, type DtsValue, type DtsValueComponent, type ParsedBinding } from "attach-lib";
+import { Attach, insert_known_structures, parse_dts, parseDtso, query_devicetree, search_node_in_dts, search_node_in_unresolved_overlays, type CellArrayElement, type DtsNode, type DtsValue, type DtsValueComponent, type ParsedBinding } from "attach-lib";
 
 import * as fs from 'node:fs';
 
-import { bigIntReplacer, find_binding } from "../../utilities";
+import { bigIntReplacer, find_binding, parse_dts_node } from "../../utilities";
 
 type Flags = {
     linux: string,
@@ -100,17 +100,35 @@ export const validate_command = buildCommand({
             return;
         }
 
-        let node_to_validate = search_node_in_unresolved_overlays(input_document.unresolved_overlays, node);
+        const found_node: { target_node: DtsNode, parent?: string } | undefined = (() => {
+            const node_with_parent = search_node_in_unresolved_overlays(input_document.unresolved_overlays, node);
 
-        if (node_to_validate === undefined) {
-            node_to_validate = search_node_in_dts(input_document, node);
-            if (node_to_validate === undefined) {
-                console.log(`Couldn't find ${node} in ${input}`);
-                return;
+            if (node_with_parent !== undefined) {
+                return {
+                    target_node: node_with_parent.node,
+                    parent: node_with_parent.overlay.overlay_target_ref.ref.kind === 'label' ?
+                        node_with_parent.overlay.overlay_target_ref.ref.name :
+                        node_with_parent.overlay.overlay_target_ref.ref.path
+                };
             }
+
+            const node_without_parent = search_node_in_dts(input_document, node);
+
+            if (node_without_parent !== undefined) {
+                return { target_node: node_without_parent, parent: "/" };
+            }
+
+            return;
+        })();
+
+        if (found_node === undefined) {
+            console.log(`Couldn't find ${node} in ${input}`);
+            return;
         }
 
-        const compatible = node_to_validate.properties.find((property) => property.name === "compatible");
+        const { target_node, parent } = found_node;
+
+        const compatible = target_node.properties.find((property) => property.name === "compatible");
 
         if (compatible === undefined) {
             console.log(`Missing compatible in ${node} from ${input}`);
@@ -146,149 +164,66 @@ export const validate_command = buildCommand({
             return;
         }
 
-        const input_data = parse_dts_node(node_to_validate, binding.parsed_binding);
-        console.log(JSON.stringify(Object.fromEntries(input_data), bigIntReplacer));
+        const partial_input_data = Object.fromEntries(parse_dts_node(target_node, binding.parsed_binding));
 
-        const update = attach.update_binding_by_changes(JSON.stringify(Object.fromEntries(input_data), bigIntReplacer));
+        const extended_binding = structuredClone(binding);
+
+        extended_binding.parsed_binding.properties = query_devicetree(
+            document,
+            binding.parsed_binding.properties,
+            JSON.stringify(partial_input_data, bigIntReplacer),
+            parent
+        );
+
+        extended_binding.parsed_binding.properties = insert_known_structures(extended_binding.parsed_binding.properties);
+
+        for (const pattern of extended_binding.parsed_binding.pattern_properties ?? []) {
+            pattern.properties = query_devicetree(
+                document,
+                pattern.properties,
+                JSON.stringify(partial_input_data, bigIntReplacer),
+                parent
+            );
+
+            pattern.properties = insert_known_structures(pattern.properties);
+        }
+
+        const input_data = Object.fromEntries(parse_dts_node(target_node, extended_binding.parsed_binding));
+        console.log(JSON.stringify(input_data, bigIntReplacer));
+
+        const update = attach.update_binding_by_changes(JSON.stringify(input_data, bigIntReplacer));
 
         if (update === undefined) {
             console.log(`Failed to update with set compatible "${compatible}" for ${binding_path}`);
             return;
         }
 
+        binding = { parsed_binding: update.binding, patterns: binding.patterns };
+
+        binding.parsed_binding.properties = query_devicetree(
+            document,
+            binding.parsed_binding.properties,
+            JSON.stringify(input_data, bigIntReplacer),
+            parent
+        );
+
+        binding.parsed_binding.properties = insert_known_structures(binding.parsed_binding.properties);
+
+        if (binding.parsed_binding.pattern_properties !== undefined) {
+            for (const pattern of binding.parsed_binding.pattern_properties) {
+                pattern.properties = query_devicetree(
+                    document,
+                    pattern.properties,
+                    JSON.stringify(input_data, bigIntReplacer),
+                    parent
+                );
+                pattern.properties = insert_known_structures(pattern.properties);
+            }
+        }
+
         console.log(`============= UPDATED BINDING =============`);
-        console.log(JSON.stringify(update.binding));
+        console.log(JSON.stringify(binding.parsed_binding, bigIntReplacer));
         console.log(`============= VALIDATION ERRORS =============`);
         console.log(JSON.stringify(update.errors));
     }
 });
-
-function parse_dts_node(node: DtsNode, parsed_binding: ParsedBinding): Map<string, unknown> {
-    const map = new Map<string, unknown>();
-    for (const property of node.properties) {
-        if (property.name === "status") {
-            continue;
-        }
-
-        const value = parse_dts_value(property.value);
-
-        const definition = parsed_binding.properties.find((value) => value.key === property.name);
-
-        if (definition === undefined) {
-            map.set(property.name, value);
-            continue;
-        }
-
-        const definition_type = definition.value._t;
-        switch (definition_type) {
-            case "array":
-            case "enum_array":
-            case "fixed_index":
-            case "number_array":
-            case "string_array": {
-
-                if (Array.isArray(value)) {
-                    map.set(property.name, value);
-                    continue;
-                }
-
-                map.set(property.name, [value]);
-                continue;
-            }
-            case "matrix": {
-
-                if (Array.isArray(value)) {
-
-                    if (value.every((entry) => Array.isArray(entry))) {
-                        map.set(property.name, value);
-                        continue;
-                    }
-
-                    map.set(property.name, value.map((entry) => [entry]));
-                    continue;
-                } else {
-                    map.set(property.name, [[value]]);
-                    continue;
-                }
-            }
-            case "boolean":
-            case "const":
-            case "enum_integer":
-            case "generic":
-            case "integer": {
-                map.set(property.name, value);
-                continue;
-            }
-            case "object": {
-                // TODO: finish?
-                continue;
-            }
-
-            default: {
-                const _x: never = definition_type;
-                throw new Error("Exhaustion check failed!");
-            }
-        }
-    }
-    return map;
-}
-
-function parse_dts_value(value: DtsValue | undefined): unknown {
-
-    if (value === undefined) {
-        return true;
-    }
-
-    if (value.components.length === 1 && value.components[0] !== undefined) {
-        return parse_dts_value_component(value.components[0]);
-    }
-
-    return value.components.map((component) => parse_dts_value_component(component));
-}
-
-function parse_dts_value_component(component: DtsValueComponent): string | number[] | (string | bigint)[] {
-    const kind = component.kind;
-
-    switch (kind) {
-        case "string": {
-            return component.value;
-        }
-        case "ref": {
-            return component.ref.kind === "label" ? component.ref.name : component.ref.path;
-        }
-        case "bytes": {
-            return component.bytes.map((byte) => byte.value);
-        }
-        case "array": {
-            return component.elements.map((element) => parse_cell_array_element(element));
-        }
-        default: {
-            const _x: never = kind;
-            throw new Error("Exhaustion check failed!");
-        }
-    }
-}
-
-function parse_cell_array_element(element: CellArrayElement): string | bigint {
-    const kind = element.item.kind;
-
-    switch (kind) {
-        case "number":
-        case "u64": {
-            return BigInt(element.item.value);
-        }
-        case "macro": {
-            return element.item.value;
-        }
-        case "ref": {
-            return element.item.ref.kind === "label" ? element.item.ref.name : element.item.ref.path;
-        }
-        case "expression": {
-            return element.item.value;
-        }
-        default: {
-            const _x: never = kind;
-            throw new Error("Exhaustive check failed!");
-        }
-    }
-}
