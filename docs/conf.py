@@ -4,7 +4,7 @@ from os import path
 
 # -- Project information -----------------------------------------------------
 
-repository = 'documentation'
+repository = 'analog-attach'
 project = 'Analog Attach'
 copyright = '2025, Analog Devices, Inc.'
 author = 'Analog Devices, Inc.'
@@ -37,7 +37,7 @@ interref_repos = [
 
 # -- Options for HTML output --------------------------------------------------
 
-html_theme = 'cosmic'
+html_theme = 'harmonic'
 html_favicon = path.join("sources", "icon.svg")
 numfig = True
 numfig_per_doc = True
