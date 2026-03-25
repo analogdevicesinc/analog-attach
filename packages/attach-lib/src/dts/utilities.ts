@@ -32,14 +32,14 @@ export function search_node_in_dts(document: DtsDocument, node_name: string): Dt
     return node;
 }
 
-export function search_node_in_unresolved_overlays(unresolved_overlays: Array<UnresolvedOverlay>, node_name: string): DtsNode | undefined {
+export function search_node_in_unresolved_overlays(unresolved_overlays: Array<UnresolvedOverlay>, node_name: string): { node: DtsNode, overlay: UnresolvedOverlay } | undefined {
 
     const { name, unit } = split_node_key(node_name);
 
     for (const unresolved of unresolved_overlays) {
         const node = search_node_impl(unresolved.overlay_node, name, unit);
         if (node !== undefined) {
-            return node;
+            return { node: node, overlay: unresolved };
         }
     }
 
