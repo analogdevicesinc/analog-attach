@@ -1,5 +1,5 @@
 import type { DtsDocument, DtsNode, DtsProperty } from './ast.js';
-import { get_node_key } from './utilities.js';
+import { get_node_key, split_node_key } from './utilities.js';
 
 export interface MergeOptions {
   /** When true, mark any newly created nodes as user-created. */
@@ -169,19 +169,6 @@ export function find_node_by_path(root: DtsNode, path: string): DtsNode | undefi
   }
 
   return current;
-}
-
-function split_node_key(node_key: string): { name: string; unit?: string } {
-  const at = node_key.indexOf('@');
-
-  if (at === -1) {
-    return { name: node_key };
-  }
-
-  return {
-    name: node_key.slice(0, at),
-    unit: node_key.slice(at + 1)
-  };
 }
 
 export function delete_node_by_label(root: DtsNode, label: string): boolean {
