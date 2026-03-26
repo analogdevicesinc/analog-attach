@@ -58,6 +58,7 @@ interface DeviceInstanceState {
     startEditingChannel: (deviceUID: DeviceUID, channelName: string) => Promise<void>;
     deleteChannelFromDevice: (deviceUID: DeviceUID, channelName: string) => Promise<void>;
     updateChannelAlias: (channelName: string, alias: string) => void;
+    updateDeviceAlias: (alias: string) => void;
 }
 
 const initialState = {
@@ -764,6 +765,31 @@ export const useDeviceInstanceStore = create<DeviceInstanceState>((set, get) => 
         });
 
         // Trigger debounced update
+        triggerDebouncedConfigUpdate(get);
+    },
+
+    updateDeviceAlias: (alias: string) => {
+        const state = get();
+        if (!state.EditableDeviceInstance) {
+            return;
+        }
+
+        const updatedConfig = {
+            ...state.EditableDeviceInstance.payload.config,
+            alias,
+        };
+
+        set({
+            EditableDeviceInstance: {
+                ...state.EditableDeviceInstance,
+                payload: {
+                    ...state.EditableDeviceInstance.payload,
+                    config: updatedConfig,
+                },
+            },
+        });
+
+        // Trigger debounced update — same pattern as updateChannelAlias
         triggerDebouncedConfigUpdate(get);
     },
 }));

@@ -8,7 +8,12 @@ import { isValidAlias } from "attach-ui-lib";
 export default function DetailsSection() {
 	const EditableDeviceInstance = useDeviceInstanceStore((state) => state.EditableDeviceInstance);
 	const deviceInstances = useDeviceInstanceStore((state) => state.deviceInstances);
+	const updateDeviceAlias = useDeviceInstanceStore((state) => state.updateDeviceAlias);
 	const updateDeviceConfiguration = useDeviceInstanceStore((state) => state.updateDeviceConfiguration);
+
+	// All hooks must be called unconditionally, before any early return
+	const getParentNodes = useParentNodeStore((state) => state.getParentNodes);
+	const [aliasError, setAliasError] = useState(false);
 
 	if (!EditableDeviceInstance) {
 		return undefined;
@@ -16,13 +21,10 @@ export default function DetailsSection() {
 
 	const deviceInstance = deviceInstances.find((di) => di.deviceUID === EditableDeviceInstance.deviceUID);
 	const parentNodeID = deviceInstance?.parentNode?.uuid || "";
-
-	const getParentNodes = useParentNodeStore((state) => state.getParentNodes);
 	const parentNodeOptions = deviceInstance ? getParentNodes(deviceInstance.compatible) : [];
 
 	// Get alias from EditableDeviceInstance payload config, fallback to deviceInstance
 	const alias = EditableDeviceInstance.payload.config.alias ?? deviceInstance?.alias ?? "";
-	const [aliasError, setAliasError] = useState(!isValidAlias(alias));
 
 	const handleAliasChange = (event: React.FormEvent) => {
 		const target = event.target as HTMLInputElement;
@@ -34,23 +36,8 @@ export default function DetailsSection() {
 		}
 		setAliasError(false);
 
-		// Update the alias in EditableDeviceInstance
-		const updatedConfig = {
-			...EditableDeviceInstance.payload.config,
-			alias: newAlias,
-		};
-
-		// Update the store
-		useDeviceInstanceStore.getState().setEditableDeviceInstance({
-			...EditableDeviceInstance,
-			payload: {
-				...EditableDeviceInstance.payload,
-				config: updatedConfig,
-			},
-		});
-
-		// Trigger immediate update (no longer debounced here - can be added if needed)
-		void updateDeviceConfiguration(updatedConfig);
+		// Update store + schedule debounced backend save (no immediate round-trip)
+		updateDeviceAlias(newAlias);
 	};
 
 	const handleParentNodeChange = (event: Event) => {
