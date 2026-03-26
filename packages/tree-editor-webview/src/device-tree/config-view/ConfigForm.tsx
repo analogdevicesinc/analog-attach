@@ -4,6 +4,7 @@ import {
     CreatePropertyToggle,
     renderFormElement,
     isValidAlias,
+    type CustomPropertyType,
 } from "attach-ui-lib";
 import { FormObjectElement, type GenericFormElement } from "extension-protocol";
 import React, { useState } from "react";
@@ -32,8 +33,8 @@ export default function ConfigForm() {
         await updateDeviceAlias(newAlias || '');
     };
 
-    const handleAddCustomProperty = (propertyName: string, propertyValue: string | boolean) => {
-        updateCustomProperty(undefined, propertyName, propertyValue);
+    const handleAddCustomProperty = (propertyName: string, propertyValue: string | boolean | number, propertyType: CustomPropertyType) => {
+        updateCustomProperty(undefined, propertyName, propertyValue, propertyType);
     };
 
     return (

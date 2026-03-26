@@ -73,7 +73,7 @@ interface DeviceConfigurationState {
     getConfiguration: (deviceUID: DeviceUID) => Promise<void>;
     updateConfiguration: (deviceUID: DeviceUID, config: DeviceConfigurationFormObject) => Promise<void>;
     updateFormElementValue: (elementKey: string, newValue: unknown, parentKey?: string) => void;
-    updateCustomProperty: (oldKey?: string, newKey?: string, newValue?: string | boolean) => void;
+    updateCustomProperty: (oldKey?: string, newKey?: string, newValue?: string | boolean | number, propertyType?: string) => void;
     deleteCustomProperty: (key: string) => void;
     setDeviceActive: (uuid: DeviceUID, active: boolean) => Promise<void>;
     updateDeviceAlias: (newAlias: string) => Promise<void>;
@@ -259,7 +259,7 @@ export const useDeviceConfigurationStore = create<DeviceConfigurationState>((set
      * @param newValue provide the new value for the property
      * @returns 
      */
-    updateCustomProperty: (oldKey?: string, newKey?: string, newValue?: string | boolean) => {
+    updateCustomProperty: (oldKey?: string, newKey?: string, newValue?: string | boolean | number, propertyType?: string) => {
         const state = get();
         if (!state.configuration) {
             console.warn('Cannot update custom property: no configuration loaded');
@@ -271,13 +271,24 @@ export const useDeviceConfigurationStore = create<DeviceConfigurationState>((set
             filteredConfig = state.configuration.config.filter(element => element.key !== oldKey);
         }
 
-        const isFlagProperty = typeof newValue === 'boolean' || newValue === undefined;
+        // Determine inputType based on propertyType
+        const getInputType = () => {
+            switch (propertyType) {
+                case 'flag': return 'custom-flag';
+                case 'number': return 'custom-number';
+                case 'phandle': return 'custom-phandle';
+                case 'text':
+                default: return 'custom';
+            }
+        };
+
+        const isFlagProperty = propertyType === 'flag';
 
         // Create the new custom form element; mark flags explicitly so the FE renders correctly
         const customElement = {
             key: newKey,
             type: 'Generic',
-            inputType: isFlagProperty ? 'custom-flag' : 'custom',
+            inputType: getInputType(),
             required: false,
             setValue: isFlagProperty ? (newValue ?? true) : newValue,
         } as GenericFormElement;

@@ -1,6 +1,7 @@
 import {
     CreatePropertyToggle,
-    renderFormElement
+    renderFormElement,
+    type CustomPropertyType,
 } from "attach-ui-lib";
 import React from "react";
 import { useDeviceInstanceStore } from "../../../../store/useDeviceInstanceStore";
@@ -45,8 +46,8 @@ export default function BaseSensorConfig() {
         updateFormElementValue(elementKey, newValue, effectiveParentKey);
     };
 
-    const handleAddCustomProperty = async (propertyName: string, propertyValue: string | boolean) => {
-        updateCustomProperty(undefined, propertyName, propertyValue);
+    const handleAddCustomProperty = async (propertyName: string, propertyValue: string | boolean | number, propertyType: CustomPropertyType) => {
+        updateCustomProperty(undefined, propertyName, propertyValue, propertyType);
     };
 
     return (
