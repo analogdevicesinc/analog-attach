@@ -8,7 +8,7 @@ import { DtsPlugAndPlayCustomEditorProvider } from './DtsPlugAndPlayCustomEditor
 import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
 import { AnalogAttachSidebarProvider } from './sidebar/AnalogAttachSidebar';
-import { DTSO_BASE_MAP_KEY } from './constants';
+import { DTSO_BASE_MAP_KEY, EXTENSION_SETTING_PREFIX } from './constants';
 import { NavigationCommands } from 'extension-protocol';
 
 export async function activate(context: vscode.ExtensionContext) {
@@ -21,7 +21,7 @@ export async function activate(context: vscode.ExtensionContext) {
     AnalogAttachLogger.info(`Analog Attach log file: ${AnalogAttachLogger.getLogFilePath()}`).catch(console.error);
 
     // Change the preprocess command based on the OS
-    const config = vscode.workspace.getConfiguration("analog-attach");
+    const config = vscode.workspace.getConfiguration(EXTENSION_SETTING_PREFIX);
     const inspection = config.inspect<string>("preprocessDtsFilesCommand");
 
     if (inspection?.globalValue || inspection?.workspaceValue || inspection?.workspaceFolderValue) {
@@ -32,8 +32,8 @@ export async function activate(context: vscode.ExtensionContext) {
         await config.update('preprocessDtsFilesCommand', default_command, vscode.ConfigurationTarget.Global);
     }
 
-    const add_device_tree_command = vscode.commands.registerCommand('analog-attach.addDeviceTree', async () => {
-        AnalogAttachLogger.userAction('command', { command: 'analog-attach.addDeviceTree' }).catch(console.error);
+    const add_device_tree_command = vscode.commands.registerCommand(`${EXTENSION_SETTING_PREFIX}.addDeviceTree`, async () => {
+        AnalogAttachLogger.userAction('command', { command: `${EXTENSION_SETTING_PREFIX}.addDeviceTree` }).catch(console.error);
         try {
             let targetUri: vscode.Uri | undefined = vscode.window.activeTextEditor?.document.uri;
 
@@ -41,7 +41,7 @@ export async function activate(context: vscode.ExtensionContext) {
             const activeTab = vscode.window.tabGroups.activeTabGroup.activeTab;
             if (!targetUri && activeTab?.input instanceof vscode.TabInputCustom) {
                 const viewType = activeTab.input.viewType;
-                if (viewType === 'analog-attach.dtsEditor' || viewType === 'analog-attach.dtsPlugAndPlayEditor') {
+                if (viewType === `${EXTENSION_SETTING_PREFIX}.dtsEditor` || viewType === `${EXTENSION_SETTING_PREFIX}.dtsPlugAndPlayEditor`) {
                     targetUri = activeTab.input.uri;
                 }
             }
@@ -100,7 +100,10 @@ export async function activate(context: vscode.ExtensionContext) {
 
             // If the active tab is a custom editor, ask VS Code to refresh the webview to reflect the merge.
             if (activeTab?.input instanceof vscode.TabInputCustom &&
-                (activeTab.input.viewType === 'analog-attach.dtsEditor' || activeTab.input.viewType === 'analog-attach.dtsPlugAndPlayEditor')) {
+                (
+                    activeTab.input.viewType === `${EXTENSION_SETTING_PREFIX}.dtsEditor` ||
+                    activeTab.input.viewType === `${EXTENSION_SETTING_PREFIX}.dtsPlugAndPlayEditor`)
+            ) {
                 await vscode.commands.executeCommand('workbench.action.webview.reloadWebviewAction');
             }
 
@@ -113,8 +116,8 @@ export async function activate(context: vscode.ExtensionContext) {
         }
     });
 
-    const compile_device_tree_command = vscode.commands.registerCommand("analog-attach.compileDeviceTree", async () => {
-        AnalogAttachLogger.userAction('command', { command: 'analog-attach.compileDeviceTree' }).catch(console.error);
+    const compile_device_tree_command = vscode.commands.registerCommand(`${EXTENSION_SETTING_PREFIX}.compileDeviceTree`, async () => {
+        AnalogAttachLogger.userAction('command', { command: `${EXTENSION_SETTING_PREFIX}.compileDeviceTree` }).catch(console.error);
         try {
             let targetUri: vscode.Uri | undefined = vscode.window.activeTextEditor?.document.uri;
 
@@ -122,7 +125,10 @@ export async function activate(context: vscode.ExtensionContext) {
             const activeTab = vscode.window.tabGroups.activeTabGroup.activeTab;
             if (!targetUri && activeTab?.input instanceof vscode.TabInputCustom) {
                 const viewType = activeTab.input.viewType;
-                if (viewType === 'analog-attach.dtsEditor' || viewType === 'analog-attach.dtsPlugAndPlayEditor') {
+                if (
+                    viewType === `${EXTENSION_SETTING_PREFIX}.dtsEditor` ||
+                    viewType === `${EXTENSION_SETTING_PREFIX}.dtsPlugAndPlayEditor`
+                ) {
                     targetUri = activeTab.input.uri;
                 }
             }
@@ -162,7 +168,7 @@ export async function activate(context: vscode.ExtensionContext) {
             }
 
             // Get the compile command from configuration
-            const config = vscode.workspace.getConfiguration('analog-attach');
+            const config = vscode.workspace.getConfiguration(EXTENSION_SETTING_PREFIX);
             const compileCommand = config.get<string>('compileDtsFileCommand', 'dtc -O dtb -I dts');
 
             // Determine output file path (replace .dts/.dtso with .dtb/.dtbo)
@@ -235,8 +241,8 @@ export async function activate(context: vscode.ExtensionContext) {
         }
     });
 
-    const deploy_device_tree_command = vscode.commands.registerCommand("analog-attach.deployDeviceTree", async () => {
-        AnalogAttachLogger.userAction('command', { command: 'analog-attach.deployDeviceTree' }).catch(console.error);
+    const deploy_device_tree_command = vscode.commands.registerCommand(`${EXTENSION_SETTING_PREFIX}.deployDeviceTree`, async () => {
+        AnalogAttachLogger.userAction('command', { command: `${EXTENSION_SETTING_PREFIX}.deployDeviceTree` }).catch(console.error);
         try {
             let targetUri: vscode.Uri | undefined = vscode.window.activeTextEditor?.document.uri;
 
@@ -244,7 +250,7 @@ export async function activate(context: vscode.ExtensionContext) {
             const activeTab = vscode.window.tabGroups.activeTabGroup.activeTab;
             if (!targetUri && activeTab?.input instanceof vscode.TabInputCustom) {
                 const viewType = activeTab.input.viewType;
-                if (viewType === 'analog-attach.dtsEditor' || viewType === 'analog-attach.dtsPlugAndPlayEditor') {
+                if (viewType === `${EXTENSION_SETTING_PREFIX}.dtsEditor` || viewType === `${EXTENSION_SETTING_PREFIX}.dtsPlugAndPlayEditor`) {
                     targetUri = activeTab.input.uri;
                 }
             }
@@ -299,7 +305,7 @@ export async function activate(context: vscode.ExtensionContext) {
 
                 if (shouldCompile === "Compile & Deploy") {
                     // Compile first, then deploy
-                    await vscode.commands.executeCommand("analog-attach.compileDeviceTree");
+                    await vscode.commands.executeCommand(`${EXTENSION_SETTING_PREFIX}.compileDeviceTree`);
 
                     // Check again if DTB was created
                     if (!fs.existsSync(dtbFilePath)) {
@@ -313,7 +319,7 @@ export async function activate(context: vscode.ExtensionContext) {
             }
 
             // Get configuration for deployment
-            const config = vscode.workspace.getConfiguration('analog-attach');
+            const config = vscode.workspace.getConfiguration(EXTENSION_SETTING_PREFIX);
             const remoteHost = config.get<string>('remoteHost');
             const remoteUser = config.get<string>('remoteUser');
             const remotePassword = config.get<string>('remotePassword');
@@ -326,14 +332,14 @@ export async function activate(context: vscode.ExtensionContext) {
             // Validate required configuration
             if (!sshpassConfig) {
                 vscode.window.showErrorMessage(
-                    `Device tree deployment requires configuration. Please set analog-attach.remotePassword (or sshpassConfig).`
+                    `Device tree deployment requires configuration. Please set ${EXTENSION_SETTING_PREFIX}.remotePassword (or sshpassConfig).`
                 );
                 return;
             }
 
             if (!sshConfig) {
                 vscode.window.showErrorMessage(
-                    `Device tree deployment requires configuration. Please set analog-attach.remoteHost and analog-attach.remoteUser (or sshConfig).`
+                    `Device tree deployment requires configuration. Please set ${EXTENSION_SETTING_PREFIX}.remoteHost and ${EXTENSION_SETTING_PREFIX}.remoteUser (or sshConfig).`
                 );
                 return;
             }
@@ -449,7 +455,7 @@ export async function activate(context: vscode.ExtensionContext) {
     const dtsProvider = new DtsCustomEditorProvider(context);
     const pnpProvider = new DtsPlugAndPlayCustomEditorProvider(context);
 
-    const navigateBack = vscode.commands.registerCommand('analog-attach.navigateBack', () => {
+    const navigateBack = vscode.commands.registerCommand(`${EXTENSION_SETTING_PREFIX}.navigateBack`, () => {
         const panel = dtsProvider.getActivePanel();
         if (!panel) {
             return;
@@ -462,7 +468,7 @@ export async function activate(context: vscode.ExtensionContext) {
         });
     });
 
-    const navigateForward = vscode.commands.registerCommand('analog-attach.navigateForward', () => {
+    const navigateForward = vscode.commands.registerCommand(`${EXTENSION_SETTING_PREFIX}.navigateForward`, () => {
         const panel = dtsProvider.getActivePanel();
         if (!panel) {
             return;
