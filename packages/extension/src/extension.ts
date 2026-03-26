@@ -11,7 +11,7 @@ import { AnalogAttachSidebarProvider } from './sidebar/AnalogAttachSidebar';
 import { DTSO_BASE_MAP_KEY } from './constants';
 import { NavigationCommands } from 'extension-protocol';
 
-export function activate(context: vscode.ExtensionContext) {
+export async function activate(context: vscode.ExtensionContext) {
     // Init the Logger with the context on first activation
     AnalogAttachLogger.getInstance(context);
     AnalogAttachLogger.info(`Analog Attach log file: ${AnalogAttachLogger.getLogFilePath()}`).catch(console.error);
@@ -19,6 +19,18 @@ export function activate(context: vscode.ExtensionContext) {
     // Init the Logger with the context on first activation
     AnalogAttachLogger.getInstance(context);
     AnalogAttachLogger.info(`Analog Attach log file: ${AnalogAttachLogger.getLogFilePath()}`).catch(console.error);
+
+    // Change the preprocess command based on the OS
+    const config = vscode.workspace.getConfiguration("analog-attach");
+    const inspection = config.inspect<string>("preprocessDtsFilesCommand");
+
+    if (inspection?.globalValue || inspection?.workspaceValue || inspection?.workspaceFolderValue) {
+        const default_command = process.platform === 'linux'
+            ? 'gcc -E -I{include_dir_path} -I{arch_dir_path} -undef -x assembler-with-cpp'
+            : 'cpp -nostdinc -I {include_dir_path} -I {arch_dir_path} -undef -x assembler-with-cpp';
+
+        await config.update('preprocessDtsFilesCommand', default_command, vscode.ConfigurationTarget.Global);
+    }
 
     const add_device_tree_command = vscode.commands.registerCommand('analog-attach.addDeviceTree', async () => {
         AnalogAttachLogger.userAction('command', { command: 'analog-attach.addDeviceTree' }).catch(console.error);
@@ -438,7 +450,7 @@ export function activate(context: vscode.ExtensionContext) {
     const pnpProvider = new DtsPlugAndPlayCustomEditorProvider(context);
 
     const navigateBack = vscode.commands.registerCommand('analog-attach.navigateBack', () => {
-        const panel = dtsProvider.getActivePanel()
+        const panel = dtsProvider.getActivePanel();
         if (!panel) {
             return;
         }
@@ -451,7 +463,7 @@ export function activate(context: vscode.ExtensionContext) {
     });
 
     const navigateForward = vscode.commands.registerCommand('analog-attach.navigateForward', () => {
-        const panel = dtsProvider.getActivePanel()
+        const panel = dtsProvider.getActivePanel();
         if (!panel) {
             return;
         }
