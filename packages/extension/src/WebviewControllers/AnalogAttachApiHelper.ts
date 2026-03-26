@@ -1495,7 +1495,7 @@ export class AnalogAttachApiHelper {
                 const genericElement = element as GenericFormElement;
 
                 // Treat boolean/blank generics as custom flags (presence = true)
-                if (typeof genericElement.setValue === "boolean" || genericElement.setValue === undefined) {
+                if (genericElement.inputType === "custom-flag" || genericElement.setValue === undefined) {
                     if (genericElement.setValue === false || genericElement.setValue === undefined) {
                         this.removeProperty(node, genericElement.key);
                     } else {

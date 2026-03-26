@@ -1,7 +1,7 @@
 import type { GenericFormElement } from 'extension-protocol';
 import { VscodeButton } from 'hds-react';
 import { useState } from 'react';
-import { CreateCustomPropertyForm } from './CreateCustomPropertyForm';
+import { CreateCustomPropertyForm, type CustomPropertyType } from './CreateCustomPropertyForm';
 import styles from './CustomProperty.module.scss';
 
 /**
@@ -18,13 +18,29 @@ export function isCustomPropertyFlag(element: GenericFormElement): boolean {
 	return element.inputType === 'custom-flag';
 }
 
+/**
+ * Helper function to check if an element is a custom property number
+ */
+export function isCustomPropertyNumber(element: GenericFormElement): boolean {
+	return element.inputType === 'custom-number';
+}
+
+/**
+ * Helper function to check if an element is a custom property phandle
+ */
+export function isCustomPropertyPhandle(element: GenericFormElement): boolean {
+	return element.inputType === 'custom-phandle';
+}
+
+
+
 /* -------------------------------------------------------------------------- */
 /*                             CustomProperty                                 */
 /* -------------------------------------------------------------------------- */
 
 interface CustomPropertyProps {
 	/** Callback when property is saved/updated */
-	onSave?: (propertyName: string, propertyValue: string | boolean) => void | Promise<void>;
+	onSave?: (propertyName: string, propertyValue: string | boolean | number, propertyType: CustomPropertyType) => void | Promise<void>;
 	/** Callback when adding is cancelled or property is deleted */
 	onCancel?: () => void | Promise<void>;
 	mode?: "pnp" | "tree-view"
@@ -37,9 +53,9 @@ interface CustomPropertyProps {
 export function CreatePropertyToggle({ onSave, onCancel, mode="pnp" }: CustomPropertyProps) {
 	const [isAddingProperty, setIsAddingProperty] = useState(false);
 
-	const handleSave = async (propertyName: string, propertyValue: string | boolean) => {
+	const handleSave = async (propertyName: string, propertyValue: string | boolean | number, propertyType: CustomPropertyType) => {
 		if (onSave) {
-			await onSave(propertyName, propertyValue);
+			await onSave(propertyName, propertyValue, propertyType);
 		}
 		setIsAddingProperty(false);
 	};

@@ -129,7 +129,7 @@ export interface FlagFormElement extends BaseFormElement {
 
 export interface GenericFormElement extends BaseFormElement {
     type: "Generic";
-    inputType: "dropdown" | "number" | "text" | "custom" | "custom-flag";
+    inputType: "dropdown" | "number" | "text" | "custom" | "custom-flag" | "custom-number" | "custom-phandle";
     setValue?: unknown;
     defaultValue?: unknown;
     validationType?: NumericRangeValidation | DropdownValidation;

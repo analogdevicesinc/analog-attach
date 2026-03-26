@@ -3,9 +3,11 @@ import React, { useEffect, useState } from 'react';
 import GhostButton from '../GhostButton/GhostButton';
 import styles from './CustomProperty.module.scss';
 
+export type CustomPropertyType = 'text' | 'flag' | 'number' | 'phandle';
+
 interface CreateCustomPropertyFormProps {
 	/** Callback when the new property is saved */
-	onSave: (propertyName: string, propertyValue: string | boolean) => void | Promise<void>;
+	onSave: (propertyName: string, propertyValue: string | boolean | number, propertyType: CustomPropertyType) => void | Promise<void>;
 	/** Callback when creation is cancelled */
 	onCancel?: () => void | Promise<void>;
 	mode?: "pnp" | "tree-view"
@@ -21,9 +23,10 @@ export function CreateCustomPropertyForm({
 	mode = "pnp"
 }: CreateCustomPropertyFormProps) {
 	const [propertyName, setPropertyName] = useState('');
-	const [isFlag, setIsFlag] = useState(false);
+	const [propertyType, setPropertyType] = useState<CustomPropertyType>('text');
 	const [propertyStringValue, setPropertyStringValue] = useState<string>('');
 	const [propertyBooleanValue, setPropertyBooleanValue] = useState<boolean>(false);
+	const [propertyNumberValue, setPropertyNumberValue] = useState<number>(0);
 
 	const formRef = React.useRef<HTMLDivElement>(null);
 
@@ -36,7 +39,21 @@ export function CreateCustomPropertyForm({
 	const handleSaveProperty = async () => {
 		if (propertyName.trim()) {
 			if (onSave) {
-				await onSave(propertyName, isFlag ? propertyBooleanValue:propertyStringValue);
+				let value: string | boolean | number;
+				switch (propertyType) {
+					case 'flag':
+						value = propertyBooleanValue;
+						break;
+					case 'number':
+						value = propertyNumberValue;
+						break;
+					case 'text':
+					case 'phandle':
+					default:
+						value = propertyStringValue;
+						break;
+				}
+				await onSave(propertyName, value, propertyType);
 			}
 		}
 	};
@@ -64,28 +81,47 @@ export function CreateCustomPropertyForm({
 				onInput={(e) => setPropertyName((e.target as HTMLInputElement).value)}
 			/>
 			<VscodeButtonGroup style={{width: "100%"}}>
-				<VscodeButton variant={isFlag?"secondary":"primary"} onClick={() => setIsFlag(false)}>Text</VscodeButton>
-				<VscodeButton variant={isFlag?"primary":"secondary"} onClick={() => setIsFlag(true)}>Flag</VscodeButton>
+				<VscodeButton variant={propertyType === 'text' ? "primary" : "secondary"} onClick={() => setPropertyType('text')}>Text</VscodeButton>
+				<VscodeButton variant={propertyType === 'flag' ? "primary" : "secondary"} onClick={() => setPropertyType('flag')}>Flag</VscodeButton>
+				<VscodeButton variant={propertyType === 'number' ? "primary" : "secondary"} onClick={() => setPropertyType('number')}>Number</VscodeButton>
+				<VscodeButton variant={propertyType === 'phandle' ? "primary" : "secondary"} onClick={() => setPropertyType('phandle')}>Phandle</VscodeButton>
 			</VscodeButtonGroup>
 			<div className={styles.propertyValueContainer}>
 				<label className={styles.propertyValueLabel}>Property Value</label>
-			
-				{isFlag && (
+
+				{propertyType === 'flag' && (
 					<VscodeCheckbox
 						className={styles.propertyField}
 						label='Enabled'
 						checked={propertyBooleanValue}
 						onChange={() => setPropertyBooleanValue(!propertyBooleanValue)}
 					/>
-				) }
-				{!isFlag && (
+				)}
+				{propertyType === 'text' && (
 					<VscodeTextfield
 						placeholder="Start typing..."
 						className={styles.propertyField}
 						value={propertyStringValue}
 						onInput={(e) => setPropertyStringValue((e.target as HTMLInputElement).value)}
 					/>
-				) }
+				)}
+				{propertyType === 'number' && (
+					<VscodeTextfield
+						placeholder="Enter a number..."
+						className={styles.propertyField}
+						type="number"
+						value={String(propertyNumberValue)}
+						onInput={(e) => setPropertyNumberValue(Number((e.target as HTMLInputElement).value))}
+					/>
+				)}
+				{propertyType === 'phandle' && (
+					<VscodeTextfield
+						placeholder="e.g. gpio0"
+						className={styles.propertyField}
+						value={propertyStringValue}
+						onInput={(e) => setPropertyStringValue((e.target as HTMLInputElement).value)}
+					/>
+				)}
 			</div>
 			<VscodeButton
 				className={styles.saveCustomPropertyButton}
