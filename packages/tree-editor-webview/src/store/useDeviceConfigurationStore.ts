@@ -381,10 +381,15 @@ export const useDeviceConfigurationStore = create<DeviceConfigurationState>((set
             configuration: updatedConfig,
         });
 
-        nodesStore.selectNode({
-            ...nodesStore.selectedNode!,
-            label: newAlias || nodesStore.selectedNode!.data.key,
-        });
+        // Use updateNode instead of selectNode to preserve the existing node reference
+        // in the tree. selectNode with a spread object breaks reference equality used
+        // by findPathToNode, causing selectedNodePath to become undefined and the view
+        // to reset to the empty state after loadNodes() is called in the debounce.
+        if (nodesStore.selectedNode) {
+            nodesStore.updateNode(nodesStore.selectedNode, {
+                label: newAlias || (nodesStore.selectedNode.data as { key?: string }).key || nodesStore.selectedNode.label,
+            });
+        }
 
         // Trigger debounced update to backend
         triggerDebouncedConfigUpdate(get);
