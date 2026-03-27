@@ -18,8 +18,11 @@ import {
     parseDtsWithLabelMap,
     mergeDtso,
     markNodesModified,
-    ParsedBinding
+    ParsedBinding,
+    query_devicetree,
+    insert_known_structures,
 } from "attach-lib";
+import { DeviceState } from "../WebviewControllers/DeviceState";
 import {
     CompatibleMapping,
     bigIntReplacer
@@ -170,8 +173,8 @@ export class AttachSession {
     /** Tracks the number of validation errors from the last UI validation pass */
     private last_validation_error_count: number = 0;
 
-    // Logging configuration
-    private readonly debug_enabled: boolean = false;
+    /** Cache of DeviceState objects keyed by device UUID */
+    private deviceStates: Map<DeviceUID, DeviceState> = new Map();
 
     private constructor(
         subsystems: string[],
@@ -424,6 +427,9 @@ export class AttachSession {
             throw new Error(`Cannot move node ${deviceUID} under its own descendant`);
         }
 
+        // Invalidate cached DeviceState since parent is changing
+        this.invalidateDeviceState(deviceUID);
+
         // actual move
         currentParent.children.splice(index, 1);
         targetParent.children.push(node);
@@ -633,6 +639,9 @@ export class AttachSession {
     }
 
     public async delete_device(deviceUID: DeviceUID): Promise<DeviceUID> {
+        // Invalidate cached DeviceState for the deleted node
+        this.invalidateDeviceState(deviceUID);
+
         // Delete exactly the node referenced by the provided UID
         const parent_node = this.find_parent_node_by_uuid(deviceUID);
         if (parent_node === undefined) {
@@ -670,7 +679,7 @@ export class AttachSession {
      * Resolve binding information and required keys for a device node.
      * Returns undefined when the compatible or binding cannot be resolved.
      */
-    public async buildFormElementsForNode(node: DtsNode, data: string):
+    public async resolveBindingInformationForNode(node: DtsNode, data: string):
         Promise<
             {
                 binding: ParsedBinding;
@@ -739,6 +748,99 @@ export class AttachSession {
      */
     public getValidationErrorCount(): number {
         return this.last_validation_error_count;
+    }
+
+    /**
+     * Get or create a DeviceState for the given device UUID.
+     * Returns a cached DeviceState if available, otherwise creates a new one
+     * from the DtsNode and its resolved binding.
+     */
+    public async getOrCreateDeviceState(uuid: DeviceUID): Promise<DeviceState> {
+        // Return cached state if available
+        const cached = this.deviceStates.get(uuid);
+        if (cached) {
+            return cached;
+        }
+
+        // Find the node
+        const node = this.find_node_by_uuid(uuid);
+        if (!node) {
+            throw new Error(`Cannot find node with UUID: ${uuid}`);
+        }
+
+        // Find parent node
+        const parentNode = this.find_parent_node_by_uuid(uuid);
+        if (!parentNode) {
+            throw new Error(`Cannot find parent node for UUID: ${uuid}`);
+        }
+
+        // Get binding for node
+        const serializedData = JSON.stringify(this.nodeToAttachLibJson(node), bigIntReplacer);
+        const bindingResult = await this.resolveBindingInformationForNode(node, serializedData);
+
+        // Enrich binding properties with devicetree queries
+        if (bindingResult?.binding) {
+            const deviceTree = this.get_device_tree();
+            bindingResult.binding.properties = query_devicetree(
+                deviceTree,
+                bindingResult.binding.properties,
+                serializedData,
+                parentNode.name
+            );
+            bindingResult.binding.properties = insert_known_structures(bindingResult.binding.properties);
+
+            // Also enrich pattern properties for channels
+            if (bindingResult.binding.pattern_properties) {
+                for (const pattern of bindingResult.binding.pattern_properties) {
+                    pattern.properties = query_devicetree(deviceTree, pattern.properties, serializedData, parentNode.name);
+                    pattern.properties = insert_known_structures(pattern.properties);
+                }
+            }
+        }
+
+        // Create DeviceState
+        const state = DeviceState.fromNodeAndBinding(
+            node,
+            parentNode,
+            bindingResult?.binding,
+            this,
+            bindingResult?.patterns ?? []
+        );
+
+        // Cache it
+        this.deviceStates.set(uuid, state);
+
+        return state;
+    }
+
+    /**
+     * Get a cached DeviceState if it exists, without creating one.
+     */
+    public getDeviceState(uuid: DeviceUID): DeviceState | undefined {
+        return this.deviceStates.get(uuid);
+    }
+
+    /**
+     * Invalidate the cached DeviceState for the given UUID.
+     * Call this when external changes may have modified the node.
+     */
+    public invalidateDeviceState(uuid: DeviceUID): void {
+        this.deviceStates.delete(uuid);
+    }
+
+    /**
+     * Invalidate all cached DeviceStates.
+     * Call this when the device tree is reloaded or significantly modified.
+     */
+    public invalidateAllDeviceStates(): void {
+        this.deviceStates.clear();
+    }
+
+    /**
+     * Update the cached DeviceState with a new instance.
+     */
+    public setDeviceState(uuid: DeviceUID, state: DeviceState): void {
+        this.deviceStates.set(uuid, state);
     }
 
     /**
@@ -1074,6 +1176,9 @@ export class AttachSession {
      * Used when the backing file changes outside the configurator UI.
      */
     public async reloadFromText(updatedContent: string): Promise<void> {
+        // Invalidate cached DeviceStates since the underlying data is changing
+        this.invalidateAllDeviceStates();
+
         // Remember user-added nodes by their logical path so we can restore the flag after reparse
         const userAddedPaths = this.collectUserAddedPaths(this.device_tree.root);
 

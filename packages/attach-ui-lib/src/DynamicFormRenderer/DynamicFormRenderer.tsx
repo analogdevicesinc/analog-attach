@@ -750,7 +750,10 @@ function isGenericFormElement(element: FormElement): element is GenericFormEleme
 }
 
 function isFormElementCustom(element: GenericFormElement) {
-    return element.inputType == "custom" || element.inputType =="custom-flag"
+    return element.inputType === "custom" ||
+        element.inputType === "custom-flag" ||
+        element.inputType === "custom-number" ||
+        element.inputType === "custom-phandle";
 }
 
 /**

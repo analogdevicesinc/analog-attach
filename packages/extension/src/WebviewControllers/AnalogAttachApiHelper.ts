@@ -2,38 +2,24 @@ import {
     type FormElement,
     type GenericFormElement,
     type FormObjectElement,
-    type NumericRangeValidation,
-    type ArrayStringValidation,
-    type ArrayNumberValidation,
     type MatrixValidation,
     type EnumValueType,
     type ConfigTemplatePayload,
     type ParentNode,
     type DeviceUID,
     ArrayMixedTypeValidation,
-    DropdownValidation,
-    ArrayValidation,
-    HyperlinkItem,
 } from "extension-protocol";
 import {
     expand_regex,
-    type AttachType,
     type BindingErrors,
     type DtsNode,
     type DtsProperty,
-    type DtsReference,
-    type DtsValue,
     type DtsValueComponent,
-    type PatternPropertyRule,
     type ParsedBinding,
-    type ResolvedProperty,
     type CellArrayElement,
     query_devicetree,
     insert_known_structures,
     cell_extract_first_value,
-    AttachEnumType,
-    serializeBigInt,
-    value_to_macro,
 } from "attach-lib";
 import { AttachSession } from "../AttachSession/AttachSession";
 import { AnalogAttachLogger } from "../AnalogAttachLogger";
@@ -56,6 +42,57 @@ export class ConfigValidationError extends Error {
  */
 export class AnalogAttachApiHelper {
     public constructor(private readonly attachSession: AttachSession) { }
+
+    /**
+     * Prefill the reg element's setValue from unit_addr when reg has no value.
+     * This centralizes the logic for prefilling reg from the node's unit address.
+     */
+    private prefillRegFromUnitAddr(elements: FormElement[], unitAddr: string | undefined): void {
+        if (unitAddr === undefined) {
+            return;
+        }
+
+        const regElement = elements.find((element) => element.key === "reg");
+        if (regElement === undefined || regElement.type === "FormObject" || regElement.setValue !== undefined) {
+            return;
+        }
+
+        const parsed = unitAddr.startsWith("0x")
+            ? Number.parseInt(unitAddr, 16)
+            : Number.parseInt(unitAddr, 10);
+
+        if (Number.isNaN(parsed)) {
+            return;
+        }
+
+        if (regElement.type === "FormMatrix") {
+            regElement.setValue = [[parsed]];
+        } else if (regElement.type === "FormArray") {
+            regElement.setValue = [parsed];
+        } else {
+            regElement.setValue = parsed;
+        }
+    }
+
+    /**
+     * Sync the unit_addr field from the reg property value.
+     * This ensures the unit address stays in sync when reg is modified.
+     */
+    private syncUnitAddrFromReg(node: DtsNode): void {
+        if (!node.modified_by_user) {
+            return;
+        }
+
+        const reg = node.properties.find((p) => p.name === "reg");
+        if (!reg?.value) {
+            return;
+        }
+
+        const regValue = cell_extract_first_value(reg);
+        if (typeof regValue === "bigint") {
+            node.unit_addr = regValue.toString();
+        }
+    }
 
     public getCatalogDevices() {
         return this.attachSession.get_catalog_devices();
@@ -89,215 +126,70 @@ export class AnalogAttachApiHelper {
     }
 
     /**
-     * 
-     * @param deviceUID 
-     * @param validateWithNodeData An optional flag indicating whether to build validation data from the current node state, in case we do not want to perform validation against an empty/default configuration.
-     * @returns 
+     * Build the device configuration payload.
+     * Uses DeviceState as the single source of truth for all device properties,
+     * channels, and touched children.
+     *
+     * @param deviceUID The device UUID
+     * @param _data Optional serialized data (deprecated, kept for API compatibility)
+     * @returns ConfigTemplatePayload for the frontend
      */
     public async buildDeviceConfiguration(
         deviceUID: DeviceUID,
-        data?: string,
-        previousConfig?: FormElement[]
+        _data?: string,
     ): Promise<ConfigTemplatePayload> {
         const node = this.attachSession.find_node_by_uuid(deviceUID);
-
         if (node === undefined) {
             throw new Error(`Cannot find node with UUID: ${deviceUID}`);
         }
 
-        const serializedData = data ?? JSON.stringify(this.attachSession.nodeToAttachLibJson(node), bigIntReplacer);
-
-        const bindingResult = await this.attachSession.buildFormElementsForNode(node, serializedData);
-        if (bindingResult === undefined) {
-            throw new Error("Could not build form elements");
-        }
-
-        const device_tree = this.attachSession.get_device_tree();
-
         const parentNode = this.attachSession.find_parent_node_by_uuid(deviceUID);
-
         if (parentNode === undefined) {
             throw new Error(`Cannot find parent node from node with UUID: ${deviceUID}`);
         }
 
-        bindingResult.binding.properties = query_devicetree(device_tree, bindingResult.binding.properties, serializedData, parentNode.name);
-        bindingResult.binding.properties = insert_known_structures(bindingResult.binding.properties);
+        // Get or create DeviceState - single source of truth
+        // This internally resolves and enriches the binding
+        const deviceState = await this.attachSession.getOrCreateDeviceState(deviceUID);
 
-        if (bindingResult.binding.pattern_properties !== undefined) {
-            for (const pattern of bindingResult.binding.pattern_properties) {
-                pattern.properties = query_devicetree(device_tree, pattern.properties, serializedData, parentNode.name);
-                pattern.properties = insert_known_structures(pattern.properties);
-            }
-        }
+        // All elements come from DeviceState (properties, touched children, channels)
+        const allElements = deviceState.toFormElements(this.attachSession, { serializeForFrontend: true });
 
-        const nodeValueMap = this.parseNodeValues(node);
+        // Prefill reg from unit_addr for device-level elements
+        this.prefillRegFromUnitAddr(allElements, node.unit_addr);
 
-        this.pruneInvalidPhandles(bindingResult.binding.properties, nodeValueMap, node);
-
-        const bindingElements = bindingResult.binding.properties
-            ? this.mapBindingToFormElements(bindingResult.binding, bindingResult.requiredKeys, nodeValueMap)
-            : [];
-        const devicePropertyElements = node.properties
-            .filter((property) => property.name !== "status")
-            .map((property) => this.propertyToFormElement(property, bindingResult.requiredKeys.has(property.name)))
-            .filter((element): element is FormElement => element !== undefined);
-
-        const bindingKeys = new Set(bindingElements.map((element: FormElement) => element.key));
-        const filteredDeviceProperties = devicePropertyElements.filter((element: FormElement) => !bindingKeys.has(element.key));
-
-        // Only properties modified by the user should be tagged as custom for the FE to render as custom/custom-flag.
-        const mappedCustomProperties = filteredDeviceProperties.map((element) => {
-            // Find the original property to check if it was user-modified
-            const originalProperty = node.properties.find(property => property.name === element.key);
-            const isUserModified = originalProperty?.modified_by_user === true;
-
-            if (element.type === "Flag") {
-                return {
-                    type: "Generic",
-                    key: element.key,
-                    inputType: isUserModified ? "custom-flag" : "text",
-                    required: false,
-                    setValue: true,
-                } satisfies GenericFormElement;
-            }
-
-            if (element.type === "Generic" && element.inputType === undefined) {
-                const isBooleanLike = typeof element.setValue === "boolean" || element.setValue === undefined;
-                element.inputType = isUserModified ? (isBooleanLike ? "custom-flag" : "custom") : "text";
-                return element;
-            }
-
-            return element;
-        });
-        let deviceElements: FormElement[] = [
-            ...bindingElements,
-            ...mappedCustomProperties,
-        ];
-
-        // Prefill reg from unit_addr when present and reg lacks a value
-        if (node.unit_addr !== undefined) {
-            const regElement = deviceElements.find((element) => element.key === "reg");
-            if (regElement !== undefined && regElement.type !== "FormObject" && regElement.setValue === undefined) {
-                const parsed = node.unit_addr.startsWith("0x")
-                    ? Number.parseInt(node.unit_addr, 16)
-                    : Number.parseInt(node.unit_addr, 10);
-                if (!Number.isNaN(parsed)) {
-                    if (regElement.type === "FormMatrix") {
-                        regElement.setValue = [[parsed]];
-                    } else if (regElement.type === "FormArray") {
-                        regElement.setValue = [parsed];
-                    } else {
-                        regElement.setValue = parsed;
-                    }
+        // Prefill reg from unit_addr for channel elements
+        for (const element of allElements) {
+            if (element.type === "FormObject" && element.channelName) {
+                const atIndex = element.channelName.lastIndexOf("@");
+                if (atIndex !== -1) {
+                    const unitAddr = element.channelName.slice(atIndex + 1);
+                    this.prefillRegFromUnitAddr(element.config, unitAddr);
                 }
             }
         }
 
-        const channelRegexes = bindingResult.patterns;
+        const channelRegexes = deviceState.channelRegexStrings ?? [];
         const generatedChannelRegexEntries = this.generateChannelRegexEntries(channelRegexes);
-        const patternRules = bindingResult.binding.pattern_properties;
-        const channelElements = this.buildChannelConfigurations(node, channelRegexes, patternRules);
-        const alias = this.getNodeAlias(node);
-        const active = this.getNodeActive(node);
 
-        // Include non-device children that were edited by the user (e.g., clocks) without marking them as channels
-        const touchedElements = node.children
-            // FIXME: This filter is a hack. The {created/modified}_by_user is a mess rn
-            .filter((child) => {
-                if (this.attachSession.isDeviceNode(child)) {
-                    return false;
-                }
-                if (this.matchesAnyChannelPattern(this.attachSession.buildNodeSegment(child), this.compileChannelRegexes(channelRegexes))) {
-                    return false;
-                }
-                return !child.created_by_user && child.properties.some((p) => p.modified_by_user === true);
-            })
-            .map((child) => {
-                const nodeSegment = this.attachSession.buildNodeSegment(child);
-                const childConfig = child.properties
-                    .filter((property) => property.name !== "status")
-                    .map((property) => this.propertyToFormElement(property, false))
-                    .filter((item): item is FormObjectElement => item !== undefined);
-
-                return {
-                    type: "FormObject",
-                    key: nodeSegment,
-                    required: false,
-                    config: childConfig,
-                } satisfies FormObjectElement;
-            });
-
-        // The difference between these elements and why there are 3 "flows" is
-        // 1: deviceElements are elements that are from a node that contains "compatible"
-        // 2: touchedElements: properties modified in nodes that are not touched by user
-        // 3: channelElements: nodes that are created by the user, but do not have a compatible,
-        // instead, they have a regex that they should follow
-        // FIXME: Eventually the flow might be unified nicely, but not now
-        let allElements = [...deviceElements, ...touchedElements, ...channelElements];
-
-        // Preserve inputType hints (e.g., custom) from previous config where possible
-        // FIXME: This is a big mess, but because of the time constraints for the release
-        // there is no cleaner fix that can be done in time (both for FE and BE).
-        // This merge bs should be removed and pruneMissingDeviceProperties as well,
-        // as custom properties need to retain metadata that they are custom (for the FE to
-        // be able to draw them correctly), but once the app writes the changes to the file
-        // information about what is or isn't custom is lost.
-        if (previousConfig) {
-            const mergeInputTypes = (current: FormElement[], previous: FormElement[]): void => {
-                const currentMap = new Map<string, FormElement>();
-                for (const element of current) {
-                    currentMap.set(element.key, element);
-                }
-
-                for (const previousElement of previous) {
-                    const currentElement = currentMap.get(previousElement.key);
-
-                    if (currentElement) {
-                        if (currentElement.type === "FormObject" && previousElement.type === "FormObject") {
-                            mergeInputTypes(currentElement.config, previousElement.config);
-                        } else if (currentElement.type === "Generic" && previousElement.type === "Generic" && previousElement.inputType) {
-                            currentElement.inputType = previousElement.inputType;
-                        }
-                        continue;
-                    }
-
-                    // If it wasn't provided by binding and is custom/custom-flag, keep it around
-                    if (
-                        previousElement.type === "Generic" &&
-                        (previousElement.inputType === "custom" || previousElement.inputType === "custom-flag")
-                    ) {
-                        current.push(previousElement);
-                        currentMap.set(previousElement.key, previousElement);
-                    }
-                }
-            };
-            mergeInputTypes(allElements, previousConfig);
-        }
-
-        const payload: ConfigTemplatePayload =
-        {
+        const payload: ConfigTemplatePayload = {
             config: {
                 type: "DeviceConfigurationFormObject",
-                alias,
-                active,
-                maxChannels: channelElements.length > 0 ? channelElements.length : undefined,
+                alias: deviceState.alias,
+                active: deviceState.active,
+                maxChannels: deviceState.channels.size > 0 ? deviceState.channels.size : undefined,
                 config: allElements,
                 parentNode: {
-                    uuid: parentNode._uuid,
-                    name: parentNode.name,
+                    uuid: deviceState.parentUUID,
+                    name: deviceState.parentName,
                 },
-                channelRegexes: (channelRegexes.length > 0) ? channelRegexes : undefined,
-                generatedChannelRegexEntries: generatedChannelRegexEntries
-            }
+                channelRegexes: channelRegexes.length > 0 ? channelRegexes : undefined,
+                generatedChannelRegexEntries: generatedChannelRegexEntries,
+            },
         };
 
-        // Re-validate using normalized payload to avoid shape mismatches (e.g. arrays vs scalars).
-        const normalizedData = this.attachSession.configPayloadToAttachLibJson(payload.config);
-        const normalizedBindingResult = await this.attachSession.buildFormElementsForNode(
-            node,
-            JSON.stringify(serializeBigInt(normalizedData))
-        );
-        const errors = normalizedBindingResult?.errors ?? [];
+        // Single validation pass using DeviceState
+        const errors = await deviceState.validate(this.attachSession);
         if (errors.length > 0) {
             this.applyValidationErrors(payload, errors);
         }
@@ -345,27 +237,17 @@ export class AnalogAttachApiHelper {
                 this.pruneMissingDeviceProperties(node, verification.deviceElements);
             }
 
-            // FIXME: This funny check should not be here for sure
-            const set_unit_addr = (node: DtsNode): Boolean => {
-                if (node.modified_by_user !== undefined && node.modified_by_user === true) {
-                    const reg = node.properties.find((value) => value.name === "reg");
-                    if (reg !== undefined && reg.value !== undefined) {
-                        const reg_value = cell_extract_first_value(reg);
-                        if (typeof reg_value === "bigint") {
-                            node.unit_addr = reg_value.toString();
-                            return true;
-                        }
-                    }
-                }
+            // Invalidate the DeviceState cache since the node has been modified
+            // This ensures the next getOrCreateDeviceState call rebuilds from fresh node data
+            this.attachSession.invalidateDeviceState(targetDeviceUID);
 
-                return false;
-            };
+            // Update DeviceState cache for custom property tracking
+            this.updateDeviceStateCache(targetDeviceUID, config, verification.deviceElements);
 
-            set_unit_addr(node);
-
+            // Sync unit_addr from reg property for device and channels
+            this.syncUnitAddrFromReg(node);
             for (const channel of node.children) {
-                set_unit_addr(channel);
-                // FIXME: Check this again later
+                this.syncUnitAddrFromReg(channel);
             }
 
             return {
@@ -375,6 +257,83 @@ export class AnalogAttachApiHelper {
         } catch (error) {
             this.attachSession.restore_from_restore_point(restorePoint);
             throw error;
+        }
+    }
+
+    /**
+     * Update DeviceState cache with custom property metadata from form elements.
+     * This preserves custom property types (custom, custom-flag, custom-number, custom-phandle)
+     * across save/load cycles.
+     *
+     * Note: We only update an existing cached DeviceState. If no cached state exists,
+     * we skip caching - the next getOrCreateDeviceState call will create a fresh one
+     * from the DTS node which already has the custom property info via modified_by_user.
+     */
+    private updateDeviceStateCache(
+        deviceUID: DeviceUID,
+        _config: ConfigTemplatePayload["config"],
+        deviceElements: FormElement[]
+    ): void {
+        // Only update if there's an existing cached DeviceState
+        const deviceState = this.attachSession.getDeviceState(deviceUID);
+        if (!deviceState) {
+            // Don't create a minimal object - let getOrCreateDeviceState create a proper one
+            return;
+        }
+
+        // Update custom property metadata
+        for (const element of deviceElements) {
+            if (element.type === "FormObject") {
+                continue;
+            }
+
+            if (element.type === "Generic") {
+                const inputType = (element as GenericFormElement).inputType;
+                if (inputType?.startsWith("custom")) {
+                    const existing = deviceState.properties.get(element.key);
+                    const customType = this.inputTypeToCustomType(inputType);
+                    if (existing) {
+                        existing.isCustom = true;
+                        existing.customType = customType;
+                        existing.value = element.setValue;
+                    } else {
+                        deviceState.properties.set(element.key, {
+                            key: element.key,
+                            value: element.setValue,
+                            isCustom: true,
+                            customType,
+                        });
+                    }
+                }
+            }
+        }
+
+        // Remove custom properties that are no longer in the elements
+        const elementKeys = new Set(deviceElements.map(element => element.key));
+        for (const [key, propertyState] of deviceState.properties) {
+            if (!elementKeys.has(key) && propertyState.isCustom) {
+                deviceState.properties.delete(key);
+            }
+        }
+    }
+
+    /**
+     * Convert inputType to CustomPropertyType.
+     */
+    private inputTypeToCustomType(inputType: string): "text" | "flag" | "number" | "phandle" {
+        switch (inputType) {
+            case "custom-flag": {
+                return "flag";
+            }
+            case "custom-number": {
+                return "number";
+            }
+            case "custom-phandle": {
+                return "phandle";
+            }
+            default: {
+                return "text";
+            }
         }
     }
 
@@ -546,7 +505,7 @@ export class AnalogAttachApiHelper {
         }
 
         AnalogAttachLogger.debug("Building form elements via attachSession.buildFormElementsForNode", node);
-        return this.attachSession.buildFormElementsForNode(node, serializedData);
+        return this.attachSession.resolveBindingInformationForNode(node, serializedData);
     }
 
     private extractCompatibleValue(elements: FormElement[]): string | undefined {
@@ -587,49 +546,6 @@ export class AnalogAttachApiHelper {
         return undefined;
     }
 
-    private buildChannelConfigurations(
-        node: DtsNode,
-        channelRegexPatterns: string[],
-        patternRules?: PatternPropertyRule[],
-    ): FormObjectElement[] {
-        const channelRegexes = this.compileChannelRegexes(channelRegexPatterns);
-        const rules = patternRules ?? [];
-
-        return node.children
-            .filter((child) => {
-                if (this.attachSession.isDeviceNode(child)) {
-                    return false;
-                }
-                if (channelRegexes.length === 0) {
-                    return true;
-                }
-                const nodeSegment = this.attachSession.buildNodeSegment(child);
-                return this.matchesAnyChannelPattern(nodeSegment, channelRegexes);
-            })
-            .map((child) => {
-                const nodeSegment = this.attachSession.buildNodeSegment(child);
-                // If segment is name@unit and unit is numeric, set unit_addr so reg can be prefetched
-                const atIndex = nodeSegment.lastIndexOf("@");
-                if (atIndex !== -1 && child.unit_addr === undefined) {
-                    const unitPart = nodeSegment.slice(atIndex + 1);
-                    const parsed = unitPart.startsWith("0x")
-                        ? Number.parseInt(unitPart, 16)
-                        : Number.parseInt(unitPart, 10);
-                    if (!Number.isNaN(parsed)) {
-                        child.unit_addr = unitPart;
-                    }
-                }
-                const matchedRule = rules.find((rule) => {
-                    try {
-                        return new RegExp(rule.pattern).test(nodeSegment);
-                    } catch {
-                        return false;
-                    }
-                });
-                return this.buildChannelFormObject(child, nodeSegment, matchedRule);
-            });
-    }
-
     private generateChannelRegexEntries(channelRegexes: string[]): string[] | undefined {
         const entries: string[] = [];
         for (const pattern of channelRegexes) {
@@ -667,86 +583,6 @@ export class AnalogAttachApiHelper {
         walk(config.config);
     }
 
-    /**
-     * prune invalid phandle enum_array values immediately
-     * */
-    private async pruneInvalidPhandles(properties: ResolvedProperty[], nodeValueMap: Map<string, unknown>, node: DtsNode) {
-        let shouldSave = false;
-
-        for (const property of properties ?? []) {
-            const dto = property.value as AttachType;
-            if (dto._t !== "enum_array" || dto.enum_type !== AttachEnumType.PHANDLE) {
-                continue;
-            }
-
-            const raw = nodeValueMap.get(property.key);
-
-            // safety backup
-            const normalized = Array.isArray(raw) ? raw : (raw === undefined ? [] : [raw]);
-            const enumSet = new Set(dto.enum.map(String));
-            const hasInvalid = normalized.some((v) => !enumSet.has(String(v)));
-
-            if (hasInvalid) {
-                shouldSave = true;
-                this.removeProperty(node, property.key);
-                nodeValueMap.delete(property.key);
-            }
-        }
-
-        if (shouldSave && this.attachSession.has_file_uri()) {
-            await this.attachSession.save_device_tree();
-        }
-    }
-
-    private buildChannelFormObject(channelNode: DtsNode, nodeSegment: string, patternRule?: PatternPropertyRule): FormObjectElement {
-        const alias = this.getNodeAlias(channelNode);
-        const nodeValueMap = this.parseNodeValues(channelNode);
-
-        const channelProperties = patternRule
-            ? this.mapPatternPropertiesToFormElements(patternRule, nodeValueMap)
-            : this.buildLegacyChannelElements(channelNode);
-
-        const bindingKeys = patternRule
-            ? new Set(patternRule.properties.map((property) => property.key))
-            : undefined;
-        const additionalProperties = bindingKeys
-            ? this.buildAdditionalChannelProperties(channelNode, bindingKeys)
-            : [];
-
-        // Prefill reg from unit_addr when present and reg lacks a value
-        if (channelNode.unit_addr !== undefined) {
-            const regElement = channelProperties.find((element) => element.key === "reg");
-            if (regElement !== undefined && regElement.type !== "FormObject" && regElement.setValue === undefined) {
-                const parsed = channelNode.unit_addr.startsWith("0x")
-                    ? Number.parseInt(channelNode.unit_addr, 16)
-                    : Number.parseInt(channelNode.unit_addr, 10);
-                if (!Number.isNaN(parsed)) {
-                    if (regElement.type === "FormMatrix") {
-                        regElement.setValue = [[parsed]];
-                    } else if (regElement.type === "FormArray") {
-                        regElement.setValue = [parsed];
-                    } else {
-                        regElement.setValue = parsed;
-                    }
-                }
-            }
-        }
-
-        const configElements: FormElement[] = [
-            ...channelProperties,
-            ...additionalProperties,
-        ];
-
-        return {
-            type: "FormObject",
-            key: nodeSegment,
-            channelName: nodeSegment,
-            required: false,
-            alias,
-            config: configElements,
-        };
-    }
-
     private assertSupportedFormElements(elements: FormElement[]): void {
         for (const element of elements) {
             switch (element.type) {
@@ -766,37 +602,6 @@ export class AnalogAttachApiHelper {
                 }
             }
         }
-    }
-
-    private mapPatternPropertiesToFormElements(
-        patternRule: PatternPropertyRule,
-        nodeValueMap: Map<string, unknown>
-    ): FormElement[] {
-        const requiredKeys = new Set(patternRule.required ?? []);
-
-        return patternRule.properties
-            .map((property) =>
-                this.bindingPropertyToFormElement(
-                    property,
-                    requiredKeys.has(property.key),
-                    nodeValueMap.get(property.key)
-                )
-            )
-            .filter(Boolean) as FormElement[];
-    }
-
-    private buildAdditionalChannelProperties(channelNode: DtsNode, bindingKeys: Set<string>): FormElement[] {
-        return channelNode.properties
-            .filter((property) => property.name !== "status" && !bindingKeys.has(property.name))
-            .map((property) => this.propertyToFormElement(property, false))
-            .filter(Boolean) as FormElement[];
-    }
-
-    private buildLegacyChannelElements(channelNode: DtsNode): FormElement[] {
-        return channelNode.properties
-            .filter((property) => property.name !== "status")
-            .map((property) => this.propertyToFormElement(property, false))
-            .filter(Boolean) as FormElement[];
     }
 
     private compileChannelRegexes(patterns: string[]): RegExp[] {
@@ -833,6 +638,22 @@ export class AnalogAttachApiHelper {
 
         const parsedValue = this.attachSession.parseDtsValue(property.value);
 
+        // Check if this is a single-element numeric array from a user-modified property
+        // These should be treated as custom-number, not FormArray
+        const isSingleNumber = Array.isArray(parsedValue) &&
+            parsedValue.length === 1 &&
+            (typeof parsedValue[0] === "number" || typeof parsedValue[0] === "bigint");
+
+        if (isSingleNumber && property.modified_by_user === true) {
+            return {
+                type: "Generic",
+                key: property.name,
+                inputType: "custom-number",
+                required,
+                setValue: Number(parsedValue[0]),
+            };
+        }
+
         if (Array.isArray(parsedValue)) {
             return {
                 type: "FormArray",
@@ -844,9 +665,19 @@ export class AnalogAttachApiHelper {
         }
 
         // Only treat user-modified properties as custom so the FE preserves custom renderers
-        const inputType = property.modified_by_user === true
-            ? (typeof parsedValue === "boolean" ? "custom-flag" : "custom")
-            : "text";
+        const getCustomInputType = (): "custom-flag" | "custom-number" | "custom-phandle" | "custom" => {
+            if (typeof parsedValue === "boolean") {
+                return "custom-flag";
+            }
+            if (typeof parsedValue === "number" || typeof parsedValue === "bigint") {
+                return "custom-number";
+            }
+            if (typeof parsedValue === "string" && parsedValue.startsWith("&")) {
+                return "custom-phandle";
+            }
+            return "custom";
+        };
+        const inputType = property.modified_by_user === true ? getCustomInputType() : "text";
 
         return {
             type: "Generic",
@@ -871,441 +702,6 @@ export class AnalogAttachApiHelper {
             return true;
         }
         return component.value !== "disabled";
-    }
-
-    private mapBindingToFormElements(
-        binding: ParsedBinding,
-        requiredKeys: Set<string>,
-        nodeValueMap: Map<string, unknown>
-    ): FormElement[] {
-        return binding.properties
-            .map((property) =>
-                this.bindingPropertyToFormElement(
-                    property,
-                    requiredKeys.has(property.key),
-                    nodeValueMap.get(property.key)
-                )
-            )
-            .filter(Boolean) as FormElement[];
-    }
-
-    private normalizeArray<T>(value: T): T[] | undefined {
-        if (Array.isArray(value)) {
-            return value;
-        }
-        if (value === undefined) {
-            return undefined;
-        }
-        return [value];
-    }
-
-    private normalizeScalar(value: unknown): unknown {
-        if (Array.isArray(value) && value.length === 1) {
-            return value[0];
-        }
-        return value;
-    }
-
-    private bindingPropertyToFormElement(
-        property: ResolvedProperty,
-        required: boolean,
-        overrideValue?: any
-    ): FormElement {
-        const dto = property.value as AttachType;
-
-        switch (dto._t) {
-            case "enum_integer": {
-                return {
-                    type: "Generic",
-                    key: property.key,
-                    inputType: "dropdown",
-                    required: required,
-                    description: dto.description,
-                    defaultValue: dto.default,
-                    setValue: this.normalizeScalar(overrideValue),
-                    validationType: {
-                        // TODO: remove ugly cast when FE is ready
-                        list: (dto.enum) as unknown as bigint[],
-                        type: "DropdownValidation"
-                    }
-                };
-            }
-            case "enum_array": {
-                const normalizeGroupedStrings = (value: unknown): Array<string | string[]> | undefined => {
-                    const values = this.normalizeArray(value);
-                    if (!values) {
-                        return undefined;
-                    }
-                    return values.map((entry) => Array.isArray(entry) ? entry.map(String) : String(entry));
-                };
-
-                let validationType: ArrayValidation;
-                validationType = dto.enum_type === AttachEnumType.PHANDLE ? {
-                    type: "ArrayHyperlinkValidation",
-                    minLength: dto.minItems,
-                    maxLength: dto.maxItems,
-                    enum: this.normalizeArray(dto.enum)?.map((item): HyperlinkItem => {
-                        const item_string = String(item);
-                        const labelPath = this.attachSession.get_label_map().get(item_string);
-                        const gotoUID = this.attachSession.path_to_uuid(labelPath ?? item_string);
-                        return {
-                            type: "HyperlinkItem",
-                            name: item_string,
-                            gotoUID: gotoUID
-                        };
-                    })
-                } : {
-                    type: "ArrayStringValidation",
-                    minLength: dto.minItems,
-                    maxLength: dto.maxItems,
-                    enum: normalizeGroupedStrings(dto.enum),
-                    enumType: dto.enum_type
-                };
-
-                const defaultValue = normalizeGroupedStrings(dto.default);
-                let setValue = overrideValue === undefined ? undefined : normalizeGroupedStrings(overrideValue);
-
-                if (validationType.type === "ArrayStringValidation") {
-                    if (dto.enum_type === AttachEnumType.PHANDLE && !validationType.enum?.includes(String(setValue))) {
-                        // somehow prune this as the referenced node might not valid anymore (AACSE-184)
-                        setValue = undefined;
-                    }
-
-                    if (dto.enum_type === AttachEnumType.MACRO && !validationType.enum?.includes(String(setValue))) {
-                        setValue = normalizeGroupedStrings(value_to_macro(Number(setValue), dto.enum));
-                    }
-                }
-
-                return {
-                    type: "FormArray",
-                    key: property.key,
-                    required: required,
-                    description: dto.description,
-                    defaultValue,
-                    setValue,
-                    validationType: validationType,
-                };
-            }
-            case "number_array": {
-                const validationType: ArrayNumberValidation =
-                {
-                    type: "ArrayNumberValidation",
-                    minLength: dto.minItems,
-                    maxLength: dto.maxItems,
-                    // TODO: remove casts after FE is ready
-                    minValue: dto.minimum,
-                    maxValue: dto.maximum
-                };
-
-                return {
-                    type: "FormArray",
-                    key: property.key,
-                    required: required,
-                    description: dto.description,
-                    setValue: this.normalizeArray(overrideValue),
-                    validationType: validationType,
-                };
-            }
-            case "string_array":
-            case "array": {
-                const validationType: ArrayStringValidation =
-                {
-                    type: "ArrayStringValidation",
-                    minLength: dto.minItems,
-                    maxLength: dto.maxItems,
-                };
-
-                return {
-                    type: "FormArray",
-                    key: property.key,
-                    required: required,
-                    description: dto.description,
-                    setValue: this.normalizeArray(overrideValue),
-                    validationType: validationType,
-                };
-            }
-            case "fixed_index": {
-                const validationType: ArrayMixedTypeValidation = {
-                    type: "ArrayMixedTypeValidation",
-                    minPrefixItems: dto.minItems,
-                    maxPrefixItems: dto.maxItems,
-                    prefixItems: []
-                };
-
-                for (const [index, item] of dto.prefixItems.entries()) {
-                    switch (item._t) {
-                        case 'enum': {
-                            if (item.enum_type === AttachEnumType.MACRO && Array.isArray(overrideValue)) {
-                                const raw = overrideValue[index];
-                                if (!item.enum.includes(raw)) {
-                                    const name = value_to_macro(Number(raw), item.enum);
-                                    if (name !== undefined) {
-                                        overrideValue[index] = name;
-                                    }
-                                }
-                            }
-                            validationType.prefixItems.push({
-                                type: "StringList",
-                                enum: item.enum,
-                                enumType: item.enum_type
-                            });
-                            break;
-                        }
-                        case "number": {
-                            validationType.prefixItems.push(
-                                {
-                                    type: "Number",
-                                    minValue: item.minimum ?? 0n,
-                                    // Note: There is no specific upper limit for bigint, it is implementation specific.
-                                    maxValue: item.maximum ?? BigInt(Number.MAX_SAFE_INTEGER)
-                                }
-                            );
-                            break;
-                        }
-                        default: {
-                            const _x: never = item;
-                            throw new Error("Failed exhaustive check!");
-                        }
-                    }
-
-                }
-
-                return {
-                    type: "FormArray",
-                    key: property.key,
-                    required: required,
-                    description: dto.description,
-                    setValue: overrideValue,
-                    validationType: validationType,
-                };
-            }
-            case "matrix": {
-                const normalizeMatrixValue = (value: any): any[] | undefined => {
-                    if (!Array.isArray(value)) {
-                        return undefined;
-                    }
-                    // If first element isn't an array, wrap the entire array as a single row
-                    if (!Array.isArray(value[0])) {
-                        return [value];
-                    }
-                    return value;
-                };
-
-                const validationType: MatrixValidation = {
-                    minRows: dto.minItems,
-                    maxRows: dto.maxItems,
-                    definition: {
-                        // Will change later
-                        type: "ArrayMixedTypeValidation",
-                        minPrefixItems: dto.minItems,
-                        maxPrefixItems: dto.maxItems,
-                        prefixItems: []
-                    }
-                };
-
-                for (const value of dto.values) {
-                    switch (value._t) {
-                        case "enum_array": {
-                            validationType.definition = {
-                                type: "ArrayStringValidation",
-                                minLength: value.minItems,
-                                maxLength: value.maxItems,
-                                enum: value.enum,
-                                enumType: value.enum_type,
-                            };
-                            break;
-                        }
-                        case "number_array": {
-                            validationType.definition = {
-                                type: "ArrayNumberValidation",
-                                minLength: value.minItems,
-                                maxLength: value.maxItems,
-                                minValue: value.minimum,
-                                maxValue: value.maximum
-                            };
-                            break;
-                        }
-                        case "array": {
-                            validationType.definition = {
-                                type: "ArrayNumberValidation",
-                                minLength: value.minItems,
-                                maxLength: value.maxItems,
-                            };
-                            break;
-                        }
-                        case "fixed_index": {
-                            const validations: ArrayMixedTypeValidation = {
-                                type: "ArrayMixedTypeValidation",
-                                minPrefixItems: value.minItems,
-                                maxPrefixItems: value.maxItems,
-                                prefixItems: []
-                            };
-
-                            const rows = normalizeMatrixValue(overrideValue);
-
-                            for (const [index, item] of value.prefixItems.entries()) {
-                                switch (item._t) {
-                                    case 'enum': {
-                                        // translate macros if needed
-                                        if (item.enum_type === AttachEnumType.MACRO && rows) {
-                                            for (const row of rows) {
-                                                const raw = row[index];
-                                                if (!item.enum.includes(raw)) {
-                                                    const name = value_to_macro(Number(raw), item.enum);
-                                                    if (name !== undefined) {
-                                                        row[index] = name;
-                                                    }
-                                                }
-                                            }
-                                        }
-                                        validations.prefixItems.push({
-                                            type: "StringList",
-                                            enum: item.enum,
-                                            enumType: item.enum_type
-                                        });
-                                        break;
-                                    }
-                                    case "number": {
-                                        if (rows) {
-                                            for (const row of rows) {
-                                                if (typeof row[index] === "string") {
-                                                    row[index] = undefined;
-                                                }
-                                            }
-                                        }
-                                        validations.prefixItems.push(
-                                            {
-                                                type: "Number",
-                                                minValue: item.minimum,
-                                                maxValue: item.maximum
-                                            }
-                                        );
-                                        break;
-                                    }
-                                    default: {
-                                        const _x: never = item;
-                                        throw new Error("Failed exhaustive check!");
-                                    }
-                                }
-                            }
-                            validationType.definition = validations;
-                        }
-                    }
-                }
-
-                let setValue = normalizeMatrixValue(overrideValue);
-
-                // Trim values to match shape constraints
-                if (setValue) {
-                    const maxCols = validationType.definition.type === "ArrayMixedTypeValidation"
-                        ? validationType.definition.maxPrefixItems
-                        : validationType.definition.maxLength;
-
-                    // Trim each row to max columns
-                    if (maxCols !== undefined) {
-                        setValue = setValue.map(row => row.slice(0, maxCols));
-                    }
-                    // Trim number of rows
-                    if (validationType.maxRows !== undefined) {
-                        setValue = setValue.slice(0, validationType.maxRows);
-                    }
-                }
-
-                return {
-                    type: "FormMatrix",
-                    key: property.key,
-                    required: required,
-                    description: dto.description,
-                    setValue: setValue,
-                    validationType: validationType,
-                };
-            }
-            case "boolean": {
-                return {
-                    type: "Flag",
-                    key: property.key,
-                    required,
-                    defaultValue: false,
-                    setValue: overrideValue,
-                    description: dto.description
-                };
-            }
-            case "integer": {
-                const validationType: NumericRangeValidation =
-                {
-                    minValue: dto.minimum,
-                    maxValue: dto.maximum,
-                    type: "NumericRangeValidation"
-                };
-
-                return {
-                    type: "Generic",
-                    key: property.key,
-                    inputType: "number",
-                    required: required,
-                    description: dto.description,
-                    defaultValue: dto.default,
-                    setValue: this.normalizeScalar(overrideValue),
-                    validationType: validationType,
-                };
-            }
-            case "const": {
-                const validationType: DropdownValidation = {
-                    type: "DropdownValidation",
-                    list: [dto.const]
-                };
-
-                return {
-                    type: "Generic",
-                    key: property.key,
-                    inputType: "dropdown",
-                    required: required,
-                    description: dto.description,
-                    validationType: validationType,
-                    setValue: this.normalizeScalar(overrideValue),
-                } satisfies GenericFormElement;
-            }
-            case "generic": {
-                return {
-                    type: "Generic",
-                    key: property.key,
-                    inputType: "text",
-                    required: required,
-                    description: dto.description,
-                    setValue: overrideValue,
-                };
-            }
-            case "object": {
-                const config: FormElement[] = [];
-
-                for (const property of dto.properties) {
-                    config.push(this.bindingPropertyToFormElement(property, false));
-                }
-
-                return {
-                    type: "FormObject",
-                    key: property.key,
-                    required: required,
-                    config: config,
-                };
-            }
-            default: {
-                const _x: never = dto;
-                throw new Error("Failed exhaustive check!");
-            }
-        }
-    }
-
-
-    private parseNodeValues(node: DtsNode): Map<string, unknown> {
-        const map = new Map<string, unknown>();
-        for (const property of node.properties) {
-            if (property.name === "status") {
-                continue;
-            }
-            map.set(property.name, property.value ? this.attachSession.parseDtsValue(property.value) : true);
-        }
-        return map;
     }
 
     private applyChannelConfigurations(
@@ -1509,6 +905,27 @@ export class AnalogAttachApiHelper {
                     this.removeProperty(node, genericElement.key);
                     break;
                 }
+
+                // Handle custom-phandle: write as <&label> (array containing ref)
+                if (genericElement.inputType === "custom-phandle") {
+                    const phandleValue = String(genericElement.setValue);
+                    // Strip leading "&" if user included it, then build ref inside array
+                    const labelName = phandleValue.startsWith("&") ? phandleValue.slice(1) : phandleValue;
+                    const arrayComponent: DtsValueComponent = {
+                        kind: "array",
+                        elements: [{
+                            item: {
+                                kind: "ref",
+                                ref: { kind: "label", name: labelName },
+                                labels: [],
+                            },
+                        }],
+                        labels: [],
+                    };
+                    this.upsertProperty(node, genericElement.key, arrayComponent);
+                    break;
+                }
+
                 const component = this.buildValueComponent(genericElement.setValue);
                 if (component) {
                     this.upsertProperty(node, genericElement.key, component);
