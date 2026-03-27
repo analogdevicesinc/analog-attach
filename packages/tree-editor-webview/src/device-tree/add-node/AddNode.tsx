@@ -43,7 +43,7 @@ function NodeTemplateItem({ template, isSelected, onSelect, onMeasure }: NodeTem
     const description = isExpanded ? template.description : template.description.slice(0, 100) + (template.description.length > 100 ? '...' : '');
 
     return (
-        <div className={styles.nodeItem}>
+        <div className={styles.nodeItem} onClick={onSelect}>
             <VscodeRadio name="node-template" value={template.deviceId} className={styles.radio} checked={isSelected} onInput={onSelect} />
             <div className={styles.nodeInfo}>
                 <div className={styles.nodeName}>{template.name}</div>
@@ -70,7 +70,7 @@ function CustomNodeTemplate({
     onCustomNodeNameChange: (name: string) => void;
 }) {
     return (
-        <div className={styles.nodeItem}>
+        <div className={styles.nodeItem} onClick={onSelect}>
             <VscodeRadio name="node-template" value="custom" className={styles.radio} checked={isSelected} onInput={onSelect} />
             <div className={styles.nodeInfo}>
                 <div className={styles.nodeName}>Custom</div>
@@ -109,7 +109,7 @@ function ChannelNodeTemplate({
     };
 
     return (
-        <div className={styles.nodeItem}>
+        <div className={styles.nodeItem} onClick={onSelect}>
             <VscodeRadio name="node-template" value="channel" className={styles.radio} checked={isSelected} onInput={onSelect} />
             <div className={styles.nodeInfo}>
                 <div className={styles.nodeName}>Channel</div>

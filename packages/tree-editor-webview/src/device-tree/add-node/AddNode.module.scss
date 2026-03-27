@@ -81,6 +81,7 @@
   border-radius: var(--hmc-border-radius-2);
   margin-bottom: var(--hmc-space-3);
   background-color: var(--vscode-sideBar-background);
+  cursor: pointer;
 
   &:focus-within {
     border: var(--hmc-border-width-1) solid var(--vscode-focusBorder);
