@@ -263,7 +263,6 @@ export class TreeConfigController implements WebviewControllerInterface {
                     const deviceConfiguration = await this.apiHelper.buildDeviceConfiguration(
                         deviceUID,
                         JSON.stringify(serializeBigInt(data)),
-                        updateRequest.payload.config.config
                     );
                     if (validationErrors.length > 0) {
                         this.apiHelper.applyValidationErrors(deviceConfiguration, validationErrors);

@@ -289,7 +289,6 @@ export class PlugAndPlayWebviewController implements WebviewControllerInterface 
             const deviceConfiguration = await this.analogApiHelper.buildDeviceConfiguration(
                 deviceUID,
                 JSON.stringify(serializeBigInt(data)),
-                request.payload.config.config
             );
             if (validationErrors.length > 0) {
                 this.analogApiHelper.applyValidationErrors(deviceConfiguration, validationErrors);
