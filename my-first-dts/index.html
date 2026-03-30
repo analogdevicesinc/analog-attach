@@ -8,7 +8,7 @@
 
     <title>My First DTS &#8212; Analog Attach  documentation</title>
     <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=8e8a900e" />
-    <link rel="stylesheet" type="text/css" href="../_static/app.min.css?v=5c8d5ce8" />
+    <link rel="stylesheet" type="text/css" href="../_static/app.min.css?v=833c9372" />
     <script async="async" src="../_static/app.umd.js?v=f78f54ff"></script>
     <link rel="icon" href="../_static/icon.svg"/>
     <link rel="index" title="Index" href="../genindex.html" />
@@ -219,7 +219,7 @@ using the Plug and Play editor.</p>
 <div class="highlight-dts notranslate"><div class="highlight"><pre><span></span><span class="cp">/dts-v1/</span><span class="p">;</span>
 <span class="cp">/plugin/</span><span class="p">;</span>
 
-<span class="o">&amp;</span><span class="na">spi0</span><span class="w"> </span><span class="p">{</span>
+<span class="o">&amp;</span><span class="nf">spi0</span><span class="cm"> </span><span class="p">{</span>
 <span class="w">    </span><span class="kr">status</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;okay&quot;</span><span class="p">;</span>
 <span class="w">    </span><span class="nf">ad7124-8</span><span class="o">@</span><span class="mi">1</span><span class="cm"> </span><span class="p">{</span>
 <span class="w">        </span><span class="kr">status</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;okay&quot;</span><span class="p">;</span>
@@ -244,7 +244,7 @@ using the Plug and Play editor.</p>
 <span class="w">    </span><span class="p">};</span>
 <span class="p">};</span>
 
-<span class="o">&amp;</span><span class="p">{</span><span class="o">/</span><span class="nf">clocks}</span><span class="cm"> </span><span class="p">{</span>
+<span class="o">&amp;</span><span class="p">{</span><span class="nn">/clocks</span><span class="p">}</span><span class="cm"> </span><span class="p">{</span>
 <span class="w">    </span><span class="kr">status</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;okay&quot;</span><span class="p">;</span>
 <span class="w">    </span><span class="nl">ad7124_mclk</span><span class="p">:</span><span class="w"> </span><span class="nf">fixed-clock</span><span class="cm"> </span><span class="p">{</span>
 <span class="w">        </span><span class="kr">status</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;okay&quot;</span><span class="p">;</span>
@@ -254,7 +254,7 @@ using the Plug and Play editor.</p>
 <span class="w">    </span><span class="p">};</span>
 <span class="p">};</span>
 
-<span class="o">&amp;</span><span class="p">{</span><span class="o">/</span><span class="nf">}</span><span class="cm"> </span><span class="p">{</span>
+<span class="o">&amp;</span><span class="p">{</span><span class="nn">/</span><span class="p">}</span><span class="cm"> </span><span class="p">{</span>
 <span class="w">    </span><span class="kr">status</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;okay&quot;</span><span class="p">;</span>
 <span class="w">    </span><span class="nl">vref</span><span class="p">:</span><span class="w"> </span><span class="nf">regulator-fixed</span><span class="cm"> </span><span class="p">{</span>
 <span class="w">        </span><span class="kr">status</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;okay&quot;</span><span class="p">;</span>
