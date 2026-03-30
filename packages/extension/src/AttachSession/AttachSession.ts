@@ -22,6 +22,12 @@ import {
     query_devicetree,
     insert_known_structures,
 } from "attach-lib";
+import {
+    dtsValueComponent,
+    dtsProperty,
+    dtsStringProperty,
+    dtsNode,
+} from "../WebviewControllers/DtsAstBuilders";
 import { DeviceState } from "../WebviewControllers/DeviceState";
 import {
     CompatibleMapping,
@@ -495,59 +501,30 @@ export class AttachSession {
         // FIXME: This is a failsafe so when adding 2 of the same compatibles
         // the default reg is not the same (idk if it is necessary, used to be)
         const unitAddr = includeUnitAddr ? this.allocateUnitAddress(parentNode, baseName) : undefined;
-        let regProperty: DtsProperty | undefined = undefined;
-        if (unitAddr !== undefined) {
-            // FIXME: Should add the unitAddr as a reg property as well
-            // but this is a very wrong way of adding it (hardcoded)
-            regProperty = {
-                name: "reg",
-                labels: [],
-                deleted: false,
-                modified_by_user: true,
-                value: {
-                    components: [{
-                        kind: "array",
-                        labels: [],
-                        elements: [
-                            {
-                                item: {
-                                    kind: "number",
-                                    value: BigInt(unitAddr),
-                                    repr: "dec",
-                                    labels: [],
-                                },
-                            },
-                        ]
-                    },
-                    ],
-                },
-            };
-        }
         const isKnownDevice = this.compatible_mapping.some((entry) => entry.compatible_string === device_compatible);
 
         const properties = [
-            this.createStringProperty("status", "okay"),
+            dtsStringProperty("status", "okay"),
         ];
 
         if (isKnownDevice) {
-            properties.push(this.createStringProperty("compatible", device_compatible));
+            properties.push(dtsStringProperty("compatible", device_compatible));
         }
 
-        if (regProperty !== undefined) {
-            properties.push(regProperty);
+        if (unitAddr !== undefined) {
+            // FIXME: Should add the unitAddr as a reg property as well
+            // but this is a very wrong way of adding it (hardcoded)
+            const regComponent = dtsValueComponent([Number.parseInt(unitAddr, 16) || Number.parseInt(unitAddr, 10)]);
+            if (regComponent) {
+                properties.push(dtsProperty("reg", regComponent));
+            }
         }
 
-        return {
-            labels: [],
+        return dtsNode({
             name: baseName,
-            unit_addr: unitAddr,
-            properties: properties,
-            _uuid: crypto.randomUUID(),
-            children: [],
-            deleted: false,
-            modified_by_user: true,
-            created_by_user: true,
-        };
+            unitAddr,
+            properties,
+        });
     }
 
     private async deviceHasRegProperty(compatible: string): Promise<boolean> {
@@ -611,23 +588,7 @@ export class AttachSession {
         return node.unit_addr ? `${node.name}@${node.unit_addr}` : node.name;
     }
 
-    private createStringProperty(name: string, value: string): DtsProperty {
-        return {
-            name,
-            value: {
-                components: [
-                    {
-                        kind: "string",
-                        value,
-                        labels: [],
-                    },
-                ],
-            },
-            labels: [],
-            deleted: false,
-            modified_by_user: true,
-        } as DtsProperty;
-    }
+    // createStringProperty is now replaced by dtsStringProperty from DtsAstBuilders
 
     private deriveCatalogDeviceName(compatibleString: string): string {
         const [vendor, ...rest] = compatibleString.split(",");
