@@ -637,6 +637,25 @@ export class AttachSession {
     }
 
     /**
+     * Parse binding for a compatible string without validation.
+     * Use this when you need to enrich before validating.
+     */
+    public async get_binding_for_compatible_parse_only(compatibleString: string): Promise<{
+        attach: Attach;
+        parsed_binding: ParsedBinding;
+        patterns: string[];
+    } | undefined> {
+        const mapping = this.compatible_mapping.find(
+            (entry) => entry.compatible_string === compatibleString
+        );
+        if (!mapping) {
+            return undefined;
+        }
+
+        return this.parse_binding_only(mapping.binding_path);
+    }
+
+    /**
      * Resolve binding information and required keys for a device node.
      * Returns undefined when the compatible or binding cannot be resolved.
      */
@@ -716,6 +735,15 @@ export class AttachSession {
      * Returns a cached DeviceState if available, otherwise creates a new one
      * from the DtsNode and its resolved binding.
      */
+    /**
+     * Get or create a DeviceState for the given device UUID.
+     *
+     * Uses the correct validation flow:
+     * 1. Parse binding (no validation yet)
+     * 2. Enrich binding with devicetree queries
+     * 3. Serialize node data using enriched binding types
+     * 4. Validate with properly shaped data
+     */
     public async getOrCreateDeviceState(uuid: DeviceUID): Promise<DeviceState> {
         // Return cached state if available
         const cached = this.deviceStates.get(uuid);
@@ -735,42 +763,61 @@ export class AttachSession {
             throw new Error(`Cannot find parent node for UUID: ${uuid}`);
         }
 
-        // Get binding for node
-        const serializedData = JSON.stringify(this.nodeToAttachLibJson(node), bigIntReplacer);
-        const bindingResult = await this.resolveBindingInformationForNode(node, serializedData);
+        // Get compatible string
+        let compatible: string | undefined;
+        try {
+            const compatibles = this.getCompatibleStringsFromNode(node);
+            compatible = compatibles[0];
+        } catch {
+            // Custom node - no binding
+        }
 
-        // Enrich binding properties with devicetree queries
-        if (bindingResult?.binding) {
-            const deviceTree = this.get_device_tree();
-            bindingResult.binding.properties = query_devicetree(
-                deviceTree,
-                bindingResult.binding.properties,
-                serializedData,
-                parentNode.name
-            );
-            bindingResult.binding.properties = insert_known_structures(bindingResult.binding.properties);
+        let binding: ParsedBinding = { required_properties: [], properties: [], examples: [] };
+        let patterns: string[] = [];
+        let errors: BindingErrors[] = [];
 
-            // Also enrich pattern properties for channels
-            if (bindingResult.binding.pattern_properties) {
-                for (const pattern of bindingResult.binding.pattern_properties) {
-                    pattern.properties = query_devicetree(deviceTree, pattern.properties, serializedData, parentNode.name);
-                    pattern.properties = insert_known_structures(pattern.properties);
+        if (compatible) {
+            const mapping = this.compatible_mapping.find(e => e.compatible_string === compatible);
+            if (mapping) {
+                // Step 1: Parse binding (no validation yet)
+                const parseResult = await this.parse_binding_only(mapping.binding_path);
+
+                if (parseResult) {
+                    binding = parseResult.parsed_binding;
+                    patterns = parseResult.patterns;
+
+                    // Step 2: Initial data serialization for enrichment queries
+                    const initialData = JSON.stringify(this.nodeToAttachLibJson(node), bigIntReplacer);
+
+                    // Step 3: Enrich binding
+                    const deviceTree = this.get_device_tree();
+                    binding.properties = query_devicetree(deviceTree, binding.properties, initialData, parentNode.name);
+                    binding.properties = insert_known_structures(binding.properties);
+
+                    if (binding.pattern_properties) {
+                        for (const pattern of binding.pattern_properties) {
+                            pattern.properties = query_devicetree(deviceTree, pattern.properties, initialData, parentNode.name);
+                            pattern.properties = insert_known_structures(pattern.properties);
+                        }
+                    }
+
+                    // Step 4: Serialize with enriched binding types
+                    const shapedData = JSON.stringify(this.nodeToAttachLibJsonWithBinding(node, binding), bigIntReplacer);
+
+                    // Step 5: Validate with properly shaped data
+                    // We only take errors from validation - keep the enriched binding
+                    const normalizedData = shapedData.trim() === "" ? "{}" : shapedData;
+                    const updateResult = parseResult.attach.update_binding_by_changes(normalizedData);
+
+                    if (updateResult) {
+                        errors = updateResult.errors;
+                    }
                 }
             }
         }
 
-        // Create DeviceState
-        const state = DeviceState.fromNodeAndBinding(
-            node,
-            parentNode,
-            bindingResult?.binding,
-            this,
-            bindingResult?.patterns ?? []
-        );
-
-        // Cache it
+        const state = DeviceState.fromNodeAndBinding(node, parentNode, binding, this, patterns, errors);
         this.deviceStates.set(uuid, state);
-
         return state;
     }
 
@@ -944,6 +991,84 @@ export class AttachSession {
         }
 
         return result;
+    }
+
+    /**
+     * Serialize a DTS node to JSON, shaping values based on binding property types.
+     * This ensures data matches what the schema expects for validation.
+     * Similar to CLI's parse_dts_node approach.
+     */
+    public nodeToAttachLibJsonWithBinding(node: DtsNode, binding: ParsedBinding): Record<string, unknown> {
+        const result: Record<string, unknown> = {};
+
+        for (const property of node.properties) {
+            if (property.name === "status") {
+                continue;
+            }
+
+            if (property.value === undefined) {
+                result[property.name] = true;
+                continue;
+            }
+
+            const rawValue = this.parseDtsValue(property.value);
+            const definition = binding.properties.find(p => p.key === property.name);
+
+            if (!definition) {
+                result[property.name] = rawValue;
+                continue;
+            }
+
+            // Shape value based on binding type
+            result[property.name] = this.shapeValueForBindingType(rawValue, definition.value._t);
+        }
+
+        // Handle children (non-device nodes)
+        for (const child of node.children) {
+            if (this.isDeviceNode(child)) {
+                continue;
+            }
+            const key = this.buildNodeSegment(child);
+            // Children use raw serialization - pattern_properties handle channel schemas
+            result[key] = this.nodeToAttachLibJson(child);
+        }
+
+        return result;
+    }
+
+    /**
+     * Shape a value based on the binding type to match schema expectations.
+     * For example, matrices expect [[value]], arrays expect [value].
+     */
+    private shapeValueForBindingType(value: unknown, bindingType: string): unknown {
+        switch (bindingType) {
+            case "matrix": {
+                if (Array.isArray(value)) {
+                    // If already a matrix (array of arrays), return as-is
+                    if (value.every(entry => Array.isArray(entry))) {
+                        return value;
+                    }
+                    // Wrap array as single row: [1, 2, 3] -> [[1, 2, 3]]
+                    return [value];
+                }
+                // Wrap scalar as single cell: 5 -> [[5]]
+                return [[value]];
+            }
+            case "array":
+            case "enum_array":
+            case "fixed_index":
+            case "number_array":
+            case "string_array": {
+                if (Array.isArray(value)) {
+                    return value;
+                }
+                // Wrap scalar as array: "value" -> ["value"]
+                return [value];
+            }
+            default: {
+                return value;
+            }
+        }
     }
 
     public parseDtsValue(value: DtsValue): unknown {
@@ -1333,6 +1458,28 @@ export class AttachSession {
 
         AnalogAttachLogger.info("Compatible strings found:", values);
         return values;
+    }
+
+    /**
+     * Parse binding without validation. Use this when you need to enrich
+     * the binding before validating.
+     */
+    public async parse_binding_only(binding_path: string): Promise<{
+        attach: Attach;
+        parsed_binding: ParsedBinding;
+        patterns: string[];
+    } | undefined> {
+        const attach = Attach.new();
+        const result = await attach.parse_binding(binding_path, this.linux_path, this.dt_schema_path);
+        if (!result) {
+            return undefined;
+        }
+
+        return {
+            attach,
+            parsed_binding: result.parsed_binding,
+            patterns: result.patterns,
+        };
     }
 
     public async get_binding(binding_path: string, data: string): Promise<{
