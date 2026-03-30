@@ -21,10 +21,15 @@ import type {
     DtsNode,
     DtsProperty,
     DtsValueComponent,
-    CellArrayElement,
     ParsedBinding,
 } from "attach-lib";
 import { AttachEnumType, value_to_macro, serializeBigInt } from "attach-lib";
+import {
+    dtsValueComponent,
+    dtsProperty,
+    dtsStatusProperty,
+    dtsNode,
+} from "./DtsAstBuilders";
 import type { AttachSession } from "../AttachSession/AttachSession";
 
 /**
@@ -1126,13 +1131,10 @@ export class DeviceState {
 
             // Remove existing and add new
             node.properties = node.properties.filter(p => p.name !== key);
-            node.properties.push({
-                name: key,
-                value: component ? { components: [component] } : undefined,
-                modified_by_user: true,
-                labels: [],
-                deleted: false,
-            });
+            const newProperty = component
+                ? dtsProperty(key, component)
+                : dtsProperty(key);
+            node.properties.push(newProperty);
         }
 
         // Sync channels
@@ -1155,17 +1157,11 @@ export class DeviceState {
             if (!channelNode) {
                 // Create new channel node
                 const [name, unitAddr] = channelName.split("@", 2);
-                channelNode = {
+                channelNode = dtsNode({
                     name,
-                    unit_addr: unitAddr,
-                    _uuid: crypto.randomUUID(),
-                    properties: [],
-                    children: [],
-                    modified_by_user: true,
-                    created_by_user: true,
+                    unitAddr,
                     labels: channelState.alias ? [channelState.alias] : [],
-                    deleted: false,
-                };
+                });
                 node.children.push(channelNode);
             }
 
@@ -1193,13 +1189,10 @@ export class DeviceState {
                 }
 
                 channelNode.properties = channelNode.properties.filter(p => p.name !== key);
-                channelNode.properties.push({
-                    name: key,
-                    value: component ? { components: [component] } : undefined,
-                    modified_by_user: true,
-                    labels: [],
-                    deleted: false,
-                });
+                const newProperty = component
+                    ? dtsProperty(key, component)
+                    : dtsProperty(key);
+                channelNode.properties.push(newProperty);
             }
 
             channelNode.modified_by_user = true;
@@ -1210,179 +1203,21 @@ export class DeviceState {
      * Sync the status property based on active state.
      */
     private syncStatusProperty(node: DtsNode): void {
-        const statusValue = this.active ? "okay" : "disabled";
-        const makeValue = () => ({
-            components: [{ kind: "string" as const, value: statusValue, labels: [] }],
-        });
-
-        const status = node.properties.find(p => p.name === "status");
-        if (status) {
-            status.value = makeValue();
-            status.modified_by_user = true;
+        const statusProperty = dtsStatusProperty(this.active);
+        const existingIndex = node.properties.findIndex(p => p.name === "status");
+        if (existingIndex !== -1) {
+            node.properties[existingIndex] = statusProperty;
         } else {
-            node.properties.push({
-                name: "status",
-                value: makeValue(),
-                modified_by_user: true,
-                labels: [],
-                deleted: false,
-            });
+            node.properties.push(statusProperty);
         }
     }
 
     /**
      * Build a DtsValueComponent from a PropertyState.
+     * Delegates to the shared dtsValueComponent helper.
      */
     private buildValueComponent(propertyState: PropertyState): DtsValueComponent | undefined {
-        const { value, numberFormat } = propertyState;
-
-        if (value === true) {
-            return undefined; // Flag property - no value
-        }
-
-        if ((typeof value === "number" && Number.isFinite(value)) || typeof value === "bigint") {
-            return {
-                kind: "array",
-                elements: [{
-                    item: {
-                        kind: "number",
-                        value: typeof value === "bigint" ? value : BigInt(Math.trunc(value)),
-                        repr: numberFormat ?? "dec",
-                        labels: [],
-                    },
-                }],
-                labels: [],
-            };
-        }
-
-        if (typeof value === "string") {
-            if (value.startsWith("&")) {
-                return {
-                    kind: "ref",
-                    ref: { kind: "label", name: value.slice(1) },
-                    labels: [],
-                };
-            }
-            if (value.startsWith("/")) {
-                return {
-                    kind: "ref",
-                    ref: { kind: "path", path: value },
-                    labels: [],
-                };
-            }
-            return {
-                kind: "string",
-                value,
-                labels: [],
-            };
-        }
-
-        if (Array.isArray(value)) {
-            return this.buildArrayComponent(value, numberFormat);
-        }
-
-        return undefined;
-    }
-
-    /**
-     * Build an array DtsValueComponent.
-     */
-    private buildArrayComponent(
-        values: unknown[],
-        numberFormat?: "hex" | "dec"
-    ): DtsValueComponent | undefined {
-        const elements: CellArrayElement[] = [];
-
-        for (const entry of values) {
-            const element = this.buildArrayElement(entry, numberFormat);
-            if (element) {
-                elements.push(element);
-            }
-        }
-
-        if (elements.length === 0) {
-            return undefined;
-        }
-
-        return {
-            kind: "array",
-            elements,
-            labels: [],
-        };
-    }
-
-    /**
-     * Build a single array element.
-     */
-    private buildArrayElement(
-        value: unknown,
-        numberFormat?: "hex" | "dec"
-    ): CellArrayElement | undefined {
-        if ((typeof value === "number" && Number.isFinite(value)) || typeof value === "bigint") {
-            return {
-                item: {
-                    kind: "number",
-                    value: typeof value === "bigint" ? value : BigInt(Math.trunc(value)),
-                    repr: numberFormat ?? "dec",
-                    labels: [],
-                },
-            };
-        }
-
-        if (typeof value === "string") {
-            // Numeric-looking strings
-            if (/^0x[0-9a-f]+$/i.test(value)) {
-                const parsed = Number.parseInt(value, 16);
-                if (Number.isFinite(parsed)) {
-                    return {
-                        item: {
-                            kind: "number",
-                            value: BigInt(parsed),
-                            repr: "hex",
-                            labels: [],
-                        },
-                    };
-                }
-            }
-            if (/^[+-]?\d+$/.test(value)) {
-                const parsed = Number.parseInt(value, 10);
-                if (Number.isFinite(parsed)) {
-                    return {
-                        item: {
-                            kind: "number",
-                            value: BigInt(parsed),
-                            repr: "dec",
-                            labels: [],
-                        },
-                    };
-                }
-            }
-
-            // Phandle reference
-            if (value.startsWith("&") || value.startsWith("/")) {
-                const isLabel = !value.startsWith("/");
-                return {
-                    item: {
-                        kind: "ref",
-                        ref: isLabel
-                            ? { kind: "label", name: value.startsWith("&") ? value.slice(1) : value }
-                            : { kind: "path", path: value },
-                        labels: [],
-                    },
-                };
-            }
-
-            // Expression/macro
-            return {
-                item: {
-                    kind: "expression",
-                    value,
-                    labels: [],
-                },
-            };
-        }
-
-        return undefined;
+        return dtsValueComponent(propertyState.value, { numberFormat: propertyState.numberFormat });
     }
 
     /**

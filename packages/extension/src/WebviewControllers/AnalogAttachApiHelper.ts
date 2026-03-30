@@ -21,6 +21,17 @@ import {
     insert_known_structures,
     cell_extract_first_value,
 } from "attach-lib";
+import {
+    dtsValueComponent,
+    dtsCellElement,
+    dtsCellArray,
+    dtsProperty,
+    dtsFlagProperty,
+    dtsString,
+    dtsStatusProperty,
+    dtsRefElement as dtsReferenceElement,
+    dtsNode,
+} from "./DtsAstBuilders";
 import { AttachSession } from "../AttachSession/AttachSession";
 import { AnalogAttachLogger } from "../AnalogAttachLogger";
 import { bigIntReplacer } from "../utilities";
@@ -569,11 +580,11 @@ export class AnalogAttachApiHelper {
      * The webview can echo previous errors back; we must start each validation clean.
      */
     public stripErrorsFromConfig(config: ConfigTemplatePayload["config"]): void {
-        delete (config as any).genericErrors;
+        config.genericErrors = undefined;
 
         const walk = (elements: FormElement[]): void => {
             for (const element of elements) {
-                delete (element as any).error;
+                element.error = undefined;
                 if (element.type === "FormObject") {
                     walk(element.config);
                 }
@@ -734,42 +745,27 @@ export class AnalogAttachApiHelper {
 
     private createChannelNode(segment: string): DtsNode {
         const [name, unitAddr] = segment.split("@", 2);
-        let properties: DtsProperty[] = [];
+        const properties: DtsProperty[] = [];
 
         // Also add the reg property in case we have a unitAddr
         if (unitAddr !== undefined) {
             const parsed = unitAddr.startsWith("0x") ? Number.parseInt(unitAddr, 16) : Number.parseInt(unitAddr, 10);
 
             if (!Number.isNaN(parsed)) {
-                const dtsValueComponent: DtsValueComponent | undefined = this.buildArrayComponent([parsed]);
-                if (dtsValueComponent) {
-                    const regProperty: DtsProperty = {
-                        labels: [],
-                        name: "reg",
-                        value: {
-                            components: [dtsValueComponent]
-                        },
-                        modified_by_user: true,
-                        deleted: false,
-                    };
-                    properties.push(regProperty);
+                const component = dtsValueComponent([parsed]);
+                if (component) {
+                    properties.push(dtsProperty("reg", component));
                 } else {
                     AnalogAttachLogger.warn("Cannot create reg property based on unit_addr for", segment);
                 }
             }
         }
 
-        return {
+        return dtsNode({
             name,
-            unit_addr: unitAddr,
-            _uuid: crypto.randomUUID(),
-            properties: properties,
-            children: [],
-            modified_by_user: true,
-            created_by_user: true,
-            labels: [],
-            deleted: false
-        };
+            unitAddr,
+            properties,
+        });
     }
 
     private hasAnySetSubChildren(element: FormObjectElement): boolean {
@@ -802,17 +798,7 @@ export class AnalogAttachApiHelper {
                         // Create the child if it doesn't exist
                         if (child === undefined) {
                             const [name, unitAddr] = element.key.split("@", 2);
-                            child = {
-                                name,
-                                unit_addr: unitAddr,
-                                _uuid: crypto.randomUUID(),
-                                properties: [],
-                                children: [],
-                                modified_by_user: true,
-                                created_by_user: true,
-                                labels: [],
-                                deleted: false,
-                            } satisfies DtsNode;
+                            child = dtsNode({ name, unitAddr });
                             node.children.push(child);
                             node.modified_by_user = true;
                         }
@@ -909,19 +895,7 @@ export class AnalogAttachApiHelper {
                 // Handle custom-phandle: write as <&label> (array containing ref)
                 if (genericElement.inputType === "custom-phandle") {
                     const phandleValue = String(genericElement.setValue);
-                    // Strip leading "&" if user included it, then build ref inside array
-                    const labelName = phandleValue.startsWith("&") ? phandleValue.slice(1) : phandleValue;
-                    const arrayComponent: DtsValueComponent = {
-                        kind: "array",
-                        elements: [{
-                            item: {
-                                kind: "ref",
-                                ref: { kind: "label", name: labelName },
-                                labels: [],
-                            },
-                        }],
-                        labels: [],
-                    };
+                    const arrayComponent = dtsCellArray([dtsReferenceElement(phandleValue)]);
                     this.upsertProperty(node, genericElement.key, arrayComponent);
                     break;
                 }
@@ -965,11 +939,7 @@ export class AnalogAttachApiHelper {
                     if (allStringLists && allNonNumericStrings) {
                         // Create string components for proper "value1", "value2" output
                         for (const entry of stringValues) {
-                            components.push({
-                                kind: "string",
-                                value: entry,
-                                labels: []
-                            });
+                            components.push(dtsString(entry));
                         }
                     } else {
                         const component = this.buildArrayComponent(normalizedValues, { prefixItems: validationType.prefixItems });
@@ -999,11 +969,7 @@ export class AnalogAttachApiHelper {
                         }
                     } else {
                         for (const entry of stringValues) {
-                            components.push({
-                                kind: "string",
-                                value: entry,
-                                labels: []
-                            });
+                            components.push(dtsString(entry));
                         }
                     }
                 } else {
@@ -1024,7 +990,7 @@ export class AnalogAttachApiHelper {
                     value: { components },
                     modified_by_user: true,
                     labels: [],
-                    deleted: false
+                    deleted: false,
                 });
                 node.modified_by_user = true;
                 break;
@@ -1112,73 +1078,19 @@ export class AnalogAttachApiHelper {
     }
 
     private setNodeStatus(node: DtsNode, active: boolean): void {
-        const statusValue = active ? "okay" : "disabled";
-        const makeValue = () => ({
-            components: [{ kind: "string" as const, value: statusValue, labels: [] }],
-        });
-
-        const status = node.properties.find((p) => p.name === "status");
-        if (status) {
-            status.value = makeValue();
-            status.labels ??= [];
-            status.modified_by_user = true;
+        const statusProperty = dtsStatusProperty(active);
+        const existingIndex = node.properties.findIndex((p) => p.name === "status");
+        if (existingIndex === -1) {
+            node.properties.push(statusProperty);
         } else {
-            node.properties.push({
-                name: "status",
-                value: makeValue(),
-                modified_by_user: true,
-                labels: [],
-                deleted: false,
-            });
+            node.properties[existingIndex] = statusProperty;
         }
 
         node.modified_by_user = true;
     }
 
     private buildValueComponent(value: unknown): DtsValueComponent | undefined {
-        if ((typeof value === "number" && Number.isFinite(value)) || typeof value === "bigint") {
-            return {
-                kind: "array",
-                elements: [{
-                    item: {
-                        kind: "number",
-                        value: typeof value === "bigint" ? value : BigInt(Math.trunc(value)),
-                        labels: []
-                    },
-                }],
-                labels: []
-            };
-        }
-
-        if (typeof value === "string") {
-            if (value.startsWith("&")) {
-                return {
-                    kind: "ref",
-                    ref: { kind: "label", name: value.slice(1) },
-                    labels: []
-                };
-            }
-
-            if (value.startsWith("/")) {
-                return {
-                    kind: "ref",
-                    ref: { kind: "path", path: value },
-                    labels: []
-                };
-            }
-
-            return {
-                kind: "string",
-                value,
-                labels: []
-            };
-        }
-
-        if (Array.isArray(value)) {
-            return this.buildArrayComponent(value);
-        }
-
-        return undefined;
+        return dtsValueComponent(value);
     }
 
     private buildArrayComponent(
@@ -1193,7 +1105,7 @@ export class AnalogAttachApiHelper {
         for (const [index, entry] of values.entries()) {
             const prefixItem = options?.prefixItems?.[index];
             const enumType = prefixItem?.type === "StringList" ? prefixItem.enumType : options?.enumType;
-            const element = this.buildArrayElement(entry, enumType);
+            const element = dtsCellElement(entry, { enumType: enumType as "phandle" | "macro" | "string" | undefined });
             if (!element) {
                 continue;
             }
@@ -1204,111 +1116,7 @@ export class AnalogAttachApiHelper {
             return undefined;
         }
 
-        return {
-            kind: "array",
-            elements,
-            labels: []
-        };
-    }
-
-    private buildArrayElement(value: unknown, enumType?: EnumValueType): CellArrayElement | undefined {
-        if ((typeof value === "number" && Number.isFinite(value)) || typeof value === "bigint") {
-            return {
-                item: {
-                    kind: "number",
-                    value: typeof value === "bigint" ? value : BigInt(Math.trunc(value)),
-                    repr: "dec",
-                    labels: []
-                },
-            };
-        }
-
-        if (typeof value === "string") {
-            if (enumType === "phandle") {
-                const isLabel = value.startsWith("/");
-                const reference = isLabel
-                    ? { kind: "path" as const, path: value }
-                    : { kind: "label" as const, name: value };
-                return {
-                    item: {
-                        kind: "ref",
-                        ref: reference,
-                        labels: []
-                    }
-                } satisfies CellArrayElement;
-            }
-
-            if (enumType === "macro") {
-                // FIXME: This is another nasty fix (yay)
-                // When the FE returns a new object containing a macro
-                // the default value for that macro is ''. This is not
-                // valid and it is not printable. Returning undefined
-                // here causes the flow to 'drop' the value (as some
-                // arrays are variable size so this would be fine), but
-                // in this specific case it is not wanted. Returning 0n
-                // means that the printer (and flow) works with the
-                // condition that there is a macro with value 0. So far
-                // this is the case and from my experience macros start
-                // from 0, so this is not a bad assumption. Hopefully
-                // a better implementation will be found at a later time.
-                if (!value) {
-                    return {
-                        item: {
-                            kind: "number",
-                            value: 0n,
-                            repr: "dec",
-                            labels: []
-                        },
-                    } satisfies CellArrayElement;
-                }
-                return {
-                    item: {
-                        kind: "macro",
-                        value: value,
-                        labels: []
-                    },
-                } satisfies CellArrayElement;
-            }
-
-            // Numeric-looking strings should be treated as numbers
-            const hexMatch = /^0x[0-9a-f]+$/i;
-            const decMatch = /^[+-]?\d+$/;
-            if (hexMatch.test(value)) {
-                const parsed = Number.parseInt(value, 16);
-                if (Number.isFinite(parsed)) {
-                    return {
-                        item: {
-                            kind: "number",
-                            value: BigInt(parsed),
-                            repr: "hex",
-                            labels: []
-                        },
-                    };
-                }
-            }
-            if (decMatch.test(value)) {
-                const parsed = Number.parseInt(value, 10);
-                if (Number.isFinite(parsed)) {
-                    return {
-                        item: {
-                            kind: "number",
-                            value: BigInt(parsed),
-                            repr: "dec",
-                            labels: []
-                        },
-                    };
-                }
-            }
-            return {
-                item: {
-                    kind: "expression",
-                    value,
-                    labels: []
-                },
-            };
-        }
-
-        return undefined;
+        return dtsCellArray(elements);
     }
 
     private isNumericLike(value: string): boolean {
@@ -1325,22 +1133,10 @@ export class AnalogAttachApiHelper {
 
     private upsertProperty(node: DtsNode, key: string, component?: DtsValueComponent): void {
         node.properties = node.properties.filter((property) => property.name !== key);
-        node.properties.push(
-            component
-                ? {
-                    name: key,
-                    value: { components: [component] },
-                    modified_by_user: true,
-                    labels: [],
-                    deleted: false
-                }
-                : {
-                    name: key,
-                    modified_by_user: true,
-                    labels: [],
-                    deleted: false
-                }
-        );
+        const newProperty = component
+            ? dtsProperty(key, component)
+            : dtsFlagProperty(key);
+        node.properties.push(newProperty);
         node.modified_by_user = true;
     }
 
