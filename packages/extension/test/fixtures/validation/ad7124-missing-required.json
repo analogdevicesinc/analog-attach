@@ -1,0 +1,14 @@
+{
+  "description": "AD7124 missing required 'interrupts' property",
+  "compatible": "adi,ad7124-4",
+  "input": {
+    "compatible": "adi,ad7124-4",
+    "reg": 0
+  },
+  "expectedErrors": [
+    {
+      "type": "missing_required",
+      "property": "interrupts"
+    }
+  ]
+}

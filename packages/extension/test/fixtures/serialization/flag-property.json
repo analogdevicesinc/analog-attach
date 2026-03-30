@@ -1,0 +1,16 @@
+{
+  "input": {
+    "name": "channel",
+    "unitAddr": "0",
+    "properties": [
+      { "name": "reg", "value": 0 },
+      { "name": "bipolar", "value": true },
+      { "name": "adi,buffered-positive", "value": true }
+    ]
+  },
+  "expected": {
+    "reg": 0,
+    "bipolar": true,
+    "adi,buffered-positive": true
+  }
+}

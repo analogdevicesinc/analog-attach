@@ -1,0 +1,17 @@
+{
+  "description": "Tests for shapeValueForBindingType with matrix type",
+  "cases": [
+    {
+      "description": "scalar -> [[scalar]]",
+      "bindingType": "matrix",
+      "input": 5,
+      "expected": [[5]]
+    },
+    {
+      "description": "[1, 2, 3] -> [[1, 2, 3]]",
+      "bindingType": "matrix",
+      "input": [1, 2, 3],
+      "expected": [[1, 2, 3]]
+    }
+  ]
+}

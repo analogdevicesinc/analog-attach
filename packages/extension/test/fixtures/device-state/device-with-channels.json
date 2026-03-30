@@ -1,0 +1,42 @@
+{
+  "description": "Device node with channel children",
+  "input": {
+    "node": {
+      "name": "adc",
+      "unitAddr": "0",
+      "properties": [
+        { "name": "compatible", "value": "adi,ad7124-4" },
+        { "name": "reg", "value": 0 },
+        { "name": "status", "value": "okay" }
+      ],
+      "children": [
+        {
+          "name": "channel",
+          "unitAddr": "0",
+          "labels": ["chan0"],
+          "properties": [
+            { "name": "reg", "value": 0 },
+            { "name": "diff-channels", "value": [0, 1] }
+          ]
+        },
+        {
+          "name": "channel",
+          "unitAddr": "1",
+          "properties": [
+            { "name": "reg", "value": 1 },
+            { "name": "bipolar", "value": true }
+          ]
+        }
+      ]
+    },
+    "parentNode": {
+      "name": "spi",
+      "unitAddr": "0"
+    },
+    "channelPatterns": ["^channel@([0-9]|1[0-5])$"]
+  },
+  "expected": {
+    "channelCount": 2,
+    "channelNames": ["channel@0", "channel@1"]
+  }
+}

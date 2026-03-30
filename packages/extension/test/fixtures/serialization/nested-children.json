@@ -1,0 +1,40 @@
+{
+  "input": {
+    "name": "adc",
+    "unitAddr": "0",
+    "properties": [
+      { "name": "compatible", "value": "adi,ad7124-4" },
+      { "name": "reg", "value": 0 }
+    ],
+    "children": [
+      {
+        "name": "channel",
+        "unitAddr": "0",
+        "properties": [
+          { "name": "reg", "value": 0 },
+          { "name": "diff-channels", "value": [0, 1] }
+        ]
+      },
+      {
+        "name": "channel",
+        "unitAddr": "1",
+        "properties": [
+          { "name": "reg", "value": 1 },
+          { "name": "bipolar", "value": true }
+        ]
+      }
+    ]
+  },
+  "expected": {
+    "compatible": "adi,ad7124-4",
+    "reg": 0,
+    "channel@0": {
+      "reg": 0,
+      "diff-channels": [0, 1]
+    },
+    "channel@1": {
+      "reg": 1,
+      "bipolar": true
+    }
+  }
+}
