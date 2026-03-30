@@ -10,6 +10,7 @@ import {
     ArrayMixedTypeValidation,
 } from "extension-protocol";
 import {
+    Attach,
     expand_regex,
     type BindingErrors,
     type DtsNode,
@@ -200,7 +201,7 @@ export class AnalogAttachApiHelper {
         };
 
         // Single validation pass using DeviceState
-        const errors = await deviceState.validate(this.attachSession);
+        const errors = deviceState.validate();
         if (errors.length > 0) {
             this.applyValidationErrors(payload, errors);
         }
@@ -348,6 +349,15 @@ export class AnalogAttachApiHelper {
         }
     }
 
+    /**
+     * Validate configuration using the correct flow:
+     * 1. Parse binding (no validation)
+     * 2. Enrich binding with devicetree queries
+     * 3. Validate with properly shaped data from form elements
+     *
+     * Form data from the webview is already shaped correctly (FormMatrix → [[value]],
+     * FormArray → [value]) because the form elements know their types.
+     */
     private async validateConfigurationWithAttachLib(
         deviceUID: DeviceUID,
         config: ConfigTemplatePayload["config"],
@@ -376,42 +386,56 @@ export class AnalogAttachApiHelper {
                 throw new Error(`Cannot find node with UUID: ${deviceUID}`);
             }
 
+            // Form data is already shaped correctly from webview FormElements
             const data = this.attachSession.configPayloadToAttachLibJson(config);
+            const serializedData = JSON.stringify(data, bigIntReplacer);
 
-            let bindingResult;
-            try {
-                bindingResult = await this.resolveBindingForValidation(config.config, node, JSON.stringify(data, bigIntReplacer));
-            } catch (error) {
-                const errorPayload: ConfigTemplatePayload = { config: structuredClone(config) };
-                errorPayload.config.genericErrors = [{
-                    code: "generic",
-                    message: "Validation failed",
-                    details: error instanceof Error ? error.message : String(error),
-                }];
-                AnalogAttachLogger.error("[error] resolveBindingForValidation failed", error);
-                throw new ConfigValidationError("Validation failed", errorPayload);
-            }
+            // Step 1: Parse binding (no validation yet)
+            const candidateCompatible = this.extractCompatibleValue(config.config);
+            let binding: ParsedBinding = { required_properties: [], properties: [], examples: [] };
+            let patterns: string[] = [];
+            let attach: Attach | undefined;
 
-            if (bindingResult === undefined) {
-                throw new Error("Could not build form elements for node");
+            if (candidateCompatible) {
+                AnalogAttachLogger.debug("Resolving binding for compatible", { compatible: candidateCompatible });
+                const parseResult = await this.attachSession.get_binding_for_compatible_parse_only(candidateCompatible);
+
+                if (parseResult) {
+                    binding = parseResult.parsed_binding;
+                    patterns = parseResult.patterns ?? [];
+                    attach = parseResult.attach;
+                    AnalogAttachLogger.debug("Resolved binding for compatible", { compatible: candidateCompatible, patterns: patterns.length });
+                } else {
+                    AnalogAttachLogger.warn("Unknown compatible string, treating as custom node", { compatible: candidateCompatible });
+                }
             }
 
             const device_tree = this.attachSession.get_device_tree();
 
-
-            bindingResult.binding.properties = query_devicetree(
+            // Step 2: Enrich binding with devicetree queries
+            binding.properties = query_devicetree(
                 device_tree,
-                bindingResult.binding.properties,
-                JSON.stringify(data, bigIntReplacer),
+                binding.properties,
+                serializedData,
                 parentNode.name
             );
+            binding.properties = insert_known_structures(binding.properties);
 
-            bindingResult.binding.properties = insert_known_structures(bindingResult.binding.properties);
-
-            if (bindingResult.binding.pattern_properties !== undefined) {
-                for (const pattern of bindingResult.binding.pattern_properties) {
-                    pattern.properties = query_devicetree(device_tree, pattern.properties, JSON.stringify(data, bigIntReplacer), parentNode.name);
+            if (binding.pattern_properties !== undefined) {
+                for (const pattern of binding.pattern_properties) {
+                    pattern.properties = query_devicetree(device_tree, pattern.properties, serializedData, parentNode.name);
                     pattern.properties = insert_known_structures(pattern.properties);
+                }
+            }
+
+            // Step 3: Validate with the enriched binding
+            // We only take errors from validation - keep the enriched binding
+            let validationErrors: BindingErrors[] = [];
+            if (attach) {
+                const normalizedData = serializedData.trim() === "" ? "{}" : serializedData;
+                const updateResult = attach.update_binding_by_changes(normalizedData);
+                if (updateResult) {
+                    validationErrors = updateResult.errors;
                 }
             }
 
@@ -419,7 +443,7 @@ export class AnalogAttachApiHelper {
                 this.setNodeAlias(node, config.alias);
             }
 
-            const compiledChannelRegexes = this.compileChannelRegexes(bindingResult.patterns);
+            const compiledChannelRegexes = this.compileChannelRegexes(patterns);
             const hasChannelPatterns = compiledChannelRegexes.length > 0;
 
             const configFormList = config.config;
@@ -459,7 +483,7 @@ export class AnalogAttachApiHelper {
             });
 
             // Filter and count errors, then update session for compile-time warning
-            const filteredErrors = this.suppressUnsupportedErrors(bindingResult.errors);
+            const filteredErrors = this.suppressUnsupportedErrors(validationErrors);
             this.attachSession.setValidationErrorCount(filteredErrors.length);
 
             return {
@@ -479,44 +503,6 @@ export class AnalogAttachApiHelper {
             }];
             throw new ConfigValidationError("Validation failed", errorPayload);
         }
-    }
-
-    private async resolveBindingForValidation(
-        elements: FormElement[],
-        node: DtsNode,
-        serializedData: string
-    ): Promise<{
-        binding: ParsedBinding;
-        requiredKeys: Set<string>;
-        patterns: string[];
-        errors: BindingErrors[];
-    }> {
-        const candidateCompatible = this.extractCompatibleValue(elements);
-
-        if (candidateCompatible) {
-            AnalogAttachLogger.debug("Resolving binding for compatible", { compatible: candidateCompatible });
-            const bindingWithPatterns = await this.attachSession.get_binding_for_compatible(candidateCompatible, serializedData);
-            if (bindingWithPatterns === undefined) {
-                AnalogAttachLogger.warn("Unknown compatible string, treating as custom node", { compatible: candidateCompatible });
-                return {
-                    binding: { required_properties: [], properties: [], examples: [] },
-                    requiredKeys: new Set<string>(),
-                    patterns: [],
-                    errors: [],
-                };
-            }
-            AnalogAttachLogger.debug("Resolved binding for compatible", { compatible: candidateCompatible, patterns: bindingWithPatterns.patterns?.length ?? 0 });
-
-            return {
-                binding: bindingWithPatterns.parsed_binding,
-                requiredKeys: new Set(bindingWithPatterns.parsed_binding.required_properties ?? []),
-                patterns: bindingWithPatterns.patterns ?? [],
-                errors: bindingWithPatterns.errors ?? [],
-            };
-        }
-
-        AnalogAttachLogger.debug("Building form elements via attachSession.buildFormElementsForNode", node);
-        return this.attachSession.resolveBindingInformationForNode(node, serializedData);
     }
 
     private extractCompatibleValue(elements: FormElement[]): string | undefined {

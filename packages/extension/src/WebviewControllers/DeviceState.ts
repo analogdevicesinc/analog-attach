@@ -135,6 +135,9 @@ export class DeviceState {
     /** Raw channel regex patterns from binding */
     channelRegexStrings?: string[];
 
+    /** Validation errors from the enriched binding */
+    validationErrors: BindingErrors[];
+
     private constructor() {
         this.uuid = crypto.randomUUID();
         this.active = true;
@@ -143,17 +146,20 @@ export class DeviceState {
         this.properties = new Map();
         this.channels = new Map();
         this.modifiedChildren = new Map();
+        this.validationErrors = [];
     }
 
     /**
      * Create DeviceState from a DtsNode and its resolved binding.
+     * The errors should be pre-filtered based on the enriched binding.
      */
     static fromNodeAndBinding(
         node: DtsNode,
         parentNode: DtsNode,
         binding: ParsedBinding | undefined,
         attachSession: AttachSession,
-        channelPatterns: string[] = []
+        channelPatterns: string[] = [],
+        errors: BindingErrors[] = []
     ): DeviceState {
         const state = new DeviceState();
         state.uuid = node._uuid;
@@ -162,6 +168,7 @@ export class DeviceState {
         state.parentUUID = parentNode._uuid;
         state.parentName = parentNode.name;
         state.binding = binding;
+        state.validationErrors = errors;
 
         // Extract compatible
         const compatibleProperty = node.properties.find(p => p.name === "compatible");
@@ -170,11 +177,13 @@ export class DeviceState {
             state.compatible = Array.isArray(parsed) ? String(parsed[0]) : String(parsed);
         }
 
-        // Build schema lookup from binding
-        const schemaMap = new Map<string, AttachType>();
+        // Build lookup maps from binding and node
         const requiredKeys = new Set(binding?.required_properties ?? []);
-        for (const bindingProperty of binding?.properties ?? []) {
-            schemaMap.set(bindingProperty.key, bindingProperty.value);
+        const nodePropertyMap = new Map<string, DtsProperty>();
+        for (const property of node.properties) {
+            if (property.name !== "status") {
+                nodePropertyMap.set(property.name, property);
+            }
         }
 
         // Compile channel patterns
@@ -189,24 +198,21 @@ export class DeviceState {
             })
             .filter((regex): regex is RegExp => regex !== undefined);
 
-        // Process device-level properties
-        for (const property of node.properties) {
-            if (property.name === "status") {
-                continue;
-            }
-
-            const propertyState = DeviceState.propertyFromDts(
-                property,
-                schemaMap.get(property.name),
-                requiredKeys.has(property.name),
-                attachSession
-            );
-            state.properties.set(property.name, propertyState);
-        }
-
-        // Add binding properties that don't exist in node yet (schema-defined but no value)
+        // Process properties in binding order first (preserves attach-lib order)
         for (const bindingProperty of binding?.properties ?? []) {
-            if (!state.properties.has(bindingProperty.key)) {
+            const nodeProperty = nodePropertyMap.get(bindingProperty.key);
+            if (nodeProperty) {
+                // Property exists in node - use node value with binding schema
+                const propertyState = DeviceState.propertyFromDts(
+                    nodeProperty,
+                    bindingProperty.value,
+                    requiredKeys.has(bindingProperty.key),
+                    attachSession
+                );
+                state.properties.set(bindingProperty.key, propertyState);
+                nodePropertyMap.delete(bindingProperty.key);
+            } else {
+                // Property only in binding - no value yet
                 state.properties.set(bindingProperty.key, {
                     key: bindingProperty.key,
                     value: undefined,
@@ -215,6 +221,17 @@ export class DeviceState {
                     required: requiredKeys.has(bindingProperty.key),
                 });
             }
+        }
+
+        // Add remaining node properties not in binding (custom properties)
+        for (const [name, property] of nodePropertyMap) {
+            const propertyState = DeviceState.propertyFromDts(
+                property,
+                undefined,
+                false,
+                attachSession
+            );
+            state.properties.set(name, propertyState);
         }
 
         // Process channels (children matching channel patterns) and touched children
@@ -1205,10 +1222,10 @@ export class DeviceState {
     private syncStatusProperty(node: DtsNode): void {
         const statusProperty = dtsStatusProperty(this.active);
         const existingIndex = node.properties.findIndex(p => p.name === "status");
-        if (existingIndex !== -1) {
-            node.properties[existingIndex] = statusProperty;
-        } else {
+        if (existingIndex === -1) {
             node.properties.push(statusProperty);
+        } else {
+            node.properties[existingIndex] = statusProperty;
         }
     }
 
@@ -1221,35 +1238,23 @@ export class DeviceState {
     }
 
     /**
-     * Validate DeviceState against its binding and apply errors.
-     * Returns the list of binding errors for further processing.
-     *
-     * @param attachSession The attach session for validation
-     * @returns Array of validation errors
+     * Get validation errors and apply them to properties.
+     * Returns the stored validation errors that were computed during creation
+     * against the enriched binding (no false positives from raw schema).
      */
-    async validate(attachSession: AttachSession): Promise<BindingErrors[]> {
-        if (!this.binding) {
-            return [];
-        }
+    validate(): BindingErrors[] {
+        // Apply stored errors to DeviceState properties
+        this.applyErrors(this.validationErrors);
+        return this.validationErrors;
+    }
 
-        // Get the node for re-validation
-        const node = attachSession.find_node_by_uuid(this.uuid);
-        if (!node) {
-            return [];
-        }
-
-        // Build canonical JSON from DeviceState
-        const json = this.toAttachLibJson();
-        const serialized = JSON.stringify(serializeBigInt(json));
-
-        // Resolve binding with the normalized data to get validation errors
-        const result = await attachSession.resolveBindingInformationForNode(node, serialized);
-        const errors = result?.errors ?? [];
-
-        // Apply errors to DeviceState
+    /**
+     * Update the stored validation errors.
+     * Called when errors are recomputed (e.g., after configuration update).
+     */
+    setValidationErrors(errors: BindingErrors[]): void {
+        this.validationErrors = errors;
         this.applyErrors(errors);
-
-        return errors;
     }
 
     /**
