@@ -1,0 +1,26 @@
+{
+  "description": "Basic device node with common properties",
+  "input": {
+    "node": {
+      "name": "adc",
+      "unitAddr": "0",
+      "labels": ["my_adc"],
+      "properties": [
+        { "name": "compatible", "value": "adi,ad7124-4" },
+        { "name": "reg", "value": 0 },
+        { "name": "status", "value": "okay" },
+        { "name": "spi-max-frequency", "value": 5000000 }
+      ]
+    },
+    "parentNode": {
+      "name": "spi",
+      "unitAddr": "0"
+    }
+  },
+  "expected": {
+    "compatible": "adi,ad7124-4",
+    "alias": "my_adc",
+    "active": true,
+    "parentName": "spi"
+  }
+}

@@ -170,7 +170,8 @@ export class DeviceState {
         state.binding = binding;
         state.validationErrors = errors;
 
-        // Extract compatible
+        // NOTE: The compatible is only one string as we do not yet have a logic for
+        // multiple compatibles
         const compatibleProperty = node.properties.find(p => p.name === "compatible");
         if (compatibleProperty?.value) {
             const parsed = attachSession.parseDtsValue(compatibleProperty.value);

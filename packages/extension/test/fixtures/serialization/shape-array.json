@@ -1,0 +1,35 @@
+{
+  "description": "Tests for shapeValueForBindingType with array types",
+  "cases": [
+    {
+      "description": "scalar -> [scalar] for array type",
+      "bindingType": "array",
+      "input": "value",
+      "expected": ["value"]
+    },
+    {
+      "description": "[1, 2] -> [1, 2] unchanged for array type",
+      "bindingType": "array",
+      "input": [1, 2],
+      "expected": [1, 2]
+    },
+    {
+      "description": "scalar -> [scalar] for enum_array type",
+      "bindingType": "enum_array",
+      "input": 0,
+      "expected": [0]
+    },
+    {
+      "description": "scalar -> [scalar] for number_array type",
+      "bindingType": "number_array",
+      "input": 42,
+      "expected": [42]
+    },
+    {
+      "description": "scalar -> [scalar] for string_array type",
+      "bindingType": "string_array",
+      "input": "test",
+      "expected": ["test"]
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "description": "Valid AD7124 configuration - should produce no errors",
+  "compatible": "adi,ad7124-4",
+  "input": {
+    "compatible": "adi,ad7124-4",
+    "reg": 0,
+    "interrupts": [25, 2],
+    "channel@0": {
+      "reg": 0,
+      "diff-channels": [0, 1]
+    }
+  },
+  "expectedErrorCount": 0
+}

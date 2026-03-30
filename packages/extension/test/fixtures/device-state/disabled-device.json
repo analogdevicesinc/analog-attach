@@ -1,0 +1,22 @@
+{
+  "description": "Device node with disabled status",
+  "input": {
+    "node": {
+      "name": "adc",
+      "unitAddr": "0",
+      "properties": [
+        { "name": "compatible", "value": "adi,ad7124-4" },
+        { "name": "reg", "value": 0 },
+        { "name": "status", "value": "disabled" }
+      ]
+    },
+    "parentNode": {
+      "name": "spi",
+      "unitAddr": "0"
+    }
+  },
+  "expected": {
+    "compatible": "adi,ad7124-4",
+    "active": false
+  }
+}

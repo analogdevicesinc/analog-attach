@@ -1,0 +1,17 @@
+{
+  "input": {
+    "name": "device",
+    "unitAddr": "0",
+    "properties": [
+      { "name": "compatible", "value": "adi,ad7124-4" },
+      { "name": "reg", "value": 0 },
+      { "name": "status", "value": "okay" },
+      { "name": "spi-max-frequency", "value": 5000000 }
+    ]
+  },
+  "expected": {
+    "compatible": "adi,ad7124-4",
+    "reg": 0,
+    "spi-max-frequency": 5000000
+  }
+}

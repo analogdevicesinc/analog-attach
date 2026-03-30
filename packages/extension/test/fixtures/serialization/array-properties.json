@@ -1,0 +1,16 @@
+{
+  "input": {
+    "name": "adc",
+    "unitAddr": "0",
+    "properties": [
+      { "name": "compatible", "value": "adi,ad7124-8" },
+      { "name": "interrupts", "value": [25, 2] },
+      { "name": "diff-channels", "value": [0, 1] }
+    ]
+  },
+  "expected": {
+    "compatible": "adi,ad7124-8",
+    "interrupts": [25, 2],
+    "diff-channels": [0, 1]
+  }
+}
