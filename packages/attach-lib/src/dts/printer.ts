@@ -103,7 +103,7 @@ export function print_property(property: DtsProperty, indent: string, depth: num
 }
 
 /** Print a property value comprised of comma-separated components. */
-function print_value(v: DtsValue): string {
+export function print_value(v: DtsValue): string {
   const parts: string[] = [];
 
   for (const c of v.components) {
