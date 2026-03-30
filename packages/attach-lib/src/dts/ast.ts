@@ -120,6 +120,140 @@ export type DtsReference = Labeled & {
   { kind: "path"; path: string };
 }
 
+export function create_flag(name: string, labels?: string[]): DtsProperty {
+  return {
+    labels: labels ?? [],
+    name: name,
+    deleted: false,
+    modified_by_user: true
+  };
+}
+
+export function create_string_array(name: string, value: string | string[], labels?: string[]): DtsProperty {
+
+  const normalized_value = Array.isArray(value) ? value : [value];
+
+  return {
+    labels: labels ?? [],
+    name: name,
+    deleted: false,
+    value: {
+      components: normalized_value.map((entry) => {
+        return {
+          kind: "string",
+          value: entry,
+          labels: []
+        };
+      })
+    }
+  };
+}
+
+export type CellArrayString = {
+  value: string,
+  type: "PHANDLE" | "PATH_REFERENCE" | "MACRO" | "EXPRESSION"
+}
+
+export function create_cell_array(
+  name: string,
+  value: bigint | CellArrayString | (bigint | CellArrayString)[],
+  labels?: string[]): DtsProperty {
+
+  if (!Array.isArray(value)) {
+    return {
+      labels: labels ?? [],
+      name: name,
+      deleted: false,
+      value: {
+        components: [
+          {
+            kind: "array",
+            labels: [],
+            elements: [create_cell_value(value)]
+          }
+        ]
+      }
+    };
+  }
+
+  return {
+    labels: labels ?? [],
+    name: name,
+    deleted: false,
+    value: {
+      components: [
+        {
+          kind: "array",
+          labels: [],
+          elements: value.map((entry) => create_cell_value(entry))
+        }
+      ]
+    }
+  };
+}
+
+function create_cell_value(value: bigint | CellArrayString): CellArrayElement {
+  if (typeof value === 'bigint') {
+    return {
+      item: {
+        kind: "number",
+        value: value,
+        labels: []
+      },
+    };
+  }
+
+  const string_type = value.type;
+  switch (string_type) {
+    case "MACRO": {
+      return {
+        item: {
+          kind: "macro",
+          value: value.value,
+          labels: []
+        },
+      };
+    }
+    case "PHANDLE": {
+      return {
+        item: {
+          kind: "ref",
+          ref: {
+            kind: "label",
+            name: value.value,
+          },
+          labels: []
+        },
+      };
+    }
+    case "PATH_REFERENCE": {
+      return {
+        item: {
+          kind: "ref",
+          ref: {
+            kind: "path",
+            path: value.value,
+          },
+          labels: []
+        },
+      };
+    }
+    case "EXPRESSION": {
+      return {
+        item: {
+          kind: "expression",
+          value: value.value,
+          labels: []
+        },
+      };
+    }
+    default: {
+      const _x: never = string_type;
+      throw new Error("Exhaustive check failed!");
+    }
+  }
+}
+
 export type Version = string;
 
 export function isVersion(object: any): object is Version {
