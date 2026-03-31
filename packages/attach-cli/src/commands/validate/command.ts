@@ -1,5 +1,5 @@
 import { buildCommand } from "@stricli/core";
-import { Attach, insert_known_structures, parse_dts, parseDtso, query_devicetree, search_node_in_dts, search_node_in_unresolved_overlays, type CellArrayElement, type DtsNode, type DtsValue, type DtsValueComponent, type ParsedBinding } from "attach-lib";
+import { Attach, insert_known_structures, mergeDtso, parse_dts, parseDtso, query_devicetree, search_node_in_dts, search_node_in_unresolved_overlays, type CellArrayElement, type DtsNode, type DtsValue, type DtsValueComponent, type ParsedBinding } from "attach-lib";
 
 import * as fs from 'node:fs';
 
@@ -100,35 +100,40 @@ export const validate_command = buildCommand({
             return;
         }
 
-        const found_node: { target_node: DtsNode, parent?: string } | undefined = (() => {
-            const node_with_parent = search_node_in_unresolved_overlays(input_document.unresolved_overlays, node);
+        const input_document_merged = mergeDtso(document, input_content, true);
+        /* 
+                const found_node: { target_node: DtsNode, parent?: string } | undefined = (() => {
+                    const node_with_parent = search_node_in_unresolved_overlays(input_document.unresolved_overlays, node);
+        
+                    if (node_with_parent !== undefined) {
+                        return {
+                            target_node: node_with_parent.node,
+                            parent: node_with_parent.overlay.overlay_target_ref.ref.kind === 'label' ?
+                                node_with_parent.overlay.overlay_target_ref.ref.name :
+                                node_with_parent.overlay.overlay_target_ref.ref.path
+                        };
+                    }
+        
+                    const node_without_parent = search_node_in_dts(input_document, node);
+        
+                    if (node_without_parent !== undefined) {
+                        return { target_node: node_without_parent, parent: "/" };
+                    }
+        
+                    return;
+                })();
+         */
 
-            if (node_with_parent !== undefined) {
-                return {
-                    target_node: node_with_parent.node,
-                    parent: node_with_parent.overlay.overlay_target_ref.ref.kind === 'label' ?
-                        node_with_parent.overlay.overlay_target_ref.ref.name :
-                        node_with_parent.overlay.overlay_target_ref.ref.path
-                };
-            }
+        const searched_node = search_node_in_dts(input_document_merged, node);
 
-            const node_without_parent = search_node_in_dts(input_document, node);
-
-            if (node_without_parent !== undefined) {
-                return { target_node: node_without_parent, parent: "/" };
-            }
-
-            return;
-        })();
-
-        if (found_node === undefined) {
+        if (searched_node === undefined) {
             console.log(`Couldn't find ${node} in ${input}`);
             return;
         }
 
-        const { target_node, parent } = found_node;
+        const { found_node, parent } = searched_node;
 
-        const compatible = target_node.properties.find((property) => property.name === "compatible");
+        const compatible = found_node.properties.find((property) => property.name === "compatible");
 
         if (compatible === undefined) {
             console.log(`Missing compatible in ${node} from ${input}`);
@@ -164,7 +169,7 @@ export const validate_command = buildCommand({
             return;
         }
 
-        const partial_input_data = Object.fromEntries(parse_dts_node(target_node, binding.parsed_binding));
+        const partial_input_data = Object.fromEntries(parse_dts_node(found_node, binding.parsed_binding));
 
         const extended_binding = structuredClone(binding);
 
@@ -188,7 +193,7 @@ export const validate_command = buildCommand({
             pattern.properties = insert_known_structures(pattern.properties);
         }
 
-        const input_data = Object.fromEntries(parse_dts_node(target_node, extended_binding.parsed_binding));
+        const input_data = Object.fromEntries(parse_dts_node(found_node, extended_binding.parsed_binding));
         console.log(JSON.stringify(input_data, bigIntReplacer));
 
         const update = attach.update_binding_by_changes(JSON.stringify(input_data, bigIntReplacer));
@@ -222,7 +227,7 @@ export const validate_command = buildCommand({
         }
 
         console.log(`============= UPDATED BINDING =============`);
-        console.log(JSON.stringify(binding.parsed_binding, bigIntReplacer));
+        console.log(JSON.stringify(binding.parsed_binding, bigIntReplacer, 4));
         console.log(`============= VALIDATION ERRORS =============`);
         console.log(JSON.stringify(update.errors));
     }
