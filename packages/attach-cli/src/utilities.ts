@@ -127,6 +127,10 @@ export function parse_dts_node(node: DtsNode, parsed_binding: ParsedBinding): Ma
             case "enum_integer":
             case "generic":
             case "integer": {
+                if (Array.isArray(value) && value.length === 1) {
+                    map.set(property.name, value[0]);
+                    continue;
+                }
                 map.set(property.name, value);
                 continue;
             }
