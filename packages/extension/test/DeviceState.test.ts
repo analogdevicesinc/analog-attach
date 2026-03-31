@@ -1,11 +1,11 @@
 import assert from "node:assert";
-import type { AttachType } from "attach-lib";
+import { AttachEnumType, type AttachType } from "attach-lib";
 import { DeviceState } from "../src/WebviewControllers/DeviceState";
 import {
     createTestAttachSession,
     createTestNode,
     createTestBinding,
-} from "./testUtils";
+} from "./testUtilities";
 
 suite("DeviceState", () => {
     suite("fromNodeAndBinding", () => {
@@ -25,6 +25,25 @@ suite("DeviceState", () => {
             const state = DeviceState.fromNodeAndBinding(node, parentNode, binding, session);
 
             assert.strictEqual(state.compatible, "adi,ad7124-4");
+        });
+
+        test("extracts grouped compatible strings from node", () => {
+            const session = createTestAttachSession();
+            const parentNode = createTestNode({ name: "spi", unitAddr: "0" });
+            const node = createTestNode({
+                name: "accel",
+                unitAddr: "0",
+                properties: [
+                    { name: "compatible", value: ["adi,adxl346", "adi,adxl345"] },
+                    { name: "status", value: "okay" },
+                ],
+            });
+
+            const binding = createTestBinding();
+            const state = DeviceState.fromNodeAndBinding(node, parentNode, binding, session);
+
+            assert.ok(Array.isArray(state.compatible));
+            assert.deepStrictEqual(state.compatible, ["adi,adxl346", "adi,adxl345"]);
         });
 
         test("extracts alias from node labels", () => {
@@ -113,9 +132,9 @@ suite("DeviceState", () => {
 
             const binding = createTestBinding({
                 properties: [
-                    { key: "compatible", value: { _t: "array" } as AttachType },
-                    { key: "reg", value: { _t: "integer" } as AttachType },
-                    { key: "interrupts", value: { _t: "array" } as AttachType },
+                    { key: "compatible", value: { _t: "array", minItems: 0, maxItems: 5 } satisfies AttachType },
+                    { key: "reg", value: { _t: "integer" } satisfies AttachType },
+                    { key: "interrupts", value: { _t: "array", minItems: 0, maxItems: 5 } satisfies AttachType },
                 ],
             });
 
@@ -240,8 +259,9 @@ suite("DeviceState", () => {
 
             const state = DeviceState.fromNodeAndBinding(node, parentNode, undefined, session);
 
-            assert.strictEqual(state.compatible, undefined);
-            assert.ok(state.properties.has("reg"));
+            assert.strictEqual(state.compatible, undefined, "Where did it find a compatible if none was provided?");
+            assert.ok(state.properties.has("reg"), "why no reg :(");
+            assert.ok(state.properties.get("reg")?.isCustom, "obviously reg should be marked custom if the whole node is custom");
         });
     });
 
@@ -264,7 +284,7 @@ suite("DeviceState", () => {
                         _t: "enum_integer",
                         enum: [0n, 1n, 3n],
                         description: "Reference source",
-                    } as AttachType,
+                    } satisfies AttachType,
                 }],
             });
 
@@ -297,8 +317,11 @@ suite("DeviceState", () => {
                     key: "compatible",
                     value: {
                         _t: "enum_array",
+                        minItems: 1,
+                        maxItems: 1,
+                        enum_type: AttachEnumType.STRING,
                         enum: ["adi,ad7124-4", "adi,ad7124-8"],
-                    } as unknown as AttachType,
+                    } satisfies AttachType,
                 }],
             });
 
@@ -306,8 +329,14 @@ suite("DeviceState", () => {
             const elements = state.toFormElements(session);
 
             const element = elements.find(_element => _element.key === "compatible");
-            assert.ok(element);
-            assert.strictEqual(element.type, "FormArray");
+            assert.ok(element, "no element with this name was created");
+            assert.strictEqual(element.type, "FormArray", "incorrect element type");
+            assert.ok(element.validationType, "validation does not exist");
+            assert.strictEqual(element.validationType.type, "ArrayStringValidation", "validation type error");
+            assert.strictEqual(element.validationType.enumType, "string", "enumType type error");
+            assert.strictEqual(element.validationType.minLength, 1, "minLength invalid");
+            assert.strictEqual(element.validationType.maxLength, 1, "maxLength invalid");
+            assert.deepStrictEqual(element.validationType.enum, ["adi,ad7124-4", "adi,ad7124-8"], "types not forwarded correctly");
         });
 
         test("converts number_array to FormArray with ArrayNumberValidation", () => {
@@ -326,11 +355,11 @@ suite("DeviceState", () => {
                     key: "diff-channels",
                     value: {
                         _t: "number_array",
-                        minItems: 2,
+                        minItems: 1,
                         maxItems: 2,
                         minimum: 0n,
                         maximum: 15n,
-                    } as AttachType,
+                    } satisfies AttachType,
                 }],
             });
 
@@ -340,9 +369,12 @@ suite("DeviceState", () => {
             const element = elements.find(_element => _element.key === "diff-channels");
             assert.ok(element);
             assert.strictEqual(element.type, "FormArray");
-            if (element.type === "FormArray" && element.validationType) {
-                assert.strictEqual(element.validationType.type, "ArrayNumberValidation");
-            }
+            assert.ok(element.validationType, "validation type should exist");
+            assert.strictEqual(element.validationType.type, "ArrayNumberValidation", "validation type error");
+            assert.equal(element.validationType.minLength, 1, "minLength not correct");
+            assert.equal(element.validationType.maxLength, 2, "maxLength not correct");
+            assert.equal(element.validationType.minValue, 0n, "minValue not correct");
+            assert.equal(element.validationType.maxValue, 15n, "maxValue not correct");
         });
 
         test("converts matrix to FormMatrix", () => {
@@ -363,11 +395,14 @@ suite("DeviceState", () => {
                         _t: "matrix",
                         values: [{
                             _t: "number_array",
-                            minItems: 2,
+                            minItems: 1,
                             maxItems: 2,
+                            minimum: 1n,
+                            maximum: 1000n
                         }],
                         minItems: 1,
-                    } as AttachType,
+                        maxItems: 3,
+                    } satisfies AttachType,
                 }],
             });
 
@@ -377,6 +412,14 @@ suite("DeviceState", () => {
             const element = elements.find(_element => _element.key === "interrupts");
             assert.ok(element);
             assert.strictEqual(element.type, "FormMatrix");
+            assert.ok(element.validationType, "validation type should exist");
+            assert.equal(element.validationType.minRows, 1, "minRows not correct");
+            assert.equal(element.validationType.maxRows, 3, "maxRows not correct");
+            assert.strictEqual(element.validationType.definition.type, "ArrayNumberValidation", "validation type error");
+            assert.equal(element.validationType.definition.minValue, 1n, "minValue not correct");
+            assert.equal(element.validationType.definition.maxValue, 1000n, "maxValue not correct");
+            assert.equal(element.validationType.definition.minLength, 1, "minLength not correct");
+            assert.equal(element.validationType.definition.maxLength, 2, "maxLength not correct");
         });
 
         test("converts boolean to Flag", () => {
@@ -404,8 +447,9 @@ suite("DeviceState", () => {
             const elements = state.toFormElements(session);
 
             const element = elements.find(_element => _element.key === "bipolar");
-            assert.ok(element);
-            assert.strictEqual(element.type, "Flag");
+            assert.ok(element, "element not found");
+            assert.strictEqual(element.type, "Flag", "type not correct");
+            assert.equal(element.setValue, true, "value not correct");
         });
 
         test("converts integer to Generic number", () => {
@@ -426,7 +470,7 @@ suite("DeviceState", () => {
                         _t: "integer",
                         minimum: 1_000_000n,
                         maximum: 10_000_000n,
-                    } as AttachType,
+                    } satisfies AttachType,
                 }],
             });
 
@@ -436,9 +480,11 @@ suite("DeviceState", () => {
             const element = elements.find(_element => _element.key === "spi-max-frequency");
             assert.ok(element);
             assert.strictEqual(element.type, "Generic");
-            if (element.type === "Generic") {
-                assert.strictEqual(element.inputType, "number");
-            }
+            assert.strictEqual(element.inputType, "number");
+            assert.ok(element.validationType);
+            assert.strictEqual(element.validationType.type, "NumericRangeValidation", "validation type error");
+            assert.equal(element.validationType.minValue, 1_000_000n, "validation minValue error");
+            assert.equal(element.validationType.maxValue, 10_000_000n, "validation maxValue error");
         });
 
         test("converts custom properties correctly", () => {
@@ -461,14 +507,17 @@ suite("DeviceState", () => {
             const flagElement = elements.find(_element => _element.key === "my-custom-flag");
             assert.ok(flagElement);
             assert.strictEqual(flagElement.type, "Generic");
+            assert.strictEqual(flagElement.inputType, "custom-flag", "flag inputType error");
 
             const numberElement = elements.find(_element => _element.key === "my-custom-number");
             assert.ok(numberElement);
             assert.strictEqual(numberElement.type, "Generic");
+            assert.strictEqual(numberElement.inputType, "custom-number", "number inputType error");
 
             const textElement = elements.find(_element => _element.key === "my-custom-text");
             assert.ok(textElement);
             assert.strictEqual(textElement.type, "Generic");
+            assert.strictEqual(textElement.inputType, "custom", "custom inputType error");
         });
 
         test("converts channels to FormObject", () => {
@@ -509,6 +558,8 @@ suite("DeviceState", () => {
             if (channelElement.type === "FormObject") {
                 assert.strictEqual(channelElement.channelName, "channel@0");
                 assert.strictEqual(channelElement.alias, "chan0");
+                assert.equal(channelElement.config.length, 1, "reg should be present here");
+                assert.strictEqual(channelElement.config[0].key, "reg", "property not here");
             }
         });
 
@@ -519,14 +570,14 @@ suite("DeviceState", () => {
                 name: "adc",
                 unitAddr: "0",
                 properties: [
-                    { name: "large-value", value: [9_007_199_254_740_991] }, // MAX_SAFE_INTEGER
+                    { name: "large-value", value: [Number.MAX_SAFE_INTEGER] },
                 ],
             });
 
             const binding = createTestBinding({
                 properties: [{
                     key: "large-value",
-                    value: { _t: "integer" } as AttachType,
+                    value: { _t: "integer" } satisfies AttachType,
                 }],
             });
 
@@ -560,6 +611,7 @@ suite("DeviceState", () => {
             assert.strictEqual(json["compatible"], "adi,ad7124-4");
             // DTS array properties are kept as arrays - only single-element arrays become scalars via normalizeScalar
             assert.ok("reg" in json);
+            assert.equal(json["reg"], 0, "reg value not ok");
         });
 
         test("normalizes hex strings to numbers", () => {
@@ -836,6 +888,42 @@ suite("DeviceState", () => {
 
             const channelNode = node.children.find(c => c.name === "channel" && c.unit_addr === "0");
             assert.ok(channelNode, "new channel node should be created");
+        });
+
+        test("syncs grouped compatible strings to DTS node as multiple components", () => {
+            const session = createTestAttachSession();
+            const parentNode = createTestNode({ name: "spi", unitAddr: "0" });
+            const node = createTestNode({
+                name: "accel",
+                unitAddr: "0",
+                properties: [
+                    { name: "compatible", value: "adi,adxl345" },
+                ],
+            });
+
+            const state = DeviceState.fromNodeAndBinding(node, parentNode, undefined, session);
+
+            // Set grouped compatible value (like when user selects grouped compatible from dropdown)
+            state.properties.set("compatible", {
+                key: "compatible",
+                value: ["adi,adxl346", "adi,adxl345"],  // Grouped!
+                isCustom: false,
+            });
+
+            state.syncToDtsNode(node, session);
+
+            // Verify: compatible should have 2 string components
+            const compatProperty = node.properties.find(p => p.name === "compatible");
+            assert.ok(compatProperty?.value);
+            assert.strictEqual(compatProperty.value.components.length, 2);
+            assert.strictEqual(compatProperty.value.components[0].kind, "string");
+            assert.strictEqual(compatProperty.value.components[1].kind, "string");
+            if (compatProperty.value.components[0].kind === "string") {
+                assert.strictEqual(compatProperty.value.components[0].value, "adi,adxl346");
+            }
+            if (compatProperty.value.components[1].kind === "string") {
+                assert.strictEqual(compatProperty.value.components[1].value, "adi,adxl345");
+            }
         });
     });
 

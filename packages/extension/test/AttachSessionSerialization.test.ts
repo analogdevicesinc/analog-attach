@@ -7,7 +7,7 @@ import {
     createTestBinding,
     loadFixture,
     bigIntReplacer,
-} from "./testUtils";
+} from "./testUtilities";
 
 suite("AttachSession serialization", () => {
     suite("nodeToAttachLibJson", () => {
@@ -143,7 +143,7 @@ suite("AttachSession serialization", () => {
 
             const result = session.nodeToAttachLibJsonWithBinding(node, binding);
 
-            assert.deepStrictEqual(result["matrix-prop"], [[5n]]);
+            assert.deepStrictEqual(result["matrix-prop"], [[5]]);
         });
 
         test("shapes array to matrix [array] when binding type is matrix", () => {
@@ -164,7 +164,7 @@ suite("AttachSession serialization", () => {
 
             const result = session.nodeToAttachLibJsonWithBinding(node, binding);
 
-            assert.deepStrictEqual(result["matrix-prop"], [[1n, 2n, 3n]]);
+            assert.deepStrictEqual(result["matrix-prop"], [[1, 2, 3]]);
         });
 
         test("leaves matrix unchanged when already [[]]", () => {
@@ -188,7 +188,7 @@ suite("AttachSession serialization", () => {
             const result = session.nodeToAttachLibJsonWithBinding(node, binding);
 
             // Since the input is [1, 2], it gets wrapped as [[1, 2]]
-            assert.deepStrictEqual(result["prop"], [[1n, 2n]]);
+            assert.deepStrictEqual(result["prop"], [[1, 2]]);
         });
 
         test("shapes scalar to array [value] when binding type is array", () => {
@@ -237,7 +237,7 @@ suite("AttachSession serialization", () => {
             const result = session.nodeToAttachLibJsonWithBinding(node, binding);
 
             // Already an array, stays as array
-            assert.deepStrictEqual(result["enum-prop"], [0n]);
+            assert.deepStrictEqual(result["enum-prop"], [0]);
         });
 
         test("leaves array unchanged for array types", () => {
@@ -258,7 +258,7 @@ suite("AttachSession serialization", () => {
 
             const result = session.nodeToAttachLibJsonWithBinding(node, binding);
 
-            assert.deepStrictEqual(result["array-prop"], [1n, 2n, 3n]);
+            assert.deepStrictEqual(result["array-prop"], [1, 2, 3]);
         });
 
         test("passes through unknown binding types unchanged", () => {
@@ -280,7 +280,7 @@ suite("AttachSession serialization", () => {
             const result = session.nodeToAttachLibJsonWithBinding(node, binding);
 
             // Integer type doesn't get shaped, just passed through
-            assert.deepStrictEqual(result["int-prop"], [42n]);
+            assert.deepStrictEqual(result["int-prop"], 42);
         });
 
         test("handles properties not in binding (custom properties)", () => {
@@ -302,7 +302,7 @@ suite("AttachSession serialization", () => {
 
             const result = session.nodeToAttachLibJsonWithBinding(node, binding);
 
-            assert.deepStrictEqual(result["known-prop"], [1n]);
+            assert.deepStrictEqual(result["known-prop"], 1);
             assert.deepStrictEqual(result["custom-prop"], [99n]);
         });
     });

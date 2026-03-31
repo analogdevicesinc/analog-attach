@@ -3,7 +3,7 @@ import {
     createTestAttachSessionWithBindings,
     createTestNode,
     createTestDeviceTree,
-} from "./testUtils";
+} from "./testUtilities";
 import { AnalogAttachLogger } from "../src/AnalogAttachLogger";
 
 /**
@@ -50,6 +50,18 @@ suite("Validation flow", () => {
             this.timeout("10000ms");
 
             const deviceTree = createTestDeviceTree();
+
+            const gpioNode = createTestNode({
+                name: "gpio",
+                unitAddr: "7e200000",
+                labels: ["gpio"],
+                properties: [
+                    { name: "interrupt-controller", value: undefined },
+                    { name: "#interrupt-cells", value: [2] },
+                ]
+            });
+            deviceTree.root.children.push(gpioNode);
+
             const spiNode = deviceTree.root.children[0];
 
             // Add AD7124 device with clocks reference
@@ -72,7 +84,9 @@ suite("Validation flow", () => {
             assert.ok(deviceState.binding);
 
             // Check that binding has interrupt-parent enriched with phandles from devicetree
-            // (The actual enum values depend on the devicetree structure)
+            const interruptParent = deviceState.binding.properties.find((property) => property.key === "interrupt-parent");
+            assert.ok(interruptParent?.value._t === "enum_array", "interrupt-parent should be enum_array");
+            assert.ok(interruptParent.value.enum.includes("gpio"));
         });
 
         test("caches DeviceState correctly", async function () {
@@ -125,9 +139,10 @@ suite("Validation flow", () => {
             const deviceState = await session.getOrCreateDeviceState(customNode._uuid);
 
             assert.ok(deviceState);
-            assert.strictEqual(deviceState.compatible, undefined);
-            assert.ok(deviceState.properties.has("reg"));
-            assert.ok(deviceState.properties.has("my-custom-prop"));
+            assert.strictEqual(deviceState.compatible, undefined, "compatible should be undefined");
+            assert.ok(deviceState.properties.has("reg"), "why is reg lost?");
+            assert.ok(deviceState.properties.has("my-custom-prop"), "my-custom-prop should be in the device state");
+            assert.ok(deviceState.properties.get("my-custom-prop")?.isCustom, "my-custom-prop should be marked custom");
         });
 
         test("invalidates cache when requested", async function () {
@@ -187,7 +202,9 @@ suite("Validation flow", () => {
             const shaped = session.nodeToAttachLibJsonWithBinding(node, bindingResult.parsed_binding);
 
             // reg should be properly shaped based on binding type
-            assert.ok("reg" in shaped);
+            assert.ok("reg" in shaped, "reg should be here");
+            assert.ok(Array.isArray(shaped["reg"]), "reg should be at least array");
+            assert.ok(Array.isArray(shaped["reg"][0]), "reg should be matrix");
         });
 
         test("interrupts property: correctly shaped based on binding", async function () {
@@ -217,6 +234,7 @@ suite("Validation flow", () => {
             const shaped = session.nodeToAttachLibJsonWithBinding(node, bindingResult.parsed_binding);
 
             assert.ok("interrupts" in shaped);
+            assert.ok(Array.isArray(shaped["interrupts"]), "interrupts should be array");
         });
     });
 
@@ -268,7 +286,7 @@ suite("Validation flow", () => {
                 name: "channel",
                 unitAddr: "0",
                 properties: [
-                    { name: "reg", value: [0] },
+                    { name: "reg", value: [[0]] },
                     // diff-channels is required but missing
                 ],
             });
@@ -278,7 +296,7 @@ suite("Validation flow", () => {
                 unitAddr: "0",
                 properties: [
                     { name: "compatible", value: "adi,ad7124-4" },
-                    { name: "reg", value: [0] },
+                    { name: "reg", value: [[0]] },
                     { name: "interrupts", value: [25, 2] },
                 ],
                 children: [channel0],
@@ -291,9 +309,14 @@ suite("Validation flow", () => {
             // Should have validation errors for missing required channel property
             // Note: The actual error depends on the binding validation implementation
             const errors = deviceState.validate();
-
-            // We expect some validation errors for the missing diff-channels
-            // The exact error format depends on attach-lib validation
+            assert.ok(errors.length > 0, "errors where?");
+            const diffChannelsError = errors.find(
+                error => error._t === 'missing_required' &&
+                error.instance &&
+                error.instance.length > 0 &&
+                error.instance[0] === 'channel@0'
+            );
+            assert.ok(diffChannelsError, `cannot find diff-channels error in ${JSON.stringify(errors)}`);
         });
     });
 
@@ -322,7 +345,7 @@ suite("Validation flow", () => {
 
             // Should have a missing_required error for 'interrupts'
             const missingInterrupts = errors.find(
-                e => e._t === "missing_required" && e.missing_property === "interrupts"
+                _error => _error._t === "missing_required" && _error.missing_property === "interrupts"
             );
             assert.ok(missingInterrupts, "Should have missing_required error for interrupts");
         });
@@ -351,16 +374,16 @@ suite("Validation flow", () => {
             const errors = deviceState.validate();
 
             // Filter out generic errors that aren't property-specific
-            const propertyErrors = errors.filter(e =>
-                e._t === "missing_required" ||
-                e._t === "number_limit" ||
-                e._t === "failed_dependency"
+            const propertyErrors = errors.filter(_error =>
+                _error._t === "missing_required" ||
+                _error._t === "number_limit" ||
+                _error._t === "failed_dependency"
             );
 
             // Should have no property-level errors for valid configuration
             // (Missing interrupts-extended or other optional properties don't count)
             assert.ok(
-                propertyErrors.every(e => e._t !== "number_limit"),
+                propertyErrors.every(_error => _error._t !== "number_limit"),
                 `Should have no number_limit errors for valid config, got: ${JSON.stringify(propertyErrors)}`
             );
         });
@@ -407,10 +430,10 @@ suite("Validation flow", () => {
             const elements = state1.toFormElements(session, { serializeForFrontend: true });
 
             // Verify FormElements contain expected data
-            const compatibleElement = elements.find(e => e.key === "compatible");
+            const compatibleElement = elements.find(element => element.key === "compatible");
             assert.ok(compatibleElement, "Should have compatible element");
 
-            const regElement = elements.find(e => e.key === "reg");
+            const regElement = elements.find(element => element.key === "reg");
             assert.ok(regElement, "Should have reg element");
 
             // Step 3: Create new node from state
@@ -428,8 +451,13 @@ suite("Validation flow", () => {
             const json = state1.toAttachLibJson();
 
             assert.ok("compatible" in json);
+            assert.deepStrictEqual(json["compatible"], "adi,ad7124-4", "compatible value is different");
+
             assert.ok("reg" in json);
+            assert.deepStrictEqual(json["reg"], [0], "reg value is different");
+
             assert.ok("interrupts" in json);
+            assert.deepStrictEqual(json["interrupts"], [25, 2], "compatible value is different");
         });
     });
 
