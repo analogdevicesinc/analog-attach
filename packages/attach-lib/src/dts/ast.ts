@@ -136,6 +136,7 @@ export function create_string_array(name: string, value: string | string[], labe
     labels: labels ?? [],
     name: name,
     deleted: false,
+    modified_by_user: true,
     value: {
       components: normalized_value.map((entry) => {
         return {
@@ -163,6 +164,7 @@ export function create_cell_array(
       labels: labels ?? [],
       name: name,
       deleted: false,
+      modified_by_user: true,
       value: {
         components: [
           {
@@ -179,6 +181,7 @@ export function create_cell_array(
     labels: labels ?? [],
     name: name,
     deleted: false,
+    modified_by_user: true,
     value: {
       components: [
         {

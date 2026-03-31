@@ -76,7 +76,7 @@ export const get_property_command = buildCommand({
             return;
         }
 
-        const found_property = found_node.properties.find((value) => value.name === property);
+        const found_property = found_node.found_node.properties.find((value) => value.name === property);
 
         if (found_property === undefined) {
             console.log(`Couldn't find ${property} in ${node} in ${input}`);

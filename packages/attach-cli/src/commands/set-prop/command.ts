@@ -1,5 +1,5 @@
 import { buildCommand } from "@stricli/core";
-import { Attach, AttachEnumType, create_cell_array, create_flag, create_string_array, insert_known_structures, parse_dts, parseDtso, printDts, query_devicetree, search_node_in_dts, search_node_in_unresolved_overlays, type CellArrayString, type DtsNode } from "attach-lib";
+import { Attach, AttachEnumType, create_cell_array, create_flag, create_string_array, insert_known_structures, mergeDocument, mergeDtso, parse_dts, parseDtso, printDts, printDtso, query_devicetree, search_node_in_dts, search_node_in_unresolved_overlays, type CellArrayString, type DtsNode } from "attach-lib";
 
 import * as fs from 'node:fs';
 
@@ -123,35 +123,41 @@ export const set_property_command = buildCommand({
             return;
         }
 
+        const input_document_merged = mergeDtso(document, input_content, true);
+
+        /*         
         const found_node: { target_node: DtsNode, parent?: string } | undefined = (() => {
-            const node_with_parent = search_node_in_unresolved_overlays(input_document.unresolved_overlays, node);
+                    const node_with_parent = search_node_in_unresolved_overlays(input_document.unresolved_overlays, node);
+        
+                    if (node_with_parent !== undefined) {
+                        return {
+                            target_node: node_with_parent.node,
+                            parent: node_with_parent.overlay.overlay_target_ref.ref.kind === 'label' ?
+                                node_with_parent.overlay.overlay_target_ref.ref.name :
+                                node_with_parent.overlay.overlay_target_ref.ref.path
+                        };
+                    }
+        
+                    const node_without_parent = search_node_in_dts(input_document, node);
+        
+                    if (node_without_parent !== undefined) {
+                        return { target_node: node_without_parent, parent: "/" };
+                    }
+        
+                    return;
+                })(); 
+        */
 
-            if (node_with_parent !== undefined) {
-                return {
-                    target_node: node_with_parent.node,
-                    parent: node_with_parent.overlay.overlay_target_ref.ref.kind === 'label' ?
-                        node_with_parent.overlay.overlay_target_ref.ref.name :
-                        node_with_parent.overlay.overlay_target_ref.ref.path
-                };
-            }
+        const searched_node = search_node_in_dts(input_document_merged, node);
 
-            const node_without_parent = search_node_in_dts(input_document, node);
-
-            if (node_without_parent !== undefined) {
-                return { target_node: node_without_parent, parent: "/" };
-            }
-
-            return;
-        })();
-
-        if (found_node === undefined) {
+        if (searched_node === undefined) {
             console.log(`Couldn't find ${node} in ${input}`);
             return;
         }
 
-        const { target_node, parent } = found_node;
+        const { found_node, parent } = searched_node;
 
-        const compatible = target_node.properties.find((property) => property.name === "compatible");
+        const compatible = found_node.properties.find((property) => property.name === "compatible");
 
         if (compatible === undefined) {
             console.log(`Missing compatible in ${node} from ${input}`);
@@ -187,7 +193,7 @@ export const set_property_command = buildCommand({
             return;
         }
 
-        const partial_input_data = Object.fromEntries(parse_dts_node(target_node, binding.parsed_binding));
+        const partial_input_data = Object.fromEntries(parse_dts_node(found_node, binding.parsed_binding));
 
         const extended_binding = structuredClone(binding);
 
@@ -211,7 +217,7 @@ export const set_property_command = buildCommand({
             pattern.properties = insert_known_structures(pattern.properties);
         }
 
-        const input_data = Object.fromEntries(parse_dts_node(target_node, extended_binding.parsed_binding));
+        const input_data = Object.fromEntries(parse_dts_node(found_node, extended_binding.parsed_binding));
 
         const update = attach.update_binding_by_changes(JSON.stringify(input_data, bigIntReplacer));
 
@@ -253,7 +259,7 @@ export const set_property_command = buildCommand({
         const parsed_value = parse_value(value);
 
         if (Array.isArray(parsed_value)) {
-            const target_property = target_node.properties.find((entry) => entry.name === property);
+            const target_property = found_node.properties.find((entry) => entry.name === property);
 
             switch (property_binding_definition.value._t) {
                 case "array": {
@@ -265,12 +271,12 @@ export const set_property_command = buildCommand({
 
                     if (target_property === undefined) {
                         if (typeof parsed_value === 'bigint') {
-                            target_node.properties.push(create_cell_array(property, parsed_value));
+                            found_node.properties.push(create_cell_array(property, parsed_value));
                             break;
                         }
 
                         // generic array we don't know anything
-                        target_node.properties.push(
+                        found_node.properties.push(
                             create_cell_array(property, mapped_value)
                         );
                         break;
@@ -295,7 +301,7 @@ export const set_property_command = buildCommand({
                     }
 
                     if (target_property === undefined) {
-                        target_node.properties.push(create_cell_array(property, parsed_value));
+                        found_node.properties.push(create_cell_array(property, parsed_value));
                         break;
                     }
 
@@ -310,7 +316,7 @@ export const set_property_command = buildCommand({
                     }
 
                     if (target_property === undefined) {
-                        target_node.properties.push(create_string_array(property, parsed_value));
+                        found_node.properties.push(create_string_array(property, parsed_value));
                         break;
                     }
 
@@ -341,7 +347,7 @@ export const set_property_command = buildCommand({
                                 return;
                             }
 
-                            target_node.properties.push(create_cell_array(property, parsed_value));
+                            found_node.properties.push(create_cell_array(property, parsed_value));
 
                             break;
                         }
@@ -354,7 +360,7 @@ export const set_property_command = buildCommand({
                                         return typeof entry === "bigint" ? entry : { value: entry, type: "PHANDLE" };
                                     }
                                 );
-                                target_node.properties.push(
+                                found_node.properties.push(
                                     create_cell_array(property, mapped_value)
                                 );
                                 break;
@@ -365,14 +371,14 @@ export const set_property_command = buildCommand({
                                         return typeof entry === "bigint" ? entry : { value: entry, type: "MACRO" };
                                     }
                                 );
-                                target_node.properties.push(
+                                found_node.properties.push(
                                     create_cell_array(property, mapped_value)
                                 );
                                 break;
                             }
                             case AttachEnumType.STRING: {
                                 const mapped_value: string[] = parsed_value.filter((entry) => typeof entry === "string");
-                                target_node.properties.push(create_string_array(property, mapped_value));
+                                found_node.properties.push(create_string_array(property, mapped_value));
                                 break;
                             }
                             case AttachEnumType.NUMBER: {
@@ -530,7 +536,7 @@ export const set_property_command = buildCommand({
 
                     if (values.every((entry) => typeof entry === 'string')) {
                         if (target_property === undefined) {
-                            target_node.properties.push(create_string_array(property, values));
+                            found_node.properties.push(create_string_array(property, values));
                             break;
                         }
 
@@ -541,7 +547,7 @@ export const set_property_command = buildCommand({
 
                     if (values.every((entry) => typeof entry !== 'string')) {
                         if (target_property === undefined) {
-                            target_node.properties.push(create_cell_array(property, values));
+                            found_node.properties.push(create_cell_array(property, values));
                             break;
                         }
 
@@ -570,12 +576,12 @@ export const set_property_command = buildCommand({
 
                             if (target_property === undefined) {
                                 if (typeof parsed_value === 'bigint') {
-                                    target_node.properties.push(create_cell_array(property, parsed_value));
+                                    found_node.properties.push(create_cell_array(property, parsed_value));
                                     break;
                                 }
 
                                 // generic array we don't know anything
-                                target_node.properties.push(
+                                found_node.properties.push(
                                     create_cell_array(property, mapped_value)
                                 );
                                 break;
@@ -600,7 +606,7 @@ export const set_property_command = buildCommand({
                             }
 
                             if (target_property === undefined) {
-                                target_node.properties.push(create_cell_array(property, parsed_value));
+                                found_node.properties.push(create_cell_array(property, parsed_value));
                                 break;
                             }
 
@@ -615,7 +621,7 @@ export const set_property_command = buildCommand({
                             }
 
                             if (target_property === undefined) {
-                                target_node.properties.push(create_string_array(property, parsed_value));
+                                found_node.properties.push(create_string_array(property, parsed_value));
                                 break;
                             }
 
@@ -646,7 +652,7 @@ export const set_property_command = buildCommand({
                                         return;
                                     }
 
-                                    target_node.properties.push(create_cell_array(property, parsed_value));
+                                    found_node.properties.push(create_cell_array(property, parsed_value));
 
                                     break;
                                 }
@@ -659,7 +665,7 @@ export const set_property_command = buildCommand({
                                                 return typeof entry === "bigint" ? entry : { value: entry, type: "PHANDLE" };
                                             }
                                         );
-                                        target_node.properties.push(
+                                        found_node.properties.push(
                                             create_cell_array(property, mapped_value)
                                         );
                                         break;
@@ -670,14 +676,14 @@ export const set_property_command = buildCommand({
                                                 return typeof entry === "bigint" ? entry : { value: entry, type: "MACRO" };
                                             }
                                         );
-                                        target_node.properties.push(
+                                        found_node.properties.push(
                                             create_cell_array(property, mapped_value)
                                         );
                                         break;
                                     }
                                     case AttachEnumType.STRING: {
                                         const mapped_value: string[] = parsed_value.filter((entry) => typeof entry === "string");
-                                        target_node.properties.push(create_string_array(property, mapped_value));
+                                        found_node.properties.push(create_string_array(property, mapped_value));
                                         break;
                                     }
                                     case AttachEnumType.NUMBER: {
@@ -835,7 +841,7 @@ export const set_property_command = buildCommand({
 
                             if (values.every((entry) => typeof entry === 'string')) {
                                 if (target_property === undefined) {
-                                    target_node.properties.push(create_string_array(property, values));
+                                    found_node.properties.push(create_string_array(property, values));
                                     break;
                                 }
 
@@ -846,7 +852,7 @@ export const set_property_command = buildCommand({
 
                             if (values.every((entry) => typeof entry !== 'string')) {
                                 if (target_property === undefined) {
-                                    target_node.properties.push(create_cell_array(property, values));
+                                    found_node.properties.push(create_cell_array(property, values));
                                     break;
                                 }
 
@@ -880,7 +886,7 @@ export const set_property_command = buildCommand({
                 }
             }
         } else {
-            const target_property = target_node.properties.find((entry) => entry.name === property);
+            const target_property = found_node.properties.find((entry) => entry.name === property);
 
             const definition_type = property_binding_definition.value._t;
             switch (definition_type) {
@@ -891,12 +897,12 @@ export const set_property_command = buildCommand({
                     }
 
                     if (target_property !== undefined && parsed_value === false) {
-                        target_node.properties = target_node.properties.filter((entry) => entry !== target_property);
+                        found_node.properties = found_node.properties.filter((entry) => entry !== target_property);
                         break;
                     }
 
                     if (target_property === undefined && parsed_value === true) {
-                        target_node.properties.push(create_flag(property));
+                        found_node.properties.push(create_flag(property));
                         break;
                     }
 
@@ -910,12 +916,12 @@ export const set_property_command = buildCommand({
 
                     if (target_property === undefined) {
                         if (typeof parsed_value === 'bigint') {
-                            target_node.properties.push(create_cell_array(property, parsed_value));
+                            found_node.properties.push(create_cell_array(property, parsed_value));
                             break;
                         }
 
                         // generic array we don't know anything
-                        target_node.properties.push(
+                        found_node.properties.push(
                             create_cell_array(property, { value: parsed_value, type: "EXPRESSION" })
                         );
                         break;
@@ -944,7 +950,7 @@ export const set_property_command = buildCommand({
                     }
 
                     if (target_property === undefined) {
-                        target_node.properties.push(create_cell_array(property, parsed_value));
+                        found_node.properties.push(create_cell_array(property, parsed_value));
                         break;
                     }
 
@@ -963,7 +969,7 @@ export const set_property_command = buildCommand({
                     }
 
                     if (target_property === undefined) {
-                        target_node.properties.push(create_string_array(property, parsed_value));
+                        found_node.properties.push(create_string_array(property, parsed_value));
                         break;
                     }
 
@@ -991,26 +997,26 @@ export const set_property_command = buildCommand({
                                 return;
                             }
 
-                            target_node.properties.push(create_cell_array(property, parsed_value));
+                            found_node.properties.push(create_cell_array(property, parsed_value));
 
                             break;
                         }
 
                         switch (property_binding_definition.value.enum_type) {
                             case AttachEnumType.PHANDLE: {
-                                target_node.properties.push(
+                                found_node.properties.push(
                                     create_cell_array(property, { value: parsed_value, type: "PHANDLE" })
                                 );
                                 break;
                             }
                             case AttachEnumType.MACRO: {
-                                target_node.properties.push(
+                                found_node.properties.push(
                                     create_cell_array(property, { value: parsed_value, type: "MACRO" })
                                 );
                                 break;
                             }
                             case AttachEnumType.STRING: {
-                                target_node.properties.push(create_string_array(property, parsed_value));
+                                found_node.properties.push(create_string_array(property, parsed_value));
                                 break;
                             }
                             case AttachEnumType.NUMBER: {
@@ -1086,7 +1092,7 @@ export const set_property_command = buildCommand({
                         }
 
                         if (target_property === undefined) {
-                            target_node.properties.push(create_cell_array(property, parsed_value));
+                            found_node.properties.push(create_cell_array(property, parsed_value));
                             break;
                         }
 
@@ -1106,7 +1112,7 @@ export const set_property_command = buildCommand({
                         case AttachEnumType.PHANDLE: {
 
                             if (target_property === undefined) {
-                                target_node.properties.push(create_cell_array(property, { value: parsed_value, type: "PHANDLE" }));
+                                found_node.properties.push(create_cell_array(property, { value: parsed_value, type: "PHANDLE" }));
                                 break;
                             }
 
@@ -1117,7 +1123,7 @@ export const set_property_command = buildCommand({
                         case AttachEnumType.MACRO: {
 
                             if (target_property === undefined) {
-                                target_node.properties.push(create_cell_array(property, { value: parsed_value, type: "MACRO" }));
+                                found_node.properties.push(create_cell_array(property, { value: parsed_value, type: "MACRO" }));
                                 break;
                             }
 
@@ -1128,7 +1134,7 @@ export const set_property_command = buildCommand({
                         case AttachEnumType.STRING: {
 
                             if (target_property === undefined) {
-                                target_node.properties.push(create_string_array(property, parsed_value));
+                                found_node.properties.push(create_string_array(property, parsed_value));
                                 break;
                             }
 
@@ -1168,12 +1174,12 @@ export const set_property_command = buildCommand({
 
                             if (target_property === undefined) {
                                 if (typeof parsed_value === 'bigint') {
-                                    target_node.properties.push(create_cell_array(property, parsed_value));
+                                    found_node.properties.push(create_cell_array(property, parsed_value));
                                     break;
                                 }
 
                                 // generic array we don't know anything
-                                target_node.properties.push(
+                                found_node.properties.push(
                                     create_cell_array(property, { value: parsed_value, type: "EXPRESSION" })
                                 );
                                 break;
@@ -1202,7 +1208,7 @@ export const set_property_command = buildCommand({
                             }
 
                             if (target_property === undefined) {
-                                target_node.properties.push(create_cell_array(property, parsed_value));
+                                found_node.properties.push(create_cell_array(property, parsed_value));
                                 break;
                             }
 
@@ -1221,7 +1227,7 @@ export const set_property_command = buildCommand({
                             }
 
                             if (target_property === undefined) {
-                                target_node.properties.push(create_string_array(property, parsed_value));
+                                found_node.properties.push(create_string_array(property, parsed_value));
                                 break;
                             }
 
@@ -1249,26 +1255,26 @@ export const set_property_command = buildCommand({
                                         return;
                                     }
 
-                                    target_node.properties.push(create_cell_array(property, parsed_value));
+                                    found_node.properties.push(create_cell_array(property, parsed_value));
 
                                     break;
                                 }
 
                                 switch (target_definition.enum_type) {
                                     case AttachEnumType.PHANDLE: {
-                                        target_node.properties.push(
+                                        found_node.properties.push(
                                             create_cell_array(property, { value: parsed_value, type: "PHANDLE" })
                                         );
                                         break;
                                     }
                                     case AttachEnumType.MACRO: {
-                                        target_node.properties.push(
+                                        found_node.properties.push(
                                             create_cell_array(property, { value: parsed_value, type: "MACRO" })
                                         );
                                         break;
                                     }
                                     case AttachEnumType.STRING: {
-                                        target_node.properties.push(create_string_array(property, parsed_value));
+                                        found_node.properties.push(create_string_array(property, parsed_value));
                                         break;
                                     }
                                     case AttachEnumType.NUMBER: {
@@ -1344,7 +1350,7 @@ export const set_property_command = buildCommand({
                                 }
 
                                 if (target_property === undefined) {
-                                    target_node.properties.push(create_cell_array(property, parsed_value));
+                                    found_node.properties.push(create_cell_array(property, parsed_value));
                                     break;
                                 }
 
@@ -1364,7 +1370,7 @@ export const set_property_command = buildCommand({
                                 case AttachEnumType.PHANDLE: {
 
                                     if (target_property === undefined) {
-                                        target_node.properties.push(create_cell_array(property, { value: parsed_value, type: "PHANDLE" }));
+                                        found_node.properties.push(create_cell_array(property, { value: parsed_value, type: "PHANDLE" }));
                                         break;
                                     }
 
@@ -1375,7 +1381,7 @@ export const set_property_command = buildCommand({
                                 case AttachEnumType.MACRO: {
 
                                     if (target_property === undefined) {
-                                        target_node.properties.push(create_cell_array(property, { value: parsed_value, type: "MACRO" }));
+                                        found_node.properties.push(create_cell_array(property, { value: parsed_value, type: "MACRO" }));
                                         break;
                                     }
 
@@ -1386,7 +1392,7 @@ export const set_property_command = buildCommand({
                                 case AttachEnumType.STRING: {
 
                                     if (target_property === undefined) {
-                                        target_node.properties.push(create_string_array(property, parsed_value));
+                                        found_node.properties.push(create_string_array(property, parsed_value));
                                         break;
                                     }
 
@@ -1419,7 +1425,7 @@ export const set_property_command = buildCommand({
                     }
 
                     if (target_property === undefined) {
-                        target_node.properties.push(create_cell_array(property, parsed_value));
+                        found_node.properties.push(create_cell_array(property, parsed_value));
                         break;
                     }
 
@@ -1443,7 +1449,7 @@ export const set_property_command = buildCommand({
                     }
 
                     if (target_property === undefined) {
-                        target_node.properties.push(create_cell_array(property, parsed_value));
+                        found_node.properties.push(create_cell_array(property, parsed_value));
                         break;
                     }
 
@@ -1467,7 +1473,7 @@ export const set_property_command = buildCommand({
                     }
 
                     if (target_property === undefined) {
-                        target_node.properties.push(create_cell_array(property, parsed_value));
+                        found_node.properties.push(create_cell_array(property, parsed_value));
                         break;
                     }
 
@@ -1488,7 +1494,7 @@ export const set_property_command = buildCommand({
             }
         }
 
-        fs.writeFileSync(input, printDts(input_document));
+        fs.writeFileSync(input, printDtso(input_document_merged));
     }
 });
 
