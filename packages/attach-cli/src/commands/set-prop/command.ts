@@ -1467,7 +1467,12 @@ export const set_property_command = buildCommand({
                         return;
                     }
 
-                    if (property_binding_definition.value.const !== parsed_value) {
+                    if (typeof parsed_value === 'bigint' && BigInt(property_binding_definition.value.const) !== parsed_value) {
+                        console.log(`Value for property ${property} is: ${JSON.stringify(property_binding_definition.value.const)}`);
+                        return;
+                    }
+
+                    if (typeof parsed_value !== 'bigint' && property_binding_definition.value.const !== parsed_value) {
                         console.log(`Value for property ${property} is: ${JSON.stringify(property_binding_definition.value.const)}`);
                         return;
                     }
