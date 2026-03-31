@@ -1,7 +1,7 @@
 import assert from "node:assert";
 import fs from "node:fs";
 import path from "node:path";
-import type { WebviewPanel, Uri } from "vscode";
+import type { WebviewPanel } from "vscode";
 import {
     CatalogCommands,
     DeviceCommands,
@@ -48,7 +48,6 @@ suite("Analog Attach Message API", () => {
         this.timeout("20000ms");
 
         const binding_path = path.resolve(__dirname, "../../test/schemas");
-        const storage_path = path.resolve(__dirname, "../../test");
 
         const linux_path = path.resolve(__dirname, "../../test/linux");
         const dt_schema_path = path.resolve(__dirname, "../../test/dt-schema");
@@ -204,7 +203,6 @@ suite("Analog Attach Message API", () => {
         this.timeout("20000ms");
 
         const binding_path = path.resolve(__dirname, '../../test/schemas/iio/adc');
-        const storage_path = path.resolve(__dirname, '../../test');
 
         const linux_path = path.resolve(__dirname, "../../test/linux");
         const dt_schema_path = path.resolve(__dirname, "../../test/dt-schema");
@@ -228,7 +226,6 @@ suite("Analog Attach Message API", () => {
         this.timeout("20000ms");
 
         const binding_path = path.resolve(__dirname, '../../test/schemas/iio/adc');
-        const storage_path = path.resolve(__dirname, '../../test');
 
         const linux_path = path.resolve(__dirname, "../../test/linux");
         const dt_schema_path = path.resolve(__dirname, "../../test/dt-schema");
@@ -241,7 +238,7 @@ suite("Analog Attach Message API", () => {
         }
 
         const deviceTree = createDeviceTreeFromFixture();
-        const controller = createController(deviceTree, undefined, compatibleMapping, storage_path, binding_path);
+        const controller = createController(deviceTree, undefined, compatibleMapping, binding_path);
         const { panel, webview } = createMockPanel();
 
         const parentLookupRequest = createRequest(DeviceCommands.getPotentialParentNodes, {
@@ -314,7 +311,6 @@ suite("Analog Attach Message API", () => {
         this.timeout("20000ms");
 
         const binding_path = path.resolve(__dirname, '../../test/schemas/iio/adc');
-        const storage_path = path.resolve(__dirname, '../../test');
 
         const linux_path = path.resolve(__dirname, "../../test/linux");
         const dt_schema_path = path.resolve(__dirname, "../../test/dt-schema");
@@ -327,7 +323,7 @@ suite("Analog Attach Message API", () => {
         }
 
         const deviceTree = createDeviceTreeFromFixture();
-        const controller = createController(deviceTree, undefined, compatibleMapping, storage_path, binding_path);
+        const controller = createController(deviceTree, undefined, compatibleMapping, binding_path);
         const { panel, webview } = createMockPanel();
 
         const parentLookupRequest = createRequest(DeviceCommands.getPotentialParentNodes, {
@@ -1201,14 +1197,12 @@ function createController(
     deviceTree: DtsDocument,
     catalogDevices?: CatalogDevice[],
     compatibleMappingOverride: CompatibleMapping[] = defaultCompatibleMapping,
-    storagePath = TEST_STORAGE_PATH,
     linuxBindingsFolder = TEST_LINUX_BINDINGS_FOLDER
 ): PlugAndPlayWebviewController {
     return createControllerAndSession(
         deviceTree,
         catalogDevices,
         compatibleMappingOverride,
-        storagePath,
         linuxBindingsFolder
     ).controller;
 }
@@ -1217,7 +1211,6 @@ function createControllerAndSession(
     deviceTree: DtsDocument,
     catalogDevices?: CatalogDevice[],
     compatibleMappingOverride: CompatibleMapping[] = defaultCompatibleMapping,
-    storagePath = TEST_STORAGE_PATH,
     linuxBindingsFolder = TEST_LINUX_BINDINGS_FOLDER
 ): { controller: PlugAndPlayWebviewController; attachSession: AttachSession } {
     const catalogSource = catalogDevices ?? loadMockCatalogDevices();
@@ -1240,7 +1233,6 @@ function createControllerAndSession(
     const attachSession = AttachSession.createTestSession(
         [],
         compatibleMapping,
-        storagePath,
         deviceTree,
         linuxBindingsFolder,
         linux_path,
@@ -1291,21 +1283,6 @@ function setGenericValue(elements: FormElement[], key: string, value: unknown): 
         }
     }
     throw new Error(`Generic form element with key "${key}" not found in configuration`);
-}
-
-function setFlagValue(elements: FormElement[], key: string, value: boolean): void {
-    for (const element of elements) {
-        if (element.type === "FormObject") {
-            setFlagValue(element.config, key, value);
-            continue;
-        }
-
-        if (element.type === "Flag" && element.key === key) {
-            element.setValue = value;
-            return;
-        }
-    }
-    throw new Error(`Flag form element with key "${key}" not found in configuration`);
 }
 
 function extractStringProperty(node: DtsNode, propertyName: string): string | undefined {

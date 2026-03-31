@@ -75,6 +75,14 @@ export function dtsCellArray(elements: CellArrayElement[]): DtsValueComponent {
 }
 
 /**
+ * Create multiple string components for grouped values (like grouped compatibles).
+ * ["a", "b"] → [dtsString("a"), dtsString("b")]
+ */
+export function dtsMultipleStringComponents(values: string[]): DtsValueComponent[] {
+    return values.map(v => dtsString(v));
+}
+
+/**
  * Smart value-to-component conversion:
  * - number/bigint → dtsNumber
  * - string starting with "&" → dtsLabelRef

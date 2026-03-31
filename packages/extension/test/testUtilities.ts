@@ -8,7 +8,13 @@ import type { DtsDocument, DtsNode, DtsProperty, ParsedBinding } from "attach-li
 import type { CompatibleMapping } from "../src/utilities";
 import { get_compatible_mapping } from "../src/utilities";
 import { AttachSession } from "../src/AttachSession/AttachSession";
-import { dtsProperty, dtsStringProperty, dtsNode, dtsValueComponent } from "../src/WebviewControllers/DtsAstBuilders";
+import {
+    dtsProperty,
+    dtsStringProperty,
+    dtsNode,
+    dtsValueComponent,
+    dtsMultipleStringComponents
+} from "../src/WebviewControllers/DtsAstBuilders";
 
 export const TEST_STORAGE_PATH = path.resolve(__dirname, "../../test");
 export const TEST_LINUX_BINDINGS_FOLDER = path.join(TEST_STORAGE_PATH, "schemas");
@@ -64,18 +70,22 @@ export function createTestNode(options: {
 }): DtsNode {
     const properties: DtsProperty[] = [];
 
-    for (const prop of options.properties ?? []) {
-        if (prop.value === undefined || prop.value === true) {
+    for (const property of options.properties ?? []) {
+        if (property.value === undefined || property.value === true) {
             // Flag property
-            properties.push(dtsProperty(prop.name));
-        } else if (typeof prop.value === "string") {
-            properties.push(dtsStringProperty(prop.name, prop.value));
+            properties.push(dtsProperty(property.name));
+        } else if (typeof property.value === "string") {
+            properties.push(dtsStringProperty(property.name, property.value));
+        } else if (Array.isArray(property.value) && property.value.every(v => typeof v === "string")) {
+            // String array - create multiple string components (e.g., grouped compatibles)
+            const components = dtsMultipleStringComponents(property.value as string[]);
+            properties.push(dtsProperty(property.name, ...components));
         } else {
-            const component = dtsValueComponent(prop.value);
+            const component = dtsValueComponent(property.value);
             if (component) {
-                properties.push(dtsProperty(prop.name, component));
+                properties.push(dtsProperty(property.name, component));
             } else {
-                properties.push(dtsProperty(prop.name));
+                properties.push(dtsProperty(property.name));
             }
         }
     }
@@ -100,7 +110,6 @@ export function createTestAttachSession(options?: {
     return AttachSession.createTestSession(
         [],
         options?.compatibleMapping ?? [],
-        TEST_STORAGE_PATH,
         options?.deviceTree ?? createEmptyDocument(),
         TEST_LINUX_BINDINGS_FOLDER,
         TEST_LINUX_PATH,
@@ -128,7 +137,7 @@ export async function createTestAttachSessionWithBindings(options?: {
  * Get the test source directory (works for both source and compiled code).
  * When compiled, __dirname is 'out/test', but fixtures are in 'test/fixtures'.
  */
-function getTestSourceDir(): string {
+function getTestSourceDirectory(): string {
     // If we're in the 'out' directory, go back to the source 'test' directory
     if (__dirname.includes(path.sep + "out" + path.sep)) {
         return __dirname.replace(path.sep + "out" + path.sep + "test", path.sep + "test");
@@ -140,8 +149,8 @@ function getTestSourceDir(): string {
  * Load a JSON fixture file.
  */
 export function loadFixture<T>(relativePath: string): T {
-    const testDir = getTestSourceDir();
-    const fullPath = path.resolve(testDir, relativePath);
+    const testDirectory = getTestSourceDirectory();
+    const fullPath = path.resolve(testDirectory, relativePath);
     const content = fs.readFileSync(fullPath, "utf8");
     return JSON.parse(content) as T;
 }
@@ -151,9 +160,9 @@ export function loadFixture<T>(relativePath: string): T {
  */
 export function saveFixture(relativePath: string, data: unknown): void {
     const fullPath = path.resolve(__dirname, relativePath);
-    const dir = path.dirname(fullPath);
-    if (!fs.existsSync(dir)) {
-        fs.mkdirSync(dir, { recursive: true });
+    const directory = path.dirname(fullPath);
+    if (!fs.existsSync(directory)) {
+        fs.mkdirSync(directory, { recursive: true });
     }
     fs.writeFileSync(fullPath, JSON.stringify(data, bigIntReplacer, 2), "utf8");
 }
@@ -198,7 +207,7 @@ export function createTestBinding(options?: {
  * Create a device tree with a simple hierarchy for testing.
  */
 export function createTestDeviceTree(): DtsDocument {
-    const doc = createEmptyDocument();
+    const document = createEmptyDocument();
 
     // Add an SPI parent node
     const spiNode = createTestNode({
@@ -211,9 +220,9 @@ export function createTestDeviceTree(): DtsDocument {
         ],
     });
 
-    doc.root.children.push(spiNode);
+    document.root.children.push(spiNode);
 
-    return doc;
+    return document;
 }
 
 /**
@@ -273,4 +282,4 @@ export function getPropertyValue(node: DtsNode, propertyName: string): unknown {
 }
 
 // Re-export DtsAstBuilders for convenience
-export { dtsProperty, dtsStringProperty, dtsNode, dtsValueComponent } from "../src/WebviewControllers/DtsAstBuilders";
+export { dtsProperty, dtsStringProperty, dtsNode, dtsValueComponent, dtsMultipleStringComponents } from "../src/WebviewControllers/DtsAstBuilders";

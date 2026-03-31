@@ -26,6 +26,7 @@ import type {
 import { AttachEnumType, value_to_macro, serializeBigInt } from "attach-lib";
 import {
     dtsValueComponent,
+    dtsMultipleStringComponents,
     dtsProperty,
     dtsStatusProperty,
     dtsNode,
@@ -102,8 +103,8 @@ export class DeviceState {
     /** Unique identifier for this device node */
     uuid: DeviceUID;
 
-    /** Device compatible string (if any) */
-    compatible?: string;
+    /** Device compatible string(s) - can be a single string or grouped array */
+    compatible?: string | string[];
 
     /** Device alias (label) */
     alias?: string;
@@ -170,12 +171,18 @@ export class DeviceState {
         state.binding = binding;
         state.validationErrors = errors;
 
-        // NOTE: The compatible is only one string as we do not yet have a logic for
-        // multiple compatibles
+        // Extract compatible - can be single string or grouped array
         const compatibleProperty = node.properties.find(p => p.name === "compatible");
         if (compatibleProperty?.value) {
             const parsed = attachSession.parseDtsValue(compatibleProperty.value);
-            state.compatible = Array.isArray(parsed) ? String(parsed[0]) : String(parsed);
+            if (Array.isArray(parsed)) {
+                // Grouped compatible: ["adi,adxl346", "adi,adxl345"]
+                state.compatible = parsed.length === 1
+                    ? String(parsed[0])
+                    : parsed.map(String);
+            } else {
+                state.compatible = String(parsed);
+            }
         }
 
         // Build lookup maps from binding and node
@@ -1142,15 +1149,15 @@ export class DeviceState {
                 continue;
             }
 
-            const component = this.buildValueComponent(propertyState);
-            if (component === undefined && propertyState.value !== true) {
+            const components = this.buildValueComponents(propertyState);
+            if (components.length === 0 && propertyState.value !== true) {
                 continue;
             }
 
             // Remove existing and add new
             node.properties = node.properties.filter(p => p.name !== key);
-            const newProperty = component
-                ? dtsProperty(key, component)
+            const newProperty = components.length > 0
+                ? dtsProperty(key, ...components)
                 : dtsProperty(key);
             node.properties.push(newProperty);
         }
@@ -1201,14 +1208,14 @@ export class DeviceState {
                     continue;
                 }
 
-                const component = this.buildValueComponent(propertyState);
-                if (component === undefined && propertyState.value !== true) {
+                const components = this.buildValueComponents(propertyState);
+                if (components.length === 0 && propertyState.value !== true) {
                     continue;
                 }
 
                 channelNode.properties = channelNode.properties.filter(p => p.name !== key);
-                const newProperty = component
-                    ? dtsProperty(key, component)
+                const newProperty = components.length > 0
+                    ? dtsProperty(key, ...components)
                     : dtsProperty(key);
                 channelNode.properties.push(newProperty);
             }
@@ -1231,11 +1238,21 @@ export class DeviceState {
     }
 
     /**
-     * Build a DtsValueComponent from a PropertyState.
-     * Delegates to the shared dtsValueComponent helper.
+     * Build DtsValueComponents from a PropertyState.
+     * Handles grouped string arrays (like grouped compatibles) as multiple string components.
+     * Returns an array of components.
      */
-    private buildValueComponent(propertyState: PropertyState): DtsValueComponent | undefined {
-        return dtsValueComponent(propertyState.value, { numberFormat: propertyState.numberFormat });
+    private buildValueComponents(propertyState: PropertyState): DtsValueComponent[] {
+        const value = propertyState.value;
+
+        // Handle grouped string arrays (like grouped compatibles)
+        if (Array.isArray(value) && value.every(v => typeof v === "string")) {
+            return dtsMultipleStringComponents(value as string[]);
+        }
+
+        // Single component fallback
+        const component = dtsValueComponent(value, { numberFormat: propertyState.numberFormat });
+        return component ? [component] : [];
     }
 
     /**

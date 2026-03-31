@@ -5,6 +5,7 @@ import path = require("node:path");
 
 import {
     Attach,
+    AttachType,
     BindingErrors,
     DtsDocument,
     DtsNode,
@@ -31,7 +32,8 @@ import {
 import { DeviceState } from "../WebviewControllers/DeviceState";
 import {
     CompatibleMapping,
-    bigIntReplacer
+    bigIntReplacer,
+    expand_tilde_if_present,
 } from "../utilities";
 import type { CatalogDevice, ConfigTemplatePayload, DeviceIdentifier, DeviceUID, FormElement } from "extension-protocol";
 import { exec as execCallback } from "node:child_process";
@@ -39,8 +41,6 @@ import { promisify } from "node:util";
 import { SchemaCache } from "./SchemaCache";
 import { UUID } from "node:crypto";
 import { AnalogAttachLogger } from "../AnalogAttachLogger";
-import { expand_tilde_if_present } from "../utilities";
-import { EXTENSION_ID } from "../constants";
 
 const exec = promisify(execCallback);
 const sanitizeDeviceNodeName = (value: string): string => value
@@ -159,7 +159,6 @@ const ensureDtsoScaffold = (text: string): { normalized: string; updated: boolea
 
 export class AttachSession {
 
-    private readonly storage_path: string;
     private readonly file_uri: vscode.Uri | undefined;
     private readonly linux_bindings_folder: string;
 
@@ -185,7 +184,6 @@ export class AttachSession {
     private constructor(
         subsystems: string[],
         compatible_mapping: CompatibleMapping[],
-        storage_path: string,
         device_tree: DtsDocument,
         linux_bindings_folder: string,
         linux_path: string,
@@ -195,7 +193,6 @@ export class AttachSession {
     ) {
         this.subsystems = subsystems;
         this.compatible_mapping = compatible_mapping;
-        this.storage_path = storage_path;
         this.device_tree = device_tree;
         this.linux_bindings_folder = linux_bindings_folder;
         this.linux_path = linux_path;
@@ -207,7 +204,6 @@ export class AttachSession {
     public static createTestSession(
         subsystems: string[],
         compatible_mapping: CompatibleMapping[],
-        storage_path: string,
         device_tree: DtsDocument,
         linux_bindings_folder: string,
         linux_path: string,
@@ -218,7 +214,6 @@ export class AttachSession {
         return new AttachSession(
             subsystems,
             compatible_mapping,
-            storage_path,
             device_tree,
             linux_bindings_folder,
             linux_path,
@@ -227,7 +222,6 @@ export class AttachSession {
             file_uri
         );
     }
-
 
     /**
      * Creates a new AttachSession instance for a specific file.
@@ -327,7 +321,6 @@ export class AttachSession {
         const session = new AttachSession(
             subsystems,
             compatible_mapping,
-            storage_path,
             device_tree,
             linux_bindings_folder,
             linux_path,
@@ -777,7 +770,7 @@ export class AttachSession {
         let errors: BindingErrors[] = [];
 
         if (compatible) {
-            const mapping = this.compatible_mapping.find(e => e.compatible_string === compatible);
+            const mapping = this.compatible_mapping.find(element => element.compatible_string === compatible);
             if (mapping) {
                 // Step 1: Parse binding (no validation yet)
                 const parseResult = await this.parse_binding_only(mapping.binding_path);
@@ -858,31 +851,6 @@ export class AttachSession {
     public configPayloadToAttachLibJson(config: ConfigTemplatePayload["config"]): Record<string, unknown> {
         const result: Record<string, unknown> = {};
 
-        const normalizeNumericLike = (value: unknown): unknown => {
-            if (typeof value === "string") {
-                if (/^0x[0-9a-f]+$/i.test(value)) {
-                    const parsed = Number.parseInt(value, 16);
-                    return Number.isNaN(parsed) ? value : parsed;
-                }
-                if (/^[+-]?\d+$/.test(value)) {
-                    const parsed = Number.parseInt(value, 10);
-                    return Number.isNaN(parsed) ? value : parsed;
-                }
-                return value;
-            }
-            if (typeof value === "bigint") {
-                // FIXME: Ajv needs a number, not a bigint, ideally
-                // we change something ajv related, but this is it for now
-                return Number(value);
-            }
-            if (Array.isArray(value)) {
-                return value.map((entry) => {
-                    return normalizeNumericLike(entry);
-                });
-            }
-            return value;
-        };
-
         const collectElements = (elements: FormElement[], target: Record<string, unknown>): void => {
             for (const element of elements) {
                 switch (element.type) {
@@ -901,7 +869,7 @@ export class AttachSession {
                             break;
                         }
 
-                        target[element.key] = normalizeNumericLike(rawValue);
+                        target[element.key] = this.normalizeNumericValue(rawValue);
                         break;
                     }
                     case "FormArray": {
@@ -909,7 +877,7 @@ export class AttachSession {
                         if (rawValue === undefined || rawValue === null) {
                             break;
                         }
-                        let normalized = normalizeNumericLike(rawValue);
+                        let normalized = this.normalizeNumericValue(rawValue);
                         if (Array.isArray(normalized) && Array.isArray(normalized[0])) {
                             normalized = normalized.flat();
                         }
@@ -929,7 +897,7 @@ export class AttachSession {
                         }
                         const rows = rawValue
                             .map((row) => Array.isArray(row) ? row : [row])
-                            .map((row) => row.map((entry) => normalizeNumericLike(entry)))
+                            .map((row) => row.map((entry) => this.normalizeNumericValue(entry)))
                             .filter((row) => row.length > 0);
                         if (rows.length === 0) {
                             break;
@@ -996,7 +964,6 @@ export class AttachSession {
     /**
      * Serialize a DTS node to JSON, shaping values based on binding property types.
      * This ensures data matches what the schema expects for validation.
-     * Similar to CLI's parse_dts_node approach.
      */
     public nodeToAttachLibJsonWithBinding(node: DtsNode, binding: ParsedBinding): Record<string, unknown> {
         const result: Record<string, unknown> = {};
@@ -1037,36 +1004,75 @@ export class AttachSession {
     }
 
     /**
+     * Normalize a value to ensure bigints and numeric strings become numbers.
+     * Recursively processes arrays.
+     */
+    private normalizeNumericValue(value: unknown): unknown {
+        if (typeof value === "bigint") {
+            return Number(value);
+        }
+        if (typeof value === "string") {
+            if (/^0x[0-9a-f]+$/i.test(value)) {
+                const parsed = Number.parseInt(value, 16);
+                return Number.isNaN(parsed) ? value : parsed;
+            }
+            if (/^[+-]?\d+$/.test(value)) {
+                const parsed = Number.parseInt(value, 10);
+                return Number.isNaN(parsed) ? value : parsed;
+            }
+        }
+        if (Array.isArray(value)) {
+            return value.map(item => this.normalizeNumericValue(item));
+        }
+        return value;
+    }
+
+    /**
      * Shape a value based on the binding type to match schema expectations.
      * For example, matrices expect [[value]], arrays expect [value].
      */
-    private shapeValueForBindingType(value: unknown, bindingType: string): unknown {
+    private shapeValueForBindingType(value: unknown, bindingType: AttachType["_t"]): unknown {
+        const normalized = this.normalizeNumericValue(value);
+
         switch (bindingType) {
             case "matrix": {
-                if (Array.isArray(value)) {
+                if (Array.isArray(normalized)) {
                     // If already a matrix (array of arrays), return as-is
-                    if (value.every(entry => Array.isArray(entry))) {
-                        return value;
+                    if (normalized.every(entry => Array.isArray(entry))) {
+                        return normalized;
                     }
                     // Wrap array as single row: [1, 2, 3] -> [[1, 2, 3]]
-                    return [value];
+                    return [normalized];
                 }
                 // Wrap scalar as single cell: 5 -> [[5]]
-                return [[value]];
+                return [[normalized]];
             }
             case "array":
             case "enum_array":
             case "fixed_index":
             case "number_array":
             case "string_array": {
-                if (Array.isArray(value)) {
-                    return value;
+                if (Array.isArray(normalized)) {
+                    return normalized;
                 }
                 // Wrap scalar as array: "value" -> ["value"]
-                return [value];
+                return [normalized];
+            }
+            case "integer":
+            case "enum_integer":
+            case "boolean":
+            case "const": {
+                // Unwrap single element array: [2] -> 2
+                if (Array.isArray(normalized) && normalized.length === 1) {
+                    return normalized[0];
+                }
+                return normalized;
+            }
+            case "generic": {
+                return value;
             }
             default: {
-                return value;
+                return normalized;
             }
         }
     }
