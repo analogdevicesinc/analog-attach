@@ -1,12 +1,14 @@
 {
     "name": "attach-cli",
     "author": "",
-    "description": "Stricli command line application",
+    "description": "CLI tool for configuring Linux device tree overlays",
     "license": "MIT",
     "type": "module",
     "version": "0.0.0",
     "files": [
-        "dist"
+        "dist",
+        "scripts",
+        "SKILL.md"
     ],
     "bin": {
         "__attach_bash_complete": "dist/bash-complete.js",
@@ -18,6 +20,7 @@
     "scripts": {
         "prebuild": "tsc -p src/tsconfig.json",
         "build": "tsup --silent --dts",
+        "postinstall": "node scripts/postinstall.js",
         "prepublishOnly": "npm run build",
         "clean": "rm -rf dist tsconfig.tsbuildinfo node_modules"
     },
