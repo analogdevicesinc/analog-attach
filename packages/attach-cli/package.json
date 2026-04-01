@@ -8,6 +8,7 @@
     "files": [
         "dist",
         "scripts",
+        "bundled",
         "SKILL.md"
     ],
     "bin": {
@@ -35,15 +36,16 @@
         "tsconfig": "src/tsconfig.json",
         "clean": true,
         "splitting": true,
-        "minify": true
+        "minify": true,
+        "noExternal": ["attach-lib"]
     },
     "dependencies": {
         "@stricli/auto-complete": "^1.2.6",
-        "@stricli/core": "^1.2.6",
-        "attach-lib": "*"
+        "@stricli/core": "^1.2.6"
     },
     "devDependencies": {
         "@types/node": "25.x",
+        "attach-lib": "*",
         "tsup": "^6.7.0",
         "typescript": "5.6.x"
     }

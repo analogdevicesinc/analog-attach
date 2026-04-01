@@ -1,0 +1,92 @@
+name: Build and Package CLI
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, ci/**]
+    paths:
+      - 'packages/attach-cli/**'
+      - 'packages/attach-lib/**'
+  pull_request:
+    paths:
+      - 'packages/attach-cli/**'
+      - 'packages/attach-lib/**'
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-package:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GH_TOKEN }}
+
+      - name: Install dtc (Device Tree Compiler)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y device-tree-compiler
+          dtc --version
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: yarn
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Install dependencies
+        run: yarn install --immutable
+
+      - name: Build all packages
+        run: yarn build:all
+
+      - name: Bundle dt-schema
+        run: |
+          cd packages/attach-cli
+          git clone --depth 1 -b main https://github.com/devicetree-org/dt-schema bundled/dt-schema
+          # Remove unnecessary files to reduce package size
+          rm -rf bundled/dt-schema/.git
+          rm -rf bundled/dt-schema/.github
+          rm -rf bundled/dt-schema/test
+
+      - name: Package CLI
+        run: |
+          cd packages/attach-cli
+          npm pack
+          mv *.tgz ../../attach-cli.tgz
+
+      - name: Upload CLI package
+        uses: actions/upload-artifact@v4
+        with:
+          name: attach-cli
+          path: attach-cli.tgz
+
+  # Optional: Test the packaged CLI installs correctly
+  test-package:
+    needs: build-and-package
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Download CLI package
+        uses: actions/download-artifact@v4
+        with:
+          name: attach-cli
+
+      - name: Install packaged CLI
+        run: |
+          # Skip postinstall prompt in CI
+          npm install -g ./attach-cli.tgz
+
+      - name: Verify CLI works
+        run: |
+          attach --version
+          attach --help

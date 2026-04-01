@@ -17,6 +17,16 @@ export function getSourceSkillPath(): string {
     return path.join(packageRoot, 'SKILL.md');
 }
 
+export function getBundledDtSchemaPath(): string {
+    // tsup bundles everything into dist/, so only go up one level to package root
+    const packageRoot = path.resolve(__dirname, '..');
+    return path.join(packageRoot, 'bundled', 'dt-schema');
+}
+
+export function getPackageRoot(): string {
+    return path.resolve(__dirname, '..');
+}
+
 export function isClaudeInstalled(): boolean {
     try {
         execSync('claude --version', { stdio: 'ignore' });
