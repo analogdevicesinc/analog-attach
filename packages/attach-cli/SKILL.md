@@ -32,9 +32,9 @@ Before using any commands, gather the **Linux kernel source path** (`--linux`) f
 
 **Per-command requirements**:
 - `list-devices`, `create`: Only need `--linux`
-- `get-schema`, `suggest-parents`, `validate`: Also need `--context` (a `.dts` file representing the target platform)
+- `get-schema`, `suggest-parents`, `validate`, `get-prop`, `set-prop`: Also need `--context` (a `.dts` file representing the target platform)
 
-**Optional for all commands**: `--dt-schema` can override the bundled dt-schema, but this is rarely needed.
+**Bundled dt-schema**: The CLI includes a bundled version of dt-schema, so `--dt-schema` is optional for all commands. Only specify it if you need to use a different version.
 
 Help users locate appropriate `.dts` files when needed - they're typically in `arch/<arch>/boot/dts/` within the Linux kernel (e.g., Raspberry Pi, BeagleBone).
 
