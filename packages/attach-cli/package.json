@@ -1,52 +1,55 @@
 {
-    "name": "attach-cli",
-    "author": "",
-    "description": "attach-lib CLI",
-    "license": "MIT",
-    "type": "module",
-    "version": "0.0.1",
-    "files": [
-        "dist"
+  "name": "attach-cli",
+  "author": "",
+  "description": "CLI tool for configuring Linux device tree overlays",
+  "license": "MIT",
+  "type": "module",
+  "version": "0.0.1",
+  "files": [
+    "dist",
+    "scripts",
+    "SKILL.md"
+  ],
+  "bin": {
+    "__attach_bash_complete": "dist/bash-complete.js",
+    "attach": "dist/cli.js"
+  },
+  "engines": {
+    "node": ">=25"
+  },
+  "scripts": {
+    "prebuild": "tsc -p src/tsconfig.json",
+    "build": "tsup --silent --dts",
+    "postinstall": "node scripts/postinstall.js",
+    "prepublishOnly": "npm run build",
+    "clean": "rm -rf dist tsconfig.tsbuildinfo node_modules",
+    "test": "vitest",
+    "test:watch": "vitest --watch",
+    "coverage": "vitest run --coverage"
+  },
+  "tsup": {
+    "entry": [
+      "src/bin/cli.ts",
+      "src/bin/bash-complete.ts"
     ],
-    "bin": {
-        "__attach_bash_complete": "dist/bash-complete.js",
-        "attach": "dist/cli.js"
-    },
-    "engines": {
-        "node": ">=25"
-    },
-    "scripts": {
-        "prebuild": "tsc -p src/tsconfig.json",
-        "build": "tsup --silent --dts",
-        "prepublishOnly": "npm run build",
-        "clean": "rm -rf dist tsconfig.tsbuildinfo node_modules",
-        "test": "vitest",
-        "test:watch": "vitest --watch",
-        "coverage": "vitest run --coverage"
-    },
-    "tsup": {
-        "entry": [
-            "src/bin/cli.ts",
-            "src/bin/bash-complete.ts"
-        ],
-        "format": [
-            "esm"
-        ],
-        "tsconfig": "src/tsconfig.json",
-        "clean": true,
-        "splitting": true,
-        "minify": true
-    },
-    "dependencies": {
-        "@stricli/auto-complete": "^1.2.6",
-        "@stricli/core": "^1.2.6",
-        "attach-lib": "*"
-    },
-    "devDependencies": {
-        "@types/node": "25.x",
-        "@vitest/coverage-v8": "^4.0.18",
-        "tsup": "^6.7.0",
-        "typescript": "5.6.x",
-        "vitest": "^4.0.18"
-    }
+    "format": [
+      "esm"
+    ],
+    "tsconfig": "src/tsconfig.json",
+    "clean": true,
+    "splitting": true,
+    "minify": true
+  },
+  "dependencies": {
+    "@stricli/auto-complete": "^1.2.6",
+    "@stricli/core": "^1.2.6",
+    "attach-lib": "*"
+  },
+  "devDependencies": {
+    "@types/node": "25.x",
+    "@vitest/coverage-v8": "^4.0.18",
+    "tsup": "^6.7.0",
+    "typescript": "5.6.x",
+    "vitest": "^4.0.18"
+  }
 }

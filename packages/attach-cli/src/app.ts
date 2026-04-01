@@ -8,6 +8,8 @@ import { create_command } from "./commands/create/command";
 import { validate_command } from "./commands/validate/command";
 import { get_property_command } from "./commands/get-prop/command";
 import { set_property_command } from "./commands/set-prop/command";
+import { install_skill_command } from "./commands/skill/install-skill";
+import { uninstall_skill_command } from "./commands/skill/uninstall-skill";
 
 const routes = buildRouteMap({
     routes: {
@@ -18,6 +20,8 @@ const routes = buildRouteMap({
         validate: validate_command,
         getProp: get_property_command,
         setProp: set_property_command,
+        installSkill: install_skill_command,
+        uninstallSkill: uninstall_skill_command,
         install: buildInstallCommand("attach", { bash: "__attach_bash_complete" }),
         uninstall: buildUninstallCommand("attach", { bash: true }),
     },
