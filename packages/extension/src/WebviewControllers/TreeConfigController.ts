@@ -4,29 +4,21 @@ import { serializeBigInt, deserializeBigInt } from "attach-lib";
 import { WebviewControllerInterface } from "../WebviewControllers/WebviewControllerInterface";
 import {
     AnalogAttachApiRequest,
-    AnalogAttachError,
     AnalogAttachResponseEnvelope,
-    AnalogAttachResponseStatus,
     TreeViewCommands,
     CatalogCommands,
     DeviceCommands,
     type GetDevicesRequest,
-    type GetDevicesResponsePayload,
     type SetParentNodeRequest,
-    type SetParentNodeResponsePayload,
     type GetDeviceConfigurationRequest,
-    type GetDeviceConfigurationResponsePayload,
     type UpdateDeviceConfigurationRequest,
-    type UpdateDeviceConfigurationResponsePayload,
     type DeleteDeviceRequest,
-    type DeleteDeviceResponsePayload,
     type DeviceUID,
     type ConfigTemplatePayload,
     type GetDeviceTreeRequest,
     type GetDeviceTreeResponsePayload,
     type FormObjectElement,
     type SetNodeActiveRequest,
-    type SetNodeActiveResponsePayload,
     SettingsCommands,
     type GetSettingRequest,
     type UpdateSettingRequest,
@@ -36,6 +28,7 @@ import { AttachSession } from "../AttachSession/AttachSession";
 import { AnalogAttachApiHelper, ConfigValidationError } from "./AnalogAttachApiHelper";
 import { AnalogAttachLogger } from "../AnalogAttachLogger";
 import { WebviewSettingsHandler } from "./WebviewSettingsHandler";
+import { executeRequest, createResponse, createInternalError, generateMessageId } from "./WebviewRequestHelper";
 
 export class TreeConfigController implements WebviewControllerInterface {
 
@@ -90,7 +83,7 @@ export class TreeConfigController implements WebviewControllerInterface {
         const isDtso = this.attach_session.is_dtso_session();
 
         const updateMessage: AnalogAttachResponseEnvelope<typeof TreeViewCommands.getDeviceTree, GetDeviceTreeResponsePayload> = {
-            id: this.generateMessageId(),
+            id: generateMessageId(),
             type: "response",
             timestamp: new Date().toISOString(),
             command: TreeViewCommands.getDeviceTree,
@@ -177,214 +170,36 @@ export class TreeConfigController implements WebviewControllerInterface {
     private async handleAnalogAttachRequest(request: AnalogAttachApiRequest, panel: WebviewPanel): Promise<void> {
         switch (request.command) {
             case CatalogCommands.getDevices: {
-                const response = this.createResponse(
+                await executeRequest(
+                    panel,
                     request as GetDevicesRequest,
-                    { devices: this.apiHelper.getCatalogDevices() } as GetDevicesResponsePayload
+                    () => ({ devices: this.apiHelper.getCatalogDevices() }),
+                    () => ({ devices: [] })
                 );
-                this.postMessage(panel, response);
                 return;
             }
             case DeviceCommands.setParentNode: {
-                try {
-                    const setRequest = request as SetParentNodeRequest;
-                    const parentUUID = setRequest.payload.parentNode?.uuid;
-                    if (parentUUID === undefined) {
-                        throw new Error("Missing parentNode.uuid in request payload");
-                    }
-                    const deviceUID = await this.apiHelper.setParentNode(
-                        setRequest.payload.deviceId,
-                        parentUUID
-                    );
-
-                    // Persist newly created node if session is file-backed
-                    if (this.attach_session.has_file_uri()) {
-                        await this.attach_session.save_device_tree();
-                    }
-
-                    const response = this.createResponse(setRequest, { deviceUID } as SetParentNodeResponsePayload);
-                    this.postMessage(panel, response);
-                } catch (error) {
-                    const response = this.createResponse(
-                        request as SetParentNodeRequest,
-                        { deviceUID: "" },
-                        "error",
-                        { code: "SET_PARENT_ERROR", message: String(error) }
-                    );
-                    this.postMessage(panel, response);
-                }
+                await this.handleSetParentNode(panel, request as SetParentNodeRequest);
                 return;
             }
             case DeviceCommands.getConfiguration: {
-                try {
-                    const getRequest = request as GetDeviceConfigurationRequest;
-                    const deviceConfiguration = await this.apiHelper.buildDeviceConfiguration(getRequest.payload.deviceUID);
-                    const response = this.createResponse(
-                        getRequest,
-                        { deviceConfiguration } as GetDeviceConfigurationResponsePayload
-                    );
-                    this.postMessage(panel, response);
-                } catch (error) {
-                    // FIXME: Somehow i should not return the config as well
-                    const response = this.createResponse(
-                        request as GetDeviceConfigurationRequest,
-                        {
-                            deviceConfiguration: {
-                                config: {
-                                    type: "DeviceConfigurationFormObject",
-                                    config: [],
-                                    maxChannels: 0,
-                                    parentNode: {
-                                        uuid: crypto.randomUUID(),
-                                        name: "",
-                                    },
-                                },
-                            } as ConfigTemplatePayload,
-                        } as GetDeviceConfigurationResponsePayload,
-                        "error",
-                        { code: "GET_CONFIG_ERROR", message: String(error) }
-                    );
-                    AnalogAttachLogger.error(`Failed to process ${request.command} request`, error);
-                    this.postMessage(panel, response);
-                }
+                await this.handleGetConfiguration(panel, request as GetDeviceConfigurationRequest);
                 return;
             }
             case DeviceCommands.updateConfiguration: {
-                try {
-                    const updateRequest = request as UpdateDeviceConfigurationRequest;
-                    const parentNode = updateRequest.payload.config.parentNode;
-                    // Remove any stale field errors echoed from the UI before validation/update
-                    this.apiHelper.stripErrorsFromConfig(updateRequest.payload.config);
-                    const { deviceUID, validationErrors } = await this.apiHelper.applyConfigurationUpdates(
-                        updateRequest.payload.deviceUID,
-                        updateRequest.payload.config,
-                        parentNode
-                    );
-                    const data = this.attach_session.configPayloadToAttachLibJson(request.payload.config);
-                    const deviceConfiguration = await this.apiHelper.buildDeviceConfiguration(
-                        deviceUID,
-                        JSON.stringify(serializeBigInt(data)),
-                    );
-                    if (validationErrors.length > 0) {
-                        this.apiHelper.applyValidationErrors(deviceConfiguration, validationErrors);
-                    }
-
-                    if (this.attach_session.has_file_uri()) {
-                        await this.attach_session.save_device_tree();
-                    }
-
-                    const response = this.createResponse(
-                        updateRequest,
-                        { deviceConfiguration, deviceUID } as UpdateDeviceConfigurationResponsePayload
-                    );
-                    AnalogAttachLogger.debug("AnalogAttach -> Webview response", response);
-                    this.postMessage(panel, response);
-                } catch (error) {
-                    if (error instanceof ConfigValidationError) {
-                        const response = this.createResponse(
-                            request,
-                            {
-                                deviceConfiguration: error.config,
-                                deviceUID: (request as UpdateDeviceConfigurationRequest).payload.deviceUID
-                            }
-                        );
-                        AnalogAttachLogger.debug("AnalogAttach -> Webview response (validation error)", response);
-                        this.postMessage(panel, response);
-                        return;
-                    }
-                    let deviceConfiguration: ConfigTemplatePayload | undefined;
-                    try {
-                        deviceConfiguration = await this.apiHelper.buildDeviceConfiguration(request.payload.deviceUID);
-                    } catch {
-                        deviceConfiguration = {
-                            config: {
-                                type: "DeviceConfigurationFormObject",
-                                config: [],
-                                maxChannels: 0,
-                                parentNode: {
-                                    uuid: crypto.randomUUID(),
-                                    name: "",
-                                },
-                            },
-                        } as ConfigTemplatePayload;
-                    }
-                    const response = this.createResponse(
-                        request as UpdateDeviceConfigurationRequest,
-                        { deviceUID: (request as UpdateDeviceConfigurationRequest).payload.deviceUID },
-                        "error",
-                        { code: "UPDATE_CONFIG_ERROR", message: String(error) }
-                    );
-                    AnalogAttachLogger.error(`Failed to process ${request.command} request`, error);
-                    AnalogAttachLogger.error("AnalogAttach -> Webview response (error path)", response);
-                    panel.webview.postMessage(response);
-                }
+                await this.handleUpdateConfiguration(panel, request as UpdateDeviceConfigurationRequest);
                 return;
             }
             case DeviceCommands.delete: {
-                try {
-                    const deleteRequest = request as DeleteDeviceRequest;
-
-                    const deviceUID = await this.apiHelper.deleteDevice(deleteRequest.payload.deviceUID);
-
-                    if (this.attach_session.has_file_uri()) {
-                        await this.attach_session.save_device_tree();
-                    }
-
-                    const response = this.createResponse(deleteRequest, { deviceUID } as DeleteDeviceResponsePayload);
-                    this.postMessage(panel, response);
-                } catch (error) {
-                    const response = this.createResponse(
-                        request as DeleteDeviceRequest,
-                        { deviceUID: "" as DeviceUID } as DeleteDeviceResponsePayload,
-                        "error",
-                        { code: "DELETE_DEVICE_ERROR", message: String(error) }
-                    );
-                    this.postMessage(panel, response);
-                }
+                await this.handleDeleteDevice(panel, request as DeleteDeviceRequest);
                 return;
             }
-            // Idk if we need this in tree view as well, but i'd rather not have
-            // discrepancies between controllers
             case DeviceCommands.setNodeActive: {
-                try {
-                    const setNodeActiveRequest = request;
-                    AnalogAttachLogger.debug("TreeConfigController/setNodeActive:", setNodeActiveRequest);
-                    const newActiveState = this.apiHelper.setNodeActive(
-                        setNodeActiveRequest.payload.uuid,
-                        setNodeActiveRequest.payload.active
-                    );
-
-                    // Save changes to file if session has a file URI
-                    if (this.attach_session.has_file_uri()) {
-                        await this.attach_session.save_device_tree();
-                    }
-
-                    const response = this.createResponse(setNodeActiveRequest, {
-                        uuid: setNodeActiveRequest.payload.uuid,
-                        active: newActiveState,
-                    } as SetNodeActiveResponsePayload);
-                    this.postMessage(panel, response);
-                } catch (error) {
-                    const response = this.createResponse(
-                        request as SetNodeActiveRequest,
-                        {
-                            uuid: (request as SetNodeActiveRequest).payload.uuid,
-                            active: (request as SetNodeActiveRequest).payload.active,
-                        } as SetNodeActiveResponsePayload,
-                        "error",
-                        { code: "SET_NODE_ACTIVE_ERROR", message: String(error) }
-                    );
-                    AnalogAttachLogger.error(`Failed to process ${request.command} request`, error);
-                    AnalogAttachLogger.error("AnalogAttach -> Webview response (setNodeActive error)", response);
-                    this.postMessage(panel, response);
-                }
+                await this.handleSetNodeActive(panel, request as SetNodeActiveRequest);
                 return;
             }
             case TreeViewCommands.getDeviceTree: {
-                this.handleGetDeviceTree(panel, request as GetDeviceTreeRequest);
-                return;
-            }
-            case DeviceCommands.setNodeActive: {
-                this.handleSetNodeActive(panel, request as SetNodeActiveRequest);
+                await this.handleGetDeviceTree(panel, request as GetDeviceTreeRequest);
                 return;
             }
             case SettingsCommands.getSetting: {
@@ -401,99 +216,179 @@ export class TreeConfigController implements WebviewControllerInterface {
         }
     }
 
-    private createResponse<TCommand extends string, TPayload>(
-        request: AnalogAttachApiRequest & { command: TCommand },
-        payload: TPayload,
-        status: AnalogAttachResponseStatus = "success",
-        error?: AnalogAttachError
-    ): AnalogAttachResponseEnvelope<TCommand, TPayload> {
-        return {
-            id: request.id ?? this.generateMessageId(),
-            type: "response",
-            timestamp: new Date().toISOString(),
-            command: request.command,
-            status,
-            error,
-            payload,
-        };
+    private async handleSetParentNode(panel: WebviewPanel, request: SetParentNodeRequest): Promise<void> {
+        await executeRequest(
+            panel,
+            request,
+            async () => {
+                const parentUUID = request.payload.parentNode?.uuid;
+                if (parentUUID === undefined) {
+                    throw new Error("Missing parentNode.uuid in request payload");
+                }
+                const deviceUID = await this.apiHelper.setParentNode(
+                    request.payload.deviceId,
+                    parentUUID
+                );
+
+                if (this.attach_session.has_file_uri()) {
+                    await this.attach_session.save_device_tree();
+                }
+
+                return { deviceUID };
+            },
+            () => ({ deviceUID: "" as DeviceUID })
+        );
     }
 
-    private generateMessageId(): string {
-        return Math.random().toString(36).slice(2, 11);
-    }
-
-    private handleGetDeviceTree(panel: WebviewPanel, request: GetDeviceTreeRequest): void {
-        try {
-            const deviceTree = this.apiHelper.buildDeviceTreeFormElement();
-            const isReadOnly = false; // TODO: Add read-only detection if required
-            const isDtso = this.attach_session.is_dtso_session();
-
-            const response = this.createResponse(request, {
-                deviceTree,
-                isReadOnly,
-                isDtso,
-            } as GetDeviceTreeResponsePayload);
-
-            this.postMessage(panel, response);
-        } catch (error) {
-            AnalogAttachLogger.error(`Failed to process ${request.command} request`, error);
-            const errorResponse = this.createResponse(
-                request,
-                {
-                    deviceTree: {
-                        type: "FormObject",
-                        key: "root",
-                        required: false,
+    private async handleGetConfiguration(panel: WebviewPanel, request: GetDeviceConfigurationRequest): Promise<void> {
+        await executeRequest(
+            panel,
+            request,
+            async () => ({
+                deviceConfiguration: await this.apiHelper.buildDeviceConfiguration(request.payload.deviceUID)
+            }),
+            () => ({
+                deviceConfiguration: {
+                    config: {
+                        type: "DeviceConfigurationFormObject" as const,
                         config: [],
-                    } as FormObjectElement,
-                    isReadOnly: true,
-                    isDtso: false,
+                        maxChannels: 0,
+                        parentNode: {
+                            uuid: "" as DeviceUID,
+                            name: "unknown",
+                        },
+                    },
                 },
-                "error",
-                { code: "TREE_BUILD_ERROR", message: "Failed to build device tree", details: error instanceof Error ? error.message : String(error) }
-            );
-            this.postMessage(panel, errorResponse);
-        }
+            })
+        );
     }
-    
-    private async handleSetNodeActive(
-        panel: vscode.WebviewPanel,
-        request: SetNodeActiveRequest
+
+    private async handleDeleteDevice(panel: WebviewPanel, request: DeleteDeviceRequest): Promise<void> {
+        await executeRequest(
+            panel,
+            request,
+            async () => {
+                const deviceUID = await this.apiHelper.deleteDevice(request.payload.deviceUID);
+
+                if (this.attach_session.has_file_uri()) {
+                    await this.attach_session.save_device_tree();
+                }
+
+                return { deviceUID };
+            },
+            () => ({ deviceUID: "" as DeviceUID })
+        );
+    }
+
+    private async handleUpdateConfiguration(
+        panel: WebviewPanel,
+        request: UpdateDeviceConfigurationRequest
     ): Promise<void> {
+        this.apiHelper.stripErrorsFromConfig(request.payload.config);
         try {
-            const newActiveState = this.apiHelper.setNodeActive(
-                request.payload.uuid,
-                request.payload.active
+            const parentNode = request.payload.config.parentNode;
+            const { deviceUID, validationErrors } = await this.apiHelper.applyConfigurationUpdates(
+                request.payload.deviceUID,
+                request.payload.config,
+                parentNode
             );
 
-            // Save changes to file if session has a file URI
             if (this.attach_session.has_file_uri()) {
                 await this.attach_session.save_device_tree();
             }
 
-            const response = this.createResponse(request, {
-                uid: request.payload.uuid,
-                active: newActiveState,
-            });
+            const deviceConfiguration = await this.apiHelper.buildDeviceConfiguration(deviceUID);
+            if (validationErrors.length > 0) {
+                this.apiHelper.applyValidationErrors(deviceConfiguration, validationErrors);
+            }
+
+            const response = createResponse(request, { deviceConfiguration, deviceUID });
             AnalogAttachLogger.debug("AnalogAttach -> Webview response", response);
             this.postMessage(panel, response);
         } catch (error) {
+            if (error instanceof ConfigValidationError) {
+                const response = createResponse(request, {
+                    deviceConfiguration: error.config,
+                    deviceUID: request.payload.deviceUID
+                });
+                AnalogAttachLogger.debug("AnalogAttach -> Webview response (validation error)", response);
+                this.postMessage(panel, response);
+                return;
+            }
+
             AnalogAttachLogger.error(`Failed to process ${request.command} request`, error);
-            const errorResponse = this.createResponse(
+            let deviceConfiguration: ConfigTemplatePayload;
+            try {
+                deviceConfiguration = await this.apiHelper.buildDeviceConfiguration(request.payload.deviceUID);
+            } catch {
+                deviceConfiguration = {
+                    config: {
+                        type: "DeviceConfigurationFormObject",
+                        config: [],
+                        maxChannels: 0,
+                        parentNode: { uuid: "" as DeviceUID, name: "unknown" },
+                    },
+                };
+            }
+            const errorResponse = createResponse(
                 request,
-                {
-                    uid: request.payload.uuid,
-                    active: request.payload.active,
-                },
+                { deviceConfiguration, deviceUID: request.payload.deviceUID },
                 "error",
-                {
-                    code: "INTERNAL_ERROR",
-                    message: "Failed to set node active",
-                    details: error instanceof Error ? error.message : String(error)
-                }
+                createInternalError(error)
             );
-            AnalogAttachLogger.debug("AnalogAttach -> Webview response (setNodeActive error)", errorResponse);
+            AnalogAttachLogger.debug("AnalogAttach -> Webview response (error)", errorResponse);
             this.postMessage(panel, errorResponse);
         }
+    }
+
+    private async handleGetDeviceTree(panel: WebviewPanel, request: GetDeviceTreeRequest): Promise<void> {
+        await executeRequest(
+            panel,
+            request,
+            () => ({
+                deviceTree: this.apiHelper.buildDeviceTreeFormElement(),
+                isReadOnly: false,
+                isDtso: this.attach_session.is_dtso_session(),
+            }),
+            () => ({
+                deviceTree: {
+                    type: "FormObject",
+                    key: "root",
+                    required: false,
+                    config: [],
+                } as FormObjectElement,
+                isReadOnly: true,
+                isDtso: false,
+            })
+        );
+    }
+
+    private async handleSetNodeActive(
+        panel: WebviewPanel,
+        request: SetNodeActiveRequest
+    ): Promise<void> {
+        await executeRequest(
+            panel,
+            request,
+            async () => {
+                const newActiveState = this.apiHelper.setNodeActive(
+                    request.payload.uuid,
+                    request.payload.active
+                );
+
+                if (this.attach_session.has_file_uri()) {
+                    await this.attach_session.save_device_tree();
+                }
+
+                return {
+                    uuid: request.payload.uuid,
+                    active: newActiveState,
+                };
+            },
+            () => ({
+                uuid: request.payload.uuid,
+                active: request.payload.active,
+            })
+        );
     }
 }

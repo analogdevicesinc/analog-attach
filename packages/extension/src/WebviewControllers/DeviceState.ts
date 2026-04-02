@@ -23,7 +23,7 @@ import type {
     DtsValueComponent,
     ParsedBinding,
 } from "attach-lib";
-import { AttachEnumType, value_to_macro, serializeBigInt } from "attach-lib";
+import { AttachEnumType, value_to_macro } from "attach-lib";
 import {
     dtsValueComponent,
     dtsMultipleStringComponents,

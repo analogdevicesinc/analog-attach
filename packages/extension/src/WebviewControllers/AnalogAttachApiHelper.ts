@@ -143,12 +143,10 @@ export class AnalogAttachApiHelper {
      * channels, and touched children.
      *
      * @param deviceUID The device UUID
-     * @param _data Optional serialized data (deprecated, kept for API compatibility)
      * @returns ConfigTemplatePayload for the frontend
      */
     public async buildDeviceConfiguration(
         deviceUID: DeviceUID,
-        _data?: string,
     ): Promise<ConfigTemplatePayload> {
         const node = this.attachSession.find_node_by_uuid(deviceUID);
         if (node === undefined) {
