@@ -2659,6 +2659,7 @@ __metadata:
     tsup: "npm:^6.7.0"
     typescript: "npm:5.6.x"
     vitest: "npm:^4.0.18"
+    yaml: "npm:^2.8.3"
   bin:
     __attach_bash_complete: dist/bash-complete.js
     attach: dist/cli.js

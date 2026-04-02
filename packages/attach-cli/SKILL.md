@@ -183,6 +183,12 @@ attach suggest-parents --linux <path> --context <dts-file> --compatible <string>
 - I2C devices → look for `i2c` in label/compatible
 - If multiple options, ask the user which physical bus their device is connected to
 
+**Parent Selection Guidelines**:
+- When presenting parent options to the user, you may show only the most probable parents in the selection question for simplicity
+- However, **always list ALL possible parents** returned by `suggest-parents` either in the question description or before asking, so users can see every valid option
+- If the user selects "Other" and provides a custom parent value, **validate it against the `suggest-parents` results**
+- If the user's input is NOT in the list of valid parents from `suggest-parents`, warn them: "The parent node you specified was not found in the list of valid parents for this device. Are you sure you want to use this parent?" and ask for confirmation before proceeding
+
 ---
 
 ### 4. `create` - Generate Device Tree Overlay

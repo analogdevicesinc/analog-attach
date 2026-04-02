@@ -4,10 +4,11 @@
   "description": "CLI tool for configuring Linux device tree overlays",
   "license": "Apache-2.0",
   "type": "module",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "files": [
     "dist",
     "scripts",
+    "bundled",
     "SKILL.md"
   ],
   "bin": {
@@ -15,7 +16,7 @@
     "attach": "dist/cli.js"
   },
   "engines": {
-    "node": ">=25"
+    "node": ">=20"
   },
   "scripts": {
     "prebuild": "tsc -p src/tsconfig.json",
@@ -38,16 +39,23 @@
     "tsconfig": "src/tsconfig.json",
     "clean": true,
     "splitting": true,
-    "minify": true
+    "minify": true,
+    "noExternal": [
+      "attach-lib"
+    ],
+    "external": [
+      "yaml"
+    ]
   },
   "dependencies": {
     "@stricli/auto-complete": "^1.2.6",
     "@stricli/core": "^1.2.6",
-    "attach-lib": "*"
+    "yaml": "^2.8.3"
   },
   "devDependencies": {
     "@types/node": "25.x",
     "@vitest/coverage-v8": "^4.0.18",
+    "attach-lib": "*",
     "tsup": "^6.7.0",
     "typescript": "5.6.x",
     "vitest": "^4.0.18"
