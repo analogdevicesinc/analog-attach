@@ -7,10 +7,7 @@ import {
     type DtsNode,
 } from "attach-lib";
 import {
-    AnalogAttachError,
     AnalogAttachRequestEnvelope,
-    AnalogAttachResponseEnvelope,
-    AnalogAttachResponseStatus,
     AttachedDeviceState,
     CatalogCommands,
     ConfigTemplatePayload,
@@ -33,12 +30,14 @@ import {
     UpdateDeviceConfigurationRequest,
     UpdateSettingRequest,
     DeviceIdentifier,
+    DeviceUID,
 } from "extension-protocol";
 import { AttachSession } from "../AttachSession/AttachSession";
 import { WebviewControllerInterface } from "./WebviewControllerInterface";
 import { AnalogAttachApiHelper, ConfigValidationError } from "./AnalogAttachApiHelper";
 import { AnalogAttachLogger } from "../AnalogAttachLogger";
 import { WebviewSettingsHandler } from "./WebviewSettingsHandler";
+import { executeRequest, createResponse, createInternalError } from "./WebviewRequestHelper";
 
 export class PlugAndPlayWebviewController implements WebviewControllerInterface {
 
@@ -159,7 +158,7 @@ export class PlugAndPlayWebviewController implements WebviewControllerInterface 
                 return;
             }
             case TreeViewCommands.getDeviceTree: {
-                this.handleGetDeviceTree(panel, request as GetDeviceTreeRequest);
+                await this.handleGetDeviceTree(panel, request as GetDeviceTreeRequest);
                 return;
             }
             case SettingsCommands.getSetting: {
@@ -177,26 +176,16 @@ export class PlugAndPlayWebviewController implements WebviewControllerInterface 
     }
 
     private async handleGetAttachedDevicesState(panel: vscode.WebviewPanel, request: GetAttachedDevicesStateRequest): Promise<void> {
-        try {
-            const data = await this.collectAttachedDevicesState();
-            const response = this.createResponse(request, { data });
-            AnalogAttachLogger.debug("AnalogAttach -> Webview response", response);
-            this.postMessage(panel, response);
-        } catch (error) {
-            AnalogAttachLogger.error(`Failed to process ${request.command} request`, error);
-            const errorResponse = this.createResponse(
-                request,
-                { data: [] },
-                "error",
-                this.createInternalError(error)
-            );
-            AnalogAttachLogger.debug("AnalogAttach -> Webview response", errorResponse);
-            this.postMessage(panel, errorResponse);
-        }
+        await executeRequest(
+            panel,
+            request,
+            async () => ({ data: await this.collectAttachedDevicesState() }),
+            () => ({ data: [] })
+        );
     }
 
     private async handleGetDevices(panel: vscode.WebviewPanel, request: GetDevicesRequest): Promise<void> {
-        await this.executeRequest(
+        await executeRequest(
             panel,
             request,
             () => ({ devices: this.analogApiHelper.getCatalogDevices() }),
@@ -205,7 +194,7 @@ export class PlugAndPlayWebviewController implements WebviewControllerInterface 
     }
 
     private async handleGetPotentialParentNodes(panel: vscode.WebviewPanel, request: GetPotentialParentNodesRequest): Promise<void> {
-        await this.executeRequest(
+        await executeRequest(
             panel,
             request,
             async () => ({
@@ -216,7 +205,7 @@ export class PlugAndPlayWebviewController implements WebviewControllerInterface 
     }
 
     private async handleSetParentNode(panel: vscode.WebviewPanel, request: SetParentNodeRequest): Promise<void> {
-        await this.executeRequest(
+        await executeRequest(
             panel,
             request,
             async () => ({
@@ -236,33 +225,28 @@ export class PlugAndPlayWebviewController implements WebviewControllerInterface 
     }
 
     private async handleGetConfiguration(panel: vscode.WebviewPanel, request: GetDeviceConfigurationRequest): Promise<void> {
-        try {
-            const deviceConfiguration = await this.analogApiHelper.buildDeviceConfiguration(request.payload.deviceUID);
-            const response = this.createResponse(request, { deviceConfiguration });
-            AnalogAttachLogger.debug("AnalogAttach -> Webview response", response);
-            this.postMessage(panel, response);
-        } catch (error) {
-            const parentNode = this.attachSession.find_parent_node_by_uuid(request.payload.deviceUID);
-            AnalogAttachLogger.error(`Failed to process ${request.command} request`, error);
-            const payload = {
-                deviceConfiguration: {
-                    config: {
-                        type: "DeviceConfigurationFormObject",
-                        config: [],
-                        maxChannels: 0,
-                        parentNode,
+        await executeRequest(
+            panel,
+            request,
+            async () => ({
+                deviceConfiguration: await this.analogApiHelper.buildDeviceConfiguration(request.payload.deviceUID)
+            }),
+            () => {
+                const parentNode = this.attachSession.find_parent_node_by_uuid(request.payload.deviceUID);
+                return {
+                    deviceConfiguration: {
+                        config: {
+                            type: "DeviceConfigurationFormObject" as const,
+                            config: [],
+                            maxChannels: 0,
+                            parentNode: parentNode
+                                ? { uuid: parentNode._uuid, name: parentNode.name }
+                                : { uuid: "" as DeviceUID, name: "unknown" },
+                        },
                     },
-                },
-            };
-            const errorResponse = this.createResponse(
-                request,
-                payload,
-                "error",
-                this.createInternalError(error)
-            );
-            this.postMessage(panel, errorResponse);
-            AnalogAttachLogger.debug("AnalogAttach -> Webview response", errorResponse);
-        }
+                };
+            }
+        );
     }
 
     private async handleUpdateConfiguration(
@@ -284,21 +268,18 @@ export class PlugAndPlayWebviewController implements WebviewControllerInterface 
                 await this.attachSession.save_device_tree();
             }
 
-            const data = this.attachSession.configPayloadToAttachLibJson(request.payload.config);
-
             const deviceConfiguration = await this.analogApiHelper.buildDeviceConfiguration(
                 deviceUID,
-                JSON.stringify(serializeBigInt(data)),
             );
             if (validationErrors.length > 0) {
                 this.analogApiHelper.applyValidationErrors(deviceConfiguration, validationErrors);
             }
-            const response = this.createResponse(request, { deviceConfiguration, deviceUID });
+            const response = createResponse(request, { deviceConfiguration, deviceUID });
             this.postMessage(panel, response);
             AnalogAttachLogger.debug("AnalogAttach -> Webview response", response);
         } catch (error) {
             if (error instanceof ConfigValidationError) {
-                const errorResponse = this.createResponse(
+                const errorResponse = createResponse(
                     request,
                     { deviceConfiguration: error.config, deviceUID: request.payload.deviceUID }
                 );
@@ -327,11 +308,11 @@ export class PlugAndPlayWebviewController implements WebviewControllerInterface 
                     },
                 };
             }
-            const errorResponse = this.createResponse(
+            const errorResponse = createResponse(
                 request,
                 { deviceConfiguration, deviceUID: request.payload.deviceUID },
                 "error",
-                this.createInternalError(error)
+                createInternalError(error)
             );
             this.postMessage(panel, errorResponse);
             AnalogAttachLogger.debug("AnalogAttach -> Webview response", errorResponse);
@@ -342,131 +323,62 @@ export class PlugAndPlayWebviewController implements WebviewControllerInterface 
         panel: vscode.WebviewPanel,
         request: SetNodeActiveRequest
     ): Promise<void> {
-        try {
-            const newActiveState = this.analogApiHelper.setNodeActive(
-                request.payload.uuid,
-                request.payload.active
-            );
+        await executeRequest(
+            panel,
+            request,
+            async () => {
+                const newActiveState = this.analogApiHelper.setNodeActive(
+                    request.payload.uuid,
+                    request.payload.active
+                );
 
-            // Save changes to file if session has a file URI
-            if (this.attachSession.has_file_uri()) {
-                await this.attachSession.save_device_tree();
-            }
+                if (this.attachSession.has_file_uri()) {
+                    await this.attachSession.save_device_tree();
+                }
 
-            const response = this.createResponse(request, {
-                uuid: request.payload.uuid,
-                active: newActiveState,
-            });
-            AnalogAttachLogger.debug("AnalogAttach -> Webview response", response);
-            this.postMessage(panel, response);
-        } catch (error) {
-            AnalogAttachLogger.error(`Failed to process ${request.command} request`, error);
-            const errorResponse = this.createResponse(
-                request,
-                {
+                return {
                     uuid: request.payload.uuid,
-                    active: request.payload.active,
-                },
-                "error",
-                this.createInternalError(error)
-            );
-            AnalogAttachLogger.debug("AnalogAttach -> Webview response", errorResponse);
-            this.postMessage(panel, errorResponse);
-        }
+                    active: newActiveState,
+                };
+            },
+            () => ({
+                uuid: request.payload.uuid,
+                active: request.payload.active,
+            })
+        );
     }
 
     private async handleDeleteDevice(panel: vscode.WebviewPanel, request: DeleteDeviceRequest) {
-        const device_uuid = await this.attachSession.delete_device(request.payload.deviceUID);
-        this.executeRequest(
+        await executeRequest(
             panel,
             request,
-            () => ({ deviceUID: device_uuid }),
+            async () => ({
+                deviceUID: await this.attachSession.delete_device(request.payload.deviceUID)
+            }),
             () => ({ deviceUID: request.payload.deviceUID })
         );
     }
 
-    private async executeRequest<TCommand extends string, TPayload>(
-        panel: vscode.WebviewPanel,
-        request: AnalogAttachRequestEnvelope<TCommand, unknown>,
-        payloadFactory: () => Promise<TPayload> | TPayload,
-        emptyPayloadFactory: () => Promise<TPayload> | TPayload
-    ): Promise<void> {
-        try {
-            const payload = await payloadFactory();
-            const response = this.createResponse(request, payload);
-            AnalogAttachLogger.debug("AnalogAttach -> Webview response", response);
-            this.postMessage(panel, response);
-        } catch (error) {
-            AnalogAttachLogger.error(`Failed to process ${request.command} request`, error);
-            const payload = await emptyPayloadFactory();
-            const errorResponse = this.createResponse(
-                request,
-                payload,
-                "error",
-                this.createInternalError(error)
-            );
-            AnalogAttachLogger.debug("AnalogAttach -> Webview response", errorResponse);
-            this.postMessage(panel, errorResponse);
-        }
-    }
-
-    private createInternalError(error: unknown): AnalogAttachError {
-        return {
-            code: "INTERNAL_ERROR",
-            message: error instanceof Error ? error.message : String(error),
-        };
-    }
-
-    private createResponse<TCommand extends string, TPayload>(
-        request: AnalogAttachRequestEnvelope<TCommand, unknown>,
-        payload: TPayload,
-        status: AnalogAttachResponseStatus = "success",
-        error?: AnalogAttachError
-    ): AnalogAttachResponseEnvelope<TCommand, TPayload> {
-        return {
-            id: request.id,
-            type: "response",
-            timestamp: new Date().toISOString(),
-            command: request.command,
-            status,
-            error,
-            payload,
-        };
-    }
-
-    private handleGetDeviceTree(panel: vscode.WebviewPanel, request: GetDeviceTreeRequest): void {
-        try {
-            const deviceTree = this.analogApiHelper.buildDeviceTreeFormElement();
-            const isReadOnly = false; // TODO: Implement read-only detection
-            const isDtso = this.attachSession.is_dtso_session();
-
-            const response = this.createResponse(request, {
-                deviceTree,
-                isReadOnly,
-                isDtso,
-            });
-
-            AnalogAttachLogger.debug("AnalogAttach -> Webview response:", response);
-            this.postMessage(panel, response);
-        } catch (error) {
-            AnalogAttachLogger.error(`Failed to process ${request.command} request`, error);
-            const errorResponse = this.createResponse(
-                request,
-                {
-                    deviceTree: {
-                        type: "FormObject",
-                        key: "root",
-                        required: false,
-                        config: [],
-                    } as FormObjectElement,
-                    isReadOnly: true,
-                    isDtso: false,
-                },
-                "error",
-                { code: "TREE_BUILD_ERROR", message: "Failed to build device tree", details: error instanceof Error ? error.message : String(error) }
-            );
-            this.postMessage(panel, errorResponse);
-        }
+    private async handleGetDeviceTree(panel: vscode.WebviewPanel, request: GetDeviceTreeRequest): Promise<void> {
+        await executeRequest(
+            panel,
+            request,
+            () => ({
+                deviceTree: this.analogApiHelper.buildDeviceTreeFormElement(),
+                isReadOnly: false, // TODO: Implement read-only detection
+                isDtso: this.attachSession.is_dtso_session(),
+            }),
+            () => ({
+                deviceTree: {
+                    type: "FormObject",
+                    key: "root",
+                    required: false,
+                    config: [],
+                } as FormObjectElement,
+                isReadOnly: true,
+                isDtso: false,
+            })
+        );
     }
 
     private parseArrayElement(element: CellArrayElement): unknown {
