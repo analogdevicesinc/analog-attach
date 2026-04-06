@@ -198,3 +198,27 @@ export interface DeviceConfiguration {
 }
 
 export type ConfigTemplatePayload = DeviceConfiguration;
+
+/*
++----------------------------------+
+| Internal Error Payload           |
++----------------------------------+
+*/
+
+/**
+ * Payload returned when a fatal internal error occurs in the backend.
+ * This is used instead of partial/broken response payloads.
+ *
+ * The frontend should check for this type and display an appropriate
+ * error message rather than trying to render incomplete data.
+ */
+export interface InternalErrorPayload {
+    type: "InternalError";
+}
+
+/**
+ * Utility type for response payloads that may contain an internal error.
+ * Use this for commands where a fatal error should return InternalErrorPayload
+ * instead of a partial/broken response.
+ */
+export type WithInternalError<T> = T | InternalErrorPayload;

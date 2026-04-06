@@ -124,10 +124,17 @@ function DeviceTree() {
       return entrySegments.some(seg => seg.uid === deviceUID);
     });
 
-    await vscodeStore.sendRequest<DeleteDeviceResponse>({
+    const response = await vscodeStore.sendRequest<DeleteDeviceResponse>({
       command: DeviceCommands.delete,
       payload: { deviceUID }
     } as DeleteDeviceRequest);
+
+    if (response.status === "error") {
+      const errorMessage = response.error?.message || 'Failed to delete node';
+      useNodesStore.getState().setError(errorMessage);
+      setDeviceToDelete(undefined);
+      return;
+    }
 
     // deselect current node if it has been deleted
     if (deviceUID === (selectedNode?.data as FormObjectElement).deviceUID) {

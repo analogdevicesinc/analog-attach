@@ -10,7 +10,6 @@ import {
     AnalogAttachRequestEnvelope,
     AttachedDeviceState,
     CatalogCommands,
-    ConfigTemplatePayload,
     DeleteDeviceRequest,
     DeviceChannelSummary,
     DeviceCommands,
@@ -20,7 +19,6 @@ import {
     GetDevicesRequest,
     GetPotentialParentNodesRequest,
     GetSettingRequest,
-    FormObjectElement,
     ParentNode,
     SessionCommands,
     SettingsCommands,
@@ -30,14 +28,13 @@ import {
     UpdateDeviceConfigurationRequest,
     UpdateSettingRequest,
     DeviceIdentifier,
-    DeviceUID,
 } from "extension-protocol";
 import { AttachSession } from "../AttachSession/AttachSession";
 import { WebviewControllerInterface } from "./WebviewControllerInterface";
 import { AnalogAttachApiHelper, ConfigValidationError } from "./AnalogAttachApiHelper";
 import { AnalogAttachLogger } from "../AnalogAttachLogger";
 import { WebviewSettingsHandler } from "./WebviewSettingsHandler";
-import { executeRequest, createResponse, createInternalError } from "./WebviewRequestHelper";
+import { executeRequest, createResponse, createInternalError, createInternalErrorPayload } from "./WebviewRequestHelper";
 
 export class PlugAndPlayWebviewController implements WebviewControllerInterface {
 
@@ -179,8 +176,7 @@ export class PlugAndPlayWebviewController implements WebviewControllerInterface 
         await executeRequest(
             panel,
             request,
-            async () => ({ data: await this.collectAttachedDevicesState() }),
-            () => ({ data: [] })
+            async () => ({ data: await this.collectAttachedDevicesState() })
         );
     }
 
@@ -188,8 +184,9 @@ export class PlugAndPlayWebviewController implements WebviewControllerInterface 
         await executeRequest(
             panel,
             request,
-            () => ({ devices: this.analogApiHelper.getCatalogDevices() }),
-            () => ({ devices: [] })
+            () => {
+                return { devices: this.analogApiHelper.getCatalogDevices() };
+            }
         );
     }
 
@@ -199,8 +196,7 @@ export class PlugAndPlayWebviewController implements WebviewControllerInterface 
             request,
             async () => ({
                 potentialParentNodes: await this.collectPotentialParentNodes(request.payload.deviceId),
-            }),
-            async () => ({ potentialParentNodes: [] })
+            })
         );
     }
 
@@ -219,8 +215,7 @@ export class PlugAndPlayWebviewController implements WebviewControllerInterface 
                         return uuid;
                     })()
                 ),
-            }),
-            () => ({ deviceUID: "" })
+            })
         );
     }
 
@@ -230,22 +225,7 @@ export class PlugAndPlayWebviewController implements WebviewControllerInterface 
             request,
             async () => ({
                 deviceConfiguration: await this.analogApiHelper.buildDeviceConfiguration(request.payload.deviceUID)
-            }),
-            () => {
-                const parentNode = this.attachSession.find_parent_node_by_uuid(request.payload.deviceUID);
-                return {
-                    deviceConfiguration: {
-                        config: {
-                            type: "DeviceConfigurationFormObject" as const,
-                            config: [],
-                            maxChannels: 0,
-                            parentNode: parentNode
-                                ? { uuid: parentNode._uuid, name: parentNode.name }
-                                : { uuid: "" as DeviceUID, name: "unknown" },
-                        },
-                    },
-                };
-            }
+            })
         );
     }
 
@@ -288,29 +268,9 @@ export class PlugAndPlayWebviewController implements WebviewControllerInterface 
                 return;
             }
             AnalogAttachLogger.error(`Failed to process ${request.command} request`, error);
-            let deviceConfiguration: ConfigTemplatePayload | undefined;
-            try {
-                deviceConfiguration = await this.analogApiHelper.buildDeviceConfiguration(request.payload.deviceUID);
-            } catch {
-                const parent_node = this.attachSession.find_parent_node_by_uuid(request.payload.deviceUID);
-                if (parent_node === undefined) {
-                    throw new Error(`Cannot find parent with UUID: ${request.payload.deviceUID}`);
-                }
-                deviceConfiguration = {
-                    config: {
-                        type: "DeviceConfigurationFormObject",
-                        config: [],
-                        maxChannels: 0,
-                        parentNode: {
-                            uuid: parent_node._uuid,
-                            name: parent_node.name,
-                        },
-                    },
-                };
-            }
             const errorResponse = createResponse(
                 request,
-                { deviceConfiguration, deviceUID: request.payload.deviceUID },
+                createInternalErrorPayload(),
                 "error",
                 createInternalError(error)
             );
@@ -340,11 +300,7 @@ export class PlugAndPlayWebviewController implements WebviewControllerInterface 
                     uuid: request.payload.uuid,
                     active: newActiveState,
                 };
-            },
-            () => ({
-                uuid: request.payload.uuid,
-                active: request.payload.active,
-            })
+            }
         );
     }
 
@@ -354,8 +310,7 @@ export class PlugAndPlayWebviewController implements WebviewControllerInterface 
             request,
             async () => ({
                 deviceUID: await this.attachSession.delete_device(request.payload.deviceUID)
-            }),
-            () => ({ deviceUID: request.payload.deviceUID })
+            })
         );
     }
 
@@ -367,16 +322,6 @@ export class PlugAndPlayWebviewController implements WebviewControllerInterface 
                 deviceTree: this.analogApiHelper.buildDeviceTreeFormElement(),
                 isReadOnly: false, // TODO: Implement read-only detection
                 isDtso: this.attachSession.is_dtso_session(),
-            }),
-            () => ({
-                deviceTree: {
-                    type: "FormObject",
-                    key: "root",
-                    required: false,
-                    config: [],
-                } as FormObjectElement,
-                isReadOnly: true,
-                isDtso: false,
             })
         );
     }

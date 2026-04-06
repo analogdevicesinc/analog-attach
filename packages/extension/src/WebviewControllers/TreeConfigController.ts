@@ -28,7 +28,7 @@ import { AttachSession } from "../AttachSession/AttachSession";
 import { AnalogAttachApiHelper, ConfigValidationError } from "./AnalogAttachApiHelper";
 import { AnalogAttachLogger } from "../AnalogAttachLogger";
 import { WebviewSettingsHandler } from "./WebviewSettingsHandler";
-import { executeRequest, createResponse, createInternalError, generateMessageId } from "./WebviewRequestHelper";
+import { executeRequest, createResponse, createInternalError, createInternalErrorPayload, generateMessageId } from "./WebviewRequestHelper";
 
 export class TreeConfigController implements WebviewControllerInterface {
 
@@ -173,8 +173,7 @@ export class TreeConfigController implements WebviewControllerInterface {
                 await executeRequest(
                     panel,
                     request as GetDevicesRequest,
-                    () => ({ devices: this.apiHelper.getCatalogDevices() }),
-                    () => ({ devices: [] })
+                    () => ({ devices: this.apiHelper.getCatalogDevices() })
                 );
                 return;
             }
@@ -235,8 +234,7 @@ export class TreeConfigController implements WebviewControllerInterface {
                 }
 
                 return { deviceUID };
-            },
-            () => ({ deviceUID: "" as DeviceUID })
+            }
         );
     }
 
@@ -246,19 +244,6 @@ export class TreeConfigController implements WebviewControllerInterface {
             request,
             async () => ({
                 deviceConfiguration: await this.apiHelper.buildDeviceConfiguration(request.payload.deviceUID)
-            }),
-            () => ({
-                deviceConfiguration: {
-                    config: {
-                        type: "DeviceConfigurationFormObject" as const,
-                        config: [],
-                        maxChannels: 0,
-                        parentNode: {
-                            uuid: "" as DeviceUID,
-                            name: "unknown",
-                        },
-                    },
-                },
             })
         );
     }
@@ -275,8 +260,7 @@ export class TreeConfigController implements WebviewControllerInterface {
                 }
 
                 return { deviceUID };
-            },
-            () => ({ deviceUID: "" as DeviceUID })
+            }
         );
     }
 
@@ -317,22 +301,9 @@ export class TreeConfigController implements WebviewControllerInterface {
             }
 
             AnalogAttachLogger.error(`Failed to process ${request.command} request`, error);
-            let deviceConfiguration: ConfigTemplatePayload;
-            try {
-                deviceConfiguration = await this.apiHelper.buildDeviceConfiguration(request.payload.deviceUID);
-            } catch {
-                deviceConfiguration = {
-                    config: {
-                        type: "DeviceConfigurationFormObject",
-                        config: [],
-                        maxChannels: 0,
-                        parentNode: { uuid: "" as DeviceUID, name: "unknown" },
-                    },
-                };
-            }
             const errorResponse = createResponse(
                 request,
-                { deviceConfiguration, deviceUID: request.payload.deviceUID },
+                createInternalErrorPayload(),
                 "error",
                 createInternalError(error)
             );
@@ -349,16 +320,6 @@ export class TreeConfigController implements WebviewControllerInterface {
                 deviceTree: this.apiHelper.buildDeviceTreeFormElement(),
                 isReadOnly: false,
                 isDtso: this.attach_session.is_dtso_session(),
-            }),
-            () => ({
-                deviceTree: {
-                    type: "FormObject",
-                    key: "root",
-                    required: false,
-                    config: [],
-                } as FormObjectElement,
-                isReadOnly: true,
-                isDtso: false,
             })
         );
     }
@@ -384,11 +345,7 @@ export class TreeConfigController implements WebviewControllerInterface {
                     uuid: request.payload.uuid,
                     active: newActiveState,
                 };
-            },
-            () => ({
-                uuid: request.payload.uuid,
-                active: request.payload.active,
-            })
+            }
         );
     }
 }
