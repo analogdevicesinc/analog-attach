@@ -65,6 +65,44 @@ type AttachFixedIndexArray = {
 
 export type AttachArray = AttachGenericArray | AttachNumberArray | AttachStringArray | AttachEnumArray | AttachFixedIndexArray;
 
+export function is_attach_array(object: AttachType): object is AttachArray {
+
+    switch (object._t) {
+        case "array":
+        case "number_array":
+        case "string_array":
+        case "enum_array":
+        case "fixed_index":
+            {
+                return true;
+            }
+        case "matrix":
+        case "integer":
+        case "object":
+        case "boolean":
+        case "enum_integer":
+        case "const":
+        case "generic":
+            {
+                return false;
+            }
+        default:
+            {
+                const _x: never = object;
+                throw new Error("Failed exhaustive check!");
+            }
+    }
+}
+
+export function to_attach_array(resolved_property: ResolvedProperty): AttachArray | undefined {
+
+    if (is_attach_array(resolved_property.value)) {
+        return resolved_property.value;
+    }
+
+    return undefined;
+}
+
 type AttachMatrix = {
     _t: "matrix",
     minItems: number,
