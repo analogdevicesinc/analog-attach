@@ -401,7 +401,7 @@ export class AttachSession {
         return deviceNode._uuid;
     }
 
-    public move_device_node(deviceUID: DeviceUID, parentNodeUID: DeviceUID): DeviceUID {
+    public move_device_node(deviceUID: DeviceUID, parentNodeUID: DeviceUID): DtsNode {
         const currentParent = this.find_parent_node_by_uuid(deviceUID);
         if (!currentParent) {
             throw new Error(`Cannot find parent for node ${deviceUID}`);
@@ -419,15 +419,16 @@ export class AttachSession {
         }
 
         if (currentParent._uuid === targetParent._uuid) {
-            return deviceUID;
+            return node;
         }
 
         if (this.isNodeWithinSubtree(node, targetParent)) {
             throw new Error(`Cannot move node ${deviceUID} under its own descendant`);
         }
 
-        // Invalidate cached DeviceState since parent is changing
-        this.invalidateDeviceState(deviceUID);
+        // Invalidate add device states, in case this was a phandle with no label referenced in
+        // another node, that other node should rehydrate
+        this.invalidateAllDeviceStates();
 
         // actual move
         currentParent.children.splice(index, 1);
@@ -438,7 +439,7 @@ export class AttachSession {
         node.modified_by_user = true;
 
         // I don't think we need to generate a new UUID tbh
-        return deviceUID;
+        return node;
     }
 
     /**
@@ -593,8 +594,9 @@ export class AttachSession {
     }
 
     public async delete_device(deviceUID: DeviceUID): Promise<DeviceUID> {
-        // Invalidate cached DeviceState for the deleted node
-        this.invalidateDeviceState(deviceUID);
+        // Invalidate all devices in case this device modifies other properties,
+        // for example if this node was a phandle referenced somewhere else
+        this.invalidateAllDeviceStates();
 
         // Delete exactly the node referenced by the provided UID
         const parent_node = this.find_parent_node_by_uuid(deviceUID);
@@ -603,6 +605,9 @@ export class AttachSession {
         }
 
         const index = parent_node.children.findIndex((child) => child._uuid === deviceUID);
+        if (index === -1) {
+            throw new Error(`Cannot find the child of ${parent_node.name} with UUID ${deviceUID}`);
+        }
         parent_node.children.splice(index, 1);
         parent_node.modified_by_user = true;
 
@@ -811,6 +816,13 @@ export class AttachSession {
 
         const state = DeviceState.fromNodeAndBinding(node, parentNode, binding, this, patterns, errors);
         this.deviceStates.set(uuid, state);
+
+        // Remove dangling phandles and save for newly created states
+        if (this.has_file_uri()) {
+            state.removeDanglingPhandles(node);
+            await this.save_device_tree();
+        }
+
         return state;
     }
 

@@ -427,7 +427,7 @@ suite("Validation flow", () => {
             const state1 = await session.getOrCreateDeviceState(adcNode._uuid);
 
             // Step 2: Convert to FormElements
-            const elements = state1.toFormElements(session, { serializeForFrontend: true });
+            const elements = state1.toFormElements(session);
 
             // Verify FormElements contain expected data
             const compatibleElement = elements.find(element => element.key === "compatible");

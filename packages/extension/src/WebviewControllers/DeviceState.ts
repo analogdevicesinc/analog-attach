@@ -242,7 +242,7 @@ export class DeviceState {
             state.properties.set(name, propertyState);
         }
 
-        // Process channels (children matching channel patterns) and touched children
+        // Process channels (children matching channel patterns) and touched subnodes
         for (const child of node.children) {
             if (attachSession.isDeviceNode(child)) {
                 continue;
@@ -252,12 +252,12 @@ export class DeviceState {
             const isChannel = state.channelPatterns.length === 0 ||
                 state.channelPatterns.some(regex => regex.test(segment));
 
-            // Check if this is a touched child (non-channel with user modifications)
-            const isTouchedChild = !isChannel &&
+            // Check if this is a non-channel with user modifications
+            const isTouchedSubnode = !isChannel &&
                 !child.created_by_user &&
                 child.properties.some(p => p.modified_by_user === true);
 
-            if (!isChannel && !isTouchedChild) {
+            if (!isChannel && !isTouchedSubnode) {
                 continue;
             }
 
@@ -311,7 +311,7 @@ export class DeviceState {
                 }
                 state.channels.set(segment, channelState);
             } else {
-                // Touched child - non-channel with user modifications
+                // Touched subnode - non-channel with user modifications
                 state.modifiedChildren.set(segment, channelState);
             }
         }
@@ -400,7 +400,7 @@ export class DeviceState {
     /**
      * Get the active status from a DtsNode.
      */
-    private static getNodeActive(node: DtsNode): boolean {
+    public static getNodeActive(node: DtsNode): boolean {
         const statusProperty = node.properties.find(p => p.name === "status");
         if (!statusProperty?.value?.components?.length) {
             return true;
@@ -479,10 +479,8 @@ export class DeviceState {
      * Convert DeviceState to FormElement[] for the frontend.
      *
      * @param attachSession The attach session for label lookups
-     * @param options Optional settings for serialization
-     *   - serializeForFrontend: Convert BigInt values to numbers for JSON serialization
      */
-    toFormElements(attachSession: AttachSession, options?: { serializeForFrontend?: boolean }): FormElement[] {
+    toFormElements(attachSession: AttachSession): FormElement[] {
         const elements: FormElement[] = [];
 
         // Device-level properties
@@ -505,12 +503,7 @@ export class DeviceState {
             elements.push(channelElement);
         }
 
-        // Convert BigInts to numbers for JSON serialization if requested
-        if (options?.serializeForFrontend) {
-            return this.convertBigIntsToNumbers(elements);
-        }
-
-        return elements;
+        return this.convertBigIntsToNumbers(elements);
     }
 
     /**
@@ -1119,6 +1112,21 @@ export class DeviceState {
         }
 
         return result;
+    }
+
+    /**
+     * Remove only dangling phandle properties (undefined value with phandle schema).
+     * Does not rewrite other properties, preserving their original format.
+     */
+    removeDanglingPhandles(node: DtsNode): void {
+        for (const [key, propertyState] of this.properties) {
+            if (propertyState.value === undefined &&
+                propertyState.schema?._t === "enum_array" &&
+                propertyState.schema?.enum_type === AttachEnumType.PHANDLE) {
+                node.properties = node.properties.filter(p => p.name !== key);
+                node.modified_by_user = true;
+            }
+        }
     }
 
     /**

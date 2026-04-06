@@ -13,11 +13,8 @@ import {
     type GetDeviceConfigurationRequest,
     type UpdateDeviceConfigurationRequest,
     type DeleteDeviceRequest,
-    type DeviceUID,
-    type ConfigTemplatePayload,
     type GetDeviceTreeRequest,
     type GetDeviceTreeResponsePayload,
-    type FormObjectElement,
     type SetNodeActiveRequest,
     SettingsCommands,
     type GetSettingRequest,
@@ -224,7 +221,7 @@ export class TreeConfigController implements WebviewControllerInterface {
                 if (parentUUID === undefined) {
                     throw new Error("Missing parentNode.uuid in request payload");
                 }
-                const deviceUID = await this.apiHelper.setParentNode(
+                const deviceUID = await this.attach_session.set_parent_node(
                     request.payload.deviceId,
                     parentUUID
                 );
@@ -253,7 +250,7 @@ export class TreeConfigController implements WebviewControllerInterface {
             panel,
             request,
             async () => {
-                const deviceUID = await this.apiHelper.deleteDevice(request.payload.deviceUID);
+                const deviceUID = await this.attach_session.delete_device(request.payload.deviceUID);
 
                 if (this.attach_session.has_file_uri()) {
                     await this.attach_session.save_device_tree();
