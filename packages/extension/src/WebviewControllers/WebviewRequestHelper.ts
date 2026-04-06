@@ -4,6 +4,7 @@ import {
     AnalogAttachError,
     AnalogAttachResponseEnvelope,
     AnalogAttachResponseStatus,
+    InternalErrorPayload,
 } from "extension-protocol";
 import { AnalogAttachLogger } from "../AnalogAttachLogger";
 
@@ -23,6 +24,14 @@ export function createInternalError(error: unknown): AnalogAttachError {
     };
 }
 
+/**
+ * Create an InternalErrorPayload for fatal errors.
+ * Use this instead of returning partial/broken response payloads.
+ */
+export function createInternalErrorPayload(): InternalErrorPayload {
+    return { type: "InternalError" };
+}
+
 export function createResponse<TCommand extends string, TPayload>(
     request: RequestWithCommand & { command: TCommand },
     payload: TPayload,
@@ -40,11 +49,17 @@ export function createResponse<TCommand extends string, TPayload>(
     };
 }
 
+/**
+ * Execute a request and send a response to the webview.
+ *
+ * On success, calls `payloadFactory` and sends the result.
+ * On error, sends `InternalErrorPayload` by default, or calls `errorPayloadFactory` if provided.
+ */
 export async function executeRequest<TCommand extends string, TPayload>(
     panel: vscode.WebviewPanel,
     request: RequestWithCommand & { command: TCommand },
     payloadFactory: () => Promise<TPayload> | TPayload,
-    emptyPayloadFactory: () => Promise<TPayload> | TPayload
+    errorPayloadFactory?: () => Promise<TPayload | InternalErrorPayload> | (TPayload | InternalErrorPayload)
 ): Promise<void> {
     try {
         const payload = await payloadFactory();
@@ -53,7 +68,13 @@ export async function executeRequest<TCommand extends string, TPayload>(
         panel.webview.postMessage(serializeBigInt(response));
     } catch (error) {
         AnalogAttachLogger.error(`Failed to process ${request.command} request`, error);
-        const payload = await emptyPayloadFactory();
+
+        // Display error with vscode message
+        vscode.window.showErrorMessage("Analog Attach: An internal error has occurred. Please check the integrity of the file.");
+
+        const payload = errorPayloadFactory
+            ? await errorPayloadFactory()
+            : createInternalErrorPayload();
         const errorResponse = createResponse(
             request,
             payload,

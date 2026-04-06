@@ -5,6 +5,7 @@ import assert from "node:assert";
 import fs from "node:fs";
 import path from "node:path";
 import type { DtsDocument, DtsNode, DtsProperty, ParsedBinding } from "attach-lib";
+import type { InternalErrorPayload, WithInternalError } from "extension-protocol";
 import type { CompatibleMapping } from "../src/utilities";
 import { get_compatible_mapping } from "../src/utilities";
 import { AttachSession } from "../src/AttachSession/AttachSession";
@@ -279,6 +280,23 @@ export function getPropertyValue(node: DtsNode, propertyName: string): unknown {
 
     const session = createTestAttachSession();
     return session.parseDtsValue(property.value);
+}
+
+/**
+ * Type guard to check if a payload is an InternalErrorPayload.
+ */
+export function isInternalError(payload: unknown): payload is InternalErrorPayload {
+    return typeof payload === "object" && payload !== null && (payload as InternalErrorPayload).type === "InternalError";
+}
+
+/**
+ * Assert that a payload is not an InternalErrorPayload and narrow the type.
+ * Use this in tests to safely access response payload fields.
+ */
+export function assertSuccessPayload<T>(payload: WithInternalError<T>): asserts payload is T {
+    if (isInternalError(payload)) {
+        throw new Error("Expected successful payload but received InternalErrorPayload");
+    }
 }
 
 // Re-export DtsAstBuilders for convenience
