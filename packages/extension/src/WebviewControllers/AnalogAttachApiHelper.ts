@@ -36,6 +36,7 @@ import {
 import { AttachSession } from "../AttachSession/AttachSession";
 import { AnalogAttachLogger } from "../AnalogAttachLogger";
 import { bigIntReplacer } from "../utilities";
+import { DeviceState } from "./DeviceState";
 
 export class ConfigValidationError extends Error {
     public readonly config: ConfigTemplatePayload;
@@ -110,15 +111,6 @@ export class AnalogAttachApiHelper {
         return this.attachSession.get_catalog_devices();
     }
 
-    public async setParentNode(deviceId: string, parentNodeId: DeviceUID): Promise<DeviceUID> {
-        console.warn(`Setting parent node with uid ${parentNodeId} to device ${deviceId}`);
-        return this.attachSession.set_parent_node(deviceId, parentNodeId);
-    }
-
-    public async deleteDevice(deviceUID: DeviceUID): Promise<DeviceUID> {
-        return await this.attachSession.delete_device(deviceUID);
-    }
-
     public setNodeActive(uuid: DeviceUID, active: boolean): boolean {
         // Parse the UID to get the node path
         const node = this.attachSession.find_node_by_uuid(uuid);
@@ -140,7 +132,7 @@ export class AnalogAttachApiHelper {
     /**
      * Build the device configuration payload.
      * Uses DeviceState as the single source of truth for all device properties,
-     * channels, and touched children.
+     * channels, and touched subnodes.
      *
      * @param deviceUID The device UUID
      * @returns ConfigTemplatePayload for the frontend
@@ -162,8 +154,8 @@ export class AnalogAttachApiHelper {
         // This internally resolves and enriches the binding
         const deviceState = await this.attachSession.getOrCreateDeviceState(deviceUID);
 
-        // All elements come from DeviceState (properties, touched children, channels)
-        const allElements = deviceState.toFormElements(this.attachSession, { serializeForFrontend: true });
+        // All elements come from DeviceState (properties, touched subnodes, channels)
+        const allElements = deviceState.toFormElements(this.attachSession);
 
         // Prefill reg from unit_addr for device-level elements
         this.prefillRegFromUnitAddr(allElements, node.unit_addr);
@@ -213,20 +205,16 @@ export class AnalogAttachApiHelper {
         parentNode: ParentNode
     ): Promise<{ deviceUID: DeviceUID; validationErrors: BindingErrors[] }> {
         const restorePoint = this.attachSession.create_restore_point();
-        const verification = await this.validateConfigurationWithAttachLib(deviceUID, config, parentNode);
-        this.stripErrorsFromConfig(config);
 
         try {
-            let targetDeviceUID = this.attachSession.move_device_node(deviceUID, parentNode.uuid);
+            const verification = await this.validateConfigurationWithAttachLib(deviceUID, config, parentNode);
 
-            const node = this.attachSession.find_node_by_uuid(targetDeviceUID);
+            let node = this.attachSession.move_device_node(deviceUID, parentNode.uuid);
 
-            if (node === undefined) {
-                throw new Error(`Cannot find node with UUID: ${targetDeviceUID}`);
-            }
-
-            if (config.alias !== undefined) {
+            if (config.alias !== undefined && config.alias !== node.labels.at(0)) {
                 this.setNodeAlias(node, config.alias);
+                // Invalidate all device states since alias changes affect phandle enums
+                this.attachSession.invalidateAllDeviceStates();
             }
 
             if (config.active !== undefined) {
@@ -249,10 +237,10 @@ export class AnalogAttachApiHelper {
 
             // Invalidate the DeviceState cache since the node has been modified
             // This ensures the next getOrCreateDeviceState call rebuilds from fresh node data
-            this.attachSession.invalidateDeviceState(targetDeviceUID);
+            this.attachSession.invalidateDeviceState(node._uuid);
 
             // Update DeviceState cache for custom property tracking
-            this.updateDeviceStateCache(targetDeviceUID, config, verification.deviceElements);
+            await this.updateDeviceStateCache(node._uuid, verification.deviceElements);
 
             // Sync unit_addr from reg property for device and channels
             this.syncUnitAddrFromReg(node);
@@ -261,7 +249,7 @@ export class AnalogAttachApiHelper {
             }
 
             return {
-                deviceUID: targetDeviceUID,
+                deviceUID: node._uuid,
                 validationErrors: verification.validationErrors
             };
         } catch (error) {
@@ -279,17 +267,11 @@ export class AnalogAttachApiHelper {
      * we skip caching - the next getOrCreateDeviceState call will create a fresh one
      * from the DTS node which already has the custom property info via modified_by_user.
      */
-    private updateDeviceStateCache(
+    private async updateDeviceStateCache(
         deviceUID: DeviceUID,
-        _config: ConfigTemplatePayload["config"],
         deviceElements: FormElement[]
-    ): void {
-        // Only update if there's an existing cached DeviceState
-        const deviceState = this.attachSession.getDeviceState(deviceUID);
-        if (!deviceState) {
-            // Don't create a minimal object - let getOrCreateDeviceState create a proper one
-            return;
-        }
+    ): Promise<void> {
+        const deviceState = await this.attachSession.getOrCreateDeviceState(deviceUID);
 
         // Update custom property metadata
         for (const element of deviceElements) {
@@ -368,8 +350,6 @@ export class AnalogAttachApiHelper {
         validationErrors: BindingErrors[];
     }> {
         try {
-            this.assertSupportedFormElements(config.config);
-
             // Strip any error annotations echoed back from the webview so we start clean
             this.stripErrorsFromConfig(config);
 
@@ -578,27 +558,6 @@ export class AnalogAttachApiHelper {
         walk(config.config);
     }
 
-    private assertSupportedFormElements(elements: FormElement[]): void {
-        for (const element of elements) {
-            switch (element.type) {
-                case "Flag":
-                case "Generic":
-                case "FormArray":
-                case "FormMatrix": {
-                    break;
-                }
-                case "FormObject": {
-                    this.assertSupportedFormElements(element.config);
-                    break;
-                }
-                default: {
-                    const typeName = (element as FormElement & { type: string }).type;
-                    throw new Error(`Unsupported form element type received: ${typeName}`);
-                }
-            }
-        }
-    }
-
     private compileChannelRegexes(patterns: string[]): RegExp[] {
         const regexes: RegExp[] = [];
 
@@ -681,22 +640,6 @@ export class AnalogAttachApiHelper {
             required,
             setValue: parsedValue,
         };
-    }
-
-    private getNodeActive(node: DtsNode): boolean {
-        const statusProperty = node.properties.find((property) => property.name === "status");
-        if (statusProperty === undefined) {
-            return true; // Not available means true by default
-        }
-
-        if (!statusProperty.value?.components.length) {
-            return true; // default to active when not specified
-        }
-        const component = statusProperty.value.components[0];
-        if (component.kind !== "string") {
-            return true;
-        }
-        return component.value !== "disabled";
     }
 
     private applyChannelConfigurations(
@@ -1053,7 +996,7 @@ export class AnalogAttachApiHelper {
                 break;
             }
 
-            if (this.getNodeActive(parent) === false) {
+            if (DeviceState.getNodeActive(parent) === false) {
                 this.setNodeStatus(parent, true);
             }
 
@@ -1205,7 +1148,7 @@ export class AnalogAttachApiHelper {
             description: `Device tree node: ${key}`,
             config: config,
             alias: this.getNodeAlias(node),
-            active: this.getNodeActive(node),
+            active: DeviceState.getNodeActive(node),
             deviceUID: node._uuid,
         };
     }
@@ -1235,12 +1178,10 @@ export class AnalogAttachApiHelper {
         // clear all existing errors to prevent stale error accumulation
         this.clearValidationErrors(elements);
 
-        const filtered = this.suppressUnsupportedErrors(errors);
-
         // Update session's validation error count for compile-time warning
-        this.attachSession.setValidationErrorCount(filtered.length);
+        this.attachSession.setValidationErrorCount(errors.length);
 
-        for (const error of filtered) {
+        for (const error of errors) {
             switch (error._t) {
                 case "missing_required": {
                     const targetElement =

@@ -52,11 +52,9 @@ export default function PnpConfig() {
     // Re-sync after backend notifies about file reload
     useEffect(() => {
         const handler = async () => {
+            // Clear the editable device instance before reloading since UUIDs change on external file changes
+            useDeviceInstanceStore.getState().setEditableDeviceInstance(undefined);
             await loadDeviceInstances();
-            const current = useDeviceInstanceStore.getState().EditableDeviceInstance;
-            if (current) {
-                await loadDeviceConfiguration(current.deviceUID);
-            }
         };
 
         const unsubscribe = subscribe((event: MessageEvent) => {

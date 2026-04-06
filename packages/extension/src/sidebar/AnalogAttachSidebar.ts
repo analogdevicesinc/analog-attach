@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import * as path from "node:path";
+import path from "node:path";
 import { EventCommands } from "extension-protocol";
 import { EXTENSION_ID } from "../constants";
 import { AttachSessionManager } from "../AttachSession/AttachSessionManager";

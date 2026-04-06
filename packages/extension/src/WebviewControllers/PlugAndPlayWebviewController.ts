@@ -205,7 +205,7 @@ export class PlugAndPlayWebviewController implements WebviewControllerInterface 
             panel,
             request,
             async () => ({
-                deviceUID: await this.analogApiHelper.setParentNode(
+                deviceUID: await this.attachSession.set_parent_node(
                     request.payload.deviceId,
                     (() => {
                         const uuid = request.payload.parentNode?.uuid;

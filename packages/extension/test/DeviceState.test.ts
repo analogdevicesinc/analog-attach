@@ -582,7 +582,7 @@ suite("DeviceState", () => {
             });
 
             const state = DeviceState.fromNodeAndBinding(node, parentNode, binding, session);
-            const elements = state.toFormElements(session, { serializeForFrontend: true });
+            const elements = state.toFormElements(session);
 
             const element = elements.find(_element => _element.key === "large-value");
             assert.ok(element);
