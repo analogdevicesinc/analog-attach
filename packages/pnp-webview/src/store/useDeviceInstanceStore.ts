@@ -201,13 +201,17 @@ export const useDeviceInstanceStore = create<DeviceInstanceState>((set, get) => 
         set({ isLoading: true, error: undefined });
 
         try {
-            // Preserve existing active states before reloading
+            // Preserve existing states before reloading
             const currentState = get();
             const activeStateMap = new Map<DeviceUID, boolean>();
             const expandedStateMap = new Map<DeviceUID, boolean>();
+            const maxChannelsMap = new Map<DeviceUID, number>();
             for (const device of currentState.deviceInstances) {
                 activeStateMap.set(device.deviceUID, device.active ?? true);
                 expandedStateMap.set(device.deviceUID, device.isExpanded ?? false);
+                if (device.maxChannels) {
+                    maxChannelsMap.set(device.deviceUID, device.maxChannels);
+                }
             }
 
             // Get device instances from backend using new API
@@ -232,6 +236,9 @@ export const useDeviceInstanceStore = create<DeviceInstanceState>((set, get) => 
                         // Preserve existing isExpanded state if available, otherwise use backend value, default to false
                         const preservedExpanded = expandedStateMap.get(device.deviceUID);
                         const isExpanded = preservedExpanded === undefined ? (device.isExpanded ?? false) : preservedExpanded;
+                        // Preserve maxChannels if we've loaded config before (backend sends 0 or current count)
+                        const preservedMaxChannels = maxChannelsMap.get(device.deviceUID);
+                        const maxChannels = preservedMaxChannels ?? device.maxChannels;
 
                         return {
                             type: "AttachedDeviceState",
@@ -250,7 +257,7 @@ export const useDeviceInstanceStore = create<DeviceInstanceState>((set, get) => 
                                 uuid: device.parentNode.uuid,
                                 name: device.parentNode.name,
                             },
-                            maxChannels: device.maxChannels,
+                            maxChannels,
                             channels: device.channels.map(ch => ({
                                 name: ch.name,
                                 alias: ch.alias,
@@ -421,9 +428,11 @@ export const useDeviceInstanceStore = create<DeviceInstanceState>((set, get) => 
                     // Update the error store with the error count
                     useErrorStore.getState().setDeviceErrors(deviceUID, configErrors);
 
-                    // Update the device instance's channels
+                    // Update the device instance's channels and maxChannels
+                    const maxChannels = (config.generatedChannelRegexEntries ?? []).length;
                     set(updateDeviceInList(deviceUID, () => ({
-                        channels: channels
+                        channels: channels,
+                        maxChannels: maxChannels
                     })));
                 } else {
                     set({
@@ -600,12 +609,14 @@ export const useDeviceInstanceStore = create<DeviceInstanceState>((set, get) => 
                     // Update the error store with the error count
                     useErrorStore.getState().setDeviceErrors(updatedDeviceUID, configErrors);
 
-                    // Also update deviceInstances with the new parent/UID, alias, and channels
+                    // Also update deviceInstances with the new parent/UID, alias, channels, and maxChannels
+                    const maxChannels = (updatedConfig.generatedChannelRegexEntries ?? []).length;
                     set(updateDeviceInList(state.EditableDeviceInstance.deviceUID, (device) => ({
                         deviceUID: updatedDeviceUID,
                         parentNode: updatedConfig.parentNode ?? device.parentNode,
                         alias: updatedConfig.alias ?? device.alias,
                         channels: updatedChannels,
+                        maxChannels: maxChannels || device.maxChannels,
                     })));
                 } else {
                     set({ error: 'No configuration data returned from backend' });
