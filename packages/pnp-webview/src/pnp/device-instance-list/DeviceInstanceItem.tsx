@@ -116,9 +116,12 @@ function DeviceInstanceItemComponent({ deviceInstance, highlighted = false }: De
 	const setIsExpanded = useDeviceInstanceStore((state) => state.setIsExpanded);
 	const { startCreatingChannel } = useDeviceInstanceStore();
 	const channelHasErrors = deviceInstance.channels.some(channel => channel.hasErrors);
-	
-    const EditableDeviceInstance = useDeviceInstanceStore((state) => state.EditableDeviceInstance);
-    const maxChannels = (EditableDeviceInstance?.payload.config.generatedChannelRegexEntries ?? []).length;
+
+	// Get maxChannels from EditableDeviceInstance only if it matches this device
+	const EditableDeviceInstance = useDeviceInstanceStore((state) => state.EditableDeviceInstance);
+	const maxChannels = EditableDeviceInstance?.deviceUID === deviceInstance.deviceUID
+		? (EditableDeviceInstance.payload.config.generatedChannelRegexEntries ?? []).length
+		: deviceInstance.maxChannels;
 
 	const handleExpand = () => {
 		setIsExpanded(deviceInstance.deviceUID, !deviceInstance.isExpanded);
