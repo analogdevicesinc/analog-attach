@@ -3,7 +3,8 @@
         "noEmit": true,
         "rootDir": "..",
         "types": [
-            "node"
+            "node",
+            "vitest/importMeta"
         ],
         "resolveJsonModule": true,
         "target": "esnext",

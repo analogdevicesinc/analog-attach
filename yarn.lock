@@ -2654,9 +2654,11 @@ __metadata:
     "@stricli/auto-complete": "npm:^1.2.6"
     "@stricli/core": "npm:^1.2.6"
     "@types/node": "npm:25.x"
+    "@vitest/coverage-v8": "npm:^4.0.18"
     attach-lib: "npm:*"
     tsup: "npm:^6.7.0"
     typescript: "npm:5.6.x"
+    vitest: "npm:^4.0.18"
   bin:
     __attach_bash_complete: dist/bash-complete.js
     attach: dist/cli.js
