@@ -1,4 +1,4 @@
-import { Attach, extract_compatible, type CellArrayElement, type DtsNode, type DtsValue, type DtsValueComponent, type ParsedBinding } from 'attach-lib';
+import { Attach, extract_compatible, type CellArrayElement, type DtsNode, type DtsReference, type DtsValue, type DtsValueComponent, type ParsedBinding } from 'attach-lib';
 import * as fs from 'node:fs';
 import path from "node:path";
 
@@ -206,4 +206,31 @@ function parse_cell_array_element(element: CellArrayElement): string | bigint {
             throw new Error("Exhaustive check failed!");
         }
     }
+}
+
+if (import.meta.vitest) {
+
+    const { test, expect } = import.meta.vitest;
+
+    let counter = 0;
+
+    test(`${parse_cell_array_element.name} - ${++counter}`, () => {
+
+        const input: CellArrayElement = {
+            item: {
+                kind: "ref",
+                labels: [],
+                ref: {
+                    kind: "label",
+                    name: "gpio"
+                }
+            }
+        };
+
+        const parsed_input = parse_cell_array_element(input);
+
+        expect(parsed_input).toStrictEqual("gpio");
+
+    });
+
 }
