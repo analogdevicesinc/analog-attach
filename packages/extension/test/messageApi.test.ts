@@ -462,12 +462,14 @@ suite("Analog Attach Message API", () => {
                 },
                 {
                     name: "diff-channels",
+                    value: undefined,
                     modified_by_user: true,
                     labels: [],
                     deleted: false
                 },
                 {
                     name: "diff-channels",
+                    value: undefined,
                     labels: [],
                     deleted: false,
                     modified_by_user: true

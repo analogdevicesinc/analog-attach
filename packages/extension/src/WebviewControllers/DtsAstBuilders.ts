@@ -281,6 +281,7 @@ export function dtsProperty(name: string, ...components: DtsValueComponent[]): D
 export function dtsFlagProperty(name: string): DtsProperty {
     return {
         name,
+        value: undefined,
         modified_by_user: true,
         labels: [],
         deleted: false,
