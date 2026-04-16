@@ -1,4 +1,3 @@
-/* eslint-disable unicorn/consistent-function-scoping */
 import { CellArrayElement, DtsCellArray, DtsProperty } from "./dts";
 import { print_property } from "./dts/printer";
 
@@ -47,18 +46,12 @@ interface ICellArrayPropertyBuilder {
 }
 
 interface INameBuilder {
-    with_name: (name: string) => ILabelsBuilder;
-}
-
-interface ILabelsBuilder {
-    with_labels: (labels: string[]) => IModifiedBuilder;
-}
-
-interface IModifiedBuilder {
-    with_user_modifications: (modified_by_user: boolean) => IBuild;
+    with_name: (name: string) => IBuild;
 }
 
 interface IBuild {
+    with_labels: (labels: string[]) => IBuild;
+    with_user_modifications: (modified_by_user: boolean) => IBuild;
     build: () => DtsProperty;
 }
 
@@ -68,8 +61,6 @@ class PropertyBuilder implements
     IReferencePropertyBuilder,
     ICellArrayPropertyBuilder,
     INameBuilder,
-    ILabelsBuilder,
-    IModifiedBuilder,
     IBuild {
 
     private property: DtsProperty = {
@@ -193,8 +184,6 @@ class PropertyBuilder implements
             return true;
         };
 
-        const x = 2;
-
         const rest_array_count: number = (() => {
             let count = 0;
             for (const entry of rest) {
@@ -239,12 +228,12 @@ class PropertyBuilder implements
         return this;
     }
 
-    with_name(name: string): ILabelsBuilder {
+    with_name(name: string): IBuild {
         this.property.name = name;
         return this;
     }
 
-    with_labels(labels: string[]): IModifiedBuilder {
+    with_labels(labels: string[]): IBuild {
         this.property.labels = labels;
         return this;
     }
