@@ -1,3 +1,4 @@
+/* eslint-disable unicorn/consistent-function-scoping */
 import { CellArrayElement, DtsCellArray, DtsProperty } from "./dts";
 import { print_property } from "./dts/printer";
 
@@ -5,13 +6,21 @@ interface IFlagPropertyBuilder {
     set_flag: () => INameBuilder;
 }
 
+type LabeledString = {
+    value: string,
+    labels: string[]
+}
+
+type StringORLabeledString = string | LabeledString;
+type StringsORLabeledStrings = string | string[] | LabeledString | LabeledString[];
+
 interface IStringPropertyBuilder {
-    with_value: (first: string | string[], ...rest: (string | string[])[]) => INameBuilder;
+    with_value: (first: StringsORLabeledStrings, ...rest: StringsORLabeledStrings[]) => INameBuilder;
 }
 
 interface IReferencePropertyBuilder {
-    with_label: (label: string) => INameBuilder;
-    with_path: (path: string) => INameBuilder;
+    with_label: (label: StringORLabeledString) => INameBuilder;
+    with_path: (path: StringORLabeledString) => INameBuilder;
 }
 
 type TaggedNumber = {
@@ -41,8 +50,73 @@ type TaggedExpression = {
 
 type TaggedCellValue = TaggedNumber | TaggedU64 | TaggedLabel | TaggedPath | TaggedExpression;
 
+function is_tagged_cell_value(object: any): object is TaggedCellValue {
+    if (object === null && typeof object !== 'object') {
+        return false;
+    }
+
+    if (!("_tag" in object)) {
+        return false;
+    }
+
+    if (!["number", "u64", "label", "path", "expression"].includes(object._tag)) {
+        return false;
+    }
+
+    if (!("value" in object)) {
+        return false;
+    }
+
+    if (!['string', 'bigint'].includes(typeof object.value)) {
+        return false;
+    }
+
+    if (Object.entries(object).length !== 2) {
+        return false;
+    }
+
+    return true;
+}
+
+function is_tagged_cell_value_array(object: any): object is TaggedCellValue[] {
+    if (!Array.isArray(object)) {
+        return false;
+    }
+
+    if (!object.every((entry) => is_tagged_cell_value(entry) === true)) {
+        return false;
+    }
+
+    return true;
+}
+
+function make_unlabeled_tagged_cell_value(input: TaggedCellValue): LabeledTaggedCellValue {
+    return {
+        value: input,
+        labels: []
+    };
+}
+
+type LabeledTaggedCellValue = {
+    value: TaggedCellValue,
+    labels: string[]
+}
+
+type TaggedCellValuesORLabeledTaggedCellValues = TaggedCellValue | TaggedCellValue[] | LabeledTaggedCellValue | LabeledTaggedCellValue[];
+
+function cast_to_labeled_tagged_cell_values(input: TaggedCellValuesORLabeledTaggedCellValues): LabeledTaggedCellValue | LabeledTaggedCellValue[] {
+
+    if (is_tagged_cell_value_array(input)) {
+        return input.map((entry) => make_unlabeled_tagged_cell_value(entry));
+    } else if (is_tagged_cell_value(input)) {
+        return make_unlabeled_tagged_cell_value(input);
+    }
+
+    return input;
+}
+
 interface ICellArrayPropertyBuilder {
-    with_tagged_values: (first: TaggedCellValue | TaggedCellValue[], ...rest: (TaggedCellValue | TaggedCellValue[])[]) => INameBuilder;
+    with_tagged_values: (first: TaggedCellValuesORLabeledTaggedCellValues, ...rest: TaggedCellValuesORLabeledTaggedCellValues[]) => INameBuilder;
 }
 
 interface INameBuilder {
@@ -95,8 +169,7 @@ class PropertyBuilder implements
         return this;
     }
 
-    with_value(first: string | string[], ...rest: (string | string[])[]): INameBuilder {
-
+    with_value(first: StringsORLabeledStrings, ...rest: StringsORLabeledStrings[]): INameBuilder {
         const flattened_rest = rest.flat();
         const normalized_value = first === undefined ? flattened_rest : (Array.isArray(first) ? [...first, ...flattened_rest] : [first, ...flattened_rest]);
 
@@ -105,18 +178,26 @@ class PropertyBuilder implements
         };
 
         for (const entry of normalized_value) {
-            this.property.value.components.push({
-                kind: "string",
-                value: entry,
-                labels: []
-            });
+            if (typeof entry === 'string') {
+                this.property.value.components.push({
+                    kind: "string",
+                    value: entry,
+                    labels: []
+                });
+            } else {
+                this.property.value.components.push({
+                    kind: "string",
+                    value: entry.value,
+                    labels: entry.labels
+                });
+            }
         }
 
         return this;
     }
 
-    with_label(label: string): INameBuilder {
-        this.property.value = {
+    with_label(label: StringORLabeledString): INameBuilder {
+        this.property.value = typeof label === 'string' ? {
             components: [{
                 kind: "ref",
                 labels: [],
@@ -125,12 +206,22 @@ class PropertyBuilder implements
                     name: label
                 }
             }]
+        } : {
+            components: [{
+                kind: "ref",
+                labels: label.labels,
+                ref: {
+                    kind: 'label',
+                    name: label.value
+                }
+            }]
         };
+
         return this;
     }
 
-    with_path(path: string): INameBuilder {
-        this.property.value = {
+    with_path(path: StringORLabeledString): INameBuilder {
+        this.property.value = typeof path === 'string' ? {
             components: [{
                 kind: "ref",
                 labels: [],
@@ -139,44 +230,53 @@ class PropertyBuilder implements
                     path: path
                 }
             }]
+        } : {
+            components: [{
+                kind: "ref",
+                labels: path.labels,
+                ref: {
+                    kind: 'path',
+                    path: path.value
+                }
+            }]
         };
+
         return this;
     }
 
+    with_tagged_values(first: TaggedCellValuesORLabeledTaggedCellValues, ...rest: TaggedCellValuesORLabeledTaggedCellValues[]): INameBuilder {
 
-    with_tagged_values(first: TaggedCellValue | TaggedCellValue[], ...rest: (TaggedCellValue | TaggedCellValue[])[]): INameBuilder {
-
-        const tagged_to_element = (entry: TaggedCellValue): CellArrayElement => {
-            switch (entry._tag) {
+        const tagged_to_element = (entry: LabeledTaggedCellValue): CellArrayElement => {
+            switch (entry.value._tag) {
                 case "number": {
-                    return { item: { kind: "number", value: entry.value, labels: [] } };
+                    return { item: { kind: "number", value: entry.value.value, labels: entry.labels } };
                 }
                 case "u64": {
-                    return { item: { kind: "u64", value: entry.value, labels: [] } };
+                    return { item: { kind: "u64", value: entry.value.value, labels: entry.labels } };
                 }
                 case "label": {
-                    return { item: { kind: "ref", labels: [], ref: { kind: "label", name: entry.value } } };
+                    return { item: { kind: "ref", labels: entry.labels, ref: { kind: "label", name: entry.value.value } } };
                 }
                 case "path": {
-                    return { item: { kind: "ref", labels: [], ref: { kind: "path", path: entry.value } } };
+                    return { item: { kind: "ref", labels: entry.labels, ref: { kind: "path", path: entry.value.value } } };
                 }
                 case "expression": {
-                    return { item: { kind: "expression", labels: [], value: entry.value } };
+                    return { item: { kind: "expression", labels: entry.labels, value: entry.value.value } };
                 }
                 default: {
-                    const _x: never = entry;
+                    const _x: never = entry.value;
                     throw new Error("Exhaustive check failed!");
                 }
             }
         };
 
-        const make_cell_array = (values: TaggedCellValue[]): DtsCellArray => ({
+        const make_cell_array = (values: LabeledTaggedCellValue[]): DtsCellArray => ({
             kind: "array",
             labels: [],
             elements: values.map((v) => tagged_to_element(v)),
         });
 
-        const is_not_2d = (array: (TaggedCellValue | TaggedCellValue[])[]): array is TaggedCellValue[] => {
+        const is_not_2d = (array: (LabeledTaggedCellValue | LabeledTaggedCellValue[])[]): array is LabeledTaggedCellValue[] => {
             for (const value of array) {
                 if (Array.isArray(value)) { return false; }
             }
@@ -194,18 +294,22 @@ class PropertyBuilder implements
             return count;
         })();
 
+        const normalized_first = cast_to_labeled_tagged_cell_values(first);
+        const normalized_rest = rest.map((entry) => cast_to_labeled_tagged_cell_values(entry));
+
         // needs type inference
-        if (rest_array_count === 0 && is_not_2d(rest)) {
+        if (rest_array_count === 0 && is_not_2d(normalized_rest)) {
             // Single component mode: flatten first + rest into one component
-            const normalized_values = (Array.isArray(first) ? [...first, ...rest] : [first, ...rest]);
+            const normalized_values = (Array.isArray(normalized_first) ? [...normalized_first, ...normalized_rest] : [normalized_first, ...normalized_rest]);
+
             this.property.value = {
                 components: [make_cell_array(normalized_values)]
             };
-        } else if (!Array.isArray(first) && rest_array_count === 1) {
+        } else if (!Array.isArray(normalized_first) && rest_array_count === 1) {
 
-            const normalized_values: TaggedCellValue[] = [first];
+            const normalized_values: LabeledTaggedCellValue[] = [normalized_first];
 
-            for (const entry of rest) {
+            for (const entry of normalized_rest) {
                 if (Array.isArray(entry)) {
                     normalized_values.push(...entry);
                     continue;
@@ -219,7 +323,7 @@ class PropertyBuilder implements
         }
         else {
             // Multiple components mode: each array becomes a component, each single value becomes a single-element component
-            const all_arguments: (TaggedCellValue | TaggedCellValue[])[] = [first, ...rest];
+            const all_arguments: (LabeledTaggedCellValue | LabeledTaggedCellValue[])[] = [normalized_first, ...normalized_rest];
             this.property.value = {
                 components: all_arguments.map((argument) => make_cell_array(Array.isArray(argument) ? argument : [argument]))
             };
@@ -307,7 +411,41 @@ if (import.meta.vitest !== undefined) {
         const compatible: DtsProperty = PropertyBuilder.build_string()
             .with_value(string_value)
             .with_name(expected_compatible.name)
-            .with_labels([])
+            .with_labels(expected_compatible.labels)
+            .with_user_modifications(expected_compatible.modified_by_user)
+            .build();
+
+        console.log(`${PropertyBuilder.to_string(compatible)}`);
+        expect(compatible).toStrictEqual(expected_compatible);
+    });
+
+    test(`Labeled String Builder`, () => {
+
+        const string_value: LabeledString = {
+            value: "adi,ad7124",
+            labels: ["my_compat"]
+        };
+
+        const expected_compatible: DtsProperty = {
+            labels: [],
+            name: "compatible",
+            value: {
+                components: [
+                    {
+                        kind: 'string',
+                        value: string_value.value,
+                        labels: string_value.labels
+                    }
+                ]
+            },
+            deleted: false,
+            modified_by_user: false
+        };
+
+        const compatible: DtsProperty = PropertyBuilder.build_string()
+            .with_value(string_value)
+            .with_name(expected_compatible.name)
+            .with_labels(expected_compatible.labels)
             .with_user_modifications(expected_compatible.modified_by_user)
             .build();
 
@@ -341,7 +479,50 @@ if (import.meta.vitest !== undefined) {
         const compatible: DtsProperty = PropertyBuilder.build_string()
             .with_value(string_values)
             .with_name(expected_compatible.name)
-            .with_labels([])
+            .with_labels(expected_compatible.labels)
+            .with_user_modifications(expected_compatible.modified_by_user)
+            .build();
+
+        console.log(`${PropertyBuilder.to_string(compatible)}`);
+        expect(compatible).toStrictEqual(expected_compatible);
+    });
+
+    test(`Labeled Array String Builder`, () => {
+        const string_values: LabeledString[] = [
+            {
+                value: "adi,ad7124",
+                labels: ["my_cool_label"]
+            },
+            {
+                value: "adi,adxl355",
+                labels: ["my_lame_label"]
+            }
+        ];
+
+        const expected_compatible: DtsProperty = {
+            labels: [],
+            name: "compatible",
+            value: {
+                components: []
+            },
+            deleted: false,
+            modified_by_user: false
+        };
+
+        for (const entry of string_values) {
+            expected_compatible.value?.components.push(
+                {
+                    kind: 'string',
+                    labels: entry.labels,
+                    value: entry.value
+                }
+            );
+        }
+
+        const compatible: DtsProperty = PropertyBuilder.build_string()
+            .with_value(string_values)
+            .with_name(expected_compatible.name)
+            .with_labels(expected_compatible.labels)
             .with_user_modifications(expected_compatible.modified_by_user)
             .build();
 
@@ -377,14 +558,12 @@ if (import.meta.vitest !== undefined) {
         const compatible: DtsProperty = PropertyBuilder.build_string()
             .with_value(string1_value, string2_value)
             .with_name(expected_compatible.name)
-            .with_labels([])
             .with_user_modifications(expected_compatible.modified_by_user)
             .build();
 
         console.log(`${PropertyBuilder.to_string(compatible)}`);
         expect(compatible).toStrictEqual(expected_compatible);
     });
-
 
     test(`Variadic String Array Builder`, () => {
         const string1_values: string[] = ["adi,ad7124-4", "adi,ad7124-8"];
@@ -415,7 +594,6 @@ if (import.meta.vitest !== undefined) {
         const compatible: DtsProperty = PropertyBuilder.build_string()
             .with_value(string1_values, string2_values)
             .with_name(expected_compatible.name)
-            .with_labels([])
             .with_user_modifications(expected_compatible.modified_by_user)
             .build();
 
@@ -452,7 +630,6 @@ if (import.meta.vitest !== undefined) {
         const compatible: DtsProperty = PropertyBuilder.build_string()
             .with_value(string1_values, string2_value)
             .with_name(expected_compatible.name)
-            .with_labels([])
             .with_user_modifications(expected_compatible.modified_by_user)
             .build();
 
@@ -489,7 +666,6 @@ if (import.meta.vitest !== undefined) {
         const compatible: DtsProperty = PropertyBuilder.build_string()
             .with_value(string1_values, string2_value)
             .with_name(expected_compatible.name)
-            .with_labels([])
             .with_user_modifications(expected_compatible.modified_by_user)
             .build();
 
@@ -527,7 +703,7 @@ if (import.meta.vitest !== undefined) {
         const compatible: DtsProperty = PropertyBuilder.build_string()
             .with_value(string1_values, string2_value, string3_values)
             .with_name(expected_compatible.name)
-            .with_labels([])
+            .with_labels(expected_compatible.labels)
             .with_user_modifications(expected_compatible.modified_by_user)
             .build();
 
@@ -569,6 +745,43 @@ if (import.meta.vitest !== undefined) {
         expect(label_reference).toStrictEqual(expected_label_reference);
     });
 
+    test(`Labeled Reference with label Builder`, () => {
+
+        const label_name: LabeledString = {
+            value: "gpio0",
+            labels: ["useless_label"]
+        };
+
+        const expected_label_reference: DtsProperty = {
+            labels: [],
+            name: "gpio0",
+            value: {
+                components: [
+                    {
+                        kind: "ref",
+                        labels: label_name.labels,
+                        ref: {
+                            kind: "label",
+                            name: label_name.value
+                        }
+                    }
+                ]
+            },
+            deleted: false,
+            modified_by_user: false
+        };
+
+        const label_reference: DtsProperty = PropertyBuilder.build_reference()
+            .with_label(label_name)
+            .with_name(expected_label_reference.name)
+            .with_labels(expected_label_reference.labels)
+            .with_user_modifications(expected_label_reference.modified_by_user)
+            .build();
+
+        console.log(`${PropertyBuilder.to_string(label_reference)}`);
+        expect(label_reference).toStrictEqual(expected_label_reference);
+    });
+
     test(`Reference with path Builder`, () => {
         const path: string = "/soc/gpio";
 
@@ -583,6 +796,42 @@ if (import.meta.vitest !== undefined) {
                         ref: {
                             kind: "path",
                             path: path
+                        }
+                    }
+                ]
+            },
+            deleted: false,
+            modified_by_user: false
+        };
+
+        const path_reference: DtsProperty = PropertyBuilder.build_reference()
+            .with_path(path)
+            .with_name(expected_path_reference.name)
+            .with_labels(expected_path_reference.labels)
+            .with_user_modifications(expected_path_reference.modified_by_user)
+            .build();
+
+        console.log(`${PropertyBuilder.to_string(path_reference)}`);
+        expect(path_reference).toStrictEqual(expected_path_reference);
+    });
+
+    test(`Labeled Reference with path Builder`, () => {
+        const path: LabeledString = {
+            value: "/soc/gpio",
+            labels: ["doubtful_label"]
+        };
+
+        const expected_path_reference: DtsProperty = {
+            labels: [],
+            name: "gpio0",
+            value: {
+                components: [
+                    {
+                        kind: "ref",
+                        labels: path.labels,
+                        ref: {
+                            kind: "path",
+                            path: path.value
                         }
                     }
                 ]
@@ -753,6 +1002,125 @@ if (import.meta.vitest !== undefined) {
                                 kind: "expression",
                                 labels: [],
                                 value: entry.value
+                            }
+                        });
+                        break;
+                    }
+            }
+        }
+
+        const expected_cell: DtsProperty = {
+            labels: [],
+            name: "unusual-cell",
+            value: {
+                components: [cell_array]
+            },
+            deleted: false,
+            modified_by_user: false
+        };
+
+        const cell = PropertyBuilder.build_cell_array()
+            .with_tagged_values(values)
+            .with_name(expected_cell.name)
+            .with_labels(expected_cell.labels)
+            .with_user_modifications(expected_cell.modified_by_user)
+            .build();
+
+        console.log(`${PropertyBuilder.to_string(cell)}`);
+        expect(cell).toStrictEqual(expected_cell);
+    });
+
+    test(`Labeled Cell Array Builder All Types Array`, () => {
+
+        const values: LabeledTaggedCellValue[] = [
+            {
+                value: PropertyBuilder.tag_number(0),
+                labels: ["insane_label"]
+            },
+            {
+                value: PropertyBuilder.tag_u64(0),
+                labels: ["insane_label"]
+            },
+            {
+                value: PropertyBuilder.tag_label("gpio0"),
+                labels: ["insane_label"]
+            },
+            {
+                value: PropertyBuilder.tag_path("/soc/gpio0"),
+                labels: ["insane_label"]
+            },
+            {
+                value: PropertyBuilder.tag_expression("(1+1)"),
+                labels: ["insane_label"]
+            },
+        ];
+
+        const cell_array: DtsCellArray = {
+            kind: "array",
+            labels: [],
+            elements: []
+        };
+
+        for (const entry of values) {
+
+            switch (entry.value._tag) {
+                case "number":
+                    {
+                        cell_array.elements.push({
+                            item: {
+                                kind: "number",
+                                labels: entry.labels,
+                                value: entry.value.value
+                            }
+                        });
+                        break;
+                    }
+                case "u64":
+                    {
+                        cell_array.elements.push({
+                            item: {
+                                kind: "u64",
+                                labels: entry.labels,
+                                value: entry.value.value
+                            }
+                        });
+                        break;
+                    }
+                case "label":
+                    {
+                        cell_array.elements.push({
+                            item: {
+                                kind: "ref",
+                                labels: entry.labels,
+                                ref: {
+                                    kind: "label",
+                                    name: entry.value.value
+                                }
+                            }
+                        });
+                        break;
+                    }
+                case "path":
+                    {
+                        cell_array.elements.push({
+                            item: {
+                                kind: "ref",
+                                labels: entry.labels,
+                                ref: {
+                                    kind: "path",
+                                    path: entry.value.value
+                                }
+                            }
+                        });
+                        break;
+                    }
+                case "expression":
+                    {
+                        cell_array.elements.push({
+                            item: {
+                                kind: "expression",
+                                labels: entry.labels,
+                                value: entry.value.value
                             }
                         });
                         break;
