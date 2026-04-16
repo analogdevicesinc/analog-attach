@@ -7,7 +7,7 @@ interface IFlagPropertyBuilder {
 }
 
 interface IStringPropertyBuilder {
-    with_value: (first: string | string[], ...rest: string[]) => INameBuilder;
+    with_value: (first: string | string[], ...rest: (string | string[])[]) => INameBuilder;
 }
 
 interface IReferencePropertyBuilder {
@@ -104,9 +104,10 @@ class PropertyBuilder implements
         return this;
     }
 
-    with_value(first: string | string[], ...rest: string[]): INameBuilder {
+    with_value(first: string | string[], ...rest: (string | string[])[]): INameBuilder {
 
-        const normalized_value = first === undefined ? [] : (Array.isArray(first) ? [...first, ...rest] : [first, ...rest]);
+        const flattened_rest = rest.flat();
+        const normalized_value = first === undefined ? flattened_rest : (Array.isArray(first) ? [...first, ...flattened_rest] : [first, ...flattened_rest]);
 
         this.property.value = {
             components: []
@@ -283,6 +284,24 @@ if (import.meta.vitest !== undefined) {
             .build();
 
         console.log(`${PropertyBuilder.to_string(long_compatible_3)}`);
+
+        const long_compatible_4: DtsProperty = PropertyBuilder.build_string()
+            .with_value(["adi,ad7124", "adi,adxl355"], ["my_generic", "my_super_generic"])
+            .with_name("compatible")
+            .with_labels([])
+            .with_user_modifications(true)
+            .build();
+
+        console.log(`${PropertyBuilder.to_string(long_compatible_4)}`);
+
+        const long_compatible_5: DtsProperty = PropertyBuilder.build_string()
+            .with_value("my_super_specific", ["adi,ad7124", "adi,adxl355"], ["my_generic", "my_super_generic"])
+            .with_name("compatible")
+            .with_labels([])
+            .with_user_modifications(true)
+            .build();
+
+        console.log(`${PropertyBuilder.to_string(long_compatible_5)}`);
 
         const label_reference: DtsProperty = PropertyBuilder.build_reference()
             .with_label("gpio0")
