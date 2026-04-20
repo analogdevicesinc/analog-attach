@@ -296,7 +296,7 @@ function is_cell_input_2(object: any): object is CellInput2 {
     return is_cell_array(object) || is_cell_matrix(object);
 }
 
-function upcast_to_LabeledTaggedCellValue_LabeledArray(input: CellInput1): LabeledTaggedCellValue_LabeledArray {
+function upcast_to_LabeledTaggedCellValue_LabeledArray(input: CellEntry | CellArray): LabeledTaggedCellValue_LabeledArray {
 
     if (is_tagged_cell_value_array(input)) {
         return make_labeled(input.map((entry) => make_labeled(entry)));
@@ -512,13 +512,39 @@ class PropertyBuilder implements
             else {
                 const upcast_first = upcast_to_LabeledTaggedCellValue_LabeledArray(first);
                 const upcast_rest = rest.map((entry) => upcast_to_LabeledTaggedCellValue_LabeledArray(entry));
-                const accumulated: LabeledTaggedCellValue_LabeledArray[] = [upcast_first, ...upcast_rest];
+                const accumulator: LabeledTaggedCellValue_LabeledArray[] = [upcast_first, ...upcast_rest];
 
                 this.property.value = {
-                    components: accumulated.map(
-                        (argument) => make_cell_array(argument))
+                    components: accumulator.map(
+                        (entry) => make_cell_array(entry))
                 };
             }
+        } else if (is_cell_input_2(first) && rest.every((entry) => is_cell_input_2(entry))) {
+
+            first = is_cell_matrix(first) ?
+                first.map((entry) => upcast_to_LabeledTaggedCellValue_LabeledArray(entry)) :
+                upcast_to_LabeledTaggedCellValue_LabeledArray(first);
+
+            rest = rest.map(
+                (entry) => is_cell_array(entry) ?
+                    upcast_to_LabeledTaggedCellValue_LabeledArray(entry) :
+                    entry.map((row) => upcast_to_LabeledTaggedCellValue_LabeledArray(row))
+            );
+
+            const accumulator: LabeledTaggedCellValue_LabeledArray[] = [];
+
+            for (const entry of [first, ...rest]) {
+                if (is_labeled_tagged_cell_value_labeled_array(entry)) {
+                    accumulator.push(entry);
+                } else if (is_cell_matrix(entry) && entry.every((item) => is_labeled_tagged_cell_value_labeled_array(item))) {
+                    accumulator.push(...entry);
+                }
+            }
+
+            this.property.value = {
+                components: accumulator.map(
+                    (entry) => make_cell_array(entry))
+            };
         }
 
         return this;
@@ -2102,6 +2128,583 @@ if (import.meta.vitest !== undefined) {
 
         const cell = PropertyBuilder.build_cell_array()
             .with_tagged_values(value, values1, values2)
+            .with_name(expected_cell.name)
+            .with_labels(expected_cell.labels)
+            .with_user_modifications(expected_cell.modified_by_user)
+            .build();
+
+        console.log(`${PropertyBuilder.to_string(cell)}`);
+        expect(cell).toStrictEqual(expected_cell);
+    });
+
+    test(`Cell Array Builder All Types Matrix `, () => {
+        const values: TaggedCellValue[][] = [
+            [PropertyBuilder.tag_number(0),
+            PropertyBuilder.tag_u64(0),
+            PropertyBuilder.tag_label("gpio0")],
+            [PropertyBuilder.tag_path("/soc/gpio0"),
+            PropertyBuilder.tag_expression("(1+1)")],
+        ];
+
+        const cell_array_array: DtsCellArray[] = [];
+
+        for (const entry of values) {
+            const cell_array: DtsCellArray = {
+                kind: "array",
+                labels: [],
+                elements: []
+            };
+
+            for (const sub_entry of entry) {
+                switch (sub_entry._tag) {
+                    case "number":
+                        {
+                            cell_array.elements.push({
+                                item: {
+                                    kind: "number",
+                                    labels: [],
+                                    value: sub_entry.value
+                                }
+                            });
+                            break;
+                        }
+                    case "u64":
+                        {
+                            cell_array.elements.push({
+                                item: {
+                                    kind: "u64",
+                                    labels: [],
+                                    value: sub_entry.value
+                                }
+                            });
+                            break;
+                        }
+                    case "label":
+                        {
+                            cell_array.elements.push({
+                                item: {
+                                    kind: "ref",
+                                    labels: [],
+                                    ref: {
+                                        kind: "label",
+                                        name: sub_entry.value
+                                    }
+                                }
+                            });
+                            break;
+                        }
+                    case "path":
+                        {
+                            cell_array.elements.push({
+                                item: {
+                                    kind: "ref",
+                                    labels: [],
+                                    ref: {
+                                        kind: "path",
+                                        path: sub_entry.value
+                                    }
+                                }
+                            });
+                            break;
+                        }
+                    case "expression":
+                        {
+                            cell_array.elements.push({
+                                item: {
+                                    kind: "expression",
+                                    labels: [],
+                                    value: sub_entry.value
+                                }
+                            });
+                            break;
+                        }
+                }
+            }
+            cell_array_array.push(cell_array);
+        }
+
+        const expected_cell: DtsProperty = {
+            labels: [],
+            name: "unusual-cell",
+            value: {
+                components: cell_array_array
+            },
+            deleted: false,
+            modified_by_user: false
+        };
+
+        const cell = PropertyBuilder.build_cell_array()
+            .with_tagged_values(values)
+            .with_name(expected_cell.name)
+            .with_labels(expected_cell.labels)
+            .with_user_modifications(expected_cell.modified_by_user)
+            .build();
+
+        console.log(`${PropertyBuilder.to_string(cell)}`);
+        expect(cell).toStrictEqual(expected_cell);
+    });
+
+    test(`Cell Array Builder All Types Matrix and Variadic 1 `, () => {
+        const values: TaggedCellValue[][] = [
+            [PropertyBuilder.tag_number(0),
+            PropertyBuilder.tag_u64(0),
+            PropertyBuilder.tag_label("gpio0")],
+            [PropertyBuilder.tag_path("/soc/gpio0"),
+            PropertyBuilder.tag_expression("(1+1)")],
+        ];
+
+        const values2: TaggedCellValue[][] = [
+            [PropertyBuilder.tag_number(1),
+            PropertyBuilder.tag_u64(1),
+            PropertyBuilder.tag_label("gpio1")],
+            [PropertyBuilder.tag_path("/soc/gpio1"),
+            PropertyBuilder.tag_expression("(1+1)")],
+        ];
+
+        const composed = [...values, ...values2];
+
+        const cell_array_array: DtsCellArray[] = [];
+
+        for (const entry of composed) {
+            const cell_array: DtsCellArray = {
+                kind: "array",
+                labels: [],
+                elements: []
+            };
+
+            for (const sub_entry of entry) {
+                switch (sub_entry._tag) {
+                    case "number":
+                        {
+                            cell_array.elements.push({
+                                item: {
+                                    kind: "number",
+                                    labels: [],
+                                    value: sub_entry.value
+                                }
+                            });
+                            break;
+                        }
+                    case "u64":
+                        {
+                            cell_array.elements.push({
+                                item: {
+                                    kind: "u64",
+                                    labels: [],
+                                    value: sub_entry.value
+                                }
+                            });
+                            break;
+                        }
+                    case "label":
+                        {
+                            cell_array.elements.push({
+                                item: {
+                                    kind: "ref",
+                                    labels: [],
+                                    ref: {
+                                        kind: "label",
+                                        name: sub_entry.value
+                                    }
+                                }
+                            });
+                            break;
+                        }
+                    case "path":
+                        {
+                            cell_array.elements.push({
+                                item: {
+                                    kind: "ref",
+                                    labels: [],
+                                    ref: {
+                                        kind: "path",
+                                        path: sub_entry.value
+                                    }
+                                }
+                            });
+                            break;
+                        }
+                    case "expression":
+                        {
+                            cell_array.elements.push({
+                                item: {
+                                    kind: "expression",
+                                    labels: [],
+                                    value: sub_entry.value
+                                }
+                            });
+                            break;
+                        }
+                }
+            }
+            cell_array_array.push(cell_array);
+        }
+
+        const expected_cell: DtsProperty = {
+            labels: [],
+            name: "unusual-cell",
+            value: {
+                components: cell_array_array
+            },
+            deleted: false,
+            modified_by_user: false
+        };
+
+        const cell = PropertyBuilder.build_cell_array()
+            .with_tagged_values(values, values2)
+            .with_name(expected_cell.name)
+            .with_labels(expected_cell.labels)
+            .with_user_modifications(expected_cell.modified_by_user)
+            .build();
+
+        console.log(`${PropertyBuilder.to_string(cell)}`);
+        expect(cell).toStrictEqual(expected_cell);
+    });
+
+    test(`Cell Array Builder All Types Matrix and Variadic 2 `, () => {
+        const values: TaggedCellValue[][] = [
+            [PropertyBuilder.tag_number(0),
+            PropertyBuilder.tag_u64(0),
+            PropertyBuilder.tag_label("gpio0")],
+            [PropertyBuilder.tag_path("/soc/gpio0"),
+            PropertyBuilder.tag_expression("(1+1)")],
+        ];
+
+        const values2: TaggedCellValue[] = [
+            PropertyBuilder.tag_number(1),
+            PropertyBuilder.tag_u64(1),
+            PropertyBuilder.tag_label("gpio1")
+        ];
+
+        const composed = [...values, [...values2]];
+
+        const cell_array_array: DtsCellArray[] = [];
+
+        for (const entry of composed) {
+            const cell_array: DtsCellArray = {
+                kind: "array",
+                labels: [],
+                elements: []
+            };
+
+            for (const sub_entry of entry) {
+                switch (sub_entry._tag) {
+                    case "number":
+                        {
+                            cell_array.elements.push({
+                                item: {
+                                    kind: "number",
+                                    labels: [],
+                                    value: sub_entry.value
+                                }
+                            });
+                            break;
+                        }
+                    case "u64":
+                        {
+                            cell_array.elements.push({
+                                item: {
+                                    kind: "u64",
+                                    labels: [],
+                                    value: sub_entry.value
+                                }
+                            });
+                            break;
+                        }
+                    case "label":
+                        {
+                            cell_array.elements.push({
+                                item: {
+                                    kind: "ref",
+                                    labels: [],
+                                    ref: {
+                                        kind: "label",
+                                        name: sub_entry.value
+                                    }
+                                }
+                            });
+                            break;
+                        }
+                    case "path":
+                        {
+                            cell_array.elements.push({
+                                item: {
+                                    kind: "ref",
+                                    labels: [],
+                                    ref: {
+                                        kind: "path",
+                                        path: sub_entry.value
+                                    }
+                                }
+                            });
+                            break;
+                        }
+                    case "expression":
+                        {
+                            cell_array.elements.push({
+                                item: {
+                                    kind: "expression",
+                                    labels: [],
+                                    value: sub_entry.value
+                                }
+                            });
+                            break;
+                        }
+                }
+            }
+            cell_array_array.push(cell_array);
+        }
+
+        const expected_cell: DtsProperty = {
+            labels: [],
+            name: "unusual-cell",
+            value: {
+                components: cell_array_array
+            },
+            deleted: false,
+            modified_by_user: false
+        };
+
+        const cell = PropertyBuilder.build_cell_array()
+            .with_tagged_values(values, values2)
+            .with_name(expected_cell.name)
+            .with_labels(expected_cell.labels)
+            .with_user_modifications(expected_cell.modified_by_user)
+            .build();
+
+        console.log(`${PropertyBuilder.to_string(cell)}`);
+        expect(cell).toStrictEqual(expected_cell);
+    });
+
+    test(`Cell Array Builder All Types Matrix and Variadic 3 `, () => {
+        const values: TaggedCellValue[][] = [
+            [PropertyBuilder.tag_number(0),
+            PropertyBuilder.tag_u64(0),
+            PropertyBuilder.tag_label("gpio0")],
+            [PropertyBuilder.tag_path("/soc/gpio0"),
+            PropertyBuilder.tag_expression("(1+1)")],
+        ];
+
+        const values2: TaggedCellValue[] = [
+            PropertyBuilder.tag_number(1),
+            PropertyBuilder.tag_u64(1),
+            PropertyBuilder.tag_label("gpio1")
+        ];
+
+        const composed = [[...values2], ...values];
+
+        const cell_array_array: DtsCellArray[] = [];
+
+        for (const entry of composed) {
+            const cell_array: DtsCellArray = {
+                kind: "array",
+                labels: [],
+                elements: []
+            };
+
+            for (const sub_entry of entry) {
+                switch (sub_entry._tag) {
+                    case "number":
+                        {
+                            cell_array.elements.push({
+                                item: {
+                                    kind: "number",
+                                    labels: [],
+                                    value: sub_entry.value
+                                }
+                            });
+                            break;
+                        }
+                    case "u64":
+                        {
+                            cell_array.elements.push({
+                                item: {
+                                    kind: "u64",
+                                    labels: [],
+                                    value: sub_entry.value
+                                }
+                            });
+                            break;
+                        }
+                    case "label":
+                        {
+                            cell_array.elements.push({
+                                item: {
+                                    kind: "ref",
+                                    labels: [],
+                                    ref: {
+                                        kind: "label",
+                                        name: sub_entry.value
+                                    }
+                                }
+                            });
+                            break;
+                        }
+                    case "path":
+                        {
+                            cell_array.elements.push({
+                                item: {
+                                    kind: "ref",
+                                    labels: [],
+                                    ref: {
+                                        kind: "path",
+                                        path: sub_entry.value
+                                    }
+                                }
+                            });
+                            break;
+                        }
+                    case "expression":
+                        {
+                            cell_array.elements.push({
+                                item: {
+                                    kind: "expression",
+                                    labels: [],
+                                    value: sub_entry.value
+                                }
+                            });
+                            break;
+                        }
+                }
+            }
+            cell_array_array.push(cell_array);
+        }
+
+        const expected_cell: DtsProperty = {
+            labels: [],
+            name: "unusual-cell",
+            value: {
+                components: cell_array_array
+            },
+            deleted: false,
+            modified_by_user: false
+        };
+
+        const cell = PropertyBuilder.build_cell_array()
+            .with_tagged_values(values2, values)
+            .with_name(expected_cell.name)
+            .with_labels(expected_cell.labels)
+            .with_user_modifications(expected_cell.modified_by_user)
+            .build();
+
+        console.log(`${PropertyBuilder.to_string(cell)}`);
+        expect(cell).toStrictEqual(expected_cell);
+    });
+
+    test(`Cell Array Builder All Types Matrix and Variadic 4 `, () => {
+        const values: TaggedCellValue[][] = [
+            [PropertyBuilder.tag_number(0),
+            PropertyBuilder.tag_u64(0),
+            PropertyBuilder.tag_label("gpio0")],
+            [PropertyBuilder.tag_path("/soc/gpio0"),
+            PropertyBuilder.tag_expression("(1+1)")],
+        ];
+
+        const values2: TaggedCellValue[] = [
+            PropertyBuilder.tag_number(1),
+            PropertyBuilder.tag_u64(1),
+            PropertyBuilder.tag_label("gpio1")
+        ];
+
+        const values3: TaggedCellValue[][] = [
+            [PropertyBuilder.tag_number(2),
+            PropertyBuilder.tag_u64(2),
+            PropertyBuilder.tag_label("gpio2")],
+            [PropertyBuilder.tag_path("/soc/gpio2"),
+            PropertyBuilder.tag_expression("(1+1)")],
+        ];
+
+        const composed = [...values, [...values2], ...values3];
+
+        const cell_array_array: DtsCellArray[] = [];
+
+        for (const entry of composed) {
+            const cell_array: DtsCellArray = {
+                kind: "array",
+                labels: [],
+                elements: []
+            };
+
+            for (const sub_entry of entry) {
+                switch (sub_entry._tag) {
+                    case "number":
+                        {
+                            cell_array.elements.push({
+                                item: {
+                                    kind: "number",
+                                    labels: [],
+                                    value: sub_entry.value
+                                }
+                            });
+                            break;
+                        }
+                    case "u64":
+                        {
+                            cell_array.elements.push({
+                                item: {
+                                    kind: "u64",
+                                    labels: [],
+                                    value: sub_entry.value
+                                }
+                            });
+                            break;
+                        }
+                    case "label":
+                        {
+                            cell_array.elements.push({
+                                item: {
+                                    kind: "ref",
+                                    labels: [],
+                                    ref: {
+                                        kind: "label",
+                                        name: sub_entry.value
+                                    }
+                                }
+                            });
+                            break;
+                        }
+                    case "path":
+                        {
+                            cell_array.elements.push({
+                                item: {
+                                    kind: "ref",
+                                    labels: [],
+                                    ref: {
+                                        kind: "path",
+                                        path: sub_entry.value
+                                    }
+                                }
+                            });
+                            break;
+                        }
+                    case "expression":
+                        {
+                            cell_array.elements.push({
+                                item: {
+                                    kind: "expression",
+                                    labels: [],
+                                    value: sub_entry.value
+                                }
+                            });
+                            break;
+                        }
+                }
+            }
+            cell_array_array.push(cell_array);
+        }
+
+        const expected_cell: DtsProperty = {
+            labels: [],
+            name: "unusual-cell",
+            value: {
+                components: cell_array_array
+            },
+            deleted: false,
+            modified_by_user: false
+        };
+
+        const cell = PropertyBuilder.build_cell_array()
+            .with_tagged_values(values, values2, values3)
             .with_name(expected_cell.name)
             .with_labels(expected_cell.labels)
             .with_user_modifications(expected_cell.modified_by_user)
