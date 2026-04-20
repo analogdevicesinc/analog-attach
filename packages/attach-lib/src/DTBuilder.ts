@@ -2,17 +2,85 @@
 import { CellArrayElement, DtsCellArray, DtsProperty } from "./dts";
 import { print_property } from "./dts/printer";
 
+type MakeLabeled<T> = {
+    payload: T,
+    labels: string[]
+}
+
+function is_labeled<T>(object: any): object is MakeLabeled<T> {
+    if (object === null && typeof object !== 'object') {
+        return false;
+    }
+
+    if (!("payload" in object)) {
+        return false;
+    }
+
+    if (object.payload === undefined) {
+        return false;
+    }
+
+    if (!("labels" in object)) {
+        return false;
+    }
+
+    if (!Array.isArray(object.labels)) {
+        return false;
+    }
+
+    if (Object.entries(object).length > 2) {
+        return false;
+    }
+
+    const narrowed = object as MakeLabeled<T>;
+
+    if (!narrowed.labels.every((entry) => typeof entry === 'string')) {
+        return false;
+    }
+
+    return true;
+}
+
+function make_labeled<T>(object: T, labels?: string[]): MakeLabeled<T> {
+
+    type Labeled_T = MakeLabeled<T>;
+    const labeled_object: Labeled_T = {
+        payload: object,
+        labels: labels ?? []
+    };
+
+    return labeled_object;
+}
+
+type MakeArray<T> = T[];
+
+function is_array<T>(object: any): object is MakeArray<T> {
+    if (object === null && typeof object !== 'object') {
+        return false;
+    }
+
+    if (!Array.isArray(object)) {
+        return false;
+    }
+
+    return true;
+}
+
+function make_array<T>(object: T): MakeArray<T> {
+    type Array_T = MakeArray<T>;
+    const object_array: Array_T = [object];
+
+    return object_array;
+}
+
 interface IFlagPropertyBuilder {
     set_flag: () => INameBuilder;
 }
 
-type LabeledString = {
-    value: string,
-    labels: string[]
-}
-
-type StringORLabeledString = string | LabeledString;
-type StringsORLabeledStrings = string | string[] | LabeledString | LabeledString[];
+type DTString = string;
+type LabeledDTString = MakeLabeled<DTString>;
+type StringORLabeledString = DTString | LabeledDTString;
+type StringsORLabeledStrings = DTString | DTString[] | LabeledDTString | LabeledDTString[];
 
 interface IStringPropertyBuilder {
     with_value: (first: StringsORLabeledStrings, ...rest: StringsORLabeledStrings[]) => INameBuilder;
@@ -49,6 +117,19 @@ type TaggedExpression = {
 }
 
 type TaggedCellValue = TaggedNumber | TaggedU64 | TaggedLabel | TaggedPath | TaggedExpression;
+type TaggedCellValue_Array = MakeArray<TaggedCellValue>;
+type TaggedCellValue_LabeledArray = MakeLabeled<TaggedCellValue_Array>;
+
+type LabeledTaggedCellValue = MakeLabeled<TaggedCellValue>;
+type LabeledTaggedCellValue_Array = MakeArray<LabeledTaggedCellValue>;
+type LabeledTaggedCellValue_LabeledArray = MakeLabeled<LabeledTaggedCellValue_Array>;
+
+type CellEntry = TaggedCellValue | LabeledTaggedCellValue;
+type CellArray = TaggedCellValue_Array | TaggedCellValue_LabeledArray | LabeledTaggedCellValue_Array | LabeledTaggedCellValue_LabeledArray;
+type CellMatrix = MakeArray<CellArray>;
+
+type CellInput1 = CellEntry | CellArray;
+type CellInput2 = CellArray | CellMatrix;
 
 function is_tagged_cell_value(object: any): object is TaggedCellValue {
     if (object === null && typeof object !== 'object') {
@@ -78,8 +159,12 @@ function is_tagged_cell_value(object: any): object is TaggedCellValue {
     return true;
 }
 
-function is_tagged_cell_value_array(object: any): object is TaggedCellValue[] {
-    if (!Array.isArray(object)) {
+function is_tagged_cell_value_array(object: any): object is TaggedCellValue_Array {
+    if (object === null && typeof object !== 'object') {
+        return false;
+    }
+
+    if (!is_array(object)) {
         return false;
     }
 
@@ -90,33 +175,155 @@ function is_tagged_cell_value_array(object: any): object is TaggedCellValue[] {
     return true;
 }
 
-function make_unlabeled_tagged_cell_value(input: TaggedCellValue): LabeledTaggedCellValue {
-    return {
-        value: input,
-        labels: []
-    };
+function is_tagged_cell_value_labeled_array(object: any): object is TaggedCellValue_LabeledArray {
+    if (object === null && typeof object !== 'object') {
+        return false;
+    }
+
+    if (!is_labeled(object)) {
+        return false;
+    }
+
+    const narrowed = object as MakeLabeled<any>;
+
+    if (!is_tagged_cell_value_array(narrowed.payload)) {
+        return false;
+    }
+
+    return true;
 }
 
-type LabeledTaggedCellValue = {
-    value: TaggedCellValue,
-    labels: string[]
+function is_labeled_tagged_cell_value(object: any): object is LabeledTaggedCellValue {
+    if (object === null && typeof object !== 'object') {
+        return false;
+    }
+
+    if (!is_labeled(object)) {
+        return false;
+    }
+
+    const narrowed = object as MakeLabeled<any>;
+
+    if (!is_tagged_cell_value(narrowed.payload)) {
+        return false;
+    }
+
+    return true;
 }
 
-type TaggedCellValuesORLabeledTaggedCellValues = TaggedCellValue | TaggedCellValue[] | LabeledTaggedCellValue | LabeledTaggedCellValue[];
+function is_labeled_tagged_cell_value_array(object: any): object is LabeledTaggedCellValue_Array {
+    if (object === null && typeof object !== 'object') {
+        return false;
+    }
 
-function cast_to_labeled_tagged_cell_values(input: TaggedCellValuesORLabeledTaggedCellValues): LabeledTaggedCellValue | LabeledTaggedCellValue[] {
+    if (!is_array(object)) {
+        return false;
+    }
+
+    if (!object.every((entry) => is_labeled_tagged_cell_value(entry) === true)) {
+        return false;
+    }
+
+    return true;
+}
+
+function is_labeled_tagged_cell_value_labeled_array(object: any): object is LabeledTaggedCellValue_LabeledArray {
+    if (object === null && typeof object !== 'object') {
+        return false;
+    }
+
+    if (!is_labeled(object)) {
+        return false;
+    }
+
+    const narrowed = object as MakeLabeled<any>;
+
+    if (!is_labeled_tagged_cell_value_array(narrowed.payload)) {
+        return false;
+    }
+
+    return true;
+}
+
+function is_cell_entry(object: any): object is CellEntry {
+    if (object === null && typeof object !== 'object') {
+        return false;
+    }
+
+    return is_tagged_cell_value(object) || is_labeled_tagged_cell_value(object);
+}
+
+function is_cell_array(object: any): object is CellArray {
+    if (object === null && typeof object !== 'object') {
+        return false;
+    }
+
+    return is_tagged_cell_value_array(object) ||
+        is_tagged_cell_value_labeled_array(object) ||
+        is_labeled_tagged_cell_value_array(object) ||
+        is_labeled_tagged_cell_value_labeled_array(object);
+}
+
+function is_cell_matrix(object: any): object is CellMatrix {
+    if (object === null && typeof object !== 'object') {
+        return false;
+    }
+
+    if (!is_array(object)) {
+        return false;
+    }
+
+    if (!object.every((entry) => is_cell_array(entry) === true)) {
+        return false;
+    }
+
+    return true;
+}
+
+function is_cell_input_1(object: any): object is CellInput1 {
+    if (object === null && typeof object !== 'object') {
+        return false;
+    }
+
+    return is_cell_entry(object) || is_cell_array(object);
+}
+
+function is_cell_input_2(object: any): object is CellInput2 {
+    if (object === null && typeof object !== 'object') {
+        return false;
+    }
+
+    return is_cell_array(object) || is_cell_matrix(object);
+}
+
+function upcast_to_LabeledTaggedCellValue_LabeledArray(input: CellInput1): LabeledTaggedCellValue_LabeledArray {
 
     if (is_tagged_cell_value_array(input)) {
-        return input.map((entry) => make_unlabeled_tagged_cell_value(entry));
-    } else if (is_tagged_cell_value(input)) {
-        return make_unlabeled_tagged_cell_value(input);
+        return make_labeled(input.map((entry) => make_labeled(entry)));
+    }
+
+    if (is_tagged_cell_value_labeled_array(input)) {
+        return make_labeled(input.payload.map((entry) => make_labeled(entry)));
+    }
+
+    if (is_tagged_cell_value(input)) {
+        return make_labeled(make_array(make_labeled(input)));
+    }
+
+    if (is_labeled_tagged_cell_value_array(input)) {
+        return make_labeled(input);
+    }
+
+    if (is_labeled_tagged_cell_value(input)) {
+        return make_labeled(make_array(input));
     }
 
     return input;
 }
 
 interface ICellArrayPropertyBuilder {
-    with_tagged_values: (first: TaggedCellValuesORLabeledTaggedCellValues, ...rest: TaggedCellValuesORLabeledTaggedCellValues[]) => INameBuilder;
+    with_tagged_values(first: CellInput1, ...rest: CellInput1[]): INameBuilder;
+    with_tagged_values(first: CellInput2, ...rest: CellInput2[]): INameBuilder;
 }
 
 interface INameBuilder {
@@ -187,7 +394,7 @@ class PropertyBuilder implements
             } else {
                 this.property.value.components.push({
                     kind: "string",
-                    value: entry.value,
+                    value: entry.payload,
                     labels: entry.labels
                 });
             }
@@ -212,7 +419,7 @@ class PropertyBuilder implements
                 labels: label.labels,
                 ref: {
                     kind: 'label',
-                    name: label.value
+                    name: label.payload
                 }
             }]
         };
@@ -236,7 +443,7 @@ class PropertyBuilder implements
                 labels: path.labels,
                 ref: {
                     kind: 'path',
-                    path: path.value
+                    path: path.payload
                 }
             }]
         };
@@ -244,45 +451,39 @@ class PropertyBuilder implements
         return this;
     }
 
-    with_tagged_values(first: TaggedCellValuesORLabeledTaggedCellValues, ...rest: TaggedCellValuesORLabeledTaggedCellValues[]): INameBuilder {
+    with_tagged_values(first: CellInput1, ...rest: CellInput1[]): INameBuilder;
+    with_tagged_values(first: CellInput2, ...rest: CellInput2[]): INameBuilder;
+    with_tagged_values(first: (CellEntry | CellArray | CellMatrix), ...rest: (CellEntry | CellArray | CellMatrix)[]): INameBuilder {
 
         const tagged_to_element = (entry: LabeledTaggedCellValue): CellArrayElement => {
-            switch (entry.value._tag) {
+            switch (entry.payload._tag) {
                 case "number": {
-                    return { item: { kind: "number", value: entry.value.value, labels: entry.labels } };
+                    return { item: { kind: "number", value: entry.payload.value, labels: entry.labels } };
                 }
                 case "u64": {
-                    return { item: { kind: "u64", value: entry.value.value, labels: entry.labels } };
+                    return { item: { kind: "u64", value: entry.payload.value, labels: entry.labels } };
                 }
                 case "label": {
-                    return { item: { kind: "ref", labels: entry.labels, ref: { kind: "label", name: entry.value.value } } };
+                    return { item: { kind: "ref", labels: entry.labels, ref: { kind: "label", name: entry.payload.value } } };
                 }
                 case "path": {
-                    return { item: { kind: "ref", labels: entry.labels, ref: { kind: "path", path: entry.value.value } } };
+                    return { item: { kind: "ref", labels: entry.labels, ref: { kind: "path", path: entry.payload.value } } };
                 }
                 case "expression": {
-                    return { item: { kind: "expression", labels: entry.labels, value: entry.value.value } };
+                    return { item: { kind: "expression", labels: entry.labels, value: entry.payload.value } };
                 }
                 default: {
-                    const _x: never = entry.value;
+                    const _x: never = entry.payload;
                     throw new Error("Exhaustive check failed!");
                 }
             }
         };
 
-        const make_cell_array = (values: LabeledTaggedCellValue[]): DtsCellArray => ({
+        const make_cell_array = (values: LabeledTaggedCellValue_LabeledArray): DtsCellArray => ({
             kind: "array",
-            labels: [],
-            elements: values.map((v) => tagged_to_element(v)),
+            labels: values.labels,
+            elements: values.payload.map((v) => tagged_to_element(v)),
         });
-
-        const is_not_2d = (array: (LabeledTaggedCellValue | LabeledTaggedCellValue[])[]): array is LabeledTaggedCellValue[] => {
-            for (const value of array) {
-                if (Array.isArray(value)) { return false; }
-            }
-
-            return true;
-        };
 
         const rest_array_count: number = (() => {
             let count = 0;
@@ -294,43 +495,68 @@ class PropertyBuilder implements
             return count;
         })();
 
-        const normalized_first = cast_to_labeled_tagged_cell_values(first);
-        const normalized_rest = rest.map((entry) => cast_to_labeled_tagged_cell_values(entry));
+        // CellInput1 overload
+        if (is_cell_input_1(first) && rest.every((entry) => is_cell_input_1(entry) === true)) {
 
-        // needs type inference
-        if (rest_array_count === 0 && is_not_2d(normalized_rest)) {
-            // Single component mode: flatten first + rest into one component
-            const normalized_values = (Array.isArray(normalized_first) ? [...normalized_first, ...normalized_rest] : [normalized_first, ...normalized_rest]);
+            if (rest.every((entry) => is_cell_entry(entry) === true)) {
 
-            this.property.value = {
-                components: [make_cell_array(normalized_values)]
-            };
-        } else if (!Array.isArray(normalized_first) && rest_array_count === 1) {
+                const upcast_first = upcast_to_LabeledTaggedCellValue_LabeledArray(first);
+                const upcast_rest = rest.map((entry) => upcast_to_LabeledTaggedCellValue_LabeledArray(entry));
 
-            const normalized_values: LabeledTaggedCellValue[] = [normalized_first];
+                const flattened: LabeledTaggedCellValue_LabeledArray = (() => {
+                    let accumulator: LabeledTaggedCellValue_LabeledArray = {
+                        payload: [...upcast_first.payload],
+                        labels: [...upcast_first.labels]
+                    };
 
-            for (const entry of normalized_rest) {
-                if (Array.isArray(entry)) {
-                    normalized_values.push(...entry);
-                    continue;
-                }
-                normalized_values.push(entry);
+                    for (const entry of upcast_rest) {
+                        accumulator.payload = [...accumulator.payload, ...entry.payload];
+                        accumulator.labels = [...accumulator.labels, ...entry.labels];
+                    }
+
+                    return accumulator;
+                })();
+
+                this.property.value = {
+                    components: [make_cell_array(flattened)]
+                };
+            } else if (is_cell_entry(first) && rest_array_count === 1) {
+                const upcast_first = upcast_to_LabeledTaggedCellValue_LabeledArray(first);
+                const upcast_rest = rest.map((entry) => upcast_to_LabeledTaggedCellValue_LabeledArray(entry));
+
+                const flattened: LabeledTaggedCellValue_LabeledArray = (() => {
+                    let accumulator: LabeledTaggedCellValue_LabeledArray = {
+                        payload: [...upcast_first.payload],
+                        labels: [...upcast_first.labels]
+                    };
+
+                    for (const entry of upcast_rest) {
+                        accumulator.payload = [...accumulator.payload, ...entry.payload];
+                        accumulator.labels = [...accumulator.labels, ...entry.labels];
+                    }
+
+                    return accumulator;
+                })();
+
+                this.property.value = {
+                    components: [make_cell_array(flattened)]
+                };
             }
+            else {
+                const upcast_first = upcast_to_LabeledTaggedCellValue_LabeledArray(first);
+                const upcast_rest = rest.map((entry) => upcast_to_LabeledTaggedCellValue_LabeledArray(entry));
+                const accumulated: LabeledTaggedCellValue_LabeledArray[] = [upcast_first, ...upcast_rest];
 
-            this.property.value = {
-                components: [make_cell_array(normalized_values)]
-            };
-        }
-        else {
-            // Multiple components mode: each array becomes a component, each single value becomes a single-element component
-            const all_arguments: (LabeledTaggedCellValue | LabeledTaggedCellValue[])[] = [normalized_first, ...normalized_rest];
-            this.property.value = {
-                components: all_arguments.map((argument) => make_cell_array(Array.isArray(argument) ? argument : [argument]))
-            };
+                this.property.value = {
+                    components: accumulated.map(
+                        (argument) => make_cell_array(argument))
+                };
+            }
         }
 
         return this;
     }
+
 
     with_name(name: string): IBuild {
         this.property.name = name;
@@ -421,8 +647,8 @@ if (import.meta.vitest !== undefined) {
 
     test(`Labeled String Builder`, () => {
 
-        const string_value: LabeledString = {
-            value: "adi,ad7124",
+        const string_value: LabeledDTString = {
+            payload: "adi,ad7124",
             labels: ["my_compat"]
         };
 
@@ -433,7 +659,7 @@ if (import.meta.vitest !== undefined) {
                 components: [
                     {
                         kind: 'string',
-                        value: string_value.value,
+                        value: string_value.payload,
                         labels: string_value.labels
                     }
                 ]
@@ -488,13 +714,13 @@ if (import.meta.vitest !== undefined) {
     });
 
     test(`Labeled Array String Builder`, () => {
-        const string_values: LabeledString[] = [
+        const string_values: LabeledDTString[] = [
             {
-                value: "adi,ad7124",
+                payload: "adi,ad7124",
                 labels: ["my_cool_label"]
             },
             {
-                value: "adi,adxl355",
+                payload: "adi,adxl355",
                 labels: ["my_lame_label"]
             }
         ];
@@ -514,7 +740,7 @@ if (import.meta.vitest !== undefined) {
                 {
                     kind: 'string',
                     labels: entry.labels,
-                    value: entry.value
+                    value: entry.payload
                 }
             );
         }
@@ -747,8 +973,8 @@ if (import.meta.vitest !== undefined) {
 
     test(`Labeled Reference with label Builder`, () => {
 
-        const label_name: LabeledString = {
-            value: "gpio0",
+        const label_name: LabeledDTString = {
+            payload: "gpio0",
             labels: ["useless_label"]
         };
 
@@ -762,7 +988,7 @@ if (import.meta.vitest !== undefined) {
                         labels: label_name.labels,
                         ref: {
                             kind: "label",
-                            name: label_name.value
+                            name: label_name.payload
                         }
                     }
                 ]
@@ -816,8 +1042,8 @@ if (import.meta.vitest !== undefined) {
     });
 
     test(`Labeled Reference with path Builder`, () => {
-        const path: LabeledString = {
-            value: "/soc/gpio",
+        const path: LabeledDTString = {
+            payload: "/soc/gpio",
             labels: ["doubtful_label"]
         };
 
@@ -831,7 +1057,7 @@ if (import.meta.vitest !== undefined) {
                         labels: path.labels,
                         ref: {
                             kind: "path",
-                            path: path.value
+                            path: path.payload
                         }
                     }
                 ]
@@ -1034,23 +1260,23 @@ if (import.meta.vitest !== undefined) {
 
         const values: LabeledTaggedCellValue[] = [
             {
-                value: PropertyBuilder.tag_number(0),
+                payload: PropertyBuilder.tag_number(0),
                 labels: ["insane_label"]
             },
             {
-                value: PropertyBuilder.tag_u64(0),
+                payload: PropertyBuilder.tag_u64(0),
                 labels: ["insane_label"]
             },
             {
-                value: PropertyBuilder.tag_label("gpio0"),
+                payload: PropertyBuilder.tag_label("gpio0"),
                 labels: ["insane_label"]
             },
             {
-                value: PropertyBuilder.tag_path("/soc/gpio0"),
+                payload: PropertyBuilder.tag_path("/soc/gpio0"),
                 labels: ["insane_label"]
             },
             {
-                value: PropertyBuilder.tag_expression("(1+1)"),
+                payload: PropertyBuilder.tag_expression("(1+1)"),
                 labels: ["insane_label"]
             },
         ];
@@ -1063,14 +1289,14 @@ if (import.meta.vitest !== undefined) {
 
         for (const entry of values) {
 
-            switch (entry.value._tag) {
+            switch (entry.payload._tag) {
                 case "number":
                     {
                         cell_array.elements.push({
                             item: {
                                 kind: "number",
                                 labels: entry.labels,
-                                value: entry.value.value
+                                value: entry.payload.value
                             }
                         });
                         break;
@@ -1081,7 +1307,7 @@ if (import.meta.vitest !== undefined) {
                             item: {
                                 kind: "u64",
                                 labels: entry.labels,
-                                value: entry.value.value
+                                value: entry.payload.value
                             }
                         });
                         break;
@@ -1094,7 +1320,7 @@ if (import.meta.vitest !== undefined) {
                                 labels: entry.labels,
                                 ref: {
                                     kind: "label",
-                                    name: entry.value.value
+                                    name: entry.payload.value
                                 }
                             }
                         });
@@ -1108,7 +1334,7 @@ if (import.meta.vitest !== undefined) {
                                 labels: entry.labels,
                                 ref: {
                                     kind: "path",
-                                    path: entry.value.value
+                                    path: entry.payload.value
                                 }
                             }
                         });
@@ -1120,7 +1346,7 @@ if (import.meta.vitest !== undefined) {
                             item: {
                                 kind: "expression",
                                 labels: entry.labels,
-                                value: entry.value.value
+                                value: entry.payload.value
                             }
                         });
                         break;
