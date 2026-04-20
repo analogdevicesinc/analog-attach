@@ -485,54 +485,21 @@ class PropertyBuilder implements
             elements: values.payload.map((v) => tagged_to_element(v)),
         });
 
-        const rest_array_count: number = (() => {
-            let count = 0;
-            for (const entry of rest) {
-                if (Array.isArray(entry)) {
-                    count++;
-                }
-            }
-            return count;
-        })();
-
         // CellInput1 overload
         if (is_cell_input_1(first) && rest.every((entry) => is_cell_input_1(entry) === true)) {
 
-            if (rest.every((entry) => is_cell_entry(entry) === true)) {
+            if ((rest.every((entry) => is_cell_entry(entry) === true)) ||
+                (is_cell_entry(first) && rest.filter((element) => is_cell_array(element)).length === 1)) {
 
                 const upcast_first = upcast_to_LabeledTaggedCellValue_LabeledArray(first);
                 const upcast_rest = rest.map((entry) => upcast_to_LabeledTaggedCellValue_LabeledArray(entry));
 
                 const flattened: LabeledTaggedCellValue_LabeledArray = (() => {
-                    let accumulator: LabeledTaggedCellValue_LabeledArray = {
-                        payload: [...upcast_first.payload],
-                        labels: [...upcast_first.labels]
-                    };
+                    const accumulator: LabeledTaggedCellValue_LabeledArray = structuredClone(upcast_first);
 
                     for (const entry of upcast_rest) {
-                        accumulator.payload = [...accumulator.payload, ...entry.payload];
-                        accumulator.labels = [...accumulator.labels, ...entry.labels];
-                    }
-
-                    return accumulator;
-                })();
-
-                this.property.value = {
-                    components: [make_cell_array(flattened)]
-                };
-            } else if (is_cell_entry(first) && rest_array_count === 1) {
-                const upcast_first = upcast_to_LabeledTaggedCellValue_LabeledArray(first);
-                const upcast_rest = rest.map((entry) => upcast_to_LabeledTaggedCellValue_LabeledArray(entry));
-
-                const flattened: LabeledTaggedCellValue_LabeledArray = (() => {
-                    let accumulator: LabeledTaggedCellValue_LabeledArray = {
-                        payload: [...upcast_first.payload],
-                        labels: [...upcast_first.labels]
-                    };
-
-                    for (const entry of upcast_rest) {
-                        accumulator.payload = [...accumulator.payload, ...entry.payload];
-                        accumulator.labels = [...accumulator.labels, ...entry.labels];
+                        accumulator.payload.push(...entry.payload);
+                        accumulator.labels.push(...entry.labels);
                     }
 
                     return accumulator;
