@@ -322,8 +322,15 @@ function upcast_to_LabeledTaggedCellValue_LabeledArray(input: CellEntry | CellAr
 }
 
 interface ICellArrayPropertyBuilder {
-    with_tagged_values(first: CellInput1, ...rest: CellInput1[]): INameBuilder;
-    with_tagged_values(first: CellInput2, ...rest: CellInput2[]): INameBuilder;
+    with_tagged_values<T extends [...CellEntry[]]>(...arguments_: [CellEntry, ...T]): INameBuilder;
+    with_tagged_values<T extends [CellEntry, ...CellEntry[]]>(...arguments_: [...T, CellArray]): INameBuilder;
+    with_tagged_values<T extends [CellEntry, ...CellEntry[]]>(...arguments_: [CellArray, ...T]): INameBuilder;
+    with_tagged_values<T extends [...CellArray[]]>(...arguments_: [CellArray, ...T]): INameBuilder;
+    with_tagged_values<T extends [CellMatrix, ...CellMatrix[]]>(...arguments_: [CellArray, ...T]): INameBuilder;
+    with_tagged_values<T extends [(CellArray | CellMatrix), ...(CellArray | CellMatrix)[]]>(...arguments_: [CellArray, ...T]): INameBuilder;
+    with_tagged_values<T extends [CellArray, ...CellArray[]]>(...arguments_: [CellMatrix, ...T]): INameBuilder;
+    with_tagged_values<T extends [...CellMatrix[]]>(...arguments_: [CellMatrix, ...T]): INameBuilder;
+    with_tagged_values<T extends [(CellArray | CellMatrix), ...(CellArray | CellMatrix)[]]>(...arguments_: [CellMatrix, ...T]): INameBuilder;
 }
 
 interface INameBuilder {
@@ -451,9 +458,8 @@ class PropertyBuilder implements
         return this;
     }
 
-    with_tagged_values(first: CellInput1, ...rest: CellInput1[]): INameBuilder;
-    with_tagged_values(first: CellInput2, ...rest: CellInput2[]): INameBuilder;
-    with_tagged_values(first: (CellEntry | CellArray | CellMatrix), ...rest: (CellEntry | CellArray | CellMatrix)[]): INameBuilder {
+    with_tagged_values(...arguments_: any[]): INameBuilder {
+        let [first, ...rest] = arguments_;
 
         const tagged_to_element = (entry: LabeledTaggedCellValue): CellArrayElement => {
             switch (entry.payload._tag) {
@@ -1070,7 +1076,7 @@ if (import.meta.vitest !== undefined) {
         expect(path_reference).toStrictEqual(expected_path_reference);
     });
 
-    test(`Cell Array Builder All Types Variadic`, () => {
+    test(`Cell Array Builder : (...CellEntry[>=1])`, () => {
 
         const expected_cell: DtsProperty = {
             labels: [],
@@ -1145,7 +1151,7 @@ if (import.meta.vitest !== undefined) {
         expect(cell).toStrictEqual(expected_cell);
     });
 
-    test(`Cell Array Builder All Types Array`, () => {
+    test(`Cell Array Builder : (CellArray)`, () => {
 
         const values: TaggedCellValue[] = [
             PropertyBuilder.tag_number(0),
@@ -1249,7 +1255,7 @@ if (import.meta.vitest !== undefined) {
         expect(cell).toStrictEqual(expected_cell);
     });
 
-    test(`Labeled Cell Array Builder All Types Array`, () => {
+    test(`Labeled Cell Array Builder : (CellArray)`, () => {
 
         const values: LabeledTaggedCellValue[] = [
             {
@@ -1368,7 +1374,7 @@ if (import.meta.vitest !== undefined) {
         expect(cell).toStrictEqual(expected_cell);
     });
 
-    test(`Cell Array Builder All Types Array and Variadic - 1`, () => {
+    test(`Cell Array Builder : (...CellEntry[>=1], CellArray)`, () => {
 
         const value: TaggedCellValue = PropertyBuilder.tag_number(0);
 
@@ -1475,7 +1481,7 @@ if (import.meta.vitest !== undefined) {
         expect(cell).toStrictEqual(expected_cell);
     });
 
-    test(`Cell Array Builder All Types Array and Variadic - 2`, () => {
+    test(`Cell Array Builder : (CellArray, ...CellEntry[>=1])`, () => {
 
         const value: TaggedCellValue = PropertyBuilder.tag_number(0);
 
@@ -1582,7 +1588,8 @@ if (import.meta.vitest !== undefined) {
         expect(cell).toStrictEqual(expected_cell);
     });
 
-    test(`Cell Array Builder All Types Array and Variadic - 3`, () => {
+    // Would be nice to have, but it's not really feasible, also probably no real use case
+    test(`FAIL Cell Array Builder : (...CellEntry[>=1], CellArray, ...CellEntry[>=1])`, () => {
 
         const value1: TaggedCellValue = PropertyBuilder.tag_number(0);
 
@@ -1680,6 +1687,7 @@ if (import.meta.vitest !== undefined) {
         };
 
         const cell = PropertyBuilder.build_cell_array()
+            // @ts-expect-error
             .with_tagged_values(value1, values, value2)
             .with_name(expected_cell.name)
             .with_labels(expected_cell.labels)
@@ -1690,13 +1698,17 @@ if (import.meta.vitest !== undefined) {
         expect(cell).toStrictEqual(expected_cell);
     });
 
-    test(`Cell Array Builder All Types Matrix of Arrays`, () => {
+    test(`Cell Array Builder : (...CellArray[>=1])`, () => {
         const values1: TaggedCellValue[] = [
             PropertyBuilder.tag_u64(0),
             PropertyBuilder.tag_label("gpio0"),
             PropertyBuilder.tag_path("/soc/gpio0"),
         ];
-        const values2: TaggedCellValue[] = [PropertyBuilder.tag_number(0), PropertyBuilder.tag_expression("(1+1)")];
+
+        const values2: TaggedCellValue[] = [
+            PropertyBuilder.tag_number(0),
+            PropertyBuilder.tag_expression("(1+1)")
+        ];
 
         const composed: TaggedCellValue[][] = [values1, values2];
 
@@ -1798,7 +1810,7 @@ if (import.meta.vitest !== undefined) {
         expect(cell).toStrictEqual(expected_cell);
     });
 
-    test(`Cell Array Builder All Types Matrix of Array and Variadic - 1`, () => {
+    test(`FAIL Cell Array Builder : (...CellArray[>=2], ...CellEntry[>=1])`, () => {
         const values1: TaggedCellValue[] = [
             PropertyBuilder.tag_u64(0),
             PropertyBuilder.tag_label("gpio0"),
@@ -1901,6 +1913,7 @@ if (import.meta.vitest !== undefined) {
         };
 
         const cell = PropertyBuilder.build_cell_array()
+            // @ts-expect-error
             .with_tagged_values(values1, values2, value)
             .with_name(expected_cell.name)
             .with_labels(expected_cell.labels)
@@ -1911,7 +1924,7 @@ if (import.meta.vitest !== undefined) {
         expect(cell).toStrictEqual(expected_cell);
     });
 
-    test(`Cell Array Builder All Types Matrix of Array and Variadic - 2`, () => {
+    test(`FAIL Cell Array Builder : (...CellArray[>=1], ...CellEntry[>=1], ...CellArray[>=1])`, () => {
         const values1: TaggedCellValue[] = [
             PropertyBuilder.tag_u64(0),
             PropertyBuilder.tag_label("gpio0"),
@@ -2014,6 +2027,7 @@ if (import.meta.vitest !== undefined) {
         };
 
         const cell = PropertyBuilder.build_cell_array()
+            // @ts-expect-error
             .with_tagged_values(values1, value, values2)
             .with_name(expected_cell.name)
             .with_labels(expected_cell.labels)
@@ -2024,7 +2038,7 @@ if (import.meta.vitest !== undefined) {
         expect(cell).toStrictEqual(expected_cell);
     });
 
-    test(`Cell Array Builder All Types Matrix of Array and Variadic - 3`, () => {
+    test(`FAIL Cell Array Builder : (...CellEntry[>=1], ...CellArray[>=2])`, () => {
         const values1: TaggedCellValue[] = [
             PropertyBuilder.tag_u64(0),
             PropertyBuilder.tag_label("gpio0"),
@@ -2127,6 +2141,7 @@ if (import.meta.vitest !== undefined) {
         };
 
         const cell = PropertyBuilder.build_cell_array()
+            // @ts-expect-error
             .with_tagged_values(value, values1, values2)
             .with_name(expected_cell.name)
             .with_labels(expected_cell.labels)
@@ -2137,7 +2152,7 @@ if (import.meta.vitest !== undefined) {
         expect(cell).toStrictEqual(expected_cell);
     });
 
-    test(`Cell Array Builder All Types Matrix `, () => {
+    test(`Cell Array Builder : (CellMatrix)`, () => {
         const values: TaggedCellValue[][] = [
             [PropertyBuilder.tag_number(0),
             PropertyBuilder.tag_u64(0),
@@ -2244,7 +2259,7 @@ if (import.meta.vitest !== undefined) {
         expect(cell).toStrictEqual(expected_cell);
     });
 
-    test(`Cell Array Builder All Types Matrix and Variadic 1 `, () => {
+    test(`Cell Array Builder : (...CellMatrix[>=1])`, () => {
         const values: TaggedCellValue[][] = [
             [PropertyBuilder.tag_number(0),
             PropertyBuilder.tag_u64(0),
@@ -2361,7 +2376,7 @@ if (import.meta.vitest !== undefined) {
         expect(cell).toStrictEqual(expected_cell);
     });
 
-    test(`Cell Array Builder All Types Matrix and Variadic 2 `, () => {
+    test(`Cell Array Builder : (CellMatrix, CellArray)`, () => {
         const values: TaggedCellValue[][] = [
             [PropertyBuilder.tag_number(0),
             PropertyBuilder.tag_u64(0),
@@ -2476,7 +2491,7 @@ if (import.meta.vitest !== undefined) {
         expect(cell).toStrictEqual(expected_cell);
     });
 
-    test(`Cell Array Builder All Types Matrix and Variadic 3 `, () => {
+    test(`Cell Array Builder : (CellArray, CellMatrix)`, () => {
         const values: TaggedCellValue[][] = [
             [PropertyBuilder.tag_number(0),
             PropertyBuilder.tag_u64(0),
@@ -2591,7 +2606,7 @@ if (import.meta.vitest !== undefined) {
         expect(cell).toStrictEqual(expected_cell);
     });
 
-    test(`Cell Array Builder All Types Matrix and Variadic 4 `, () => {
+    test(`Cell Array Builder : (CellMatrix, ...(CellArray,CellMatrix)[>=1])`, () => {
         const values: TaggedCellValue[][] = [
             [PropertyBuilder.tag_number(0),
             PropertyBuilder.tag_u64(0),
