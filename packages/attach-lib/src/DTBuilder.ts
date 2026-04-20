@@ -2,12 +2,12 @@
 import { CellArrayElement, DtsCellArray, DtsProperty } from "./dts";
 import { print_property } from "./dts/printer";
 
-type MakeLabeled<T> = {
+type Labeled<T> = {
     payload: T,
     labels: string[]
 }
 
-function is_labeled<T>(object: any): object is MakeLabeled<T> {
+function is_labeled<T>(object: any): object is Labeled<T> {
     if (object === null && typeof object !== 'object') {
         return false;
     }
@@ -32,7 +32,7 @@ function is_labeled<T>(object: any): object is MakeLabeled<T> {
         return false;
     }
 
-    const narrowed = object as MakeLabeled<T>;
+    const narrowed = object as Labeled<T>;
 
     if (!narrowed.labels.every((entry) => typeof entry === 'string')) {
         return false;
@@ -41,9 +41,9 @@ function is_labeled<T>(object: any): object is MakeLabeled<T> {
     return true;
 }
 
-function make_labeled<T>(object: T, labels?: string[]): MakeLabeled<T> {
+function make_labeled<T>(object: T, labels?: string[]): Labeled<T> {
 
-    type Labeled_T = MakeLabeled<T>;
+    type Labeled_T = Labeled<T>;
     const labeled_object: Labeled_T = {
         payload: object,
         labels: labels ?? []
@@ -78,7 +78,7 @@ interface IFlagPropertyBuilder {
 }
 
 type DTString = string;
-type LabeledDTString = MakeLabeled<DTString>;
+type LabeledDTString = Labeled<DTString>;
 type StringORLabeledString = DTString | LabeledDTString;
 type StringsORLabeledStrings = DTString | DTString[] | LabeledDTString | LabeledDTString[];
 
@@ -118,11 +118,11 @@ type TaggedExpression = {
 
 type TaggedCellValue = TaggedNumber | TaggedU64 | TaggedLabel | TaggedPath | TaggedExpression;
 type TaggedCellValue_Array = MakeArray<TaggedCellValue>;
-type TaggedCellValue_LabeledArray = MakeLabeled<TaggedCellValue_Array>;
+type TaggedCellValue_LabeledArray = Labeled<TaggedCellValue_Array>;
 
-type LabeledTaggedCellValue = MakeLabeled<TaggedCellValue>;
+type LabeledTaggedCellValue = Labeled<TaggedCellValue>;
 type LabeledTaggedCellValue_Array = MakeArray<LabeledTaggedCellValue>;
-type LabeledTaggedCellValue_LabeledArray = MakeLabeled<LabeledTaggedCellValue_Array>;
+type LabeledTaggedCellValue_LabeledArray = Labeled<LabeledTaggedCellValue_Array>;
 
 type CellEntry = TaggedCellValue | LabeledTaggedCellValue;
 type CellArray = TaggedCellValue_Array | TaggedCellValue_LabeledArray | LabeledTaggedCellValue_Array | LabeledTaggedCellValue_LabeledArray;
@@ -184,7 +184,7 @@ function is_tagged_cell_value_labeled_array(object: any): object is TaggedCellVa
         return false;
     }
 
-    const narrowed = object as MakeLabeled<any>;
+    const narrowed = object as Labeled<any>;
 
     if (!is_tagged_cell_value_array(narrowed.payload)) {
         return false;
@@ -202,7 +202,7 @@ function is_labeled_tagged_cell_value(object: any): object is LabeledTaggedCellV
         return false;
     }
 
-    const narrowed = object as MakeLabeled<any>;
+    const narrowed = object as Labeled<any>;
 
     if (!is_tagged_cell_value(narrowed.payload)) {
         return false;
@@ -236,7 +236,7 @@ function is_labeled_tagged_cell_value_labeled_array(object: any): object is Labe
         return false;
     }
 
-    const narrowed = object as MakeLabeled<any>;
+    const narrowed = object as Labeled<any>;
 
     if (!is_labeled_tagged_cell_value_array(narrowed.payload)) {
         return false;
