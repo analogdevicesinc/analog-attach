@@ -31,11 +31,19 @@ interface INameBuilder {
     with_name(name: string): IBuild;
 }
 
-interface IBuild {
-    with_labels(labels: string[]): IBuild;
-    with_user_modifications(modified_by_user: boolean): IBuild;
+interface IBuildBase {
     build(): DtsProperty;
 }
+
+type CallOnce = {
+    with_labels: (labels: string[]) => void;
+    with_user_modifications: (modified_by_user: boolean) => void;
+};
+
+type IBuild<Remaining extends keyof CallOnce = keyof CallOnce> =
+    IBuildBase & {
+        [K in Remaining]: (...arguments_: Parameters<CallOnce[K]>) => IBuild<Exclude<Remaining, K>>;
+    };
 
 class PropertyBuilder implements
     IFlagPropertyBuilder,
