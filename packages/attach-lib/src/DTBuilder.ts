@@ -83,7 +83,7 @@ type LabeledDTString = Labeled<DTString>;
 type LabeledDTString_Array = MakeArray<LabeledDTString>;
 type DTStringInput = (DTString | DTString_Array | LabeledDTString | LabeledDTString_Array);
 
-function is_dts_string(object: any): object is DTString {
+function is_dt_string(object: any): object is DTString {
     if (object === null || typeof object !== 'string') {
         return false;
     }
@@ -100,6 +100,10 @@ function is_dts_string_array(object: any): object is DTString_Array {
         return false;
     }
 
+    if (!object.every((entry) => is_dt_string(entry))) {
+        return false;
+    }
+
     return true;
 }
 
@@ -112,7 +116,7 @@ function is_labeled_dt_string(object: any): object is LabeledDTString {
         return false;
     }
 
-    if (!is_dts_string(object.payload)) {
+    if (!is_dt_string(object.payload)) {
         return false;
     }
 
@@ -124,7 +128,7 @@ function is_labeled_dt_string_array(object: any): object is LabeledDTString_Arra
         return false;
     }
 
-    if (!is_dts_string_array(object)) {
+    if (!is_array(object)) {
         return false;
     }
 
@@ -140,7 +144,24 @@ function is_dt_string_input(object: any): object is DTStringInput {
         return false;
     }
 
-    return is_dts_string(object) || is_dts_string_array(object) || is_labeled_dt_string(object) || is_labeled_dt_string_array(object);
+    return is_dt_string(object) || is_dts_string_array(object) || is_labeled_dt_string(object) || is_labeled_dt_string_array(object);
+}
+
+function upcast_to_LabeledDTStringArray(input: DTStringInput): LabeledDTString_Array {
+
+    if (is_dt_string(input)) {
+        return make_array(make_labeled(input));
+    }
+
+    if (is_dts_string_array(input)) {
+        return input.map((entry) => make_labeled(entry));
+    }
+
+    if (is_labeled_dt_string(input)) {
+        return make_array(input);
+    }
+
+    return input;
 }
 
 interface IStringPropertyBuilder {
@@ -148,6 +169,19 @@ interface IStringPropertyBuilder {
 }
 
 type DTSReferenceInput = DTString | LabeledDTString;
+
+function is_dts_reference_input(object: any): object is DTSReferenceInput {
+    return is_dt_string(object) || is_labeled_dt_string(object);
+}
+
+function upcast_to_LabeledDTString(input: DTSReferenceInput): LabeledDTString {
+
+    if (is_dt_string(input)) {
+        return make_labeled(input);
+    }
+
+    return input;
+}
 
 interface IReferencePropertyBuilder {
     with_label(label: DTSReferenceInput): INameBuilder;
@@ -425,58 +459,41 @@ class PropertyBuilder implements
     }
 
     with_value(...arguments_: any[]): INameBuilder {
-
         // Not sure if needed
         if (!arguments_.every((entry => is_dt_string_input(entry)))) {
             // TODO: error handling
             return this;
         }
 
-        const [first, ...rest] = arguments_;
+        const upcast = arguments_.map((entry) => upcast_to_LabeledDTStringArray(entry));
 
-        const flattened_rest = rest.flat();
-        const normalized_value = (is_array(first) ? [...first, ...flattened_rest] : [first, ...flattened_rest]);
+        const normalized_value = upcast.flat();
 
         this.property.value = {
             components: []
         };
 
         for (const entry of normalized_value) {
-            if (is_dts_string(entry)) {
-                this.property.value.components.push({
-                    kind: "string",
-                    value: entry,
-                    labels: []
-                });
-            } else if (is_labeled_dt_string(entry)) {
-                this.property.value.components.push({
-                    kind: "string",
-                    value: entry.payload,
-                    labels: entry.labels
-                });
-            }
+            this.property.value.components.push({
+                kind: "string",
+                value: entry.payload,
+                labels: entry.labels
+            });
         }
 
         return this;
     }
 
     with_label(label: DTSReferenceInput): INameBuilder {
-        this.property.value = typeof label === 'string' ? {
+        const upcast = upcast_to_LabeledDTString(label);
+
+        this.property.value = {
             components: [{
                 kind: "ref",
-                labels: [],
+                labels: upcast.labels,
                 ref: {
                     kind: 'label',
-                    name: label
-                }
-            }]
-        } : {
-            components: [{
-                kind: "ref",
-                labels: label.labels,
-                ref: {
-                    kind: 'label',
-                    name: label.payload
+                    name: upcast.payload
                 }
             }]
         };
@@ -485,22 +502,15 @@ class PropertyBuilder implements
     }
 
     with_path(path: DTSReferenceInput): INameBuilder {
-        this.property.value = typeof path === 'string' ? {
+        const upcast = upcast_to_LabeledDTString(path);
+
+        this.property.value = {
             components: [{
                 kind: "ref",
-                labels: [],
+                labels: upcast.labels,
                 ref: {
                     kind: 'path',
-                    path: path
-                }
-            }]
-        } : {
-            components: [{
-                kind: "ref",
-                labels: path.labels,
-                ref: {
-                    kind: 'path',
-                    path: path.payload
+                    path: upcast.payload
                 }
             }]
         };
