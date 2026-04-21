@@ -1,6 +1,6 @@
 /* eslint-disable unicorn/consistent-function-scoping */
-import { CellArrayElement, DtsCellArray, DtsProperty } from "./dts";
-import { print_property } from "./dts/printer";
+import { CellArrayElement, DtsCellArray, DtsProperty } from "../dts";
+import { print_property } from "../dts/printer";
 
 type Labeled<T> = {
     payload: T,
