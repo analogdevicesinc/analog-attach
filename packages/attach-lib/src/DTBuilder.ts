@@ -150,12 +150,15 @@ interface IReferencePropertyBuilder {
     with_path(path: DTSReferenceInput): INameBuilder;
 }
 
-type TagWith<T, tag extends string> = {
-    _tag: tag,
+const CELL_VALUE_TAGS = ["number", "u64", "label", "path", "expression"] as const;
+type CellValueTag = typeof CELL_VALUE_TAGS[number];
+
+type TagWith<T extends string | bigint, TAG extends CellValueTag> = {
+    _tag: TAG,
     value: T
 }
 
-function is_tagged<T>(object: any): object is TagWith<T, string> {
+function is_tagged(object: any): object is TagWith<string | bigint, CellValueTag> {
     if (object === null || typeof object !== 'object') {
         return false;
     }
@@ -169,6 +172,16 @@ function is_tagged<T>(object: any): object is TagWith<T, string> {
     }
 
     if (Object.entries(object).length > 2) {
+        return false;
+    }
+
+    const narrowed = object as TagWith<string | bigint, CellValueTag>;
+
+    if (!CELL_VALUE_TAGS.includes(narrowed._tag)) {
+        return false;
+    }
+
+    if (!['string', 'bigint'].includes(typeof narrowed.value)) {
         return false;
     }
 
@@ -194,25 +207,8 @@ type CellArray = TaggedCellValue_Array | TaggedCellValue_LabeledArray | LabeledT
 type CellMatrix = MakeArray<CellArray>;
 type DTCellArrayInput = CellEntry | CellArray | CellMatrix;
 
-function is_tagged_cell_value(object: any): object is CellValue {
-    if (!is_tagged(object)) {
-        return false;
-    }
-
-    // TODO: think of something easier
-    if (!["number", "u64", "label", "path", "expression"].includes(object._tag)) {
-        return false;
-    }
-
-    if (!['string', 'bigint'].includes(typeof object.value)) {
-        return false;
-    }
-
-    return true;
-}
-
 function is_tagged_cell_value_array(object: any): object is TaggedCellValue_Array {
-    return is_array(object) && object.every((entry) => is_tagged_cell_value(entry) === true);
+    return is_array(object) && object.every((entry) => is_tagged(entry) === true);
 }
 
 function is_tagged_cell_value_labeled_array(object: any): object is TaggedCellValue_LabeledArray {
@@ -220,7 +216,7 @@ function is_tagged_cell_value_labeled_array(object: any): object is TaggedCellVa
 }
 
 function is_labeled_tagged_cell_value(object: any): object is LabeledTaggedCellValue {
-    return is_labeled(object) && is_tagged_cell_value(object.payload);
+    return is_labeled(object) && is_tagged(object.payload);
 }
 
 function is_labeled_tagged_cell_value_array(object: any): object is LabeledTaggedCellValue_Array {
@@ -232,7 +228,7 @@ function is_labeled_tagged_cell_value_labeled_array(object: any): object is Labe
 }
 
 function is_cell_entry(object: any): object is CellEntry {
-    return is_tagged_cell_value(object) || is_labeled_tagged_cell_value(object);
+    return is_tagged(object) || is_labeled_tagged_cell_value(object);
 }
 
 function is_cell_array(object: any): object is CellArray {
@@ -288,7 +284,7 @@ function upcast_to_LabeledTaggedCellValue_LabeledArray(input: CellEntry | CellAr
         return make_labeled(input.payload.map((entry) => make_labeled(entry)));
     }
 
-    if (is_tagged_cell_value(input)) {
+    if (is_tagged(input)) {
         return make_labeled(make_array(make_labeled(input)));
     }
 
@@ -420,7 +416,7 @@ class PropertyBuilder implements
     }
 
     with_tagged_values(...arguments_: DTCellArrayInput[]): INameBuilder {
-        let [first, ...rest] = arguments_;
+        const [first, ...rest] = arguments_;
 
         const tagged_to_element = (entry: LabeledTaggedCellValue): CellArrayElement => {
             switch (entry.payload._tag) {
@@ -488,11 +484,11 @@ class PropertyBuilder implements
             }
         } else if (is_cell_array_or_cell_matrix(first) && rest.every((entry) => is_cell_array_or_cell_matrix(entry))) {
 
-            first = is_cell_matrix(first) ?
+            const upcast_first = is_cell_matrix(first) ?
                 first.map((entry) => upcast_to_LabeledTaggedCellValue_LabeledArray(entry)) :
                 upcast_to_LabeledTaggedCellValue_LabeledArray(first);
 
-            rest = rest.map(
+            const upcast_rest = rest.map(
                 (entry) => is_cell_array(entry) ?
                     upcast_to_LabeledTaggedCellValue_LabeledArray(entry) :
                     entry.map((row) => upcast_to_LabeledTaggedCellValue_LabeledArray(row))
@@ -500,7 +496,7 @@ class PropertyBuilder implements
 
             const accumulator: LabeledTaggedCellValue_LabeledArray[] = [];
 
-            for (const entry of [first, ...rest]) {
+            for (const entry of [upcast_first, ...upcast_rest]) {
                 if (is_labeled_tagged_cell_value_labeled_array(entry)) {
                     accumulator.push(entry);
                 } else if (is_cell_matrix(entry) && entry.every((item) => is_labeled_tagged_cell_value_labeled_array(item))) {
