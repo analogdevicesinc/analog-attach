@@ -8,7 +8,7 @@ type Labeled<T> = {
 }
 
 function is_labeled<T>(object: any): object is Labeled<T> {
-    if (object === null && typeof object !== 'object') {
+    if (object === null || typeof object !== 'object') {
         return false;
     }
 
@@ -55,7 +55,7 @@ function make_labeled<T>(object: T, labels?: string[]): Labeled<T> {
 type MakeArray<T> = T[];
 
 function is_array<T>(object: any): object is MakeArray<T> {
-    if (object === null && typeof object !== 'object') {
+    if (object === null || typeof object !== 'object') {
         return false;
     }
 
@@ -74,65 +74,111 @@ function make_array<T>(object: T): MakeArray<T> {
 }
 
 interface IFlagPropertyBuilder {
-    set_flag: () => INameBuilder;
+    set_flag(): INameBuilder;
 }
 
 type DTString = string;
+type DTString_Array = MakeArray<DTString>;
 type LabeledDTString = Labeled<DTString>;
-type StringORLabeledString = DTString | LabeledDTString;
-type StringsORLabeledStrings = DTString | DTString[] | LabeledDTString | LabeledDTString[];
+type LabeledDTString_Array = MakeArray<LabeledDTString>;
+type DTStringInput = (DTString | DTString_Array | LabeledDTString | LabeledDTString_Array);
+
+function is_dts_string(object: any): object is DTString {
+    if (object === null || typeof object !== 'string') {
+        return false;
+    }
+
+    return true;
+}
+
+function is_dts_string_array(object: any): object is DTString_Array {
+    if (object === null || typeof object !== 'object') {
+        return false;
+    }
+
+    if (!is_array(object)) {
+        return false;
+    }
+
+    return true;
+}
+
+function is_labeled_dt_string(object: any): object is LabeledDTString {
+    if (object === null || typeof object !== 'object') {
+        return false;
+    }
+
+    if (!is_labeled(object)) {
+        return false;
+    }
+
+    if (!is_dts_string(object.payload)) {
+        return false;
+    }
+
+    return true;
+}
+
+function is_labeled_dt_string_array(object: any): object is LabeledDTString_Array {
+    if (object === null || typeof object !== 'object') {
+        return false;
+    }
+
+    if (!is_dts_string_array(object)) {
+        return false;
+    }
+
+    if (!object.every((entry) => is_labeled_dt_string(entry))) {
+        return false;
+    }
+
+    return true;
+}
+
+function is_dt_string_input(object: any): object is DTStringInput {
+    if (object === null || object === undefined) {
+        return false;
+    }
+
+    return is_dts_string(object) || is_dts_string_array(object) || is_labeled_dt_string(object) || is_labeled_dt_string_array(object);
+}
 
 interface IStringPropertyBuilder {
-    with_value: (first: StringsORLabeledStrings, ...rest: StringsORLabeledStrings[]) => INameBuilder;
+    with_value<T extends [...DTStringInput[]]>(...arguments_: [DTStringInput, ...T]): INameBuilder;
 }
+
+type DTSReferenceInput = DTString | LabeledDTString;
 
 interface IReferencePropertyBuilder {
-    with_label: (label: StringORLabeledString) => INameBuilder;
-    with_path: (path: StringORLabeledString) => INameBuilder;
+    with_label(label: DTSReferenceInput): INameBuilder;
+    with_path(path: DTSReferenceInput): INameBuilder;
 }
 
-type TaggedNumber = {
-    _tag: "number",
-    value: bigint
+type TagWith<T, tag extends string> = {
+    _tag: tag,
+    value: T
 }
 
-type TaggedU64 = {
-    _tag: "u64",
-    value: bigint
-}
+type CellValue =
+    TagWith<bigint, "number"> |
+    TagWith<bigint, "u64"> |
+    TagWith<string, "label"> |
+    TagWith<string, "path"> |
+    TagWith<string, "expression">
 
-type TaggedLabel = {
-    _tag: "label";
-    value: string
-}
-
-type TaggedPath = {
-    _tag: "path";
-    value: string
-}
-
-type TaggedExpression = {
-    _tag: "expression";
-    value: string
-}
-
-type TaggedCellValue = TaggedNumber | TaggedU64 | TaggedLabel | TaggedPath | TaggedExpression;
-type TaggedCellValue_Array = MakeArray<TaggedCellValue>;
+type TaggedCellValue_Array = MakeArray<CellValue>;
 type TaggedCellValue_LabeledArray = Labeled<TaggedCellValue_Array>;
 
-type LabeledTaggedCellValue = Labeled<TaggedCellValue>;
+type LabeledTaggedCellValue = Labeled<CellValue>;
 type LabeledTaggedCellValue_Array = MakeArray<LabeledTaggedCellValue>;
 type LabeledTaggedCellValue_LabeledArray = Labeled<LabeledTaggedCellValue_Array>;
 
-type CellEntry = TaggedCellValue | LabeledTaggedCellValue;
+type CellEntry = CellValue | LabeledTaggedCellValue;
 type CellArray = TaggedCellValue_Array | TaggedCellValue_LabeledArray | LabeledTaggedCellValue_Array | LabeledTaggedCellValue_LabeledArray;
 type CellMatrix = MakeArray<CellArray>;
 
-type CellInput1 = CellEntry | CellArray;
-type CellInput2 = CellArray | CellMatrix;
-
-function is_tagged_cell_value(object: any): object is TaggedCellValue {
-    if (object === null && typeof object !== 'object') {
+function is_tagged_cell_value(object: any): object is CellValue {
+    if (object === null || typeof object !== 'object') {
         return false;
     }
 
@@ -140,6 +186,7 @@ function is_tagged_cell_value(object: any): object is TaggedCellValue {
         return false;
     }
 
+    // TODO: think of something easier
     if (!["number", "u64", "label", "path", "expression"].includes(object._tag)) {
         return false;
     }
@@ -160,7 +207,7 @@ function is_tagged_cell_value(object: any): object is TaggedCellValue {
 }
 
 function is_tagged_cell_value_array(object: any): object is TaggedCellValue_Array {
-    if (object === null && typeof object !== 'object') {
+    if (object === null || typeof object !== 'object') {
         return false;
     }
 
@@ -176,7 +223,7 @@ function is_tagged_cell_value_array(object: any): object is TaggedCellValue_Arra
 }
 
 function is_tagged_cell_value_labeled_array(object: any): object is TaggedCellValue_LabeledArray {
-    if (object === null && typeof object !== 'object') {
+    if (object === null || typeof object !== 'object') {
         return false;
     }
 
@@ -184,9 +231,7 @@ function is_tagged_cell_value_labeled_array(object: any): object is TaggedCellVa
         return false;
     }
 
-    const narrowed = object as Labeled<any>;
-
-    if (!is_tagged_cell_value_array(narrowed.payload)) {
+    if (!is_tagged_cell_value_array(object.payload)) {
         return false;
     }
 
@@ -194,7 +239,7 @@ function is_tagged_cell_value_labeled_array(object: any): object is TaggedCellVa
 }
 
 function is_labeled_tagged_cell_value(object: any): object is LabeledTaggedCellValue {
-    if (object === null && typeof object !== 'object') {
+    if (object === null || typeof object !== 'object') {
         return false;
     }
 
@@ -202,9 +247,7 @@ function is_labeled_tagged_cell_value(object: any): object is LabeledTaggedCellV
         return false;
     }
 
-    const narrowed = object as Labeled<any>;
-
-    if (!is_tagged_cell_value(narrowed.payload)) {
+    if (!is_tagged_cell_value(object.payload)) {
         return false;
     }
 
@@ -212,7 +255,7 @@ function is_labeled_tagged_cell_value(object: any): object is LabeledTaggedCellV
 }
 
 function is_labeled_tagged_cell_value_array(object: any): object is LabeledTaggedCellValue_Array {
-    if (object === null && typeof object !== 'object') {
+    if (object === null || typeof object !== 'object') {
         return false;
     }
 
@@ -228,7 +271,7 @@ function is_labeled_tagged_cell_value_array(object: any): object is LabeledTagge
 }
 
 function is_labeled_tagged_cell_value_labeled_array(object: any): object is LabeledTaggedCellValue_LabeledArray {
-    if (object === null && typeof object !== 'object') {
+    if (object === null || typeof object !== 'object') {
         return false;
     }
 
@@ -236,9 +279,7 @@ function is_labeled_tagged_cell_value_labeled_array(object: any): object is Labe
         return false;
     }
 
-    const narrowed = object as Labeled<any>;
-
-    if (!is_labeled_tagged_cell_value_array(narrowed.payload)) {
+    if (!is_labeled_tagged_cell_value_array(object.payload)) {
         return false;
     }
 
@@ -246,7 +287,7 @@ function is_labeled_tagged_cell_value_labeled_array(object: any): object is Labe
 }
 
 function is_cell_entry(object: any): object is CellEntry {
-    if (object === null && typeof object !== 'object') {
+    if (object === null || typeof object !== 'object') {
         return false;
     }
 
@@ -254,7 +295,7 @@ function is_cell_entry(object: any): object is CellEntry {
 }
 
 function is_cell_array(object: any): object is CellArray {
-    if (object === null && typeof object !== 'object') {
+    if (object === null || typeof object !== 'object') {
         return false;
     }
 
@@ -265,7 +306,7 @@ function is_cell_array(object: any): object is CellArray {
 }
 
 function is_cell_matrix(object: any): object is CellMatrix {
-    if (object === null && typeof object !== 'object') {
+    if (object === null || typeof object !== 'object') {
         return false;
     }
 
@@ -280,16 +321,16 @@ function is_cell_matrix(object: any): object is CellMatrix {
     return true;
 }
 
-function is_cell_input_1(object: any): object is CellInput1 {
-    if (object === null && typeof object !== 'object') {
+function is_cell_entry_or_cell_array(object: any): object is (CellEntry | CellArray) {
+    if (object === null || typeof object !== 'object') {
         return false;
     }
 
     return is_cell_entry(object) || is_cell_array(object);
 }
 
-function is_cell_input_2(object: any): object is CellInput2 {
-    if (object === null && typeof object !== 'object') {
+function is_cell_array_or_cell_matrix(object: any): object is (CellArray | CellMatrix) {
+    if (object === null || typeof object !== 'object') {
         return false;
     }
 
@@ -334,13 +375,13 @@ interface ICellArrayPropertyBuilder {
 }
 
 interface INameBuilder {
-    with_name: (name: string) => IBuild;
+    with_name(name: string): IBuild;
 }
 
 interface IBuild {
-    with_labels: (labels: string[]) => IBuild;
-    with_user_modifications: (modified_by_user: boolean) => IBuild;
-    build: () => DtsProperty;
+    with_labels(labels: string[]): IBuild;
+    with_user_modifications(modified_by_user: boolean): IBuild;
+    build(): DtsProperty;
 }
 
 class PropertyBuilder implements
@@ -383,22 +424,31 @@ class PropertyBuilder implements
         return this;
     }
 
-    with_value(first: StringsORLabeledStrings, ...rest: StringsORLabeledStrings[]): INameBuilder {
+    with_value(...arguments_: any[]): INameBuilder {
+
+        // Not sure if needed
+        if (!arguments_.every((entry => is_dt_string_input(entry)))) {
+            // TODO: error handling
+            return this;
+        }
+
+        const [first, ...rest] = arguments_;
+
         const flattened_rest = rest.flat();
-        const normalized_value = first === undefined ? flattened_rest : (Array.isArray(first) ? [...first, ...flattened_rest] : [first, ...flattened_rest]);
+        const normalized_value = (is_array(first) ? [...first, ...flattened_rest] : [first, ...flattened_rest]);
 
         this.property.value = {
             components: []
         };
 
         for (const entry of normalized_value) {
-            if (typeof entry === 'string') {
+            if (is_dts_string(entry)) {
                 this.property.value.components.push({
                     kind: "string",
                     value: entry,
                     labels: []
                 });
-            } else {
+            } else if (is_labeled_dt_string(entry)) {
                 this.property.value.components.push({
                     kind: "string",
                     value: entry.payload,
@@ -410,7 +460,7 @@ class PropertyBuilder implements
         return this;
     }
 
-    with_label(label: StringORLabeledString): INameBuilder {
+    with_label(label: DTSReferenceInput): INameBuilder {
         this.property.value = typeof label === 'string' ? {
             components: [{
                 kind: "ref",
@@ -434,7 +484,7 @@ class PropertyBuilder implements
         return this;
     }
 
-    with_path(path: StringORLabeledString): INameBuilder {
+    with_path(path: DTSReferenceInput): INameBuilder {
         this.property.value = typeof path === 'string' ? {
             components: [{
                 kind: "ref",
@@ -492,7 +542,7 @@ class PropertyBuilder implements
         });
 
         // CellInput1 overload
-        if (is_cell_input_1(first) && rest.every((entry) => is_cell_input_1(entry) === true)) {
+        if (is_cell_entry_or_cell_array(first) && rest.every((entry) => is_cell_entry_or_cell_array(entry) === true)) {
 
             if ((rest.every((entry) => is_cell_entry(entry) === true)) ||
                 (is_cell_entry(first) && rest.filter((element) => is_cell_array(element)).length === 1)) {
@@ -525,7 +575,7 @@ class PropertyBuilder implements
                         (entry) => make_cell_array(entry))
                 };
             }
-        } else if (is_cell_input_2(first) && rest.every((entry) => is_cell_input_2(entry))) {
+        } else if (is_cell_array_or_cell_matrix(first) && rest.every((entry) => is_cell_array_or_cell_matrix(entry))) {
 
             first = is_cell_matrix(first) ?
                 first.map((entry) => upcast_to_LabeledTaggedCellValue_LabeledArray(entry)) :
@@ -555,7 +605,6 @@ class PropertyBuilder implements
 
         return this;
     }
-
 
     with_name(name: string): IBuild {
         this.property.name = name;
@@ -1153,7 +1202,7 @@ if (import.meta.vitest !== undefined) {
 
     test(`Cell Array Builder : (CellArray)`, () => {
 
-        const values: TaggedCellValue[] = [
+        const values: CellValue[] = [
             PropertyBuilder.tag_number(0),
             PropertyBuilder.tag_u64(0),
             PropertyBuilder.tag_label("gpio0"),
@@ -1376,9 +1425,9 @@ if (import.meta.vitest !== undefined) {
 
     test(`Cell Array Builder : (...CellEntry[>=1], CellArray)`, () => {
 
-        const value: TaggedCellValue = PropertyBuilder.tag_number(0);
+        const value: CellValue = PropertyBuilder.tag_number(0);
 
-        const values: TaggedCellValue[] = [
+        const values: CellValue[] = [
             PropertyBuilder.tag_u64(0),
             PropertyBuilder.tag_label("gpio0"),
             PropertyBuilder.tag_path("/soc/gpio0"),
@@ -1483,9 +1532,9 @@ if (import.meta.vitest !== undefined) {
 
     test(`Cell Array Builder : (CellArray, ...CellEntry[>=1])`, () => {
 
-        const value: TaggedCellValue = PropertyBuilder.tag_number(0);
+        const value: CellValue = PropertyBuilder.tag_number(0);
 
-        const values: TaggedCellValue[] = [
+        const values: CellValue[] = [
             PropertyBuilder.tag_u64(0),
             PropertyBuilder.tag_label("gpio0"),
             PropertyBuilder.tag_path("/soc/gpio0"),
@@ -1591,15 +1640,15 @@ if (import.meta.vitest !== undefined) {
     // Would be nice to have, but it's not really feasible, also probably no real use case
     test(`FAIL Cell Array Builder : (...CellEntry[>=1], CellArray, ...CellEntry[>=1])`, () => {
 
-        const value1: TaggedCellValue = PropertyBuilder.tag_number(0);
+        const value1: CellValue = PropertyBuilder.tag_number(0);
 
-        const values: TaggedCellValue[] = [
+        const values: CellValue[] = [
             PropertyBuilder.tag_u64(0),
             PropertyBuilder.tag_label("gpio0"),
             PropertyBuilder.tag_path("/soc/gpio0"),
         ];
 
-        const value2: TaggedCellValue = PropertyBuilder.tag_expression("(1+1)");
+        const value2: CellValue = PropertyBuilder.tag_expression("(1+1)");
 
         const composed = [value1, ...values, value2];
 
@@ -1699,18 +1748,18 @@ if (import.meta.vitest !== undefined) {
     });
 
     test(`Cell Array Builder : (...CellArray[>=1])`, () => {
-        const values1: TaggedCellValue[] = [
+        const values1: CellValue[] = [
             PropertyBuilder.tag_u64(0),
             PropertyBuilder.tag_label("gpio0"),
             PropertyBuilder.tag_path("/soc/gpio0"),
         ];
 
-        const values2: TaggedCellValue[] = [
+        const values2: CellValue[] = [
             PropertyBuilder.tag_number(0),
             PropertyBuilder.tag_expression("(1+1)")
         ];
 
-        const composed: TaggedCellValue[][] = [values1, values2];
+        const composed: CellValue[][] = [values1, values2];
 
         const cell_array_array: DtsCellArray[] = [];
 
@@ -1811,19 +1860,19 @@ if (import.meta.vitest !== undefined) {
     });
 
     test(`FAIL Cell Array Builder : (...CellArray[>=2], ...CellEntry[>=1])`, () => {
-        const values1: TaggedCellValue[] = [
+        const values1: CellValue[] = [
             PropertyBuilder.tag_u64(0),
             PropertyBuilder.tag_label("gpio0"),
             PropertyBuilder.tag_path("/soc/gpio0"),
         ];
 
-        const values2: TaggedCellValue[] = [
+        const values2: CellValue[] = [
             PropertyBuilder.tag_path("/soc/gpio0"),
         ];
 
-        const value: TaggedCellValue = PropertyBuilder.tag_number(0);
+        const value: CellValue = PropertyBuilder.tag_number(0);
 
-        const composed: TaggedCellValue[][] = [values1, values2, [value]];
+        const composed: CellValue[][] = [values1, values2, [value]];
 
         const cell_array_array: DtsCellArray[] = [];
 
@@ -1925,19 +1974,19 @@ if (import.meta.vitest !== undefined) {
     });
 
     test(`FAIL Cell Array Builder : (...CellArray[>=1], ...CellEntry[>=1], ...CellArray[>=1])`, () => {
-        const values1: TaggedCellValue[] = [
+        const values1: CellValue[] = [
             PropertyBuilder.tag_u64(0),
             PropertyBuilder.tag_label("gpio0"),
             PropertyBuilder.tag_path("/soc/gpio0"),
         ];
 
-        const values2: TaggedCellValue[] = [
+        const values2: CellValue[] = [
             PropertyBuilder.tag_path("/soc/gpio0"),
         ];
 
-        const value: TaggedCellValue = PropertyBuilder.tag_number(0);
+        const value: CellValue = PropertyBuilder.tag_number(0);
 
-        const composed: TaggedCellValue[][] = [values1, [value], values2];
+        const composed: CellValue[][] = [values1, [value], values2];
 
         const cell_array_array: DtsCellArray[] = [];
 
@@ -2039,19 +2088,19 @@ if (import.meta.vitest !== undefined) {
     });
 
     test(`FAIL Cell Array Builder : (...CellEntry[>=1], ...CellArray[>=2])`, () => {
-        const values1: TaggedCellValue[] = [
+        const values1: CellValue[] = [
             PropertyBuilder.tag_u64(0),
             PropertyBuilder.tag_label("gpio0"),
             PropertyBuilder.tag_path("/soc/gpio0"),
         ];
 
-        const values2: TaggedCellValue[] = [
+        const values2: CellValue[] = [
             PropertyBuilder.tag_path("/soc/gpio0"),
         ];
 
-        const value: TaggedCellValue = PropertyBuilder.tag_number(0);
+        const value: CellValue = PropertyBuilder.tag_number(0);
 
-        const composed: TaggedCellValue[][] = [[value], values1, values2];
+        const composed: CellValue[][] = [[value], values1, values2];
 
         const cell_array_array: DtsCellArray[] = [];
 
@@ -2153,7 +2202,7 @@ if (import.meta.vitest !== undefined) {
     });
 
     test(`Cell Array Builder : (CellMatrix)`, () => {
-        const values: TaggedCellValue[][] = [
+        const values: CellValue[][] = [
             [PropertyBuilder.tag_number(0),
             PropertyBuilder.tag_u64(0),
             PropertyBuilder.tag_label("gpio0")],
@@ -2260,7 +2309,7 @@ if (import.meta.vitest !== undefined) {
     });
 
     test(`Cell Array Builder : (...CellMatrix[>=1])`, () => {
-        const values: TaggedCellValue[][] = [
+        const values: CellValue[][] = [
             [PropertyBuilder.tag_number(0),
             PropertyBuilder.tag_u64(0),
             PropertyBuilder.tag_label("gpio0")],
@@ -2268,7 +2317,7 @@ if (import.meta.vitest !== undefined) {
             PropertyBuilder.tag_expression("(1+1)")],
         ];
 
-        const values2: TaggedCellValue[][] = [
+        const values2: CellValue[][] = [
             [PropertyBuilder.tag_number(1),
             PropertyBuilder.tag_u64(1),
             PropertyBuilder.tag_label("gpio1")],
@@ -2377,7 +2426,7 @@ if (import.meta.vitest !== undefined) {
     });
 
     test(`Cell Array Builder : (CellMatrix, CellArray)`, () => {
-        const values: TaggedCellValue[][] = [
+        const values: CellValue[][] = [
             [PropertyBuilder.tag_number(0),
             PropertyBuilder.tag_u64(0),
             PropertyBuilder.tag_label("gpio0")],
@@ -2385,7 +2434,7 @@ if (import.meta.vitest !== undefined) {
             PropertyBuilder.tag_expression("(1+1)")],
         ];
 
-        const values2: TaggedCellValue[] = [
+        const values2: CellValue[] = [
             PropertyBuilder.tag_number(1),
             PropertyBuilder.tag_u64(1),
             PropertyBuilder.tag_label("gpio1")
@@ -2492,7 +2541,7 @@ if (import.meta.vitest !== undefined) {
     });
 
     test(`Cell Array Builder : (CellArray, CellMatrix)`, () => {
-        const values: TaggedCellValue[][] = [
+        const values: CellValue[][] = [
             [PropertyBuilder.tag_number(0),
             PropertyBuilder.tag_u64(0),
             PropertyBuilder.tag_label("gpio0")],
@@ -2500,7 +2549,7 @@ if (import.meta.vitest !== undefined) {
             PropertyBuilder.tag_expression("(1+1)")],
         ];
 
-        const values2: TaggedCellValue[] = [
+        const values2: CellValue[] = [
             PropertyBuilder.tag_number(1),
             PropertyBuilder.tag_u64(1),
             PropertyBuilder.tag_label("gpio1")
@@ -2607,7 +2656,7 @@ if (import.meta.vitest !== undefined) {
     });
 
     test(`Cell Array Builder : (CellMatrix, ...(CellArray,CellMatrix)[>=1])`, () => {
-        const values: TaggedCellValue[][] = [
+        const values: CellValue[][] = [
             [PropertyBuilder.tag_number(0),
             PropertyBuilder.tag_u64(0),
             PropertyBuilder.tag_label("gpio0")],
@@ -2615,13 +2664,13 @@ if (import.meta.vitest !== undefined) {
             PropertyBuilder.tag_expression("(1+1)")],
         ];
 
-        const values2: TaggedCellValue[] = [
+        const values2: CellValue[] = [
             PropertyBuilder.tag_number(1),
             PropertyBuilder.tag_u64(1),
             PropertyBuilder.tag_label("gpio1")
         ];
 
-        const values3: TaggedCellValue[][] = [
+        const values3: CellValue[][] = [
             [PropertyBuilder.tag_number(2),
             PropertyBuilder.tag_u64(2),
             PropertyBuilder.tag_label("gpio2")],
