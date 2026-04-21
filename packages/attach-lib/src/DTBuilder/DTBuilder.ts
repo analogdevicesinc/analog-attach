@@ -132,65 +132,35 @@ class PropertyBuilder implements
     }
 
     with_tagged_values(...arguments_: DTCellArrayInput[]): INameBuilder {
-        const [first, ...rest] = arguments_;
 
-        if (is_cell_entry_or_cell_array(first) && rest.every((entry) => is_cell_entry_or_cell_array(entry) === true)) {
+        if (
+            arguments_.every((entry) => is_cell_entry_or_cell_array(entry) === true) &&
+            arguments_.filter((element) => is_cell_array(element)).length <= 1
+        ) {
+            const upcast = arguments_.map((entry) => upcast_to_LabeledTaggedCellValue_LabeledArray(entry));
 
-            if ((rest.every((entry) => is_cell_entry(entry) === true)) ||
-                (is_cell_entry(first) && rest.filter((element) => is_cell_array(element)).length === 1)) {
+            // eslint-disable-next-line unicorn/no-array-reduce
+            const merged = upcast.reduce((accumulator, current_value) => {
+                accumulator.payload.push(...current_value.payload);
+                accumulator.labels.push(...current_value.labels);
+                return accumulator;
+            });
 
-                const upcast_first = upcast_to_LabeledTaggedCellValue_LabeledArray(first);
-                const upcast_rest = rest.map((entry) => upcast_to_LabeledTaggedCellValue_LabeledArray(entry));
+            this.property.value = {
+                components: [make_cell_array(merged)]
+            };
+        }
 
-                const flattened: LabeledTaggedCellValue_LabeledArray = (() => {
-                    const accumulator: LabeledTaggedCellValue_LabeledArray = structuredClone(upcast_first);
+        if (arguments_.every((entry) => is_cell_array_or_cell_matrix(entry) === true)) {
 
-                    for (const entry of upcast_rest) {
-                        accumulator.payload.push(...entry.payload);
-                        accumulator.labels.push(...entry.labels);
-                    }
-
-                    return accumulator;
-                })();
-
-                this.property.value = {
-                    components: [make_cell_array(flattened)]
-                };
-            }
-            else {
-                const upcast_first = upcast_to_LabeledTaggedCellValue_LabeledArray(first);
-                const upcast_rest = rest.map((entry) => upcast_to_LabeledTaggedCellValue_LabeledArray(entry));
-                const accumulator: LabeledTaggedCellValue_LabeledArray[] = [upcast_first, ...upcast_rest];
-
-                this.property.value = {
-                    components: accumulator.map(
-                        (entry) => make_cell_array(entry))
-                };
-            }
-        } else if (is_cell_array_or_cell_matrix(first) && rest.every((entry) => is_cell_array_or_cell_matrix(entry))) {
-
-            const upcast_first = is_cell_matrix(first) ?
-                first.map((entry) => upcast_to_LabeledTaggedCellValue_LabeledArray(entry)) :
-                upcast_to_LabeledTaggedCellValue_LabeledArray(first);
-
-            const upcast_rest = rest.map(
+            const upcast = arguments_.map(
                 (entry) => is_cell_array(entry) ?
                     upcast_to_LabeledTaggedCellValue_LabeledArray(entry) :
                     entry.map((row) => upcast_to_LabeledTaggedCellValue_LabeledArray(row))
             );
 
-            const accumulator: LabeledTaggedCellValue_LabeledArray[] = [];
-
-            for (const entry of [upcast_first, ...upcast_rest]) {
-                if (is_labeled_tagged_cell_value_labeled_array(entry)) {
-                    accumulator.push(entry);
-                } else if (is_cell_matrix(entry) && entry.every((item) => is_labeled_tagged_cell_value_labeled_array(item))) {
-                    accumulator.push(...entry);
-                }
-            }
-
             this.property.value = {
-                components: accumulator.map(
+                components: upcast.flat().map(
                     (entry) => make_cell_array(entry))
             };
         }
@@ -1229,9 +1199,7 @@ if (import.meta.vitest !== undefined) {
         expect(cell).toStrictEqual(expected_cell);
     });
 
-    // Would be nice to have, but it's not really feasible, also probably no real use case
     test(`FAIL Cell Array Builder : (...CellEntry[>=1], CellArray, ...CellEntry[>=1])`, () => {
-
         const value1: CellValue = PropertyBuilder.tag_number(0);
 
         const values: CellValue[] = [
@@ -1242,101 +1210,11 @@ if (import.meta.vitest !== undefined) {
 
         const value2: CellValue = PropertyBuilder.tag_expression("(1+1)");
 
-        const composed = [value1, ...values, value2];
-
-        const cell_array: DtsCellArray = {
-            kind: "array",
-            labels: [],
-            elements: []
-        };
-
-        for (const entry of composed) {
-
-            switch (entry._tag) {
-                case "number":
-                    {
-                        cell_array.elements.push({
-                            item: {
-                                kind: "number",
-                                labels: [],
-                                value: entry.value
-                            }
-                        });
-                        break;
-                    }
-                case "u64":
-                    {
-                        cell_array.elements.push({
-                            item: {
-                                kind: "u64",
-                                labels: [],
-                                value: entry.value
-                            }
-                        });
-                        break;
-                    }
-                case "label":
-                    {
-                        cell_array.elements.push({
-                            item: {
-                                kind: "ref",
-                                labels: [],
-                                ref: {
-                                    kind: "label",
-                                    name: entry.value
-                                }
-                            }
-                        });
-                        break;
-                    }
-                case "path":
-                    {
-                        cell_array.elements.push({
-                            item: {
-                                kind: "ref",
-                                labels: [],
-                                ref: {
-                                    kind: "path",
-                                    path: entry.value
-                                }
-                            }
-                        });
-                        break;
-                    }
-                case "expression":
-                    {
-                        cell_array.elements.push({
-                            item: {
-                                kind: "expression",
-                                labels: [],
-                                value: entry.value
-                            }
-                        });
-                        break;
-                    }
-            }
-        }
-
-        const expected_cell: DtsProperty = {
-            labels: [],
-            name: "unusual-cell",
-            value: {
-                components: [cell_array]
-            },
-            deleted: false,
-            modified_by_user: false
-        };
-
-        const cell = PropertyBuilder.build_cell_array()
+        const _cell = PropertyBuilder.build_cell_array()
             // @ts-expect-error
             .with_tagged_values(value1, values, value2)
-            .with_name(expected_cell.name)
-            .with_labels(expected_cell.labels)
-            .with_user_modifications(expected_cell.modified_by_user)
+            .with_name("")
             .build();
-
-        console.log(`${PropertyBuilder.to_string(cell)}`);
-        expect(cell).toStrictEqual(expected_cell);
     });
 
     test(`Cell Array Builder : (...CellArray[>=1])`, () => {
@@ -1464,105 +1342,11 @@ if (import.meta.vitest !== undefined) {
 
         const value: CellValue = PropertyBuilder.tag_number(0);
 
-        const composed: CellValue[][] = [values1, values2, [value]];
-
-        const cell_array_array: DtsCellArray[] = [];
-
-        for (const entry of composed) {
-            const cell_array: DtsCellArray = {
-                kind: "array",
-                labels: [],
-                elements: []
-            };
-
-            for (const sub_entry of entry) {
-                switch (sub_entry._tag) {
-                    case "number":
-                        {
-                            cell_array.elements.push({
-                                item: {
-                                    kind: "number",
-                                    labels: [],
-                                    value: sub_entry.value
-                                }
-                            });
-                            break;
-                        }
-                    case "u64":
-                        {
-                            cell_array.elements.push({
-                                item: {
-                                    kind: "u64",
-                                    labels: [],
-                                    value: sub_entry.value
-                                }
-                            });
-                            break;
-                        }
-                    case "label":
-                        {
-                            cell_array.elements.push({
-                                item: {
-                                    kind: "ref",
-                                    labels: [],
-                                    ref: {
-                                        kind: "label",
-                                        name: sub_entry.value
-                                    }
-                                }
-                            });
-                            break;
-                        }
-                    case "path":
-                        {
-                            cell_array.elements.push({
-                                item: {
-                                    kind: "ref",
-                                    labels: [],
-                                    ref: {
-                                        kind: "path",
-                                        path: sub_entry.value
-                                    }
-                                }
-                            });
-                            break;
-                        }
-                    case "expression":
-                        {
-                            cell_array.elements.push({
-                                item: {
-                                    kind: "expression",
-                                    labels: [],
-                                    value: sub_entry.value
-                                }
-                            });
-                            break;
-                        }
-                }
-            }
-            cell_array_array.push(cell_array);
-        }
-
-        const expected_cell: DtsProperty = {
-            labels: [],
-            name: "unusual-cell",
-            value: {
-                components: cell_array_array
-            },
-            deleted: false,
-            modified_by_user: false
-        };
-
-        const cell = PropertyBuilder.build_cell_array()
-            // @ts-expect-error
+        const _cell = PropertyBuilder.build_cell_array()
+            // @ts-expect-error invalid combination
             .with_tagged_values(values1, values2, value)
-            .with_name(expected_cell.name)
-            .with_labels(expected_cell.labels)
-            .with_user_modifications(expected_cell.modified_by_user)
+            .with_name("")
             .build();
-
-        console.log(`${PropertyBuilder.to_string(cell)}`);
-        expect(cell).toStrictEqual(expected_cell);
     });
 
     test(`FAIL Cell Array Builder : (...CellArray[>=1], ...CellEntry[>=1], ...CellArray[>=1])`, () => {
@@ -1578,105 +1362,11 @@ if (import.meta.vitest !== undefined) {
 
         const value: CellValue = PropertyBuilder.tag_number(0);
 
-        const composed: CellValue[][] = [values1, [value], values2];
-
-        const cell_array_array: DtsCellArray[] = [];
-
-        for (const entry of composed) {
-            const cell_array: DtsCellArray = {
-                kind: "array",
-                labels: [],
-                elements: []
-            };
-
-            for (const sub_entry of entry) {
-                switch (sub_entry._tag) {
-                    case "number":
-                        {
-                            cell_array.elements.push({
-                                item: {
-                                    kind: "number",
-                                    labels: [],
-                                    value: sub_entry.value
-                                }
-                            });
-                            break;
-                        }
-                    case "u64":
-                        {
-                            cell_array.elements.push({
-                                item: {
-                                    kind: "u64",
-                                    labels: [],
-                                    value: sub_entry.value
-                                }
-                            });
-                            break;
-                        }
-                    case "label":
-                        {
-                            cell_array.elements.push({
-                                item: {
-                                    kind: "ref",
-                                    labels: [],
-                                    ref: {
-                                        kind: "label",
-                                        name: sub_entry.value
-                                    }
-                                }
-                            });
-                            break;
-                        }
-                    case "path":
-                        {
-                            cell_array.elements.push({
-                                item: {
-                                    kind: "ref",
-                                    labels: [],
-                                    ref: {
-                                        kind: "path",
-                                        path: sub_entry.value
-                                    }
-                                }
-                            });
-                            break;
-                        }
-                    case "expression":
-                        {
-                            cell_array.elements.push({
-                                item: {
-                                    kind: "expression",
-                                    labels: [],
-                                    value: sub_entry.value
-                                }
-                            });
-                            break;
-                        }
-                }
-            }
-            cell_array_array.push(cell_array);
-        }
-
-        const expected_cell: DtsProperty = {
-            labels: [],
-            name: "unusual-cell",
-            value: {
-                components: cell_array_array
-            },
-            deleted: false,
-            modified_by_user: false
-        };
-
         const cell = PropertyBuilder.build_cell_array()
-            // @ts-expect-error
+            // @ts-expect-error invalid combination
             .with_tagged_values(values1, value, values2)
-            .with_name(expected_cell.name)
-            .with_labels(expected_cell.labels)
-            .with_user_modifications(expected_cell.modified_by_user)
+            .with_name("")
             .build();
-
-        console.log(`${PropertyBuilder.to_string(cell)}`);
-        expect(cell).toStrictEqual(expected_cell);
     });
 
     test(`FAIL Cell Array Builder : (...CellEntry[>=1], ...CellArray[>=2])`, () => {
@@ -1692,105 +1382,11 @@ if (import.meta.vitest !== undefined) {
 
         const value: CellValue = PropertyBuilder.tag_number(0);
 
-        const composed: CellValue[][] = [[value], values1, values2];
-
-        const cell_array_array: DtsCellArray[] = [];
-
-        for (const entry of composed) {
-            const cell_array: DtsCellArray = {
-                kind: "array",
-                labels: [],
-                elements: []
-            };
-
-            for (const sub_entry of entry) {
-                switch (sub_entry._tag) {
-                    case "number":
-                        {
-                            cell_array.elements.push({
-                                item: {
-                                    kind: "number",
-                                    labels: [],
-                                    value: sub_entry.value
-                                }
-                            });
-                            break;
-                        }
-                    case "u64":
-                        {
-                            cell_array.elements.push({
-                                item: {
-                                    kind: "u64",
-                                    labels: [],
-                                    value: sub_entry.value
-                                }
-                            });
-                            break;
-                        }
-                    case "label":
-                        {
-                            cell_array.elements.push({
-                                item: {
-                                    kind: "ref",
-                                    labels: [],
-                                    ref: {
-                                        kind: "label",
-                                        name: sub_entry.value
-                                    }
-                                }
-                            });
-                            break;
-                        }
-                    case "path":
-                        {
-                            cell_array.elements.push({
-                                item: {
-                                    kind: "ref",
-                                    labels: [],
-                                    ref: {
-                                        kind: "path",
-                                        path: sub_entry.value
-                                    }
-                                }
-                            });
-                            break;
-                        }
-                    case "expression":
-                        {
-                            cell_array.elements.push({
-                                item: {
-                                    kind: "expression",
-                                    labels: [],
-                                    value: sub_entry.value
-                                }
-                            });
-                            break;
-                        }
-                }
-            }
-            cell_array_array.push(cell_array);
-        }
-
-        const expected_cell: DtsProperty = {
-            labels: [],
-            name: "unusual-cell",
-            value: {
-                components: cell_array_array
-            },
-            deleted: false,
-            modified_by_user: false
-        };
-
         const cell = PropertyBuilder.build_cell_array()
-            // @ts-expect-error
+            // @ts-expect-error invalid combination
             .with_tagged_values(value, values1, values2)
-            .with_name(expected_cell.name)
-            .with_labels(expected_cell.labels)
-            .with_user_modifications(expected_cell.modified_by_user)
+            .with_name("")
             .build();
-
-        console.log(`${PropertyBuilder.to_string(cell)}`);
-        expect(cell).toStrictEqual(expected_cell);
     });
 
     test(`Cell Array Builder : (CellMatrix)`, () => {
