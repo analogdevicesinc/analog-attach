@@ -92,63 +92,25 @@ function is_dt_string(object: any): object is DTString {
 }
 
 function is_dts_string_array(object: any): object is DTString_Array {
-    if (object === null || typeof object !== 'object') {
-        return false;
-    }
-
-    if (!is_array(object)) {
-        return false;
-    }
-
-    if (!object.every((entry) => is_dt_string(entry))) {
-        return false;
-    }
-
-    return true;
+    return is_array(object) && object.every((entry) => is_dt_string(entry));
 }
 
 function is_labeled_dt_string(object: any): object is LabeledDTString {
-    if (object === null || typeof object !== 'object') {
-        return false;
-    }
-
-    if (!is_labeled(object)) {
-        return false;
-    }
-
-    if (!is_dt_string(object.payload)) {
-        return false;
-    }
-
-    return true;
+    return is_labeled(object) && is_dt_string(object.payload);
 }
 
 function is_labeled_dt_string_array(object: any): object is LabeledDTString_Array {
-    if (object === null || typeof object !== 'object') {
-        return false;
-    }
-
-    if (!is_array(object)) {
-        return false;
-    }
-
-    if (!object.every((entry) => is_labeled_dt_string(entry))) {
-        return false;
-    }
-
-    return true;
+    return is_array(object) && object.every((entry) => is_labeled_dt_string(entry));
 }
 
 function is_dt_string_input(object: any): object is DTStringInput {
-    if (object === null || object === undefined) {
-        return false;
-    }
-
-    return is_dt_string(object) || is_dts_string_array(object) || is_labeled_dt_string(object) || is_labeled_dt_string_array(object);
+    return is_dt_string(object) ||
+        is_dts_string_array(object) ||
+        is_labeled_dt_string(object) ||
+        is_labeled_dt_string_array(object);
 }
 
 function upcast_to_LabeledDTStringArray(input: DTStringInput): LabeledDTString_Array {
-
     if (is_dt_string(input)) {
         return make_array(make_labeled(input));
     }
@@ -193,6 +155,26 @@ type TagWith<T, tag extends string> = {
     value: T
 }
 
+function is_tagged<T>(object: any): object is TagWith<T, string> {
+    if (object === null || typeof object !== 'object') {
+        return false;
+    }
+
+    if (!("_tag" in object)) {
+        return false;
+    }
+
+    if (!("value" in object)) {
+        return false;
+    }
+
+    if (Object.entries(object).length > 2) {
+        return false;
+    }
+
+    return true;
+}
+
 type CellValue =
     TagWith<bigint, "number"> |
     TagWith<bigint, "u64"> |
@@ -210,13 +192,10 @@ type LabeledTaggedCellValue_LabeledArray = Labeled<LabeledTaggedCellValue_Array>
 type CellEntry = CellValue | LabeledTaggedCellValue;
 type CellArray = TaggedCellValue_Array | TaggedCellValue_LabeledArray | LabeledTaggedCellValue_Array | LabeledTaggedCellValue_LabeledArray;
 type CellMatrix = MakeArray<CellArray>;
+type DTCellArrayInput = CellEntry | CellArray | CellMatrix;
 
 function is_tagged_cell_value(object: any): object is CellValue {
-    if (object === null || typeof object !== 'object') {
-        return false;
-    }
-
-    if (!("_tag" in object)) {
+    if (!is_tagged(object)) {
         return false;
     }
 
@@ -225,15 +204,7 @@ function is_tagged_cell_value(object: any): object is CellValue {
         return false;
     }
 
-    if (!("value" in object)) {
-        return false;
-    }
-
     if (!['string', 'bigint'].includes(typeof object.value)) {
-        return false;
-    }
-
-    if (Object.entries(object).length !== 2) {
         return false;
     }
 
@@ -241,90 +212,26 @@ function is_tagged_cell_value(object: any): object is CellValue {
 }
 
 function is_tagged_cell_value_array(object: any): object is TaggedCellValue_Array {
-    if (object === null || typeof object !== 'object') {
-        return false;
-    }
-
-    if (!is_array(object)) {
-        return false;
-    }
-
-    if (!object.every((entry) => is_tagged_cell_value(entry) === true)) {
-        return false;
-    }
-
-    return true;
+    return is_array(object) && object.every((entry) => is_tagged_cell_value(entry) === true);
 }
 
 function is_tagged_cell_value_labeled_array(object: any): object is TaggedCellValue_LabeledArray {
-    if (object === null || typeof object !== 'object') {
-        return false;
-    }
-
-    if (!is_labeled(object)) {
-        return false;
-    }
-
-    if (!is_tagged_cell_value_array(object.payload)) {
-        return false;
-    }
-
-    return true;
+    return is_labeled(object) && is_tagged_cell_value_array(object.payload);
 }
 
 function is_labeled_tagged_cell_value(object: any): object is LabeledTaggedCellValue {
-    if (object === null || typeof object !== 'object') {
-        return false;
-    }
-
-    if (!is_labeled(object)) {
-        return false;
-    }
-
-    if (!is_tagged_cell_value(object.payload)) {
-        return false;
-    }
-
-    return true;
+    return is_labeled(object) && is_tagged_cell_value(object.payload);
 }
 
 function is_labeled_tagged_cell_value_array(object: any): object is LabeledTaggedCellValue_Array {
-    if (object === null || typeof object !== 'object') {
-        return false;
-    }
-
-    if (!is_array(object)) {
-        return false;
-    }
-
-    if (!object.every((entry) => is_labeled_tagged_cell_value(entry) === true)) {
-        return false;
-    }
-
-    return true;
+    return is_array(object) && object.every((entry) => is_labeled_tagged_cell_value(entry) === true);
 }
 
 function is_labeled_tagged_cell_value_labeled_array(object: any): object is LabeledTaggedCellValue_LabeledArray {
-    if (object === null || typeof object !== 'object') {
-        return false;
-    }
-
-    if (!is_labeled(object)) {
-        return false;
-    }
-
-    if (!is_labeled_tagged_cell_value_array(object.payload)) {
-        return false;
-    }
-
-    return true;
+    return is_labeled(object) && is_labeled_tagged_cell_value_array(object.payload);
 }
 
 function is_cell_entry(object: any): object is CellEntry {
-    if (object === null || typeof object !== 'object') {
-        return false;
-    }
-
     return is_tagged_cell_value(object) || is_labeled_tagged_cell_value(object);
 }
 
@@ -458,13 +365,7 @@ class PropertyBuilder implements
         return this;
     }
 
-    with_value(...arguments_: any[]): INameBuilder {
-        // Not sure if needed
-        if (!arguments_.every((entry => is_dt_string_input(entry)))) {
-            // TODO: error handling
-            return this;
-        }
-
+    with_value(...arguments_: DTStringInput[]): INameBuilder {
         const upcast = arguments_.map((entry) => upcast_to_LabeledDTStringArray(entry));
 
         const normalized_value = upcast.flat();
@@ -518,7 +419,7 @@ class PropertyBuilder implements
         return this;
     }
 
-    with_tagged_values(...arguments_: any[]): INameBuilder {
+    with_tagged_values(...arguments_: DTCellArrayInput[]): INameBuilder {
         let [first, ...rest] = arguments_;
 
         const tagged_to_element = (entry: LabeledTaggedCellValue): CellArrayElement => {
