@@ -22,9 +22,14 @@ import type {
   DtsValueComponent,
   Memreserve,
   UnresolvedOverlay,
+  DtsMetadata,
+  Version,
+  AbsolutePathToDTSNode,
 } from "./ast";
 
 import { get_node_key } from './utilities.js';
+
+import { parse as parse_yaml_string } from "yaml";
 
 /** 
 * Parser error enriched with line/column from the triggering token. 
@@ -81,6 +86,7 @@ class Parser {
   private i = 0;
   // Map of labels to their absolute paths
   private label_to_path = new Map<string, string>();
+  private comments: CommentToken[] = [];
 
   constructor(private readonly tokens: Token[]) { }
 
@@ -115,11 +121,53 @@ class Parser {
   }
 
   private get tok(): Token {
-    return this.tokens[this.i];
+    return this.tokens[this.i] ?? this.tokens[this.tokens.length - 1];
   }
 
   private advance(): Token {
-    return this.tokens[this.i++];
+    const current_token = this.tokens[this.i];
+
+    if (current_token.kind === TokKind.EOF) {
+      return current_token;
+    }
+
+    if (isCommentToken(current_token)) {
+      this.comments.push(current_token);
+    }
+
+    ++this.i;
+
+    while (this.i < this.tokens.length - 1) {
+      const token = this.tokens[this.i];
+      if (isCommentToken(token)) {
+        this.comments.push(token);
+        ++this.i;
+      } else {
+        break;
+      }
+    }
+
+    return current_token;
+  }
+
+  private lookahead(offset: number): Token {
+    if (offset <= 0) {
+      return this.tok;
+    }
+
+    let count = 0;
+    for (let index = this.i + 1; index < this.tokens.length; ++index) {
+      const token = this.tokens[index];
+
+      if (!isCommentToken(token)) {
+        ++count;
+        if (count === offset) return token;
+      }
+
+      if (token.kind === TokKind.EOF) return token;
+    }
+    
+    return this.tokens[this.tokens.length - 1];
   }
 
   private consume(kind: TokKind): boolean {
@@ -156,7 +204,7 @@ class Parser {
     }
 
     // Zero or more /memreserve/ <addr> <len>;
-    while (this.tok.kind === TokKind.Slash && this.tokens[this.i + 1]?.kind === TokKind.Ident) {
+    while (this.tok.kind === TokKind.Slash && this.lookahead(1)?.kind === TokKind.Ident) {
       const word = this.consume_slash_word();
 
       if (word === '/dts-v1/') {
@@ -195,10 +243,10 @@ class Parser {
     // TODO: could be technically determined already if we have /plugin/ or not
     // At least one root or overlay fragment
     let base_document: DtsDocument;
-    if (this.tok.kind === TokKind.Slash && this.tokens[this.i + 1]?.kind === TokKind.LBrace) {
+    if (this.tok.kind === TokKind.Slash && this.lookahead(1)?.kind === TokKind.LBrace) {
       // Traditional root node starting with '/'
       const root = this.parse_node();
-      base_document = { memreserves: memreserves, root: root, unresolved_overlays: [] };
+      base_document = { memreserves: memreserves, root: root, unresolved_overlays: [], metadata: undefined };
     } else {
       // Document starts with overlay fragments - create empty root
       let root: DtsNode = {
@@ -210,18 +258,19 @@ class Parser {
         deleted: false
       };
 
-      base_document = { memreserves: memreserves, root: root, unresolved_overlays: [] };
+      base_document = { memreserves: memreserves, root: root, unresolved_overlays: [], metadata: undefined };
     }
 
     // Additional roots and/or directives
     while (this.tok.kind !== TokKind.EOF) {
       // Additional root blocks
-      if (this.tok.kind === TokKind.Slash && this.tokens[this.i + 1]?.kind === TokKind.LBrace) {
+      if (this.tok.kind === TokKind.Slash && this.lookahead(1)?.kind === TokKind.LBrace) {
         const next_root = this.parse_node(base_document.root);
         const incoming: DtsDocument = {
           memreserves: [],
           root: next_root,
-          unresolved_overlays: []
+          unresolved_overlays: [],
+          metadata: undefined
         };
 
         merge_document(base_document, incoming);
@@ -231,7 +280,7 @@ class Parser {
       // Top-level overlay: optional label then &ref { ... }
       const labels: string[] = this.consume_present_labels();
 
-      if (this.tokens[this.i]?.kind === TokKind.Ampersand) {
+      if (this.tok.kind === TokKind.Ampersand) {
         const target_reference = this.parse_reference();
         let target = this.resolve_reference(base_document.root, target_reference);
 
@@ -269,7 +318,7 @@ class Parser {
       }
 
       // Top-level directives 
-      if (this.tok.kind === TokKind.Slash && this.tokens[this.i + 1]?.kind === TokKind.Ident) {
+      if (this.tok.kind === TokKind.Slash && this.lookahead(1)?.kind === TokKind.Ident) {
         this.parse_and_apply_directive(base_document.root);
         continue;
       }
@@ -283,6 +332,8 @@ class Parser {
     base_document.unresolved_overlays = unresolved_overlays;
 
     prune_soft_delete(base_document);
+
+    base_document.metadata = this.parse_dts_metadata();
 
     return base_document;
   }
@@ -888,7 +939,7 @@ class Parser {
 
       if (k === TokKind.RAngle) {
         // Possible end of array or shift-right; check if it's a shift '>>'
-        if (this.tokens[this.i + 1]?.kind === TokKind.RAngle) {
+        if (this.lookahead(1)?.kind === TokKind.RAngle) {
           this.advance();
           this.advance();
           push(">>");
@@ -960,7 +1011,7 @@ class Parser {
       if (k === TokKind.BitwiseNot) { this.advance(); push("~"); expect_operand = true; continue; }
       if (k === TokKind.LAngle) {
         // Must be '<<'
-        if (this.tokens[this.i + 1]?.kind === TokKind.LAngle) {
+        if (this.lookahead(1)?.kind === TokKind.LAngle) {
           this.advance();
           this.advance();
           push("<<");
@@ -1039,14 +1090,14 @@ class Parser {
   * True if an identifier (or identifier + unit address) is followed by `{` 
   */
   private peek_node_start(): boolean {
-    if (this.tokens[this.i + 1]?.kind === TokKind.LBrace) {
+    if (this.lookahead(1)?.kind === TokKind.LBrace) {
       return true;
     }
 
-    if (this.tokens[this.i + 1]?.kind === TokKind.At) {
-      let lookahead = this.i + 2;
+    if (this.lookahead(1)?.kind === TokKind.At) {
+      let lookahead = 2;
       while (lookahead++) {
-        switch (this.tokens[lookahead].kind) {
+        switch (this.lookahead(lookahead).kind) {
           case TokKind.Ident:
           case TokKind.Number:
           case TokKind.Comma: {
@@ -1068,12 +1119,30 @@ class Parser {
   private consume_present_labels(): string[] {
     const labels: string[] = [];
 
-    while (this.tok.kind === TokKind.Ident && this.tokens[this.i + 1]?.kind === TokKind.Colon) {
+    while (this.tok.kind === TokKind.Ident && this.lookahead(1)?.kind === TokKind.Colon) {
       labels.push(this.advance().value!);
       this.expect(TokKind.Colon);
     }
 
     return labels;
+  }
+
+  private parse_dts_metadata(): DtsMetadata | undefined {
+    const metadata_token = this.comments.reverse().find(c => (
+      c.kind === TokKind.CommentBlock
+      && c.value.includes("modified:")
+    ));
+
+    if (metadata_token === undefined) {
+      return undefined;
+    }
+
+    try {
+      const metadata = parse_yaml_string(metadata_token.value);
+      return isDtsMetadata(metadata) ? metadata : undefined;
+    } catch {
+      return undefined;
+    }
   }
 }
 
@@ -1157,4 +1226,81 @@ function prune_soft_delete_impl(root: DtsNode) {
   for (const child of root.children) {
     prune_soft_delete_impl(child);
   }
+}
+
+type CommentToken = Token & {
+  kind: TokKind.CommentLine | TokKind.CommentBlock;
+  value: string;
+};
+
+function isCommentToken(t: any): t is CommentToken {
+  if (typeof t !== "object" || t === null) {
+    return false;
+  }
+
+  if (
+    t.kind !== TokKind.CommentLine
+    && t.kind !== TokKind.CommentBlock
+  ) {
+    return false;
+  }
+
+  if (typeof t.value !== "string") {
+    return false;
+  }
+
+  return true;
+}
+
+function isVersion(obj: any): obj is Version {
+  if (typeof obj !== "string") {
+    return false;
+  }
+
+  const version_regex = /^\d+\.\d+\.\d+$/;
+  if (!version_regex.test(obj)) {
+    return false;
+  }
+
+  return true;
+}
+
+function isAbsolutePathToDTSNode(obj: any): obj is AbsolutePathToDTSNode {
+  if (typeof obj !== "string") {
+    return false;
+  }
+
+  return true;
+}
+
+function isArrayOfAbsolutePathToDTSNode(obj: any): obj is AbsolutePathToDTSNode[] {
+  if (!Array.isArray(obj)) {
+    return false;
+  }
+
+  if (!obj.every(e => isAbsolutePathToDTSNode(e))) {
+    return false;
+  }
+
+  return true;
+}
+
+function isDtsMetadata(obj: any): obj is DtsMetadata {
+  if (typeof obj !== 'object' || obj === null) {
+    return false;
+  }
+
+  if (Object.keys(obj).length !== 2) {
+    return false;
+  }
+
+  if (!isVersion(obj.version)) {
+    return false;
+  }
+
+  if (!isArrayOfAbsolutePathToDTSNode(obj.modified)) {
+    return false;
+  }
+
+  return true;
 }

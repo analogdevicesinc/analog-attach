@@ -413,3 +413,15 @@ test('printDtso merges overlays with reference as full path and enables direct p
   // NOTE: formatting really really matters
   expect(dtsoText).toStrictEqual(expected);
 });
+
+test('comments are correctly parsed', () => {
+  const source_path = path.resolve(__dirname, 'dts_source/comments.dts');
+  const source = fs.readFileSync(source_path, 'utf8');
+
+  const document = parse_dts(source);
+
+  const out = printDts(document);
+
+  const document2 = parse_dts(out);
+  expect(normalize(document2)).toStrictEqual(normalize(document));
+});

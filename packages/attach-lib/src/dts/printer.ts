@@ -13,6 +13,8 @@ import type {
   DtsValueComponent,
 } from "./ast";
 
+import { stringify as stringify_as_yaml } from "yaml";
+
 /**
  * Print a DtsDocument back to DTS text.
  *
@@ -30,6 +32,12 @@ export function print_dts(document: DtsDocument): string {
   }
 
   out.push(print_node(document.root, indent, 0, '/'));
+
+  if (document.metadata !== undefined) {
+    out.push("\n/*\n---\n");
+    out.push(stringify_as_yaml(document.metadata));
+    out.push("...\n*/");
+  }
 
   return out.join("");
 }

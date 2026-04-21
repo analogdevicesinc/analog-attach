@@ -18,6 +18,7 @@ export type DtsDocument = {
   root: DtsNode;
   /** Unresolved overlay fragments (for DTSO files with label references) */
   unresolved_overlays: Array<UnresolvedOverlay>;
+  metadata: DtsMetadata | undefined;
 }
 
 /** Node within the DTS tree (`name[@unit]`). */
@@ -118,3 +119,11 @@ export type DtsReference = Labeled & {
   { kind: "label"; name: string } |
   { kind: "path"; path: string };
 }
+
+export type Version = string;
+export type AbsolutePathToDTSNode = string;
+
+export type DtsMetadata = {
+  version: Version;
+  modified: AbsolutePathToDTSNode[];
+};
