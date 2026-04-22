@@ -121,6 +121,12 @@ class Parser {
   }
 
   private get tok(): Token {
+	if (this.i < 0 || this.i >= this.tokens.length) {
+		throw new ParseError(
+			`Index ${this.i} exceeds token 
+			range [0, ${this.tokens.length})`
+		);
+	}
     return this.tokens[this.i] ?? this.tokens[this.tokens.length - 1];
   }
 
