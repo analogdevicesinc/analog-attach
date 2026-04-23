@@ -7,24 +7,26 @@ import {
   delete_node_by_label,
   delete_node_by_key
 } from "./merge.js";
-import type {
-  CellArrayElement,
-  CellArrayNumber,
-  CellArrayU64,
-  Bits,
-  DtsCellArray,
-  DtsByteArray,
-  DtsDocument,
-  DtsNode,
-  DtsProperty,
-  DtsReference,
-  DtsValue,
-  DtsValueComponent,
-  Memreserve,
-  UnresolvedOverlay,
-  DtsMetadata,
-  Version,
-  AbsolutePathToDTSNode,
+import {
+  type CellArrayElement,
+  type CellArrayNumber,
+  type CellArrayU64,
+  type Bits,
+  type DtsCellArray,
+  type DtsByteArray,
+  type DtsDocument,
+  type DtsNode,
+  type DtsProperty,
+  type DtsReference,
+  type DtsValue,
+  type DtsValueComponent,
+  type Memreserve,
+  type UnresolvedOverlay,
+  type DtsMetadata,
+  type Version,
+  type AbsolutePathToDTSNode,
+  isDtsMetadata,
+  DtsMetadataHeader,
 } from "./ast";
 
 import { get_node_key } from './utilities.js';
@@ -86,7 +88,7 @@ class Parser {
   private i = 0;
   // Map of labels to their absolute paths
   private label_to_path = new Map<string, string>();
-  private comments: CommentToken[] = [];
+  private comments = new Array<Token>();
 
   constructor(private readonly tokens: Token[]) { }
 
@@ -121,59 +123,38 @@ class Parser {
   }
 
   private get tok(): Token {
-	if (this.i < 0 || this.i >= this.tokens.length) {
-		throw new ParseError(
-			`Index ${this.i} exceeds token 
-			range [0, ${this.tokens.length})`
-		);
-	}
-    return this.tokens[this.i] ?? this.tokens[this.tokens.length - 1];
+    return this.tokens[this.i];
   }
 
   private advance(): Token {
-    const current_token = this.tokens[this.i];
-
-    if (current_token.kind === TokKind.EOF) {
-      return current_token;
+    const previous = this.tok;
+    while([TokKind.CommentBlock, TokKind.CommentLine].includes(this.tokens[++this.i].kind)) {
+      this.comments.push(this.tok);
     }
-
-    if (isCommentToken(current_token)) {
-      this.comments.push(current_token);
-    }
-
-    ++this.i;
-
-    while (this.i < this.tokens.length - 1) {
-      const token = this.tokens[this.i];
-      if (isCommentToken(token)) {
-        this.comments.push(token);
-        ++this.i;
-      } else {
-        break;
-      }
-    }
-
-    return current_token;
+    return previous;
   }
 
   private lookahead(offset: number): Token {
     if (offset <= 0) {
-      return this.tok;
+      throw new ParseError("offset must be > 0");
     }
 
     let count = 0;
     for (let index = this.i + 1; index < this.tokens.length; ++index) {
       const token = this.tokens[index];
-
-      if (!isCommentToken(token)) {
-        ++count;
-        if (count === offset) return token;
+      
+      if (token.kind === TokKind.CommentLine || token.kind === TokKind.CommentBlock) {
+        continue;
       }
 
-      if (token.kind === TokKind.EOF) return token;
+      count++;
+
+      if (count === offset || token.kind === TokKind.EOF) {
+        return token;
+      }
     }
-    
-    return this.tokens[this.tokens.length - 1];
+
+    return this.tokens.at(-1)!;
   }
 
   private consume(kind: TokKind): boolean {
@@ -200,6 +181,12 @@ class Parser {
     const memreserves: Array<Memreserve> = [];
     // TODO: this is for overlays => think about splitting dts and dtso
     const unresolved_overlays: Array<UnresolvedOverlay> = [];
+
+    if (this.tok.kind === TokKind.CommentLine
+        || this.tok.kind === TokKind.CommentBlock
+    ) {
+      this.advance();
+    }
 
     const version_tag = this.consume_slash_word();
 
@@ -1134,9 +1121,9 @@ class Parser {
   }
 
   private parse_dts_metadata(): DtsMetadata | undefined {
-    const metadata_token = this.comments.reverse().find(c => (
+    const metadata_token = this.comments.find(c => (
       c.kind === TokKind.CommentBlock
-      && c.value.includes("modified:")
+      && c.value?.includes(DtsMetadataHeader)
     ));
 
     if (metadata_token === undefined) {
@@ -1144,7 +1131,7 @@ class Parser {
     }
 
     try {
-      const metadata = parse_yaml_string(metadata_token.value);
+      const metadata = parse_yaml_string(metadata_token.value as string);      
       return isDtsMetadata(metadata) ? metadata : undefined;
     } catch {
       return undefined;
@@ -1232,81 +1219,4 @@ function prune_soft_delete_impl(root: DtsNode) {
   for (const child of root.children) {
     prune_soft_delete_impl(child);
   }
-}
-
-type CommentToken = Token & {
-  kind: TokKind.CommentLine | TokKind.CommentBlock;
-  value: string;
-};
-
-function isCommentToken(t: any): t is CommentToken {
-  if (typeof t !== "object" || t === null) {
-    return false;
-  }
-
-  if (
-    t.kind !== TokKind.CommentLine
-    && t.kind !== TokKind.CommentBlock
-  ) {
-    return false;
-  }
-
-  if (typeof t.value !== "string") {
-    return false;
-  }
-
-  return true;
-}
-
-function isVersion(obj: any): obj is Version {
-  if (typeof obj !== "string") {
-    return false;
-  }
-
-  const version_regex = /^\d+\.\d+\.\d+$/;
-  if (!version_regex.test(obj)) {
-    return false;
-  }
-
-  return true;
-}
-
-function isAbsolutePathToDTSNode(obj: any): obj is AbsolutePathToDTSNode {
-  if (typeof obj !== "string") {
-    return false;
-  }
-
-  return true;
-}
-
-function isArrayOfAbsolutePathToDTSNode(obj: any): obj is AbsolutePathToDTSNode[] {
-  if (!Array.isArray(obj)) {
-    return false;
-  }
-
-  if (!obj.every(e => isAbsolutePathToDTSNode(e))) {
-    return false;
-  }
-
-  return true;
-}
-
-function isDtsMetadata(obj: any): obj is DtsMetadata {
-  if (typeof obj !== 'object' || obj === null) {
-    return false;
-  }
-
-  if (Object.keys(obj).length !== 2) {
-    return false;
-  }
-
-  if (!isVersion(obj.version)) {
-    return false;
-  }
-
-  if (!isArrayOfAbsolutePathToDTSNode(obj.modified)) {
-    return false;
-  }
-
-  return true;
 }

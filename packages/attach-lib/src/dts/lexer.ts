@@ -168,12 +168,12 @@ export class Lexer {
             continue;
           }
 
-          if (this.peek(1) == "/") {
+          if (this.peek(1) === "/") {
             this.tokens.push(this.readCommentLine());
             continue;
           }
 
-          if (this.peek(1) == "*") {
+          if (this.peek(1) === "*") {
             this.tokens.push(this.readCommentBlock());
             continue;
           }

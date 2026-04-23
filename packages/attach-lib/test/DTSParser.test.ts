@@ -419,9 +419,11 @@ test('comments are correctly parsed', () => {
   const source = fs.readFileSync(source_path, 'utf8');
 
   const document = parse_dts(source);
+  expect(document.metadata).toBeDefined();
 
   const out = printDts(document);
 
   const document2 = parse_dts(out);
+  expect(document2.metadata).toBeDefined();
   expect(normalize(document2)).toStrictEqual(normalize(document));
 });
