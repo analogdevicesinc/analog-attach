@@ -13,4 +13,9 @@ export default defineConfig({
             exclude: ['src/**/*.test.ts', 'test/**/*.ts'],
         },
     },
+    server: {
+        watch: {
+            ignored: ['**/linux/**', '**/dt-schema/**', '**/node_modules/**'],
+        },
+    },
 });
