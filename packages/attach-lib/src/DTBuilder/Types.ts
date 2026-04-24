@@ -115,7 +115,7 @@ type TaggedCellValue_LabeledArray = Labeled<TaggedCellValue_Array>;
 
 export type LabeledTaggedCellValue = Labeled<CellValue>;
 type LabeledTaggedCellValue_Array = MakeArray<LabeledTaggedCellValue>;
-export type LabeledTaggedCellValue_LabeledArray = Labeled<LabeledTaggedCellValue_Array>;
+type LabeledTaggedCellValue_LabeledArray = Labeled<LabeledTaggedCellValue_Array>;
 
 export type CellEntry = CellValue | LabeledTaggedCellValue;
 export type CellArray = TaggedCellValue_Array | TaggedCellValue_LabeledArray | LabeledTaggedCellValue_Array | LabeledTaggedCellValue_LabeledArray;
@@ -138,11 +138,11 @@ function is_labeled_tagged_cell_value_array(object: any): object is LabeledTagge
     return is_array(object) && object.every((entry) => is_labeled_tagged_cell_value(entry) === true);
 }
 
-export function is_labeled_tagged_cell_value_labeled_array(object: any): object is LabeledTaggedCellValue_LabeledArray {
+function is_labeled_tagged_cell_value_labeled_array(object: any): object is LabeledTaggedCellValue_LabeledArray {
     return is_labeled(object) && is_labeled_tagged_cell_value_array(object.payload);
 }
 
-export function is_cell_entry(object: any): object is CellEntry {
+function is_cell_entry(object: any): object is CellEntry {
     return is_tagged(object) || is_labeled_tagged_cell_value(object);
 }
 

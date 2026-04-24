@@ -25,24 +25,20 @@ interface IFlagPropertyBuilder {
 }
 
 interface IStringPropertyBuilder {
-    with_value<T extends [...DTStringInput[]]>(...arguments_: [DTStringInput, ...T]): INameBuilder;
+    with_value<T extends DTStringInput[]>(...arguments_: [DTStringInput, ...T]): INameBuilder;
 }
 
 interface IReferencePropertyBuilder {
-    with_label(label: DTSReferenceInput): INameBuilder;
-    with_path(path: DTSReferenceInput): INameBuilder;
+    with_label_value(label: DTSReferenceInput): INameBuilder;
+    with_path_value(path: DTSReferenceInput): INameBuilder;
 }
 
 interface ICellArrayPropertyBuilder {
-    with_tagged_values<T extends [...CellEntry[]]>(...arguments_: [CellEntry, ...T]): INameBuilder;
-    with_tagged_values<T extends [CellEntry, ...CellEntry[]]>(...arguments_: [...T, CellArray]): INameBuilder;
-    with_tagged_values<T extends [CellEntry, ...CellEntry[]]>(...arguments_: [CellArray, ...T]): INameBuilder;
-    with_tagged_values<T extends [...CellArray[]]>(...arguments_: [CellArray, ...T]): INameBuilder;
-    with_tagged_values<T extends [CellMatrix, ...CellMatrix[]]>(...arguments_: [CellArray, ...T]): INameBuilder;
-    with_tagged_values<T extends [(CellArray | CellMatrix), ...(CellArray | CellMatrix)[]]>(...arguments_: [CellArray, ...T]): INameBuilder;
-    with_tagged_values<T extends [CellArray, ...CellArray[]]>(...arguments_: [CellMatrix, ...T]): INameBuilder;
-    with_tagged_values<T extends [...CellMatrix[]]>(...arguments_: [CellMatrix, ...T]): INameBuilder;
-    with_tagged_values<T extends [(CellArray | CellMatrix), ...(CellArray | CellMatrix)[]]>(...arguments_: [CellMatrix, ...T]): INameBuilder;
+    with_tagged_values<T extends CellEntry[]>(...arguments_: [CellEntry, ...T]): INameBuilder;
+    with_tagged_values<T extends CellEntry[]>(...arguments_: [...T, CellEntry, CellArray]): INameBuilder;
+    with_tagged_values<T extends CellEntry[]>(...arguments_: [CellArray, CellEntry, ...T]): INameBuilder;
+    with_tagged_values<T extends (CellArray | CellMatrix)[]>(...arguments_: [CellArray, ...T]): INameBuilder;
+    with_tagged_values<T extends (CellArray | CellMatrix)[]>(...arguments_: [CellMatrix, ...T]): INameBuilder;
 }
 
 interface INameBuilder {
@@ -54,14 +50,21 @@ interface IBuildBase {
 }
 
 interface IBuildCallOnce {
-    with_labels: (labels: string[]) => void;
+    with_label: (labels: string | string[]) => void;
     with_user_modifications: (modified_by_user: boolean) => void;
 };
 
-type IBuild<Remaining extends keyof IBuildCallOnce = keyof IBuildCallOnce> =
-    IBuildBase & {
-        [K in Remaining]: (...arguments_: Parameters<IBuildCallOnce[K]>) => IBuild<Exclude<Remaining, K>>;
-    };
+type AddCallOnce<
+    Base,
+    CallOnce,
+    Remaining extends keyof CallOnce = keyof CallOnce
+> = Base & {
+    [K in Remaining]: CallOnce[K] extends (...arguments_: infer A) => any
+    ? (...arguments_: A) => AddCallOnce<Base, CallOnce, Exclude<Remaining, K>>
+    : never;
+};
+
+type IBuild = AddCallOnce<IBuildBase, IBuildCallOnce>;
 
 class PropertyBuilder implements
     IFlagPropertyBuilder,
@@ -123,7 +126,7 @@ class PropertyBuilder implements
         return this;
     }
 
-    with_label(label: DTSReferenceInput): INameBuilder {
+    with_label_value(label: DTSReferenceInput): INameBuilder {
         const upcast = upcast_to_LabeledDTString(label);
 
         this.property.value = {
@@ -140,7 +143,7 @@ class PropertyBuilder implements
         return this;
     }
 
-    with_path(path: DTSReferenceInput): INameBuilder {
+    with_path_value(path: DTSReferenceInput): INameBuilder {
         const upcast = upcast_to_LabeledDTString(path);
 
         this.property.value = {
@@ -158,7 +161,6 @@ class PropertyBuilder implements
     }
 
     with_tagged_values(...arguments_: DTCellArrayInput[]): INameBuilder {
-
         if (
             arguments_.every((entry) => is_cell_entry_or_cell_array(entry) === true) &&
             arguments_.filter((element) => is_cell_array(element)).length <= 1
@@ -199,8 +201,8 @@ class PropertyBuilder implements
         return this;
     }
 
-    with_labels(labels: string[]): IBuild {
-        this.property.labels = labels;
+    with_label(labels: string | string[]): IBuild {
+        this.property.labels = Array.isArray(labels) ? labels : [labels];
         return this;
     }
 
@@ -229,7 +231,6 @@ if (import.meta.vitest !== undefined) {
     const { test, expect } = import.meta.vitest;
 
     test(`Flag Builder`, () => {
-
         const expected_flag: DtsProperty = {
             labels: [],
             name: "spi-controller",
@@ -241,7 +242,7 @@ if (import.meta.vitest !== undefined) {
         const flag: DtsProperty = PropertyBuilder.build_flag()
             .set_flag()
             .with_name(expected_flag.name)
-            .with_labels(expected_flag.labels)
+            .with_label(expected_flag.labels)
             .with_user_modifications(expected_flag.modified_by_user)
             .build();
 
@@ -251,7 +252,6 @@ if (import.meta.vitest !== undefined) {
     });
 
     test(`String Builder`, () => {
-
         const string_value: string = "adi,ad7124";
 
         const expected_compatible: DtsProperty = {
@@ -273,7 +273,7 @@ if (import.meta.vitest !== undefined) {
         const compatible: DtsProperty = PropertyBuilder.build_string()
             .with_value(string_value)
             .with_name(expected_compatible.name)
-            .with_labels(expected_compatible.labels)
+            .with_label(expected_compatible.labels)
             .with_user_modifications(expected_compatible.modified_by_user)
             .build();
 
@@ -282,7 +282,6 @@ if (import.meta.vitest !== undefined) {
     });
 
     test(`Labeled String Builder`, () => {
-
         const string_value: LabeledDTString = {
             payload: "adi,ad7124",
             labels: ["my_compat"]
@@ -307,7 +306,7 @@ if (import.meta.vitest !== undefined) {
         const compatible: DtsProperty = PropertyBuilder.build_string()
             .with_value(string_value)
             .with_name(expected_compatible.name)
-            .with_labels(expected_compatible.labels)
+            .with_label(expected_compatible.labels)
             .with_user_modifications(expected_compatible.modified_by_user)
             .build();
 
@@ -341,7 +340,7 @@ if (import.meta.vitest !== undefined) {
         const compatible: DtsProperty = PropertyBuilder.build_string()
             .with_value(string_values)
             .with_name(expected_compatible.name)
-            .with_labels(expected_compatible.labels)
+            .with_label(expected_compatible.labels)
             .with_user_modifications(expected_compatible.modified_by_user)
             .build();
 
@@ -384,7 +383,7 @@ if (import.meta.vitest !== undefined) {
         const compatible: DtsProperty = PropertyBuilder.build_string()
             .with_value(string_values)
             .with_name(expected_compatible.name)
-            .with_labels(expected_compatible.labels)
+            .with_label(expected_compatible.labels)
             .with_user_modifications(expected_compatible.modified_by_user)
             .build();
 
@@ -565,7 +564,7 @@ if (import.meta.vitest !== undefined) {
         const compatible: DtsProperty = PropertyBuilder.build_string()
             .with_value(string1_values, string2_value, string3_values)
             .with_name(expected_compatible.name)
-            .with_labels(expected_compatible.labels)
+            .with_label(expected_compatible.labels)
             .with_user_modifications(expected_compatible.modified_by_user)
             .build();
 
@@ -574,7 +573,6 @@ if (import.meta.vitest !== undefined) {
     });
 
     test(`Reference with label Builder`, () => {
-
         const label_name: string = "gpio";
 
         const expected_label_reference: DtsProperty = {
@@ -597,9 +595,9 @@ if (import.meta.vitest !== undefined) {
         };
 
         const label_reference: DtsProperty = PropertyBuilder.build_reference()
-            .with_label(label_name)
+            .with_label_value(label_name)
             .with_name(expected_label_reference.name)
-            .with_labels(expected_label_reference.labels)
+            .with_label(expected_label_reference.labels)
             .with_user_modifications(expected_label_reference.modified_by_user)
             .build();
 
@@ -608,7 +606,6 @@ if (import.meta.vitest !== undefined) {
     });
 
     test(`Labeled Reference with label Builder`, () => {
-
         const label_name: LabeledDTString = {
             payload: "gpio0",
             labels: ["useless_label"]
@@ -634,9 +631,9 @@ if (import.meta.vitest !== undefined) {
         };
 
         const label_reference: DtsProperty = PropertyBuilder.build_reference()
-            .with_label(label_name)
+            .with_label_value(label_name)
             .with_name(expected_label_reference.name)
-            .with_labels(expected_label_reference.labels)
+            .with_label(expected_label_reference.labels)
             .with_user_modifications(expected_label_reference.modified_by_user)
             .build();
 
@@ -667,9 +664,9 @@ if (import.meta.vitest !== undefined) {
         };
 
         const path_reference: DtsProperty = PropertyBuilder.build_reference()
-            .with_path(path)
+            .with_path_value(path)
             .with_name(expected_path_reference.name)
-            .with_labels(expected_path_reference.labels)
+            .with_label(expected_path_reference.labels)
             .with_user_modifications(expected_path_reference.modified_by_user)
             .build();
 
@@ -703,9 +700,9 @@ if (import.meta.vitest !== undefined) {
         };
 
         const path_reference: DtsProperty = PropertyBuilder.build_reference()
-            .with_path(path)
+            .with_path_value(path)
             .with_name(expected_path_reference.name)
-            .with_labels(expected_path_reference.labels)
+            .with_label(expected_path_reference.labels)
             .with_user_modifications(expected_path_reference.modified_by_user)
             .build();
 
@@ -741,7 +738,7 @@ if (import.meta.vitest !== undefined) {
                 PropertyBuilder.tag_expression("(1+1)")
             )
             .with_name(expected_cell.name)
-            .with_labels(expected_cell.labels)
+            .with_label(expected_cell.labels)
             .with_user_modifications(expected_cell.modified_by_user)
             .build();
 
@@ -773,7 +770,7 @@ if (import.meta.vitest !== undefined) {
         const cell = PropertyBuilder.build_cell_array()
             .with_tagged_values(values)
             .with_name(expected_cell.name)
-            .with_labels(expected_cell.labels)
+            .with_label(expected_cell.labels)
             .with_user_modifications(expected_cell.modified_by_user)
             .build();
 
@@ -820,7 +817,7 @@ if (import.meta.vitest !== undefined) {
         const cell = PropertyBuilder.build_cell_array()
             .with_tagged_values(values)
             .with_name(expected_cell.name)
-            .with_labels(expected_cell.labels)
+            .with_label(expected_cell.labels)
             .with_user_modifications(expected_cell.modified_by_user)
             .build();
 
@@ -853,7 +850,7 @@ if (import.meta.vitest !== undefined) {
         const cell = PropertyBuilder.build_cell_array()
             .with_tagged_values(value, values)
             .with_name(expected_cell.name)
-            .with_labels(expected_cell.labels)
+            .with_label(expected_cell.labels)
             .with_user_modifications(expected_cell.modified_by_user)
             .build();
 
@@ -886,7 +883,7 @@ if (import.meta.vitest !== undefined) {
         const cell = PropertyBuilder.build_cell_array()
             .with_tagged_values(values, value)
             .with_name(expected_cell.name)
-            .with_labels(expected_cell.labels)
+            .with_label(expected_cell.labels)
             .with_user_modifications(expected_cell.modified_by_user)
             .build();
 
@@ -939,7 +936,7 @@ if (import.meta.vitest !== undefined) {
         const cell = PropertyBuilder.build_cell_array()
             .with_tagged_values(values1, values2)
             .with_name(expected_cell.name)
-            .with_labels(expected_cell.labels)
+            .with_label(expected_cell.labels)
             .with_user_modifications(expected_cell.modified_by_user)
             .build();
 
@@ -1031,7 +1028,7 @@ if (import.meta.vitest !== undefined) {
         const cell = PropertyBuilder.build_cell_array()
             .with_tagged_values(values)
             .with_name(expected_cell.name)
-            .with_labels(expected_cell.labels)
+            .with_label(expected_cell.labels)
             .with_user_modifications(expected_cell.modified_by_user)
             .build();
 
@@ -1071,7 +1068,7 @@ if (import.meta.vitest !== undefined) {
         const cell = PropertyBuilder.build_cell_array()
             .with_tagged_values(values, values2)
             .with_name(expected_cell.name)
-            .with_labels(expected_cell.labels)
+            .with_label(expected_cell.labels)
             .with_user_modifications(expected_cell.modified_by_user)
             .build();
 
@@ -1109,7 +1106,7 @@ if (import.meta.vitest !== undefined) {
         const cell = PropertyBuilder.build_cell_array()
             .with_tagged_values(values, values2)
             .with_name(expected_cell.name)
-            .with_labels(expected_cell.labels)
+            .with_label(expected_cell.labels)
             .with_user_modifications(expected_cell.modified_by_user)
             .build();
 
@@ -1147,7 +1144,7 @@ if (import.meta.vitest !== undefined) {
         const cell = PropertyBuilder.build_cell_array()
             .with_tagged_values(values2, values)
             .with_name(expected_cell.name)
-            .with_labels(expected_cell.labels)
+            .with_label(expected_cell.labels)
             .with_user_modifications(expected_cell.modified_by_user)
             .build();
 
@@ -1193,7 +1190,7 @@ if (import.meta.vitest !== undefined) {
         const cell = PropertyBuilder.build_cell_array()
             .with_tagged_values(values, values2, values3)
             .with_name(expected_cell.name)
-            .with_labels(expected_cell.labels)
+            .with_label(expected_cell.labels)
             .with_user_modifications(expected_cell.modified_by_user)
             .build();
 
