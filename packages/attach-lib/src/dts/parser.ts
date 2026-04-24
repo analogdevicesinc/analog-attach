@@ -23,15 +23,13 @@ import {
   type Memreserve,
   type UnresolvedOverlay,
   type DtsMetadata,
-  type Version,
-  type AbsolutePathToDTSNode,
   isDtsMetadata,
-  DtsMetadataHeader,
 } from "./ast";
 
 import { get_node_key } from './utilities.js';
 
 import { parse as parse_yaml_string } from "yaml";
+import { DtsMetadataHeader } from "./constants.js";
 
 /** 
 * Parser error enriched with line/column from the triggering token. 
