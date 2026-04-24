@@ -78,3 +78,14 @@ export function make_array<T>(object: T): MakeArray<T> {
 
     return object_array;
 }
+
+export type AddCallOnce<
+    Base,
+    CallOnce,
+    Remaining extends keyof CallOnce = keyof CallOnce
+> = Base & {
+    [K in Remaining]: CallOnce[K] extends (...arguments_: infer A) => any
+    ? (...arguments_: A) => AddCallOnce<Base, CallOnce, Exclude<Remaining, K>>
+    : never;
+};
+

@@ -18,61 +18,51 @@ import {
     upcast_to_LabeledDTStringArray,
     upcast_to_LabeledTaggedCellValue_LabeledArray
 } from "./Types";
-import { make_labeled_iterable } from "./TypeUtilities";
+import { AddCallOnce, make_labeled_iterable } from "./TypeUtilities";
 
 interface IFlagPropertyBuilder {
-    set_flag(): INameBuilder;
+    set_flag(): IPropertyNameBuilder;
 }
 
 interface IStringPropertyBuilder {
-    with_value<T extends DTStringInput[]>(...arguments_: [DTStringInput, ...T]): INameBuilder;
+    with_value<T extends DTStringInput[]>(...arguments_: [DTStringInput, ...T]): IPropertyNameBuilder;
 }
 
 interface IReferencePropertyBuilder {
-    with_label_value(label: DTSReferenceInput): INameBuilder;
-    with_path_value(path: DTSReferenceInput): INameBuilder;
+    with_label_value(label: DTSReferenceInput): IPropertyNameBuilder;
+    with_path_value(path: DTSReferenceInput): IPropertyNameBuilder;
 }
 
 interface ICellArrayPropertyBuilder {
-    with_tagged_values<T extends CellEntry[]>(...arguments_: [CellEntry, ...T]): INameBuilder;
-    with_tagged_values<T extends CellEntry[]>(...arguments_: [...T, CellEntry, CellArray]): INameBuilder;
-    with_tagged_values<T extends CellEntry[]>(...arguments_: [CellArray, CellEntry, ...T]): INameBuilder;
-    with_tagged_values<T extends (CellArray | CellMatrix)[]>(...arguments_: [CellArray, ...T]): INameBuilder;
-    with_tagged_values<T extends (CellArray | CellMatrix)[]>(...arguments_: [CellMatrix, ...T]): INameBuilder;
+    with_tagged_values<T extends CellEntry[]>(...arguments_: [CellEntry, ...T]): IPropertyNameBuilder;
+    with_tagged_values<T extends CellEntry[]>(...arguments_: [...T, CellEntry, CellArray]): IPropertyNameBuilder;
+    with_tagged_values<T extends CellEntry[]>(...arguments_: [CellArray, CellEntry, ...T]): IPropertyNameBuilder;
+    with_tagged_values<T extends (CellArray | CellMatrix)[]>(...arguments_: [CellArray, ...T]): IPropertyNameBuilder;
+    with_tagged_values<T extends (CellArray | CellMatrix)[]>(...arguments_: [CellMatrix, ...T]): IPropertyNameBuilder;
 }
 
-interface INameBuilder {
-    with_name(name: string): IBuild;
+interface IPropertyNameBuilder {
+    with_name(name: string): IPropertyBuild;
 }
 
-interface IBuildBase {
+interface IPropertyBuildBase {
     build(): DtsProperty;
 }
 
-interface IBuildCallOnce {
+interface IPropertyBuildCallOnce {
     with_label: (labels: string | string[]) => void;
     with_user_modifications: (modified_by_user: boolean) => void;
 };
 
-type AddCallOnce<
-    Base,
-    CallOnce,
-    Remaining extends keyof CallOnce = keyof CallOnce
-> = Base & {
-    [K in Remaining]: CallOnce[K] extends (...arguments_: infer A) => any
-    ? (...arguments_: A) => AddCallOnce<Base, CallOnce, Exclude<Remaining, K>>
-    : never;
-};
-
-type IBuild = AddCallOnce<IBuildBase, IBuildCallOnce>;
+type IPropertyBuild = AddCallOnce<IPropertyBuildBase, IPropertyBuildCallOnce>;
 
 class PropertyBuilder implements
     IFlagPropertyBuilder,
     IStringPropertyBuilder,
     IReferencePropertyBuilder,
     ICellArrayPropertyBuilder,
-    INameBuilder,
-    IBuild {
+    IPropertyNameBuilder,
+    IPropertyBuild {
 
     private property: DtsProperty = {
         labels: [],
@@ -101,12 +91,12 @@ class PropertyBuilder implements
         return new PropertyBuilder;
     }
 
-    set_flag(): INameBuilder {
+    set_flag(): IPropertyNameBuilder {
         this.property.value = undefined;
         return this;
     }
 
-    with_value(...arguments_: DTStringInput[]): INameBuilder {
+    with_value(...arguments_: DTStringInput[]): IPropertyNameBuilder {
         const upcast = arguments_.map((entry) => upcast_to_LabeledDTStringArray(entry));
 
         const normalized_value = upcast.flat();
@@ -126,7 +116,7 @@ class PropertyBuilder implements
         return this;
     }
 
-    with_label_value(label: DTSReferenceInput): INameBuilder {
+    with_label_value(label: DTSReferenceInput): IPropertyNameBuilder {
         const upcast = upcast_to_LabeledDTString(label);
 
         this.property.value = {
@@ -143,7 +133,7 @@ class PropertyBuilder implements
         return this;
     }
 
-    with_path_value(path: DTSReferenceInput): INameBuilder {
+    with_path_value(path: DTSReferenceInput): IPropertyNameBuilder {
         const upcast = upcast_to_LabeledDTString(path);
 
         this.property.value = {
@@ -160,7 +150,7 @@ class PropertyBuilder implements
         return this;
     }
 
-    with_tagged_values(...arguments_: DTCellArrayInput[]): INameBuilder {
+    with_tagged_values(...arguments_: DTCellArrayInput[]): IPropertyNameBuilder {
         if (
             arguments_.every((entry) => is_cell_entry_or_cell_array(entry) === true) &&
             arguments_.filter((element) => is_cell_array(element)).length <= 1
@@ -196,17 +186,17 @@ class PropertyBuilder implements
         return this;
     }
 
-    with_name(name: string): IBuild {
+    with_name(name: string): IPropertyBuild {
         this.property.name = name;
         return this;
     }
 
-    with_label(labels: string | string[]): IBuild {
+    with_label(labels: string | string[]): IPropertyBuild {
         this.property.labels = Array.isArray(labels) ? labels : [labels];
         return this;
     }
 
-    with_user_modifications(modified_by_user: boolean): IBuild {
+    with_user_modifications(modified_by_user: boolean): IPropertyBuild {
         this.property.modified_by_user = modified_by_user;
         return this;
     }
@@ -225,6 +215,8 @@ class PropertyBuilder implements
     static tag_path(value: string) { return { _tag: "path" as const, value: value }; };
     static tag_expression(value: string) { return { _tag: "expression" as const, value: value }; };
 }
+
+
 
 if (import.meta.vitest !== undefined) {
 
