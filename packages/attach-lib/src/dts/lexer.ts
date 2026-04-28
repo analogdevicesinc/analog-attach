@@ -38,6 +38,8 @@ export enum TokKind {
   LogicalNot = "!",
   Pipe = "|",
   EOF = "EOF",
+  CommentLine = "CommentLine",
+  CommentBlock = "CommentBlock"
 }
 
 /** Single token with position for error reporting. */
@@ -61,7 +63,7 @@ export class Lexer {
   /** Tokenize the entire source into a flat array of tokens. */
   public lex(): Token[] {
     while (!this.eof()) {
-      this.skipWhitespaceAndComments();
+      this.skipWhitespaces();
       if (this.eof()) { break; }
 
       const ch = this.peek();
@@ -165,6 +167,17 @@ export class Lexer {
             this.tokens.push({ kind: TokKind.Bits, value: "/bits/", line: start.line, col: start.col });
             continue;
           }
+
+          if (this.peek(1) === "/") {
+            this.tokens.push(this.readCommentLine());
+            continue;
+          }
+
+          if (this.peek(1) === "*") {
+            this.tokens.push(this.readCommentBlock());
+            continue;
+          }
+
           // otherwise treat as slash token for directives like /dts-v1/; and /memreserve/
           this.advance();
           this.tokens.push({ kind: TokKind.Slash, line: start.line, col: start.col });
@@ -222,6 +235,36 @@ export class Lexer {
       }
     }
     return { kind: TokKind.String, value: out, line: start.line, col: start.col };
+  }
+
+  private readCommentLine(): Token {
+    const startPosition = this.pos();
+
+    this.advance();
+    this.advance();
+
+    const startIndex = this.i;
+    while (!this.eof() && this.peek() !== "\n") {
+      this.advance();
+    }
+    const content = this.source.slice(startIndex, this.i).trim();
+    return { kind: TokKind.CommentLine, value: content, ...startPosition };
+  }
+
+  private readCommentBlock(): Token {
+    const startPosition = this.pos();
+
+    this.advance();
+    this.advance();
+
+    const startIndex = this.i;
+    while (!this.eof() && !(this.peek() === "*" && this.peek(1) === "/")) {
+      this.advance();
+    }
+    const content = this.source.slice(startIndex, this.i).trim();
+    this.advance();
+    this.advance();
+    return { kind: TokKind.CommentBlock, value: content, ...startPosition };
   }
 
   /**
@@ -283,7 +326,7 @@ export class Lexer {
   }
 
   /** Skip whitespace, comments, and preprocessor line markers. */
-  private skipWhitespaceAndComments() {
+  private skipWhitespaces() {
     while (!this.eof()) {
       const ch = this.peek();
       // whitespace
@@ -291,21 +334,6 @@ export class Lexer {
       // Preprocessor line markers (e.g., '# 1 "file"') — only if '#' is at true line start
       if (ch === '#' && (this.i === 0 || this.source[this.i - 1] === '\n')) {
         while (!this.eof() && this.peek() !== '\n') { this.advance(); }
-        continue;
-      }
-      // C++ comment
-      if (ch === '/' && this.peek(1) === '/') {
-        this.advance(); this.advance();
-        while (!this.eof() && this.peek() !== '\n') { this.advance(); }
-        continue;
-      }
-      // C comment
-      if (ch === '/' && this.peek(1) === '*') {
-        this.advance(); this.advance();
-        while (!this.eof()) {
-          if (this.peek() === '*' && this.peek(1) === '/') { this.advance(); this.advance(); break; }
-          this.advance();
-        }
         continue;
       }
       break;

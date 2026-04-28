@@ -55,7 +55,8 @@ export function createEmptyDocument(): DtsDocument {
             modified_by_user: true,
             created_by_user: true,
         },
-        unresolved_overlays: []
+        unresolved_overlays: [],
+		metadata: undefined
     };
 }
 

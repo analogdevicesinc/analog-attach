@@ -18,6 +18,7 @@ export type DtsDocument = {
   root: DtsNode;
   /** Unresolved overlay fragments (for DTSO files with label references) */
   unresolved_overlays: Array<UnresolvedOverlay>;
+  metadata: DtsMetadata | undefined;
 }
 
 /** Node within the DTS tree (`name[@unit]`). */
@@ -117,4 +118,59 @@ export type DtsReference = Labeled & {
   ref:
   { kind: "label"; name: string } |
   { kind: "path"; path: string };
+}
+
+export type Version = string;
+
+export function isVersion(object: any): object is Version {
+  if (typeof object !== "string") {
+    return false;
+  }
+
+  const version_regex = /^\d+\.\d+\.\d+$/;
+  if (!version_regex.test(object)) {
+    return false;
+  }
+
+  return true;
+}
+
+export type AbsolutePathToDTSNode = string;
+
+export function isAbsolutePathToDTSNode(object: any): object is AbsolutePathToDTSNode {
+  return typeof object === "string";
+}
+
+export function isArrayOfAbsolutePathToDTSNode(object: any): object is AbsolutePathToDTSNode[] {
+  return Array.isArray(object)
+    && object.every(element => isAbsolutePathToDTSNode(element));
+}
+
+export type DtsMetadata = {
+  version: Version;
+  modified: AbsolutePathToDTSNode[];
+};
+
+export function isDtsMetadata(object: any): object is DtsMetadata {
+  if (typeof object !== 'object' || object === null) {
+    return false;
+  }
+
+  if (Object.keys(object).length !== 2) {
+    return false;
+  }
+
+  if (!("version" in object) || !("modified" in object)) {
+    return false;
+  }
+
+  if (!isVersion(object.version)) {
+    return false;
+  }
+
+  if (!isArrayOfAbsolutePathToDTSNode(object.modified)) {
+    return false;
+  }
+
+  return true;
 }

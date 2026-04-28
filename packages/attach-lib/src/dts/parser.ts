@@ -7,24 +7,29 @@ import {
   delete_node_by_label,
   delete_node_by_key
 } from "./merge.js";
-import type {
-  CellArrayElement,
-  CellArrayNumber,
-  CellArrayU64,
-  Bits,
-  DtsCellArray,
-  DtsByteArray,
-  DtsDocument,
-  DtsNode,
-  DtsProperty,
-  DtsReference,
-  DtsValue,
-  DtsValueComponent,
-  Memreserve,
-  UnresolvedOverlay,
+import {
+  type CellArrayElement,
+  type CellArrayNumber,
+  type CellArrayU64,
+  type Bits,
+  type DtsCellArray,
+  type DtsByteArray,
+  type DtsDocument,
+  type DtsNode,
+  type DtsProperty,
+  type DtsReference,
+  type DtsValue,
+  type DtsValueComponent,
+  type Memreserve,
+  type UnresolvedOverlay,
+  type DtsMetadata,
+  isDtsMetadata,
 } from "./ast";
 
 import { get_node_key } from './utilities.js';
+
+import { parse as parse_yaml_string } from "yaml";
+import { DtsMetadataHeader } from "./constants.js";
 
 /** 
 * Parser error enriched with line/column from the triggering token. 
@@ -81,6 +86,7 @@ class Parser {
   private i = 0;
   // Map of labels to their absolute paths
   private label_to_path = new Map<string, string>();
+  private comments = new Array<Token>();
 
   constructor(private readonly tokens: Token[]) { }
 
@@ -119,7 +125,34 @@ class Parser {
   }
 
   private advance(): Token {
-    return this.tokens[this.i++];
+    const previous = this.tok;
+    while([TokKind.CommentBlock, TokKind.CommentLine].includes(this.tokens[++this.i].kind)) {
+      this.comments.push(this.tok);
+    }
+    return previous;
+  }
+
+  private lookahead(offset: number): Token {
+    if (offset <= 0) {
+      throw new ParseError("offset must be > 0");
+    }
+
+    let count = 0;
+    for (let index = this.i + 1; index < this.tokens.length; ++index) {
+      const token = this.tokens[index];
+      
+      if (token.kind === TokKind.CommentLine || token.kind === TokKind.CommentBlock) {
+        continue;
+      }
+
+      count++;
+
+      if (count === offset || token.kind === TokKind.EOF) {
+        return token;
+      }
+    }
+
+    return this.tokens.at(-1)!;
   }
 
   private consume(kind: TokKind): boolean {
@@ -147,6 +180,12 @@ class Parser {
     // TODO: this is for overlays => think about splitting dts and dtso
     const unresolved_overlays: Array<UnresolvedOverlay> = [];
 
+    if (this.tok.kind === TokKind.CommentLine
+        || this.tok.kind === TokKind.CommentBlock
+    ) {
+      this.advance();
+    }
+
     const version_tag = this.consume_slash_word();
 
     if (version_tag === "/dts-v1/") {
@@ -156,7 +195,7 @@ class Parser {
     }
 
     // Zero or more /memreserve/ <addr> <len>;
-    while (this.tok.kind === TokKind.Slash && this.tokens[this.i + 1]?.kind === TokKind.Ident) {
+    while (this.tok.kind === TokKind.Slash && this.lookahead(1)?.kind === TokKind.Ident) {
       const word = this.consume_slash_word();
 
       if (word === '/dts-v1/') {
@@ -195,10 +234,10 @@ class Parser {
     // TODO: could be technically determined already if we have /plugin/ or not
     // At least one root or overlay fragment
     let base_document: DtsDocument;
-    if (this.tok.kind === TokKind.Slash && this.tokens[this.i + 1]?.kind === TokKind.LBrace) {
+    if (this.tok.kind === TokKind.Slash && this.lookahead(1)?.kind === TokKind.LBrace) {
       // Traditional root node starting with '/'
       const root = this.parse_node();
-      base_document = { memreserves: memreserves, root: root, unresolved_overlays: [] };
+      base_document = { memreserves: memreserves, root: root, unresolved_overlays: [], metadata: undefined };
     } else {
       // Document starts with overlay fragments - create empty root
       let root: DtsNode = {
@@ -210,18 +249,19 @@ class Parser {
         deleted: false
       };
 
-      base_document = { memreserves: memreserves, root: root, unresolved_overlays: [] };
+      base_document = { memreserves: memreserves, root: root, unresolved_overlays: [], metadata: undefined };
     }
 
     // Additional roots and/or directives
     while (this.tok.kind !== TokKind.EOF) {
       // Additional root blocks
-      if (this.tok.kind === TokKind.Slash && this.tokens[this.i + 1]?.kind === TokKind.LBrace) {
+      if (this.tok.kind === TokKind.Slash && this.lookahead(1)?.kind === TokKind.LBrace) {
         const next_root = this.parse_node(base_document.root);
         const incoming: DtsDocument = {
           memreserves: [],
           root: next_root,
-          unresolved_overlays: []
+          unresolved_overlays: [],
+          metadata: undefined
         };
 
         merge_document(base_document, incoming);
@@ -231,7 +271,7 @@ class Parser {
       // Top-level overlay: optional label then &ref { ... }
       const labels: string[] = this.consume_present_labels();
 
-      if (this.tokens[this.i]?.kind === TokKind.Ampersand) {
+      if (this.tok.kind === TokKind.Ampersand) {
         const target_reference = this.parse_reference();
         let target = this.resolve_reference(base_document.root, target_reference);
 
@@ -269,7 +309,7 @@ class Parser {
       }
 
       // Top-level directives 
-      if (this.tok.kind === TokKind.Slash && this.tokens[this.i + 1]?.kind === TokKind.Ident) {
+      if (this.tok.kind === TokKind.Slash && this.lookahead(1)?.kind === TokKind.Ident) {
         this.parse_and_apply_directive(base_document.root);
         continue;
       }
@@ -283,6 +323,8 @@ class Parser {
     base_document.unresolved_overlays = unresolved_overlays;
 
     prune_soft_delete(base_document);
+
+    base_document.metadata = this.parse_dts_metadata();
 
     return base_document;
   }
@@ -888,7 +930,7 @@ class Parser {
 
       if (k === TokKind.RAngle) {
         // Possible end of array or shift-right; check if it's a shift '>>'
-        if (this.tokens[this.i + 1]?.kind === TokKind.RAngle) {
+        if (this.lookahead(1)?.kind === TokKind.RAngle) {
           this.advance();
           this.advance();
           push(">>");
@@ -960,7 +1002,7 @@ class Parser {
       if (k === TokKind.BitwiseNot) { this.advance(); push("~"); expect_operand = true; continue; }
       if (k === TokKind.LAngle) {
         // Must be '<<'
-        if (this.tokens[this.i + 1]?.kind === TokKind.LAngle) {
+        if (this.lookahead(1)?.kind === TokKind.LAngle) {
           this.advance();
           this.advance();
           push("<<");
@@ -1039,14 +1081,14 @@ class Parser {
   * True if an identifier (or identifier + unit address) is followed by `{` 
   */
   private peek_node_start(): boolean {
-    if (this.tokens[this.i + 1]?.kind === TokKind.LBrace) {
+    if (this.lookahead(1)?.kind === TokKind.LBrace) {
       return true;
     }
 
-    if (this.tokens[this.i + 1]?.kind === TokKind.At) {
-      let lookahead = this.i + 2;
+    if (this.lookahead(1)?.kind === TokKind.At) {
+      let lookahead = 2;
       while (lookahead++) {
-        switch (this.tokens[lookahead].kind) {
+        switch (this.lookahead(lookahead).kind) {
           case TokKind.Ident:
           case TokKind.Number:
           case TokKind.Comma: {
@@ -1068,12 +1110,30 @@ class Parser {
   private consume_present_labels(): string[] {
     const labels: string[] = [];
 
-    while (this.tok.kind === TokKind.Ident && this.tokens[this.i + 1]?.kind === TokKind.Colon) {
+    while (this.tok.kind === TokKind.Ident && this.lookahead(1)?.kind === TokKind.Colon) {
       labels.push(this.advance().value!);
       this.expect(TokKind.Colon);
     }
 
     return labels;
+  }
+
+  private parse_dts_metadata(): DtsMetadata | undefined {
+    const metadata_token = this.comments.find(c => (
+      c.kind === TokKind.CommentBlock
+      && c.value?.includes(DtsMetadataHeader)
+    ));
+
+    if (metadata_token === undefined) {
+      return undefined;
+    }
+
+    try {
+      const metadata = parse_yaml_string(metadata_token.value as string);      
+      return isDtsMetadata(metadata) ? metadata : undefined;
+    } catch {
+      return undefined;
+    }
   }
 }
 
