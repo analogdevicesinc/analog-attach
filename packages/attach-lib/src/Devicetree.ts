@@ -36,7 +36,8 @@ export class DeviceTree {
                     properties: [],
                     deleted: false,
                 },
-                unresolved_overlays: []
+                unresolved_overlays: [],
+                metadata: undefined
             },
             false
         );
@@ -55,7 +56,8 @@ export class DeviceTree {
                     properties: [],
                     deleted: false,
                 },
-                unresolved_overlays: []
+                unresolved_overlays: [],
+                metadata: undefined
             },
             true
         );
