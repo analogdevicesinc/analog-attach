@@ -1,4 +1,4 @@
-import { DtsCellArray, DtsProperty } from "../dts";
+import { DtsCellArray, DtsNode, DtsProperty } from "../dts";
 import { print_property } from "../dts/printer";
 import {
     CellArray,
@@ -56,7 +56,7 @@ interface IPropertyBuildCallOnce {
 
 type IPropertyBuild = AddCallOnce<IPropertyBuildBase, IPropertyBuildCallOnce>;
 
-class PropertyBuilder implements
+export class PropertyBuilder implements
     IFlagPropertyBuilder,
     IStringPropertyBuilder,
     IReferencePropertyBuilder,
@@ -216,7 +216,65 @@ class PropertyBuilder implements
     static tag_expression(value: string) { return { _tag: "expression" as const, value: value }; };
 }
 
+interface INodeNameBuilder {
+    with_name: (name: string) => INodeBuilder;
+}
 
+export interface INodeBuilderBase {
+    build: () => DtsNode;
+}
+
+interface INodeBuilderCallOnce {
+    with_label: (label: string | string[]) => void;
+    with_unit_address: (unit_address: string) => void;
+    with_properties: (properties: DtsProperty | DtsProperty[]) => void;
+}
+
+type INodeBuilder = AddCallOnce<INodeBuilderBase, INodeBuilderCallOnce>;
+
+export class NodeBuilder implements INodeNameBuilder, INodeBuilder {
+
+    private node: DtsNode = {
+        labels: [],
+        name: "",
+        _uuid: crypto.randomUUID(),
+        unit_addr: undefined,
+        properties: [],
+        children: [],
+        deleted: false,
+        created_by_user: true,
+    };
+
+    private constructor() { }
+
+    static new(): INodeNameBuilder {
+        return new NodeBuilder;
+    }
+
+    build(): DtsNode {
+        return this.node;
+    }
+
+    with_label(label: string | string[]): INodeBuilder {
+        this.node.labels = Array.isArray(label) ? label : [label];
+        return this;
+    }
+
+    with_name(name: string): INodeBuilder {
+        this.node.name = name;
+        return this;
+    }
+
+    with_unit_address(unit_address: string): INodeBuilder {
+        this.node.unit_addr = unit_address;
+        return this;
+    }
+
+    with_properties(properties: DtsProperty | DtsProperty[]): INodeBuilder {
+        this.node.properties = Array.isArray(properties) ? properties : [properties];
+        return this;
+    }
+}
 
 if (import.meta.vitest !== undefined) {
 
