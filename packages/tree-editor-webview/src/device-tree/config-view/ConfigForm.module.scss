@@ -1,0 +1,131 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  padding-top: var(--hmc-space-6);
+  white-space: nowrap !important;
+  height: 100%;
+}
+
+.mainFrame {
+  overflow: visible;
+}
+
+.header {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.title {
+  font-family: var(--font-family/editor, "Segoe UI Variable", sans-serif);
+  font-weight: 700;
+  font-size: 11px;
+  line-height: 1.2;
+  color: var(--vscode-editor-foreground);
+  text-transform: uppercase;
+}
+
+.icons {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 0;
+
+
+  :global(vscode-form-group) {
+    width: 100%;
+  }
+
+  :global(vscode-label) {
+    font-size: var(--hmc-font-size-4);
+    font-weight: bold;
+  }
+
+  :global(vscode-textfield),
+  :global(vscode-single-select),
+  :global(vscode-multi-select) {
+    width: 100%;
+  }
+}
+
+.fields {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+  width: 100%;
+  min-width: 180px;
+  box-sizing: border-box;
+}
+
+.checkboxGroup {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  width: 100%;
+  min-width: 180px;
+}
+
+// Form field styles to be checked against Figma design later
+
+.fieldContainer {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  align-self: stretch;
+
+  padding: 16px;
+  border: 1px solid var(--vscode-commandCenter-inactiveBorder);
+  border-radius: var(--hmc-border-radius-2);
+}
+
+.fieldLabelGroup {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+}
+
+.badgeContainer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.optionalBadge {
+  font-size: 10px;
+  color: var(--vscode-descriptionForeground);
+}
+
+.errorBadge {
+  font-size: 10px;
+  color: var(--vscode-errorForeground);
+}
+
+.description {
+  font-size: 11px;
+  color: var(--vscode-descriptionForeground);
+  margin-top: -4px;
+}
+
+.formObjectContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  box-sizing: border-box;
+  max-width: 100%;
+  width: 100%;
+}

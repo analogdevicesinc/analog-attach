@@ -1,0 +1,25 @@
+/**
+ * Harmonic Design System - elevation tokens
+ */
+
+
+  :root {
+    /* Base elevation shadows with theme-aware opacity */
+    --hmc-shadow: rgba(0, 0, 0, 0.16);
+    /** Tooltip z-index */
+    --hmc-tooltip-z-index: 1000;
+  }
+
+  /* Dark theme - higher opacity for better visibility */
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --hmc-shadow: rgba(0, 0, 0, 0.36);
+    }
+  }
+
+  /* Light theme - lower opacity for subtlety */
+  @media (prefers-color-scheme: light) {
+    :root {
+      --hmc-shadow: rgba(0, 0, 0, 0.16);
+    }
+  }

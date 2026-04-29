@@ -1,0 +1,16 @@
+/**
+ * Harmonic Design System - borders tokens
+ */
+
+
+  :root {
+    /* Border width */
+    --hmc-border-width-1: 0.5px;
+    --hmc-border-width-2: 1px;
+    --hmc-border-width-3: 2px;
+
+    /* Border radius */
+    --hmc-border-radius-1: 2px;
+    --hmc-border-radius-2: 5px;
+    --hmc-border-radius-3: 100%;
+  }

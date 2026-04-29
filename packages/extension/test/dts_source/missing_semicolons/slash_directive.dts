@@ -1,0 +1,7 @@
+/dts-v1/;
+
+/{
+	prop;
+	/delete-property/ prop
+	new-stuff;
+};

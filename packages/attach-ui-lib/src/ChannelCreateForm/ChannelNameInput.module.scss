@@ -1,0 +1,67 @@
+.field {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  width: 100%;
+  min-width: 180px;
+
+  :global(vscode-textfield) {
+    width: 100%;
+  }
+
+  :global(vscode-single-select) {
+    width: 100%;
+  }
+}
+
+.fieldLabelGroup {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  width: 100%;
+  justify-content: space-between;
+
+  :global(vscode-label) {
+    flex: 1 0 0;
+  }
+}
+
+.labelWithIcon {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  flex: 1 0 0;
+}
+
+.infoIcon {
+  color: var(--vscode-foreground);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.tooltipWrapper {
+  position: relative;
+}
+
+.tooltipContent {
+  width: 170px;
+  white-space: normal;
+  word-break: normal;
+  overflow-wrap: break-word;
+}
+
+.errorMessage {
+  padding: 8px 12px;
+  background-color: var(--vscode-inputValidation-errorBackground);
+  border: 1px solid var(--vscode-inputValidation-errorBorder);
+  color: var(--vscode-inputValidation-errorForeground);
+  font-size: 12px;
+  border-radius: 2px;
+  width: 100%;
+}
+
+.errorBadge {
+  font-size: 10px;
+  color: var(--vscode-errorForeground);
+}

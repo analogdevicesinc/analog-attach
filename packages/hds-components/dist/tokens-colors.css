@@ -1,0 +1,8 @@
+/**
+ * Harmonic Design System - colors tokens
+ */
+
+
+  :root {
+    --vscode-input-border: var(--vscode-settings-textInputBorder, #3c3c3c);
+  }

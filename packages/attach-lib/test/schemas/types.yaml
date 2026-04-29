@@ -1,0 +1,188 @@
+# SPDX-License-Identifier: BSD-2-Clause
+# Copyright 2018 Linaro Ltd.
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/types.yaml#
+$schema: http://devicetree.org/meta-schemas/base.yaml#
+
+title: Core devicetree property data types
+
+description: Schema for core devicetree data types. Binding schema can reference
+  these types.
+
+maintainers:
+  - Rob Herring <robh@kernel.org>
+
+select: true
+
+definitions:
+  flag:
+    oneOf:
+      - type: boolean
+        const: true
+      - type: 'null'
+  non-unique-string-array:
+    type: array
+    items: { type: string }
+    minItems: 1
+  string-array:
+    allOf:
+      - $ref: '#/definitions/non-unique-string-array'
+      - uniqueItems: true
+  string:
+    allOf:
+      - $ref: '#/definitions/string-array'
+      - maxItems: 1
+  uint8:
+    type: integer
+    typeSize: 8
+    minimum: 0
+    maximum: 0xff
+  uint8-array:
+    type: array
+    minItems: 1
+    items:
+      $ref: '#/definitions/uint8'
+  uint8-matrix:
+    type: array
+    minItems: 1
+    items:
+      $ref: '#/definitions/uint8-array'
+
+  int8:
+    type: integer
+    typeSize: 8
+    minimum: -128
+    maximum: 127
+  int8-array:
+    type: array
+    minItems: 1
+    items:
+      $ref: '#/definitions/int8'
+  int8-matrix:
+    type: array
+    minItems: 1
+    items:
+      $ref: '#/definitions/int8-array'
+
+  uint16:
+    type: integer
+    typeSize: 16
+    minimum: 0
+    maximum: 0xffff
+  uint16-array:
+    type: array
+    minItems: 1
+    items:
+      $ref: '#/definitions/uint16'
+  uint16-matrix:
+    type: array
+    minItems: 1
+    items:
+      $ref: '#/definitions/uint16-array'
+
+  int16:
+    type: integer
+    typeSize: 16
+    minimum: -8192
+    maximum: 8191
+  int16-array:
+    type: array
+    minItems: 1
+    items:
+      $ref: '#/definitions/int16'
+  int16-matrix:
+    type: array
+    minItems: 1
+    items:
+      $ref: '#/definitions/int16-array'
+
+  uint32:
+    type: integer
+    typeSize: 32
+    minimum: 0
+    maximum: 0xffffffff
+  uint32-array:
+    type: array
+    minItems: 1
+    items:
+      $ref: '#/definitions/uint32'
+  uint32-matrix:
+    type: array
+    minItems: 1
+    items:
+      $ref: '#/definitions/uint32-array'
+
+  int32:
+    type: integer
+    minimum: -2147483648
+    maximum: 2147483647
+  int32-array:
+    type: array
+    minItems: 1
+    items:
+      $ref: '#/definitions/int32'
+  int32-matrix:
+    type: array
+    minItems: 1
+    items:
+      $ref: '#/definitions/int32-array'
+
+  int64:
+    type: integer
+    typeSize: 64
+    minimum: -9223372036854775808
+    maximum: 9223372036854775807
+  int64-array:
+    type: array
+    minItems: 1
+    items:
+      $ref: '#/definitions/int64'
+  int64-matrix:
+    type: array
+    minItems: 1
+    items:
+      $ref: '#/definitions/int64-array'
+
+  uint64:
+    type: integer
+    typeSize: 64
+    minimum: 0
+    maximum: 0xffffffffffffffff
+  uint64-array:
+    type: array
+    minItems: 1
+    items:
+      $ref: '#/definitions/uint64'
+  uint64-matrix:
+    type: array
+    minItems: 1
+    items:
+      $ref: '#/definitions/uint64-array'
+
+  phandle:
+    $ref: '#/definitions/phandle-array'
+    maxItems: 1
+    items:
+      maxItems: 1
+  phandle-array:
+    type: array
+    minItems: 1
+    items:
+      type: array
+      minItems: 1
+      items:
+        - oneOf:
+            - type: integer
+              minimum: 1
+              maximum: 0xffffffff
+            - type: integer
+              const: 0
+      additionalItems:
+        $ref: '#/definitions/uint32'
+
+  address:
+    $ref: '#/definitions/uint32-matrix'
+    items:
+      minItems: 1
+      maxItems: 5 # At most 3 address cells and 2 size cells

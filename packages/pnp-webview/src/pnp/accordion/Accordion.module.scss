@@ -1,0 +1,89 @@
+/**
+ *
+ * Copyright (c) 2025 Analog Devices, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ */
+
+@use "hds-components/dist/typography.scss" as typography;
+
+$body-padding: var(--accordion-body-padding, 0 12px 0 30px);
+$body-margin: var(--accordion-body-margin, 6px 0);
+$body-gap: var(--accordion-body-gap, 13px);
+
+.container {
+  border-bottom: 1px solid var(--vscode-panel-border);
+  font-size: 13px;
+  color: var(--vscode-foreground);
+  border-left: 2px solid transparent;
+
+  &:hover {
+    border-left: 2px solid var(--vscode-foreground);
+  }
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  padding: $body-padding;
+  box-sizing: border-box;
+  gap: $body-gap;
+}
+
+.hasBorder {
+  border-left: 2px solid var(--vscode-foreground);
+}
+
+.highlight {
+  background-color: var(--vscode-list-hoverBackground);
+}
+
+.header {
+  display: flex;
+  padding: var(--hmc-space-3) var(--hmc-space-4) var(--hmc-space-3)
+    var(--hmc-space-3);
+  flex-direction: row;
+  align-items: center;
+  gap: var(--hmc-space-2);
+  align-self: stretch;
+  cursor: pointer;
+  height: 32px;
+
+  border: 1px solid transparent;
+  &:focus {
+    border: 1px solid var(--vscode-focusBorder);
+  }
+  &:hover {
+    background-color: var(--vscode-list-inactiveSelectionBackground);
+  }
+
+  .titleContainer {
+    display: flex;
+    height: 16px;
+    flex-direction: column;
+    justify-content: center;
+    flex: 1;
+    .title {
+      color: var(--vscode-editor-foreground);
+      @include typography.text-heading-h5;
+    }
+  }
+
+  .chevron {
+    display: flex;
+    align-items: center;
+    transition: transform 0.3s ease-in-out;
+  }
+}
+
+.iconOpen {
+  transform: rotate(90deg);
+}

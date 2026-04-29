@@ -1,0 +1,400 @@
+{
+  "$schema": "https://raw.githubusercontent.com/microsoft/vscode-css-languageservice/main/docs/customData.schema.json",
+  "version": 1.1,
+  "properties": [
+    {
+      "name": "--vscode-font-family",
+      "description": "A sans-serif font type depends on the host OS.",
+      "values": []
+    },
+    { "name": "--vscode-contrastBorder", "values": [] },
+    {
+      "name": "--vscode-badge-background",
+      "description": "default and counter variant background color",
+      "values": []
+    },
+    {
+      "name": "--vscode-badge-foreground",
+      "description": "default and counter variant foreground color",
+      "values": []
+    },
+    {
+      "name": "--vscode-activityBarBadge-background",
+      "description": "activity bar variant background color",
+      "values": []
+    },
+    {
+      "name": "--vscode-activityBarBadge-foreground",
+      "description": "activity bar variant foreground color",
+      "values": []
+    },
+    { "name": "--vscode-button-background", "values": [] },
+    { "name": "--vscode-button-foreground", "values": [] },
+    { "name": "--vscode-button-border", "values": [] },
+    { "name": "--vscode-button-hoverBackground", "values": [] },
+    {
+      "name": "--vscode-font-family",
+      "description": "A sans-serif font type depends on the host OS.",
+      "values": []
+    },
+    { "name": "--vscode-font-size", "values": [] },
+    { "name": "--vscode-font-weight", "values": [] },
+    { "name": "--vscode-button-secondaryForeground", "values": [] },
+    { "name": "--vscode-button-secondaryBackground", "values": [] },
+    { "name": "--vscode-button-secondaryHoverBackground", "values": [] },
+    { "name": "--vscode-focusBorder", "values": [] },
+    {
+      "name": "--vscode-button-background",
+      "description": "Primary button background",
+      "values": []
+    },
+    {
+      "name": "--vscode-button-foreground",
+      "description": "Primary button foreground",
+      "values": []
+    },
+    {
+      "name": "--vscode-button-border",
+      "description": "Primary button border",
+      "values": []
+    },
+    {
+      "name": "--vscode-button-hoverBackground",
+      "description": "Primary button hover background",
+      "values": []
+    },
+    {
+      "name": "--vscode-button-focusBackground",
+      "description": "Primary button focus background",
+      "values": []
+    },
+    {
+      "name": "--vscode-font-family",
+      "description": "A sans-serif font type depends on the host OS.",
+      "values": []
+    },
+    { "name": "--vscode-font-size", "values": [] },
+    { "name": "--vscode-font-weight", "values": [] },
+    {
+      "name": "--vscode-button-secondaryForeground",
+      "description": "Secondary button foreground",
+      "values": []
+    },
+    {
+      "name": "--vscode-button-secondaryBackground",
+      "description": "Secondary button background",
+      "values": []
+    },
+    {
+      "name": "--vscode-button-secondaryHoverBackground",
+      "description": "Secondary button hover background",
+      "values": []
+    },
+    {
+      "name": "--vscode-button-secondaryFocusBackground",
+      "description": "Secondary button focus background",
+      "values": []
+    },
+    {
+      "name": "--vscode-button-tertiaryForeground",
+      "description": "Tertiary button foreground",
+      "values": []
+    },
+    {
+      "name": "--vscode-button-tertiaryBackground",
+      "description": "Tertiary button background",
+      "values": []
+    },
+    {
+      "name": "--vscode-button-tertiaryHoverBackground",
+      "description": "Tertiary button hover background",
+      "values": []
+    },
+    {
+      "name": "--vscode-button-tertiaryFocusBackground",
+      "description": "Tertiary button focus background",
+      "values": []
+    },
+    { "name": "--vscode-focusBorder", "values": [] },
+    { "name": "--vscode-font-family", "values": [] },
+    { "name": "--vscode-font-size", "values": [] },
+    { "name": "--vscode-font-weight", "values": [] },
+    { "name": "--vscode-foreground", "values": [] },
+    { "name": "--vscode-settings-checkboxBackground", "values": [] },
+    { "name": "--vscode-settings-checkboxBorder", "values": [] },
+    { "name": "--vscode-settings-checkboxForeground", "values": [] },
+    { "name": "--vscode-focusBorder", "values": [] },
+    { "name": "--vscode-inputValidation-errorBackground", "values": [] },
+    { "name": "--vscode-inputValidation-errorBorder", "values": [] },
+    {
+      "name": "--vscode-sideBar-background",
+      "description": "Background color",
+      "values": []
+    },
+    {
+      "name": "--vscode-focusBorder",
+      "description": "Focus border color",
+      "values": []
+    },
+    {
+      "name": "--vscode-font-family",
+      "description": "Header font family",
+      "values": []
+    },
+    {
+      "name": "--vscode-sideBarSectionHeader-background",
+      "description": "Header background",
+      "values": []
+    },
+    {
+      "name": "--vscode-icon-foreground",
+      "description": "Arrow icon color",
+      "values": []
+    },
+    {
+      "name": "--vscode-sideBarTitle-foreground",
+      "description": "Header font color",
+      "values": []
+    },
+    { "name": "--vscode-font-family", "values": [] },
+    { "name": "--vscode-font-size", "values": [] },
+    { "name": "--vscode-font-weight", "values": [] },
+    { "name": "--vscode-menu-background", "values": [] },
+    { "name": "--vscode-menu-border", "values": [] },
+    { "name": "--vscode-menu-foreground", "values": [] },
+    { "name": "--vscode-widget-shadow", "values": [] },
+    { "name": "--vscode-font-family", "values": [] },
+    { "name": "--vscode-font-size", "values": [] },
+    { "name": "--vscode-font-weight", "values": [] },
+    { "name": "--vscode-menu-background", "values": [] },
+    { "name": "--vscode-menu-selectionBorder", "values": [] },
+    { "name": "--vscode-menu-foreground", "values": [] },
+    { "name": "--vscode-menu-selectionBackground", "values": [] },
+    { "name": "--vscode-menu-selectionForeground", "values": [] },
+    { "name": "--vscode-menu-separatorBackground", "values": [] },
+    { "name": "--vscode-foreground", "values": [] },
+    {
+      "name": "--label-width",
+      "description": "The width of the label in horizontal mode",
+      "values": []
+    },
+    {
+      "name": "--label-right-margin",
+      "description": "The right margin of the label in horizontal mode",
+      "values": []
+    },
+    {
+      "name": "--vsc-foreground-translucent",
+      "description": "Default text color. 90% transparency version of `--vscode-foreground` by default.",
+      "values": []
+    },
+    { "name": "--vscode-icon-foreground", "values": [] },
+    {
+      "name": "--vscode-toolbar-hoverBackground",
+      "description": "Hover state background color in `active-icon` mode",
+      "values": []
+    },
+    {
+      "name": "--vscode-toolbar-activeBackground",
+      "description": "Active state background color in `active-icon` mode",
+      "values": []
+    },
+    { "name": "--vscode-focusBorder", "values": [] },
+    {
+      "name": "--icon-mask",
+      "description": "Custom icon mask image (when using custom icons)",
+      "values": []
+    },
+    { "name": "--vscode-font-family", "values": [] },
+    { "name": "--vscode-font-size", "values": [] },
+    { "name": "--vscode-foreground", "values": [] },
+    { "name": "--dropdown-z-index", "values": [] },
+    { "name": "--vscode-badge-background", "values": [] },
+    { "name": "--vscode-badge-foreground", "values": [] },
+    { "name": "--vscode-settings-dropdownBorder", "values": [] },
+    { "name": "--vscode-settings-checkboxBackground", "values": [] },
+    { "name": "--vscode-settings-dropdownBackground", "values": [] },
+    { "name": "--vscode-settings-dropdownForeground", "values": [] },
+    { "name": "--vscode-settings-dropdownListBorder", "values": [] },
+    { "name": "--vscode-focusBorder", "values": [] },
+    { "name": "--vscode-foreground", "values": [] },
+    { "name": "--vscode-font-family", "values": [] },
+    { "name": "--vscode-font-size", "values": [] },
+    { "name": "--vscode-font-weight", "values": [] },
+    { "name": "--vscode-inputValidation-errorBackground", "values": [] },
+    { "name": "--vscode-inputValidation-errorBorder", "values": [] },
+    { "name": "--vscode-list-activeSelectionBackground", "values": [] },
+    { "name": "--vscode-list-activeSelectionForeground", "values": [] },
+    { "name": "--vscode-list-focusOutline", "values": [] },
+    { "name": "--vscode-list-focusHighlightForeground", "values": [] },
+    { "name": "--vscode-list-highlightForeground", "values": [] },
+    { "name": "--vscode-list-hoverBackground", "values": [] },
+    { "name": "--vscode-list-hoverForeground", "values": [] },
+    { "name": "--vscode-progressBar-background", "values": [] },
+    { "name": "--vscode-progressBar-background", "values": [] },
+    { "name": "--vscode-font-family", "values": [] },
+    { "name": "--vscode-font-size", "values": [] },
+    { "name": "--vscode-font-weight", "values": [] },
+    { "name": "--vscode-settings-checkboxBackground", "values": [] },
+    { "name": "--vscode-settings-checkboxBorder", "values": [] },
+    { "name": "--vscode-settings-checkboxForeground", "values": [] },
+    { "name": "--vscode-focusBorder", "values": [] },
+    { "name": "--vscode-inputValidation-errorBackground", "values": [] },
+    { "name": "--vscode-inputValidation-errorBorder", "values": [] },
+    { "name": "--vscode-scrollbar-shadow", "values": [] },
+    { "name": "--vscode-scrollbarSlider-background", "values": [] },
+    { "name": "--vscode-scrollbarSlider-hoverBackground", "values": [] },
+    { "name": "--vscode-scrollbarSlider-activeBackground", "values": [] },
+    { "name": "--dropdown-z-index", "values": [] },
+    { "name": "--vscode-badge-background", "values": [] },
+    { "name": "--vscode-badge-foreground", "values": [] },
+    { "name": "--vscode-settings-dropdownBorder", "values": [] },
+    { "name": "--vscode-settings-checkboxBackground", "values": [] },
+    { "name": "--vscode-settings-dropdownBackground", "values": [] },
+    { "name": "--vscode-settings-dropdownForeground", "values": [] },
+    { "name": "--vscode-settings-dropdownListBorder", "values": [] },
+    { "name": "--vscode-focusBorder", "values": [] },
+    { "name": "--vscode-foreground", "values": [] },
+    { "name": "--vscode-font-family", "values": [] },
+    { "name": "--vscode-font-size", "values": [] },
+    { "name": "--vscode-font-weight", "values": [] },
+    { "name": "--vscode-inputValidation-errorBackground", "values": [] },
+    { "name": "--vscode-inputValidation-errorBorder", "values": [] },
+    { "name": "--vscode-list-activeSelectionBackground", "values": [] },
+    { "name": "--vscode-list-activeSelectionForeground", "values": [] },
+    { "name": "--vscode-list-focusOutline", "values": [] },
+    { "name": "--vscode-list-focusHighlightForeground", "values": [] },
+    { "name": "--vscode-list-highlightForeground", "values": [] },
+    { "name": "--vscode-list-hoverBackground", "values": [] },
+    { "name": "--vscode-list-hoverForeground", "values": [] },
+    { "name": "--separator-border", "values": [] },
+    { "name": "--vscode-editorWidget-border", "values": [] },
+    { "name": "--vscode-sash-hoverBorder", "values": [] },
+    { "name": "--vscode-focusBorder", "values": [] },
+    { "name": "--vscode-foreground", "values": [] },
+    { "name": "--vscode-panelTitle-activeBorder", "values": [] },
+    { "name": "--vscode-panelTitle-activeForeground", "values": [] },
+    { "name": "--vscode-panelTitle-inactiveForeground", "values": [] },
+    { "name": "--vscode-focusBorder", "values": [] },
+    { "name": "--vscode-panel--background", "values": [] },
+    { "name": "--vscode-editorGroup-border", "values": [] },
+    { "name": "--vscode-keybindingTable-rowsBackground", "values": [] },
+    { "name": "--vscode-sash-hoverBorder", "values": [] },
+    { "name": "--vscode-editorGroup-border", "values": [] },
+    { "name": "--vscode-foreground", "values": [] },
+    { "name": "--vscode-font-family", "values": [] },
+    { "name": "--vscode-font-size", "values": [] },
+    {
+      "name": "--vscode-keybindingTable-headerBackground",
+      "description": "Table header background",
+      "values": []
+    },
+    { "name": "--vscode-foreground", "values": [] },
+    { "name": "--vscode-font-family", "values": [] },
+    { "name": "--vscode-font-size", "values": [] },
+    { "name": "--vscode-editorGroup-border", "values": [] },
+    { "name": "--vscode-font-family", "values": [] },
+    { "name": "--vscode-font-size", "values": [] },
+    { "name": "--vscode-font-weight", "values": [] },
+    { "name": "--vscode-settings-headerBorder", "values": [] },
+    { "name": "--vscode-panel-background", "values": [] },
+    { "name": "--vscode-scrollbar-shadow", "values": [] },
+    { "name": "--vscode-settings-textInputBackground", "values": [] },
+    { "name": "--vscode-settings-textInputBorder", "values": [] },
+    { "name": "--vscode-settings-textInputForeground", "values": [] },
+    { "name": "--vscode-input-placeholderForeground", "values": [] },
+    { "name": "--vscode-font-family", "values": [] },
+    { "name": "--vscode-font-size", "values": [] },
+    { "name": "--vscode-font-weight", "values": [] },
+    { "name": "--vscode-editor-background", "values": [] },
+    { "name": "--vscode-editor-foreground", "values": [] },
+    { "name": "--vscode-editor-font-family", "values": [] },
+    { "name": "--vscode-editor-font-size", "values": [] },
+    { "name": "--vscode-editor-font-weight", "values": [] },
+    { "name": "--vscode-editor-inlineValuesForeground", "values": [] },
+    { "name": "--vscode-focusBorder", "values": [] },
+    { "name": "--vscode-scrollbarSlider-background", "values": [] },
+    { "name": "--vscode-scrollbarSlider-hoverBackground", "values": [] },
+    { "name": "--vscode-scrollbarSlider-activeBackground", "values": [] },
+    { "name": "--vscode-settings-textInputBackground", "values": [] },
+    { "name": "--vscode-settings-textInputBorder", "values": [] },
+    { "name": "--vscode-settings-textInputForeground", "values": [] },
+    { "name": "--vscode-settings-textInputBackground", "values": [] },
+    { "name": "--vscode-focusBorder", "values": [] },
+    {
+      "name": "--vscode-font-family",
+      "description": "A sans-serif font type depends on the host OS.",
+      "values": []
+    },
+    { "name": "--vscode-font-size", "values": [] },
+    { "name": "--vscode-font-weight", "values": [] },
+    { "name": "--vscode-inputValidation-errorBorder", "values": [] },
+    { "name": "--vscode-inputValidation-errorBackground", "values": [] },
+    { "name": "--vscode-input-placeholderForeground", "values": [] },
+    { "name": "--vscode-button-background", "values": [] },
+    { "name": "--vscode-button-foreground", "values": [] },
+    { "name": "--vscode-button-hoverBackground", "values": [] },
+    {
+      "name": "--vscode-tooltip-background",
+      "description": "Tooltip background color",
+      "values": []
+    },
+    {
+      "name": "--vscode-tooltip-foreground",
+      "description": "Tooltip text color",
+      "values": []
+    },
+    {
+      "name": "--vscode-tooltip-border",
+      "description": "Tooltip border color",
+      "values": []
+    },
+    {
+      "name": "--vscode-font-family",
+      "description": "Font family",
+      "values": []
+    },
+    { "name": "--vscode-font-size", "description": "Font size", "values": [] },
+    {
+      "name": "--vscode-tooltip-maxWidth",
+      "description": "Maximum width of tooltip",
+      "values": []
+    },
+    {
+      "name": "--vscode-tooltip-zIndex",
+      "description": "Z-index for tooltip positioning",
+      "values": []
+    },
+    {
+      "name": "--vscode-focusBorder",
+      "description": "Border color for active tooltips",
+      "values": []
+    },
+    { "name": "--vscode-font-family", "values": [] },
+    { "name": "--vscode-font-size", "values": [] },
+    { "name": "--vscode-font-weight", "values": [] },
+    { "name": "--vscode-foreground", "values": [] },
+    { "name": "--vscode-icon-foreground", "values": [] },
+    { "name": "--vscode-list-focusAndSelectionOutline", "values": [] },
+    { "name": "--vscode-list-focusOutline", "values": [] },
+    { "name": "--vscode-list-hoverBackground", "values": [] },
+    { "name": "--vscode-list-hoverForeground", "values": [] },
+    { "name": "--vscode-tree-inactiveIndentGuidesStroke", "values": [] },
+    { "name": "--vscode-tree-indentGuidesStroke", "values": [] }
+  ],
+  "pseudoElements": [
+    {
+      "name": "::part(base)",
+      "description": "The main content area of the component."
+    },
+    {
+      "name": "::part(body)",
+      "description": "Container for the toggleable content of the component. The container's overflow content is hidden by default. This CSS part can serve as an escape hatch to modify this behavior."
+    },
+    {
+      "name": "::part(tooltip)",
+      "description": "The tooltip container element"
+    },
+    { "name": "::part(content)", "description": "The wrapped content element" }
+  ]
+}

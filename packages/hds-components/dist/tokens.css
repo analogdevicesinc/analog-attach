@@ -1,0 +1,91 @@
+/**
+ * Harmonic Design System - CSS Custom Properties
+ *
+ * Import this file to use HDS design tokens in your CSS/SCSS projects.
+ *
+ * Usage:
+ *   @import 'hds-components/dist/tokens.css';
+ *
+ *   .my-component {
+ *     padding: var(--hmc-space-5);
+ *     border-radius: var(--hmc-border-radius-2);
+ *   }
+ */
+
+
+  :root {
+    /* Spacing Scale */
+    --hmc-space-1: 2px;
+    --hmc-space-2: 4px;
+    --hmc-space-3: 8px;
+    --hmc-space-4: 12px;
+    --hmc-space-5: 16px;
+    --hmc-space-6: 20px;
+    --hmc-space-7: 24px;
+    --hmc-space-8: 32px;
+    --hmc-space-9: 40px;
+
+    /* Border Radius Scale */
+    --hmc-border-radius-1: 2px;
+    --hmc-border-radius-2: 5px;
+    --hmc-border-radius-3: 100%;
+
+    /** Border width */
+    --hmc-border-width-1: 0.5px;
+    --hmc-border-width-2: 1px;
+    --hmc-border-width-3: 2px;
+
+    /* Font Size Scale */
+    --hmc-font-size-1: 9px;
+    --hmc-font-size-2: 11px;
+    --hmc-font-size-3: 12px;
+    --hmc-font-size-4: 13px;
+    --hmc-font-size-5: 14px;
+    --hmc-font-size-6: 15px;
+    --hmc-font-size-7: 18px;
+    --hmc-font-size-8: 20px;
+    --hmc-font-size-9: 26px;
+  }
+
+
+
+  :root {
+    /* Border width */
+    --hmc-border-width-1: 0.5px;
+    --hmc-border-width-2: 1px;
+    --hmc-border-width-3: 2px;
+
+    /* Border radius */
+    --hmc-border-radius-1: 2px;
+    --hmc-border-radius-2: 5px;
+    --hmc-border-radius-3: 100%;
+  }
+
+
+
+  :root {
+    --vscode-input-border: var(--vscode-settings-textInputBorder, #3c3c3c);
+  }
+
+
+
+  :root {
+    /* Base elevation shadows with theme-aware opacity */
+    --hmc-shadow: rgba(0, 0, 0, 0.16);
+    /** Tooltip z-index */
+    --hmc-tooltip-z-index: 1000;
+  }
+
+  /* Dark theme - higher opacity for better visibility */
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --hmc-shadow: rgba(0, 0, 0, 0.36);
+    }
+  }
+
+  /* Light theme - lower opacity for subtlety */
+  @media (prefers-color-scheme: light) {
+    :root {
+      --hmc-shadow: rgba(0, 0, 0, 0.16);
+    }
+  }

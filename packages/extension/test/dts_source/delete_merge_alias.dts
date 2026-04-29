@@ -1,0 +1,17 @@
+/dts-v1/;
+
+/ {
+	aliases {
+		soc = &soc;
+		spi = &spi;
+		intc = &intc;
+	};
+};
+
+/ {
+	aliases {
+		uart2 = &uart2;
+		spi = &spi2;
+		/delete-property/ intc;
+	};
+};

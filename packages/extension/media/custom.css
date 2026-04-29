@@ -1,0 +1,90 @@
+/* Harmonic Design System (HMC) Variables */
+/* These variables provide a consistent design system and must be available at :root level */
+/* for use in React components and SCSS modules, not just web components */
+:root {
+    /* Spacing Scale */
+    --hmc-space-1: 2px;
+    --hmc-space-2: 4px;
+    --hmc-space-3: 8px;
+    --hmc-space-4: 12px;
+    --hmc-space-5: 16px;
+    --hmc-space-6: 20px;
+    --hmc-space-7: 24px;
+    --hmc-space-8: 32px;
+    --hmc-space-9: 40px;
+
+    /* Border Width */
+    --hmc-border-width-1: 0.5px;
+    --hmc-border-width-2: 1px;
+    --hmc-border-width-3: 2px;
+
+    /* Border Radius */
+    --hmc-border-radius-1: 2px;
+    --hmc-border-radius-2: 5px;
+    --hmc-border-radius-3: 100%;
+
+    /* Font Size Scale */
+    --hmc-font-size-1: 9px;
+    --hmc-font-size-2: 11px;
+    --hmc-font-size-3: 12px;
+    --hmc-font-size-4: 13px;
+    --hmc-font-size-5: 14px;
+    --hmc-font-size-6: 15px;
+    --hmc-font-size-7: 18px;
+    --hmc-font-size-8: 20px;
+    --hmc-font-size-9: 26px;
+
+    /* Shadow/Elevation */
+    --hmc-shadow: rgba(0, 0, 0, 0.36);
+}
+
+.flex-container {
+    display: flex;
+    flex-wrap: wrap;
+    background-color: rgb(53, 53, 53);
+}
+
+.flex-container>div {
+    background-color: #ffffff;
+    color: #000000;
+    width: max-content;
+    margin: 10px;
+    padding: 10px;
+    text-align: center;
+    line-height: 75px;
+    font-size: 1em;
+}
+
+vscode-scrollable {
+    white-space: pre-wrap;
+    font-size: 12px;
+    height: 150px;
+}
+
+vscode-scrollable p:first-child {
+    margin-top: 0;
+}
+
+vscode-scrollable p:last-child {
+    margin-bottom: 0;
+}
+
+.div-const-string {
+    background-color: #ffffff;
+    color: #000000;
+    font-size: 15px;
+    max-width: max-content;
+    padding: 10px;
+}
+
+.row {
+    display: flex;
+}
+
+.column {
+    flex: 50%;
+}
+
+.device-tree {
+    white-space: pre-wrap;
+}

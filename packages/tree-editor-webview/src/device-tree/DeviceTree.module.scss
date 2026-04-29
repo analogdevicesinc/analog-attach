@@ -1,0 +1,40 @@
+.layout {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+
+  .header {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+    gap: var(--hmc-space-5);
+    padding: var(--hmc-space-5);
+    border-bottom: 1px solid var(--vscode-panel-border);
+    background: var(--vscode-editor-background);
+  }
+
+  .leftPane {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    height: 100%;
+  }
+}
+
+.searchContainer {
+  display: flex;
+  align-items: center;
+  background: var(--vscode-editor-background);
+  flex-shrink: 0;
+  padding: var(--hmc-space-5);
+}
+
+.deviceTreeContainer {
+  min-height: 0;
+  max-height: 100%;
+  height: 100%;
+  width: 100%;
+  white-space: nowrap !important;
+}

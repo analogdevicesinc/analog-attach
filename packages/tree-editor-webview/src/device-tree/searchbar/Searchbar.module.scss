@@ -1,0 +1,61 @@
+.searchbar {
+    width: 100%;
+}
+
+.searchResultsPopup {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    z-index: 1000;
+    background: var(--vscode-editor-background);
+    border: 1px solid var(--vscode-panel-border);
+    border-radius: 4px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    max-height: 300px;
+    overflow: auto;
+    margin-top: 2px;
+}
+
+.searchResultItem {
+    display: block;
+    width: 100%;
+    padding: 8px 12px;
+    background: transparent;
+    border: none;
+    text-align: left;
+    color: var(--vscode-editor-foreground);
+    cursor: pointer;
+    font-size: var(--vscode-font-size, 13px);
+    font-family: var(--vscode-font-family);
+
+    &:hover {
+        background: var(--vscode-list-hoverBackground);
+    }
+
+    &:focus {
+        background: var(--vscode-list-activeSelectionBackground);
+        color: var(--vscode-list-activeSelectionForeground);
+        outline: none;
+    }
+}
+
+.noResults {
+    padding: 8px 12px;
+    color: var(--vscode-descriptionForeground);
+    font-size: var(--vscode-font-size, 13px);
+    font-style: italic;
+}
+
+.highlight {
+    background-color: var(--vscode-input-border);
+    color: inherit;
+}
+
+.searchResults {
+    position: absolute;
+
+    margin-top: var(--hmc-space-3);
+    font-size: var(--vscode-font-size, 13px);
+    color: var(--vscode-editor-foreground);
+}

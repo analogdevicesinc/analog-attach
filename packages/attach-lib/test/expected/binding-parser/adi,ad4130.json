@@ -1,0 +1,608 @@
+{
+    "required_properties": [
+        "compatible",
+        "reg",
+        "interrupts"
+    ],
+    "properties": [
+        {
+            "key": "compatible",
+            "value": {
+                "_t": "enum_array",
+                "minItems": 1,
+                "maxItems": 1,
+                "enum": [
+                    "adi,ad4130"
+                ],
+                "enum_type": "string"
+            }
+        },
+        {
+            "key": "reg",
+            "value": {
+                "_t": "matrix",
+                "minItems": 1,
+                "maxItems": 1,
+                "description": "Chip select used by the device.",
+                "values": [
+                    {
+                        "_t": "number_array",
+                        "minItems": 1,
+                        "maxItems": 1,
+                        "minimum": 0,
+                        "maximum": 256
+                    }
+                ]
+            }
+        },
+        {
+            "key": "interrupts",
+            "value": {
+                "_t": "array",
+                "minItems": 1,
+                "maxItems": 1
+            }
+        },
+        {
+            "key": "interrupt-parent",
+            "value": {
+                "_t": "array",
+                "minItems": 1,
+                "maxItems": 1
+            }
+        },
+        {
+            "key": "interrupt-names",
+            "value": {
+                "_t": "enum_array",
+                "minItems": 1,
+                "maxItems": 1,
+                "enum": [
+                    "int",
+                    "clk",
+                    "p2",
+                    "dout"
+                ],
+                "description": "Specify which interrupt pin should be configured as Data Ready / FIFO\ninterrupt.\nDefault if not supplied is int.\n",
+                "enum_type": "string"
+            }
+        },
+        {
+            "key": "clocks",
+            "value": {
+                "_t": "array",
+                "minItems": 1,
+                "maxItems": 1,
+                "description": "phandle to the master clock (mclk)"
+            }
+        },
+        {
+            "key": "clock-output-names",
+            "value": {
+                "_t": "string_array",
+                "minItems": 1,
+                "maxItems": 1,
+                "unique_items": false
+            }
+        },
+        {
+            "key": "#clock-cells",
+            "value": {
+                "_t": "const",
+                "const": 0
+            }
+        },
+        {
+            "key": "clock-names",
+            "value": {
+                "_t": "enum_array",
+                "minItems": 1,
+                "maxItems": 1,
+                "enum": [
+                    "mclk"
+                ],
+                "default": "mclk",
+                "enum_type": "string"
+            }
+        },
+        {
+            "key": "#address-cells",
+            "value": {
+                "_t": "const",
+                "const": 1
+            }
+        },
+        {
+            "key": "#size-cells",
+            "value": {
+                "_t": "const",
+                "const": 0
+            }
+        },
+        {
+            "key": "refin1-supply",
+            "value": {
+                "_t": "generic",
+                "description": "refin1 supply. Can be used as reference for conversion."
+            }
+        },
+        {
+            "key": "refin2-supply",
+            "value": {
+                "_t": "generic",
+                "description": "refin2 supply. Can be used as reference for conversion."
+            }
+        },
+        {
+            "key": "avdd-supply",
+            "value": {
+                "_t": "generic",
+                "description": "AVDD voltage supply. Can be used as reference for conversion."
+            }
+        },
+        {
+            "key": "iovdd-supply",
+            "value": {
+                "_t": "generic",
+                "description": "IOVDD voltage supply. Used for the chip interface."
+            }
+        },
+        {
+            "key": "spi-max-frequency",
+            "value": {
+                "_t": "integer",
+                "minimum": 0,
+                "maximum": 5000000,
+                "typeSize": 32,
+                "description": "Maximum SPI clocking speed of the device in Hz.",
+                "default": null
+            }
+        },
+        {
+            "key": "adi,ext-clk-freq-hz",
+            "value": {
+                "_t": "generic",
+                "description": "Specify the frequency of the external clock."
+            }
+        },
+        {
+            "key": "adi,bipolar",
+            "value": {
+                "_t": "boolean",
+                "description": "Specify if the device should be used in bipolar mode."
+            }
+        },
+        {
+            "key": "adi,vbias-pins",
+            "value": {
+                "_t": "number_array",
+                "minItems": 1,
+                "maxItems": 16,
+                "minimum": 0,
+                "maximum": 15,
+                "description": "Analog inputs to apply a voltage bias of (AVDD − AVSS) / 2 to."
+            }
+        },
+        {
+            "key": "spi-cs-high",
+            "value": {
+                "_t": "boolean",
+                "description": "The device requires the chip select active high."
+            }
+        },
+        {
+            "key": "spi-lsb-first",
+            "value": {
+                "_t": "boolean",
+                "description": "The device requires the LSB first mode."
+            }
+        },
+        {
+            "key": "spi-cs-setup-delay-ns",
+            "value": {
+                "_t": "generic",
+                "description": "Delay in nanoseconds to be introduced by the controller after CS is asserted."
+            }
+        },
+        {
+            "key": "spi-cs-hold-delay-ns",
+            "value": {
+                "_t": "generic",
+                "description": "Delay in nanoseconds to be introduced by the controller before CS is de-asserted."
+            }
+        },
+        {
+            "key": "spi-cs-inactive-delay-ns",
+            "value": {
+                "_t": "generic",
+                "description": "Delay in nanoseconds to be introduced by the controller after CS is de-asserted."
+            }
+        },
+        {
+            "key": "spi-rx-bus-width",
+            "value": {
+                "_t": "enum_integer",
+                "enum": [
+                    0,
+                    1,
+                    2,
+                    4,
+                    8
+                ],
+                "typeSize": 32,
+                "description": "Bus width to the SPI bus used for read transfers. If 0 is provided, then no RX will be possible on this device.",
+                "default": 1
+            }
+        },
+        {
+            "key": "spi-rx-delay-us",
+            "value": {
+                "_t": "generic",
+                "description": "Delay, in microseconds, after a read transfer."
+            }
+        },
+        {
+            "key": "rx-sample-delay-ns",
+            "value": {
+                "_t": "generic",
+                "description": "SPI Rx sample delay offset, unit is nanoseconds. The delay from the default sample time before the actual sample of the rxd input signal occurs."
+            }
+        },
+        {
+            "key": "spi-tx-bus-width",
+            "value": {
+                "_t": "enum_integer",
+                "enum": [
+                    0,
+                    1,
+                    2,
+                    4,
+                    8
+                ],
+                "typeSize": 32,
+                "description": "Bus width to the SPI bus used for write transfers. If 0 is provided, then no TX will be possible on this device.",
+                "default": 1
+            }
+        },
+        {
+            "key": "spi-tx-delay-us",
+            "value": {
+                "_t": "generic",
+                "description": "Delay, in microseconds, after a write transfer."
+            }
+        },
+        {
+            "key": "stacked-memories",
+            "value": {
+                "_t": "number_array",
+                "minItems": 2,
+                "maxItems": 4,
+                "minimum": 0,
+                "maximum": 18446744073709552000,
+                "typeSize": 64,
+                "description": "Several SPI memories can be wired in stacked mode. This basically means that either a device features several chip selects, or that different devices must be seen as a single bigger chip. This basically doubles (or more) the total address space with only a single additional wire, while still needing to repeat the commands when crossing a chip boundary. The size of each chip should be provided as members of the array."
+            }
+        },
+        {
+            "key": "parallel-memories",
+            "value": {
+                "_t": "number_array",
+                "minItems": 2,
+                "maxItems": 4,
+                "minimum": 0,
+                "maximum": 18446744073709552000,
+                "typeSize": 64,
+                "description": "Several SPI memories can be wired in parallel mode. The devices are physically on a different buses but will always act synchronously as each data word is spread across the different memories (eg. even bits are stored in one memory, odd bits in the other). This basically doubles the address space and the throughput while greatly complexifying the wiring because as many busses as devices must be wired. The size of each chip should be provided as members of the array."
+            }
+        },
+        {
+            "key": "st,spi-midi-ns",
+            "value": {
+                "_t": "generic",
+                "description": "Only for STM32H7, (Master Inter-Data Idleness) minimum time\ndelay in nanoseconds inserted between two consecutive data frames.\n"
+            }
+        },
+        {
+            "key": "pl022,interface",
+            "value": {
+                "_t": "enum_integer",
+                "enum": [
+                    0,
+                    1,
+                    2
+                ],
+                "typeSize": 32,
+                "description": "SPI interface type",
+                "default": null
+            }
+        },
+        {
+            "key": "pl022,com-mode",
+            "value": {
+                "_t": "enum_integer",
+                "enum": [
+                    0,
+                    1,
+                    2
+                ],
+                "typeSize": 32,
+                "description": "Specifies the transfer mode",
+                "default": 1
+            }
+        },
+        {
+            "key": "pl022,rx-level-trig",
+            "value": {
+                "_t": "integer",
+                "minimum": 0,
+                "maximum": 4,
+                "typeSize": 32,
+                "description": "Rx FIFO watermark level",
+                "default": null
+            }
+        },
+        {
+            "key": "pl022,tx-level-trig",
+            "value": {
+                "_t": "integer",
+                "minimum": 0,
+                "maximum": 4,
+                "typeSize": 32,
+                "description": "Tx FIFO watermark level",
+                "default": null
+            }
+        },
+        {
+            "key": "pl022,ctrl-len",
+            "value": {
+                "_t": "integer",
+                "minimum": 3,
+                "maximum": 31,
+                "typeSize": 32,
+                "description": "Microwire interface - Control length",
+                "default": null
+            }
+        },
+        {
+            "key": "pl022,wait-state",
+            "value": {
+                "_t": "enum_integer",
+                "enum": [
+                    0,
+                    1
+                ],
+                "typeSize": 32,
+                "description": "Microwire interface - Wait state",
+                "default": null
+            }
+        },
+        {
+            "key": "pl022,duplex",
+            "value": {
+                "_t": "enum_integer",
+                "enum": [
+                    0,
+                    1
+                ],
+                "typeSize": 32,
+                "description": "Microwire interface - Full/Half duplex",
+                "default": null
+            }
+        },
+        {
+            "key": "cdns,read-delay",
+            "value": {
+                "_t": "integer",
+                "minimum": 0,
+                "maximum": 4294967295,
+                "typeSize": 32,
+                "description": "Delay for read capture logic, in clock cycles.",
+                "default": null
+            }
+        },
+        {
+            "key": "cdns,tshsl-ns",
+            "value": {
+                "_t": "generic",
+                "description": "Delay in nanoseconds for the length that the master mode chip select outputs are de-asserted between transactions."
+            }
+        },
+        {
+            "key": "cdns,tsd2d-ns",
+            "value": {
+                "_t": "generic",
+                "description": "Delay in nanoseconds between one chip select being de-activated and the activation of another."
+            }
+        },
+        {
+            "key": "cdns,tchsh-ns",
+            "value": {
+                "_t": "generic",
+                "description": "Delay in nanoseconds between last bit of current transaction and deasserting the device chip select (qspi_n_ss_out)."
+            }
+        },
+        {
+            "key": "cdns,tslch-ns",
+            "value": {
+                "_t": "generic",
+                "description": "Delay in nanoseconds between setting qspi_n_ss_out low and first bit transfer."
+            }
+        },
+        {
+            "key": "fsl,spi-cs-sck-delay",
+            "value": {
+                "_t": "integer",
+                "minimum": 0,
+                "maximum": 4294967295,
+                "typeSize": 32,
+                "description": "Delay in nanoseconds between activating chip select and the start of clock signal, at the start of a transfer.",
+                "default": null
+            }
+        },
+        {
+            "key": "fsl,spi-sck-cs-delay",
+            "value": {
+                "_t": "integer",
+                "minimum": 0,
+                "maximum": 4294967295,
+                "typeSize": 32,
+                "description": "Delay in nanoseconds between stopping the clock signal and deactivating chip select, at the end of a transfer.",
+                "default": null
+            }
+        },
+        {
+            "key": "controller-data",
+            "value": {
+                "_t": "object",
+                "properties": [
+                    {
+                        "key": "samsung,spi-feedback-delay",
+                        "value": {
+                            "_t": "enum_integer",
+                            "enum": [
+                                0,
+                                1,
+                                2,
+                                3
+                            ],
+                            "typeSize": 32,
+                            "description": "The sampling phase shift to be applied on the miso line (to account\nfor any lag in the miso line). Valid values:\n - 0: No phase shift.\n - 1: 90 degree phase shift sampling.\n - 2: 180 degree phase shift sampling.\n - 3: 270 degree phase shift sampling.\n",
+                            "default": 0
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            "key": "nvidia,tx-clk-tap-delay",
+            "value": {
+                "_t": "integer",
+                "minimum": 0,
+                "maximum": 31,
+                "typeSize": 32,
+                "description": "Delays the clock going out to device with this tap value. Tap value varies based on platform design trace lengths from Tegra QSPI to corresponding slave device.",
+                "default": null
+            }
+        },
+        {
+            "key": "nvidia,rx-clk-tap-delay",
+            "value": {
+                "_t": "integer",
+                "minimum": 0,
+                "maximum": 255,
+                "typeSize": 32,
+                "description": "Delays the clock coming in from the device with this tap value. Tap value varies based on platform design trace lengths from Tegra QSPI to corresponding slave device.",
+                "default": null
+            }
+        }
+    ],
+    "pattern_properties": [
+        {
+            "pattern": "^channel@([0-9a-f])$",
+            "description": "A few properties are defined in a common way ADC channels.",
+            "properties": [
+                {
+                    "key": "reg",
+                    "value": {
+                        "_t": "integer",
+                        "minimum": 0,
+                        "maximum": 15,
+                        "description": "The channel number.",
+                        "default": null
+                    }
+                },
+                {
+                    "key": "diff-channels",
+                    "value": {
+                        "_t": "number_array",
+                        "minItems": 2,
+                        "maxItems": 2,
+                        "minimum": 0,
+                        "maximum": 29,
+                        "typeSize": 32,
+                        "description": "Besides the analog inputs available, internal inputs can be used.\n16: Internal temperature sensor.\n17: AVSS\n18: Internal reference\n19: DGND\n20: (AVDD − AVSS)/6+\n21: (AVDD − AVSS)/6-\n22: (IOVDD − DGND)/6+\n23: (IOVDD − DGND)/6-\n24: (ALDO − AVSS)/6+\n25: (ALDO − AVSS)/6-\n26: (DLDO − DGND)/6+\n27: (DLDO − DGND)/6-\n28: V_MV_P\n29: V_MV_M\n"
+                    }
+                },
+                {
+                    "key": "adi,reference-select",
+                    "value": {
+                        "_t": "enum_integer",
+                        "enum": [
+                            0,
+                            1,
+                            2,
+                            3
+                        ],
+                        "typeSize": 32,
+                        "description": "Select the reference source to use when converting on the\nspecific channel. Valid values are:\n0: REFIN1(+)/REFIN1(−)\n1: REFIN2(+)/REFIN2(−)\n2: REFOUT/AVSS (Internal reference)\n3: AVDD/AVSS\nIf not specified, REFIN1 is used.\n",
+                        "default": 0
+                    }
+                },
+                {
+                    "key": "adi,excitation-pin-0",
+                    "value": {
+                        "_t": "integer",
+                        "minimum": 0,
+                        "maximum": 15,
+                        "typeSize": 32,
+                        "description": "Analog input to apply excitation current to while the channel\nis active.\n",
+                        "default": 0
+                    }
+                },
+                {
+                    "key": "adi,excitation-pin-1",
+                    "value": {
+                        "_t": "integer",
+                        "minimum": 0,
+                        "maximum": 15,
+                        "typeSize": 32,
+                        "description": "Analog input to apply excitation current to while this channel\nis active.\n",
+                        "default": 0
+                    }
+                },
+                {
+                    "key": "adi,excitation-current-0-nanoamp",
+                    "value": {
+                        "_t": "generic",
+                        "description": "Excitation current in nanoamps to be applied to pin specified in\nadi,excitation-pin-0 while this channel is active.\n"
+                    }
+                },
+                {
+                    "key": "adi,excitation-current-1-nanoamp",
+                    "value": {
+                        "_t": "generic",
+                        "description": "Excitation current in nanoamps to be applied to pin specified in\nadi,excitation-pin-1 while this channel is active.\n"
+                    }
+                },
+                {
+                    "key": "adi,burnout-current-nanoamp",
+                    "value": {
+                        "_t": "generic",
+                        "description": "Burnout current in nanoamps to be applied for this channel.\n"
+                    }
+                },
+                {
+                    "key": "adi,buffered-positive",
+                    "value": {
+                        "_t": "boolean",
+                        "description": "Enable buffered mode for positive input."
+                    }
+                },
+                {
+                    "key": "adi,buffered-negative",
+                    "value": {
+                        "_t": "boolean",
+                        "description": "Enable buffered mode for negative input."
+                    }
+                }
+            ],
+            "required": [
+                "reg",
+                "diff-channels"
+            ]
+        }
+    ],
+    "examples": [
+        "#include <dt-bindings/interrupt-controller/irq.h>\n\nspi {\n  #address-cells = <1>;\n  #size-cells = <0>;\n\n  adc@0 {\n    compatible = \"adi,ad4130\";\n    reg = <0>;\n\n    #address-cells = <1>;\n    #size-cells = <0>;\n\n    spi-max-frequency = <5000000>;\n    interrupts = <27 IRQ_TYPE_EDGE_FALLING>;\n    interrupt-parent = <&gpio>;\n\n    channel@0 {\n      reg = <0>;\n\n      adi,reference-select = <2>;\n\n      /* AIN8, AIN9 */\n      diff-channels = <8 9>;\n    };\n\n    channel@1 {\n      reg = <1>;\n\n      adi,reference-select = <2>;\n\n      /* AIN10, AIN11 */\n      diff-channels = <10 11>;\n    };\n\n    channel@2 {\n      reg = <2>;\n\n      adi,reference-select = <2>;\n\n      /* Temperature Sensor, DGND */\n      diff-channels = <16 19>;\n    };\n\n    channel@3 {\n      reg = <3>;\n\n      adi,reference-select = <2>;\n\n      /* Internal reference, DGND */\n      diff-channels = <18 19>;\n    };\n\n    channel@4 {\n      reg = <4>;\n\n      adi,reference-select = <2>;\n\n      /* DGND, DGND */\n      diff-channels = <19 19>;\n    };\n  };\n};\n"
+    ]
+}

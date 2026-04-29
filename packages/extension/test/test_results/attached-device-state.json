@@ -1,0 +1,20 @@
+{
+  "data": [
+    {
+      "active": true,
+      "alias": "imu0",
+      "channels": [],
+      "compatible": "adi,my-device",
+      "deviceUID": "2ac6ee55-8c44-4ce9-9cb8-f2c3e565b7b1",
+      "hasChannels": false,
+      "hasErrors": false,
+      "maxChannels": 0,
+      "name": "my-device",
+      "parentNode": {
+        "name": "spi",
+        "uuid": "81f87670-9213-4251-a962-738e7ff0dda2"
+      },
+      "type": "AttachedDeviceState"
+    }
+  ]
+}

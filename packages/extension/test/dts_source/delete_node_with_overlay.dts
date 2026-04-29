@@ -1,0 +1,17 @@
+/dts-v1/;
+
+/ {
+	leds: leds {
+		foo: foo {
+			
+		};
+	};
+	
+	phy1: phy@0 {
+		
+	};
+};
+
+&leds {
+	/delete-node/ foo;
+};

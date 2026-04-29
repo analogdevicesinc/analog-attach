@@ -1,0 +1,58 @@
+/**
+ *
+ * Copyright (c) 2025 Analog Devices, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ */
+.accordionContainer {
+  --accordion-body-padding: 0;
+  --accordion-body-margin: 0 0 4px 0;
+  --accordion-body-gap: 0;
+  width: 100%;
+
+  section:first-child {
+    &:hover {
+      background-color: var(--vscode-list-hoverBackground);
+    }
+  }
+
+  &.selected {
+    // add top border on the first item
+    section:last-of-type > div > div:first-child {
+      border-top: 1px solid var(--vscode-panel-border);
+    }
+
+    // remove bottom border from the last item
+    section:last-of-type > div > div:last-child {
+      border-bottom: none;
+    }
+
+    // disable left border on hover
+    section:last-of-type > div > div:hover {
+      border-left: 2px solid transparent;
+    }
+
+    // visual adjustments for devices
+    section:last-of-type > div > div {
+      > div .deviceContent {
+        padding: 0;
+
+        > div:first-child {
+          min-height: 27px;
+
+          > div {
+            font-weight: unset;
+          }
+        }
+      }
+    }
+  }
+}

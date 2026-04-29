@@ -1,0 +1,9 @@
+/dts-v1/;
+/plugin/;
+
+&{/soc/gpio@7e200000/gpclk0_gpio49/pin-gpclk} {
+	imu@1 {
+		compatible = "adi,imu";
+		reg = <1>;
+	};
+};

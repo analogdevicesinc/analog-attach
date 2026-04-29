@@ -1,0 +1,255 @@
+{
+    "required_properties": [
+        "compatible",
+        "reg",
+        "clocks",
+        "clock-names",
+        "dmas",
+        "dma-names",
+        "pwms",
+        "pwm-names",
+        "refin-supply",
+        "adi,spi-engine"
+    ],
+    "properties": [
+        {
+            "key": "compatible",
+            "value": {
+                "_t": "enum_array",
+                "minItems": 1,
+                "maxItems": 1,
+                "enum": [
+                    "adi,ad4134"
+                ],
+                "enum_type": "string"
+            }
+        },
+        {
+            "key": "reg",
+            "value": {
+                "_t": "array",
+                "minItems": 1,
+                "maxItems": 1
+            }
+        },
+        {
+            "key": "clocks",
+            "value": {
+                "_t": "matrix",
+                "minItems": 1,
+                "maxItems": 1,
+                "values": [
+                    {
+                        "_t": "fixed_index",
+                        "minItems": 1,
+                        "maxItems": 1,
+                        "prefixItems": [
+                            {
+                                "_t": "enum",
+                                "enum": [
+                                    "clk_osc",
+                                    "clk_usb",
+                                    "clk_27MHz",
+                                    "clk_108MHz",
+                                    "cam1_clk",
+                                    "cam0_clk"
+                                ],
+                                "enum_type": "phandle"
+                            }
+                        ]
+                    }
+                ]
+            }
+        },
+        {
+            "key": "clock-names",
+            "value": {
+                "_t": "enum_array",
+                "minItems": 1,
+                "maxItems": 1,
+                "enum": [
+                    "sys_clk"
+                ],
+                "default": "sys_clk",
+                "enum_type": "string"
+            }
+        },
+        {
+            "key": "dmas",
+            "value": {
+                "_t": "matrix",
+                "minItems": 1,
+                "maxItems": 1,
+                "values": [
+                    {
+                        "_t": "fixed_index",
+                        "minItems": 1,
+                        "maxItems": 1,
+                        "prefixItems": [
+                            {
+                                "_t": "enum",
+                                "enum": [
+                                    "dma",
+                                    "dma40"
+                                ],
+                                "enum_type": "phandle"
+                            }
+                        ]
+                    }
+                ]
+            }
+        },
+        {
+            "key": "dma-names",
+            "value": {
+                "_t": "enum_array",
+                "minItems": 1,
+                "maxItems": 1,
+                "enum": [
+                    "rx"
+                ],
+                "default": "rx",
+                "enum_type": "string"
+            }
+        },
+        {
+            "key": "pwms",
+            "value": {
+                "_t": "matrix",
+                "minItems": 1,
+                "maxItems": 1,
+                "values": [
+                    {
+                        "_t": "fixed_index",
+                        "minItems": 1,
+                        "maxItems": 1,
+                        "prefixItems": [
+                            {
+                                "_t": "enum",
+                                "enum": [
+                                    "pwm",
+                                    "pwm1"
+                                ],
+                                "enum_type": "phandle"
+                            }
+                        ]
+                    }
+                ]
+            }
+        },
+        {
+            "key": "pwm-names",
+            "value": {
+                "_t": "enum_array",
+                "minItems": 1,
+                "maxItems": 1,
+                "enum": [
+                    "odr_pwm"
+                ],
+                "default": "odr_pwm",
+                "enum_type": "string"
+            }
+        },
+        {
+            "key": "refin-supply",
+            "value": {
+                "_t": "enum_array",
+                "minItems": 1,
+                "maxItems": 1,
+                "enum": [
+                    "cam1_reg",
+                    "cam0_regulator",
+                    "cam_dummy_reg",
+                    "sd_vcc_reg",
+                    "vdd_3v3_reg",
+                    "vdd_5v0_reg"
+                ],
+                "enum_type": "phandle"
+            }
+        },
+        {
+            "key": "adi,spi-engine",
+            "value": {
+                "_t": "array",
+                "minItems": 1,
+                "maxItems": 1,
+                "description": "phandle of the SPI slave connected to the SPI engine master"
+            }
+        },
+        {
+            "key": "spi-max-frequency",
+            "value": {
+                "_t": "integer",
+                "maximum": 1000000,
+                "default": null
+            }
+        },
+        {
+            "key": "reset-gpios",
+            "value": {
+                "_t": "enum_array",
+                "minItems": 1,
+                "maxItems": 1,
+                "enum": [
+                    "gpio",
+                    "expgpio"
+                ],
+                "enum_type": "phandle"
+            }
+        },
+        {
+            "key": "avdd5-supply",
+            "value": {
+                "_t": "enum_array",
+                "minItems": 1,
+                "maxItems": 1,
+                "enum": [
+                    "cam1_reg",
+                    "cam0_regulator",
+                    "cam_dummy_reg",
+                    "sd_vcc_reg",
+                    "vdd_3v3_reg",
+                    "vdd_5v0_reg"
+                ],
+                "enum_type": "phandle"
+            }
+        },
+        {
+            "key": "avdd1v8-supply",
+            "value": {
+                "_t": "enum_array",
+                "minItems": 1,
+                "maxItems": 1,
+                "enum": [
+                    "cam1_reg",
+                    "cam0_regulator",
+                    "cam_dummy_reg",
+                    "sd_vcc_reg",
+                    "vdd_3v3_reg",
+                    "vdd_5v0_reg"
+                ],
+                "enum_type": "phandle"
+            }
+        },
+        {
+            "key": "iovdd-supply",
+            "value": {
+                "_t": "enum_array",
+                "minItems": 1,
+                "maxItems": 1,
+                "enum": [
+                    "cam1_reg",
+                    "cam0_regulator",
+                    "cam_dummy_reg",
+                    "sd_vcc_reg",
+                    "vdd_3v3_reg",
+                    "vdd_5v0_reg"
+                ],
+                "enum_type": "phandle"
+            }
+        }
+    ],
+    "examples": [
+        "#include <dt-bindings/gpio/gpio.h>\n\nspi {\n  #address-cells = <1>;\n  #size-cells = <0>;\n\n  adc@0 {\n    compatible = \"adi,ad4134\";\n    reg = <0>;\n\n    spi-max-frequency = <1000000>;\n\n    reset-gpios = <&gpio0 86 GPIO_ACTIVE_LOW>;\n\n    clocks = <&sys_clk>;\n    clock-names = \"sys_clk\";\n\n    dmas = <&rx_dma 0>;\n    dma-names = \"rx\";\n\n    pwms = <&ad4134_odr_generator 0 0>;\n    pwm-names = \"odr_pwm\";\n\n    avdd5-supply = <&avdd5>;\n    avdd1v8-supply = <&avdd1v8>;\n    iovdd-supply = <&iovdd>;\n    refin-supply = <&refin>;\n\n    adi,spi-engine = <&ad4134_spi_engine>;\n  };\n};\n"
+    ]
+}

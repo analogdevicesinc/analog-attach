@@ -1,0 +1,119 @@
+{
+    "$id": "http://devicetree.org/schemas/iio/adc/adi,ad4134.yaml#",
+    "title": "Analog Devices AD4134 ADC",
+    "description": "The AD4134 is a quad channel, low noise, simultaneous sampling,\nprecision analog-to-digital converter (ADC) that delivers on\nfunctionality, performance, and ease of use.\n\n  https://www.analog.com/en/products/ad4134.html\n",
+    "properties": {
+        "compatible": {
+            "items": [
+                {
+                    "enum": [
+                        "adi,ad4134"
+                    ]
+                }
+            ],
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 1
+        },
+        "reg": {
+            "maxItems": 1,
+            "type": "array",
+            "minItems": 1
+        },
+        "spi-max-frequency": {
+            "maximum": 1000000,
+            "type": "integer"
+        },
+        "reset-gpios": {
+            "maxItems": 1,
+            "type": "array",
+            "minItems": 1
+        },
+        "clocks": {
+            "maxItems": 1,
+            "type": "array",
+            "minItems": 1,
+            "items": [
+                {
+                    "items": {
+                        "minimum": 0,
+                        "maximum": 4294967295
+                    },
+                    "type": "array"
+                }
+            ]
+        },
+        "clock-names": {
+            "type": "array",
+            "items": [
+                {
+                    "const": "sys_clk"
+                }
+            ],
+            "minItems": 1,
+            "maxItems": 1
+        },
+        "dmas": {
+            "maxItems": 1,
+            "type": "array",
+            "minItems": 1
+        },
+        "dma-names": {
+            "type": "array",
+            "items": [
+                {
+                    "const": "rx"
+                }
+            ],
+            "minItems": 1,
+            "maxItems": 1
+        },
+        "pwms": {
+            "maxItems": 1,
+            "type": "array",
+            "minItems": 1
+        },
+        "pwm-names": {
+            "type": "array",
+            "items": [
+                {
+                    "const": "odr_pwm"
+                }
+            ],
+            "minItems": 1,
+            "maxItems": 1
+        },
+        "avdd5-supply": true,
+        "avdd1v8-supply": true,
+        "iovdd-supply": true,
+        "refin-supply": true,
+        "adi,spi-engine": {
+            "description": "phandle of the SPI slave connected to the SPI engine master",
+            "maxItems": 1,
+            "items": {
+                "maxItems": 1,
+                "type": "array",
+                "minItems": 1
+            },
+            "type": "array",
+            "minItems": 1
+        }
+    },
+    "required": [
+        "compatible",
+        "reg",
+        "clocks",
+        "clock-names",
+        "dmas",
+        "dma-names",
+        "pwms",
+        "pwm-names",
+        "refin-supply",
+        "adi,spi-engine"
+    ],
+    "additionalProperties": false,
+    "examples": [
+        "#include <dt-bindings/gpio/gpio.h>\n\nspi {\n  #address-cells = <1>;\n  #size-cells = <0>;\n\n  adc@0 {\n    compatible = \"adi,ad4134\";\n    reg = <0>;\n\n    spi-max-frequency = <1000000>;\n\n    reset-gpios = <&gpio0 86 GPIO_ACTIVE_LOW>;\n\n    clocks = <&sys_clk>;\n    clock-names = \"sys_clk\";\n\n    dmas = <&rx_dma 0>;\n    dma-names = \"rx\";\n\n    pwms = <&ad4134_odr_generator 0 0>;\n    pwm-names = \"odr_pwm\";\n\n    avdd5-supply = <&avdd5>;\n    avdd1v8-supply = <&avdd1v8>;\n    iovdd-supply = <&iovdd>;\n    refin-supply = <&refin>;\n\n    adi,spi-engine = <&ad4134_spi_engine>;\n  };\n};\n"
+    ],
+    "type": "object"
+}

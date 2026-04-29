@@ -1,0 +1,916 @@
+{
+  "$schema": "https://raw.githubusercontent.com/microsoft/vscode-html-languageservice/main/docs/customData.schema.json",
+  "version": 1.1,
+  "tags": [
+    {
+      "name": "vscode-badge",
+      "description": "Show counts or status information. Badges can also be used within [Textfield](https://vscode-elements.github.io/components/textfield) and [TabHeader](https://vscode-elements.github.io/components/tabs) components.\n---\n\n\n### **CSS Properties:**\n - **--vscode-font-family** - A sans-serif font type depends on the host OS. _(default: sans-serif)_\n- **--vscode-contrastBorder** - undefined _(default: transparent)_\n- **--vscode-badge-background** - default and counter variant background color _(default: #616161)_\n- **--vscode-badge-foreground** - default and counter variant foreground color _(default: #f8f8f8)_\n- **--vscode-activityBarBadge-background** - activity bar variant background color _(default: #0078d4)_\n- **--vscode-activityBarBadge-foreground** - activity bar variant foreground color _(default: #ffffff)_",
+      "attributes": [
+        {
+          "name": "variant",
+          "values": [
+            { "name": "" },
+            { "name": "default" },
+            { "name": "counter" },
+            { "name": "activity-bar-counter" },
+            { "name": "tab-header-counter" }
+          ]
+        }
+      ],
+      "references": []
+    },
+    {
+      "name": "vscode-button-group",
+      "description": "Shows a split button, including several components in a single button. Commonly used to show a button with a dropdown to the right.\n---\n\n\n### **CSS Properties:**\n - **--vscode-button-background** - undefined _(default: #0078d4)_\n- **--vscode-button-foreground** - undefined _(default: #ffffff)_\n- **--vscode-button-border** - undefined _(default: var(--vscode-button-background, rgba(255, 255, 255, 0.07)))_\n- **--vscode-button-hoverBackground** - undefined _(default: #026ec1)_\n- **--vscode-font-family** - A sans-serif font type depends on the host OS. _(default: sans-serif)_\n- **--vscode-font-size** - undefined _(default: 13px)_\n- **--vscode-font-weight** - undefined _(default: normal)_\n- **--vscode-button-secondaryForeground** - undefined _(default: #cccccc)_\n- **--vscode-button-secondaryBackground** - undefined _(default: #313131)_\n- **--vscode-button-secondaryHoverBackground** - undefined _(default: #3c3c3c)_\n- **--vscode-focusBorder** - undefined _(default: #0078d4)_",
+      "attributes": [],
+      "references": []
+    },
+    {
+      "name": "vscode-button",
+      "description": "Clickable element that are used to trigger actions.\n---\n\n\n### **Slots:**\n - **content-before** - Slot before the main content.\n- **content-after** - Slot after the main content.\n\n### **CSS Properties:**\n - **--vscode-button-background** - Primary button background _(default: #0078d4)_\n- **--vscode-button-foreground** - Primary button foreground _(default: #ffffff)_\n- **--vscode-button-border** - Primary button border _(default: var(--vscode-button-background, rgba(255, 255, 255, 0.07)))_\n- **--vscode-button-hoverBackground** - Primary button hover background _(default: #026ec1)_\n- **--vscode-button-focusBackground** - Primary button focus background _(default: #026ec1)_\n- **--vscode-font-family** - A sans-serif font type depends on the host OS. _(default: sans-serif)_\n- **--vscode-font-size** - undefined _(default: 13px)_\n- **--vscode-font-weight** - undefined _(default: normal)_\n- **--vscode-button-secondaryForeground** - Secondary button foreground _(default: #cccccc)_\n- **--vscode-button-secondaryBackground** - Secondary button background _(default: #313131)_\n- **--vscode-button-secondaryHoverBackground** - Secondary button hover background _(default: #3c3c3c)_\n- **--vscode-button-secondaryFocusBackground** - Secondary button focus background _(default: #3c3c3c)_\n- **--vscode-button-tertiaryForeground** - Tertiary button foreground _(default: #cccccc)_\n- **--vscode-button-tertiaryBackground** - Tertiary button background _(default: transparent)_\n- **--vscode-button-tertiaryHoverBackground** - Tertiary button hover background _(default: #2a2d2e)_\n- **--vscode-button-tertiaryFocusBackground** - Tertiary button focus background _(default: #2a2d2e)_\n- **--vscode-focusBorder** - undefined _(default: #0078d4)_\n\n### **CSS Parts:**\n - **base** - The main content area of the component.",
+      "attributes": [
+        { "name": "autofocus", "values": [] },
+        {
+          "name": "variant",
+          "description": "Button variant style, default is primary.",
+          "values": [
+            { "name": "primary" },
+            { "name": "secondary" },
+            { "name": "tertiary" }
+          ]
+        },
+        {
+          "name": "size",
+          "description": "Button size.",
+          "values": [
+            { "name": "small" },
+            { "name": "medium" },
+            { "name": "large" }
+          ]
+        },
+        { "name": "disabled", "values": [] },
+        {
+          "name": "icon",
+          "description": "A [Codicon](https://microsoft.github.io/vscode-codicons/dist/codicon.html) before the label",
+          "values": [{ "name": "IconType" }]
+        },
+        {
+          "name": "icon-spin",
+          "description": "Spin property for the icon",
+          "values": []
+        },
+        {
+          "name": "fixed",
+          "description": "Fixed width property for the button\nA fixed button will have full width of the parent container.",
+          "values": []
+        },
+        {
+          "name": "icon-spin-duration",
+          "description": "Duration property for the icon",
+          "values": []
+        },
+        {
+          "name": "icon-after",
+          "description": "A [Codicon](https://microsoft.github.io/vscode-codicons/dist/codicon.html) after the label",
+          "values": [{ "name": "IconType" }]
+        },
+        {
+          "name": "icon-after-spin",
+          "description": "Spin property for the after icon",
+          "values": []
+        },
+        {
+          "name": "icon-after-spin-duration",
+          "description": "Duration property for the after icon",
+          "values": []
+        },
+        { "name": "focused", "values": [] },
+        { "name": "name", "values": [] },
+        { "name": "icon-only", "values": [] },
+        {
+          "name": "type",
+          "values": [
+            { "name": "submit" },
+            { "name": "reset" },
+            { "name": "button" }
+          ]
+        },
+        { "name": "value", "values": [] }
+      ],
+      "references": []
+    },
+    {
+      "name": "vscode-checkbox",
+      "description": "Allows users to select one or more options from a set. When participating in a form, it supports\nthe `:invalid` pseudo class. Otherwise the error styles can be applied through the `invalid`\nproperty.\n---\n\n\n### **Events:**\n - **change** - Dispatched when checked state is changed. The event is bubbled, so it can be listened on a parent element like the `CheckboxGroup`.\n- **invalid** - Dispatched when the element is invalid and `checkValidity()` has been called or the form containing this element is submitted. [MDN Reference](https://developer.mozilla.org/en-US/docs/Web/API/HTMLInputElement/invalid_event)\n\n### **Methods:**\n - **checkValidity(): _boolean_** - Returns `true` if the element's value is valid; otherwise, it returns `false`.\nIf the element's value is invalid, an invalid event is triggered on the element.\n\n[MDN Reference](https://developer.mozilla.org/en-US/docs/Web/API/HTMLInputElement/checkValidity)\n- **reportValidity(): _boolean_** - Returns `true` if the element's value is valid; otherwise, it returns `false`.\nIf the element's value is invalid, an invalid event is triggered on the element, and the\nbrowser displays an error message to the user.\n\n[MDN Reference](https://developer.mozilla.org/en-US/docs/Web/API/HTMLInputElement/reportValidity)\n\n### **CSS Properties:**\n - **--vscode-font-family** - undefined _(default: sans-serif)_\n- **--vscode-font-size** - undefined _(default: 13px)_\n- **--vscode-font-weight** - undefined _(default: normal)_\n- **--vscode-foreground** - undefined _(default: #cccccc)_\n- **--vscode-settings-checkboxBackground** - undefined _(default: #313131)_\n- **--vscode-settings-checkboxBorder** - undefined _(default: #3c3c3c)_\n- **--vscode-settings-checkboxForeground** - undefined _(default: #cccccc)_\n- **--vscode-focusBorder** - undefined _(default: #0078d4)_\n- **--vscode-inputValidation-errorBackground** - undefined _(default: #5a1d1d)_\n- **--vscode-inputValidation-errorBorder** - undefined _(default: #be1100)_",
+      "attributes": [
+        {
+          "name": "name",
+          "description": "Name which is used as a variable name in the data of the form-container.",
+          "values": []
+        },
+        {
+          "name": "label",
+          "description": "Attribute pair of the `label` property.",
+          "values": []
+        },
+        {
+          "name": "autofocus",
+          "description": "Automatically focus on the element when the page loads.\n\n[MDN Reference](https://developer.mozilla.org/en-US/docs/Web/HTML/Global_attributes/autofocus)",
+          "values": []
+        },
+        { "name": "checked", "values": [] },
+        {
+          "name": "default-checked",
+          "description": "The element's initial checked state, which will be restored when the containing form is reset.",
+          "values": []
+        },
+        { "name": "invalid", "values": [] },
+        {
+          "name": "toggle",
+          "description": "When true, renders as a toggle switch instead of a checkbox.",
+          "values": []
+        },
+        {
+          "name": "value",
+          "description": "Associate a value to the checkbox. According to the native checkbox [specification](https://developer.mozilla.org/en-US/docs/Web/HTML/Element/input/checkbox#value_2), If the component participates in a form:\n\n- If it is unchecked, the value will not be submitted.\n- If it is checked but the value is not set, `on` will be submitted.\n- If it is checked and value is set, the value will be submitted.",
+          "values": []
+        },
+        { "name": "disabled", "values": [] },
+        { "name": "indeterminate", "values": [] },
+        { "name": "required", "values": [] },
+        { "name": "description", "values": [] },
+        { "name": "focused", "values": [] }
+      ],
+      "references": []
+    },
+    {
+      "name": "vscode-checkbox-group",
+      "description": "Arranges a group of checkboxes horizontally or vertically.\n---\n",
+      "attributes": [
+        {
+          "name": "variant",
+          "values": [{ "name": "horizontal" }, { "name": "vertical" }]
+        }
+      ],
+      "references": []
+    },
+    {
+      "name": "vscode-collapsible",
+      "description": "Allows users to reveal or hide related content on a page.\n---\n\n\n### **Events:**\n - **vsc-collapsible-toggle** - Dispatched when the content visibility is changed.\n\n### **Slots:**\n - _default_ - Main content.\n- **actions** - You can place any action icon in this slot in the header, but it's also possible to use any HTML element in it. It's only visible when the component is open.\n- **decorations** - The elements placed in the decorations slot are always visible.\n\n### **CSS Properties:**\n - **--vscode-sideBar-background** - Background color _(default: #181818)_\n- **--vscode-focusBorder** - Focus border color _(default: #0078d4)_\n- **--vscode-font-family** - Header font family _(default: sans-serif)_\n- **--vscode-sideBarSectionHeader-background** - Header background _(default: #181818)_\n- **--vscode-icon-foreground** - Arrow icon color _(default: #cccccc)_\n- **--vscode-sideBarTitle-foreground** - Header font color _(default: #cccccc)_\n\n### **CSS Parts:**\n - **body** - Container for the toggleable content of the component. The container's overflow content is hidden by default. This CSS part can serve as an escape hatch to modify this behavior.",
+      "attributes": [
+        {
+          "name": "always-show-header-actions",
+          "description": "When enabled, header actions are always visible; otherwise, they appear only when the cursor\nhovers over the component. Actions are shown only when the Collapsible component is open. This\nproperty is designed to use the `workbench.view.alwaysShowHeaderActions` setting.",
+          "values": []
+        },
+        {
+          "name": "title",
+          "description": "Component heading text",
+          "values": []
+        },
+        { "name": "heading", "description": "Heading text.", "values": [] },
+        {
+          "name": "description",
+          "description": "Less prominent text in the header.",
+          "values": []
+        },
+        { "name": "open", "values": [] }
+      ],
+      "references": []
+    },
+    {
+      "name": "vscode-context-menu",
+      "description": "\n---\n\n\n### **Events:**\n - **vsc-menu-select** - Emitted when a menu item is clicked\n\n### **CSS Properties:**\n - **--vscode-font-family** - undefined _(default: sans-serif)_\n- **--vscode-font-size** - undefined _(default: 13px)_\n- **--vscode-font-weight** - undefined _(default: normal)_\n- **--vscode-menu-background** - undefined _(default: #1f1f1f)_\n- **--vscode-menu-border** - undefined _(default: #454545)_\n- **--vscode-menu-foreground** - undefined _(default: #cccccc)_\n- **--vscode-widget-shadow** - undefined _(default: rgba(0, 0, 0, 0.36))_",
+      "attributes": [
+        {
+          "name": "prevent-close",
+          "description": "By default, the menu closes when an item is clicked. This attribute prevents the menu from closing.",
+          "values": []
+        },
+        { "name": "show", "values": [] }
+      ],
+      "references": []
+    },
+    {
+      "name": "vscode-context-menu-item",
+      "description": "\n---\n\n\n### **CSS Properties:**\n - **--vscode-font-family** - undefined _(default: sans-serif)_\n- **--vscode-font-size** - undefined _(default: 13px)_\n- **--vscode-font-weight** - undefined _(default: normal)_\n- **--vscode-menu-background** - undefined _(default: #1f1f1f)_\n- **--vscode-menu-selectionBorder** - undefined _(default: transparent)_\n- **--vscode-menu-foreground** - undefined _(default: #cccccc)_\n- **--vscode-menu-selectionBackground** - undefined _(default: #0078d4)_\n- **--vscode-menu-selectionForeground** - undefined _(default: #ffffff)_\n- **--vscode-menu-separatorBackground** - undefined _(default: #454545)_",
+      "attributes": [
+        { "name": "label", "values": [] },
+        { "name": "keybinding", "values": [] },
+        { "name": "value", "values": [] },
+        { "name": "separator", "values": [] },
+        { "name": "tabindex", "values": [] }
+      ],
+      "references": []
+    },
+    {
+      "name": "vscode-divider",
+      "description": "\n---\n\n\n### **CSS Properties:**\n - **--vscode-foreground** - undefined _(default: #cccccc)_",
+      "attributes": [
+        {
+          "name": "role",
+          "values": [{ "name": "separator" }, { "name": "presentation" }]
+        }
+      ],
+      "references": []
+    },
+    {
+      "name": "vscode-form-container",
+      "description": "\n---\n",
+      "attributes": [
+        { "name": "responsive", "values": [] },
+        { "name": "breakpoint", "values": [] }
+      ],
+      "references": []
+    },
+    {
+      "name": "vscode-form-group",
+      "description": "\n---\n\n\n### **CSS Properties:**\n - **--label-width** - The width of the label in horizontal mode _(default: 150px)_\n- **--label-right-margin** - The right margin of the label in horizontal mode _(default: 14px)_",
+      "attributes": [
+        { "name": "variant", "values": [{ "name": "FormGroupVariant" }] }
+      ],
+      "references": []
+    },
+    {
+      "name": "vscode-form-helper",
+      "description": "Adds more detailed description to a [FromGroup](https://bendera.github.io/vscode-webview-elements/components/vscode-form-group/)\n---\n\n\n### **CSS Properties:**\n - **--vsc-foreground-translucent** - Default text color. 90% transparency version of `--vscode-foreground` by default. _(default: undefined)_",
+      "attributes": [],
+      "references": []
+    },
+    {
+      "name": "vscode-icon",
+      "description": "Display a [Codicon](https://microsoft.github.io/vscode-codicons/dist/codicon.html).\nIn \"action-icon\" mode it behaves like a button. In this case, it is\nrecommended that a meaningful label is specified with the `label` property.\n---\n\n\n### **CSS Properties:**\n - **--vscode-icon-foreground** - undefined _(default: #cccccc)_\n- **--vscode-toolbar-hoverBackground** - Hover state background color in `active-icon` mode _(default: rgba(90, 93, 94, 0.31))_\n- **--vscode-toolbar-activeBackground** - Active state background color in `active-icon` mode _(default: rgba(99, 102, 103, 0.31))_\n- **--vscode-focusBorder** - undefined _(default: #0078d4)_\n- **--icon-mask** - Custom icon mask image (when using custom icons) _(default: undefined)_",
+      "attributes": [
+        {
+          "name": "label",
+          "description": "Set a meaningful label in `action-icon` mode for the screen readers",
+          "values": []
+        },
+        {
+          "name": "name",
+          "description": "[Codicon](https://microsoft.github.io/vscode-codicons/dist/codicon.html) icon name or HDS custom icon name.",
+          "values": [{ "name": "IconType" }]
+        },
+        { "name": "size", "description": "Icon size in pixels", "values": [] },
+        {
+          "name": "spin",
+          "description": "Enable rotation animation",
+          "values": []
+        },
+        {
+          "name": "spin-duration",
+          "description": "Animation duration in seconds",
+          "values": []
+        },
+        {
+          "name": "action-icon",
+          "description": "Behaves like a button",
+          "values": []
+        },
+        {
+          "name": "custom",
+          "description": "Use custom icon via CSS custom property (--icon-mask)",
+          "values": []
+        }
+      ],
+      "references": []
+    },
+    {
+      "name": "vscode-label",
+      "description": "\n---\n\n\n### **CSS Properties:**\n - **--vscode-font-family** - undefined _(default: sans-serif)_\n- **--vscode-font-size** - undefined _(default: 13px)_\n- **--vscode-foreground** - undefined _(default: #cccccc)_",
+      "attributes": [
+        { "name": "for", "values": [] },
+        { "name": "id", "values": [] },
+        { "name": "required", "values": [] }
+      ],
+      "references": []
+    },
+    {
+      "name": "vscode-multi-select",
+      "description": "Allows to select multiple items from a list of options.\n\nWhen participating in a form, it supports the `:invalid` pseudo class. Otherwise the error styles\ncan be applied through the `invalid` property.\n---\n\n\n### **Events:**\n - **change**\n- **input**\n\n### **CSS Properties:**\n - **--dropdown-z-index** - undefined _(default: 2)_\n- **--vscode-badge-background** - undefined _(default: #616161)_\n- **--vscode-badge-foreground** - undefined _(default: #f8f8f8)_\n- **--vscode-settings-dropdownBorder** - undefined _(default: #3c3c3c)_\n- **--vscode-settings-checkboxBackground** - undefined _(default: #313131)_\n- **--vscode-settings-dropdownBackground** - undefined _(default: #313131)_\n- **--vscode-settings-dropdownForeground** - undefined _(default: #cccccc)_\n- **--vscode-settings-dropdownListBorder** - undefined _(default: #454545)_\n- **--vscode-focusBorder** - undefined _(default: #0078d4)_\n- **--vscode-foreground** - undefined _(default: #cccccc)_\n- **--vscode-font-family** - undefined _(default: sans-serif)_\n- **--vscode-font-size** - undefined _(default: 13px)_\n- **--vscode-font-weight** - undefined _(default: normal)_\n- **--vscode-inputValidation-errorBackground** - undefined _(default: #5a1d1d)_\n- **--vscode-inputValidation-errorBorder** - undefined _(default: #be1100)_\n- **--vscode-list-activeSelectionBackground** - undefined _(default: #04395e)_\n- **--vscode-list-activeSelectionForeground** - undefined _(default: #ffffff)_\n- **--vscode-list-focusOutline** - undefined _(default: #0078d4)_\n- **--vscode-list-focusHighlightForeground** - undefined _(default: #2aaaff)_\n- **--vscode-list-highlightForeground** - undefined _(default: #2aaaff)_\n- **--vscode-list-hoverBackground** - undefined _(default: #2a2d2e)_\n- **--vscode-list-hoverForeground** - undefined _(default: #ffffff)_",
+      "attributes": [
+        {
+          "name": "invalid",
+          "description": "Sets the invalid state manually.",
+          "values": []
+        },
+        {
+          "name": "name",
+          "description": "Name which is used as a variable name in the data of the form-container.",
+          "values": []
+        },
+        { "name": "default-value", "values": [{ "name": "string[]" }] },
+        { "name": "required", "values": [] },
+        { "name": "value", "values": [{ "name": "string[]" }] },
+        { "name": "options", "values": [{ "name": "Option[]" }] },
+        { "name": "creatable", "values": [] },
+        {
+          "name": "combobox",
+          "description": "Options can be filtered by typing into a text input field.",
+          "values": []
+        },
+        {
+          "name": "label",
+          "description": "Accessible label for screen readers. When a `<vscode-label>` is connected\nto the component, it will be filled automatically.",
+          "values": []
+        },
+        {
+          "name": "disabled",
+          "description": "The element cannot be used and is not focusable.",
+          "values": []
+        },
+        {
+          "name": "filter",
+          "description": "Search method in the filtered list within the combobox mode.\n\n- contains - The list item includes the searched pattern at any position.\n- fuzzy - The list item contains the letters of the search pattern in the same order, but at any position.\n- startsWith - The search pattern matches the beginning of the searched text.\n- startsWithPerTerm - The search pattern matches the beginning of any word in the searched text.",
+          "values": [
+            { "name": "contains" },
+            { "name": "fuzzy" },
+            { "name": "startsWith" },
+            { "name": "startsWithPerTerm" }
+          ]
+        },
+        {
+          "name": "focused",
+          "description": "Its value is true when element is focused.",
+          "values": []
+        },
+        {
+          "name": "open",
+          "description": "Toggle the dropdown visibility.",
+          "values": []
+        },
+        {
+          "name": "position",
+          "description": "Position of the options list when visible.",
+          "values": [{ "name": "above" }, { "name": "below" }]
+        },
+        {
+          "name": "size",
+          "description": "Select size.",
+          "values": [{ "name": "small" }, { "name": "large" }]
+        }
+      ],
+      "references": []
+    },
+    {
+      "name": "vscode-option",
+      "description": "\n---\n",
+      "attributes": [
+        { "name": "value", "values": [] },
+        { "name": "description", "values": [] },
+        { "name": "icon", "values": [] },
+        { "name": "selected", "values": [] },
+        { "name": "disabled", "values": [] }
+      ],
+      "references": []
+    },
+    {
+      "name": "vscode-progress-bar",
+      "description": "\n---\n\n\n### **CSS Properties:**\n - **--vscode-progressBar-background** - undefined _(default: #0078d4)_",
+      "attributes": [
+        {
+          "name": "value",
+          "description": "Current value for determinate mode. If undefined/NaN, the bar is indeterminate.",
+          "values": []
+        },
+        {
+          "name": "max",
+          "description": "Maximum value for determinate mode.",
+          "values": []
+        },
+        {
+          "name": "indeterminate",
+          "description": "Force indeterminate mode even if value is set.",
+          "values": []
+        },
+        {
+          "name": "long-running-threshold",
+          "description": "Switch to a gentler animation after this many ms in indeterminate mode.",
+          "values": []
+        }
+      ],
+      "references": []
+    },
+    {
+      "name": "vscode-progress-ring",
+      "description": "\n---\n\n\n### **CSS Properties:**\n - **--vscode-progressBar-background** - undefined _(default: #0078d4)_",
+      "attributes": [
+        { "name": "aria-label", "values": [] },
+        { "name": "aria-live", "values": [] },
+        { "name": "role", "values": [] }
+      ],
+      "references": []
+    },
+    {
+      "name": "vscode-radio",
+      "description": "When participating in a form, it supports the `:invalid` pseudo class. Otherwise the error styles\ncan be applied through the `invalid` property.\n---\n\n\n### **Events:**\n - **change** - Dispatched when checked state is changed.\n- **invalid** - Dispatched when the element is invalid and `checkValidity()` has been called or the form containing this element is submitted. [MDN Reference](https://developer.mozilla.org/en-US/docs/Web/API/HTMLInputElement/invalid_event)\n\n### **CSS Properties:**\n - **--vscode-font-family** - undefined _(default: sans-serif)_\n- **--vscode-font-size** - undefined _(default: 13px)_\n- **--vscode-font-weight** - undefined _(default: normal)_\n- **--vscode-settings-checkboxBackground** - undefined _(default: #313131)_\n- **--vscode-settings-checkboxBorder** - undefined _(default: #3c3c3c)_\n- **--vscode-settings-checkboxForeground** - undefined _(default: #cccccc)_\n- **--vscode-focusBorder** - undefined _(default: #0078d4)_\n- **--vscode-inputValidation-errorBackground** - undefined _(default: #5a1d1d)_\n- **--vscode-inputValidation-errorBorder** - undefined _(default: #be1100)_",
+      "attributes": [
+        {
+          "name": "name",
+          "description": "Name which is used as a variable name in the data of the form-container.",
+          "values": []
+        },
+        {
+          "name": "label",
+          "description": "Attribute pair of the `label` property.",
+          "values": []
+        },
+        { "name": "autofocus", "values": [] },
+        { "name": "checked", "values": [] },
+        { "name": "default-checked", "values": [] },
+        { "name": "invalid", "values": [] },
+        { "name": "value", "values": [] },
+        { "name": "disabled", "values": [] },
+        { "name": "required", "values": [] },
+        { "name": "description", "values": [] },
+        { "name": "focused", "values": [] }
+      ],
+      "references": []
+    },
+    {
+      "name": "vscode-radio-group",
+      "description": "\n---\n\n\n### **Events:**\n - **change** - Dispatched when a child radio button is changed.",
+      "attributes": [
+        {
+          "name": "variant",
+          "values": [{ "name": "horizontal" }, { "name": "vertical" }]
+        }
+      ],
+      "references": []
+    },
+    {
+      "name": "vscode-scrollable",
+      "description": "\n---\n\n\n### **CSS Properties:**\n - **--vscode-scrollbar-shadow** - undefined _(default: #000000)_\n- **--vscode-scrollbarSlider-background** - undefined _(default: rgba(121, 121, 121, 0.4))_\n- **--vscode-scrollbarSlider-hoverBackground** - undefined _(default: rgba(100, 100, 100, 0.7))_\n- **--vscode-scrollbarSlider-activeBackground** - undefined _(default: rgba(191, 191, 191, 0.4))_",
+      "attributes": [
+        {
+          "name": "always-visible",
+          "description": "By default, the scrollbar appears only when the cursor hovers over the\ncomponent. With this option, the scrollbar will always be visible.",
+          "values": []
+        },
+        {
+          "name": "fast-scroll-sensitivity",
+          "description": "Scrolling speed multiplier when pressing `Alt`. This property is designed to use the value of\n`editor.fastScrollSensitivity`, `workbench.list.fastScrollSensitivity` or\n`terminal.integrated.fastScrollSensitivity` depending on the context.",
+          "values": []
+        },
+        {
+          "name": "min-thumb-size",
+          "description": "This setting defines the scrollbar's minimum size when the component contains a large amount of content.",
+          "values": []
+        },
+        {
+          "name": "mouse-wheel-scroll-sensitivity",
+          "description": "A multiplier to be used on the `deltaY` of the mouse wheel scroll events. This property is\ndesigned to use the value of `editor.mouseWheelScrollSensitivity`,\n`workbench.list.mouseWheelScrollSensitivity` or\n`terminal.integrated.mouseWheelScrollSensitivity` depending on the context.",
+          "values": []
+        },
+        {
+          "name": "shadow",
+          "description": "Controls shadow visibility when content overflows.",
+          "values": []
+        },
+        {
+          "name": "scrolled",
+          "description": "It's true when `scrollPos` greater than 0",
+          "values": []
+        },
+        {
+          "name": "scroll-pos",
+          "description": "Scroll position.",
+          "values": []
+        }
+      ],
+      "references": []
+    },
+    {
+      "name": "vscode-single-select",
+      "description": "Allows to select an item from multiple options.\n\nWhen participating in a form, it supports the `:invalid` pseudo class. Otherwise the error styles\ncan be applied through the `invalid` property.\n---\n\n\n### **Events:**\n - **change**\n- **input**\n\n### **CSS Properties:**\n - **--dropdown-z-index** - undefined _(default: 2)_\n- **--vscode-badge-background** - undefined _(default: #616161)_\n- **--vscode-badge-foreground** - undefined _(default: #f8f8f8)_\n- **--vscode-settings-dropdownBorder** - undefined _(default: #3c3c3c)_\n- **--vscode-settings-checkboxBackground** - undefined _(default: #313131)_\n- **--vscode-settings-dropdownBackground** - undefined _(default: #313131)_\n- **--vscode-settings-dropdownForeground** - undefined _(default: #cccccc)_\n- **--vscode-settings-dropdownListBorder** - undefined _(default: #454545)_\n- **--vscode-focusBorder** - undefined _(default: #0078d4)_\n- **--vscode-foreground** - undefined _(default: #cccccc)_\n- **--vscode-font-family** - undefined _(default: sans-serif)_\n- **--vscode-font-size** - undefined _(default: 13px)_\n- **--vscode-font-weight** - undefined _(default: normal)_\n- **--vscode-inputValidation-errorBackground** - undefined _(default: #5a1d1d)_\n- **--vscode-inputValidation-errorBorder** - undefined _(default: #be1100)_\n- **--vscode-list-activeSelectionBackground** - undefined _(default: #04395e)_\n- **--vscode-list-activeSelectionForeground** - undefined _(default: #ffffff)_\n- **--vscode-list-focusOutline** - undefined _(default: #0078d4)_\n- **--vscode-list-focusHighlightForeground** - undefined _(default: #2aaaff)_\n- **--vscode-list-highlightForeground** - undefined _(default: #2aaaff)_\n- **--vscode-list-hoverBackground** - undefined _(default: #2a2d2e)_\n- **--vscode-list-hoverForeground** - undefined _(default: #ffffff)_",
+      "attributes": [
+        {
+          "name": "invalid",
+          "description": "Sets the invalid state manually.",
+          "values": []
+        },
+        {
+          "name": "name",
+          "description": "Name which is used as a variable name in the data of the form-container.",
+          "values": []
+        },
+        { "name": "default-value", "values": [] },
+        { "name": "selected-index", "values": [] },
+        { "name": "value", "values": [] },
+        { "name": "required", "values": [] },
+        { "name": "options", "values": [{ "name": "Option[]" }] },
+        { "name": "creatable", "values": [] },
+        {
+          "name": "combobox",
+          "description": "Options can be filtered by typing into a text input field.",
+          "values": []
+        },
+        {
+          "name": "label",
+          "description": "Accessible label for screen readers. When a `<vscode-label>` is connected\nto the component, it will be filled automatically.",
+          "values": []
+        },
+        {
+          "name": "disabled",
+          "description": "The element cannot be used and is not focusable.",
+          "values": []
+        },
+        {
+          "name": "filter",
+          "description": "Search method in the filtered list within the combobox mode.\n\n- contains - The list item includes the searched pattern at any position.\n- fuzzy - The list item contains the letters of the search pattern in the same order, but at any position.\n- startsWith - The search pattern matches the beginning of the searched text.\n- startsWithPerTerm - The search pattern matches the beginning of any word in the searched text.",
+          "values": [
+            { "name": "contains" },
+            { "name": "fuzzy" },
+            { "name": "startsWith" },
+            { "name": "startsWithPerTerm" }
+          ]
+        },
+        {
+          "name": "focused",
+          "description": "Its value is true when element is focused.",
+          "values": []
+        },
+        {
+          "name": "open",
+          "description": "Toggle the dropdown visibility.",
+          "values": []
+        },
+        {
+          "name": "position",
+          "description": "Position of the options list when visible.",
+          "values": [{ "name": "above" }, { "name": "below" }]
+        },
+        {
+          "name": "size",
+          "description": "Select size.",
+          "values": [{ "name": "small" }, { "name": "large" }]
+        }
+      ],
+      "references": []
+    },
+    {
+      "name": "vscode-split-layout",
+      "description": "\n---\n\n\n### **Methods:**\n - **resetHandlePosition()** - Sets the handle position to the value specified in the `initialHandlePosition` property.\n\n### **CSS Properties:**\n - **--separator-border** - undefined _(default: #454545)_\n- **--vscode-editorWidget-border** - undefined _(default: #454545)_\n- **--vscode-sash-hoverBorder** - undefined _(default: #0078d4)_",
+      "attributes": [
+        {
+          "name": "split",
+          "description": "Direction of the divider.",
+          "values": [{ "name": "Orientation" }]
+        },
+        {
+          "name": "reset-on-dbl-click",
+          "description": "Controls whether the handle position should reset to the value set in the\n`initialHandlePosition` when it is double-clicked.",
+          "values": []
+        },
+        {
+          "name": "handle-size",
+          "description": "Controls the draggable area size in pixels. it is intended to use the value\nof `workbench.sash.size`.",
+          "values": []
+        },
+        {
+          "name": "initial-handle-position",
+          "description": "The handler position will reset to this position when it is double-clicked,\nor the `resetHandlePosition()` is called.",
+          "values": []
+        },
+        {
+          "name": "handle-position",
+          "description": "Set the handle position programmatically. The value must include a unit,\neither `%` or `px`. If no unit is specified, the value is interpreted as\n`px`.",
+          "values": []
+        },
+        {
+          "name": "fixed-pane",
+          "description": "The size of the fixed pane will not change when the component is resized.",
+          "values": [{ "name": "start" }, { "name": "end" }, { "name": "none" }]
+        }
+      ],
+      "references": []
+    },
+    {
+      "name": "vscode-tab-header",
+      "description": "\n---\n\n\n### **CSS Properties:**\n - **--vscode-focusBorder** - undefined _(default: #0078d4)_\n- **--vscode-foreground** - undefined _(default: #cccccc)_\n- **--vscode-panelTitle-activeBorder** - undefined _(default: #0078d4)_\n- **--vscode-panelTitle-activeForeground** - undefined _(default: #cccccc)_\n- **--vscode-panelTitle-inactiveForeground** - undefined _(default: #9d9d9d)_",
+      "attributes": [
+        { "name": "active", "values": [] },
+        { "name": "panel", "description": "Panel-like look", "values": [] }
+      ],
+      "references": []
+    },
+    {
+      "name": "vscode-tab-panel",
+      "description": "\n---\n\n\n### **CSS Properties:**\n - **--vscode-focusBorder** - undefined _(default: #0078d4)_\n- **--vscode-panel--background** - undefined _(default: #181818)_",
+      "attributes": [
+        { "name": "hidden", "values": [] },
+        { "name": "panel", "description": "Panel-like look", "values": [] }
+      ],
+      "references": []
+    },
+    {
+      "name": "vscode-table",
+      "description": "\n---\n\n\n### **CSS Properties:**\n - **--vscode-editorGroup-border** - undefined _(default: rgba(255, 255, 255, 0.09))_\n- **--vscode-keybindingTable-rowsBackground** - undefined _(default: rgba(204, 204, 204, 0.04))_\n- **--vscode-sash-hoverBorder** - undefined _(default: #0078d4)_",
+      "attributes": [
+        { "name": "resizable", "values": [] },
+        { "name": "responsive", "values": [] },
+        {
+          "name": "bordered",
+          "description": "Both rows and columns are separated by borders.",
+          "values": []
+        },
+        {
+          "name": "bordered-columns",
+          "description": "Columns are separated by borders.",
+          "values": []
+        },
+        {
+          "name": "bordered-rows",
+          "description": "Rows are separated by borders.",
+          "values": []
+        },
+        { "name": "breakpoint", "values": [] },
+        {
+          "name": "columns",
+          "description": "Initial column sizes in a JSON-encoded array.\nAccepted values are:\n- number\n- string-type number (ex.: \"100\")\n- px value (ex.: \"100px\")\n- percentage value (ex.: \"50%\")\n- percentage value (ex.: \"50%\")\n- \"auto\" keyword",
+          "values": [{ "name": "string[]" }]
+        },
+        {
+          "name": "min-column-width",
+          "description": "Minimum column width. Valid values are:\n- number\n- string-type number (ex.: \"100\")\n- px value (ex.: \"100px\")\n- percentage value (ex.: \"50%\")\n- percentage value (ex.: \"50%\")\n- \"auto\" keyword",
+          "values": []
+        },
+        { "name": "delayed-resizing", "values": [] },
+        {
+          "name": "condensed",
+          "description": "Condensed view, rows have less height and padding.",
+          "values": []
+        },
+        {
+          "name": "zebra",
+          "description": "Zebra stripes, even rows are tinted.",
+          "values": []
+        },
+        {
+          "name": "zebra-odd",
+          "description": "Zebra stripes, odd rows are tinted.",
+          "values": []
+        }
+      ],
+      "references": []
+    },
+    {
+      "name": "vscode-table-body",
+      "description": "\n---\n",
+      "attributes": [],
+      "references": []
+    },
+    {
+      "name": "vscode-table-cell",
+      "description": "\n---\n\n\n### **CSS Properties:**\n - **--vscode-editorGroup-border** - undefined _(default: rgba(255, 255, 255, 0.09))_\n- **--vscode-foreground** - undefined _(default: #cccccc)_\n- **--vscode-font-family** - undefined _(default: sans-serif)_\n- **--vscode-font-size** - undefined _(default: 13px)_",
+      "attributes": [
+        {
+          "name": "column-label",
+          "description": "Cell label in the compact view of the responsive mode. For internal use only.",
+          "values": []
+        },
+        {
+          "name": "alignment",
+          "values": [
+            { "name": "left" },
+            { "name": "center" },
+            { "name": "right" }
+          ]
+        },
+        {
+          "name": "compact",
+          "description": "Enable compact view in the responsive mode. For internal use only.",
+          "values": []
+        }
+      ],
+      "references": []
+    },
+    {
+      "name": "vscode-table-header",
+      "description": "\n---\n\n\n### **CSS Properties:**\n - **--vscode-keybindingTable-headerBackground** - Table header background _(default: rgba(204, 204, 204, 0.04))_",
+      "attributes": [],
+      "references": []
+    },
+    {
+      "name": "vscode-table-header-cell",
+      "description": "\n---\n\n\n### **Events:**\n - **vsc-table-header-cell-sort** - Emitted when the header cell sort icon is clicked.\n\n### **CSS Properties:**\n - **--vscode-foreground** - undefined _(default: #cccccc)_\n- **--vscode-font-family** - undefined _(default: sans-serif)_\n- **--vscode-font-size** - undefined _(default: 13px)_",
+      "attributes": [
+        {
+          "name": "alignment",
+          "values": [
+            { "name": "left" },
+            { "name": "center" },
+            { "name": "right" }
+          ]
+        },
+        { "name": "sortable", "values": [] },
+        { "name": "sortDirection", "values": [{ "name": "SortDirection" }] }
+      ],
+      "references": []
+    },
+    {
+      "name": "vscode-table-row",
+      "description": "\n---\n\n\n### **CSS Properties:**\n - **--vscode-editorGroup-border** - undefined _(default: rgba(255, 255, 255, 0.09))_",
+      "attributes": [],
+      "references": []
+    },
+    {
+      "name": "vscode-tabs",
+      "description": "\n---\n\n\n### **Events:**\n - **vsc-tabs-select** - Dispatched when the active tab is changed\n\n### **Slots:**\n - _default_ - Default slot. It is used for tab panels.\n- **header** - Slot for tab headers.\n- **addons** - Right aligned area in the header.\n\n### **CSS Properties:**\n - **--vscode-font-family** - undefined _(default: sans-serif)_\n- **--vscode-font-size** - undefined _(default: 13px)_\n- **--vscode-font-weight** - undefined _(default: normal)_\n- **--vscode-settings-headerBorder** - undefined _(default: #2b2b2b)_\n- **--vscode-panel-background** - undefined _(default: #181818)_",
+      "attributes": [
+        { "name": "panel", "description": "Panel-like look", "values": [] },
+        { "name": "selected-index", "values": [] }
+      ],
+      "references": []
+    },
+    {
+      "name": "vscode-textarea",
+      "description": "Multi-line text input.\n\nWhen participating in a form, it supports the `:invalid` pseudo class. Otherwise the error styles\ncan be applied through the `invalid` property.\n---\n\n\n### **Events:**\n - **change**\n- **input**\n\n### **CSS Properties:**\n - **--vscode-scrollbar-shadow** - undefined _(default: #000000)_\n- **--vscode-settings-textInputBackground** - undefined _(default: #313131)_\n- **--vscode-settings-textInputBorder** - undefined _(default: transparent)_\n- **--vscode-settings-textInputForeground** - undefined _(default: #cccccc)_\n- **--vscode-input-placeholderForeground** - undefined _(default: #989898)_\n- **--vscode-font-family** - undefined _(default: sans-serif)_\n- **--vscode-font-size** - undefined _(default: 13px)_\n- **--vscode-font-weight** - undefined _(default: normal)_\n- **--vscode-editor-background** - undefined _(default: #1f1f1f)_\n- **--vscode-editor-foreground** - undefined _(default: #cccccc)_\n- **--vscode-editor-font-family** - undefined _(default: monospace)_\n- **--vscode-editor-font-size** - undefined _(default: 14px)_\n- **--vscode-editor-font-weight** - undefined _(default: normal)_\n- **--vscode-editor-inlineValuesForeground** - undefined _(default: rgba(255, 255, 255, 0.5))_\n- **--vscode-focusBorder** - undefined _(default: #0078d4)_\n- **--vscode-scrollbarSlider-background** - undefined _(default: rgba(121, 121, 121, 0.4))_\n- **--vscode-scrollbarSlider-hoverBackground** - undefined _(default: rgba(100, 100, 100, 0.7))_\n- **--vscode-scrollbarSlider-activeBackground** - undefined _(default: rgba(191, 191, 191, 0.4))_",
+      "attributes": [
+        {
+          "name": "autocomplete",
+          "values": [{ "name": "on" }, { "name": "off" }]
+        },
+        { "name": "autofocus", "values": [] },
+        { "name": "default-value", "values": [] },
+        { "name": "disabled", "values": [] },
+        { "name": "invalid", "values": [] },
+        { "name": "maxLength", "values": [] },
+        { "name": "minLength", "values": [] },
+        { "name": "rows", "values": [] },
+        { "name": "cols", "values": [] },
+        { "name": "name", "values": [] },
+        { "name": "placeholder", "values": [] },
+        { "name": "readonly", "values": [] },
+        {
+          "name": "resize",
+          "values": [
+            { "name": "both" },
+            { "name": "horizontal" },
+            { "name": "vertical" },
+            { "name": "none" }
+          ]
+        },
+        { "name": "required", "values": [] },
+        { "name": "spellcheck", "values": [] },
+        {
+          "name": "monospace",
+          "description": "Use monospace fonts. The font family, weight, size, and color will be the same as set in the\nVSCode code editor.",
+          "values": []
+        },
+        { "name": "value", "values": [] }
+      ],
+      "references": []
+    },
+    {
+      "name": "vscode-textfield",
+      "description": "A simple inline textfield\n\nWhen participating in a form, it supports the `:invalid` pseudo class. Otherwise the error styles\ncan be applied through the `invalid` property.\n---\n\n\n### **Events:**\n - **change**\n- **input**\n\n### **Methods:**\n - **checkValidity(): _boolean_** - Check the component's validity state when built-in validation is used.\nBuilt-in validation is triggered when any validation-related attribute is set. Validation-related\nattributes are: `max, maxlength, min, minlength, pattern, required, step`.\nSee this [the MDN reference](https://developer.mozilla.org/en-US/docs/Web/API/HTMLInputElement/checkValidity) for more details.\n\n### **Slots:**\n - **content-before** - A slot before the editable area but inside of the component. It is used to place icons.\n- **content-after** - A slot after the editable area but inside of the component. It is used to place icons.\n\n### **CSS Properties:**\n - **--vscode-settings-textInputBackground** - undefined _(default: #313131)_\n- **--vscode-settings-textInputBorder** - undefined _(default: var(--vscode-settings-textInputBackground, #3c3c3c))_\n- **--vscode-settings-textInputForeground** - undefined _(default: #cccccc)_\n- **--vscode-settings-textInputBackground** - undefined _(default: #313131)_\n- **--vscode-focusBorder** - undefined _(default: #0078d4)_\n- **--vscode-font-family** - A sans-serif font type depends on the host OS. _(default: sans-serif)_\n- **--vscode-font-size** - undefined _(default: 13px)_\n- **--vscode-font-weight** - undefined _(default: normal)_\n- **--vscode-inputValidation-errorBorder** - undefined _(default: #be1100)_\n- **--vscode-inputValidation-errorBackground** - undefined _(default: #5a1d1d)_\n- **--vscode-input-placeholderForeground** - undefined _(default: #989898)_\n- **--vscode-button-background** - undefined _(default: #0078d4)_\n- **--vscode-button-foreground** - undefined _(default: #ffffff)_\n- **--vscode-button-hoverBackground** - undefined _(default: #026ec1)_",
+      "attributes": [
+        {
+          "name": "autocomplete",
+          "values": [{ "name": "on" }, { "name": "off" }]
+        },
+        { "name": "autofocus", "values": [] },
+        { "name": "default-value", "values": [] },
+        { "name": "disabled", "values": [] },
+        { "name": "focused", "values": [] },
+        {
+          "name": "invalid",
+          "description": "Set error styles on the component. This is only intended to apply styles when custom error\nvalidation is implemented. To check whether the component is valid, use the checkValidity method.",
+          "values": []
+        },
+        { "name": "max", "values": [] },
+        { "name": "maxLength", "values": [] },
+        { "name": "min", "values": [] },
+        { "name": "minLength", "values": [] },
+        { "name": "multiple", "values": [] },
+        { "name": "name", "values": [] },
+        {
+          "name": "pattern",
+          "description": "Specifies a regular expression the form control's value should match.\n[MDN Reference](https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes/pattern)",
+          "values": []
+        },
+        { "name": "placeholder", "values": [] },
+        { "name": "readonly", "values": [] },
+        { "name": "required", "values": [] },
+        { "name": "step", "values": [] },
+        {
+          "name": "type",
+          "description": "Same as the `type` of the native `<input>` element but only a subset of types are supported.\nThe supported ones are: `color`,`date`,`datetime-local`,`email`,`file`,`month`,`number`,`password`,`search`,`tel`,`text`,`time`,`url`,`week`",
+          "values": [{ "name": "InputType" }]
+        },
+        { "name": "value", "values": [] }
+      ],
+      "references": []
+    },
+    {
+      "name": "vscode-toolbar-button",
+      "description": "Toolbar button\n---\n\n\n### **Events:**\n - **change**",
+      "attributes": [
+        { "name": "icon", "values": [] },
+        { "name": "label", "values": [] },
+        { "name": "toggleable", "values": [] },
+        { "name": "checked", "values": [] }
+      ],
+      "references": []
+    },
+    {
+      "name": "vscode-toolbar-container",
+      "description": "Simple container to arrange the toolar buttons\n---\n",
+      "attributes": [],
+      "references": []
+    },
+    {
+      "name": "vscode-tooltip",
+      "description": "A tooltip component that displays a label on hover over its children.\nThe tooltip wraps its children and shows the tooltip text when hovered.\nCan also be set to active mode for always-visible tooltips.\n---\n\n\n### **Slots:**\n - _default_ - The content that will trigger the tooltip on hover.\n- **tooltip** - Custom content to display in the tooltip. Takes precedence over the label property.\n\n### **CSS Properties:**\n - **--vscode-tooltip-background** - Tooltip background color _(default: #1e1e1e)_\n- **--vscode-tooltip-foreground** - Tooltip text color _(default: #cccccc)_\n- **--vscode-tooltip-border** - Tooltip border color _(default: #454545)_\n- **--vscode-font-family** - Font family _(default: sans-serif)_\n- **--vscode-font-size** - Font size _(default: 12px)_\n- **--vscode-tooltip-maxWidth** - Maximum width of tooltip _(default: 320px)_\n- **--vscode-tooltip-zIndex** - Z-index for tooltip positioning _(default: 1000)_\n- **--vscode-focusBorder** - Border color for active tooltips _(default: #0078d4)_\n\n### **CSS Parts:**\n - **tooltip** - The tooltip container element\n- **content** - The wrapped content element",
+      "attributes": [
+        {
+          "name": "label",
+          "description": "The text to display in the tooltip",
+          "values": []
+        },
+        {
+          "name": "position",
+          "description": "Position of the tooltip relative to the trigger element",
+          "values": [
+            { "name": "top" },
+            { "name": "bottom" },
+            { "name": "left" },
+            { "name": "right" }
+          ]
+        },
+        {
+          "name": "show-delay",
+          "description": "Delay in milliseconds before showing the tooltip",
+          "values": []
+        },
+        {
+          "name": "hide-delay",
+          "description": "Delay in milliseconds before hiding the tooltip",
+          "values": []
+        },
+        {
+          "name": "disabled",
+          "description": "Disable the tooltip",
+          "values": []
+        },
+        {
+          "name": "active",
+          "description": "Keep the tooltip always visible (overrides hover/focus behavior)",
+          "values": []
+        }
+      ],
+      "references": []
+    },
+    {
+      "name": "vscode-tree",
+      "description": "\n---\n\n\n### **Methods:**\n - **expandAll()** - Expands all folders.\n- **collapseAll()** - Collapses all folders.\n\n### **CSS Properties:**\n - **--vscode-font-family** - undefined _(default: sans-serif)_\n- **--vscode-font-size** - undefined _(default: 13px)_\n- **--vscode-font-weight** - undefined _(default: normal)_\n- **--vscode-foreground** - undefined _(default: #cccccc)_\n- **--vscode-icon-foreground** - undefined _(default: #cccccc)_\n- **--vscode-list-focusAndSelectionOutline** - undefined _(default: #0078d4)_\n- **--vscode-list-focusOutline** - undefined _(default: #0078d4)_\n- **--vscode-list-hoverBackground** - undefined _(default: #2a2d2e)_\n- **--vscode-list-hoverForeground** - undefined _(default: #cccccc)_\n- **--vscode-tree-inactiveIndentGuidesStroke** - undefined _(default: rgba(88, 88, 88, 0.4))_\n- **--vscode-tree-indentGuidesStroke** - undefined _(default: #585858)_",
+      "attributes": [
+        {
+          "name": "expand-mode",
+          "description": "Controls how tree folders are expanded when clicked. This property is designed to use\nthe `workbench.tree.expandMode` setting.\n\nValid options are available as constants.\n\n```javascript\nimport {ExpandMode} from '@vscode-elements/elements/dist/vscode-tree/vscode-tree.js';\n\ndocument.querySelector('vscode-tree').expandMode = ExpandMode.singleClick;\n```",
+          "values": [{ "name": "singleClick" }, { "name": "doubleClick" }]
+        },
+        {
+          "name": "hide-arrows",
+          "description": "Although arrows are always visible in the Tree component by default in VSCode, some icon sets\n(e.g., Material Icon Theme) allow disabling them in the file explorer view. This flag makes it\npossible to mimic that behavior.",
+          "values": []
+        },
+        {
+          "name": "indent",
+          "description": "Controls the indentation in pixels. This property is designed to use the\n`workbench.tree.indent` setting.",
+          "values": []
+        },
+        {
+          "name": "indent-guides",
+          "description": "Controls whether the tree should render indent guides. This property is\ndesigned to use the `workbench.tree.renderIndentGuides` setting.\n\nValid options are available as constants.\n\n```javascript\nimport {IndentGuides} from '@vscode-elements/elements/dist/vscode-tree/vscode-tree.js';\n\ndocument.querySelector('vscode-tree').expandMode = IndentGuides.onHover;\n```",
+          "values": [
+            { "name": "none" },
+            { "name": "onHover" },
+            { "name": "always" }
+          ]
+        },
+        {
+          "name": "multi-select",
+          "description": "Allows selecting multiple items.",
+          "values": []
+        }
+      ],
+      "references": []
+    },
+    {
+      "name": "vscode-tree-item",
+      "description": "\n---\n",
+      "attributes": [
+        { "name": "active", "values": [] },
+        { "name": "branch", "values": [] },
+        { "name": "hasActiveItem", "values": [] },
+        { "name": "hasSelectedItem", "values": [] },
+        { "name": "open", "values": [] },
+        { "name": "level", "values": [] },
+        { "name": "selected", "values": [] }
+      ],
+      "references": []
+    }
+  ]
+}

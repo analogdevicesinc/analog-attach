@@ -1,0 +1,234 @@
+.container {
+	position: relative;
+	font-family: var(--vscode-font-family);
+	font-size: var(--vscode-font-size);
+	color: var(--vscode-foreground);
+	width: 100%;
+}
+
+.label {
+	margin-bottom: 8px;
+	font-weight: var(--vscode-font-weight);
+	color: var(--vscode-foreground);
+}
+
+.matrix {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	padding: 12px;
+	background-color: var(--vscode-settings-dropdownBackground, #313131);
+	border: 1px solid var(--vscode-settings-dropdownBorder, #3c3c3c);
+	border-radius: 2px;
+	transition: border-color 0.1s ease;
+
+	&:hover:not(.disabled) {
+		border-color: var(--vscode-focusBorder, #0078d4);
+	}
+
+	&:focus-within:not(.disabled) {
+		border-color: var(--vscode-focusBorder, #0078d4);
+		outline: 1px solid var(--vscode-focusBorder, #0078d4);
+		outline-offset: -1px;
+	}
+
+	&.disabled {
+		opacity: 0.6;
+		cursor: not-allowed;
+		background-color: var(--vscode-settings-checkboxBackground, #313131);
+	}
+
+	&.error {
+		border-color: var(--vscode-inputValidation-errorBorder, #be1100);
+	}
+}
+
+.headerRow {
+	display: flex;
+	gap: 8px;
+	margin-bottom: 4px;
+}
+
+.headerCell {
+	flex: 1;
+	min-width: 0;
+	font-weight: 600;
+	color: var(--vscode-foreground);
+	padding: 4px 8px;
+	text-align: left;
+	font-size: 12px;
+	text-transform: uppercase;
+	letter-spacing: 0.5px;
+	
+	&:last-child {
+		flex: 0 0 32px;
+		width: 32px;
+	}
+}
+
+.rows {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+}
+
+.row {
+	display: flex;
+	gap: 8px;
+	align-items: stretch;
+	padding: 0;
+	border-radius: 2px;
+}
+
+.cell {
+	flex: 1 1 0;
+	min-width: 0;
+	display: flex;
+}
+
+.cellInput {
+	width: 100%;
+	box-sizing: border-box;
+	
+	:global(vscode-textfield) {
+		width: 100%;
+		
+		&::part(control) {
+			min-height: 22px;
+			height: 22px;
+			padding: 2px 6px;
+		}
+	}
+}
+
+.cellSelect {
+	width: 100%;
+	box-sizing: border-box;
+	
+	:global(vscode-single-select) {
+		width: 100%;
+		
+		&::part(control) {
+			min-height: 22px;
+			height: 22px;
+			padding: 1px 6px;
+		}
+	}
+}
+
+.actionCell {
+	flex: 0 0 36px;
+	width: 36px;
+	min-width: 36px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.deleteButton {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	padding: 0;
+	margin: 0;
+	background: transparent;
+	border: none;
+	color: var(--vscode-errorForeground, #f48771);
+	cursor: pointer;
+	width: 20px;
+	height: 20px;
+	border-radius: 2px;
+	transition: background-color 0.1s ease;
+
+	&:hover:not(:disabled) {
+		background-color: var(--vscode-list-hoverBackground, #2a2d2e);
+		color: var(--vscode-errorForeground, #f48771);
+	}
+
+	&:active:not(:disabled) {
+		background-color: var(--vscode-list-activeSelectionBackground, #04395e);
+	}
+
+	&:disabled {
+		cursor: not-allowed;
+		opacity: 0.4;
+		color: var(--vscode-disabledForeground, #656565);
+	}
+
+	vscode-icon {
+		font-size: 12px;
+	}
+}
+
+.addRowContainer {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	margin-top: 4px;
+	padding-top: 6px;
+	border-top: 1px solid var(--vscode-settings-dropdownBorder, #3c3c3c);
+}
+
+.addButton {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 4px;
+	padding: 4px 8px;
+	background-color: var(--vscode-button-secondaryBackground, #3a3d41);
+	border: 1px solid var(--vscode-button-border, #3c3c3c);
+	border-radius: 2px;
+	color: var(--vscode-button-secondaryForeground, #cccccc);
+	font-family: var(--vscode-font-family);
+	font-size: 12px;
+	cursor: pointer;
+	transition: all 0.1s ease;
+	min-width: 0;
+	overflow: hidden;
+	white-space: nowrap;
+
+	&:hover:not(:disabled) {
+		background-color: var(--vscode-button-secondaryHoverBackground, #45494e);
+		border-color: var(--vscode-focusBorder, #0078d4);
+	}
+
+	&:active:not(:disabled) {
+		background-color: var(--vscode-button-secondaryHoverBackground, #45494e);
+		transform: translateY(1px);
+	}
+
+	&:disabled {
+		cursor: not-allowed;
+		opacity: 0.5;
+	}
+
+	vscode-icon {
+		font-size: 12px;
+		flex-shrink: 0;
+	}
+
+	span {
+		font-weight: 400;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+}
+
+.rowCount {
+	color: var(--vscode-descriptionForeground, #888888);
+	font-size: 12px;
+	font-style: italic;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.emptyMessage {
+	padding: 20px;
+	text-align: center;
+	color: var(--vscode-descriptionForeground, #888888);
+	font-style: italic;
+	background-color: var(--vscode-editor-background, #1e1e1e);
+	border-radius: 2px;
+}

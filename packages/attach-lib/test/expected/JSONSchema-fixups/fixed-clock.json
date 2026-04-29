@@ -1,0 +1,57 @@
+{
+    "$id": "http://devicetree.org/schemas/clock/fixed-clock.yaml#",
+    "title": "Simple fixed-rate clock sources",
+    "properties": {
+        "$nodename": {
+            "anyOf": [
+                {
+                    "description": "Preferred name is 'clock-<freq>' with <freq> being the output frequency as defined in the 'clock-frequency' property.",
+                    "pattern": "^clock-([0-9]+|[a-z0-9-]+)$"
+                },
+                {
+                    "description": "Any name allowed",
+                    "deprecated": true
+                }
+            ]
+        },
+        "compatible": {
+            "items": [
+                {
+                    "const": "fixed-clock"
+                }
+            ],
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 1
+        },
+        "#clock-cells": {
+            "const": 0
+        },
+        "clock-frequency": true,
+        "clock-accuracy": {
+            "description": "accuracy of clock in ppb (parts per billion).",
+            "type": "integer",
+            "typeSize": 32,
+            "minimum": 0,
+            "maximum": 4294967295
+        },
+        "clock-output-names": {
+            "type": "array",
+            "items": {
+                "type": "string"
+            },
+            "minItems": 1,
+            "maxItems": 1
+        }
+    },
+    "required": [
+        "compatible",
+        "#clock-cells",
+        "clock-frequency"
+    ],
+    "additionalProperties": false,
+    "examples": [
+        "clock {\n  compatible = \"fixed-clock\";\n  #clock-cells = <0>;\n  clock-frequency = <1000000000>;\n  clock-accuracy = <100>;\n};\n"
+    ],
+    "type": "object"
+}

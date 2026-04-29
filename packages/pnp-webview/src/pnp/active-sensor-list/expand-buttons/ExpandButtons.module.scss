@@ -1,0 +1,84 @@
+.container {
+	display: flex;
+	align-items: flex-start;
+	.button {
+		display: flex;
+		width: 24px;
+		height: 24px;
+		justify-content: center;
+		align-items: center;
+		border-radius: var(--hmc-border-radius-1) 0 0 var(--hmc-border-radius-1);
+		border: var(--hmc-border-width-2) solid var(--vscode-commandCenter-inactiveBorder);
+		background: var(--vscode-editor-background);
+		background: var(--vscode-editor-background);
+		cursor: pointer;
+
+
+		// First button
+		&:first-child {
+			border-radius: var(--hmc-border-radius-1) 0 0 var(--hmc-border-radius-1);
+			border-right: var(--hmc-border-width-1) solid var(--vscode-commandCenter-inactiveBorder);
+
+			&:hover {
+				border: var(--hmc-border-width-2) solid var(--vscode-commandCenter-activeBorder);
+				border-right: var(--hmc-border-width-1) solid var(--vscode-commandCenter-activeBorder);
+				background: var(--vscode-editor-background);
+			}
+
+
+			&:focus {
+				outline-color: var(--vscode-focusBorder);
+				outline-style: solid;
+				outline-width: 1px;
+				outline-offset: 2px;
+				z-index: 10;
+			}
+		}
+		
+		// Last button
+		&:last-child {
+			border-radius: 0 var(--hmc-border-radius-1) var(--hmc-border-radius-1) 0;
+			border-left: var(--hmc-border-width-1) solid var(--vscode-commandCenter-inactiveBorder);
+
+
+			&:hover {
+				border: var(--hmc-border-width-2) solid var(--vscode-commandCenter-activeBorder);
+				border-left: var(--hmc-border-width-1) solid var(--vscode-commandCenter-activeBorder);
+				background: var(--vscode-editor-background);
+			}
+
+
+			&:focus {
+				outline-color: var(--vscode-focusBorder);
+				outline-style: solid;
+				outline-width: 1px;
+				outline-offset: 2px;
+				z-index: 10;
+			}
+		}
+
+		&:active{
+			border-color: var(--vscode-commandCenter-activeBorder);
+			background: var(--vscode-editor-background);
+		}
+
+		&:disabled {
+			cursor: not-allowed;
+			&>* {
+				opacity: 0.4;
+			}
+		}
+	}
+
+
+	// Disabled state
+	.disabled {
+		cursor: not-allowed;
+		&>* {
+			opacity: 0.4;
+		}
+		&:hover {
+			background: var(--vscode-editor-background);
+		}
+	}
+}

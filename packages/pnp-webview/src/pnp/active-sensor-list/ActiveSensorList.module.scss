@@ -1,0 +1,90 @@
+@use "hds-components/dist/typography.scss" as typography;
+
+.coreContainer {
+  display: flex;
+  padding: var(--hmc-space-9);
+  flex-direction: column;
+  align-items: center;
+  gap: var(--hmc-space-7);
+  flex: 1 0 0;
+  width: 100%;
+  max-width: 600px;
+  min-width: 400px;
+  box-sizing: border-box;
+  //align-self: stretch;
+
+  // Frame 1224 (1st one), unnamed layer in Figma
+  .header {
+    display: flex;
+    // max-width: 566px;
+    justify-content: space-between;
+    align-items: center;
+    gap: 24px;
+    align-self: stretch;
+  }
+
+  .headerText {
+    flex: 1;
+    color: var(--vscode-editor-foreground);
+
+    /* Heading/H1 */
+    font-size: var(--hmc-font-size-9);
+    font-style: normal;
+    font-weight: 700;
+    line-height: 120%; /* 31.2px */
+  }
+
+  // Frame 1224 (2nd one)
+  .content {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--hmc-space-3);
+    flex: 1 0 0;
+    width: 100%;
+  }
+
+  .emptyContainer {
+    display: flex;
+    padding: var(--hmc-space-9);
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: var(--hmc-space-4);
+    flex: 1 0 0;
+    align-self: stretch;
+
+    border-radius: var(--hmc-border-radius-1);
+    border: var(--hmc-border-width-1) solid
+      var(--vscode-commandCenter-inactiveBorder);
+  }
+
+  .emptyContainerIcon {
+    display: flex;
+    width: 16px;
+    height: 16px;
+    justify-content: center;
+    align-items: center;
+    color: var(--vscode-button-background);
+  }
+
+  .emptyContainerTextContainer {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--hmc-space-2);
+    align-self: stretch;
+  }
+
+  .emptyContainerTitle {
+    text-align: center;
+    color: var(--vscode-editor-foreground);
+    @include typography.text-heading-h4;
+  }
+
+  .emptyContainerDescription {
+    color: var(--vscode-descriptionForeground);
+    text-align: center;
+    @include typography.text-body-b2;
+  }
+}

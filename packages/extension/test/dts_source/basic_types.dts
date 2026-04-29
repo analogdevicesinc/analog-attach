@@ -1,0 +1,20 @@
+/dts-v1/;
+
+/memreserve/ 0x100000 0x1000;
+
+/ {
+	property_label: model = string_label: "Board";
+	str = "string value";
+	bytes = [byte_label: 00 00 00 1b 73 74 61 74 75 73 00];
+	bytes2 = [0000001b73746174757300];
+	interrupts = cell_label: <interior_cell_label: 17 0xc>;
+	interrupts8 = /bits/ 8 <17 0xc>;
+	
+	mpic: interrupt-controller@40000 {
+		compatible = "fsl,mpic";
+	};
+	
+	dev@0 {
+		interrupt-parent = < &mpic >;
+	};
+};

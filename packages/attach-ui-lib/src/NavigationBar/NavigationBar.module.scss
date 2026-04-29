@@ -1,0 +1,43 @@
+@use "hds-components/dist/typography.scss" as typography;
+
+.navigationBar {
+  display: flex;
+  padding: 8px;
+  justify-content: space-between;
+  align-items: center;
+  align-self: stretch;
+  border-top: 0.5px solid var(--vscode-commandCenter-inactiveBorder);
+  border-bottom: var(--hmc-border-width-1) solid var(--vscode-commandCenter-inactiveBorder);
+  background: var(--vscode-tab-activeBackground);
+}
+
+.navigationBarControls {
+  display: flex;
+  width: 200px;
+  height: 24px;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.navigationBarSignPostingGroup {
+  display: flex;
+  // width: 64px;
+  justify-content: space-between;
+  align-items: center;
+  white-space: nowrap;
+  height: 13px;
+}
+
+.navigationBarTitle {
+  color: var(--vscode-foreground);
+  @include typography.text-heading-h6;
+}
+
+.navigationBarCommunity {
+  display: flex;
+  width: 200px;
+  justify-content: flex-end;
+  align-items: flex-start;
+  gap: 8px;
+}
+

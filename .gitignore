@@ -1,0 +1,31 @@
+out
+dist
+node_modules
+media/codicons/** 
+.vscode-test/
+*.vsix
+*.dtb
+packages/pnp-webview/public/
+packages/extension/test/cache
+venv/
+docs/_build
+
+# Yarn
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/sdks
+!.yarn/versions
+.pnp.*
+
+# tsbuildinfo
+packages/attach-lib/tsconfig.tsbuildinfo
+packages/extension-protocol/tsconfig.tsbuildinfo
+packages/hds-react/tsconfig.tsbuildinfo
+packages/attach-ui-lib/tsconfig.tsbuildinfo
+!packages/hds-components/dist
+
+#symlinks
+packages/extension/test/linux
+packages/extension/test/dt-schema

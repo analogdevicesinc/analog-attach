@@ -1,0 +1,43 @@
+{
+  "name": "attach-lib",
+  "version": "0.0.1",
+  "description": "Core device tree parsing, schema validation, and binding logic for Analog Attach",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./browser": {
+      "types": "./dist/browser.d.ts",
+      "import": "./dist/browser.js",
+      "require": "./dist/browser.cjs"
+    }
+  },
+  "scripts": {
+    "build": "vite build",
+    "watch": "vite build --watch",
+    "clean": "rm -rf dist tsconfig.tsbuildinfo node_modules",
+    "test": "vitest",
+    "test:watch": "vitest --watch",
+    "coverage": "vitest run --coverage"
+  },
+  "dependencies": {
+    "@apidevtools/json-schema-ref-parser": "^15.3.1",
+    "@types/json-schema": "^7.0.15",
+    "ajv": "^8.17.1"
+  },
+  "devDependencies": {
+    "@types/node": "20.x",
+    "@vitest/coverage-v8": "^4.0.18",
+    "typescript": "^5.7.2",
+    "vite": "^7.3.1",
+    "vite-plugin-dts": "^4.5.4",
+    "vitest": "^4.0.18"
+  }
+}

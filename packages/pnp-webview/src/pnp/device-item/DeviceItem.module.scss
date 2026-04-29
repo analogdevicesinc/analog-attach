@@ -1,0 +1,130 @@
+/**
+ *
+ * Copyright (c) 2025 Analog Devices, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ */
+
+ @use "hds-components/dist/typography.scss" as typography;
+
+.deviceItemContainer {
+  border-left: 2px solid transparent;
+  box-sizing: border-box;
+  display: grid;
+  grid-template-columns: 1fr;
+  align-items: center;
+  align-self: stretch;
+  width: 100%;
+
+  &:hover {
+    background: var(--vscode-list-inactiveSelectionBackground);
+    border-left: 2px solid var(--vscode-foreground);
+  }
+
+  // Remove bottom border from the last nestedDeviceItemContainer
+  &:last-child > .nestedDeviceItemContainer {
+    &:last-child {
+      border-bottom: none;
+    }
+  }
+}
+
+.nestedDeviceItemContainer {
+  border-bottom: 1px solid var(--vscode-panel-border);
+  margin: 0 0px 0 28px;
+  padding: 0 12px 0 0px;
+  box-sizing: border-box;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 8px;
+  align-self: stretch;
+  min-width: 0;
+}
+
+.flatDeviceItemContainer {
+  padding: 0 12px 0 28px;
+  border-bottom: 1px solid var(--vscode-panel-border);
+  box-sizing: border-box;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 8px;
+  align-self: stretch;
+  min-width: 0;
+}
+
+.deviceContent {
+  display: flex;
+  height: 32px;
+  padding: 8px 0;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  overflow: hidden;
+
+  .deviceName {
+    height: 16px;
+    flex-direction: row;
+    justify-content: center;
+    flex: 1 0 0;
+    text-transform: uppercase;
+    overflow: hidden;
+    color: var(--vscode-editor-foreground);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    @include typography.text-body-b3;
+  }
+
+  .deviceDescription {
+    font-size: 12px;
+    line-height: 16px;
+    color: var(--vscode-descriptionForeground);
+  }
+}
+
+.actionContainer {
+  .deviceItemContainer {
+    border-left: none;
+  }
+}
+
+.tooltip {
+  height: 20px;
+  width: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.actionButton {
+  display: flex;
+  align-items: center;
+  padding: 2px;
+  cursor: pointer;
+  height: 20px;
+  width: 20px;
+
+  &:hover {
+    border-radius: 4px;
+    background: var(--vscode-editor-background);
+  }
+
+  vscode-icon {
+    display: block;
+  }
+}
+
+.editorBGButton {
+  &::part(base):hover {
+    background-color: var(--vscode-editor-background) !important;
+  }
+}

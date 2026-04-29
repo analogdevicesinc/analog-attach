@@ -1,0 +1,151 @@
+{
+    "required_properties": [
+        "compatible",
+        "reg",
+        "clocks",
+        "clock-names",
+        "dmas",
+        "dma-names",
+        "pwms",
+        "pwm-names",
+        "refin-supply",
+        "adi,spi-engine"
+    ],
+    "properties": [
+        {
+            "key": "compatible",
+            "value": {
+                "_t": "enum_array",
+                "minItems": 1,
+                "maxItems": 1,
+                "enum": [
+                    "adi,ad4134"
+                ],
+                "enum_type": "string"
+            }
+        },
+        {
+            "key": "reg",
+            "value": {
+                "_t": "array",
+                "minItems": 1,
+                "maxItems": 1
+            }
+        },
+        {
+            "key": "clocks",
+            "value": {
+                "_t": "array",
+                "minItems": 1,
+                "maxItems": 1
+            }
+        },
+        {
+            "key": "clock-names",
+            "value": {
+                "_t": "enum_array",
+                "minItems": 1,
+                "maxItems": 1,
+                "enum": [
+                    "sys_clk"
+                ],
+                "default": "sys_clk",
+                "enum_type": "string"
+            }
+        },
+        {
+            "key": "dmas",
+            "value": {
+                "_t": "array",
+                "minItems": 1,
+                "maxItems": 1
+            }
+        },
+        {
+            "key": "dma-names",
+            "value": {
+                "_t": "enum_array",
+                "minItems": 1,
+                "maxItems": 1,
+                "enum": [
+                    "rx"
+                ],
+                "default": "rx",
+                "enum_type": "string"
+            }
+        },
+        {
+            "key": "pwms",
+            "value": {
+                "_t": "array",
+                "minItems": 1,
+                "maxItems": 1
+            }
+        },
+        {
+            "key": "pwm-names",
+            "value": {
+                "_t": "enum_array",
+                "minItems": 1,
+                "maxItems": 1,
+                "enum": [
+                    "odr_pwm"
+                ],
+                "default": "odr_pwm",
+                "enum_type": "string"
+            }
+        },
+        {
+            "key": "refin-supply",
+            "value": {
+                "_t": "generic"
+            }
+        },
+        {
+            "key": "adi,spi-engine",
+            "value": {
+                "_t": "array",
+                "minItems": 1,
+                "maxItems": 1,
+                "description": "phandle of the SPI slave connected to the SPI engine master"
+            }
+        },
+        {
+            "key": "spi-max-frequency",
+            "value": {
+                "_t": "integer",
+                "maximum": 1000000,
+                "default": null
+            }
+        },
+        {
+            "key": "reset-gpios",
+            "value": {
+                "_t": "array",
+                "minItems": 1,
+                "maxItems": 1
+            }
+        },
+        {
+            "key": "avdd5-supply",
+            "value": {
+                "_t": "generic"
+            }
+        },
+        {
+            "key": "avdd1v8-supply",
+            "value": {
+                "_t": "generic"
+            }
+        },
+        {
+            "key": "iovdd-supply",
+            "value": {
+                "_t": "generic"
+            }
+        }
+    ],
+    "examples": [
+        "#include <dt-bindings/gpio/gpio.h>\n\nspi {\n  #address-cells = <1>;\n  #size-cells = <0>;\n\n  adc@0 {\n    compatible = \"adi,ad4134\";\n    reg = <0>;\n\n    spi-max-frequency = <1000000>;\n\n    reset-gpios = <&gpio0 86 GPIO_ACTIVE_LOW>;\n\n    clocks = <&sys_clk>;\n    clock-names = \"sys_clk\";\n\n    dmas = <&rx_dma 0>;\n    dma-names = \"rx\";\n\n    pwms = <&ad4134_odr_generator 0 0>;\n    pwm-names = \"odr_pwm\";\n\n    avdd5-supply = <&avdd5>;\n    avdd1v8-supply = <&avdd1v8>;\n    iovdd-supply = <&iovdd>;\n    refin-supply = <&refin>;\n\n    adi,spi-engine = <&ad4134_spi_engine>;\n  };\n};\n"
+    ]
+}

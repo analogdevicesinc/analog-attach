@@ -1,0 +1,58 @@
+{
+    "required_properties": [
+        "compatible",
+        "#clock-cells",
+        "clock-frequency"
+    ],
+    "properties": [
+        {
+            "key": "compatible",
+            "value": {
+                "_t": "enum_array",
+                "minItems": 1,
+                "maxItems": 1,
+                "enum": [
+                    "fixed-clock"
+                ],
+                "default": "fixed-clock",
+                "enum_type": "string"
+            }
+        },
+        {
+            "key": "#clock-cells",
+            "value": {
+                "_t": "const",
+                "const": 0
+            }
+        },
+        {
+            "key": "clock-frequency",
+            "value": {
+                "_t": "generic"
+            }
+        },
+        {
+            "key": "clock-accuracy",
+            "value": {
+                "_t": "integer",
+                "minimum": 0,
+                "maximum": 4294967295,
+                "typeSize": 32,
+                "description": "accuracy of clock in ppb (parts per billion).",
+                "default": null
+            }
+        },
+        {
+            "key": "clock-output-names",
+            "value": {
+                "_t": "string_array",
+                "minItems": 1,
+                "maxItems": 1,
+                "unique_items": false
+            }
+        }
+    ],
+    "examples": [
+        "clock {\n  compatible = \"fixed-clock\";\n  #clock-cells = <0>;\n  clock-frequency = <1000000000>;\n  clock-accuracy = <100>;\n};\n"
+    ]
+}

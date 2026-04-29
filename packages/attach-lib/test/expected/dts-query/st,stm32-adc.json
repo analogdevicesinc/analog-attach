@@ -1,0 +1,425 @@
+{
+    "required_properties": [
+        "compatible",
+        "reg",
+        "interrupts",
+        "clocks",
+        "clock-names",
+        "vdda-supply",
+        "vref-supply",
+        "interrupt-controller",
+        "#interrupt-cells",
+        "#address-cells",
+        "#size-cells"
+    ],
+    "properties": [
+        {
+            "key": "compatible",
+            "value": {
+                "_t": "enum_array",
+                "minItems": 1,
+                "maxItems": 1,
+                "enum": [
+                    "st,stm32f4-adc-core",
+                    "st,stm32h7-adc-core",
+                    "st,stm32mp1-adc-core",
+                    "st,stm32mp13-adc-core"
+                ],
+                "enum_type": "string"
+            }
+        },
+        {
+            "key": "reg",
+            "value": {
+                "_t": "array",
+                "minItems": 1,
+                "maxItems": 1
+            }
+        },
+        {
+            "key": "interrupts",
+            "value": {
+                "_t": "matrix",
+                "minItems": 1,
+                "maxItems": 2,
+                "values": [
+                    {
+                        "_t": "fixed_index",
+                        "prefixItems": [
+                            {
+                                "_t": "number"
+                            },
+                            {
+                                "_t": "number"
+                            },
+                            {
+                                "_t": "enum",
+                                "enum": [
+                                    "IRQ_TYPE_NONE",
+                                    "IRQ_TYPE_EDGE_RISING",
+                                    "IRQ_TYPE_EDGE_FALLING",
+                                    "IRQ_TYPE_EDGE_BOTH",
+                                    "IRQ_TYPE_LEVEL_HIGH",
+                                    "IRQ_TYPE_LEVEL_LOW"
+                                ],
+                                "enum_type": "macro"
+                            }
+                        ],
+                        "minItems": 3,
+                        "maxItems": 3
+                    }
+                ]
+            }
+        },
+        {
+            "key": "interrupt-parent",
+            "value": {
+                "_t": "enum_array",
+                "minItems": 1,
+                "maxItems": 1,
+                "enum": [
+                    "gpio",
+                    "gicv2",
+                    "aon_intr"
+                ],
+                "default": "gicv2",
+                "enum_type": "phandle"
+            }
+        },
+        {
+            "key": "#interrupt-cells",
+            "value": {
+                "_t": "const",
+                "const": 1
+            }
+        },
+        {
+            "key": "interrupt-controller",
+            "value": {
+                "_t": "generic"
+            }
+        },
+        {
+            "key": "clocks",
+            "value": {
+                "_t": "matrix",
+                "minItems": 1,
+                "maxItems": 1,
+                "values": [
+                    {
+                        "_t": "fixed_index",
+                        "minItems": 1,
+                        "maxItems": 1,
+                        "prefixItems": [
+                            {
+                                "_t": "enum",
+                                "enum": [
+                                    "clk_osc",
+                                    "clk_usb",
+                                    "clk_27MHz",
+                                    "clk_108MHz",
+                                    "cam1_clk",
+                                    "cam0_clk"
+                                ],
+                                "enum_type": "phandle"
+                            }
+                        ]
+                    }
+                ]
+            }
+        },
+        {
+            "key": "clock-names",
+            "value": {
+                "_t": "string_array",
+                "minItems": 1,
+                "maxItems": 2,
+                "unique_items": false
+            }
+        },
+        {
+            "key": "vdda-supply",
+            "value": {
+                "_t": "enum_array",
+                "minItems": 1,
+                "maxItems": 1,
+                "enum": [
+                    "cam1_reg",
+                    "cam0_regulator",
+                    "cam_dummy_reg",
+                    "sd_vcc_reg",
+                    "vdd_3v3_reg",
+                    "vdd_5v0_reg"
+                ],
+                "enum_type": "phandle"
+            }
+        },
+        {
+            "key": "vref-supply",
+            "value": {
+                "_t": "enum_array",
+                "minItems": 1,
+                "maxItems": 1,
+                "enum": [
+                    "cam1_reg",
+                    "cam0_regulator",
+                    "cam_dummy_reg",
+                    "sd_vcc_reg",
+                    "vdd_3v3_reg",
+                    "vdd_5v0_reg"
+                ],
+                "enum_type": "phandle"
+            }
+        },
+        {
+            "key": "#address-cells",
+            "value": {
+                "_t": "const",
+                "const": 1
+            }
+        },
+        {
+            "key": "#size-cells",
+            "value": {
+                "_t": "const",
+                "const": 0
+            }
+        },
+        {
+            "key": "st,max-clk-rate-hz",
+            "value": {
+                "_t": "generic",
+                "description": "Allow to specify desired max clock rate used by analog circuitry."
+            }
+        },
+        {
+            "key": "booster-supply",
+            "value": {
+                "_t": "enum_array",
+                "minItems": 1,
+                "maxItems": 1,
+                "enum": [
+                    "cam1_reg",
+                    "cam0_regulator",
+                    "cam_dummy_reg",
+                    "sd_vcc_reg",
+                    "vdd_3v3_reg",
+                    "vdd_5v0_reg"
+                ],
+                "enum_type": "phandle"
+            }
+        },
+        {
+            "key": "vdd-supply",
+            "value": {
+                "_t": "enum_array",
+                "minItems": 1,
+                "maxItems": 1,
+                "enum": [
+                    "cam1_reg",
+                    "cam0_regulator",
+                    "cam_dummy_reg",
+                    "sd_vcc_reg",
+                    "vdd_3v3_reg",
+                    "vdd_5v0_reg"
+                ],
+                "enum_type": "phandle"
+            }
+        },
+        {
+            "key": "st,syscfg",
+            "value": {
+                "_t": "matrix",
+                "minItems": 1,
+                "maxItems": 1,
+                "description": "Phandle to system configuration controller. It can be used to control the analog circuitry on stm32mp1.",
+                "values": [
+                    {
+                        "_t": "array",
+                        "minItems": 1,
+                        "maxItems": 1
+                    }
+                ]
+            }
+        },
+        {
+            "key": "access-controllers",
+            "value": {
+                "_t": "array",
+                "minItems": 1,
+                "maxItems": 2
+            }
+        }
+    ],
+    "pattern_properties": [
+        {
+            "pattern": "^adc@[0-9]+$",
+            "description": "An ADC block node should contain at least one subnode, representing an ADC instance available on the machine.",
+            "properties": [
+                {
+                    "key": "compatible",
+                    "value": {
+                        "_t": "enum_array",
+                        "minItems": 1,
+                        "maxItems": 1,
+                        "enum": [
+                            "st,stm32f4-adc",
+                            "st,stm32h7-adc",
+                            "st,stm32mp1-adc",
+                            "st,stm32mp13-adc"
+                        ],
+                        "enum_type": "string"
+                    }
+                },
+                {
+                    "key": "reg",
+                    "value": {
+                        "_t": "array",
+                        "minItems": 1,
+                        "maxItems": 1,
+                        "description": "Offset of ADC instance in ADC block. Valid values are:\n  - 0x0:   ADC1\n  - 0x100: ADC2\n  - 0x200: ADC3 (stm32f4 only)\n"
+                    }
+                },
+                {
+                    "key": "#io-channel-cells",
+                    "value": {
+                        "_t": "const",
+                        "const": 1
+                    }
+                },
+                {
+                    "key": "#address-cells",
+                    "value": {
+                        "_t": "const",
+                        "const": 1
+                    }
+                },
+                {
+                    "key": "#size-cells",
+                    "value": {
+                        "_t": "const",
+                        "const": 0
+                    }
+                },
+                {
+                    "key": "interrupts",
+                    "value": {
+                        "_t": "array",
+                        "minItems": 1,
+                        "maxItems": 1,
+                        "description": "IRQ Line for the ADC instance. Valid values are:\n  - 0 for adc@0 (single adc for stm32mp13)\n  - 1 for adc@100\n  - 2 for adc@200 (stm32f4 only)\n"
+                    }
+                },
+                {
+                    "key": "clocks",
+                    "value": {
+                        "_t": "array",
+                        "minItems": 1,
+                        "maxItems": 1,
+                        "description": "Input clock private to this ADC instance. It's required only on stm32f4, that has per instance clock input for registers access."
+                    }
+                },
+                {
+                    "key": "dmas",
+                    "value": {
+                        "_t": "array",
+                        "minItems": 1,
+                        "maxItems": 1,
+                        "description": "RX DMA Channel"
+                    }
+                },
+                {
+                    "key": "dma-names",
+                    "value": {
+                        "_t": "enum_array",
+                        "minItems": 1,
+                        "maxItems": 1,
+                        "enum": "rx",
+                        "default": "rx",
+                        "enum_type": "string"
+                    }
+                },
+                {
+                    "key": "assigned-resolution-bits",
+                    "value": {
+                        "_t": "generic",
+                        "description": "Resolution (bits) to use for conversions:\n  - can be 6, 8, 10 or 12 on stm32f4 and stm32mp13\n  - can be 8, 10, 12, 14 or 16 on stm32h7 and stm32mp1\n"
+                    }
+                },
+                {
+                    "key": "st,adc-channels",
+                    "value": {
+                        "_t": "number_array",
+                        "minItems": 1,
+                        "maxItems": 1,
+                        "minimum": 0,
+                        "maximum": 4294967295,
+                        "typeSize": 32,
+                        "description": "List of single-ended channels muxed for this ADC. It can have up to:\n  - 16 channels, numbered from 0 to 15 (for in0..in15) on stm32f4\n  - 19 channels, numbered from 0 to 18 (for in0..in18) on stm32mp13.\n  - 20 channels, numbered from 0 to 19 (for in0..in19) on stm32h7 and\n    stm32mp1.\n"
+                    }
+                },
+                {
+                    "key": "st,adc-diff-channels",
+                    "value": {
+                        "_t": "array",
+                        "minItems": 1,
+                        "maxItems": 1,
+                        "description": "List of differential channels muxed for this ADC. Some channels can\nbe configured as differential instead of single-ended on stm32h7 and\non stm32mp1. Positive and negative inputs pairs are listed:\n<vinp vinn>, <vinp vinn>,... vinp and vinn are numbered from 0 to 19.\n\nNote: At least one of \"st,adc-channels\" or \"st,adc-diff-channels\" is\nrequired if no adc generic channel is defined. These legacy channel\nproperties are exclusive with adc generic channel bindings.\nBoth properties can be used together. Some channels can be\nused as single-ended and some other ones as differential (mixed). But\nchannels can't be configured both as single-ended and differential.\n"
+                    }
+                },
+                {
+                    "key": "st,min-sample-time-nsecs",
+                    "value": {
+                        "_t": "number_array",
+                        "minItems": 1,
+                        "maxItems": 1,
+                        "minimum": 0,
+                        "maximum": 4294967295,
+                        "typeSize": 32,
+                        "description": "Minimum sampling time in nanoseconds. Depending on hardware (board) e.g. high/low analog input source impedance, fine tune of ADC sampling time may be recommended. This can be either one value or an array that matches \"st,adc-channels\" and/or \"st,adc-diff-channels\" list, to set sample time resp. for all channels, or independently for each channel."
+                    }
+                },
+                {
+                    "key": "nvmem-cells",
+                    "value": {
+                        "_t": "array",
+                        "minItems": 1,
+                        "maxItems": 1
+                    }
+                },
+                {
+                    "key": "nvmem-cell-names",
+                    "value": {
+                        "_t": "enum_array",
+                        "minItems": 1,
+                        "maxItems": 1,
+                        "enum": [
+                            "vrefint"
+                        ],
+                        "default": "vrefint",
+                        "enum_type": "string"
+                    }
+                },
+                {
+                    "key": "interrupt-parent",
+                    "value": {
+                        "_t": "array",
+                        "minItems": 1,
+                        "maxItems": 1
+                    }
+                }
+            ],
+            "required": [
+                "compatible",
+                "reg",
+                "interrupts",
+                "#io-channel-cells"
+            ]
+        }
+    ],
+    "examples": [
+        "// Example 1: with stm32f429, ADC1, single-ended channel 8\n  adc123: adc@40012000 {\n    compatible = \"st,stm32f4-adc-core\";\n    reg = <0x40012000 0x400>;\n    interrupts = <18>;\n    clocks = <&rcc 0 168>;\n    clock-names = \"adc\";\n    st,max-clk-rate-hz = <36000000>;\n    vdda-supply = <&vdda>;\n    vref-supply = <&vref>;\n    interrupt-controller;\n    #interrupt-cells = <1>;\n    #address-cells = <1>;\n    #size-cells = <0>;\n    adc@0 {\n      compatible = \"st,stm32f4-adc\";\n      #io-channel-cells = <1>;\n      reg = <0x0>;\n      clocks = <&rcc 0 168>;\n      interrupt-parent = <&adc123>;\n      interrupts = <0>;\n      st,adc-channels = <8>;\n      dmas = <&dma2 0 0 0x400 0x0>;\n      dma-names = \"rx\";\n      assigned-resolution-bits = <8>;\n    };\n    // ...\n    // other adc child nodes follow...\n  };\n",
+        "// Example 2: with stm32mp157c to setup ADC1 with:\n// - channels 0 & 1 as single-ended\n// - channels 2 & 3 as differential (with resp. 6 & 7 negative inputs)\n  #include <dt-bindings/interrupt-controller/arm-gic.h>\n  #include <dt-bindings/clock/stm32mp1-clks.h>\n  adc12: adc@48003000 {\n    compatible = \"st,stm32mp1-adc-core\";\n    reg = <0x48003000 0x400>;\n    interrupts = <GIC_SPI 18 IRQ_TYPE_LEVEL_HIGH>,\n                 <GIC_SPI 90 IRQ_TYPE_LEVEL_HIGH>;\n    clocks = <&rcc ADC12>, <&rcc ADC12_K>;\n    clock-names = \"bus\", \"adc\";\n    booster-supply = <&booster>;\n    vdd-supply = <&vdd>;\n    vdda-supply = <&vdda>;\n    vref-supply = <&vref>;\n    st,syscfg = <&syscfg>;\n    interrupt-controller;\n    #interrupt-cells = <1>;\n    #address-cells = <1>;\n    #size-cells = <0>;\n    adc@0 {\n      compatible = \"st,stm32mp1-adc\";\n      #io-channel-cells = <1>;\n      reg = <0x0>;\n      interrupt-parent = <&adc12>;\n      interrupts = <0>;\n      st,adc-channels = <0 1>;\n      st,adc-diff-channels = <2 6>, <3 7>;\n      st,min-sample-time-nsecs = <5000>;\n      dmas = <&dmamux1 9 0x400 0x05>;\n      dma-names = \"rx\";\n    };\n    // ...\n    // other adc child node follow...\n  };\n",
+        "// Example 3: with stm32mp157c to setup ADC2 with:\n// - internal channels 13, 14, 15.\n  #include <dt-bindings/interrupt-controller/arm-gic.h>\n  #include <dt-bindings/clock/stm32mp1-clks.h>\n  adc122: adc@48003000 {\n    compatible = \"st,stm32mp1-adc-core\";\n    reg = <0x48003000 0x400>;\n    interrupts = <GIC_SPI 18 IRQ_TYPE_LEVEL_HIGH>,\n                 <GIC_SPI 90 IRQ_TYPE_LEVEL_HIGH>;\n    clocks = <&rcc ADC12>, <&rcc ADC12_K>;\n    clock-names = \"bus\", \"adc\";\n    booster-supply = <&booster>;\n    vdd-supply = <&vdd>;\n    vdda-supply = <&vdda>;\n    vref-supply = <&vref>;\n    st,syscfg = <&syscfg>;\n    interrupt-controller;\n    #interrupt-cells = <1>;\n    #address-cells = <1>;\n    #size-cells = <0>;\n    adc@100 {\n      compatible = \"st,stm32mp1-adc\";\n      #io-channel-cells = <1>;\n      reg = <0x100>;\n      interrupts = <1>;\n      #address-cells = <1>;\n      #size-cells = <0>;\n      channel@13 {\n        reg = <13>;\n        label = \"vrefint\";\n        st,min-sample-time-ns = <9000>;\n      };\n      channel@14 {\n        reg = <14>;\n        label = \"vddcore\";\n        st,min-sample-time-ns = <9000>;\n      };\n      channel@15 {\n        reg = <15>;\n        label = \"vbat\";\n        st,min-sample-time-ns = <9000>;\n      };\n    };\n  };\n"
+    ]
+}

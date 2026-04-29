@@ -1,0 +1,2201 @@
+import {
+    type FormElement,
+    type GenericFormElement,
+    type FormObjectElement,
+    type NumericRangeValidation,
+    type ArrayStringValidation,
+    type ArrayNumberValidation,
+    type MatrixValidation,
+    type EnumValueType,
+    type ConfigTemplatePayload,
+    type ParentNode,
+    type DeviceUID,
+    ArrayMixedTypeValidation,
+    DropdownValidation,
+    ArrayValidation,
+    HyperlinkItem,
+} from "extension-protocol";
+import {
+    expand_regex,
+    type AttachType,
+    type BindingErrors,
+    type DtsNode,
+    type DtsProperty,
+    type DtsReference,
+    type DtsValue,
+    type DtsValueComponent,
+    type PatternPropertyRule,
+    type ParsedBinding,
+    type ResolvedProperty,
+    type CellArrayElement,
+    query_devicetree,
+    insert_known_structures,
+    cell_extract_first_value,
+    AttachEnumType,
+    serializeBigInt,
+    value_to_macro,
+} from "attach-lib";
+import { AttachSession } from "../AttachSession/AttachSession";
+import { AnalogAttachLogger } from "../AnalogAttachLogger";
+import { bigIntReplacer } from "../utilities";
+
+export class ConfigValidationError extends Error {
+    public readonly config: ConfigTemplatePayload;
+
+    public constructor(message: string, config: ConfigTemplatePayload) {
+        super(message);
+        this.name = "ConfigValidationError";
+        this.config = config;
+    }
+}
+
+/**
+ * Shared Analog Attach API helper used by both webview controllers.
+ * Contains the logic for building device tree/configuration payloads and
+ * mutating the AttachSession in response to API commands.
+ */
+export class AnalogAttachApiHelper {
+    public constructor(private readonly attachSession: AttachSession) { }
+
+    public getCatalogDevices() {
+        return this.attachSession.get_catalog_devices();
+    }
+
+    public async setParentNode(deviceId: string, parentNodeId: DeviceUID): Promise<DeviceUID> {
+        console.warn(`Setting parent node with uid ${parentNodeId} to device ${deviceId}`);
+        return this.attachSession.set_parent_node(deviceId, parentNodeId);
+    }
+
+    public async deleteDevice(deviceUID: DeviceUID): Promise<DeviceUID> {
+        return await this.attachSession.delete_device(deviceUID);
+    }
+
+    public setNodeActive(uuid: DeviceUID, active: boolean): boolean {
+        // Parse the UID to get the node path
+        const node = this.attachSession.find_node_by_uuid(uuid);
+        if (node === undefined) {
+            throw new Error(`Invalid UID: ${uuid}`);
+        }
+
+        // Set the active status using the existing setNodeActive method
+        this.setNodeActiveInternal(node, active);
+
+        return active;
+    }
+
+    public buildDeviceTreeFormElement(): FormObjectElement {
+        const deviceTree = this.attachSession.get_device_tree();
+        return this.convertDtsNodeToFormElement(deviceTree.root);
+    }
+
+    /**
+     * 
+     * @param deviceUID 
+     * @param validateWithNodeData An optional flag indicating whether to build validation data from the current node state, in case we do not want to perform validation against an empty/default configuration.
+     * @returns 
+     */
+    public async buildDeviceConfiguration(
+        deviceUID: DeviceUID,
+        data?: string,
+        previousConfig?: FormElement[]
+    ): Promise<ConfigTemplatePayload> {
+        const node = this.attachSession.find_node_by_uuid(deviceUID);
+
+        if (node === undefined) {
+            throw new Error(`Cannot find node with UUID: ${deviceUID}`);
+        }
+
+        const serializedData = data ?? JSON.stringify(this.attachSession.nodeToAttachLibJson(node), bigIntReplacer);
+
+        const bindingResult = await this.attachSession.buildFormElementsForNode(node, serializedData);
+        if (bindingResult === undefined) {
+            throw new Error("Could not build form elements");
+        }
+
+        const device_tree = this.attachSession.get_device_tree();
+
+        const parentNode = this.attachSession.find_parent_node_by_uuid(deviceUID);
+
+        if (parentNode === undefined) {
+            throw new Error(`Cannot find parent node from node with UUID: ${deviceUID}`);
+        }
+
+        bindingResult.binding.properties = query_devicetree(device_tree, bindingResult.binding.properties, serializedData, parentNode.name);
+        bindingResult.binding.properties = insert_known_structures(bindingResult.binding.properties);
+
+        if (bindingResult.binding.pattern_properties !== undefined) {
+            for (const pattern of bindingResult.binding.pattern_properties) {
+                pattern.properties = query_devicetree(device_tree, pattern.properties, serializedData, parentNode.name);
+                pattern.properties = insert_known_structures(pattern.properties);
+            }
+        }
+
+        const nodeValueMap = this.parseNodeValues(node);
+
+        this.pruneInvalidPhandles(bindingResult.binding.properties, nodeValueMap, node);
+
+        const bindingElements = bindingResult.binding.properties
+            ? this.mapBindingToFormElements(bindingResult.binding, bindingResult.requiredKeys, nodeValueMap)
+            : [];
+        const devicePropertyElements = node.properties
+            .filter((property) => property.name !== "status")
+            .map((property) => this.propertyToFormElement(property, bindingResult.requiredKeys.has(property.name)))
+            .filter((element): element is FormElement => element !== undefined);
+
+        const bindingKeys = new Set(bindingElements.map((element: FormElement) => element.key));
+        const filteredDeviceProperties = devicePropertyElements.filter((element: FormElement) => !bindingKeys.has(element.key));
+
+        // Only properties modified by the user should be tagged as custom for the FE to render as custom/custom-flag.
+        const mappedCustomProperties = filteredDeviceProperties.map((element) => {
+            // Find the original property to check if it was user-modified
+            const originalProperty = node.properties.find(property => property.name === element.key);
+            const isUserModified = originalProperty?.modified_by_user === true;
+
+            if (element.type === "Flag") {
+                return {
+                    type: "Generic",
+                    key: element.key,
+                    inputType: isUserModified ? "custom-flag" : "text",
+                    required: false,
+                    setValue: true,
+                } satisfies GenericFormElement;
+            }
+
+            if (element.type === "Generic" && element.inputType === undefined) {
+                const isBooleanLike = typeof element.setValue === "boolean" || element.setValue === undefined;
+                element.inputType = isUserModified ? (isBooleanLike ? "custom-flag" : "custom") : "text";
+                return element;
+            }
+
+            return element;
+        });
+        let deviceElements: FormElement[] = [
+            ...bindingElements,
+            ...mappedCustomProperties,
+        ];
+
+        // Prefill reg from unit_addr when present and reg lacks a value
+        if (node.unit_addr !== undefined) {
+            const regElement = deviceElements.find((element) => element.key === "reg");
+            if (regElement !== undefined && regElement.type !== "FormObject" && regElement.setValue === undefined) {
+                const parsed = node.unit_addr.startsWith("0x")
+                    ? Number.parseInt(node.unit_addr, 16)
+                    : Number.parseInt(node.unit_addr, 10);
+                if (!Number.isNaN(parsed)) {
+                    if (regElement.type === "FormMatrix") {
+                        regElement.setValue = [[parsed]];
+                    } else if (regElement.type === "FormArray") {
+                        regElement.setValue = [parsed];
+                    } else {
+                        regElement.setValue = parsed;
+                    }
+                }
+            }
+        }
+
+        const channelRegexes = bindingResult.patterns;
+        const generatedChannelRegexEntries = this.generateChannelRegexEntries(channelRegexes);
+        const patternRules = bindingResult.binding.pattern_properties;
+        const channelElements = this.buildChannelConfigurations(node, channelRegexes, patternRules);
+        const alias = this.getNodeAlias(node);
+        const active = this.getNodeActive(node);
+
+        // Include non-device children that were edited by the user (e.g., clocks) without marking them as channels
+        const touchedElements = node.children
+            // FIXME: This filter is a hack. The {created/modified}_by_user is a mess rn
+            .filter((child) => {
+                if (this.attachSession.isDeviceNode(child)) {
+                    return false;
+                }
+                if (this.matchesAnyChannelPattern(this.attachSession.buildNodeSegment(child), this.compileChannelRegexes(channelRegexes))) {
+                    return false;
+                }
+                return !child.created_by_user && child.properties.some((p) => p.modified_by_user === true);
+            })
+            .map((child) => {
+                const nodeSegment = this.attachSession.buildNodeSegment(child);
+                const childConfig = child.properties
+                    .filter((property) => property.name !== "status")
+                    .map((property) => this.propertyToFormElement(property, false))
+                    .filter((item): item is FormObjectElement => item !== undefined);
+
+                return {
+                    type: "FormObject",
+                    key: nodeSegment,
+                    required: false,
+                    config: childConfig,
+                } satisfies FormObjectElement;
+            });
+
+        // The difference between these elements and why there are 3 "flows" is
+        // 1: deviceElements are elements that are from a node that contains "compatible"
+        // 2: touchedElements: properties modified in nodes that are not touched by user
+        // 3: channelElements: nodes that are created by the user, but do not have a compatible,
+        // instead, they have a regex that they should follow
+        // FIXME: Eventually the flow might be unified nicely, but not now
+        let allElements = [...deviceElements, ...touchedElements, ...channelElements];
+
+        // Preserve inputType hints (e.g., custom) from previous config where possible
+        // FIXME: This is a big mess, but because of the time constraints for the release
+        // there is no cleaner fix that can be done in time (both for FE and BE).
+        // This merge bs should be removed and pruneMissingDeviceProperties as well,
+        // as custom properties need to retain metadata that they are custom (for the FE to
+        // be able to draw them correctly), but once the app writes the changes to the file
+        // information about what is or isn't custom is lost.
+        if (previousConfig) {
+            const mergeInputTypes = (current: FormElement[], previous: FormElement[]): void => {
+                const currentMap = new Map<string, FormElement>();
+                for (const element of current) {
+                    currentMap.set(element.key, element);
+                }
+
+                for (const previousElement of previous) {
+                    const currentElement = currentMap.get(previousElement.key);
+
+                    if (currentElement) {
+                        if (currentElement.type === "FormObject" && previousElement.type === "FormObject") {
+                            mergeInputTypes(currentElement.config, previousElement.config);
+                        } else if (currentElement.type === "Generic" && previousElement.type === "Generic" && previousElement.inputType) {
+                            currentElement.inputType = previousElement.inputType;
+                        }
+                        continue;
+                    }
+
+                    // If it wasn't provided by binding and is custom/custom-flag, keep it around
+                    if (
+                        previousElement.type === "Generic" &&
+                        (previousElement.inputType === "custom" || previousElement.inputType === "custom-flag")
+                    ) {
+                        current.push(previousElement);
+                        currentMap.set(previousElement.key, previousElement);
+                    }
+                }
+            };
+            mergeInputTypes(allElements, previousConfig);
+        }
+
+        const payload: ConfigTemplatePayload =
+        {
+            config: {
+                type: "DeviceConfigurationFormObject",
+                alias,
+                active,
+                maxChannels: channelElements.length > 0 ? channelElements.length : undefined,
+                config: allElements,
+                parentNode: {
+                    uuid: parentNode._uuid,
+                    name: parentNode.name,
+                },
+                channelRegexes: (channelRegexes.length > 0) ? channelRegexes : undefined,
+                generatedChannelRegexEntries: generatedChannelRegexEntries
+            }
+        };
+
+        // Re-validate using normalized payload to avoid shape mismatches (e.g. arrays vs scalars).
+        const normalizedData = this.attachSession.configPayloadToAttachLibJson(payload.config);
+        const normalizedBindingResult = await this.attachSession.buildFormElementsForNode(
+            node,
+            JSON.stringify(serializeBigInt(normalizedData))
+        );
+        const errors = normalizedBindingResult?.errors ?? [];
+        if (errors.length > 0) {
+            this.applyValidationErrors(payload, errors);
+        }
+
+        return payload;
+    }
+
+    public async applyConfigurationUpdates(
+        deviceUID: DeviceUID,
+        config: ConfigTemplatePayload["config"],
+        parentNode: ParentNode
+    ): Promise<{ deviceUID: DeviceUID; validationErrors: BindingErrors[] }> {
+        const restorePoint = this.attachSession.create_restore_point();
+        const verification = await this.validateConfigurationWithAttachLib(deviceUID, config, parentNode);
+        this.stripErrorsFromConfig(config);
+
+        try {
+            let targetDeviceUID = this.attachSession.move_device_node(deviceUID, parentNode.uuid);
+
+            const node = this.attachSession.find_node_by_uuid(targetDeviceUID);
+
+            if (node === undefined) {
+                throw new Error(`Cannot find node with UUID: ${targetDeviceUID}`);
+            }
+
+            if (config.alias !== undefined) {
+                this.setNodeAlias(node, config.alias);
+            }
+
+            if (config.active !== undefined) {
+                this.setNodeActiveInternal(node, config.active);
+            }
+
+            if (verification.channelElements.length > 0) {
+                this.applyChannelConfigurations(node, verification.channelElements);
+            }
+
+            // Remove channels that are not present in the payload
+            if (verification.hasChannelPatterns) {
+                this.removeChannelsIfMissing(node, verification.channelElements, verification.compiledChannelRegexes);
+            }
+
+            if (verification.deviceElements.length > 0) {
+                this.applyFormElementsToNode(node, verification.deviceElements);
+                this.pruneMissingDeviceProperties(node, verification.deviceElements);
+            }
+
+            // FIXME: This funny check should not be here for sure
+            const set_unit_addr = (node: DtsNode): Boolean => {
+                if (node.modified_by_user !== undefined && node.modified_by_user === true) {
+                    const reg = node.properties.find((value) => value.name === "reg");
+                    if (reg !== undefined && reg.value !== undefined) {
+                        const reg_value = cell_extract_first_value(reg);
+                        if (typeof reg_value === "bigint") {
+                            node.unit_addr = reg_value.toString();
+                            return true;
+                        }
+                    }
+                }
+
+                return false;
+            };
+
+            set_unit_addr(node);
+
+            for (const channel of node.children) {
+                set_unit_addr(channel);
+                // FIXME: Check this again later
+            }
+
+            return {
+                deviceUID: targetDeviceUID,
+                validationErrors: verification.validationErrors
+            };
+        } catch (error) {
+            this.attachSession.restore_from_restore_point(restorePoint);
+            throw error;
+        }
+    }
+
+    private async validateConfigurationWithAttachLib(
+        deviceUID: DeviceUID,
+        config: ConfigTemplatePayload["config"],
+        parentNode: ParentNode
+    ): Promise<{
+        compiledChannelRegexes: RegExp[];
+        channelElements: FormObjectElement[];
+        deviceElements: FormElement[];
+        hasChannelPatterns: boolean;
+        validationErrors: BindingErrors[];
+    }> {
+        try {
+            this.assertSupportedFormElements(config.config);
+
+            // Strip any error annotations echoed back from the webview so we start clean
+            this.stripErrorsFromConfig(config);
+
+            if (!parentNode || !parentNode.uuid) {
+                throw new Error("Parent node is required for configuration updates");
+            }
+
+            this.attachSession.preflight_move_device_node(deviceUID, parentNode.uuid);
+
+            const node = this.attachSession.find_node_by_uuid(deviceUID);
+            if (node === undefined) {
+                throw new Error(`Cannot find node with UUID: ${deviceUID}`);
+            }
+
+            const data = this.attachSession.configPayloadToAttachLibJson(config);
+
+            let bindingResult;
+            try {
+                bindingResult = await this.resolveBindingForValidation(config.config, node, JSON.stringify(data, bigIntReplacer));
+            } catch (error) {
+                const errorPayload: ConfigTemplatePayload = { config: structuredClone(config) };
+                errorPayload.config.genericErrors = [{
+                    code: "generic",
+                    message: "Validation failed",
+                    details: error instanceof Error ? error.message : String(error),
+                }];
+                AnalogAttachLogger.error("[error] resolveBindingForValidation failed", error);
+                throw new ConfigValidationError("Validation failed", errorPayload);
+            }
+
+            if (bindingResult === undefined) {
+                throw new Error("Could not build form elements for node");
+            }
+
+            const device_tree = this.attachSession.get_device_tree();
+
+
+            bindingResult.binding.properties = query_devicetree(
+                device_tree,
+                bindingResult.binding.properties,
+                JSON.stringify(data, bigIntReplacer),
+                parentNode.name
+            );
+
+            bindingResult.binding.properties = insert_known_structures(bindingResult.binding.properties);
+
+            if (bindingResult.binding.pattern_properties !== undefined) {
+                for (const pattern of bindingResult.binding.pattern_properties) {
+                    pattern.properties = query_devicetree(device_tree, pattern.properties, JSON.stringify(data, bigIntReplacer), parentNode.name);
+                    pattern.properties = insert_known_structures(pattern.properties);
+                }
+            }
+
+            if (config.alias !== undefined) {
+                this.setNodeAlias(node, config.alias);
+            }
+
+            const compiledChannelRegexes = this.compileChannelRegexes(bindingResult.patterns);
+            const hasChannelPatterns = compiledChannelRegexes.length > 0;
+
+            const configFormList = config.config;
+            const channelElements = configFormList.filter((element): element is FormObjectElement => {
+                if (element.type !== "FormObject") {
+                    return false;
+                }
+
+                const channelSegment = element.channelName ?? element.key;
+
+                if (!hasChannelPatterns) {
+                    // Fallback: honor explicit channelName when no patterns are provided
+                    return element.channelName !== undefined;
+                }
+
+                return this.matchesAnyChannelPattern(channelSegment, compiledChannelRegexes);
+            });
+
+            const deviceElements = configFormList.filter((element) => {
+                if (element.type !== "FormObject") {
+                    return true;
+                }
+
+                if (channelElements.includes(element)) {
+                    return false;
+                }
+
+                if (!hasChannelPatterns) {
+                    return element.channelName === undefined;
+                }
+
+                if (element.channelName !== undefined) {
+                    return false;
+                }
+
+                return !this.matchesAnyChannelPattern(element.key, compiledChannelRegexes);
+            });
+
+            // Filter and count errors, then update session for compile-time warning
+            const filteredErrors = this.suppressUnsupportedErrors(bindingResult.errors);
+            this.attachSession.setValidationErrorCount(filteredErrors.length);
+
+            return {
+                compiledChannelRegexes,
+                channelElements,
+                deviceElements,
+                hasChannelPatterns,
+                validationErrors: filteredErrors,
+            };
+        } catch (error) {
+            AnalogAttachLogger.error("[error] validateConfigurationWithAttachLib failed", error);
+            const errorPayload: ConfigTemplatePayload = { config: structuredClone(config) };
+            errorPayload.config.genericErrors = [{
+                code: "generic",
+                message: "Validation failed",
+                details: error instanceof Error ? error.message : String(error),
+            }];
+            throw new ConfigValidationError("Validation failed", errorPayload);
+        }
+    }
+
+    private async resolveBindingForValidation(
+        elements: FormElement[],
+        node: DtsNode,
+        serializedData: string
+    ): Promise<{
+        binding: ParsedBinding;
+        requiredKeys: Set<string>;
+        patterns: string[];
+        errors: BindingErrors[];
+    }> {
+        const candidateCompatible = this.extractCompatibleValue(elements);
+
+        if (candidateCompatible) {
+            AnalogAttachLogger.debug("Resolving binding for compatible", { compatible: candidateCompatible });
+            const bindingWithPatterns = await this.attachSession.get_binding_for_compatible(candidateCompatible, serializedData);
+            if (bindingWithPatterns === undefined) {
+                AnalogAttachLogger.warn("Unknown compatible string, treating as custom node", { compatible: candidateCompatible });
+                return {
+                    binding: { required_properties: [], properties: [], examples: [] },
+                    requiredKeys: new Set<string>(),
+                    patterns: [],
+                    errors: [],
+                };
+            }
+            AnalogAttachLogger.debug("Resolved binding for compatible", { compatible: candidateCompatible, patterns: bindingWithPatterns.patterns?.length ?? 0 });
+
+            return {
+                binding: bindingWithPatterns.parsed_binding,
+                requiredKeys: new Set(bindingWithPatterns.parsed_binding.required_properties ?? []),
+                patterns: bindingWithPatterns.patterns ?? [],
+                errors: bindingWithPatterns.errors ?? [],
+            };
+        }
+
+        AnalogAttachLogger.debug("Building form elements via attachSession.buildFormElementsForNode", node);
+        return this.attachSession.buildFormElementsForNode(node, serializedData);
+    }
+
+    private extractCompatibleValue(elements: FormElement[]): string | undefined {
+        for (const element of elements) {
+            if (element.type === "FormObject") {
+                // Skip channel objects; compatible is only meaningful at the device level
+                continue;
+            }
+
+            if (element.key !== "compatible") {
+                continue;
+            }
+
+            if (element.type === "Generic") {
+                const value = element.setValue;
+                if (typeof value === "string") {
+                    return value;
+                }
+                if (Array.isArray(value)) {
+                    const first = value.find((item) => typeof item === "string") as string | undefined;
+                    if (first) {
+                        return first;
+                    }
+                }
+            }
+
+            if (element.type === "FormArray") {
+                const value = element.setValue;
+                if (Array.isArray(value)) {
+                    const first = value.find((item) => typeof item === "string") as string | undefined;
+                    if (first) {
+                        return first;
+                    }
+                }
+            }
+        }
+
+        return undefined;
+    }
+
+    private buildChannelConfigurations(
+        node: DtsNode,
+        channelRegexPatterns: string[],
+        patternRules?: PatternPropertyRule[],
+    ): FormObjectElement[] {
+        const channelRegexes = this.compileChannelRegexes(channelRegexPatterns);
+        const rules = patternRules ?? [];
+
+        return node.children
+            .filter((child) => {
+                if (this.attachSession.isDeviceNode(child)) {
+                    return false;
+                }
+                if (channelRegexes.length === 0) {
+                    return true;
+                }
+                const nodeSegment = this.attachSession.buildNodeSegment(child);
+                return this.matchesAnyChannelPattern(nodeSegment, channelRegexes);
+            })
+            .map((child) => {
+                const nodeSegment = this.attachSession.buildNodeSegment(child);
+                // If segment is name@unit and unit is numeric, set unit_addr so reg can be prefetched
+                const atIndex = nodeSegment.lastIndexOf("@");
+                if (atIndex !== -1 && child.unit_addr === undefined) {
+                    const unitPart = nodeSegment.slice(atIndex + 1);
+                    const parsed = unitPart.startsWith("0x")
+                        ? Number.parseInt(unitPart, 16)
+                        : Number.parseInt(unitPart, 10);
+                    if (!Number.isNaN(parsed)) {
+                        child.unit_addr = unitPart;
+                    }
+                }
+                const matchedRule = rules.find((rule) => {
+                    try {
+                        return new RegExp(rule.pattern).test(nodeSegment);
+                    } catch {
+                        return false;
+                    }
+                });
+                return this.buildChannelFormObject(child, nodeSegment, matchedRule);
+            });
+    }
+
+    private generateChannelRegexEntries(channelRegexes: string[]): string[] | undefined {
+        const entries: string[] = [];
+        for (const pattern of channelRegexes) {
+            try {
+                const expanded = expand_regex(new RegExp(pattern));
+                entries.push(...expanded);
+            } catch {
+                // Ignore patterns we cannot expand automatically
+            }
+        }
+
+        if (entries.length === 0) {
+            return undefined;
+        }
+
+        return [...new Set(entries)];
+    }
+
+    /**
+     * Remove error annotations and genericErrors from a config payload (in-place).
+     * The webview can echo previous errors back; we must start each validation clean.
+     */
+    public stripErrorsFromConfig(config: ConfigTemplatePayload["config"]): void {
+        delete (config as any).genericErrors;
+
+        const walk = (elements: FormElement[]): void => {
+            for (const element of elements) {
+                delete (element as any).error;
+                if (element.type === "FormObject") {
+                    walk(element.config);
+                }
+            }
+        };
+
+        walk(config.config);
+    }
+
+    /**
+     * prune invalid phandle enum_array values immediately
+     * */
+    private async pruneInvalidPhandles(properties: ResolvedProperty[], nodeValueMap: Map<string, unknown>, node: DtsNode) {
+        let shouldSave = false;
+
+        for (const property of properties ?? []) {
+            const dto = property.value as AttachType;
+            if (dto._t !== "enum_array" || dto.enum_type !== AttachEnumType.PHANDLE) {
+                continue;
+            }
+
+            const raw = nodeValueMap.get(property.key);
+
+            // safety backup
+            const normalized = Array.isArray(raw) ? raw : (raw === undefined ? [] : [raw]);
+            const enumSet = new Set(dto.enum.map(String));
+            const hasInvalid = normalized.some((v) => !enumSet.has(String(v)));
+
+            if (hasInvalid) {
+                shouldSave = true;
+                this.removeProperty(node, property.key);
+                nodeValueMap.delete(property.key);
+            }
+        }
+
+        if (shouldSave && this.attachSession.has_file_uri()) {
+            await this.attachSession.save_device_tree();
+        }
+    }
+
+    private buildChannelFormObject(channelNode: DtsNode, nodeSegment: string, patternRule?: PatternPropertyRule): FormObjectElement {
+        const alias = this.getNodeAlias(channelNode);
+        const nodeValueMap = this.parseNodeValues(channelNode);
+
+        const channelProperties = patternRule
+            ? this.mapPatternPropertiesToFormElements(patternRule, nodeValueMap)
+            : this.buildLegacyChannelElements(channelNode);
+
+        const bindingKeys = patternRule
+            ? new Set(patternRule.properties.map((property) => property.key))
+            : undefined;
+        const additionalProperties = bindingKeys
+            ? this.buildAdditionalChannelProperties(channelNode, bindingKeys)
+            : [];
+
+        // Prefill reg from unit_addr when present and reg lacks a value
+        if (channelNode.unit_addr !== undefined) {
+            const regElement = channelProperties.find((element) => element.key === "reg");
+            if (regElement !== undefined && regElement.type !== "FormObject" && regElement.setValue === undefined) {
+                const parsed = channelNode.unit_addr.startsWith("0x")
+                    ? Number.parseInt(channelNode.unit_addr, 16)
+                    : Number.parseInt(channelNode.unit_addr, 10);
+                if (!Number.isNaN(parsed)) {
+                    if (regElement.type === "FormMatrix") {
+                        regElement.setValue = [[parsed]];
+                    } else if (regElement.type === "FormArray") {
+                        regElement.setValue = [parsed];
+                    } else {
+                        regElement.setValue = parsed;
+                    }
+                }
+            }
+        }
+
+        const configElements: FormElement[] = [
+            ...channelProperties,
+            ...additionalProperties,
+        ];
+
+        return {
+            type: "FormObject",
+            key: nodeSegment,
+            channelName: nodeSegment,
+            required: false,
+            alias,
+            config: configElements,
+        };
+    }
+
+    private assertSupportedFormElements(elements: FormElement[]): void {
+        for (const element of elements) {
+            switch (element.type) {
+                case "Flag":
+                case "Generic":
+                case "FormArray":
+                case "FormMatrix": {
+                    break;
+                }
+                case "FormObject": {
+                    this.assertSupportedFormElements(element.config);
+                    break;
+                }
+                default: {
+                    const typeName = (element as FormElement & { type: string }).type;
+                    throw new Error(`Unsupported form element type received: ${typeName}`);
+                }
+            }
+        }
+    }
+
+    private mapPatternPropertiesToFormElements(
+        patternRule: PatternPropertyRule,
+        nodeValueMap: Map<string, unknown>
+    ): FormElement[] {
+        const requiredKeys = new Set(patternRule.required ?? []);
+
+        return patternRule.properties
+            .map((property) =>
+                this.bindingPropertyToFormElement(
+                    property,
+                    requiredKeys.has(property.key),
+                    nodeValueMap.get(property.key)
+                )
+            )
+            .filter(Boolean) as FormElement[];
+    }
+
+    private buildAdditionalChannelProperties(channelNode: DtsNode, bindingKeys: Set<string>): FormElement[] {
+        return channelNode.properties
+            .filter((property) => property.name !== "status" && !bindingKeys.has(property.name))
+            .map((property) => this.propertyToFormElement(property, false))
+            .filter(Boolean) as FormElement[];
+    }
+
+    private buildLegacyChannelElements(channelNode: DtsNode): FormElement[] {
+        return channelNode.properties
+            .filter((property) => property.name !== "status")
+            .map((property) => this.propertyToFormElement(property, false))
+            .filter(Boolean) as FormElement[];
+    }
+
+    private compileChannelRegexes(patterns: string[]): RegExp[] {
+        const regexes: RegExp[] = [];
+
+        for (const pattern of patterns) {
+            try {
+                regexes.push(new RegExp(pattern));
+            } catch {
+                // ignore invalid regex
+            }
+        }
+
+        return regexes;
+    }
+
+    private matchesAnyChannelPattern(name: string, regexes: RegExp[]): boolean {
+        if (regexes.length === 0) {
+            return false;
+        }
+
+        return regexes.some((regex) => regex.test(name));
+    }
+
+    private propertyToFormElement(property: DtsProperty, required: boolean): FormElement | undefined {
+        if (property.value === undefined) {
+            return {
+                type: "Flag",
+                key: property.name,
+                required,
+                defaultValue: false,
+            };
+        }
+
+        const parsedValue = this.attachSession.parseDtsValue(property.value);
+
+        if (Array.isArray(parsedValue)) {
+            return {
+                type: "FormArray",
+                key: property.name,
+                required,
+                setValue: parsedValue,
+                defaultValue: [],
+            };
+        }
+
+        // Only treat user-modified properties as custom so the FE preserves custom renderers
+        const inputType = property.modified_by_user === true
+            ? (typeof parsedValue === "boolean" ? "custom-flag" : "custom")
+            : "text";
+
+        return {
+            type: "Generic",
+            key: property.name,
+            inputType,
+            required,
+            setValue: parsedValue,
+        };
+    }
+
+    private getNodeActive(node: DtsNode): boolean {
+        const statusProperty = node.properties.find((property) => property.name === "status");
+        if (statusProperty === undefined) {
+            return true; // Not available means true by default
+        }
+
+        if (!statusProperty.value?.components.length) {
+            return true; // default to active when not specified
+        }
+        const component = statusProperty.value.components[0];
+        if (component.kind !== "string") {
+            return true;
+        }
+        return component.value !== "disabled";
+    }
+
+    private mapBindingToFormElements(
+        binding: ParsedBinding,
+        requiredKeys: Set<string>,
+        nodeValueMap: Map<string, unknown>
+    ): FormElement[] {
+        return binding.properties
+            .map((property) =>
+                this.bindingPropertyToFormElement(
+                    property,
+                    requiredKeys.has(property.key),
+                    nodeValueMap.get(property.key)
+                )
+            )
+            .filter(Boolean) as FormElement[];
+    }
+
+    private normalizeArray<T>(value: T): T[] | undefined {
+        if (Array.isArray(value)) {
+            return value;
+        }
+        if (value === undefined) {
+            return undefined;
+        }
+        return [value];
+    }
+
+    private normalizeScalar(value: unknown): unknown {
+        if (Array.isArray(value) && value.length === 1) {
+            return value[0];
+        }
+        return value;
+    }
+
+    private bindingPropertyToFormElement(
+        property: ResolvedProperty,
+        required: boolean,
+        overrideValue?: any
+    ): FormElement {
+        const dto = property.value as AttachType;
+
+        switch (dto._t) {
+            case "enum_integer": {
+                return {
+                    type: "Generic",
+                    key: property.key,
+                    inputType: "dropdown",
+                    required: required,
+                    description: dto.description,
+                    defaultValue: dto.default,
+                    setValue: this.normalizeScalar(overrideValue),
+                    validationType: {
+                        // TODO: remove ugly cast when FE is ready
+                        list: (dto.enum) as unknown as bigint[],
+                        type: "DropdownValidation"
+                    }
+                };
+            }
+            case "enum_array": {
+                const normalizeGroupedStrings = (value: unknown): Array<string | string[]> | undefined => {
+                    const values = this.normalizeArray(value);
+                    if (!values) {
+                        return undefined;
+                    }
+                    return values.map((entry) => Array.isArray(entry) ? entry.map(String) : String(entry));
+                };
+
+                let validationType: ArrayValidation;
+                validationType = dto.enum_type === AttachEnumType.PHANDLE ? {
+                    type: "ArrayHyperlinkValidation",
+                    minLength: dto.minItems,
+                    maxLength: dto.maxItems,
+                    enum: this.normalizeArray(dto.enum)?.map((item): HyperlinkItem => {
+                        const item_string = String(item);
+                        const labelPath = this.attachSession.get_label_map().get(item_string);
+                        const gotoUID = this.attachSession.path_to_uuid(labelPath ?? item_string);
+                        return {
+                            type: "HyperlinkItem",
+                            name: item_string,
+                            gotoUID: gotoUID
+                        };
+                    })
+                } : {
+                    type: "ArrayStringValidation",
+                    minLength: dto.minItems,
+                    maxLength: dto.maxItems,
+                    enum: normalizeGroupedStrings(dto.enum),
+                    enumType: dto.enum_type
+                };
+
+                const defaultValue = normalizeGroupedStrings(dto.default);
+                let setValue = overrideValue === undefined ? undefined : normalizeGroupedStrings(overrideValue);
+
+                if (validationType.type === "ArrayStringValidation") {
+                    if (dto.enum_type === AttachEnumType.PHANDLE && !validationType.enum?.includes(String(setValue))) {
+                        // somehow prune this as the referenced node might not valid anymore (AACSE-184)
+                        setValue = undefined;
+                    }
+
+                    if (dto.enum_type === AttachEnumType.MACRO && !validationType.enum?.includes(String(setValue))) {
+                        setValue = normalizeGroupedStrings(value_to_macro(Number(setValue), dto.enum));
+                    }
+                }
+
+                return {
+                    type: "FormArray",
+                    key: property.key,
+                    required: required,
+                    description: dto.description,
+                    defaultValue,
+                    setValue,
+                    validationType: validationType,
+                };
+            }
+            case "number_array": {
+                const validationType: ArrayNumberValidation =
+                {
+                    type: "ArrayNumberValidation",
+                    minLength: dto.minItems,
+                    maxLength: dto.maxItems,
+                    // TODO: remove casts after FE is ready
+                    minValue: dto.minimum,
+                    maxValue: dto.maximum
+                };
+
+                return {
+                    type: "FormArray",
+                    key: property.key,
+                    required: required,
+                    description: dto.description,
+                    setValue: this.normalizeArray(overrideValue),
+                    validationType: validationType,
+                };
+            }
+            case "string_array":
+            case "array": {
+                const validationType: ArrayStringValidation =
+                {
+                    type: "ArrayStringValidation",
+                    minLength: dto.minItems,
+                    maxLength: dto.maxItems,
+                };
+
+                return {
+                    type: "FormArray",
+                    key: property.key,
+                    required: required,
+                    description: dto.description,
+                    setValue: this.normalizeArray(overrideValue),
+                    validationType: validationType,
+                };
+            }
+            case "fixed_index": {
+                const validationType: ArrayMixedTypeValidation = {
+                    type: "ArrayMixedTypeValidation",
+                    minPrefixItems: dto.minItems,
+                    maxPrefixItems: dto.maxItems,
+                    prefixItems: []
+                };
+
+                for (const [index, item] of dto.prefixItems.entries()) {
+                    switch (item._t) {
+                        case 'enum': {
+                            if (item.enum_type === AttachEnumType.MACRO && Array.isArray(overrideValue)) {
+                                const raw = overrideValue[index];
+                                if (!item.enum.includes(raw)) {
+                                    const name = value_to_macro(Number(raw), item.enum);
+                                    if (name !== undefined) {
+                                        overrideValue[index] = name;
+                                    }
+                                }
+                            }
+                            validationType.prefixItems.push({
+                                type: "StringList",
+                                enum: item.enum,
+                                enumType: item.enum_type
+                            });
+                            break;
+                        }
+                        case "number": {
+                            validationType.prefixItems.push(
+                                {
+                                    type: "Number",
+                                    minValue: item.minimum ?? 0n,
+                                    // Note: There is no specific upper limit for bigint, it is implementation specific.
+                                    maxValue: item.maximum ?? BigInt(Number.MAX_SAFE_INTEGER)
+                                }
+                            );
+                            break;
+                        }
+                        default: {
+                            const _x: never = item;
+                            throw new Error("Failed exhaustive check!");
+                        }
+                    }
+
+                }
+
+                return {
+                    type: "FormArray",
+                    key: property.key,
+                    required: required,
+                    description: dto.description,
+                    setValue: overrideValue,
+                    validationType: validationType,
+                };
+            }
+            case "matrix": {
+                const normalizeMatrixValue = (value: any): any[] | undefined => {
+                    if (!Array.isArray(value)) {
+                        return undefined;
+                    }
+                    // If first element isn't an array, wrap the entire array as a single row
+                    if (!Array.isArray(value[0])) {
+                        return [value];
+                    }
+                    return value;
+                };
+
+                const validationType: MatrixValidation = {
+                    minRows: dto.minItems,
+                    maxRows: dto.maxItems,
+                    definition: {
+                        // Will change later
+                        type: "ArrayMixedTypeValidation",
+                        minPrefixItems: dto.minItems,
+                        maxPrefixItems: dto.maxItems,
+                        prefixItems: []
+                    }
+                };
+
+                for (const value of dto.values) {
+                    switch (value._t) {
+                        case "enum_array": {
+                            validationType.definition = {
+                                type: "ArrayStringValidation",
+                                minLength: value.minItems,
+                                maxLength: value.maxItems,
+                                enum: value.enum,
+                                enumType: value.enum_type,
+                            };
+                            break;
+                        }
+                        case "number_array": {
+                            validationType.definition = {
+                                type: "ArrayNumberValidation",
+                                minLength: value.minItems,
+                                maxLength: value.maxItems,
+                                minValue: value.minimum,
+                                maxValue: value.maximum
+                            };
+                            break;
+                        }
+                        case "array": {
+                            validationType.definition = {
+                                type: "ArrayNumberValidation",
+                                minLength: value.minItems,
+                                maxLength: value.maxItems,
+                            };
+                            break;
+                        }
+                        case "fixed_index": {
+                            const validations: ArrayMixedTypeValidation = {
+                                type: "ArrayMixedTypeValidation",
+                                minPrefixItems: value.minItems,
+                                maxPrefixItems: value.maxItems,
+                                prefixItems: []
+                            };
+
+                            const rows = normalizeMatrixValue(overrideValue);
+
+                            for (const [index, item] of value.prefixItems.entries()) {
+                                switch (item._t) {
+                                    case 'enum': {
+                                        // translate macros if needed
+                                        if (item.enum_type === AttachEnumType.MACRO && rows) {
+                                            for (const row of rows) {
+                                                const raw = row[index];
+                                                if (!item.enum.includes(raw)) {
+                                                    const name = value_to_macro(Number(raw), item.enum);
+                                                    if (name !== undefined) {
+                                                        row[index] = name;
+                                                    }
+                                                }
+                                            }
+                                        }
+                                        validations.prefixItems.push({
+                                            type: "StringList",
+                                            enum: item.enum,
+                                            enumType: item.enum_type
+                                        });
+                                        break;
+                                    }
+                                    case "number": {
+                                        if (rows) {
+                                            for (const row of rows) {
+                                                if (typeof row[index] === "string") {
+                                                    row[index] = undefined;
+                                                }
+                                            }
+                                        }
+                                        validations.prefixItems.push(
+                                            {
+                                                type: "Number",
+                                                minValue: item.minimum,
+                                                maxValue: item.maximum
+                                            }
+                                        );
+                                        break;
+                                    }
+                                    default: {
+                                        const _x: never = item;
+                                        throw new Error("Failed exhaustive check!");
+                                    }
+                                }
+                            }
+                            validationType.definition = validations;
+                        }
+                    }
+                }
+
+                let setValue = normalizeMatrixValue(overrideValue);
+
+                // Trim values to match shape constraints
+                if (setValue) {
+                    const maxCols = validationType.definition.type === "ArrayMixedTypeValidation"
+                        ? validationType.definition.maxPrefixItems
+                        : validationType.definition.maxLength;
+
+                    // Trim each row to max columns
+                    if (maxCols !== undefined) {
+                        setValue = setValue.map(row => row.slice(0, maxCols));
+                    }
+                    // Trim number of rows
+                    if (validationType.maxRows !== undefined) {
+                        setValue = setValue.slice(0, validationType.maxRows);
+                    }
+                }
+
+                return {
+                    type: "FormMatrix",
+                    key: property.key,
+                    required: required,
+                    description: dto.description,
+                    setValue: setValue,
+                    validationType: validationType,
+                };
+            }
+            case "boolean": {
+                return {
+                    type: "Flag",
+                    key: property.key,
+                    required,
+                    defaultValue: false,
+                    setValue: overrideValue,
+                    description: dto.description
+                };
+            }
+            case "integer": {
+                const validationType: NumericRangeValidation =
+                {
+                    minValue: dto.minimum,
+                    maxValue: dto.maximum,
+                    type: "NumericRangeValidation"
+                };
+
+                return {
+                    type: "Generic",
+                    key: property.key,
+                    inputType: "number",
+                    required: required,
+                    description: dto.description,
+                    defaultValue: dto.default,
+                    setValue: this.normalizeScalar(overrideValue),
+                    validationType: validationType,
+                };
+            }
+            case "const": {
+                const validationType: DropdownValidation = {
+                    type: "DropdownValidation",
+                    list: [dto.const]
+                };
+
+                return {
+                    type: "Generic",
+                    key: property.key,
+                    inputType: "dropdown",
+                    required: required,
+                    description: dto.description,
+                    validationType: validationType,
+                    setValue: this.normalizeScalar(overrideValue),
+                } satisfies GenericFormElement;
+            }
+            case "generic": {
+                return {
+                    type: "Generic",
+                    key: property.key,
+                    inputType: "text",
+                    required: required,
+                    description: dto.description,
+                    setValue: overrideValue,
+                };
+            }
+            case "object": {
+                const config: FormElement[] = [];
+
+                for (const property of dto.properties) {
+                    config.push(this.bindingPropertyToFormElement(property, false));
+                }
+
+                return {
+                    type: "FormObject",
+                    key: property.key,
+                    required: required,
+                    config: config,
+                };
+            }
+            default: {
+                const _x: never = dto;
+                throw new Error("Failed exhaustive check!");
+            }
+        }
+    }
+
+
+    private parseNodeValues(node: DtsNode): Map<string, unknown> {
+        const map = new Map<string, unknown>();
+        for (const property of node.properties) {
+            if (property.name === "status") {
+                continue;
+            }
+            map.set(property.name, property.value ? this.attachSession.parseDtsValue(property.value) : true);
+        }
+        return map;
+    }
+
+    private applyChannelConfigurations(
+        deviceNode: DtsNode,
+        channelElements: FormObjectElement[],
+    ): void {
+        for (const element of channelElements) {
+            const channelSegment = element.channelName ?? element.key;
+            if (!channelSegment) {
+                continue;
+            }
+
+            let channelNode = this.findChildNode(deviceNode, channelSegment);
+
+            if (!channelNode) {
+                channelNode = this.createChannelNode(channelSegment);
+                deviceNode.children.push(channelNode);
+                deviceNode.modified_by_user = true;
+            }
+
+            if (element.alias !== undefined) {
+                this.setNodeAlias(channelNode, element.alias);
+            }
+
+            if (Array.isArray(element.config)) {
+                this.applyFormElementsToNode(channelNode, element.config);
+            }
+        }
+    }
+
+    private createChannelNode(segment: string): DtsNode {
+        const [name, unitAddr] = segment.split("@", 2);
+        let properties: DtsProperty[] = [];
+
+        // Also add the reg property in case we have a unitAddr
+        if (unitAddr !== undefined) {
+            const parsed = unitAddr.startsWith("0x") ? Number.parseInt(unitAddr, 16) : Number.parseInt(unitAddr, 10);
+
+            if (!Number.isNaN(parsed)) {
+                const dtsValueComponent: DtsValueComponent | undefined = this.buildArrayComponent([parsed]);
+                if (dtsValueComponent) {
+                    const regProperty: DtsProperty = {
+                        labels: [],
+                        name: "reg",
+                        value: {
+                            components: [dtsValueComponent]
+                        },
+                        modified_by_user: true,
+                        deleted: false,
+                    };
+                    properties.push(regProperty);
+                } else {
+                    AnalogAttachLogger.warn("Cannot create reg property based on unit_addr for", segment);
+                }
+            }
+        }
+
+        return {
+            name,
+            unit_addr: unitAddr,
+            _uuid: crypto.randomUUID(),
+            properties: properties,
+            children: [],
+            modified_by_user: true,
+            created_by_user: true,
+            labels: [],
+            deleted: false
+        };
+    }
+
+    private hasAnySetSubChildren(element: FormObjectElement): boolean {
+        for (const child of element.config) {
+            if (child.type === "FormObject") {
+                const hit = this.hasAnySetSubChildren(child);
+                if (hit) {
+                    return true;
+                }
+            } else {
+                if (child.setValue !== undefined) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private applyFormElementsToNode(node: DtsNode, elements: FormElement[]): void {
+        for (const element of elements) {
+            switch (element.type) {
+                case "FormObject": {
+                    if (element.channelName !== undefined) {
+                        break;
+                    }
+
+                    let child = this.findChildNode(node, element.key);
+                    if (this.hasAnySetSubChildren(element)) {
+                        // Create the child if it doesn't exist
+                        if (child === undefined) {
+                            const [name, unitAddr] = element.key.split("@", 2);
+                            child = {
+                                name,
+                                unit_addr: unitAddr,
+                                _uuid: crypto.randomUUID(),
+                                properties: [],
+                                children: [],
+                                modified_by_user: true,
+                                created_by_user: true,
+                                labels: [],
+                                deleted: false,
+                            } satisfies DtsNode;
+                            node.children.push(child);
+                            node.modified_by_user = true;
+                        }
+
+                        this.applyFormElementsToNode(child, element.config);
+                    } else if (child !== undefined) {
+                        // Typescript narrowing was complaining..
+                        const existingChild = child;
+                        const nodeIndex = node.children.findIndex(item => item._uuid === existingChild._uuid);
+                        if (nodeIndex !== -1) {
+                            node.children.splice(nodeIndex, 1);
+                            node.modified_by_user = true;
+                        }
+                    }
+
+                    break;
+                }
+                default: {
+                    this.applySingleFormElement(node, element);
+                    break;
+                }
+            }
+        }
+    }
+
+    /**
+     * Remove device-level properties that are not present in the current payload.
+     * This helps keep renamed custom properties from leaving stale entries behind.
+     * // FIXME: This should be removed, helps the custom properties problem, see
+     * // another fixme above that explains it
+     */
+    private pruneMissingDeviceProperties(node: DtsNode, elements: FormElement[]): void {
+        const allowedKeys = new Set<string>();
+
+        const collectKeys = (list: FormElement[]): void => {
+            for (const element of list) {
+                if (element.type === "FormObject") {
+                    // device-level call only expects non-channel objects here, but recurse just in case
+                    collectKeys(element.config);
+                } else {
+                    allowedKeys.add(element.key);
+                }
+            }
+        };
+
+        collectKeys(elements);
+
+        node.properties = node.properties.filter((property) => {
+            if (property.name === "status") {
+                return true;
+            }
+            return allowedKeys.has(property.name);
+        });
+    }
+
+    private applySingleFormElement(node: DtsNode, element: FormElement): void {
+        if (element.key === "alias" && element.type === "Generic") {
+            const alias = element.setValue as string | undefined;
+            this.setNodeAlias(node, alias ?? "");
+            return;
+        }
+
+        switch (element.type) {
+            case "Flag": {
+                const normalized = element.setValue === false ? undefined : element.setValue;
+                if (normalized === undefined) {
+                    this.removeProperty(node, element.key);
+                } else if (normalized === true) { // just to be explicit
+                    this.upsertProperty(node, element.key);
+                } else {
+                    AnalogAttachLogger.warn(`Unexpected flag value for ${element.key}, skipping apply`, { normalized });
+                }
+                break;
+            }
+            case "Generic": {
+                const genericElement = element as GenericFormElement;
+
+                // Treat boolean/blank generics as custom flags (presence = true)
+                if (typeof genericElement.setValue === "boolean" || genericElement.setValue === undefined) {
+                    if (genericElement.setValue === false || genericElement.setValue === undefined) {
+                        this.removeProperty(node, genericElement.key);
+                    } else {
+                        this.upsertProperty(node, genericElement.key);
+                    }
+                    break;
+                }
+
+                // Only write to device tree if user explicitly set a value
+                if (genericElement.setValue === undefined) {
+                    this.removeProperty(node, genericElement.key);
+                    break;
+                }
+                const component = this.buildValueComponent(genericElement.setValue);
+                if (component) {
+                    this.upsertProperty(node, genericElement.key, component);
+                } else {
+                    this.removeProperty(node, genericElement.key);
+                }
+                break;
+            }
+            case "FormArray": {
+                // Only write to device tree if user explicitly set a value
+                if (element.setValue === undefined) {
+                    this.removeProperty(node, element.key);
+                    break;
+                }
+                if (!Array.isArray(element.setValue)) {
+                    this.removeProperty(node, element.key);
+                    break;
+                }
+                const shouldFlatten = element.setValue.every(
+                    (entry) => typeof entry === "string" || Array.isArray(entry)
+                );
+                const normalizedValues = shouldFlatten && element.setValue.some((element) => Array.isArray(element))
+                    ? element.setValue.flatMap((entry) => Array.isArray(entry) ? entry : [entry])
+                    : element.setValue;
+                const allStrings = normalizedValues.every((entry) => typeof entry === "string");
+                const components: DtsValueComponent[] = [];
+                const validationType = element.validationType;
+
+                if (validationType?.type === "ArrayMixedTypeValidation") {
+                    // Check if all prefixItems are StringList with string enumType - these should be printed as quoted strings
+                    const allStringLists = validationType.prefixItems.every(
+                        (item) => item.type === "StringList" && item.enumType === "string"
+                    );
+                    const stringValues = normalizedValues as string[];
+                    const allNonNumericStrings = allStrings && !stringValues.every((s) => this.isNumericLike(s));
+
+                    if (allStringLists && allNonNumericStrings) {
+                        // Create string components for proper "value1", "value2" output
+                        for (const entry of stringValues) {
+                            components.push({
+                                kind: "string",
+                                value: entry,
+                                labels: []
+                            });
+                        }
+                    } else {
+                        const component = this.buildArrayComponent(normalizedValues, { prefixItems: validationType.prefixItems });
+                        if (component) {
+                            components.push(component);
+                        }
+                    }
+                } else if (validationType?.type === "ArrayHyperlinkValidation") {
+                    // Phandle arrays - values are labels that need to be converted to references
+                    const component = this.buildArrayComponent(normalizedValues, { enumType: "phandle" });
+                    if (component) {
+                        components.push(component);
+                    }
+                } else if (validationType?.type === "ArrayStringValidation" && validationType.enumType && validationType.enumType !== "string") {
+                    const component = this.buildArrayComponent(normalizedValues, { enumType: validationType.enumType });
+                    if (component) {
+                        components.push(component);
+                    }
+                } else if (allStrings) {
+                    const stringValues = normalizedValues as string[];
+                    const allNumbers = stringValues.every((s) => this.isNumericLike(s));
+
+                    if (allNumbers) {
+                        const component = this.buildArrayComponent(stringValues);
+                        if (component) {
+                            components.push(component);
+                        }
+                    } else {
+                        for (const entry of stringValues) {
+                            components.push({
+                                kind: "string",
+                                value: entry,
+                                labels: []
+                            });
+                        }
+                    }
+                } else {
+                    const component = this.buildArrayComponent(element.setValue);
+                    if (component) {
+                        components.push(component);
+                    }
+                }
+
+                if (components.length === 0) {
+                    this.removeProperty(node, element.key);
+                    break;
+                }
+
+                node.properties = node.properties.filter((property) => property.name !== element.key);
+                node.properties.push({
+                    name: element.key,
+                    value: { components },
+                    modified_by_user: true,
+                    labels: [],
+                    deleted: false
+                });
+                node.modified_by_user = true;
+                break;
+            }
+            case "FormMatrix": {
+                // Only write to device tree if user explicitly set a value
+                if (element.setValue === undefined) {
+                    this.removeProperty(node, element.key);
+                    break;
+                }
+                if (!Array.isArray(element.setValue)) {
+                    this.removeProperty(node, element.key);
+                    break;
+                }
+                const matrixValidation = element.validationType as MatrixValidation | undefined;
+                const matrixDefinition = matrixValidation?.definition;
+                const arrayOptions: { enumType?: EnumValueType; prefixItems?: ArrayMixedTypeValidation["prefixItems"] } = {};
+
+                if (matrixDefinition?.type === "ArrayMixedTypeValidation") {
+                    arrayOptions.prefixItems = matrixDefinition.prefixItems;
+                } else if (matrixDefinition?.type === "ArrayStringValidation" && matrixDefinition.enumType) {
+                    arrayOptions.enumType = matrixDefinition.enumType;
+                }
+
+                const components = element.setValue
+                    .map((row) => Array.isArray(row) ? this.buildArrayComponent(row, arrayOptions) : undefined)
+                    .filter((component): component is DtsValueComponent => component !== undefined);
+
+                if (components.length === 0) {
+                    this.removeProperty(node, element.key);
+                    break;
+                }
+
+                node.properties = node.properties.filter((property) => property.name !== element.key);
+                node.properties.push({
+                    name: element.key,
+                    value: { components },
+                    modified_by_user: true,
+                    labels: [],
+                    deleted: false
+                });
+                node.modified_by_user = true;
+                break;
+            }
+            default: {
+                break;
+            }
+        }
+    }
+
+    private setNodeAlias(node: DtsNode, alias: string): void {
+        if (!alias) {
+            node.labels = [];
+            node.modified_by_user = true;
+            return;
+        }
+
+        node.labels = [alias];
+        node.modified_by_user = true;
+    }
+
+    private setNodeActiveInternal(node: DtsNode, active: boolean): void {
+        if (active) {
+            this.enableParentChain(node);
+        }
+
+        this.setNodeStatus(node, active);
+    }
+
+    private enableParentChain(node: DtsNode): void {
+        let current: DtsNode | undefined = node;
+
+        while (current) {
+            const parent = this.attachSession.find_parent_node_by_uuid(current._uuid);
+            if (parent === undefined) {
+                break;
+            }
+
+            if (this.getNodeActive(parent) === false) {
+                this.setNodeStatus(parent, true);
+            }
+
+            current = parent;
+        }
+    }
+
+    private setNodeStatus(node: DtsNode, active: boolean): void {
+        const statusValue = active ? "okay" : "disabled";
+        const makeValue = () => ({
+            components: [{ kind: "string" as const, value: statusValue, labels: [] }],
+        });
+
+        const status = node.properties.find((p) => p.name === "status");
+        if (status) {
+            status.value = makeValue();
+            status.labels ??= [];
+            status.modified_by_user = true;
+        } else {
+            node.properties.push({
+                name: "status",
+                value: makeValue(),
+                modified_by_user: true,
+                labels: [],
+                deleted: false,
+            });
+        }
+
+        node.modified_by_user = true;
+    }
+
+    private buildValueComponent(value: unknown): DtsValueComponent | undefined {
+        if ((typeof value === "number" && Number.isFinite(value)) || typeof value === "bigint") {
+            return {
+                kind: "array",
+                elements: [{
+                    item: {
+                        kind: "number",
+                        value: typeof value === "bigint" ? value : BigInt(Math.trunc(value)),
+                        labels: []
+                    },
+                }],
+                labels: []
+            };
+        }
+
+        if (typeof value === "string") {
+            if (value.startsWith("&")) {
+                return {
+                    kind: "ref",
+                    ref: { kind: "label", name: value.slice(1) },
+                    labels: []
+                };
+            }
+
+            if (value.startsWith("/")) {
+                return {
+                    kind: "ref",
+                    ref: { kind: "path", path: value },
+                    labels: []
+                };
+            }
+
+            return {
+                kind: "string",
+                value,
+                labels: []
+            };
+        }
+
+        if (Array.isArray(value)) {
+            return this.buildArrayComponent(value);
+        }
+
+        return undefined;
+    }
+
+    private buildArrayComponent(
+        values: unknown[],
+        options?: {
+            enumType?: EnumValueType;
+            prefixItems?: ArrayMixedTypeValidation["prefixItems"];
+        }
+    ): DtsValueComponent | undefined {
+        const elements: CellArrayElement[] = [];
+
+        for (const [index, entry] of values.entries()) {
+            const prefixItem = options?.prefixItems?.[index];
+            const enumType = prefixItem?.type === "StringList" ? prefixItem.enumType : options?.enumType;
+            const element = this.buildArrayElement(entry, enumType);
+            if (!element) {
+                continue;
+            }
+            elements.push(element);
+        }
+
+        if (elements.length === 0) {
+            return undefined;
+        }
+
+        return {
+            kind: "array",
+            elements,
+            labels: []
+        };
+    }
+
+    private buildArrayElement(value: unknown, enumType?: EnumValueType): CellArrayElement | undefined {
+        if ((typeof value === "number" && Number.isFinite(value)) || typeof value === "bigint") {
+            return {
+                item: {
+                    kind: "number",
+                    value: typeof value === "bigint" ? value : BigInt(Math.trunc(value)),
+                    repr: "dec",
+                    labels: []
+                },
+            };
+        }
+
+        if (typeof value === "string") {
+            if (enumType === "phandle") {
+                const isLabel = value.startsWith("/");
+                const reference = isLabel
+                    ? { kind: "path" as const, path: value }
+                    : { kind: "label" as const, name: value };
+                return {
+                    item: {
+                        kind: "ref",
+                        ref: reference,
+                        labels: []
+                    }
+                } satisfies CellArrayElement;
+            }
+
+            if (enumType === "macro") {
+                // FIXME: This is another nasty fix (yay)
+                // When the FE returns a new object containing a macro
+                // the default value for that macro is ''. This is not
+                // valid and it is not printable. Returning undefined
+                // here causes the flow to 'drop' the value (as some
+                // arrays are variable size so this would be fine), but
+                // in this specific case it is not wanted. Returning 0n
+                // means that the printer (and flow) works with the
+                // condition that there is a macro with value 0. So far
+                // this is the case and from my experience macros start
+                // from 0, so this is not a bad assumption. Hopefully
+                // a better implementation will be found at a later time.
+                if (!value) {
+                    return {
+                        item: {
+                            kind: "number",
+                            value: 0n,
+                            repr: "dec",
+                            labels: []
+                        },
+                    } satisfies CellArrayElement;
+                }
+                return {
+                    item: {
+                        kind: "macro",
+                        value: value,
+                        labels: []
+                    },
+                } satisfies CellArrayElement;
+            }
+
+            // Numeric-looking strings should be treated as numbers
+            const hexMatch = /^0x[0-9a-f]+$/i;
+            const decMatch = /^[+-]?\d+$/;
+            if (hexMatch.test(value)) {
+                const parsed = Number.parseInt(value, 16);
+                if (Number.isFinite(parsed)) {
+                    return {
+                        item: {
+                            kind: "number",
+                            value: BigInt(parsed),
+                            repr: "hex",
+                            labels: []
+                        },
+                    };
+                }
+            }
+            if (decMatch.test(value)) {
+                const parsed = Number.parseInt(value, 10);
+                if (Number.isFinite(parsed)) {
+                    return {
+                        item: {
+                            kind: "number",
+                            value: BigInt(parsed),
+                            repr: "dec",
+                            labels: []
+                        },
+                    };
+                }
+            }
+            return {
+                item: {
+                    kind: "expression",
+                    value,
+                    labels: []
+                },
+            };
+        }
+
+        return undefined;
+    }
+
+    private isNumericLike(value: string): boolean {
+        return /^0x[0-9a-f]+$/i.test(value) || /^[+-]?\d+$/.test(value);
+    }
+
+    private removeProperty(node: DtsNode, key: string): void {
+        node.properties = node.properties.filter((property) => property.name !== key);
+        if (key === "reg") {
+            node.unit_addr = undefined;
+        }
+        node.modified_by_user = true;
+    }
+
+    private upsertProperty(node: DtsNode, key: string, component?: DtsValueComponent): void {
+        node.properties = node.properties.filter((property) => property.name !== key);
+        node.properties.push(
+            component
+                ? {
+                    name: key,
+                    value: { components: [component] },
+                    modified_by_user: true,
+                    labels: [],
+                    deleted: false
+                }
+                : {
+                    name: key,
+                    modified_by_user: true,
+                    labels: [],
+                    deleted: false
+                }
+        );
+        node.modified_by_user = true;
+    }
+
+    private removeChannelsIfMissing(
+        deviceNode: DtsNode,
+        channelElements: FormObjectElement[],
+        compiledChannelRegexes: RegExp[]
+    ): void {
+        // Get the set of channel names that are present in the payload
+        const payloadChannelNames = new Set(
+            channelElements.map(element => element.channelName ?? element.key)
+        );
+
+        // Find existing channel child nodes that should be considered for removal
+        const existingChannelNodes = deviceNode.children.filter((child) => {
+            if (child.created_by_user !== true) {
+                return false;
+            }
+            if (this.attachSession.isDeviceNode(child)) {
+                return false;
+            }
+
+            // If there are no channel patterns, consider all user-created non-device nodes as channels
+            if (compiledChannelRegexes.length === 0) {
+                return true;
+            }
+
+            // If there are channel patterns, only consider nodes that match the patterns
+            const nodeSegment = this.attachSession.buildNodeSegment(child);
+            return this.matchesAnyChannelPattern(nodeSegment, compiledChannelRegexes);
+        });
+
+        // Remove channel nodes that are not present in the payload
+        const channelsToRemove = existingChannelNodes.filter((child) => {
+            const nodeSegment = this.attachSession.buildNodeSegment(child);
+            return !payloadChannelNames.has(nodeSegment);
+        });
+
+        if (channelsToRemove.length > 0) {
+            // Remove the channels from the device node's children
+            deviceNode.children = deviceNode.children.filter((child) => !channelsToRemove.includes(child));
+            deviceNode.modified_by_user = true;
+        }
+    }
+
+    private findChildNode(node: DtsNode, key: string): DtsNode | undefined {
+        return node.children.find((child) => {
+            const childSegment = this.attachSession.buildNodeSegment(child);
+            return childSegment === key;
+        });
+    }
+
+    private getNodeAlias(node: DtsNode): string {
+        return node.labels?.[0] ?? "";
+    }
+
+    private convertDtsNodeToFormElement(node: DtsNode): FormObjectElement {
+        const config: FormElement[] = [];
+
+        for (const property of node.properties) {
+            if (property.name === "status") {
+                continue;
+            }
+
+            const formElement = this.propertyToFormElement(property, false);
+            if (formElement) {
+                config.push(formElement);
+            }
+        }
+
+        for (const child of node.children) {
+            const childFormElement = this.convertDtsNodeToFormElement(child);
+            config.push(childFormElement);
+        }
+
+        const key = node.name === "/" ? "root" : node.name;
+
+        return {
+            type: "FormObject",
+            key,
+            required: false,
+            description: `Device tree node: ${key}`,
+            config: config,
+            alias: this.getNodeAlias(node),
+            active: this.getNodeActive(node),
+            deviceUID: node._uuid,
+        };
+    }
+
+    /**
+     * Clear all validation errors from form elements recursively.
+     * Used before applying new validation errors.
+     */
+    private clearValidationErrors(elements: FormElement[]): void {
+        for (const element of elements) {
+            element.error = undefined;
+            if (element.type === "FormObject") {
+                this.clearValidationErrors(element.config);
+            }
+        }
+    }
+
+    /**
+     * Apply validation errors to form elements by matching error property paths
+     * to element keys and attaching ConfigurationItemError objects.
+     */
+    public applyValidationErrors(config: ConfigTemplatePayload, errors: BindingErrors[]): void {
+        // This looks stupid :)))
+        const elements = config.config.config;
+        config.config.genericErrors = [];
+
+        // clear all existing errors to prevent stale error accumulation
+        this.clearValidationErrors(elements);
+
+        const filtered = this.suppressUnsupportedErrors(errors);
+
+        // Update session's validation error count for compile-time warning
+        this.attachSession.setValidationErrorCount(filtered.length);
+
+        for (const error of filtered) {
+            switch (error._t) {
+                case "missing_required": {
+                    const targetElement =
+                        error.instance.length > 0 ?
+                            this.findFormElementByPath(elements, [...error.instance, error.missing_property]) :
+                            this.findFormElementByKey(elements, error.missing_property);
+                    if (targetElement) {
+                        targetElement.error = {
+                            code: error._t,
+                            message: error.msg ?? `Required property '${error.missing_property}' is missing`,
+                            details: `Missing required property ${error.missing_property}`,
+                        };
+                    }
+                    break;
+                }
+                case "number_limit": {
+                    const targetElement = this.findFormElementByPath(elements, error.failed_property);
+                    if (!targetElement) {
+                        break;
+                    }
+                    if (!this.elementHasValue(targetElement)) {
+                        break; // ignore optional fields with no value
+                    }
+
+                    targetElement.error = {
+                        code: error._t,
+                        message: error.msg ?? "Value is out of range",
+                        details: `Provided number out of range for ${error.failed_property}: ${error.comparison} ${error.limit}`,
+                    };
+                    break;
+                }
+                case "failed_dependency": {
+                    const targetElement = this.findFormElementByKey(elements, error.dependent_property);
+                    if (targetElement && this.elementHasValue(targetElement)) {
+                        targetElement.error = {
+                            code: error._t,
+                            message: `'${error.dependent_property}' requires '${error.missing_property}'`,
+                            details: `Dependency not met for ${error.dependent_property}, missing ${error.missing_property}`,
+                        };
+                    }
+                    break;
+                }
+                case "generic": {
+                    // Attach generic errors at the top level; do not attempt to guess a target field
+                    config.config.genericErrors.push({
+                        code: error._t,
+                        message: error.msg ?? "Validation failed",
+                        details: error.origin,
+                    });
+                    break;
+                }
+            }
+        }
+    }
+
+    /**
+     * FIXME: The binding parser (narrow_object / narrow_array_object in Attach.ts) does not
+     * handle all JSON Schema patterns correctly. For example:
+     *   - Phandle properties with nested arrays ({type:"array", items:{type:"array"}}) fall
+     *     through to the generic _t:"array" fallback, causing AJV "must be array" errors
+     *     because the value shape doesn't match the schema's nested structure.
+     *   - The schema sets additionalProperties:false, but standard DT properties like
+     *     "status" and "reg" are not included in the schema's property list (they come
+     *     from base DT schema $refs that are stripped during fixups), causing invalid
+     *     "must NOT have additional properties" errors.
+     * These errors are not actionable by the user, so we suppress them until the binding
+     * parser properly supports these patterns.
+     */
+    private suppressUnsupportedErrors(errors: BindingErrors[]): BindingErrors[] {
+        return errors.filter(error => {
+            if (error._t !== "generic") {
+                return true;
+            }
+
+            // Suppress "must be array" for adi,spi-engine — its schema has a nested
+            // array pattern ({type:"array", items:{type:"array"}}) that narrow_array_object
+            // does not handle. It falls through to _t:"array" with ArrayStringValidation,
+            // causing AJV to reject the flat value shape.
+            if (error.msg === "must be array" && error.origin && error.origin.includes("spi-engine")) {
+                return false;
+            }
+
+            // Suppress "must NOT have additional properties" from standard DT props
+            // not listed in the binding schema
+            if (error.origin && /\/additionalProperties$/.test(error.origin)) {
+                return false;
+            }
+
+            return true;
+        });
+    }
+
+    /**
+     * Find a form element by its key (top-level search).
+     */
+    private findFormElementByKey(elements: FormElement[], key: string): FormElement | undefined {
+        for (const element of elements) {
+            if (element.key === key) {
+                return element;
+            }
+            // Also search within FormObject elements
+            if (element.type === "FormObject") {
+                const found = this.findFormElementByKey(element.config, key);
+                if (found) {
+                    return found;
+                }
+            }
+        }
+        return undefined;
+    }
+
+    private elementHasValue(element: FormElement): boolean {
+        switch (element.type) {
+            case "Flag":
+            case "Generic": {
+                return element.setValue !== undefined || element.defaultValue !== undefined;
+            }
+            case "FormArray": {
+                return element.setValue !== undefined && Array.isArray(element.setValue) && element.setValue.length > 0;
+            }
+            case "FormMatrix": {
+                return element.setValue !== undefined && Array.isArray(element.setValue) && element.setValue.length > 0;
+            }
+            case "FormObject": {
+                return element.config.some((child) => this.elementHasValue(child));
+            }
+            default: {
+                return false;
+            }
+        }
+    }
+
+    /**
+     * Find a form element by property path (for nested properties).
+     */
+    private findFormElementByPath(elements: FormElement[], path: string[]): FormElement | undefined {
+        if (path.length === 0) {
+            return undefined;
+        }
+
+        if (path.length === 1) {
+            return this.findFormElementByKey(elements, path[0]);
+        }
+
+        // Navigate through nested FormObjects
+        const [first, ...rest] = path;
+        for (const element of elements) {
+            if (element.type === "FormObject" && (element.key === first || element.channelName === first)) {
+                return this.findFormElementByPath(element.config, rest);
+            }
+        }
+
+        return undefined;
+    }
+}

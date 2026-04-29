@@ -1,0 +1,28 @@
+{
+  "name": "extension-protocol",
+  "version": "0.0.1",
+  "description": "Shared protocol types for communication between extension and webviews",
+  "private": true,
+  "type": "module",
+  "main": "./out/index.js",
+  "types": "./out/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./out/index.d.ts",
+      "import": "./out/index.js",
+      "default": "./out/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p .",
+    "watch": "tsc -p . --watch",
+    "clean": "rm -rf out tsconfig.tsbuildinfo"
+  },
+  "dependencies": {
+    "attach-lib": "*"
+  },
+  "devDependencies": {
+    "@types/node": "20.x",
+    "typescript": "^5.7.2"
+  }
+}

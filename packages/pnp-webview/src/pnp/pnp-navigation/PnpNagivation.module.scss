@@ -1,0 +1,48 @@
+.deviceListContainer {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.searchContainer {
+  display: flex;
+  padding: var(--hmc-space-5);
+  align-items: center;
+  background: var(--vscode-editor-background);
+  border-bottom: 0.5px solid var(--vscode-commandCenter-inactiveBorder);
+  flex-shrink: 0;
+}
+
+.deviceListContent {
+  white-space: normal !important;
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+}
+
+.deviceListContentInner {
+  width: 100%;
+  height: 100%;
+}
+
+.highlight {
+  background-color: gray;
+  color: inherit;
+}
+
+.noMatches {
+  color: var(--vscode-editor-foreground);
+  font-weight: bold;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--hmc-space-5);
+  width: 100%;
+  height: 100%;
+}
+
+.infoIcon {
+  color: var(--vscode-button-background);
+}

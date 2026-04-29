@@ -1,0 +1,111 @@
+@use "hds-components/dist/typography.scss" as typography;
+
+.SidesheetHeader {
+  display: flex;
+  padding: 20px 20px 20px 20px;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  align-self: stretch;
+  border-bottom: 0.5px solid var(--vscode-commandCenter-inactiveBorder);
+}
+
+.content {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+  align-self: stretch;
+}
+
+.labelGroup {
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+  align-self: stretch;
+  justify-content: space-between;
+}
+
+.primaryName {
+  overflow: hidden;
+  color: var(--vscode-editor-foreground);
+  @include typography.text-heading-h2;
+}
+
+.secondaryName {
+  overflow: hidden;
+  color: var(--vscode-descriptionForeground);
+  text-overflow: ellipsis;
+  @include typography.text-heading-h3;
+}
+
+.infoContainer {
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  width: 100%;
+}
+
+.detailsContainer {
+  display: flex;
+  padding: var(--hmc-space-3);
+  align-items: center;
+  gap: var(--hmc-space-2);
+  min-height: 32px;
+  width: 100%;
+  border-radius: var(--hmc-border-radius-1);
+  border: var(--hmc-border-width-1) solid var(--vscode-notificationToast-border);
+  background: var(--vscode-notifications-background);
+  box-sizing: border-box;
+}
+
+.detailsContainerColumn {
+  composes: detailsContainer;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.inlineDetails {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: var(--hmc-space-2);
+}
+
+.errorIcon {
+  color: var(--vscode-notificationsErrorIcon-foreground);
+}
+
+.infoIcon {
+  color: var(--vscode-notificationsInfoIcon-foreground);
+}
+
+.infoMessage {
+  color: var(--vscode-input-foreground);
+  @include typography.text-body-b2;
+}
+
+.genericErrorList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--hmc-space-2);
+  padding-left: var(--hmc-space-1);
+}
+
+.genericErrorItem {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.genericErrorMessage {
+  color: var(--vscode-input-foreground);
+  @include typography.text-body-b2;
+}
+
+.genericErrorDetails {
+  color: var(--vscode-descriptionForeground);
+  @include typography.text-body-b3;
+}

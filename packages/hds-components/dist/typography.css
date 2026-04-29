@@ -1,0 +1,137 @@
+/**
+ * Harmonic Design System - Typography Utility Classes
+ *
+ * Import this file to use HDS typography classes in your HTML.
+ *
+ * Usage:
+ *   @import 'hds-components/dist/typography.css';
+ *
+ *   <h4 class="hmc-text-heading-h4">My Heading</h4>
+ *   <p class="hmc-text-body-b1">My paragraph text</p>
+ */
+
+.hmc-text-body-b1 {
+  font-family: var(--vscode-font-family, 'Segoe UI Variable');
+  font-size: var(--hmc-font-size-4);
+  font-style: normal;
+  font-weight: 600;
+  line-height: 120%; /* 15.6px */
+}
+
+.hmc-text-body-b2 {
+  /* Body/B2/Text */
+  font-family: var(--vscode-font-family, 'Segoe UI Variable');
+  font-size: var(--hmc-font-size-3);
+  font-style: normal;
+  font-weight: 600;
+  line-height: 120%; /* 14.4px */
+}
+
+.hmc-text-body-b3 {
+  /* Body/B3/Text */
+  font-family: var(--vscode-font-family, 'Segoe UI Variable');
+  font-size: var(--hmc-font-size-2);
+  font-style: normal;
+  font-weight: 600;
+  line-height: 120%; /* 13.2px */
+}
+
+.hmc-text-label-l1 {
+  /* Label/L1 */
+  font-family: var(--vscode-font-family, 'Segoe UI Variable');
+  font-size: var(--hmc-font-size-5);
+  font-style: normal;
+  font-weight: 600;
+  line-height: 150%; /* 21px */
+}
+
+.hmc-text-label-l2 {
+  /* Label/L2 */
+  font-family: var(--vscode-font-family, 'Segoe UI Variable');
+  font-size: var(--hmc-font-size-3);
+  font-style: normal;
+  font-weight: 700;
+  line-height: 150%; /* 18px */
+}
+
+.hmc-text-label-l3 {
+  font-family: var(--vscode-font-family, 'Segoe UI Variable');
+  font-size: var(--hmc-font-size-2);
+  font-style: normal;
+  font-weight: 600;
+  line-height: 100%; /* 11px */
+}
+
+.hmc-text-label-l4 {
+  /* Label/L4 */
+  font-family: var(--vscode-font-family, 'Segoe UI Variable');
+  font-size: var(--hmc-font-size-1);
+  font-style: normal;
+  font-weight: 700;
+  line-height: 120%; /* 10.8px */
+}
+
+.hmc-text-heading-h1 {
+  /* Heading/H1 */
+  font-family: var(--vscode-font-family, 'Segoe UI Variable');
+  font-size: var(--hmc-font-size-9);
+  font-style: normal;
+  font-weight: 700;
+  line-height: 120%; /* 31.2px */
+}
+
+.hmc-text-heading-h2 {
+  /* Heading/H2 */
+  font-family: var(--vscode-font-family, 'Segoe UI Variable');
+  font-size: var(--hmc-font-size-7);
+  font-style: normal;
+  font-weight: 600;
+  line-height: 120%; /* 21.6px */
+}
+
+.hmc-text-heading-h3 {
+  /* Heading/H3 */
+  font-family: var(--vscode-font-family, 'Segoe UI Variable');
+  font-size: var(--hmc-font-size-5);
+  font-style: normal;
+  font-weight: 600;
+  line-height: 120%; /* 16.8px */
+}
+
+.hmc-text-heading-h4 {
+  /* Heading/H4 */
+  font-family: var(--vscode-font-family, 'Segoe UI Variable');
+  font-size: var(--hmc-font-size-4);
+  font-style: normal;
+  font-weight: 700;
+  line-height: 120%; /* 15.6px */
+}
+
+.hmc-text-heading-h5 {
+  /* Heading/H5 */
+  font-family: var(--vscode-font-family, 'Segoe UI Variable');
+  font-size: var(--hmc-font-size-2);
+  font-style: normal;
+  font-weight: 700;
+  line-height: 120%; /* 13.2px */
+  text-transform: uppercase;
+}
+
+.hmc-text-heading-h6 {
+  /* Heading/H6 */
+  font-family: var(--vscode-font-family, 'Segoe UI Variable');
+  font-size: var(--hmc-font-size-2);
+  font-style: normal;
+  font-weight: 600;
+  line-height: 120%; /* 13.2px */
+  text-transform: uppercase;
+}
+
+.hmc-text-heading-h7 {
+  /* Heading/H7 */
+  font-family: var(--vscode-font-family, 'Segoe UI Variable');
+  font-size: var(--hmc-font-size-2);
+  font-style: normal;
+  font-weight: 400;
+  line-height: 120%; /* 13.2px */
+}

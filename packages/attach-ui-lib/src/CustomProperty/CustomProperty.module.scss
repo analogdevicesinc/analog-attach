@@ -1,0 +1,99 @@
+// Custom property styles
+.customPropertyContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+}
+
+.customPropertyPnp {
+  border-top: 1px solid var(--vscode-commandCenter-inactiveBorder);
+  padding-top: var(--hmc-space-4);
+  display: flex;
+}
+
+.customPropertyTreeView {
+  border: 1px solid var(--vscode-commandCenter-inactiveBorder);
+  border-radius: var(--hmc-border-radius-2);
+}
+
+.paddedElements {
+  padding: var(--hmc-space-4);
+}
+
+.customPropertyForm {
+  margin-top: var(--hmc-space-4);
+  display: flex;
+  gap: 10px;
+  flex-direction: column;
+  max-width: 100%;
+  height: fit-content;
+  align-self: stretch;
+  
+  .propertyNameLabel {
+    color: var(--vscode-input-foreground);
+    font-weight: 700;
+    line-height: 150%;
+    font-size: var(--hmc-font-size-4);
+  }
+
+  .propertyHeader {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: baseline;
+  }
+
+  .infoField {
+    display: flex;
+    align-items: center;
+    gap: var(--hmc-space-2);
+    color: var(--vscode-descriptionForeground);
+    font-size: var(--hmc-font-size-1);
+    font-weight: 700;
+    line-height: 120%;
+  }
+
+  .propertyValueLabel {
+    color: var(--vscode-descriptionForeground);
+    font-weight: 600;
+    line-height: 120%;
+    font-size: var(--hmc-font-size-3);
+  }
+
+  .propertyField {
+    width: 100%;
+
+    &::placeholder {
+      font-size: var(--hmc-font-size-2);
+      font-weight: 600;
+      line-height: 120%;
+    }
+  }
+
+  .propertyValueContainer {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--hmc-space-2);
+    width: 100%;
+  }
+}
+
+.saveCustomPropertyButton {
+  height: auto;
+  width: 100%;
+}
+
+.addCustomPropertyButton {
+  margin-top: var(--hmc-space-4);
+  height: auto;
+  width: min-content;
+
+  &::part(base) {
+    align-self: flex-start;
+    font-weight: 600;
+    line-height: 120%;
+    font-size: var(--hmc-font-size-4);
+  }
+}

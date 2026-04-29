@@ -1,0 +1,52 @@
+.layout {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+
+  .canvas {
+    display: flex;
+    flex: 1 0 0;
+    align-self: stretch;
+    overflow: hidden;
+  }
+
+  .outerAllotment {
+    flex: 1 0 0;
+    height: 100%;
+  }
+
+  .taskSidebar {
+    display: flex;
+    width: 100%;
+    height: 100%;
+    border-right: 0.5px solid var(--vscode-commandCenter-inactiveBorder);
+  }
+
+  .allotmentContainer {
+    flex: 1 0 0;
+    height: 100%;
+  }
+
+  .mainContentArea {
+    display: flex;
+    overflow-y: auto!important;
+    flex-direction: column;
+    align-items: center;
+    height: 100%;
+    width: 100%;
+
+    &.narrow {
+      align-items: flex-start !important;
+    }
+  }
+
+  .scrollableContainer {
+    display: flex;
+    flex-direction: column;
+    white-space: normal !important;
+    overflow: scroll;
+    height: 100%;
+    background: var(--vscode-editor-background);
+  }
+}

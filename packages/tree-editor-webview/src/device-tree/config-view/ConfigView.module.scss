@@ -1,0 +1,102 @@
+.configView {
+    height: 100%;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    padding-left: var(--hmc-space-9);
+    padding-right: var(--hmc-space-9);
+
+    .container {
+        width: 100%;
+        flex: 1;
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        scrollbar-gutter: stable;
+    }
+}
+
+.centered {
+    max-width: 600px;
+    width: 100%;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.header {
+    display: flex;
+    flex-direction: column;
+    padding-top: 28px;
+    scrollbar-gutter: stable;
+    overflow: auto;
+
+    .headerTitle {
+        font-size: var(--hmc-font-size-9);
+    }
+
+    .headerToolbar {
+        display: flex;
+        flex-direction: row;
+
+        justify-content: space-between;
+        align-items: baseline;
+        margin-top: var(--hmc-space-5);
+        border-bottom: 1px solid var(--vscode-panel-border);
+    }
+
+    .headerControls {
+        display: flex;
+        justify-content: flex-end;
+        align-items: center;
+        gap: var(--hmc-space-3);
+
+        .toggleCheckbox {
+            margin-right: -10px;
+        }
+    }
+}
+
+
+.emptyState {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    width: 100%;
+    text-align: center;
+
+    border: var(--hmc-border-width-1) solid var(--vscode-notificationToast-border);
+
+    .emptyStateLabel {
+        margin-top: var(--hmc-space-4);
+        font-size: var(--hmc-font-size-4);
+        font-weight: bold;
+    }
+
+    .emptyStateText {
+        margin-top: var(--hmc-space-2);
+        font-size: var(--hmc-font-size-3);
+        color: var(--vscode-descriptionForeground);
+    }
+}
+
+
+.nodeConfig {
+    white-space: nowrap !important;
+    min-height: 0;
+    flex: 1;
+    overflow-y: auto;
+    scrollbar-gutter: stable;
+    padding-top: var(--hmc-space-7);
+    padding-bottom: var(--hmc-space-7);
+}
+
+.errorIcon {
+    color: var(--vscode-errorForeground);
+}
+
+.infoIcon {
+    color: var(--vscode-button-background);
+}

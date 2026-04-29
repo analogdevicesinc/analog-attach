@@ -1,0 +1,119 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  align-self: stretch;
+  border-bottom: 0.5px solid var(--vscode-commandCenter-inactiveBorder);
+  padding: 20px;
+}
+
+.header {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  align-self: stretch;
+  justify-content: space-between;
+}
+
+.title {
+  font-family: var(--font-family/editor, "Segoe UI Variable", sans-serif);
+  font-weight: 700;
+  font-size: 11px;
+  line-height: 1.2;
+  color: var(--vscode-editor-foreground);
+  text-transform: uppercase;
+  flex: 1 0 0;
+}
+
+.icons {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+
+  :global(vscode-form-group) {
+    width: 100%;
+  }
+
+  :global(vscode-textfield),
+  :global(vscode-single-select),
+  :global(vscode-multi-select) {
+    width: 100%;
+  }
+}
+
+.fields {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+  width: 100%;
+  min-width: 180px;
+}
+
+.checkboxGroup {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  width: 100%;
+  min-width: 180px;
+}
+
+// Form field styles to be checked against Figma design later
+
+.fieldContainer {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  width: 100%;
+}
+
+.fieldLabelGroup {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+}
+
+.badgeContainer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.optionalBadge {
+  font-size: 10px;
+  color: var(--vscode-descriptionForeground);
+}
+
+.errorBadge {
+  font-size: 10px;
+  color: var(--vscode-errorForeground);
+}
+
+.description {
+  font-size: 11px;
+  color: var(--vscode-descriptionForeground);
+  margin-top: -4px;
+}
+
+.formObjectContainer {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  padding-left: 16px;
+  border-left: 1px solid var(--vscode-commandCenter-inactiveBorder);
+}

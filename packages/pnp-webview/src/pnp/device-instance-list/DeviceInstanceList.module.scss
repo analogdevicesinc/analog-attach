@@ -1,0 +1,232 @@
+@use "hds-components/dist/typography.scss" as typography;
+
+.deviceInstanceListContainer {
+  display: flex;
+  max-width: 600px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--hmc-space-3);
+  align-self: stretch;
+}
+
+.deviceInstanceItemContainer {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  align-self: stretch;
+  border-radius: 5px;
+  border: 1px solid var(--vscode-commandCenter-inactiveBorder);
+  background: var(--vscode-editor-background);
+  .deviceInstanceCardFooter {
+    border-top: 1px solid var(--vscode-commandCenter-inactiveBorder);
+    display: flex;
+    padding: 12px 1px;
+    flex-direction: column;
+    align-items: flex-start;
+    align-self: stretch;
+    border-radius: 0 0 5px 5px;
+  }
+  &.highlighted {
+    border: 1px solid var(--vscode-commandCenter-activeBorder);
+    .deviceInstanceCardFooter {
+      border-top: 1px solid var(--vscode-commandCenter-activeBorder);
+    }
+  }
+}
+
+.deviceInstanceCardHeader {
+  display: flex;
+  padding: 12px 16px;
+  flex-direction: column;
+  align-items: flex-start;
+  align-self: stretch;
+  border-radius: 5px 5px 0 0;
+}
+
+// For alias or name (if alias is not set) and controls
+.deviceInstanceCardPrimaryHeader {
+  display: flex;
+  height: 24px;
+  padding: 2px 0;
+  align-items: center;
+  gap: 16px;
+  align-self: stretch;
+}
+
+// For the actual name if the alias is set
+.deviceInstanceCardSecondaryHeader {
+  display: flex;
+  padding-bottom: 4px;
+  gap: 10px;
+  align-self: stretch;
+}
+
+.deviceInstanceName {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  line-clamp: 1;
+  -webkit-line-clamp: 1;
+  flex: 1 0 0;
+  @include typography.text-heading-h3;
+  overflow: hidden;
+  color: var(--vscode-editor-foreground);
+  text-overflow: ellipsis;
+}
+
+.deviceInstanceNameSecondary {
+  color: var(--vscode-descriptionForeground);
+  @include typography.text-heading-h5;
+  text-align: start;
+}
+
+.deviceInstanceControls {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 12px;
+}
+
+.errorIcon {
+  color: var(--vscode-notificationsErrorIcon-foreground);
+}
+
+.toggleWrapper {
+  margin-right: -5px;
+}
+
+.tagContainer {
+  display: flex;
+  width: 64px;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
+}
+
+.tag {
+  display: flex;
+  padding: 4px 7px;
+  align-items: center;
+  gap: 10px;
+  border-radius: 20px;
+  border: 1px solid var(--vscode-commandCenter-inactiveBorder);
+  opacity: 0.9;
+  background: var(--vscode-editorWidget-background);
+
+  color: var(--vscode-descriptionForeground);
+  text-align: center;
+
+  /* B5 */
+  font-size: 9px;
+  font-style: normal;
+  font-weight: 500;
+  line-height: normal;
+}
+
+.channelSummary {
+  cursor: pointer;
+  border: 1px solid transparent;
+  &:hover {
+    background: var(--vscode-list-inactiveSelectionBackground, #37373d);
+  }
+  display: flex;
+  padding: 2px 15px;
+  align-items: center;
+  align-self: stretch;
+  background: var(--vscode-editor-background, #1e1e1e);
+
+  &:focus {
+    border: 1px solid var(--vscode-focusBorder);
+    background: var(--vscode-editor-background);
+  }
+}
+
+.channelCount {
+  margin-left: 4px;
+  color: var(--vscode-editor-foreground);
+  @include typography.text-heading-h6;
+  text-align: start;
+  flex: 1 0 0;
+}
+
+.iconList {
+  display: flex;
+  flex-direction: row;
+  width: 68px;
+  justify-content: space-between;
+  align-items: center;
+  gap: 4px;
+}
+
+.fixedSizeIcon {
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.channelBaseContainer {
+  display: flex;
+  min-height: 24px;
+  padding: 0 15px 0 25px; // +1px to account for the border
+  align-items: center;
+  gap: 11.5px;
+  align-self: stretch;
+  background: var(--vscode-editor-background);
+  &:hover {
+    background: var(--vscode-list-inactiveSelectionBackground, #37373d);
+  }
+}
+
+.channelNameContainer {
+  display: flex;
+  align-items: center;
+  gap: 13.5px;
+  flex: 1 0 0;
+  align-self: stretch;
+}
+
+.channelIndicator {
+  width: 1px;
+  align-self: stretch;
+  background: var(--vscode-descriptionForeground);
+}
+
+.channelContent {
+  display: flex;
+  padding: 4px 0;
+  align-items: center;
+  gap: 4px;
+  flex: 1 0 0;
+}
+
+.channelIcons {
+  display: flex;
+  width: 68px;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 4px;
+}
+
+.channelNamePrimary {
+  color: var(--vscode-editor-foreground);
+  color: var(--vscode-editor-foreground);
+  @include typography.text-body-b3;
+  text-align: start;
+}
+
+.channelNameSecondary {
+  color: var(--vscode-descriptionForeground);
+  @include typography.text-body-b3;
+  text-align: start;
+}
+
+.chevronButton {
+  cursor: pointer;
+}
+
+.editorBGButton {
+  &::part(base):hover {
+    background-color: var(--vscode-editor-background) !important;
+  }
+}

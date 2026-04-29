@@ -1,0 +1,38 @@
+/**
+ * Harmonic Design System - spacing tokens
+ */
+
+
+  :root {
+    /* Spacing Scale */
+    --hmc-space-1: 2px;
+    --hmc-space-2: 4px;
+    --hmc-space-3: 8px;
+    --hmc-space-4: 12px;
+    --hmc-space-5: 16px;
+    --hmc-space-6: 20px;
+    --hmc-space-7: 24px;
+    --hmc-space-8: 32px;
+    --hmc-space-9: 40px;
+
+    /* Border Radius Scale */
+    --hmc-border-radius-1: 2px;
+    --hmc-border-radius-2: 5px;
+    --hmc-border-radius-3: 100%;
+
+    /** Border width */
+    --hmc-border-width-1: 0.5px;
+    --hmc-border-width-2: 1px;
+    --hmc-border-width-3: 2px;
+
+    /* Font Size Scale */
+    --hmc-font-size-1: 9px;
+    --hmc-font-size-2: 11px;
+    --hmc-font-size-3: 12px;
+    --hmc-font-size-4: 13px;
+    --hmc-font-size-5: 14px;
+    --hmc-font-size-6: 15px;
+    --hmc-font-size-7: 18px;
+    --hmc-font-size-8: 20px;
+    --hmc-font-size-9: 26px;
+  }

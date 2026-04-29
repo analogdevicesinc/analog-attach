@@ -1,0 +1,70 @@
+@use "hds-components/dist/typography.scss" as typography;
+
+.container {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.backContainer {
+  display: flex;
+  width: 262px;
+  padding: 14px 12px;
+  align-items: flex-start;
+  height: 44px;
+  box-sizing: border-box;
+}
+
+.titleContainer {
+  display: flex;
+  padding: 12px 20px 4px 20px;
+  justify-content: left;
+  align-items: center;
+  gap: 10px;
+  align-self: stretch;
+
+  color: var(--vscode-editor-foreground);
+  @include typography.text-heading-h4;
+  height: 32px;
+  box-sizing: border-box;
+}
+
+.selectionContainer {
+  display: flex;
+  padding: 8px 20px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  align-self: stretch;
+  flex: 1;
+  overflow-y: auto;
+}
+
+.selectionCard {
+  display: flex;
+  max-width: 566px;
+  padding: var(--hmc-space-5);
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-start;
+  gap: var(--hmc-space-5);
+  align-self: stretch;
+
+  border-radius: 4px;
+  cursor: pointer;
+
+  border-radius: 4px;
+  border: 1px solid var(--vscode-commandCenter-inactiveBorder);
+  background: var(--vscode-editor-background);
+
+  &:hover {
+    border: 1px solid var(--vscode-commandCenter-activeBorder);
+    background: var(--vscode-list-hoverBackground);
+  }
+
+  &:active {
+    border: 1px solid var(--vscode-focusBorder);
+    background: var(--vscode-editor-background);
+  }
+}

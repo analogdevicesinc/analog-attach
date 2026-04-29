@@ -1,0 +1,182 @@
+.container {
+	position: relative;
+	font-family: var(--vscode-font-family);
+	font-size: var(--vscode-font-size);
+	color: var(--vscode-foreground);
+	width: 100%;
+}
+
+.label {
+	margin-bottom: 8px;
+	font-weight: var(--vscode-font-weight);
+	color: var(--vscode-foreground);
+}
+
+.array {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	padding: 12px;
+	background-color: transparent;
+	border: 1px solid var(--vscode-settings-dropdownBorder, #3c3c3c);
+	border-radius: 2px;
+	transition: border-color 0.1s ease;
+
+	&:hover:not(.disabled) {
+		border-color: var(--vscode-focusBorder, #0078d4);
+	}
+
+	&:focus-within:not(.disabled) {
+		border-color: var(--vscode-focusBorder, #0078d4);
+	}
+
+	&.disabled {
+		opacity: 0.6;
+		cursor: not-allowed;
+	}
+
+	&.error {
+		border-color: var(--vscode-inputValidation-errorBorder, #be1100);
+	}
+}
+
+.fields {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+
+.fieldRow {
+	display: flex;
+	gap: 8px;
+	align-items: center;
+}
+
+.field {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	flex: 1;
+}
+
+.fieldLabel {
+	font-size: 12px;
+	font-weight: 500;
+	color: var(--vscode-foreground);
+	line-height: 1.4;
+}
+
+.fieldInput {
+	width: 100%;
+	box-sizing: border-box;
+	
+	:global(vscode-textfield) {
+		width: 100%;
+		
+		&::part(control) {
+			min-height: 22px;
+			height: 22px;
+			padding: 2px 6px;
+		}
+	}
+	
+	:global(vscode-single-select) {
+		width: 100%;
+		
+		&::part(control) {
+			min-height: 22px;
+			height: 22px;
+			padding: 1px 6px;
+		}
+	}
+}
+
+.removeButton {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	padding: 0;
+	margin: 0;
+	background: transparent;
+	border: none;
+	color: var(--vscode-errorForeground, #f48771);
+	cursor: pointer;
+	width: 20px;
+	height: 20px;
+	min-width: 20px;
+	border-radius: 2px;
+	transition: background-color 0.1s ease;
+
+	&:hover:not(:disabled) {
+		background-color: var(--vscode-list-hoverBackground, #2a2d2e);
+		color: var(--vscode-errorForeground, #f48771);
+	}
+
+	&:active:not(:disabled) {
+		background-color: var(--vscode-list-activeSelectionBackground, #04395e);
+	}
+
+	&:disabled {
+		cursor: not-allowed;
+		opacity: 0.4;
+		color: var(--vscode-disabledForeground, #656565);
+	}
+
+	vscode-icon {
+		font-size: 12px;
+	}
+}
+
+.addFieldContainer {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	margin-top: 4px;
+	padding-top: 6px;
+	border-top: 1px solid var(--vscode-settings-dropdownBorder, #3c3c3c);
+}
+
+.addButton {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 4px;
+	padding: 4px 8px;
+	background-color: var(--vscode-button-secondaryBackground, #3a3d41);
+	border: 1px solid var(--vscode-button-border, #3c3c3c);
+	border-radius: 2px;
+	color: var(--vscode-button-secondaryForeground, #cccccc);
+	font-family: var(--vscode-font-family);
+	font-size: 12px;
+	cursor: pointer;
+	transition: all 0.1s ease;
+
+	&:hover:not(:disabled) {
+		background-color: var(--vscode-button-secondaryHoverBackground, #45494e);
+		border-color: var(--vscode-focusBorder, #0078d4);
+	}
+
+	&:active:not(:disabled) {
+		background-color: var(--vscode-button-secondaryHoverBackground, #45494e);
+		transform: translateY(1px);
+	}
+
+	&:disabled {
+		cursor: not-allowed;
+		opacity: 0.5;
+	}
+
+	vscode-icon {
+		font-size: 12px;
+	}
+
+	span {
+		font-weight: 400;
+	}
+}
+
+.fieldCount {
+	color: var(--vscode-descriptionForeground, #888888);
+	font-size: 12px;
+	font-style: italic;
+}

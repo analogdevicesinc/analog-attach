@@ -1,0 +1,96 @@
+// Default styles for the DynamicFormRenderer
+// These can be overridden by passing customStyles prop
+ @use "hds-components/dist/typography.scss" as typography;
+
+.fieldContainer {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  width: 100%;
+}
+
+.fieldLabelGroup {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+}
+
+.badgeContainer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.optionalBadge {
+  font-size: 10px;
+  color: var(--vscode-descriptionForeground);
+}
+
+.customBadge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.errorBadge {
+  font-size: 10px;
+  color: var(--vscode-errorForeground);
+}
+
+.formObjectContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  padding-left: 16px;
+  border-left: 1px solid var(--vscode-commandCenter-inactiveBorder);
+
+  &.error {
+    border-left-color: var(--vscode-inputValidation-errorBorder, #be1100);
+  }
+}
+
+.descriptionLabelContainer {
+  display: flex;
+  flex-direction: row;
+  gap: 4px;
+  align-items: center;
+}
+
+.tooltip {
+  align-self: stretch;
+  color: var(--vscode-editor-foreground);
+
+  font-size: var(--hmc-font-size-2);
+  font-style: normal;
+  font-weight: 600;
+  line-height: 120%;
+}
+
+.gotoButton {
+  display: flex;
+  width: 26px;
+  height: 26px;
+  justify-content: center;
+  align-items: center;
+  border-radius: var(--hmc-border-radius-1);
+  border: var(--hmc-border-width-2) solid var(--vscode-commandCenter-inactiveBorder);
+  background: var(--vscode-editor-background);
+  cursor: pointer;
+  flex-shrink: 0;
+
+  &:hover {
+    border: var(--hmc-border-width-2) solid var(--vscode-commandCenter-activeBorder);
+    background: var(--vscode-editor-background);
+  }
+
+  &:focus {
+    outline-color: var(--vscode-focusBorder);
+    outline-style: solid;
+    outline-width: 1px;
+    outline-offset: 2px;
+    z-index: 10;
+  }
+}

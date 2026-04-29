@@ -1,0 +1,33 @@
+{
+  "name": "tree-editor-webview",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "yarn build && vite",
+    "build": "tsc --noEmit && vite build",
+    "watch": "tsc --noEmit --watch && vite build --watch",
+    "preview": "vite preview",
+    "clean": "rm -rf dist out"
+  },
+  "dependencies": {
+    "@tanstack/react-virtual": "^3.13.18",
+    "allotment": "^1.20.5",
+    "classnames": "^2.5.1",
+    "extension-protocol": "workspace:*",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "zustand": "^5.0.8"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "^4.3.4",
+    "@vscode-elements/webview-playground": "^1.9.0",
+    "@vscode/codicons": "^0.0.36",
+    "hds-react": "workspace:*",
+    "sass": "^1.83.0",
+    "typescript": "^5.7.2",
+    "vite": "^6.0.3"
+  }
+}

@@ -1,0 +1,106 @@
+[
+    {
+        "path": [
+            "/",
+            "soc",
+            "spi@7e204000"
+        ],
+        "label": "spi0"
+    },
+    {
+        "path": [
+            "/",
+            "soc",
+            "spi@7e215080"
+        ],
+        "label": "spi1"
+    },
+    {
+        "path": [
+            "/",
+            "soc",
+            "spi@7e2150c0"
+        ],
+        "label": "spi2"
+    },
+    {
+        "path": [
+            "/",
+            "soc",
+            "spi@7e204600"
+        ],
+        "label": "spi3"
+    },
+    {
+        "path": [
+            "/",
+            "soc",
+            "spi@7e204800"
+        ],
+        "label": "spi4"
+    },
+    {
+        "path": [
+            "/",
+            "soc",
+            "spi@7e204a00"
+        ],
+        "label": "spi5"
+    },
+    {
+        "path": [
+            "/",
+            "soc",
+            "spi@7e204c00"
+        ],
+        "label": "spi6"
+    },
+    {
+        "path": [
+            "/",
+            "soc",
+            "i2c@7e205000"
+        ],
+        "label": "i2c0if"
+    },
+    {
+        "path": [
+            "/",
+            "soc",
+            "i2c@7e804000"
+        ],
+        "label": "i2c_arm"
+    },
+    {
+        "path": [
+            "/",
+            "soc",
+            "i2c@7e205600"
+        ],
+        "label": "i2c3"
+    },
+    {
+        "path": [
+            "/",
+            "soc",
+            "i2c@7e205800"
+        ],
+        "label": "i2c4"
+    },
+    {
+        "path": [
+            "/",
+            "soc",
+            "i2c@7e205a00"
+        ],
+        "label": "i2c5"
+    },
+    {
+        "path": [
+            "/",
+            "soc",
+            "i2c@7e205c00"
+        ],
+        "label": "i2c6"
+    }
+]

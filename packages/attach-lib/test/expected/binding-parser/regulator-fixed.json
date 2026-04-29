@@ -1,0 +1,439 @@
+{
+    "required_properties": [
+        "compatible",
+        "regulator-name"
+    ],
+    "properties": [
+        {
+            "key": "compatible",
+            "value": {
+                "_t": "enum_array",
+                "minItems": 1,
+                "maxItems": 1,
+                "enum": [
+                    "regulator-fixed",
+                    "regulator-fixed-clock",
+                    "regulator-fixed-domain"
+                ],
+                "enum_type": "string"
+            }
+        },
+        {
+            "key": "regulator-name",
+            "value": {
+                "_t": "string_array",
+                "minItems": 1,
+                "maxItems": 1,
+                "description": "A string used as a descriptive name for regulator outputs",
+                "unique_items": true
+            }
+        },
+        {
+            "key": "gpio",
+            "value": {
+                "_t": "array",
+                "minItems": 1,
+                "maxItems": 1,
+                "description": "gpio to use for enable control"
+            }
+        },
+        {
+            "key": "gpios",
+            "value": {
+                "_t": "array",
+                "minItems": 1,
+                "maxItems": 1
+            }
+        },
+        {
+            "key": "clocks",
+            "value": {
+                "_t": "array",
+                "minItems": 1,
+                "maxItems": 1,
+                "description": "clock to use for enable control. This binding is only available if the compatible is chosen to regulator-fixed-clock. The clock binding is mandatory if compatible is chosen to regulator-fixed-clock."
+            }
+        },
+        {
+            "key": "power-domains",
+            "value": {
+                "_t": "array",
+                "minItems": 1,
+                "maxItems": 1,
+                "description": "Power domain to use for enable control. This binding is only available if the compatible is chosen to regulator-fixed-domain."
+            }
+        },
+        {
+            "key": "required-opps",
+            "value": {
+                "_t": "array",
+                "minItems": 1,
+                "maxItems": 1,
+                "description": "Performance state to use for enable control. This binding is only available if the compatible is chosen to regulator-fixed-domain. The power-domain binding is mandatory if compatible is chosen to regulator-fixed-domain."
+            }
+        },
+        {
+            "key": "startup-delay-us",
+            "value": {
+                "_t": "generic",
+                "description": "startup time in microseconds"
+            }
+        },
+        {
+            "key": "off-on-delay-us",
+            "value": {
+                "_t": "generic",
+                "description": "off delay time in microseconds"
+            }
+        },
+        {
+            "key": "enable-active-high",
+            "value": {
+                "_t": "boolean",
+                "description": "Polarity of GPIO is Active high. If this property is missing, the default assumed is Active low."
+            }
+        },
+        {
+            "key": "gpio-open-drain",
+            "value": {
+                "_t": "boolean",
+                "description": "GPIO is open drain type. If this property is missing then default assumption is false."
+            }
+        },
+        {
+            "key": "vin-supply",
+            "value": {
+                "_t": "generic",
+                "description": "Input supply phandle."
+            }
+        },
+        {
+            "key": "interrupts",
+            "value": {
+                "_t": "array",
+                "minItems": 1,
+                "maxItems": 1,
+                "description": "Interrupt signaling a critical under-voltage event."
+            }
+        },
+        {
+            "key": "interrupt-parent",
+            "value": {
+                "_t": "array",
+                "minItems": 1,
+                "maxItems": 1
+            }
+        },
+        {
+            "key": "system-critical-regulator",
+            "value": {
+                "_t": "boolean",
+                "description": "Set if the regulator is critical to system stability or functionality."
+            }
+        },
+        {
+            "key": "regulator-min-microvolt",
+            "value": {
+                "_t": "generic",
+                "description": "smallest voltage consumers may set"
+            }
+        },
+        {
+            "key": "regulator-max-microvolt",
+            "value": {
+                "_t": "generic",
+                "description": "largest voltage consumers may set"
+            }
+        },
+        {
+            "key": "regulator-microvolt-offset",
+            "value": {
+                "_t": "integer",
+                "minimum": 0,
+                "maximum": 4294967295,
+                "typeSize": 32,
+                "description": "Offset applied to voltages to compensate for voltage drops",
+                "default": null
+            }
+        },
+        {
+            "key": "regulator-min-microamp",
+            "value": {
+                "_t": "generic",
+                "description": "smallest current consumers may set"
+            }
+        },
+        {
+            "key": "regulator-max-microamp",
+            "value": {
+                "_t": "generic",
+                "description": "largest current consumers may set"
+            }
+        },
+        {
+            "key": "regulator-input-current-limit-microamp",
+            "value": {
+                "_t": "generic",
+                "description": "maximum input current regulator allows"
+            }
+        },
+        {
+            "key": "regulator-always-on",
+            "value": {
+                "_t": "boolean",
+                "description": "boolean, regulator should never be disabled"
+            }
+        },
+        {
+            "key": "regulator-boot-on",
+            "value": {
+                "_t": "boolean",
+                "description": "bootloader/firmware enabled regulator. It's expected that this regulator was left on by the bootloader. If the bootloader didn't leave it on then OS should turn it on at boot but shouldn't prevent it from being turned off later. This property is intended to only be used for regulators where software cannot read the state of the regulator."
+            }
+        },
+        {
+            "key": "regulator-allow-bypass",
+            "value": {
+                "_t": "boolean",
+                "description": "allow the regulator to go into bypass mode"
+            }
+        },
+        {
+            "key": "regulator-allow-set-load",
+            "value": {
+                "_t": "boolean",
+                "description": "allow the regulator performance level to be configured"
+            }
+        },
+        {
+            "key": "regulator-ramp-delay",
+            "value": {
+                "_t": "integer",
+                "minimum": 0,
+                "maximum": 4294967295,
+                "typeSize": 32,
+                "description": "ramp delay for regulator(in uV/us) For hardware which supports disabling ramp rate, it should be explicitly initialised to zero (regulator-ramp-delay = <0>) for disabling ramp delay.",
+                "default": null
+            }
+        },
+        {
+            "key": "regulator-enable-ramp-delay",
+            "value": {
+                "_t": "integer",
+                "minimum": 0,
+                "maximum": 4294967295,
+                "typeSize": 32,
+                "description": "The time taken, in microseconds, for the supply rail to reach the target voltage, plus/minus whatever tolerance the board design requires. This property describes the total system ramp time required due to the combination of internal ramping of the regulator itself, and board design issues such as trace capacitance and load on the supply.",
+                "default": null
+            }
+        },
+        {
+            "key": "regulator-settling-time-us",
+            "value": {
+                "_t": "generic",
+                "description": "Settling time, in microseconds, for voltage change if regulator have the constant time for any level voltage change. This is useful when regulator have exponential voltage change."
+            }
+        },
+        {
+            "key": "regulator-settling-time-up-us",
+            "value": {
+                "_t": "generic",
+                "description": "Settling time, in microseconds, for voltage increase if the regulator needs a constant time to settle after voltage increases of any level. This is useful for regulators with exponential voltage changes."
+            }
+        },
+        {
+            "key": "regulator-settling-time-down-us",
+            "value": {
+                "_t": "generic",
+                "description": "Settling time, in microseconds, for voltage decrease if the regulator needs a constant time to settle after voltage decreases of any level. This is useful for regulators with exponential voltage changes."
+            }
+        },
+        {
+            "key": "regulator-soft-start",
+            "value": {
+                "_t": "boolean",
+                "description": "Enable soft start so that voltage ramps slowly"
+            }
+        },
+        {
+            "key": "regulator-initial-mode",
+            "value": {
+                "_t": "integer",
+                "minimum": 0,
+                "maximum": 4294967295,
+                "typeSize": 32,
+                "description": "initial operating mode. The set of possible operating modes depends on the capabilities of every hardware so each device binding documentation explains which values the regulator supports.",
+                "default": null
+            }
+        },
+        {
+            "key": "regulator-allowed-modes",
+            "value": {
+                "_t": "number_array",
+                "minItems": 1,
+                "minimum": 0,
+                "maximum": 4294967295,
+                "typeSize": 32,
+                "description": "list of operating modes that software is allowed to configure for the regulator at run-time.  Elements may be specified in any order. The set of possible operating modes depends on the capabilities of every hardware so each device binding document explains which values the regulator supports."
+            }
+        },
+        {
+            "key": "regulator-system-load",
+            "value": {
+                "_t": "integer",
+                "minimum": 0,
+                "maximum": 4294967295,
+                "typeSize": 32,
+                "description": "Load in uA present on regulator that is not captured by any consumer request.",
+                "default": null
+            }
+        },
+        {
+            "key": "regulator-pull-down",
+            "value": {
+                "_t": "boolean",
+                "description": "Enable pull down resistor when the regulator is disabled."
+            }
+        },
+        {
+            "key": "regulator-over-current-protection",
+            "value": {
+                "_t": "boolean",
+                "description": "Enable over current protection."
+            }
+        },
+        {
+            "key": "regulator-oc-protection-microamp",
+            "value": {
+                "_t": "generic",
+                "description": "Set over current protection limit. This is a limit where hardware performs emergency shutdown. Zero can be passed to disable protection and value '1' indicates that protection should be enabled but limit setting can be omitted."
+            }
+        },
+        {
+            "key": "regulator-oc-error-microamp",
+            "value": {
+                "_t": "generic",
+                "description": "Set over current error limit. This is a limit where part of the hardware probably is malfunctional and damage prevention is requested. Zero can be passed to disable error detection and value '1' indicates that detection should be enabled but limit setting can be omitted."
+            }
+        },
+        {
+            "key": "regulator-oc-warn-microamp",
+            "value": {
+                "_t": "generic",
+                "description": "Set over current warning limit. This is a limit where hardware is assumed still to be functional but approaching limit where it gets damaged. Recovery actions should be initiated. Zero can be passed to disable detection and value '1' indicates that detection should be enabled but limit setting can be omitted."
+            }
+        },
+        {
+            "key": "regulator-ov-protection-microvolt",
+            "value": {
+                "_t": "generic",
+                "description": "Set over voltage protection limit. This is a limit where hardware performs emergency shutdown. Zero can be passed to disable protection and value '1' indicates that protection should be enabled but limit setting can be omitted. Limit is given as microvolt offset from voltage set to regulator."
+            }
+        },
+        {
+            "key": "regulator-ov-error-microvolt",
+            "value": {
+                "_t": "generic",
+                "description": "Set over voltage error limit. This is a limit where part of the hardware probably is malfunctional and damage prevention is requested Zero can be passed to disable error detection and value '1' indicates that detection should be enabled but limit setting can be omitted. Limit is given as microvolt offset from voltage set to regulator."
+            }
+        },
+        {
+            "key": "regulator-ov-warn-microvolt",
+            "value": {
+                "_t": "generic",
+                "description": "Set over voltage warning limit. This is a limit where hardware is assumed still to be functional but approaching limit where it gets damaged. Recovery actions should be initiated. Zero can be passed to disable detection and value '1' indicates that detection should be enabled but limit setting can be omitted. Limit is given as microvolt offset from voltage set to regulator."
+            }
+        },
+        {
+            "key": "regulator-uv-protection-microvolt",
+            "value": {
+                "_t": "generic",
+                "description": "Set over under voltage protection limit. This is a limit where hardware performs emergency shutdown. Zero can be passed to disable protection and value '1' indicates that protection should be enabled but limit setting can be omitted. Limit is given as microvolt offset from voltage set to regulator."
+            }
+        },
+        {
+            "key": "regulator-uv-error-microvolt",
+            "value": {
+                "_t": "generic",
+                "description": "Set under voltage error limit. This is a limit where part of the hardware probably is malfunctional and damage prevention is requested Zero can be passed to disable error detection and value '1' indicates that detection should be enabled but limit setting can be omitted. Limit is given as microvolt offset from voltage set to regulator."
+            }
+        },
+        {
+            "key": "regulator-uv-warn-microvolt",
+            "value": {
+                "_t": "generic",
+                "description": "Set over under voltage warning limit. This is a limit where hardware is assumed still to be functional but approaching limit where it gets damaged. Recovery actions should be initiated. Zero can be passed to disable detection and value '1' indicates that detection should be enabled but limit setting can be omitted. Limit is given as microvolt offset from voltage set to regulator."
+            }
+        },
+        {
+            "key": "regulator-uv-less-critical-window-ms",
+            "value": {
+                "_t": "generic",
+                "description": "Specifies the time window (in milliseconds) following a critical under-voltage event during which the system can continue to operate safely while performing less critical operations. This property provides a defined duration before a more severe reaction to the under-voltage event is needed, allowing for certain non-urgent actions to be carried out in preparation for potential power loss."
+            }
+        },
+        {
+            "key": "regulator-temp-protection-kelvin",
+            "value": {
+                "_t": "generic",
+                "description": "Set over temperature protection limit. This is a limit where hardware performs emergency shutdown. Zero can be passed to disable protection and value '1' indicates that protection should be enabled but limit setting can be omitted."
+            }
+        },
+        {
+            "key": "regulator-temp-error-kelvin",
+            "value": {
+                "_t": "generic",
+                "description": "Set over temperature error limit. This is a limit where part of the hardware probably is malfunctional and damage prevention is requested Zero can be passed to disable error detection and value '1' indicates that detection should be enabled but limit setting can be omitted."
+            }
+        },
+        {
+            "key": "regulator-temp-warn-kelvin",
+            "value": {
+                "_t": "generic",
+                "description": "Set over temperature warning limit. This is a limit where hardware is assumed still to be functional but approaching limit where it gets damaged. Recovery actions should be initiated. Zero can be passed to disable detection and value '1' indicates that detection should be enabled but limit setting can be omitted."
+            }
+        },
+        {
+            "key": "regulator-active-discharge",
+            "value": {
+                "_t": "enum_integer",
+                "enum": [
+                    0,
+                    1
+                ],
+                "typeSize": 32,
+                "description": "tristate, enable/disable active discharge of regulators. The values are:\n0: Disable active discharge.\n1: Enable active discharge.\nAbsence of this property will leave configuration to default.\n",
+                "default": null
+            }
+        },
+        {
+            "key": "regulator-coupled-with",
+            "value": {
+                "_t": "array",
+                "minItems": 1,
+                "description": "Regulators with which the regulator is coupled. The linkage is 2-way - all coupled regulators should be linked with each other. A regulator should not be coupled with its supplier."
+            }
+        },
+        {
+            "key": "regulator-coupled-max-spread",
+            "value": {
+                "_t": "number_array",
+                "minItems": 1,
+                "minimum": 0,
+                "maximum": 4294967295,
+                "typeSize": 32,
+                "description": "Array of maximum spread between voltages of coupled regulators in microvolts, each value in the array relates to the corresponding couple specified by the regulator-coupled-with property."
+            }
+        },
+        {
+            "key": "regulator-max-step-microvolt",
+            "value": {
+                "_t": "generic",
+                "description": "Maximum difference between current and target voltages that can be changed safely in a single step."
+            }
+        }
+    ],
+    "examples": [
+        "reg_1v8: regulator-1v8 {\n  compatible = \"regulator-fixed\";\n  regulator-name = \"1v8\";\n  regulator-min-microvolt = <1800000>;\n  regulator-max-microvolt = <1800000>;\n  gpio = <&gpio1 16 0>;\n  startup-delay-us = <70000>;\n  enable-active-high;\n  regulator-boot-on;\n  gpio-open-drain;\n  vin-supply = <&parent_reg>;\n};\nreg_1v8_clk: regulator-1v8-clk {\n  compatible = \"regulator-fixed-clock\";\n  regulator-name = \"1v8\";\n  regulator-min-microvolt = <1800000>;\n  regulator-max-microvolt = <1800000>;\n  clocks = <&clock1>;\n  startup-delay-us = <70000>;\n  enable-active-high;\n  regulator-boot-on;\n  vin-supply = <&parent_reg>;\n};\nreg_1v8_domain: regulator-1v8-domain {\n  compatible = \"regulator-fixed-domain\";\n  regulator-name = \"1v8\";\n  regulator-min-microvolt = <1800000>;\n  regulator-max-microvolt = <1800000>;\n  power-domains = <&domain1>;\n  required-opps = <&domain1_state1>;\n  startup-delay-us = <70000>;\n  enable-active-high;\n  regulator-boot-on;\n  vin-supply = <&parent_reg>;\n};\n"
+    ]
+}

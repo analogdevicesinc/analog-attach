@@ -1,0 +1,14 @@
+/dts-v1/;
+
+/{
+	soc {
+		gpio@7e200000 {
+			gpclk0_gpio49 {
+				pin-gpclk {
+					some_flag;
+					some_value = <2>;
+				};
+			};
+		};
+	};
+};

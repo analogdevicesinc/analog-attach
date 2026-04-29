@@ -1,0 +1,7 @@
+coverage/*
+
+test/expected/cache/*
+
+#SYMLINKS
+test/dt-schema
+test/linux

@@ -1,0 +1,33 @@
+.errorDisplay {
+    padding: var(--hmc-space-2);
+    padding-left: var(--hmc-space-3);
+    border: var(--hmc-border-width-1) solid var(--vscode-notificationToast-border);
+    background: var(--vscode-notifications-background);
+    border-radius: var(--hmc-border-radius-1);
+    
+    max-width: 566px;
+    min-width: 360px;
+    width: 100%;
+    margin-left: auto;
+    margin-right: auto;
+
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: var(--hmc-space-2);
+
+    .errorItem {
+        display: flex;
+        align-items: center;
+        gap: var(--hmc-space-2);
+
+        &:last-child {
+            margin-bottom: 0;
+        }
+    }
+
+    .errorIcon {
+        color: var(--vscode-errorForeground);
+        font-size: var(--hmc-font-size-5);
+    }
+}

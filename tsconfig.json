@@ -1,0 +1,10 @@
+{
+  "files": [],
+  "references": [
+    { "path": "./packages/attach-lib" },
+    { "path": "./packages/extension-protocol" },
+    { "path": "./packages/pnp-webview" },
+    { "path": "./packages/extension" },
+    { "path": "./packages/hds-react" }
+  ]
+}

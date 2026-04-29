@@ -1,0 +1,25 @@
+.deleteContent {
+	display: flex;
+	flex-direction: column;
+	gap: 16px;
+	padding: 16px 0;
+}
+
+.title {
+	margin: 0;
+	font-size: 18px;
+	font-weight: 400;
+	color: var(--vscode-foreground);
+}
+
+.description {
+	margin: 0;
+	font-size: 13px;
+	color: var(--vscode-descriptionForeground);
+}
+
+.footerButtons {
+	display: flex;
+	gap: 8px;
+	justify-content: flex-end;
+}

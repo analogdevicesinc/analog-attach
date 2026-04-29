@@ -1,0 +1,22 @@
+
+.customTetriary {
+	/* Try to override using CSS parts */
+	&::part(base) {
+	  display: flex;
+	  color: var(--vscode-editor-foreground);
+	  background-color: transparent
+	}
+  
+	&::part(base):hover {
+	  background: var(--vscode-list-inactiveSelectionBackground, #37373D);
+	}
+  
+	&::part(base):focus {
+	  background: transparent;
+	}
+  
+	&::part(base):active {
+	  background: var(--vscode-button-secondaryHoverBackground);
+	}
+  }
+  

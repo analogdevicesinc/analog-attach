@@ -1,0 +1,46 @@
+{
+  "name": "attach-ui-lib",
+  "version": "0.0.1",
+  "description": "Shared React UI components for Analog Attach",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./dist/styles/index.css": "./dist/styles/index.css"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "dev": "vite build --watch",
+    "build": "vite build",
+    "watch": "vite build --watch",
+    "clean": "rm -rf dist out"
+  },
+  "dependencies": {
+    "classnames": "^2.5.1",
+    "react": "^19.0.0",
+    "zustand": "^5.0.2"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.0",
+    "@vitejs/plugin-react": "^4.3.4",
+    "extension-protocol": "workspace:*",
+    "hds-react": "workspace:*",
+    "sass": "^1.93.2",
+    "typescript": "^5.7.2",
+    "vite": "^6.0.3",
+    "vite-plugin-dts": "^4.3.0"
+  },
+  "peerDependencies": {
+    "extension-protocol": "workspace:*",
+    "hds-react": "workspace:*",
+    "react": "^19.0.0"
+  }
+}

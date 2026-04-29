@@ -1,0 +1,85 @@
+/**
+ *
+ * Copyright (c) 2024 Analog Devices, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ */
+
+ @use "hds-components/dist/typography.scss" as typography;
+
+.modal {
+	display: flex;
+	width: 480px;
+	min-width: 480px;
+	padding: var(--hmc-space-6);
+	flex-direction: column;
+	align-items: flex-start;
+	gap: var(--hmc-space-6);
+	
+	position: absolute;
+
+	border-radius: var(--hmc-border-radius-1);
+	border: var(--hmc-border-width-1) solid var(--vscode-commandCenter-inactiveBorder);
+	background: var(--vscode-editorWidget-background);
+
+	/* Elevation */
+	box-shadow: 0 2px 16px 0 var(--hmc-shadow);
+
+	&::backdrop {
+		background-color: var(--vscode-editor-background);
+		opacity: 0.8;
+	}
+}
+
+.innerModal {
+	width: 100%;
+}
+
+.modalHeader {
+	display: flex;
+	align-items: flex-start;
+	gap: var(--hmc-space-5);
+	align-self: stretch;
+}
+
+.modalTitle {
+	display: flex;
+	align-items: flex-start;
+	gap: var(--hmc-space-3);
+	flex: 1 0 0;
+	color: var(--vscode-editorWidget-foreground);
+
+	@include typography.text-heading-h2;
+}
+.modalBody {
+	color: var(--vscode-descriptionForeground);
+
+	/* Body/B1/Text */
+    @include typography.text-body-b1;
+}
+
+.modalFooter {
+	display: flex;
+	justify-content: flex-end;
+	align-items: center;
+	align-self: stretch;
+}
+
+.backdrop {
+	position: fixed;
+	top: 0;
+	left: 0;
+	width: 100%;
+	height: 100%;
+	background-color: var(--vscode-editor-background);
+	opacity: 0.8;
+	z-index: 100;
+}
