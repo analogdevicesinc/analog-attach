@@ -54,4 +54,4 @@
 
 ---
 
-**Note**: This is the initial release of Analog Attach. We welcome your feedback and suggestions for future improvements.
+**Note**: This is the initial release of Analog Attach. We welcome your feedback and suggestions on our [GitHub Issues](https://github.com/analogdevicesinc/analog-attach/issues).
