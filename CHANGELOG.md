@@ -1,6 +1,6 @@
-# Analog Attach v0.1.0 - First Release
+# Change Log
 
-## Overview
+## [0.1.0] - 2026-03-09
 
 **Analog Attach** is a Visual Studio Code extension designed to simplify the process of integrating hardware devices into embedded development projects. This first release focuses on Device Tree Source (DTS) and Device Tree Overlay (DTSO) file support, providing two complementary editing tools that streamline device integration workflows for embedded systems development.
 
