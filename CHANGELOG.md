@@ -46,17 +46,6 @@
 - **Detailed Property Management**: Full property configuration in the central panel
 - **Expert-Level Control**: Direct manipulation of device tree structure
 
-## 🎯 What's New in v0.0.1
-
-✅ **Initial Release Features:**
-- Complete Plug and Play editing workflow
-- Advanced Device Tree Editor with tree navigation
-- Device catalog integration with device tree bindings
-- Real-time validation and error reporting
-- Dynamic configuration panels with binding-aware validation
-- Local compilation and remote deployment workflow
-- Support for both new overlay creation and existing file editing
-
 ## 🛠️ Extension Commands
 
 - **Add Device Tree**: Attach a device tree file to current overlay
