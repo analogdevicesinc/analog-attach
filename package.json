@@ -2,7 +2,7 @@
   "name": "analog-attach",
   "displayName": "Analog Attach",
   "description": "Device Tree Source (DTS/DTSO) editor with schema validation and binding support",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "publisher": "AnalogDevices",
   "repository": {
     "type": "git",
