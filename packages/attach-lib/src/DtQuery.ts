@@ -1,5 +1,5 @@
 import { ParsedBinding, ResolvedProperty } from "./AttachTypes.js";
-import { DtsDocument, DtsNode, DtsProperty } from "./dts/ast.js";
+import { DtsDocument, DtsNode, DtsProperty } from "./dts_legacy/ast.js";
 import { AttachArray, AttachEnumType, FixedIndex } from "./StructuralTypes.js";
 
 export enum DTCommDeviceTypes {

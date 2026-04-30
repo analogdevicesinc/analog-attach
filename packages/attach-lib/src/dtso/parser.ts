@@ -1,7 +1,7 @@
-import { parse_dts, ensure_node_by_path } from "../dts/parser.js";
-import { merge_document, merge_node, find_node_by_label, find_node_by_path, type MergeOptions } from "../dts/merge.js";
-import type { DtsDocument, DtsNode, } from "../dts/ast.js";
-import { markNodesModified } from "../dts/utilities.js";
+import { parse_dts, ensure_node_by_path } from "../dts_legacy/parser.js";
+import { merge_document, merge_node, find_node_by_label, find_node_by_path, type MergeOptions } from "../dts_legacy/merge.js";
+import type { DtsDocument, DtsNode, } from "../dts_legacy/ast.js";
+import { markNodesModified } from "../dts_legacy/utilities.js";
 
 /** Parse a DTSO string and return an overlay document structure */
 export function parseDtso(text: string): DtsDocument {

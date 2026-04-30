@@ -1,253 +1,225 @@
-import { UUID } from "node:crypto";
+// TODO: ok for now, unify with WIP Devicetree branch
+export type Labeled = {
+  labels: string[];
+}
 
 /** Width specifier used by `/bits/` arrays. */
-export type Bits = 8 | 16 | 32 | 64;
+export enum Bits {
+  b8 = 8,
+  b16 = 16,
+  b32 = 32,
+  b64 = 64
+}
 
 export type Memreserve = {
   address: bigint,
   length: bigint,
 };
 
-export type UnresolvedOverlay = {
-  overlay_target_ref: DtsReference,
-  overlay_node: DtsNode,
-};
-
-export type DtsDocument = {
+export type DTS<T extends DTNode = DTNode<DTProperty>> = {
   memreserves: Array<Memreserve>;
-  root: DtsNode;
-  /** Unresolved overlay fragments (for DTSO files with label references) */
-  unresolved_overlays: Array<UnresolvedOverlay>;
-  metadata: DtsMetadata | undefined;
+  root: T;
+}
+
+export type DTO<T extends DTNode = DTNode<DTProperty>> = {
+  root: T;
 }
 
 /** Node within the DTS tree (`name[@unit]`). */
-export type DtsNode = {
-  labels: string[];
+export interface DTNode<T extends DTProperty = DTProperty> extends Labeled {
   name: string;
-  /** @field _uuid Internal. */
-  _uuid: UUID;
   /** Raw text after `@` (unit address), preserved as-is. */
-  unit_addr?: string;
-  properties: DtsProperty[];
-  children: DtsNode[];
-  deleted: boolean,
-  modified_by_user?: boolean;
-  created_by_user?: boolean;
+  unit_addr: string | undefined;
+  properties: T[];
+  children: this[];
 }
 
 /** Property inside a node. */
-export type DtsProperty = {
-  labels: string[];
+export type DTProperty = Labeled & {
   name: string;
-  /** Missing `value` indicates a boolean/empty property (e.g., `status;`). */
-  value?: DtsValue;
-  deleted: boolean,
-  modified_by_user?: boolean;
+  value: DTValue[] | DTFlag;
 }
 
-/** Value assigned to a property (possibly comma-separated). */
-export type DtsValue = {
-  components: DtsValueComponent[];
+export type DTFlag = {
+  kind: "flag"
+};
+
+export function is_dt_flag(object: any): object is DTFlag {
+
+  if (!("kind" in object)) {
+    return false;
+  }
+
+  if (Object.entries(object).length > 1) {
+    return false;
+  }
+
+  const narrowed = object as DTFlag;
+
+  if (narrowed.kind !== 'flag') {
+    return false;
+  }
+
+  return true;
 }
 
-export type DtsValueComponent =
-  | DtsString
-  | DtsByteArray
-  | DtsCellArray
-  | DtsReference;
+export type DTValue =
+  | DTString
+  | DTByteArray
+  | DTCellArray
+  | DTLabel
+  | DTPath
 
-export type Labeled = {
-  labels: string[];
-}
-
-export type DtsString = Labeled & {
+export type DTString = Labeled & {
   kind: "string";
-  /** Raw value without the surrounding quotes. */
   value: string;
 }
 
-/** Byte string value, e.g. `[ab cd 00]`. */
-export type DtsByteArray = Labeled & {
+export type DTByteArray = Labeled & {
   kind: "bytes";
   // Each byte is 0..255; labels may annotate specific bytes. 
-  bytes: Array<{ value: number; labels: string[] }>;
+  // TODO: think of better solution
+  bytes: Array<Labeled & { byte: number }>;
 }
 
-/** Numeric/reference array value, optionally preceded by `/bits/ N`. */
-export type DtsCellArray = Labeled & {
+export type DTCellArray = Labeled & {
   kind: "array";
-  bit_width?: Bits;
+  bit_width: Bits;
   elements: Array<CellArrayElement>;
 }
 
-export type CellArrayElement = {
-  item: CellArrayNumber | CellArrayU64 | DtsReference | ConstExpression | Macro
-};
+export type CellArrayElement =
+  | DTNumber
+  | DTLabel
+  | DTPath
+  | DTExpression
 
-/** Numeric (<= 32-bit) array element. */
-export type CellArrayNumber = Labeled & {
+export type DTNumber = Labeled & {
   kind: "number";
-  /** Numeric value stored as bigint; must fit in `bitWidth`. */
   value: bigint;
-  /** Original representation hint for printing. */
-  repr?: "dec" | "hex";
+  repr: "dec" | "hex";
 }
 
-// TODO: not sure this is how it's supposed to be; my suspicion is that they are still 2 32bit for a 64 one but it'll be interpreted as a 64bit 
-/** 64-bit array element when `/bits/ 64` is active. */
-export type CellArrayU64 = Labeled & {
-  kind: "u64";
-  value: bigint;
-  repr?: "dec" | "hex";
-}
-
-export type ConstExpression = Labeled & {
+export type DTExpression = Labeled & {
   kind: "expression",
   value: string
 }
 
-export type Macro = Labeled & {
-  kind: "macro",
-  value: string,
+export type DTLabel = Labeled & {
+  kind: "label";
+  name: string
 }
 
-/** Reference to a label (e.g., `&gpio`) or an absolute path `&{/path}`. */
-export type DtsReference = Labeled & {
-  kind: "ref";
-  ref:
-  { kind: "label"; name: string } |
-  { kind: "path"; path: string };
-}
+export type DTPath = Labeled & {
+  kind: "path";
+  path: string
+};
 
-export function create_flag(name: string, labels?: string[]): DtsProperty {
+
+export function create_flag(name: string, labels?: string[]): DTProperty {
   return {
     labels: labels ?? [],
     name: name,
-    deleted: false,
-    modified_by_user: true
+    value: {
+      kind: "flag"
+    }
   };
 }
 
-export function create_string_array(name: string, value: string | string[], labels?: string[]): DtsProperty {
+export function create_string_array(name: string, value: string | string[], labels?: string[]): DTProperty {
 
   const normalized_value = Array.isArray(value) ? value : [value];
 
   return {
     labels: labels ?? [],
     name: name,
-    deleted: false,
-    modified_by_user: true,
-    value: {
-      components: normalized_value.map((entry) => {
+    value:
+      normalized_value.map((entry) => {
         return {
           kind: "string",
           value: entry,
           labels: []
         };
       })
-    }
+
   };
 }
 
+// TODO: obsolete when DTBuilder is integrated
+
 export type CellArrayString = {
   value: string,
-  type: "PHANDLE" | "PATH_REFERENCE" | "MACRO" | "EXPRESSION"
+  type: "PHANDLE" | "PATH_REFERENCE" | "EXPRESSION"
 }
 
 export function create_cell_array(
   name: string,
   value: bigint | CellArrayString | (bigint | CellArrayString)[],
-  labels?: string[]): DtsProperty {
+  labels?: string[]): DTProperty {
 
   if (!Array.isArray(value)) {
     return {
       labels: labels ?? [],
       name: name,
-      deleted: false,
-      modified_by_user: true,
-      value: {
-        components: [
+      value:
+        [
           {
             kind: "array",
             labels: [],
+            bit_width: Bits.b32,
             elements: [create_cell_value(value)]
           }
         ]
-      }
+
     };
   }
 
   return {
     labels: labels ?? [],
     name: name,
-    deleted: false,
-    modified_by_user: true,
-    value: {
-      components: [
+    value:
+      [
         {
           kind: "array",
           labels: [],
+          bit_width: Bits.b32,
           elements: value.map((entry) => create_cell_value(entry))
         }
       ]
-    }
   };
 }
 
 function create_cell_value(value: bigint | CellArrayString): CellArrayElement {
   if (typeof value === 'bigint') {
     return {
-      item: {
-        kind: "number",
-        value: value,
-        labels: []
-      },
+      kind: "number",
+      value: value,
+      repr: "dec",
+      labels: []
     };
   }
 
   const string_type = value.type;
   switch (string_type) {
-    case "MACRO": {
-      return {
-        item: {
-          kind: "macro",
-          value: value.value,
-          labels: []
-        },
-      };
-    }
     case "PHANDLE": {
       return {
-        item: {
-          kind: "ref",
-          ref: {
-            kind: "label",
-            name: value.value,
-          },
-          labels: []
-        },
+        kind: "label",
+        name: value.value,
+        labels: []
       };
     }
     case "PATH_REFERENCE": {
       return {
-        item: {
-          kind: "ref",
-          ref: {
-            kind: "path",
-            path: value.value,
-          },
-          labels: []
-        },
+        kind: "path",
+        path: value.value,
+        labels: []
       };
     }
     case "EXPRESSION": {
       return {
-        item: {
-          kind: "expression",
-          value: value.value,
-          labels: []
-        },
+        kind: "expression",
+        value: value.value,
+        labels: []
       };
     }
     default: {
@@ -255,59 +227,4 @@ function create_cell_value(value: bigint | CellArrayString): CellArrayElement {
       throw new Error("Exhaustive check failed!");
     }
   }
-}
-
-export type Version = string;
-
-export function isVersion(object: any): object is Version {
-  if (typeof object !== "string") {
-    return false;
-  }
-
-  const version_regex = /^\d+\.\d+\.\d+$/;
-  if (!version_regex.test(object)) {
-    return false;
-  }
-
-  return true;
-}
-
-export type AbsolutePathToDTSNode = string;
-
-export function isAbsolutePathToDTSNode(object: any): object is AbsolutePathToDTSNode {
-  return typeof object === "string";
-}
-
-export function isArrayOfAbsolutePathToDTSNode(object: any): object is AbsolutePathToDTSNode[] {
-  return Array.isArray(object)
-    && object.every(element => isAbsolutePathToDTSNode(element));
-}
-
-export type DtsMetadata = {
-  version: Version;
-  modified: AbsolutePathToDTSNode[];
-};
-
-export function isDtsMetadata(object: any): object is DtsMetadata {
-  if (typeof object !== 'object' || object === null) {
-    return false;
-  }
-
-  if (Object.keys(object).length !== 2) {
-    return false;
-  }
-
-  if (!("version" in object) || !("modified" in object)) {
-    return false;
-  }
-
-  if (!isVersion(object.version)) {
-    return false;
-  }
-
-  if (!isArrayOfAbsolutePathToDTSNode(object.modified)) {
-    return false;
-  }
-
-  return true;
 }

@@ -1,15 +1,16 @@
-import {
-  type DTCellArray,
-  type DTByteArray,
-  type DTNode,
-  type DTProperty,
-  type DTValue,
-  type DTS,
-  is_dt_flag,
-  DTLabel,
-  DTPath,
-  Bits,
-  DTO,
+import { INTERRUPT_MACROS, GPIO_MACROS } from "../DtQuery.js";
+
+const ALL_MACROS = [...INTERRUPT_MACROS, ...GPIO_MACROS];
+
+import type {
+  DtsCellArray,
+  DtsByteArray,
+  DtsDocument,
+  DtsNode,
+  DtsProperty,
+  DtsReference,
+  DtsValue,
+  DtsValueComponent,
 } from "./ast.js";
 
 import { stringify as stringify_as_yaml } from "yaml";
@@ -21,7 +22,7 @@ import { DtsMetadataHeader } from "./constants.js";
  * By default, printing preserves first-seen order of properties and children,
  * adds `/dts-v1/;` and `/memreserve/` as encountered
  */
-export function print_dts(document: DTS): string {
+export function print_dts(document: DtsDocument): string {
   const indent = "\t";
   const out: string[] = [];
 
@@ -33,41 +34,22 @@ export function print_dts(document: DTS): string {
 
   out.push(print_node(document.root, indent, 0, '/'));
 
-  //   if (document.metadata !== undefined) {
-  //     out.push(`
-  // /*
-  // ---
-  // ${DtsMetadataHeader}${stringify_as_yaml(document.metadata)}
-  // ...
-  // */
-  // `);
-  //}
-
-  return out.join("");
-}
-
-export function print_dto(document: DTO): string {
-  const indent = "\t";
-  const out: string[] = [];
-
-  out.push("/dts-v1/;\n", "/plugin/;\n", print_node(document.root, indent, 0, '/'));
-
-  //   if (document.metadata !== undefined) {
-  //     out.push(`
-  // /*
-  // ---
-  // ${DtsMetadataHeader}${stringify_as_yaml(document.metadata)}
-  // ...
-  // */
-  // `);
-  //}
+  if (document.metadata !== undefined) {
+    out.push(`
+/*
+---
+${DtsMetadataHeader}${stringify_as_yaml(document.metadata)}
+...
+*/
+`);
+  }
 
   return out.join("");
 }
 
 /** Print a single node and its subtree. */
 function print_node(
-  node: DTNode,
+  node: DtsNode,
   indent: string,
   depth: number,
   absPath: string
@@ -81,16 +63,20 @@ function print_node(
 
   let out = `${pad}${labels}${name} {\n`;
 
-  const properties: DTProperty[] = structuredClone(node.properties);
+  const properties: DtsProperty[] = structuredClone(node.properties);
 
   for (const property of properties) {
-    out += print_property(property, indent, depth + 1);
+    if (property.deleted !== true) {
+      out += print_property(property, indent, depth + 1);
+    }
   }
 
   const baseChildren = structuredClone(node.children);
 
   for (const child of baseChildren) {
-    out += print_node(child, indent, depth + 1, currentPath);
+    if (child.deleted !== true) {
+      out += print_node(child, indent, depth + 1, currentPath);
+    }
   }
 
   out += `${pad}};\n`;
@@ -99,7 +85,7 @@ function print_node(
 }
 
 /** Print a single property, including its value if present. */
-export function print_property(property: DTProperty, indent: string, depth: number): string {
+export function print_property(property: DtsProperty, indent: string, depth: number): string {
   const pad = indent.repeat(depth);
 
   let labels: string = "";
@@ -107,7 +93,7 @@ export function print_property(property: DTProperty, indent: string, depth: numb
     labels = labels + `${label}: `;
   }
 
-  if (is_dt_flag(property.value)) {
+  if (property.value === undefined) {
     return `${pad}${labels}${property.name};\n`;
   }
 
@@ -117,10 +103,10 @@ export function print_property(property: DTProperty, indent: string, depth: numb
 }
 
 /** Print a property value comprised of comma-separated components. */
-export function print_value(v: DTValue[]): string {
+export function print_value(v: DtsValue): string {
   const parts: string[] = [];
 
-  for (const c of v) {
+  for (const c of v.components) {
     parts.push(print_component(c));
   }
 
@@ -128,7 +114,7 @@ export function print_value(v: DTValue[]): string {
 }
 
 /** Print a single value component with optional before/after labels. */
-function print_component(component: DTValue): string {
+function print_component(component: DtsValueComponent): string {
 
   let labels: string = "";
   for (const label of component.labels) {
@@ -148,7 +134,7 @@ function print_component(component: DTValue): string {
       {
         return `${labels}${print_array(component)}`;
       }
-    case "label": case "path":
+    case "ref":
       {
         return `${labels}${print_references(component)}`;
       }
@@ -161,7 +147,7 @@ function print_component(component: DTValue): string {
 }
 
 /** Print a byte string as `[aa bb ...]` with preserved byte labels. */
-function print_bytes(b: DTByteArray): string {
+function print_bytes(b: DtsByteArray): string {
   const parts: string[] = [];
 
   for (const byte of b.bytes) {
@@ -171,62 +157,78 @@ function print_bytes(b: DTByteArray): string {
       labels = labels + `${label}: `;
     }
 
-    parts.push(`${labels}${to_hex_2(byte.byte)}`);
+    parts.push(`${labels}${to_hex_2(byte.value)}`);
   }
 
   return `[${parts.join(" ")}]`;
 }
 
 /** Print an array, honoring `/bits/` and item representation hints. */
-function print_array(a: DTCellArray): string {
+function print_array(a: DtsCellArray): string {
   const parts: string[] = [];
 
   for (const element of a.elements) {
     let labels: string = "";
 
-    for (const label of element.labels) {
+    for (const label of element.item.labels) {
       labels = labels + `${label}: `;
     }
 
-    switch (element.kind) {
-      case "label": case "path":
+    switch (element.item.kind) {
+      case "ref":
         {
-          parts.push(`${labels}${print_references(element)}`);
+          parts.push(`${labels}${print_references(element.item)}`);
+          break;
+        }
+      case "u64":
+        {
+          parts.push(`${labels}${print_array_number(element.item.value, element.item.repr)}`);
           break;
         }
       case "number":
         {
-          parts.push(`${labels}${print_array_number(element.value, element.repr)}`);
+          parts.push(`${labels}${print_array_number(element.item.value, element.item.repr)}`);
           break;
         }
       case "expression":
         {
-          parts.push(`${labels}${element.value}`);
+          parts.push(`${labels}${element.item.value}`);
+          break;
+        }
+      case "macro":
+        {
+          const item = element.item.value;
+          const is_macro = ALL_MACROS.find((macro) => macro.name === item);
+
+          if (is_macro === undefined) {
+            throw new Error("Used unknown macro");
+          } else {
+            parts.push(`${labels}${is_macro.value}`);
+          }
+
           break;
         }
       default:
         {
-          const _x: never = element;
+          const _x: never = element.item;
           throw new Error("Failed exhaustive switch check!");
         }
     }
   }
 
-  const bw = a.bit_width === Bits.b32 ? "" : `/bits/ ${a.bit_width} `;
+  const bw = a.bit_width ? `/bits/ ${a.bit_width} ` : "";
 
   return `${bw}<${parts.join(" ")}>`;
 }
 
 /** Print a reference as `&label` or `&{/path}`. */
-function print_references(r: DTLabel | DTPath): string {
-  if (r.kind === "label") {
-    const name = r.name;
-    // TODO: remove check
+function print_references(r: DtsReference): string {
+  if (r.ref.kind === "label") {
+    const name = r.ref.name;
     return name.startsWith("&") ? name : `&${name}`;
   }
 
-  const path = r.path;
-  // TODO: remove check
+  const path = r.ref.path;
   return path.startsWith("&") ? path : `&{${path}}`;
 }
 

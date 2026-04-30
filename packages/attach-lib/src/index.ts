@@ -8,7 +8,7 @@ export * from './StructuralTypes.js';
 export * from './RegexExpansion.js';
 
 // DTS parsing and manipulation
-export * from './dts/index.js';
+export * from './dts_legacy/index.js';
 export * from './dtso/index.js';
 
 // binding resolving
