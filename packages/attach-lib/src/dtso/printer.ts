@@ -3,12 +3,12 @@ import type {
   DtsNode,
   DtsProperty,
   UnresolvedOverlay,
-} from "../dts/ast.js";
+} from "../dts_legacy/ast.js";
 // FIXME: Should ast be in the dts folder or should it be in AttachLib at the base level
 
 import {
   print_property,
-} from "../dts/printer.js";
+} from "../dts_legacy/printer.js";
 
 /**
  * Builds a map of paths to labels for the entire document tree.

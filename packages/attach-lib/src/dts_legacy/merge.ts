@@ -1,5 +1,4 @@
-import type { DTO, DTS } from './ast.js';
-import { DeletableNode, DeletableProperty } from './parser.js';
+import type { DtsDocument, DtsNode, DtsProperty } from './ast.js';
 import { get_node_key, split_node_key } from './utilities.js';
 
 export interface MergeOptions {
@@ -10,7 +9,7 @@ export interface MergeOptions {
 /**
 *  Merge all properties from `from` into `into`, preserving earliest order. 
 */
-function merge_properties(into: DeletableNode, from: DeletableNode) {
+function merge_properties(into: DtsNode, from: DtsNode) {
   const property_index_map = new Map<string, number>();
 
   let index = 0;
@@ -31,7 +30,7 @@ function merge_properties(into: DeletableNode, from: DeletableNode) {
       property_index_map.set(p.name, into.properties.length - 1);
     } else {
       // incoming wins in content, but preserve base document order
-      const incoming: DeletableProperty = structuredClone(p);
+      const incoming: DtsProperty = structuredClone(p);
 
       incoming.labels = [...incoming.labels, ...into.properties[pos].labels];
 
@@ -43,20 +42,20 @@ function merge_properties(into: DeletableNode, from: DeletableNode) {
   }
 
   // If any properties were added/modified, mark the node as modified
-  // if (has_modifications && from.modified_by_user) {
-  //   into.modified_by_user = true;
-  // }
+  if (has_modifications && from.modified_by_user) {
+    into.modified_by_user = true;
+  }
 }
 
 export function merge_node(
-  into: DeletableNode,
-  from: DeletableNode,
+  into: DtsNode,
+  from: DtsNode,
   options?: MergeOptions,
 ) {
   // If the source node is marked as modified, mark the target as well
-  // if (from.modified_by_user) {
-  //   into.modified_by_user = true;
-  // }
+  if (from.modified_by_user) {
+    into.modified_by_user = true;
+  }
 
   into.deleted = false;
 
@@ -92,7 +91,7 @@ export function merge_node(
       const new_child = structuredClone(child);
 
       if (options?.mark_created_nodes) {
-        //new_child.created_by_user = true;
+        new_child.created_by_user = true;
       }
 
       // eslint-disable-next-line unicorn/no-array-reverse
@@ -111,25 +110,16 @@ export function merge_node(
 * Merge two documents while reporting label renames during node merges. 
 */
 export function merge_document(
-  into: DTO<DeletableNode>,
-  from: DTO<DeletableNode>,
+  into: DtsDocument,
+  from: DtsDocument,
   options?: MergeOptions,
-): void
-export function merge_document(
-  into: DTS<DeletableNode> | DTO<DeletableNode>,
-  from: DTS<DeletableNode> | DTO<DeletableNode>,
-  options?: MergeOptions,
-): void {
+) {
   // TODO: if only one memreserve can exist maybe this doesn't apply
-  // TODO: make proper type check
-  if ("memreserves" in into && "memreserves" in from) {
-    into.memreserves.push(...from.memreserves);
-  }
-
+  into.memreserves.push(...from.memreserves);
   merge_node(into.root, from.root, options);
 }
 
-export function find_node_by_label(root: DeletableNode, label: string): DeletableNode | undefined {
+export function find_node_by_label(root: DtsNode, label: string): DtsNode | undefined {
   if (root.labels.includes(label)) {
     return root;
   }
@@ -148,14 +138,14 @@ export function find_node_by_label(root: DeletableNode, label: string): Deletabl
 /** 
 * Resolve a node by absolute path like `/soc/interrupt-controller@40000`. 
 */
-export function find_node_by_path(root: DeletableNode, path: string): DeletableNode | undefined {
+export function find_node_by_path(root: DtsNode, path: string): DtsNode | undefined {
   // path is like /soc/interrupt-controller@40000
   if (path === "" || path[0] !== '/') {
     return undefined;
   }
 
   const parts = path.split('/').slice(1); // remove leading ''
-  let current: DeletableNode | undefined = root;
+  let current: DtsNode | undefined = root;
   if (parts.length === 1 && parts[0] === "") {
     return current;
   }
@@ -181,15 +171,15 @@ export function find_node_by_path(root: DeletableNode, path: string): DeletableN
   return current;
 }
 
-export function delete_node_by_label(root: DeletableNode, label: string): boolean {
+export function delete_node_by_label(root: DtsNode, label: string): boolean {
   return delete_where(root, (n) => n.labels.includes(label));
 }
 
-export function delete_node_by_key(root: DeletableNode, key: string): boolean {
+export function delete_node_by_key(root: DtsNode, key: string): boolean {
   return delete_where(root, (n) => get_node_key(n) === key);
 }
 
-function delete_where(parent: DeletableNode, pred: (n: DeletableNode) => boolean): boolean {
+function delete_where(parent: DtsNode, pred: (n: DtsNode) => boolean): boolean {
   for (const child of parent.children) {
 
     if (pred(child) === true) {
@@ -205,7 +195,7 @@ function delete_where(parent: DeletableNode, pred: (n: DeletableNode) => boolean
   return false;
 }
 
-function delete_node(node: DeletableNode) {
+function delete_node(node: DtsNode) {
 
   node.deleted = true;
   node.properties = [];

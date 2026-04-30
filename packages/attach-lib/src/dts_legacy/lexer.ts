@@ -8,7 +8,7 @@
  * preprocessed inputs.
  */
 
-// TODO: extend with rest conforming to spec
+/** Token kinds produced by the lexer. */
 export enum TokKind {
   Ident = "Ident",
   Number = "Number",
@@ -42,7 +42,7 @@ export enum TokKind {
   CommentBlock = "CommentBlock"
 }
 
-// TODO: make iterable self handling
+/** Single token with position for error reporting. */
 export interface Token {
   kind: TokKind;
   /** Optional raw text (for numbers, idents, strings). */
@@ -51,17 +51,16 @@ export interface Token {
   col: number;
 }
 
+/** Simple single-pass tokenizer over a DTS source string. */
 export class Lexer {
   private i = 0;
   private line = 1;
   private col = 1;
   private tokens: Token[] = [];
-  private readonly source: string;
 
-  constructor(source: string) {
-    this.source = source;
-  }
+  constructor(private readonly source: string) { }
 
+  /** Tokenize the entire source into a flat array of tokens. */
   public lex(): Token[] {
     while (!this.eof()) {
       this.skipWhitespaces();

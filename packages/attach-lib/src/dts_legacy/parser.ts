@@ -9,18 +9,21 @@ import {
 } from "./merge.js";
 import {
   type CellArrayElement,
-  type DTNumber,
-  Bits,
-  type DTCellArray,
-  type DTByteArray,
-  type DTNode,
-  type DTProperty,
-  type DTValue,
+  type CellArrayNumber,
+  type CellArrayU64,
+  type Bits,
+  type DtsCellArray,
+  type DtsByteArray,
+  type DtsDocument,
+  type DtsNode,
+  type DtsProperty,
+  type DtsReference,
+  type DtsValue,
+  type DtsValueComponent,
   type Memreserve,
-  DTS,
-  DTO,
-  DTLabel,
-  DTPath,
+  type UnresolvedOverlay,
+  type DtsMetadata,
+  isDtsMetadata,
 } from "./ast.js";
 
 import { get_node_key } from './utilities.js';
@@ -28,72 +31,93 @@ import { get_node_key } from './utilities.js';
 import { parse as parse_yaml_string } from "yaml";
 import { DtsMetadataHeader } from "./constants.js";
 
+/** 
+* Parser error enriched with line/column from the triggering token. 
+*/
 class ParseError extends Error {
   constructor(message: string, readonly tok?: Token) {
     super(tok ? `${message} at ${tok.line}:${tok.col}` : message);
   }
 }
 
-// TODO: error handling
-export function parse_dts(text: string): DTS | string {
+/**
+ * Parse a DTS source string into a DtsDocument.
+ *
+ * Notes:
+ * - The parser accepts a broad subset of DTS used in Linux/Zephyr.
+ * - Includes/macros should be expanded externally 
+ */
+export function parse_dts(text: string, is_dtso: boolean = false): DtsDocument {
   const lx = new Lexer(text);
   const tokens = lx.lex();
   const p = new Parser(tokens);
 
-  return p.parse_dts();
+  return p.parse_document(is_dtso);
 }
 
-// TODO: error handling
-export function parse_dto(text: string): DTO | string {
+/** 
+* Parse a DTS string and return both the document and a label-to-path map 
+*/
+export function parse_dts_and_label_map(
+  text: string,
+  is_dtso: boolean,
+): {
+  document: DtsDocument,
+  label_map: Map<string, string>
+} {
   const lx = new Lexer(text);
   const tokens = lx.lex();
   const p = new Parser(tokens);
+  const document = p.parse_document(is_dtso);
+  const label_map = p.get_label_map();
 
-  return p.parse_dto();
-}
-
-type Deletable<T> = T & {
-  deleted: boolean;
-}
-
-export type DeletableProperty = Deletable<DTProperty>;
-export type DeletableNode = Deletable<DTNode<DeletableProperty>>;
-
-function strip_deletable_dts(dts: DTS<DeletableNode>): DTS {
   return {
-    memreserves: dts.memreserves,
-    root: strip_node(dts.root),
+    document: document,
+    label_map: label_map
   };
 }
 
-function strip_deletable_dto(dto: DTO<DeletableNode>): DTO {
-  return {
-    root: strip_node(dto.root)
-  };
-}
-
-function strip_node(node: DeletableNode): DTNode {
-  const { deleted, ...rest } = node;
-  return {
-    ...rest,
-    properties: node.properties
-      .filter(p => !p.deleted)
-      .map(({ deleted, ...p }) => p),
-    children: node.children
-      .filter(c => !c.deleted)
-      .map((element) => strip_node(element)),
-  };
-}
-
+/**
+ * Concrete syntax parser from token stream to AST with overlay semantics and
+ * directive application.
+ */
 class Parser {
   // Current token index
   private i = 0;
   // Map of labels to their absolute paths
+  private label_to_path = new Map<string, string>();
   private comments = new Array<Token>();
-  private readonly tokens: Token[];
 
-  constructor(tokens: Token[]) {
-    this.tokens = tokens;
+  constructor(private readonly tokens: Token[]) { }
+
+  /** 
+  * Get the label-to-path map collected during parsing 
+  */
+  public get_label_map(): Map<string, string> {
+    return structuredClone(this.label_to_path);
+  }
+
+  /** 
+  * Track a node's labels and path 
+  */
+  private track_nodes_labels(node: DtsNode, path: string) {
+    if (node.labels) {
+      for (const label of node.labels) {
+        this.label_to_path.set(label, path);
+      }
+    }
+  }
+
+  /** 
+  * Build label map for the entire document tree 
+  */
+  private build_label_map(root: DtsNode, path: string = '') {
+    const nodePath = root.name === '/' ? '/' : `${path}${path.endsWith('/') ? '' : '/'}${get_node_key(root)}`;
+    this.track_nodes_labels(root, nodePath);
+
+    for (const child of root.children) {
+      this.build_label_map(child, nodePath);
+    }
   }
 
   private get tok(): Token {
@@ -148,8 +172,13 @@ class Parser {
     return this.advance();
   }
 
-  parse_dts(): DTS {
+  /** 
+  * Parse the entire token stream into a DtsDocument.
+  */
+  parse_document(is_dtso: boolean): DtsDocument {
     const memreserves: Array<Memreserve> = [];
+    // TODO: this is for overlays => think about splitting dts and dtso
+    const unresolved_overlays: Array<UnresolvedOverlay> = [];
 
     if (this.tok.kind === TokKind.CommentLine
       || this.tok.kind === TokKind.CommentBlock
@@ -180,7 +209,9 @@ class Parser {
       }
 
       if (word === '/plugin/') {
-        throw new ParseError(`This is a devicetree overlay`);
+        // TODO: we are in an overlay
+        this.expect(TokKind.Semicolon, "Expected ';' after /plugin/ tag");
+        continue;
       }
 
       if (word !== "/memreserve/") {
@@ -200,34 +231,37 @@ class Parser {
       this.expect(TokKind.Semicolon, "Missing ';' after /memreserve/");
     }
 
-    // At least one root 
-    const base_document: DTS<DeletableNode> | undefined = ((): DTS<DeletableNode> | undefined => {
-      if (this.tok.kind === TokKind.Slash && this.lookahead(1)?.kind === TokKind.LBrace) {
-        const root = this.parse_node();
+    // TODO: could be technically determined already if we have /plugin/ or not
+    // At least one root or overlay fragment
+    let base_document: DtsDocument;
+    if (this.tok.kind === TokKind.Slash && this.lookahead(1)?.kind === TokKind.LBrace) {
+      // Traditional root node starting with '/'
+      const root = this.parse_node();
+      base_document = { memreserves: memreserves, root: root, unresolved_overlays: [], metadata: undefined };
+    } else {
+      // Document starts with overlay fragments - create empty root
+      let root: DtsNode = {
+        _uuid: crypto.randomUUID(),
+        labels: [],
+        name: "/",
+        properties: [],
+        children: [],
+        deleted: false
+      };
 
-        return {
-          memreserves: memreserves,
-          root: root,
-        };
-      }
-
-      return;
-    })();
-
-    if (base_document === undefined) {
-      throw new ParseError(`Expected to find root node`, this.tok);
+      base_document = { memreserves: memreserves, root: root, unresolved_overlays: [], metadata: undefined };
     }
 
-    // Additional roots and/or directives => prepro file as input
+    // Additional roots and/or directives
     while (this.tok.kind !== TokKind.EOF) {
-
+      // Additional root blocks
       if (this.tok.kind === TokKind.Slash && this.lookahead(1)?.kind === TokKind.LBrace) {
-
         const next_root = this.parse_node(base_document.root);
-
-        const incoming: DTS<DeletableNode> = {
+        const incoming: DtsDocument = {
           memreserves: [],
           root: next_root,
+          unresolved_overlays: [],
+          metadata: undefined
         };
 
         merge_document(base_document, incoming);
@@ -241,20 +275,17 @@ class Parser {
         const target_reference = this.parse_reference();
         let target = this.resolve_reference(base_document.root, target_reference);
 
-        if (target === undefined && target_reference.kind === 'path') {
-          target = ensure_node_by_path(
-            base_document.root,
-            target_reference.path,
-          );
+        if (target === undefined && target_reference.ref.kind === 'path') {
+          target = ensure_node_by_path(base_document.root, target_reference.ref.path, { mark_modified: is_dtso });
         }
 
         this.expect(TokKind.LBrace, "Expected '{' to start overlay body");
 
         // TODO: consider not using __overlay__ as it could conflict with Overlay specs
-        const overlay_node: DeletableNode = {
+        const overlay_node: DtsNode = {
+          _uuid: crypto.randomUUID(),
           labels: labels,
           name: "__overlay__",
-          unit_addr: undefined,
           properties: [],
           children: [],
           deleted: false
@@ -263,172 +294,17 @@ class Parser {
         this.parse_node_body(overlay_node, base_document.root, target);
 
         if (target === undefined) {
-          throw new ParseError(`Failed to merge nodes`, this.tok);
-        } else {
-          merge_node(target, overlay_node);
-        }
-        continue;
-      }
 
-      // Top-level directives 
-      if (this.tok.kind === TokKind.Slash && this.lookahead(1)?.kind === TokKind.Ident) {
-        this.parse_and_apply_directive(base_document.root);
-        continue;
-      }
-
-      throw new ParseError("Unexpected token", this.tok);
-    }
-
-    return strip_deletable_dts(base_document);
-  }
-
-  parse_dto(): DTO {
-    if (this.tok.kind === TokKind.CommentLine
-      || this.tok.kind === TokKind.CommentBlock
-    ) {
-      this.advance();
-    }
-
-    const version_tag = this.consume_slash_word();
-
-    if (version_tag === "/dts-v1/") {
-      this.expect(TokKind.Semicolon, `Missing ';' after ${version_tag}`);
-    } else {
-      throw new ParseError('Missing version specifier (e.g. "/dts-v1/;")');
-    }
-
-    const plugin_tag = this.consume_slash_word();
-
-    if (plugin_tag === "/plugin/") {
-      this.expect(TokKind.Semicolon, `Missing ';' after ${plugin_tag}`);
-    } else {
-      throw new ParseError('Missing /plugin/ tag!');
-    }
-
-    // At least one root 
-    const base_document: DTO<DeletableNode> = ((): DTO<DeletableNode> => {
-      if (this.tok.kind === TokKind.Slash && this.lookahead(1)?.kind === TokKind.LBrace) {
-        const root = this.parse_node();
-
-        return {
-          root: root,
-        };
-      }
-
-      return {
-        root: {
-          name: "/",
-          unit_addr: undefined,
-          labels: [],
-          children: [],
-          properties: [],
-          deleted: false
-        }
-      };
-    })();
-
-    // Additional roots and/or directives => prepro file as input
-    while (this.tok.kind !== TokKind.EOF) {
-
-      if (this.tok.kind === TokKind.Slash && this.lookahead(1)?.kind === TokKind.LBrace) {
-
-        const next_root = this.parse_node(base_document.root);
-
-        const incoming: DTO<DeletableNode> = {
-          root: next_root,
-        };
-
-        merge_document(base_document, incoming);
-        continue;
-      }
-
-      // Top-level overlay: optional label then &ref { ... }
-      const labels: string[] = this.consume_present_labels();
-
-      if (this.tok.kind === TokKind.Ampersand) {
-        const target_reference = this.parse_reference();
-
-        this.expect(TokKind.LBrace, "Expected '{' to start overlay body");
-
-        // TODO: unsure about labels
-        const overlay_node: DeletableNode = {
-          labels: labels,
-          name: "__overlay__",
-          unit_addr: undefined,
-          properties: [],
-          children: [],
-          deleted: false
-        };
-
-        this.parse_node_body(overlay_node, base_document.root);
-
-        const next_fragment_id: string = ((): string => {
-
-          let current_max = 0;
-
-          for (const entry of base_document.root.children) {
-            if (entry.name === "fragment" && entry.unit_addr !== undefined) {
-              current_max = Number.parseInt(entry.unit_addr, 10);
+          unresolved_overlays.push(
+            {
+              overlay_target_ref: target_reference,
+              overlay_node: overlay_node,
             }
-          }
+          );
+        } else {
 
-          return (++current_max).toString();
-        })();
-
-        switch (target_reference.kind) {
-          case "label": {
-            base_document.root.children.push({
-              name: "fragment",
-              unit_addr: next_fragment_id,
-              labels: [],
-              properties: [
-                {
-                  labels: [],
-                  name: "target",
-                  value: [
-                    {
-                      kind: 'array',
-                      labels: [],
-                      bit_width: Bits.b32,
-                      elements: [
-                        target_reference
-                      ]
-                    }
-                  ],
-                  deleted: false
-                }
-              ],
-              children: [overlay_node],
-              deleted: false
-            });
-            break;
-          }
-          case "path": {
-            base_document.root.children.push({
-              name: "fragment",
-              unit_addr: next_fragment_id,
-              labels: [],
-              properties: [
-                {
-                  labels: [],
-                  name: "target-path",
-                  value: [
-                    {
-                      kind: 'string',
-                      labels: [],
-                      value: target_reference.path
-                    }
-                  ],
-                  deleted: false
-                }
-              ],
-              children: [overlay_node],
-              deleted: false
-            });
-            break;
-          }
+          merge_node(target, overlay_node, { mark_created_nodes: is_dtso });
         }
-
         continue;
       }
 
@@ -441,15 +317,27 @@ class Parser {
       throw new ParseError("Unexpected token", this.tok);
     }
 
-    return strip_deletable_dto(base_document);
+    // Build label map for the entire document
+    this.build_label_map(base_document.root);
+
+    base_document.unresolved_overlays = unresolved_overlays;
+
+    prune_soft_delete(base_document);
+
+    base_document.metadata = this.parse_dts_metadata();
+
+    return base_document;
   }
 
-  private resolve_reference(root: DeletableNode, reference: DTLabel | DTPath): DeletableNode | undefined {
-    if (reference.kind === "label") {
-      return find_node_by_label(root, reference.name);
+  /** 
+  * Resolve a reference (label or absolute path) to a node in the current tree.
+  */
+  private resolve_reference(root: DtsNode, reference: DtsReference): DtsNode | undefined {
+    if (reference.ref.kind === "label") {
+      return find_node_by_label(root, reference.ref.name);
     }
 
-    return find_node_by_path(root, reference.path);
+    return find_node_by_path(root, reference.ref.path);
   }
 
 
@@ -470,18 +358,18 @@ class Parser {
    *  1. parsing the first root (special case) => it becomes the base root for the merge operation
    *  2. parsing sequential roots (special case) => keep track so we know how to operate slash directives
    *  3. parsing nodes (general case)
-   * @param {DeletableNode | undefined} base_root - where the merged devicetree is getting built
-   * @param {DeletableNode | undefined} current_root - tree that's currently parsed
+   * @param {DtsNode | undefined} base_root - where the merged devicetree is getting built
+   * @param {DtsNode | undefined} current_root - tree that's currently parsed
    */
-  private parse_node(base_root?: DeletableNode, current_root?: DeletableNode): DeletableNode {
+  private parse_node(base_root?: DtsNode, current_root?: DtsNode): DtsNode {
 
     if (this.consume(TokKind.Slash)) {
       this.expect(TokKind.LBrace, "Expected '{' after '/'");
 
-      const root: DeletableNode = {
+      const root: DtsNode = {
+        _uuid: crypto.randomUUID(),
         labels: [],
         name: "/",
-        unit_addr: undefined,
         properties: [],
         children: [],
         deleted: false
@@ -498,7 +386,8 @@ class Parser {
     this.expect(TokKind.LBrace, "Expected '{' to start node body");
 
     // Labels are assigned when parsing the body
-    const node: DeletableNode = {
+    const node: DtsNode = {
+      _uuid: crypto.randomUUID(),
       labels: [],
       name: name,
       unit_addr: unit_addr,
@@ -520,11 +409,11 @@ class Parser {
    * Entrypoint for parsing the body of a node consisting of properties, nodes or slash directives.
    * Slash directives execution tries the local scope first and on failure then tries the global scope,
    * if present.
-   * @param {DeletableNode} node - what's currently being parsed
-   * @param {DeletableNode} base_root - there's always a base root, even when working on the base root
-   * @param {DeletableNode | undefined} current_root - exists only when multiple roots are being parsed
+   * @param {DtsNode} node - what's currently being parsed
+   * @param {DtsNode} base_root - there's always a base root, even when working on the base root
+   * @param {DtsNode | undefined} current_root - exists only when multiple roots are being parsed
    */
-  private parse_node_body(node: DeletableNode, base_root: DeletableNode, current_root?: DeletableNode) {
+  private parse_node_body(node: DtsNode, base_root: DtsNode, current_root?: DtsNode) {
     while (this.tok.kind !== TokKind.RBrace && this.tok.kind !== TokKind.EOF) {
       const labels: string[] = this.consume_present_labels();
 
@@ -543,16 +432,16 @@ class Parser {
               const target_reference = this.parse_reference();
               let target = this.resolve_reference(base_root, target_reference);
 
-              if (target === undefined && target_reference.kind === 'path') {
-                target = ensure_node_by_path(base_root, target_reference.path);
+              if (target === undefined && target_reference.ref.kind === 'path') {
+                target = ensure_node_by_path(base_root, target_reference.ref.path, { mark_modified: true });
               }
 
               this.expect(TokKind.LBrace, "Expected '{' to start overlay body");
 
-              const overlay_node: DeletableNode = {
+              const overlay_node: DtsNode = {
+                _uuid: crypto.randomUUID(),
                 labels: [],
                 name: "__overlay__",
-                unit_addr: undefined,
                 properties: [],
                 children: [],
                 deleted: false
@@ -578,10 +467,9 @@ class Parser {
 
               // Flag
               if (this.consume(TokKind.Semicolon)) {
-                const property: DeletableProperty = {
+                const property: DtsProperty = {
                   labels: labels,
                   name: property_name,
-                  value: { kind: "flag" },
                   deleted: false
                 };
 
@@ -595,7 +483,7 @@ class Parser {
 
               this.expect(TokKind.Semicolon, "Missing ';' after property value");
 
-              const property: DeletableProperty = {
+              const property: DtsProperty = {
                 labels: labels,
                 name: property_name,
                 value: value,
@@ -628,11 +516,11 @@ class Parser {
    * Parse a `/delete-property/` or `/delete-node/` directive and apply it to
    * the current tree. When inside (local) overlays (not dtso), operations are relative to 
    * the current root when provided.
-   * @param {DeletableNode} base_root - working base root on which to fallback directive target
-   * @param {DeletableNode | undefined} current_node - is optional because `/delete-node/` doesn't need to be in a node
-   * @param {DeletableNode | undefined} current_root - is optional because `/delete-node` doesn't need to be in a node 
+   * @param {DtsNode} base_root - working base root on which to fallback directive target
+   * @param {DtsNode | undefined} current_node - is optional because `/delete-node/` doesn't need to be in a node
+   * @param {DtsNode | undefined} current_root - is optional because `/delete-node` doesn't need to be in a node 
    */
-  private parse_and_apply_directive(base_root: DeletableNode, current_node?: DeletableNode, current_root?: DeletableNode) {
+  private parse_and_apply_directive(base_root: DtsNode, current_node?: DtsNode, current_root?: DtsNode) {
     const directive = this.consume_slash_word();
 
     if (directive === '/include/') {
@@ -652,7 +540,7 @@ class Parser {
       current_node.properties = current_node.properties.filter((p) => p.name !== name);
 
       const scope_root = current_root ?? base_root;
-      const target: DeletableNode | undefined = (current_root !== undefined && current_node.name === '__overlay__')
+      const target: DtsNode | undefined = (current_root !== undefined && current_node.name === '__overlay__')
         ? current_root
         : find_by_key(scope_root, get_node_key(current_node));
 
@@ -675,11 +563,11 @@ class Parser {
       if (this.tok.kind === TokKind.Ampersand) {
         const reference = this.parse_reference();
 
-        if (reference.kind === 'label') {
-          delete_node_by_label(base_root, reference.name);
+        if (reference.ref.kind === 'label') {
+          delete_node_by_label(base_root, reference.ref.name);
         }
         else {
-          const target = find_node_by_path(base_root, reference.path);
+          const target = find_node_by_path(base_root, reference.ref.path);
 
           if (target !== undefined) {
             delete_node_by_key(base_root, get_node_key(target));
@@ -756,8 +644,8 @@ class Parser {
   /**
   * Parse a property value composed of one or more comma-separated components. 
   */
-  private parse_value(): DTValue[] {
-    const components: DTValue[] = [];
+  private parse_value(): DtsValue {
+    const components: DtsValueComponent[] = [];
 
     while (true) {
       const labels: string[] = this.consume_present_labels();
@@ -808,7 +696,7 @@ class Parser {
       break;
     }
 
-    return components;
+    return { components: components };
   }
 
   /**
@@ -821,10 +709,10 @@ class Parser {
    * - Hex nibbles can span multiple tokens (e.g., Number('1') + Ident('b')).
    * - If the closing bracket arrives with a dangling single nibble, it's an error.
    */
-  private parse_byte_array(labels: string[]): DTByteArray {
+  private parse_byte_array(labels: string[]): DtsByteArray {
     this.expect(TokKind.LBracket);
 
-    const bytes_array: DTByteArray = { kind: "bytes", bytes: [], labels: labels };
+    const bytes_array: DtsByteArray = { kind: "bytes", bytes: [], labels: labels };
 
     // Accumulate hex nibbles across tokens to tolerate splits like '1' 'b'
     let hex_buffer = "";
@@ -851,7 +739,7 @@ class Parser {
           const b = Number.parseInt(hex_buffer.slice(0, 2), 16);
           bytes_array.bytes.push(
             {
-              byte: b,
+              value: b,
               labels: structuredClone(labels)
             }
           );
@@ -876,7 +764,7 @@ class Parser {
           const b = Number.parseInt(hex_buffer.slice(0, 2), 16);
           bytes_array.bytes.push(
             {
-              byte: b,
+              value: b,
               labels: structuredClone(labels)
             }
           );
@@ -902,8 +790,8 @@ class Parser {
   /** 
   * Parse an array with optional `/bits/ N` prefix. 
   */
-  private parse_cell_array(labels: string[]): DTCellArray {
-    let bit_width: Bits = Bits.b32;
+  private parse_cell_array(labels: string[]): DtsCellArray {
+    let bit_width: Bits | undefined;
 
     // NOTE: admittedly don't know if we can label /bits/ or the value of /bits/; didn't find any examples
     if (this.consume(TokKind.Bits)) {
@@ -930,7 +818,11 @@ class Parser {
           {
             const reference = this.parse_reference();
             reference.labels = labels;
-            elements.push(reference);
+            elements.push(
+              {
+                item: reference
+              }
+            );
 
             break;
           }
@@ -942,18 +834,28 @@ class Parser {
             const number_ = BigInt(raw);
             const repr = raw.toLowerCase().startsWith('0x') ? 'hex' : 'dec';
 
-            const item: DTNumber = {
-              kind: "number",
-              value: number_,
-              repr: repr,
-              labels: structuredClone(labels),
-            };
+            if (bit_width === 64) {
+              const u64: CellArrayU64 = {
+                kind: "u64",
+                value: BigInt.asUintN(64, number_),
+                repr: repr,
+                labels: structuredClone(labels),
+              };
 
-            elements.push(item);
+              elements.push({ item: u64 });
+            } else {
+              const item: CellArrayNumber = {
+                kind: "number",
+                value: number_,
+                repr: repr,
+                labels: structuredClone(labels),
+              };
+
+              elements.push({ item: item });
+            }
 
             break;
           }
-
         // TODO: ConstExpr can start with LParen or number, probably?
         case TokKind.LParen:
         case TokKind.Minus:
@@ -964,13 +866,28 @@ class Parser {
             // Evaluate constant expression until comma or closing '>'
             const value = this.parse_const_expression(this.tok.kind === TokKind.LParen);
 
-            elements.push(
-              {
-                kind: "expression",
-                value: value,
-                labels: structuredClone(labels),
-              }
-            );
+            // TODO: doesn't matter for now but will probably come up later
+            if (bit_width === 64) {
+              elements.push(
+                {
+                  item: {
+                    kind: "expression",
+                    value: value,
+                    labels: structuredClone(labels),
+                  }
+                }
+              );
+            } else {
+              elements.push(
+                {
+                  item: {
+                    kind: "expression",
+                    value: value,
+                    labels: labels
+                  }
+                }
+              );
+            }
 
             break;
           }
@@ -1114,7 +1031,7 @@ class Parser {
   /** 
   * Parse a label (`&foo`) or absolute path (`&{/soc/...}`) reference. 
   */
-  private parse_reference(): DTLabel | DTPath {
+  private parse_reference(): DtsReference {
     this.expect(TokKind.Ampersand);
 
     // &{/path}
@@ -1139,8 +1056,11 @@ class Parser {
       this.expect(TokKind.RBrace, "Expected '}' in path reference");
 
       return {
-        kind: "path",
-        path: path,
+        kind: "ref",
+        ref: {
+          kind: "path",
+          path: path
+        },
         labels: []
       };
     }
@@ -1148,8 +1068,11 @@ class Parser {
     const ident = this.expect(TokKind.Ident, "Expected label after '&'").value!;
 
     return {
-      kind: "label",
-      name: ident,
+      kind: "ref",
+      ref: {
+        kind: "label",
+        name: ident
+      },
       labels: []
     };
   }
@@ -1195,23 +1118,23 @@ class Parser {
     return labels;
   }
 
-  //   private parse_dts_metadata(): DtsMetadata | undefined {
-  //     const metadata_token = this.comments.find(c => (
-  //       c.kind === TokKind.CommentBlock
-  //       && c.value?.includes(DtsMetadataHeader)
-  //     ));
+  private parse_dts_metadata(): DtsMetadata | undefined {
+    const metadata_token = this.comments.find(c => (
+      c.kind === TokKind.CommentBlock
+      && c.value?.includes(DtsMetadataHeader)
+    ));
 
-  //     if (metadata_token === undefined) {
-  //       return undefined;
-  //     }
+    if (metadata_token === undefined) {
+      return undefined;
+    }
 
-  //     try {
-  //       const metadata = parse_yaml_string(metadata_token.value as string);
-  //       return isDtsMetadata(metadata) ? metadata : undefined;
-  //     } catch {
-  //       return undefined;
-  //     }
-  //   }
+    try {
+      const metadata = parse_yaml_string(metadata_token.value as string);
+      return isDtsMetadata(metadata) ? metadata : undefined;
+    } catch {
+      return undefined;
+    }
+  }
 }
 
 /**
@@ -1220,9 +1143,10 @@ class Parser {
 * match dtc's ordering where an overlay's first touch determines placement.
 */
 export function ensure_node_by_path(
-  root: DeletableNode,
+  root: DtsNode,
   absolute_path: string,
-): DeletableNode {
+  options?: { mark_modified?: boolean }
+): DtsNode {
   if (absolute_path[0] !== '/') {
     return root;
   }
@@ -1236,12 +1160,13 @@ export function ensure_node_by_path(
     const name = at === -1 ? segment : segment.slice(0, at);
     const unit = at === -1 ? undefined : segment.slice(at + 1);
 
-    let next: DeletableNode | undefined = current.children.find(
+    let next: DtsNode | undefined = current.children.find(
       (n) => n.name === name && (unit === undefined ? (n.unit_addr === undefined) : (n.unit_addr === unit))
     );
 
     if (next === undefined) {
       next = {
+        _uuid: crypto.randomUUID(),
         name: name,
         unit_addr: unit,
         properties: [],
@@ -1253,13 +1178,17 @@ export function ensure_node_by_path(
       current.children.push(next);
     }
 
+    if (options?.mark_modified) {
+      next.modified_by_user = true;
+    }
+
     current = next;
   }
 
   return current;
 }
 
-function find_by_key(root: DeletableNode, key: string): DeletableNode | undefined {
+function find_by_key(root: DtsNode, key: string): DtsNode | undefined {
   if (get_node_key(root) === key) {
     return root;
   }
@@ -1273,4 +1202,19 @@ function find_by_key(root: DeletableNode, key: string): DeletableNode | undefine
   }
 
   return undefined;
+}
+function prune_soft_delete(base_document: DtsDocument) {
+
+  prune_soft_delete_impl(base_document.root);
+
+}
+
+function prune_soft_delete_impl(root: DtsNode) {
+
+  root.properties = root.properties.filter((property) => property.deleted !== true);
+  root.children = root.children.filter((child) => child.deleted !== true);
+
+  for (const child of root.children) {
+    prune_soft_delete_impl(child);
+  }
 }
