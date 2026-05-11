@@ -1,4 +1,4 @@
-import { CellArrayElement, DtsCellArray } from "../dts";
+import { Bits, CellArrayElement, DTCellArray } from "../dts";
 import { Labeled, MakeArray, is_array, is_labeled, make_array, make_labeled } from "./TypeUtilities";
 
 type DTString = string;
@@ -65,7 +65,7 @@ export function upcast_to_LabeledDTString(input: DTSReferenceInput): LabeledDTSt
     return input;
 }
 
-const CELL_VALUE_TAGS = ["number", "u64", "label", "path", "expression"] as const;
+const CELL_VALUE_TAGS = ["number", "label", "path", "expression"] as const;
 type CellValueTag = typeof CELL_VALUE_TAGS[number];
 
 type TagWith<T extends string | bigint, TAG extends CellValueTag> = {
@@ -105,7 +105,6 @@ function is_tagged(object: any): object is TagWith<string | bigint, CellValueTag
 
 export type CellValue =
     TagWith<bigint, "number"> |
-    TagWith<bigint, "u64"> |
     TagWith<string, "label"> |
     TagWith<string, "path"> |
     TagWith<string, "expression">
@@ -214,25 +213,37 @@ export function upcast_to_LabeledTaggedCellValue_LabeledArray(input: CellEntry |
     return input;
 }
 
-export function make_cell_array(values: LabeledTaggedCellValue_LabeledArray): DtsCellArray {
+export function make_cell_array(values: LabeledTaggedCellValue_LabeledArray): DTCellArray {
 
     // eslint-disable-next-line unicorn/consistent-function-scoping
     const tagged_to_element = (entry: LabeledTaggedCellValue): CellArrayElement => {
         switch (entry.payload._tag) {
             case "number": {
-                return { item: { kind: "number", value: entry.payload.value, labels: entry.labels } };
-            }
-            case "u64": {
-                return { item: { kind: "u64", value: entry.payload.value, labels: entry.labels } };
+                return {
+                    kind: "number",
+                    value: entry.payload.value,
+                    labels: entry.labels,
+                    repr: "dec"
+                };
             }
             case "label": {
-                return { item: { kind: "ref", labels: entry.labels, ref: { kind: "label", name: entry.payload.value } } };
+                return {
+                    kind: "label",
+                    labels: entry.labels,
+                    name: entry.payload.value
+                };
             }
             case "path": {
-                return { item: { kind: "ref", labels: entry.labels, ref: { kind: "path", path: entry.payload.value } } };
+                return {
+                    kind: "path",
+                    labels: entry.labels,
+                    path: entry.payload.value
+                };
             }
             case "expression": {
-                return { item: { kind: "expression", labels: entry.labels, value: entry.payload.value } };
+                return {
+                    kind: "expression", labels: entry.labels, value: entry.payload.value
+                };
             }
             default: {
                 const _x: never = entry.payload;
@@ -244,6 +255,7 @@ export function make_cell_array(values: LabeledTaggedCellValue_LabeledArray): Dt
     return {
         kind: "array",
         labels: values.labels,
+        bit_width: Bits.b32,
         elements: values.payload.map((v) => tagged_to_element(v)),
     };
 }
