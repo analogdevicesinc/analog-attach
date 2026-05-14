@@ -1,6 +1,6 @@
-import { INodeBuilderBase, NodeBuilder, PropertyBuilder } from "./DTBuilder/DTBuilder";
-import { DTS, DTO, DTNode, parse_dts, parse_dto, DTLabel, DTPath, get_full_node_name } from "./dts";
-import { print_dts, print_dto, print_property, print_node } from "./dts/printer";
+import { INodeBuilderBase } from "./DTBuilder/DTBuilder";
+import { DTS, DTNode, parse_dts, DTLabel, DTPath, get_full_node_name, DTProperty, is_dt_flag } from "./dts";
+import { print_dts } from "./dts/printer";
 import path from 'node:path';
 import * as fs from 'node:fs';
 
@@ -65,6 +65,15 @@ export class DeviceTree {
             return new DeviceTree(dts);
         } catch (error) {
             return error instanceof Error ? error.message : "Failed to parse!";
+        }
+    }
+
+    static new_from_file(file_path: string): DeviceTree | string {
+        try {
+            const content = fs.readFileSync(file_path, 'utf8');
+            return DeviceTree.new_from_string(content);
+        } catch (error) {
+            return error instanceof Error ? error.message : "Failed to read file!";
         }
     }
 
@@ -149,6 +158,38 @@ export class DeviceTree {
         return;
     }
 
+    public move_node(target: DTReference, new_parent: DTReference): DTReference | undefined {
+        const node = this.deref_node(target);
+        if (node === undefined) {
+            return undefined;
+        }
+
+        this.remove_node(target);
+
+        const new_parent_node = this.deref_node(new_parent);
+        if (new_parent_node === undefined) {
+            return undefined;
+        }
+
+        new_parent_node.children.push(node);
+
+        const new_path = new_parent.full_path.path === "/"
+            ? `/${get_full_node_name(node)}`
+            : `${new_parent.full_path.path}/${get_full_node_name(node)}`;
+
+        return DeviceTree.node_to_ref(node, { kind: "path", labels: [], path: new_path });
+    }
+
+    public rename_node(target: DTReference, new_name: string): boolean {
+        const node = this.deref_node(target);
+        if (node === undefined) {
+            return false;
+        }
+
+        node.name = new_name;
+        return true;
+    }
+
     public get_parent(target: DTReference): DTReference | undefined {
         // eslint-disable-next-line unicorn/consistent-function-scoping
         const make_path = (p: string): DTPath => ({ kind: "path", labels: [], path: p });
@@ -183,12 +224,76 @@ export class DeviceTree {
         return undefined;
     }
 
+    public get_node_by_path(path: DTPath): DTReference | undefined {
+        const node = this.deref_node_by_path(path.path);
+        if (node === undefined) {
+            return undefined;
+        }
+
+        return DeviceTree.node_to_ref(node, path);
+    }
+
+    public get_nodes_with_compatible(compatible: string): DTReference[] {
+        const results: DTReference[] = [];
+
+        for (const [node, path] of this.as_stream()) {
+            const compat_property = node.properties.find(p => p.name === "compatible");
+            if (compat_property === undefined || is_dt_flag(compat_property.value)) {
+                continue;
+            }
+
+            const has_match = compat_property.value.some(v => v.kind === "string" && v.value === compatible);
+            if (has_match) {
+                results.push(DeviceTree.node_to_ref(node, path));
+            }
+        }
+
+        return results;
+    }
+
     static node_to_ref(node: DTNode, path: DTPath): DTReference {
         return {
             node_name: get_full_node_name(node),
             full_path: path,
             labels: node.labels.map(entry => ({ kind: "label", labels: [], name: entry }))
         };
+    }
+
+    public get_property(target_node: DTReference, property: string): DTProperty | undefined {
+        const node = this.deref_node(target_node);
+        if (node === undefined) {
+            return undefined;
+        }
+
+        return node.properties.find(p => p.name === property);
+    }
+
+    public set_property(target_node: DTReference, property: DTProperty): boolean {
+        const node = this.deref_node(target_node);
+        if (node === undefined) {
+            return false;
+        }
+
+        const existing_index = node.properties.findIndex(p => p.name === property.name);
+        if (existing_index === -1) {
+            node.properties.push(property);
+        } else {
+            node.properties[existing_index] = property;
+        }
+
+        return true;
+    }
+
+    public remove_property(target_node: DTReference, property: string): boolean {
+        const node = this.deref_node(target_node);
+        if (node === undefined) {
+            return false;
+        }
+
+        const original_length = node.properties.length;
+        node.properties = node.properties.filter(p => p.name !== property);
+
+        return node.properties.length < original_length;
     }
 
     public deref_node(reference: DTReference): DTNode | undefined {
