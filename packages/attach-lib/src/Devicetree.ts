@@ -1,4 +1,4 @@
-import { INodeBuilderBase } from "./DTBuilder/DTBuilder";
+import { INodeBuilderBase, PropertyBuilder } from "./DTBuilder/DTBuilder";
 import { DTS, DTNode, parse_dts, DTLabel, DTPath, get_full_node_name, DTProperty, is_dt_flag } from "./dts";
 import { print_dts } from "./dts/printer";
 import path from 'node:path';
@@ -188,6 +188,15 @@ export class DeviceTree {
 
         node.name = new_name;
         return true;
+    }
+
+    public set_status(target: DTReference, status: "okay" | "disabled" | "reserved" | "fail" | "fail-sss"): boolean {
+        const property = PropertyBuilder.build_string()
+            .with_value(status)
+            .with_name("status")
+            .build();
+
+        return this.set_property(target, property);
     }
 
     public get_parent(target: DTReference): DTReference | undefined {
