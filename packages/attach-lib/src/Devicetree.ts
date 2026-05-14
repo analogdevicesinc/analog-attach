@@ -153,7 +153,7 @@ export class DeviceTree {
             return undefined;
         }
 
-        deref_parent.children = deref_parent.children.filter((entry) => get_full_node_name(entry) === target.node_name);
+        deref_parent.children = deref_parent.children.filter((entry) => get_full_node_name(entry) !== target.node_name);
 
         return;
     }
