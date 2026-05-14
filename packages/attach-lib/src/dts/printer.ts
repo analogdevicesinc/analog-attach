@@ -62,7 +62,7 @@ function serialize_metadata(metadata: DTMetadata): string {
 }
 
 /** Print a single node and its subtree. */
-function print_node(
+export function print_node(
   node: DTNode,
   indent: string,
   depth: number,

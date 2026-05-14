@@ -44,6 +44,10 @@ export interface DTNode<T extends DTProperty = DTProperty> extends Labeled {
   children: this[];
 }
 
+export function get_full_node_name(node: DTNode): string {
+  return `${node.name}${node.unit_addr === undefined ? "" : `@${node.unit_addr}`}`;
+}
+
 export type DTProperty = Labeled & {
   name: string;
   value: DTValue[] | DTFlag;
