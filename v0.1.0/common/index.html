@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta content="This section contains shared workflows and UI concepts." name="description" />
+
+    <title>Topics &#8212; Analog Attach  documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=8e8a900e" />
+    <link rel="stylesheet" type="text/css" href="../_static/app.min.css?v=ac863bf0" />
+    <script async="async" src="../_static/app.umd.js?v=09b0c6bc"></script>
+    <link rel="icon" href="../_static/icon.svg"/>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Topics" href="../debugging/index.html" />
+    <link rel="prev" title="Overview" href="../tree-config/index.html" />
+   
+  
+  
+  <meta name="repository" content="analog-attach">
+  <meta name="version" content="">
+  
+    <meta name="page_source_suffix" content=".rst">
+  
+  
+  
+
+
+<style>
+  body {
+    
+  }
+
+  body.dark {
+    
+  }
+
+  @media (prefers-color-scheme: dark) {
+    body:not(.light) {
+      
+    }
+  }
+</style>
+  </head>
+  
+    <body>
+  
+  <input type="checkbox" id="input-show-toc">
+  <input type="checkbox" id="input-show-localtoc">
+  <input type="checkbox" id="input-show-repotoc">
+
+  
+  <div class="search-area">
+    <form action="" method="get">
+      <input type="text" name="q" aria-labelledby="search-documentation" value="" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" role="search" placeholder="Search"/>
+      <button class="icon"></button>
+    </form>
+  </div>
+  
+
+  <header>
+    <div id="left">
+      <label id="show-sidebar" class="icon" for="input-show-toc" title="Show/hide index"></label>
+    </div>
+    <div id="right">
+      <span>
+        <a id="logo-org" href="https://analog.com" aria-label="Analog Devices Inc. landing page"></a>
+        <div class="vertical-divider"></div>
+        
+        <label id="show-repotoc" for="input-show-repotoc" title="Show/hide docs">Docs</label>
+        
+        <a id="logo" href="../index.html">
+          <div>Analog Attach</div>
+        </a>
+      </span>
+      <span class="reverse">
+        <label id="show-localtoc" class="icon" for="input-show-localtoc" title="Show/hide contents"></label>
+      </span>
+    </div>
+  </header>
+
+
+  <div class="repotoc-tree overlay">
+    <root>
+  <a href="../index.html" class="current">Analog Attach</a>
+</root>
+
+  </div>
+    <div class="localtoc">
+      <div class="tocwrapper">
+        <div class="header localtoc-header">
+          <a id="scroll-up" href="#top-anchor" title="Back to top"></a>
+        </div>
+        <nav>
+          <ul>
+<li><a class="reference internal" href="#">Topics</a></li>
+<li><a class="reference internal" href="#switching-editors">Switching Editors</a></li>
+<li><a class="reference internal" href="#settings">Settings</a></li>
+<li><a class="reference internal" href="#behind-the-scenes-helpful-behaviors">Behind the Scenes (Helpful Behaviors)</a></li>
+<li><a class="reference internal" href="#sidebar-analog-attach-panel">Sidebar (Analog Attach Panel)</a><ul>
+<li><a class="reference internal" href="#buttons">Buttons</a></li>
+<li><a class="reference internal" href="#remote-settings">Remote Settings</a></li>
+</ul>
+</li>
+</ul>
+
+        </nav>
+      </div>
+    </div>
+
+  
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+    <a id="no-logo" href="../index.html">
+      Analog Attach
+    </a><input id="input-switch-toc" type="checkbox">
+<label id="show-repotoc" for="input-switch-toc">
+All content
+</label>
+<label id="show-toc" for="input-switch-toc">
+Content on this topic
+</label>
+<div class="repotoc-tree">
+  <root>
+  <a href="../index.html" class="current">Analog Attach</a>
+</root>
+
+</div>
+<div class="toc-tree">
+  <p class="caption" role="heading">
+  <span class="caption-text">How to install</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../install-steps/index.html">Requirements</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../install-steps/index.html#getting-the-extension">Getting the Extension</a></li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">Getting Started</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../my-first-dts/index.html">My First DTS</a></li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">Plug and Play View</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../plug-and-play/index.html">Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../plug-and-play/index.html#setup-merge-dts-into-dtso">Setup (Merge DTS Into DTSO)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../plug-and-play/index.html#adding-devices">Adding Devices</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../plug-and-play/index.html#selecting-a-parent">Selecting a Parent</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../plug-and-play/index.html#managing-the-device">Managing the Device</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../plug-and-play/index.html#channels">Channels</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../plug-and-play/index.html#configuration-and-validation">Configuration and Validation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../plug-and-play/index.html#topics">Topics</a></li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">Tree Config View</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../tree-config/index.html">Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tree-config/index.html#using-the-tree">Using the Tree</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tree-config/index.html#search">Search</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tree-config/index.html#configuration">Configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tree-config/index.html#hidden-features">Hidden Features</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tree-config/index.html#topics">Topics</a></li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">Common</span>
+</p>
+
+<ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Topics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="#switching-editors">Switching Editors</a></li>
+<li class="toctree-l1"><a class="reference internal" href="#settings">Settings</a></li>
+<li class="toctree-l1"><a class="reference internal" href="#behind-the-scenes-helpful-behaviors">Behind the Scenes (Helpful Behaviors)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="#sidebar-analog-attach-panel">Sidebar (Analog Attach Panel)</a></li>
+</ul>
+
+<p class="caption" role="heading">
+  <span class="caption-text">Debugging and Common Issues</span>
+</p>
+
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../debugging/index.html">Topics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../debugging/index.html#logs">Logs</a></li>
+</ul>
+
+
+</div>
+        </div>
+      </div>
+
+  <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper" id="top-anchor">
+          <div class="body-header">
+  <nav class="breadcrumb empty"><ol></ol></nav>
+</div>
+          <div class="body" role="main">
+            
+  <section id="topics">
+<h1>Topics<a class="headerlink" href="#topics" title="Link to this heading"></a></h1>
+<p>This section contains shared workflows and UI concepts.</p>
+<ul class="simple">
+<li><p>Commands and command palette</p></li>
+<li><p>Left side panel</p></li>
+<li><p>Opening files and selecting editors</p></li>
+<li><p>Switching editors</p></li>
+<li><p>Settings</p></li>
+<li><p>Sidebar (Analog Attach panel)</p></li>
+<li><p>File types (.dts, .dtso)</p></li>
+<li><p>Save, validate, and compile flow</p></li>
+<li><p>Behind the Scenes (Helpful Behaviors)</p></li>
+</ul>
+</section>
+<section id="switching-editors">
+<h1>Switching Editors<a class="headerlink" href="#switching-editors" title="Link to this heading"></a></h1>
+<p>You can switch between editors for the current file in two ways:</p>
+<ul class="simple">
+<li><p>Right-click the file tab and select <code class="docutils literal notranslate"><span class="pre">Reopen</span> <span class="pre">Editor</span> <span class="pre">With...</span></code></p></li>
+<li><p>Open the Analog Attach side panel and click <code class="docutils literal notranslate"><span class="pre">Switch</span> <span class="pre">View</span></code></p></li>
+</ul>
+<img alt="Switch view" class="align-center" src="https://raw.githubusercontent.com/analogdevicesinc/analog-attach/doc_resources/resources/common-switch-view.png" />
+</section>
+<section id="settings">
+<h1>Settings<a class="headerlink" href="#settings" title="Link to this heading"></a></h1>
+<p>Open settings with <code class="docutils literal notranslate"><span class="pre">Ctrl+,</span></code> or via <strong>File &gt; Preferences &gt; Settings</strong>.
+You can also open settings from the Analog Attach side panel by clicking
+<code class="docutils literal notranslate"><span class="pre">Open</span> <span class="pre">Settings</span></code>.
+You can search for <code class="docutils literal notranslate"><span class="pre">Analog</span> <span class="pre">Attach</span></code> in the Settings UI.</p>
+<p>Key settings:</p>
+<dl class="simple">
+<dt><code class="docutils literal notranslate"><span class="pre">Analog</span> <span class="pre">Attach:</span> <span class="pre">Default</span> <span class="pre">Linux</span> <span class="pre">Repository</span></code></dt><dd><p>Path to a Linux kernel repository used for bindings and preprocessing.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">Analog</span> <span class="pre">Attach:</span> <span class="pre">Default</span> <span class="pre">Dt</span> <span class="pre">Schema</span> <span class="pre">Repository</span></code></dt><dd><p>Path to the dt-schema repository. If not set, the bundled copy is used.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">Analog</span> <span class="pre">Attach:</span> <span class="pre">Preprocess</span> <span class="pre">DTS</span> <span class="pre">Files</span> <span class="pre">Command</span></code></dt><dd><p>Command used to preprocess DTS files that contain include directives.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">Analog</span> <span class="pre">Attach:</span> <span class="pre">Compile</span> <span class="pre">DTS</span> <span class="pre">File</span> <span class="pre">Command</span></code></dt><dd><p>Command used to compile a DTS/DTSO file.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">Analog</span> <span class="pre">Attach:</span> <span class="pre">Decompile</span> <span class="pre">DTB</span> <span class="pre">File</span> <span class="pre">Command</span></code></dt><dd><p>Command used to decompile a DTB file.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">Analog</span> <span class="pre">Attach:</span> <span class="pre">SSH</span> <span class="pre">Config</span></code></dt><dd><p>SSH command template used for remote execution.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">Analog</span> <span class="pre">Attach:</span> <span class="pre">SSHPass</span> <span class="pre">Config</span></code></dt><dd><p>sshpass command template used for remote uploads.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">Analog</span> <span class="pre">Attach:</span> <span class="pre">Remote</span> <span class="pre">Host</span></code></dt><dd><p>Remote target host used to build the SSH command.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">Analog</span> <span class="pre">Attach:</span> <span class="pre">Remote</span> <span class="pre">User</span></code></dt><dd><p>Remote username used to build the SSH command.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">Analog</span> <span class="pre">Attach:</span> <span class="pre">Remote</span> <span class="pre">Password</span></code></dt><dd><p>Remote password used to build the sshpass command.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">Analog</span> <span class="pre">Attach:</span> <span class="pre">Enable</span> <span class="pre">Auto</span> <span class="pre">Merge</span> <span class="pre">Dtso</span> <span class="pre">Base</span></code></dt><dd><p>When enabled, Analog Attach remembers the DTS base you selected for a
+<code class="docutils literal notranslate"><span class="pre">.dtso</span></code> overlay and automatically re-merges that base the next time you
+open the overlay.</p>
+</dd>
+</dl>
+</section>
+<section id="behind-the-scenes-helpful-behaviors">
+<h1>Behind the Scenes (Helpful Behaviors)<a class="headerlink" href="#behind-the-scenes-helpful-behaviors" title="Link to this heading"></a></h1>
+<p>Analog Attach performs a few automatic actions to reduce manual work. These
+behaviors can be easy to miss at first:</p>
+<ul>
+<li><p><strong>Auto-merge remembered DTS bases for DTSO files</strong> when
+<code class="docutils literal notranslate"><span class="pre">Enable</span> <span class="pre">Auto</span> <span class="pre">Merge</span> <span class="pre">Dtso</span> <span class="pre">Base</span></code> is enabled.</p></li>
+<li><p><strong>Channel-aware validation</strong> runs on configuration updates to highlight
+missing required properties for device channels.</p></li>
+<li><p><strong>Parent validation and filtering</strong> helps guide you to valid parent nodes
+when selecting a placement for a device.</p></li>
+<li><p><strong>Enable/Disable behavior</strong>: enabling a node turns on any disabled ancestors
+up to the root, while disabling only affects the selected node. This is an
+intentional design decision (and a known limitation).</p>
+<p>A side effect is that if you delete a node after enabling a parent via this
+behavior, the parent can remain enabled and still be printed in the DTS/DTSO
+output.</p>
+</li>
+</ul>
+</section>
+<section id="sidebar-analog-attach-panel">
+<h1>Sidebar (Analog Attach Panel)<a class="headerlink" href="#sidebar-analog-attach-panel" title="Link to this heading"></a></h1>
+<p>The Analog Attach side panel provides quick access to common actions and remote
+settings.</p>
+<section id="buttons">
+<h2>Buttons<a class="headerlink" href="#buttons" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p><strong>Merge DTS into DTSO</strong>: Run the merge command for the currently open overlay.</p></li>
+<li><p><strong>Compile Device Tree</strong>: Compile the current DTS/DTSO file.</p></li>
+<li><p><strong>Deploy Device Tree</strong>: Deploy the compiled device tree to the target.</p></li>
+<li><p><strong>Open Settings</strong>: Open Analog Attach settings.</p></li>
+<li><p><strong>Switch View</strong>: Switch between Plug and Play and Tree Config views.</p></li>
+</ul>
+</section>
+<section id="remote-settings">
+<h2>Remote Settings<a class="headerlink" href="#remote-settings" title="Link to this heading"></a></h2>
+<p>The Remote Settings section lets you edit the target connection details:</p>
+<ul class="simple">
+<li><p><strong>IP Address</strong>: Remote host address</p></li>
+<li><p><strong>User</strong>: Remote username</p></li>
+<li><p><strong>Password</strong>: Remote password</p></li>
+</ul>
+<p>When you update these fields, the extension updates the derived SSH commands
+(<code class="docutils literal notranslate"><span class="pre">analog-attach.sshConfig</span></code> and <code class="docutils literal notranslate"><span class="pre">analog-attach.sshpassConfig</span></code>) automatically.</p>
+</section>
+</section>
+
+
+          </div>
+              <div class="related">
+                &nbsp;
+    <a href="../tree-config/index.html" title="Previous document (Alt+Shift+LeftArrow)" class="prev">Overview</a>
+    <a href="../debugging/index.html" title="Next document (Alt+Shift+RightArrow)" class="next">Topics</a>
+              </div>
+          
+        </div>
+      </div>
+  </div>
+
+  <label id="cancel-area-show-toc" for="input-show-toc"></label>
+  <label id="cancel-area-show-localtoc" for="input-show-localtoc"></label>
+    <footer>
+      &#169;2025, Analog Devices, Inc.
+      
+      |
+      Made with <a href="https://www.sphinx-doc.org/">Sphinx</a>
+      &amp; <a href="https://github.com/analogdevicesinc/doctools">Doctools</a>
+      
+    </footer>
+  </body>
+</html>
