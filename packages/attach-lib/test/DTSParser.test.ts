@@ -1,429 +1,508 @@
-import * as fs from 'node:fs';
 import path from 'node:path';
+import { readFile } from 'node:fs/promises';
 
-import { parse_dts, printDts, printDtso, mergeDtso, DtsDocument, DtsReference } from 'attach-lib';
+import { test, expect, describe } from 'vitest';
+import { Result } from '../src/result';
 
-import { test, expect } from 'vitest';
+import { parse_dto, parse_dts } from "../src/dts/parser";
 
-function normalize(document: DtsDocument): any {
-  // Convert BigInt to string for deepEqual and drop non-essential fields (_uuid)
-  return JSON.parse(JSON.stringify(document, (k, v) => {
-    if (k === "_uuid") {
-      return;
+import { print_dts } from "../src/dts/printer";
+import { Bits, DTLabel, DTO, DTS, is_dt_flag, isDTMetadata } from '../src/dts/ast';
+
+const TEST_DTS_FILES_DIR_PATH = path.resolve(__dirname, "dts_source/");
+
+describe("round trip", async () => {
+  test('minimal', async () => {
+    await basic_round_trip_test_impl("minimal.dts");
+  });
+
+  test("types", async () => {
+    await basic_round_trip_test_impl("basic_types.dts");
+  });
+
+  test("preprocessed", async () => {
+    await basic_round_trip_test_impl("rpi.prepro.dts");
+  });
+
+  test("zephyr", async () => {
+    await basic_round_trip_test_impl("zephyr.dts");
+  });
+});
+
+describe("types", async () => {
+  test('bytestring supports compact hex with spaces', async () => {
+    const dts = await parse_dts_from_file("basic_types.dts");
+
+    const bytes_property = dts.root.properties.find(p => p.name === 'bytes');
+    expect.assert.isDefined(bytes_property);
+
+    if (is_dt_flag(bytes_property.value)) {
+      expect.fail("value of 'bytes' property should not be empty");
     }
 
-    // FIXME: ideal position to do is when we make the dif between dts and dtso
-    // (consider only in dtso). This is just for the tests to pass
-    if (k === "created_by_user") {
-      return;
+    const component = bytes_property.value[0];
+    if (component.kind !== "array" || component.bit_width !== Bits.b8) {
+      expect.fail("value of 'bytes' property must be an array and its bit width must be equal to 8");
     }
 
-    return typeof v === 'bigint' ? v.toString() : v;
-  }));
+    if (!component.elements.every(dtv => dtv.kind === "number")) {
+      expect.fail("all values within 'bytes' property must be numbers");
+    }
+
+    expect(component.elements.map(dtv => Number.parseInt(dtv.value.toString())))
+      .toStrictEqual([0x00, 0x00, 0x00, 0x1B, 0x73, 0x74, 0x61, 0x74, 0x75, 0x73, 0x00]);
+  });
+
+  test("bytestring supports compact hex without spaces", async () => {
+    const dts = await parse_dts_from_file("basic_types.dts");
+
+    const bytes_property = dts.root.properties.find(p => p.name === 'bytes2');
+    expect.assert.isDefined(bytes_property);
+
+    if (is_dt_flag(bytes_property.value)) {
+      expect.fail("value of 'bytes2' property should not be empty");
+    }
+
+    const component = bytes_property.value[0];
+    if (component.kind !== "array" || component.bit_width !== Bits.b8) {
+      expect.fail("value of 'bytes2' property must be an array and its bit width must be equal to 8");
+    }
+
+    if (!component.elements.every(dtv => dtv.kind === "number")) {
+      expect.fail("all values within 'bytes' property must be numbers");
+    }
+
+    expect(component.elements.map(dtv => Number.parseInt(dtv.value.toString())))
+      .toStrictEqual([0x00, 0x00, 0x00, 0x1B, 0x73, 0x74, 0x61, 0x74, 0x75, 0x73, 0x00]);
+  });
+});
+
+describe("merging behaviour", async () => {
+  test("later root overrides earlier", async () => {
+    const dts = await parse_dts_from_file("merge_input.dts");
+    const child_node = dts.root.children.find(c => c.name === 'node' && (c.labels ?? []).includes('a'));
+
+    expect.assert.isDefined(child_node);
+
+    const property = child_node.properties.find(p => p.name === 'x');
+    expect.assert.isDefined(property);
+
+    const merged_dts = await parse_dts_from_file("merge_output.dts");
+    expect(normalize(dts))
+      .toStrictEqual(normalize(merged_dts));
+  });
+});
+
+describe("delete behaviour", async () => {
+  test("/delete-property/ removes alias intc", async () => {
+    const dts = await parse_dts_from_file("delete_merge_alias.dts");
+    const aliases = dts.root.children.find(c => c.name === 'aliases');
+
+    expect.assert.isDefined(aliases);
+
+    expect(aliases.properties.length).toStrictEqual(3);
+
+    for (const property of aliases.properties) {
+      if (!['soc', 'uart2', 'spi'].includes(property.name)) {
+        expect.fail(`Extra alias after merge: ${property.name}`);
+      }
+
+      if (property.name === 'intc') {
+        expect.fail('aliases still contains intc');
+      }
+
+      if (property.name === "spi") {
+        if (is_dt_flag(property.value)) {
+          expect.fail("spi should not be an empty property");
+        }
+
+        const expected: DTLabel = { labels: [], kind: "label", name: "spi2" };
+        expect(property.value.length).toStrictEqual(1);
+        expect(property.value[0]).toStrictEqual(expected);
+      }
+    }
+  });
+
+  test("delete from overlay is relative and does not remove same-named root node", async () => {
+    const dts = await parse_dts_from_file("relative_delete_node_with_overlay.dts");
+
+    const leds = dts.root.children.find(c => c.name === "leds");
+    expect.assert.isDefined(leds);
+    expect(leds.labels.includes("leds"), "Missing label on leds node");
+  });
+
+  test("delete node from overlay successful delete", async () => {
+    const dts = await parse_dts_from_file("delete_node_with_overlay.dts");
+
+    const leds = dts.root.children.find(c => c.name === "leds");
+    expect.assert.isDefined(leds, "Missing leds node");
+
+    const foo = leds.children.find(c => c.name === "foo");
+    expect.assert.isUndefined(foo, "This node should have been deleted");
+  });
+
+  test("delete property from overlay successful delete", async () => {
+    const dts = await parse_dts_from_file("delete_property_with_overlay.dts");
+
+    const leds = dts.root.children.find(c => c.name === "leds");
+    expect.assert.isDefined(leds, "Missing leds node");
+
+    const property = leds.properties.find((c) => c.name === "property");
+    expect.assert.isUndefined(property, "This property should have been deleted");
+  });
+});
+
+describe("labeling", async () => {
+  test("basic", async () => {
+    const dts = await parse_dts_from_file("basic_types.dts");
+
+    const model_property = dts.root.properties.find(p => p.name === "model");
+    expect.assert.isDefined(model_property);
+
+    expect(model_property.labels.length).toStrictEqual(1);
+    expect(model_property.labels.at(0)).toStrictEqual("property_label");
+
+    if (is_dt_flag(model_property.value)) {
+      expect.fail("Unexpected flag property");
+    }
+
+    expect(model_property.value.length).toBeGreaterThan(0);
+    expect(model_property.value[0].labels.length).toStrictEqual(1);
+    expect(model_property.value[0].labels.at(0)).toStrictEqual("string_label");
+
+    const bytes_property = dts.root.properties.find(p => p.name === "bytes");
+    expect.assert.isDefined(bytes_property);
+
+    if (is_dt_flag(bytes_property.value)) {
+      expect.fail("Unexpected flag property");
+    }
+
+    expect(bytes_property.value.length).toBeGreaterThan(0);
+
+    const bytestring = bytes_property.value.at(0);
+    expect.assert.isDefined(bytestring);
+
+    if (bytestring.kind !== "array") {
+      expect.fail("Expected bytestring");
+    }
+
+    expect(bytestring.bit_width).toStrictEqual(8);
+    expect(bytestring.elements.length).toBeGreaterThan(0);
+    expect(bytestring.elements[0].labels.length).toStrictEqual(1);
+    expect(bytestring.elements[0].labels[0]).toStrictEqual("byte_label");
+
+    const interrupt_controller = dts.root.children.find(c => c.name === "interrupt-controller");
+    expect.assert.isDefined(interrupt_controller);
+
+    expect(interrupt_controller.labels.length).toStrictEqual(1);
+    expect(interrupt_controller.labels[0]).toStrictEqual("mpic");
+  });
+
+  test('stack labels', async () => {
+    const dts = await parse_dts_from_file("stack_labels.dts");
+
+    const property = dts.root.properties.find(p => p.name === "prop");
+    expect.assert.isDefined(property);
+
+    expect(property.labels).not.toHaveLength(0);
+    expect(property.labels.length).toStrictEqual(2);
+    expect(property.labels[0]).toStrictEqual("second_label");
+    expect(property.labels[1]).toStrictEqual("first_label");
+
+    if (is_dt_flag(property.value)) {
+      expect.fail("Unexpected flag property");
+    }
+
+    expect(property.value).not.toHaveLength(0);
+    expect(property.value[0].labels).not.toHaveLength(0);
+    expect(property.value[0].labels[0]).toStrictEqual("value_label2");
+
+    const node = dts.root.children.find(c => c.name === "node");
+    expect.assert.isDefined(node);
+
+    expect(node.labels).toHaveLength(3);
+    expect(node.labels.at(0)).toStrictEqual("c_label");
+    expect(node.labels.at(1)).toStrictEqual("b_label");
+    expect(node.labels.at(2)).toStrictEqual("a_label");
+  });
+});
+
+describe("bad tokens", async () => {
+
+  test("simple bad char", async () => {
+    await bad_tokens_test_impl("bad_character.dts");
+  });
+
+  test("missing version tag", async () => {
+    await bad_tokens_test_impl("missing_version.dts");
+  });
+
+  describe("missing semicolons", async () => {
+    test("after version tag", async () => {
+      await bad_tokens_test_impl("missing_semicolons/version_tag.dts");
+    });
+
+    test("after memreserve statement", async () => {
+      await bad_tokens_test_impl("missing_semicolons/memreserve.dts");
+    });
+
+    test("after slash directive", async () => {
+      await bad_tokens_test_impl("missing_semicolons/slash_directive.dts");
+    });
+
+    test("after property", async () => {
+      await bad_tokens_test_impl("missing_semicolons/property.dts");
+    });
+
+    test("after node", async () => {
+      await bad_tokens_test_impl("missing_semicolons/node.dts");
+    });
+  });
+
+  describe("extra semicolons", async () => {
+    test("after version tag", async () => {
+      await bad_tokens_test_impl("extra_semicolons/version_tag.dts");
+    });
+
+    test("after memreserve statement", async () => {
+      await bad_tokens_test_impl("extra_semicolons/memreserve.dts");
+    });
+
+    test("after slash directive", async () => {
+      await bad_tokens_test_impl("extra_semicolons/slash_directive.dts");
+    });
+
+    test("after property", async () => {
+      await bad_tokens_test_impl("extra_semicolons/property.dts");
+    });
+
+    test("after node", async () => {
+      await bad_tokens_test_impl("extra_semicolons/node.dts");
+    });
+  });
+});
+
+describe("overlays (DTOs)", async () => {
+  test("label/path references become fragments", async () => {
+    const dto = await parse_dto_from_file("dtso/references.dtso");
+
+    expect(dto.root.properties).toHaveLength(0);
+    expect(dto.root.children).toHaveLength(2);
+
+    // fragment0
+
+    const fragment0 = dto.root.children.find(c => c.name === "fragment" && c.unit_addr === "0");
+    expect.assert.isDefined(fragment0);
+
+    expect(fragment0.properties).toHaveLength(1);
+
+    const target_path_property = fragment0.properties[0];
+    expect(target_path_property.name).toStrictEqual("target-path");
+
+    if (is_dt_flag(target_path_property.value)) {
+      expect.fail("Unexpected empty property");
+    }
+
+    expect(target_path_property.value).toHaveLength(1);
+
+    const target_path_value = target_path_property.value[0];
+    if (target_path_value.kind !== "string") {
+      expect.fail("Expected string value");
+    }
+    expect(target_path_value.value.startsWith("/"), "Expected valid path");
+
+    expect(fragment0.children).toHaveLength(1);
+
+    const overlay0 = fragment0.children.find(c => c.name === "__overlay__" && c.unit_addr === undefined);
+    expect.assert.isDefined(overlay0);
+
+    expect(overlay0.properties).toHaveLength(0);
+    expect(overlay0.children).toHaveLength(1);
+
+    const new_node0 = overlay0.children.find(c => c.name === "imu" && c.unit_addr === "1");
+    expect.assert.isDefined(new_node0);
+    expect(new_node0.properties).toHaveLength(2);
+
+    // fragment@1
+
+    const fragment1 = dto.root.children.find(c => c.name === "fragment" && c.unit_addr === "1");
+    expect.assert.isDefined(fragment1);
+
+    expect(fragment1.properties).toHaveLength(1);
+
+    const target_property = fragment1.properties[0];
+    expect(target_property.name).toStrictEqual("target");
+
+    if (is_dt_flag(target_property.value)) {
+      expect.fail("Unexpected empty property");
+    }
+
+    const target_value = target_property.value[0];
+    if (target_value.kind !== "array") {
+      expect.fail("Expected array value");
+    }
+
+    expect(target_value.bit_width).toStrictEqual(Bits.b32);
+    expect(target_value.elements).toHaveLength(1);
+
+    const label_reference = target_value.elements[0];
+    if (label_reference.kind !== "label") {
+      expect.fail("Expected label reference");
+    }
+
+    const overlay1 = fragment1.children.find(c => c.name === "__overlay__" && c.unit_addr === undefined);
+    expect.assert.isDefined(overlay1);
+
+    const new_node1 = overlay1.children.find(c => c.name === "imu" && c.unit_addr === "1");
+    expect.assert.isDefined(new_node1);
+    expect(new_node1.properties).toHaveLength(2);
+  });
+
+  test("fragments are correctly parsed", async () => {
+    const dto = await parse_dto_from_file("dtso/fragments.dtso");
+
+    expect(dto.root.properties).toHaveLength(0);
+    expect(dto.root.children).toHaveLength(3);
+
+    // fragment0
+
+    const fragment0 = dto.root.children.find(c => c.name === "fragment" && c.unit_addr === "0");
+    expect.assert.isDefined(fragment0);
+
+    expect(fragment0.properties).toHaveLength(1);
+
+    const target_path_property = fragment0.properties[0];
+    expect(target_path_property.name).toStrictEqual("target-path");
+
+    if (is_dt_flag(target_path_property.value)) {
+      expect.fail("Unexpected empty property");
+    }
+
+    expect(target_path_property.value).toHaveLength(1);
+
+    const target_path_value = target_path_property.value[0];
+    if (target_path_value.kind !== "string") {
+      expect.fail("Expected string value");
+    }
+    expect(target_path_value.value.startsWith("/"), "Expected valid path");
+
+    expect(fragment0.children).toHaveLength(1);
+
+    const overlay0 = fragment0.children.find(c => c.name === "__overlay__" && c.unit_addr === undefined);
+    expect.assert.isDefined(overlay0);
+
+    expect(overlay0.properties).toHaveLength(2);
+
+    // fragment@1
+
+    const fragment1 = dto.root.children.find(c => c.name === "fragment" && c.unit_addr === "1");
+    expect.assert.isDefined(fragment1);
+
+    expect(fragment1.properties).toHaveLength(1);
+
+    const target_property = fragment1.properties[0];
+    expect(target_property.name).toStrictEqual("target");
+
+    if (is_dt_flag(target_property.value)) {
+      expect.fail("Unexpected empty property");
+    }
+
+    const target_value = target_property.value[0];
+    if (target_value.kind !== "array") {
+      expect.fail("Expected string value");
+    }
+
+    expect(target_value.bit_width).toStrictEqual(Bits.b32);
+    expect(target_value.elements).toHaveLength(1);
+
+    const label_reference = target_value.elements[0];
+    if (label_reference.kind !== "label") {
+      expect.fail("Expected label reference");
+    }
+
+    const overlay1 = fragment1.children.find(c => c.name === "__overlay__" && c.unit_addr === undefined);
+    expect.assert.isDefined(overlay1);
+
+    expect(overlay1.properties).toHaveLength(2);
+
+    // fragment@2
+
+    const fragment2 = dto.root.children.find(c => c.name === "fragment" && c.unit_addr === "2");
+    expect.assert.isDefined(fragment2);
+
+    const overlay2 = fragment2.children.find(c => c.name === "__overlay__" && c.unit_addr === undefined);
+    expect.assert.isDefined(overlay2);
+
+    expect(overlay2.properties).toHaveLength(0);
+    expect(overlay2.children).toHaveLength(1);
+    expect(overlay2.children[0].properties).toHaveLength(2);
+  });
+});
+
+describe("comments", async () => {
+  test("metadata is parsed correctly", async () => {
+    const source = await readFile(path.resolve(TEST_DTS_FILES_DIR_PATH, "comments.dts"), "utf8");
+    const parse_result = parse_dts(source);
+    if (Result.isError(parse_result)) {
+      expect.fail(`Failed to parse input file because: ${parse_result.error.message}`);
+    }
+
+    const metadata = parse_result.value.metadata;
+    if (!isDTMetadata(metadata)) {
+      expect.fail("Expected valid device tree metadata");
+    }
+
+    expect(metadata.version).toStrictEqual("0.1.0");
+    expect(metadata.modifications).toHaveLength(4);
+
+    for (let index = 0; index < metadata.modifications.length; ++index) {
+      expect(metadata.modifications[index])
+        .toStrictEqual(`/abs/path/to/modified/${index + 1}`);
+    }
+  });
+});
+
+// Utilities
+
+async function basic_round_trip_test_impl(filename: string) {
+  const first_dts = await parse_dts_from_file(filename);
+
+  const stringified_dts = print_dts(first_dts);
+  const second_parse_result = parse_dts(stringified_dts);
+  if (Result.isError(second_parse_result)) {
+    expect.fail(`Parser failed: ${second_parse_result.error.message}`);
+  }
+
+  const second_dts = second_parse_result.value.dts;
+  expect(normalize(second_dts)).toStrictEqual(normalize(first_dts));
 }
 
-test('minimal root and string property', () => {
-  const source_path = path.resolve(__dirname, 'dts_source/minimal.dts');
-  const source = fs.readFileSync(source_path, 'utf8');
-
-  const document = parse_dts(source);
-
-  const out = printDts(document);
-
-  const document2 = parse_dts(out);
-  expect(normalize(document2)).toStrictEqual(normalize(document));
-});
-
-test('arrays, refs, bytes, labels', () => {
-  const source_path = path.resolve(__dirname, 'dts_source/basic_types.dts');
-  const source = fs.readFileSync(source_path, 'utf8');
-
-  const document = parse_dts(source);
-
-  const out = printDts(document);
-
-  const document2 = parse_dts(out);
-  expect(normalize(document2)).toStrictEqual(normalize(document));
-});
-
-test('roundtrip rpi.prepro.dts', () => {
-  const source_path = path.resolve(__dirname, 'dts_source/rpi.prepro.dts');
-  const source = fs.readFileSync(source_path, 'utf8');
-
-  const document = parse_dts(source);
-
-  const out = printDts(document);
-
-  const document2 = parse_dts(out);
-  expect(normalize(document2)).toStrictEqual(normalize(document));
-});
-
-test('roundtrip zephyr.dts', () => {
-  const dts_source = path.resolve(__dirname, 'dts_source/zephyr.dts');
-  const source = fs.readFileSync(dts_source, 'utf8');
-
-  const document = parse_dts(source);
-
-  const out = printDts(document);
-
-  const document2 = parse_dts(out);
-  expect(normalize(document2)).toStrictEqual(normalize(document));
-});
-
-test('byte strings support compact hex with spaces', () => {
-  const source_path = path.resolve(__dirname, 'dts_source/basic_types.dts');
-  const source = fs.readFileSync(source_path, 'utf8');
-
-  const document = parse_dts(source);
-
-  const bytesProperty = document.root.properties.find((p) => p.name === 'bytes');
-
-  expect(
-    bytesProperty !== undefined &&
-    bytesProperty.value !== undefined,
-    'bytes property missing'
-  );
-
-  const comp: any = bytesProperty!.value!.components[0];
-  expect(comp.kind, 'bytes component not parsed as bytes').toStrictEqual('bytes');
-
-  const values = comp.bytes.map((b: any) => b.value);
-  expect(values).toStrictEqual([0x00, 0x00, 0x00, 0x1B, 0x73, 0x74, 0x61, 0x74, 0x75, 0x73, 0x00]);
-
-  const out = printDts(document);
-  const document2 = parse_dts(out);
-
-  expect(normalize(document2)).toStrictEqual(normalize(document));
-});
-
-test('byte strings support compact hex without spaces', () => {
-  const source_path = path.resolve(__dirname, 'dts_source/basic_types.dts');
-  const source = fs.readFileSync(source_path, 'utf8');
-
-  const document = parse_dts(source);
-
-  const bytesProperty = document.root.properties.find((p) => p.name === 'bytes2');
-
-  expect(
-    bytesProperty !== undefined &&
-    bytesProperty.value !== undefined,
-    'bytes property missing'
-  );
-
-  const comp: any = bytesProperty!.value!.components[0];
-  expect(comp.kind, 'bytes component not parsed as bytes').toStrictEqual('bytes');
-
-  const values = comp.bytes.map((b: any) => b.value);
-  expect(values).toStrictEqual([0x00, 0x00, 0x00, 0x1B, 0x73, 0x74, 0x61, 0x74, 0x75, 0x73, 0x00]);
-
-  const out = printDts(document);
-  const document2 = parse_dts(out);
-
-  expect(normalize(document2)).toStrictEqual(normalize(document));
-});
-
-test('merge behavior: later root overrides earlier', () => {
-  const source_path = path.resolve(__dirname, 'dts_source/merge_input.dts');
-  const source = fs.readFileSync(source_path, 'utf8');
-
-  const document = parse_dts(source);
-
-  const a = document.root.children.find((c) => c.name === 'node' && (c.labels ?? []).includes('a'));
-
-  expect(
-    a !== undefined,
-    'merged child node present'
-  );
-
-  const x = a!.properties.find((p) => p.name === 'x');
-
-  expect(
-    x !== undefined &&
-    x.value !== undefined,
-    'property x exists'
-  );
-
-  const output = printDts(document);
-
-  const expected_path = path.resolve(__dirname, 'dts_source/merge_output.dts');
-  const expected = fs.readFileSync(expected_path, 'utf8');
-
-  // TODO: maybe ignore formatting
-  expect(output).toStrictEqual(expected);
-});
-
-test('delete-property removes alias intc', () => {
-  const source_path = path.resolve(__dirname, 'dts_source/delete_merge_alias.dts');
-  const source = fs.readFileSync(source_path, 'utf8');
-  const document = parse_dts(source);
-
-  const aliases = document.root.children.find((c) => c.name === 'aliases');
-
-  expect.assert.isDefined(aliases);
-
-  expect(aliases.properties.length).toStrictEqual(3);
-
-  for (const property of aliases.properties) {
-    if (!['soc', 'uart2', 'spi'].includes(property.name)) {
-      expect.fail(`Extra alias after merge: ${property.name}`);
-    }
-
-    if (property.name === 'intc') {
-      expect.fail('aliases still contains intc');
-    }
-
-    if (property.name === "spi") {
-      const expected: DtsReference = {
-        kind: 'ref',
-        labels: [],
-        ref: {
-          kind: 'label',
-          name: 'spi2'
-        }
-      };
-
-      expect(property.value!.components.length).toStrictEqual(1);
-      expect(property.value!.components[0]).toStrictEqual(expected);
-    }
+async function bad_tokens_test_impl(filename: string) {
+  const source = await readFile(path.resolve(TEST_DTS_FILES_DIR_PATH, filename), "utf8");
+  const parse_result = parse_dts(source);
+  if (Result.isOk(parse_result)) {
+    expect.fail("Should have failed to parse this file");
   }
-});
-
-test('labeling', () => {
-  const source_path = path.resolve(__dirname, 'dts_source/basic_types.dts');
-  const source = fs.readFileSync(source_path, 'utf8');
-  const document = parse_dts(source);
-
-  const model = document.root.properties.find((value) => value.name === 'model');
-
-  expect.assert.isDefined(model);
-
-  expect(
-    model.labels?.length === 1 &&
-    model.labels.at(0) === 'property_label',
-    "Failed property_label check"
-  );
-
-  expect.assert.isDefined(model.value, `${model.name} has no value`);
-
-  expect(
-    model.value.components[0].labels.length === 1 &&
-    model.value.components[0].labels.at(0) === 'string_label',
-    "Failed string_label check"
-  );
-
-  const bytes = document.root.properties.find((value) => value.name === "bytes");
-
-  expect.assert.isDefined(bytes);
-  expect.assert.isDefined(bytes.value);
-
-  expect(
-    bytes.value.components[0].kind === "bytes" &&
-    bytes.value.components[0].bytes[0].labels.length === 1 &&
-    bytes.value.components[0].bytes[0].labels[0] === "byte_label"
-  );
-
-  // missing cell_label
-  const interrupts = document.root.properties.find((value) => value.name === "interrupts");
-
-  expect.assert.isDefined(interrupts);
-  expect.assert.isDefined(interrupts.value);
-
-  expect(
-    interrupts.value.components[0].labels?.length === 1 &&
-    interrupts.value.components[0].labels.at(0) === "cell_label" &&
-    interrupts.value.components[0].kind === 'array' &&
-    interrupts.value.components[0].elements[0].item.labels.length === 1 &&
-    interrupts.value.components[0].elements[0].item.labels[0] === "interior_cell_label"
-  );
-
-  const interrupt_controller = document.root.children.find((value) => value.name === 'interrupt-controller');
-
-  expect(
-    interrupt_controller !== undefined &&
-    interrupt_controller.labels![0] === 'mpic'
-  );
-});
-
-test('stack labels', () => {
-  const source_path = path.resolve(__dirname, 'dts_source/stack_labels.dts');
-  const source = fs.readFileSync(source_path, 'utf8');
-  const document = parse_dts(source);
-
-  const property = document.root.properties.find((value) => value.name === "prop");
-
-  expect.assert.isDefined(property);
-  expect.assert.isDefined(property.value);
-
-  expect(
-    property.labels.length === 2 &&
-    property.labels.at(0) === 'second_label' &&
-    property.labels.at(1) === 'first_label',
-    "Failed property label stacking!"
-  );
-
-  // Assumption is that incoming content wins when merging
-  expect(
-    property.value.components[0].labels.length === 1 &&
-    property.value.components[0].labels.at(0) === 'value_label2' &&
-    "Values labels shouldn't be stacked!"
-  );
-
-  const node = document.root.children.find((value) => value.name === "node");
-
-  expect.assert.isDefined(node);
-
-  expect(
-    node.labels.length === 3 &&
-    node.labels.at(0) === "c_label" &&
-    node.labels.at(1) === "b_label" &&
-    node.labels.at(2) === "a_label",
-    "Failed node label stacking!"
-  );
-});
-
-test('bad character in dts', () => {
-  const source_path = path.resolve(__dirname, 'dts_source/bad_character.dts');
-  const source = fs.readFileSync(source_path, 'utf8');
-
-  expect(() => parse_dts(source)).toThrowError(Error);
-});
-
-test('missing semicolon in dts', () => {
-  const version_tag_path = path.resolve(__dirname, 'dts_source/missing_semicolons/version_tag.dts');
-  const version_tag = fs.readFileSync(version_tag_path, 'utf8');
-
-  expect(() => parse_dts(version_tag)).toThrowError(Error);
-
-  const memreserve_path = path.resolve(__dirname, 'dts_source/missing_semicolons/memreserve.dts');
-  const memreserve = fs.readFileSync(memreserve_path, 'utf8');
-
-  expect(() => parse_dts(memreserve)).toThrowError(Error);
-
-  const slash_directive_path = path.resolve(__dirname, 'dts_source/missing_semicolons/slash_directive.dts');
-  const slash_directive = fs.readFileSync(slash_directive_path, 'utf8');
-
-  expect(() => parse_dts(slash_directive)).toThrowError(Error);
-
-  const property_path = path.resolve(__dirname, 'dts_source/missing_semicolons/property.dts');
-  const property = fs.readFileSync(property_path, 'utf8');
-
-  expect(() => parse_dts(property)).toThrowError(Error);
-
-  const node_path = path.resolve(__dirname, 'dts_source/missing_semicolons/node.dts');
-  const node = fs.readFileSync(node_path, 'utf8');
-
-  expect(() => parse_dts(node)).toThrowError(Error);
-});
-
-test('extra semicolon in dts', () => {
-  const version_tag_path = path.resolve(__dirname, 'dts_source/extra_semicolons/version_tag.dts');
-  const version_tag = fs.readFileSync(version_tag_path, 'utf8');
-
-  expect(() => parse_dts(version_tag)).toThrowError(Error);
-
-  const memreserve_path = path.resolve(__dirname, 'dts_source/extra_semicolons/memreserve.dts');
-  const memreserve = fs.readFileSync(memreserve_path, 'utf8');
-
-  expect(() => parse_dts(memreserve)).toThrowError(Error);
-
-  const slash_directive_path = path.resolve(__dirname, 'dts_source/extra_semicolons/slash_directive.dts');
-  const slash_directive = fs.readFileSync(slash_directive_path, 'utf8');
-
-  expect(() => parse_dts(slash_directive)).toThrowError(Error);
-
-  const property_path = path.resolve(__dirname, 'dts_source/extra_semicolons/property.dts');
-  const property = fs.readFileSync(property_path, 'utf8');
-
-  expect(() => parse_dts(property)).toThrowError(Error);
-
-  const node_path = path.resolve(__dirname, 'dts_source/extra_semicolons/node.dts');
-  const node = fs.readFileSync(node_path, 'utf8');
-
-  expect(() => parse_dts(node)).toThrowError(Error);
-});
-
-test('missing version tag', () => {
-  const source_path = path.resolve(__dirname, 'dts_source/missing_version.dts');
-  const source = fs.readFileSync(source_path, 'utf8');
-
-  expect(() => parse_dts(source)).toThrowError(Error);
-});
-
-test('delete from overlay is relative and does not remove same-named root node', () => {
-  const source_path = path.resolve(__dirname, 'dts_source/relative_delete_node_with_overlay.dts');
-  const source = fs.readFileSync(source_path, 'utf8');
-  const document = parse_dts(source);
-
-  const leds = document.root.children.find((c) => c.name === 'leds');
-
-  expect.assert.isDefined(leds);
-
-  expect(
-    leds.labels.includes('leds'),
-    'root leds label missing'
-  );
-});
-
-test('delete node from overlay successful delete', () => {
-  const source_path = path.resolve(__dirname, 'dts_source/delete_node_with_overlay.dts');
-  const source = fs.readFileSync(source_path, 'utf8');
-  const document = parse_dts(source);
-
-  const leds = document.root.children.find((c) => c.name === 'leds');
-
-  expect.assert.isDefined(leds, "Missing leds node");
-
-  const foo = leds.children.find((c) => c.name === 'foo');
-
-  expect.assert.isUndefined(foo, "Missing leds node");
-});
-
-test('delete property from overlay successful delete', () => {
-  const source_path = path.resolve(__dirname, 'dts_source/delete_property_with_overlay.dts');
-  const source = fs.readFileSync(source_path, 'utf8');
-  const document = parse_dts(source);
-
-  const leds = document.root.children.find((c) => c.name === 'leds');
-
-  expect.assert.isDefined(leds, "Missing leds node");
-
-  const property = leds.properties.find((c) => c.name === 'property');
-
-  expect.assert.isUndefined(property, "Missing leds node");
-});
-
-test('printDtso merges overlays with reference as full path and enables direct parent (status property)', () => {
-  const source_path = path.resolve(__dirname, 'dts_source/dtso/base.dts');
-  const source = fs.readFileSync(source_path, 'utf8');
-  const base = parse_dts(source);
-
-  const flag_overlay_path = path.resolve(__dirname, 'dts_source/dtso/add_flag.dtso');
-  const flag_overlay_source = fs.readFileSync(flag_overlay_path, 'utf8');
-  const flag_overlay = mergeDtso(base, flag_overlay_source);
-
-  const device_overlay_path = path.resolve(__dirname, 'dts_source/dtso/add_device.dtso');
-  const device_overlay_source = fs.readFileSync(device_overlay_path, 'utf8');
-  const mergedDocument = mergeDtso(flag_overlay, device_overlay_source);
-
-  const dtsoText = printDtso(mergedDocument);
-
-  const expected_path = path.resolve(__dirname, 'dts_source/dtso/merged_result.dtso');
-  const expected = fs.readFileSync(expected_path, 'utf8');
-
-  // NOTE: formatting really really matters
-  expect(dtsoText).toStrictEqual(expected);
-});
-
-test('comments are correctly parsed', () => {
-  const source_path = path.resolve(__dirname, 'dts_source/comments.dts');
-  const source = fs.readFileSync(source_path, 'utf8');
-
-  const document = parse_dts(source);
-  expect(document.metadata).toBeDefined();
-
-  const out = printDts(document);
-
-  const document2 = parse_dts(out);
-  expect(document2.metadata).toBeDefined();
-  expect(normalize(document2)).toStrictEqual(normalize(document));
-});
+}
+
+async function parse_dts_from_file(filename: string): Promise<DTS> {
+  const source = await readFile(path.resolve(TEST_DTS_FILES_DIR_PATH, filename), "utf8");
+  const parse_result = parse_dts(source);
+  if (Result.isError(parse_result)) {
+    expect.fail(`Failed to parse input file because: ${parse_result.error.message}`);
+  }
+  return parse_result.value.dts;
+}
+
+async function parse_dto_from_file(filename: string): Promise<DTO> {
+  const source = await readFile(path.resolve(TEST_DTS_FILES_DIR_PATH, filename), "utf8");
+  const parse_result = parse_dto(source);
+  if (Result.isError(parse_result)) {
+    expect.fail(`Failed to parse input file because: ${parse_result.error.message}`);
+  }
+  return parse_result.value.dto;
+}
+
+function normalize(document: DTS): any {
+  return JSON.parse(JSON.stringify(document, (k, v) => typeof v === "bigint" ? v.toString() : v));
+}
