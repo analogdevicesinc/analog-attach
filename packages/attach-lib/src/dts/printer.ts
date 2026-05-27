@@ -7,6 +7,7 @@ import type {
   DTLabel,
   DTPath,
   DTO,
+  DTMetadata,
 } from "./ast";
 import { Bits, is_dt_flag } from "./ast.js";
 
@@ -21,7 +22,7 @@ import { assert_never } from "../utilities.js";
  * By default, printing preserves first-seen order of properties and children,
  * adds `/dts-v1/;` and `/memreserve/` as encountered
  */
-export function print_dts(document: DTS): string {
+export function print_dts(document: DTS, metadata?: DTMetadata): string {
   const indent = "\t";
   const out: string[] = [];
 
@@ -33,36 +34,30 @@ export function print_dts(document: DTS): string {
 
   out.push(print_node(document.root, indent, 0, '/'));
 
-  //   if (document.metadata !== undefined) {
-  //     out.push(`
-  // /*
-  // ---
-  // ${DtsMetadataHeader}${stringify_as_yaml(document.metadata)}
-  // ...
-  // */
-  // `);
-  //}
+  if (metadata !== undefined) {
+    const serialized_metadata = serialize_metadata(metadata);
+    out.push(serialized_metadata);
+  }
 
   return out.join("");
 }
 
-export function print_dto(document: DTO): string {
+export function print_dto(document: DTO, metadata?: DTMetadata): string {
   const indent = "\t";
   const out: string[] = [];
 
   out.push("/dts-v1/;\n", "/plugin/;\n", print_node(document.root, indent, 0, '/'));
 
-  //   if (document.metadata !== undefined) {
-  //     out.push(`
-  // /*
-  // ---
-  // ${DtsMetadataHeader}${stringify_as_yaml(document.metadata)}
-  // ...
-  // */
-  // `);
-  //}
+  if (metadata !== undefined) {
+    const serialized_metadata = serialize_metadata(metadata);
+    out.push(serialized_metadata);
+  }
 
   return out.join("");
+}
+
+function serialize_metadata(metadata: DTMetadata): string {
+  return `/*\n${DTS_METADATA_HEADER}\n---\n${stringify_as_yaml(metadata)}\n...\n*/`;
 }
 
 /** Print a single node and its subtree. */
@@ -153,17 +148,25 @@ function print_component(component: DTValue): string {
 }
 
 /** Print a byte string as `[aa bb ...]` with preserved byte labels. */
-function print_bytes(b: DTByteArray): string {
+function print_bytes(b: DTCellArray): string {
   const parts: string[] = [];
 
-  for (const byte of b.bytes) {
+  if (b.bit_width !== Bits.b8) {
+    throw new Error("Expected bit width to be 8");
+  }
+
+  if (!b.elements.every(element => element.kind === "number")) {
+    throw new Error("Expected only numbers");
+  }
+
+  for (const byte of b.elements) {
     let labels: string = "";
 
     for (const label of byte.labels) {
       labels = labels + `${label}: `;
     }
 
-    parts.push(`${labels}${to_hex_2(byte.byte)}`);
+    parts.push(`${labels}${to_hex_2(byte.value)}`);
   }
 
   return `[${parts.join(" ")}]`;
@@ -232,7 +235,7 @@ function fmt_big_hex(n: bigint): string {
 }
 
 /** Two-digit hexadecimal for a byte. */
-function to_hex_2(n: number): string {
+function to_hex_2(n: bigint): string {
   return n.toString(16).padStart(2, "0");
 }
 
