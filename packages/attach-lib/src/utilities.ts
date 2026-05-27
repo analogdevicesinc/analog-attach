@@ -23,30 +23,10 @@ export function get_node_key(n: DTNode): string {
   return `${n.name}@${n.unit_addr ?? ""}`;
 }
 
-export function search_node_in_dts(document: DTS, node_name: string): { found_node: DTNode, parent: string } | undefined {
-
-  const { name, unit } = split_node_key(node_name);
-
-  const node = search_node_impl(document.root, [document.root.name], name, unit);
-
-  return node;
+export function search_node_in_dts(document: DTS, node_identifier: string): { found_node: DTNode, parent: string } | undefined {
+  const [name, unit_addr] = node_identifier.split("@");
+  return search_node_impl(document.root, [document.root.name], name, unit_addr);
 }
-
-// export function search_node_in_unresolved_overlays(unresolved_overlays: Array<UnresolvedOverlay>, node_name: string): { node: DTNode, parent: string } | undefined {
-
-//     const { name, unit } = split_node_key(node_name);
-
-//     for (const unresolved of unresolved_overlays) {
-
-//         const node = search_node_impl(unresolved.overlay_node, [unresolved.overlay_node.name], name, unit);
-
-//         if (node !== undefined) {
-//             return { node: node.found_node, parent: node.parent };
-//         }
-//     }
-
-//     return undefined;
-// }
 
 function search_node_impl(root: DTNode, path: string[], name: string, unit?: string): { found_node: DTNode, parent: string } | undefined {
 
