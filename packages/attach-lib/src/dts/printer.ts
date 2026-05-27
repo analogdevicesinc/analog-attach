@@ -1,19 +1,19 @@
-import {
-  type DTCellArray,
-  type DTByteArray,
-  type DTNode,
-  type DTProperty,
-  type DTValue,
-  type DTS,
-  is_dt_flag,
+import type {
+  DTCellArray,
+  DTNode,
+  DTProperty,
+  DTValue,
+  DTS,
   DTLabel,
   DTPath,
-  Bits,
   DTO,
-} from "./ast.js";
+} from "./ast";
+import { Bits, is_dt_flag } from "./ast.js";
 
 import { stringify as stringify_as_yaml } from "yaml";
-import { DtsMetadataHeader } from "./constants.js";
+import { DTS_METADATA_HEADER } from "./parser";
+
+import { assert_never } from "../utilities.js";
 
 /**
  * Print a DtsDocument back to DTS text.
@@ -136,27 +136,19 @@ function print_component(component: DTValue): string {
   }
 
   switch (component.kind) {
-    case "string":
-      {
-        return `${labels}"${component.value}"`;
-      }
-    case "bytes":
-      {
-        return `${labels}${print_bytes(component)}`;
-      }
-    case "array":
-      {
-        return `${labels}${print_array(component)}`;
-      }
-    case "label": case "path":
-      {
-        return `${labels}${print_references(component)}`;
-      }
-    default:
-      {
-        const _x: never = component;
-        throw new Error("Failed exhaustive switch!");
-      }
+    case "string": {
+      return `${labels}"${component.value}"`;
+    }
+    case "array": {
+      return `${labels}${print_array(component)}`;
+    }
+    case "label":
+    case "path": {
+      return `${labels}${print_references(component)}`;
+    }
+    default: {
+      assert_never(component);
+    }
   }
 }
 
@@ -219,15 +211,17 @@ function print_array(a: DTCellArray): string {
 
 /** Print a reference as `&label` or `&{/path}`. */
 function print_references(r: DTLabel | DTPath): string {
-  if (r.kind === "label") {
-    const name = r.name;
-    // TODO: remove check
-    return name.startsWith("&") ? name : `&${name}`;
+  switch (r.kind) {
+    case "label": {
+      return `&${r.name}`;
+    }
+    case "path": {
+      return `\${${r.path}}`;
+    }
+    default: {
+      assert_never(r);
+    }
   }
-
-  const path = r.path;
-  // TODO: remove check
-  return path.startsWith("&") ? path : `&{${path}}`;
 }
 
 /** Print a BigInt as hexadecimal (with `0x`, handling negative). */

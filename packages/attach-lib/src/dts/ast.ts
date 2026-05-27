@@ -11,13 +11,25 @@ export enum Bits {
   b64 = 64
 }
 
+export function is_bits(value: any): value is Bits {
+  if (value === undefined || value === null) {
+    return false;
+  }
+
+  if (typeof value !== "number") {
+    return false;
+  }
+
+  return Object.values(Bits).filter(v => typeof v === "number").includes(value);
+}
+
 export type Memreserve = {
   address: bigint,
   length: bigint,
 };
 
 export type DTS<T extends DTNode = DTNode<DTProperty>> = {
-  memreserves: Array<Memreserve>;
+  memreserves: Memreserve[];
   root: T;
 }
 
@@ -25,16 +37,13 @@ export type DTO<T extends DTNode = DTNode<DTProperty>> = {
   root: T;
 }
 
-/** Node within the DTS tree (`name[@unit]`). */
 export interface DTNode<T extends DTProperty = DTProperty> extends Labeled {
   name: string;
-  /** Raw text after `@` (unit address), preserved as-is. */
   unit_addr: string | undefined;
   properties: T[];
   children: this[];
 }
 
-/** Property inside a node. */
 export type DTProperty = Labeled & {
   name: string;
   value: DTValue[] | DTFlag;
@@ -65,7 +74,6 @@ export function is_dt_flag(object: any): object is DTFlag {
 
 export type DTValue =
   | DTString
-  | DTByteArray
   | DTCellArray
   | DTLabel
   | DTPath
@@ -75,17 +83,10 @@ export type DTString = Labeled & {
   value: string;
 }
 
-export type DTByteArray = Labeled & {
-  kind: "bytes";
-  // Each byte is 0..255; labels may annotate specific bytes. 
-  // TODO: think of better solution
-  bytes: Array<Labeled & { byte: number }>;
-}
-
 export type DTCellArray = Labeled & {
   kind: "array";
   bit_width: Bits;
-  elements: Array<CellArrayElement>;
+  elements: CellArrayElement[];
 }
 
 export type CellArrayElement =
@@ -113,8 +114,63 @@ export type DTLabel = Labeled & {
 export type DTPath = Labeled & {
   kind: "path";
   path: string
-};
+}
 
+export type Version = string;
+
+export function isVersion(object: any): object is Version {
+  if (typeof object !== "string") {
+    return false;
+  }
+
+  const version_regex = /^\d+\.\d+\.\d+$/;
+  if (!version_regex.test(object)) {
+    return false;
+  }
+
+  return true;
+}
+
+export type DTPathToPropertyOrNode = string;
+
+export function isDTPathToNodeOrProperty(object: any): object is DTPathToPropertyOrNode {
+  return typeof object === "string";
+}
+
+export function isArrayOfDTPathToNodeOrProperty(object: any): object is DTPathToPropertyOrNode[] {
+  return Array.isArray(object) && object.every(element => typeof element === "string");
+}
+
+export type DTMetadata = {
+  version: Version;
+  modifications: DTPathToPropertyOrNode[];
+}
+
+export function isDTMetadata(object: any): object is DTMetadata {
+  if (typeof object !== 'object' || object === null) {
+    return false;
+  }
+
+  if (Object.keys(object).length !== 2) {
+    return false;
+  }
+
+  if (!("version" in object) || !("modifications" in object)) {
+    return false;
+  }
+
+  if (!isVersion(object.version)) {
+    return false;
+  }
+
+  if (!isArrayOfDTPathToNodeOrProperty(object.modifications)) {
+    return false;
+  }
+
+  return true;
+}
+
+// TODO: obsolete when DTBuilder is integrated
 
 export function create_flag(name: string, labels?: string[]): DTProperty {
   return {
@@ -144,8 +200,6 @@ export function create_string_array(name: string, value: string | string[], labe
 
   };
 }
-
-// TODO: obsolete when DTBuilder is integrated
 
 export type CellArrayString = {
   value: string,
