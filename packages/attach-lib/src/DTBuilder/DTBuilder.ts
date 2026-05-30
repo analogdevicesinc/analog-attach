@@ -206,6 +206,7 @@ interface INodeBuilderCallOnce {
     with_label: (label: string | string[]) => void;
     with_unit_address: (unit_address: string) => void;
     with_properties: (properties: DTProperty | DTProperty[]) => void;
+    with_children: (children: INodeBuilderBase | INodeBuilderBase[]) => void;
 }
 
 type INodeBuilder = AddCallOnce<INodeBuilderBase, INodeBuilderCallOnce>;
@@ -247,6 +248,12 @@ export class NodeBuilder implements INodeNameBuilder, INodeBuilder {
 
     with_properties(properties: DTProperty | DTProperty[]): INodeBuilder {
         this.node.properties = Array.isArray(properties) ? properties : [properties];
+        return this;
+    }
+
+    with_children(children: INodeBuilderBase | INodeBuilderBase[]): INodeBuilder {
+        const childArray = Array.isArray(children) ? children : [children];
+        this.node.children = childArray.map(child => child.build());
         return this;
     }
 }

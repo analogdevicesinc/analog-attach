@@ -1,6 +1,6 @@
-import { INodeBuilderBase, PropertyBuilder } from "./DTBuilder/DTBuilder";
-import { DTS, DTNode, parse_dts, DTLabel, DTPath, get_full_node_name, DTProperty, is_dt_flag } from "./dts";
-import { print_dts } from "./dts/printer";
+import { INodeBuilderBase, NodeBuilder, PropertyBuilder } from "./DTBuilder/DTBuilder";
+import { DTS, DTNode, parse_dts, parse_dto, DTLabel, DTPath, get_full_node_name, DTProperty, is_dt_flag, DTO } from "./dts";
+import { print_dts, print_dto } from "./dts/printer";
 import path from 'node:path';
 import * as fs from 'node:fs';
 
@@ -330,6 +330,144 @@ export class DeviceTree {
 
     public print(): string {
         return print_dts(this.devicetree);
+    }
+}
+
+export class DeviceTreeOverlay {
+
+    private overlay: DTO;
+    private readonly base_dts: DeviceTree | undefined;
+
+    private constructor(overlay: DTO, base_dts: DeviceTree | undefined) {
+        this.overlay = overlay;
+        this.base_dts = base_dts;
+    }
+
+    static new_from_string(content: string, base_dts?: DeviceTree): DeviceTreeOverlay | string {
+        try {
+            const dto = parse_dto(content);
+
+            if (typeof dto === 'string') {
+                return "Failed to parse overlay!";
+            }
+
+            return new DeviceTreeOverlay(dto, base_dts);
+        } catch (error) {
+            return error instanceof Error ? error.message : "Failed to parse overlay!";
+        }
+    }
+
+    static new_from_file(file_path: string, base_dts?: DeviceTree): DeviceTreeOverlay | string {
+        try {
+            const content = fs.readFileSync(file_path, 'utf8');
+            return DeviceTreeOverlay.new_from_string(content, base_dts);
+        } catch (error) {
+            return error instanceof Error ? error.message : "Failed to read file!";
+        }
+    }
+
+    static new_empty(base_dts?: DeviceTree): DeviceTreeOverlay {
+        return new DeviceTreeOverlay(
+            {
+                root: {
+                    name: "/",
+                    unit_addr: undefined,
+                    labels: [],
+                    children: [],
+                    properties: [],
+                },
+            },
+            base_dts,
+        );
+    }
+
+    public get_base_dts(): DeviceTree | undefined {
+        return this.base_dts;
+    }
+
+    public add_fragment(target_label: DTLabel, node: INodeBuilderBase): void {
+        const targetProperty = PropertyBuilder.build_cell_array()
+            .with_tagged_values(PropertyBuilder.tag_label(target_label.name))
+            .with_name("target")
+            .build();
+
+        const overlayNode = NodeBuilder.new()
+            .with_name("__overlay__")
+            .with_children(node);
+
+        const fragment = NodeBuilder.new()
+            .with_name("fragment")
+            .with_properties(targetProperty)
+            .with_children(overlayNode)
+            .build();
+
+        this.overlay.root.children.push(fragment);
+    }
+
+    public add_fragment_by_path(target_path: DTPath, node: INodeBuilderBase): void {
+        const targetProperty = PropertyBuilder.build_string()
+            .with_value(target_path.path)
+            .with_name("target-path")
+            .build();
+
+        const overlayNode = NodeBuilder.new()
+            .with_name("__overlay__")
+            .with_children(node);
+
+        const fragment = NodeBuilder.new()
+            .with_name("fragment")
+            .with_properties(targetProperty)
+            .with_children(overlayNode)
+            .build();
+
+        this.overlay.root.children.push(fragment);
+    }
+
+    public as_stream(order: TraversalOrder = "DFS"): Stream<DTNode, DTPath> {
+        return new Stream(this.as_generator(this.overlay.root, "/", order));
+    }
+
+    private *as_generator(root: DTNode, currentPath: string, order: TraversalOrder): Generator<[DTNode, DTPath]> {
+        const make_path = (p: string): DTPath => ({ kind: "path", labels: [], path: p });
+
+        if (order === "DFS") {
+            yield [root, make_path(currentPath)];
+
+            for (const child of root.children) {
+                const childPath = currentPath === "/"
+                    ? `/${get_full_node_name(child)}`
+                    : `${currentPath}/${get_full_node_name(child)}`;
+
+                yield* this.as_generator(child, childPath, order);
+            }
+        } else {
+            const queue: [DTNode, string][] = [[root, currentPath]];
+
+            while (queue.length > 0) {
+                const [node, nodePath] = queue.shift()!;
+
+                yield [node, make_path(nodePath)];
+
+                for (const child of node.children) {
+                    const childPath = nodePath === "/"
+                        ? `/${get_full_node_name(child)}`
+                        : `${nodePath}/${get_full_node_name(child)}`;
+
+                    queue.push([child, childPath]);
+                }
+            }
+        }
+    }
+
+    public get_fragments(): DTNode[] {
+        return this.as_stream()
+            .filter((node) => node.name === "fragment" || node.name.startsWith("fragment@"))
+            .toArray()
+            .map(([node]) => node);
+    }
+
+    public print(): string {
+        return print_dto(this.overlay);
     }
 }
 
