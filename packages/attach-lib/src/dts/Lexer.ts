@@ -7,7 +7,7 @@ import { TokenKind, RawToken, Token } from "./tokens";
 import { is_dt_directive, is_char_token } from "./tokens";
 
 const TOKEN_KIND_AND_REGEX_PAIRS = [
-  // 1. Comments (Highest priority - they must "eat" slashes before anything else)
+  // 1. Comments (Highest priority - they must consume slashes before anything else)
   [TokenKind.CommentLine, /\/\/.*/y],
   [TokenKind.CommentBlock, /\/\*[\s\S]*?\*\//y],
 
@@ -60,12 +60,14 @@ export class Lexer {
         break;
       }
 
+      const coordinates = this.input_stream.current_coordinates;
       const match_result = this.try_match();
       if (Result.isError(match_result)) {
         return match_result;
       }
 
-      this.emit(match_result.value);
+      const { value: token } = match_result;
+      this.emit(token, coordinates);
     }
 
     return Result.ok({
@@ -129,6 +131,7 @@ export class Lexer {
         }
       }
     }
+
     return Result.error({
       code: LexerErrorCode.UnknownChar,
       message: `Unknown char met while lexing`,
@@ -136,12 +139,12 @@ export class Lexer {
     });
   }
 
-  private emit(token: RawToken) {
-    const t: Token = { ...token, ...this.input_stream.current_coordinates };
+  private emit(raw_token: RawToken, coordinates: CoordinatesIn2D) {
+    const token: Token = { ...raw_token, ...coordinates };
     if (token.kind === TokenKind.CommentBlock || token.kind === TokenKind.CommentLine) {
-      this.trivia.push(t);
+      this.trivia.push(token);
     } else {
-      this.tokens.push(t);
+      this.tokens.push(token);
     }
   }
 }
