@@ -35,24 +35,26 @@ type DeletableProperty = Deletable<DTProperty>;
 type DeletableNode = Deletable<DTNode<DeletableProperty>>;
 
 export class ParserException extends Error {
-  constructor(
-    message: string,
-    public readonly current_token?: Token,
-    public readonly expected_token?: RawToken
-  ) {
-    const coords = current_token ? ` at ${current_token.row}:${current_token.col}` : "";
-    const found = current_token ? ` found ${current_token.kind}${current_token.value ? ` '${current_token.value}'` : ""})` : "";
-    const expected = expected_token ? `, expected ${JSON.stringify(expected_token)}` : "";
+  constructor({ message, found, expected }: ParseError) {
 
-    super(`${message}${coords}${found}${expected}`);
+    if (found !== undefined) {
+      message += `, at ${found.row}:${found.col}`;
+      message += `, found ${JSON.stringify(found, undefined, 4)}`;
+    }
+
+    if (expected !== undefined) {
+      message += `, expected ${JSON.stringify(expected)}`;
+    }
+
+    super(message);
     this.name = "ParserException";
   }
 }
 
-export type ParserError = {
+export type ParseError = {
   message: string;
-  row?: number;
-  col?: number;
+  found?: Token;
+  expected?: RawToken;
 }
 
 export type DTSParseResult = {
@@ -71,7 +73,7 @@ export class Parser {
     private readonly trivia_stream: TokenStream,
   ) { }
 
-  public parse_dts(): Result<DTSParseResult, ParserError> {
+  public parse_dts(): Result<DTSParseResult, ParseError> {
     try {
       this.consume_directive_token_then_advance(DTDirective.DTSV1);
       this.consume_char_token_then_advance(CharTokenKind.Semicolon);
@@ -124,7 +126,7 @@ export class Parser {
     }
   }
 
-  public parse_dto(): Result<DTOParseResult, ParserError> {
+  public parse_dto(): Result<DTOParseResult, ParseError> {
     try {
       this.consume_directive_token_then_advance(DTDirective.DTSV1);
       this.consume_char_token_then_advance(CharTokenKind.Semicolon);
@@ -151,14 +153,17 @@ export class Parser {
 
             const node_identifier_token = this.token_stream.current;
             if (node_identifier_token.kind !== TokenKind.Identifier) {
-              throw new ParserException("Expected node/fragment identifier", node_identifier_token);
+              throw new ParserException({
+                message: "Expected node/fragment identifier",
+                found: node_identifier_token
+              });
             }
 
             if (children_map.has(node_identifier_token.value)) {
-              throw new ParserException(
-                "Previously defined node with this identifier might conflict",
-                node_identifier_token
-              );
+              throw new ParserException({
+                message: "Previously defined node with this identifier might conflict",
+                found: node_identifier_token
+              });
             }
 
             const node = this.parse_node_statement(labels);
@@ -214,7 +219,10 @@ export class Parser {
               };
             }
 
-            throw new ParserException("Expected reference (path or label)", current);
+            throw new ParserException({
+              message: "Expected reference (path or label)",
+              found: current
+            });
           })();
 
           const overlay_properties_map = new Map<string, DeletableProperty>();
@@ -228,7 +236,7 @@ export class Parser {
 
             const current = this.token_stream.current;
 
-            // Ignoreing /delete-*/ identifier;
+            // Ignoring /delete-*/ identifier;
 
             if (current.kind === TokenKind.Directive) {
               if (current.value === DTDirective.DeleteNode || current.value === DTDirective.DeleteProperty) {
@@ -237,29 +245,41 @@ export class Parser {
                 this.consume_char_token_then_advance(CharTokenKind.Semicolon);
                 continue;
               }
-              throw new ParserException("Unexpected directive within node", current);
+              throw new ParserException({
+                message: "Unexpected directive within node",
+                found: current
+              });
             }
 
             if (current.kind !== TokenKind.Identifier) {
-              throw new ParserException("Looking for identifier that represents property/child name", current);
+              throw new ParserException({
+                message: "Looking for identifier that represents property/child name",
+                found: current
+              });
             }
 
             const next = Option.unwrap(this.token_stream.lookahead(1));
             if (next.kind !== TokenKind.Char) {
-              throw new ParserException("Property/Child name must be followed by '=', '{', or ';'", next);
+              throw new ParserException({
+                message: "Property/Child name must be followed by '=', '{', or ';'",
+                found: next
+              });
             }
 
             // Properties
 
             if (next.value === CharTokenKind.Equals || next.value === CharTokenKind.Semicolon) {
               if (overlay_children_map.size > 0) {
-                throw new ParserException("Properties must be defined before children");
+                throw new ParserException({ message: "Properties must be defined before children" });
               }
 
               const property_name = current.value;
 
               if (overlay_properties_map.has(property_name)) {
-                throw new ParserException("Property name will conflict with another previously defined property", current);
+                throw new ParserException({
+                  message: "Property name will conflict with another previously defined property",
+                  found: current
+                });
               }
 
               const property = this.parse_property_statement(labels);
@@ -273,11 +293,17 @@ export class Parser {
               const node_identifier = current.value;
 
               if (overlay_properties_map.has(node_identifier)) {
-                throw new ParserException("Node name will conflict with prefious defined property name", current);
+                throw new ParserException({
+                  message: "Node name will conflict with previous defined property name",
+                  found: current
+                });
               }
 
               if (overlay_children_map.has(node_identifier)) {
-                throw new ParserException("Node name will conflict with another previously defined node name", current);
+                throw new ParserException({
+                  message: "Node name will conflict with another previously defined node name",
+                  found: current
+                });
               }
 
               const node = this.parse_node_statement(labels);
@@ -285,7 +311,10 @@ export class Parser {
               continue;
             }
 
-            throw new ParserException("Expected '{','=' or ';' after property/child identifier", next);
+            throw new ParserException({
+              message: "Expected '{','=' or ';' after property/child identifier",
+              found: next
+            });
           }
 
           this.consume_char_token_then_advance(CharTokenKind.RBrace);
@@ -379,23 +408,32 @@ export class Parser {
           continue;
         }
 
-        throw new ParserException("Unexpected directive within overlay", current);
+        throw new ParserException({
+          message: "Unexpected directive within overlay",
+          found: current
+        });
       }
 
       if (current.kind !== TokenKind.Identifier) {
-        throw new ParserException("Expected child/property name identifier", current);
+        throw new ParserException({
+          message: "Expected child/property name identifier",
+          found: current
+        });
       }
 
       const next = Option.unwrap(this.token_stream.lookahead(1));
       if (next.kind !== TokenKind.Char) {
-        throw new ParserException("Property/Child name must be followed by '=', '{', or ';'", next);
+        throw new ParserException({
+          message: "Property/Child name must be followed by '=', '{', or ';'",
+          found: next
+        });
       }
 
       // Property Override
 
       if (next.value === CharTokenKind.Equals || next.value === CharTokenKind.Semicolon) {
         if (defined_at_least_one_child) {
-          throw new ParserException("Properties must be defined before children");
+          throw new ParserException({ message: "Properties must be defined before children" });
         }
 
         const property = this.parse_property_statement(labels);
@@ -436,7 +474,10 @@ export class Parser {
         continue;
       }
 
-      throw new ParserException("Expected '{','=' or ';' after property/child identifier", next);
+      throw new ParserException({
+        message: "Expected '{','=' or ';' after property/child identifier",
+        found: next
+      });
     }
 
     this.consume_char_token_then_advance(CharTokenKind.RBrace);
@@ -478,11 +519,11 @@ export class Parser {
     })();
 
     if (name === "/" && labels.length > 0) {
-      throw new ParserException("Root node cannot have labels");
+      throw new ParserException({ message: "Root node cannot have labels" });
     }
 
     if (name === "/" && unit_addr !== undefined) {
-      throw new ParserException("Root node cannot have a unit address");
+      throw new ParserException({ message: "Root node cannot have a unit address" });
     }
 
     // Node Body Start {
@@ -500,7 +541,7 @@ export class Parser {
 
       const current = this.token_stream.current;
 
-      // Ignoreing /delete-*/ identifier;
+      // Ignoring /delete-*/ identifier;
 
       if (current.kind === TokenKind.Directive) {
         if (current.value === DTDirective.DeleteNode || current.value === DTDirective.DeleteProperty) {
@@ -509,29 +550,41 @@ export class Parser {
           this.consume_char_token_then_advance(CharTokenKind.Semicolon);
           continue;
         }
-        throw new ParserException("Unexpected directive within node", current);
+        throw new ParserException({
+          message: "Unexpected directive within node",
+          found: current
+        });
       }
 
       if (current.kind !== TokenKind.Identifier) {
-        throw new ParserException("Looking for identifier that represents property/child name", current);
+        throw new ParserException({
+          message: "Looking for identifier that represents property/child name",
+          found: current
+        });
       }
 
       const next = Option.unwrap(this.token_stream.lookahead(1));
       if (next.kind !== TokenKind.Char) {
-        throw new ParserException("Property/Child name must be followed by '=', '{', or ';'", next);
+        throw new ParserException({
+          message: "Property/Child name must be followed by '=', '{', or ';'",
+          found: next
+        });
       }
 
       // Properties
 
       if (next.value === CharTokenKind.Equals || next.value === CharTokenKind.Semicolon) {
         if (children_map.size > 0) {
-          throw new ParserException("Properties must be defined before children");
+          throw new ParserException({ message: "Properties must be defined before children" });
         }
 
         const property_name = current.value;
 
         if (properties_map.has(property_name)) {
-          throw new ParserException("Property name will conflict with another previously defined property", current);
+          throw new ParserException({
+            message: "Property name will conflict with another previously defined property",
+            found: current
+          });
         }
 
         const property = this.parse_property_statement(labels);
@@ -545,11 +598,17 @@ export class Parser {
         const node_identifier = current.value;
 
         if (properties_map.has(node_identifier)) {
-          throw new ParserException("Node name will conflict with prefious defined property name", current);
+          throw new ParserException({
+            message: "Node name will conflict with previous defined property name",
+            found: current
+          });
         }
 
         if (children_map.has(node_identifier)) {
-          throw new ParserException("Node name will conflict with another previously defined node name", current);
+          throw new ParserException({
+            message: "Node name will conflict with another previously defined node name",
+            found: current
+          });
         }
 
         const node = this.parse_node_statement(labels);
@@ -557,7 +616,10 @@ export class Parser {
         continue;
       }
 
-      throw new ParserException("Expected '{','=' or ';' after property/child identifier", next);
+      throw new ParserException({
+        message: "Expected '{','=' or ';' after property/child identifier",
+        found: next
+      });
     }
 
     // Node Body End };
@@ -617,8 +679,7 @@ export class Parser {
 
         const bits = Number.parseInt(this.consume_number_token_then_advance());
         if (!is_bits(bits)) {
-          throw new ParserException(
-            `Invalid bits value: ${bits}. Expected 8, 16, 32 or 64. Got: ${bits}`);
+          throw new ParserException({ message: `Invalid bits value: ${bits}. Expected 8, 16, 32 or 64. Got: ${bits}` });
         }
 
         const cell_array = this.parse_cell_array(labels, bits);
@@ -650,7 +711,10 @@ export class Parser {
         continue;
       }
 
-      throw new ParserException("Failed to parse property value. Met unknown token", current);
+      throw new ParserException({
+        message: "Failed to parse property value. Met unknown token",
+        found: current
+      });
     }
 
     this.consume_char_token_then_advance(CharTokenKind.Semicolon);
@@ -661,10 +725,10 @@ export class Parser {
   private consume_identifier_token_then_advance(): string {
     const current = this.token_stream.current;
     if (current.kind !== TokenKind.Identifier) {
-      throw new ParserException(
-        "Tried to consume identifier, but met other kind of token",
-        this.token_stream.current
-      );
+      throw new ParserException({
+        message: "Tried to consume identifier, but met other kind of token",
+        found: this.token_stream.current
+      });
     }
     this.token_stream.advance();
     return current.value;
@@ -682,11 +746,17 @@ export class Parser {
 
       const current = this.token_stream.current;
       if (current.kind !== TokenKind.Identifier && current.kind !== TokenKind.Number) {
-        throw new ParserException("Unexpected token within bytestring", current);
+        throw new ParserException({
+          message: "Unexpected token within bytestring",
+          found: current
+        });
       }
 
       if (current.value.length % 2 !== 0) {
-        throw new ParserException("Bytes can be represented without space, but the number of hex digits must be even", current);
+        throw new ParserException({
+          message: "Bytes can be represented without space, but the number of hex digits must be even",
+          found: current
+        });
       }
 
       const bytes = current.value.match(/.{1,2}/g) || [];
@@ -741,7 +811,10 @@ export class Parser {
         continue;
       }
 
-      throw new ParserException("Failed to parse cell array component. Expecting a reference, number or expression", current);
+      throw new ParserException({
+        message: "Failed to parse cell array component. Expecting a reference, number or expression",
+        found: current
+      });
     }
 
     this.consume_char_token_then_advance(CharTokenKind.RAngle);
@@ -767,7 +840,7 @@ export class Parser {
     } while (!this.token_stream.done && open_parentheses > 0);
 
     if (open_parentheses !== 0) {
-      throw new ParserException("Expression's open parentheses number doesn't match close ones");
+      throw new ParserException({ message: "Expression's open parentheses number doesn't match close ones" });
     }
 
     return expression;
@@ -785,17 +858,19 @@ export class Parser {
   private consume_directive_token_then_advance(directive: DTDirective): DirectiveToken & CoordinatesIn2D {
     const current = this.token_stream.current;
     if (current.kind !== TokenKind.Directive) {
-      throw new ParserException(
-        "Failed to consume directive token", current,
-        { kind: TokenKind.Directive, value: directive }
-      );
+      throw new ParserException({
+        message: "Failed to consume directive token",
+        found: current,
+        expected: { kind: TokenKind.Directive, value: directive }
+      });
     }
 
     if (current.value !== directive) {
-      throw new ParserException(
-        "Failed to consume specific directive token", current,
-        { kind: TokenKind.Directive, value: directive }
-      );
+      throw new ParserException({
+        message: "Failed to consume specific directive token",
+        found: current,
+        expected: { kind: TokenKind.Directive, value: directive }
+      });
     }
 
     this.token_stream.advance();
@@ -805,17 +880,19 @@ export class Parser {
   private consume_char_token_then_advance(char_kind: CharTokenKind): CharToken & CoordinatesIn2D {
     const current = this.token_stream.current;
     if (current.kind !== TokenKind.Char) {
-      throw new ParserException(
-        "Failed to consume char token", current,
-        { kind: TokenKind.Char, value: char_kind }
-      );
+      throw new ParserException({
+        message: "Failed to consume char token",
+        found: current,
+        expected: { kind: TokenKind.Char, value: char_kind }
+      });
     }
 
     if (current.value !== char_kind) {
-      throw new ParserException(
-        "Failed to consume specific char token", current,
-        { kind: TokenKind.Char, value: char_kind }
-      );
+      throw new ParserException({
+        message: "Failed to consume specific char token",
+        found: current,
+        expected: { kind: TokenKind.Char, value: char_kind }
+      });
     }
 
     this.token_stream.advance();
@@ -825,7 +902,10 @@ export class Parser {
   private consume_number_token_then_advance(): string {
     const current = this.token_stream.current;
     if (current.kind !== TokenKind.Number) {
-      throw new ParserException("Failed to consume number token", current);
+      throw new ParserException({
+        message: "Failed to consume number token",
+        found: current
+      });
     }
 
     this.token_stream.advance();
@@ -838,11 +918,14 @@ export class Parser {
       if (current.value === CharTokenKind.Slash) {
         return root;
       }
-      throw new ParserException("Expected / or label/path reference");
+      throw new ParserException({ message: "Expected / or label/path reference" });
     }
 
     if (current.kind !== TokenKind.LabelReference && current.kind !== TokenKind.PathReference) {
-      throw new ParserException("Invalid token, expected label or path reference", current);
+      throw new ParserException({
+        message: "Invalid token, expected label or path reference",
+        found: current
+      });
     }
 
     const search_result = current.kind === TokenKind.LabelReference
@@ -850,7 +933,7 @@ export class Parser {
       : find_node_by_path(root, current.value);
 
     if (Option.isNone(search_result)) {
-      throw new ParserException(`Invalid reference`, current);
+      throw new ParserException({ message: `Invalid reference`, found: current });
     }
 
     return search_result.value;
@@ -864,7 +947,7 @@ export class Parser {
           const metadata = parse_yaml_string(current.value.replace(DTS_METADATA_HEADER, ""));
           return isDTMetadata(metadata) ? metadata : undefined;
         } catch (error) {
-          throw new ParserException(`Failed to parse metadata, because: ${error}`);
+          throw new ParserException({ message: `Failed to parse metadata, unexpected error: ${error}` });
         }
       }
       this.trivia_stream.advance();
@@ -874,13 +957,13 @@ export class Parser {
 
 // Public utilities
 
-export function parse_dts(raw: string): Result<DTSParseResult, ParserError> {
+export function parse_dts(raw: string): Result<DTSParseResult, ParseError> {
   const lexer_input_stream = new LexerInputStream(raw);
   const lexer = new Lexer(lexer_input_stream);
 
   const lexing_result = lexer.lex();
   if (Result.isError(lexing_result)) {
-    return Result.error({ message: `Lexing failed with: ${lexing_result.error}` });
+    return Result.error({ message: `Lexing failed with: ${lexing_result.error.message}` });
   }
 
   const { tokens, trivia } = lexing_result.value;
@@ -889,7 +972,7 @@ export function parse_dts(raw: string): Result<DTSParseResult, ParserError> {
   return parser.parse_dts();
 }
 
-export function parse_dto(raw: string): Result<DTOParseResult, ParserError> {
+export function parse_dto(raw: string): Result<DTOParseResult, ParseError> {
   const lexer_input_stream = new LexerInputStream(raw);
   const lexer = new Lexer(lexer_input_stream);
 
@@ -920,7 +1003,7 @@ function find_node_by_label(root: DeletableNode, label: string): Option<Deletabl
 
 function find_node_by_path(root: DeletableNode, path: string): Option<DeletableNode> {
   if (path.length === 0 || !path.startsWith("/")) {
-    throw new ParserException(`Invalid path reference: ${path}`);
+    throw new ParserException({ message: `Invalid path reference: ${path}` });
   }
 
   if (path === "/") {
