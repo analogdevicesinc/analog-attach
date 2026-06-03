@@ -175,7 +175,7 @@ export class Parser {
         }
       } else {
 
-        // Parsing overlays and transform them to fragments
+        // Parsing overlays and transform them into fragments
         let current_number_of_fragments = 0;
 
         while (!this.token_stream.done) {
@@ -378,6 +378,7 @@ export class Parser {
       const current = this.token_stream.current;
 
       // Delete Directive
+
       if (current.kind === TokenKind.Directive) {
         if (current.value === DTDirective.DeleteNode) {
           this.token_stream.advance();
@@ -462,7 +463,9 @@ export class Parser {
         defined_at_least_one_child = true;
 
         const [name, unit_addr] = split_node_identifier(current.value);
-        const existing_child = target_node.children.find(c => c.name === name && c.unit_addr === unit_addr);
+        const existing_child = target_node.children
+          .find(c => c.name === name && c.unit_addr === unit_addr);
+
         if (existing_child) {
           this.token_stream.advance();
           this.parse_and_apply_overlay_statement(labels, existing_child);
@@ -653,6 +656,7 @@ export class Parser {
     }
 
     // Property with value(s) case
+
     this.consume_char_token_then_advance(CharTokenKind.Equals);
 
     const property_value_components = new Array<DTValue>();
@@ -668,11 +672,15 @@ export class Parser {
 
       const current = this.token_stream.current;
 
+      // string
+
       if (current.kind === TokenKind.String) {
         property_value_components.push({ labels, kind: "string", value: current.value });
         this.token_stream.advance();
         continue;
       }
+
+      // cell array (specified bit width)
 
       if (current.kind === TokenKind.Directive) {
         this.consume_directive_token_then_advance(DTDirective.Bits);
@@ -687,11 +695,15 @@ export class Parser {
         continue;
       }
 
+      // cell array
+
       if (current.kind === TokenKind.Char && current.value === CharTokenKind.LAngle) {
         const cell_array = this.parse_cell_array(labels);
         property_value_components.push(cell_array);
         continue;
       }
+
+      // bytestring
 
       if (current.kind === TokenKind.Char && current.value === CharTokenKind.LBracket) {
         const cell_array = this.parse_bytestring(labels);
@@ -699,17 +711,23 @@ export class Parser {
         continue;
       }
 
+      // label reference
+
       if (current.kind === TokenKind.LabelReference) {
         property_value_components.push({ labels, kind: "label", name: current.value });
         this.token_stream.advance();
         continue;
       }
 
+      // path reference
+
       if (current.kind === TokenKind.PathReference) {
         property_value_components.push({ labels, kind: "path", path: current.value });
         this.token_stream.advance();
         continue;
       }
+
+      // unknown
 
       throw new ParserException({
         message: "Failed to parse property value. Met unknown token",
@@ -1026,27 +1044,23 @@ function find_node_by_path(root: DeletableNode, path: string): Option<DeletableN
     : Option.none();
 }
 
-function strip_node(node: DeletableNode): DTNode {
-  const { deleted, ...rest } = node;
-  const a = {
+function strip_node({ deleted, properties, children, ...rest }: DeletableNode): DTNode {
+  return {
     ...rest,
-    properties: node.properties
+    properties: properties
       .filter(p => !p.deleted)
       .map(p => strip_property(p)),
-    children: node.children
+    children: children
       .filter(c => !c.deleted)
       .map(c => strip_node(c)),
   };
-  return a;
 }
 
 function strip_property({ deleted, ...rest }: DeletableProperty): DTProperty {
   return rest;
 };
 
-function split_node_identifier(
-  identifier: string
-): [string, string | undefined] {
+function split_node_identifier(identifier: string): [string, string | undefined] {
   const [name, unit_addr] = identifier.split("@");
   return [name, unit_addr];
 }
