@@ -131,45 +131,24 @@ function print_component(component: DTValue): string {
   }
 
   switch (component.kind) {
-    case "string": {
-      return `${labels}"${component.value}"`;
-    }
-    case "array": {
-      return `${labels}${print_array(component)}`;
-    }
+    case "string":
+      {
+        return `${labels}"${component.value}"`;
+      }
+    case "array":
+      {
+        return `${labels}${print_array(component)}`;
+      }
     case "label":
-    case "path": {
-      return `${labels}${print_references(component)}`;
-    }
-    default: {
-      assert_never(component);
-    }
+    case "path":
+      {
+        return `${labels}${print_references(component)}`;
+      }
+    default:
+      {
+        assert_never(component);
+      }
   }
-}
-
-/** Print a byte string as `[aa bb ...]` with preserved byte labels. */
-function print_bytes(b: DTCellArray): string {
-  const parts: string[] = [];
-
-  if (b.bit_width !== Bits.b8) {
-    throw new Error("Expected bit width to be 8");
-  }
-
-  if (!b.elements.every(element => element.kind === "number")) {
-    throw new Error("Expected only numbers");
-  }
-
-  for (const byte of b.elements) {
-    let labels: string = "";
-
-    for (const label of byte.labels) {
-      labels = labels + `${label}: `;
-    }
-
-    parts.push(`${labels}${to_hex_2(byte.value)}`);
-  }
-
-  return `[${parts.join(" ")}]`;
 }
 
 /** Print an array, honoring `/bits/` and item representation hints. */
@@ -215,15 +194,18 @@ function print_array(a: DTCellArray): string {
 /** Print a reference as `&label` or `&{/path}`. */
 function print_references(r: DTLabel | DTPath): string {
   switch (r.kind) {
-    case "label": {
-      return `&${r.name}`;
-    }
-    case "path": {
-      return `\${${r.path}}`;
-    }
-    default: {
-      assert_never(r);
-    }
+    case "label":
+      {
+        return `&${r.name}`;
+      }
+    case "path":
+      {
+        return `\${${r.path}}`;
+      }
+    default:
+      {
+        assert_never(r);
+      }
   }
 }
 
