@@ -1,4 +1,4 @@
-import { CoordinatesIn2D } from "./LexerInputStream";
+import { WithRowAndCol } from "./LexerInputStream";
 
 export enum TokenKind {
   CommentLine = "CommentLine",
@@ -80,7 +80,7 @@ export type RawToken =
   | IdentifierToken
   | CharToken
 
-export type Token = RawToken & CoordinatesIn2D;
+export type Token = RawToken & WithRowAndCol;
 export function is_token_of_kind<K extends TokenKind>(
   t: Token,
   k: K

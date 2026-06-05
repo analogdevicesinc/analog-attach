@@ -1,4 +1,4 @@
-import { CoordinatesIn2D, LexerInputStream } from "./LexerInputStream";
+import { WithRowAndCol, LexerInputStream } from "./LexerInputStream";
 import { Option } from "../option";
 import { Result } from "../result";
 import { assert_never } from "../utilities";
@@ -34,7 +34,7 @@ const TOKEN_KIND_AND_REGEX_PAIRS = [
 
 export type LexerResult = {
   tokens: TokenStream;
-  trivia: TokenStream;
+  comments: TokenStream;
 }
 
 export enum LexerErrorCode {
@@ -42,16 +42,19 @@ export enum LexerErrorCode {
   UnknownDirective = "UnknownDirective",
 }
 
-export type LexerError = CoordinatesIn2D & {
+export type LexerError = WithRowAndCol & {
   code: LexerErrorCode;
   message: string;
 }
 
 export class Lexer {
   private tokens: Token[] = [];
-  private trivia: Token[] = [];
+  private comments: Token[] = [];
+  private input_stream: LexerInputStream;
 
-  constructor(private readonly input_stream: LexerInputStream) { }
+  constructor(content: string) {
+	this.input_stream = new LexerInputStream(content);
+  }
 
   public lex(): Result<LexerResult, LexerError> {
     while (!this.input_stream.done) {
@@ -72,7 +75,7 @@ export class Lexer {
 
     return Result.ok({
       tokens: new TokenStream(this.tokens),
-      trivia: new TokenStream(this.trivia)
+      comments: new TokenStream(this.comments)
     });
   }
 
@@ -139,10 +142,10 @@ export class Lexer {
     });
   }
 
-  private emit(raw_token: RawToken, coordinates: CoordinatesIn2D) {
+  private emit(raw_token: RawToken, coordinates: WithRowAndCol) {
     const token: Token = { ...raw_token, ...coordinates };
     if (token.kind === TokenKind.CommentBlock || token.kind === TokenKind.CommentLine) {
-      this.trivia.push(token);
+      this.comments.push(token);
     } else {
       this.tokens.push(token);
     }

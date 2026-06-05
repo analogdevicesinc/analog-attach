@@ -200,7 +200,7 @@ function print_references(r: DTLabel | DTPath): string {
       }
     case "path":
       {
-        return `\${${r.path}}`;
+        return `\&{${r.path}}`;
       }
     default:
       {
