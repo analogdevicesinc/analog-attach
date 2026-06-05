@@ -58,15 +58,6 @@ function search_node_impl(root: DTNode, path: string[], name: string, unit?: str
   return;
 }
 
-export function is_white_space(char_code: number): boolean {
-  return (
-    char_code === 32 ||  // space
-    char_code === 9  ||  // tab
-    char_code === 10 ||  // LF (\n)
-    char_code === 13     // CR (\r)
-  );
-}
-
 export function assert_never(_: never): never {
   throw new Error("Didn't expect to get here");
 }

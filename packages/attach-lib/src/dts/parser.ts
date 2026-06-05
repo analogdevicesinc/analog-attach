@@ -20,7 +20,7 @@ import {
 } from "./tokens.js";
 import { Option } from "../option.js";
 import { Result } from "../result.js";
-import { CoordinatesIn2D, LexerInputStream } from "./LexerInputStream.js";
+import { WithRowAndCol } from "./LexerInputStream.js";
 import { Lexer } from "./Lexer.js";
 import { parse as parse_yaml_string } from "yaml";
 
@@ -70,7 +70,7 @@ export type DTOParseResult = {
 export class Parser {
   constructor(
     private readonly token_stream: TokenStream,
-    private readonly trivia_stream: TokenStream,
+    private readonly comments_stream: TokenStream,
   ) { }
 
   public parse_dts(): Result<DTSParseResult, ParseError> {
@@ -176,6 +176,7 @@ export class Parser {
       } else {
 
         // Parsing overlays and transform them into fragments
+		
         let current_number_of_fragments = 0;
 
         while (!this.token_stream.done) {
@@ -687,7 +688,7 @@ export class Parser {
 
         const bits = Number.parseInt(this.consume_number_token_then_advance());
         if (!is_bits(bits)) {
-          throw new ParserException({ message: `Invalid bits value: ${bits}. Expected 8, 16, 32 or 64. Got: ${bits}` });
+          throw new ParserException({ message: `Invalid bits value. Expected 8, 16, 32 or 64. Got: ${bits}` });
         }
 
         const cell_array = this.parse_cell_array(labels, bits);
@@ -873,7 +874,7 @@ export class Parser {
     return labels;
   }
 
-  private consume_directive_token_then_advance(directive: DTDirective): DirectiveToken & CoordinatesIn2D {
+  private consume_directive_token_then_advance(directive: DTDirective): DirectiveToken & WithRowAndCol {
     const current = this.token_stream.current;
     if (current.kind !== TokenKind.Directive) {
       throw new ParserException({
@@ -895,7 +896,7 @@ export class Parser {
     return current;
   }
 
-  private consume_char_token_then_advance(char_kind: CharTokenKind): CharToken & CoordinatesIn2D {
+  private consume_char_token_then_advance(char_kind: CharTokenKind): CharToken & WithRowAndCol {
     const current = this.token_stream.current;
     if (current.kind !== TokenKind.Char) {
       throw new ParserException({
@@ -958,8 +959,8 @@ export class Parser {
   }
 
   private parse_metadata(): DTMetadata | undefined {
-    while (!this.trivia_stream.done) {
-      const current = this.trivia_stream.current;
+    while (!this.comments_stream.done) {
+      const current = this.comments_stream.current;
       if (current.kind === TokenKind.CommentBlock && current.value.startsWith(DTS_METADATA_HEADER)) {
         try {
           const metadata = parse_yaml_string(current.value.replace(DTS_METADATA_HEADER, ""));
@@ -968,7 +969,7 @@ export class Parser {
           throw new ParserException({ message: `Failed to parse metadata, unexpected error: ${error}` });
         }
       }
-      this.trivia_stream.advance();
+      this.comments_stream.advance();
     }
   }
 }
@@ -976,31 +977,27 @@ export class Parser {
 // Public utilities
 
 export function parse_dts(raw: string): Result<DTSParseResult, ParseError> {
-  const lexer_input_stream = new LexerInputStream(raw);
-  const lexer = new Lexer(lexer_input_stream);
-
+  const lexer = new Lexer(raw);
   const lexing_result = lexer.lex();
   if (Result.isError(lexing_result)) {
     return Result.error({ message: `Lexing failed with: ${lexing_result.error.message}` });
   }
 
-  const { tokens, trivia } = lexing_result.value;
-  const parser = new Parser(tokens, trivia);
+  const { tokens, comments } = lexing_result.value;
+  const parser = new Parser(tokens, comments);
 
   return parser.parse_dts();
 }
 
 export function parse_dto(raw: string): Result<DTOParseResult, ParseError> {
-  const lexer_input_stream = new LexerInputStream(raw);
-  const lexer = new Lexer(lexer_input_stream);
-
+  const lexer = new Lexer(raw);
   const lexing_result = lexer.lex();
   if (Result.isError(lexing_result)) {
     return Result.error({ message: `Lexing failed with: ${lexing_result.error.message}` });
   }
 
-  const { tokens, trivia } = lexing_result.value;
-  const parser = new Parser(tokens, trivia);
+  const { tokens, comments } = lexing_result.value;
+  const parser = new Parser(tokens, comments);
 
   return parser.parse_dto();
 }
