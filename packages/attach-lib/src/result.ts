@@ -13,9 +13,9 @@ export type Result<T, E> =
   | Error<E>;
 
 export const Result = {
-  ok: <T, E = never>(value: T): Result<T, E> => ({ kind: "ok", value }) as const,
-  error: <T = never, E = unknown>(error: E): Result<T, E> => ({ kind: "error", error }) as const,
+  Ok: <T, E = never>(value: T): Result<T, E> => ({ kind: "ok", value }) as const,
+  Err: <T = never, E = unknown>(error: E): Result<T, E> => ({ kind: "error", error }) as const,
 
-  isOk: <T, E>(r: Result<T, E>): r is OK<T> => r.kind === "ok" as const,
-  isError: <T, E>(r: Result<T, E>): r is Error<E> => r.kind === "error" as const,
+  is_ok: <T, E>(r: Result<T, E>): r is OK<T> => r.kind === "ok" as const,
+  is_err: <T, E>(r: Result<T, E>): r is Error<E> => !Result.is_ok(r),
 } as const;

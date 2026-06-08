@@ -72,49 +72,49 @@ export function lex(content: string): Result<LexerResult, LexerError> {
 
         switch (kind) {
           case TokenKind.CommentLine: {
-            return Result.ok({ kind, value: value.slice(2).trim() });
+            return Result.Ok({ kind, value: value.slice(2).trim() });
           }
           case TokenKind.CommentBlock: {
-            return Result.ok({ kind, value: value.slice(2, -2).trim() });
+            return Result.Ok({ kind, value: value.slice(2, -2).trim() });
           }
           case TokenKind.Directive: {
             if (!is_dt_directive(value)) {
-              return Result.error({
+              return Result.Err({
                 code: LexerErrorCode.UnknownDirective,
                 message: "Unknown directive met while lexing",
                 ...coordinates
               });
             }
-            return Result.ok({ kind, value });
+            return Result.Ok({ kind, value });
           }
           case TokenKind.String: {
-            return Result.ok({ kind, value: value.slice(1, -1) });
+            return Result.Ok({ kind, value: value.slice(1, -1) });
           }
           case TokenKind.Number: {
-            return Result.ok({ kind, value });
+            return Result.Ok({ kind, value });
           }
           case TokenKind.PathReference: {
-            return Result.ok({ kind, value: value.slice(2, -1) });
+            return Result.Ok({ kind, value: value.slice(2, -1) });
           }
           case TokenKind.LabelReference: {
-            return Result.ok({ kind, value: value.slice(1) });
+            return Result.Ok({ kind, value: value.slice(1) });
           }
           case TokenKind.Label: {
-            return Result.ok({ kind, value: value.slice(0, -1) });
+            return Result.Ok({ kind, value: value.slice(0, -1) });
           }
           case TokenKind.Identifier: {
-            return Result.ok({ kind, value });
+            return Result.Ok({ kind, value });
           }
           case TokenKind.Char: {
             if (!is_char_token(value)) {
-              return Result.error({
+              return Result.Err({
                 code: LexerErrorCode.UnknownChar,
                 message: `Unknown char '${value}' met while lexing`,
                 ...coordinates
               });
             }
 
-            return Result.ok({ kind, value });
+            return Result.Ok({ kind, value });
           }
           default: {
             assert_never(kind);
@@ -122,7 +122,7 @@ export function lex(content: string): Result<LexerResult, LexerError> {
         }
       }
 
-      return Result.error({
+      return Result.Err({
         code: LexerErrorCode.UnknownChar,
         message: `Unknown Char!`,
         ...coordinates
@@ -130,7 +130,7 @@ export function lex(content: string): Result<LexerResult, LexerError> {
 
     })();
 
-    if (Result.isError(raw_token)) {
+    if (Result.is_err(raw_token)) {
       return raw_token;
     }
 
@@ -144,7 +144,7 @@ export function lex(content: string): Result<LexerResult, LexerError> {
     }
   }
 
-  return Result.ok({
+  return Result.Ok({
     tokens: new TokenStream(tokens),
     comments: new TokenStream(comments)
   });

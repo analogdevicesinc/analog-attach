@@ -113,14 +113,14 @@ export class Parser {
         this.parse_and_apply_overlay_statement(labels, target);
       }
 
-      return Result.ok({
+      return Result.Ok({
         dts: { memreserves, root: strip_node(root) },
         metadata: this.parse_metadata()
       });
 
     } catch (error) {
       if (error instanceof Error) {
-        return Result.error({ message: error.message });
+        return Result.Err({ message: error.message });
       }
       throw error;
     }
@@ -341,7 +341,7 @@ export class Parser {
         }
       }
 
-      return Result.ok({
+      return Result.Ok({
         dto: {
           root: strip_node({
             labels: [],
@@ -357,7 +357,7 @@ export class Parser {
 
     } catch (error) {
       if (error instanceof Error) {
-        return Result.error({ message: error.message });
+        return Result.Err({ message: error.message });
       }
       throw error;
     }
@@ -978,8 +978,8 @@ export class Parser {
 
 export function parse_dts(raw: string): Result<DTSParseResult, ParseError> {
   const lexing_result = lex(raw);
-  if (Result.isError(lexing_result)) {
-    return Result.error({ message: `Lexing failed with: ${lexing_result.error.message}` });
+  if (Result.is_err(lexing_result)) {
+    return Result.Err({ message: `Lexing failed with: ${lexing_result.error.message}` });
   }
 
   const { tokens, comments } = lexing_result.value;
@@ -990,8 +990,8 @@ export function parse_dts(raw: string): Result<DTSParseResult, ParseError> {
 
 export function parse_dto(raw: string): Result<DTOParseResult, ParseError> {
   const lexing_result = lex(raw);
-  if (Result.isError(lexing_result)) {
-    return Result.error({ message: `Lexing failed with: ${lexing_result.error.message}` });
+  if (Result.is_err(lexing_result)) {
+    return Result.Err({ message: `Lexing failed with: ${lexing_result.error.message}` });
   }
 
   const { tokens, comments } = lexing_result.value;
