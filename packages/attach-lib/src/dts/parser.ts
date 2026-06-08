@@ -176,7 +176,7 @@ export class Parser {
       } else {
 
         // Parsing overlays and transform them into fragments
-		
+
         let current_number_of_fragments = 0;
 
         while (!this.token_stream.done) {
@@ -951,7 +951,7 @@ export class Parser {
       ? find_node_by_label(root, current.value)
       : find_node_by_path(root, current.value);
 
-    if (Option.isNone(search_result)) {
+    if (Option.is_none(search_result)) {
       throw new ParserException({ message: `Invalid reference`, found: current });
     }
 
@@ -1006,14 +1006,13 @@ export function parse_dto(raw: string): Result<DTOParseResult, ParseError> {
 
 function find_node_by_label(root: DeletableNode, label: string): Option<DeletableNode> {
   if (root.labels.includes(label)) {
-    // eslint-disable-next-line unicorn/no-array-callback-reference
-    return Option.some(root);
+    return Option.Some(root);
   }
 
   return root.children
     .map(child => find_node_by_label(child, label))
     // eslint-disable-next-line unicorn/no-array-callback-reference
-    .find(Option.isSome) ?? Option.none();
+    .find(Option.is_some) ?? Option.None();
 }
 
 function find_node_by_path(root: DeletableNode, path: string): Option<DeletableNode> {
@@ -1022,8 +1021,7 @@ function find_node_by_path(root: DeletableNode, path: string): Option<DeletableN
   }
 
   if (path === "/") {
-    // eslint-disable-next-line unicorn/no-array-callback-reference
-    return Option.some(root);
+    return Option.Some(root);
   }
 
   const search_result = path
@@ -1036,9 +1034,8 @@ function find_node_by_path(root: DeletableNode, path: string): Option<DeletableN
     }, root);
 
   return search_result
-    // eslint-disable-next-line unicorn/no-array-callback-reference
-    ? Option.some(search_result)
-    : Option.none();
+    ? Option.Some(search_result)
+    : Option.None();
 }
 
 function strip_node({ deleted, properties, children, ...rest }: DeletableNode): DTNode {

@@ -16,8 +16,8 @@ export type Option<T> =
   | None;
 
 export const Option = {
-  some: <T>(value: Valid<T>): Option<T> => ({ kind: "some", value }) as const,
-  none: (): Option<never> => ({ kind: "none" }) as const,
+  Some: <T>(value: Valid<T>): Option<T> => ({ kind: "some", value }) as const,
+  None: <T = never>(): Option<T> => ({ kind: "none" }) as const,
 
   unwrap: <T>(o: Option<T>): T => {
     if (o.kind !== "some") {
@@ -29,6 +29,6 @@ export const Option = {
     return o.kind === "some" ? o.value : fallback_value;
   },
 
-  isSome: <T>(o: Option<T>): o is Some<T> => o.kind === "some",
-  isNone: <T>(o: Option<T>): o is None => o.kind === "none",
+  is_none: <T>(o: Option<T>): o is None => o.kind === "none",
+  is_some: <T>(o: Option<T>): o is Some<T> => !Option.is_none(o),
 } as const;

@@ -53,7 +53,7 @@ export class Lexer {
   private input_stream: LexerInputStream;
 
   constructor(content: string) {
-	this.input_stream = new LexerInputStream(content);
+    this.input_stream = new LexerInputStream(content);
   }
 
   public lex(): Result<LexerResult, LexerError> {
@@ -83,7 +83,7 @@ export class Lexer {
     const current_coordinates = this.input_stream.current_coordinates;
     for (const [kind, regex] of TOKEN_KIND_AND_REGEX_PAIRS) {
       const match = this.input_stream.try_consume(regex);
-      if (Option.isNone(match)) {
+      if (Option.is_none(match)) {
         continue;
       }
 

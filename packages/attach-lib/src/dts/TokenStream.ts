@@ -36,9 +36,8 @@ export class TokenStream {
     if (offset < 0) {
       throw new Error(`Cannot pass negative number as offset: ${offset}`);
     }
-	
+
     const current = this.tokens.at(this.pos + offset);
-    // eslint-disable-next-line unicorn/no-array-callback-reference
-    return current === undefined ? Option.none() : Option.some(current);
+    return current === undefined ? Option.None() : Option.Some(current);
   }
 }

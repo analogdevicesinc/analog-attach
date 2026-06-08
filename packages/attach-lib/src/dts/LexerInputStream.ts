@@ -74,7 +74,7 @@ export class LexerInputStream {
     const match = this.content.match(regex);
 
     if (match === null) {
-      return Option.none();
+      return Option.None();
     }
 
     const text = match[0];
@@ -85,7 +85,6 @@ export class LexerInputStream {
       this.advance();
     }
 
-    // eslint-disable-next-line unicorn/no-array-callback-reference
-    return Option.some(text);
+    return Option.Some(text);
   }
 }
