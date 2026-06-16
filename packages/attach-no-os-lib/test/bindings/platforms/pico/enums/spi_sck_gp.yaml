@@ -1,0 +1,15 @@
+$id: "platforms/pico/enums/spi_sck_gp.yaml"
+$type: enum
+$name: spi_sck_gp
+$description: "Available GP config for SPI SCK (clock)"
+$ranking: 4
+$sources:
+  headers:
+    - "drivers/platform/pico/pico_spi.h"
+
+values:
+  - SPI0_SCK_GP2
+  - SPI0_SCK_GP6
+  - SPI0_SCK_GP18
+  - SPI1_SCK_GP10
+  - SPI1_SCK_GP14

@@ -1,0 +1,10 @@
+$id: "platforms/pico/platform_ops/irq_ops.yaml"
+$type: platform_ops
+$name: pico_irq_ops
+$description: "Pico IRQ platform ops"
+$ranking: 4
+$sources:
+  headers:
+    - "drivers/platform/pico/pico_irq.h"
+  sources:
+    - "drivers/platform/pico/pico_irq.c"

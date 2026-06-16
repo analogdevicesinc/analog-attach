@@ -1,0 +1,16 @@
+$id: "devices/ad7124-structs/ad7124_analog_inputs.yaml"
+$type: struct
+$name: ad7124_analog_inputs
+$description: "AD7124 positive and negative analog input pair"
+$ranking: 4
+$sources:
+  headers:
+    - "drivers/adc/ad7124/ad7124.h"
+
+ainp:
+  include: "devices/ad7124-enums/ad7124_analog_input.yaml"
+  description: "Positive analog input"
+
+ainm:
+  include: "devices/ad7124-enums/ad7124_analog_input.yaml"
+  description: "Negative analog input"

@@ -1,0 +1,19 @@
+$id: "platforms/xilinx/xil_timer_init_param.yaml"
+$type: struct
+$name: xil_timer_init_param
+$description: "Xilinx platform specific timer initialization parameters"
+$ranking: 4
+$sources:
+  headers:
+    - "drivers/platform/xilinx/xilinx_timer.h"
+  sources:
+    - "drivers/platform/xilinx/xilinx_timer.c"
+
+active_tmr:
+  type: uint8_t
+  description: "Timer used from the PL 3-timer core (0, 1, or 2)"
+  default: 0
+
+type:
+  include: "platforms/xilinx/enums/xil_timer_type.yaml"
+  description: "Platform selection (PL or PS)"

@@ -1,0 +1,10 @@
+$id: "platforms/pico/platform_ops/uart_ops.yaml"
+$type: platform_ops
+$name: pico_uart_ops
+$description: "Pico UART platform ops"
+$ranking: 4
+$sources:
+  headers:
+    - "drivers/platform/pico/pico_uart.h"
+  sources:
+    - "drivers/platform/pico/pico_uart.c"

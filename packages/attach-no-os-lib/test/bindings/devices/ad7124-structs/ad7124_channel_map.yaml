@@ -1,0 +1,24 @@
+$id: "devices/ad7124-structs/ad7124_channel_map.yaml"
+$type: struct
+$name: ad7124_channel_map
+$description: "AD7124 channel mapping configuration"
+$ranking: 4
+$sources:
+  headers:
+    - "drivers/adc/ad7124/ad7124.h"
+
+channel_enable:
+  type: bool
+  default: false
+  description: "Enable this channel"
+
+setup_sel:
+  type: uint8_t
+  default: 0
+  minimum: 0
+  maximum: 7
+  description: "Setup selection (0-7)"
+
+ain:
+  include: "devices/ad7124-structs/ad7124_analog_inputs.yaml"
+  description: "Analog input pair for this channel"

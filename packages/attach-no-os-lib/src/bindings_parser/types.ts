@@ -18,6 +18,7 @@ export const PRIMITIVE_SYMBOLS: PrimitiveSymbol[] = [
       "size_t"
 ];
 
+// TODO : Rename this, bool is separate primitive
 export function is_primitive_symbols(s: string): s is PrimitiveSymbol {
 	return (PRIMITIVE_SYMBOLS as readonly string[]).includes(s);
 }
@@ -53,7 +54,15 @@ export type UnionProperty = PropertyBase & {
 	members: IncludeProperty[]
 }
 
-export type Property = NumberProperty | BooleanProperty | IncludeProperty | EnumProperty | UnionProperty;
+export type ArrayElement = NumberProperty | BooleanProperty | EnumProperty | IncludeProperty;
+
+export type ArrayProperty = PropertyBase & {
+	_t: "ArrayProperty",
+	size: number,
+	element: ArrayElement,
+}
+
+export type Property = NumberProperty | BooleanProperty | IncludeProperty | EnumProperty | UnionProperty | ArrayProperty;
 
 export type TargetOverride = {
 	_t: "TargetOverride",
@@ -75,23 +84,29 @@ type OverrideSwitch = {
 	$cases: SwitchCase[],
 }
 
+type OverrideCondition = {
+	target: string,
+	value: unknown // FIXME: Does this need to be unknwon?
+}
+
 type OverrideIfThen = {
 	_t: "OverrideIfThen",
 	scope: OverrideScope,
-	if: Property, // FIXME: Should this be a diff type?
-	then: Property, // FIXME: Same here
+	condition: OverrideCondition,
+	overrides: TargetOverride[],
 }
 
 type OverrideMutex = {
 	_t: "OverrideMutex",
 	scope: OverrideScope,
-	values: string[]
+	properties: string[]
 }
 
 type OverrideStatic = {
 	_t: "OverrideStatic",
 	scope: OverrideScope,
-	property: Property
+	target: string,
+	override: PropertyOverride
 }
 
 export type PropertyOverride<T extends Property = Property> = Partial<Omit<T, '_t' | 'type' | 'name'>>;

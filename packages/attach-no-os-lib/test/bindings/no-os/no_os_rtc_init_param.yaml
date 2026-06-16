@@ -1,0 +1,23 @@
+$id: "no-os/no_os_rtc_init_param.yaml"
+$type: struct
+$name: no_os_rtc_init_param
+$description: "Structure holding RTC initialization parameters"
+$ranking: 4
+$sources:
+  headers:
+    - "include/no_os_rtc.h"
+  sources:
+    - "drivers/platform/maxim/max32690/maxim_rtc.c"
+
+id:
+  type: uint8_t
+  required: true
+  description: "ID of the real time clock core"
+
+freq:
+  type: uint32_t
+  description: "Frequency of the RTC"
+
+load:
+  type: uint32_t
+  description: "Load value of the RTC"

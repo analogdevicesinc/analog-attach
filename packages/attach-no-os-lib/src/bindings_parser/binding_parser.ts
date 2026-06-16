@@ -13,7 +13,7 @@ import YAML from "yaml";
 import { Result, ok, error } from "./result";
 import { asObject, at, number_, optional, optionalWithDefault, ParseContext, required, string_, stringArray } from "./validators";
 import { BindingType, BindingHeaderSources } from "./types";
-import { parse_enum_property, parse_include_property, parse_number_property, parse_union_property } from "./property_parser";
+import { parse_array_property, parse_bool_property, parse_enum_property, parse_include_property, parse_number_property, parse_union_property } from "./property_parser";
 import { is_boolean_property_override, is_enum_property_override, is_include_property_override, is_number_property_override, is_union_property_override } from "./override_validators";
 
 export function unwrap<T>(result: Result<T>): T {
@@ -125,8 +125,16 @@ function parse_property(name: string, value: unknown, context: ParseContext): Re
 			return parse_union_property(name, object.value, context);
 		}
 
+		if (type_ === "bool") {
+			return parse_bool_property(name, object.value, context);
+		}
+
 		if (is_primitive_symbols(type_)) {
 			return parse_number_property(name, object.value, context);
+		}
+
+		if (type_ === "array") {
+			return parse_array_property(name, object.value, context);
 		}
 
 		return error(`Unknown property type '${type_}'`, at(context, type_).path);
@@ -160,6 +168,9 @@ function is_property_override(
 	if (!object.ok) {
 		return object;
 	}
+
+	// FIXME: Another issue is that idk a way to validate unknown properties
+	// or mistyped ones since the type gets removed at build. will investigate later
 
 	// TODO : treat $parent scope this is placeholder
 	if (scope === "$parent" || !property) {
@@ -268,6 +279,137 @@ function parse_case_body(
 	return ok(overrides);
 }
 
+function is_override_mutex(value: Record<string, unknown>, context: ParseContext, scope: OverrideScope): Result<OverrideDirective> {
+	const $mutex = value["$mutex"];
+	
+	if (!Array.isArray($mutex)) {
+		return error("$mutex must be an array of property names", at(context, "$mutex").path);
+	}
+
+	const mutex_context: ParseContext = {
+		path: at(context, "$mutex").path,
+		document: context.document
+	};
+
+	const properties: string[] = [];
+
+	for (const [index, item] of $mutex.entries()) {
+		if (typeof item !== "string") {
+			return error(`Expected string, got ${typeof item}`, at(mutex_context, index).path);
+		}
+
+		const property = require_property(context, item, scope);
+		if (!property.ok) {
+			return property;
+		}
+
+		properties.push(item);
+	}
+
+	if (properties.length < 2) {
+		return error("$mutex must have at least 2 properties", mutex_context.path);
+	}
+
+	return ok({
+		_t: "OverrideMutex",
+		scope: scope,
+		properties: properties
+	});
+}
+
+function is_override_static(value: Record<string, unknown>, context: ParseContext, scope: OverrideScope): Result<OverrideDirective> {
+	const keys = Object.keys(value);
+	if (keys.length !== 1) {
+		return error("Static override must have exactly one property key", context.path);
+	}
+
+	const target_name = keys[0];
+	const override_value = value[target_name];
+
+	const target_property = require_property(context, target_name, scope);
+	if (!target_property.ok) {
+		return target_property;
+	}
+
+	const override_context: ParseContext = {
+		path: at(context, target_name).path,
+		document: context.document,
+	};
+
+	const override = is_property_override(override_value, override_context, scope, target_property.value);
+	if (!override.ok) {
+		return override;
+	}
+
+	return ok({
+		_t: "OverrideStatic",
+		scope: scope,
+		target: target_name,
+		override: override.value
+	});
+}
+
+function is_override_if_then(value: Record<string, unknown>, context: ParseContext, scope: OverrideScope): Result<OverrideDirective> {
+	const object = asObject(value["$if"], at(context, "$if"));
+	if (!object.ok) {
+		return object;
+	}
+
+	const if_context: ParseContext = {
+		path: at(context, "$if").path,
+		document: context.document
+	};
+
+	const if_keys = Object.keys(object.value);
+	if (if_keys.length !== 1) {
+		return error("$if must have exactly one property condition", if_context.path);
+	}
+
+	const condition_target = if_keys[0];
+	const condition_value = object.value[condition_target];
+
+	const condition_property = require_property(context, condition_target, scope);
+	if (!condition_property.ok) {
+		return condition_property;
+	}
+
+	const condition_object = asObject(condition_value, at(if_context, condition_target));
+	if (!condition_object.ok) {
+		return condition_object;
+	}
+
+	const then = asObject(value["$then"], at(context, "$then"));
+	if (!then.ok) {
+		return then;
+	}
+
+	const expected_value = condition_object.value["value"];
+	if (expected_value === undefined) {
+		// FIXME: This is temp, in theory, the condition value could also be a minimum, maximum, etc...
+		return error("Condition myst have a 'value' field",at(if_context, condition_target).path);
+	}
+
+	const then_context: ParseContext = {
+		path: at(context, "$then").path,
+		document: context.document
+	};
+
+	const then_overrides = parse_case_body(then.value, then_context, scope);
+	if (!then_overrides.ok) {
+		return then_overrides;
+	}
+
+	return ok({
+		_t: "OverrideIfThen",
+		scope: scope,
+		condition: {
+			target: condition_target,
+			value: expected_value
+		},
+		overrides: then_overrides.value
+	});
+}
+
 function is_override_switch(value: Record<string, unknown>, context: ParseContext, scope: OverrideScope): Result<OverrideDirective> {
 	const object = asObject(value["$switch"], at(context, "$switch"));
 	if (!object.ok) {
@@ -370,18 +512,15 @@ function is_override_directive(value: unknown, context: ParseContext, scope: Ove
 		return is_override_switch(object.value, context, scope);
 	}
 
+	if ("$if" in object.value) {
+		return is_override_if_then(object.value, context, scope);
+	}
 
-	return ok(); // FIXME: Implement
+	if ("$mutex" in object.value) {
+		return is_override_mutex(object.value, context, scope);
+	}
 
-	// if ("$if" in object.value) {
-	// 	return is_override_if_then(object.value, context, scope);
-	// }
-	//
-	// if ("$mutex" in object.value) {
-	// 	return is_override_mutex(object.value, context, scope);
-	// }
-	//
-	// return is_override_static(object.value, context, scope);
+	return is_override_static(object.value, context, scope);
 }
 
 // FIXME: Move these in another file?
@@ -418,11 +557,19 @@ function is_override(value: unknown, context: ParseContext): Result<OverrideDire
 	}
 
 	if ("$parent" in object.value) {
-		return is_override_array(value, context, "$parent");
+		return is_override_array(
+			object.value["$parent"],
+			{ path: at(context, "$parent").path, document: context.document },
+			"$parent"
+		);
 	}
 
 	if ("$this" in object.value) {
-		return is_override_array(value, context, "$this");
+		return is_override_array(
+			object.value["$this"],
+			{ path: at(context, "$this").path, document: context.document },
+			"$this"
+		);
 	}
 
 	return error("$override must be an array or object with $this/$parent", context.path);

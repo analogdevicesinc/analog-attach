@@ -1,0 +1,12 @@
+$id: "platforms/xilinx/enums/xil_gpio_type.yaml"
+$type: enum
+$name: xil_gpio_type
+$description: "Xilinx platform architecture sections for GPIO"
+$ranking: 4
+$sources:
+  headers:
+    - "drivers/platform/xilinx/xilinx_gpio.h"
+
+values:
+  - GPIO_PL
+  - GPIO_PS

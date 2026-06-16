@@ -1,0 +1,14 @@
+$id: "platforms/stm32/stm32_i2c_init_param.yaml"
+$type: struct
+$name: stm32_i2c_init_param
+$description: "STM32 platform specific I2C initialization parameters"
+$ranking: 4
+$sources:
+  headers:
+    - "drivers/platform/stm32/stm32_i2c.h"
+  sources:
+    - "drivers/platform/stm32/stm32_i2c.c"
+
+i2c_timing:
+  type: uint32_t
+  description: "I2C timing configuration value"

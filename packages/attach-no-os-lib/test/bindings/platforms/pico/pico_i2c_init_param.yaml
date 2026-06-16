@@ -1,0 +1,73 @@
+$id: "platforms/pico/pico_i2c_init_param.yaml"
+$type: struct
+$name: pico_i2c_init_param
+$description: "Pico platform specific I2C initialization parameters"
+$ranking: 4
+$sources:
+  headers:
+    - "drivers/platform/pico/pico_i2c.h"
+
+i2c_sda_pin:
+  include: "platforms/pico/enums/i2c_sda_gp.yaml"
+  description: "I2C SDA pin configuration"
+
+i2c_scl_pin:
+  include: "platforms/pico/enums/i2c_scl_gp.yaml"
+  description: "I2C SCL pin configuration"
+
+$override:
+  # I2C0 (device_id = 0) can only use I2C0_* pins
+  - $if:
+      $parent:
+        device_id:
+          value: 0
+    $then:
+      $this:
+        i2c_sda_pin:
+          value:
+            [
+              I2C0_SDA_GP0,
+              I2C0_SDA_GP4,
+              I2C0_SDA_GP8,
+              I2C0_SDA_GP12,
+              I2C0_SDA_GP16,
+              I2C0_SDA_GP20,
+            ]
+        i2c_scl_pin:
+          value:
+            [
+              I2C0_SCL_GP1,
+              I2C0_SCL_GP5,
+              I2C0_SCL_GP9,
+              I2C0_SCL_GP13,
+              I2C0_SCL_GP17,
+              I2C0_SCL_GP21,
+            ]
+
+  # I2C1 (device_id = 1) can only use I2C1_* pins
+  - $if:
+      $parent:
+        device_id:
+          value: 1
+    $then:
+      $this:
+        i2c_sda_pin:
+          value:
+            [
+              I2C1_SDA_GP2,
+              I2C1_SDA_GP6,
+              I2C1_SDA_GP10,
+              I2C1_SDA_GP14,
+              I2C1_SDA_GP18,
+              I2C1_SDA_GP26,
+            ]
+        i2c_scl_pin:
+          value:
+            [
+              I2C1_SCL_GP3,
+              I2C1_SCL_GP7,
+              I2C1_SCL_GP11,
+              I2C1_SCL_GP15,
+              I2C1_SCL_GP19,
+              I2C1_SCL_GP27,
+            ]

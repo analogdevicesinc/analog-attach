@@ -1,0 +1,14 @@
+$id: "platforms/xilinx/enums/xil_i2c_type.yaml"
+$type: enum
+$name: xil_i2c_type
+$description: "Xilinx platform architecture sections for I2C"
+$ranking: 4
+$sources:
+  headers:
+    - "drivers/platform/xilinx/xilinx_i2c.h"
+
+values:
+  - IIC_PL
+  - IIC_PS
+
+default: IIC_PL

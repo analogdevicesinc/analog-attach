@@ -1,0 +1,16 @@
+$id: "no-os/enums/no_os_spi_bit_order.yaml"
+$type: enum
+$name: no_os_spi_bit_order
+$description: "SPI bit order configuration"
+$ranking: 4
+$sources:
+  headers:
+    - "include/no_os_spi.h"
+
+values:
+  NO_OS_SPI_BIT_ORDER_MSB_FIRST:
+    description: "Most significant bit first"
+  NO_OS_SPI_BIT_ORDER_LSB_FIRST:
+    description: "Least significant bit first"
+
+default: NO_OS_SPI_BIT_ORDER_MSB_FIRST

@@ -1,0 +1,56 @@
+$id: "no-os/no_os_spi_init_param.yaml"
+$type: struct
+$name: no_os_spi_init_param
+$description: "Structure holding the parameters for SPI initialization"
+$ranking: 4
+$sources:
+  headers:
+    - "include/no_os_spi.h"
+  sources:
+    - "drivers/api/no_os_spi.c"
+
+device_id:
+  type: uint32_t
+  required: true
+  description: "SPI peripheral device ID"
+
+max_speed_hz:
+  type: uint32_t
+  description: "Maximum SPI clock frequency in Hz"
+
+chip_select:
+  type: uint8_t
+  required: true
+  description: "Chip select line number"
+
+mode:
+  include: "no-os/enums/no_os_spi_mode.yaml"
+  description: "SPI mode (clock polarity and phase)"
+
+bit_order:
+  include: "no-os/enums/no_os_spi_bit_order.yaml"
+  description: "Bit order (MSB or LSB first)"
+
+platform_ops:
+  type: platform_ops
+  target: no_os_spi_platform_ops
+  required: true
+  description: "Platform-specific SPI operations"
+  platforms:
+    - include: "platforms/maxim/max32690/platform_ops/spi_ops.yaml"
+    - include: "platforms/stm32/platform_ops/spi_ops.yaml"
+    - include: "platforms/xilinx/platform_ops/spi_ops.yaml"
+    - include: "platforms/xilinx/platform_ops/spi_pl_ops.yaml"
+    - include: "platforms/xilinx/platform_ops/spi_engine_ops.yaml"
+    - include: "platforms/pico/platform_ops/spi_ops.yaml"
+    - include: "platforms/linux/platform_ops/spi_ops.yaml"
+
+extra:
+  type: platform_extra
+  required: true
+  description: "Platform-specific initialization parameters"
+  platforms:
+    - include: "platforms/maxim/max32690/max_spi_init_param.yaml"
+    - include: "platforms/stm32/stm32_spi_init_param.yaml"
+    - include: "platforms/xilinx/xil_spi_init_param.yaml"
+    - include: "platforms/pico/pico_spi_init_param.yaml"

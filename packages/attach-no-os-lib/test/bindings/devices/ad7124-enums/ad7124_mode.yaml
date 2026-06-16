@@ -1,0 +1,21 @@
+$id: "devices/ad7124-enums/ad7124_mode.yaml"
+$type: enum
+$name: ad7124_mode
+$description: "AD7124 ADC modes of operation"
+$ranking: 4
+$sources:
+  headers:
+    - "drivers/adc/ad7124/ad7124.h"
+
+values:
+  AD7124_CONTINUOUS: "Continuous conversion mode"
+  AD7124_SINGLE: "Single conversion mode"
+  AD7124_STANDBY: "Standby mode"
+  AD7124_POWER_DOWN: "Power-down mode"
+  AD7124_IDLE: "Idle mode"
+  AD7124_IN_ZERO_SCALE_OFF: "Internal zero-scale offset calibration"
+  AD7124_IN_FULL_SCALE_GAIN: "Internal full-scale gain calibration"
+  AD7124_SYS_ZERO_SCALE_OFF: "System zero-scale offset calibration"
+  AD7124_SYS_ZERO_SCALE_GAIN: "System zero-scale gain calibration"
+
+default: AD7124_CONTINUOUS

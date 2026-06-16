@@ -1,0 +1,8 @@
+$id: "platforms/stm32/platform_ops/irq_ops.yaml"
+$type: platform_ops
+$name: stm32_irq_ops
+$sources:
+  headers:
+    - "stm32_irq.h"
+  sources:
+    - "stm32_irq.c"

@@ -1,0 +1,15 @@
+$id: "devices/adi,ltc4306.yaml"
+$type: struct
+$name: ltc4306_init_param
+$description: "LTC4306 4-Channel I2C Mux/Switch"
+$ranking: 4
+$sources:
+  headers:
+    - "drivers/io-expander/ltc4306/ltc4306.h"
+  sources:
+    - "drivers/io-expander/ltc4306/ltc4306.c"
+
+i2c_init:
+  include: "no-os/no_os_i2c_init_param.yaml"
+  required: true
+  description: "I2C initialization parameters for upstream connection"

@@ -1,0 +1,43 @@
+$id: "no-os/no_os_gpio_init_param.yaml"
+$type: struct
+$name: no_os_gpio_init_param
+$init_function: no_os_gpio_get
+$description: "Structure holding the parameters for GPIO initialization"
+$ranking: 4
+$sources:
+  headers:
+    - "include/no_os_gpio.h"
+  sources:
+    - "drivers/api/no_os_gpio.c"
+
+port:
+  type: int32_t
+  description: "Port number"
+
+number:
+  type: int32_t
+  required: true
+  description: "GPIO number"
+
+pull:
+  include: "no-os/enums/no_os_gpio_pull_up.yaml"
+  description: "Pull up/down resistor configuration"
+
+platform_ops:
+  type: platform_ops
+  target: no_os_gpio_platform_ops
+  description: "Platform-specific GPIO operations"
+  platforms:
+    - include: "platforms/maxim/max32690/platform_ops/gpio_ops.yaml"
+    - include: "platforms/stm32/platform_ops/gpio_ops.yaml"
+    - include: "platforms/xilinx/platform_ops/gpio_ops.yaml"
+    - include: "platforms/pico/platform_ops/gpio_ops.yaml"
+    - include: "platforms/linux/platform_ops/gpio_ops.yaml"
+
+extra:
+  type: platform_extra
+  description: "Platform-specific initialization parameters"
+  platforms:
+    - include: "platforms/maxim/max32690/max_gpio_init_param.yaml"
+    - include: "platforms/stm32/stm32_gpio_init_param.yaml"
+    - include: "platforms/xilinx/xil_gpio_init_param.yaml"

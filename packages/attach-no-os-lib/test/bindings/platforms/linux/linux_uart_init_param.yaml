@@ -1,0 +1,14 @@
+$id: "platforms/linux/linux_uart_init_param.yaml"
+$type: struct
+$name: linux_uart_init_param
+$description: "Linux platform specific UART initialization parameters"
+$ranking: 4
+$sources:
+  headers:
+    - "drivers/platform/linux/linux_uart.h"
+  sources:
+    - "drivers/platform/linux/linux_uart.c"
+
+device_id:
+  type: string
+  description: "UART device path (/dev/<device_id>)"

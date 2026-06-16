@@ -1,0 +1,22 @@
+$id: "no-os/enums/no_os_gpio_pull_up.yaml"
+$type: enum
+$name: no_os_gpio_pull_up
+$description: "GPIO pull up/pull down resistor configuration"
+$ranking: 4
+$sources:
+  headers:
+    - "include/no_os_gpio.h"
+
+values:
+  NO_OS_PULL_NONE:
+    description: "No pull up or pull down"
+  NO_OS_PULL_UP:
+    description: "Strong pull up"
+  NO_OS_PULL_DOWN:
+    description: "Strong pull down"
+  NO_OS_PULL_UP_WEAK:
+    description: "Weak pull up"
+  NO_OS_PULL_DOWN_WEAK:
+    description: "Weak pull down"
+
+default: NO_OS_PULL_NONE
