@@ -1,0 +1,10 @@
+$id: "platforms/stm32/platform_ops/timer_ops.yaml"
+$type: platform_ops
+$name: stm32_timer_ops
+$description: "STM32 Timer platform ops"
+$ranking: 4
+$sources:
+  headers:
+    - "drivers/platform/stm32/stm32_timer.h"
+  sources:
+    - "drivers/platform/stm32/stm32_timer.c"

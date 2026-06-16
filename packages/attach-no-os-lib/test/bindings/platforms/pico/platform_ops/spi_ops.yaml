@@ -1,0 +1,10 @@
+$id: "platforms/pico/platform_ops/spi_ops.yaml"
+$type: platform_ops
+$name: pico_spi_ops
+$description: "Pico SPI platform ops"
+$ranking: 4
+$sources:
+  headers:
+    - "drivers/platform/pico/pico_spi.h"
+  sources:
+    - "drivers/platform/pico/pico_spi.c"

@@ -1,0 +1,18 @@
+$id: "platforms/stm32/enums/stm32_dma_data_alignment.yaml"
+$type: enum
+$name: stm32_dma_data_alignment
+$description: "DMA data alignment"
+$ranking: 4
+$sources:
+  headers:
+    - "drivers/platform/stm32/stm32_dma.h"
+
+values:
+  DATA_ALIGN_BYTE:
+    description: "Byte alignment (8-bit)"
+  DATA_ALIGN_HALF_WORD:
+    description: "Half word alignment (16-bit)"
+  DATA_ALIGN_WORD:
+    description: "Word alignment (32-bit)"
+
+default: DATA_ALIGN_BYTE

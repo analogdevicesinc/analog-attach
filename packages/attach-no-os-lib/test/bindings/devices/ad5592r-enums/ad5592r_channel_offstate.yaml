@@ -1,0 +1,20 @@
+$id: "devices/ad5592r-enums/ad5592r_channel_offstate.yaml"
+$type: enum
+$name: ad5592r_channel_offstate
+$description: "Channel off-state configuration for AD5592R"
+$ranking: 4
+$sources:
+  headers:
+    - "drivers/adc-dac/ad5592r/ad5592r-base.h"
+
+values:
+  CH_OFFSTATE_PULLDOWN:
+    description: "Pull-down when off"
+  CH_OFFSTATE_OUT_LOW:
+    description: "Output low when off"
+  CH_OFFSTATE_OUT_HIGH:
+    description: "Output high when off"
+  CH_OFFSTATE_OUT_TRISTATE:
+    description: "Tristate (high-impedance) when off"
+
+default: CH_OFFSTATE_PULLDOWN

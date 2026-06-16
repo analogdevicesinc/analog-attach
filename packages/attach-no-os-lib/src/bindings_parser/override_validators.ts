@@ -1,5 +1,5 @@
 import { error, ok, Result } from "./result";
-import { BooleanProperty, EnumProperty, IncludeProperty, NumberProperty, PropertyBase, PropertyOverride, UnionProperty } from "./types";
+import { BooleanProperty, EnumProperty, IncludeProperty, NumberProperty, Property, PropertyBase, PropertyOverride, UnionProperty } from "./types";
 import { at, boolean_, number_, ParseContext, string_, stringArray } from "./validators";
 
 function is_number_property_override(
@@ -161,4 +161,11 @@ function parse_common_override_fields(
 	return ok(result);
 }
 
-export {parse_common_override_fields, is_enum_property_override, is_union_property_override, is_number_property_override, is_boolean_property_override, is_include_property_override};
+export {
+	parse_common_override_fields,
+	is_enum_property_override,
+	is_union_property_override,
+	is_number_property_override,
+	is_boolean_property_override,
+	is_include_property_override,
+};

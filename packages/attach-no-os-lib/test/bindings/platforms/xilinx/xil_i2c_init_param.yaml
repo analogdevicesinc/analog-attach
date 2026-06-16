@@ -1,0 +1,18 @@
+$id: "platforms/xilinx/xil_i2c_init_param.yaml"
+$type: struct
+$name: xil_i2c_init_param
+$description: "Xilinx platform specific I2C initialization parameters"
+$ranking: 4
+$sources:
+  headers:
+    - "drivers/platform/xilinx/xilinx_i2c.h"
+
+type:
+  include: "platforms/xilinx/enums/xil_i2c_type.yaml"
+  # default: IIC_PS
+  description: "Xilinx architecture (PL or PS)"
+
+device_id:
+  type: uint32_t
+  default: 0
+  description: "Device ID"

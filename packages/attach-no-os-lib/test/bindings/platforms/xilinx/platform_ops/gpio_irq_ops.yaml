@@ -1,0 +1,10 @@
+$id: "platforms/xilinx/platform_ops/gpio_irq_ops.yaml"
+$type: platform_ops
+$name: xil_gpio_irq_ops
+$description: "Xilinx GPIO IRQ platform ops"
+$ranking: 4
+$sources:
+  headers:
+    - "drivers/platform/xilinx/xilinx_gpio_irq.h"
+  sources:
+    - "drivers/platform/xilinx/xilinx_gpio_irq.c"

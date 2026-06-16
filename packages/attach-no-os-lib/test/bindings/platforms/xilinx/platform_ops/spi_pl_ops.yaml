@@ -1,0 +1,10 @@
+$id: "platforms/xilinx/platform_ops/spi_pl_ops.yaml"
+$type: platform_ops
+$name: xil_spi_pl_ops
+$description: "Xilinx SPI PL (Programmable Logic) specific platform ops"
+$ranking: 4
+$sources:
+  headers:
+    - "drivers/platform/xilinx/xilinx_spi.h"
+  sources:
+    - "drivers/platform/xilinx/xilinx_spi_pl.c"

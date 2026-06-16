@@ -1,0 +1,13 @@
+$id: "platforms/xilinx/xil_irq_init_param.yaml"
+$type: struct
+$name: xil_irq_init_param
+$description: "Xilinx platform specific IRQ initialization parameters"
+$ranking: 4
+$sources:
+  headers:
+    - "drivers/platform/xilinx/xilinx_irq.h"
+
+type:
+  include: "platforms/xilinx/enums/xil_irq_type.yaml"
+  default: IRQ_PS
+  description: "Xilinx architecture (PL or PS)"

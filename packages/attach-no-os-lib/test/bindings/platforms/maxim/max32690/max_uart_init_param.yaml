@@ -1,0 +1,16 @@
+$id: "platforms/maxim/max32690/max_uart_init_param.yaml"
+$type: struct
+$name: max_uart_init_param
+$description: "Maxim MAX32690 platform specific UART initialization parameters"
+$ranking: 4
+$sources:
+  headers:
+    - "drivers/platform/maxim/max32690/maxim_uart.h"
+
+flow:
+  include: "platforms/maxim/max32690/enums/max_uart_flow_ctrl.yaml"
+  description: "UART flow control setting"
+
+vssel:
+  include: "platforms/maxim/max32690/enums/mxc_gpio_vssel.yaml"
+  description: "GPIO voltage select"

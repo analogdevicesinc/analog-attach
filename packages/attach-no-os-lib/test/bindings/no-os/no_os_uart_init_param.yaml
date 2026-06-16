@@ -1,0 +1,62 @@
+$id: "no-os/no_os_uart_init_param.yaml"
+$type: struct
+$name: no_os_uart_init_param
+$description: "Structure holding the parameters for UART initialization"
+$ranking: 4
+$sources:
+  headers:
+    - "include/no_os_uart.h"
+
+device_id:
+  type: uint8_t
+  required: true
+  description: "UART peripheral device ID"
+
+irq_id:
+  type: uint32_t
+  description: "UART interrupt ID"
+
+asynchronous_rx:
+  type: bool
+  default: false
+  description: "If set, the reception is interrupt driven"
+
+baud_rate:
+  type: uint32_t
+  required: true
+  description: "UART baud rate in bits per second"
+
+size:
+  include: "no-os/enums/no_os_uart_size.yaml"
+  description: "UART character size (number of data bits)"
+
+parity:
+  include: "no-os/enums/no_os_uart_parity.yaml"
+  description: "UART parity configuration"
+
+stop:
+  include: "no-os/enums/no_os_uart_stop.yaml"
+  description: "UART number of stop bits"
+
+platform_ops:
+  type: platform_ops
+  target: no_os_uart_platform_ops
+  required: true
+  description: "Platform-specific UART operations"
+  platforms:
+    - include: "platforms/maxim/max32690/platform_ops/uart_ops.yaml"
+    - include: "platforms/stm32/platform_ops/uart_ops.yaml"
+    - include: "platforms/xilinx/platform_ops/uart_ops.yaml"
+    - include: "platforms/pico/platform_ops/uart_ops.yaml"
+    - include: "platforms/linux/platform_ops/uart_ops.yaml"
+
+extra:
+  type: platform_extra
+  required: true
+  description: "Platform-specific initialization parameters"
+  platforms:
+    - include: "platforms/maxim/max32690/max_uart_init_param.yaml"
+    - include: "platforms/stm32/stm32_uart_init_param.yaml"
+    - include: "platforms/xilinx/xil_uart_init_param.yaml"
+    - include: "platforms/pico/pico_uart_init_param.yaml"
+    - include: "platforms/linux/linux_uart_init_param.yaml"

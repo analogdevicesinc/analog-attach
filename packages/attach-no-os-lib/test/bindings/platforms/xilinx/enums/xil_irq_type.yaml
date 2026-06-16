@@ -1,0 +1,12 @@
+$id: "platforms/xilinx/enums/xil_irq_type.yaml"
+$type: enum
+$name: xil_irq_type
+$description: "Xilinx platform architecture sections for IRQ"
+$ranking: 4
+$sources:
+  headers:
+    - "drivers/platform/xilinx/xilinx_irq.h"
+
+values:
+  - IRQ_PL
+  - IRQ_PS

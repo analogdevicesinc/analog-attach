@@ -1,0 +1,39 @@
+$id: "platforms/stm32/stm32_dma_channel.yaml"
+$type: struct
+$name: stm32_dma_channel
+$description: "STM32 DMA channel configuration"
+$ranking: 4
+$sources:
+  headers:
+    - "drivers/platform/stm32/stm32_dma.h"
+
+hdma:
+  type: external_ptr
+  target: DMA_HandleTypeDef
+  description: "DMA handle (HAL type, managed by STM32CubeMX)"
+
+ch_num:
+  type: uint32_t
+  description: "Channel number"
+
+mem_increment:
+  type: bool
+  default: true
+  description: "Memory address increment enable"
+
+per_increment:
+  type: bool
+  default: false
+  description: "Peripheral address increment enable"
+
+mem_data_alignment:
+  include: "platforms/stm32/enums/stm32_dma_data_alignment.yaml"
+  description: "Memory data alignment"
+
+per_data_alignment:
+  include: "platforms/stm32/enums/stm32_dma_data_alignment.yaml"
+  description: "Peripheral data alignment"
+
+dma_mode:
+  include: "platforms/stm32/enums/stm32_dma_mode.yaml"
+  description: "DMA mode"

@@ -1,0 +1,76 @@
+$id: "devices/adi,ad7124.yaml"
+$type: struct
+$name: ad7124_init_param
+$description: "AD7124 24-bit Sigma-Delta ADC initialization parameters"
+$ranking: 4
+$pointer: true
+$init_function: ad7124_setup
+$remove_function: ad7124_remove
+$sources:
+  headers:
+    - "drivers/adc/ad7124/ad7124.h"
+  sources:
+    - "drivers/adc/ad7124/ad7124.c"
+
+# SPI interface
+spi_init:
+  include: "no-os/no_os_spi_init_param.yaml"
+  pointer: true
+  required: true
+  description: "SPI initialization parameters"
+
+# CRC settings
+use_crc:
+  type: int16_t
+  default: 0
+  description: "Use CRC for SPI communication (0=disabled, 1=enabled)"
+
+check_ready:
+  type: int16_t
+  default: 1
+  description: "Check device ready status"
+
+spi_rdy_poll_cnt:
+  type: int16_t
+  default: 25000
+  description: "SPI ready polling count"
+
+# Operating mode
+mode:
+  include: "devices/ad7124-enums/ad7124_mode.yaml"
+  description: "ADC operating mode"
+
+# Device variant
+active_device:
+  type: enum
+  required: true
+  values: [ID_AD7124_4, ID_AD7124_8]
+  default: ID_AD7124_4
+  description: "Device variant (AD7124-4 or AD7124-8)"
+
+# Reference
+ref_en:
+  type: bool
+  default: true
+  description: "Enable internal reference"
+
+# Power mode
+power_mode:
+  include: "devices/ad7124-enums/ad7124_power_mode.yaml"
+  description: "Power mode selection"
+
+# Channel setups (array of 8)
+setups:
+  type: array
+  size: 8
+  element:
+    include: "devices/ad7124-structs/ad7124_channel_setup.yaml"
+  description: "Channel setup configurations (8 setups available)"
+
+# Channel mappings (array of 16)
+chan_map:
+  type: array
+  size: 16
+  element:
+    include: "devices/ad7124-structs/ad7124_channel_map.yaml"
+  description: "Channel mapping configurations (16 channels available)"

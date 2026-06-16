@@ -1,5 +1,6 @@
+import { profile } from "node:console";
 import { error, ok, Result } from "./result";
-import { EnumProperty, IncludeProperty, is_primitive_symbols, NumberProperty, UnionProperty } from "./types";
+import { ArrayElement, ArrayProperty, BooleanProperty, EnumProperty, IncludeProperty, is_primitive_symbols, NumberProperty, UnionProperty } from "./types";
 import { asObject, at, boolean_, number_, optional, optionalWithDefault, ParseContext, required, string_, stringArray } from "./validators";
 
 export function parse_number_property(name: string, object: Record<string, unknown>, context: ParseContext): Result<NumberProperty> {
@@ -47,6 +48,32 @@ export function parse_number_property(name: string, object: Record<string, unkno
 		default: default_.value,
 		minimum: minimum.value,
 		maximum: maximum.value
+	});
+}
+
+export function parse_bool_property(name: string, object: Record<string, unknown>, context: ParseContext): Result<BooleanProperty> {
+	const description = optionalWithDefault(object, "description", context, "", string_);
+	if (!description.ok) {
+		return description;
+	}
+
+	const required_ = optionalWithDefault(object, "required", context, false, boolean_);
+	if (!required_.ok) {
+		return required_;
+	}
+
+	const default_ = optionalWithDefault(object, "default", context, false, boolean_);
+	if (!default_.ok) {
+		return default_;
+	}
+
+	return ok({
+		_t: "BooleanProperty",
+		name,
+		type: "bool",
+		description: description.value,
+		required: required_.value,
+		default: default_.value,
 	});
 }
 
@@ -163,3 +190,82 @@ export function parse_union_property(name: string, object: Record<string, unknow
 		members: members.value,
 	});
 }
+
+export function parse_array_property(name: string, object: Record<string, unknown>, context: ParseContext): Result<ArrayProperty> {
+	const size = required(object, "size", context, number_);
+	if (!size.ok) {
+		return size;
+	}
+
+	const description = optionalWithDefault(object, "description", context, "", string_);
+	if (!description.ok) {
+		return description;
+	}
+
+	const required_ = optionalWithDefault(object, "required", context, false, boolean_);
+	if (!required_.ok) {
+		return required_;
+	}
+
+	const disabled = optionalWithDefault(object, "disabled", context, false, boolean_);
+	if (!disabled.ok) {
+		return disabled;
+	}
+
+	const element_object = required(object, "element", context, (v, c) => asObject(v, c));
+	if (!element_object.ok) {
+		return element_object;
+	}
+
+	const element_context = at(context, "element");
+	let element: ArrayElement;
+
+	if ("include" in element_object.value) {
+		const include = parse_include_property("element", element_object.value, element_context);
+		if (!include.ok) {
+			return include;
+		}
+		element = include.value;
+	} else if ("type" in element_object.value) {
+		const type_ = element_object.value["type"];
+
+		if (typeof type_ !== "string") {
+			return error("Type of 'type' should be string", at(element_context, "type").path);
+		}
+
+		if (type_ === "bool") {
+			const bool_ = parse_bool_property("element", element_object.value, element_context);
+			if (!bool_.ok) {
+				return bool_;
+			}
+			element = bool_.value;
+		} else if (type_ === "enum") {
+			const enum_ = parse_enum_property("element", element_object.value, element_context);
+			if (!enum_.ok) {
+				return enum_;
+			}
+			element = enum_.value;
+		} else if (is_primitive_symbols(type_ as string)) {
+			const number_property = parse_number_property("element", element_object.value, element_context);
+			if (!number_property.ok) {
+				return number_property;
+			}
+			element = number_property.value;
+		} else {
+			return error(`Invalid element type '${type_}'`, at(element_context, "type").path);
+		}
+	} else {
+		return error(`Element must have either 'type' or 'include'`, element_context.path);
+	}
+
+	return ok({
+		_t: "ArrayProperty",
+		name: name,
+		description: description.value,
+		required: required_.value,
+		disabled: disabled.value,
+		size: size.value,
+		element: element
+	});
+}
+
