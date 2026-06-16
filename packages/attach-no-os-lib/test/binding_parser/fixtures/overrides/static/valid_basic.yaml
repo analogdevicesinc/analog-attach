@@ -1,0 +1,15 @@
+$id: "test/static_basic"
+$type: struct
+$name: test_struct
+$ranking: 4
+$sources:
+  headers:
+    - "test.h"
+
+value:
+  type: uint8_t
+
+$override:
+  - value:
+      default: 42
+      required: true

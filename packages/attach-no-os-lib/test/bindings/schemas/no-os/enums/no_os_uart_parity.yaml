@@ -1,0 +1,22 @@
+$id: "no-os/enums/no_os_uart_parity.yaml"
+$type: enum
+$name: no_os_uart_parity
+$description: "UART parity configuration"
+$ranking: 4
+$sources:
+  headers:
+    - "include/no_os_uart.h"
+
+values:
+  NO_OS_UART_PAR_NO:
+    description: "No parity"
+  NO_OS_UART_PAR_MARK:
+    description: "Mark parity"
+  NO_OS_UART_PAR_SPACE:
+    description: "Space parity"
+  NO_OS_UART_PAR_ODD:
+    description: "Odd parity"
+  NO_OS_UART_PAR_EVEN:
+    description: "Even parity"
+
+default: NO_OS_UART_PAR_NO

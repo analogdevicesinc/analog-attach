@@ -1,0 +1,15 @@
+$id: "platforms/pico/enums/spi_tx_gp.yaml"
+$type: enum
+$name: spi_tx_gp
+$description: "Available GP config for SPI TX (MOSI)"
+$ranking: 4
+$sources:
+  headers:
+    - "drivers/platform/pico/pico_spi.h"
+
+values:
+  - SPI0_TX_GP3
+  - SPI0_TX_GP7
+  - SPI0_TX_GP19
+  - SPI1_TX_GP11
+  - SPI1_TX_GP15

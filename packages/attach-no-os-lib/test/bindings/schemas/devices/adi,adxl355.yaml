@@ -1,0 +1,58 @@
+$id: "devices/adi,adxl355.yaml"
+$type: struct
+$name: adxl355_init_param
+$description: "ADXL355 3-axis accelerometer configuration"
+$ranking: 4
+$sources:
+  headers:
+    - "drivers/accel/adxl355/adxl355.h"
+  sources:
+    - "drivers/accel/adxl355/adxl355.c"
+  api:
+    headers:
+      - "no_os_i2c.h"
+      - "no_os_spi.h"
+    sources:
+      - "no_os_i2c.c"
+      - "no_os_spi.c"
+  $note: "Driver header includes both I2C and SPI regardless of comm_type selection"
+
+comm_type:
+  type: enum
+  required: true
+  values: [ADXL355_SPI_COMM, ADXL355_I2C_COMM]
+  default: ADXL355_SPI_COMM
+  description: "Communication interface type (SPI or I2C)"
+
+dev_type:
+  type: enum
+  required: true
+  values: [ID_ADXL355, ID_ADXL357, ID_ADXL359]
+  default: ID_ADXL355
+  description: "Device variant identifier"
+
+comm_init:
+  type: union
+  required: true
+  description: "Communication initialization parameters"
+  # unions would have value: spi_init if the spi_init is the selected value
+  # like some sort of special behaviour
+  members:
+    - spi_init:
+        include: "no-os/no_os_spi_init_param.yaml"
+        description: "SPI initialization parameters"
+    - i2c_init:
+        include: "no-os/no_os_i2c_init_param.yaml"
+        description: "I2C initialization parameters"
+
+$override:
+  - $switch:
+      $on: comm_type
+      $cases:
+        ADXL355_SPI_COMM:
+          comm_init:
+            value: spi_init
+
+        ADXL355_I2C_COMM:
+          comm_init:
+            value: i2c_init

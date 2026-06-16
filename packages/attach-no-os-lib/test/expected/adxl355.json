@@ -1,0 +1,29 @@
+{
+  "$id": "adxl355/adxl355.yaml",
+  "$type": "bt_struct",
+  "$name": "adxl355_dev",
+  "$description": "ADXL355 accelerometer device",
+  "$ranking": 3,
+  "$sources": {
+    "headers": [
+      "drivers/accel/adxl355/adxl355.h"
+    ],
+    "sdk": {
+      "headers": [
+        "no_os_spi.h"
+      ]
+    }
+  },
+  "properties": [
+    {
+      "name": "dev_type",
+      "_t": "EnumProperty",
+      "description": "Device type",
+      "values": [
+        "ID_ADXL355",
+        "ID_ADXL357"
+      ],
+      "default": "ID_ADXL355"
+    }
+  ]
+}

@@ -1,0 +1,24 @@
+$id: "test/with_props"
+$type: struct
+$name: config_param
+$description: "A struct with properties"
+$ranking: 2
+$sources:
+  headers:
+    - "config.h"
+  sources:
+    - "config.c"
+
+enabled:
+  type: bool
+  default: true
+
+count:
+  type: uint32_t
+  minimum: 0
+  maximum: 100
+
+mode:
+  type: enum
+  values: [MODE_A, MODE_B]
+  default: MODE_A

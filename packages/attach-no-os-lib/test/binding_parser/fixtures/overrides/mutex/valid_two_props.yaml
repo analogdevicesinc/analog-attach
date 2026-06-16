@@ -1,0 +1,16 @@
+$id: "test/mutex_two"
+$type: struct
+$name: test_struct
+$ranking: 4
+$sources:
+  headers:
+    - "test.h"
+
+prop_a:
+  type: uint8_t
+
+prop_b:
+  type: uint8_t
+
+$override:
+  - $mutex: [prop_a, prop_b]

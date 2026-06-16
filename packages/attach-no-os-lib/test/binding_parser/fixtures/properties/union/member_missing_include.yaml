@@ -1,0 +1,4 @@
+type: union
+members:
+  - some_member:
+      pointer: true

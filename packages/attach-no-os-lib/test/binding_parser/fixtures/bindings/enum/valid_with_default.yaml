@@ -1,0 +1,10 @@
+$id: "test/enum_default"
+$type: enum
+$name: mode_enum
+$ranking: 4
+$sources:
+  headers:
+    - "mode.h"
+
+values: [MODE_A, MODE_B, MODE_C]
+default: MODE_B

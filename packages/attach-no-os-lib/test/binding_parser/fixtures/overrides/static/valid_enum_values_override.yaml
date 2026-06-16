@@ -1,0 +1,15 @@
+$id: "test/enum_values_override"
+$type: struct
+$name: test_struct
+$ranking: 4
+$sources:
+  headers:
+    - "test.h"
+
+mode:
+  type: enum
+  values: [MODE_A, MODE_B, MODE_C]
+
+$override:
+  - mode:
+      values: [MODE_X, MODE_Y]

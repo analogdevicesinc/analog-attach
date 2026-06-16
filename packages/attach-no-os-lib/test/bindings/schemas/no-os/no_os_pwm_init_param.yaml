@@ -1,0 +1,57 @@
+$id: "no-os/no_os_pwm_init_param.yaml"
+$type: struct
+$name: no_os_pwm_init_param
+$description: "Structure containing the init parameters needed by the PWM generator"
+$ranking: 4
+$sources:
+  headers:
+    - "include/no_os_pwm.h"
+
+id:
+  type: uint32_t
+  description: "PWM id (e.g., pin number, timer_id)"
+
+period_ns:
+  type: uint32_t
+  description: "PWM generator period in nanoseconds"
+
+duty_cycle_ns:
+  type: uint32_t
+  description: "PWM generator duty cycle in nanoseconds"
+
+phase_ns:
+  type: uint32_t
+  description: "PWM generator phase in nanoseconds"
+
+polarity:
+  include: "no-os/enums/no_os_pwm_polarity.yaml"
+  description: "PWM generator polarity"
+
+pwm_gpio:
+  include: "no-os/no_os_gpio_init_param.yaml"
+  description: "PWM GPIO pin init param"
+
+irq_id:
+  type: uint32_t
+  description: "IRQ ID"
+
+pwm_callback:
+  type: callback_func
+  signature: "void (*)(void *)"
+  default: "NULL"
+  description: "PWM callback function"
+
+platform_ops:
+  type: platform_ops
+  target: no_os_pwm_platform_ops
+  description: "PWM platform specific functions"
+  platforms:
+    - include: "platforms/maxim/max32690/platform_ops/pwm_ops.yaml"
+    - include: "platforms/stm32/platform_ops/pwm_ops.yaml"
+
+extra:
+  type: platform_extra
+  description: "PWM extra parameters (platform specific)"
+  platforms:
+    - include: "platforms/maxim/max32690/max_pwm_init_param.yaml"
+    - include: "platforms/stm32/stm32_pwm_init_param.yaml"

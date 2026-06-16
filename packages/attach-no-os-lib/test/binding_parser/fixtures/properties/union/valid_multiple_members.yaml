@@ -1,0 +1,10 @@
+type: union
+description: "Communication interface"
+required: true
+members:
+  - spi:
+      include: "spi.yaml"
+  - i2c:
+      include: "i2c.yaml"
+  - uart:
+      include: "uart.yaml"

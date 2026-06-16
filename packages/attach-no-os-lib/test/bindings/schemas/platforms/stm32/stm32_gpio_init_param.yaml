@@ -1,0 +1,20 @@
+$id: "platforms/stm32/stm32_gpio_init_param.yaml"
+$type: struct
+$name: stm32_gpio_init_param
+$description: "STM32 platform specific GPIO initialization parameters"
+$ranking: 4
+$sources:
+  headers:
+    - "drivers/platform/stm32/stm32_gpio.h"
+
+mode:
+  type: uint32_t
+  description: "GPIO output mode"
+
+speed:
+  type: uint32_t
+  description: "GPIO speed grade"
+
+alternate:
+  type: uint32_t
+  description: "GPIO alternate functionality"
