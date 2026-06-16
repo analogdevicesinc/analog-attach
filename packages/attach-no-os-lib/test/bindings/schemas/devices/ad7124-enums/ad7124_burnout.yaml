@@ -1,0 +1,16 @@
+$id: "devices/ad7124-enums/ad7124_burnout.yaml"
+$type: enum
+$name: ad7124_burnout
+$description: "AD7124 burnout current values"
+$ranking: 4
+$sources:
+  headers:
+    - "drivers/adc/ad7124/ad7124.h"
+
+values:
+  AD7124_BURNOUT_OFF: "Burnout current off"
+  AD7124_BURNOUT_500N: "500 nA burnout current"
+  AD7124_BURNOUT_2U: "2 uA burnout current"
+  AD7124_BURNOUT_4U: "4 uA burnout current"
+
+default: AD7124_BURNOUT_OFF

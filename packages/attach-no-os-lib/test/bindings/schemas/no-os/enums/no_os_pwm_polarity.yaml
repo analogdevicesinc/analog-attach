@@ -1,0 +1,16 @@
+$id: "no-os/enums/no_os_pwm_polarity.yaml"
+$type: enum
+$name: no_os_pwm_polarity
+$description: "Possible polarities of the PWM signal"
+$ranking: 4
+$sources:
+  headers:
+    - "include/no_os_pwm.h"
+
+values:
+  NO_OS_PWM_POLARITY_HIGH:
+    description: "PWM duty cycle is high, idle low"
+  NO_OS_PWM_POLARITY_LOW:
+    description: "PWM duty cycle is low, idle high"
+
+default: NO_OS_PWM_POLARITY_HIGH

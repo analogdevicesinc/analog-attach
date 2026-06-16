@@ -1,0 +1,13 @@
+$id: "test/enum_nested"
+$type: enum
+$name: detailed_enum
+$ranking: 2
+$sources:
+  headers:
+    - "test.h"
+
+values:
+  OPTION_ONE:
+    description: "First option with detailed description"
+  OPTION_TWO:
+    description: "Second option with detailed description"

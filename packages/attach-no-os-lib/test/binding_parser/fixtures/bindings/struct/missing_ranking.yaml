@@ -1,0 +1,6 @@
+$id: "test/no_ranking"
+$type: struct
+$name: no_ranking_struct
+$sources:
+  headers:
+    - "test.h"

@@ -1,0 +1,22 @@
+$id: "test/switch_invalid_case"
+$type: struct
+$name: test_struct
+$ranking: 4
+$sources:
+  headers:
+    - "test.h"
+
+mode:
+  type: enum
+  values: [A, B]
+
+value:
+  type: uint8_t
+
+$override:
+  - $switch:
+      $on: mode
+      $cases:
+        C:
+          value:
+            default: 100

@@ -1,0 +1,57 @@
+$id: "platforms/pico/pico_spi_init_param.yaml"
+$type: struct
+$name: pico_spi_init_param
+$description: "Pico platform specific SPI initialization parameters"
+$ranking: 4
+$sources:
+  headers:
+    - "drivers/platform/pico/pico_spi.h"
+
+spi_tx_pin:
+  include: "platforms/pico/enums/spi_tx_gp.yaml"
+  description: "SPI TX (MOSI) pin configuration"
+
+spi_rx_pin:
+  include: "platforms/pico/enums/spi_rx_gp.yaml"
+  description: "SPI RX (MISO) pin configuration"
+
+spi_sck_pin:
+  include: "platforms/pico/enums/spi_sck_gp.yaml"
+  description: "SPI SCK (clock) pin configuration"
+
+spi_cs_pin:
+  include: "platforms/pico/enums/spi_cs_gp.yaml"
+  description: "SPI CS (chip select) pin configuration"
+
+$override:
+  # SPI0 (device_id = 0) can only use SPI0_* pins
+  - $if:
+      $parent:
+        device_id:
+          value: 0
+    $then:
+      $this:
+        spi_tx_pin:
+          value: [SPI0_TX_GP3, SPI0_TX_GP7, SPI0_TX_GP19]
+        spi_rx_pin:
+          value: [SPI0_RX_GP0, SPI0_RX_GP4, SPI0_RX_GP16]
+        spi_sck_pin:
+          value: [SPI0_SCK_GP2, SPI0_SCK_GP6, SPI0_SCK_GP18]
+        spi_cs_pin:
+          value: [SPI0_CS_GP1, SPI0_CS_GP5, SPI0_CS_GP17]
+
+  # SPI1 (device_id = 1) can only use SPI1_* pins
+  - $if:
+      $parent:
+        device_id:
+          value: 1
+    $then:
+      $this:
+        spi_tx_pin:
+          value: [SPI1_TX_GP11, SPI1_TX_GP15]
+        spi_rx_pin:
+          value: [SPI1_RX_GP8, SPI1_RX_GP12]
+        spi_sck_pin:
+          value: [SPI1_SCK_GP10, SPI1_SCK_GP14]
+        spi_cs_pin:
+          value: [SPI1_CS_GP9, SPI1_CS_GP13]

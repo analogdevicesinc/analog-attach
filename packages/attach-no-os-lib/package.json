@@ -1,0 +1,33 @@
+{
+  "name": "attach-no-os-lib",
+  "version": "0.0.1",
+  "description": "No-OS device tree generation library for Analog Attach",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "scripts": {
+    "build": "vite build",
+    "watch": "vite build --watch",
+    "clean": "rm -rf dist tsconfig.tsbuildinfo node_modules",
+    "test": "vitest",
+    "test:watch": "vitest --watch",
+    "coverage": "vitest run --coverage"
+  },
+  "devDependencies": {
+    "@types/node": "20.x",
+    "@vitest/coverage-v8": "^4.0.18",
+    "typescript": "^5.7.2",
+    "vite": "^7.3.1",
+    "vite-plugin-dts": "^4.5.4",
+    "vitest": "^4.0.18"
+  }
+}

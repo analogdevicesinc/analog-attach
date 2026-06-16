@@ -1,0 +1,41 @@
+$id: "no-os/no_os_i2c_init_param.yaml"
+$type: struct
+$name: no_os_i2c_init_param
+$description: "Structure holding the parameters for I2C initialization"
+$ranking: 4
+$sources:
+  headers:
+    - "include/no_os_i2c.h"
+
+device_id:
+  type: uint32_t
+  description: "I2C peripheral device ID"
+
+max_speed_hz:
+  type: uint32_t
+  description: "Maximum I2C clock frequency in Hz"
+
+slave_address:
+  type: uint8_t
+  description: "I2C slave device address"
+
+platform_ops:
+  type: platform_ops
+  target: no_os_i2c_platform_ops
+  description: "Platform-specific I2C operations"
+  platforms:
+    - include: "platforms/maxim/max32690/platform_ops/i2c_ops.yaml"
+    - include: "platforms/stm32/platform_ops/i2c_ops.yaml"
+    - include: "platforms/xilinx/platform_ops/i2c_ops.yaml"
+    - include: "platforms/pico/platform_ops/i2c_ops.yaml"
+    - include: "platforms/linux/platform_ops/i2c_ops.yaml"
+
+extra:
+  type: platform_extra
+  description: "Platform-specific initialization parameters"
+  platforms:
+    - include: "platforms/maxim/max32690/max_i2c_init_param.yaml"
+    - include: "platforms/stm32/stm32_i2c_init_param.yaml"
+    - include: "platforms/xilinx/xil_i2c_init_param.yaml"
+    - include: "platforms/pico/pico_i2c_init_param.yaml"
+    - include: "platforms/linux/linux_i2c_init_param.yaml"

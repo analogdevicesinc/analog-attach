@@ -1,0 +1,19 @@
+$id: "test/mutex_multi"
+$type: struct
+$name: test_struct
+$ranking: 4
+$sources:
+  headers:
+    - "test.h"
+
+option_x:
+  type: bool
+
+option_y:
+  type: bool
+
+option_z:
+  type: bool
+
+$override:
+  - $mutex: [option_x, option_y, option_z]

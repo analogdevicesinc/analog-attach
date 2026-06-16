@@ -1,0 +1,19 @@
+$id: "test/invalid_union_value"
+$type: struct
+$name: test_struct
+$ranking: 4
+$sources:
+  headers:
+    - "test.h"
+
+comm:
+  type: union
+  members:
+    - spi:
+        include: "spi.yaml"
+    - i2c:
+        include: "i2c.yaml"
+
+$override:
+  - comm:
+      value: uart

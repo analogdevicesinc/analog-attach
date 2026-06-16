@@ -1,0 +1,20 @@
+$id: "test/number_override"
+$type: struct
+$name: test_struct
+$ranking: 4
+$sources:
+  headers:
+    - "test.h"
+
+value:
+  type: uint8_t
+  minimum: 0
+  maximum: 255
+
+$override:
+  - value:
+      default: 50
+      minimum: 10
+      maximum: 200
+      description: "Overridden value"
+      required: true

@@ -1,0 +1,32 @@
+$id: "platforms/maxim/max32690/platform_ops/uart_ops.yaml"
+$type: platform_ops
+$ranking: 4
+$name: max_uart_ops
+$sources:
+  headers:
+    - "maxim_uart.h"
+    - "maxim_uart_stdio.h"
+    - "maxim_irq.h"
+    - "maxim_gpio.h"
+    - "maxim_gpio_irq.h"
+    - "../common/maxim_dma.h"
+  sources:
+    - "maxim_uart.c"
+    - "maxim_uart_stdio.c"
+    - "maxim_irq.c"
+    - "maxim_gpio_irq.c"
+    - "maxim_gpio.c"
+    - "../common/maxim_dma.c"
+  api:
+    headers:
+      - "no_os_irq.h"
+      - "no_os_gpio.h"
+      - "no_os_dma.h"
+    sources:
+      - "no_os_irq.c"
+      - "no_os_gpio.c"
+      - "no_os_dma.c"
+  sdk:
+    headers:
+      - "uart.h"
+      - "gpio.h"

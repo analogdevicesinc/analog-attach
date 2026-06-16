@@ -1,0 +1,44 @@
+$id: "no-os/no_os_timer_init_param.yaml"
+$type: struct
+$name: no_os_timer_init_param
+$description: "Structure holding the parameters for timer initialization"
+$ranking: 4
+$sources:
+  headers:
+    - "include/no_os_timer.h"
+  sources:
+    - "drivers/api/no_os_timer.c"
+
+id:
+  type: uint16_t
+  required: true
+  description: "Timer ID"
+
+freq_hz:
+  type: uint32_t
+  required: true
+  description: "Timer count frequency in Hz"
+
+ticks_count:
+  type: uint32_t
+  required: true
+  description: "Number of ticks the timer counts until it resets"
+
+platform_ops:
+  type: platform_ops
+  target: no_os_timer_platform_ops
+  required: true
+  description: "Platform-specific timer operations"
+  platforms:
+    - include: "platforms/stm32/platform_ops/timer_ops.yaml"
+    - include: "platforms/xilinx/platform_ops/timer_ops.yaml"
+    - include: "platforms/pico/platform_ops/timer_ops.yaml"
+    - include: "platforms/linux/platform_ops/timer_ops.yaml"
+
+extra:
+  type: platform_extra
+  required: true
+  description: "Platform-specific initialization parameters"
+  platforms:
+    - include: "platforms/stm32/stm32_timer_init_param.yaml"
+    - include: "platforms/xilinx/xil_timer_init_param.yaml"

@@ -1,0 +1,18 @@
+$id: "platforms/xilinx/xil_gpio_init_param.yaml"
+$type: struct
+$name: xil_gpio_init_param
+$description: "Xilinx platform specific GPIO initialization parameters"
+$ranking: 4
+$sources:
+  headers:
+    - "drivers/platform/xilinx/xilinx_gpio.h"
+
+type:
+  include: "platforms/xilinx/enums/xil_gpio_type.yaml"
+  default: GPIO_PS
+  description: "Xilinx architecture (PL or PS)"
+
+device_id:
+  type: uint32_t
+  default: 0
+  description: "Device ID"

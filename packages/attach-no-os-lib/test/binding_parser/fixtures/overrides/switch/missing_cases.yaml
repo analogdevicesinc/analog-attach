@@ -1,0 +1,15 @@
+$id: "test/switch_missing_cases"
+$type: struct
+$name: test_struct
+$ranking: 4
+$sources:
+  headers:
+    - "test.h"
+
+mode:
+  type: enum
+  values: [A, B]
+
+$override:
+  - $switch:
+      $on: mode

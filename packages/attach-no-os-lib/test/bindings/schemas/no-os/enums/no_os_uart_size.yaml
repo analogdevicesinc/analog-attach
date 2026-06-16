@@ -1,0 +1,22 @@
+$id: "no-os/enums/no_os_uart_size.yaml"
+$type: enum
+$name: no_os_uart_size
+$description: "UART character size (number of data bits)"
+$ranking: 4
+$sources:
+  headers:
+    - "include/no_os_uart.h"
+
+values:
+  NO_OS_UART_CS_5:
+    description: "5 data bits"
+  NO_OS_UART_CS_6:
+    description: "6 data bits"
+  NO_OS_UART_CS_7:
+    description: "7 data bits"
+  NO_OS_UART_CS_8:
+    description: "8 data bits"
+  NO_OS_UART_CS_9:
+    description: "9 data bits"
+
+default: NO_OS_UART_CS_8

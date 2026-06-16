@@ -1,0 +1,9 @@
+$id: "test/enum_array"
+$type: enum
+$name: test_mode
+$ranking: 4
+$sources:
+  headers:
+    - "test.h"
+
+values: [VALUE_A, VALUE_B, VALUE_C]

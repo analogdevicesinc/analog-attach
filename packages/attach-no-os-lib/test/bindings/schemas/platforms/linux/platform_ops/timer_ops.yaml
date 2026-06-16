@@ -1,0 +1,10 @@
+$id: "platforms/linux/platform_ops/timer_ops.yaml"
+$type: platform_ops
+$name: linux_timer_ops
+$description: "Linux Timer platform ops"
+$ranking: 4
+$sources:
+  headers:
+    - "drivers/platform/linux/linux_timer.h"
+  sources:
+    - "drivers/platform/linux/linux_timer.c"

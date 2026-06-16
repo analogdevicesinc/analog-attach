@@ -1,0 +1,7 @@
+$id: "test/bad_ranking"
+$type: struct
+$name: bad_ranking_struct
+$ranking: 5
+$sources:
+  headers:
+    - "test.h"

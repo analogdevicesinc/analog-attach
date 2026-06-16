@@ -1,0 +1,10 @@
+$id: "platforms/linux/platform_ops/gpio_ops.yaml"
+$type: platform_ops
+$name: linux_gpio_ops
+$description: "Linux GPIO platform ops"
+$ranking: 4
+$sources:
+  headers:
+    - "drivers/platform/linux/linux_gpio.h"
+  sources:
+    - "drivers/platform/linux/linux_gpio.c"

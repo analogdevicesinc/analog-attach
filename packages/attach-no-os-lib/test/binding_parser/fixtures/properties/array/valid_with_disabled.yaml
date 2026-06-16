@@ -1,0 +1,5 @@
+type: array
+size: 5
+disabled: true
+element:
+  type: uint32_t

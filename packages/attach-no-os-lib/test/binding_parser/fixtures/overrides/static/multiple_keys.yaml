@@ -1,0 +1,19 @@
+$id: "test/static_multi_keys"
+$type: struct
+$name: test_struct
+$ranking: 4
+$sources:
+  headers:
+    - "test.h"
+
+prop_a:
+  type: uint8_t
+
+prop_b:
+  type: uint8_t
+
+$override:
+  - prop_a:
+      default: 10
+    prop_b:
+      default: 20

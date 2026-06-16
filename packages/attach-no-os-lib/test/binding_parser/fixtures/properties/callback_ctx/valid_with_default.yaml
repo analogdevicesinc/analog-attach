@@ -1,0 +1,3 @@
+type: callback_ctx
+default: "NULL"
+description: "User context pointer"

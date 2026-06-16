@@ -1,0 +1,20 @@
+$id: "platforms/stm32/platform_ops/uart_ops.yaml"
+$type: platform_ops
+$ranking: 4
+$name: stm32_uart_ops
+$sources:
+  headers:
+    - "stm32_uart.h"
+  sources:
+    - "stm32_uart.c"
+  api:
+    headers:
+      - "no_os_irq.h"
+    sources:
+      - "no_os_irq.c"
+  platform:
+    headers:
+      - "stm32_irq.h"
+    sources:
+      - "stm32_irq.c"
+  $note: "STM32 UART driver uses IRQ internally"

@@ -1,0 +1,21 @@
+$id: "test/with_override"
+$type: struct
+$name: override_param
+$ranking: 3
+$sources:
+  headers:
+    - "test.h"
+
+flag:
+  type: bool
+
+value:
+  type: uint8_t
+
+$override:
+  - $if:
+      flag:
+        value: true
+    $then:
+      value:
+        required: true

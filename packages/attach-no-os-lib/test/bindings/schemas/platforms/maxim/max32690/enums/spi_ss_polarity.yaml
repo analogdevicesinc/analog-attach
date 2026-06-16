@@ -1,0 +1,16 @@
+$id: "platforms/maxim/max32690/enums/spi_ss_polarity.yaml"
+$type: enum
+$name: spi_ss_polarity
+$description: "Maxim MAX32690 SPI slave select polarity options"
+$ranking: 4
+$sources:
+  headers:
+    - "drivers/platform/maxim/max32690/maxim_spi.h"
+
+values:
+  SPI_SS_POL_LOW:
+    description: "Active low slave select"
+  SPI_SS_POL_HIGH:
+    description: "Active high slave select"
+
+default: SPI_SS_POL_LOW

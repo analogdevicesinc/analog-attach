@@ -1,0 +1,14 @@
+$id: "platforms/stm32/stm32_gpio_irq_init_param.yaml"
+$type: struct
+$name: stm32_gpio_irq_init_param
+$description: "STM32 platform specific GPIO IRQ initialization parameters"
+$ranking: 4
+$sources:
+  headers:
+    - "drivers/platform/stm32/stm32_gpio_irq.h"
+  sources:
+    - "drivers/platform/stm32/stm32_gpio_irq.c"
+
+port_nb:
+  type: uint8_t
+  description: "GPIO port number for EXTI line"

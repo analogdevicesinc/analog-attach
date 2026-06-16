@@ -1,0 +1,38 @@
+$id: "no-os/no_os_irq_init_param.yaml"
+$type: struct
+$name: no_os_irq_init_param
+$init_function: no_os_irq_ctrl_init
+$descriptor: no_os_irq_ctrl_desc
+$description: "Structure holding the initial parameters for Interrupt Request"
+$ranking: 4
+$sources:
+  headers:
+    - "include/no_os_irq.h"
+  sources:
+    - "drivers/api/no_os_irq.c"
+
+irq_ctrl_id:
+  type: uint32_t
+  required: true
+  description: "Interrupt request controller ID"
+
+platform_ops:
+  type: platform_ops
+  target: no_os_irq_platform_ops
+  required: true
+  description: "Platform-specific IRQ operations"
+  platforms:
+    - include: "platforms/maxim/max32690/platform_ops/irq_ops.yaml"
+    - include: "platforms/stm32/platform_ops/irq_ops.yaml"
+    - include: "platforms/stm32/platform_ops/gpio_irq_ops.yaml"
+    - include: "platforms/xilinx/platform_ops/irq_ops.yaml"
+    - include: "platforms/xilinx/platform_ops/gpio_irq_ops.yaml"
+    - include: "platforms/pico/platform_ops/irq_ops.yaml"
+
+extra:
+  type: platform_extra
+  description: "Platform-specific initialization parameters (IRQ controller config, not peripheral reference)"
+  platforms:
+    - include: "platforms/stm32/stm32_gpio_irq_init_param.yaml"
+    - include: "platforms/xilinx/xil_irq_init_param.yaml"
+    - include: "platforms/xilinx/xil_gpio_irq_init_param.yaml"

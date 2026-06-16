@@ -1,0 +1,15 @@
+$id: "platforms/pico/enums/uart_rx_gp.yaml"
+$type: enum
+$name: uart_rx_gp
+$description: "Available GP config for UART RX"
+$ranking: 4
+$sources:
+  headers:
+    - "drivers/platform/pico/pico_uart.h"
+
+values:
+  - UART0_RX_GP1
+  - UART0_RX_GP13
+  - UART0_RX_GP17
+  - UART1_RX_GP5
+  - UART1_RX_GP9

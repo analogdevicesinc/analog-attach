@@ -1,0 +1,16 @@
+$id: "devices/ad7124-enums/ad7124_reference_source.yaml"
+$type: enum
+$name: ad7124_reference_source
+$description: "AD7124 ADC reference source"
+$ranking: 4
+$sources:
+  headers:
+    - "drivers/adc/ad7124/ad7124.h"
+
+values:
+  EXTERNAL_REFIN1: "External reference REFIN1+/-"
+  EXTERNAL_REFIN2: "External reference REFIN2+/-"
+  INTERNAL_REF: "Internal 2.5V reference"
+  AVDD_AVSS: "AVDD - AVSS"
+
+default: INTERNAL_REF

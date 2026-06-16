@@ -1,0 +1,24 @@
+$id: "platforms/xilinx/xil_uart_init_param.yaml"
+$type: struct
+$name: xil_uart_init_param
+$description: "Xilinx platform specific UART initialization parameters"
+$ranking: 4
+$sources:
+  headers:
+    - "drivers/platform/xilinx/xilinx_uart.h"
+
+type:
+  include: "platforms/xilinx/enums/xil_uart_type.yaml"
+  default: UART_PS
+  description: "Xilinx architecture (PL or PS)"
+
+irq_id:
+  type: uint32_t
+  default: 0
+  description: "Interrupt Request ID"
+
+# TODO: Wtf is this?
+# irq_desc:
+#   type: ptr
+#   target: no_os_irq_ctrl_desc
+#   description: "Interrupt Request Descriptor (can be NULL if IRQ not used)"

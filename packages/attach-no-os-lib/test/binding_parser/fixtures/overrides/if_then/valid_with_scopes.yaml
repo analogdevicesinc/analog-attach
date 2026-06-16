@@ -1,0 +1,22 @@
+$id: "test/if_then_scopes"
+$type: struct
+$name: test_struct
+$ranking: 4
+$sources:
+  headers:
+    - "test.h"
+
+flag:
+  type: bool
+
+count:
+  type: uint32_t
+
+$override:
+  - $if:
+      $this:
+        flag:
+          value: true
+    $then:
+      count:
+        default: 100
