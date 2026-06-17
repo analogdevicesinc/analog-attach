@@ -1,0 +1,18 @@
+$id: "test/switch_missing_on"
+$type: struct
+$name: test_struct
+$ranking: 4
+$sources:
+  headers:
+    - "test.h"
+
+mode:
+  type: enum
+  values: [A, B]
+
+$override:
+  - $switch:
+      $cases:
+        A:
+          mode:
+            default: A

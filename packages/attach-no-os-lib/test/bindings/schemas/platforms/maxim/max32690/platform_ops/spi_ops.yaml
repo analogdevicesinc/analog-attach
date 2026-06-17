@@ -1,0 +1,29 @@
+$id: "platforms/maxim/max32690/platform_ops/spi_ops.yaml"
+$type: platform_ops
+$ranking: 4
+$name: max_spi_ops
+$sources:
+  headers:
+    - "maxim_spi.h"
+  sources:
+    - "maxim_spi.c"
+  api:
+    headers:
+      - "no_os_dma.h"
+      - "no_os_irq.h"
+    sources:
+      - "no_os_dma.c"
+      - "no_os_irq.c"
+  platform:
+    headers:
+      - "../common/maxim_dma.h"
+      - "maxim_irq.h"
+    sources:
+      - "../common/maxim_dma.c"
+      - "maxim_irq.c"
+  sdk:
+    headers:
+      - "spi.h"
+      - "gpio.h"
+      - "dma.h"
+  $note: "Maxim SPI driver uses DMA and IRQ internally"

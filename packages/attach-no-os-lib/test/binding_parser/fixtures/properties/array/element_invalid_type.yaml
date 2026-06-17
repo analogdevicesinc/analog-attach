@@ -1,0 +1,4 @@
+type: array
+size: 10
+element:
+  type: invalid_type

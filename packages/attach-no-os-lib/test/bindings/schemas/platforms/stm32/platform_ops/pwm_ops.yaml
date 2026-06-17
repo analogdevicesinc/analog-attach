@@ -1,0 +1,9 @@
+$id: "platforms/stm32/platform_ops/pwm_ops.yaml"
+$type: platform_ops
+$ranking: 4
+$name: stm32_pwm_ops
+$sources:
+  headers:
+    - "stm32_pwm.h"
+  sources:
+    - "stm32_pwm.c"

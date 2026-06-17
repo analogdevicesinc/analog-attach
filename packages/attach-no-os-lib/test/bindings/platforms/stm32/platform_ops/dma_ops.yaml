@@ -1,8 +1,0 @@
-$id: "platforms/stm32/platform_ops/dma_ops.yaml"
-$type: platform_ops
-$name: stm32_dma_ops
-$sources:
-  headers:
-    - "stm32_dma.h"
-  sources:
-    - "stm32_dma.c"

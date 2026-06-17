@@ -1,0 +1,5 @@
+type: array
+size: 8
+element:
+  type: enum
+  values: [MODE_A, MODE_B, MODE_C]

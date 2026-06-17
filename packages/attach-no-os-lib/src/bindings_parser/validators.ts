@@ -1,9 +1,9 @@
 import { Result, ok, error } from "./result";
-import { Binding } from "./types";
+import { BindingStruct } from "./types";
 
 type ParseContext = {
 	path: string,
-	document: Partial<Binding>
+	document: Partial<BindingStruct>
 }
 
 function at(context: ParseContext, key: string | number): ParseContext {
@@ -53,6 +53,25 @@ function stringArray(value: unknown, context: ParseContext): Result<string[]> {
 	return ok(value as string[]);
 }
 
+function enumValueArray(value: unknown, context: ParseContext): Result<(string | number)[]> {
+	if (!Array.isArray(value)) {
+		return error(`Expected array, got ${typeof value}`, context.path);
+	}
+	for (const [index, element] of value.entries()) {
+		if (typeof element !== "string" && typeof element !== "number") {
+			return error(`Expected string or number, got ${typeof element}`, at(context, index).path);
+		}
+	}
+	return ok(value);
+}
+
+function stringOrNumber_(value: unknown, context: ParseContext): Result<string | number> {
+	if (typeof value !== "string" && typeof value !== "number") {
+		return error(`Expected string or number, got ${typeof value}`, context.path);
+	}
+	return ok(value);
+}
+
 function required<T>(
 	object: Record<string, unknown>,
 	key: string,
@@ -90,4 +109,4 @@ function optionalWithDefault<T>(
 	return validate(object[key], at(context, key));
 }
 
-export { ParseContext, asObject, at, string_, number_, boolean_, stringArray, required, optional, optionalWithDefault };
+export { ParseContext, asObject, at, string_, number_, boolean_, stringArray, enumValueArray, stringOrNumber_, required, optional, optionalWithDefault };
