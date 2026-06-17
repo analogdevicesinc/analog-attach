@@ -1,0 +1,15 @@
+$id: "test/bool_override"
+$type: struct
+$name: test_struct
+$ranking: 4
+$sources:
+  headers:
+    - "test.h"
+
+enabled:
+  type: bool
+
+$override:
+  - enabled:
+      default: true
+      required: true

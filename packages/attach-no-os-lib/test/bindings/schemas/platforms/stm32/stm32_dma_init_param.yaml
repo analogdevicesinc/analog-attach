@@ -1,0 +1,14 @@
+$id: "platforms/stm32/stm32_dma_init_param.yaml"
+$type: struct
+$name: stm32_dma_init_param
+$description: "STM32 platform specific DMA initialization parameters"
+$ranking: 4
+$sources:
+  headers:
+    - "drivers/platform/stm32/stm32_dma.h"
+
+# FIXME: This is not valid
+# chn:
+#   type: ptr
+#   target: stm32_dma_channel
+#   description: "DMA channel descriptor"

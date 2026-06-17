@@ -1,0 +1,15 @@
+$id: "test/if_then_missing"
+$type: struct
+$name: test_struct
+$ranking: 4
+$sources:
+  headers:
+    - "test.h"
+
+enabled:
+  type: bool
+
+$override:
+  - $if:
+      enabled:
+        value: true

@@ -1,0 +1,2 @@
+type: enum
+values: [VALUE_A, VALUE_B, VALUE_C]

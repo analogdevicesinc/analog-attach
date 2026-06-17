@@ -1,0 +1,21 @@
+$id: "test/if_then_basic"
+$type: struct
+$name: test_struct
+$ranking: 4
+$sources:
+  headers:
+    - "test.h"
+
+enabled:
+  type: bool
+
+value:
+  type: uint8_t
+
+$override:
+  - $if:
+      enabled:
+        value: true
+    $then:
+      value:
+        required: true

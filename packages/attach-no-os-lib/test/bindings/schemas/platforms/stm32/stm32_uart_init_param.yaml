@@ -1,0 +1,18 @@
+$id: "platforms/stm32/stm32_uart_init_param.yaml"
+$type: struct
+$name: stm32_uart_init_param
+$description: "STM32 platform specific UART initialization parameters"
+$ranking: 4
+$sources:
+  headers:
+    - "drivers/platform/stm32/stm32_uart.h"
+
+# FIXME: This is not valid
+# huart:
+#   type: external_ptr
+#   target: UART_HandleTypeDef
+#   description: "UART instance handle (from STM32 HAL)"
+
+timeout:
+  type: uint32_t
+  description: "UART transaction timeout (HAL_IncTick() units)"

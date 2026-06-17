@@ -1,0 +1,12 @@
+$id: "test/enum_object"
+$type: enum
+$name: status_enum
+$ranking: 3
+$sources:
+  headers:
+    - "status.h"
+
+values:
+  STATUS_OK: "Operation succeeded"
+  STATUS_ERROR: "Operation failed"
+  STATUS_PENDING: "Operation in progress"

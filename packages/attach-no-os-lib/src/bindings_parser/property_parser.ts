@@ -1,7 +1,6 @@
-import { profile } from "node:console";
 import { error, ok, Result } from "./result";
-import { ArrayElement, ArrayProperty, BooleanProperty, EnumProperty, IncludeProperty, is_primitive_symbols, NumberProperty, UnionProperty } from "./types";
-import { asObject, at, boolean_, number_, optional, optionalWithDefault, ParseContext, required, string_, stringArray } from "./validators";
+import { ArrayElement, ArrayProperty, BooleanProperty, CallbackContextProperty, CallbackFunctionProperty, EnumProperty, IncludeProperty, is_primitive_symbols, NumberProperty, PlatformExtraProperty, PlatformOpsProperty, StringProperty, UnionProperty } from "./types";
+import { asObject, at, boolean_, number_, optional, optionalWithDefault, ParseContext, required, string_, enumValueArray, stringOrNumber_ } from "./validators";
 
 export function parse_number_property(name: string, object: Record<string, unknown>, context: ParseContext): Result<NumberProperty> {
 	const type_ = required(object, "type", context, string_);
@@ -77,12 +76,7 @@ export function parse_bool_property(name: string, object: Record<string, unknown
 	});
 }
 
-export function parse_enum_property(name: string, object: Record<string, unknown>, context: ParseContext): Result<EnumProperty> {
-	const values = required(object, "values", context, stringArray);
-	if (!values.ok) {
-		return values;
-	}
-
+export function parse_string_property(name: string, object: Record<string, unknown>, context: ParseContext): Result<StringProperty> {
 	const description = optionalWithDefault(object, "description", context, "", string_);
 	if (!description.ok) {
 		return description;
@@ -97,6 +91,38 @@ export function parse_enum_property(name: string, object: Record<string, unknown
 	if (!default_.ok) {
 		return default_;
 	}
+
+	return ok({
+		_t: "StringProperty",
+		name,
+		type: "string",
+		description: description.value,
+		required: required_.value,
+		default: default_.value,
+	});
+}
+
+export function parse_enum_property(name: string, object: Record<string, unknown>, context: ParseContext): Result<EnumProperty> {
+	const values = required(object, "values", context, enumValueArray);
+	if (!values.ok) {
+		return values;
+	}
+
+	const description = optionalWithDefault(object, "description", context, "", string_);
+	if (!description.ok) {
+		return description;
+	}
+
+	const required_ = optionalWithDefault(object, "required", context, false, boolean_);
+	if (!required_.ok) {
+		return required_;
+	}
+
+	const default_ = optional(object, "default", context, stringOrNumber_);
+	if (!default_.ok) {
+		return default_;
+	}
+
 	if (default_.value !== undefined && !values.value.includes(default_.value)) {
 		return error(`Default value '${default_.value}' is not present in the 'values' field (${JSON.stringify(values.value)})`, at(context, "default").path);
 	}
@@ -269,3 +295,155 @@ export function parse_array_property(name: string, object: Record<string, unknow
 	});
 }
 
+export function parse_platform_ops_property(name: string, object: Record<string, unknown>, context: ParseContext): Result<PlatformOpsProperty> {
+    const description = optionalWithDefault(object, "description", context, "", string_);
+    if (!description.ok) {
+        return description;
+    }
+
+    const required_ = optionalWithDefault(object, "required", context, false, boolean_);
+    if (!required_.ok) {
+        return required_;
+    }
+
+    const target = required(object, "target", context, string_);
+    if (!target.ok) {
+        return target;
+    }
+
+    const platforms = required(object, "platforms", context, (v, c) => {
+        if (!Array.isArray(v)) {
+            return error("Expected array", c.path);
+        }
+
+        const result: IncludeProperty[] = [];
+        for (const [index, element] of v.entries()) {
+            const object_ = asObject(element, at(c, index));
+            if (!object_.ok) {
+                return object_;
+            }
+            const include = parse_include_property(`platform_${index}`, object_.value, at(c, index));
+            if (!include.ok) {
+                return include;
+            }
+            result.push(include.value);
+        }
+        return ok(result);
+    });
+
+    if (!platforms.ok) {
+        return platforms;
+    }
+
+    return ok({
+        _t: "PlatformOpsProperty",
+        name,
+        type: "platform_ops",
+        description: description.value,
+        required: required_.value,
+        target: target.value,
+        platforms: platforms.value,
+    });
+}
+
+export function parse_platform_extra_property(name: string, object: Record<string, unknown>, context: ParseContext): Result<PlatformExtraProperty> {
+    const description = optionalWithDefault(object, "description", context, "", string_);
+    if (!description.ok) {
+        return description;
+    }
+
+    const required_ = optionalWithDefault(object, "required", context, false, boolean_);
+    if (!required_.ok) {
+        return required_;
+    }
+
+    const platforms = required(object, "platforms", context, (v, c) => {
+        if (!Array.isArray(v)) {
+            return error("Expected array", c.path);
+        }
+
+        const result: IncludeProperty[] = [];
+        for (const [index, element] of v.entries()) {
+            const object_ = asObject(element, at(c, index));
+            if (!object_.ok) {
+                return object_;
+            }
+            const include = parse_include_property(`platform_${index}`, object_.value, at(c, index));
+            if (!include.ok) {
+                return include;
+            }
+            result.push(include.value);
+        }
+        return ok(result);
+    });
+    if (!platforms.ok) {
+        return platforms;
+    }
+
+    return ok({
+        _t: "PlatformExtraProperty",
+        name,
+        type: "platform_extra",
+        description: description.value,
+        required: required_.value,
+        platforms: platforms.value,
+    });
+}
+
+export function parse_callback_function_property(name: string, object: Record<string, unknown>, context: ParseContext): Result<CallbackFunctionProperty> {
+    const description = optionalWithDefault(object, "description", context, "", string_);
+    if (!description.ok) {
+        return description;
+    }
+
+    const required_ = optionalWithDefault(object, "required", context, false, boolean_);
+    if (!required_.ok) {
+        return required_;
+    }
+
+    const signature = required(object, "signature", context, string_);
+    if (!signature.ok) {
+        return signature;
+    }
+
+    const default_ = optional(object, "default", context, string_);
+    if (!default_.ok) {
+        return default_;
+    }
+
+    return ok({
+        _t: "CallbackFunctionProperty",
+        name,
+        type: "callback_func",
+        description: description.value,
+        required: required_.value,
+        signature: signature.value,
+        default: default_.value,
+    });
+}
+
+export function parse_callback_context_property(name: string, object: Record<string, unknown>, context: ParseContext): Result<CallbackContextProperty> {
+    const description = optionalWithDefault(object, "description", context, "", string_);
+    if (!description.ok) {
+        return description;
+    }
+
+    const required_ = optionalWithDefault(object, "required", context, false, boolean_);
+    if (!required_.ok) {
+        return required_;
+    }
+
+    const default_ = optional(object, "default", context, string_);
+    if (!default_.ok) {
+        return default_;
+    }
+
+    return ok({
+        _t: "CallbackContextProperty",
+        name,
+        type: "callback_ctx",
+        description: description.value,
+        required: required_.value,
+        default: default_.value,
+    });
+}

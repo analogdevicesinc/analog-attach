@@ -1,0 +1,26 @@
+$id: "test/if_then_multi_cond"
+$type: struct
+$name: test_struct
+$ranking: 4
+$sources:
+  headers:
+    - "test.h"
+
+flag1:
+  type: bool
+
+flag2:
+  type: bool
+
+count:
+  type: uint32_t
+
+$override:
+  - $if:
+      flag1:
+        value: true
+      flag2:
+        value: false
+    $then:
+      count:
+        default: 0

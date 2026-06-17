@@ -1,8 +1,0 @@
-$id: "platforms/stm32/platform_ops/gpio_ops.yaml"
-$type: platform_ops
-$name: stm32_gpio_ops
-$sources:
-  headers:
-    - "stm32_gpio.h"
-  sources:
-    - "stm32_gpio.c"

@@ -1,0 +1,4 @@
+type: enum
+values: [MODE_A, MODE_B]
+description: "Operation mode selector"
+required: true

@@ -1,0 +1,19 @@
+$id: "test/switch_unknown_prop"
+$type: struct
+$name: test_struct
+$ranking: 4
+$sources:
+  headers:
+    - "test.h"
+
+mode:
+  type: enum
+  values: [A, B]
+
+$override:
+  - $switch:
+      $on: unknown_prop
+      $cases:
+        A:
+          mode:
+            default: A

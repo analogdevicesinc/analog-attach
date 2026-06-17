@@ -1,8 +1,0 @@
-$id: "platforms/stm32/platform_ops/i2c_ops.yaml"
-$type: platform_ops
-$name: stm32_i2c_ops
-$sources:
-  headers:
-    - "stm32_i2c.h"
-  sources:
-    - "stm32_i2c.c"

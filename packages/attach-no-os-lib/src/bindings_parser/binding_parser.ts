@@ -1,5 +1,5 @@
 import {
-	Binding,
+	BindingStruct,
 	BindingSources,
 	is_primitive_symbols,
 	OverrideDirective,
@@ -7,13 +7,16 @@ import {
 	Property,
 	PropertyOverride,
 	SwitchCase,
-	TargetOverride
+	TargetOverride,
+    BindingEnum,
+    BindingEnumValue,
+    Binding
 } from "./types";
 import YAML from "yaml";
 import { Result, ok, error } from "./result";
 import { asObject, at, number_, optional, optionalWithDefault, ParseContext, required, string_, stringArray } from "./validators";
 import { BindingType, BindingHeaderSources } from "./types";
-import { parse_array_property, parse_bool_property, parse_enum_property, parse_include_property, parse_number_property, parse_union_property } from "./property_parser";
+import { parse_array_property, parse_bool_property, parse_callback_context_property, parse_callback_function_property, parse_enum_property, parse_include_property, parse_number_property, parse_platform_extra_property, parse_platform_ops_property, parse_string_property, parse_union_property } from "./property_parser";
 import { is_boolean_property_override, is_enum_property_override, is_include_property_override, is_number_property_override, is_union_property_override } from "./override_validators";
 
 export function unwrap<T>(result: Result<T>): T {
@@ -71,7 +74,7 @@ function is_binding_sources(value: unknown, context: ParseContext): Result<Bindi
 		return object;
 	}
 
-	const headers = required(object.value, "headers", context, stringArray);
+	const headers = optional(object.value, "headers", context, stringArray);
 	if (!headers.ok) {
 		return headers;
 	}
@@ -105,7 +108,7 @@ function is_binding_sources(value: unknown, context: ParseContext): Result<Bindi
 	});
 }
 
-function parse_property(name: string, value: unknown, context: ParseContext): Result<Property> {
+export function parse_property(name: string, value: unknown, context: ParseContext): Result<Property> {
 	const object = asObject(value, context);
 	if (!object.ok) {
 		return object;
@@ -137,10 +140,30 @@ function parse_property(name: string, value: unknown, context: ParseContext): Re
 			return parse_array_property(name, object.value, context);
 		}
 
+		if (type_ === "string") {
+			return parse_string_property(name, object.value, context);
+		}
+
+		if (type_ === "platform_ops") {
+			return parse_platform_ops_property(name, object.value, context);
+		}
+
+		if (type_ === "platform_extra") {
+			return parse_platform_extra_property(name, object.value, context);
+		}
+
+		if (type_ === "callback_func") {
+			return parse_callback_function_property(name, object.value, context);
+		}
+
+		if (type_ === "callback_ctx") {
+			return parse_callback_context_property(name, object.value, context);
+		}
+
 		return error(`Unknown property type '${type_}'`, at(context, type_).path);
 	}
 
-	return error("Cannot detemrine the property type", context.path);
+	return error("Cannot determine the property type", context.path);
 }
 
 function require_property(context: ParseContext, name: string, scope: OverrideScope): Result<Property> {
@@ -360,15 +383,34 @@ function is_override_if_then(value: Record<string, unknown>, context: ParseConte
 		document: context.document
 	};
 
-	const if_keys = Object.keys(object.value);
+	// FIXME: Recheck this part, i am not sure if it's good
+	let condition_scope = scope;
+	let condition_container = object.value;
+	if ("$this" in object.value) {
+		condition_scope = "$this";
+		const inner = asObject(object.value["$this"], at(if_context, "$this"));
+		if (!inner.ok) {
+			return inner;
+		}
+		condition_container = inner.value;
+	} else if ("$parent" in object.value) {
+		condition_scope = "$parent";
+		const inner = asObject(object.value["$parent"], at(if_context, "$parent"));
+		if (!inner.ok) {
+			return inner;
+		}
+		condition_container = inner.value;
+	}
+
+	const if_keys = Object.keys(condition_container);
 	if (if_keys.length !== 1) {
 		return error("$if must have exactly one property condition", if_context.path);
 	}
 
 	const condition_target = if_keys[0];
-	const condition_value = object.value[condition_target];
+	const condition_value = condition_container[condition_target];
 
-	const condition_property = require_property(context, condition_target, scope);
+	const condition_property = require_property(context, condition_target, condition_scope);
 	if (!condition_property.ok) {
 		return condition_property;
 	}
@@ -403,6 +445,7 @@ function is_override_if_then(value: Record<string, unknown>, context: ParseConte
 		_t: "OverrideIfThen",
 		scope: scope,
 		condition: {
+			scope: condition_scope,
 			target: condition_target,
 			value: expected_value
 		},
@@ -575,6 +618,45 @@ function is_override(value: unknown, context: ParseContext): Result<OverrideDire
 	return error("$override must be an array or object with $this/$parent", context.path);
 }
 
+function is_enum_property(value: unknown, context: ParseContext): Result<BindingEnumValue[]> {
+	if (Array.isArray(value)) {
+        const values: BindingEnumValue[] = [];
+        for (const [index, item] of value.entries()) {
+            if (typeof item === "string") {
+                values.push({ name: item, description: undefined });
+            } else {
+                return error(`Expected string at index ${index}`, at(context, index).path);
+            }
+        }
+        return ok(values);
+    }
+
+	const object = asObject(value, context);
+	if (!object.ok) {
+		return object;
+	}
+
+	const values: BindingEnumValue[] = [];
+	for (const [name, value] of Object.entries(object.value)) {
+		if (typeof value === "string") {
+			values.push({
+				name: name,
+				description: value
+			});
+		} else if (typeof value === "object" && value !== null) {
+			const description = (value as Record<string, unknown>)["description"];
+			values.push({
+				name: name,
+				description: typeof description === "string" ? description : undefined
+			});
+		} else {
+			return error(`Invalid enum value format for '${name}'`, at(context, name).path);
+		}
+	}
+
+	return ok(values);
+}
+
 function parse_binding_from_object(object: Record<string, unknown>, context: ParseContext): Result<Binding> {
 	const $id = required(object, "$id", context, string_);
 	if (!$id.ok) {
@@ -609,35 +691,80 @@ function parse_binding_from_object(object: Record<string, unknown>, context: Par
 		return error(`Ranking value is invalid (0-4)`, at(context, "$ranking").path);
 	}
 
-	context.document.properties = [];
-	for (const key of Object.keys(object)) {
-		if (key.startsWith("$")) {
-			continue;
+	switch ($type.value) {
+		case BindingType.BT_STRUCT: {
+			context.document.properties = [];
+			for (const key of Object.keys(object)) {
+				if (key.startsWith("$")) {
+					continue;
+				}
+
+				const property = parse_property(key, object[key], at(context, key));
+				if (!property.ok) {
+					return property;
+				}
+				context.document.properties.push(property.value);
+			}
+
+			const $override = optional(object, "$override", context, is_override);
+			if (!$override.ok) {
+				return $override;
+			}
+
+			return ok({
+				_t: "BindingStuct",
+				$id: $id.value,
+				$type: $type.value,
+				$name: $name.value,
+				$description: $description.value,
+				$ranking: $ranking.value,
+				$sources: $sources.value,
+				properties: context.document.properties,
+				$override: $override.value,
+			});
 		}
+		case BindingType.BT_ENUM: {
+			const values = required(object, "values", context, is_enum_property);
+			if (!values.ok) {
+				return values;
+			}
 
-		const property = parse_property(key, object[key], at(context, key));
-		if (!property.ok) {
-			return property;
+			const default_ = optional(object, "default", context, string_);
+			if (!default_.ok) {
+				return default_;
+			}
+
+			if (default_.value !== undefined) {
+				const value_names = values.value.map(v => v.name);
+				if (!value_names.includes(default_.value)) {
+					return error(`Default value '${default_.value}' is not a valid enum value. Valid: ${value_names.join(", ")}`, at(context, "default").path);
+				}
+			}
+
+			return ok({
+				_t: "BindingEnum",
+				$id: $id.value,
+				$type: $type.value,
+				$name: $name.value,
+				$description: $description.value,
+				$ranking: $ranking.value,
+				$sources: $sources.value,
+				values: values.value,
+				default: default_.value,
+			});
 		}
-		context.document.properties.push(property.value);
+		case BindingType.BT_PLATFORM_OPS: {
+			return ok({
+				_t:	"BindingPlatformOps",
+				$id: $id.value,
+				$type: $type.value,
+				$name: $name.value,
+				$description: $description.value,
+				$ranking: $ranking.value,
+				$sources: $sources.value,
+			});
+		}
 	}
-
-	const $override = optional(object, "$override", context, is_override);
-	if (!$override.ok) {
-		return $override;
-	}
-
-	return ok({
-		_t: "Binding",
-		$id: $id.value,
-		$type: $type.value,
-		$name: $name.value,
-		$description: $description.value,
-		$ranking: $ranking.value,
-		$sources: $sources.value,
-		properties: context.document.properties,
-		$override: $override.value,
-	});
 }
 
 export function parse_binding(contents: string): Result<Binding> {

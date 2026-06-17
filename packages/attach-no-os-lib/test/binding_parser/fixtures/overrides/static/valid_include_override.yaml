@@ -1,0 +1,15 @@
+$id: "test/include_override"
+$type: struct
+$name: test_struct
+$ranking: 4
+$sources:
+  headers:
+    - "test.h"
+
+config:
+  include: "path/to/config.yaml"
+
+$override:
+  - config:
+      pointer: true
+      description: "Pointer to config"

@@ -1,0 +1,12 @@
+$id: "platforms/maxim/max32690/platform_ops/irq_ops.yaml"
+$type: platform_ops
+$ranking: 4
+$name: max_irq_ops
+$sources:
+  headers:
+    - "maxim_irq.h"
+  sources:
+    - "maxim_irq.c"
+  sdk:
+    headers:
+      - "mxc_sys.h"
