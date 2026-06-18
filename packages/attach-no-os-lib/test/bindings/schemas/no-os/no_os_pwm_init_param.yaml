@@ -43,15 +43,11 @@ pwm_callback:
 
 platform_ops:
   type: platform_ops
+  capability: pwm
   target: no_os_pwm_platform_ops
   description: "PWM platform specific functions"
-  platforms:
-    - include: "platforms/maxim/max32690/platform_ops/pwm_ops.yaml"
-    - include: "platforms/stm32/platform_ops/pwm_ops.yaml"
 
 extra:
   type: platform_extra
+  capability: pwm
   description: "PWM extra parameters (platform specific)"
-  platforms:
-    - include: "platforms/maxim/max32690/max_pwm_init_param.yaml"
-    - include: "platforms/stm32/stm32_pwm_init_param.yaml"

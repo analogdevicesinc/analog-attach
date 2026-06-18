@@ -20,17 +20,14 @@ num_ch:
 
 platform_ops:
   type: platform_ops
+  capability: dma
   target: no_os_dma_platform_ops
   description: "Platform specific DMA functions"
-  platforms:
-    - include: "platforms/maxim/max32690/platform_ops/dma_ops.yaml"
-    - include: "platforms/stm32/platform_ops/dma_ops.yaml"
 
 extra:
   type: platform_extra
+  capability: dma
   description: "Platform specific data"
-  platforms:
-    - include: "platforms/stm32/stm32_dma_init_param.yaml"
 
 sg_handler:
   type: callback_func

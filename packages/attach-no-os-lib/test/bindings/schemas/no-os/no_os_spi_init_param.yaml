@@ -33,24 +33,13 @@ bit_order:
 
 platform_ops:
   type: platform_ops
+  capability: spi
   target: no_os_spi_platform_ops
   required: true
   description: "Platform-specific SPI operations"
-  platforms:
-    - include: "platforms/maxim/max32690/platform_ops/spi_ops.yaml"
-    - include: "platforms/stm32/platform_ops/spi_ops.yaml"
-    - include: "platforms/xilinx/platform_ops/spi_ops.yaml"
-    - include: "platforms/xilinx/platform_ops/spi_pl_ops.yaml"
-    - include: "platforms/xilinx/platform_ops/spi_engine_ops.yaml"
-    - include: "platforms/pico/platform_ops/spi_ops.yaml"
-    - include: "platforms/linux/platform_ops/spi_ops.yaml"
 
 extra:
   type: platform_extra
+  capability: spi
   required: true
   description: "Platform-specific initialization parameters"
-  platforms:
-    - include: "platforms/maxim/max32690/max_spi_init_param.yaml"
-    - include: "platforms/stm32/stm32_spi_init_param.yaml"
-    - include: "platforms/xilinx/xil_spi_init_param.yaml"
-    - include: "platforms/pico/pico_spi_init_param.yaml"

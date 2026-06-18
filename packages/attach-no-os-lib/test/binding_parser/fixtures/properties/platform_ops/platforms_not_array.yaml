@@ -1,3 +1,0 @@
-type: platform_ops
-target: spi_ops
-platforms: "not_an_array"

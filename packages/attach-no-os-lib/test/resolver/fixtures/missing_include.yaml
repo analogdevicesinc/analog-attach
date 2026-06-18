@@ -1,0 +1,11 @@
+$id: "test/missing_include.yaml"
+$type: struct
+$name: test_struct
+$description: "Test struct with missing include file"
+$ranking: 4
+$sources:
+  headers:
+    - "test.h"
+
+bad_include:
+  include: "does/not/exist.yaml"

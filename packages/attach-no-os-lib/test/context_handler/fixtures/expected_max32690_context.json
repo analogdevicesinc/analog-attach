@@ -1,0 +1,34 @@
+{
+  "selected_platform": "max32690",
+  "symbols": [],
+  "platform_specs": {
+    "max32690": {
+      "spi": {
+        "ops": "platform_ops/spi_ops.yaml",
+        "extra": "max_spi_init_param.yaml"
+      },
+      "i2c": {
+        "ops": "platform_ops/i2c_ops.yaml",
+        "extra": "max_i2c_init_param.yaml"
+      },
+      "gpio": {
+        "ops": "platform_ops/gpio_ops.yaml",
+        "extra": "max_gpio_init_param.yaml"
+      },
+      "uart": {
+        "ops": "platform_ops/uart_ops.yaml",
+        "extra": "max_uart_init_param.yaml"
+      },
+      "pwm": {
+        "ops": "platform_ops/pwm_ops.yaml",
+        "extra": "max_pwm_init_param.yaml"
+      },
+      "irq": {
+        "ops": "platform_ops/irq_ops.yaml"
+      },
+      "dma": {
+        "ops": "platform_ops/dma_ops.yaml"
+      }
+    }
+  }
+}

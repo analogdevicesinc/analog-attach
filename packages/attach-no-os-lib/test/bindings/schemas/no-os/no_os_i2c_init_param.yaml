@@ -21,21 +21,11 @@ slave_address:
 
 platform_ops:
   type: platform_ops
+  capability: i2c
   target: no_os_i2c_platform_ops
   description: "Platform-specific I2C operations"
-  platforms:
-    - include: "platforms/maxim/max32690/platform_ops/i2c_ops.yaml"
-    - include: "platforms/stm32/platform_ops/i2c_ops.yaml"
-    - include: "platforms/xilinx/platform_ops/i2c_ops.yaml"
-    - include: "platforms/pico/platform_ops/i2c_ops.yaml"
-    - include: "platforms/linux/platform_ops/i2c_ops.yaml"
 
 extra:
   type: platform_extra
+  capability: i2c
   description: "Platform-specific initialization parameters"
-  platforms:
-    - include: "platforms/maxim/max32690/max_i2c_init_param.yaml"
-    - include: "platforms/stm32/stm32_i2c_init_param.yaml"
-    - include: "platforms/xilinx/xil_i2c_init_param.yaml"
-    - include: "platforms/pico/pico_i2c_init_param.yaml"
-    - include: "platforms/linux/linux_i2c_init_param.yaml"

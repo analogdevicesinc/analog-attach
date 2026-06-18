@@ -1,0 +1,29 @@
+$id: "test/struct_with_capabilities"
+$type: struct
+$name: test_init_param
+$description: "A struct with capability properties"
+$ranking: 2
+$sources:
+  headers:
+    - "test.h"
+
+device_id:
+  type: uint32_t
+  description: "Device ID"
+
+spi_ops:
+  type: platform_ops
+  target: no_os_spi_platform_ops
+  capability: spi
+  description: "SPI platform ops"
+
+spi_extra:
+  type: platform_extra
+  capability: spi
+  description: "SPI extra"
+
+irq_ops:
+  type: platform_ops
+  target: no_os_irq_platform_ops
+  capability: irq
+  description: "IRQ platform ops"
