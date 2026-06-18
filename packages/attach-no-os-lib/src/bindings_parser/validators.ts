@@ -72,6 +72,22 @@ function stringOrNumber_(value: unknown, context: ParseContext): Result<string |
 	return ok(value);
 }
 
+function capabilityArray(value: unknown, context: ParseContext): Result<string[]> {
+	// Accept either a single string or array of strings, normalize to array
+	if (typeof value === "string") {
+		return ok([value]);
+	}
+	if (!Array.isArray(value)) {
+		return error(`Expected string or array of strings, got ${typeof value}`, context.path);
+	}
+	for (const [index, element] of value.entries()) {
+		if (typeof element !== "string") {
+			return error(`Expected string, got ${typeof element}`, at(context, index).path);
+		}
+	}
+	return ok(value as string[]);
+}
+
 function required<T>(
 	object: Record<string, unknown>,
 	key: string,
@@ -109,4 +125,4 @@ function optionalWithDefault<T>(
 	return validate(object[key], at(context, key));
 }
 
-export { ParseContext, asObject, at, string_, number_, boolean_, stringArray, enumValueArray, stringOrNumber_, required, optional, optionalWithDefault };
+export { ParseContext, asObject, at, string_, number_, boolean_, stringArray, enumValueArray, stringOrNumber_, capabilityArray, required, optional, optionalWithDefault };

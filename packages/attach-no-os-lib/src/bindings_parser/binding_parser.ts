@@ -711,6 +711,17 @@ function parse_binding_from_object(object: Record<string, unknown>, context: Par
 				return $override;
 			}
 
+			// Collect all capabilities from properties into $requires
+			const capabilities = new Set<string>();
+			for (const property of context.document.properties) {
+				if (property.capability) {
+					for (const cap of property.capability) {
+						capabilities.add(cap);
+					}
+				}
+			}
+			const $requires = capabilities.size > 0 ? Array.from(capabilities) : undefined;
+
 			return ok({
 				_t: "BindingStuct",
 				$id: $id.value,
@@ -721,6 +732,7 @@ function parse_binding_from_object(object: Record<string, unknown>, context: Par
 				$sources: $sources.value,
 				properties: context.document.properties,
 				$override: $override.value,
+				$requires,
 			});
 		}
 		case BindingType.BT_ENUM: {

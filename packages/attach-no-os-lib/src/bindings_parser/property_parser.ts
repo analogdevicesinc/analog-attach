@@ -1,6 +1,6 @@
 import { error, ok, Result } from "./result";
 import { ArrayElement, ArrayProperty, BooleanProperty, CallbackContextProperty, CallbackFunctionProperty, EnumProperty, IncludeProperty, is_primitive_symbols, NumberProperty, PlatformExtraProperty, PlatformOpsProperty, StringProperty, UnionProperty } from "./types";
-import { asObject, at, boolean_, number_, optional, optionalWithDefault, ParseContext, required, string_, enumValueArray, stringOrNumber_ } from "./validators";
+import { asObject, at, boolean_, number_, optional, optionalWithDefault, ParseContext, required, string_, enumValueArray, stringOrNumber_, capabilityArray } from "./validators";
 
 export function parse_number_property(name: string, object: Record<string, unknown>, context: ParseContext): Result<NumberProperty> {
 	const type_ = required(object, "type", context, string_);
@@ -38,6 +38,11 @@ export function parse_number_property(name: string, object: Record<string, unkno
 		return maximum;
 	}
 
+	const capability = optional(object, "capability", context, capabilityArray);
+	if (!capability.ok) {
+		return capability;
+	}
+
 	return ok({
 		_t: "NumberProperty",
 		name: name,
@@ -46,7 +51,8 @@ export function parse_number_property(name: string, object: Record<string, unkno
 		type: type_.value,
 		default: default_.value,
 		minimum: minimum.value,
-		maximum: maximum.value
+		maximum: maximum.value,
+		capability: capability.value,
 	});
 }
 
@@ -66,6 +72,11 @@ export function parse_bool_property(name: string, object: Record<string, unknown
 		return default_;
 	}
 
+	const capability = optional(object, "capability", context, capabilityArray);
+	if (!capability.ok) {
+		return capability;
+	}
+
 	return ok({
 		_t: "BooleanProperty",
 		name,
@@ -73,6 +84,7 @@ export function parse_bool_property(name: string, object: Record<string, unknown
 		description: description.value,
 		required: required_.value,
 		default: default_.value,
+		capability: capability.value,
 	});
 }
 
@@ -92,6 +104,11 @@ export function parse_string_property(name: string, object: Record<string, unkno
 		return default_;
 	}
 
+	const capability = optional(object, "capability", context, capabilityArray);
+	if (!capability.ok) {
+		return capability;
+	}
+
 	return ok({
 		_t: "StringProperty",
 		name,
@@ -99,6 +116,7 @@ export function parse_string_property(name: string, object: Record<string, unkno
 		description: description.value,
 		required: required_.value,
 		default: default_.value,
+		capability: capability.value,
 	});
 }
 
@@ -127,6 +145,11 @@ export function parse_enum_property(name: string, object: Record<string, unknown
 		return error(`Default value '${default_.value}' is not present in the 'values' field (${JSON.stringify(values.value)})`, at(context, "default").path);
 	}
 
+	const capability = optional(object, "capability", context, capabilityArray);
+	if (!capability.ok) {
+		return capability;
+	}
+
 	return ok({
 		_t: "EnumProperty",
 		name,
@@ -134,6 +157,7 @@ export function parse_enum_property(name: string, object: Record<string, unknown
 		required: required_.value,
 		values: values.value,
 		default: default_.value,
+		capability: capability.value,
 	});
 }
 
@@ -150,6 +174,9 @@ export function parse_include_property(name: string, object: Record<string, unkn
 	const pointer = optionalWithDefault(object, "pointer", context, false, boolean_);
 	if (!pointer.ok) {return pointer;}
 
+	const capability = optional(object, "capability", context, capabilityArray);
+	if (!capability.ok) {return capability;}
+
 	return ok({
 		_t: "IncludeProperty",
 		name,
@@ -157,6 +184,7 @@ export function parse_include_property(name: string, object: Record<string, unkn
 		required: required_.value,
 		include: include.value,
 		pointer: pointer.value,
+		capability: capability.value,
 	});
 }
 
@@ -208,12 +236,18 @@ export function parse_union_property(name: string, object: Record<string, unknow
 		return required_;
 	}
 
+	const capability = optional(object, "capability", context, capabilityArray);
+	if (!capability.ok) {
+		return capability;
+	}
+
 	return ok({
 		_t: "UnionProperty",
 		name: name,
 		description: description.value,
 		required: required_.value,
 		members: members.value,
+		capability: capability.value,
 	});
 }
 
@@ -284,6 +318,11 @@ export function parse_array_property(name: string, object: Record<string, unknow
 		return error(`Element must have either 'type' or 'include'`, element_context.path);
 	}
 
+	const capability = optional(object, "capability", context, capabilityArray);
+	if (!capability.ok) {
+		return capability;
+	}
+
 	return ok({
 		_t: "ArrayProperty",
 		name: name,
@@ -291,7 +330,8 @@ export function parse_array_property(name: string, object: Record<string, unknow
 		required: required_.value,
 		disabled: disabled.value,
 		size: size.value,
-		element: element
+		element: element,
+		capability: capability.value,
 	});
 }
 
@@ -311,28 +351,9 @@ export function parse_platform_ops_property(name: string, object: Record<string,
         return target;
     }
 
-    const platforms = required(object, "platforms", context, (v, c) => {
-        if (!Array.isArray(v)) {
-            return error("Expected array", c.path);
-        }
-
-        const result: IncludeProperty[] = [];
-        for (const [index, element] of v.entries()) {
-            const object_ = asObject(element, at(c, index));
-            if (!object_.ok) {
-                return object_;
-            }
-            const include = parse_include_property(`platform_${index}`, object_.value, at(c, index));
-            if (!include.ok) {
-                return include;
-            }
-            result.push(include.value);
-        }
-        return ok(result);
-    });
-
-    if (!platforms.ok) {
-        return platforms;
+    const capability = optional(object, "capability", context, capabilityArray);
+    if (!capability.ok) {
+        return capability;
     }
 
     return ok({
@@ -342,7 +363,7 @@ export function parse_platform_ops_property(name: string, object: Record<string,
         description: description.value,
         required: required_.value,
         target: target.value,
-        platforms: platforms.value,
+        capability: capability.value,
     });
 }
 
@@ -357,27 +378,9 @@ export function parse_platform_extra_property(name: string, object: Record<strin
         return required_;
     }
 
-    const platforms = required(object, "platforms", context, (v, c) => {
-        if (!Array.isArray(v)) {
-            return error("Expected array", c.path);
-        }
-
-        const result: IncludeProperty[] = [];
-        for (const [index, element] of v.entries()) {
-            const object_ = asObject(element, at(c, index));
-            if (!object_.ok) {
-                return object_;
-            }
-            const include = parse_include_property(`platform_${index}`, object_.value, at(c, index));
-            if (!include.ok) {
-                return include;
-            }
-            result.push(include.value);
-        }
-        return ok(result);
-    });
-    if (!platforms.ok) {
-        return platforms;
+    const capability = optional(object, "capability", context, capabilityArray);
+    if (!capability.ok) {
+        return capability;
     }
 
     return ok({
@@ -386,7 +389,7 @@ export function parse_platform_extra_property(name: string, object: Record<strin
         type: "platform_extra",
         description: description.value,
         required: required_.value,
-        platforms: platforms.value,
+        capability: capability.value,
     });
 }
 
@@ -411,6 +414,11 @@ export function parse_callback_function_property(name: string, object: Record<st
         return default_;
     }
 
+    const capability = optional(object, "capability", context, capabilityArray);
+    if (!capability.ok) {
+        return capability;
+    }
+
     return ok({
         _t: "CallbackFunctionProperty",
         name,
@@ -419,6 +427,7 @@ export function parse_callback_function_property(name: string, object: Record<st
         required: required_.value,
         signature: signature.value,
         default: default_.value,
+        capability: capability.value,
     });
 }
 
@@ -438,6 +447,11 @@ export function parse_callback_context_property(name: string, object: Record<str
         return default_;
     }
 
+    const capability = optional(object, "capability", context, capabilityArray);
+    if (!capability.ok) {
+        return capability;
+    }
+
     return ok({
         _t: "CallbackContextProperty",
         name,
@@ -445,5 +459,6 @@ export function parse_callback_context_property(name: string, object: Record<str
         description: description.value,
         required: required_.value,
         default: default_.value,
+        capability: capability.value,
     });
 }

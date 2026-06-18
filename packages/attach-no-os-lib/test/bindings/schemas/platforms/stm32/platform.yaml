@@ -1,0 +1,27 @@
+capabilities:
+  spi:
+    ops: platform_ops/spi_ops.yaml
+    extra: stm32_spi_init_param.yaml
+  i2c:
+    ops: platform_ops/i2c_ops.yaml
+    extra: stm32_i2c_init_param.yaml
+  gpio:
+    ops: platform_ops/gpio_ops.yaml
+    extra: stm32_gpio_init_param.yaml
+  gpio_irq:
+    ops: platform_ops/gpio_irq_ops.yaml
+    extra: stm32_gpio_irq_init_param.yaml
+  uart:
+    ops: platform_ops/uart_ops.yaml
+    extra: stm32_uart_init_param.yaml
+  pwm:
+    ops: platform_ops/pwm_ops.yaml
+    extra: stm32_pwm_init_param.yaml
+  irq:
+    ops: platform_ops/irq_ops.yaml
+  timer:
+    ops: platform_ops/timer_ops.yaml
+    extra: stm32_timer_init_param.yaml
+  dma:
+    ops: platform_ops/dma_ops.yaml
+    extra: stm32_dma_init_param.yaml
