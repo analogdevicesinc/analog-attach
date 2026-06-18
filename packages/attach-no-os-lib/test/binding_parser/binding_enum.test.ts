@@ -1,6 +1,6 @@
 import { describe, test, expect } from 'vitest';
 import { expectOk, expectError, expectErrorPath, expectErrorContains, loadAndParseBinding } from '../test_utils';
-import { BindingEnum, BindingType } from '../../src/bindings_parser/types';
+import { RulesetEnum, RulesetType } from '../../src/bindings_parser/types';
 
 describe('BindingEnum parsing', () => {
 	describe('valid cases', () => {
@@ -8,8 +8,8 @@ describe('BindingEnum parsing', () => {
 			const result = loadAndParseBinding('bindings/enum/valid_array_values.yaml');
 			expectOk(result);
 			expect(result.value._t).toBe('BindingEnum');
-			expect(result.value.$type).toBe(BindingType.BT_ENUM);
-			const binding = result.value as BindingEnum;
+			expect(result.value.$type).toBe(RulesetType.BT_ENUM);
+			const binding = result.value as RulesetEnum;
 			expect(binding.values).toHaveLength(3);
 			expect(binding.values[0].name).toBe('VALUE_A');
 		});
@@ -17,7 +17,7 @@ describe('BindingEnum parsing', () => {
 		test('parses enum with object values (name: description)', () => {
 			const result = loadAndParseBinding('bindings/enum/valid_object_values.yaml');
 			expectOk(result);
-			const binding = result.value as BindingEnum;
+			const binding = result.value as RulesetEnum;
 			expect(binding.values).toHaveLength(3);
 			expect(binding.values[0].name).toBe('STATUS_OK');
 			expect(binding.values[0].description).toBe('Operation succeeded');
@@ -26,7 +26,7 @@ describe('BindingEnum parsing', () => {
 		test('parses enum with nested description objects', () => {
 			const result = loadAndParseBinding('bindings/enum/valid_nested_description.yaml');
 			expectOk(result);
-			const binding = result.value as BindingEnum;
+			const binding = result.value as RulesetEnum;
 			expect(binding.values).toHaveLength(2);
 			expect(binding.values[0].description).toBe('First option with detailed description');
 		});
@@ -34,7 +34,7 @@ describe('BindingEnum parsing', () => {
 		test('parses enum with default value', () => {
 			const result = loadAndParseBinding('bindings/enum/valid_with_default.yaml');
 			expectOk(result);
-			const binding = result.value as BindingEnum;
+			const binding = result.value as RulesetEnum;
 			expect(binding.default).toBe('MODE_B');
 		});
 	});

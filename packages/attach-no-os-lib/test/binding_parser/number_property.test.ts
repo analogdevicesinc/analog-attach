@@ -52,6 +52,13 @@ describe('NumberProperty parsing', () => {
 			expectOk(result);
 			expect((result.value as NumberProperty).type).toBe('size_t');
 		});
+
+		test('parses with capability', () => {
+			const result = loadAndParseProperty('properties/number/valid_with_capability.yaml');
+			expectOk(result);
+			const prop = result.value as NumberProperty;
+			expect(prop.capability).toEqual(['dma']);
+		});
 	});
 
 	describe('error cases', () => {

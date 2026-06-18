@@ -1,0 +1,13 @@
+$id: "test/include_with_pointer.yaml"
+$type: struct
+$name: test_struct
+$description: "Test struct with pointer include"
+$ranking: 4
+$sources:
+  headers:
+    - "test.h"
+
+spi_init:
+  include: "no-os/no_os_spi_init_param.yaml"
+  pointer: true
+  description: "SPI configuration pointer"
