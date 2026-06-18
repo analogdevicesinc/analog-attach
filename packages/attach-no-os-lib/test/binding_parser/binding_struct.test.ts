@@ -29,6 +29,23 @@ describe('BindingStruct parsing', () => {
 			expect(binding.$override).toBeDefined();
 			expect(binding.$override).toHaveLength(1);
 		});
+
+		test('auto-computes $requires from property capabilities', () => {
+			const result = loadAndParseBinding('bindings/struct/valid_with_capabilities.yaml');
+			expectOk(result);
+			const binding = result.value as BindingStruct;
+			expect(binding.$requires).toBeDefined();
+			expect(binding.$requires).toContain('spi');
+			expect(binding.$requires).toContain('irq');
+			expect(binding.$requires).toHaveLength(2);
+		});
+
+		test('$requires is undefined when no properties have capabilities', () => {
+			const result = loadAndParseBinding('bindings/struct/valid_with_properties.yaml');
+			expectOk(result);
+			const binding = result.value as BindingStruct;
+			expect(binding.$requires).toBeUndefined();
+		});
 	});
 
 	describe('error cases', () => {

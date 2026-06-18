@@ -1,4 +1,2 @@
 type: platform_extra
-platforms:
-  - include: "platforms/maxim/max_extra.yaml"
-  - include: "platforms/xilinx/xil_extra.yaml"
+capability: spi

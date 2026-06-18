@@ -9,7 +9,6 @@ $sources:
 
 type:
   include: "platforms/xilinx/enums/xil_i2c_type.yaml"
-  # default: IIC_PS
   description: "Xilinx architecture (PL or PS)"
 
 device_id:

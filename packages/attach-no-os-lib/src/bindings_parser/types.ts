@@ -8,6 +8,8 @@ export type PropertyBase = {
 	required?: boolean
 	disabled?: boolean, // NOTE: default is disabled: false
 	value?: any,
+	capability?: string[], // Platform capabilities required for this property
+	_platform_disabled?: boolean, // Internal: set by resolver when capability is missing, not parsed from binding
 }
 
 export type PrimitiveSymbol = PrimitiveCType["symbol"];
@@ -66,13 +68,11 @@ export type PlatformOpsProperty = PropertyBase & {
     _t: "PlatformOpsProperty",
     type: "platform_ops",
     target: string,
-    platforms: IncludeProperty[],
 }
 
 export type PlatformExtraProperty = PropertyBase & {
     _t: "PlatformExtraProperty",
     type: "platform_extra",
-    platforms: IncludeProperty[],
 }
 
 export type CallbackFunctionProperty = PropertyBase & {
@@ -204,6 +204,7 @@ export type BindingStruct = BindingBase & {
 	$type: BindingType.BT_STRUCT,
 	properties: Property[],
 	$override?: OverrideDirective[],
+	$requires?: string[], // Auto-computed: all capabilities required by properties
 };
 
 export type BindingPlatformOps = BindingBase & {

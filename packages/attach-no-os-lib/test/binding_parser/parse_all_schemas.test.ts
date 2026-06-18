@@ -12,7 +12,7 @@ function findYamlFiles(directory: string): string[] {
 		const fullPath = path.join(directory, entry.name);
 		if (entry.isDirectory()) {
 			files.push(...findYamlFiles(fullPath));
-		} else if (entry.isFile() && entry.name.endsWith('.yaml')) {
+		} else if (entry.isFile() && entry.name.endsWith('.yaml') && entry.name !== 'platform.yaml') {
 			files.push(fullPath);
 		}
 	}
