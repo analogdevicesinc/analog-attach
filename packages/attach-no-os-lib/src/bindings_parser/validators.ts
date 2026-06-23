@@ -1,9 +1,9 @@
 import { Result, ok, error } from "./result";
-import { BindingStruct } from "./types";
+import { RulesetStruct } from "./types";
 
 type ParseContext = {
 	path: string,
-	document: Partial<BindingStruct>
+	document: Partial<RulesetStruct>
 }
 
 function at(context: ParseContext, key: string | number): ParseContext {

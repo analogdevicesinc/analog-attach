@@ -1,6 +1,5 @@
 import {
-	BindingStruct,
-	BindingSources,
+	RulesetSources,
 	is_primitive_symbols,
 	OverrideDirective,
 	OverrideScope,
@@ -8,15 +7,26 @@ import {
 	PropertyOverride,
 	SwitchCase,
 	TargetOverride,
-    BindingEnum,
-    BindingEnumValue,
-    Binding
+	RulesetEnumValue,
+	Ruleset
 } from "./types";
 import YAML from "yaml";
 import { Result, ok, error } from "./result";
 import { asObject, at, number_, optional, optionalWithDefault, ParseContext, required, string_, stringArray } from "./validators";
-import { BindingType, BindingHeaderSources } from "./types";
-import { parse_array_property, parse_bool_property, parse_callback_context_property, parse_callback_function_property, parse_enum_property, parse_include_property, parse_number_property, parse_platform_extra_property, parse_platform_ops_property, parse_string_property, parse_union_property } from "./property_parser";
+import { RulesetType, RulesetHeaderSources } from "./types";
+import {
+	parse_array_property,
+	parse_bool_property,
+	parse_callback_context_property,
+	parse_callback_function_property,
+	parse_enum_property,
+	parse_include_property,
+	parse_number_property,
+	parse_platform_extra_property,
+	parse_platform_ops_property,
+	parse_string_property,
+	parse_union_property
+} from "./property_parser";
 import { is_boolean_property_override, is_enum_property_override, is_include_property_override, is_number_property_override, is_union_property_override } from "./override_validators";
 
 export function unwrap<T>(result: Result<T>): T {
@@ -24,7 +34,7 @@ export function unwrap<T>(result: Result<T>): T {
 	return result.value;
 }
 
-function is_binding_type(value: unknown, context: ParseContext): Result<BindingType> {
+function is_binding_type(value: unknown, context: ParseContext): Result<RulesetType> {
 	const s = string_(value, context);
 	if (!s.ok) {
 		return s;
@@ -32,13 +42,13 @@ function is_binding_type(value: unknown, context: ParseContext): Result<BindingT
 
 	switch (s.value) {
 		case "struct": {
-			return ok(BindingType.BT_STRUCT);
+			return ok(RulesetType.BT_STRUCT);
 		}
 		case "enum": {
-			return ok(BindingType.BT_ENUM);
+			return ok(RulesetType.BT_ENUM);
 		}
 		case "platform_ops": {
-			return ok(BindingType.BT_PLATFORM_OPS);
+			return ok(RulesetType.BT_PLATFORM_OPS);
 		}
 		default: {
 			return error(`Invalid binding type '${s.value}'`, context.path);
@@ -46,7 +56,7 @@ function is_binding_type(value: unknown, context: ParseContext): Result<BindingT
 	}
 }
 
-function is_source_files(value: unknown, context: ParseContext): Result<BindingHeaderSources> {
+function is_source_files(value: unknown, context: ParseContext): Result<RulesetHeaderSources> {
 	const object = asObject(value, context);
 	if (!object.ok) {
 		return object;
@@ -68,7 +78,7 @@ function is_source_files(value: unknown, context: ParseContext): Result<BindingH
 	});
 }
 
-function is_binding_sources(value: unknown, context: ParseContext): Result<BindingSources> {
+function is_binding_sources(value: unknown, context: ParseContext): Result<RulesetSources> {
 	const object = asObject(value, context);
 	if (!object.ok) {
 		return object;
@@ -304,7 +314,7 @@ function parse_case_body(
 
 function is_override_mutex(value: Record<string, unknown>, context: ParseContext, scope: OverrideScope): Result<OverrideDirective> {
 	const $mutex = value["$mutex"];
-	
+
 	if (!Array.isArray($mutex)) {
 		return error("$mutex must be an array of property names", at(context, "$mutex").path);
 	}
@@ -490,11 +500,11 @@ function is_override_switch(value: Record<string, unknown>, context: ParseContex
 	for (const [case_name, case_value] of Object.entries($cases.value)) {
 		// Validate case name against enum values (only for $this scope with EnumProperty)
 		if (scope === "$this" && switch_property.value?._t === "EnumProperty" && !switch_property.value.values.includes(case_name)) {
-				return error(
-					`Invalid case '${case_name}'. Valid values: ${switch_property.value.values.join(", ")}`,
-					at(cases_context, case_name).path
-				);
-			}
+			return error(
+				`Invalid case '${case_name}'. Valid values: ${switch_property.value.values.join(", ")}`,
+				at(cases_context, case_name).path
+			);
+		}
 
 		const case_object = asObject(case_value, at(cases_context, case_name));
 		if (!case_object.ok) {
@@ -618,25 +628,25 @@ function is_override(value: unknown, context: ParseContext): Result<OverrideDire
 	return error("$override must be an array or object with $this/$parent", context.path);
 }
 
-function is_enum_property(value: unknown, context: ParseContext): Result<BindingEnumValue[]> {
+function is_enum_property(value: unknown, context: ParseContext): Result<RulesetEnumValue[]> {
 	if (Array.isArray(value)) {
-        const values: BindingEnumValue[] = [];
-        for (const [index, item] of value.entries()) {
-            if (typeof item === "string") {
-                values.push({ name: item, description: undefined });
-            } else {
-                return error(`Expected string at index ${index}`, at(context, index).path);
-            }
-        }
-        return ok(values);
-    }
+		const values: RulesetEnumValue[] = [];
+		for (const [index, item] of value.entries()) {
+			if (typeof item === "string") {
+				values.push({ name: item, description: undefined });
+			} else {
+				return error(`Expected string at index ${index}`, at(context, index).path);
+			}
+		}
+		return ok(values);
+	}
 
 	const object = asObject(value, context);
 	if (!object.ok) {
 		return object;
 	}
 
-	const values: BindingEnumValue[] = [];
+	const values: RulesetEnumValue[] = [];
 	for (const [name, value] of Object.entries(object.value)) {
 		if (typeof value === "string") {
 			values.push({
@@ -657,7 +667,7 @@ function is_enum_property(value: unknown, context: ParseContext): Result<Binding
 	return ok(values);
 }
 
-function parse_binding_from_object(object: Record<string, unknown>, context: ParseContext): Result<Binding> {
+function parse_binding_from_object(object: Record<string, unknown>, context: ParseContext): Result<Ruleset> {
 	const $id = required(object, "$id", context, string_);
 	if (!$id.ok) {
 		return $id;
@@ -692,7 +702,7 @@ function parse_binding_from_object(object: Record<string, unknown>, context: Par
 	}
 
 	switch ($type.value) {
-		case BindingType.BT_STRUCT: {
+		case RulesetType.BT_STRUCT: {
 			context.document.properties = [];
 			for (const key of Object.keys(object)) {
 				if (key.startsWith("$")) {
@@ -720,7 +730,7 @@ function parse_binding_from_object(object: Record<string, unknown>, context: Par
 					}
 				}
 			}
-			const $requires = capabilities.size > 0 ? Array.from(capabilities) : undefined;
+			const $requires = capabilities.size > 0 ? [...capabilities] : undefined;
 
 			return ok({
 				_t: "BindingStuct",
@@ -735,7 +745,7 @@ function parse_binding_from_object(object: Record<string, unknown>, context: Par
 				$requires,
 			});
 		}
-		case BindingType.BT_ENUM: {
+		case RulesetType.BT_ENUM: {
 			const values = required(object, "values", context, is_enum_property);
 			if (!values.ok) {
 				return values;
@@ -765,7 +775,7 @@ function parse_binding_from_object(object: Record<string, unknown>, context: Par
 				default: default_.value,
 			});
 		}
-		case BindingType.BT_PLATFORM_OPS: {
+		case RulesetType.BT_PLATFORM_OPS: {
 			return ok({
 				_t:	"BindingPlatformOps",
 				$id: $id.value,
@@ -779,7 +789,7 @@ function parse_binding_from_object(object: Record<string, unknown>, context: Par
 	}
 }
 
-export function parse_binding(contents: string): Result<Binding> {
+export function parse_binding(contents: string): Result<Ruleset> {
 	let parsed: unknown;
 	try {
 		parsed = YAML.parse(contents);
