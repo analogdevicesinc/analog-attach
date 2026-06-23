@@ -1,0 +1,15 @@
+$id: "test/array_missing_include.yaml"
+$type: struct
+$name: test_struct
+$description: "Test struct with array containing missing include"
+$ranking: 4
+$sources:
+  headers:
+    - "test.h"
+
+channels:
+  type: array
+  size: 4
+  description: "Bad channels"
+  element:
+    include: "does/not/exist.yaml"

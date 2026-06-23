@@ -61,7 +61,7 @@ export type EnumProperty = PropertyBase & {
 
 export type UnionProperty = PropertyBase & {
 	_t: "UnionProperty",
-	members: IncludeProperty[]
+	members: (IncludeProperty | ResolvedRulesetProperty)[]
 }
 
 export type PlatformOpsProperty = PropertyBase & {
@@ -88,7 +88,13 @@ export type CallbackContextProperty = PropertyBase & {
     default?: string,
 }
 
-export type ArrayElement = NumberProperty | BooleanProperty | EnumProperty | IncludeProperty;
+export type ResolvedRulesetProperty = PropertyBase & {
+	_t: "ResolvedRulesetProperty",
+	pointer?: boolean, // NOTE: Inherited from IncludeProperty
+	resolved: Ruleset,
+}
+
+export type ArrayElement = NumberProperty | BooleanProperty | EnumProperty | IncludeProperty | ResolvedRulesetProperty;
 
 export type ArrayProperty = PropertyBase & {
 	_t: "ArrayProperty",
@@ -96,7 +102,7 @@ export type ArrayProperty = PropertyBase & {
 	element: ArrayElement,
 }
 
-export type Property = NumberProperty | BooleanProperty | StringProperty | IncludeProperty | EnumProperty | UnionProperty | ArrayProperty | PlatformOpsProperty | PlatformExtraProperty | CallbackFunctionProperty | CallbackContextProperty;
+export type Property = NumberProperty | BooleanProperty | StringProperty | IncludeProperty | EnumProperty | UnionProperty | ArrayProperty | PlatformOpsProperty | PlatformExtraProperty | CallbackFunctionProperty | CallbackContextProperty | ResolvedRulesetProperty;
 
 export type TargetOverride = {
 	_t: "TargetOverride",
@@ -151,65 +157,65 @@ export type OverrideScope = "$parent" | "$this";
 export type OverrideDirective = OverrideSwitch | OverrideIfThen | OverrideStatic | OverrideMutex;
 
 // TODO: Figure out how to specify the spi/i2c etc types, these are too generic
-export enum BindingType {
+export enum RulesetType {
 	BT_STRUCT = "bt_struct",
-		BT_ENUM = "bt_enum",
-		BT_PLATFORM_OPS = "bt_platform_ops"
+	BT_ENUM = "bt_enum",
+	BT_PLATFORM_OPS = "bt_platform_ops"
 };
 
-enum BindingRank {
+enum RulesetRank {
 	BR_PRODUCTION = 0, // Deployed in shipping products/apps, hardware validated across all variants
-		BR_VALIDATED = 1, // Developer reviewd, tested on real hardware
-		BR_REVIEWED = 2, // Human reviewed, schema validates, basic tests
-		BR_GENERATED = 3, // Auto/AI generated, validates, but minimally tested
-		BR_DRAFT = 4, // Experimental, may not fully validate
+	BR_VALIDATED = 1, // Developer reviewd, tested on real hardware
+	BR_REVIEWED = 2, // Human reviewed, schema validates, basic tests
+	BR_GENERATED = 3, // Auto/AI generated, validates, but minimally tested
+	BR_DRAFT = 4, // Experimental, may not fully validate
 };
 
-export type BindingHeaderSources = {
+export type RulesetHeaderSources = {
 	headers?: string[],
 	sources?: string[],
 };
 
-export type BindingSources = BindingHeaderSources & {
-	platform?: BindingHeaderSources,
-	sdk?: BindingHeaderSources,
+export type RulesetSources = RulesetHeaderSources & {
+	platform?: RulesetHeaderSources,
+	sdk?: RulesetHeaderSources,
 	$note?: string
 };
 
-export type BindingEnumValue = {
+export type RulesetEnumValue = {
 	name: string,
 	description?: string,
 };
 
-type BindingBase = {
+type RulesetBase = {
 	_t: string,
 	$id: string,
-	$type: BindingType,
+	$type: RulesetType,
 	$name: string,
 	$description: string,
-	$ranking: BindingRank,
-	$sources: BindingSources,
+	$ranking: RulesetRank,
+	$sources: RulesetSources,
 	// TODO: add something like maintainer or edited_by?
 }
 
-export type BindingEnum = BindingBase & {
+export type RulesetEnum = RulesetBase & {
 	_t: "BindingEnum",
-	$type: BindingType.BT_ENUM,
-	values: BindingEnumValue[],
+	$type: RulesetType.BT_ENUM,
+	values: RulesetEnumValue[],
 	default?: string,
 };
 
-export type BindingStruct = BindingBase & {
+export type RulesetStruct = RulesetBase & {
 	_t: "BindingStuct",
-	$type: BindingType.BT_STRUCT,
+	$type: RulesetType.BT_STRUCT,
 	properties: Property[],
 	$override?: OverrideDirective[],
 	$requires?: string[], // Auto-computed: all capabilities required by properties
 };
 
-export type BindingPlatformOps = BindingBase & {
+export type RulesetPlatformOps = RulesetBase & {
 	_t: "BindingPlatformOps",
-	$type: BindingType.BT_PLATFORM_OPS,
+	$type: RulesetType.BT_PLATFORM_OPS,
 };
 
-export type Binding = BindingStruct | BindingEnum | BindingPlatformOps;
+export type Ruleset = RulesetStruct | RulesetEnum | RulesetPlatformOps;

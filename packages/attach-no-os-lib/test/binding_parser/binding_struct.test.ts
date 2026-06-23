@@ -1,6 +1,6 @@
 import { describe, test, expect } from 'vitest';
 import { expectOk, expectError, expectErrorPath, expectErrorContains, loadAndParseBinding } from '../test_utils';
-import { BindingStruct, BindingType } from '../../src/bindings_parser/types';
+import { RulesetStruct, RulesetType } from '../../src/bindings_parser/types';
 
 describe('BindingStruct parsing', () => {
 	describe('valid cases', () => {
@@ -8,7 +8,7 @@ describe('BindingStruct parsing', () => {
 			const result = loadAndParseBinding('bindings/struct/valid_minimal.yaml');
 			expectOk(result);
 			expect(result.value._t).toBe('BindingStuct');
-			expect(result.value.$type).toBe(BindingType.BT_STRUCT);
+			expect(result.value.$type).toBe(RulesetType.BT_STRUCT);
 			expect(result.value.$id).toBe('test/minimal_struct');
 			expect(result.value.$name).toBe('minimal_init_param');
 		});
@@ -16,7 +16,7 @@ describe('BindingStruct parsing', () => {
 		test('parses struct with properties', () => {
 			const result = loadAndParseBinding('bindings/struct/valid_with_properties.yaml');
 			expectOk(result);
-			const binding = result.value as BindingStruct;
+			const binding = result.value as RulesetStruct;
 			expect(binding.properties).toHaveLength(3);
 			expect(binding.$description).toBe('A struct with properties');
 			expect(binding.$ranking).toBe(2);
@@ -25,7 +25,7 @@ describe('BindingStruct parsing', () => {
 		test('parses struct with override', () => {
 			const result = loadAndParseBinding('bindings/struct/valid_with_override.yaml');
 			expectOk(result);
-			const binding = result.value as BindingStruct;
+			const binding = result.value as RulesetStruct;
 			expect(binding.$override).toBeDefined();
 			expect(binding.$override).toHaveLength(1);
 		});
@@ -33,7 +33,7 @@ describe('BindingStruct parsing', () => {
 		test('auto-computes $requires from property capabilities', () => {
 			const result = loadAndParseBinding('bindings/struct/valid_with_capabilities.yaml');
 			expectOk(result);
-			const binding = result.value as BindingStruct;
+			const binding = result.value as RulesetStruct;
 			expect(binding.$requires).toBeDefined();
 			expect(binding.$requires).toContain('spi');
 			expect(binding.$requires).toContain('irq');
@@ -43,7 +43,7 @@ describe('BindingStruct parsing', () => {
 		test('$requires is undefined when no properties have capabilities', () => {
 			const result = loadAndParseBinding('bindings/struct/valid_with_properties.yaml');
 			expectOk(result);
-			const binding = result.value as BindingStruct;
+			const binding = result.value as RulesetStruct;
 			expect(binding.$requires).toBeUndefined();
 		});
 	});
