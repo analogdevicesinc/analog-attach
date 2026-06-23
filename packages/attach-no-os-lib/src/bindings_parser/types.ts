@@ -61,7 +61,7 @@ export type EnumProperty = PropertyBase & {
 
 export type UnionProperty = PropertyBase & {
 	_t: "UnionProperty",
-	members: (IncludeProperty | ResolvedRulesetProperty)[]
+	members: IncludeProperty[]
 }
 
 export type PlatformOpsProperty = PropertyBase & {
@@ -88,13 +88,7 @@ export type CallbackContextProperty = PropertyBase & {
     default?: string,
 }
 
-export type ResolvedRulesetProperty = PropertyBase & {
-	_t: "ResolvedRulesetProperty",
-	pointer?: boolean, // NOTE: Inherited from IncludeProperty
-	resolved: Ruleset,
-}
-
-export type ArrayElement = NumberProperty | BooleanProperty | EnumProperty | IncludeProperty | ResolvedRulesetProperty;
+export type ArrayElement = NumberProperty | BooleanProperty | EnumProperty | IncludeProperty;
 
 export type ArrayProperty = PropertyBase & {
 	_t: "ArrayProperty",
@@ -102,7 +96,7 @@ export type ArrayProperty = PropertyBase & {
 	element: ArrayElement,
 }
 
-export type Property = NumberProperty | BooleanProperty | StringProperty | IncludeProperty | EnumProperty | UnionProperty | ArrayProperty | PlatformOpsProperty | PlatformExtraProperty | CallbackFunctionProperty | CallbackContextProperty | ResolvedRulesetProperty;
+export type Property = NumberProperty | BooleanProperty | StringProperty | IncludeProperty | EnumProperty | UnionProperty | ArrayProperty | PlatformOpsProperty | PlatformExtraProperty | CallbackFunctionProperty | CallbackContextProperty;
 
 export type TargetOverride = {
 	_t: "TargetOverride",
