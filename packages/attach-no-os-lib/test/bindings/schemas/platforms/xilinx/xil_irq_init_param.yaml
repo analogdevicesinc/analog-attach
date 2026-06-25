@@ -1,6 +1,7 @@
 $id: "platforms/xilinx/xil_irq_init_param.yaml"
 $type: struct
-$name: xil_irq_init_param
+$symbol: xil_irq_init_param
+$capability: irq
 $description: "Xilinx platform specific IRQ initialization parameters"
 $ranking: 4
 $sources:

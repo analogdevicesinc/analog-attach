@@ -1,6 +1,6 @@
 $id: "platforms/pico/enums/i2c_scl_gp.yaml"
 $type: enum
-$name: i2c_scl_gp
+$symbol: i2c_scl_gp
 $description: "Available GP config for I2C SCL"
 $ranking: 4
 $sources:

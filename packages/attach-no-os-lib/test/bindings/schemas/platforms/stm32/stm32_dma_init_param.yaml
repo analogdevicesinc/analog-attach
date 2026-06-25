@@ -1,6 +1,7 @@
 $id: "platforms/stm32/stm32_dma_init_param.yaml"
 $type: struct
-$name: stm32_dma_init_param
+$symbol: stm32_dma_init_param
+$capability: dma
 $description: "STM32 platform specific DMA initialization parameters"
 $ranking: 4
 $sources:

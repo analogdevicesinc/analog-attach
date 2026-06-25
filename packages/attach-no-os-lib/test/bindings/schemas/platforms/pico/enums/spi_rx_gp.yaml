@@ -1,6 +1,6 @@
 $id: "platforms/pico/enums/spi_rx_gp.yaml"
 $type: enum
-$name: spi_rx_gp
+$symbol: spi_rx_gp
 $description: "Available GP config for SPI RX (MISO)"
 $ranking: 4
 $sources:

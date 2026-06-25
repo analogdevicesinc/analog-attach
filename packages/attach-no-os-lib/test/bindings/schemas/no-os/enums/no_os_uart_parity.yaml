@@ -1,6 +1,6 @@
 $id: "no-os/enums/no_os_uart_parity.yaml"
 $type: enum
-$name: no_os_uart_parity
+$symbol: no_os_uart_parity
 $description: "UART parity configuration"
 $ranking: 4
 $sources:

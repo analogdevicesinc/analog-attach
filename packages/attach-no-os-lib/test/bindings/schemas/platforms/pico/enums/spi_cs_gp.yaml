@@ -1,6 +1,6 @@
 $id: "platforms/pico/enums/spi_cs_gp.yaml"
 $type: enum
-$name: spi_cs_gp
+$symbol: spi_cs_gp
 $description: "Available GP config for SPI CS (chip select)"
 $ranking: 4
 $sources:

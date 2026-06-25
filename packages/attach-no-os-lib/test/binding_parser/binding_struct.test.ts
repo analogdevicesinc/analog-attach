@@ -10,7 +10,7 @@ describe('BindingStruct parsing', () => {
 			expect(result.value._t).toBe('BindingStuct');
 			expect(result.value.$type).toBe(RulesetType.BT_STRUCT);
 			expect(result.value.$id).toBe('test/minimal_struct');
-			expect(result.value.$name).toBe('minimal_init_param');
+			expect(result.value.$symbol).toBe('minimal_init_param');
 		});
 
 		test('parses struct with properties', () => {
@@ -46,6 +46,20 @@ describe('BindingStruct parsing', () => {
 			const binding = result.value as RulesetStruct;
 			expect(binding.$requires).toBeUndefined();
 		});
+
+		test('parses $capability field', () => {
+			const result = loadAndParseBinding('bindings/struct/valid_with_capability.yaml');
+			expectOk(result);
+			const binding = result.value as RulesetStruct;
+			expect(binding.$capability).toBe('spi');
+		});
+
+		test('$capability is undefined when not specified', () => {
+			const result = loadAndParseBinding('bindings/struct/valid_minimal.yaml');
+			expectOk(result);
+			const binding = result.value as RulesetStruct;
+			expect(binding.$capability).toBeUndefined();
+		});
 	});
 
 	describe('error cases', () => {
@@ -61,10 +75,10 @@ describe('BindingStruct parsing', () => {
 			expectErrorContains(result, "Missing required field '$type'");
 		});
 
-		test('rejects missing $name', () => {
-			const result = loadAndParseBinding('bindings/struct/missing_name.yaml');
+		test('rejects missing $symbol', () => {
+			const result = loadAndParseBinding('bindings/struct/missing_symbol.yaml');
 			expectError(result);
-			expectErrorContains(result, "Missing required field '$name'");
+			expectErrorContains(result, "Missing required field '$symbol'");
 		});
 
 		test('rejects missing $sources', () => {

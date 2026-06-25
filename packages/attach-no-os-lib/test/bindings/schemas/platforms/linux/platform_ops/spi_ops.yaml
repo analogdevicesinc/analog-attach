@@ -1,6 +1,7 @@
 $id: "platforms/linux/platform_ops/spi_ops.yaml"
 $type: platform_ops
-$name: linux_spi_ops
+$symbol: linux_spi_ops
+$capability: spi
 $description: "Linux SPI platform ops"
 $ranking: 4
 $sources:

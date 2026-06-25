@@ -1,6 +1,6 @@
 $id: "test/struct_with_capabilities"
 $type: struct
-$name: test_init_param
+$symbol: test_init_param
 $description: "A struct with capability properties"
 $ranking: 2
 $sources:

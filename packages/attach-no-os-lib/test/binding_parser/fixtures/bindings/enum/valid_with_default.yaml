@@ -1,6 +1,6 @@
 $id: "test/enum_default"
 $type: enum
-$name: mode_enum
+$symbol: mode_enum
 $ranking: 4
 $sources:
   headers:

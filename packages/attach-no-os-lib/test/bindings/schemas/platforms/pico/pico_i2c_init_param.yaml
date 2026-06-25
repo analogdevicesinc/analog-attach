@@ -1,6 +1,7 @@
 $id: "platforms/pico/pico_i2c_init_param.yaml"
 $type: struct
-$name: pico_i2c_init_param
+$symbol: pico_i2c_init_param
+$capability: i2c
 $description: "Pico platform specific I2C initialization parameters"
 $ranking: 4
 $sources:

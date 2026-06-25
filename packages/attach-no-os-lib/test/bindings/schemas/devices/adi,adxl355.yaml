@@ -1,6 +1,6 @@
 $id: "devices/adi,adxl355.yaml"
 $type: struct
-$name: adxl355_init_param
+$symbol: adxl355_init_param
 $description: "ADXL355 3-axis accelerometer configuration"
 $ranking: 4
 $sources:

@@ -1,6 +1,6 @@
 $id: "devices/ad7124-structs/ad7124_channel_setup.yaml"
 $type: struct
-$name: ad7124_channel_setup
+$symbol: ad7124_channel_setup
 $description: "AD7124 channel setup configuration"
 $ranking: 4
 $sources:

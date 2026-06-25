@@ -1,28 +1,19 @@
-capabilities:
-  spi:
-    ops: platform_ops/spi_ops.yaml
-    extra: xil_spi_init_param.yaml
-  spi_engine:
-    ops: platform_ops/spi_engine_ops.yaml
-    extra: xil_spi_init_param.yaml
-  spi_pl:
-    ops: platform_ops/spi_pl_ops.yaml
-    extra: xil_spi_init_param.yaml
-  i2c:
-    ops: platform_ops/i2c_ops.yaml
-    extra: xil_i2c_init_param.yaml
-  gpio:
-    ops: platform_ops/gpio_ops.yaml
-    extra: xil_gpio_init_param.yaml
-  gpio_irq:
-    ops: platform_ops/gpio_irq_ops.yaml
-    extra: xil_gpio_irq_init_param.yaml
-  uart:
-    ops: platform_ops/uart_ops.yaml
-    extra: xil_uart_init_param.yaml
-  irq:
-    ops: platform_ops/irq_ops.yaml
-    extra: xil_irq_init_param.yaml
-  timer:
-    ops: platform_ops/timer_ops.yaml
-    extra: xil_timer_init_param.yaml
+ops:
+  - platform_ops/spi_ops.yaml
+  - platform_ops/spi_engine_ops.yaml
+  - platform_ops/spi_pl_ops.yaml
+  - platform_ops/i2c_ops.yaml
+  - platform_ops/gpio_ops.yaml
+  - platform_ops/gpio_irq_ops.yaml
+  - platform_ops/uart_ops.yaml
+  - platform_ops/irq_ops.yaml
+  - platform_ops/timer_ops.yaml
+
+structs:
+  - xil_spi_init_param.yaml
+  - xil_i2c_init_param.yaml
+  - xil_gpio_init_param.yaml
+  - xil_gpio_irq_init_param.yaml
+  - xil_uart_init_param.yaml
+  - xil_irq_init_param.yaml
+  - xil_timer_init_param.yaml

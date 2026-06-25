@@ -1,6 +1,6 @@
 $id: "devices/ad7124-enums/ad7124_reference_source.yaml"
 $type: enum
-$name: ad7124_reference_source
+$symbol: ad7124_reference_source
 $description: "AD7124 ADC reference source"
 $ranking: 4
 $sources:

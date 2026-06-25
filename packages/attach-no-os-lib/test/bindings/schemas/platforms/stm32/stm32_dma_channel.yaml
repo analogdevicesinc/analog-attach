@@ -1,6 +1,6 @@
 $id: "platforms/stm32/stm32_dma_channel.yaml"
 $type: struct
-$name: stm32_dma_channel
+$symbol: stm32_dma_channel
 $description: "STM32 DMA channel configuration"
 $ranking: 4
 $sources:

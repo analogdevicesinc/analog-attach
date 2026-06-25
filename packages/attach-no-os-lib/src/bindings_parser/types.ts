@@ -111,33 +111,33 @@ export type SwitchCase = {
 	overrides: TargetOverride[]
 }
 
-type OverrideSwitch = {
+export type OverrideSwitch = {
 	_t: "OverrideSwitch",
 	scope: OverrideScope,
 	$on: string,
 	$cases: SwitchCase[],
 }
 
-type OverrideCondition = {
+export type OverrideCondition = {
 	scope: OverrideScope,
 	target: string,
 	value: unknown // FIXME: Does this need to be unknwon?
 }
 
-type OverrideIfThen = {
+export type OverrideIfThen = {
 	_t: "OverrideIfThen",
 	scope: OverrideScope,
 	condition: OverrideCondition,
 	overrides: TargetOverride[],
 }
 
-type OverrideMutex = {
+export type OverrideMutex = {
 	_t: "OverrideMutex",
 	scope: OverrideScope,
 	properties: string[]
 }
 
-type OverrideStatic = {
+export type OverrideStatic = {
 	_t: "OverrideStatic",
 	scope: OverrideScope,
 	target: string,
@@ -185,7 +185,7 @@ type RulesetBase = {
 	_t: string,
 	$id: string,
 	$type: RulesetType,
-	$name: string,
+	$symbol: string,
 	$description: string,
 	$ranking: RulesetRank,
 	$sources: RulesetSources,
@@ -205,11 +205,14 @@ export type RulesetStruct = RulesetBase & {
 	properties: Property[],
 	$override?: OverrideDirective[],
 	$requires?: string[], // Auto-computed: all capabilities required by properties
+	$capability?: string,
 };
 
 export type RulesetPlatformOps = RulesetBase & {
+	// FIXME: Rename this type
 	_t: "BindingPlatformOps",
 	$type: RulesetType.BT_PLATFORM_OPS,
+	$capability?: string,
 };
 
 export type Ruleset = RulesetStruct | RulesetEnum | RulesetPlatformOps;

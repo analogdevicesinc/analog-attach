@@ -1,6 +1,6 @@
 $id: "devices/ad7124-enums/ad7124_power_mode.yaml"
 $type: enum
-$name: ad7124_power_mode
+$symbol: ad7124_power_mode
 $description: "AD7124 power mode selection"
 $ranking: 4
 $sources:

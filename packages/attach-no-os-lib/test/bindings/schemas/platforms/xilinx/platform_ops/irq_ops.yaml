@@ -1,6 +1,7 @@
 $id: "platforms/xilinx/platform_ops/irq_ops.yaml"
 $type: platform_ops
-$name: xil_irq_ops
+$symbol: xil_irq_ops
+$capability: irq
 $description: "Xilinx IRQ platform ops"
 $ranking: 4
 $sources:
