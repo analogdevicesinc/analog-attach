@@ -1,6 +1,7 @@
 $id: "platforms/stm32/stm32_uart_init_param.yaml"
 $type: struct
-$name: stm32_uart_init_param
+$symbol: stm32_uart_init_param
+$capability: uart
 $description: "STM32 platform specific UART initialization parameters"
 $ranking: 4
 $sources:

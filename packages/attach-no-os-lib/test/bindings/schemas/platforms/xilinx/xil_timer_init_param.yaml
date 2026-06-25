@@ -1,6 +1,7 @@
 $id: "platforms/xilinx/xil_timer_init_param.yaml"
 $type: struct
-$name: xil_timer_init_param
+$symbol: xil_timer_init_param
+$capability: timer
 $description: "Xilinx platform specific timer initialization parameters"
 $ranking: 4
 $sources:

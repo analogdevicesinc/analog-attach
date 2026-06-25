@@ -8,40 +8,40 @@ describe('ArrayProperty parsing', () => {
 			const result = loadAndParseProperty('properties/array/valid_number_element.yaml');
 			expectOk(result);
 			expect(result.value._t).toBe('ArrayProperty');
-			const prop = result.value as ArrayProperty;
-			expect(prop.size).toBe(10);
-			expect(prop.element._t).toBe('NumberProperty');
+			const property = result.value as ArrayProperty;
+			expect(property.size).toBe(10);
+			expect(property.element._t).toBe('NumberProperty');
 		});
 
 		test('parses with bool element', () => {
 			const result = loadAndParseProperty('properties/array/valid_bool_element.yaml');
 			expectOk(result);
-			const prop = result.value as ArrayProperty;
-			expect(prop.size).toBe(4);
-			expect(prop.element._t).toBe('BooleanProperty');
+			const property = result.value as ArrayProperty;
+			expect(property.size).toBe(4);
+			expect(property.element._t).toBe('BooleanProperty');
 		});
 
 		test('parses with enum element', () => {
 			const result = loadAndParseProperty('properties/array/valid_enum_element.yaml');
 			expectOk(result);
-			const prop = result.value as ArrayProperty;
-			expect(prop.size).toBe(8);
-			expect(prop.element._t).toBe('EnumProperty');
+			const property = result.value as ArrayProperty;
+			expect(property.size).toBe(8);
+			expect(property.element._t).toBe('EnumProperty');
 		});
 
 		test('parses with include element', () => {
 			const result = loadAndParseProperty('properties/array/valid_include_element.yaml');
 			expectOk(result);
-			const prop = result.value as ArrayProperty;
-			expect(prop.size).toBe(16);
-			expect(prop.element._t).toBe('IncludeProperty');
+			const property = result.value as ArrayProperty;
+			expect(property.size).toBe(16);
+			expect(property.element._t).toBe('IncludeProperty');
 		});
 
 		test('parses with disabled flag', () => {
 			const result = loadAndParseProperty('properties/array/valid_with_disabled.yaml');
 			expectOk(result);
-			const prop = result.value as ArrayProperty;
-			expect(prop.disabled).toBe(true);
+			const property = result.value as ArrayProperty;
+			expect(property.disabled).toBe(true);
 		});
 	});
 

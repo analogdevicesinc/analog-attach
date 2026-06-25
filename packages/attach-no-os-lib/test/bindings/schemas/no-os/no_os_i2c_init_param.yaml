@@ -1,6 +1,7 @@
 $id: "no-os/no_os_i2c_init_param.yaml"
 $type: struct
-$name: no_os_i2c_init_param
+$symbol: no_os_i2c_init_param
+$capability: i2c
 $description: "Structure holding the parameters for I2C initialization"
 $ranking: 4
 $sources:

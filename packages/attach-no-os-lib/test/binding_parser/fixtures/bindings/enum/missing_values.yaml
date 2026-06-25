@@ -1,6 +1,6 @@
 $id: "test/enum_no_values"
 $type: enum
-$name: no_values_enum
+$symbol: no_values_enum
 $ranking: 4
 $sources:
   headers:

@@ -1,6 +1,6 @@
 $id: "test/switch_parent"
 $type: struct
-$name: test_struct
+$symbol: test_struct
 $ranking: 4
 $sources:
   headers:

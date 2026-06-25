@@ -1,6 +1,7 @@
 $id: "no-os/no_os_spi_init_param.yaml"
 $type: struct
-$name: no_os_spi_init_param
+$symbol: no_os_spi_init_param
+$capability: spi
 $description: "Structure holding the parameters for SPI initialization"
 $ranking: 4
 $sources:

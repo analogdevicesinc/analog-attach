@@ -1,6 +1,6 @@
 $id: "no-os/no_os_rtc_init_param.yaml"
 $type: struct
-$name: no_os_rtc_init_param
+$symbol: no_os_rtc_init_param
 $description: "Structure holding RTC initialization parameters"
 $ranking: 4
 $sources:

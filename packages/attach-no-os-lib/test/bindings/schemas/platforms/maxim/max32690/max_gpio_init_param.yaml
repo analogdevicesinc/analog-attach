@@ -1,6 +1,7 @@
 $id: "platforms/maxim/max32690/max_gpio_init_param.yaml"
 $type: struct
-$name: max_gpio_init_param
+$symbol: max_gpio_init_param
+$capability: gpio
 $description: "Maxim MAX32690 platform specific GPIO initialization parameters"
 $ranking: 4
 $sources:

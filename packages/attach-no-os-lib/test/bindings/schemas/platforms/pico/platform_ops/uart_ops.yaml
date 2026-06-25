@@ -1,6 +1,7 @@
 $id: "platforms/pico/platform_ops/uart_ops.yaml"
 $type: platform_ops
-$name: pico_uart_ops
+$symbol: pico_uart_ops
+$capability: uart
 $description: "Pico UART platform ops"
 $ranking: 4
 $sources:

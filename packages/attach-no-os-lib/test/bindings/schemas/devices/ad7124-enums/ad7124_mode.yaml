@@ -1,6 +1,6 @@
 $id: "devices/ad7124-enums/ad7124_mode.yaml"
 $type: enum
-$name: ad7124_mode
+$symbol: ad7124_mode
 $description: "AD7124 ADC modes of operation"
 $ranking: 4
 $sources:
