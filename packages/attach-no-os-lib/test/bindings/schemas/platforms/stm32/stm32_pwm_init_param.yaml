@@ -1,6 +1,7 @@
 $id: "platforms/stm32/stm32_pwm_init_param.yaml"
 $type: struct
-$name: stm32_pwm_init_param
+$symbol: stm32_pwm_init_param
+$capability: pwm
 $description: "STM32 platform specific PWM initialization parameters"
 $ranking: 4
 $sources:

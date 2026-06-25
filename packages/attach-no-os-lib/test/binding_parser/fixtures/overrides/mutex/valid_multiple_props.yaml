@@ -1,6 +1,6 @@
 $id: "test/mutex_multi"
 $type: struct
-$name: test_struct
+$symbol: test_struct
 $ranking: 4
 $sources:
   headers:

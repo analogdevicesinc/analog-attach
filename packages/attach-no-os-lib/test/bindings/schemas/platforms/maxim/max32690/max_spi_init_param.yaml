@@ -1,6 +1,7 @@
 $id: "platforms/maxim/max32690/max_spi_init_param.yaml"
 $type: struct
-$name: max_spi_init_param
+$symbol: max_spi_init_param
+$capability: spi
 $description: "Maxim MAX32690 platform specific SPI initialization parameters"
 $ranking: 4
 $sources:

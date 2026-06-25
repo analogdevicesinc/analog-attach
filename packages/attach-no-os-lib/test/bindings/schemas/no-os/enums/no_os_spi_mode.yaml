@@ -1,6 +1,6 @@
 $id: "no-os/enums/no_os_spi_mode.yaml"
 $type: enum
-$name: no_os_spi_mode
+$symbol: no_os_spi_mode
 $description: "SPI mode (clock polarity and phase)"
 $ranking: 4
 $sources:

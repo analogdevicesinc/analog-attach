@@ -1,6 +1,7 @@
 $id: "platforms/linux/linux_i2c_init_param.yaml"
 $type: struct
-$name: linux_i2c_init_param
+$symbol: linux_i2c_init_param
+$capability: i2c
 $description: "Linux platform specific I2C initialization parameters"
 $ranking: 4
 $sources:

@@ -1,6 +1,6 @@
 $id: "platforms/pico/enums/uart_rx_gp.yaml"
 $type: enum
-$name: uart_rx_gp
+$symbol: uart_rx_gp
 $description: "Available GP config for UART RX"
 $ranking: 4
 $sources:

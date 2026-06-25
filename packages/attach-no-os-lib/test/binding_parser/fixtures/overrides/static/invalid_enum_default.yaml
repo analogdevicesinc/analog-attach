@@ -1,6 +1,6 @@
 $id: "test/invalid_enum_default"
 $type: struct
-$name: test_struct
+$symbol: test_struct
 $ranking: 4
 $sources:
   headers:

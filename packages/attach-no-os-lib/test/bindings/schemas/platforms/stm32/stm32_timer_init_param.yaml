@@ -1,6 +1,7 @@
 $id: "platforms/stm32/stm32_timer_init_param.yaml"
 $type: struct
-$name: stm32_timer_init_param
+$symbol: stm32_timer_init_param
+$capability: timer
 $description: "STM32 platform specific timer initialization parameters"
 $ranking: 4
 $sources:

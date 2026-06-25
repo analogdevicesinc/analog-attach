@@ -1,6 +1,6 @@
 $id: "no-os/enums/no_os_uart_size.yaml"
 $type: enum
-$name: no_os_uart_size
+$symbol: no_os_uart_size
 $description: "UART character size (number of data bits)"
 $ranking: 4
 $sources:

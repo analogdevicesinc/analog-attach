@@ -1,6 +1,6 @@
 $id: "devices/adi,24xx32a.yaml"
 $type: struct
-$name: eeprom_24xx32a_init_param
+$symbol: eeprom_24xx32a_init_param
 $description: "24AA32A/24LC32A I2C EEPROM"
 $ranking: 4
 $sources:

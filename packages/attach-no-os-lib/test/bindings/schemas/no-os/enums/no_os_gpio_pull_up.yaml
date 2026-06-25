@@ -1,6 +1,6 @@
 $id: "no-os/enums/no_os_gpio_pull_up.yaml"
 $type: enum
-$name: no_os_gpio_pull_up
+$symbol: no_os_gpio_pull_up
 $description: "GPIO pull up/pull down resistor configuration"
 $ranking: 4
 $sources:

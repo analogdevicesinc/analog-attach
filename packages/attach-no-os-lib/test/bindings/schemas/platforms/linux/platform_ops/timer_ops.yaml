@@ -1,6 +1,7 @@
 $id: "platforms/linux/platform_ops/timer_ops.yaml"
 $type: platform_ops
-$name: linux_timer_ops
+$symbol: linux_timer_ops
+$capability: timer
 $description: "Linux Timer platform ops"
 $ranking: 4
 $sources:

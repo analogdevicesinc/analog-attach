@@ -1,6 +1,6 @@
 $id: "test/with_override"
 $type: struct
-$name: override_param
+$symbol: override_param
 $ranking: 3
 $sources:
   headers:

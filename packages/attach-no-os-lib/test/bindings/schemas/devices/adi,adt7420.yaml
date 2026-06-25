@@ -1,6 +1,6 @@
 $id: "devices/adi,adt7420.yaml"
 $type: struct
-$name: adt7420_init_param
+$symbol: adt7420_init_param
 $description: "ADT7420/ADT7320 Temperature Sensor"
 $ranking: 4
 $sources:

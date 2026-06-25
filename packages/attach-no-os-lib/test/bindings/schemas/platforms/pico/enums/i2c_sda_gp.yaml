@@ -1,6 +1,6 @@
 $id: "platforms/pico/enums/i2c_sda_gp.yaml"
 $type: enum
-$name: i2c_sda_gp
+$symbol: i2c_sda_gp
 $description: "Available GP config for I2C SDA"
 $ranking: 4
 $sources:

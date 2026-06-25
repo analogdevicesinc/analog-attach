@@ -1,6 +1,7 @@
 $id: "platforms/stm32/platform_ops/gpio_irq_ops.yaml"
 $type: platform_ops
-$name: stm32_gpio_irq_ops
+$symbol: stm32_gpio_irq_ops
+$capability: gpio_irq
 $description: "STM32 GPIO IRQ platform ops"
 $ranking: 4
 $sources:

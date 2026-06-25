@@ -1,6 +1,7 @@
 $id: "platforms/pico/platform_ops/timer_ops.yaml"
 $type: platform_ops
-$name: pico_timer_ops
+$symbol: pico_timer_ops
+$capability: timer
 $description: "Pico Timer platform ops"
 $ranking: 4
 $sources:

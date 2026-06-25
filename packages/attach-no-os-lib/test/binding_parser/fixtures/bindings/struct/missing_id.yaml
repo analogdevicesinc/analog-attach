@@ -1,5 +1,5 @@
 $type: struct
-$name: no_id_struct
+$symbol: no_id_struct
 $ranking: 4
 $sources:
   headers:

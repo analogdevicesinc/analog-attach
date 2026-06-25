@@ -1,6 +1,6 @@
 $id: "platforms/xilinx/enums/xil_irq_type.yaml"
 $type: enum
-$name: xil_irq_type
+$symbol: xil_irq_type
 $description: "Xilinx platform architecture sections for IRQ"
 $ranking: 4
 $sources:

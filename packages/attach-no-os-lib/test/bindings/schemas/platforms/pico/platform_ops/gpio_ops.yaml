@@ -1,6 +1,7 @@
 $id: "platforms/pico/platform_ops/gpio_ops.yaml"
 $type: platform_ops
-$name: pico_gpio_ops
+$symbol: pico_gpio_ops
+$capability: gpio
 $description: "Pico GPIO platform ops"
 $ranking: 4
 $sources:

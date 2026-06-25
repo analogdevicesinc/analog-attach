@@ -1,0 +1,8 @@
+$id: "test/spi_ops"
+$type: platform_ops
+$symbol: test_spi_ops
+$capability: spi
+$ranking: 4
+$sources:
+  headers:
+    - "test_spi.h"

@@ -1,6 +1,7 @@
 $id: "platforms/pico/pico_spi_init_param.yaml"
 $type: struct
-$name: pico_spi_init_param
+$symbol: pico_spi_init_param
+$capability: spi
 $description: "Pico platform specific SPI initialization parameters"
 $ranking: 4
 $sources:

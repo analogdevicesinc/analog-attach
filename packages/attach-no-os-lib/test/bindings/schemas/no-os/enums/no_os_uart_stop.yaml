@@ -1,6 +1,6 @@
 $id: "no-os/enums/no_os_uart_stop.yaml"
 $type: enum
-$name: no_os_uart_stop
+$symbol: no_os_uart_stop
 $description: "UART number of stop bits"
 $ranking: 4
 $sources:

@@ -1,6 +1,6 @@
 $id: "devices/adi,ad5592r.yaml"
 $type: struct
-$name: ad5592r_init_param
+$symbol: ad5592r_init_param
 $description: "AD5592R 8-channel, 12-bit configurable ADC/DAC with GPIO"
 $ranking: 4
 $sources:

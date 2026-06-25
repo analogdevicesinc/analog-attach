@@ -1,5 +1,5 @@
 $id: "test/no_type"
-$name: no_type_struct
+$symbol: no_type_struct
 $ranking: 4
 $sources:
   headers:

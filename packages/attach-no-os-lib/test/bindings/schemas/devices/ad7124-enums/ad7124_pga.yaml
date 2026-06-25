@@ -1,6 +1,6 @@
 $id: "devices/ad7124-enums/ad7124_pga.yaml"
 $type: enum
-$name: ad7124_pga
+$symbol: ad7124_pga
 $description: "AD7124 PGA gain settings"
 $ranking: 4
 $sources:

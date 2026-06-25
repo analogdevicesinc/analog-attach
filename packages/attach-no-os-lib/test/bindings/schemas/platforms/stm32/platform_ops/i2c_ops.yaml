@@ -1,7 +1,8 @@
 $id: "platforms/stm32/platform_ops/i2c_ops.yaml"
 $type: platform_ops
 $ranking: 4
-$name: stm32_i2c_ops
+$symbol: stm32_i2c_ops
+$capability: i2c
 $sources:
   headers:
     - "stm32_i2c.h"

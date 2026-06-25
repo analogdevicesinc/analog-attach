@@ -1,6 +1,6 @@
 $id: "test/if_then_multi_cond"
 $type: struct
-$name: test_struct
+$symbol: test_struct
 $ranking: 4
 $sources:
   headers:

@@ -1,6 +1,7 @@
 $id: "no-os/no_os_irq_init_param.yaml"
 $type: struct
-$name: no_os_irq_init_param
+$symbol: no_os_irq_init_param
+$capability: irq
 $init_function: no_os_irq_ctrl_init
 $descriptor: no_os_irq_ctrl_desc
 $description: "Structure holding the initial parameters for Interrupt Request"

@@ -1,6 +1,6 @@
 $id: "devices/ad7124-enums/ad7124_burnout.yaml"
 $type: enum
-$name: ad7124_burnout
+$symbol: ad7124_burnout
 $description: "AD7124 burnout current values"
 $ranking: 4
 $sources:

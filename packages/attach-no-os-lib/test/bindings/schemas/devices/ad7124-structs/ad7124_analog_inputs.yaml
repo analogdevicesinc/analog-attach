@@ -1,6 +1,6 @@
 $id: "devices/ad7124-structs/ad7124_analog_inputs.yaml"
 $type: struct
-$name: ad7124_analog_inputs
+$symbol: ad7124_analog_inputs
 $description: "AD7124 positive and negative analog input pair"
 $ranking: 4
 $sources:

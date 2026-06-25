@@ -1,6 +1,6 @@
 $id: "no-os/enums/no_os_pwm_polarity.yaml"
 $type: enum
-$name: no_os_pwm_polarity
+$symbol: no_os_pwm_polarity
 $description: "Possible polarities of the PWM signal"
 $ranking: 4
 $sources:

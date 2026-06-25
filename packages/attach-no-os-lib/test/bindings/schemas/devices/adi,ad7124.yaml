@@ -1,6 +1,6 @@
 $id: "devices/adi,ad7124.yaml"
 $type: struct
-$name: ad7124_init_param
+$symbol: ad7124_init_param
 $description: "AD7124 24-bit Sigma-Delta ADC initialization parameters"
 $ranking: 4
 $pointer: true

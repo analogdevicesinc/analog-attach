@@ -1,6 +1,6 @@
 $id: "test/enum_object"
 $type: enum
-$name: status_enum
+$symbol: status_enum
 $ranking: 3
 $sources:
   headers:

@@ -1,6 +1,7 @@
 $id: "platforms/maxim/max32690/max_uart_init_param.yaml"
 $type: struct
-$name: max_uart_init_param
+$symbol: max_uart_init_param
+$capability: uart
 $description: "Maxim MAX32690 platform specific UART initialization parameters"
 $ranking: 4
 $sources:

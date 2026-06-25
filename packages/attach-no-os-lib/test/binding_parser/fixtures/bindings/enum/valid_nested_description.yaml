@@ -1,6 +1,6 @@
 $id: "test/enum_nested"
 $type: enum
-$name: detailed_enum
+$symbol: detailed_enum
 $ranking: 2
 $sources:
   headers:

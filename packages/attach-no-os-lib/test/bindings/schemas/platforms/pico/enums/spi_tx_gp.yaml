@@ -1,6 +1,6 @@
 $id: "platforms/pico/enums/spi_tx_gp.yaml"
 $type: enum
-$name: spi_tx_gp
+$symbol: spi_tx_gp
 $description: "Available GP config for SPI TX (MOSI)"
 $ranking: 4
 $sources:

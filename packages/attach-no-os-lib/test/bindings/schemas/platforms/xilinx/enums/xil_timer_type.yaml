@@ -1,6 +1,6 @@
 $id: "platforms/xilinx/enums/xil_timer_type.yaml"
 $type: enum
-$name: xil_timer_type
+$symbol: xil_timer_type
 $description: "Xilinx timer type selection"
 $ranking: 4
 $sources:

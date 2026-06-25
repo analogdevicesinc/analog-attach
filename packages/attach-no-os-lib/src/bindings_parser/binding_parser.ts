@@ -28,6 +28,8 @@ import {
 	parse_union_property
 } from "./property_parser";
 import { is_boolean_property_override, is_enum_property_override, is_include_property_override, is_number_property_override, is_union_property_override } from "./override_validators";
+import { BindingLoader } from "../workfile_handler/types";
+import { resolve_ruleset } from "../resolver/resolver";
 
 export function unwrap<T>(result: Result<T>): T {
 	if (!result.ok) {throw result.error;}
@@ -632,10 +634,10 @@ function is_enum_property(value: unknown, context: ParseContext): Result<Ruleset
 	if (Array.isArray(value)) {
 		const values: RulesetEnumValue[] = [];
 		for (const [index, item] of value.entries()) {
-			if (typeof item === "string") {
+			if (typeof item === "string" || typeof item === "number") {
 				values.push({ name: item, description: undefined });
 			} else {
-				return error(`Expected string at index ${index}`, at(context, index).path);
+				return error(`Expected string or number at index ${index}`, at(context, index).path);
 			}
 		}
 		return ok(values);
@@ -678,9 +680,9 @@ function parse_binding_from_object(object: Record<string, unknown>, context: Par
 		return $type;
 	}
 
-	const $name = required(object, "$name", context, string_);
-	if (!$name.ok) {
-		return $name;
+	const $symbol = required(object, "$symbol", context, string_);
+	if (!$symbol.ok) {
+		return $symbol;
 	}
 
 	const $description = optionalWithDefault(object, "$description", context, "no-OS binding", string_);
@@ -721,6 +723,11 @@ function parse_binding_from_object(object: Record<string, unknown>, context: Par
 				return $override;
 			}
 
+			const $capability = optional(object, "$capability", context, string_);
+			if (!$capability.ok) {
+				return $capability;
+			}
+
 			// Collect all capabilities from properties into $requires
 			const capabilities = new Set<string>();
 			for (const property of context.document.properties) {
@@ -736,13 +743,14 @@ function parse_binding_from_object(object: Record<string, unknown>, context: Par
 				_t: "BindingStuct",
 				$id: $id.value,
 				$type: $type.value,
-				$name: $name.value,
+				$symbol: $symbol.value,
 				$description: $description.value,
 				$ranking: $ranking.value,
 				$sources: $sources.value,
 				properties: context.document.properties,
 				$override: $override.value,
 				$requires,
+				$capability: $capability.value,
 			});
 		}
 		case RulesetType.BT_ENUM: {
@@ -767,7 +775,7 @@ function parse_binding_from_object(object: Record<string, unknown>, context: Par
 				_t: "BindingEnum",
 				$id: $id.value,
 				$type: $type.value,
-				$name: $name.value,
+				$symbol: $symbol.value,
 				$description: $description.value,
 				$ranking: $ranking.value,
 				$sources: $sources.value,
@@ -776,14 +784,20 @@ function parse_binding_from_object(object: Record<string, unknown>, context: Par
 			});
 		}
 		case RulesetType.BT_PLATFORM_OPS: {
+			const $capability = optional(object, "$capability", context, string_);
+			if (!$capability.ok) {
+				return $capability;
+			}
+
 			return ok({
 				_t:	"BindingPlatformOps",
 				$id: $id.value,
 				$type: $type.value,
-				$name: $name.value,
+				$symbol: $symbol.value,
 				$description: $description.value,
 				$ranking: $ranking.value,
 				$sources: $sources.value,
+				$capability: $capability.value,
 			});
 		}
 	}
@@ -798,4 +812,13 @@ export function parse_binding(contents: string): Result<Ruleset> {
 	}
 
 	return parse_binding_from_object(parsed as Record<string, unknown>, { path: "", document: {} });
+}
+
+export function load_resolved_binding(content: string): Result<Ruleset> {
+	const parsed = parse_binding(content);
+	if (!parsed.ok) {
+		return parsed;
+	}
+
+	return resolve_ruleset(parsed.value);
 }
