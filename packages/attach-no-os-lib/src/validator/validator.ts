@@ -1,6 +1,5 @@
-import { Property } from "../bindings_parser/types";
 import { Workfile } from "../workfile_handler/types";
-import { ChildOverride, ConnectionGraph, ValidationError, ValidationResult } from "./types";
+import { ValidationError, ValidationResult } from "./types";
 import { ParseContext } from "../bindings_parser/validators";
 import { validate_property } from "./property_validator";
 import { validate_mutex } from "./override_resolver";
