@@ -1,0 +1,10 @@
+{
+  "platform": "max32690",
+  "symbols": {
+    "my_spi": {
+      "$compatible": "no-os/no_os_spi_init_param.yaml",
+      "device_id": 1,
+      "chip_select": 2
+    }
+  }
+}

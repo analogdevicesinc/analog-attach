@@ -1,21 +1,24 @@
 import path from "node:path";
 import { Result, ok, error } from "../bindings_parser/result";
 import { ArrayProperty, EnumProperty, IncludeProperty, PlatformExtraProperty, PlatformOpsProperty, Ruleset, RulesetPlatformOps, RulesetStruct, UnionProperty } from "../bindings_parser/types";
+import { scan_platforms } from "../context_handler/platform_scanner";
 import { PlatformManifest } from "../context_handler/types";
 import { load_resolved_binding } from "../resolver/resolver";
 import { get_schemas_path } from "../settings/settings";
 import { collect_child_overrides, create_connections_graph } from "../validator/connection_graph";
 import { apply_overrides } from "../validator/override_resolver";
-import { AvailableStructs, LoadPlatformResult, Workfile } from "./types";
+import { AvailableStructs, LoadPlatformResult, MinimalWorkfile, Workfile } from "./types";
 import fs from "node:fs";
 
 export class WorkfileHandler {
     private workfile: Workfile;
     private platform_structs: string[];
+    private platform_name: string | undefined;
 
     constructor() {
         this.workfile = { platform_ops: {}, symbols: {} };
         this.platform_structs = [];
+        this.platform_name = undefined;
     }
 
     // --- Platform Ops (locked, from manifest) ---
@@ -326,10 +329,96 @@ export class WorkfileHandler {
         }
 
         this.platform_structs = manifest.structs;
+        this.platform_name = manifest.name;
 
         return ok({
             available_structs: manifest.structs,
         });
+    }
+
+    // --- Transformations ---
+    export_minimal(): Result<MinimalWorkfile> {
+        if (!this.platform_name) {
+            return error("No platform loaded", "platform");
+        }
+
+        const symbols: MinimalWorkfile["symbols"] = {};
+
+        for (const [name, ruleset] of Object.entries(this.workfile.symbols)) {
+            if (ruleset._t !== "BindingStuct") {
+                continue;
+            }
+
+            const node: MinimalWorkfile["symbols"][string] = {
+                $compatible: ruleset.$id
+            };
+
+            for (const property of ruleset.properties) {
+                if (property.value !== undefined) {
+                    node[property.name] = property.value;
+                }
+            }
+
+            symbols[name] = node;
+        }
+
+        return ok({
+            platform: this.platform_name,
+            symbols
+        });
+    }
+
+    import_minimal(minimal: MinimalWorkfile): Result<void> {
+        const schemas_path = get_schemas_path();
+        if (!schemas_path) {
+            return error("Schemas path not set", "settings");
+        }
+
+        // Find platform by name using scan_platforms
+        const platforms_result = scan_platforms(path.join(schemas_path, "platforms"));
+        if (!platforms_result.ok) {
+            return platforms_result;
+        }
+
+        const manifest = platforms_result.value[minimal.platform];
+        if (!manifest) {
+            return error(`Platform '${minimal.platform}' not found`, "platform");
+        }
+
+        // Load the platform
+        const load_result = this.load_platform(manifest);
+        if (!load_result.ok) {
+            return load_result;
+        }
+
+        // Clear existing symbols
+        this.workfile.symbols = {};
+
+        // Load each symbol
+        for (const [name, node] of Object.entries(minimal.symbols)) {
+            const binding_result = load_resolved_binding(node.$compatible);
+            if (!binding_result.ok) {
+                return binding_result;
+            }
+
+            const add_result = this.add_symbol(name, binding_result.value);
+            if (!add_result.ok) {
+                return add_result;
+            }
+
+            // Set property values (skip $compatible)
+            for (const [property_name, value] of Object.entries(node)) {
+                if (property_name === "$compatible") {
+                    continue;
+                }
+                const set_result = this.set_value(name, property_name, value);
+                if (!set_result.ok) {
+                    return set_result;
+                }
+            }
+        }
+
+        return ok();
     }
 
     // --- Persistence ---

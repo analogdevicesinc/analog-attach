@@ -6,6 +6,7 @@ import { scan_platform } from '../../src/context_handler/platform_scanner';
 import { expectOk, expectError, expectErrorContains } from '../test_utils';
 import { set_schemas_path, reset_settings } from '../../src/settings/settings';
 import { load_resolved_binding } from '../../src/resolver/resolver';
+import minimal_workfile_spi from './fixtures/minimal_workfile_spi.json';
 
 function make_struct(id: string, name: string, properties: RulesetStruct['properties'] = []): RulesetStruct {
     return {
@@ -356,7 +357,7 @@ describe('WorkfileHandler', () => {
         });
 
         test('returns error if binding is not platform_ops', () => {
-            const manifest = { ops: ['platforms/maxim/max32690/max_spi_init_param.yaml'], structs: [] };
+            const manifest = { name: 'max32690', ops: ['platforms/maxim/max32690/max_spi_init_param.yaml'], structs: [] };
 
             const result = handler.load_platform(manifest);
             expectError(result);
@@ -573,6 +574,105 @@ describe('WorkfileHandler', () => {
             reset_settings();
             const result = handler.list_available_structs();
             expectError(result);
+        });
+    });
+
+    describe('export_minimal', () => {
+        const PLATFORM_PATH = path.join(__dirname, '../bindings/schemas/platforms/maxim/max32690');
+
+        test('exports platform name and symbol values', () => {
+            const scan_result = scan_platform(PLATFORM_PATH);
+            expectOk(scan_result);
+            handler.load_platform(scan_result.value);
+
+            // Load real SPI binding and set values
+            const spi_result = load_resolved_binding("no-os/no_os_spi_init_param.yaml");
+            expectOk(spi_result);
+            handler.add_symbol("my_spi", spi_result.value);
+            handler.set_value("my_spi", "device_id", 1);
+            handler.set_value("my_spi", "chip_select", 2);
+
+            const result = handler.export_minimal();
+            expectOk(result);
+
+            expect(result.value.platform).toBe(minimal_workfile_spi.platform);
+            expect(result.value.symbols["my_spi"].$compatible).toBe(minimal_workfile_spi.symbols.my_spi.$compatible);
+            expect(result.value.symbols["my_spi"]["device_id"]).toBe(minimal_workfile_spi.symbols.my_spi.device_id);
+            expect(result.value.symbols["my_spi"]["chip_select"]).toBe(minimal_workfile_spi.symbols.my_spi.chip_select);
+        });
+
+        test('returns error when no platform loaded', () => {
+            const result = handler.export_minimal();
+            expectError(result);
+            expectErrorContains(result, "No platform loaded");
+        });
+    });
+
+    describe('import_minimal', () => {
+        test('imports minimal workfile and restores full state', () => {
+            const minimal = {
+                platform: "max32690",
+                symbols: {
+                    "my_spi": {
+                        $compatible: "no-os/no_os_spi_init_param.yaml",
+                        device_id: 1,
+                        chip_select: 2,
+                    }
+                }
+            };
+
+            const result = handler.import_minimal(minimal);
+            expectOk(result);
+
+            // Check platform was loaded
+            expect(handler.list_platform_ops()).toContain("max_spi_ops");
+
+            // Check symbol was added with values
+            expect(handler.list_symbols()).toContain("my_spi");
+            const device_id = handler.get_value("my_spi", "device_id");
+            expectOk(device_id);
+            expect(device_id.value).toBe(1);
+        });
+
+        test('returns error for unknown platform', () => {
+            const minimal = {
+                platform: "unknown_platform",
+                symbols: {}
+            };
+
+            const result = handler.import_minimal(minimal);
+            expectError(result);
+            expectErrorContains(result, "not found");
+        });
+
+        test('round-trip: export then import produces same state', () => {
+            // Setup initial state using real bindings
+            const scan_result = scan_platform(path.join(__dirname, '../bindings/schemas/platforms/maxim/max32690'));
+            expectOk(scan_result);
+            handler.load_platform(scan_result.value);
+
+            const spi_result = load_resolved_binding("no-os/no_os_spi_init_param.yaml");
+            expectOk(spi_result);
+            handler.add_symbol("test_spi", spi_result.value);
+            handler.set_value("test_spi", "device_id", 42);
+            handler.set_value("test_spi", "chip_select", 3);
+
+            // Export
+            const exported = handler.export_minimal();
+            expectOk(exported);
+
+            // Create new handler and import
+            const handler2 = new WorkfileHandler();
+            const import_result = handler2.import_minimal(exported.value);
+            expectOk(import_result);
+
+            // Verify state matches
+            expect(handler2.list_platform_ops()).toContain("max_spi_ops");
+            expect(handler2.list_symbols()).toContain("test_spi");
+
+            const device_id = handler2.get_value("test_spi", "device_id");
+            expectOk(device_id);
+            expect(device_id.value).toBe(42);
         });
     });
 });
