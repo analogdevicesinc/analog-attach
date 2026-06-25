@@ -1,14 +1,21 @@
+import path from "node:path";
 import { Result, ok, error } from "../bindings_parser/result";
-import { ArrayProperty, IncludeProperty, Ruleset, RulesetPlatformOps, UnionProperty } from "../bindings_parser/types";
+import { ArrayProperty, EnumProperty, IncludeProperty, PlatformExtraProperty, PlatformOpsProperty, Ruleset, RulesetPlatformOps, RulesetStruct, UnionProperty } from "../bindings_parser/types";
 import { PlatformManifest } from "../context_handler/types";
 import { load_resolved_binding } from "../resolver/resolver";
-import { LoadPlatformResult, Workfile } from "./types";
+import { get_schemas_path } from "../settings/settings";
+import { collect_child_overrides, create_connections_graph } from "../validator/connection_graph";
+import { apply_overrides } from "../validator/override_resolver";
+import { AvailableStructs, LoadPlatformResult, Workfile } from "./types";
+import fs from "node:fs";
 
 export class WorkfileHandler {
     private workfile: Workfile;
+    private platform_structs: string[];
 
     constructor() {
         this.workfile = { platform_ops: {}, symbols: {} };
+        this.platform_structs = [];
     }
 
     // --- Platform Ops (locked, from manifest) ---
@@ -110,7 +117,7 @@ export class WorkfileHandler {
 
     // --- Suggestions ---
 
-    suggest_for_include(include: IncludeProperty): string[] {
+    suggest_for_include(include: IncludeProperty): Result<string[]> {
         const suggestions: string[] = [];
         // Check both platform_ops and symbols
         for (const [name, ruleset] of Object.entries(this.workfile.platform_ops)) {
@@ -123,22 +130,175 @@ export class WorkfileHandler {
                 suggestions.push(name);
             }
         }
-        return suggestions;
+        return ok(suggestions);
     }
 
-    suggest_for_union(union: UnionProperty, member_name: string): Result<string[]> {
+    suggest_for_union(union: UnionProperty, member_name?: string): Result<string[]> {
+        // Suggest a member if no member is provided
+        if (member_name === undefined) {
+            return ok(union.members.map(p => p.name));
+        }
+
         const member = union.members.find(m => m.name === member_name);
         if (!member) {
             return error(`Unknown union member '${member_name}'`, member_name);
         }
-        return ok(this.suggest_for_include(member));
+        return this.suggest_for_include(member);
     }
 
     suggest_for_array(array: ArrayProperty): Result<string[]> {
         if (array.element._t !== "IncludeProperty") {
             return error(`Array element is not an include`, "element");
         }
-        return ok(this.suggest_for_include(array.element));
+        return this.suggest_for_include(array.element);
+    }
+
+    suggest_for_enum(property: EnumProperty): Result<string[]> {
+        return ok(property.values.map(p => typeof p === "number" ? p.toString() : p));
+    }
+
+    suggest_platform_ops(property: PlatformOpsProperty, parent_struct: RulesetStruct): Result<string[]> {
+        const suggestions: string[] = [];
+        
+        for (const [name, ops] of Object.entries(this.workfile.platform_ops)) {
+            if (ops._t !== "BindingPlatformOps") {
+                continue;
+            }
+
+            if (property.allowed && property.allowed.includes(ops.$id)) {
+                suggestions.push(name);
+            } else if (ops.$capability === parent_struct.$capability) {
+                suggestions.push(name);
+            }
+        }
+
+        return ok(suggestions);
+    }
+
+    suggest_platform_extra(property: PlatformExtraProperty, parent_struct: RulesetStruct): Result<string[]> {
+        const suggestions: string[] = [];
+
+        for (const [name, symbol] of Object.entries(this.workfile.symbols)) {
+            if (symbol._t !== "BindingStuct") {
+                continue;
+            }
+
+            if (property.allowed && property.allowed.includes(symbol.$id)) {
+                suggestions.push(name);
+            } else if (symbol.$capability === parent_struct.$capability) {
+                suggestions.push(name);
+            }
+        }
+
+        return ok(suggestions);
+    }
+
+    suggest_for_property(symbol_name: string, property_name: string, union_member?: string): Result<string[]> {
+        const symbol = this.workfile.symbols[symbol_name];
+        if (!symbol) {
+            return error(`Could not find symbol with name: "${symbol_name}" in [${Object.keys(this.workfile.symbols)}]`, "");
+        }
+
+        if (symbol._t !== "BindingStuct") {
+            return error(`Expected type BindingStruct, got "${symbol._t}"`, "");
+        }
+
+        const property = symbol.properties.find(p => p.name === property_name);
+        if (!property) {
+            return error(`Could not find property "${property_name}" in [${symbol.properties.join(", ")}]`, symbol_name);
+        }
+
+        switch (property._t) {
+            case "NumberProperty": {
+                return ok([]);
+            }
+            case "BooleanProperty": {
+                // I don't think we might enforce this somehow?
+                return ok(["true", "false"]);
+            }
+            case "StringProperty": {
+                return ok([]);
+            }
+            case "IncludeProperty": {
+                return this.suggest_for_include(property);
+            }
+            case "EnumProperty": {
+                return this.suggest_for_enum(property);
+            }
+            case "UnionProperty": {
+                return this.suggest_for_union(property, union_member);
+            }
+            case "ArrayProperty": {
+                return this.suggest_for_array(property);
+            }
+            case "PlatformOpsProperty": {
+                const graph = create_connections_graph(this.workfile);
+                const child_overrides = collect_child_overrides(symbol_name, this.workfile, graph);
+                const effective = apply_overrides(property, child_overrides, symbol);
+                return this.suggest_platform_ops(effective as PlatformOpsProperty, symbol);
+            }
+            case "PlatformExtraProperty": {
+                const graph = create_connections_graph(this.workfile);
+                const child_overrides = collect_child_overrides(symbol_name, this.workfile, graph);
+                const effective = apply_overrides(property, child_overrides, symbol);
+                return this.suggest_platform_extra(effective as PlatformExtraProperty, symbol);
+            }
+            case "CallbackFunctionProperty": {
+                return ok([]);
+            }
+            case "CallbackContextProperty": {
+                return ok([]);
+            }
+            default: {
+                return error("unknown type", "");
+            }
+        }
+    }
+
+    list_available_structs(): Result<AvailableStructs> {
+        const schema_path = get_schemas_path();
+        if (!schema_path) {
+            return error("Schema path not set", "settings");
+        }
+
+        const devices = this.scan_yaml_files(path.join(schema_path, "devices"));
+        if (!devices.ok) {
+            return error(`Path ${path.join(schema_path, "devices")} not found`, "");
+        }
+
+        const noos = this.scan_yaml_files(path.join(schema_path, "no-os"));
+        if (!noos.ok) {
+            return error(`Path ${path.join(schema_path, "noos")} not found`, "");
+        }
+
+        return ok({
+            devices: devices.value,
+            noos: noos.value,
+            platform: this.platform_structs
+        });
+    }
+
+    private scan_yaml_files(directory: string): Result<string[]> {
+        const schema_path = get_schemas_path();
+        if (!schema_path || !fs.readdirSync(directory)) {
+            return error("Schema path not set", "settings");
+        }
+
+        const results: string[] = [];
+        const scan = (current: string) => {
+            const entries = fs.readdirSync(current, { withFileTypes: true });
+            for (const entry of entries) {
+                const full_path = path.join(current, entry.name);
+                if (entry.isDirectory()) {
+                    scan(full_path);
+                } else if (entry.name.endsWith(".yaml")) {
+                    results.push(path.relative(schema_path, full_path));
+                }
+            }
+        };
+
+        scan(directory);
+        return ok(results);
     }
 
     // --- Platform Loading ---
@@ -164,6 +324,8 @@ export class WorkfileHandler {
                 return add_result;
             }
         }
+
+        this.platform_structs = manifest.structs;
 
         return ok({
             available_structs: manifest.structs,
