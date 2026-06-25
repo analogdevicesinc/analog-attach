@@ -1,4 +1,3 @@
-import { KeyPairSyncResult } from "node:crypto";
 import { ArrayProperty, BooleanProperty, EnumProperty, IncludeProperty, NumberProperty, PlatformExtraProperty, PlatformOpsProperty, Property, RulesetStruct, StringProperty, UnionProperty } from "../bindings_parser/types";
 import { at, ParseContext } from "../bindings_parser/validators";
 import { Workfile } from "../workfile_handler/types";
@@ -95,6 +94,26 @@ function validate_platform_ops(
 		}];
 	}
 
+	if (property.allowed) {
+		if (!property.allowed.includes(ops.$id)) {
+			return [{
+				path: context.path,
+				message: `Platform ops '${symbol_name}' ($id: ${ops.$id}) is not in the allowed list: ${property.allowed.join(", ")}`,
+				severity: "error"
+			}];
+		}
+
+		if (parent_struct.$capability && ops.$capability !== parent_struct.$capability) {
+			return [{
+				path: context.path,
+				message: `Capability mismatch: ops is '${ops.$capability}', expected ${parent_struct.$capability} (allowed by override)`,
+				severity: "warning"
+			}];
+		}
+
+		return [];
+	}
+
 	if (parent_struct.$capability && ops.$capability !== parent_struct.$capability) {
 		return [{
 			path: context.path,
@@ -129,6 +148,26 @@ function validate_platform_extra(
 			message: `Expected type strucy, got ${extra._t}`,
 			severity: "error"
 		}];
+	}
+
+	if (property.allowed) {
+		if (!property.allowed.includes(extra.$id)) {
+			return [{
+				path: context.path,
+				message: `Platform extra '${symbol_name}' ($id: ${extra.$id}) is not in the allowed list: ${property.allowed.join(", ")}`,
+				severity: "error"
+			}];
+		}
+
+		if (parent_struct.$capability && extra.$capability !== parent_struct.$capability) {
+			return [{
+				path: context.path,
+				message: `Capability mismatch: extra is '${extra.$capability}', expected ${parent_struct.$capability} (allowed by override)`,
+				severity: "warning"
+			}];
+		}
+
+		return [];
 	}
 	
 	if (parent_struct.$capability && extra.$capability !== parent_struct.$capability) {

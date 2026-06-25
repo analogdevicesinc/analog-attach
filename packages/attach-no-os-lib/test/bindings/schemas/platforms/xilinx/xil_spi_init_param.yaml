@@ -26,8 +26,8 @@ $override:
     $then:
       $parent:
         platform_ops:
-          platforms:
-            - include: "platforms/xilinx/platform_ops/spi_ops.yaml"
+          allowed:
+            - "platforms/xilinx/platform_ops/spi_ops.yaml"
 
   # SPI_PL can use xil_spi_ops or xil_spi_pl_ops (direct register access)
   - $if:
@@ -37,9 +37,9 @@ $override:
     $then:
       $parent:
         platform_ops:
-          platforms:
-            - include: "platforms/xilinx/platform_ops/spi_ops.yaml"
-            - include: "platforms/xilinx/platform_ops/spi_pl_ops.yaml"
+          allowed:
+            - "platforms/xilinx/platform_ops/spi_ops.yaml"
+            - "platforms/xilinx/platform_ops/spi_pl_ops.yaml"
 
   # SPI_ENGINE must use spi_eng_platform_ops
   - $if:
@@ -48,5 +48,5 @@ $override:
     $then:
       $parent:
         platform_ops:
-          platforms:
-            - include: "platforms/xilinx/platform_ops/spi_engine_ops.yaml"
+          allowed:
+            - "platforms/xilinx/platform_ops/spi_engine_ops.yaml"

@@ -1,12 +1,10 @@
-import { describe, test, expect, beforeEach } from 'vitest';
-import * as fs from 'node:fs';
-import * as path from 'node:path';
+import { describe, test, expect, beforeEach, afterEach } from 'vitest';
+import path from 'node:path';
 import { WorkfileHandler } from '../../src/workfile_handler/workfile_handler';
 import { RulesetStruct, RulesetType, IncludeProperty, UnionProperty, ArrayProperty, RulesetPlatformOps } from '../../src/bindings_parser/types';
-import { parse_binding } from '../../src/bindings_parser/binding_parser';
 import { scan_platform } from '../../src/context_handler/platform_scanner';
 import { expectOk, expectError, expectErrorContains } from '../test_utils';
-import { BindingLoader } from '../../src/workfile_handler/types';
+import { set_schemas_path, reset_settings } from '../../src/settings/settings';
 
 function make_struct(id: string, name: string, properties: RulesetStruct['properties'] = []): RulesetStruct {
     return {
@@ -65,11 +63,18 @@ function make_array(name: string, size: number, element: ArrayProperty['element'
     };
 }
 
+const SCHEMAS_ROOT = path.join(__dirname, '../bindings/schemas');
+
 describe('WorkfileHandler', () => {
     let handler: WorkfileHandler;
 
     beforeEach(() => {
+        set_schemas_path(SCHEMAS_ROOT);
         handler = new WorkfileHandler();
+    });
+
+    afterEach(() => {
+        reset_settings();
     });
 
     describe('Symbol CRUD', () => {
@@ -307,24 +312,15 @@ describe('WorkfileHandler', () => {
     describe('load_platform', () => {
         const PLATFORM_PATH = path.join(__dirname, '../bindings/schemas/platforms/maxim/max32690');
 
-        function create_loader(platform_path: string): BindingLoader {
-            return (binding_path: string) => {
-                const full_path = path.join(platform_path, binding_path);
-                const contents = fs.readFileSync(full_path, 'utf8');
-                return parse_binding(contents);
-            };
-        }
-
         test('loads max32690 platform ops from real files', () => {
             const scan_result = scan_platform(PLATFORM_PATH);
             expectOk(scan_result);
 
-            const loader = create_loader(PLATFORM_PATH);
-            const result = handler.load_platform(scan_result.value, loader);
+            const result = handler.load_platform(scan_result.value);
 
             expectOk(result);
             expect(result.value.available_structs).toHaveLength(5);
-            expect(result.value.available_structs).toContain('max_spi_init_param.yaml');
+            expect(result.value.available_structs).toContain('platforms/maxim/max32690/max_spi_init_param.yaml');
 
             const ops_list = handler.list_platform_ops();
             expect(ops_list).toHaveLength(7);
@@ -339,8 +335,7 @@ describe('WorkfileHandler', () => {
             const scan_result = scan_platform(PLATFORM_PATH);
             expectOk(scan_result);
 
-            const loader = create_loader(PLATFORM_PATH);
-            handler.load_platform(scan_result.value, loader);
+            handler.load_platform(scan_result.value);
 
             expect(handler.list_platform_ops()).not.toContain('old_ops');
             expect(handler.list_platform_ops()).toContain('max_spi_ops');
@@ -350,8 +345,7 @@ describe('WorkfileHandler', () => {
             const scan_result = scan_platform(PLATFORM_PATH);
             expectOk(scan_result);
 
-            const loader = create_loader(PLATFORM_PATH);
-            handler.load_platform(scan_result.value, loader);
+            handler.load_platform(scan_result.value);
 
             const spi_ops = handler.find_any('max_spi_ops');
             expect(spi_ops).toBeDefined();
@@ -359,10 +353,9 @@ describe('WorkfileHandler', () => {
         });
 
         test('returns error if binding is not platform_ops', () => {
-            const manifest = { ops: ['max_spi_init_param.yaml'], structs: [] };
-            const loader = create_loader(PLATFORM_PATH);
+            const manifest = { ops: ['platforms/maxim/max32690/max_spi_init_param.yaml'], structs: [] };
 
-            const result = handler.load_platform(manifest, loader);
+            const result = handler.load_platform(manifest);
             expectError(result);
             expectErrorContains(result, 'Expected platform_ops');
         });

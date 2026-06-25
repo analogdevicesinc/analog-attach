@@ -1,7 +1,8 @@
 import { Result, ok, error } from "../bindings_parser/result";
 import { ArrayProperty, IncludeProperty, Ruleset, RulesetPlatformOps, UnionProperty } from "../bindings_parser/types";
 import { PlatformManifest } from "../context_handler/types";
-import { BindingLoader, LoadPlatformResult, Workfile } from "./types";
+import { load_resolved_binding } from "../resolver/resolver";
+import { LoadPlatformResult, Workfile } from "./types";
 
 export class WorkfileHandler {
     private workfile: Workfile;
@@ -142,16 +143,13 @@ export class WorkfileHandler {
 
     // --- Platform Loading ---
 
-    load_platform(
-        manifest: PlatformManifest,
-        load_binding: BindingLoader
-    ): Result<LoadPlatformResult> {
+    load_platform(manifest: PlatformManifest): Result<LoadPlatformResult> {
         // Clear existing platform ops
         this.clear_platform_ops();
 
         // Load each ops binding
         for (const ops_path of manifest.ops) {
-            const ruleset_result = load_binding(ops_path);
+            const ruleset_result = load_resolved_binding(ops_path);
             if (!ruleset_result.ok) {
                 return ruleset_result;
             }
