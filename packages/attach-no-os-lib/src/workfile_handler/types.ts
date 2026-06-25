@@ -14,3 +14,13 @@ export type AvailableStructs = {
     noos: string[];
     platform: string[];
 };
+
+export type MinimalWorkfileNode = {
+    $compatible: string;
+    [property: string]: unknown;
+};
+
+export type MinimalWorkfile = {
+    platform: string; // e.g. max32690
+    symbols: Record<string, MinimalWorkfileNode>;
+}

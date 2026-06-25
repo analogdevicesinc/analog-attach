@@ -85,7 +85,14 @@ describe('Real System Integration', () => {
             // The suggest function would show matching ops by capability
             const spi_ops = handler.find_any("max_spi_ops");
             expect(spi_ops).toBeDefined();
+            // NOTE: This is just because the toBeDefined doesn't actually narrow the object
+            if (!spi_ops) {
+                return;
+            }
             expect(spi_ops?._t).toBe("BindingPlatformOps");
+            if (spi_ops._t !== "BindingPlatformOps") {
+                return;
+            }
             expect(spi_ops?.$capability).toBe("spi");
 
             handler.set_value("adxl355_spi", "platform_ops", "max_spi_ops");
@@ -243,7 +250,7 @@ describe('Real System Integration', () => {
 
             let validation = validate_workfile(handler.export_workfile());
             expect(validation.valid).toBe(false);
-            expect(validation.errors.some(e => e.message.includes("not in the allowed list"))).toBe(true);
+            expect(validation.errors.some(error => error.message.includes("not in the allowed list"))).toBe(true);
 
             // Use spi_eng_platform_ops (should pass)
             handler.set_value("my_spi", "platform_ops", "spi_eng_platform_ops");
@@ -290,7 +297,7 @@ describe('Real System Integration', () => {
             handler.set_value("my_spi", "platform_ops", "spi_eng_platform_ops");
             validation = validate_workfile(handler.export_workfile());
             expect(validation.valid).toBe(false);
-            expect(validation.errors.some(e => e.message.includes("not in the allowed list"))).toBe(true);
+            expect(validation.errors.some(error => error.message.includes("not in the allowed list"))).toBe(true);
         });
     });
 });
