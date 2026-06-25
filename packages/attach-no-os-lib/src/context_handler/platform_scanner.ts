@@ -55,7 +55,11 @@ function parse_manifest(manifest: unknown, platform_path: string): Result<Platfo
 	const prefixed_ops = ops_list.map(p => path.join(relative_prefix, p));
 	const prefixed_structs = structs_list.map(p => path.join(relative_prefix, p));
 
+	// Get platform name from directory
+	const platform_name = path.basename(platform_path);
+
 	return ok({
+		name: platform_name,
 		ops: prefixed_ops,
 		structs: prefixed_structs,
 	});

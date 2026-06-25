@@ -356,7 +356,7 @@ describe('WorkfileHandler', () => {
         });
 
         test('returns error if binding is not platform_ops', () => {
-            const manifest = { ops: ['platforms/maxim/max32690/max_spi_init_param.yaml'], structs: [] };
+            const manifest = { name: 'max32690', ops: ['platforms/maxim/max32690/max_spi_init_param.yaml'], structs: [] };
 
             const result = handler.load_platform(manifest);
             expectError(result);
@@ -573,6 +573,108 @@ describe('WorkfileHandler', () => {
             reset_settings();
             const result = handler.list_available_structs();
             expectError(result);
+        });
+    });
+
+    describe('export_minimal', () => {
+        const PLATFORM_PATH = path.join(__dirname, '../bindings/schemas/platforms/maxim/max32690');
+
+        test('exports platform name and symbol values', () => {
+            const scan_result = scan_platform(PLATFORM_PATH);
+            expectOk(scan_result);
+            handler.load_platform(scan_result.value);
+
+            // Add a struct and set some values
+            const struct = make_struct("no-os/no_os_spi_init_param.yaml", "spi", [
+                { _t: "NumberProperty", name: "device_id", description: "", type: "uint32_t", value: 1 },
+                { _t: "NumberProperty", name: "chip_select", description: "", type: "uint32_t", value: 2 },
+                { _t: "NumberProperty", name: "max_speed_hz", description: "", type: "uint32_t" }, // no value
+            ]);
+            handler.add_symbol("my_spi", struct);
+
+            const result = handler.export_minimal();
+            expectOk(result);
+
+            expect(result.value.platform).toBe("max32690");
+            expect(result.value.symbols["my_spi"]).toBeDefined();
+            expect(result.value.symbols["my_spi"].$compatible).toBe("no-os/no_os_spi_init_param.yaml");
+            expect(result.value.symbols["my_spi"]["device_id"]).toBe(1);
+            expect(result.value.symbols["my_spi"]["chip_select"]).toBe(2);
+            expect(result.value.symbols["my_spi"]["max_speed_hz"]).toBeUndefined(); // no value set
+        });
+
+        test('returns error when no platform loaded', () => {
+            const result = handler.export_minimal();
+            expectError(result);
+            expectErrorContains(result, "No platform loaded");
+        });
+    });
+
+    describe('import_minimal', () => {
+        test('imports minimal workfile and restores full state', () => {
+            const minimal = {
+                platform: "max32690",
+                symbols: {
+                    "my_spi": {
+                        $compatible: "no-os/no_os_spi_init_param.yaml",
+                        device_id: 1,
+                        chip_select: 2,
+                    }
+                }
+            };
+
+            const result = handler.import_minimal(minimal);
+            expectOk(result);
+
+            // Check platform was loaded
+            expect(handler.list_platform_ops()).toContain("max_spi_ops");
+
+            // Check symbol was added with values
+            expect(handler.list_symbols()).toContain("my_spi");
+            const device_id = handler.get_value("my_spi", "device_id");
+            expectOk(device_id);
+            expect(device_id.value).toBe(1);
+        });
+
+        test('returns error for unknown platform', () => {
+            const minimal = {
+                platform: "unknown_platform",
+                symbols: {}
+            };
+
+            const result = handler.import_minimal(minimal);
+            expectError(result);
+            expectErrorContains(result, "not found");
+        });
+
+        test('round-trip: export then import produces same state', () => {
+            // Setup initial state
+            const scan_result = scan_platform(path.join(__dirname, '../bindings/schemas/platforms/maxim/max32690'));
+            expectOk(scan_result);
+            handler.load_platform(scan_result.value);
+
+            const struct = make_struct("no-os/no_os_spi_init_param.yaml", "spi", [
+                { _t: "NumberProperty", name: "device_id", description: "", type: "uint32_t", value: 42 },
+                { _t: "StringProperty", name: "mode", description: "", type: "string", value: "MODE_0" },
+            ]);
+            handler.add_symbol("test_spi", struct);
+
+            // Export
+            const exported = handler.export_minimal();
+            expectOk(exported);
+
+            // Create new handler and import
+            const handler2 = new WorkfileHandler();
+            const import_result = handler2.import_minimal(exported.value);
+            expectOk(import_result);
+
+            // Verify state matches
+            expect(handler2.list_platform_ops()).toContain("max_spi_ops");
+            expect(handler2.list_symbols()).toContain("test_spi");
+
+            const device_id = handler2.get_value("test_spi", "device_id");
+            expectOk(device_id);
+            expect(device_id.value).toBe(42);
         });
     });
 });
