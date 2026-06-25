@@ -960,13 +960,32 @@ describe('validate_workfile', () => {
                 {
                     my_spi: make_struct_with_capability("no-os/spi.yaml", "spi_init", "spi", [
                         make_platform_extra_property("extra", { required: true })
-                    ])
+                    ]),
+                    // A valid extra exists, so the required check should fail
+                    available_extra: make_struct_with_capability("platform/spi_extra.yaml", "spi_extra", "spi", [])
                 },
                 {}
             );
             const result = validate_workfile(workfile);
             expect(result.valid).toBe(false);
             expect(result.errors[0].message).toContain("Required");
+        });
+
+        test('required platform_extra without value passes if no valid extras exist', () => {
+            // Edge case: platform doesn't have an extra struct for this capability
+            // In this case, required extra should be skipped
+            const workfile = make_workfile(
+                {
+                    my_spi: make_struct_with_capability("no-os/spi.yaml", "spi_init", "spi", [
+                        make_platform_extra_property("extra", { required: true })
+                    ]),
+                    // Add an extra with different capability - should not match
+                    unrelated_extra: make_struct_with_capability("platform/i2c_extra.yaml", "i2c_extra", "i2c", [])
+                },
+                {}
+            );
+            const result = validate_workfile(workfile);
+            expect(result.valid).toBe(true);
         });
     });
 
