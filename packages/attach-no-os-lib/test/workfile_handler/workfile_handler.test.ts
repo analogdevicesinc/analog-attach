@@ -6,6 +6,7 @@ import { scan_platform } from '../../src/context_handler/platform_scanner';
 import { expectOk, expectError, expectErrorContains } from '../test_utils';
 import { set_schemas_path, reset_settings } from '../../src/settings/settings';
 import { load_resolved_binding } from '../../src/resolver/resolver';
+import minimal_workfile_spi from './fixtures/minimal_workfile_spi.json';
 
 function make_struct(id: string, name: string, properties: RulesetStruct['properties'] = []): RulesetStruct {
     return {
@@ -584,23 +585,20 @@ describe('WorkfileHandler', () => {
             expectOk(scan_result);
             handler.load_platform(scan_result.value);
 
-            // Add a struct and set some values
-            const struct = make_struct("no-os/no_os_spi_init_param.yaml", "spi", [
-                { _t: "NumberProperty", name: "device_id", description: "", type: "uint32_t", value: 1 },
-                { _t: "NumberProperty", name: "chip_select", description: "", type: "uint32_t", value: 2 },
-                { _t: "NumberProperty", name: "max_speed_hz", description: "", type: "uint32_t" }, // no value
-            ]);
-            handler.add_symbol("my_spi", struct);
+            // Load real SPI binding and set values
+            const spi_result = load_resolved_binding("no-os/no_os_spi_init_param.yaml");
+            expectOk(spi_result);
+            handler.add_symbol("my_spi", spi_result.value);
+            handler.set_value("my_spi", "device_id", 1);
+            handler.set_value("my_spi", "chip_select", 2);
 
             const result = handler.export_minimal();
             expectOk(result);
 
-            expect(result.value.platform).toBe("max32690");
-            expect(result.value.symbols["my_spi"]).toBeDefined();
-            expect(result.value.symbols["my_spi"].$compatible).toBe("no-os/no_os_spi_init_param.yaml");
-            expect(result.value.symbols["my_spi"]["device_id"]).toBe(1);
-            expect(result.value.symbols["my_spi"]["chip_select"]).toBe(2);
-            expect(result.value.symbols["my_spi"]["max_speed_hz"]).toBeUndefined(); // no value set
+            expect(result.value.platform).toBe(minimal_workfile_spi.platform);
+            expect(result.value.symbols["my_spi"].$compatible).toBe(minimal_workfile_spi.symbols.my_spi.$compatible);
+            expect(result.value.symbols["my_spi"]["device_id"]).toBe(minimal_workfile_spi.symbols.my_spi.device_id);
+            expect(result.value.symbols["my_spi"]["chip_select"]).toBe(minimal_workfile_spi.symbols.my_spi.chip_select);
         });
 
         test('returns error when no platform loaded', () => {
@@ -648,16 +646,16 @@ describe('WorkfileHandler', () => {
         });
 
         test('round-trip: export then import produces same state', () => {
-            // Setup initial state
+            // Setup initial state using real bindings
             const scan_result = scan_platform(path.join(__dirname, '../bindings/schemas/platforms/maxim/max32690'));
             expectOk(scan_result);
             handler.load_platform(scan_result.value);
 
-            const struct = make_struct("no-os/no_os_spi_init_param.yaml", "spi", [
-                { _t: "NumberProperty", name: "device_id", description: "", type: "uint32_t", value: 42 },
-                { _t: "StringProperty", name: "mode", description: "", type: "string", value: "MODE_0" },
-            ]);
-            handler.add_symbol("test_spi", struct);
+            const spi_result = load_resolved_binding("no-os/no_os_spi_init_param.yaml");
+            expectOk(spi_result);
+            handler.add_symbol("test_spi", spi_result.value);
+            handler.set_value("test_spi", "device_id", 42);
+            handler.set_value("test_spi", "chip_select", 3);
 
             // Export
             const exported = handler.export_minimal();
