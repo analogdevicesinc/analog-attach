@@ -68,11 +68,13 @@ export type PlatformOpsProperty = PropertyBase & {
     _t: "PlatformOpsProperty",
     type: "platform_ops",
     target: string,
+    allowed?: string[], // NOTE: Set by override only
 }
 
 export type PlatformExtraProperty = PropertyBase & {
     _t: "PlatformExtraProperty",
     type: "platform_extra",
+    allowed?: string[], // NOTE: Set by override only
 }
 
 export type CallbackFunctionProperty = PropertyBase & {
@@ -177,7 +179,7 @@ export type RulesetSources = RulesetHeaderSources & {
 };
 
 export type RulesetEnumValue = {
-	name: string,
+	name: string | number,
 	description?: string,
 };
 

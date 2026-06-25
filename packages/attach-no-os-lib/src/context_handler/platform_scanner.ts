@@ -3,6 +3,7 @@ import path from "node:path";
 import YAML from "yaml";
 import { Result, ok, error } from "../bindings_parser/result";
 import { asObject, at, optional, ParseContext, stringArray } from "../bindings_parser/validators";
+import { get_schemas_path } from "../settings/settings";
 import { PlatformManifest, PlatformSpecs } from "./types";
 
 const MANIFEST_FILENAME = "platform.yaml";
@@ -45,9 +46,18 @@ function parse_manifest(manifest: unknown, platform_path: string): Result<Platfo
 		}
 	}
 
+	// Convert paths to be relative to schemas root
+	const schemas_path = get_schemas_path();
+	const relative_prefix = schemas_path
+		? path.relative(schemas_path, platform_path)
+		: "";
+
+	const prefixed_ops = ops_list.map(p => path.join(relative_prefix, p));
+	const prefixed_structs = structs_list.map(p => path.join(relative_prefix, p));
+
 	return ok({
-		ops: ops_list,
-		structs: structs_list,
+		ops: prefixed_ops,
+		structs: prefixed_structs,
 	});
 }
 

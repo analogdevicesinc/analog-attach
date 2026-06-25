@@ -969,4 +969,103 @@ describe('validate_workfile', () => {
             expect(result.errors[0].message).toContain("Required");
         });
     });
+
+    describe('platform_ops allowed restriction', () => {
+        test('ops in allowed list passes', () => {
+            const workfile = make_workfile(
+                {
+                    my_spi: make_struct_with_capability("no-os/spi.yaml", "spi_init", "spi", [
+                        make_platform_ops_property("platform_ops", {
+                            value: "spi_ops_a",
+                            allowed: ["platform/spi_ops_a.yaml", "platform/spi_ops_b.yaml"]
+                        })
+                    ])
+                },
+                {
+                    spi_ops_a: make_platform_ops("platform/spi_ops_a.yaml", "spi_ops_a", "spi"),
+                    spi_ops_b: make_platform_ops("platform/spi_ops_b.yaml", "spi_ops_b", "spi")
+                }
+            );
+            const result = validate_workfile(workfile);
+            expect(result.valid).toBe(true);
+        });
+
+        test('ops not in allowed list fails', () => {
+            const workfile = make_workfile(
+                {
+                    my_spi: make_struct_with_capability("no-os/spi.yaml", "spi_init", "spi", [
+                        make_platform_ops_property("platform_ops", {
+                            value: "spi_ops_c",
+                            allowed: ["platform/spi_ops_a.yaml", "platform/spi_ops_b.yaml"]
+                        })
+                    ])
+                },
+                {
+                    spi_ops_a: make_platform_ops("platform/spi_ops_a.yaml", "spi_ops_a", "spi"),
+                    spi_ops_b: make_platform_ops("platform/spi_ops_b.yaml", "spi_ops_b", "spi"),
+                    spi_ops_c: make_platform_ops("platform/spi_ops_c.yaml", "spi_ops_c", "spi")
+                }
+            );
+            const result = validate_workfile(workfile);
+            expect(result.valid).toBe(false);
+            expect(result.errors[0].message).toContain("not in the allowed list");
+        });
+
+        test('allowed overrides capability check - mismatch is warning not error', () => {
+            const workfile = make_workfile(
+                {
+                    my_spi: make_struct_with_capability("no-os/spi.yaml", "spi_init", "spi", [
+                        make_platform_ops_property("platform_ops", {
+                            value: "gpio_ops",
+                            allowed: ["platform/gpio_ops.yaml"]  // override allows gpio ops for spi
+                        })
+                    ])
+                },
+                {
+                    gpio_ops: make_platform_ops("platform/gpio_ops.yaml", "gpio_ops", "gpio")
+                }
+            );
+            const result = validate_workfile(workfile);
+            // Should be valid (allowed takes precedence) but with warning
+            expect(result.valid).toBe(true);
+            expect(result.errors.some(e => e.severity === "warning" && e.message.includes("Capability mismatch"))).toBe(true);
+        });
+    });
+
+    describe('platform_extra allowed restriction', () => {
+        test('extra in allowed list passes', () => {
+            const workfile = make_workfile(
+                {
+                    my_spi: make_struct_with_capability("no-os/spi.yaml", "spi_init", "spi", [
+                        make_platform_extra_property("extra", {
+                            value: "my_extra",
+                            allowed: ["platform/extra_a.yaml", "platform/extra_b.yaml"]
+                        })
+                    ]),
+                    my_extra: make_struct_with_capability("platform/extra_a.yaml", "extra_a", "spi", [])
+                },
+                {}
+            );
+            const result = validate_workfile(workfile);
+            expect(result.valid).toBe(true);
+        });
+
+        test('extra not in allowed list fails', () => {
+            const workfile = make_workfile(
+                {
+                    my_spi: make_struct_with_capability("no-os/spi.yaml", "spi_init", "spi", [
+                        make_platform_extra_property("extra", {
+                            value: "my_extra",
+                            allowed: ["platform/extra_a.yaml", "platform/extra_b.yaml"]
+                        })
+                    ]),
+                    my_extra: make_struct_with_capability("platform/extra_c.yaml", "extra_c", "spi", [])
+                },
+                {}
+            );
+            const result = validate_workfile(workfile);
+            expect(result.valid).toBe(false);
+            expect(result.errors[0].message).toContain("not in the allowed list");
+        });
+    });
 });

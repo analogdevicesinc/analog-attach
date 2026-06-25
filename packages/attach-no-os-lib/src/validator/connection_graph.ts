@@ -23,6 +23,12 @@ function get_connected_symbols(property: Property): string[] {
 			}
 			return [];
 		}
+		case "PlatformExtraProperty": {
+			if (typeof property.value === "string") {
+				return [property.value];
+			}
+			return [];
+		}
 		default: {
 			return [];
 		}
