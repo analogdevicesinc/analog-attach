@@ -1,10 +1,11 @@
 import { describe, test, expect, beforeEach, afterEach } from 'vitest';
 import path from 'node:path';
 import { WorkfileHandler } from '../../src/workfile_handler/workfile_handler';
-import { RulesetStruct, RulesetType, IncludeProperty, UnionProperty, ArrayProperty, RulesetPlatformOps } from '../../src/bindings_parser/types';
+import { RulesetStruct, RulesetType, IncludeProperty, UnionProperty, ArrayProperty, RulesetPlatformOps, EnumProperty, BooleanProperty, PlatformOpsProperty, PlatformExtraProperty } from '../../src/bindings_parser/types';
 import { scan_platform } from '../../src/context_handler/platform_scanner';
 import { expectOk, expectError, expectErrorContains } from '../test_utils';
 import { set_schemas_path, reset_settings } from '../../src/settings/settings';
+import { load_resolved_binding } from '../../src/resolver/resolver';
 
 function make_struct(id: string, name: string, properties: RulesetStruct['properties'] = []): RulesetStruct {
     return {
@@ -230,7 +231,8 @@ describe('WorkfileHandler', () => {
 
             const include = make_include("spi", "no-os/spi.yaml");
             const suggestions = handler.suggest_for_include(include);
-            expect(suggestions).toEqual(["spi1", "spi2"]);
+            expectOk(suggestions);
+            expect(suggestions.value).toEqual(["spi1", "spi2"]);
         });
 
         test('returns empty array when no matches', () => {
@@ -238,7 +240,8 @@ describe('WorkfileHandler', () => {
 
             const include = make_include("spi", "no-os/spi.yaml");
             const suggestions = handler.suggest_for_include(include);
-            expect(suggestions).toEqual([]);
+            expectOk(suggestions);
+            expect(suggestions.value).toEqual([]);
         });
     });
 
@@ -358,6 +361,218 @@ describe('WorkfileHandler', () => {
             const result = handler.load_platform(manifest);
             expectError(result);
             expectErrorContains(result, 'Expected platform_ops');
+        });
+    });
+
+    describe('suggest_for_property', () => {
+        test('suggests enum values', () => {
+            const struct = make_struct("test.yaml", "test", [
+                { _t: "EnumProperty", name: "mode", description: "", values: ["MODE_A", "MODE_B", "MODE_C"] } as EnumProperty
+            ]);
+            handler.add_symbol("my_struct", struct);
+
+            const result = handler.suggest_for_property("my_struct", "mode");
+            expectOk(result);
+            expect(result.value).toEqual(["MODE_A", "MODE_B", "MODE_C"]);
+        });
+
+        test('suggests boolean values', () => {
+            const struct = make_struct("test.yaml", "test", [
+                { _t: "BooleanProperty", name: "enabled", description: "", type: "bool", default: false } as BooleanProperty
+            ]);
+            handler.add_symbol("my_struct", struct);
+
+            const result = handler.suggest_for_property("my_struct", "enabled");
+            expectOk(result);
+            expect(result.value).toEqual(["true", "false"]);
+        });
+
+        test('suggests matching symbols for include property', () => {
+            handler.add_symbol("spi1", make_struct("no-os/spi.yaml", "spi"));
+            handler.add_symbol("spi2", make_struct("no-os/spi.yaml", "spi"));
+
+            const struct = make_struct("test.yaml", "test", [
+                make_include("spi_ref", "no-os/spi.yaml")
+            ]);
+            handler.add_symbol("my_struct", struct);
+
+            const result = handler.suggest_for_property("my_struct", "spi_ref");
+            expectOk(result);
+            expect(result.value).toEqual(["spi1", "spi2"]);
+        });
+
+        test('suggests union member names when no member specified', () => {
+            const struct = make_struct("test.yaml", "test", [
+                make_union("comm", [
+                    make_include("spi_init", "no-os/spi.yaml"),
+                    make_include("i2c_init", "no-os/i2c.yaml"),
+                ])
+            ]);
+            handler.add_symbol("my_struct", struct);
+
+            const result = handler.suggest_for_property("my_struct", "comm");
+            expectOk(result);
+            expect(result.value).toEqual(["spi_init", "i2c_init"]);
+        });
+
+        test('suggests symbols for union member when member specified', () => {
+            handler.add_symbol("spi1", make_struct("no-os/spi.yaml", "spi"));
+
+            const struct = make_struct("test.yaml", "test", [
+                make_union("comm", [
+                    make_include("spi_init", "no-os/spi.yaml"),
+                    make_include("i2c_init", "no-os/i2c.yaml"),
+                ])
+            ]);
+            handler.add_symbol("my_struct", struct);
+
+            const result = handler.suggest_for_property("my_struct", "comm", "spi_init");
+            expectOk(result);
+            expect(result.value).toEqual(["spi1"]);
+        });
+
+        test('returns empty array for number property', () => {
+            const struct = make_struct("test.yaml", "test", [
+                { _t: "NumberProperty", name: "count", description: "", type: "uint32_t" }
+            ]);
+            handler.add_symbol("my_struct", struct);
+
+            const result = handler.suggest_for_property("my_struct", "count");
+            expectOk(result);
+            expect(result.value).toEqual([]);
+        });
+
+        test('returns error for unknown symbol', () => {
+            const result = handler.suggest_for_property("unknown", "prop");
+            expectError(result);
+        });
+
+        test('returns error for unknown property', () => {
+            handler.add_symbol("my_struct", make_struct("test.yaml", "test", []));
+            const result = handler.suggest_for_property("my_struct", "unknown");
+            expectError(result);
+        });
+    });
+
+    describe('suggest_platform_ops', () => {
+        const PLATFORM_PATH = path.join(__dirname, '../bindings/schemas/platforms/maxim/max32690');
+
+        test('suggests ops matching capability', () => {
+            const scan_result = scan_platform(PLATFORM_PATH);
+            expectOk(scan_result);
+            handler.load_platform(scan_result.value);
+
+            // Create a parent struct with spi capability
+            const spi_struct: RulesetStruct = {
+                ...make_struct("no-os/spi.yaml", "spi"),
+                $capability: "spi"
+            };
+
+            const property: PlatformOpsProperty = {
+                _t: "PlatformOpsProperty",
+                name: "platform_ops",
+                description: "",
+                type: "platform_ops",
+                target: "no_os_spi_ops"
+            };
+
+            const result = handler.suggest_platform_ops(property, spi_struct);
+            expectOk(result);
+            expect(result.value).toContain("max_spi_ops");
+            expect(result.value).not.toContain("max_i2c_ops");
+        });
+
+        test('suggests ops from allowed list when override present', () => {
+            const scan_result = scan_platform(PLATFORM_PATH);
+            expectOk(scan_result);
+            handler.load_platform(scan_result.value);
+
+            const spi_struct: RulesetStruct = {
+                ...make_struct("no-os/spi.yaml", "spi"),
+                $capability: "spi"
+            };
+
+            // Property with allowed list (set by override)
+            const property: PlatformOpsProperty = {
+                _t: "PlatformOpsProperty",
+                name: "platform_ops",
+                description: "",
+                type: "platform_ops",
+                target: "no_os_spi_ops",
+                allowed: ["platforms/maxim/max32690/platform_ops/spi_ops.yaml"]
+            };
+
+            const result = handler.suggest_platform_ops(property, spi_struct);
+            expectOk(result);
+            expect(result.value).toEqual(["max_spi_ops"]);
+        });
+    });
+
+    describe('suggest_platform_extra', () => {
+        test('suggests extras matching capability', () => {
+            // Add platform ops (needed for parent capability)
+            handler.add_platform_ops("max_spi_ops", make_platform_ops("ops/spi.yaml", "max_spi_ops", "spi"));
+
+            // Add extra structs with capability
+            const spi_extra: RulesetStruct = {
+                ...make_struct("platform/max_spi.yaml", "max_spi"),
+                $capability: "spi"
+            };
+            // eslint-disable-next-line unicorn/prevent-abbreviations
+            const i2c_extra: RulesetStruct = {
+                ...make_struct("platform/max_i2c.yaml", "max_i2c"),
+                $capability: "i2c"
+            };
+            handler.add_symbol("my_spi_extra", spi_extra);
+            handler.add_symbol("my_i2c_extra", i2c_extra);
+
+            // Parent struct with spi capability
+            const parent: RulesetStruct = {
+                ...make_struct("no-os/spi.yaml", "spi"),
+                $capability: "spi"
+            };
+
+            const property: PlatformExtraProperty = {
+                _t: "PlatformExtraProperty",
+                name: "extra",
+                description: "",
+                type: "platform_extra"
+            };
+
+            const result = handler.suggest_platform_extra(property, parent);
+            expectOk(result);
+            expect(result.value).toContain("my_spi_extra");
+            expect(result.value).not.toContain("my_i2c_extra");
+        });
+    });
+
+    describe('list_available_structs', () => {
+        test('returns device, noos, and platform structs', () => {
+            const PLATFORM_PATH = path.join(__dirname, '../bindings/schemas/platforms/maxim/max32690');
+            const scan_result = scan_platform(PLATFORM_PATH);
+            expectOk(scan_result);
+            handler.load_platform(scan_result.value);
+
+            const result = handler.list_available_structs();
+            expectOk(result);
+
+            // Check devices
+            expect(result.value.devices.length).toBeGreaterThan(0);
+            expect(result.value.devices.some(d => d.includes("adxl355"))).toBe(true);
+
+            // Check no-os
+            expect(result.value.noos.length).toBeGreaterThan(0);
+            expect(result.value.noos.some(n => n.includes("spi"))).toBe(true);
+
+            // Check platform structs
+            expect(result.value.platform.length).toBe(5);
+            expect(result.value.platform).toContain("platforms/maxim/max32690/max_spi_init_param.yaml");
+        });
+
+        test('returns error when schemas_path not set', () => {
+            reset_settings();
+            const result = handler.list_available_structs();
+            expectError(result);
         });
     });
 });
