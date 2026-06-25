@@ -1,5 +1,5 @@
 import { Result, ok, error } from "../bindings_parser/result";
-import { Capability, CapabilitySpec, Context, PlatformCapabilities, Symbol } from "./types";
+import { Context, PlatformManifest } from "./types";
 
 export class ContextHandler {
 	private context: Context;
@@ -13,7 +13,6 @@ export class ContextHandler {
 	create_context(): Context {
 		return {
 			selected_platform: undefined,
-			symbols: [],
 			platform_specs: {},
 		};
 	}
@@ -36,98 +35,26 @@ export class ContextHandler {
 		return this.context.selected_platform;
 	}
 
-	has_capability(capability: Capability): boolean {
-		const platform = this.context.selected_platform;
-		if (!platform) {
-			return false;
-		}
-		const capabilities = this.context.platform_specs[platform];
-		if (!capabilities) {
-			return false;
-		}
-		return capability in capabilities;
-	}
-
-	get_capability_specification(capability: Capability): CapabilitySpec | undefined {
+	get_platform_manifest(): PlatformManifest | undefined {
 		const platform = this.context.selected_platform;
 		if (!platform) {
 			return undefined;
 		}
-		const capabilities = this.context.platform_specs[platform];
-		if (!capabilities) {
-			return undefined;
-		}
-		return capabilities[capability];
-	}
-
-	get_capabilities(): Capability[] {
-		const platform = this.context.selected_platform;
-		if (!platform) {
-			return [];
-		}
-		const capabilities = this.context.platform_specs[platform];
-		if (!capabilities) {
-			return [];
-		}
-		return Object.keys(capabilities) as Capability[];
+		return this.context.platform_specs[platform];
 	}
 
 	// --- Platform Specs Management ---
 
-	set_platform_specifications(platform_id: string, capabilities: PlatformCapabilities): void {
-		this.context.platform_specs[platform_id] = capabilities;
+	set_platform_specifications(platform_id: string, manifest: PlatformManifest): void {
+		this.context.platform_specs[platform_id] = manifest;
 	}
 
-	get_platform_specifications(platform_id: string): PlatformCapabilities | undefined {
+	get_platform_specifications(platform_id: string): PlatformManifest | undefined {
 		return this.context.platform_specs[platform_id];
 	}
 
 	get_available_platforms(): string[] {
 		return Object.keys(this.context.platform_specs);
-	}
-
-	// --- Symbol CRUD ---
-
-	add_symbol(type: string, symbol: string, capabilities?: Capability[]): Result<Symbol> {
-		if (this.has_symbol(symbol)) {
-			return error(`Symbol '${symbol}' already exists`, "symbol");
-		}
-		const new_symbol: Symbol = { type, symbol, capabilities };
-		this.context.symbols.push(new_symbol);
-		return ok(new_symbol);
-	}
-
-	remove_symbol(symbol: string): Result<void> {
-		const index = this.context.symbols.findIndex(s => s.symbol === symbol);
-		if (index === -1) {
-			return error(`Symbol '${symbol}' not found`, "symbol");
-		}
-		this.context.symbols.splice(index, 1);
-		return ok();
-	}
-
-	get_symbols(): Symbol[] {
-		return this.context.symbols;
-	}
-
-	get_symbols_by_type(type: string): Symbol[] {
-		return this.context.symbols.filter(s => s.type === type);
-	}
-
-	has_symbol(symbol: string): boolean {
-		return this.context.symbols.some(s => s.symbol === symbol);
-	}
-
-	rename_symbol(old_name: string, new_name: string): Result<void> {
-		if (this.has_symbol(new_name)) {
-			return error(`Symbol '${new_name}' already exists`, "new_name");
-		}
-		const symbol = this.context.symbols.find(s => s.symbol === old_name);
-		if (!symbol) {
-			return error(`Symbol '${old_name}' not found`, "old_name");
-		}
-		symbol.symbol = new_name;
-		return ok();
 	}
 
 	// --- Persistence ---

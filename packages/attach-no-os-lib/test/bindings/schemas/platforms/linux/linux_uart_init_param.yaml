@@ -1,6 +1,7 @@
 $id: "platforms/linux/linux_uart_init_param.yaml"
 $type: struct
-$name: linux_uart_init_param
+$symbol: linux_uart_init_param
+$capability: uart
 $description: "Linux platform specific UART initialization parameters"
 $ranking: 4
 $sources:

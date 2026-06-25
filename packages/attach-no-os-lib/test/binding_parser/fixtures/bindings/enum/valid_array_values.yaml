@@ -1,6 +1,6 @@
 $id: "test/enum_array"
 $type: enum
-$name: test_mode
+$symbol: test_mode
 $ranking: 4
 $sources:
   headers:

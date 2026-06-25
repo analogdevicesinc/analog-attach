@@ -1,6 +1,6 @@
 $id: "devices/ad7124-enums/ad7124_analog_input.yaml"
 $type: enum
-$name: ad7124_analog_input
+$symbol: ad7124_analog_input
 $description: "AD7124 analog input sources"
 $ranking: 4
 $sources:

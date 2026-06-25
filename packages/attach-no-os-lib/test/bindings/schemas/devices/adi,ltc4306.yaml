@@ -1,6 +1,6 @@
 $id: "devices/adi,ltc4306.yaml"
 $type: struct
-$name: ltc4306_init_param
+$symbol: ltc4306_init_param
 $description: "LTC4306 4-Channel I2C Mux/Switch"
 $ranking: 4
 $sources:

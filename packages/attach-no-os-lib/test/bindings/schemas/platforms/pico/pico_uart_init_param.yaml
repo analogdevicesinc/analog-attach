@@ -1,6 +1,7 @@
 $id: "platforms/pico/pico_uart_init_param.yaml"
 $type: struct
-$name: pico_uart_init_param
+$symbol: pico_uart_init_param
+$capability: uart
 $description: "Pico platform specific UART initialization parameters"
 $ranking: 4
 $sources:

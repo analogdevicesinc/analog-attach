@@ -1,6 +1,7 @@
 $id: "platforms/xilinx/xil_spi_init_param.yaml"
 $type: struct
-$name: xil_spi_init_param
+$symbol: xil_spi_init_param
+$capability: spi
 $description: "Xilinx platform specific SPI initialization parameters"
 $ranking: 4
 $sources:

@@ -1,20 +1,49 @@
 import { Result, ok, error } from "../bindings_parser/result";
-import { ArrayProperty, IncludeProperty, Property, Ruleset, RulesetStruct, UnionProperty } from "../bindings_parser/types";
-import { ParseContext, at } from "../bindings_parser/validators";
-import { Workfile } from "./types";
+import { ArrayProperty, IncludeProperty, Ruleset, RulesetPlatformOps, UnionProperty } from "../bindings_parser/types";
+import { PlatformManifest } from "../context_handler/types";
+import { BindingLoader, LoadPlatformResult, Workfile } from "./types";
 
 export class WorkfileHandler {
     private workfile: Workfile;
 
     constructor() {
-        this.workfile = { symbols: {} };
+        this.workfile = { platform_ops: {}, symbols: {} };
     }
 
-    // --- Symbol CRUD ---
+    // --- Platform Ops (locked, from manifest) ---
+
+    add_platform_ops(name: string, ruleset: RulesetPlatformOps): Result<void> {
+        if (name in this.workfile.platform_ops) {
+            return error(`Platform ops '${name}' already exists`, "name");
+        }
+        this.workfile.platform_ops[name] = ruleset;
+        return ok();
+    }
+
+    get_platform_ops(name: string): Result<RulesetPlatformOps> {
+        const ops = this.workfile.platform_ops[name];
+        if (!ops) {
+            return error(`Platform ops '${name}' not found`, "name");
+        }
+        return ok(ops as RulesetPlatformOps);
+    }
+
+    list_platform_ops(): string[] {
+        return Object.keys(this.workfile.platform_ops);
+    }
+
+    clear_platform_ops(): void {
+        this.workfile.platform_ops = {};
+    }
+
+    // --- Symbol CRUD (user-created) ---
 
     add_symbol(name: string, ruleset: Ruleset): Result<void> {
         if (name in this.workfile.symbols) {
             return error(`Symbol '${name}' already exists`, "name");
+        }
+        if (name in this.workfile.platform_ops) {
+            return error(`Symbol '${name}' conflicts with platform ops`, "name");
         }
         this.workfile.symbols[name] = ruleset;
         return ok();
@@ -22,7 +51,7 @@ export class WorkfileHandler {
 
     get_symbol(name: string): Result<Ruleset> {
         if (!(name in this.workfile.symbols)) {
-            return error(`Symbol '${name} does not exist'`, "name");
+            return error(`Symbol '${name}' does not exist`, "name");
         }
         return ok(this.workfile.symbols[name]);
     }
@@ -37,6 +66,12 @@ export class WorkfileHandler {
 
     list_symbols(): string[] {
         return Object.keys(this.workfile.symbols);
+    }
+
+    // --- Lookup (checks both platform_ops and symbols) ---
+
+    find_any(name: string): Ruleset | undefined {
+        return this.workfile.platform_ops[name] ?? this.workfile.symbols[name];
     }
 
     // --- Property Values ---
@@ -67,177 +102,21 @@ export class WorkfileHandler {
 
         const property = ruleset.properties.find(p => p.name === property_name);
         if (property === undefined) {
-            return error(`Symbol '${symbol_name}' not found`, "name");
+            return error(`Property '${property_name}' not found`, "property_name");
         }
         return ok(property.value);
-    }
-
-    // --- Private Helpers ---
-
-    private get_struct(symbol_name: string, context: ParseContext): Result<RulesetStruct> {
-        const ruleset = this.workfile.symbols[symbol_name];
-        if (!ruleset) {
-            return error(`Symbol '${symbol_name}' not found`, context.path);
-        }
-        if (ruleset._t !== "BindingStuct") {
-            return error(`Symbol '${symbol_name}' is not a struct`, context.path);
-        }
-        return ok(ruleset);
-    }
-
-    private get_property(ruleset: RulesetStruct, property_name: string, context: ParseContext): Result<Property> {
-        const property = ruleset.properties.find(p => p.name === property_name);
-        if (!property) {
-            return error(`Property '${property_name}' not found`, context.path);
-        }
-        return ok(property);
-    }
-
-    // --- Include Validation ---
-
-    validate_include(symbol_name: string, property_name: string): Result<void> {
-        const context: ParseContext = { path: symbol_name, document: {} };
-
-        const ruleset = this.get_struct(symbol_name, context);
-        if (!ruleset.ok) {return ruleset;}
-
-        const property_context = at(context, property_name);
-        const property = this.get_property(ruleset.value, property_name, property_context);
-        if (!property.ok) {return property;}
-
-        if (property.value._t !== "IncludeProperty") {
-            return error(`Property '${property_name}' is not an include`, property_context.path);
-        }
-
-        const value_context = at(property_context, "value");
-        const target_symbol_name = property.value.value as string | undefined;
-        if (!target_symbol_name) {
-            return error(`Include has no value set`, value_context.path);
-        }
-
-        const target = this.get_symbol(target_symbol_name);
-        if (!target.ok) {
-            return error(`Target symbol '${target_symbol_name}' not found`, value_context.path);
-        }
-
-        if (target.value.$id !== property.value.include) {
-            return error(
-                `Type mismatch: '${target_symbol_name}' is '${target.value.$id}', expected '${property.value.include}'`,
-                value_context.path
-            );
-        }
-
-        return ok();
-    }
-
-    // --- Union Validation ---
-
-    validate_union(symbol_name: string, property_name: string): Result<void> {
-        const context: ParseContext = { path: symbol_name, document: {} };
-
-        const ruleset = this.get_struct(symbol_name, context);
-        if (!ruleset.ok) {return ruleset;}
-
-        const property_context = at(context, property_name);
-        const property = this.get_property(ruleset.value, property_name, property_context);
-        if (!property.ok) {return property;}
-
-        if (property.value._t !== "UnionProperty") {
-            return error(`Property '${property_name}' is not a union`, property_context.path);
-        }
-
-        const value_context = at(property_context, "value");
-        const value = property.value.value as Record<string, string> | undefined;
-        if (!value) {
-            return error(`Union has no value set`, value_context.path);
-        }
-
-        const keys = Object.keys(value);
-        if (keys.length !== 1) {
-            return error(`Union value must have exactly one key`, value_context.path);
-        }
-
-        const selected_member_name = keys[0];
-        const target_symbol_name = value[selected_member_name];
-        const member_context = at(value_context, selected_member_name);
-
-        const member = property.value.members.find(m => m.name === selected_member_name);
-        if (!member) {
-            return error(`Unknown union member '${selected_member_name}'`, member_context.path);
-        }
-
-        const target = this.get_symbol(target_symbol_name);
-        if (!target.ok) {
-            return error(`Target symbol '${target_symbol_name}' not found`, member_context.path);
-        }
-
-        if (target.value.$id !== member.include) {
-            return error(
-                `Type mismatch: '${target_symbol_name}' is '${target.value.$id}', expected '${member.include}'`,
-                member_context.path
-            );
-        }
-
-        return ok();
-    }
-
-    // --- Array Validation ---
-
-    validate_array(symbol_name: string, property_name: string): Result<void> {
-        const context: ParseContext = { path: symbol_name, document: {} };
-
-        const ruleset = this.get_struct(symbol_name, context);
-        if (!ruleset.ok) {return ruleset;}
-
-        const property_context = at(context, property_name);
-        const property = this.get_property(ruleset.value, property_name, property_context);
-        if (!property.ok) {return property;}
-
-        if (property.value._t !== "ArrayProperty") {
-            return error(`Property '${property_name}' is not an array`, property_context.path);
-        }
-
-        if (property.value.element._t !== "IncludeProperty") {
-            return error(`Array element is not an include`, at(property_context, "element").path);
-        }
-
-        const value_context = at(property_context, "value");
-        const value = property.value.value as string[] | undefined;
-        if (!value) {
-            return error(`Array has no value set`, value_context.path);
-        }
-
-        if (value.length !== property.value.size) {
-            return error(
-                `Array must have ${property.value.size} elements, got ${value.length}`,
-                value_context.path
-            );
-        }
-
-        const element = property.value.element;
-        for (const [index, target_symbol_name] of value.entries()) {
-            const index_context = at(value_context, index);
-
-            const target = this.get_symbol(target_symbol_name);
-            if (!target.ok) {
-                return error(`Target symbol '${target_symbol_name}' not found`, index_context.path);
-            }
-
-            if (target.value.$id !== element.include) {
-                return error(
-                    `Type mismatch: '${target_symbol_name}' is '${target.value.$id}', expected '${element.include}'`,
-                    index_context.path
-                );
-            }
-        }
-
-        return ok();
     }
 
     // --- Suggestions ---
 
     suggest_for_include(include: IncludeProperty): string[] {
         const suggestions: string[] = [];
+        // Check both platform_ops and symbols
+        for (const [name, ruleset] of Object.entries(this.workfile.platform_ops)) {
+            if (ruleset.$id === include.include) {
+                suggestions.push(name);
+            }
+        }
         for (const [name, ruleset] of Object.entries(this.workfile.symbols)) {
             if (ruleset.$id === include.include) {
                 suggestions.push(name);
@@ -259,6 +138,38 @@ export class WorkfileHandler {
             return error(`Array element is not an include`, "element");
         }
         return ok(this.suggest_for_include(array.element));
+    }
+
+    // --- Platform Loading ---
+
+    load_platform(
+        manifest: PlatformManifest,
+        load_binding: BindingLoader
+    ): Result<LoadPlatformResult> {
+        // Clear existing platform ops
+        this.clear_platform_ops();
+
+        // Load each ops binding
+        for (const ops_path of manifest.ops) {
+            const ruleset_result = load_binding(ops_path);
+            if (!ruleset_result.ok) {
+                return ruleset_result;
+            }
+
+            const ruleset = ruleset_result.value;
+            if (ruleset._t !== "BindingPlatformOps") {
+                return error(`Expected platform_ops binding, got ${ruleset._t}: ${ops_path}`, ops_path);
+            }
+
+            const add_result = this.add_platform_ops(ruleset.$symbol, ruleset);
+            if (!add_result.ok) {
+                return add_result;
+            }
+        }
+
+        return ok({
+            available_structs: manifest.structs,
+        });
     }
 
     // --- Persistence ---

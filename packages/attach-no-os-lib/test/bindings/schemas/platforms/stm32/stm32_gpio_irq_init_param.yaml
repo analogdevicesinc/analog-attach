@@ -1,6 +1,7 @@
 $id: "platforms/stm32/stm32_gpio_irq_init_param.yaml"
 $type: struct
-$name: stm32_gpio_irq_init_param
+$symbol: stm32_gpio_irq_init_param
+$capability: gpio_irq
 $description: "STM32 platform specific GPIO IRQ initialization parameters"
 $ranking: 4
 $sources:

@@ -1,6 +1,6 @@
 $id: "platforms/maxim/max32690/enums/spi_ss_polarity.yaml"
 $type: enum
-$name: spi_ss_polarity
+$symbol: spi_ss_polarity
 $description: "Maxim MAX32690 SPI slave select polarity options"
 $ranking: 4
 $sources:

@@ -1,6 +1,6 @@
 $id: "platforms/pico/enums/spi_sck_gp.yaml"
 $type: enum
-$name: spi_sck_gp
+$symbol: spi_sck_gp
 $description: "Available GP config for SPI SCK (clock)"
 $ranking: 4
 $sources:

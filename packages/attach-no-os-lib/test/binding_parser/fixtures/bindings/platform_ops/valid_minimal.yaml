@@ -1,6 +1,6 @@
 $id: "test/platform_ops"
 $type: platform_ops
-$name: spi_ops
+$symbol: spi_ops
 $ranking: 4
 $sources:
   headers:

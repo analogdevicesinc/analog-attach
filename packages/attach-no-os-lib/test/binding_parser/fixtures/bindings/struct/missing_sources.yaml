@@ -1,4 +1,4 @@
 $id: "test/no_sources"
 $type: struct
-$name: no_sources_struct
+$symbol: no_sources_struct
 $ranking: 4

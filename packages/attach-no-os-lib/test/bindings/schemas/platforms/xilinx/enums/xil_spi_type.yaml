@@ -1,6 +1,6 @@
 $id: "platforms/xilinx/enums/xil_spi_type.yaml"
 $type: enum
-$name: xil_spi_type
+$symbol: xil_spi_type
 $description: "Xilinx platform architecture sections for SPI"
 $ranking: 4
 $sources:

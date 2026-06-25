@@ -1,6 +1,6 @@
 $id: "test/enum_bad_default"
 $type: enum
-$name: bad_default_enum
+$symbol: bad_default_enum
 $ranking: 4
 $sources:
   headers:

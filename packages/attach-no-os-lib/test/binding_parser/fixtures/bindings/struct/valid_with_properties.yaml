@@ -1,6 +1,6 @@
 $id: "test/with_props"
 $type: struct
-$name: config_param
+$symbol: config_param
 $description: "A struct with properties"
 $ranking: 2
 $sources:

@@ -1,6 +1,7 @@
 $id: "no-os/no_os_timer_init_param.yaml"
 $type: struct
-$name: no_os_timer_init_param
+$symbol: no_os_timer_init_param
+$capability: timer
 $description: "Structure holding the parameters for timer initialization"
 $ranking: 4
 $sources:

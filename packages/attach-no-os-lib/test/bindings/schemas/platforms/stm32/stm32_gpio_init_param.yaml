@@ -1,6 +1,7 @@
 $id: "platforms/stm32/stm32_gpio_init_param.yaml"
 $type: struct
-$name: stm32_gpio_init_param
+$symbol: stm32_gpio_init_param
+$capability: gpio
 $description: "STM32 platform specific GPIO initialization parameters"
 $ranking: 4
 $sources:

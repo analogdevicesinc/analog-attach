@@ -1,6 +1,7 @@
 $id: "platforms/stm32/stm32_spi_init_param.yaml"
 $type: struct
-$name: stm32_spi_init_param
+$symbol: stm32_spi_init_param
+$capability: spi
 $description: "STM32 platform specific SPI initialization parameters"
 $ranking: 4
 $sources:

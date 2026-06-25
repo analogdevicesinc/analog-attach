@@ -1,16 +1,12 @@
-capabilities:
-  spi:
-    ops: platform_ops/spi_ops.yaml
-    extra: pico_spi_init_param.yaml
-  i2c:
-    ops: platform_ops/i2c_ops.yaml
-    extra: pico_i2c_init_param.yaml
-  gpio:
-    ops: platform_ops/gpio_ops.yaml
-  uart:
-    ops: platform_ops/uart_ops.yaml
-    extra: pico_uart_init_param.yaml
-  irq:
-    ops: platform_ops/irq_ops.yaml
-  timer:
-    ops: platform_ops/timer_ops.yaml
+ops:
+  - platform_ops/spi_ops.yaml
+  - platform_ops/i2c_ops.yaml
+  - platform_ops/gpio_ops.yaml
+  - platform_ops/uart_ops.yaml
+  - platform_ops/irq_ops.yaml
+  - platform_ops/timer_ops.yaml
+
+structs:
+  - pico_spi_init_param.yaml
+  - pico_i2c_init_param.yaml
+  - pico_uart_init_param.yaml

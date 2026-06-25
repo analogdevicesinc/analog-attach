@@ -1,6 +1,7 @@
 $id: "platforms/xilinx/platform_ops/spi_pl_ops.yaml"
 $type: platform_ops
-$name: xil_spi_pl_ops
+$symbol: xil_spi_pl_ops
+$capability: spi
 $description: "Xilinx SPI PL (Programmable Logic) specific platform ops"
 $ranking: 4
 $sources:

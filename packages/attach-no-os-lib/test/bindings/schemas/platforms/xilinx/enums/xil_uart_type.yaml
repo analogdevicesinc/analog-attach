@@ -1,6 +1,6 @@
 $id: "platforms/xilinx/enums/xil_uart_type.yaml"
 $type: enum
-$name: xil_uart_type
+$symbol: xil_uart_type
 $description: "Xilinx platform architecture sections for UART"
 $ranking: 4
 $sources:

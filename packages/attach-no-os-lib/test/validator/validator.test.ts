@@ -1,0 +1,972 @@
+import { describe, test, expect } from 'vitest';
+import { validate_workfile } from '../../src/validator/validator';
+import { RulesetStruct, RulesetType, RulesetPlatformOps, IncludeProperty, UnionProperty, ArrayProperty, NumberProperty, BooleanProperty, EnumProperty, StringProperty, OverrideDirective, PlatformOpsProperty, PlatformExtraProperty } from '../../src/bindings_parser/types';
+import { Workfile } from '../../src/workfile_handler/types';
+
+function make_struct(
+    id: string,
+    name: string,
+    properties: RulesetStruct['properties'] = [],
+    overrides?: OverrideDirective[]
+): RulesetStruct {
+    return {
+        _t: "BindingStuct",
+        $id: id,
+        $type: RulesetType.BT_STRUCT,
+        $symbol: name,
+        $description: "Test struct",
+        $ranking: 4,
+        $sources: { headers: ["test.h"] },
+        properties,
+        $override: overrides,
+    };
+}
+
+function make_number(name: string, options: Partial<NumberProperty> = {}): NumberProperty {
+    return {
+        _t: "NumberProperty",
+        name,
+        description: "",
+        type: "uint32_t",
+        ...options,
+    };
+}
+
+function make_boolean(name: string, options: Partial<BooleanProperty> = {}): BooleanProperty {
+    return {
+        _t: "BooleanProperty",
+        name,
+        description: "",
+        type: "bool",
+        default: false,
+        ...options,
+    };
+}
+
+function make_string(name: string, options: Partial<StringProperty> = {}): StringProperty {
+    return {
+        _t: "StringProperty",
+        name,
+        description: "",
+        type: "string",
+        ...options,
+    };
+}
+
+function make_enum(name: string, values: (string | number)[], options: Partial<EnumProperty> = {}): EnumProperty {
+    return {
+        _t: "EnumProperty",
+        name,
+        description: "",
+        values,
+        ...options,
+    };
+}
+
+function make_include(name: string, include: string, options: Partial<IncludeProperty> = {}): IncludeProperty {
+    return {
+        _t: "IncludeProperty",
+        name,
+        description: "",
+        include,
+        ...options,
+    };
+}
+
+function make_union(name: string, members: IncludeProperty[], options: Partial<UnionProperty> = {}): UnionProperty {
+    return {
+        _t: "UnionProperty",
+        name,
+        description: "",
+        members,
+        ...options,
+    };
+}
+
+function make_array(name: string, size: number, element: ArrayProperty['element'], options: Partial<ArrayProperty> = {}): ArrayProperty {
+    return {
+        _t: "ArrayProperty",
+        name,
+        description: "",
+        size,
+        element,
+        ...options,
+    };
+}
+
+function make_workfile(symbols: Record<string, RulesetStruct>, platform_ops: Record<string, RulesetPlatformOps> = {}): Workfile {
+    return { platform_ops, symbols };
+}
+
+function make_platform_ops(id: string, name: string, capability?: string): RulesetPlatformOps {
+    return {
+        _t: "BindingPlatformOps",
+        $id: id,
+        $type: RulesetType.BT_PLATFORM_OPS,
+        $symbol: name,
+        $description: "Test ops",
+        $ranking: 4,
+        $sources: { headers: ["test.h"] },
+        $capability: capability,
+    };
+}
+
+function make_platform_ops_property(name: string, options: Partial<PlatformOpsProperty> = {}): PlatformOpsProperty {
+    return {
+        _t: "PlatformOpsProperty",
+        name,
+        description: "",
+        type: "platform_ops",
+        target: "test_ops",
+        ...options,
+    };
+}
+
+function make_platform_extra_property(name: string, options: Partial<PlatformExtraProperty> = {}): PlatformExtraProperty {
+    return {
+        _t: "PlatformExtraProperty",
+        name,
+        description: "",
+        type: "platform_extra",
+        ...options,
+    };
+}
+
+function make_struct_with_capability(
+    id: string,
+    name: string,
+    capability: string,
+    properties: RulesetStruct['properties'] = []
+): RulesetStruct {
+    return {
+        _t: "BindingStuct",
+        $id: id,
+        $type: RulesetType.BT_STRUCT,
+        $symbol: name,
+        $description: "Test struct",
+        $ranking: 4,
+        $sources: { headers: ["test.h"] },
+        $capability: capability,
+        properties,
+    };
+}
+
+describe('validate_workfile', () => {
+    describe('number property validation', () => {
+        test('valid number passes', () => {
+            const workfile = make_workfile({
+                my_struct: make_struct("test.yaml", "test", [
+                    make_number("count", { value: 42, minimum: 0, maximum: 100 })
+                ])
+            });
+            const result = validate_workfile(workfile);
+            expect(result.valid).toBe(true);
+            expect(result.errors).toHaveLength(0);
+        });
+
+        test('number below minimum fails', () => {
+            const workfile = make_workfile({
+                my_struct: make_struct("test.yaml", "test", [
+                    make_number("count", { value: -5, minimum: 0 })
+                ])
+            });
+            const result = validate_workfile(workfile);
+            expect(result.valid).toBe(false);
+            expect(result.errors).toHaveLength(1);
+            expect(result.errors[0].path).toBe("my_struct.count");
+            expect(result.errors[0].message).toContain("below");
+        });
+
+        test('number above maximum fails', () => {
+            const workfile = make_workfile({
+                my_struct: make_struct("test.yaml", "test", [
+                    make_number("count", { value: 150, maximum: 100 })
+                ])
+            });
+            const result = validate_workfile(workfile);
+            expect(result.valid).toBe(false);
+            expect(result.errors).toHaveLength(1);
+            expect(result.errors[0].path).toBe("my_struct.count");
+            expect(result.errors[0].message).toContain("above");
+        });
+
+        test('wrong type fails', () => {
+            const workfile = make_workfile({
+                my_struct: make_struct("test.yaml", "test", [
+                    make_number("count", { value: "not a number" as any })
+                ])
+            });
+            const result = validate_workfile(workfile);
+            expect(result.valid).toBe(false);
+            expect(result.errors[0].message).toContain("Expected number");
+        });
+    });
+
+    describe('boolean property validation', () => {
+        test('valid boolean passes', () => {
+            const workfile = make_workfile({
+                my_struct: make_struct("test.yaml", "test", [
+                    make_boolean("flag", { value: true })
+                ])
+            });
+            const result = validate_workfile(workfile);
+            expect(result.valid).toBe(true);
+        });
+
+        test('wrong type fails', () => {
+            const workfile = make_workfile({
+                my_struct: make_struct("test.yaml", "test", [
+                    make_boolean("flag", { value: "true" as any })
+                ])
+            });
+            const result = validate_workfile(workfile);
+            expect(result.valid).toBe(false);
+            expect(result.errors[0].message).toContain("Expected boolean");
+        });
+    });
+
+    describe('string property validation', () => {
+        test('valid string passes', () => {
+            const workfile = make_workfile({
+                my_struct: make_struct("test.yaml", "test", [
+                    make_string("name", { value: "hello" })
+                ])
+            });
+            const result = validate_workfile(workfile);
+            expect(result.valid).toBe(true);
+        });
+
+        test('wrong type fails', () => {
+            const workfile = make_workfile({
+                my_struct: make_struct("test.yaml", "test", [
+                    make_string("name", { value: 123 as any })
+                ])
+            });
+            const result = validate_workfile(workfile);
+            expect(result.valid).toBe(false);
+            expect(result.errors[0].message).toContain("Expected string");
+        });
+    });
+
+    describe('enum property validation', () => {
+        test('valid enum value passes', () => {
+            const workfile = make_workfile({
+                my_struct: make_struct("test.yaml", "test", [
+                    make_enum("mode", ["fast", "slow"], { value: "fast" })
+                ])
+            });
+            const result = validate_workfile(workfile);
+            expect(result.valid).toBe(true);
+        });
+
+        test('invalid enum value fails', () => {
+            const workfile = make_workfile({
+                my_struct: make_struct("test.yaml", "test", [
+                    make_enum("mode", ["fast", "slow"], { value: "medium" })
+                ])
+            });
+            const result = validate_workfile(workfile);
+            expect(result.valid).toBe(false);
+            expect(result.errors[0].message).toContain("Invalid value");
+            expect(result.errors[0].message).toContain("fast, slow");
+        });
+    });
+
+    describe('required property validation', () => {
+        test('required property without value fails', () => {
+            const workfile = make_workfile({
+                my_struct: make_struct("test.yaml", "test", [
+                    make_number("count", { required: true })
+                ])
+            });
+            const result = validate_workfile(workfile);
+            expect(result.valid).toBe(false);
+            expect(result.errors[0].message).toContain("Required");
+        });
+
+        test('optional property without value passes', () => {
+            const workfile = make_workfile({
+                my_struct: make_struct("test.yaml", "test", [
+                    make_number("count", { required: false })
+                ])
+            });
+            const result = validate_workfile(workfile);
+            expect(result.valid).toBe(true);
+        });
+    });
+
+    describe('disabled property validation', () => {
+        test('disabled property is skipped', () => {
+            const workfile = make_workfile({
+                my_struct: make_struct("test.yaml", "test", [
+                    make_number("count", { disabled: true, required: true })
+                ])
+            });
+            const result = validate_workfile(workfile);
+            expect(result.valid).toBe(true);
+        });
+    });
+
+    describe('include property validation', () => {
+        test('valid include passes', () => {
+            const workfile = make_workfile({
+                my_spi: make_struct("no-os/spi.yaml", "spi_init_param", []),
+                my_device: make_struct("device.yaml", "device", [
+                    make_include("spi", "no-os/spi.yaml", { value: "my_spi" })
+                ])
+            });
+            const result = validate_workfile(workfile);
+            expect(result.valid).toBe(true);
+        });
+
+        test('include with missing target fails', () => {
+            const workfile = make_workfile({
+                my_device: make_struct("device.yaml", "device", [
+                    make_include("spi", "no-os/spi.yaml", { value: "nonexistent" })
+                ])
+            });
+            const result = validate_workfile(workfile);
+            expect(result.valid).toBe(false);
+            expect(result.errors[0].message).toContain("not found");
+        });
+
+        test('include with type mismatch fails', () => {
+            const workfile = make_workfile({
+                my_i2c: make_struct("no-os/i2c.yaml", "i2c_init_param", []),
+                my_device: make_struct("device.yaml", "device", [
+                    make_include("spi", "no-os/spi.yaml", { value: "my_i2c" })
+                ])
+            });
+            const result = validate_workfile(workfile);
+            expect(result.valid).toBe(false);
+            expect(result.errors[0].message).toContain("Type mismatch");
+        });
+    });
+
+    describe('union property validation', () => {
+        test('valid union passes', () => {
+            const workfile = make_workfile({
+                my_spi: make_struct("no-os/spi.yaml", "spi", []),
+                my_device: make_struct("device.yaml", "device", [
+                    make_union("comm", [
+                        make_include("spi", "no-os/spi.yaml"),
+                        make_include("i2c", "no-os/i2c.yaml"),
+                    ], { value: { "spi": "my_spi" } })
+                ])
+            });
+            const result = validate_workfile(workfile);
+            expect(result.valid).toBe(true);
+        });
+
+        test('union with unknown member fails', () => {
+            const workfile = make_workfile({
+                my_spi: make_struct("no-os/spi.yaml", "spi", []),
+                my_device: make_struct("device.yaml", "device", [
+                    make_union("comm", [
+                        make_include("spi", "no-os/spi.yaml"),
+                    ], { value: { "uart": "my_spi" } })
+                ])
+            });
+            const result = validate_workfile(workfile);
+            expect(result.valid).toBe(false);
+            expect(result.errors[0].message).toContain("Unknown union member");
+        });
+
+        test('union with multiple keys fails', () => {
+            const workfile = make_workfile({
+                my_spi: make_struct("no-os/spi.yaml", "spi", []),
+                my_i2c: make_struct("no-os/i2c.yaml", "i2c", []),
+                my_device: make_struct("device.yaml", "device", [
+                    make_union("comm", [
+                        make_include("spi", "no-os/spi.yaml"),
+                        make_include("i2c", "no-os/i2c.yaml"),
+                    ], { value: { "spi": "my_spi", "i2c": "my_i2c" } })
+                ])
+            });
+            const result = validate_workfile(workfile);
+            expect(result.valid).toBe(false);
+            expect(result.errors[0].message).toContain("exactly one key");
+        });
+    });
+
+    describe('array property validation', () => {
+        test('valid array passes', () => {
+            const workfile = make_workfile({
+                gpio1: make_struct("no-os/gpio.yaml", "gpio", []),
+                gpio2: make_struct("no-os/gpio.yaml", "gpio", []),
+                my_device: make_struct("device.yaml", "device", [
+                    make_array("gpios", 2, make_include("element", "no-os/gpio.yaml"), { value: ["gpio1", "gpio2"] })
+                ])
+            });
+            const result = validate_workfile(workfile);
+            expect(result.valid).toBe(true);
+        });
+
+        test('array with wrong size fails', () => {
+            const workfile = make_workfile({
+                gpio1: make_struct("no-os/gpio.yaml", "gpio", []),
+                my_device: make_struct("device.yaml", "device", [
+                    make_array("gpios", 2, make_include("element", "no-os/gpio.yaml"), { value: ["gpio1"] })
+                ])
+            });
+            const result = validate_workfile(workfile);
+            expect(result.valid).toBe(false);
+            expect(result.errors[0].message).toContain("must have 2 elements");
+        });
+
+        test('array with missing element fails', () => {
+            const workfile = make_workfile({
+                gpio1: make_struct("no-os/gpio.yaml", "gpio", []),
+                my_device: make_struct("device.yaml", "device", [
+                    make_array("gpios", 2, make_include("element", "no-os/gpio.yaml"), { value: ["gpio1", "nonexistent"] })
+                ])
+            });
+            const result = validate_workfile(workfile);
+            expect(result.valid).toBe(false);
+            expect(result.errors[0].message).toContain("not found");
+            expect(result.errors[0].path).toContain("[1]");
+        });
+    });
+
+    describe('static override validation', () => {
+        test('$parent static override modifies constraints', () => {
+            const child = make_struct("child.yaml", "child", [], [
+                {
+                    _t: "OverrideStatic",
+                    scope: "$parent",
+                    target: "device_id",
+                    override: { maximum: 4 }
+                }
+            ]);
+            const parent = make_struct("parent.yaml", "parent", [
+                make_number("device_id", { value: 5, maximum: 10 }),
+                make_include("extra", "child.yaml", { value: "my_child" })
+            ]);
+
+            const workfile = make_workfile({
+                my_child: child,
+                my_parent: parent
+            });
+
+            const result = validate_workfile(workfile);
+            expect(result.valid).toBe(false);
+            expect(result.errors[0].path).toBe("my_parent.device_id");
+            expect(result.errors[0].message).toContain("above");
+            expect(result.errors[0].message).toContain("4");
+        });
+
+        test('$this static override does not affect parent', () => {
+            const child = make_struct("child.yaml", "child", [], [
+                {
+                    _t: "OverrideStatic",
+                    scope: "$this",
+                    target: "device_id",
+                    override: { maximum: 4 }
+                }
+            ]);
+            const parent = make_struct("parent.yaml", "parent", [
+                make_number("device_id", { value: 5, maximum: 10 }),
+                make_include("extra", "child.yaml", { value: "my_child" })
+            ]);
+
+            const workfile = make_workfile({
+                my_child: child,
+                my_parent: parent
+            });
+
+            const result = validate_workfile(workfile);
+            expect(result.valid).toBe(true);
+        });
+    });
+
+    describe('conditional override validation', () => {
+        test('$if override applies when condition matches', () => {
+            const child = make_struct("child.yaml", "child", [], [
+                {
+                    _t: "OverrideIfThen",
+                    scope: "$parent",
+                    condition: { scope: "$parent", target: "mode", value: "fast" },
+                    overrides: [
+                        { _t: "TargetOverride", scope: "$parent", target: "speed", override: { minimum: 100 } }
+                    ]
+                }
+            ]);
+            const parent = make_struct("parent.yaml", "parent", [
+                make_enum("mode", ["fast", "slow"], { value: "fast" }),
+                make_number("speed", { value: 50 }),
+                make_include("extra", "child.yaml", { value: "my_child" })
+            ]);
+
+            const workfile = make_workfile({
+                my_child: child,
+                my_parent: parent
+            });
+
+            const result = validate_workfile(workfile);
+            expect(result.valid).toBe(false);
+            expect(result.errors[0].path).toBe("my_parent.speed");
+            expect(result.errors[0].message).toContain("below");
+        });
+
+        test('$if override does not apply when condition does not match', () => {
+            const child = make_struct("child.yaml", "child", [], [
+                {
+                    _t: "OverrideIfThen",
+                    scope: "$parent",
+                    condition: { scope: "$parent", target: "mode", value: "fast" },
+                    overrides: [
+                        { _t: "TargetOverride", scope: "$parent", target: "speed", override: { minimum: 100 } }
+                    ]
+                }
+            ]);
+            const parent = make_struct("parent.yaml", "parent", [
+                make_enum("mode", ["fast", "slow"], { value: "slow" }),
+                make_number("speed", { value: 50 }),
+                make_include("extra", "child.yaml", { value: "my_child" })
+            ]);
+
+            const workfile = make_workfile({
+                my_child: child,
+                my_parent: parent
+            });
+
+            const result = validate_workfile(workfile);
+            expect(result.valid).toBe(true);
+        });
+    });
+
+    describe('mutex validation', () => {
+        test('mutex with one value passes', () => {
+            const child = make_struct("child.yaml", "child", [], [
+                {
+                    _t: "OverrideMutex",
+                    scope: "$parent",
+                    properties: ["opt_a", "opt_b"]
+                }
+            ]);
+            const parent = make_struct("parent.yaml", "parent", [
+                make_number("opt_a", { value: 1 }),
+                make_number("opt_b"),
+                make_include("extra", "child.yaml", { value: "my_child" })
+            ]);
+
+            const workfile = make_workfile({
+                my_child: child,
+                my_parent: parent
+            });
+
+            const result = validate_workfile(workfile);
+            expect(result.valid).toBe(true);
+        });
+
+        test('mutex with multiple values fails', () => {
+            const child = make_struct("child.yaml", "child", [], [
+                {
+                    _t: "OverrideMutex",
+                    scope: "$parent",
+                    properties: ["opt_a", "opt_b"]
+                }
+            ]);
+            const parent = make_struct("parent.yaml", "parent", [
+                make_number("opt_a", { value: 1 }),
+                make_number("opt_b", { value: 2 }),
+                make_include("extra", "child.yaml", { value: "my_child" })
+            ]);
+
+            const workfile = make_workfile({
+                my_child: child,
+                my_parent: parent
+            });
+
+            const result = validate_workfile(workfile);
+            expect(result.valid).toBe(false);
+            expect(result.errors[0].message).toContain("Mutex");
+            expect(result.errors[0].message).toContain("opt_a");
+            expect(result.errors[0].message).toContain("opt_b");
+        });
+
+        test('$this mutex does not affect parent', () => {
+            const child = make_struct("child.yaml", "child", [], [
+                {
+                    _t: "OverrideMutex",
+                    scope: "$this",
+                    properties: ["opt_a", "opt_b"]
+                }
+            ]);
+            const parent = make_struct("parent.yaml", "parent", [
+                make_number("opt_a", { value: 1 }),
+                make_number("opt_b", { value: 2 }),
+                make_include("extra", "child.yaml", { value: "my_child" })
+            ]);
+
+            const workfile = make_workfile({
+                my_child: child,
+                my_parent: parent
+            });
+
+            const result = validate_workfile(workfile);
+            expect(result.valid).toBe(true);
+        });
+    });
+
+    describe('switch override validation', () => {
+        test('$switch override applies matching case', () => {
+            const child = make_struct("child.yaml", "child", [], [
+                {
+                    _t: "OverrideSwitch",
+                    scope: "$parent",
+                    $on: "mode",
+                    $cases: [
+                        {
+                            _t: "SwitchCase",
+                            condition: "fast",
+                            overrides: [
+                                { _t: "TargetOverride", scope: "$parent", target: "speed", override: { minimum: 100 } }
+                            ]
+                        },
+                        {
+                            _t: "SwitchCase",
+                            condition: "slow",
+                            overrides: [
+                                { _t: "TargetOverride", scope: "$parent", target: "speed", override: { maximum: 50 } }
+                            ]
+                        }
+                    ]
+                }
+            ]);
+            const parent = make_struct("parent.yaml", "parent", [
+                make_enum("mode", ["fast", "slow"], { value: "fast" }),
+                make_number("speed", { value: 50 }),
+                make_include("extra", "child.yaml", { value: "my_child" })
+            ]);
+
+            const workfile = make_workfile({
+                my_child: child,
+                my_parent: parent
+            });
+
+            const result = validate_workfile(workfile);
+            expect(result.valid).toBe(false);
+            expect(result.errors[0].path).toBe("my_parent.speed");
+            expect(result.errors[0].message).toContain("below");
+        });
+
+        test('$switch override does not apply non-matching case', () => {
+            const child = make_struct("child.yaml", "child", [], [
+                {
+                    _t: "OverrideSwitch",
+                    scope: "$parent",
+                    $on: "mode",
+                    $cases: [
+                        {
+                            _t: "SwitchCase",
+                            condition: "fast",
+                            overrides: [
+                                { _t: "TargetOverride", scope: "$parent", target: "speed", override: { minimum: 100 } }
+                            ]
+                        }
+                    ]
+                }
+            ]);
+            const parent = make_struct("parent.yaml", "parent", [
+                make_enum("mode", ["fast", "slow"], { value: "slow" }),
+                make_number("speed", { value: 50 }),
+                make_include("extra", "child.yaml", { value: "my_child" })
+            ]);
+
+            const workfile = make_workfile({
+                my_child: child,
+                my_parent: parent
+            });
+
+            const result = validate_workfile(workfile);
+            expect(result.valid).toBe(true);
+        });
+
+        test('$switch with $this scope checks child property', () => {
+            const child = make_struct("child.yaml", "child", [
+                make_enum("child_mode", ["a", "b"], { value: "a" })
+            ], [
+                {
+                    _t: "OverrideSwitch",
+                    scope: "$this",
+                    $on: "child_mode",
+                    $cases: [
+                        {
+                            _t: "SwitchCase",
+                            condition: "a",
+                            overrides: [
+                                { _t: "TargetOverride", scope: "$parent", target: "speed", override: { minimum: 100 } }
+                            ]
+                        }
+                    ]
+                }
+            ]);
+            const parent = make_struct("parent.yaml", "parent", [
+                make_number("speed", { value: 50 }),
+                make_include("extra", "child.yaml", { value: "my_child" })
+            ]);
+
+            const workfile = make_workfile({
+                my_child: child,
+                my_parent: parent
+            });
+
+            const result = validate_workfile(workfile);
+            expect(result.valid).toBe(false);
+            expect(result.errors[0].message).toContain("below");
+        });
+
+        test('$switch skips when $on property not found', () => {
+            const child = make_struct("child.yaml", "child", [], [
+                {
+                    _t: "OverrideSwitch",
+                    scope: "$parent",
+                    $on: "nonexistent",
+                    $cases: [
+                        {
+                            _t: "SwitchCase",
+                            condition: "fast",
+                            overrides: [
+                                { _t: "TargetOverride", scope: "$parent", target: "speed", override: { minimum: 100 } }
+                            ]
+                        }
+                    ]
+                }
+            ]);
+            const parent = make_struct("parent.yaml", "parent", [
+                make_number("speed", { value: 50 }),
+                make_include("extra", "child.yaml", { value: "my_child" })
+            ]);
+
+            const workfile = make_workfile({
+                my_child: child,
+                my_parent: parent
+            });
+
+            const result = validate_workfile(workfile);
+            expect(result.valid).toBe(true);
+        });
+    });
+
+    describe('conditional override edge cases', () => {
+        test('$if skips when condition target not found', () => {
+            const child = make_struct("child.yaml", "child", [], [
+                {
+                    _t: "OverrideIfThen",
+                    scope: "$parent",
+                    condition: { scope: "$parent", target: "nonexistent", value: "x" },
+                    overrides: [
+                        { _t: "TargetOverride", scope: "$parent", target: "speed", override: { minimum: 100 } }
+                    ]
+                }
+            ]);
+            const parent = make_struct("parent.yaml", "parent", [
+                make_number("speed", { value: 50 }),
+                make_include("extra", "child.yaml", { value: "my_child" })
+            ]);
+
+            const workfile = make_workfile({
+                my_child: child,
+                my_parent: parent
+            });
+
+            const result = validate_workfile(workfile);
+            expect(result.valid).toBe(true);
+        });
+    });
+
+    describe('multiple errors', () => {
+        test('returns all errors, not just first', () => {
+            const workfile = make_workfile({
+                my_struct: make_struct("test.yaml", "test", [
+                    make_number("a", { value: -1, minimum: 0 }),
+                    make_number("b", { value: 200, maximum: 100 }),
+                    make_number("c", { required: true })
+                ])
+            });
+            const result = validate_workfile(workfile);
+            expect(result.valid).toBe(false);
+            expect(result.errors.length).toBe(3);
+        });
+    });
+
+    describe('platform_ops validation', () => {
+        test('valid platform_ops passes', () => {
+            const workfile = make_workfile(
+                {
+                    my_spi: make_struct_with_capability("no-os/spi.yaml", "spi_init", "spi", [
+                        make_platform_ops_property("platform_ops", { value: "spi_ops" })
+                    ])
+                },
+                {
+                    spi_ops: make_platform_ops("platform/spi_ops.yaml", "spi_ops", "spi")
+                }
+            );
+            const result = validate_workfile(workfile);
+            expect(result.valid).toBe(true);
+        });
+
+        test('missing platform_ops symbol fails', () => {
+            const workfile = make_workfile(
+                {
+                    my_spi: make_struct_with_capability("no-os/spi.yaml", "spi_init", "spi", [
+                        make_platform_ops_property("platform_ops", { value: "nonexistent_ops" })
+                    ])
+                },
+                {}
+            );
+            const result = validate_workfile(workfile);
+            expect(result.valid).toBe(false);
+            expect(result.errors[0].message).toContain("not found");
+        });
+
+        test('capability mismatch fails', () => {
+            const workfile = make_workfile(
+                {
+                    my_spi: make_struct_with_capability("no-os/spi.yaml", "spi_init", "spi", [
+                        make_platform_ops_property("platform_ops", { value: "gpio_ops" })
+                    ])
+                },
+                {
+                    gpio_ops: make_platform_ops("platform/gpio_ops.yaml", "gpio_ops", "gpio")
+                }
+            );
+            const result = validate_workfile(workfile);
+            expect(result.valid).toBe(false);
+            expect(result.errors[0].message).toContain("Capability mismatch");
+            expect(result.errors[0].message).toContain("gpio");
+            expect(result.errors[0].message).toContain("spi");
+        });
+
+        test('no capability on parent skips capability check', () => {
+            const workfile = make_workfile(
+                {
+                    my_struct: make_struct("test.yaml", "test", [
+                        make_platform_ops_property("platform_ops", { value: "spi_ops" })
+                    ])
+                },
+                {
+                    spi_ops: make_platform_ops("platform/spi_ops.yaml", "spi_ops", "spi")
+                }
+            );
+            const result = validate_workfile(workfile);
+            expect(result.valid).toBe(true);
+        });
+
+        test('no value skips validation (not required)', () => {
+            const workfile = make_workfile(
+                {
+                    my_spi: make_struct_with_capability("no-os/spi.yaml", "spi_init", "spi", [
+                        make_platform_ops_property("platform_ops")
+                    ])
+                },
+                {}
+            );
+            const result = validate_workfile(workfile);
+            expect(result.valid).toBe(true);
+        });
+
+        test('required platform_ops without value fails', () => {
+            const workfile = make_workfile(
+                {
+                    my_spi: make_struct_with_capability("no-os/spi.yaml", "spi_init", "spi", [
+                        make_platform_ops_property("platform_ops", { required: true })
+                    ])
+                },
+                {}
+            );
+            const result = validate_workfile(workfile);
+            expect(result.valid).toBe(false);
+            expect(result.errors[0].message).toContain("Required");
+        });
+    });
+
+    describe('platform_extra validation', () => {
+        test('valid platform_extra passes', () => {
+            const workfile = make_workfile(
+                {
+                    my_spi: make_struct_with_capability("no-os/spi.yaml", "spi_init", "spi", [
+                        make_platform_extra_property("extra", { value: "my_spi_extra" })
+                    ]),
+                    my_spi_extra: make_struct_with_capability("platform/max_spi.yaml", "max_spi", "spi", [])
+                },
+                {}
+            );
+            const result = validate_workfile(workfile);
+            expect(result.valid).toBe(true);
+        });
+
+        test('missing platform_extra symbol fails', () => {
+            const workfile = make_workfile(
+                {
+                    my_spi: make_struct_with_capability("no-os/spi.yaml", "spi_init", "spi", [
+                        make_platform_extra_property("extra", { value: "nonexistent" })
+                    ])
+                },
+                {}
+            );
+            const result = validate_workfile(workfile);
+            expect(result.valid).toBe(false);
+            expect(result.errors[0].message).toContain("not found");
+        });
+
+        test('capability mismatch fails', () => {
+            const workfile = make_workfile(
+                {
+                    my_spi: make_struct_with_capability("no-os/spi.yaml", "spi_init", "spi", [
+                        make_platform_extra_property("extra", { value: "my_gpio_extra" })
+                    ]),
+                    my_gpio_extra: make_struct_with_capability("platform/max_gpio.yaml", "max_gpio", "gpio", [])
+                },
+                {}
+            );
+            const result = validate_workfile(workfile);
+            expect(result.valid).toBe(false);
+            expect(result.errors[0].message).toContain("Capability mismatch");
+            expect(result.errors[0].message).toContain("gpio");
+            expect(result.errors[0].message).toContain("spi");
+        });
+
+        test('no capability on parent skips capability check', () => {
+            const workfile = make_workfile(
+                {
+                    my_struct: make_struct("test.yaml", "test", [
+                        make_platform_extra_property("extra", { value: "my_extra" })
+                    ]),
+                    my_extra: make_struct_with_capability("platform/extra.yaml", "extra", "spi", [])
+                },
+                {}
+            );
+            const result = validate_workfile(workfile);
+            expect(result.valid).toBe(true);
+        });
+
+        test('no value skips validation (not required)', () => {
+            const workfile = make_workfile(
+                {
+                    my_spi: make_struct_with_capability("no-os/spi.yaml", "spi_init", "spi", [
+                        make_platform_extra_property("extra")
+                    ])
+                },
+                {}
+            );
+            const result = validate_workfile(workfile);
+            expect(result.valid).toBe(true);
+        });
+
+        test('required platform_extra without value fails', () => {
+            const workfile = make_workfile(
+                {
+                    my_spi: make_struct_with_capability("no-os/spi.yaml", "spi_init", "spi", [
+                        make_platform_extra_property("extra", { required: true })
+                    ])
+                },
+                {}
+            );
+            const result = validate_workfile(workfile);
+            expect(result.valid).toBe(false);
+            expect(result.errors[0].message).toContain("Required");
+        });
+    });
+});

@@ -1,18 +1,36 @@
 import { describe, test, expect, beforeEach } from 'vitest';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 import { WorkfileHandler } from '../../src/workfile_handler/workfile_handler';
-import { RulesetStruct, RulesetType, IncludeProperty, UnionProperty, ArrayProperty } from '../../src/bindings_parser/types';
-import { expectOk, expectError, expectErrorPath, expectErrorContains } from '../test_utils';
+import { RulesetStruct, RulesetType, IncludeProperty, UnionProperty, ArrayProperty, RulesetPlatformOps } from '../../src/bindings_parser/types';
+import { parse_binding } from '../../src/bindings_parser/binding_parser';
+import { scan_platform } from '../../src/context_handler/platform_scanner';
+import { expectOk, expectError, expectErrorContains } from '../test_utils';
+import { BindingLoader } from '../../src/workfile_handler/types';
 
 function make_struct(id: string, name: string, properties: RulesetStruct['properties'] = []): RulesetStruct {
     return {
         _t: "BindingStuct",
         $id: id,
         $type: RulesetType.BT_STRUCT,
-        $name: name,
+        $symbol: name,
         $description: "Test struct",
         $ranking: 4,
         $sources: { headers: ["test.h"] },
         properties,
+    };
+}
+
+function make_platform_ops(id: string, name: string, capability?: string): RulesetPlatformOps {
+    return {
+        _t: "BindingPlatformOps",
+        $id: id,
+        $type: RulesetType.BT_PLATFORM_OPS,
+        $symbol: name,
+        $description: "Test ops",
+        $ranking: 4,
+        $sources: { headers: ["test.h"] },
+        $capability: capability,
     };
 }
 
@@ -104,6 +122,71 @@ describe('WorkfileHandler', () => {
             handler.add_symbol("baz", make_struct("c.yaml", "c"));
             expect(handler.list_symbols()).toEqual(["foo", "bar", "baz"]);
         });
+
+        test('add_symbol rejects name that conflicts with platform_ops', () => {
+            handler.add_platform_ops("spi_ops", make_platform_ops("ops/spi.yaml", "spi_ops", "spi"));
+            const result = handler.add_symbol("spi_ops", make_struct("test.yaml", "test"));
+            expectError(result);
+            expectErrorContains(result, "conflicts with platform ops");
+        });
+    });
+
+    describe('Platform Ops', () => {
+        test('add_platform_ops adds ops', () => {
+            const ops = make_platform_ops("ops/spi.yaml", "spi_ops", "spi");
+            const result = handler.add_platform_ops("spi_ops", ops);
+            expectOk(result);
+            expect(handler.list_platform_ops()).toContain("spi_ops");
+        });
+
+        test('add_platform_ops rejects duplicate names', () => {
+            const ops = make_platform_ops("ops/spi.yaml", "spi_ops", "spi");
+            handler.add_platform_ops("spi_ops", ops);
+            const result = handler.add_platform_ops("spi_ops", ops);
+            expectError(result);
+            expectErrorContains(result, "already exists");
+        });
+
+        test('get_platform_ops returns existing ops', () => {
+            const ops = make_platform_ops("ops/spi.yaml", "spi_ops", "spi");
+            handler.add_platform_ops("spi_ops", ops);
+            const result = handler.get_platform_ops("spi_ops");
+            expectOk(result);
+            expect(result.value.$id).toBe("ops/spi.yaml");
+            expect(result.value.$capability).toBe("spi");
+        });
+
+        test('get_platform_ops returns error for unknown ops', () => {
+            const result = handler.get_platform_ops("unknown");
+            expectError(result);
+            expectErrorContains(result, "not found");
+        });
+
+        test('clear_platform_ops removes all ops', () => {
+            handler.add_platform_ops("spi_ops", make_platform_ops("spi.yaml", "spi_ops", "spi"));
+            handler.add_platform_ops("i2c_ops", make_platform_ops("i2c.yaml", "i2c_ops", "i2c"));
+            handler.clear_platform_ops();
+            expect(handler.list_platform_ops()).toEqual([]);
+        });
+
+        test('find_any finds platform_ops', () => {
+            handler.add_platform_ops("spi_ops", make_platform_ops("spi.yaml", "spi_ops", "spi"));
+            const result = handler.find_any("spi_ops");
+            expect(result).toBeDefined();
+            expect(result?.$id).toBe("spi.yaml");
+        });
+
+        test('find_any finds symbols', () => {
+            handler.add_symbol("my_struct", make_struct("test.yaml", "test"));
+            const result = handler.find_any("my_struct");
+            expect(result).toBeDefined();
+            expect(result?.$id).toBe("test.yaml");
+        });
+
+        test('find_any returns undefined for unknown', () => {
+            const result = handler.find_any("unknown");
+            expect(result).toBeUndefined();
+        });
     });
 
     describe('Property Values', () => {
@@ -131,193 +214,6 @@ describe('WorkfileHandler', () => {
             const result = handler.set_value("my_foo", "unknown", 42);
             expectError(result);
             expectErrorContains(result, "not found");
-        });
-    });
-
-    describe('validate_include', () => {
-        test('validates matching include', () => {
-            const spi_ruleset = make_struct("no-os/spi.yaml", "spi_init_param");
-            const device_ruleset = make_struct("device.yaml", "device_init_param", [
-                make_include("spi", "no-os/spi.yaml", "my_spi")
-            ]);
-            handler.add_symbol("my_spi", spi_ruleset);
-            handler.add_symbol("my_device", device_ruleset);
-
-            const result = handler.validate_include("my_device", "spi");
-            expectOk(result);
-        });
-
-        test('returns error when value not set', () => {
-            const device_ruleset = make_struct("device.yaml", "device_init_param", [
-                make_include("spi", "no-os/spi.yaml")
-            ]);
-            handler.add_symbol("my_device", device_ruleset);
-
-            const result = handler.validate_include("my_device", "spi");
-            expectError(result);
-            expectErrorContains(result, "no value set");
-            expectErrorPath(result, "my_device.spi.value");
-        });
-
-        test('returns error when target symbol not found', () => {
-            const device_ruleset = make_struct("device.yaml", "device_init_param", [
-                make_include("spi", "no-os/spi.yaml", "nonexistent")
-            ]);
-            handler.add_symbol("my_device", device_ruleset);
-
-            const result = handler.validate_include("my_device", "spi");
-            expectError(result);
-            expectErrorContains(result, "not found");
-            expectErrorPath(result, "my_device.spi.value");
-        });
-
-        test('returns error on type mismatch', () => {
-            const wrong_ruleset = make_struct("no-os/i2c.yaml", "i2c_init_param");
-            const device_ruleset = make_struct("device.yaml", "device_init_param", [
-                make_include("spi", "no-os/spi.yaml", "my_i2c")
-            ]);
-            handler.add_symbol("my_i2c", wrong_ruleset);
-            handler.add_symbol("my_device", device_ruleset);
-
-            const result = handler.validate_include("my_device", "spi");
-            expectError(result);
-            expectErrorContains(result, "Type mismatch");
-            expectErrorPath(result, "my_device.spi.value");
-        });
-    });
-
-    describe('validate_union', () => {
-        test('validates matching union member', () => {
-            const spi_ruleset = make_struct("no-os/spi.yaml", "spi_init_param");
-            const device_ruleset = make_struct("device.yaml", "device_init_param", [
-                make_union("comm", [
-                    make_include("spi", "no-os/spi.yaml"),
-                    make_include("i2c", "no-os/i2c.yaml"),
-                ], { "spi": "my_spi" })
-            ]);
-            handler.add_symbol("my_spi", spi_ruleset);
-            handler.add_symbol("my_device", device_ruleset);
-
-            const result = handler.validate_union("my_device", "comm");
-            expectOk(result);
-        });
-
-        test('returns error when value not set', () => {
-            const device_ruleset = make_struct("device.yaml", "device_init_param", [
-                make_union("comm", [
-                    make_include("spi", "no-os/spi.yaml"),
-                ])
-            ]);
-            handler.add_symbol("my_device", device_ruleset);
-
-            const result = handler.validate_union("my_device", "comm");
-            expectError(result);
-            expectErrorContains(result, "no value set");
-            expectErrorPath(result, "my_device.comm.value");
-        });
-
-        test('returns error for unknown union member', () => {
-            const spi_ruleset = make_struct("no-os/spi.yaml", "spi_init_param");
-            const device_ruleset = make_struct("device.yaml", "device_init_param", [
-                make_union("comm", [
-                    make_include("spi", "no-os/spi.yaml"),
-                ], { "uart": "my_spi" })
-            ]);
-            handler.add_symbol("my_spi", spi_ruleset);
-            handler.add_symbol("my_device", device_ruleset);
-
-            const result = handler.validate_union("my_device", "comm");
-            expectError(result);
-            expectErrorContains(result, "Unknown union member");
-            expectErrorPath(result, "my_device.comm.value.uart");
-        });
-
-        test('returns error on type mismatch', () => {
-            const i2c_ruleset = make_struct("no-os/i2c.yaml", "i2c_init_param");
-            const device_ruleset = make_struct("device.yaml", "device_init_param", [
-                make_union("comm", [
-                    make_include("spi", "no-os/spi.yaml"),
-                ], { "spi": "my_i2c" })
-            ]);
-            handler.add_symbol("my_i2c", i2c_ruleset);
-            handler.add_symbol("my_device", device_ruleset);
-
-            const result = handler.validate_union("my_device", "comm");
-            expectError(result);
-            expectErrorContains(result, "Type mismatch");
-            expectErrorPath(result, "my_device.comm.value.spi");
-        });
-    });
-
-    describe('validate_array', () => {
-        test('validates matching array elements', () => {
-            const gpio_ruleset = make_struct("no-os/gpio.yaml", "gpio_init_param");
-            const device_ruleset = make_struct("device.yaml", "device_init_param", [
-                make_array("gpios", 2, make_include("element", "no-os/gpio.yaml"), ["gpio1", "gpio2"])
-            ]);
-            handler.add_symbol("gpio1", gpio_ruleset);
-            handler.add_symbol("gpio2", gpio_ruleset);
-            handler.add_symbol("my_device", device_ruleset);
-
-            const result = handler.validate_array("my_device", "gpios");
-            expectOk(result);
-        });
-
-        test('returns error when value not set', () => {
-            const device_ruleset = make_struct("device.yaml", "device_init_param", [
-                make_array("gpios", 2, make_include("element", "no-os/gpio.yaml"))
-            ]);
-            handler.add_symbol("my_device", device_ruleset);
-
-            const result = handler.validate_array("my_device", "gpios");
-            expectError(result);
-            expectErrorContains(result, "no value set");
-            expectErrorPath(result, "my_device.gpios.value");
-        });
-
-        test('returns error when array size mismatch', () => {
-            const gpio_ruleset = make_struct("no-os/gpio.yaml", "gpio_init_param");
-            const device_ruleset = make_struct("device.yaml", "device_init_param", [
-                make_array("gpios", 3, make_include("element", "no-os/gpio.yaml"), ["gpio1", "gpio2"])
-            ]);
-            handler.add_symbol("gpio1", gpio_ruleset);
-            handler.add_symbol("gpio2", gpio_ruleset);
-            handler.add_symbol("my_device", device_ruleset);
-
-            const result = handler.validate_array("my_device", "gpios");
-            expectError(result);
-            expectErrorContains(result, "must have 3 elements");
-            expectErrorPath(result, "my_device.gpios.value");
-        });
-
-        test('returns error when element not found', () => {
-            const gpio_ruleset = make_struct("no-os/gpio.yaml", "gpio_init_param");
-            const device_ruleset = make_struct("device.yaml", "device_init_param", [
-                make_array("gpios", 2, make_include("element", "no-os/gpio.yaml"), ["gpio1", "nonexistent"])
-            ]);
-            handler.add_symbol("gpio1", gpio_ruleset);
-            handler.add_symbol("my_device", device_ruleset);
-
-            const result = handler.validate_array("my_device", "gpios");
-            expectError(result);
-            expectErrorContains(result, "not found");
-            expectErrorPath(result, "my_device.gpios.value.[1]");
-        });
-
-        test('returns error on type mismatch at index', () => {
-            const gpio_ruleset = make_struct("no-os/gpio.yaml", "gpio_init_param");
-            const spi_ruleset = make_struct("no-os/spi.yaml", "spi_init_param");
-            const device_ruleset = make_struct("device.yaml", "device_init_param", [
-                make_array("gpios", 2, make_include("element", "no-os/gpio.yaml"), ["gpio1", "my_spi"])
-            ]);
-            handler.add_symbol("gpio1", gpio_ruleset);
-            handler.add_symbol("my_spi", spi_ruleset);
-            handler.add_symbol("my_device", device_ruleset);
-
-            const result = handler.validate_array("my_device", "gpios");
-            expectError(result);
-            expectErrorContains(result, "Type mismatch");
-            expectErrorPath(result, "my_device.gpios.value.[1]");
         });
     });
 
@@ -403,8 +299,72 @@ describe('WorkfileHandler', () => {
 
         test('load_workfile replaces current state', () => {
             handler.add_symbol("foo", make_struct("foo.yaml", "foo"));
-            handler.load_workfile({ symbols: { "bar": make_struct("bar.yaml", "bar") } });
+            handler.load_workfile({ platform_ops: {}, symbols: { "bar": make_struct("bar.yaml", "bar") } });
             expect(handler.list_symbols()).toEqual(["bar"]);
+        });
+    });
+
+    describe('load_platform', () => {
+        const PLATFORM_PATH = path.join(__dirname, '../bindings/schemas/platforms/maxim/max32690');
+
+        function create_loader(platform_path: string): BindingLoader {
+            return (binding_path: string) => {
+                const full_path = path.join(platform_path, binding_path);
+                const contents = fs.readFileSync(full_path, 'utf8');
+                return parse_binding(contents);
+            };
+        }
+
+        test('loads max32690 platform ops from real files', () => {
+            const scan_result = scan_platform(PLATFORM_PATH);
+            expectOk(scan_result);
+
+            const loader = create_loader(PLATFORM_PATH);
+            const result = handler.load_platform(scan_result.value, loader);
+
+            expectOk(result);
+            expect(result.value.available_structs).toHaveLength(5);
+            expect(result.value.available_structs).toContain('max_spi_init_param.yaml');
+
+            const ops_list = handler.list_platform_ops();
+            expect(ops_list).toHaveLength(7);
+            expect(ops_list).toContain('max_spi_ops');
+            expect(ops_list).toContain('max_i2c_ops');
+            expect(ops_list).toContain('max_gpio_ops');
+        });
+
+        test('clears existing ops before loading', () => {
+            handler.add_platform_ops('old_ops', make_platform_ops('old.yaml', 'old_ops', 'old'));
+
+            const scan_result = scan_platform(PLATFORM_PATH);
+            expectOk(scan_result);
+
+            const loader = create_loader(PLATFORM_PATH);
+            handler.load_platform(scan_result.value, loader);
+
+            expect(handler.list_platform_ops()).not.toContain('old_ops');
+            expect(handler.list_platform_ops()).toContain('max_spi_ops');
+        });
+
+        test('loaded ops can be found with find_any', () => {
+            const scan_result = scan_platform(PLATFORM_PATH);
+            expectOk(scan_result);
+
+            const loader = create_loader(PLATFORM_PATH);
+            handler.load_platform(scan_result.value, loader);
+
+            const spi_ops = handler.find_any('max_spi_ops');
+            expect(spi_ops).toBeDefined();
+            expect(spi_ops?._t).toBe('BindingPlatformOps');
+        });
+
+        test('returns error if binding is not platform_ops', () => {
+            const manifest = { ops: ['max_spi_init_param.yaml'], structs: [] };
+            const loader = create_loader(PLATFORM_PATH);
+
+            const result = handler.load_platform(manifest, loader);
+            expectError(result);
+            expectErrorContains(result, 'Expected platform_ops');
         });
     });
 });

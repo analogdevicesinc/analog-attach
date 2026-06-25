@@ -1,6 +1,7 @@
 $id: "platforms/xilinx/platform_ops/i2c_ops.yaml"
 $type: platform_ops
-$name: xil_i2c_ops
+$symbol: xil_i2c_ops
+$capability: i2c
 $description: "Xilinx I2C platform ops"
 $ranking: 4
 $sources:

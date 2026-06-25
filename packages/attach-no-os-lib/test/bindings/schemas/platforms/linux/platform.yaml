@@ -1,13 +1,10 @@
-capabilities:
-  spi:
-    ops: platform_ops/spi_ops.yaml
-  i2c:
-    ops: platform_ops/i2c_ops.yaml
-    extra: linux_i2c_init_param.yaml
-  gpio:
-    ops: platform_ops/gpio_ops.yaml
-  uart:
-    ops: platform_ops/uart_ops.yaml
-    extra: linux_uart_init_param.yaml
-  timer:
-    ops: platform_ops/timer_ops.yaml
+ops:
+  - platform_ops/spi_ops.yaml
+  - platform_ops/i2c_ops.yaml
+  - platform_ops/gpio_ops.yaml
+  - platform_ops/uart_ops.yaml
+  - platform_ops/timer_ops.yaml
+
+structs:
+  - linux_i2c_init_param.yaml
+  - linux_uart_init_param.yaml

@@ -1,6 +1,7 @@
 $id: "platforms/maxim/max32690/max_pwm_init_param.yaml"
 $type: struct
-$name: max_pwm_init_param
+$symbol: max_pwm_init_param
+$capability: pwm
 $description: "Maxim MAX32690 platform specific PWM initialization parameters"
 $ranking: 4
 $sources:

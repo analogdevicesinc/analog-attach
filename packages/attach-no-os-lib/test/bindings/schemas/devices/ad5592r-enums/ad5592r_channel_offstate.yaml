@@ -1,6 +1,6 @@
 $id: "devices/ad5592r-enums/ad5592r_channel_offstate.yaml"
 $type: enum
-$name: ad5592r_channel_offstate
+$symbol: ad5592r_channel_offstate
 $description: "Channel off-state configuration for AD5592R"
 $ranking: 4
 $sources:

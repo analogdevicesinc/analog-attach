@@ -1,7 +1,8 @@
 $id: "platforms/maxim/max32690/platform_ops/pwm_ops.yaml"
 $type: platform_ops
 $ranking: 4
-$name: max_pwm_ops
+$symbol: max_pwm_ops
+$capability: pwm
 $sources:
   headers:
     - "maxim_pwm.h"

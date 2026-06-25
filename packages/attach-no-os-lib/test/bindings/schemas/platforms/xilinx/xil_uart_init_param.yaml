@@ -1,6 +1,7 @@
 $id: "platforms/xilinx/xil_uart_init_param.yaml"
 $type: struct
-$name: xil_uart_init_param
+$symbol: xil_uart_init_param
+$capability: uart
 $description: "Xilinx platform specific UART initialization parameters"
 $ranking: 4
 $sources:

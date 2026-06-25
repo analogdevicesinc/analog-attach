@@ -678,9 +678,9 @@ function parse_binding_from_object(object: Record<string, unknown>, context: Par
 		return $type;
 	}
 
-	const $name = required(object, "$name", context, string_);
-	if (!$name.ok) {
-		return $name;
+	const $symbol = required(object, "$symbol", context, string_);
+	if (!$symbol.ok) {
+		return $symbol;
 	}
 
 	const $description = optionalWithDefault(object, "$description", context, "no-OS binding", string_);
@@ -721,6 +721,11 @@ function parse_binding_from_object(object: Record<string, unknown>, context: Par
 				return $override;
 			}
 
+			const $capability = optional(object, "$capability", context, string_);
+			if (!$capability.ok) {
+				return $capability;
+			}
+
 			// Collect all capabilities from properties into $requires
 			const capabilities = new Set<string>();
 			for (const property of context.document.properties) {
@@ -736,13 +741,14 @@ function parse_binding_from_object(object: Record<string, unknown>, context: Par
 				_t: "BindingStuct",
 				$id: $id.value,
 				$type: $type.value,
-				$name: $name.value,
+				$symbol: $symbol.value,
 				$description: $description.value,
 				$ranking: $ranking.value,
 				$sources: $sources.value,
 				properties: context.document.properties,
 				$override: $override.value,
 				$requires,
+				$capability: $capability.value,
 			});
 		}
 		case RulesetType.BT_ENUM: {
@@ -767,7 +773,7 @@ function parse_binding_from_object(object: Record<string, unknown>, context: Par
 				_t: "BindingEnum",
 				$id: $id.value,
 				$type: $type.value,
-				$name: $name.value,
+				$symbol: $symbol.value,
 				$description: $description.value,
 				$ranking: $ranking.value,
 				$sources: $sources.value,
@@ -776,14 +782,20 @@ function parse_binding_from_object(object: Record<string, unknown>, context: Par
 			});
 		}
 		case RulesetType.BT_PLATFORM_OPS: {
+			const $capability = optional(object, "$capability", context, string_);
+			if (!$capability.ok) {
+				return $capability;
+			}
+
 			return ok({
 				_t:	"BindingPlatformOps",
 				$id: $id.value,
 				$type: $type.value,
-				$name: $name.value,
+				$symbol: $symbol.value,
 				$description: $description.value,
 				$ranking: $ranking.value,
 				$sources: $sources.value,
+				$capability: $capability.value,
 			});
 		}
 	}
