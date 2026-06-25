@@ -1,4 +1,16 @@
-import { ArrayProperty, BooleanProperty, EnumProperty, IncludeProperty, NumberProperty, PlatformExtraProperty, PlatformOpsProperty, Property, RulesetStruct, StringProperty, UnionProperty } from "../bindings_parser/types";
+import {
+	ArrayProperty,
+	BooleanProperty,
+	EnumProperty,
+	IncludeProperty,
+	NumberProperty,
+	PlatformExtraProperty,
+	PlatformOpsProperty,
+	Property,
+	RulesetStruct,
+	StringProperty,
+	UnionProperty
+} from "../bindings_parser/types";
 import { at, ParseContext } from "../bindings_parser/validators";
 import { Workfile } from "../workfile_handler/types";
 import { apply_overrides } from "./override_resolver";
@@ -20,11 +32,23 @@ export function validate_property(
 	const effective = apply_overrides(property, child_overrides, parent_symbol);
 
 	if (effective.value === undefined) {
-		return effective.required ? [{
-				path: property_context.path,
-				message: "Required property has no value",
-				severity: "error"
-			}] : [];
+		if (!effective.required) {
+			return [];
+		}
+
+		// FIXME: This might not be supposed to be checked here, might move elsewhere
+		// Skip required check for platform_extra if no valid extras exist (excluding self)
+		if (effective._t === "PlatformExtraProperty" &&
+			!Object.values(workfile.symbols).some(s =>
+				s !== parent_symbol && s._t === "BindingStuct" && s.$capability === parent_symbol.$capability)) {
+			return [];
+		}
+
+		return [{
+			path: property_context.path,
+			message: "Required property has no value",
+			severity: "error"
+		}];
 	}
 
 	switch (effective._t) {
