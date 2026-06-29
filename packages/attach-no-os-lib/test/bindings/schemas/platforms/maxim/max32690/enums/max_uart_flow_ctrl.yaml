@@ -4,7 +4,7 @@ $symbol: max_uart_flow_ctrl
 $description: "Maxim MAX32690 UART flow control options"
 $ranking: 4
 $sources:
-  headers:
+  platform:
     - "drivers/platform/maxim/max32690/maxim_uart.h"
 
 values:

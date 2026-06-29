@@ -4,7 +4,7 @@ $symbol: xil_uart_type
 $description: "Xilinx platform architecture sections for UART"
 $ranking: 4
 $sources:
-  headers:
+  platform:
     - "drivers/platform/xilinx/xilinx_uart.h"
 
 values:

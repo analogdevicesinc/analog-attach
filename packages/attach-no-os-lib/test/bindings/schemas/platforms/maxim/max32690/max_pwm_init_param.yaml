@@ -5,7 +5,7 @@ $capability: pwm
 $description: "Maxim MAX32690 platform specific PWM initialization parameters"
 $ranking: 4
 $sources:
-  headers:
+  platform:
     - "drivers/platform/maxim/max32690/maxim_pwm.h"
 
 vssel:

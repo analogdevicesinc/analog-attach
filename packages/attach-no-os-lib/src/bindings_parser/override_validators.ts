@@ -1,5 +1,5 @@
 import { error, ok, Result } from "./result";
-import { BooleanProperty, EnumProperty, IncludeProperty, NumberProperty, Property, PropertyBase, PropertyOverride, UnionProperty } from "./types";
+import { BooleanProperty, EnumProperty, IncludeProperty, NumberProperty, PropertyBase, PropertyOverride, UnionProperty } from "./types";
 import { at, boolean_, number_, ParseContext, string_, stringArray } from "./validators";
 
 function is_number_property_override(
@@ -105,7 +105,7 @@ function is_union_property_override(
 function is_boolean_property_override(
 	object: Record<string, unknown>,
 	context: ParseContext,
-	property: BooleanProperty
+	_property: BooleanProperty
 ): Result<PropertyOverride<BooleanProperty>> {
 	const override: PropertyOverride<BooleanProperty> = {};
 
@@ -124,7 +124,7 @@ function is_boolean_property_override(
 function is_include_property_override(
 	object: Record<string, unknown>,
 	context: ParseContext,
-	property: IncludeProperty
+	_property: IncludeProperty
 ): Result<PropertyOverride<IncludeProperty>> {
 	const override: PropertyOverride<IncludeProperty> = {};
 

@@ -4,7 +4,7 @@ $symbol: ad7124_reference_source
 $description: "AD7124 ADC reference source"
 $ranking: 4
 $sources:
-  headers:
+  noos:
     - "drivers/adc/ad7124/ad7124.h"
 
 values:

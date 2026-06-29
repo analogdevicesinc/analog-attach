@@ -7,9 +7,8 @@ $descriptor: no_os_irq_ctrl_desc
 $description: "Structure holding the initial parameters for Interrupt Request"
 $ranking: 4
 $sources:
-  headers:
+  noos:
     - "include/no_os_irq.h"
-  sources:
     - "drivers/api/no_os_irq.c"
 
 irq_ctrl_id:

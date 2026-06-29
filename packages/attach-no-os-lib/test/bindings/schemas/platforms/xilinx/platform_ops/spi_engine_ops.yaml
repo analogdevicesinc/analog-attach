@@ -5,7 +5,6 @@ $capability: spi
 $description: "ADI SPI Engine platform ops (for SPI Engine IP core in FPGA)"
 $ranking: 4
 $sources:
-  headers:
+  platform:
     - "drivers/axi_core/spi_engine/spi_engine.h"
-  sources:
     - "drivers/axi_core/spi_engine/spi_engine.c"

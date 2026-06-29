@@ -5,9 +5,8 @@ $capability: uart
 $description: "Linux platform specific UART initialization parameters"
 $ranking: 4
 $sources:
-  headers:
+  platform:
     - "drivers/platform/linux/linux_uart.h"
-  sources:
     - "drivers/platform/linux/linux_uart.c"
 
 device_id:

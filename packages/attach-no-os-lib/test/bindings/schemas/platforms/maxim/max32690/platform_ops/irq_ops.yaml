@@ -4,10 +4,8 @@ $ranking: 4
 $symbol: max_irq_ops
 $capability: irq
 $sources:
-  headers:
+  platform:
     - "maxim_irq.h"
-  sources:
     - "maxim_irq.c"
   sdk:
-    headers:
-      - "mxc_sys.h"
+    - "mxc_sys.h"

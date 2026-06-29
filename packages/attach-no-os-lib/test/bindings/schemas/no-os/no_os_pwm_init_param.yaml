@@ -5,7 +5,7 @@ $capability: pwm
 $description: "Structure containing the init parameters needed by the PWM generator"
 $ranking: 4
 $sources:
-  headers:
+  noos:
     - "include/no_os_pwm.h"
 
 id:

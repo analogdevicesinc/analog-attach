@@ -5,7 +5,7 @@ $capability: i2c
 $description: "Maxim MAX32690 platform specific I2C initialization parameters"
 $ranking: 4
 $sources:
-  headers:
+  platform:
     - "drivers/platform/maxim/max32690/maxim_i2c.h"
 
 vssel:

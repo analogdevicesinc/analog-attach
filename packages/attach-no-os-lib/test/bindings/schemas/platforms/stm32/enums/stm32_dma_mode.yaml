@@ -4,7 +4,7 @@ $symbol: stm32_dma_mode
 $description: "DMA data modes"
 $ranking: 4
 $sources:
-  headers:
+  platform:
     - "drivers/platform/stm32/stm32_dma.h"
 
 values:

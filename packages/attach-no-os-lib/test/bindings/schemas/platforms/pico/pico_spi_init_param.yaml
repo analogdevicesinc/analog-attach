@@ -5,7 +5,7 @@ $capability: spi
 $description: "Pico platform specific SPI initialization parameters"
 $ranking: 4
 $sources:
-  headers:
+  platform:
     - "drivers/platform/pico/pico_spi.h"
 
 spi_tx_pin:

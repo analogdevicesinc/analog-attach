@@ -4,27 +4,20 @@ $ranking: 4
 $symbol: max_spi_ops
 $capability: spi
 $sources:
-  headers:
-    - "maxim_spi.h"
-  sources:
-    - "maxim_spi.c"
-  api:
-    headers:
-      - "no_os_dma.h"
-      - "no_os_irq.h"
-    sources:
-      - "no_os_dma.c"
-      - "no_os_irq.c"
+  noos:
+    - "include/no_os_dma.h"
+    - "include/no_os_irq.h"
+    - "drivers/api/no_os_dma.c"
+    - "drivers/api/no_os_irq.c"
   platform:
-    headers:
-      - "../common/maxim_dma.h"
-      - "maxim_irq.h"
-    sources:
-      - "../common/maxim_dma.c"
-      - "maxim_irq.c"
+    - "maxim_spi.h"
+    - "maxim_spi.c"
+    - "../common/maxim_dma.h"
+    - "maxim_irq.h"
+    - "../common/maxim_dma.c"
+    - "maxim_irq.c"
   sdk:
-    headers:
-      - "spi.h"
-      - "gpio.h"
-      - "dma.h"
+    - "spi.h"
+    - "gpio.h"
+    - "dma.h"
   $note: "Maxim SPI driver uses DMA and IRQ internally"

@@ -5,7 +5,7 @@ $capability: gpio
 $description: "Xilinx platform specific GPIO initialization parameters"
 $ranking: 4
 $sources:
-  headers:
+  platform:
     - "drivers/platform/xilinx/xilinx_gpio.h"
 
 type:

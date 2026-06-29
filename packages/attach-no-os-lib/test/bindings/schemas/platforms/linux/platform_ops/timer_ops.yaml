@@ -5,7 +5,6 @@ $capability: timer
 $description: "Linux Timer platform ops"
 $ranking: 4
 $sources:
-  headers:
+  platform:
     - "drivers/platform/linux/linux_timer.h"
-  sources:
     - "drivers/platform/linux/linux_timer.c"

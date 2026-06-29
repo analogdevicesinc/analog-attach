@@ -5,7 +5,7 @@ $capability: uart
 $description: "Structure holding the parameters for UART initialization"
 $ranking: 4
 $sources:
-  headers:
+  noos:
     - "include/no_os_uart.h"
 
 device_id:

@@ -4,7 +4,7 @@ $symbol: ad559xr_range
 $description: "ADC/DAC voltage range configuration for AD5592R"
 $ranking: 4
 $sources:
-  headers:
+  noos:
     - "drivers/adc-dac/ad5592r/ad5592r-base.h"
 
 values:
