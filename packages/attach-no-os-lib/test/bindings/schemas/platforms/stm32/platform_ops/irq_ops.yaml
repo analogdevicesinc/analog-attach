@@ -4,7 +4,6 @@ $ranking: 4
 $symbol: stm32_irq_ops
 $capability: irq
 $sources:
-  headers:
+  platform:
     - "stm32_irq.h"
-  sources:
     - "stm32_irq.c"

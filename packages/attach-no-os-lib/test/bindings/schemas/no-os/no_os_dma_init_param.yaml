@@ -5,10 +5,9 @@ $capability: dma
 $description: "Initialization parameter for the DMA controller"
 $ranking: 4
 $sources:
-  headers:
+  noos:
     - "include/no_os_dma.h"
     - "include/no_os_irq.h"
-  sources:
     - "drivers/api/no_os_irq.c"
 
 id:

@@ -4,7 +4,7 @@ $symbol: xil_gpio_type
 $description: "Xilinx platform architecture sections for GPIO"
 $ranking: 4
 $sources:
-  headers:
+  platform:
     - "drivers/platform/xilinx/xilinx_gpio.h"
 
 values:

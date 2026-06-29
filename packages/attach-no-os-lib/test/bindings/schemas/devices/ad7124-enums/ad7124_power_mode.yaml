@@ -4,7 +4,7 @@ $symbol: ad7124_power_mode
 $description: "AD7124 power mode selection"
 $ranking: 4
 $sources:
-  headers:
+  noos:
     - "drivers/adc/ad7124/ad7124.h"
 
 values:

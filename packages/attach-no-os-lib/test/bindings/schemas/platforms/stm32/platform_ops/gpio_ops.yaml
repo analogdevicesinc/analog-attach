@@ -4,7 +4,6 @@ $ranking: 4
 $symbol: stm32_gpio_ops
 $capability: gpio
 $sources:
-  headers:
+  platform:
     - "stm32_gpio.h"
-  sources:
     - "stm32_gpio.c"

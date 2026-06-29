@@ -5,7 +5,7 @@ $capability: uart
 $description: "Maxim MAX32690 platform specific UART initialization parameters"
 $ranking: 4
 $sources:
-  headers:
+  platform:
     - "drivers/platform/maxim/max32690/maxim_uart.h"
 
 flow:

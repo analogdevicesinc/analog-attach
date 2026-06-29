@@ -5,9 +5,8 @@ $capability: gpio_irq
 $description: "STM32 platform specific GPIO IRQ initialization parameters"
 $ranking: 4
 $sources:
-  headers:
+  platform:
     - "drivers/platform/stm32/stm32_gpio_irq.h"
-  sources:
     - "drivers/platform/stm32/stm32_gpio_irq.c"
 
 port_nb:

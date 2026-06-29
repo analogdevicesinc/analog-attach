@@ -4,7 +4,7 @@ $symbol: xil_irq_type
 $description: "Xilinx platform architecture sections for IRQ"
 $ranking: 4
 $sources:
-  headers:
+  platform:
     - "drivers/platform/xilinx/xilinx_irq.h"
 
 values:

@@ -4,7 +4,7 @@ $symbol: ad7124_burnout
 $description: "AD7124 burnout current values"
 $ranking: 4
 $sources:
-  headers:
+  noos:
     - "drivers/adc/ad7124/ad7124.h"
 
 values:

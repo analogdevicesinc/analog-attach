@@ -4,7 +4,7 @@ $symbol: i2c_sda_gp
 $description: "Available GP config for I2C SDA"
 $ranking: 4
 $sources:
-  headers:
+  platform:
     - "drivers/platform/pico/pico_i2c.h"
 
 values:

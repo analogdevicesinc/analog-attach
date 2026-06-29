@@ -5,9 +5,8 @@ $capability: timer
 $description: "Structure holding the parameters for timer initialization"
 $ranking: 4
 $sources:
-  headers:
+  noos:
     - "include/no_os_timer.h"
-  sources:
     - "drivers/api/no_os_timer.c"
 
 id:

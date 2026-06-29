@@ -4,12 +4,10 @@ $ranking: 4
 $symbol: max_dma_ops
 $capability: dma
 $sources:
-  headers:
+  platform:
     - "../common/maxim_dma.h"
     - "maxim_irq.h"
-  sources:
     - "../common/maxim_dma.c"
     - "maxim_irq.c"
   sdk:
-    headers:
-      - "dma.h"
+    - "dma.h"
