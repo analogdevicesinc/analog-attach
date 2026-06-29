@@ -4,9 +4,8 @@ $symbol: eeprom_24xx32a_init_param
 $description: "24AA32A/24LC32A I2C EEPROM"
 $ranking: 4
 $sources:
-  headers:
+  noos:
     - "drivers/eeprom/24xx32a/24xx32a.h"
-  sources:
     - "drivers/eeprom/24xx32a/24xx32a.c"
 
 i2c_init:

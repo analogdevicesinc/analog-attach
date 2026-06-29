@@ -13,7 +13,7 @@ import {
 import YAML from "yaml";
 import { Result, ok, error } from "./result";
 import { asObject, at, number_, optional, optionalWithDefault, ParseContext, required, string_, stringArray } from "./validators";
-import { RulesetType, RulesetHeaderSources } from "./types";
+import { RulesetType } from "./types";
 import {
 	parse_array_property,
 	parse_bool_property,
@@ -28,7 +28,6 @@ import {
 	parse_union_property
 } from "./property_parser";
 import { is_boolean_property_override, is_enum_property_override, is_include_property_override, is_number_property_override, is_union_property_override } from "./override_validators";
-import { BindingLoader } from "../workfile_handler/types";
 import { resolve_ruleset } from "../resolver/resolver";
 
 export function unwrap<T>(result: Result<T>): T {
@@ -58,52 +57,30 @@ function is_binding_type(value: unknown, context: ParseContext): Result<RulesetT
 	}
 }
 
-function is_source_files(value: unknown, context: ParseContext): Result<RulesetHeaderSources> {
-	const object = asObject(value, context);
-	if (!object.ok) {
-		return object;
-	}
-
-	const headers = required(object.value, "headers", context, stringArray);
-	if (!headers.ok) {
-		return headers;
-	}
-
-	const sources = optional(object.value, "sources", context, stringArray);
-	if (!sources.ok) {
-		return sources;
-	}
-
-	return ok({
-		headers: headers.value,
-		sources: sources.value,
-	});
-}
-
 function is_binding_sources(value: unknown, context: ParseContext): Result<RulesetSources> {
 	const object = asObject(value, context);
 	if (!object.ok) {
 		return object;
 	}
 
-	const headers = optional(object.value, "headers", context, stringArray);
-	if (!headers.ok) {
-		return headers;
+	const noos = optional(object.value, "noos", context, stringArray);
+	if (!noos.ok) {
+		return noos;
 	}
 
-	const sources = optional(object.value, "sources", context, stringArray);
-	if (!sources.ok) {
-		return sources;
-	}
-
-	const sdk = optional(object.value, "sdk", context, is_source_files);
-	if (!sdk.ok) {
-		return sdk;
-	}
-
-	const platform = optional(object.value, "platform", context, is_source_files);
+	const platform = optional(object.value, "platform", context, stringArray);
 	if (!platform.ok) {
 		return platform;
+	}
+
+	const project = optional(object.value, "project", context, stringArray);
+	if (!project.ok) {
+		return project;
+	}
+
+	const sdk = optional(object.value, "sdk", context, stringArray);
+	if (!sdk.ok) {
+		return sdk;
 	}
 
 	const $note = optional(object.value, "$note", context, string_);
@@ -112,9 +89,9 @@ function is_binding_sources(value: unknown, context: ParseContext): Result<Rules
 	}
 
 	return ok({
-		headers: headers.value,
-		sources: sources.value,
+		noos: noos.value,
 		platform: platform.value,
+		project: project.value,
 		sdk: sdk.value,
 		$note: $note.value,
 	});

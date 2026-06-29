@@ -5,7 +5,6 @@ $capability: gpio_irq
 $description: "Xilinx GPIO IRQ platform ops"
 $ranking: 4
 $sources:
-  headers:
+  platform:
     - "drivers/platform/xilinx/xilinx_gpio_irq.h"
-  sources:
     - "drivers/platform/xilinx/xilinx_gpio_irq.c"

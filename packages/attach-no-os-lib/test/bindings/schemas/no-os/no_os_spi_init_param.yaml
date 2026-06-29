@@ -5,9 +5,8 @@ $capability: spi
 $description: "Structure holding the parameters for SPI initialization"
 $ranking: 4
 $sources:
-  headers:
+  noos:
     - "include/no_os_spi.h"
-  sources:
     - "drivers/api/no_os_spi.c"
 
 device_id:

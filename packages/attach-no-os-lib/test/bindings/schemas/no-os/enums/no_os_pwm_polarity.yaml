@@ -4,7 +4,7 @@ $symbol: no_os_pwm_polarity
 $description: "Possible polarities of the PWM signal"
 $ranking: 4
 $sources:
-  headers:
+  noos:
     - "include/no_os_pwm.h"
 
 values:

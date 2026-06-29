@@ -4,7 +4,7 @@ $symbol: no_os_uart_size
 $description: "UART character size (number of data bits)"
 $ranking: 4
 $sources:
-  headers:
+  noos:
     - "include/no_os_uart.h"
 
 values:

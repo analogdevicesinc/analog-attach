@@ -5,9 +5,8 @@ $capability: i2c
 $description: "Linux platform specific I2C initialization parameters"
 $ranking: 4
 $sources:
-  headers:
+  platform:
     - "drivers/platform/linux/linux_i2c.h"
-  sources:
     - "drivers/platform/linux/linux_i2c.c"
 
 device_id:

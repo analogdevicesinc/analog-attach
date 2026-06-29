@@ -5,7 +5,7 @@ $capability: i2c
 $description: "Xilinx platform specific I2C initialization parameters"
 $ranking: 4
 $sources:
-  headers:
+  platform:
     - "drivers/platform/xilinx/xilinx_i2c.h"
 
 type:

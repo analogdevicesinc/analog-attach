@@ -5,9 +5,8 @@ $capability: timer
 $description: "Xilinx platform specific timer initialization parameters"
 $ranking: 4
 $sources:
-  headers:
+  platform:
     - "drivers/platform/xilinx/xilinx_timer.h"
-  sources:
     - "drivers/platform/xilinx/xilinx_timer.c"
 
 active_tmr:

@@ -5,7 +5,7 @@ $capability: uart
 $description: "Xilinx platform specific UART initialization parameters"
 $ranking: 4
 $sources:
-  headers:
+  platform:
     - "drivers/platform/xilinx/xilinx_uart.h"
 
 type:

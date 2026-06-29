@@ -4,9 +4,8 @@ $symbol: no_os_rtc_init_param
 $description: "Structure holding RTC initialization parameters"
 $ranking: 4
 $sources:
-  headers:
+  noos:
     - "include/no_os_rtc.h"
-  sources:
     - "drivers/platform/maxim/max32690/maxim_rtc.c"
 
 id:

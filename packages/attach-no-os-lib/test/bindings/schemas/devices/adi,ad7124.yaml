@@ -7,9 +7,8 @@ $pointer: true
 $init_function: ad7124_setup
 $remove_function: ad7124_remove
 $sources:
-  headers:
+  noos:
     - "drivers/adc/ad7124/ad7124.h"
-  sources:
     - "drivers/adc/ad7124/ad7124.c"
 
 # SPI interface

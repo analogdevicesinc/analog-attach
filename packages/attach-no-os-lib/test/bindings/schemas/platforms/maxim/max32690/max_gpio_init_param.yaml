@@ -5,10 +5,9 @@ $capability: gpio
 $description: "Maxim MAX32690 platform specific GPIO initialization parameters"
 $ranking: 4
 $sources:
-  headers:
+  platform:
     - "drivers/platform/maxim/max32690/maxim_gpio.h"
     - "include/no_os_irq.h"
-  sources:
     - "drivers/platform/maxim/max32690/maxim_gpio.c"
     - "drivers/api/no_os_gpio.c"
 

@@ -4,7 +4,7 @@ $symbol: uart_tx_gp
 $description: "Available GP config for UART TX"
 $ranking: 4
 $sources:
-  headers:
+  platform:
     - "drivers/platform/pico/pico_uart.h"
 
 values:

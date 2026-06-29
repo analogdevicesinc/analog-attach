@@ -4,7 +4,7 @@ $symbol: ad5592r_channel_mode
 $description: "Channel mode configuration for AD5592R"
 $ranking: 4
 $sources:
-  headers:
+  noos:
     - "drivers/adc-dac/ad5592r/ad5592r-base.h"
 
 values:

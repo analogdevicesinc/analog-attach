@@ -5,7 +5,6 @@ $capability: timer
 $description: "Pico Timer platform ops"
 $ranking: 4
 $sources:
-  headers:
+  platform:
     - "drivers/platform/pico/pico_timer.h"
-  sources:
     - "drivers/platform/pico/pico_timer.c"

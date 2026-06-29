@@ -4,7 +4,6 @@ $ranking: 4
 $symbol: stm32_pwm_ops
 $capability: pwm
 $sources:
-  headers:
+  platform:
     - "stm32_pwm.h"
-  sources:
     - "stm32_pwm.c"

@@ -4,9 +4,8 @@ $symbol: ltc4306_init_param
 $description: "LTC4306 4-Channel I2C Mux/Switch"
 $ranking: 4
 $sources:
-  headers:
+  noos:
     - "drivers/io-expander/ltc4306/ltc4306.h"
-  sources:
     - "drivers/io-expander/ltc4306/ltc4306.c"
 
 i2c_init:

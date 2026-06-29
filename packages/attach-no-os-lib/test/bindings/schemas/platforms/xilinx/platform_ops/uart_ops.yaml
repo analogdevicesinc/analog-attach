@@ -5,7 +5,6 @@ $capability: uart
 $description: "Xilinx UART platform ops"
 $ranking: 4
 $sources:
-  headers:
+  platform:
     - "drivers/platform/xilinx/xilinx_uart.h"
-  sources:
     - "drivers/platform/xilinx/xilinx_uart.c"

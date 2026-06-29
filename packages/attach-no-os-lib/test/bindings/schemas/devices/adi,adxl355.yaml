@@ -4,17 +4,13 @@ $symbol: adxl355_init_param
 $description: "ADXL355 3-axis accelerometer configuration"
 $ranking: 4
 $sources:
-  headers:
+  noos:
     - "drivers/accel/adxl355/adxl355.h"
-  sources:
     - "drivers/accel/adxl355/adxl355.c"
-  api:
-    headers:
-      - "no_os_i2c.h"
-      - "no_os_spi.h"
-    sources:
-      - "no_os_i2c.c"
-      - "no_os_spi.c"
+    - "include/no_os_i2c.h"
+    - "include/no_os_spi.h"
+    - "drivers/api/no_os_i2c.c"
+    - "drivers/api/no_os_spi.c"
   $note: "Driver header includes both I2C and SPI regardless of comm_type selection"
 
 comm_type:

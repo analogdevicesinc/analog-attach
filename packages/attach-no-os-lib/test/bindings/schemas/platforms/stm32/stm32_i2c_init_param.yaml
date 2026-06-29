@@ -5,9 +5,8 @@ $capability: i2c
 $description: "STM32 platform specific I2C initialization parameters"
 $ranking: 4
 $sources:
-  headers:
+  platform:
     - "drivers/platform/stm32/stm32_i2c.h"
-  sources:
     - "drivers/platform/stm32/stm32_i2c.c"
 
 i2c_timing:
