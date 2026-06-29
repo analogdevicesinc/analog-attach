@@ -5,7 +5,6 @@ $capability: timer
 $description: "STM32 Timer platform ops"
 $ranking: 4
 $sources:
-  headers:
+  platform:
     - "drivers/platform/stm32/stm32_timer.h"
-  sources:
     - "drivers/platform/stm32/stm32_timer.c"

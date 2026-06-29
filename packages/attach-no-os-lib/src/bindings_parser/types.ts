@@ -173,8 +173,10 @@ export type RulesetHeaderSources = {
 };
 
 export type RulesetSources = RulesetHeaderSources & {
-	platform?: RulesetHeaderSources,
-	sdk?: RulesetHeaderSources,
+	noos?: string[],
+	platform?: string[],
+	project?: string[],
+	sdk?: string[],
 	$note?: string
 };
 

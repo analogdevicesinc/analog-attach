@@ -4,11 +4,9 @@ $ranking: 4
 $symbol: max_pwm_ops
 $capability: pwm
 $sources:
-  headers:
+  platform:
     - "maxim_pwm.h"
-  sources:
     - "maxim_pwm.c"
   sdk:
-    headers:
-      - "tmr.h"
-      - "gpio.h"
+    - "tmr.h"
+    - "gpio.h"

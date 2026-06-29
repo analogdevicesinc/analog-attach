@@ -5,7 +5,6 @@ $capability: gpio
 $description: "Pico GPIO platform ops"
 $ranking: 4
 $sources:
-  headers:
+  platform:
     - "drivers/platform/pico/pico_gpio.h"
-  sources:
     - "drivers/platform/pico/pico_gpio.c"

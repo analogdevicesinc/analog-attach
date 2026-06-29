@@ -4,17 +4,13 @@ $symbol: adt7420_init_param
 $description: "ADT7420/ADT7320 Temperature Sensor"
 $ranking: 4
 $sources:
-  headers:
+  noos:
     - "drivers/temperature/adt7420/adt7420.h"
-  sources:
     - "drivers/temperature/adt7420/adt7420.c"
-  api:
-    headers:
-      - "no_os_i2c.h"
-      - "no_os_spi.h"
-    sources:
-      - "no_os_i2c.c"
-      - "no_os_spi.c"
+    - "include/no_os_i2c.h"
+    - "include/no_os_spi.h"
+    - "drivers/api/no_os_i2c.c"
+    - "drivers/api/no_os_spi.c"
   $note: "Driver header includes both I2C and SPI regardless of interface selection"
 
 active_device:

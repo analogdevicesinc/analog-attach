@@ -5,7 +5,7 @@ $capability: spi
 $description: "STM32 platform specific SPI initialization parameters"
 $ranking: 4
 $sources:
-  headers:
+  platform:
     - "drivers/platform/stm32/stm32_spi.h"
 
 chip_select_port:

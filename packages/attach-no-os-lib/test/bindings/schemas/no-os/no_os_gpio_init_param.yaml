@@ -6,9 +6,8 @@ $init_function: no_os_gpio_get
 $description: "Structure holding the parameters for GPIO initialization"
 $ranking: 4
 $sources:
-  headers:
+  noos:
     - "include/no_os_gpio.h"
-  sources:
     - "drivers/api/no_os_gpio.c"
 
 port:

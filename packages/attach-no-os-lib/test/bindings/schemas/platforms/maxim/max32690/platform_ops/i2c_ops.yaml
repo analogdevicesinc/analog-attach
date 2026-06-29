@@ -4,11 +4,9 @@ $ranking: 4
 $symbol: max_i2c_ops
 $capability: i2c
 $sources:
-  headers:
+  platform:
     - "maxim_i2c.h"
-  sources:
     - "maxim_i2c.c"
   sdk:
-    headers:
-      - "i2c.h"
-      - "gpio.h"
+    - "i2c.h"
+    - "gpio.h"

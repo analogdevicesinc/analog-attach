@@ -5,7 +5,7 @@ $capability: uart
 $description: "Pico platform specific UART initialization parameters"
 $ranking: 4
 $sources:
-  headers:
+  platform:
     - "drivers/platform/pico/pico_uart.h"
 
 uart_tx_pin:

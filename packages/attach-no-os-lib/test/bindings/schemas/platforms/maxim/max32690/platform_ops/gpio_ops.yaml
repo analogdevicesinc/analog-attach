@@ -4,10 +4,8 @@ $ranking: 4
 $symbol: max_gpio_ops
 $capability: gpio
 $sources:
-  headers:
+  platform:
     - "maxim_gpio.h"
-  sources:
     - "maxim_gpio.c"
   sdk:
-    headers:
-      - "gpio.h"
+    - "gpio.h"

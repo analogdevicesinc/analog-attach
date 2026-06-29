@@ -5,7 +5,7 @@ $capability: gpio
 $description: "STM32 platform specific GPIO initialization parameters"
 $ranking: 4
 $sources:
-  headers:
+  platform:
     - "drivers/platform/stm32/stm32_gpio.h"
 
 mode:

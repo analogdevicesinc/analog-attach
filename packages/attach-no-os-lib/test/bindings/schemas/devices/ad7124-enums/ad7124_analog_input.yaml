@@ -4,7 +4,7 @@ $symbol: ad7124_analog_input
 $description: "AD7124 analog input sources"
 $ranking: 4
 $sources:
-  headers:
+  noos:
     - "drivers/adc/ad7124/ad7124.h"
 
 values:

@@ -4,7 +4,7 @@ $symbol: spi_rx_gp
 $description: "Available GP config for SPI RX (MISO)"
 $ranking: 4
 $sources:
-  headers:
+  platform:
     - "drivers/platform/pico/pico_spi.h"
 
 values:

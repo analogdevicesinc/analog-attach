@@ -5,8 +5,7 @@ $description: "Maxim MAX32690 GPIO voltage select options"
 $ranking: 4
 $sources:
   sdk:
-    headers:
-      - "gpio.h"
+    - "gpio.h"
 
 values:
   MXC_GPIO_VSSEL_VDDIO:

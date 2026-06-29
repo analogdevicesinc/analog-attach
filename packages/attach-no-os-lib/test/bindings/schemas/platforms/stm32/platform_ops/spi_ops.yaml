@@ -4,30 +4,24 @@ $ranking: 4
 $symbol: stm32_spi_ops
 $capability: spi
 $sources:
-  headers:
-    - "stm32_spi.h"
-  sources:
-    - "stm32_spi.c"
-  api:
-    headers:
-      - "no_os_dma.h"
-      - "no_os_pwm.h"
-      - "no_os_gpio.h"
-      - "no_os_irq.h"
-    sources:
-      - "no_os_dma.c"
-      - "no_os_pwm.c"
-      - "no_os_gpio.c"
-      - "no_os_irq.c"
+  noos:
+    - "include/no_os_dma.h"
+    - "include/no_os_pwm.h"
+    - "include/no_os_gpio.h"
+    - "include/no_os_irq.h"
+    - "drivers/api/no_os_dma.c"
+    - "drivers/api/no_os_pwm.c"
+    - "drivers/api/no_os_gpio.c"
+    - "drivers/api/no_os_irq.c"
   platform:
-    headers:
-      - "stm32_dma.h"
-      - "stm32_pwm.h"
-      - "stm32_gpio.h"
-      - "stm32_irq.h"
-    sources:
-      - "stm32_dma.c"
-      - "stm32_pwm.c"
-      - "stm32_gpio.c"
-      - "stm32_irq.c"
+    - "stm32_spi.h"
+    - "stm32_spi.c"
+    - "stm32_dma.h"
+    - "stm32_pwm.h"
+    - "stm32_gpio.h"
+    - "stm32_irq.h"
+    - "stm32_dma.c"
+    - "stm32_pwm.c"
+    - "stm32_gpio.c"
+    - "stm32_irq.c"
   $note: "STM32 SPI driver uses DMA, PWM, GPIO, and IRQ internally"
