@@ -4,6 +4,8 @@ $ranking: 4
 $symbol: max_pwm_ops
 $capability: pwm
 $sources:
+  noos:
+    - "include/no_os_pwm.h"
   platform:
     - "maxim_pwm.h"
     - "maxim_pwm.c"

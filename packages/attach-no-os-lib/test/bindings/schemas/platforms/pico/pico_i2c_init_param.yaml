@@ -6,7 +6,7 @@ $description: "Pico platform specific I2C initialization parameters"
 $ranking: 4
 $sources:
   platform:
-    - "drivers/platform/pico/pico_i2c.h"
+    - "pico_i2c.h"
 
 i2c_sda_pin:
   include: "platforms/pico/enums/i2c_sda_gp.yaml"

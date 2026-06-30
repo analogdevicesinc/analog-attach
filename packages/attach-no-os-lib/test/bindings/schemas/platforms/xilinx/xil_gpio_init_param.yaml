@@ -6,7 +6,7 @@ $description: "Xilinx platform specific GPIO initialization parameters"
 $ranking: 4
 $sources:
   platform:
-    - "drivers/platform/xilinx/xilinx_gpio.h"
+    - "xilinx_gpio.h"
 
 type:
   include: "platforms/xilinx/enums/xil_gpio_type.yaml"

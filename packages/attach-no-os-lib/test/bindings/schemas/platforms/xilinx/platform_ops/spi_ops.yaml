@@ -6,5 +6,5 @@ $description: "Xilinx SPI platform ops (PS and general use)"
 $ranking: 4
 $sources:
   platform:
-    - "drivers/platform/xilinx/xilinx_spi.h"
-    - "drivers/platform/xilinx/xilinx_spi.c"
+    - "xilinx_spi.h"
+    - "xilinx_spi.c"

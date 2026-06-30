@@ -6,5 +6,5 @@ $description: "Linux GPIO platform ops"
 $ranking: 4
 $sources:
   platform:
-    - "drivers/platform/linux/linux_gpio.h"
-    - "drivers/platform/linux/linux_gpio.c"
+    - "linux_gpio.h"
+    - "linux_gpio.c"

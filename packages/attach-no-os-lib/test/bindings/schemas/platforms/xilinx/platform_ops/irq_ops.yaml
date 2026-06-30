@@ -6,5 +6,5 @@ $description: "Xilinx IRQ platform ops"
 $ranking: 4
 $sources:
   platform:
-    - "drivers/platform/xilinx/xilinx_irq.h"
-    - "drivers/platform/xilinx/xilinx_irq.c"
+    - "xilinx_irq.h"
+    - "xilinx_irq.c"

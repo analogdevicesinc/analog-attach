@@ -5,7 +5,7 @@ $description: "Maxim MAX32690 SPI slave select polarity options"
 $ranking: 4
 $sources:
   platform:
-    - "drivers/platform/maxim/max32690/maxim_spi.h"
+    - "maxim_spi.h"
 
 values:
   SPI_SS_POL_LOW:
