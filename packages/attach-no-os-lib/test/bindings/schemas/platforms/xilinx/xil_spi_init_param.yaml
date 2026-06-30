@@ -6,7 +6,7 @@ $description: "Xilinx platform specific SPI initialization parameters"
 $ranking: 4
 $sources:
   platform:
-    - "drivers/platform/xilinx/xilinx_spi.h"
+    - "xilinx_spi.h"
 
 type:
   include: "platforms/xilinx/enums/xil_spi_type.yaml"

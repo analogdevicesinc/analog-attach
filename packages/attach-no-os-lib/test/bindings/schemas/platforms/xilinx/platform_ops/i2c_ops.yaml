@@ -6,5 +6,5 @@ $description: "Xilinx I2C platform ops"
 $ranking: 4
 $sources:
   platform:
-    - "drivers/platform/xilinx/xilinx_i2c.h"
-    - "drivers/platform/xilinx/xilinx_i2c.c"
+    - "xilinx_i2c.h"
+    - "xilinx_i2c.c"

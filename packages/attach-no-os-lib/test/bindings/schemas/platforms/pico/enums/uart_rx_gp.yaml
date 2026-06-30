@@ -5,7 +5,7 @@ $description: "Available GP config for UART RX"
 $ranking: 4
 $sources:
   platform:
-    - "drivers/platform/pico/pico_uart.h"
+    - "pico_uart.h"
 
 values:
   - UART0_RX_GP1

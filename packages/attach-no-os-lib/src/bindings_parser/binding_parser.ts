@@ -12,7 +12,7 @@ import {
 } from "./types";
 import YAML from "yaml";
 import { Result, ok, error } from "./result";
-import { asObject, at, number_, optional, optionalWithDefault, ParseContext, required, string_, stringArray } from "./validators";
+import { asObject, at, boolean_, number_, optional, optionalWithDefault, ParseContext, required, string_, stringArray } from "./validators";
 import { RulesetType } from "./types";
 import {
 	parse_array_property,
@@ -50,6 +50,9 @@ function is_binding_type(value: unknown, context: ParseContext): Result<RulesetT
 		}
 		case "platform_ops": {
 			return ok(RulesetType.BT_PLATFORM_OPS);
+		}
+		case "device": {
+			return ok(RulesetType.BT_DEVICE);
 		}
 		default: {
 			return error(`Invalid binding type '${s.value}'`, context.path);
@@ -728,6 +731,86 @@ function parse_binding_from_object(object: Record<string, unknown>, context: Par
 				$override: $override.value,
 				$requires,
 				$capability: $capability.value,
+			});
+		}
+		case RulesetType.BT_DEVICE: {
+			context.document.properties = [];
+			for (const key of Object.keys(object)) {
+				if (key.startsWith("$")) {
+					continue;
+				}
+
+				const property = parse_property(key, object[key], at(context, key));
+				if (!property.ok) {
+					return property;
+				}
+				context.document.properties.push(property.value);
+			}
+
+			const $override = optional(object, "$override", context, is_override);
+			if (!$override.ok) {
+				return $override;
+			}
+
+			const $capability = optional(object, "$capability", context, string_);
+			if (!$capability.ok) {
+				return $capability;
+			}
+
+			// Device-specific fields (all required)
+			const $init_function = required(object, "$init_function", context, string_);
+			if (!$init_function.ok) {
+				return $init_function;
+			}
+
+			const $remove_function = required(object, "$remove_function", context, string_);
+			if (!$remove_function.ok) {
+				return $remove_function;
+			}
+
+			const $descriptor = required(object, "$descriptor", context, string_);
+			if (!$descriptor.ok) {
+				return $descriptor;
+			}
+
+			const $header = required(object, "$header", context, string_);
+			if (!$header.ok) {
+				return $header;
+			}
+
+			const $init_by_pointer = required(object, "$init_by_pointer", context, boolean_);
+			if (!$init_by_pointer.ok) {
+				return $init_by_pointer;
+			}
+
+			// Collect all capabilities from properties into $requires
+			const capabilities = new Set<string>();
+			for (const property of context.document.properties) {
+				if (property.capability) {
+					for (const cap of property.capability) {
+						capabilities.add(cap);
+					}
+				}
+			}
+			const $requires = capabilities.size > 0 ? [...capabilities] : undefined;
+
+			return ok({
+				_t: "BindingDevice",
+				$id: $id.value,
+				$type: $type.value,
+				$symbol: $symbol.value,
+				$description: $description.value,
+				$ranking: $ranking.value,
+				$sources: $sources.value,
+				properties: context.document.properties,
+				$override: $override.value,
+				$requires,
+				$capability: $capability.value,
+				$init_function: $init_function.value,
+				$remove_function: $remove_function.value,
+				$descriptor: $descriptor.value,
+				$header: $header.value,
+				$init_by_pointer: $init_by_pointer.value,
 			});
 		}
 		case RulesetType.BT_ENUM: {

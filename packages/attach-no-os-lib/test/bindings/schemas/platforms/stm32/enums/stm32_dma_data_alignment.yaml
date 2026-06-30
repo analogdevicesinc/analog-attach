@@ -5,7 +5,7 @@ $description: "DMA data alignment"
 $ranking: 4
 $sources:
   platform:
-    - "drivers/platform/stm32/stm32_dma.h"
+    - "stm32_dma.h"
 
 values:
   DATA_ALIGN_BYTE:

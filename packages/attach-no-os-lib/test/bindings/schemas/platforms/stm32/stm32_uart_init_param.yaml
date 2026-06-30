@@ -6,7 +6,7 @@ $description: "STM32 platform specific UART initialization parameters"
 $ranking: 4
 $sources:
   platform:
-    - "drivers/platform/stm32/stm32_uart.h"
+    - "stm32_uart.h"
 
 # FIXME: This is not valid
 # huart:

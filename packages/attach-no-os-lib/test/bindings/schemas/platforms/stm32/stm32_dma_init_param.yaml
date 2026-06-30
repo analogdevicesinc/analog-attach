@@ -6,7 +6,7 @@ $description: "STM32 platform specific DMA initialization parameters"
 $ranking: 4
 $sources:
   platform:
-    - "drivers/platform/stm32/stm32_dma.h"
+    - "stm32_dma.h"
 
 # FIXME: This is not valid
 # chn:

@@ -6,7 +6,7 @@ $description: "Pico platform specific SPI initialization parameters"
 $ranking: 4
 $sources:
   platform:
-    - "drivers/platform/pico/pico_spi.h"
+    - "pico_spi.h"
 
 spi_tx_pin:
   include: "platforms/pico/enums/spi_tx_gp.yaml"

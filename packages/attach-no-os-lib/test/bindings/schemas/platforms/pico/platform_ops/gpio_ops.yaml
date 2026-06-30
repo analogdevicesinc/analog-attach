@@ -6,5 +6,5 @@ $description: "Pico GPIO platform ops"
 $ranking: 4
 $sources:
   platform:
-    - "drivers/platform/pico/pico_gpio.h"
-    - "drivers/platform/pico/pico_gpio.c"
+    - "pico_gpio.h"
+    - "pico_gpio.c"

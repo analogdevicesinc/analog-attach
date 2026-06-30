@@ -1,6 +1,6 @@
 import path from "node:path";
 import { Result, ok, error } from "../bindings_parser/result";
-import { ArrayProperty, EnumProperty, IncludeProperty, PlatformExtraProperty, PlatformOpsProperty, Ruleset, RulesetPlatformOps, RulesetStruct, UnionProperty } from "../bindings_parser/types";
+import { ArrayProperty, EnumProperty, IncludeProperty, PlatformExtraProperty, PlatformOpsProperty, Ruleset, RulesetDevice, RulesetPlatformOps, RulesetStruct, UnionProperty } from "../bindings_parser/types";
 import { scan_platforms } from "../context_handler/platform_scanner";
 import { PlatformManifest } from "../context_handler/types";
 import { load_resolved_binding } from "../resolver/resolver";
@@ -92,8 +92,8 @@ export class WorkfileHandler {
         if (!ruleset) {
             return error(`Symbol '${symbol_name}' not found`, "symbol_name");
         }
-        if (ruleset._t !== "BindingStuct") {
-            return error(`Symbol '${symbol_name}' is not a struct`, "symbol_name");
+        if (ruleset._t !== "BindingStuct" && ruleset._t !== "BindingDevice") {
+            return error(`Symbol '${symbol_name}' is not a struct or device`, "symbol_name");
         }
 
         const property = ruleset.properties.find(p => p.name === property_name);
@@ -107,8 +107,8 @@ export class WorkfileHandler {
 
     get_value(symbol_name: string, property_name: string): Result<any> {
         const ruleset = this.workfile.symbols[symbol_name];
-        if (!ruleset || ruleset._t !== "BindingStuct") {
-            return error(`Symbol '${symbol_name}' is not a struct`, "symbol_name");
+        if (!ruleset || (ruleset._t !== "BindingStuct" && ruleset._t !== "BindingDevice")) {
+            return error(`Symbol '${symbol_name}' is not a struct or device`, "symbol_name");
         }
 
         const property = ruleset.properties.find(p => p.name === property_name);
@@ -160,7 +160,7 @@ export class WorkfileHandler {
         return ok(property.values.map(p => typeof p === "number" ? p.toString() : p));
     }
 
-    suggest_platform_ops(property: PlatformOpsProperty, parent_struct: RulesetStruct): Result<string[]> {
+    suggest_platform_ops(property: PlatformOpsProperty, parent_struct: RulesetStruct | RulesetDevice): Result<string[]> {
         const suggestions: string[] = [];
         
         for (const [name, ops] of Object.entries(this.workfile.platform_ops)) {
@@ -178,11 +178,11 @@ export class WorkfileHandler {
         return ok(suggestions);
     }
 
-    suggest_platform_extra(property: PlatformExtraProperty, parent_struct: RulesetStruct): Result<string[]> {
+    suggest_platform_extra(property: PlatformExtraProperty, parent_struct: RulesetStruct | RulesetDevice): Result<string[]> {
         const suggestions: string[] = [];
 
         for (const [name, symbol] of Object.entries(this.workfile.symbols)) {
-            if (symbol._t !== "BindingStuct") {
+            if (symbol._t !== "BindingStuct" && symbol._t !== "BindingDevice") {
                 continue;
             }
 
@@ -202,8 +202,8 @@ export class WorkfileHandler {
             return error(`Could not find symbol with name: "${symbol_name}" in [${Object.keys(this.workfile.symbols)}]`, "");
         }
 
-        if (symbol._t !== "BindingStuct") {
-            return error(`Expected type BindingStruct, got "${symbol._t}"`, "");
+        if (symbol._t !== "BindingStuct" && symbol._t !== "BindingDevice") {
+            return error(`Expected type BindingStruct or BindingDevice, got "${symbol._t}"`, "");
         }
 
         const property = symbol.properties.find(p => p.name === property_name);
@@ -345,7 +345,7 @@ export class WorkfileHandler {
         const symbols: MinimalWorkfile["symbols"] = {};
 
         for (const [name, ruleset] of Object.entries(this.workfile.symbols)) {
-            if (ruleset._t !== "BindingStuct") {
+            if (ruleset._t !== "BindingStuct" && ruleset._t !== "BindingDevice") {
                 continue;
             }
 

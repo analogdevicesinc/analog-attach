@@ -5,7 +5,7 @@ $description: "Xilinx platform architecture sections for IRQ"
 $ranking: 4
 $sources:
   platform:
-    - "drivers/platform/xilinx/xilinx_irq.h"
+    - "xilinx_irq.h"
 
 values:
   - IRQ_PL

@@ -6,7 +6,7 @@ $description: "Maxim MAX32690 platform specific SPI initialization parameters"
 $ranking: 4
 $sources:
   platform:
-    - "drivers/platform/maxim/max32690/maxim_spi.h"
+    - "maxim_spi.h"
 
 num_slaves:
   type: uint32_t

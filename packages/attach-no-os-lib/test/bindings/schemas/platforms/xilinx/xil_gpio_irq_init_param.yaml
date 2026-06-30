@@ -6,8 +6,8 @@ $description: "Xilinx platform specific GPIO IRQ initialization parameters"
 $ranking: 4
 $sources:
   platform:
-    - "drivers/platform/xilinx/xilinx_gpio_irq.h"
-    - "drivers/platform/xilinx/xilinx_gpio_irq.c"
+    - "xilinx_gpio_irq.h"
+    - "xilinx_gpio_irq.c"
 
 # FIXME: This is not valid
 # parent_desc:

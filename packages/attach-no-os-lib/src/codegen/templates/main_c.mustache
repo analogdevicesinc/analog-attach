@@ -1,0 +1,23 @@
+#include "no_os_error.h"
+#include "common/common_data.h"
+#include "user_app.h"
+
+int main(void)
+{
+	int ret;
+	struct user_devices devices;
+
+{{#devices}}
+	ret = {{{init_function}}}(&devices.{{{symbol_name}}}, {{{init_param_ref}}});
+	if (ret)
+		return ret;
+
+{{/devices}}
+	user_app(&devices);
+
+{{#devices}}
+	{{{remove_function}}}(devices.{{{symbol_name}}});
+{{/devices}}
+
+	return 0;
+}

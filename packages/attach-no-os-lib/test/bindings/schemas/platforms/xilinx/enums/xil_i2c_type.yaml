@@ -5,7 +5,7 @@ $description: "Xilinx platform architecture sections for I2C"
 $ranking: 4
 $sources:
   platform:
-    - "drivers/platform/xilinx/xilinx_i2c.h"
+    - "xilinx_i2c.h"
 
 values:
   - IIC_PL

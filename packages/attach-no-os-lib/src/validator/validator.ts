@@ -11,7 +11,7 @@ export function validate_workfile(workfile: Workfile): ValidationResult {
 	const connections_graph = create_connections_graph(workfile);
 
 	for (const [symbol_name, ruleset] of Object.entries(workfile.symbols)) {
-		if (ruleset._t !== "BindingStuct") {
+		if (ruleset._t !== "BindingStuct" && ruleset._t !== "BindingDevice") {
 			continue;
 		}
 

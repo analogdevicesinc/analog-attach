@@ -1,12 +1,16 @@
 $id: "devices/adi,ad5592r.yaml"
-$type: struct
+$type: device
 $symbol: ad5592r_init_param
 $description: "AD5592R 8-channel, 12-bit configurable ADC/DAC with GPIO"
 $ranking: 4
+$header: "drivers/adc-dac/ad5592r/ad5592r.h"
+$init_function: ad5592r_init
+$remove_function: ad5592r_remove
+$descriptor: ad5592r_dev
+$init_by_pointer: true
 $sources:
   noos:
     - "drivers/adc-dac/ad5592r/ad5592r-base.h"
-    - "drivers/adc-dac/ad5592r/ad5592r.h"
     - "drivers/adc-dac/ad5592r/ad5592r-base.c"
     - "drivers/adc-dac/ad5592r/ad5592r.c"
 

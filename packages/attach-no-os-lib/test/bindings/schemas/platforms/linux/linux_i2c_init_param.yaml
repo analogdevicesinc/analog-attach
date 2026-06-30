@@ -6,8 +6,8 @@ $description: "Linux platform specific I2C initialization parameters"
 $ranking: 4
 $sources:
   platform:
-    - "drivers/platform/linux/linux_i2c.h"
-    - "drivers/platform/linux/linux_i2c.c"
+    - "linux_i2c.h"
+    - "linux_i2c.c"
 
 device_id:
   type: uint32_t
