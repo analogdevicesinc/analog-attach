@@ -1,6 +1,6 @@
 import { describe, test, expect } from 'vitest';
-import { expectOk, expectError, expectErrorPath, expectErrorContains, loadAndParseProperty } from '../test_utils';
-import { NumberProperty } from '../../src/bindings_parser/types';
+import { expectOk, expectError, expectErrorPath, expectErrorContains, loadAndParseProperty } from '../test_utilities';
+import { NumberProperty } from '../../src/ruleset_parser/types';
 
 describe('NumberProperty parsing', () => {
 	describe('valid cases', () => {
@@ -21,30 +21,30 @@ describe('NumberProperty parsing', () => {
 		test('parses with minimum and maximum', () => {
 			const result = loadAndParseProperty('properties/number/valid_with_min_max.yaml');
 			expectOk(result);
-			const prop = result.value as NumberProperty;
-			expect(prop.type).toBe('uint8_t');
-			expect(prop.minimum).toBe(0);
-			expect(prop.maximum).toBe(255);
+			const property = result.value as NumberProperty;
+			expect(property.type).toBe('uint8_t');
+			expect(property.minimum).toBe(0);
+			expect(property.maximum).toBe(255);
 		});
 
 		test('parses with default value', () => {
 			const result = loadAndParseProperty('properties/number/valid_with_default.yaml');
 			expectOk(result);
-			const prop = result.value as NumberProperty;
-			expect(prop.type).toBe('uint16_t');
-			expect(prop.default).toBe(100);
+			const property = result.value as NumberProperty;
+			expect(property.type).toBe('uint16_t');
+			expect(property.default).toBe(100);
 		});
 
 		test('parses with all options', () => {
 			const result = loadAndParseProperty('properties/number/valid_with_all_options.yaml');
 			expectOk(result);
-			const prop = result.value as NumberProperty;
-			expect(prop.type).toBe('uint32_t');
-			expect(prop.description).toBe('A fully configured number property');
-			expect(prop.required).toBe(true);
-			expect(prop.default).toBe(42);
-			expect(prop.minimum).toBe(0);
-			expect(prop.maximum).toBe(1000);
+			const property = result.value as NumberProperty;
+			expect(property.type).toBe('uint32_t');
+			expect(property.description).toBe('A fully configured number property');
+			expect(property.required).toBe(true);
+			expect(property.default).toBe(42);
+			expect(property.minimum).toBe(0);
+			expect(property.maximum).toBe(1000);
 		});
 
 		test('parses size_t type', () => {
@@ -56,8 +56,8 @@ describe('NumberProperty parsing', () => {
 		test('parses with capability', () => {
 			const result = loadAndParseProperty('properties/number/valid_with_capability.yaml');
 			expectOk(result);
-			const prop = result.value as NumberProperty;
-			expect(prop.capability).toEqual(['dma']);
+			const property = result.value as NumberProperty;
+			expect(property.capability).toEqual(['dma']);
 		});
 	});
 

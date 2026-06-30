@@ -35,7 +35,7 @@ export function unwrap<T>(result: Result<T>): T {
 	return result.value;
 }
 
-function is_binding_type(value: unknown, context: ParseContext): Result<RulesetType> {
+function is_ruleset_type(value: unknown, context: ParseContext): Result<RulesetType> {
 	const s = string_(value, context);
 	if (!s.ok) {
 		return s;
@@ -43,24 +43,24 @@ function is_binding_type(value: unknown, context: ParseContext): Result<RulesetT
 
 	switch (s.value) {
 		case "struct": {
-			return ok(RulesetType.BT_STRUCT);
+			return ok(RulesetType.RT_STRUCT);
 		}
 		case "enum": {
-			return ok(RulesetType.BT_ENUM);
+			return ok(RulesetType.RT_ENUM);
 		}
 		case "platform_ops": {
-			return ok(RulesetType.BT_PLATFORM_OPS);
+			return ok(RulesetType.RT_PLATFORM_OPS);
 		}
 		case "device": {
-			return ok(RulesetType.BT_DEVICE);
+			return ok(RulesetType.RT_DEVICE);
 		}
 		default: {
-			return error(`Invalid binding type '${s.value}'`, context.path);
+			return error(`Invalid ruleset type '${s.value}'`, context.path);
 		}
 	}
 }
 
-function is_binding_sources(value: unknown, context: ParseContext): Result<RulesetSources> {
+function is_ruleset_sources(value: unknown, context: ParseContext): Result<RulesetSources> {
 	const object = asObject(value, context);
 	if (!object.ok) {
 		return object;
@@ -649,13 +649,13 @@ function is_enum_property(value: unknown, context: ParseContext): Result<Ruleset
 	return ok(values);
 }
 
-function parse_binding_from_object(object: Record<string, unknown>, context: ParseContext): Result<Ruleset> {
+function parse_ruleset_from_object(object: Record<string, unknown>, context: ParseContext): Result<Ruleset> {
 	const $id = required(object, "$id", context, string_);
 	if (!$id.ok) {
 		return $id;
 	}
 
-	const $type = required(object, "$type", context, is_binding_type);
+	const $type = required(object, "$type", context, is_ruleset_type);
 	if (!$type.ok) {
 		return $type;
 	}
@@ -665,12 +665,12 @@ function parse_binding_from_object(object: Record<string, unknown>, context: Par
 		return $symbol;
 	}
 
-	const $description = optionalWithDefault(object, "$description", context, "no-OS binding", string_);
+	const $description = optionalWithDefault(object, "$description", context, "no-OS ruleset", string_);
 	if (!$description.ok) {
 		return $description;
 	}
 
-	const $sources = required(object, "$sources", context, is_binding_sources);
+	const $sources = required(object, "$sources", context, is_ruleset_sources);
 	if (!$sources.ok) {
 		return $sources;
 	}
@@ -684,7 +684,7 @@ function parse_binding_from_object(object: Record<string, unknown>, context: Par
 	}
 
 	switch ($type.value) {
-		case RulesetType.BT_STRUCT: {
+		case RulesetType.RT_STRUCT: {
 			context.document.properties = [];
 			for (const key of Object.keys(object)) {
 				if (key.startsWith("$")) {
@@ -720,7 +720,7 @@ function parse_binding_from_object(object: Record<string, unknown>, context: Par
 			const $requires = capabilities.size > 0 ? [...capabilities] : undefined;
 
 			return ok({
-				_t: "BindingStuct",
+				_t: "RulesetStruct",
 				$id: $id.value,
 				$type: $type.value,
 				$symbol: $symbol.value,
@@ -733,7 +733,7 @@ function parse_binding_from_object(object: Record<string, unknown>, context: Par
 				$capability: $capability.value,
 			});
 		}
-		case RulesetType.BT_DEVICE: {
+		case RulesetType.RT_DEVICE: {
 			context.document.properties = [];
 			for (const key of Object.keys(object)) {
 				if (key.startsWith("$")) {
@@ -795,7 +795,7 @@ function parse_binding_from_object(object: Record<string, unknown>, context: Par
 			const $requires = capabilities.size > 0 ? [...capabilities] : undefined;
 
 			return ok({
-				_t: "BindingDevice",
+				_t: "RulesetDevice",
 				$id: $id.value,
 				$type: $type.value,
 				$symbol: $symbol.value,
@@ -813,7 +813,7 @@ function parse_binding_from_object(object: Record<string, unknown>, context: Par
 				$init_by_pointer: $init_by_pointer.value,
 			});
 		}
-		case RulesetType.BT_ENUM: {
+		case RulesetType.RT_ENUM: {
 			const values = required(object, "values", context, is_enum_property);
 			if (!values.ok) {
 				return values;
@@ -832,7 +832,7 @@ function parse_binding_from_object(object: Record<string, unknown>, context: Par
 			}
 
 			return ok({
-				_t: "BindingEnum",
+				_t: "RulesetEnum",
 				$id: $id.value,
 				$type: $type.value,
 				$symbol: $symbol.value,
@@ -843,14 +843,14 @@ function parse_binding_from_object(object: Record<string, unknown>, context: Par
 				default: default_.value,
 			});
 		}
-		case RulesetType.BT_PLATFORM_OPS: {
+		case RulesetType.RT_PLATFORM_OPS: {
 			const $capability = optional(object, "$capability", context, string_);
 			if (!$capability.ok) {
 				return $capability;
 			}
 
 			return ok({
-				_t:	"BindingPlatformOps",
+				_t:	"RulesetPlatformOps",
 				$id: $id.value,
 				$type: $type.value,
 				$symbol: $symbol.value,
@@ -863,7 +863,7 @@ function parse_binding_from_object(object: Record<string, unknown>, context: Par
 	}
 }
 
-export function parse_binding(contents: string): Result<Ruleset> {
+export function parse_ruleset(contents: string): Result<Ruleset> {
 	let parsed: unknown;
 	try {
 		parsed = YAML.parse(contents);
@@ -871,11 +871,11 @@ export function parse_binding(contents: string): Result<Ruleset> {
 		return error(`YAML parse error at: ${_error}`, "");
 	}
 
-	return parse_binding_from_object(parsed as Record<string, unknown>, { path: "", document: {} });
+	return parse_ruleset_from_object(parsed as Record<string, unknown>, { path: "", document: {} });
 }
 
-export function load_resolved_binding(content: string): Result<Ruleset> {
-	const parsed = parse_binding(content);
+export function load_resolved_ruleset(content: string): Result<Ruleset> {
+	const parsed = parse_ruleset(content);
 	if (!parsed.ok) {
 		return parsed;
 	}

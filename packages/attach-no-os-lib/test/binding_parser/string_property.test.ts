@@ -1,6 +1,6 @@
 import { describe, test, expect } from 'vitest';
-import { expectOk, expectError, expectErrorPath, expectErrorContains, loadAndParseProperty } from '../test_utils';
-import { StringProperty } from '../../src/bindings_parser/types';
+import { expectOk, expectError, expectErrorPath, expectErrorContains, loadAndParseProperty } from '../test_utilities';
+import { StringProperty } from '../../src/ruleset_parser/types';
 
 describe('StringProperty parsing', () => {
 	describe('valid cases', () => {
@@ -14,9 +14,9 @@ describe('StringProperty parsing', () => {
 		test('parses with default value', () => {
 			const result = loadAndParseProperty('properties/string/valid_with_default.yaml');
 			expectOk(result);
-			const prop = result.value as StringProperty;
-			expect(prop.default).toBe('hello');
-			expect(prop.description).toBe('A string with default');
+			const property = result.value as StringProperty;
+			expect(property.default).toBe('hello');
+			expect(property.description).toBe('A string with default');
 		});
 	});
 

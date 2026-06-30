@@ -1,4 +1,4 @@
-import { Result, ok, error } from "../bindings_parser/result";
+import { Result, ok, error } from "../ruleset_parser/result";
 import { Context, PlatformManifest } from "./types";
 
 export class ContextHandler {

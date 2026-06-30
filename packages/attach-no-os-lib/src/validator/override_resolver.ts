@@ -1,5 +1,12 @@
-import { OverrideCondition, OverrideMutex, Property, PropertyOverride, RulesetDevice, RulesetStruct } from "../bindings_parser/types";
-import { ParseContext } from "../bindings_parser/validators";
+import {
+	OverrideCondition,
+	OverrideMutex,
+	Property,
+	PropertyOverride,
+	RulesetDevice,
+	RulesetStruct
+} from "../ruleset_parser/types";
+import { ParseContext } from "../ruleset_parser/validators";
 import { ChildOverride, ValidationError } from "./types";
 
 export function apply_overrides(
@@ -22,12 +29,12 @@ export function apply_overrides(
 			}
 			case "OverrideSwitch": {
 				const on_symbol = directive.scope === "$parent" ? parent_symbol : child;
-				const on_property = on_symbol.properties.find(p => p.name === directive.$on);
+				const on_property = on_symbol.properties.find(property => property.name === directive.$on);
 				if (!on_property) {
 					break;
 				}
 
-				const matching_case = directive.$cases.find(c => c.condition === on_property.value);
+				const matching_case = directive.$cases.find(_case => _case.condition === on_property.value);
 				if (!matching_case) {
 					break;
 				}

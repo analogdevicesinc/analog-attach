@@ -11,8 +11,8 @@ import {
 	RulesetStruct,
 	StringProperty,
 	UnionProperty
-} from "../bindings_parser/types";
-import { at, ParseContext } from "../bindings_parser/validators";
+} from "../ruleset_parser/types";
+import { at, ParseContext } from "../ruleset_parser/validators";
 import { Workfile } from "../workfile_handler/types";
 import { apply_overrides } from "./override_resolver";
 import { ChildOverride, ValidationError } from "./types";
@@ -41,7 +41,7 @@ export function validate_property(
 		// Skip required check for platform_extra if no valid extras exist (excluding self)
 		if (effective._t === "PlatformExtraProperty" &&
 			!Object.values(workfile.symbols).some(s =>
-				s !== parent_symbol && (s._t === "BindingStuct" || s._t === "BindingDevice") && s.$capability === parent_symbol.$capability)) {
+				s !== parent_symbol && (s._t === "RulesetStruct" || s._t === "RulesetDevice") && s.$capability === parent_symbol.$capability)) {
 			return [];
 		}
 
@@ -111,7 +111,7 @@ function validate_platform_ops(
 		}];
 	}
 
-	if (ops._t !== "BindingPlatformOps") {
+	if (ops._t !== "RulesetPlatformOps") {
 		return [{
 			path: context.path,
 			message: `Expected type platform_ops, got ${ops._t}`,
@@ -167,7 +167,7 @@ function validate_platform_extra(
 		}];
 	}
 
-	if (extra._t !== "BindingStuct" && extra._t !== "BindingDevice") {
+	if (extra._t !== "RulesetStruct" && extra._t !== "RulesetDevice") {
 		return [{
 			path: context.path,
 			message: `Expected type struct or device, got ${extra._t}`,
