@@ -1,6 +1,6 @@
 import { describe, test, expect } from 'vitest';
-import { expectOk, expectError, expectErrorPath, expectErrorContains, loadAndParseProperty } from '../test_utils';
-import { IncludeProperty } from '../../src/bindings_parser/types';
+import { expectOk, expectError, expectErrorPath, expectErrorContains, loadAndParseProperty } from '../test_utilities';
+import { IncludeProperty } from '../../src/ruleset_parser/types';
 
 describe('IncludeProperty parsing', () => {
 	describe('valid cases', () => {
@@ -8,18 +8,18 @@ describe('IncludeProperty parsing', () => {
 			const result = loadAndParseProperty('properties/include/valid_basic.yaml');
 			expectOk(result);
 			expect(result.value._t).toBe('IncludeProperty');
-			const prop = result.value as IncludeProperty;
-			expect(prop.include).toBe('path/to/other.yaml');
-			expect(prop.pointer).toBe(false);
+			const property = result.value as IncludeProperty;
+			expect(property.include).toBe('path/to/other.yaml');
+			expect(property.pointer).toBe(false);
 		});
 
 		test('parses with pointer', () => {
 			const result = loadAndParseProperty('properties/include/valid_with_pointer.yaml');
 			expectOk(result);
-			const prop = result.value as IncludeProperty;
-			expect(prop.include).toBe('path/to/struct.yaml');
-			expect(prop.pointer).toBe(true);
-			expect(prop.description).toBe('Pointer to external struct');
+			const property = result.value as IncludeProperty;
+			expect(property.include).toBe('path/to/struct.yaml');
+			expect(property.pointer).toBe(true);
+			expect(property.description).toBe('Pointer to external struct');
 		});
 	});
 

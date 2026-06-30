@@ -1,4 +1,4 @@
-import { Ruleset } from "../bindings_parser/types";
+import { Ruleset } from "../ruleset_parser/types";
 
 export type Workfile = {
     platform_ops: Record<string, Ruleset>;  // locked, auto-populated from platform, not printed

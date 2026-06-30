@@ -1,9 +1,20 @@
 import path from "node:path";
-import { Result, ok, error } from "../bindings_parser/result";
-import { ArrayProperty, EnumProperty, IncludeProperty, PlatformExtraProperty, PlatformOpsProperty, Ruleset, RulesetDevice, RulesetPlatformOps, RulesetStruct, UnionProperty } from "../bindings_parser/types";
+import { Result, ok, error } from "../ruleset_parser/result";
+import {
+    ArrayProperty,
+    EnumProperty,
+    IncludeProperty,
+    PlatformExtraProperty,
+    PlatformOpsProperty,
+    Ruleset,
+    RulesetDevice,
+    RulesetPlatformOps,
+    RulesetStruct,
+    UnionProperty
+} from "../ruleset_parser/types";
 import { scan_platforms } from "../context_handler/platform_scanner";
 import { PlatformManifest } from "../context_handler/types";
-import { load_resolved_binding } from "../resolver/resolver";
+import { load_resolved_ruleset } from "../resolver/resolver";
 import { get_schemas_path } from "../settings/settings";
 import { collect_child_overrides, create_connections_graph } from "../validator/connection_graph";
 import { apply_overrides } from "../validator/override_resolver";
@@ -92,7 +103,7 @@ export class WorkfileHandler {
         if (!ruleset) {
             return error(`Symbol '${symbol_name}' not found`, "symbol_name");
         }
-        if (ruleset._t !== "BindingStuct" && ruleset._t !== "BindingDevice") {
+        if (ruleset._t !== "RulesetStruct" && ruleset._t !== "RulesetDevice") {
             return error(`Symbol '${symbol_name}' is not a struct or device`, "symbol_name");
         }
 
@@ -107,7 +118,7 @@ export class WorkfileHandler {
 
     get_value(symbol_name: string, property_name: string): Result<any> {
         const ruleset = this.workfile.symbols[symbol_name];
-        if (!ruleset || (ruleset._t !== "BindingStuct" && ruleset._t !== "BindingDevice")) {
+        if (!ruleset || (ruleset._t !== "RulesetStruct" && ruleset._t !== "RulesetDevice")) {
             return error(`Symbol '${symbol_name}' is not a struct or device`, "symbol_name");
         }
 
@@ -164,7 +175,7 @@ export class WorkfileHandler {
         const suggestions: string[] = [];
         
         for (const [name, ops] of Object.entries(this.workfile.platform_ops)) {
-            if (ops._t !== "BindingPlatformOps") {
+            if (ops._t !== "RulesetPlatformOps") {
                 continue;
             }
 
@@ -182,7 +193,7 @@ export class WorkfileHandler {
         const suggestions: string[] = [];
 
         for (const [name, symbol] of Object.entries(this.workfile.symbols)) {
-            if (symbol._t !== "BindingStuct" && symbol._t !== "BindingDevice") {
+            if (symbol._t !== "RulesetStruct" && symbol._t !== "RulesetDevice") {
                 continue;
             }
 
@@ -202,8 +213,8 @@ export class WorkfileHandler {
             return error(`Could not find symbol with name: "${symbol_name}" in [${Object.keys(this.workfile.symbols)}]`, "");
         }
 
-        if (symbol._t !== "BindingStuct" && symbol._t !== "BindingDevice") {
-            return error(`Expected type BindingStruct or BindingDevice, got "${symbol._t}"`, "");
+        if (symbol._t !== "RulesetStruct" && symbol._t !== "RulesetDevice") {
+            return error(`Expected type RulesetStruct or RulesetDevice, got "${symbol._t}"`, "");
         }
 
         const property = symbol.properties.find(p => p.name === property_name);
@@ -310,16 +321,16 @@ export class WorkfileHandler {
         // Clear existing platform ops
         this.clear_platform_ops();
 
-        // Load each ops binding
+        // Load each ops ruleset
         for (const ops_path of manifest.ops) {
-            const ruleset_result = load_resolved_binding(ops_path);
+            const ruleset_result = load_resolved_ruleset(ops_path);
             if (!ruleset_result.ok) {
                 return ruleset_result;
             }
 
             const ruleset = ruleset_result.value;
-            if (ruleset._t !== "BindingPlatformOps") {
-                return error(`Expected platform_ops binding, got ${ruleset._t}: ${ops_path}`, ops_path);
+            if (ruleset._t !== "RulesetPlatformOps") {
+                return error(`Expected platform_ops ruleset, got ${ruleset._t}: ${ops_path}`, ops_path);
             }
 
             const add_result = this.add_platform_ops(ruleset.$symbol, ruleset);
@@ -345,7 +356,7 @@ export class WorkfileHandler {
         const symbols: MinimalWorkfile["symbols"] = {};
 
         for (const [name, ruleset] of Object.entries(this.workfile.symbols)) {
-            if (ruleset._t !== "BindingStuct" && ruleset._t !== "BindingDevice") {
+            if (ruleset._t !== "RulesetStruct" && ruleset._t !== "RulesetDevice") {
                 continue;
             }
 
@@ -396,12 +407,12 @@ export class WorkfileHandler {
 
         // Load each symbol
         for (const [name, node] of Object.entries(minimal.symbols)) {
-            const binding_result = load_resolved_binding(node.$compatible);
-            if (!binding_result.ok) {
-                return binding_result;
+            const ruleset_result = load_resolved_ruleset(node.$compatible);
+            if (!ruleset_result.ok) {
+                return ruleset_result;
             }
 
-            const add_result = this.add_symbol(name, binding_result.value);
+            const add_result = this.add_symbol(name, ruleset_result.value);
             if (!add_result.ok) {
                 return add_result;
             }

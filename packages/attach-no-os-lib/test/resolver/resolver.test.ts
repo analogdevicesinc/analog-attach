@@ -1,11 +1,11 @@
 import { describe, test, expect, beforeEach, afterEach } from 'vitest';
-import * as path from 'node:path';
-import { resolve_ruleset, load_resolved_binding } from '../../src/resolver/resolver';
+import path from 'node:path';
+import { resolve_ruleset, load_resolved_ruleset } from '../../src/resolver/resolver';
 import { set_schemas_path, reset_settings } from '../../src/settings/settings';
-import { parse_binding } from '../../src/bindings_parser/binding_parser';
-import { RulesetStruct } from '../../src/bindings_parser/types';
-import { expectOk } from '../test_utils';
-import * as fs from 'node:fs';
+import { parse_ruleset } from '../../src/ruleset_parser/ruleset_parser';
+import { RulesetStruct } from '../../src/ruleset_parser/types';
+import { expectOk } from '../test_utilities';
+import fs from 'node:fs';
 
 const SCHEMAS_ROOT = path.join(__dirname, '../bindings/schemas');
 
@@ -24,20 +24,20 @@ describe('resolver', () => {
                 path.join(SCHEMAS_ROOT, 'platforms/xilinx/xil_spi_init_param.yaml'),
                 'utf8'
             );
-            const parsed = parse_binding(content);
+            const parsed = parse_ruleset(content);
             expectOk(parsed);
 
             const resolved = resolve_ruleset(parsed.value);
             expectOk(resolved);
 
             const struct = resolved.value as RulesetStruct;
-            const type_prop = struct.properties.find(p => p.name === 'type');
+            const type_property = struct.properties.find(p => p.name === 'type');
 
-            expect(type_prop).toBeDefined();
-            expect(type_prop!._t).toBe('EnumProperty');
-            expect(type_prop!._t === 'EnumProperty' && type_prop.values).toContain('SPI_PS');
-            expect(type_prop!._t === 'EnumProperty' && type_prop.values).toContain('SPI_PL');
-            expect(type_prop!._t === 'EnumProperty' && type_prop.values).toContain('SPI_ENGINE');
+            expect(type_property).toBeDefined();
+            expect(type_property!._t).toBe('EnumProperty');
+            expect(type_property!._t === 'EnumProperty' && type_property.values).toContain('SPI_PS');
+            expect(type_property!._t === 'EnumProperty' && type_property.values).toContain('SPI_PL');
+            expect(type_property!._t === 'EnumProperty' && type_property.values).toContain('SPI_ENGINE');
         });
 
         test('keeps struct include as IncludeProperty', () => {
@@ -45,18 +45,18 @@ describe('resolver', () => {
                 path.join(SCHEMAS_ROOT, 'no-os/no_os_spi_init_param.yaml'),
                 'utf8'
             );
-            const parsed = parse_binding(content);
+            const parsed = parse_ruleset(content);
             expectOk(parsed);
 
             const resolved = resolve_ruleset(parsed.value);
             expectOk(resolved);
 
             const struct = resolved.value as RulesetStruct;
-            const mode_prop = struct.properties.find(p => p.name === 'mode');
+            const mode_property = struct.properties.find(p => p.name === 'mode');
 
-            expect(mode_prop).toBeDefined();
+            expect(mode_property).toBeDefined();
             // mode includes an enum, so should become EnumProperty
-            expect(mode_prop!._t).toBe('EnumProperty');
+            expect(mode_property!._t).toBe('EnumProperty');
         });
 
         test('non-struct rulesets pass through unchanged', () => {
@@ -64,36 +64,36 @@ describe('resolver', () => {
                 path.join(SCHEMAS_ROOT, 'no-os/enums/no_os_spi_mode.yaml'),
                 'utf8'
             );
-            const parsed = parse_binding(content);
+            const parsed = parse_ruleset(content);
             expectOk(parsed);
 
             const resolved = resolve_ruleset(parsed.value);
             expectOk(resolved);
 
-            expect(resolved.value._t).toBe('BindingEnum');
+            expect(resolved.value._t).toBe('RulesetEnum');
         });
     });
 
-    describe('load_resolved_binding', () => {
+    describe('load_resolved_ruleset', () => {
         test('loads and resolves in one call', () => {
-            const result = load_resolved_binding('platforms/xilinx/xil_spi_init_param.yaml');
+            const result = load_resolved_ruleset('platforms/xilinx/xil_spi_init_param.yaml');
             expectOk(result);
 
             const struct = result.value as RulesetStruct;
-            const type_prop = struct.properties.find(p => p.name === 'type');
+            const type_property = struct.properties.find(p => p.name === 'type');
 
-            expect(type_prop).toBeDefined();
-            expect(type_prop!._t).toBe('EnumProperty');
+            expect(type_property).toBeDefined();
+            expect(type_property!._t).toBe('EnumProperty');
         });
 
         test('returns error for non-existent file', () => {
-            const result = load_resolved_binding('nonexistent.yaml');
+            const result = load_resolved_ruleset('nonexistent.yaml');
             expect(result.ok).toBe(false);
         });
 
         test('returns error if schemas_path not set', () => {
             reset_settings();
-            const result = load_resolved_binding('no-os/no_os_spi_init_param.yaml');
+            const result = load_resolved_ruleset('no-os/no_os_spi_init_param.yaml');
             expect(result.ok).toBe(false);
             if (!result.ok) {
                 expect(result.error.message).toContain('Schemas path not configured');

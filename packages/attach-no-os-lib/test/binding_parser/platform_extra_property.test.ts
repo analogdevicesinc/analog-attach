@@ -1,6 +1,6 @@
 import { describe, test, expect } from 'vitest';
-import { expectOk, loadAndParseProperty } from '../test_utils';
-import { PlatformExtraProperty } from '../../src/bindings_parser/types';
+import { expectOk, loadAndParseProperty } from '../test_utilities';
+import { PlatformExtraProperty } from '../../src/ruleset_parser/types';
 
 describe('PlatformExtraProperty parsing', () => {
 	describe('valid cases', () => {
@@ -8,8 +8,8 @@ describe('PlatformExtraProperty parsing', () => {
 			const result = loadAndParseProperty('properties/platform_extra/valid_basic.yaml');
 			expectOk(result);
 			expect(result.value._t).toBe('PlatformExtraProperty');
-			const prop = result.value as PlatformExtraProperty;
-			expect(prop.capability).toEqual(['spi']);
+			const property = result.value as PlatformExtraProperty;
+			expect(property.capability).toEqual(['spi']);
 		});
 	});
 });

@@ -1,6 +1,6 @@
 import { describe, test, expect } from 'vitest';
-import { expectOk, expectError, expectErrorPath, expectErrorContains, loadAndParseProperty } from '../test_utils';
-import { ArrayProperty } from '../../src/bindings_parser/types';
+import { expectOk, expectError, expectErrorPath, expectErrorContains, loadAndParseProperty } from '../test_utilities';
+import { ArrayProperty } from '../../src/ruleset_parser/types';
 
 describe('ArrayProperty parsing', () => {
 	describe('valid cases', () => {

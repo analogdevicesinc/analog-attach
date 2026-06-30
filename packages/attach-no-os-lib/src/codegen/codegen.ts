@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import Mustache from "mustache";
 import { CodegenInput, CodegenResult } from "./types";
-import { Result, ok } from "../bindings_parser/result";
+import { Result, ok } from "../ruleset_parser/result";
 import { build_views } from "./view_builder";
 
 const TEMPLATES_DIR = path.join(__dirname, "templates");

@@ -1,8 +1,8 @@
 import * as fs from 'node:fs';
 import path from 'node:path';
 import { test, describe } from 'vitest';
-import { parse_binding } from '../../src/bindings_parser/binding_parser';
-import { expectOk } from '../test_utils';
+import { parse_ruleset } from '../../src/ruleset_parser/ruleset_parser';
+import { expectOk } from '../test_utilities';
 
 function findYamlFiles(directory: string): string[] {
 	const files: string[] = [];
@@ -26,7 +26,7 @@ const yamlFiles = findYamlFiles(schemas_directory);
 describe('parse all schemas', () => {
 	test.each(yamlFiles)('parses %s', (filePath) => {
 		const content = fs.readFileSync(filePath, 'utf8');
-		const result = parse_binding(content);
+		const result = parse_ruleset(content);
 		expectOk(result);
 	});
 });

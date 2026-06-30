@@ -1,6 +1,6 @@
 import { describe, test, expect } from 'vitest';
-import { expectOk, expectError, expectErrorPath, expectErrorContains, loadAndParseProperty } from '../test_utils';
-import { UnionProperty } from '../../src/bindings_parser/types';
+import { expectOk, expectError, expectErrorPath, expectErrorContains, loadAndParseProperty } from '../test_utilities';
+import { UnionProperty } from '../../src/ruleset_parser/types';
 
 describe('UnionProperty parsing', () => {
 	describe('valid cases', () => {
@@ -8,19 +8,19 @@ describe('UnionProperty parsing', () => {
 			const result = loadAndParseProperty('properties/union/valid_two_members.yaml');
 			expectOk(result);
 			expect(result.value._t).toBe('UnionProperty');
-			const prop = result.value as UnionProperty;
-			expect(prop.members).toHaveLength(2);
-			expect(prop.members[0].name).toBe('spi_init');
-			expect(prop.members[1].name).toBe('i2c_init');
+			const property = result.value as UnionProperty;
+			expect(property.members).toHaveLength(2);
+			expect(property.members[0].name).toBe('spi_init');
+			expect(property.members[1].name).toBe('i2c_init');
 		});
 
 		test('parses with multiple members', () => {
 			const result = loadAndParseProperty('properties/union/valid_multiple_members.yaml');
 			expectOk(result);
-			const prop = result.value as UnionProperty;
-			expect(prop.members).toHaveLength(3);
-			expect(prop.description).toBe('Communication interface');
-			expect(prop.required).toBe(true);
+			const property = result.value as UnionProperty;
+			expect(property.members).toHaveLength(3);
+			expect(property.description).toBe('Communication interface');
+			expect(property.required).toBe(true);
 		});
 	});
 
