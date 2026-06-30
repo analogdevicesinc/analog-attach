@@ -1,0 +1,12 @@
+{{#includes}}
+#include "{{{.}}}"
+{{/includes}}
+
+{{#structs}}
+const struct {{{type}}} {{{name}}} = {
+{{#fields}}
+	.{{{name}}} = {{{c_value}}},
+{{/fields}}
+};
+
+{{/structs}}

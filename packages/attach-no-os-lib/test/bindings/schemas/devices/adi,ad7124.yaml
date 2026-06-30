@@ -1,14 +1,15 @@
 $id: "devices/adi,ad7124.yaml"
-$type: struct
+$type: device
 $symbol: ad7124_init_param
 $description: "AD7124 24-bit Sigma-Delta ADC initialization parameters"
 $ranking: 4
-$pointer: true
+$header: "drivers/adc/ad7124/ad7124.h"
 $init_function: ad7124_setup
 $remove_function: ad7124_remove
+$descriptor: ad7124_dev
+$init_by_pointer: true
 $sources:
   noos:
-    - "drivers/adc/ad7124/ad7124.h"
     - "drivers/adc/ad7124/ad7124.c"
 
 # SPI interface

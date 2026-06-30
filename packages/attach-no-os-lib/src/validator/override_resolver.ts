@@ -1,11 +1,11 @@
-import { OverrideCondition, OverrideMutex, Property, PropertyOverride, RulesetStruct } from "../bindings_parser/types";
+import { OverrideCondition, OverrideMutex, Property, PropertyOverride, RulesetDevice, RulesetStruct } from "../bindings_parser/types";
 import { ParseContext } from "../bindings_parser/validators";
 import { ChildOverride, ValidationError } from "./types";
 
 export function apply_overrides(
 	property: Property,
 	child_overrides: ChildOverride[],
-	parent_symbol: RulesetStruct,
+	parent_symbol: RulesetStruct | RulesetDevice,
 ): Property {
 	const effective = structuredClone(property);
 
@@ -69,7 +69,7 @@ function merge_override(property: Property, override: PropertyOverride): void {
 
 function evaluate_condition(
 	condition: OverrideCondition,
-	symbol: RulesetStruct
+	symbol: RulesetStruct | RulesetDevice
 ): boolean {
 	const property = symbol.properties.find(p => p.name === condition.target);
 	if (!property) {
@@ -81,7 +81,7 @@ function evaluate_condition(
 
 export function validate_mutex(
 	mutex: OverrideMutex,
-	symbol: RulesetStruct,
+	symbol: RulesetStruct | RulesetDevice,
 	context: ParseContext
 ): ValidationError[] {
 	if (mutex.scope !== "$parent") {

@@ -5,7 +5,7 @@ $description: "Xilinx timer type selection"
 $ranking: 4
 $sources:
   platform:
-    - "drivers/platform/xilinx/xilinx_timer.h"
+    - "xilinx_timer.h"
 
 values:
   TIMER_PL: "Programmable Logic timer"

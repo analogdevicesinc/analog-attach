@@ -5,7 +5,7 @@ $description: "DMA data modes"
 $ranking: 4
 $sources:
   platform:
-    - "drivers/platform/stm32/stm32_dma.h"
+    - "stm32_dma.h"
 
 values:
   DMA_NORMAL_MODE:

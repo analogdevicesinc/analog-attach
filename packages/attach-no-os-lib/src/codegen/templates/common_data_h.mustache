@@ -1,0 +1,21 @@
+#ifndef COMMON_DATA_H
+#define COMMON_DATA_H
+
+/* Includes */
+{{#includes}}
+#include "{{{.}}}"
+{{/includes}}
+
+/* All initialized devices */
+struct user_devices {
+{{#devices}}
+	struct {{{descriptor_type}}} *{{{symbol_name}}};
+{{/devices}}
+};
+
+/* Init param externs */
+{{#externs}}
+extern const struct {{{type}}} {{{name}}};
+{{/externs}}
+
+#endif /* COMMON_DATA_H */

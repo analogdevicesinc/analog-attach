@@ -6,7 +6,7 @@ $description: "Pico platform specific UART initialization parameters"
 $ranking: 4
 $sources:
   platform:
-    - "drivers/platform/pico/pico_uart.h"
+    - "pico_uart.h"
 
 uart_tx_pin:
   include: "platforms/pico/enums/uart_tx_gp.yaml"

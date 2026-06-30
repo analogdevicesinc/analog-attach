@@ -21,7 +21,7 @@ function load_binding(binding_path: string): Result<Ruleset> {
 }
 
 export function resolve_ruleset(ruleset: Ruleset): Result<Ruleset> {
-	if (ruleset._t !== "BindingStuct") {
+	if (ruleset._t !== "BindingStuct" && ruleset._t !== "BindingDevice") {
 		return ok(ruleset);
 	}
 

@@ -5,7 +5,7 @@ $description: "Available GP config for SPI SCK (clock)"
 $ranking: 4
 $sources:
   platform:
-    - "drivers/platform/pico/pico_spi.h"
+    - "pico_spi.h"
 
 values:
   - SPI0_SCK_GP2

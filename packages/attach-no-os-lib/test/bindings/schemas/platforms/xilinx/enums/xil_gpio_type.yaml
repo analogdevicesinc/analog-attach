@@ -5,7 +5,7 @@ $description: "Xilinx platform architecture sections for GPIO"
 $ranking: 4
 $sources:
   platform:
-    - "drivers/platform/xilinx/xilinx_gpio.h"
+    - "xilinx_gpio.h"
 
 values:
   - GPIO_PL
