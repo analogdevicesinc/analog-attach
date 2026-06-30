@@ -1,10 +1,10 @@
-export type BindingError = {
-	_t: "BindingError",
+export type RulesetError = {
+	_t: "RulesetError",
 	message: string,
 	path: string
 }
 
-export type Result<T, E = BindingError> =
+export type Result<T, E = RulesetError> =
 	| { ok: true;  value: T }
 	| { ok: false; error: E }
 
@@ -13,6 +13,6 @@ export function ok<T = void>(value?: T): Result<T> {
 }
 
 export function error(message: string, path: string): Result<never> {
-	return { ok: false, error: { "_t": "BindingError", message, path } };
+	return { ok: false, error: { "_t": "RulesetError", message, path } };
 }
 

@@ -1,6 +1,6 @@
 import { describe, test, expect } from 'vitest';
-import { expectOk, expectError, expectErrorContains, loadAndParseProperty } from '../test_utils';
-import { PlatformOpsProperty } from '../../src/bindings_parser/types';
+import { expectOk, expectError, expectErrorContains, loadAndParseProperty } from '../test_utilities';
+import { PlatformOpsProperty } from '../../src/ruleset_parser/types';
 
 describe('PlatformOpsProperty parsing', () => {
 	describe('valid cases', () => {
@@ -8,9 +8,9 @@ describe('PlatformOpsProperty parsing', () => {
 			const result = loadAndParseProperty('properties/platform_ops/valid_basic.yaml');
 			expectOk(result);
 			expect(result.value._t).toBe('PlatformOpsProperty');
-			const prop = result.value as PlatformOpsProperty;
-			expect(prop.target).toBe('spi_ops');
-			expect(prop.capability).toEqual(['spi']);
+			const property = result.value as PlatformOpsProperty;
+			expect(property.target).toBe('spi_ops');
+			expect(property.capability).toEqual(['spi']);
 		});
 	});
 

@@ -5,7 +5,7 @@ import os from 'node:os';
 import { WorkfileHandler } from '../../src/workfile_handler/workfile_handler';
 import { set_schemas_path, reset_settings } from '../../src/settings/settings';
 import { generate_project } from '../../src/codegen/codegen';
-import { expectOk } from '../test_utils';
+import { expectOk } from '../test_utilities';
 import { MinimalWorkfile } from '../../src/workfile_handler/types';
 
 const SCHEMAS_ROOT = path.join(__dirname, '../bindings/schemas');
@@ -37,17 +37,17 @@ const test_workfile: MinimalWorkfile = {
 
 describe('codegen', () => {
     let handler: WorkfileHandler;
-    let tmp_dir: string;
+    let temporary_directory: string;
 
     beforeEach(() => {
         set_schemas_path(SCHEMAS_ROOT);
         handler = new WorkfileHandler();
-        tmp_dir = fs.mkdtempSync(path.join(os.tmpdir(), 'codegen-test-'));
+        temporary_directory = fs.mkdtempSync(path.join(os.tmpdir(), 'codegen-test-'));
     });
 
     afterEach(() => {
         reset_settings();
-        fs.rmSync(tmp_dir, { recursive: true, force: true });
+        fs.rmSync(temporary_directory, { recursive: true, force: true });
     });
 
     test('generate project from minimal workfile', () => {
@@ -63,7 +63,7 @@ describe('codegen', () => {
             platform_name: "max32690",
             platform_vendor: "maxim",
             project_name: "test-project",
-            output_path: tmp_dir,
+            output_path: temporary_directory,
             noos_path: "$(realpath ../../../)",
         });
 
@@ -74,7 +74,7 @@ describe('codegen', () => {
 
         // Print common_data.h for visual inspection
         const common_data_h = fs.readFileSync(
-            path.join(tmp_dir, "test-project/src/common/common_data.h"),
+            path.join(temporary_directory, "test-project/src/common/common_data.h"),
             "utf8"
         );
         console.log("\n=== common_data.h ===");
@@ -82,7 +82,7 @@ describe('codegen', () => {
 
         // Print common_data.c for visual inspection
         const common_data_c = fs.readFileSync(
-            path.join(tmp_dir, "test-project/src/common/common_data.c"),
+            path.join(temporary_directory, "test-project/src/common/common_data.c"),
             "utf8"
         );
         console.log("\n=== common_data.c ===");
@@ -90,7 +90,7 @@ describe('codegen', () => {
 
         // Print src.mk for visual inspection
         const source_mk = fs.readFileSync(
-            path.join(tmp_dir, "test-project/src.mk"),
+            path.join(temporary_directory, "test-project/src.mk"),
             "utf8"
         );
         console.log("\n=== src.mk ===");
@@ -98,7 +98,7 @@ describe('codegen', () => {
 
         // Print main.c for visual inspection
         const main_c = fs.readFileSync(
-            path.join(tmp_dir, "test-project/src/main.c"),
+            path.join(temporary_directory, "test-project/src/main.c"),
             "utf8"
         );
         console.log("\n=== main.c ===");
@@ -106,7 +106,7 @@ describe('codegen', () => {
 
         // Print user_app.h for visual inspection
         const user_app_h = fs.readFileSync(
-            path.join(tmp_dir, "test-project/src/user_app.h"),
+            path.join(temporary_directory, "test-project/src/user_app.h"),
             "utf8"
         );
         console.log("\n=== user_app.h ===");

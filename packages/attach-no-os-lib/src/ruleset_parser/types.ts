@@ -9,7 +9,7 @@ export type PropertyBase = {
 	disabled?: boolean, // NOTE: default is disabled: false
 	value?: any,
 	capability?: string[], // Platform capabilities required for this property
-	_platform_disabled?: boolean, // Internal: set by resolver when capability is missing, not parsed from binding
+	_platform_disabled?: boolean, // Internal: set by resolver when capability is missing, not parsed from ruleset
 }
 
 export type PrimitiveSymbol = PrimitiveCType["symbol"];
@@ -123,7 +123,7 @@ export type OverrideSwitch = {
 export type OverrideCondition = {
 	scope: OverrideScope,
 	target: string,
-	value: unknown // FIXME: Does this need to be unknwon?
+	value: unknown // FIXME: Does this need to be unknown?
 }
 
 export type OverrideIfThen = {
@@ -154,18 +154,18 @@ export type OverrideDirective = OverrideSwitch | OverrideIfThen | OverrideStatic
 
 // TODO: Figure out how to specify the spi/i2c etc types, these are too generic
 export enum RulesetType {
-	BT_STRUCT = "bt_struct",
-	BT_ENUM = "bt_enum",
-	BT_PLATFORM_OPS = "bt_platform_ops",
-	BT_DEVICE = "bt_device",
+	RT_STRUCT = "bt_struct",
+	RT_ENUM = "bt_enum",
+	RT_PLATFORM_OPS = "bt_platform_ops",
+	RT_DEVICE = "bt_device",
 };
 
 enum RulesetRank {
-	BR_PRODUCTION = 0, // Deployed in shipping products/apps, hardware validated across all variants
-	BR_VALIDATED = 1, // Developer reviewd, tested on real hardware
-	BR_REVIEWED = 2, // Human reviewed, schema validates, basic tests
-	BR_GENERATED = 3, // Auto/AI generated, validates, but minimally tested
-	BR_DRAFT = 4, // Experimental, may not fully validate
+	RR_PRODUCTION = 0, // Deployed in shipping products/apps, hardware validated across all variants
+	RR_VALIDATED = 1, // Developer reviewed, tested on real hardware
+	RR_REVIEWED = 2, // Human reviewed, schema validates, basic tests
+	RR_GENERATED = 3, // Auto/AI generated, validates, but minimally tested
+	RR_DRAFT = 4, // Experimental, may not fully validate
 };
 
 export type RulesetHeaderSources = {
@@ -198,15 +198,15 @@ type RulesetBase = {
 }
 
 export type RulesetEnum = RulesetBase & {
-	_t: "BindingEnum",
-	$type: RulesetType.BT_ENUM,
+	_t: "RulesetEnum",
+	$type: RulesetType.RT_ENUM,
 	values: RulesetEnumValue[],
 	default?: string,
 };
 
 export type RulesetStruct = RulesetBase & {
-	_t: "BindingStuct",
-	$type: RulesetType.BT_STRUCT,
+	_t: "RulesetStruct",
+	$type: RulesetType.RT_STRUCT,
 	properties: Property[],
 	$override?: OverrideDirective[],
 	$requires?: string[], // Auto-computed: all capabilities required by properties
@@ -214,8 +214,8 @@ export type RulesetStruct = RulesetBase & {
 };
 
 export type RulesetDevice = RulesetBase & {
-	_t: "BindingDevice",
-	$type: RulesetType.BT_DEVICE,
+	_t: "RulesetDevice",
+	$type: RulesetType.RT_DEVICE,
 	properties: Property[],
 	$override?: OverrideDirective[],
 	$requires?: string[],
@@ -230,8 +230,8 @@ export type RulesetDevice = RulesetBase & {
 
 export type RulesetPlatformOps = RulesetBase & {
 	// FIXME: Rename this type
-	_t: "BindingPlatformOps",
-	$type: RulesetType.BT_PLATFORM_OPS,
+	_t: "RulesetPlatformOps",
+	$type: RulesetType.RT_PLATFORM_OPS,
 	$capability?: string,
 };
 

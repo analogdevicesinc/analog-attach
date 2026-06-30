@@ -1,6 +1,6 @@
 import { describe, test, expect } from 'vitest';
-import { expectOk, loadAndParseProperty } from '../test_utils';
-import { CallbackContextProperty } from '../../src/bindings_parser/types';
+import { expectOk, loadAndParseProperty } from '../test_utilities';
+import { CallbackContextProperty } from '../../src/ruleset_parser/types';
 
 describe('CallbackContextProperty parsing', () => {
 	describe('valid cases', () => {
@@ -13,9 +13,9 @@ describe('CallbackContextProperty parsing', () => {
 		test('parses with default', () => {
 			const result = loadAndParseProperty('properties/callback_ctx/valid_with_default.yaml');
 			expectOk(result);
-			const prop = result.value as CallbackContextProperty;
-			expect(prop.default).toBe('NULL');
-			expect(prop.description).toBe('User context pointer');
+			const property = result.value as CallbackContextProperty;
+			expect(property.default).toBe('NULL');
+			expect(property.description).toBe('User context pointer');
 		});
 	});
 });
