@@ -1,4 +1,4 @@
-import { OverrideDirective, RulesetDevice, RulesetStruct } from "../bindings_parser/types";
+import { OverrideDirective, RulesetDevice, RulesetStruct } from "../ruleset_parser/types";
 
 export type ValidationError = {
 	path: string;

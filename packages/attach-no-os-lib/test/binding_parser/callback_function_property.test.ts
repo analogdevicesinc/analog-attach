@@ -1,6 +1,6 @@
 import { describe, test, expect } from 'vitest';
-import { expectOk, expectError, expectErrorContains, loadAndParseProperty } from '../test_utils';
-import { CallbackFunctionProperty } from '../../src/bindings_parser/types';
+import { expectOk, expectError, expectErrorContains, loadAndParseProperty } from '../test_utilities';
+import { CallbackFunctionProperty } from '../../src/ruleset_parser/types';
 
 describe('CallbackFunctionProperty parsing', () => {
 	describe('valid cases', () => {
@@ -8,16 +8,16 @@ describe('CallbackFunctionProperty parsing', () => {
 			const result = loadAndParseProperty('properties/callback_func/valid_basic.yaml');
 			expectOk(result);
 			expect(result.value._t).toBe('CallbackFunctionProperty');
-			const prop = result.value as CallbackFunctionProperty;
-			expect(prop.signature).toBe('int (*)(void *ctx, uint8_t *data, size_t len)');
+			const property = result.value as CallbackFunctionProperty;
+			expect(property.signature).toBe('int (*)(void *ctx, uint8_t *data, size_t len)');
 		});
 
 		test('parses with default', () => {
 			const result = loadAndParseProperty('properties/callback_func/valid_with_default.yaml');
 			expectOk(result);
-			const prop = result.value as CallbackFunctionProperty;
-			expect(prop.default).toBe('NULL');
-			expect(prop.description).toBe('Optional callback');
+			const property = result.value as CallbackFunctionProperty;
+			expect(property.default).toBe('NULL');
+			expect(property.description).toBe('Optional callback');
 		});
 	});
 

@@ -1,6 +1,6 @@
 import path from "node:path";
-import { ok, Result } from "../bindings_parser/result";
-import { Property, RulesetDevice, RulesetStruct } from "../bindings_parser/types";
+import { ok, Result } from "../ruleset_parser/result";
+import { Property, RulesetDevice, RulesetStruct } from "../ruleset_parser/types";
 import { Workfile } from "../workfile_handler/types";
 import { CodegenInput, DeviceInfo, SourcePaths, StructView, Views } from "./types";
 import { create_connections_graph } from "../validator/connection_graph";
@@ -128,7 +128,7 @@ function collect_sources(workfile: Workfile): SourcePaths {
 		}
 
 		// Merge $header into appropriate set (for device schemas)
-		if (ruleset._t === "BindingDevice") {
+		if (ruleset._t === "RulesetDevice") {
 			const mapped = map_noos_path(ruleset.$header);
 			if (mapped.variable === "INCLUDE") {
 				include.add(mapped.path);
@@ -194,7 +194,7 @@ function order_symbols(workfile: Workfile): [string, RulesetStruct | RulesetDevi
 	const result: [string, RulesetStruct | RulesetDevice][] = [];
 	for (const name of sorted) {
 		const ruleset = workfile.symbols[name];
-		if (ruleset._t === "BindingStuct" || ruleset._t === "BindingDevice") {
+		if (ruleset._t === "RulesetStruct" || ruleset._t === "RulesetDevice") {
 			result.push([name, ruleset]);
 		}
 	}
@@ -204,15 +204,15 @@ function order_symbols(workfile: Workfile): [string, RulesetStruct | RulesetDevi
 
 function build_struct_view(name: string, ruleset: RulesetStruct | RulesetDevice): StructView {
 	return {
-        type: ruleset.$symbol,
-        name: name,
-        fields: ruleset.properties
-            .filter(property => property.value !== undefined && property.value !== null)
-            .map(property => ({
-                name: property.name,
-                c_value: format_c_value(property),
-            })),
-    };
+		type: ruleset.$symbol,
+		name: name,
+		fields: ruleset.properties
+			.filter(property => property.value !== undefined && property.value !== null)
+			.map(property => ({
+				name: property.name,
+				c_value: format_c_value(property),
+		})),
+	};
 }
 
 function format_c_value(property: Property): string {
@@ -250,7 +250,7 @@ function format_c_value(property: Property): string {
 			const value = property.value as Record<string, string>;
 			const [member_name, reference] = Object.entries(value)[0];
 			// Find the union member to check if it's a pointer
-			const member = property.members.find(m => m.name === member_name);
+			const member = property.members.find(member => member.name === member_name);
 			const is_pointer = member?.pointer ?? false;
 			return is_pointer
 				? `{ .${member_name} = &${reference} }`
@@ -316,6 +316,6 @@ function extract_device_info(symbol_name: string, ruleset: RulesetDevice): Devic
 
 function collect_devices(workfile: Workfile): DeviceInfo[] {
 	return Object.entries(workfile.symbols)
-		.filter(([_, sym]) => sym._t === "BindingDevice")
+		.filter(([_, sym]) => sym._t === "RulesetDevice")
 		.map(([name, sym]) => extract_device_info(name, sym as RulesetDevice));
 }

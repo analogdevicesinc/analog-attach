@@ -1,6 +1,20 @@
 import { describe, test, expect } from 'vitest';
 import { validate_workfile } from '../../src/validator/validator';
-import { RulesetStruct, RulesetType, RulesetPlatformOps, IncludeProperty, UnionProperty, ArrayProperty, NumberProperty, BooleanProperty, EnumProperty, StringProperty, OverrideDirective, PlatformOpsProperty, PlatformExtraProperty } from '../../src/bindings_parser/types';
+import {
+    RulesetStruct,
+    RulesetType,
+    RulesetPlatformOps,
+    IncludeProperty,
+    UnionProperty,
+    ArrayProperty,
+    NumberProperty,
+    BooleanProperty,
+    EnumProperty,
+    StringProperty,
+    OverrideDirective,
+    PlatformOpsProperty,
+    PlatformExtraProperty
+} from '../../src/ruleset_parser/types';
 import { Workfile } from '../../src/workfile_handler/types';
 
 function make_struct(
@@ -10,9 +24,9 @@ function make_struct(
     overrides?: OverrideDirective[]
 ): RulesetStruct {
     return {
-        _t: "BindingStuct",
+        _t: "RulesetStruct",
         $id: id,
-        $type: RulesetType.BT_STRUCT,
+        $type: RulesetType.RT_STRUCT,
         $symbol: name,
         $description: "Test struct",
         $ranking: 4,
@@ -100,9 +114,9 @@ function make_workfile(symbols: Record<string, RulesetStruct>, platform_ops: Rec
 
 function make_platform_ops(id: string, name: string, capability?: string): RulesetPlatformOps {
     return {
-        _t: "BindingPlatformOps",
+        _t: "RulesetPlatformOps",
         $id: id,
-        $type: RulesetType.BT_PLATFORM_OPS,
+        $type: RulesetType.RT_PLATFORM_OPS,
         $symbol: name,
         $description: "Test ops",
         $ranking: 4,
@@ -139,9 +153,9 @@ function make_struct_with_capability(
     properties: RulesetStruct['properties'] = []
 ): RulesetStruct {
     return {
-        _t: "BindingStuct",
+        _t: "RulesetStruct",
         $id: id,
-        $type: RulesetType.BT_STRUCT,
+        $type: RulesetType.RT_STRUCT,
         $symbol: name,
         $description: "Test struct",
         $ranking: 4,
@@ -1047,7 +1061,7 @@ describe('validate_workfile', () => {
             const result = validate_workfile(workfile);
             // Should be valid (allowed takes precedence) but with warning
             expect(result.valid).toBe(true);
-            expect(result.errors.some(e => e.severity === "warning" && e.message.includes("Capability mismatch"))).toBe(true);
+            expect(result.errors.some(_error => _error.severity === "warning" && _error.message.includes("Capability mismatch"))).toBe(true);
         });
     });
 

@@ -1,27 +1,27 @@
 import fs from "node:fs";
 import path from "node:path";
-import { error, ok, Result } from "../bindings_parser/result";
-import { parse_binding } from "../bindings_parser/binding_parser";
-import { EnumProperty, Property, Ruleset } from "../bindings_parser/types";
+import { error, ok, Result } from "../ruleset_parser/result";
+import { parse_ruleset } from "../ruleset_parser/ruleset_parser";
+import { EnumProperty, Property, Ruleset } from "../ruleset_parser/types";
 import { get_schemas_path } from "../settings/settings";
 
-function load_binding(binding_path: string): Result<Ruleset> {
+function load_ruleset(ruleset_path: string): Result<Ruleset> {
 	const schemas_path = get_schemas_path();
 	if (!schemas_path) {
 		return error("Schemas path not configured. Call set_schemas_path() first.", "schemas_path");
 	}
 
-	const full_path = path.join(schemas_path, binding_path);
+	const full_path = path.join(schemas_path, ruleset_path);
 	try {
 		const content = fs.readFileSync(full_path, "utf8");
-		return parse_binding(content);
+		return parse_ruleset(content);
 	} catch {
-		return error(`Failed to load binding: ${full_path}`, binding_path);
+		return error(`Failed to load ruleset: ${full_path}`, ruleset_path);
 	}
 }
 
 export function resolve_ruleset(ruleset: Ruleset): Result<Ruleset> {
-	if (ruleset._t !== "BindingStuct" && ruleset._t !== "BindingDevice") {
+	if (ruleset._t !== "RulesetStruct" && ruleset._t !== "RulesetDevice") {
 		return ok(ruleset);
 	}
 
@@ -45,12 +45,12 @@ function resolve_property(property: Property): Result<Property> {
 		return ok(property);
 	}
 
-	const included = load_binding(property.include);
+	const included = load_ruleset(property.include);
 	if (!included.ok) {
 		return included;
 	}
 
-	if (included.value._t === "BindingEnum") {
+	if (included.value._t === "RulesetEnum") {
 		const enum_property: EnumProperty = {
 			_t: "EnumProperty",
 			name: property.name,
@@ -67,8 +67,8 @@ function resolve_property(property: Property): Result<Property> {
 	return ok(property);
 }
 
-export function load_resolved_binding(binding_path: string): Result<Ruleset> {
-	const parsed = load_binding(binding_path);
+export function load_resolved_ruleset(ruleset_path: string): Result<Ruleset> {
+	const parsed = load_ruleset(ruleset_path);
 	if (!parsed.ok) {
 		return parsed;
 	}

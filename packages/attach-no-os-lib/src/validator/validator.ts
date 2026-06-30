@@ -1,6 +1,6 @@
 import { Workfile } from "../workfile_handler/types";
 import { ValidationError, ValidationResult } from "./types";
-import { ParseContext } from "../bindings_parser/validators";
+import { ParseContext } from "../ruleset_parser/validators";
 import { validate_property } from "./property_validator";
 import { validate_mutex } from "./override_resolver";
 import { collect_child_overrides, create_connections_graph } from "./connection_graph";
@@ -11,7 +11,7 @@ export function validate_workfile(workfile: Workfile): ValidationResult {
 	const connections_graph = create_connections_graph(workfile);
 
 	for (const [symbol_name, ruleset] of Object.entries(workfile.symbols)) {
-		if (ruleset._t !== "BindingStuct" && ruleset._t !== "BindingDevice") {
+		if (ruleset._t !== "RulesetStruct" && ruleset._t !== "RulesetDevice") {
 			continue;
 		}
 

@@ -1,18 +1,29 @@
 import { describe, test, expect, beforeEach, afterEach } from 'vitest';
 import path from 'node:path';
 import { WorkfileHandler } from '../../src/workfile_handler/workfile_handler';
-import { RulesetStruct, RulesetType, IncludeProperty, UnionProperty, ArrayProperty, RulesetPlatformOps, EnumProperty, BooleanProperty, PlatformOpsProperty, PlatformExtraProperty } from '../../src/bindings_parser/types';
+import {
+    RulesetStruct,
+    RulesetType,
+    IncludeProperty,
+    UnionProperty,
+    ArrayProperty,
+    RulesetPlatformOps,
+    EnumProperty,
+    BooleanProperty,
+    PlatformOpsProperty,
+    PlatformExtraProperty
+} from '../../src/ruleset_parser/types';
 import { scan_platform } from '../../src/context_handler/platform_scanner';
-import { expectOk, expectError, expectErrorContains } from '../test_utils';
+import { expectOk, expectError, expectErrorContains } from '../test_utilities';
 import { set_schemas_path, reset_settings } from '../../src/settings/settings';
-import { load_resolved_binding } from '../../src/resolver/resolver';
+import { load_resolved_ruleset } from '../../src/resolver/resolver';
 import minimal_workfile_spi from './fixtures/minimal_workfile_spi.json';
 
 function make_struct(id: string, name: string, properties: RulesetStruct['properties'] = []): RulesetStruct {
     return {
-        _t: "BindingStuct",
+        _t: "RulesetStruct",
         $id: id,
-        $type: RulesetType.BT_STRUCT,
+        $type: RulesetType.RT_STRUCT,
         $symbol: name,
         $description: "Test struct",
         $ranking: 4,
@@ -23,9 +34,9 @@ function make_struct(id: string, name: string, properties: RulesetStruct['proper
 
 function make_platform_ops(id: string, name: string, capability?: string): RulesetPlatformOps {
     return {
-        _t: "BindingPlatformOps",
+        _t: "RulesetPlatformOps",
         $id: id,
-        $type: RulesetType.BT_PLATFORM_OPS,
+        $type: RulesetType.RT_PLATFORM_OPS,
         $symbol: name,
         $description: "Test ops",
         $ranking: 4,
@@ -353,7 +364,7 @@ describe('WorkfileHandler', () => {
 
             const spi_ops = handler.find_any('max_spi_ops');
             expect(spi_ops).toBeDefined();
-            expect(spi_ops?._t).toBe('BindingPlatformOps');
+            expect(spi_ops?._t).toBe('RulesetPlatformOps');
         });
 
         test('returns error if binding is not platform_ops', () => {
@@ -586,7 +597,7 @@ describe('WorkfileHandler', () => {
             handler.load_platform(scan_result.value);
 
             // Load real SPI binding and set values
-            const spi_result = load_resolved_binding("no-os/no_os_spi_init_param.yaml");
+            const spi_result = load_resolved_ruleset("no-os/no_os_spi_init_param.yaml");
             expectOk(spi_result);
             handler.add_symbol("my_spi", spi_result.value);
             handler.set_value("my_spi", "device_id", 1);
@@ -651,7 +662,7 @@ describe('WorkfileHandler', () => {
             expectOk(scan_result);
             handler.load_platform(scan_result.value);
 
-            const spi_result = load_resolved_binding("no-os/no_os_spi_init_param.yaml");
+            const spi_result = load_resolved_ruleset("no-os/no_os_spi_init_param.yaml");
             expectOk(spi_result);
             handler.add_symbol("test_spi", spi_result.value);
             handler.set_value("test_spi", "device_id", 42);

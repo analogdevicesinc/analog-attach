@@ -1,6 +1,6 @@
 import { describe, test, expect } from 'vitest';
-import { expectOk, expectError, expectErrorPath, expectErrorContains, loadAndParseProperty } from '../test_utils';
-import { BooleanProperty } from '../../src/bindings_parser/types';
+import { expectOk, expectError, expectErrorPath, expectErrorContains, loadAndParseProperty } from '../test_utilities';
+import { BooleanProperty } from '../../src/ruleset_parser/types';
 
 describe('BooleanProperty parsing', () => {
 	describe('valid cases', () => {
@@ -21,9 +21,9 @@ describe('BooleanProperty parsing', () => {
 		test('parses with required', () => {
 			const result = loadAndParseProperty('properties/boolean/valid_with_required.yaml');
 			expectOk(result);
-			const prop = result.value as BooleanProperty;
-			expect(prop.required).toBe(true);
-			expect(prop.description).toBe('A required boolean');
+			const property = result.value as BooleanProperty;
+			expect(property.required).toBe(true);
+			expect(property.description).toBe('A required boolean');
 		});
 	});
 

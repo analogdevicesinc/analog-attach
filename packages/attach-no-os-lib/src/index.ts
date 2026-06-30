@@ -1,1 +1,1 @@
-export { parse_binding } from "./bindings_parser/binding_parser";
+export { parse_ruleset } from "./ruleset_parser/ruleset_parser";

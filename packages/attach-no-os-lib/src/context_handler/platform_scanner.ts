@@ -1,8 +1,8 @@
 import * as fs from "node:fs";
 import path from "node:path";
 import YAML from "yaml";
-import { Result, ok, error } from "../bindings_parser/result";
-import { asObject, at, optional, ParseContext, stringArray } from "../bindings_parser/validators";
+import { Result, ok, error } from "../ruleset_parser/result";
+import { asObject, at, optional, ParseContext, stringArray } from "../ruleset_parser/validators";
 import { get_schemas_path } from "../settings/settings";
 import { PlatformManifest, PlatformSpecs } from "./types";
 
