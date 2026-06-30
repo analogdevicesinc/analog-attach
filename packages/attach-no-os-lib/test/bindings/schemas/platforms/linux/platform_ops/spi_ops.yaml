@@ -6,5 +6,5 @@ $description: "Linux SPI platform ops"
 $ranking: 4
 $sources:
   platform:
-    - "drivers/platform/linux/linux_spi.h"
-    - "drivers/platform/linux/linux_spi.c"
+    - "linux_spi.h"
+    - "linux_spi.c"

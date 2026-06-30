@@ -6,7 +6,7 @@ $description: "Xilinx platform specific I2C initialization parameters"
 $ranking: 4
 $sources:
   platform:
-    - "drivers/platform/xilinx/xilinx_i2c.h"
+    - "xilinx_i2c.h"
 
 type:
   include: "platforms/xilinx/enums/xil_i2c_type.yaml"

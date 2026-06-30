@@ -6,7 +6,7 @@ $description: "STM32 platform specific PWM initialization parameters"
 $ranking: 4
 $sources:
   platform:
-    - "drivers/platform/stm32/stm32_pwm.h"
+    - "stm32_pwm.h"
 
 # FIXME: This is not valid
 # htimer:

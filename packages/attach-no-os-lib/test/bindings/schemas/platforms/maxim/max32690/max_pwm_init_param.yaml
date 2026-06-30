@@ -6,7 +6,7 @@ $description: "Maxim MAX32690 platform specific PWM initialization parameters"
 $ranking: 4
 $sources:
   platform:
-    - "drivers/platform/maxim/max32690/maxim_pwm.h"
+    - "maxim_pwm.h"
 
 vssel:
   include: "platforms/maxim/max32690/enums/mxc_gpio_vssel.yaml"

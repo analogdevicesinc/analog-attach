@@ -6,7 +6,7 @@ $description: "Xilinx platform specific IRQ initialization parameters"
 $ranking: 4
 $sources:
   platform:
-    - "drivers/platform/xilinx/xilinx_irq.h"
+    - "xilinx_irq.h"
 
 type:
   include: "platforms/xilinx/enums/xil_irq_type.yaml"

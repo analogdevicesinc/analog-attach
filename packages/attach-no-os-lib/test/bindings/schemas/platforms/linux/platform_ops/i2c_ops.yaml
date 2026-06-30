@@ -6,5 +6,5 @@ $description: "Linux I2C platform ops"
 $ranking: 4
 $sources:
   platform:
-    - "drivers/platform/linux/linux_i2c.h"
-    - "drivers/platform/linux/linux_i2c.c"
+    - "linux_i2c.h"
+    - "linux_i2c.c"

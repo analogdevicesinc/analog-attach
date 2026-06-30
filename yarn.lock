@@ -1733,6 +1733,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@types/mustache@npm:^4.2.6":
+  version: 4.2.6
+  resolution: "@types/mustache@npm:4.2.6"
+  checksum: 10c0/f49a83b189e92c962e9b61094c80c979f115ea876bd746bdb9f725c38ab8981a6691e3d1d5cd008ade24b6e5040602970bc0bc60ade71772501d1df8adc7adad
+  languageName: node
+  linkType: hard
+
 "@types/node@npm:*":
   version: 25.0.10
   resolution: "@types/node@npm:25.0.10"
@@ -2687,8 +2694,10 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "attach-no-os-lib@workspace:packages/attach-no-os-lib"
   dependencies:
+    "@types/mustache": "npm:^4.2.6"
     "@types/node": "npm:20.x"
     "@vitest/coverage-v8": "npm:^4.0.18"
+    mustache: "npm:^4.2.0"
     typescript: "npm:^5.7.2"
     vite: "npm:^7.3.1"
     vite-plugin-dts: "npm:^4.5.4"
@@ -5175,6 +5184,15 @@ __metadata:
   version: 0.4.1
   resolution: "muggle-string@npm:0.4.1"
   checksum: 10c0/e914b63e24cd23f97e18376ec47e4ba3aa24365e4776212b666add2e47bb158003212980d732c49abf3719568900af7861873844a6e2d3a7ca7e86952c0e99e9
+  languageName: node
+  linkType: hard
+
+"mustache@npm:^4.2.0":
+  version: 4.2.0
+  resolution: "mustache@npm:4.2.0"
+  bin:
+    mustache: bin/mustache
+  checksum: 10c0/1f8197e8a19e63645a786581d58c41df7853da26702dbc005193e2437c98ca49b255345c173d50c08fe4b4dbb363e53cb655ecc570791f8deb09887248dd34a2
   languageName: node
   linkType: hard
 

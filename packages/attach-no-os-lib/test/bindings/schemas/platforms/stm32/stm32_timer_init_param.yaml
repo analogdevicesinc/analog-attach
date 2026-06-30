@@ -6,8 +6,8 @@ $description: "STM32 platform specific timer initialization parameters"
 $ranking: 4
 $sources:
   platform:
-    - "drivers/platform/stm32/stm32_timer.h"
-    - "drivers/platform/stm32/stm32_timer.c"
+    - "stm32_timer.h"
+    - "stm32_timer.c"
 
 # FIXME: This is not valid
 # htimer:

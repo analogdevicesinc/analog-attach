@@ -1,4 +1,4 @@
-import { OverrideDirective, RulesetStruct } from "../bindings_parser/types";
+import { OverrideDirective, RulesetDevice, RulesetStruct } from "../bindings_parser/types";
 
 export type ValidationError = {
 	path: string;
@@ -13,7 +13,7 @@ export type ValidationResult = {
 
 export type ChildOverride = {
 	directive: OverrideDirective,
-	child: RulesetStruct
+	child: RulesetStruct | RulesetDevice
 }
 
 export type ConnectionGraph = Map<string, string[]>;

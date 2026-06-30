@@ -1,0 +1,115 @@
+import { describe, test, expect, beforeEach, afterEach } from 'vitest';
+import path from 'node:path';
+import fs from 'node:fs';
+import os from 'node:os';
+import { WorkfileHandler } from '../../src/workfile_handler/workfile_handler';
+import { set_schemas_path, reset_settings } from '../../src/settings/settings';
+import { generate_project } from '../../src/codegen/codegen';
+import { expectOk } from '../test_utils';
+import { MinimalWorkfile } from '../../src/workfile_handler/types';
+
+const SCHEMAS_ROOT = path.join(__dirname, '../bindings/schemas');
+
+const test_workfile: MinimalWorkfile = {
+    platform: "max32690",
+    symbols: {
+        "max_spi_ip": {
+            "$compatible": "platforms/maxim/max32690/max_spi_init_param.yaml",
+            "vssel": "MXC_GPIO_VSSEL_VDDIOH",
+            "polarity": "SPI_SS_POL_LOW"
+        },
+        "no_os_spi_ip": {
+            "$compatible": "no-os/no_os_spi_init_param.yaml",
+            "device_id": 1,
+            "max_speed_hz": 1_000_000,
+            "chip_select": 2,
+            "platform_ops": "spi_ops",
+            "extra": "max_spi_ip"
+        },
+        "misp": {
+            "$compatible": "devices/adi,adxl355.yaml",
+            "comm_type": "ADXL355_SPI_COMM",
+            "dev_type": "ID_ADXL355",
+            "comm_init": { "spi_init": "no_os_spi_ip" }
+        }
+    }
+};
+
+describe('codegen', () => {
+    let handler: WorkfileHandler;
+    let tmp_dir: string;
+
+    beforeEach(() => {
+        set_schemas_path(SCHEMAS_ROOT);
+        handler = new WorkfileHandler();
+        tmp_dir = fs.mkdtempSync(path.join(os.tmpdir(), 'codegen-test-'));
+    });
+
+    afterEach(() => {
+        reset_settings();
+        fs.rmSync(tmp_dir, { recursive: true, force: true });
+    });
+
+    test('generate project from minimal workfile', () => {
+        const minimal = test_workfile;
+
+        const import_result = handler.import_minimal(minimal);
+        expectOk(import_result);
+
+        const workfile = handler.export_workfile();
+
+        const result = generate_project({
+            workfile,
+            platform_name: "max32690",
+            platform_vendor: "maxim",
+            project_name: "test-project",
+            output_path: tmp_dir,
+            noos_path: "$(realpath ../../../)",
+        });
+
+        expectOk(result);
+
+        // Check files were created
+        expect(result.value.files_created.length).toBeGreaterThan(0);
+
+        // Print common_data.h for visual inspection
+        const common_data_h = fs.readFileSync(
+            path.join(tmp_dir, "test-project/src/common/common_data.h"),
+            "utf8"
+        );
+        console.log("\n=== common_data.h ===");
+        console.log(common_data_h);
+
+        // Print common_data.c for visual inspection
+        const common_data_c = fs.readFileSync(
+            path.join(tmp_dir, "test-project/src/common/common_data.c"),
+            "utf8"
+        );
+        console.log("\n=== common_data.c ===");
+        console.log(common_data_c);
+
+        // Print src.mk for visual inspection
+        const source_mk = fs.readFileSync(
+            path.join(tmp_dir, "test-project/src.mk"),
+            "utf8"
+        );
+        console.log("\n=== src.mk ===");
+        console.log(source_mk);
+
+        // Print main.c for visual inspection
+        const main_c = fs.readFileSync(
+            path.join(tmp_dir, "test-project/src/main.c"),
+            "utf8"
+        );
+        console.log("\n=== main.c ===");
+        console.log(main_c);
+
+        // Print user_app.h for visual inspection
+        const user_app_h = fs.readFileSync(
+            path.join(tmp_dir, "test-project/src/user_app.h"),
+            "utf8"
+        );
+        console.log("\n=== user_app.h ===");
+        console.log(user_app_h);
+    });
+});

@@ -5,7 +5,7 @@ $description: "Xilinx platform architecture sections for SPI"
 $ranking: 4
 $sources:
   platform:
-    - "drivers/platform/xilinx/xilinx_spi.h"
+    - "xilinx_spi.h"
 
 values:
   - SPI_PL
