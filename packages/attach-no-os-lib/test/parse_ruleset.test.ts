@@ -5,7 +5,7 @@ import { test } from 'vitest';
 import { expectOk } from './test_utilities';
 
 test('parse adxl355 ruleset', () => {
-	const source_path = path.resolve(__dirname, 'bindings/schemas/devices/adi,adxl355.yaml');
+	const source_path = path.resolve(__dirname, 'bindings/schemas/devices/adxl355/adxl355.yaml');
 	const source = fs.readFileSync(source_path, 'utf8');
 
 	const result = parse_ruleset(source);
@@ -21,7 +21,7 @@ test('parse max_spi_init_param ruleset', () => {
 });
 
 test('parse ad5592r ruleset', () => {
-	const source_path = path.resolve(__dirname, 'bindings/schemas/devices/adi,ad5592r.yaml');
+	const source_path = path.resolve(__dirname, 'bindings/schemas/devices/ad5592r/ad5592r.yaml');
 	const source = fs.readFileSync(source_path, 'utf8');
 	const result = parse_ruleset(source);
 	expectOk(result);
@@ -35,7 +35,7 @@ test('parse xil_spi_init_param ruleset', () => {
 });
 
 test('parse ad5592r_channel_mode enum binding', () => {
-	const source_path = path.resolve(__dirname, 'bindings/schemas/devices/ad5592r-enums/ad5592r_channel_mode.yaml');
+	const source_path = path.resolve(__dirname, 'bindings/schemas/devices/ad5592r/enums/ad5592r_channel_mode.yaml');
 	const source = fs.readFileSync(source_path, 'utf8');
 	const result = parse_ruleset(source);
 	expectOk(result);

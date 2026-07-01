@@ -8,7 +8,7 @@ int main(void)
 	struct user_devices devices;
 
 {{#devices}}
-	ret = {{{init_function}}}(&devices.{{{symbol_name}}}, {{{init_param_ref}}});
+	ret = {{{init_code}}};
 	if (ret)
 		return ret;
 
@@ -16,7 +16,7 @@ int main(void)
 	user_app(&devices);
 
 {{#devices}}
-	{{{remove_function}}}(devices.{{{symbol_name}}});
+	{{{remove_code}}};
 {{/devices}}
 
 	return 0;

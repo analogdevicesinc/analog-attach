@@ -1,4 +1,4 @@
-$id: "devices/ad5592r-enums/ad559xr_range.yaml"
+$id: "devices/ad5592r/enums/ad559xr_range.yaml"
 $type: enum
 $symbol: ad559xr_range
 $description: "ADC/DAC voltage range configuration for AD5592R"

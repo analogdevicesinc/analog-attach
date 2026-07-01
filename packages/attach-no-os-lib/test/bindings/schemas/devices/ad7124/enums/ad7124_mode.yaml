@@ -1,4 +1,4 @@
-$id: "devices/ad7124-enums/ad7124_mode.yaml"
+$id: "devices/ad7124/enums/ad7124_mode.yaml"
 $type: enum
 $symbol: ad7124_mode
 $description: "AD7124 ADC modes of operation"

@@ -18,9 +18,9 @@ const PLATFORMS_ROOT = path.join(SCHEMAS_ROOT, 'platforms');
  */
 function mock_suggest_devices(): string[] {
     return [
-        "devices/adi,adxl355.yaml",
-        "devices/adi,ad7124.yaml",
-        "devices/adi,adt7420.yaml",
+        "devices/adxl355/adxl355.yaml",
+        "devices/ad7124/ad7124.yaml",
+        "devices/adt7420/adt7420.yaml",
     ];
 }
 
@@ -56,10 +56,10 @@ describe('Real System Integration', () => {
 
             // Step 3: User sees available devices (mocked suggestion function)
             const available_devices = mock_suggest_devices();
-            expect(available_devices).toContain("devices/adi,adxl355.yaml");
+            expect(available_devices).toContain("devices/adxl355/adxl355.yaml");
 
             // Step 4: User selects ADXL355 - load from real binding file
-            const adxl355_result = load_resolved_ruleset("devices/adi,adxl355.yaml");
+            const adxl355_result = load_resolved_ruleset("devices/adxl355/adxl355.yaml");
             expectOk(adxl355_result);
             const adxl355 = adxl355_result.value as RulesetStruct;
             expect(adxl355.$symbol).toBe("adxl355_init_param");
