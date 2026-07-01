@@ -7,7 +7,6 @@ import {
 	PlatformExtraProperty,
 	PlatformOpsProperty,
 	Property,
-	RulesetDevice,
 	RulesetStruct,
 	StringProperty,
 	UnionProperty
@@ -20,7 +19,7 @@ import { ChildOverride, ValidationError } from "./types";
 export function validate_property(
 	property: Property,
 	child_overrides: ChildOverride[],
-	parent_symbol: RulesetStruct | RulesetDevice,
+	parent_symbol: RulesetStruct,
 	workfile: Workfile,
 	context: ParseContext
 ): ValidationError[] {
@@ -41,7 +40,7 @@ export function validate_property(
 		// Skip required check for platform_extra if no valid extras exist (excluding self)
 		if (effective._t === "PlatformExtraProperty" &&
 			!Object.values(workfile.symbols).some(s =>
-				s !== parent_symbol && (s._t === "RulesetStruct" || s._t === "RulesetDevice") && s.$capability === parent_symbol.$capability)) {
+				s !== parent_symbol && s._t === "RulesetStruct" && s.$capability === parent_symbol.$capability)) {
 			return [];
 		}
 
@@ -97,7 +96,7 @@ export function validate_property(
 function validate_platform_ops(
 	property: PlatformOpsProperty,
 	workfile: Workfile,
-	parent_struct: RulesetStruct | RulesetDevice,
+	parent_struct: RulesetStruct,
 	context: ParseContext
 ): ValidationError[] {
 	const symbol_name = property.value as string;
@@ -153,7 +152,7 @@ function validate_platform_ops(
 function validate_platform_extra(
 	property: PlatformExtraProperty,
 	workfile: Workfile,
-	parent_struct: RulesetStruct | RulesetDevice,
+	parent_struct: RulesetStruct,
 	context: ParseContext
 ): ValidationError[] {
 	const symbol_name = property.value as string;
@@ -167,7 +166,7 @@ function validate_platform_extra(
 		}];
 	}
 
-	if (extra._t !== "RulesetStruct" && extra._t !== "RulesetDevice") {
+	if (extra._t !== "RulesetStruct") {
 		return [{
 			path: context.path,
 			message: `Expected type struct or device, got ${extra._t}`,

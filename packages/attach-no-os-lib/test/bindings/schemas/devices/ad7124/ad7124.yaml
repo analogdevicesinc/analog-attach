@@ -1,13 +1,10 @@
-$id: "devices/adi,ad7124.yaml"
-$type: device
+$id: "devices/ad7124/ad7124.yaml"
+$type: struct
 $symbol: ad7124_init_param
+$descriptor: ad7124_dev
 $description: "AD7124 24-bit Sigma-Delta ADC initialization parameters"
 $ranking: 4
 $header: "drivers/adc/ad7124/ad7124.h"
-$init_function: ad7124_setup
-$remove_function: ad7124_remove
-$descriptor: ad7124_dev
-$init_by_pointer: true
 $sources:
   noos:
     - "drivers/adc/ad7124/ad7124.c"
@@ -37,7 +34,7 @@ spi_rdy_poll_cnt:
 
 # Operating mode
 mode:
-  include: "devices/ad7124-enums/ad7124_mode.yaml"
+  include: "devices/ad7124/enums/ad7124_mode.yaml"
   description: "ADC operating mode"
 
 # Device variant
@@ -56,7 +53,7 @@ ref_en:
 
 # Power mode
 power_mode:
-  include: "devices/ad7124-enums/ad7124_power_mode.yaml"
+  include: "devices/ad7124/enums/ad7124_power_mode.yaml"
   description: "Power mode selection"
 
 # Channel setups (array of 8)
@@ -64,7 +61,7 @@ setups:
   type: array
   size: 8
   element:
-    include: "devices/ad7124-structs/ad7124_channel_setup.yaml"
+    include: "devices/ad7124/structs/ad7124_channel_setup.yaml"
   description: "Channel setup configurations (8 setups available)"
 
 # Channel mappings (array of 16)
@@ -72,5 +69,5 @@ chan_map:
   type: array
   size: 16
   element:
-    include: "devices/ad7124-structs/ad7124_channel_map.yaml"
+    include: "devices/ad7124/structs/ad7124_channel_map.yaml"
   description: "Channel mapping configurations (16 channels available)"
