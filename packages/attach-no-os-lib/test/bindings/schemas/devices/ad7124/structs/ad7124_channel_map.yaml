@@ -1,4 +1,4 @@
-$id: "devices/ad7124-structs/ad7124_channel_map.yaml"
+$id: "devices/ad7124/structs/ad7124_channel_map.yaml"
 $type: struct
 $symbol: ad7124_channel_map
 $description: "AD7124 channel mapping configuration"
@@ -20,5 +20,5 @@ setup_sel:
   description: "Setup selection (0-7)"
 
 ain:
-  include: "devices/ad7124-structs/ad7124_analog_inputs.yaml"
+  include: "devices/ad7124/structs/ad7124_analog_inputs.yaml"
   description: "Analog input pair for this channel"

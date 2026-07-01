@@ -1,14 +1,13 @@
 import { Workfile } from "../workfile_handler/types";
 
 export type DeviceInfo = {
-	symbol_name: string;       // workfile key: "misp"
-	init_param_type: string;   // "adxl355_init_param"
-	descriptor_type: string;   // "adxl355_dev"
-	init_function: string;     // "adxl355_init"
-	remove_function: string;   // "adxl355_remove"
+	symbol_name: string;       // init param name: "my_accel"
+	descriptor_name: string;   // descriptor name: "my_accel_device"
+	descriptor_type: string;   // descriptor type: "adxl355_dev"
+	init_param_type: string;   // init param type: "adxl355_init_param"
 	header: string;            // "adxl355.h"
-	init_by_pointer: boolean;  // true: init(&param), false: init(param)
-	init_param_ref: string;    // "&symbol_name" or "symbol_name" (precomputed for template)
+	init_code: string;         // rendered init.mustache
+	remove_code: string;       // rendered remove.mustache
 };
 
 export type SourcePaths = {

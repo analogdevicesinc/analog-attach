@@ -1,4 +1,4 @@
-$id: "devices/ad7124-enums/ad7124_analog_input.yaml"
+$id: "devices/ad7124/enums/ad7124_analog_input.yaml"
 $type: enum
 $symbol: ad7124_analog_input
 $description: "AD7124 analog input sources"

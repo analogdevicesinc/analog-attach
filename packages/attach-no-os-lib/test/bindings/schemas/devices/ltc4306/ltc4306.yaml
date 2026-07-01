@@ -1,13 +1,10 @@
-$id: "devices/adi,ltc4306.yaml"
-$type: device
+$id: "devices/ltc4306/ltc4306.yaml"
+$type: struct
 $symbol: ltc4306_init_param
+$descriptor: ltc4306_dev
 $description: "LTC4306 4-Channel I2C Mux/Switch"
 $ranking: 4
 $header: "drivers/io-expander/ltc4306/ltc4306.h"
-$init_function: ltc4306_init
-$remove_function: ltc4306_remove
-$descriptor: ltc4306_dev
-$init_by_pointer: false
 $sources:
   noos:
     - "drivers/io-expander/ltc4306/ltc4306.c"

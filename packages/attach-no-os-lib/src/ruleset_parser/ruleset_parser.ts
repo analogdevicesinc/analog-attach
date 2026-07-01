@@ -51,9 +51,6 @@ function is_ruleset_type(value: unknown, context: ParseContext): Result<RulesetT
 		case "platform_ops": {
 			return ok(RulesetType.RT_PLATFORM_OPS);
 		}
-		case "device": {
-			return ok(RulesetType.RT_DEVICE);
-		}
 		default: {
 			return error(`Invalid ruleset type '${s.value}'`, context.path);
 		}
@@ -708,6 +705,16 @@ function parse_ruleset_from_object(object: Record<string, unknown>, context: Par
 				return $capability;
 			}
 
+			const $header = optional(object, "$header", context, string_);
+			if (!$header.ok) {
+				return $header;
+			}
+
+			const $descriptor = optional(object, "$descriptor", context, string_);
+			if (!$descriptor.ok) {
+				return $descriptor;
+			}
+
 			// Collect all capabilities from properties into $requires
 			const capabilities = new Set<string>();
 			for (const property of context.document.properties) {
@@ -731,86 +738,8 @@ function parse_ruleset_from_object(object: Record<string, unknown>, context: Par
 				$override: $override.value,
 				$requires,
 				$capability: $capability.value,
-			});
-		}
-		case RulesetType.RT_DEVICE: {
-			context.document.properties = [];
-			for (const key of Object.keys(object)) {
-				if (key.startsWith("$")) {
-					continue;
-				}
-
-				const property = parse_property(key, object[key], at(context, key));
-				if (!property.ok) {
-					return property;
-				}
-				context.document.properties.push(property.value);
-			}
-
-			const $override = optional(object, "$override", context, is_override);
-			if (!$override.ok) {
-				return $override;
-			}
-
-			const $capability = optional(object, "$capability", context, string_);
-			if (!$capability.ok) {
-				return $capability;
-			}
-
-			// Device-specific fields (all required)
-			const $init_function = required(object, "$init_function", context, string_);
-			if (!$init_function.ok) {
-				return $init_function;
-			}
-
-			const $remove_function = required(object, "$remove_function", context, string_);
-			if (!$remove_function.ok) {
-				return $remove_function;
-			}
-
-			const $descriptor = required(object, "$descriptor", context, string_);
-			if (!$descriptor.ok) {
-				return $descriptor;
-			}
-
-			const $header = required(object, "$header", context, string_);
-			if (!$header.ok) {
-				return $header;
-			}
-
-			const $init_by_pointer = required(object, "$init_by_pointer", context, boolean_);
-			if (!$init_by_pointer.ok) {
-				return $init_by_pointer;
-			}
-
-			// Collect all capabilities from properties into $requires
-			const capabilities = new Set<string>();
-			for (const property of context.document.properties) {
-				if (property.capability) {
-					for (const cap of property.capability) {
-						capabilities.add(cap);
-					}
-				}
-			}
-			const $requires = capabilities.size > 0 ? [...capabilities] : undefined;
-
-			return ok({
-				_t: "RulesetDevice",
-				$id: $id.value,
-				$type: $type.value,
-				$symbol: $symbol.value,
-				$description: $description.value,
-				$ranking: $ranking.value,
-				$sources: $sources.value,
-				properties: context.document.properties,
-				$override: $override.value,
-				$requires,
-				$capability: $capability.value,
-				$init_function: $init_function.value,
-				$remove_function: $remove_function.value,
-				$descriptor: $descriptor.value,
 				$header: $header.value,
-				$init_by_pointer: $init_by_pointer.value,
+				$descriptor: $descriptor.value,
 			});
 		}
 		case RulesetType.RT_ENUM: {

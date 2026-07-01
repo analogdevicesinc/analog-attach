@@ -1,4 +1,4 @@
-$id: "devices/ad7124-structs/ad7124_channel_setup.yaml"
+$id: "devices/ad7124/structs/ad7124_channel_setup.yaml"
 $type: struct
 $symbol: ad7124_channel_setup
 $description: "AD7124 channel setup configuration"
@@ -13,7 +13,7 @@ bi_unipolar:
   description: "Bipolar (true) or unipolar (false) mode"
 
 burnout:
-  include: "devices/ad7124-enums/ad7124_burnout.yaml"
+  include: "devices/ad7124/enums/ad7124_burnout.yaml"
   description: "Burnout current source setting"
 
 ref_buff:
@@ -27,9 +27,9 @@ ain_buff:
   description: "Enable analog input buffer"
 
 ref_source:
-  include: "devices/ad7124-enums/ad7124_reference_source.yaml"
+  include: "devices/ad7124/enums/ad7124_reference_source.yaml"
   description: "Reference source selection"
 
 pga:
-  include: "devices/ad7124-enums/ad7124_pga.yaml"
+  include: "devices/ad7124/enums/ad7124_pga.yaml"
   description: "PGA gain setting"

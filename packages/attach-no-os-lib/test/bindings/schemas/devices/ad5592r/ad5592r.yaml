@@ -1,13 +1,10 @@
-$id: "devices/adi,ad5592r.yaml"
-$type: device
+$id: "devices/ad5592r/ad5592r.yaml"
+$type: struct
 $symbol: ad5592r_init_param
+$descriptor: ad5592r_dev
 $description: "AD5592R 8-channel, 12-bit configurable ADC/DAC with GPIO"
 $ranking: 4
 $header: "drivers/adc-dac/ad5592r/ad5592r.h"
-$init_function: ad5592r_init
-$remove_function: ad5592r_remove
-$descriptor: ad5592r_dev
-$init_by_pointer: true
 $sources:
   noos:
     - "drivers/adc-dac/ad5592r/ad5592r-base.h"
@@ -42,22 +39,22 @@ channel_modes:
   type: array
   size: 8
   element:
-    include: "devices/ad5592r-enums/ad5592r_channel_mode.yaml"
+    include: "devices/ad5592r/enums/ad5592r_channel_mode.yaml"
   description: "Mode configuration for each of the 8 channels"
 
 channel_offstate:
   type: array
   size: 8
   element:
-    include: "devices/ad5592r-enums/ad5592r_channel_offstate.yaml"
+    include: "devices/ad5592r/enums/ad5592r_channel_offstate.yaml"
   description: "Off-state configuration for each of the 8 channels"
 
 adc_range:
-  include: "devices/ad5592r-enums/ad559xr_range.yaml"
+  include: "devices/ad5592r/enums/ad559xr_range.yaml"
   description: "ADC input voltage range"
 
 dac_range:
-  include: "devices/ad5592r-enums/ad559xr_range.yaml"
+  include: "devices/ad5592r/enums/ad559xr_range.yaml"
   description: "DAC output voltage range"
 
 adc_buf:

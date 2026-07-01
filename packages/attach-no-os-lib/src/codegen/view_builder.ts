@@ -1,9 +1,12 @@
 import path from "node:path";
+import fs from "node:fs";
+import Mustache from "mustache";
 import { ok, Result } from "../ruleset_parser/result";
-import { Property, RulesetDevice, RulesetStruct } from "../ruleset_parser/types";
+import { Property, RulesetStruct } from "../ruleset_parser/types";
 import { Workfile } from "../workfile_handler/types";
 import { CodegenInput, DeviceInfo, SourcePaths, StructView, Views } from "./types";
 import { create_connections_graph } from "../validator/connection_graph";
+import { get_schemas_path } from "../settings/settings";
 
 // FIXME: I am really not sure where these should go to be good for the project
 // Core no-OS utilities that most projects need
@@ -128,7 +131,7 @@ function collect_sources(workfile: Workfile): SourcePaths {
 		}
 
 		// Merge $header into appropriate set (for device schemas)
-		if (ruleset._t === "RulesetDevice") {
+		if (ruleset._t === "RulesetStruct" && ruleset.$header) {
 			const mapped = map_noos_path(ruleset.$header);
 			if (mapped.variable === "INCLUDE") {
 				include.add(mapped.path);
@@ -145,7 +148,7 @@ function collect_sources(workfile: Workfile): SourcePaths {
 	};
 }
 
-function order_symbols(workfile: Workfile): [string, RulesetStruct | RulesetDevice][] {
+function order_symbols(workfile: Workfile): [string, RulesetStruct][] {
 	// NOTE: graph: parent -> children it references
 	// For topological sort, we need: if A references B, B comes first
 	// So in_degree counts how many symbols references this one
@@ -190,11 +193,10 @@ function order_symbols(workfile: Workfile): [string, RulesetStruct | RulesetDevi
 		}
 	}
 
-	// Include both structs and devices
-	const result: [string, RulesetStruct | RulesetDevice][] = [];
+	const result: [string, RulesetStruct][] = [];
 	for (const name of sorted) {
 		const ruleset = workfile.symbols[name];
-		if (ruleset._t === "RulesetStruct" || ruleset._t === "RulesetDevice") {
+		if (ruleset._t === "RulesetStruct") {
 			result.push([name, ruleset]);
 		}
 	}
@@ -202,7 +204,7 @@ function order_symbols(workfile: Workfile): [string, RulesetStruct | RulesetDevi
 	return result;
 }
 
-function build_struct_view(name: string, ruleset: RulesetStruct | RulesetDevice): StructView {
+function build_struct_view(name: string, ruleset: RulesetStruct): StructView {
 	return {
 		type: ruleset.$symbol,
 		name: name,
@@ -300,22 +302,64 @@ function format_c_value(property: Property): string {
 	}
 }
 
-function extract_device_info(symbol_name: string, ruleset: RulesetDevice): DeviceInfo {
-	const init_by_pointer = ruleset.$init_by_pointer;
+function is_device(schema_id: string): boolean {
+	const schemas_path = get_schemas_path();
+	if (!schemas_path) {
+		return false;
+	}
+	const directory = path.dirname(schema_id);
+	const init_path = path.join(schemas_path, directory, "init.mustache");
+	return fs.existsSync(init_path);
+}
+
+function load_device_templates(schema_id: string): { init: string; remove: string } | undefined {
+	const schemas_path = get_schemas_path();
+	if (!schemas_path) {
+		return undefined;
+	}
+	const directory = path.dirname(schema_id);
+	const init_path = path.join(schemas_path, directory, "init.mustache");
+	const remove_path = path.join(schemas_path, directory, "remove.mustache");
+
+	if (!fs.existsSync(init_path) || !fs.existsSync(remove_path)) {
+		return undefined;
+	}
+
+	return {
+		init: fs.readFileSync(init_path, "utf8"),
+		remove: fs.readFileSync(remove_path, "utf8"),
+	};
+}
+
+function extract_device_info(symbol_name: string, ruleset: RulesetStruct): DeviceInfo | undefined {
+	if (!is_device(ruleset.$id)) {
+		return undefined;
+	}
+
+	const templates = load_device_templates(ruleset.$id);
+	if (!templates) {
+		return undefined;
+	}
+
+	const descriptor_name = `${symbol_name}_device`;
+	const view = { symbol_name, descriptor_name };
+	const init_code = Mustache.render(templates.init, view).trim();
+	const remove_code = Mustache.render(templates.remove, view).trim();
+
 	return {
 		symbol_name,
+		descriptor_name,
+		descriptor_type: ruleset.$descriptor ?? "",
 		init_param_type: ruleset.$symbol,
-		descriptor_type: ruleset.$descriptor,
-		init_function: ruleset.$init_function,
-		remove_function: ruleset.$remove_function,
-		header: path.basename(ruleset.$header),
-		init_by_pointer,
-		init_param_ref: init_by_pointer ? `&${symbol_name}` : symbol_name,
+		header: ruleset.$header ? path.basename(ruleset.$header) : "",
+		init_code,
+		remove_code,
 	};
 }
 
 function collect_devices(workfile: Workfile): DeviceInfo[] {
 	return Object.entries(workfile.symbols)
-		.filter(([_, sym]) => sym._t === "RulesetDevice")
-		.map(([name, sym]) => extract_device_info(name, sym as RulesetDevice));
+		.filter(([_, sym]) => sym._t === "RulesetStruct")
+		.map(([name, sym]) => extract_device_info(name, sym as RulesetStruct))
+		.filter((info): info is DeviceInfo => info !== undefined);
 }

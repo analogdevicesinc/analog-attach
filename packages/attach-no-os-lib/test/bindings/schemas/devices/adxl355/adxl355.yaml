@@ -1,13 +1,10 @@
-$id: "devices/adi,adxl355.yaml"
-$type: device
+$id: "devices/adxl355/adxl355.yaml"
+$type: struct
 $symbol: adxl355_init_param
+$descriptor: adxl355_dev
 $description: "ADXL355 3-axis accelerometer configuration"
 $ranking: 4
 $header: "drivers/accel/adxl355/adxl355.h"
-$init_function: adxl355_init
-$remove_function: adxl355_remove
-$descriptor: adxl355_dev
-$init_by_pointer: false
 $sources:
   noos:
     - "drivers/accel/adxl355/adxl355.c"

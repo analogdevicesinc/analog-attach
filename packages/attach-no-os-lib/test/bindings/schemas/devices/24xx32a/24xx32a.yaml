@@ -1,13 +1,10 @@
-$id: "devices/adi,24xx32a.yaml"
-$type: device
+$id: "devices/24xx32a/24xx32a.yaml"
+$type: struct
 $symbol: eeprom_24xx32a_init_param
+$descriptor: no_os_eeprom_desc
 $description: "24AA32A/24LC32A I2C EEPROM"
 $ranking: 4
 $header: "drivers/eeprom/24xx32a/24xx32a.h"
-$init_function: no_os_eeprom_init
-$remove_function: no_os_eeprom_remove
-$descriptor: no_os_eeprom_desc
-$init_by_pointer: true
 $sources:
   noos:
     - "drivers/eeprom/24xx32a/24xx32a.c"
