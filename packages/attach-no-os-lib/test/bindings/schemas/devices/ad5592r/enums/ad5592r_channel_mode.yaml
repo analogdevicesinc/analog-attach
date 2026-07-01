@@ -1,4 +1,4 @@
-$id: "devices/ad5592r-enums/ad5592r_channel_mode.yaml"
+$id: "devices/ad5592r/enums/ad5592r_channel_mode.yaml"
 $type: enum
 $symbol: ad5592r_channel_mode
 $description: "Channel mode configuration for AD5592R"

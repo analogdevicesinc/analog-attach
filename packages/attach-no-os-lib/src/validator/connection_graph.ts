@@ -43,7 +43,7 @@ export function create_connections_graph(workfile: Workfile): ConnectionGraph {
 	}
 
 	for (const [symbol_name, ruleset] of Object.entries(workfile.symbols)) {
-		if (ruleset._t !== "RulesetStruct" && ruleset._t !== "RulesetDevice") {
+		if (ruleset._t !== "RulesetStruct") {
 			continue;
 		}
 
@@ -68,7 +68,7 @@ export function collect_child_overrides(symbol_name: string, workfile: Workfile,
 
 	for (const child_name of children) {
 		const child = workfile.symbols[child_name];
-		if (!child || (child._t !== "RulesetStruct" && child._t !== "RulesetDevice") || !child.$override) {
+		if (!child || child._t !== "RulesetStruct" || !child.$override) {
 			continue;
 		}
 

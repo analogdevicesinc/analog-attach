@@ -1,13 +1,10 @@
-$id: "devices/adi,adt7420.yaml"
-$type: device
+$id: "devices/adt7420/adt7420.yaml"
+$type: struct
 $symbol: adt7420_init_param
+$descriptor: adt7420_dev
 $description: "ADT7420/ADT7320 Temperature Sensor"
 $ranking: 4
 $header: "drivers/temperature/adt7420/adt7420.h"
-$init_function: adt7420_init
-$remove_function: adt7420_remove
-$descriptor: adt7420_dev
-$init_by_pointer: false
 $sources:
   noos:
     - "drivers/temperature/adt7420/adt7420.c"

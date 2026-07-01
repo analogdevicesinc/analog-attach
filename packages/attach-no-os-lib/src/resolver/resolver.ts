@@ -21,7 +21,7 @@ function load_ruleset(ruleset_path: string): Result<Ruleset> {
 }
 
 export function resolve_ruleset(ruleset: Ruleset): Result<Ruleset> {
-	if (ruleset._t !== "RulesetStruct" && ruleset._t !== "RulesetDevice") {
+	if (ruleset._t !== "RulesetStruct") {
 		return ok(ruleset);
 	}
 

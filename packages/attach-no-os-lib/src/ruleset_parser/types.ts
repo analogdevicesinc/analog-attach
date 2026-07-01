@@ -157,7 +157,6 @@ export enum RulesetType {
 	RT_STRUCT = "bt_struct",
 	RT_ENUM = "bt_enum",
 	RT_PLATFORM_OPS = "bt_platform_ops",
-	RT_DEVICE = "bt_device",
 };
 
 enum RulesetRank {
@@ -211,21 +210,8 @@ export type RulesetStruct = RulesetBase & {
 	$override?: OverrideDirective[],
 	$requires?: string[], // Auto-computed: all capabilities required by properties
 	$capability?: string,
-};
-
-export type RulesetDevice = RulesetBase & {
-	_t: "RulesetDevice",
-	$type: RulesetType.RT_DEVICE,
-	properties: Property[],
-	$override?: OverrideDirective[],
-	$requires?: string[],
-	$capability?: string,
-	// Required device fields
-	$init_function: string,    // e.g. "adxl355_init", "ad7124_setup"
-	$remove_function: string,  // e.g. "adxl355_remove"
-	$descriptor: string,       // e.g. "adxl355_dev", "no_os_eeprom_desc"
-	$header: string,           // Full path, e.g. "drivers/accel/adxl355/adxl355.h"
-	$init_by_pointer: boolean, // true: init(&param), false: init(param)
+	$header?: string,      // Device header path, e.g. "drivers/accel/adxl355/adxl355.h"
+	$descriptor?: string,  // Device descriptor type, e.g. "adxl355_dev"
 };
 
 export type RulesetPlatformOps = RulesetBase & {
@@ -235,4 +221,4 @@ export type RulesetPlatformOps = RulesetBase & {
 	$capability?: string,
 };
 
-export type Ruleset = RulesetStruct | RulesetEnum | RulesetPlatformOps | RulesetDevice;
+export type Ruleset = RulesetStruct | RulesetEnum | RulesetPlatformOps;

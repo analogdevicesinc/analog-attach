@@ -27,7 +27,7 @@ const test_workfile: MinimalWorkfile = {
             "extra": "max_spi_ip"
         },
         "misp": {
-            "$compatible": "devices/adi,adxl355.yaml",
+            "$compatible": "devices/adxl355/adxl355.yaml",
             "comm_type": "ADXL355_SPI_COMM",
             "dev_type": "ID_ADXL355",
             "comm_init": { "spi_init": "no_os_spi_ip" }
