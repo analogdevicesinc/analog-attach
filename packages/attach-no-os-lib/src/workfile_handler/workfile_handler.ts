@@ -109,6 +109,25 @@ export function remove_symbol(workfile: Workfile, name: string): Result<void> {
     return ok();
 }
 
+// TODO: Unify C name validation regex with add_symbol
+export function rename_symbol(workfile: Workfile, old_name: string, new_name: string): Result<Workfile> {
+    if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(new_name)) {
+        return error(`Symbol '${new_name}' is not a valid C name`);
+    }
+    if (!(old_name in workfile.symbols)) {
+        return error(`Symbol '${old_name}' not found`, "old_name");
+    }
+    if (new_name in workfile.symbols) {
+        return error(`Symbol '${new_name}' already exists`, "new_name");
+    }
+    if (new_name in workfile.platform_ops) {
+        return error(`Symbol '${new_name}' conflicts with platform ops`, "new_name");
+    }
+    workfile.symbols[new_name] = workfile.symbols[old_name];
+    delete workfile.symbols[old_name];
+    return ok(workfile);
+}
+
 export function list_symbols(workfile: Workfile): string[] {
     return Object.keys(workfile.symbols);
 }
@@ -121,7 +140,7 @@ export function find_any(workfile: Workfile, name: string): Ruleset | undefined 
 
 // --- Property Values ---
 
-export function set_value(workfile: Workfile, symbol_name: string, property_name: string, value: unknown): Result<void> {
+export function set_value(workfile: Workfile, symbol_name: string, property_name: string, value?: unknown): Result<void> {
     const ruleset = workfile.symbols[symbol_name];
     if (!ruleset) {
         return error(`Symbol '${symbol_name}' not found`, "symbol_name");

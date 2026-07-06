@@ -8,12 +8,13 @@ import {
     suggest_for_include,
     load_minimal_workfile,
     import_minimal,
-    resolve_workfile_path
+    resolve_workfile_path,
+    IncludeProperty
 } from "attach-no-os-lib";
 
 export const readCommand = buildCommand<
     { json?: boolean },
-    [string | undefined, string | undefined]  // node, property
+    [string | undefined, string | undefined, string | undefined]  // node, property, union_member
 >({
     docs: { brief: "Read workfile, node, or property" },
     parameters: {
@@ -21,16 +22,15 @@ export const readCommand = buildCommand<
             kind: "tuple",
             parameters: [
                 { placeholder: "node", brief: "Node name", optional: true, parse: String },
-                { placeholder: "property", brief: "Property name", optional: true, parse: String }
+                { placeholder: "property", brief: "Property name", optional: true, parse: String },
+                { placeholder: "union_member", brief: "Union member name", optional: true, parse: String }
             ]
         },
         flags: {
             json: { kind: "boolean", brief: "Output as JSON", optional: true }
         }
     },
-    // FIXME: This might need a new parameter, optional, that should be the union value, so suggest for union
-    // will have 2 parts, first is the value and then what the object set in that value is (e.g. spi_comm -> id)
-    func: async (flags, node: string | undefined, property: string | undefined) => {
+    func: async (flags, node: string | undefined, property: string | undefined, union_member: string | undefined) => {
         // Load workfile
         const workfile_path = resolve_workfile_path();
         if (!workfile_path) {
@@ -110,10 +110,38 @@ export const readCommand = buildCommand<
                 console.log(`Cannot find property '${property}' in the property list of the rulesets: ${selected_node.properties.map(p => p.name).join(", ")}`);
                 return;
             }
+
+            // aa read <node> <property> <union_member> - show union member details
+            if (union_member) {
+                if (selected_property._t !== "UnionProperty") {
+                    console.log(`Property '${property}' is not a union type`);
+                    return;
+                }
+
+                const member = selected_property.members.find(m => m.name === union_member);
+                if (!member) {
+                    console.log(`Invalid union member '${union_member}'. Available: ${selected_property.members.map(m => m.name).join(", ")}`);
+                    return;
+                }
+
+                const suggestions = suggest_for_union(workfile.value, selected_property, union_member);
+                if (flags.json) {
+                    console.log(JSON.stringify({
+                        property,
+                        type: "union",
+                        member: union_member,
+                        schema: member.include,
+                        suggestions: suggestions.ok ? suggestions.value : []
+                    }, undefined, 2));
+                } else {
+                    console.log(format_union_member_details(property, member, suggestions.ok ? suggestions.value : []));
+                }
+                return;
+            }
+
             if (flags.json) {
                 console.log(format_property_json(selected_property, workfile.value));
             } else {
-
                 console.log(format_property_details(selected_property, workfile.value));
             }
 
@@ -327,6 +355,23 @@ function format_property_json(property: Property, workfile: Workfile): PropertyJ
     }
 
     return base;
+}
+
+// aa read <node> <property> <union_member> - show union member details
+function format_union_member_details(property: string, member: IncludeProperty, suggestions: string[]): string {
+    let out = `${property} → ${member.name}\n\n`;
+    out += `  ${"Schema:".padEnd(15)}${member.include}\n`;
+
+    if (suggestions.length > 0) {
+        out += "\n  Suggestions:\n";
+        for (const s of suggestions) {
+            out += `    • ${s}\n`;
+        }
+    } else {
+        out += "\n  No suggestions available.\n";
+    }
+
+    return out;
 }
 
 // Helpers

@@ -1,6 +1,6 @@
 export { parse_ruleset } from "./ruleset_parser/ruleset_parser";
 export { load_resolved_ruleset } from "./resolver/resolver";
-export type { Ruleset, Property } from "./ruleset_parser/types";
+export type { Ruleset, Property, IncludeProperty } from "./ruleset_parser/types";
 export { ok, error } from "./ruleset_parser/result";
 export type { Result, ResultError } from "./ruleset_parser/result";
 export {
@@ -8,6 +8,7 @@ export {
     add_symbol,
     get_symbol,
     remove_symbol,
+    rename_symbol,
     list_symbols,
     find_any,
     set_value,
