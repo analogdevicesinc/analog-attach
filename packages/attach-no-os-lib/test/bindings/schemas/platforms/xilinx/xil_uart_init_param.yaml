@@ -17,9 +17,3 @@ irq_id:
   type: uint32_t
   default: 0
   description: "Interrupt Request ID"
-
-# TODO: Wtf is this?
-# irq_desc:
-#   type: ptr
-#   target: no_os_irq_ctrl_desc
-#   description: "Interrupt Request Descriptor (can be NULL if IRQ not used)"
