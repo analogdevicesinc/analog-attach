@@ -15,7 +15,8 @@ import {
 	AvailableStructs,
 	Workfile,
 	add_symbol,
-	load_resolved_ruleset
+	load_resolved_ruleset,
+    resolve_workfile_path
 } from "attach-no-os-lib";
 
 type CreateWorkfileNoPlatform = {
@@ -26,20 +27,6 @@ type CreateWorkfileNoPlatform = {
 };
 
 const DISPLAY_MAX_IDS = 5;
-
-function resolve_workfile_path(path?: string): string | undefined {
-	if (!path) {
-		return "./workfile.json";
-	}
-
-	// Path ends with / or is an existing directory
-	if (path.endsWith("/") || (fs.existsSync(path) && fs.statSync(path).isDirectory())) {
-		return path.endsWith("/") ? `${path}workfile.json` : `${path}/workfile.json`;
-	}
-
-	// Custom filename provided - not supported
-	return undefined;
-}
 
 function list_available_platforms(): Result<CreateWorkfileNoPlatform> {
 	const schemas_path = get_schemas_path();
@@ -326,7 +313,7 @@ const createNodeCommand = buildCommand<
 				if (
 					!available_structs.value.noos.includes(schema) &&
 					!available_structs.value.devices.includes(schema) &&
-				!available_structs.value.platform.includes(schema)
+					!available_structs.value.platform.includes(schema)
 				) {
 					const message = `Unknown schema "${schema}", please check the list again`;
 					if (flags.json) {
