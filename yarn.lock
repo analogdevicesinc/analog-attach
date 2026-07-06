@@ -1594,6 +1594,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@stricli/core@npm:^1.1.0":
+  version: 1.2.8
+  resolution: "@stricli/core@npm:1.2.8"
+  checksum: 10c0/7dd2927ad6f9fe3f62d4c65385b7b85969b1211266cf53a7f8f059c88545f188dd05eaa05cf08388774f42fb4ebe688fbfb7fbffb6a7e7c9f7215f548470c8d3
+  languageName: node
+  linkType: hard
+
 "@stricli/core@npm:^1.2.6":
   version: 1.2.6
   resolution: "@stricli/core@npm:1.2.6"
@@ -2690,7 +2697,23 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"attach-no-os-lib@workspace:packages/attach-no-os-lib":
+"attach-no-os-cli@workspace:packages/attach-no-os-cli":
+  version: 0.0.0-use.local
+  resolution: "attach-no-os-cli@workspace:packages/attach-no-os-cli"
+  dependencies:
+    "@stricli/core": "npm:^1.1.0"
+    "@types/node": "npm:20.x"
+    attach-no-os-lib: "workspace:*"
+    tsup: "npm:^6.7.0"
+    typescript: "npm:^5.7.2"
+    vitest: "npm:^4.0.18"
+    yaml: "npm:^2.7.1"
+  bin:
+    aa: ./dist/cli.js
+  languageName: unknown
+  linkType: soft
+
+"attach-no-os-lib@workspace:*, attach-no-os-lib@workspace:packages/attach-no-os-lib":
   version: 0.0.0-use.local
   resolution: "attach-no-os-lib@workspace:packages/attach-no-os-lib"
   dependencies:
@@ -7215,6 +7238,15 @@ __metadata:
   version: 1.10.3
   resolution: "yaml@npm:1.10.3"
   checksum: 10c0/c309ff85a0a569a981d71ab9cf0fef68672a16b9cdf40639d1c3b30034f6cd16ee428602bd6d64ecf006f8c8bee499023cac236538f79898aa99fb5db529a2ed
+  languageName: node
+  linkType: hard
+
+"yaml@npm:^2.7.1":
+  version: 2.9.0
+  resolution: "yaml@npm:2.9.0"
+  bin:
+    yaml: bin.mjs
+  checksum: 10c0/f340718df45e97a9551b9bf9dac61c80050bc464513b710debfb5067c380c8472e3b67809cffacb4ab5ffb5e66ef9310816c88b05f371cec60abfedd8c88e0a2
   languageName: node
   linkType: hard
 

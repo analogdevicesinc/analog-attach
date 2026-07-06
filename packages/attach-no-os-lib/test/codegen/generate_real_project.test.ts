@@ -1,15 +1,15 @@
-import { describe, test, beforeEach } from 'vitest';
+import { describe, test, beforeEach, afterEach } from 'vitest';
 import path from 'node:path';
-import { WorkfileHandler } from '../../src/workfile_handler/workfile_handler';
-import { set_schemas_path, reset_settings } from '../../src/settings/settings';
+import { import_minimal } from '../../src/workfile_handler/workfile_handler';
 import { generate_project } from '../../src/codegen/codegen';
-import { expectOk } from '../test_utilities';
+import { expectOk, setup_test_config, teardown_test_config } from '../test_utilities';
 import { MinimalWorkfile } from '../../src/workfile_handler/types';
 
-const SCHEMAS_ROOT = path.join(__dirname, '../bindings/schemas');
+const NOOS_ROOT = path.join(__dirname, '../bindings');
+const SCHEMAS_ROOT = path.join(NOOS_ROOT, 'schemas');
 const NOOS_PROJECTS = "/home/andrei-fabian/adi/no-OS/projects";
 
-const workfile: MinimalWorkfile = {
+const workfile_data: MinimalWorkfile = {
     platform: "max32690",
     symbols: {
         "max_spi_ip": {
@@ -35,21 +35,22 @@ const workfile: MinimalWorkfile = {
 };
 
 describe('generate real project', () => {
-    let handler: WorkfileHandler;
-
     beforeEach(() => {
-        set_schemas_path(SCHEMAS_ROOT);
-        handler = new WorkfileHandler();
+        setup_test_config(NOOS_ROOT);
+    });
+
+    afterEach(() => {
+        teardown_test_config();
     });
 
     test('generate adxl355 project to no-OS/projects', () => {
-        const import_result = handler.import_minimal(workfile);
+        const import_result = import_minimal(workfile_data);
         expectOk(import_result);
 
-        const expanded_workfile = handler.export_workfile();
+        const workfile = import_result.value;
 
         const result = generate_project({
-            workfile: expanded_workfile,
+            workfile,
             platform_name: "max32690",
             platform_vendor: "maxim",
             project_name: "adxl355_test",
@@ -64,7 +65,5 @@ describe('generate real project', () => {
         for (const file of result.value.files_created) {
             console.log("  ", file);
         }
-
-        reset_settings();
     });
 });

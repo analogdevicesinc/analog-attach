@@ -7,11 +7,11 @@ import { get_schemas_path } from "../settings/settings";
 
 function load_ruleset(ruleset_path: string): Result<Ruleset> {
 	const schemas_path = get_schemas_path();
-	if (!schemas_path) {
-		return error("Schemas path not configured. Call set_schemas_path() first.", "schemas_path");
+	if (!schemas_path.ok) {
+		return schemas_path;
 	}
 
-	const full_path = path.join(schemas_path, ruleset_path);
+	const full_path = path.join(schemas_path.value, ruleset_path);
 	try {
 		const content = fs.readFileSync(full_path, "utf8");
 		return parse_ruleset(content);

@@ -1,7 +1,7 @@
 import path from "node:path";
 import fs from "node:fs";
 import Mustache from "mustache";
-import { ok, Result } from "../ruleset_parser/result";
+import { error, ok, Result } from "../ruleset_parser/result";
 import { Property, RulesetStruct } from "../ruleset_parser/types";
 import { Workfile } from "../workfile_handler/types";
 import { CodegenInput, DeviceInfo, SourcePaths, StructView, Views } from "./types";
@@ -304,49 +304,49 @@ function format_c_value(property: Property): string {
 
 function is_device(schema_id: string): boolean {
 	const schemas_path = get_schemas_path();
-	if (!schemas_path) {
+	if (!schemas_path.ok) {
 		return false;
 	}
 	const directory = path.dirname(schema_id);
-	const init_path = path.join(schemas_path, directory, "init.mustache");
+	const init_path = path.join(schemas_path.value, directory, "init.mustache");
 	return fs.existsSync(init_path);
 }
 
-function load_device_templates(schema_id: string): { init: string; remove: string } | undefined {
+function load_device_templates(schema_id: string): Result<{ init: string; remove: string }> {
 	const schemas_path = get_schemas_path();
-	if (!schemas_path) {
-		return undefined;
+	if (!schemas_path.ok) {
+		return schemas_path;
 	}
 	const directory = path.dirname(schema_id);
-	const init_path = path.join(schemas_path, directory, "init.mustache");
-	const remove_path = path.join(schemas_path, directory, "remove.mustache");
+	const init_path = path.join(schemas_path.value, directory, "init.mustache");
+	const remove_path = path.join(schemas_path.value, directory, "remove.mustache");
 
 	if (!fs.existsSync(init_path) || !fs.existsSync(remove_path)) {
-		return undefined;
+		return error(`Missing templates for id: ${schema_id}`);
 	}
 
-	return {
+	return ok({
 		init: fs.readFileSync(init_path, "utf8"),
 		remove: fs.readFileSync(remove_path, "utf8"),
-	};
+	});
 }
 
-function extract_device_info(symbol_name: string, ruleset: RulesetStruct): DeviceInfo | undefined {
+function extract_device_info(symbol_name: string, ruleset: RulesetStruct): Result<DeviceInfo> {
 	if (!is_device(ruleset.$id)) {
-		return undefined;
+		return error(`Symbol ${symbol_name} is not a device. (missing init templates)`);
 	}
 
 	const templates = load_device_templates(ruleset.$id);
-	if (!templates) {
-		return undefined;
+	if (!templates.ok) {
+		return templates;
 	}
 
 	const descriptor_name = `${symbol_name}_device`;
 	const view = { symbol_name, descriptor_name };
-	const init_code = Mustache.render(templates.init, view).trim();
-	const remove_code = Mustache.render(templates.remove, view).trim();
+	const init_code = Mustache.render(templates.value.init, view).trim();
+	const remove_code = Mustache.render(templates.value.remove, view).trim();
 
-	return {
+	return ok({
 		symbol_name,
 		descriptor_name,
 		descriptor_type: ruleset.$descriptor ?? "",
@@ -354,12 +354,25 @@ function extract_device_info(symbol_name: string, ruleset: RulesetStruct): Devic
 		header: ruleset.$header ? path.basename(ruleset.$header) : "",
 		init_code,
 		remove_code,
-	};
+	});
 }
 
 function collect_devices(workfile: Workfile): DeviceInfo[] {
-	return Object.entries(workfile.symbols)
-		.filter(([_, sym]) => sym._t === "RulesetStruct")
-		.map(([name, sym]) => extract_device_info(name, sym as RulesetStruct))
-		.filter((info): info is DeviceInfo => info !== undefined);
+	const rulesets = Object.entries(workfile.symbols);
+	let result: DeviceInfo[] = [];
+	for (const [name, symbol] of rulesets) {
+		if (symbol._t !== "RulesetStruct") {
+			continue;
+		}
+
+		const device_info = extract_device_info(name, symbol);
+		if (!device_info.ok) {
+			// FIXME: For now just continue on fail, maybe an error or warning would be nice
+			continue;
+		}
+
+		result.push(device_info.value);
+	}
+
+	return result;
 }

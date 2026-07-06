@@ -1,4 +1,5 @@
 import path from "node:path";
+import fs from "node:fs";
 import { Result, ok, error } from "../ruleset_parser/result";
 import {
     ArrayProperty,
@@ -11,433 +12,467 @@ import {
     RulesetStruct,
     UnionProperty
 } from "../ruleset_parser/types";
-import { scan_platforms } from "../context_handler/platform_scanner";
-import { PlatformManifest } from "../context_handler/types";
+import { scan_platforms } from "./platform_scanner";
+import { PlatformManifest } from "./types";
 import { load_resolved_ruleset } from "../resolver/resolver";
 import { get_schemas_path } from "../settings/settings";
 import { collect_child_overrides, create_connections_graph } from "../validator/connection_graph";
 import { apply_overrides } from "../validator/override_resolver";
-import { AvailableStructs, LoadPlatformResult, MinimalWorkfile, Workfile } from "./types";
-import fs from "node:fs";
+import { AvailableStructs, is_minimal_workfile, MinimalWorkfile, Workfile } from "./types";
 
-export class WorkfileHandler {
-    private workfile: Workfile;
-    private platform_structs: string[];
-    private platform_name: string | undefined;
+// --- Workfile Creation ---
 
-    constructor() {
-        this.workfile = { platform_ops: {}, symbols: {} };
-        this.platform_structs = [];
-        this.platform_name = undefined;
+export function create_workfile(platform?: string): Result<Workfile> {
+    const workfile: Workfile = {
+        platform: platform,
+        platform_ops: {},
+        symbols: {}
+    };
+
+    if (!platform) {
+        return ok(workfile);
     }
 
-    // --- Platform Ops (locked, from manifest) ---
-
-    add_platform_ops(name: string, ruleset: RulesetPlatformOps): Result<void> {
-        if (name in this.workfile.platform_ops) {
-            return error(`Platform ops '${name}' already exists`, "name");
-        }
-        this.workfile.platform_ops[name] = ruleset;
-        return ok();
+    const schemas_path = get_schemas_path();
+    if (!schemas_path.ok) {
+        return schemas_path;
     }
 
-    get_platform_ops(name: string): Result<RulesetPlatformOps> {
-        const ops = this.workfile.platform_ops[name];
-        if (!ops) {
-            return error(`Platform ops '${name}' not found`, "name");
-        }
-        return ok(ops as RulesetPlatformOps);
+    const platforms_result = scan_platforms(path.join(schemas_path.value, "platforms"));
+    if (!platforms_result.ok) {
+        return platforms_result;
     }
 
-    list_platform_ops(): string[] {
-        return Object.keys(this.workfile.platform_ops);
+    const manifest = platforms_result.value[platform];
+    if (!manifest) {
+        return error(`Platform '${platform}' not found`, "platform");
     }
 
-    clear_platform_ops(): void {
-        this.workfile.platform_ops = {};
+    const load_result = load_platform(workfile, manifest);
+    return load_result; // Error or not, we return this anyway
+}
+
+// --- Platform Ops (locked, from manifest) ---
+
+export function add_platform_ops(workfile: Workfile, name: string, ruleset: RulesetPlatformOps): Result<void> {
+    if (name in workfile.platform_ops) {
+        return error(`Platform ops '${name}' already exists`, "name");
+    }
+    workfile.platform_ops[name] = ruleset;
+    return ok();
+}
+
+export function get_platform_ops(workfile: Workfile, name: string): Result<RulesetPlatformOps> {
+    const ops = workfile.platform_ops[name];
+    if (!ops) {
+        return error(`Platform ops '${name}' not found`, "name");
+    }
+    return ok(ops as RulesetPlatformOps);
+}
+
+export function list_platform_ops(workfile: Workfile): string[] {
+    return Object.keys(workfile.platform_ops);
+}
+
+export function clear_platform_ops(workfile: Workfile): void {
+    workfile.platform_ops = {};
+}
+
+// --- Symbol CRUD (user-created) ---
+
+export function add_symbol(workfile: Workfile, name: string, ruleset: Ruleset): Result<Workfile> {
+    if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(name)) {
+        return error(`Symbol '${name}' is not a valid C name`);
+    }
+    if (name in workfile.symbols) {
+        return error(`Symbol '${name}' already exists`, "name");
+    }
+    if (name in workfile.platform_ops) {
+        return error(`Symbol '${name}' conflicts with platform ops`, "name");
+    }
+    workfile.symbols[name] = ruleset;
+    return ok(workfile);
+}
+
+export function get_symbol(workfile: Workfile, name: string): Result<Ruleset> {
+    if (!(name in workfile.symbols)) {
+        return error(`Symbol '${name}' does not exist`, "name");
+    }
+    return ok(workfile.symbols[name]);
+}
+
+export function remove_symbol(workfile: Workfile, name: string): Result<void> {
+    if (!(name in workfile.symbols)) {
+        return error(`Symbol '${name}' not found`, "name");
+    }
+    delete workfile.symbols[name];
+    return ok();
+}
+
+export function list_symbols(workfile: Workfile): string[] {
+    return Object.keys(workfile.symbols);
+}
+
+// --- Lookup (checks both platform_ops and symbols) ---
+
+export function find_any(workfile: Workfile, name: string): Ruleset | undefined {
+    return workfile.platform_ops[name] ?? workfile.symbols[name];
+}
+
+// --- Property Values ---
+
+export function set_value(workfile: Workfile, symbol_name: string, property_name: string, value: unknown): Result<void> {
+    const ruleset = workfile.symbols[symbol_name];
+    if (!ruleset) {
+        return error(`Symbol '${symbol_name}' not found`, "symbol_name");
+    }
+    if (ruleset._t !== "RulesetStruct") {
+        return error(`Symbol '${symbol_name}' is not a struct or device`, "symbol_name");
     }
 
-    // --- Symbol CRUD (user-created) ---
-
-    add_symbol(name: string, ruleset: Ruleset): Result<void> {
-        if (name in this.workfile.symbols) {
-            return error(`Symbol '${name}' already exists`, "name");
-        }
-        if (name in this.workfile.platform_ops) {
-            return error(`Symbol '${name}' conflicts with platform ops`, "name");
-        }
-        this.workfile.symbols[name] = ruleset;
-        return ok();
+    const property = ruleset.properties.find(p => p.name === property_name);
+    if (!property) {
+        return error(`Property '${property_name}' not found in '${symbol_name}'`, "property_name");
     }
 
-    get_symbol(name: string): Result<Ruleset> {
-        if (!(name in this.workfile.symbols)) {
-            return error(`Symbol '${name}' does not exist`, "name");
-        }
-        return ok(this.workfile.symbols[name]);
+    property.value = value;
+    return ok();
+}
+
+export function get_value(workfile: Workfile, symbol_name: string, property_name: string): Result<unknown> {
+    const ruleset = workfile.symbols[symbol_name];
+    if (!ruleset || (ruleset._t !== "RulesetStruct")) {
+        return error(`Symbol '${symbol_name}' is not a struct or device`, "symbol_name");
     }
 
-    remove_symbol(name: string): Result<void> {
-        if (!(name in this.workfile.symbols)) {
-            return error(`Symbol '${name}' not found`, "name");
+    const property = ruleset.properties.find(p => p.name === property_name);
+    if (property === undefined) {
+        return error(`Property '${property_name}' not found`, "property_name");
+    }
+    return ok(property.value);
+}
+
+// --- Suggestions ---
+
+export function suggest_for_include(workfile: Workfile, include: IncludeProperty): Result<string[]> {
+    const suggestions: string[] = [];
+    for (const [name, ruleset] of Object.entries(workfile.platform_ops)) {
+        if (ruleset.$id === include.include) {
+            suggestions.push(name);
         }
-        delete this.workfile.symbols[name];
-        return ok();
+    }
+    for (const [name, ruleset] of Object.entries(workfile.symbols)) {
+        if (ruleset.$id === include.include) {
+            suggestions.push(name);
+        }
+    }
+    return ok(suggestions);
+}
+
+export function suggest_for_union(workfile: Workfile, union: UnionProperty, member_name?: string): Result<string[]> {
+    if (member_name === undefined) {
+        return ok(union.members.map(p => p.name));
     }
 
-    list_symbols(): string[] {
-        return Object.keys(this.workfile.symbols);
+    const member = union.members.find(m => m.name === member_name);
+    if (!member) {
+        return error(`Unknown union member '${member_name}'`, member_name);
+    }
+    return suggest_for_include(workfile, member);
+}
+
+export function suggest_for_array(workfile: Workfile, array: ArrayProperty): Result<string[]> {
+    if (array.element._t !== "IncludeProperty") {
+        return error(`Array element is not an include`, "element");
+    }
+    return suggest_for_include(workfile, array.element);
+}
+
+export function suggest_for_enum(property: EnumProperty): Result<string[]> {
+    return ok(property.values.map(p => typeof p === "number" ? p.toString() : p));
+}
+
+export function suggest_platform_ops(workfile: Workfile, property: PlatformOpsProperty, parent_struct: RulesetStruct): Result<string[]> {
+    const suggestions: string[] = [];
+
+    for (const [name, ops] of Object.entries(workfile.platform_ops)) {
+        if (ops._t !== "RulesetPlatformOps") {
+            continue;
+        }
+
+        if (property.allowed && property.allowed.includes(ops.$id)) {
+            suggestions.push(name);
+        } else if (ops.$capability === parent_struct.$capability) {
+            suggestions.push(name);
+        }
     }
 
-    // --- Lookup (checks both platform_ops and symbols) ---
+    return ok(suggestions);
+}
 
-    find_any(name: string): Ruleset | undefined {
-        return this.workfile.platform_ops[name] ?? this.workfile.symbols[name];
-    }
+export function suggest_platform_extra(workfile: Workfile, property: PlatformExtraProperty, parent_struct: RulesetStruct): Result<string[]> {
+    const suggestions: string[] = [];
 
-    // --- Property Values ---
-
-    set_value(symbol_name: string, property_name: string, value: unknown): Result<void> {
-        const ruleset = this.workfile.symbols[symbol_name];
-        if (!ruleset) {
-            return error(`Symbol '${symbol_name}' not found`, "symbol_name");
-        }
-        if (ruleset._t !== "RulesetStruct") {
-            return error(`Symbol '${symbol_name}' is not a struct or device`, "symbol_name");
-        }
-
-        const property = ruleset.properties.find(p => p.name === property_name);
-        if (!property) {
-            return error(`Property '${property_name}' not found in '${symbol_name}'`, "property_name");
-        }
-
-        property.value = value;
-        return ok();
-    }
-
-    get_value(symbol_name: string, property_name: string): Result<any> {
-        const ruleset = this.workfile.symbols[symbol_name];
-        if (!ruleset || (ruleset._t !== "RulesetStruct")) {
-            return error(`Symbol '${symbol_name}' is not a struct or device`, "symbol_name");
-        }
-
-        const property = ruleset.properties.find(p => p.name === property_name);
-        if (property === undefined) {
-            return error(`Property '${property_name}' not found`, "property_name");
-        }
-        return ok(property.value);
-    }
-
-    // --- Suggestions ---
-
-    suggest_for_include(include: IncludeProperty): Result<string[]> {
-        const suggestions: string[] = [];
-        // Check both platform_ops and symbols
-        for (const [name, ruleset] of Object.entries(this.workfile.platform_ops)) {
-            if (ruleset.$id === include.include) {
-                suggestions.push(name);
-            }
-        }
-        for (const [name, ruleset] of Object.entries(this.workfile.symbols)) {
-            if (ruleset.$id === include.include) {
-                suggestions.push(name);
-            }
-        }
-        return ok(suggestions);
-    }
-
-    suggest_for_union(union: UnionProperty, member_name?: string): Result<string[]> {
-        // Suggest a member if no member is provided
-        if (member_name === undefined) {
-            return ok(union.members.map(p => p.name));
-        }
-
-        const member = union.members.find(m => m.name === member_name);
-        if (!member) {
-            return error(`Unknown union member '${member_name}'`, member_name);
-        }
-        return this.suggest_for_include(member);
-    }
-
-    suggest_for_array(array: ArrayProperty): Result<string[]> {
-        if (array.element._t !== "IncludeProperty") {
-            return error(`Array element is not an include`, "element");
-        }
-        return this.suggest_for_include(array.element);
-    }
-
-    suggest_for_enum(property: EnumProperty): Result<string[]> {
-        return ok(property.values.map(p => typeof p === "number" ? p.toString() : p));
-    }
-
-    suggest_platform_ops(property: PlatformOpsProperty, parent_struct: RulesetStruct): Result<string[]> {
-        const suggestions: string[] = [];
-        
-        for (const [name, ops] of Object.entries(this.workfile.platform_ops)) {
-            if (ops._t !== "RulesetPlatformOps") {
-                continue;
-            }
-
-            if (property.allowed && property.allowed.includes(ops.$id)) {
-                suggestions.push(name);
-            } else if (ops.$capability === parent_struct.$capability) {
-                suggestions.push(name);
-            }
-        }
-
-        return ok(suggestions);
-    }
-
-    suggest_platform_extra(property: PlatformExtraProperty, parent_struct: RulesetStruct): Result<string[]> {
-        const suggestions: string[] = [];
-
-        for (const [name, symbol] of Object.entries(this.workfile.symbols)) {
-            if (symbol._t !== "RulesetStruct") {
-                continue;
-            }
-
-            if (property.allowed && property.allowed.includes(symbol.$id)) {
-                suggestions.push(name);
-            } else if (symbol.$capability === parent_struct.$capability) {
-                suggestions.push(name);
-            }
-        }
-
-        return ok(suggestions);
-    }
-
-    suggest_for_property(symbol_name: string, property_name: string, union_member?: string): Result<string[]> {
-        const symbol = this.workfile.symbols[symbol_name];
-        if (!symbol) {
-            return error(`Could not find symbol with name: "${symbol_name}" in [${Object.keys(this.workfile.symbols)}]`, "");
-        }
-
+    for (const [name, symbol] of Object.entries(workfile.symbols)) {
         if (symbol._t !== "RulesetStruct") {
-            return error(`Expected type RulesetStruct, got "${symbol._t}"`, "");
+            continue;
         }
 
-        const property = symbol.properties.find(p => p.name === property_name);
-        if (!property) {
-            return error(`Could not find property "${property_name}" in [${symbol.properties.join(", ")}]`, symbol_name);
+        if (property.allowed && property.allowed.includes(symbol.$id)) {
+            suggestions.push(name);
+        } else if (symbol.$capability === parent_struct.$capability) {
+            suggestions.push(name);
         }
+    }
 
-        switch (property._t) {
-            case "NumberProperty": {
-                return ok([]);
-            }
-            case "BooleanProperty": {
-                // I don't think we might enforce this somehow?
-                return ok(["true", "false"]);
-            }
-            case "StringProperty": {
-                return ok([]);
-            }
-            case "IncludeProperty": {
-                return this.suggest_for_include(property);
-            }
-            case "EnumProperty": {
-                return this.suggest_for_enum(property);
-            }
-            case "UnionProperty": {
-                return this.suggest_for_union(property, union_member);
-            }
-            case "ArrayProperty": {
-                return this.suggest_for_array(property);
-            }
-            case "PlatformOpsProperty": {
-                const graph = create_connections_graph(this.workfile);
-                const child_overrides = collect_child_overrides(symbol_name, this.workfile, graph);
-                const effective = apply_overrides(property, child_overrides, symbol);
-                return this.suggest_platform_ops(effective as PlatformOpsProperty, symbol);
-            }
-            case "PlatformExtraProperty": {
-                const graph = create_connections_graph(this.workfile);
-                const child_overrides = collect_child_overrides(symbol_name, this.workfile, graph);
-                const effective = apply_overrides(property, child_overrides, symbol);
-                return this.suggest_platform_extra(effective as PlatformExtraProperty, symbol);
-            }
-            case "CallbackFunctionProperty": {
-                return ok([]);
-            }
-            case "CallbackContextProperty": {
-                return ok([]);
-            }
-            default: {
-                return error("unknown type", "");
+    return ok(suggestions);
+}
+
+export function suggest_for_property(workfile: Workfile, symbol_name: string, property_name: string, union_member?: string): Result<string[]> {
+    const symbol = workfile.symbols[symbol_name];
+    if (!symbol) {
+        return error(`Could not find symbol with name: "${symbol_name}" in [${Object.keys(workfile.symbols)}]`, "");
+    }
+
+    if (symbol._t !== "RulesetStruct") {
+        return error(`Expected type RulesetStruct, got "${symbol._t}"`, "");
+    }
+
+    const property = symbol.properties.find(p => p.name === property_name);
+    if (!property) {
+        return error(`Could not find property "${property_name}" in [${symbol.properties.join(", ")}]`, symbol_name);
+    }
+
+    switch (property._t) {
+        case "NumberProperty": {
+            return ok([]);
+        }
+        case "BooleanProperty": {
+            return ok(["true", "false"]);
+        }
+        case "StringProperty": {
+            return ok([]);
+        }
+        case "IncludeProperty": {
+            return suggest_for_include(workfile, property);
+        }
+        case "EnumProperty": {
+            return suggest_for_enum(property);
+        }
+        case "UnionProperty": {
+            return suggest_for_union(workfile, property, union_member);
+        }
+        case "ArrayProperty": {
+            return suggest_for_array(workfile, property);
+        }
+        case "PlatformOpsProperty": {
+            const graph = create_connections_graph(workfile);
+            const child_overrides = collect_child_overrides(symbol_name, workfile, graph);
+            const effective = apply_overrides(property, child_overrides, symbol);
+            return suggest_platform_ops(workfile, effective as PlatformOpsProperty, symbol);
+        }
+        case "PlatformExtraProperty": {
+            const graph = create_connections_graph(workfile);
+            const child_overrides = collect_child_overrides(symbol_name, workfile, graph);
+            const effective = apply_overrides(property, child_overrides, symbol);
+            return suggest_platform_extra(workfile, effective as PlatformExtraProperty, symbol);
+        }
+        case "CallbackFunctionProperty": {
+            return ok([]);
+        }
+        case "CallbackContextProperty": {
+            return ok([]);
+        }
+        default: {
+            return error("unknown type", "");
+        }
+    }
+}
+
+export function list_available_structs(workfile: Workfile): Result<AvailableStructs> {
+    const schema_path = get_schemas_path();
+    if (!schema_path.ok) {
+        return schema_path;
+    }
+
+    const devices = scan_yaml_files(path.join(schema_path.value, "devices"));
+    if (!devices.ok) {
+        return error(`Path ${path.join(schema_path.value, "devices")} not found`, "");
+    }
+
+    const noos = scan_yaml_files(path.join(schema_path.value, "no-os"));
+    if (!noos.ok) {
+        return error(`Path ${path.join(schema_path.value, "noos")} not found`, "");
+    }
+
+    // Get platform structs from manifest if platform is set
+    let platform_structs: string[] = [];
+    if (workfile.platform) {
+        const platforms_result = scan_platforms(path.join(schema_path.value, "platforms"));
+        if (platforms_result.ok) {
+            const manifest = platforms_result.value[workfile.platform];
+            if (manifest) {
+                platform_structs = manifest.structs;
             }
         }
     }
 
-    list_available_structs(): Result<AvailableStructs> {
-        const schema_path = get_schemas_path();
-        if (!schema_path) {
-            return error("Schema path not set", "settings");
-        }
+    return ok({
+        devices: devices.value,
+        noos: noos.value,
+        platform: platform_structs
+    });
+}
 
-        const devices = this.scan_yaml_files(path.join(schema_path, "devices"));
-        if (!devices.ok) {
-            return error(`Path ${path.join(schema_path, "devices")} not found`, "");
-        }
-
-        const noos = this.scan_yaml_files(path.join(schema_path, "no-os"));
-        if (!noos.ok) {
-            return error(`Path ${path.join(schema_path, "noos")} not found`, "");
-        }
-
-        return ok({
-            devices: devices.value,
-            noos: noos.value,
-            platform: this.platform_structs
-        });
+function scan_yaml_files(directory: string): Result<string[]> {
+    const schema_path = get_schemas_path();
+    if (!schema_path.ok) {
+        return schema_path;
     }
 
-    private scan_yaml_files(directory: string): Result<string[]> {
-        const schema_path = get_schemas_path();
-        if (!schema_path || !fs.readdirSync(directory)) {
-            return error("Schema path not set", "settings");
+    if (!fs.readdirSync(directory)) {
+        return error(`Cannot read directory ${directory}`);
+    }
+
+    const results: string[] = [];
+    const scan = (current: string) => {
+        const entries = fs.readdirSync(current, { withFileTypes: true });
+        for (const entry of entries) {
+            const full_path = path.join(current, entry.name);
+            if (entry.isDirectory()) {
+                scan(full_path);
+            } else if (entry.name.endsWith(".yaml")) {
+                results.push(path.relative(schema_path.value, full_path));
+            }
+        }
+    };
+
+    scan(directory);
+    return ok(results);
+}
+
+// --- Platform Loading ---
+
+export function load_platform(workfile: Workfile, manifest: PlatformManifest): Result<Workfile> {
+    clear_platform_ops(workfile);
+
+    for (const ops_path of manifest.ops) {
+        const ruleset_result = load_resolved_ruleset(ops_path);
+        if (!ruleset_result.ok) {
+            return ruleset_result;
         }
 
-        const results: string[] = [];
-        const scan = (current: string) => {
-            const entries = fs.readdirSync(current, { withFileTypes: true });
-            for (const entry of entries) {
-                const full_path = path.join(current, entry.name);
-                if (entry.isDirectory()) {
-                    scan(full_path);
-                } else if (entry.name.endsWith(".yaml")) {
-                    results.push(path.relative(schema_path, full_path));
-                }
-            }
+        const ruleset = ruleset_result.value;
+        if (ruleset._t !== "RulesetPlatformOps") {
+            return error(`Expected platform_ops ruleset, got ${ruleset._t}: ${ops_path}`, ops_path);
+        }
+
+        const add_result = add_platform_ops(workfile, ruleset.$symbol, ruleset);
+        if (!add_result.ok) {
+            return add_result;
+        }
+    }
+
+    workfile.platform = manifest.name;
+
+    return ok(workfile);
+}
+
+// --- Transformations ---
+
+export function export_minimal(workfile: Workfile): Result<MinimalWorkfile> {
+    if (!workfile.platform) {
+        return error("No platform loaded", "platform");
+    }
+
+    const symbols: MinimalWorkfile["symbols"] = {};
+
+    for (const [name, ruleset] of Object.entries(workfile.symbols)) {
+        if (ruleset._t !== "RulesetStruct") {
+            continue;
+        }
+
+        const node: MinimalWorkfile["symbols"][string] = {
+            $compatible: ruleset.$id
         };
 
-        scan(directory);
-        return ok(results);
-    }
-
-    // --- Platform Loading ---
-
-    load_platform(manifest: PlatformManifest): Result<LoadPlatformResult> {
-        // Clear existing platform ops
-        this.clear_platform_ops();
-
-        // Load each ops ruleset
-        for (const ops_path of manifest.ops) {
-            const ruleset_result = load_resolved_ruleset(ops_path);
-            if (!ruleset_result.ok) {
-                return ruleset_result;
-            }
-
-            const ruleset = ruleset_result.value;
-            if (ruleset._t !== "RulesetPlatformOps") {
-                return error(`Expected platform_ops ruleset, got ${ruleset._t}: ${ops_path}`, ops_path);
-            }
-
-            const add_result = this.add_platform_ops(ruleset.$symbol, ruleset);
-            if (!add_result.ok) {
-                return add_result;
+        for (const property of ruleset.properties) {
+            if (property.value !== undefined) {
+                node[property.name] = property.value;
             }
         }
 
-        this.platform_structs = manifest.structs;
-        this.platform_name = manifest.name;
-
-        return ok({
-            available_structs: manifest.structs,
-        });
+        symbols[name] = node;
     }
 
-    // --- Transformations ---
-    export_minimal(): Result<MinimalWorkfile> {
-        if (!this.platform_name) {
-            return error("No platform loaded", "platform");
+    return ok({
+        platform: workfile.platform,
+        symbols: symbols
+    });
+}
+
+export function import_minimal(minimal: MinimalWorkfile): Result<Workfile> {
+    const workfile_result = create_workfile(minimal.platform);
+    if (!workfile_result.ok) {
+        return workfile_result;
+    }
+
+    const workfile = workfile_result.value;
+
+    for (const [name, node] of Object.entries(minimal.symbols)) {
+        const ruleset_result = load_resolved_ruleset(node.$compatible);
+        if (!ruleset_result.ok) {
+            return ruleset_result;
         }
 
-        const symbols: MinimalWorkfile["symbols"] = {};
+        const add_result = add_symbol(workfile, name, ruleset_result.value);
+        if (!add_result.ok) {
+            console.log(add_result);
+            return add_result;
+        }
 
-        for (const [name, ruleset] of Object.entries(this.workfile.symbols)) {
-            if (ruleset._t !== "RulesetStruct") {
+        for (const [property_name, value] of Object.entries(node)) {
+            if (property_name === "$compatible") {
                 continue;
             }
-
-            const node: MinimalWorkfile["symbols"][string] = {
-                $compatible: ruleset.$id
-            };
-
-            for (const property of ruleset.properties) {
-                if (property.value !== undefined) {
-                    node[property.name] = property.value;
-                }
-            }
-
-            symbols[name] = node;
-        }
-
-        return ok({
-            platform: this.platform_name,
-            symbols
-        });
-    }
-
-    import_minimal(minimal: MinimalWorkfile): Result<void> {
-        const schemas_path = get_schemas_path();
-        if (!schemas_path) {
-            return error("Schemas path not set", "settings");
-        }
-
-        // Find platform by name using scan_platforms
-        const platforms_result = scan_platforms(path.join(schemas_path, "platforms"));
-        if (!platforms_result.ok) {
-            return platforms_result;
-        }
-
-        const manifest = platforms_result.value[minimal.platform];
-        if (!manifest) {
-            return error(`Platform '${minimal.platform}' not found`, "platform");
-        }
-
-        // Load the platform
-        const load_result = this.load_platform(manifest);
-        if (!load_result.ok) {
-            return load_result;
-        }
-
-        // Clear existing symbols
-        this.workfile.symbols = {};
-
-        // Load each symbol
-        for (const [name, node] of Object.entries(minimal.symbols)) {
-            const ruleset_result = load_resolved_ruleset(node.$compatible);
-            if (!ruleset_result.ok) {
-                return ruleset_result;
-            }
-
-            const add_result = this.add_symbol(name, ruleset_result.value);
-            if (!add_result.ok) {
-                return add_result;
-            }
-
-            // Set property values (skip $compatible)
-            for (const [property_name, value] of Object.entries(node)) {
-                if (property_name === "$compatible") {
-                    continue;
-                }
-                const set_result = this.set_value(name, property_name, value);
-                if (!set_result.ok) {
-                    return set_result;
-                }
+            const set_result = set_value(workfile, name, property_name, value);
+            if (!set_result.ok) {
+                return set_result;
             }
         }
-
-        return ok();
     }
 
-    // --- Persistence ---
+    return ok(workfile);
+}
 
-    export_workfile(): Workfile {
-        return structuredClone(this.workfile);
+export function load_minimal_workfile(file_path: string): Result<MinimalWorkfile> {
+    if (!fs.existsSync(file_path)) {
+        return error(`Workfile not found: ${file_path}`, file_path);
     }
 
-    load_workfile(workfile: Workfile): void {
-        this.workfile = workfile;
+    let content: string;
+    try {
+        content = fs.readFileSync(file_path, "utf8");
+    } catch {
+        return error(`Failed to read workfile: ${file_path}`, file_path);
     }
+
+    let parsed: unknown;
+    try {
+        parsed = JSON.parse(content);
+    } catch {
+        return error(`Failed to parse workfile as JSON: ${file_path}`, file_path);
+    }
+
+    if (!is_minimal_workfile(parsed)) {
+        return error(`Invalid workfile format: ${file_path}`, file_path);
+    }
+
+    return ok(parsed);
+}
+
+// --- Persistence ---
+
+export function clone_workfile(workfile: Workfile): Workfile {
+    return structuredClone(workfile);
 }
