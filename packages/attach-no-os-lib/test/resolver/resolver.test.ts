@@ -1,21 +1,21 @@
 import { describe, test, expect, beforeEach, afterEach } from 'vitest';
 import path from 'node:path';
 import { resolve_ruleset, load_resolved_ruleset } from '../../src/resolver/resolver';
-import { set_schemas_path, reset_settings } from '../../src/settings/settings';
 import { parse_ruleset } from '../../src/ruleset_parser/ruleset_parser';
 import { RulesetStruct } from '../../src/ruleset_parser/types';
-import { expectOk } from '../test_utilities';
+import { expectOk, setup_test_config, teardown_test_config, setup_no_config, teardown_no_config } from '../test_utilities';
 import fs from 'node:fs';
 
-const SCHEMAS_ROOT = path.join(__dirname, '../bindings/schemas');
+const NOOS_ROOT = path.join(__dirname, '../bindings');
+const SCHEMAS_ROOT = path.join(NOOS_ROOT, 'schemas');
 
 describe('resolver', () => {
     beforeEach(() => {
-        set_schemas_path(SCHEMAS_ROOT);
+        setup_test_config(NOOS_ROOT);
     });
 
     afterEach(() => {
-        reset_settings();
+        teardown_test_config();
     });
 
     describe('resolve_ruleset', () => {
@@ -92,11 +92,12 @@ describe('resolver', () => {
         });
 
         test('returns error if schemas_path not set', () => {
-            reset_settings();
+            setup_no_config();
             const result = load_resolved_ruleset('no-os/no_os_spi_init_param.yaml');
+            teardown_no_config();
             expect(result.ok).toBe(false);
             if (!result.ok) {
-                expect(result.error.message).toContain('Schemas path not configured');
+                expect(result.error.message).toContain('No global config');
             }
         });
     });

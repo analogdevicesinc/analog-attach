@@ -48,8 +48,8 @@ function parse_manifest(manifest: unknown, platform_path: string): Result<Platfo
 
 	// Convert paths to be relative to schemas root
 	const schemas_path = get_schemas_path();
-	const relative_prefix = schemas_path
-		? path.relative(schemas_path, platform_path)
+	const relative_prefix = schemas_path.ok
+		? path.relative(schemas_path.value, platform_path)
 		: "";
 
 	const prefixed_ops = ops_list.map(p => path.join(relative_prefix, p));

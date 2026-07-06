@@ -2,13 +2,13 @@ import { describe, test, expect, beforeEach, afterEach } from 'vitest';
 import path from 'node:path';
 import fs from 'node:fs';
 import os from 'node:os';
-import { WorkfileHandler } from '../../src/workfile_handler/workfile_handler';
-import { set_schemas_path, reset_settings } from '../../src/settings/settings';
+import { import_minimal } from '../../src/workfile_handler/workfile_handler';
 import { generate_project } from '../../src/codegen/codegen';
-import { expectOk } from '../test_utilities';
+import { expectOk, setup_test_config, teardown_test_config } from '../test_utilities';
 import { MinimalWorkfile } from '../../src/workfile_handler/types';
 
-const SCHEMAS_ROOT = path.join(__dirname, '../bindings/schemas');
+const NOOS_ROOT = path.join(__dirname, '../bindings');
+const SCHEMAS_ROOT = path.join(NOOS_ROOT, 'schemas');
 
 const test_workfile: MinimalWorkfile = {
     platform: "max32690",
@@ -36,27 +36,25 @@ const test_workfile: MinimalWorkfile = {
 };
 
 describe('codegen', () => {
-    let handler: WorkfileHandler;
     let temporary_directory: string;
 
     beforeEach(() => {
-        set_schemas_path(SCHEMAS_ROOT);
-        handler = new WorkfileHandler();
+        setup_test_config(NOOS_ROOT);
         temporary_directory = fs.mkdtempSync(path.join(os.tmpdir(), 'codegen-test-'));
     });
 
     afterEach(() => {
-        reset_settings();
+        teardown_test_config();
         fs.rmSync(temporary_directory, { recursive: true, force: true });
     });
 
     test('generate project from minimal workfile', () => {
         const minimal = test_workfile;
 
-        const import_result = handler.import_minimal(minimal);
+        const import_result = import_minimal(minimal);
         expectOk(import_result);
 
-        const workfile = handler.export_workfile();
+        const workfile = import_result.value;
 
         const result = generate_project({
             workfile,
