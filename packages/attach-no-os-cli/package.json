@@ -1,0 +1,44 @@
+{
+  "name": "attach-no-os-cli",
+  "version": "0.0.1",
+  "description": "CLI for Analog Attach no-OS workfile management",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "aa": "./dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsup --silent",
+    "watch": "tsup --watch",
+    "clean": "rm -rf dist tsconfig.tsbuildinfo node_modules",
+    "test": "vitest",
+    "test:watch": "vitest --watch"
+  },
+  "tsup": {
+    "entry": [
+      "src/bin/cli.ts"
+    ],
+    "format": [
+      "esm"
+    ],
+    "clean": true,
+    "splitting": true,
+    "noExternal": [
+      "attach-no-os-lib"
+    ],
+    "external": [
+      "yaml"
+    ]
+  },
+  "devDependencies": {
+    "@types/node": "20.x",
+    "attach-no-os-lib": "workspace:*",
+    "tsup": "^6.7.0",
+    "typescript": "^5.7.2",
+    "vitest": "^4.0.18"
+  },
+  "dependencies": {
+    "@stricli/core": "^1.1.0",
+    "yaml": "^2.7.1"
+  }
+}
