@@ -99,3 +99,18 @@ export function get_schemas_path(): Result<string> {
 	}
 	return ok(path.join(result.value, SCHEMAS_SUBPATH));
 }
+
+const DEFAULT_WORKFILE_NAME = "workfile.json";
+
+export function resolve_workfile_path(workfile_path?: string): string | undefined {
+	if (!workfile_path) {
+		return `./${DEFAULT_WORKFILE_NAME}`;
+	}
+
+	if (workfile_path.endsWith("/") || (fs.existsSync(workfile_path) && fs.statSync(workfile_path).isDirectory())) {
+		return workfile_path.endsWith("/") ? `${workfile_path}${DEFAULT_WORKFILE_NAME}` : `${workfile_path}/${DEFAULT_WORKFILE_NAME}`;
+	}
+
+	// Custom filename provided - not supported
+	return undefined;
+}

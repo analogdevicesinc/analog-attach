@@ -1,11 +1,13 @@
 import { buildApplication, buildRouteMap } from "@stricli/core";
 import { configCommand } from "./commands/config";
 import { createCommand } from "./commands/create";
+import { readCommand } from "./commands/read";
 
 const routes = buildRouteMap({
 	routes: {
 		config: configCommand,
-		create: createCommand
+		create: createCommand,
+		read: readCommand
 	},
 	docs: {
 		brief: "Analog Attach CLI for no-OS workfiles",
