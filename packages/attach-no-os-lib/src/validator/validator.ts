@@ -5,7 +5,6 @@ import { validate_property } from "./property_validator";
 import { validate_mutex } from "./override_resolver";
 import { collect_child_overrides, create_connections_graph } from "./connection_graph";
 
-
 export function validate_workfile(workfile: Workfile): ValidationResult {
 	const errors: ValidationError[] = [];
 	const connections_graph = create_connections_graph(workfile);
