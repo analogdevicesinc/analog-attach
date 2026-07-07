@@ -1,17 +1,22 @@
 import { buildCommand } from "@stricli/core";
-import fs from "node:fs";
 import {
-    export_minimal,
-    get_symbol,
-    import_minimal,
-    load_minimal_workfile,
-    MinimalWorkfile,
     Property,
+    PropertySuggestions,
     rename_symbol,
-    resolve_workfile_path,
     set_value,
     suggest_for_property
 } from "attach-no-os-lib";
+import {
+    load_context,
+    save_workfile,
+    output,
+    output_error,
+    get_node,
+    get_node_property,
+    format_property_type,
+    format_property_list,
+    format_suggestions
+} from "./shared";
 
 export const updateCommand = buildCommand<
     { json?: boolean; rename?: string },
@@ -34,231 +39,138 @@ export const updateCommand = buildCommand<
         }
     },
     func: async (flags, node, property, value, union_value) => {
-        const workfile_path = resolve_workfile_path();
-        if (!workfile_path) {
-            const message = "No workfile found in current directory";
-            if (flags.json) {
-                console.log(JSON.stringify({ error: "no_workfile", message }));
-            } else {
-                console.log(message);
-            }
-            return;
-        }
-
-        const minimal = load_minimal_workfile(workfile_path);
-        if (!minimal.ok) {
-            if (flags.json) {
-                console.log(JSON.stringify({ error: "load_failed", message: minimal.error.message }));
-            } else {
-                console.log(minimal.error.message);
-            }
-            return;
-        }
-
-        const workfile = import_minimal(minimal.value);
-        if (!workfile.ok) {
-            if (flags.json) {
-                console.log(JSON.stringify({ error: "import_failed", message: workfile.error.message }));
-            } else {
-                console.log(workfile.error.message);
-            }
+        const context = load_context();
+        if (!context.ok) {
+            output_error(flags, "load_failed", context.error.message);
             return;
         }
 
         // aa update - list nodes
         if (!node) {
-            if (flags.json) {
-                console.log(JSON.stringify({
-                    nodes: Object.entries(minimal.value.symbols).map(([name, n]) => ({
-                        name,
-                        schema: n.$compatible
-                    }))
-                }, undefined, 2));
-            } else {
-                console.log(format_node_list(minimal.value));
-            }
-            return;
-        }
-
-        // Check node exists
-        const symbol = get_symbol(workfile.value, node);
-        if (!symbol.ok) {
-            if (flags.json) {
-                console.log(JSON.stringify({ error: "node_not_found", node, available: Object.keys(minimal.value.symbols) }));
-            } else {
-                console.log(`Node '${node}' not found. Available: ${Object.keys(minimal.value.symbols).join(", ")}`);
-            }
+            const text = "Nodes:\n\n" + Object.entries(context.value.minimal.symbols)
+                .map(([name, n]) => `  ${name.padEnd(18)}${n.$compatible}`)
+                .join("\n") + "\n\nUse: aa update <node> <property> <value>";
+            const json = {
+                nodes: Object.entries(context.value.minimal.symbols).map(([name, n]) => ({
+                    name,
+                    schema: n.$compatible
+                }))
+            };
+            output(flags, text, json);
             return;
         }
 
         // aa update <node> --rename <new_name>
         if (flags.rename) {
-            const result = rename_symbol(workfile.value, node, flags.rename);
+            const result = rename_symbol(context.value.workfile, node, flags.rename);
             if (!result.ok) {
-                if (flags.json) {
-                    console.log(JSON.stringify({ error: "rename_failed", message: result.error.message }));
-                } else {
-                    console.log(result.error.message);
-                }
+                output_error(flags, "rename_failed", result.error.message);
                 return;
             }
 
-            const updated = export_minimal(result.value);
-            if (!updated.ok) {
-                if (flags.json) {
-                    console.log(JSON.stringify({ error: "export_failed", message: updated.error.message }));
-                } else {
-                    console.log(updated.error.message);
-                }
+            context.value.workfile = result.value;
+            const save = save_workfile(context.value);
+            if (!save.ok) {
+                output_error(flags, "save_failed", save.error.message);
                 return;
             }
 
-            fs.writeFileSync(workfile_path, JSON.stringify(updated.value, undefined, 2));
-
-            if (flags.json) {
-                console.log(JSON.stringify({ renamed: { from: node, to: flags.rename } }, undefined, 2));
-            } else {
-                console.log(`Renamed ${node} to ${flags.rename}`);
-            }
+            output(flags, `Renamed ${node} to ${flags.rename}`, { renamed: { from: node, to: flags.rename } });
             return;
         }
 
         // aa update <node> - list properties
         if (!property) {
-            if (symbol.value._t !== "RulesetStruct") {
-                console.log(`Node ${node} is not a struct`);
+            const node_result = get_node(context.value, node);
+            if (!node_result.ok) {
+                output_error(flags, "node_not_found", node_result.error.message);
                 return;
             }
 
-            if (flags.json) {
-                console.log(JSON.stringify({
-                    node,
-                    properties: symbol.value.properties.map(p => ({
-                        name: p.name,
-                        type: format_property_type(p._t),
-                        value: p.value
-                    }))
-                }, undefined, 2));
-            } else {
-                console.log(format_property_list(node, symbol.value.properties));
-            }
+            const text = format_property_list(node, node_result.value.properties) + "\nUse: aa update <node> <property> [value]";
+            const json = {
+                node,
+                properties: node_result.value.properties.map(p => ({
+                    name: p.name,
+                    type: format_property_type(p._t),
+                    value: p.value
+                }))
+            };
+            output(flags, text, json);
             return;
         }
 
         // Check property exists
-        if (symbol.value._t !== "RulesetStruct") {
-            console.log(`Node ${node} is not a struct`);
-            return;
-        }
-
-        const property_ = symbol.value.properties.find(p => p.name === property);
-        if (!property_) {
-            if (flags.json) {
-                console.log(JSON.stringify({
-                    error: "property_not_found",
-                    property,
-                    available: symbol.value.properties.map(p => p.name)
-                }));
-            } else {
-                console.log(`Property '${property}' not found. Available: ${symbol.value.properties.map(p => p.name).join(", ")}`);
-            }
+        const lookup = get_node_property(context.value, node, property);
+        if (!lookup.ok) {
+            output_error(flags, "lookup_failed", lookup.error.message);
             return;
         }
 
         // aa update <node> <property> - show suggestions
         if (!value) {
-            const suggestions = suggest_for_property(workfile.value, node, property);
-            if (flags.json) {
-                console.log(JSON.stringify({
-                    property,
-                    type: format_property_type(property_._t),
-                    current: property_.value,
-                    suggestions: suggestions.ok ? suggestions.value : []
-                }, undefined, 2));
-            } else {
-                console.log(format_suggestions(property_, suggestions.ok ? suggestions.value : []));
-            }
+            const suggestions = suggest_for_property(context.value.workfile, node, property);
+            const empty_suggestions: PropertySuggestions = {};
+            const suggestions_value = suggestions.ok ? suggestions.value : empty_suggestions;
+            const text = format_suggestions(lookup.value.property, suggestions_value);
+            const json = {
+                property,
+                type: format_property_type(lookup.value.property._t),
+                current: lookup.value.property.value,
+                suggestions: suggestions_value.values ?? [],
+                types: suggestions_value.types ?? []
+            };
+            output(flags, text, json);
             return;
         }
 
         // Handle union type
-        if (property_._t === "UnionProperty") {
-            const member = property_.members.find(m => m.name === value);
+        if (lookup.value.property._t === "UnionProperty") {
+            const member = lookup.value.property.members.find(m => m.name === value);
             if (!member) {
-                if (flags.json) {
-                    console.log(JSON.stringify({
-                        error: "invalid_union_member",
-                        member: value,
-                        available: property_.members.map(m => m.name)
-                    }));
-                } else {
-                    console.log(`Invalid union member '${value}'. Available: ${property_.members.map(m => m.name).join(", ")}`);
-                }
+                output_error(flags, "invalid_union_member", `Invalid union member '${value}'. Available: ${lookup.value.property.members.map(m => m.name).join(", ")}`);
                 return;
             }
 
-            // aa update <node> <property> <union_member> - set union member with null value
-            const union_obj = { [value]: union_value ?? null };
-            const result = set_value(workfile.value, node, property, union_obj);
+            // eslint-disable-next-line unicorn/no-null
+            const union_object = { [value]: union_value ?? null };
+            const result = set_value(context.value.workfile, node, property, union_object);
             if (!result.ok) {
-                if (flags.json) {
-                    console.log(JSON.stringify({ error: "set_failed", message: result.error.message }));
-                } else {
-                    console.log(result.error.message);
-                }
+                output_error(flags, "set_failed", result.error.message);
                 return;
             }
 
-            const updated = export_minimal(workfile.value);
-            if (!updated.ok) {
-                if (flags.json) {
-                    console.log(JSON.stringify({ error: "export_failed", message: updated.error.message }));
-                } else {
-                    console.log(updated.error.message);
-                }
+            const save = save_workfile(context.value);
+            if (!save.ok) {
+                output_error(flags, "save_failed", save.error.message);
                 return;
             }
 
-            fs.writeFileSync(workfile_path, JSON.stringify(updated.value, undefined, 2));
-
-            if (flags.json) {
-                console.log(JSON.stringify({ updated: { node, property, member: value, value: union_value ?? null } }, undefined, 2));
-            } else {
-                const display_value = union_value ?? "(none)";
-                console.log(`Set ${node}.${property} = ${value}: ${display_value}`);
-            }
+            const display_value = union_value ?? "(none)";
+            output(flags, `Set ${node}.${property} = ${value}: ${display_value}`, {
+                // eslint-disable-next-line unicorn/no-null
+                updated: { node, property, member: value, value: union_value ?? null }
+            });
             return;
         }
 
         // aa update <node> <property> <value> - set non-union value
-        const parsed_value = parse_value(value, property_);
-        const result = set_value(workfile.value, node, property, parsed_value);
+        const parsed_value = parse_value(value, lookup.value.property);
+        const result = set_value(context.value.workfile, node, property, parsed_value);
         if (!result.ok) {
-            if (flags.json) {
-                console.log(JSON.stringify({ error: "set_failed", message: result.error.message }));
-            } else {
-                console.log(result.error.message);
-            }
+            output_error(flags, "set_failed", result.error.message);
             return;
         }
 
-        const updated = export_minimal(workfile.value);
-        if (!updated.ok) {
-            if (flags.json) {
-                console.log(JSON.stringify({ error: "export_failed", message: updated.error.message }));
-            } else {
-                console.log(updated.error.message);
-            }
+        const save = save_workfile(context.value);
+        if (!save.ok) {
+            output_error(flags, "save_failed", save.error.message);
             return;
         }
 
-        fs.writeFileSync(workfile_path, JSON.stringify(updated.value, undefined, 2));
-
-        if (flags.json) {
-            console.log(JSON.stringify({ updated: { node, property, value: parsed_value } }, undefined, 2));
-        } else {
-            console.log(`Set ${node}.${property} = ${parsed_value}`);
-        }
+        output(flags, `Set ${node}.${property} = ${parsed_value}`, {
+            updated: { node, property, value: parsed_value }
+        });
     }
 });
 
@@ -279,82 +191,12 @@ function parse_value(value: string, property: Property): unknown {
             }
             return value;
         }
+        case "ArrayProperty": {
+            return value.split(",").map(v => v.trim()).filter(v => v.length > 0);
+        }
         default: {
             return value;
         }
     }
 }
 
-// ------- FORMATTERS --------
-
-function format_node_list(minimal: MinimalWorkfile): string {
-    const entries = Object.entries(minimal.symbols);
-    if (entries.length === 0) {
-        return "No nodes to update.";
-    }
-
-    let out = "Nodes:\n\n";
-    for (const [name, node] of entries) {
-        out += `  ${name.padEnd(18)}${node.$compatible}\n`;
-    }
-    out += "\nUse: aa update <node> <property> <value>";
-    return out;
-}
-
-function format_property_list(node: string, properties: Property[]): string {
-    let out = `${node} properties:\n\n`;
-    out += `  ${"Property".padEnd(20)}${"Type".padEnd(14)}${"Value"}\n`;
-    out += `  ${"─".repeat(50)}\n`;
-
-    for (const p of properties) {
-        const type = format_property_type(p._t);
-        const value = format_property_value(p);
-        out += `  ${p.name.padEnd(20)}${type.padEnd(14)}${value}\n`;
-    }
-
-    out += "\nUse: aa update <node> <property> [value]";
-    return out;
-}
-
-function format_suggestions(property: Property, suggestions: string[]): string {
-    let out = `${property.name}\n\n`;
-    out += `  Type:    ${format_property_type(property._t)}\n`;
-    out += `  Current: ${format_property_value(property)}\n`;
-
-    if (suggestions.length > 0) {
-        out += "\n  Suggestions:\n";
-        for (const s of suggestions) {
-            out += `    • ${s}\n`;
-        }
-    }
-
-    return out;
-}
-
-function format_property_type(t: string): string {
-    const map: Record<string, string> = {
-        "NumberProperty": "number",
-        "StringProperty": "string",
-        "BooleanProperty": "boolean",
-        "EnumProperty": "enum",
-        "IncludeProperty": "include",
-        "UnionProperty": "union",
-        "ArrayProperty": "array",
-        "PlatformOpsProperty": "platform_ops",
-        "PlatformExtraProperty": "platform_extra",
-        "CallbackFunctionProperty": "callback",
-        "CallbackContextProperty": "callback_ctx",
-    };
-    return map[t] ?? t;
-}
-
-function format_property_value(property: Property): string {
-    if (property.value === undefined) { return "-"; }
-
-    if (property._t === "UnionProperty" && typeof property.value === "object") {
-        const [key, value] = Object.entries(property.value)[0];
-        return `${key} = ${value}`;
-    }
-
-    return String(property.value);
-}
