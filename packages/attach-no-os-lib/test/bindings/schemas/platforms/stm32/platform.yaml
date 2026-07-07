@@ -1,3 +1,5 @@
+vendor: stm32
+
 ops:
   - platform_ops/spi_ops.yaml
   - platform_ops/i2c_ops.yaml
