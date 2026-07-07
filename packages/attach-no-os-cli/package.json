@@ -12,7 +12,8 @@
     "watch": "tsup --watch",
     "clean": "rm -rf dist tsconfig.tsbuildinfo node_modules",
     "test": "vitest",
-    "test:watch": "vitest --watch"
+    "test:watch": "vitest --watch",
+    "test:e2e": "./test/e2e_build.sh"
   },
   "tsup": {
     "entry": [
