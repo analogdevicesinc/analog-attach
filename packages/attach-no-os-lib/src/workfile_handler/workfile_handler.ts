@@ -465,6 +465,7 @@ export function load_platform(workfile: Workfile, manifest: PlatformManifest): R
     }
 
     workfile.platform = manifest.name;
+    workfile.platform_vendor = manifest.vendor;
 
     return ok(workfile);
 }
