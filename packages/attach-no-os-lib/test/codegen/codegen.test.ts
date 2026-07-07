@@ -110,4 +110,70 @@ describe('codegen', () => {
         console.log("\n=== user_app.h ===");
         console.log(user_app_h);
     });
+
+    test('empty array generates { 0 }', () => {
+        const minimal: MinimalWorkfile = {
+            platform: "max32690",
+            symbols: {
+                "my_ad5592r": {
+                    "$compatible": "devices/ad5592r/ad5592r.yaml",
+                    "channel_modes": []
+                }
+            }
+        };
+
+        const import_result = import_minimal(minimal);
+        expectOk(import_result);
+
+        const result = generate_project({
+            workfile: import_result.value,
+            platform_name: "max32690",
+            platform_vendor: "maxim",
+            project_name: "test-project",
+            output_path: temporary_directory,
+            noos_path: "$(realpath ../../../)",
+        });
+
+        expectOk(result);
+
+        const common_data_c = fs.readFileSync(
+            path.join(temporary_directory, "test-project/src/common/common_data.c"),
+            "utf8"
+        );
+
+        expect(common_data_c).toContain(".channel_modes = { 0 }");
+    });
+
+    test('partial array generates correct values', () => {
+        const minimal: MinimalWorkfile = {
+            platform: "max32690",
+            symbols: {
+                "my_ad5592r": {
+                    "$compatible": "devices/ad5592r/ad5592r.yaml",
+                    "channel_modes": ["CH_MODE_ADC", "CH_MODE_DAC"]
+                }
+            }
+        };
+
+        const import_result = import_minimal(minimal);
+        expectOk(import_result);
+
+        const result = generate_project({
+            workfile: import_result.value,
+            platform_name: "max32690",
+            platform_vendor: "maxim",
+            project_name: "test-project",
+            output_path: temporary_directory,
+            noos_path: "$(realpath ../../../)",
+        });
+
+        expectOk(result);
+
+        const common_data_c = fs.readFileSync(
+            path.join(temporary_directory, "test-project/src/common/common_data.c"),
+            "utf8"
+        );
+
+        expect(common_data_c).toContain(".channel_modes = { CH_MODE_ADC, CH_MODE_DAC }");
+    });
 });

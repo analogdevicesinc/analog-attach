@@ -271,16 +271,28 @@ describe('workfile_handler', () => {
             const include = make_include("spi", "no-os/spi.yaml");
             const suggestions = suggest_for_include(workfile, include);
             expectOk(suggestions);
-            expect(suggestions.value).toEqual(["spi1", "spi2"]);
+            expect(suggestions.value.values).toEqual(["spi1", "spi2"]);
+            expect(suggestions.value.types).toEqual(["no-os/spi.yaml"]);
         });
 
-        test('returns empty array when no matches', () => {
+        test('returns empty values when no matches', () => {
             add_symbol(workfile, "i2c1", make_struct("no-os/i2c.yaml", "i2c"));
 
             const include = make_include("spi", "no-os/spi.yaml");
             const suggestions = suggest_for_include(workfile, include);
             expectOk(suggestions);
-            expect(suggestions.value).toEqual([]);
+            expect(suggestions.value.values).toBeUndefined();
+            expect(suggestions.value.types).toEqual(["no-os/spi.yaml"]);
+        });
+
+        test('returns enum values when include points to enum', () => {
+            const include = make_include("channel_mode", "devices/ad5592r/enums/ad5592r_channel_mode.yaml");
+            const suggestions = suggest_for_include(workfile, include);
+            expectOk(suggestions);
+            expect(suggestions.value.values).toContain("CH_MODE_UNUSED");
+            expect(suggestions.value.values).toContain("CH_MODE_ADC");
+            expect(suggestions.value.values).toContain("CH_MODE_DAC");
+            expect(suggestions.value.types).toBeUndefined();
         });
     });
 
@@ -295,7 +307,8 @@ describe('workfile_handler', () => {
             ]);
             const result = suggest_for_union(workfile, union, "spi");
             expectOk(result);
-            expect(result.value).toEqual(["spi1"]);
+            expect(result.value.values).toEqual(["spi1"]);
+            expect(result.value.types).toEqual(["no-os/spi.yaml"]);
         });
 
         test('returns error for unknown member', () => {
@@ -316,10 +329,11 @@ describe('workfile_handler', () => {
             const array = make_array("gpios", 2, make_include("element", "no-os/gpio.yaml"));
             const result = suggest_for_array(workfile, array);
             expectOk(result);
-            expect(result.value).toEqual(["gpio1", "gpio2"]);
+            expect(result.value.values).toEqual(["gpio1", "gpio2"]);
+            expect(result.value.types).toEqual(["no-os/gpio.yaml"]);
         });
 
-        test('returns error for non-include element', () => {
+        test('returns empty object for number element', () => {
             const array: ArrayProperty = {
                 _t: "ArrayProperty",
                 name: "values",
@@ -328,8 +342,8 @@ describe('workfile_handler', () => {
                 element: { _t: "NumberProperty", name: "element", description: "", type: "uint32_t" }
             };
             const result = suggest_for_array(workfile, array);
-            expectError(result);
-            expectErrorContains(result, "not an include");
+            expectOk(result);
+            expect(result.value).toEqual({});
         });
     });
 
@@ -385,7 +399,7 @@ describe('workfile_handler', () => {
         });
 
         test('returns error if binding is not platform_ops', () => {
-            const manifest = { name: 'max32690', ops: ['platforms/maxim/max32690/max_spi_init_param.yaml'], structs: [] };
+            const manifest = { name: 'max32690', vendor: 'maxim', ops: ['platforms/maxim/max32690/max_spi_init_param.yaml'], structs: [] };
 
             const result = load_platform(workfile, manifest);
             expectError(result);
@@ -402,7 +416,7 @@ describe('workfile_handler', () => {
 
             const result = suggest_for_property(workfile, "my_struct", "mode");
             expectOk(result);
-            expect(result.value).toEqual(["MODE_A", "MODE_B", "MODE_C"]);
+            expect(result.value).toEqual({ values: ["MODE_A", "MODE_B", "MODE_C"] });
         });
 
         test('suggests boolean values', () => {
@@ -413,7 +427,7 @@ describe('workfile_handler', () => {
 
             const result = suggest_for_property(workfile, "my_struct", "enabled");
             expectOk(result);
-            expect(result.value).toEqual(["true", "false"]);
+            expect(result.value).toEqual({ values: ["true", "false"] });
         });
 
         test('suggests matching symbols for include property', () => {
@@ -427,7 +441,8 @@ describe('workfile_handler', () => {
 
             const result = suggest_for_property(workfile, "my_struct", "spi_ref");
             expectOk(result);
-            expect(result.value).toEqual(["spi1", "spi2"]);
+            expect(result.value.values).toEqual(["spi1", "spi2"]);
+            expect(result.value.types).toEqual(["no-os/spi.yaml"]);
         });
 
         test('suggests union member names when no member specified', () => {
@@ -441,7 +456,7 @@ describe('workfile_handler', () => {
 
             const result = suggest_for_property(workfile, "my_struct", "comm");
             expectOk(result);
-            expect(result.value).toEqual(["spi_init", "i2c_init"]);
+            expect(result.value).toEqual({ values: ["spi_init", "i2c_init"] });
         });
 
         test('suggests symbols for union member when member specified', () => {
@@ -457,10 +472,11 @@ describe('workfile_handler', () => {
 
             const result = suggest_for_property(workfile, "my_struct", "comm", "spi_init");
             expectOk(result);
-            expect(result.value).toEqual(["spi1"]);
+            expect(result.value.values).toEqual(["spi1"]);
+            expect(result.value.types).toEqual(["no-os/spi.yaml"]);
         });
 
-        test('returns empty array for number property', () => {
+        test('returns empty object for number property', () => {
             const struct = make_struct("test.yaml", "test", [
                 { _t: "NumberProperty", name: "count", description: "", type: "uint32_t" }
             ]);
@@ -468,7 +484,7 @@ describe('workfile_handler', () => {
 
             const result = suggest_for_property(workfile, "my_struct", "count");
             expectOk(result);
-            expect(result.value).toEqual([]);
+            expect(result.value).toEqual({});
         });
 
         test('returns error for unknown symbol', () => {
@@ -506,8 +522,8 @@ describe('workfile_handler', () => {
 
             const result = suggest_platform_ops(workfile, property, spi_struct);
             expectOk(result);
-            expect(result.value).toContain("max_spi_ops");
-            expect(result.value).not.toContain("max_i2c_ops");
+            expect(result.value.values).toContain("max_spi_ops");
+            expect(result.value.values).not.toContain("max_i2c_ops");
         });
 
         test('suggests ops from allowed list when override present', () => {
@@ -531,20 +547,25 @@ describe('workfile_handler', () => {
 
             const result = suggest_platform_ops(workfile, property, spi_struct);
             expectOk(result);
-            expect(result.value).toEqual(["max_spi_ops"]);
+            expect(result.value).toEqual({ values: ["max_spi_ops"] });
         });
     });
 
     describe('suggest_platform_extra', () => {
-        test('suggests extras matching capability', () => {
-            add_platform_ops(workfile, "max_spi_ops", make_platform_ops("ops/spi.yaml", "max_spi_ops", "spi"));
+        const PLATFORM_PATH = path.join(__dirname, '../bindings/schemas/platforms/maxim/max32690');
 
+        test('suggests extras matching capability', () => {
+            const scan_result = scan_platform(PLATFORM_PATH);
+            expectOk(scan_result);
+            load_platform(workfile, scan_result.value);
+
+            // Create symbols that match platform structs
             const spi_extra: RulesetStruct = {
-                ...make_struct("platform/max_spi.yaml", "max_spi"),
+                ...make_struct("platforms/maxim/max32690/max_spi_init_param.yaml", "max_spi_init_param"),
                 $capability: "spi"
             };
             const i2c_extra: RulesetStruct = {
-                ...make_struct("platform/max_i2c.yaml", "max_i2c"),
+                ...make_struct("platforms/maxim/max32690/max_i2c_init_param.yaml", "max_i2c_init_param"),
                 $capability: "i2c"
             };
             add_symbol(workfile, "my_spi_extra", spi_extra);
@@ -564,8 +585,8 @@ describe('workfile_handler', () => {
 
             const result = suggest_platform_extra(workfile, property, parent);
             expectOk(result);
-            expect(result.value).toContain("my_spi_extra");
-            expect(result.value).not.toContain("my_i2c_extra");
+            expect(result.value.values).toContain("my_spi_extra");
+            expect(result.value.values).not.toContain("my_i2c_extra");
         });
     });
 
@@ -687,6 +708,101 @@ describe('workfile_handler', () => {
             const device_id = get_value(workfile2, "test_spi", "device_id");
             expectOk(device_id);
             expect(device_id.value).toBe(42);
+        });
+
+        test('round-trip preserves array values', () => {
+            const minimal = {
+                platform: "max32690",
+                symbols: {
+                    "my_ad5592r": {
+                        $compatible: "devices/ad5592r/ad5592r.yaml",
+                        channel_modes: ["CH_MODE_ADC", "CH_MODE_DAC", "CH_MODE_UNUSED"]
+                    }
+                }
+            };
+
+            const import_result = import_minimal(minimal);
+            expectOk(import_result);
+
+            const exported = export_minimal(import_result.value);
+            expectOk(exported);
+
+            expect(exported.value.symbols["my_ad5592r"]["channel_modes"]).toEqual(["CH_MODE_ADC", "CH_MODE_DAC", "CH_MODE_UNUSED"]);
+        });
+
+        test('round-trip preserves union values', () => {
+            const minimal = {
+                platform: "max32690",
+                symbols: {
+                    "my_spi": {
+                        $compatible: "no-os/no_os_spi_init_param.yaml",
+                        device_id: 1
+                    },
+                    "my_adxl355": {
+                        $compatible: "devices/adxl355/adxl355.yaml",
+                        comm_type: "ADXL355_SPI_COMM",
+                        dev_type: "ID_ADXL355",
+                        comm_init: { spi_init: "my_spi" }
+                    }
+                }
+            };
+
+            const import_result = import_minimal(minimal);
+            expectOk(import_result);
+
+            const exported = export_minimal(import_result.value);
+            expectOk(exported);
+
+            expect(exported.value.symbols["my_adxl355"]["comm_init"]).toEqual({ spi_init: "my_spi" });
+        });
+
+        test('round-trip preserves boolean values', () => {
+            const minimal = {
+                platform: "max32690",
+                symbols: {
+                    "my_ad7124": {
+                        $compatible: "devices/ad7124/ad7124.yaml",
+                        ref_en: false,
+                        check_ready: true
+                    }
+                }
+            };
+
+            const import_result = import_minimal(minimal);
+            expectOk(import_result);
+
+            const exported = export_minimal(import_result.value);
+            expectOk(exported);
+
+            expect(exported.value.symbols["my_ad7124"]["ref_en"]).toBe(false);
+            expect(exported.value.symbols["my_ad7124"]["check_ready"]).toBe(true);
+        });
+    });
+
+    describe('platform_vendor', () => {
+        test('platform_vendor is set after loading platform', () => {
+            const scan_result = scan_platform(path.join(__dirname, '../bindings/schemas/platforms/maxim/max32690'));
+            expectOk(scan_result);
+            load_platform(workfile, scan_result.value);
+
+            expect(workfile.platform_vendor).toBe("maxim");
+        });
+
+        test('create_workfile sets platform_vendor', () => {
+            const result = create_workfile("max32690");
+            expectOk(result);
+            expect(result.value.platform_vendor).toBe("maxim");
+        });
+
+        test('import_minimal sets platform_vendor', () => {
+            const minimal = {
+                platform: "max32690",
+                symbols: {}
+            };
+
+            const result = import_minimal(minimal);
+            expectOk(result);
+            expect(result.value.platform_vendor).toBe("maxim");
         });
     });
 });

@@ -1,6 +1,7 @@
 import { Property } from "../ruleset_parser/types";
 import { Workfile } from "../workfile_handler/types";
 import { ChildOverride, ConnectionGraph } from "./types";
+import { load_resolved_ruleset } from "../resolver/resolver";
 
 function get_connected_symbols(property: Property): string[] {
 	switch (property._t) {
@@ -19,6 +20,11 @@ function get_connected_symbols(property: Property): string[] {
 		}
 		case "ArrayProperty": {
 			if (property.element._t === "IncludeProperty" && Array.isArray(property.value)) {
+				// Check if the include points to an enum - enum values are not symbol references
+				const resolved = load_resolved_ruleset(property.element.include);
+				if (resolved.ok && resolved.value._t === "RulesetEnum") {
+					return [];
+				}
 				return property.value as string[];
 			}
 			return [];
