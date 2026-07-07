@@ -8,7 +8,7 @@
     "aa": "./dist/cli.js"
   },
   "scripts": {
-    "build": "tsup --silent",
+    "build": "tsup --silent && cp -r ../attach-no-os-lib/src/codegen/templates dist/",
     "watch": "tsup --watch",
     "clean": "rm -rf dist tsconfig.tsbuildinfo node_modules",
     "test": "vitest",

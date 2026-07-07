@@ -49,6 +49,8 @@ export function create_workfile(platform?: string): Result<Workfile> {
         return error(`Platform '${platform}' not found`, "platform");
     }
 
+    workfile.platform_vendor = manifest.vendor;
+
     const load_result = load_platform(workfile, manifest);
     return load_result; // Error or not, we return this anyway
 }

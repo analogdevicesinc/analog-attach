@@ -5,6 +5,7 @@ import { Ruleset } from "../ruleset_parser/types";
  */
 export type PlatformManifest = {
     name: string;       // platform name e.g. "max32690"
+    vendor: string;     // vendor name e.g. "maxim"
     ops: string[];      // paths to ops yaml files
     structs: string[];  // paths to struct yaml files (extras)
 };
@@ -18,6 +19,7 @@ export type PlatformSpecs = {
 
 export type Workfile = {
     platform?: string;                      // platform name e.g. "max32690"
+    platform_vendor?: string;               // vendor name e.g. "maxim"
     platform_ops: Record<string, Ruleset>;  // locked, auto-populated from platform, not printed
     symbols: Record<string, Ruleset>;       // user-created symbols, printed in codegen
 };

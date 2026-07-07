@@ -1,3 +1,5 @@
+vendor: xilinx
+
 ops:
   - platform_ops/spi_ops.yaml
   - platform_ops/spi_engine_ops.yaml
