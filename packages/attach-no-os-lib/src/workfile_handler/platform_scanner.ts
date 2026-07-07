@@ -2,7 +2,7 @@ import * as fs from "node:fs";
 import path from "node:path";
 import YAML from "yaml";
 import { Result, ok, error } from "../ruleset_parser/result";
-import { asObject, at, optional, ParseContext, stringArray } from "../ruleset_parser/validators";
+import { asObject, at, optional, required, ParseContext, stringArray, string_ } from "../ruleset_parser/validators";
 import { get_schemas_path } from "../settings/settings";
 import { PlatformManifest, PlatformSpecs } from "./types";
 
@@ -17,6 +17,11 @@ function parse_manifest(manifest: unknown, platform_path: string): Result<Platfo
 	const object = asObject(manifest, context);
 	if (!object.ok) {
 		return object;
+	}
+
+	const vendor = required(object.value, "vendor", context, string_);
+	if (!vendor.ok) {
+		return vendor;
 	}
 
 	const ops = optional(object.value, "ops", context, stringArray);
@@ -60,6 +65,7 @@ function parse_manifest(manifest: unknown, platform_path: string): Result<Platfo
 
 	return ok({
 		name: platform_name,
+		vendor: vendor.value,
 		ops: prefixed_ops,
 		structs: prefixed_structs,
 	});
