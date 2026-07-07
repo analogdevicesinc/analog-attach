@@ -2,7 +2,6 @@ import {
 	ArrayProperty,
 	BooleanProperty,
 	EnumProperty,
-	IncludeProperty,
 	NumberProperty,
 	PlatformExtraProperty,
 	PlatformOpsProperty,
@@ -13,6 +12,8 @@ import {
 } from "../ruleset_parser/types";
 import { at, ParseContext } from "../ruleset_parser/validators";
 import { Workfile } from "../workfile_handler/types";
+import { suggest_platform_extra } from "../workfile_handler/workfile_handler";
+import { load_resolved_ruleset } from "../resolver/resolver";
 import { apply_overrides } from "./override_resolver";
 import { ChildOverride, ValidationError } from "./types";
 
@@ -36,12 +37,13 @@ export function validate_property(
 			return [];
 		}
 
-		// FIXME: This might not be supposed to be checked here, might move elsewhere
-		// Skip required check for platform_extra if no valid extras exist (excluding self)
-		if (effective._t === "PlatformExtraProperty" &&
-			!Object.values(workfile.symbols).some(s =>
-				s !== parent_symbol && s._t === "RulesetStruct" && s.$capability === parent_symbol.$capability)) {
-			return [];
+		// This might be an odd check, but if there is no "extra" struct for this platform, assume
+		// it is okay and do not return error even if the "extra" property is required.
+		if (effective._t === "PlatformExtraProperty") {
+			const suggestions = suggest_platform_extra(workfile, effective, parent_symbol);
+			if (!suggestions.ok || !suggestions.value.types || suggestions.value.types.length === 0) {
+				return []; // no possible extra for this, assume there is none
+			}
 		}
 
 		return [{
@@ -62,7 +64,7 @@ export function validate_property(
 			return validate_string(effective, property_context);
 		}
 		case "IncludeProperty": {
-			return validate_include(effective, workfile, property_context);
+			return validate_include(effective.value as string, effective.include, workfile, property_context);
 		}
 		case "EnumProperty": {
 			return validate_enum(effective, property_context);
@@ -275,25 +277,39 @@ function validate_enum(property: EnumProperty, context: ParseContext): Validatio
 }
 
 function validate_include(
-    property: IncludeProperty,
+    value: string,
+    include_path: string,
     workfile: Workfile,
     context: ParseContext
 ): ValidationError[] {
-    const target_symbol_name = property.value as string;
-    const target = workfile.symbols[target_symbol_name];
+    const resolved = load_resolved_ruleset(include_path);
+
+    if (resolved.ok && resolved.value._t === "RulesetEnum") {
+        const valid_values = resolved.value.values.map(v => v.name);
+        if (!valid_values.includes(value)) {
+            return [{
+                path: context.path,
+                message: `Invalid value '${value}'. Expected one of: ${valid_values.join(", ")}`,
+                severity: "error"
+            }];
+        }
+        return [];
+    }
+
+    const target = workfile.symbols[value];
 
     if (!target) {
         return [{
             path: context.path,
-            message: `Target symbol '${target_symbol_name}' not found`,
+            message: `Target symbol '${value}' not found`,
             severity: "error"
         }];
     }
 
-    if (target.$id !== property.include) {
+    if (target.$id !== include_path) {
         return [{
             path: context.path,
-            message: `Type mismatch: '${target_symbol_name}' is '${target.$id}', expected '${property.include}'`,
+            message: `Type mismatch: '${value}' is '${target.$id}', expected '${include_path}'`,
             severity: "error"
         }];
     }
@@ -355,41 +371,41 @@ function validate_array(
     context: ParseContext
 ): ValidationError[] {
     const errors: ValidationError[] = [];
-    const value = property.value as string[];
+    const value = property.value as string[] | undefined;
 
-    if (property.element._t !== "IncludeProperty") {
-        // Array of primitives - no symbol validation needed
-        // Could add per-element type validation here later
+    if (!value) {
         return [];
     }
 
-    if (value.length !== property.size) {
+    if (!Array.isArray(value)) {
         return [{
             path: context.path,
-            message: `Array must have ${property.size} elements, got ${value.length}`,
+            message: `Expected array, got ${typeof value}`,
             severity: "error"
         }];
     }
 
-    const element = property.element;
-    for (const [index, target_symbol_name] of value.entries()) {
-        const target = workfile.symbols[target_symbol_name];
+    if (value.length === 0) {
+        return [];
+    }
 
-        if (!target) {
-            errors.push({
-                path: at(context, index).path,
-                message: `Target symbol '${target_symbol_name}' not found`,
-                severity: "error"
-            });
-            continue;
-        }
+    if (value.length > property.size) {
+        return [{
+            path: context.path,
+            message: `Array exceeds maximum size of ${property.size}, got ${value.length}`,
+            severity: "error"
+        }];
+    }
 
-        if (target.$id !== element.include) {
-            errors.push({
-                path: at(context, index).path,
-                message: `Type mismatch: '${target_symbol_name}' is '${target.$id}', expected '${element.include}'`,
-                severity: "error"
-            });
+    if (property.element._t === "IncludeProperty") {
+        for (const [index, element_value] of value.entries()) {
+            const element_errors = validate_include(
+                element_value,
+                property.element.include,
+                workfile,
+                at(context, index)
+            );
+            errors.push(...element_errors);
         }
     }
 

@@ -13,12 +13,13 @@ import {
     UnionProperty
 } from "../ruleset_parser/types";
 import { scan_platforms } from "./platform_scanner";
-import { PlatformManifest } from "./types";
+import { PlatformManifest, PropertySuggestions } from "./types";
 import { load_resolved_ruleset } from "../resolver/resolver";
 import { get_schemas_path } from "../settings/settings";
 import { collect_child_overrides, create_connections_graph } from "../validator/connection_graph";
 import { apply_overrides } from "../validator/override_resolver";
 import { AvailableStructs, is_minimal_workfile, MinimalWorkfile, Workfile } from "./types";
+import { parse_ruleset } from "../ruleset_parser/ruleset_parser";
 
 // --- Workfile Creation ---
 
@@ -173,24 +174,38 @@ export function get_value(workfile: Workfile, symbol_name: string, property_name
 
 // --- Suggestions ---
 
-export function suggest_for_include(workfile: Workfile, include: IncludeProperty): Result<string[]> {
-    const suggestions: string[] = [];
+export function suggest_for_include(workfile: Workfile, include: IncludeProperty): Result<PropertySuggestions> {
+    const resolved = load_resolved_ruleset(include.include);
+    if (resolved.ok && resolved.value._t === "RulesetEnum") {
+        return ok({
+            values: resolved.value.values.map(v => typeof v.name === "number" ? v.name.toString() : v.name),
+        });
+    }
+
+    const values: string[] = [];
+
+    // add the already declared symbols
     for (const [name, ruleset] of Object.entries(workfile.platform_ops)) {
         if (ruleset.$id === include.include) {
-            suggestions.push(name);
+            values.push(name);
         }
     }
     for (const [name, ruleset] of Object.entries(workfile.symbols)) {
         if (ruleset.$id === include.include) {
-            suggestions.push(name);
+            values.push(name);
         }
     }
-    return ok(suggestions);
+
+    return ok({
+        values: values.length === 0 ? undefined : values,
+        types: [include.include],
+    });
 }
 
-export function suggest_for_union(workfile: Workfile, union: UnionProperty, member_name?: string): Result<string[]> {
+export function suggest_for_union(workfile: Workfile, union: UnionProperty, member_name?: string): Result<PropertySuggestions> {
     if (member_name === undefined) {
-        return ok(union.members.map(p => p.name));
+        // Suggest the member names (one must be selected for further suggestions)
+        return ok({ values: union.members.map(p => p.name)});
     }
 
     const member = union.members.find(m => m.name === member_name);
@@ -200,18 +215,28 @@ export function suggest_for_union(workfile: Workfile, union: UnionProperty, memb
     return suggest_for_include(workfile, member);
 }
 
-export function suggest_for_array(workfile: Workfile, array: ArrayProperty): Result<string[]> {
-    if (array.element._t !== "IncludeProperty") {
-        return error(`Array element is not an include`, "element");
+export function suggest_for_array(workfile: Workfile, array: ArrayProperty): Result<PropertySuggestions> {
+    switch (array.element._t) {
+        case "IncludeProperty": {
+            return suggest_for_include(workfile, array.element);
+        }
+        case "EnumProperty": {
+            return suggest_for_enum(array.element);
+        }
+        case "BooleanProperty": {
+            return ok({ values: ["true", "false"] });
+        }
+        default: {
+            return ok({});
+        }
     }
-    return suggest_for_include(workfile, array.element);
 }
 
-export function suggest_for_enum(property: EnumProperty): Result<string[]> {
-    return ok(property.values.map(p => typeof p === "number" ? p.toString() : p));
+export function suggest_for_enum(property: EnumProperty): Result<PropertySuggestions> {
+    return ok({ values: property.values.map(p => typeof p === "number" ? p.toString() : p)});
 }
 
-export function suggest_platform_ops(workfile: Workfile, property: PlatformOpsProperty, parent_struct: RulesetStruct): Result<string[]> {
+export function suggest_platform_ops(workfile: Workfile, property: PlatformOpsProperty, parent_struct: RulesetStruct): Result<PropertySuggestions> {
     const suggestions: string[] = [];
 
     for (const [name, ops] of Object.entries(workfile.platform_ops)) {
@@ -226,28 +251,59 @@ export function suggest_platform_ops(workfile: Workfile, property: PlatformOpsPr
         }
     }
 
-    return ok(suggestions);
+    return ok({ values: suggestions });
 }
 
-export function suggest_platform_extra(workfile: Workfile, property: PlatformExtraProperty, parent_struct: RulesetStruct): Result<string[]> {
-    const suggestions: string[] = [];
+export function suggest_platform_extra(workfile: Workfile, property: PlatformExtraProperty, parent_struct: RulesetStruct): Result<PropertySuggestions> {
+    // Add possible schemas that would fit here
+    const available = list_available_structs(workfile);
+    if (!available.ok) {
+        // This should not happen, getting here without being able to resolve the structs is odd
+        return ok({});
+    }
 
+    const values: string[] = [];
+    const types: string[] = [];
+
+    // Add already created symbols
     for (const [name, symbol] of Object.entries(workfile.symbols)) {
         if (symbol._t !== "RulesetStruct") {
             continue;
         }
 
-        if (property.allowed && property.allowed.includes(symbol.$id)) {
-            suggestions.push(name);
-        } else if (symbol.$capability === parent_struct.$capability) {
-            suggestions.push(name);
+        if (symbol === parent_struct) {
+            continue; // skip self
+        }
+
+        const matches_allowed = property.allowed && property.allowed.includes(symbol.$id);
+        const matches_capability = available.value.platform.includes(symbol.$id) && symbol.$capability === parent_struct.$capability;
+
+        if (matches_allowed || matches_capability) {
+            values.push(name);
         }
     }
 
-    return ok(suggestions);
+    for (const schema_path of available.value.platform) {
+        const ruleset = load_resolved_ruleset(schema_path);
+        if (!ruleset.ok || ruleset.value._t !== "RulesetStruct") {
+            continue;
+        }
+
+        const matches_allowed = property.allowed && property.allowed.includes(ruleset.value.$id);
+        const matches_capability = ruleset.value.$capability === parent_struct.$capability;
+
+        if (matches_allowed || matches_capability) {
+            types.push(schema_path);
+        }
+    }
+
+    return ok({
+        values: values.length > 0 ? values : undefined,
+        types: types.length > 0 ? types : undefined,
+    });
 }
 
-export function suggest_for_property(workfile: Workfile, symbol_name: string, property_name: string, union_member?: string): Result<string[]> {
+export function suggest_for_property(workfile: Workfile, symbol_name: string, property_name: string, union_member?: string): Result<PropertySuggestions> {
     const symbol = workfile.symbols[symbol_name];
     if (!symbol) {
         return error(`Could not find symbol with name: "${symbol_name}" in [${Object.keys(workfile.symbols)}]`, "");
@@ -264,13 +320,13 @@ export function suggest_for_property(workfile: Workfile, symbol_name: string, pr
 
     switch (property._t) {
         case "NumberProperty": {
-            return ok([]);
+            return ok({});
         }
         case "BooleanProperty": {
-            return ok(["true", "false"]);
+            return ok({ values: ["true", "false"]});
         }
         case "StringProperty": {
-            return ok([]);
+            return ok({});
         }
         case "IncludeProperty": {
             return suggest_for_include(workfile, property);
@@ -297,13 +353,13 @@ export function suggest_for_property(workfile: Workfile, symbol_name: string, pr
             return suggest_platform_extra(workfile, effective as PlatformExtraProperty, symbol);
         }
         case "CallbackFunctionProperty": {
-            return ok([]);
+            return ok({});
         }
         case "CallbackContextProperty": {
-            return ok([]);
+            return ok({});
         }
         default: {
-            return error("unknown type", "");
+            return error("unknown type");
         }
     }
 }
@@ -316,12 +372,12 @@ export function list_available_structs(workfile: Workfile): Result<AvailableStru
 
     const devices = scan_yaml_files(path.join(schema_path.value, "devices"));
     if (!devices.ok) {
-        return error(`Path ${path.join(schema_path.value, "devices")} not found`, "");
+        return error(`Path ${path.join(schema_path.value, "devices")} not found`);
     }
 
     const noos = scan_yaml_files(path.join(schema_path.value, "no-os"));
     if (!noos.ok) {
-        return error(`Path ${path.join(schema_path.value, "noos")} not found`, "");
+        return error(`Path ${path.join(schema_path.value, "noos")} not found`);
     }
 
     // Get platform structs from manifest if platform is set
@@ -336,12 +392,26 @@ export function list_available_structs(workfile: Workfile): Result<AvailableStru
         }
     }
 
+    // We should eliminate the enum types from this search as those are not instantiable
     return ok({
-        devices: devices.value,
-        noos: noos.value,
-        platform: platform_structs
+        devices: devices.value.filter(item => filter_enums(path.join(schema_path.value, item))),
+        noos: noos.value.filter(item => filter_enums(path.join(schema_path.value, item))),
+        platform: platform_structs.filter(item => filter_enums(path.join(schema_path.value, item)))
     });
 }
+
+function filter_enums(path: string) {
+    if (!fs.existsSync(path)) {
+        return false;
+    }
+    const contents = fs.readFileSync(path, "utf8");
+    const ruleset = parse_ruleset(contents);
+    if (!ruleset.ok || ruleset.value._t !== "RulesetStruct") {
+        return false;
+    }
+
+    return true;
+};
 
 function scan_yaml_files(directory: string): Result<string[]> {
     const schema_path = get_schemas_path();
@@ -446,7 +516,6 @@ export function import_minimal(minimal: MinimalWorkfile): Result<Workfile> {
 
         const add_result = add_symbol(workfile, name, ruleset_result.value);
         if (!add_result.ok) {
-            console.log(add_result);
             return add_result;
         }
 

@@ -1,20 +1,21 @@
 import { buildCommand } from "@stricli/core";
 import {
-    export_minimal,
-    get_symbol,
-    import_minimal,
-    list_symbols,
-    load_minimal_workfile,
-    MinimalWorkfile,
     remove_symbol,
-    resolve_workfile_path,
     set_value
 } from "attach-no-os-lib";
-import fs from "node:fs";
+import {
+    load_context,
+    save_workfile,
+    output,
+    output_error,
+    get_node,
+    get_node_property,
+    format_node_list
+} from "./shared";
 
 export const deleteCommand = buildCommand<
-{ json?: boolean; reset?: string },
-[string | undefined]  // node
+    { json?: boolean; reset?: string },
+    [string | undefined]
 >({
     docs: { brief: "Delete a node or reset a property" },
     parameters: {
@@ -30,154 +31,69 @@ export const deleteCommand = buildCommand<
         }
     },
     func: async (flags, node) => {
-        const workfile_path = resolve_workfile_path();
-        if (!workfile_path) {
-            const message = "No workfile found in current directory";
-            if (flags.json) {
-                console.log(JSON.stringify({ error: "no_workfile", message }));
-            } else {
-                console.log(message);
-            }
-            return;
-        }
-
-        const minimal = load_minimal_workfile(workfile_path);
-        if (!minimal.ok) {
-            if (flags.json) {
-                console.log(JSON.stringify({ error: "load_failed", message: minimal.error.message }));
-            } else {
-                console.log(minimal.error.message);
-            }
+        const context = load_context();
+        if (!context.ok) {
+            output_error(flags, "load_failed", context.error.message);
             return;
         }
 
         // aa delete - list deletable nodes
         if (!node) {
-            if (flags.json) {
-                console.log(JSON.stringify({
-                    nodes: Object.entries(minimal.value.symbols).map(([name, n]) => ({
-                        name,
-                        schema: n.$compatible
-                    }))
-                }, undefined, 2));
-            } else {
-                console.log(format_deletable_nodes(minimal.value));
-            }
-            return;
-        }
-
-        const workfile = import_minimal(minimal.value);
-        if (!workfile.ok) {
-            if (flags.json) {
-                console.log(JSON.stringify({ error: "import_failed", message: workfile.error.message }));
-            } else {
-                console.log(workfile.error.message);
-            }
+            const text = format_node_list(context.value.minimal, "Nodes that can be deleted:") + "\nUse: aa delete <node>";
+            const json = {
+                nodes: Object.entries(context.value.minimal.symbols).map(([name, n]) => ({
+                    name,
+                    schema: n.$compatible
+                }))
+            };
+            output(flags, text, json);
             return;
         }
 
         // Check node exists
-        const symbol = get_symbol(workfile.value, node);
-        if (!symbol.ok) {
-            if (flags.json) {
-                console.log(JSON.stringify({
-                    error: "node_not_found",
-                    node: node,
-                    existing_nodes: list_symbols(workfile.value)
-                }, undefined, 2));
-            } else {
-                console.log(`Node '${node}' not found.\n`);
-                console.log(format_existing_nodes(minimal.value));
-            }
+        const node_result = get_node(context.value, node);
+        if (!node_result.ok) {
+            output_error(flags, "node_not_found", node_result.error.message);
             return;
         }
 
         // aa delete <node> --reset <property>
         if (flags.reset) {
-            const result = set_value(workfile.value, node, flags.reset);
+            const lookup = get_node_property(context.value, node, flags.reset);
+            if (!lookup.ok) {
+                output_error(flags, "property_not_found", lookup.error.message);
+                return;
+            }
+
+            const result = set_value(context.value.workfile, node, flags.reset);
             if (!result.ok) {
-                if (flags.json) {
-                    console.log(JSON.stringify({ error: "reset_failed", message: result.error.message }));
-                } else {
-                    console.log(result.error.message);
-                }
+                output_error(flags, "reset_failed", result.error.message);
                 return;
             }
 
-            const updated = export_minimal(workfile.value);
-            if (!updated.ok) {
-                if (flags.json) {
-                    console.log(JSON.stringify({ error: "export_failed", message: updated.error.message }));
-                } else {
-                    console.log(updated.error.message);
-                }
+            const save = save_workfile(context.value);
+            if (!save.ok) {
+                output_error(flags, "save_failed", save.error.message);
                 return;
             }
 
-            fs.writeFileSync(workfile_path, JSON.stringify(updated.value, undefined, 2));
-
-            if (flags.json) {
-                console.log(JSON.stringify({
-                    reset: { node, property: flags.reset }
-                }, undefined, 2));
-            } else {
-                console.log(`Reset ${node}.${flags.reset}`);
-            }
+            output(flags, `Reset ${node}.${flags.reset}`, { reset: { node, property: flags.reset } });
             return;
         }
 
         // aa delete <node>
-        const result = remove_symbol(workfile.value, node);
+        const result = remove_symbol(context.value.workfile, node);
         if (!result.ok) {
-            if (flags.json) {
-                console.log(JSON.stringify({ error: "delete_failed", message: result.error.message }));
-            } else {
-                console.log(result.error.message);
-            }
+            output_error(flags, "delete_failed", result.error.message);
             return;
         }
 
-        const updated = export_minimal(workfile.value);
-        if (!updated.ok) {
-            if (flags.json) {
-                console.log(JSON.stringify({ error: "export_failed", message: updated.error.message }));
-            } else {
-                console.log(updated.error.message);
-            }
+        const save = save_workfile(context.value);
+        if (!save.ok) {
+            output_error(flags, "save_failed", save.error.message);
             return;
         }
 
-        fs.writeFileSync(workfile_path, JSON.stringify(updated.value, undefined, 2));
-
-        if (flags.json) {
-            console.log(JSON.stringify({ deleted: node }, undefined, 2));
-        } else {
-            console.log(`Deleted node ${node}`);
-        }
+        output(flags, `Deleted node ${node}`, { deleted: node });
     }
 });
-
-// ------ FORMATTERS -------
-
-function format_deletable_nodes(minimal: MinimalWorkfile): string {
-    const entries = Object.entries(minimal.symbols);
-
-    if (entries.length === 0) {
-        return "No nodes to delete.";
-    }
-
-    let out = "Nodes that can be deleted:\n\n";
-    for (const [name, node] of entries) {
-        out += `  ${name.padEnd(18)}${node.$compatible}\n`;
-    }
-    out += "\nUse: aa delete <node>";
-    return out;
-}
-
-function format_existing_nodes(minimal: MinimalWorkfile): string {
-    const names = Object.keys(minimal.symbols);
-    if (names.length === 0) {
-        return "No existing nodes.";
-    }
-    return "Existing nodes:\n" + names.map(n => `  ${n}`).join("\n");
-}

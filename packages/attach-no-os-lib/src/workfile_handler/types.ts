@@ -32,6 +32,11 @@ export type AvailableStructs = {
     platform: string[];
 };
 
+export type PropertySuggestions = {
+    values?: string[], // for normal values / instantiated symbols
+    types?: string[], // types that can be instantiated and become symbols/values (that fit in this case)
+}
+
 export type MinimalWorkfileNode = {
     $compatible: string;
     [property: string]: unknown;

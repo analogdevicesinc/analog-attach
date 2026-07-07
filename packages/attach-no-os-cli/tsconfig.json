@@ -19,7 +19,11 @@
     "composite": true,
     "types": [
       "node"
-    ]
+    ],
+    "baseUrl": ".",
+    "paths": {
+      "attach-no-os-lib": ["../attach-no-os-lib/src/index.ts"]
+    }
   },
   "include": [
     "src/**/*"
@@ -27,5 +31,8 @@
   "exclude": [
     "node_modules",
     "dist"
+  ],
+  "references": [
+    { "path": "../attach-no-os-lib" }
   ]
 }

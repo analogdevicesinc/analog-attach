@@ -1,6 +1,6 @@
 export { parse_ruleset } from "./ruleset_parser/ruleset_parser";
 export { load_resolved_ruleset } from "./resolver/resolver";
-export type { Ruleset, Property, IncludeProperty } from "./ruleset_parser/types";
+export type { Ruleset, Property, IncludeProperty, RulesetStruct, ArrayProperty } from "./ruleset_parser/types";
 export { ok, error } from "./ruleset_parser/result";
 export type { Result, ResultError } from "./ruleset_parser/result";
 export {
@@ -25,7 +25,7 @@ export {
     suggest_for_include
 } from "./workfile_handler/workfile_handler";
 export { scan_platform, scan_platforms } from "./workfile_handler/platform_scanner";
-export type { MinimalWorkfile, PlatformManifest, PlatformSpecs, Workfile, AvailableStructs } from "./workfile_handler/types";
+export type { MinimalWorkfile, PlatformManifest, PlatformSpecs, Workfile, AvailableStructs, PropertySuggestions } from "./workfile_handler/types";
 export {
     get_settings,
     set_settings,
@@ -41,3 +41,5 @@ export {
 export { SETTINGS_DEFAULTS, DEFAULT_SYSTEM_CONFIG_PATH, DEFAULT_SYSTEM_CONFIG_FILENAME, SCHEMAS_SUBPATH } from "./settings/globals";
 export type { Setting, SettingsFile } from "./settings/types";
 export { is_setting, is_settings_file } from "./settings/types";
+export { validate_workfile } from "./validator/validator";
+export type { ValidationResult, ValidationError } from "./validator/types";

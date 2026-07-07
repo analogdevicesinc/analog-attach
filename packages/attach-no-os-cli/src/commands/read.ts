@@ -1,20 +1,25 @@
 import { buildCommand } from "@stricli/core";
 import {
-    MinimalWorkfile,
     Ruleset,
-    Workfile,
     Property,
-    suggest_for_union,
-    suggest_for_include,
-    load_minimal_workfile,
-    import_minimal,
-    resolve_workfile_path,
+    PropertySuggestions,
+    suggest_for_property,
     IncludeProperty
 } from "attach-no-os-lib";
+import {
+    load_context,
+    output,
+    output_error,
+    get_node,
+    get_node_property,
+    format_property_type,
+    format_property_value,
+    format_node_list
+} from "./shared";
 
 export const readCommand = buildCommand<
     { json?: boolean },
-    [string | undefined, string | undefined, string | undefined]  // node, property, union_member
+    [string | undefined, string | undefined, string | undefined]
 >({
     docs: { brief: "Read workfile, node, or property" },
     parameters: {
@@ -30,147 +35,91 @@ export const readCommand = buildCommand<
             json: { kind: "boolean", brief: "Output as JSON", optional: true }
         }
     },
-    func: async (flags, node: string | undefined, property: string | undefined, union_member: string | undefined) => {
-        // Load workfile
-        const workfile_path = resolve_workfile_path();
-        if (!workfile_path) {
-            console.log("No workfile found in current directory");
-            return;
-        }
-
-        const minimal = load_minimal_workfile(workfile_path);
-        if (!minimal.ok) {
-            console.log(minimal.error.message);
-            return;
-        }
-
-        const workfile = import_minimal(minimal.value);
-        if (!workfile.ok) {
-            console.log(workfile.error.message);
+    func: async (flags, node, property, union_member) => {
+        const context = load_context();
+        if (!context.ok) {
+            output_error(flags, "load_failed", context.error.message);
             return;
         }
 
         // aa read - list all nodes
         if (!node) {
-            if (flags.json) {
-                console.log(JSON.stringify({
-                    platform: minimal.value.platform,
-                    nodes: Object.entries(minimal.value.symbols).map(([name, n]) => ({
-                        name,
-                        schema: n.$compatible
-                    }))
-                }, undefined, 2));
-            } else {
-                console.log(format_node_list(minimal.value));
-            }
+            const text = `Platform: ${context.value.minimal.platform}\n\n` + format_node_list(context.value.minimal, "Nodes:");
+            const json = {
+                platform: context.value.minimal.platform,
+                nodes: Object.entries(context.value.minimal.symbols).map(([name, n]) => ({
+                    name,
+                    schema: n.$compatible
+                }))
+            };
+            output(flags, text, json);
             return;
         }
 
         // aa read <node> - show node properties
-        if (node && !property) {
-            if (!Object.keys(minimal.value.symbols).includes(node)) {
-                const message = `Node ${node} is not defined in the workfile. Available nodes: ${Object.keys(minimal.value.symbols).join(", ")}`;
-                if (flags.json) {
-                    console.log(JSON.stringify({ message }, undefined, 2));
-                } else {
-                    console.log(message);
-                }
+        if (!property) {
+            const node_result = get_node(context.value, node);
+            if (!node_result.ok) {
+                output_error(flags, "node_not_found", node_result.error.message);
                 return;
             }
 
-            const selected_node = minimal.value.symbols[node];
-            if (flags.json) {
-                console.log(JSON.stringify(selected_node, undefined, 2));
-            } else {
-                console.log(format_node_summary(node, workfile.value.symbols[node]));
-            }
-
+            const text = format_node_summary(node, context.value.workfile.symbols[node]);
+            const json = context.value.minimal.symbols[node];
+            output(flags, text, json);
             return;
         }
 
-        if (node && property) {
-            if (!Object.keys(workfile.value.symbols).includes(node)) {
-                const message = `Node ${node} is not defined in the workfile. Available nodes: ${workfile.value.symbols}`;
-                if (flags.json) {
-                    console.log(JSON.stringify({ message }, undefined, 2));
-                } else {
-                    console.log(message);
-                }
-                return;
-            }
-
-            const selected_node = workfile.value.symbols[node];
-            if (selected_node._t !== "RulesetStruct") {
-                console.log(`Selected node ${node} has the wrong type (${workfile.value.symbols[node]._t}) instead of RulesetStruct`);
-                return;
-            }
-
-            const selected_property = selected_node.properties.find(p => p.name === property);
-            if (selected_property === undefined) {
-                console.log(`Cannot find property '${property}' in the property list of the rulesets: ${selected_node.properties.map(p => p.name).join(", ")}`);
-                return;
-            }
-
-            // aa read <node> <property> <union_member> - show union member details
-            if (union_member) {
-                if (selected_property._t !== "UnionProperty") {
-                    console.log(`Property '${property}' is not a union type`);
-                    return;
-                }
-
-                const member = selected_property.members.find(m => m.name === union_member);
-                if (!member) {
-                    console.log(`Invalid union member '${union_member}'. Available: ${selected_property.members.map(m => m.name).join(", ")}`);
-                    return;
-                }
-
-                const suggestions = suggest_for_union(workfile.value, selected_property, union_member);
-                if (flags.json) {
-                    console.log(JSON.stringify({
-                        property,
-                        type: "union",
-                        member: union_member,
-                        schema: member.include,
-                        suggestions: suggestions.ok ? suggestions.value : []
-                    }, undefined, 2));
-                } else {
-                    console.log(format_union_member_details(property, member, suggestions.ok ? suggestions.value : []));
-                }
-                return;
-            }
-
-            if (flags.json) {
-                console.log(format_property_json(selected_property, workfile.value));
-            } else {
-                console.log(format_property_details(selected_property, workfile.value));
-            }
-
+        // aa read <node> <property>
+        const lookup = get_node_property(context.value, node, property);
+        if (!lookup.ok) {
+            output_error(flags, "lookup_failed", lookup.error.message);
             return;
         }
+
+        // aa read <node> <property> <union_member>
+        if (union_member) {
+            if (lookup.value.property._t !== "UnionProperty") {
+                output_error(flags, "not_union", `Property '${property}' is not a union type`);
+                return;
+            }
+
+            const member = lookup.value.property.members.find(m => m.name === union_member);
+            if (!member) {
+                output_error(flags, "invalid_member", `Invalid union member '${union_member}'. Available: ${lookup.value.property.members.map(m => m.name).join(", ")}`);
+                return;
+            }
+
+            const suggestions = suggest_for_property(context.value.workfile, node, property, union_member);
+            const empty_suggestions: PropertySuggestions = {};
+            const suggestions_value = suggestions.ok ? suggestions.value : empty_suggestions;
+            const text = format_union_member_details(property, member, suggestions_value);
+            const json = {
+                property,
+                type: "union",
+                member: union_member,
+                schema: member.include,
+                values: suggestions_value.values ?? [],
+                types: suggestions_value.types ?? []
+            };
+            output(flags, text, json);
+            return;
+        }
+
+        // aa read <node> <property>
+        const suggestions = suggest_for_property(context.value.workfile, node, property);
+        if (!suggestions.ok) {
+            console.log(`Warning: suggest_for_property failed: ${suggestions.error.message}`);
+        }
+        const suggestions_value = suggestions.ok ? suggestions.value : {};
+        const text = format_property_details(lookup.value.property, suggestions_value);
+        const json = format_property_json(lookup.value.property, suggestions_value);
+        output(flags, text, json);
     }
 });
 
 // ------- FORMATTERS --------
 
-// aa read - list all nodes
-function format_node_list(minimal: MinimalWorkfile): string {
-    let out = `Platform: ${minimal.platform}\n\n`;
-    out += "Nodes:\n";
-
-    const entries = Object.entries(minimal.symbols);
-    if (entries.length === 0) {
-        out += "  (none)\n";
-        return out;
-    }
-
-    for (const [name, node] of entries) {
-        out += `  ${name.padEnd(18)}${node.$compatible}\n`;
-    }
-
-    return out;
-}
-
-// aa read <node> - show node properties
 function format_node_summary(name: string, ruleset: Ruleset): string {
     if (ruleset._t !== "RulesetStruct") {
         return `${name} is not a struct`;
@@ -198,8 +147,7 @@ function format_node_summary(name: string, ruleset: Ruleset): string {
     return out;
 }
 
-// aa read <node> <property> - show property details
-function format_property_details(property: Property, workfile: Workfile): string {
+function format_property_details(property: Property, suggestions: PropertySuggestions): string {
     let out = `${property.name}\n\n`;
 
     out += `  ${"Type:".padEnd(15)}${format_property_type(property._t)}\n`;
@@ -214,13 +162,12 @@ function format_property_details(property: Property, workfile: Workfile): string
         out += `  ${"Description:".padEnd(15)}${property.description}\n`;
     }
 
-    // Type-specific details
     switch (property._t) {
         case "NumberProperty": {
             if (property.minimum !== undefined || property.maximum !== undefined) {
                 out += "\n  Constraints:\n";
-                if (property.minimum !== undefined) {out += `    ${"minimum".padEnd(12)}${property.minimum}\n`;}
-                if (property.maximum !== undefined) {out += `    ${"maximum".padEnd(12)}${property.maximum}\n`;}
+                if (property.minimum !== undefined) { out += `    ${"minimum".padEnd(12)}${property.minimum}\n`; }
+                if (property.maximum !== undefined) { out += `    ${"maximum".padEnd(12)}${property.maximum}\n`; }
             }
             break;
         }
@@ -245,28 +192,6 @@ function format_property_details(property: Property, workfile: Workfile): string
                 const suffix = selected ? "  (selected)" : "";
                 out += `    ${marker} ${member.name.padEnd(12)}${member.include}${suffix}\n`;
             }
-
-            // Add suggestions if a member is selected
-            if (selectedMember && property.value) {
-                const suggestions = suggest_for_union(workfile, property, selectedMember);
-                if (suggestions.ok && suggestions.value.length > 0) {
-                    out += "\n  Suggestions:\n";
-                    for (const s of suggestions.value) {
-                        out += `    • ${s}\n`;
-                    }
-                }
-            }
-            break;
-        }
-
-        case "IncludeProperty": {
-            const includeSuggestions = suggest_for_include(workfile, property);
-            if (includeSuggestions.ok && includeSuggestions.value.length > 0) {
-                out += "\n  Suggestions:\n";
-                for (const s of includeSuggestions.value) {
-                    out += `    • ${s}\n`;
-                }
-            }
             break;
         }
 
@@ -276,6 +201,52 @@ function format_property_details(property: Property, workfile: Workfile): string
             out += `    ${property.value === false ? "●" : "○"} false${property.value === false ? "  (current)" : ""}\n`;
             break;
         }
+
+        case "ArrayProperty": {
+            out += `  ${"Max size:".padEnd(15)}${property.size}\n`;
+            out += "\n  Format: comma-separated values\n";
+            out += `    aa update <node> ${property.name} value1,value2,value3\n`;
+            break;
+        }
+    }
+
+    if (suggestions.values && suggestions.values.length > 0) {
+        out += "\n  Suggestions:\n";
+        for (const value of suggestions.values) {
+            out += `    • ${value}\n`;
+        }
+    }
+
+    if (suggestions.types && suggestions.types.length > 0) {
+        out += "\n  Can create:\n";
+        for (const type of suggestions.types) {
+            out += `    + ${type}\n`;
+        }
+    }
+
+    return out;
+}
+
+function format_union_member_details(property: string, member: IncludeProperty, suggestions: PropertySuggestions): string {
+    let out = `${property} → ${member.name}\n\n`;
+    out += `  ${"Schema:".padEnd(15)}${member.include}\n`;
+
+    if (suggestions.values && suggestions.values.length > 0) {
+        out += "\n  Suggestions:\n";
+        for (const value of suggestions.values) {
+            out += `    • ${value}\n`;
+        }
+    }
+
+    if (suggestions.types && suggestions.types.length > 0) {
+        out += "\n  Can create:\n";
+        for (const type of suggestions.types) {
+            out += `    + ${type}\n`;
+        }
+    }
+
+    if ((!suggestions.values || suggestions.values.length === 0) && (!suggestions.types || suggestions.types.length === 0)) {
+        out += "\n  No suggestions available.\n";
     }
 
     return out;
@@ -292,10 +263,11 @@ type PropertyJson = {
     options?: (string | number)[];
     members?: { name: string; schema: string }[];
     schema?: string;
-    suggestions?: string[];
+    values?: string[];
+    types?: string[];
 };
 
-function format_property_json(property: Property, workfile: Workfile): PropertyJson {
+function format_property_json(property: Property, suggestions: PropertySuggestions): PropertyJson {
     const base: PropertyJson = {
         name: property.name,
         type: format_property_type(property._t),
@@ -315,8 +287,8 @@ function format_property_json(property: Property, workfile: Workfile): PropertyJ
         case "NumberProperty": {
             if (property.minimum !== undefined || property.maximum !== undefined) {
                 base.constraints = {};
-                if (property.minimum !== undefined) {base.constraints.minimum = property.minimum;}
-                if (property.maximum !== undefined) {base.constraints.maximum = property.maximum;}
+                if (property.minimum !== undefined) { base.constraints.minimum = property.minimum; }
+                if (property.maximum !== undefined) { base.constraints.maximum = property.maximum; }
             }
             break;
         }
@@ -331,74 +303,23 @@ function format_property_json(property: Property, workfile: Workfile): PropertyJ
                 name: m.name,
                 schema: m.include
             }));
-
-            if (property.value) {
-                const selectedMember = Object.keys(property.value)[0];
-                const suggestions = suggest_for_union(workfile, property, selectedMember);
-                if (suggestions.ok && suggestions.value.length > 0) {
-                    base.suggestions = suggestions.value;
-                }
-            }
             break;
         }
 
         case "IncludeProperty": {
             base.schema = property.include;
-            const includeSuggestions = suggest_for_include(workfile, property);
-            if (includeSuggestions.ok && includeSuggestions.value.length > 0) {
-                base.suggestions = includeSuggestions.value;
-            }
             break;
         }
 
-        default:
+    }
+
+    if (suggestions.values && suggestions.values.length > 0) {
+        base.values = suggestions.values;
+    }
+
+    if (suggestions.types && suggestions.types.length > 0) {
+        base.types = suggestions.types;
     }
 
     return base;
-}
-
-// aa read <node> <property> <union_member> - show union member details
-function format_union_member_details(property: string, member: IncludeProperty, suggestions: string[]): string {
-    let out = `${property} → ${member.name}\n\n`;
-    out += `  ${"Schema:".padEnd(15)}${member.include}\n`;
-
-    if (suggestions.length > 0) {
-        out += "\n  Suggestions:\n";
-        for (const s of suggestions) {
-            out += `    • ${s}\n`;
-        }
-    } else {
-        out += "\n  No suggestions available.\n";
-    }
-
-    return out;
-}
-
-// Helpers
-function format_property_type(t: string): string {
-    const map: Record<string, string> = {
-        "NumberProperty": "number",
-        "StringProperty": "string",
-        "BooleanProperty": "boolean",
-        "EnumProperty": "enum",
-        "IncludeProperty": "include",
-        "UnionProperty": "union",
-        "ArrayProperty": "array",
-        "PlatformOpsProperty": "platform_ops",
-        "PlatformExtraProperty": "platform_extra",
-        "CallbackFunctionProperty": "callback",
-        "CallbackContextProperty": "callback_ctx",
-    };
-    return map[t] ?? t;
-}
-
-function format_property_value(property: Property): string {
-    if (property.value === undefined) {return "-";}
-
-    if (property._t === "UnionProperty" && typeof property.value === "object") {
-        const [key, value] = Object.entries(property.value)[0];
-        return `${key} = ${value}`;
-    }
-
-    return String(property.value);
 }
