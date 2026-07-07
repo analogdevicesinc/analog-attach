@@ -1,10 +1,12 @@
 import fs from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import Mustache from "mustache";
 import { CodegenInput, CodegenResult } from "./types";
 import { Result, ok } from "../ruleset_parser/result";
 import { build_views } from "./view_builder";
 
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const TEMPLATES_DIR = path.join(__dirname, "templates");
 
 function load_template(name: string): string {
