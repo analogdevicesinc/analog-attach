@@ -6,6 +6,7 @@ import { updateCommand } from "./commands/update";
 import { deleteCommand } from "./commands/delete";
 import { validateCommand } from "./commands/validate";
 import { generateCommand } from "./commands/generate";
+import { buildCommandDefinition } from "./commands/build";
 
 const routes = buildRouteMap({
 	routes: {
@@ -16,6 +17,7 @@ const routes = buildRouteMap({
 		delete: deleteCommand,
 		validate: validateCommand,
 		generate: generateCommand,
+		build: buildCommandDefinition,
 	},
 	docs: {
 		brief: "Analog Attach CLI for no-OS workfiles",
