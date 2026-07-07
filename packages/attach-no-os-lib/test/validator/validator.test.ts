@@ -1,4 +1,5 @@
 import { describe, test, expect } from 'vitest';
+import path from 'node:path';
 import { validate_workfile } from '../../src/validator/validator';
 import {
     RulesetStruct,
@@ -16,6 +17,8 @@ import {
     PlatformExtraProperty
 } from '../../src/ruleset_parser/types';
 import { Workfile } from '../../src/workfile_handler/types';
+import { scan_platform } from '../../src/workfile_handler/platform_scanner';
+import { load_platform } from '../../src/workfile_handler/workfile_handler';
 
 function make_struct(
     id: string,
@@ -416,7 +419,21 @@ describe('validate_workfile', () => {
             expect(result.valid).toBe(true);
         });
 
-        test('array with wrong size fails', () => {
+        test('array exceeding max size fails', () => {
+            const workfile = make_workfile({
+                gpio1: make_struct("no-os/gpio.yaml", "gpio", []),
+                gpio2: make_struct("no-os/gpio.yaml", "gpio", []),
+                gpio3: make_struct("no-os/gpio.yaml", "gpio", []),
+                my_device: make_struct("device.yaml", "device", [
+                    make_array("gpios", 2, make_include("element", "no-os/gpio.yaml"), { value: ["gpio1", "gpio2", "gpio3"] })
+                ])
+            });
+            const result = validate_workfile(workfile);
+            expect(result.valid).toBe(false);
+            expect(result.errors[0].message).toContain("exceeds maximum size");
+        });
+
+        test('array with fewer elements than max passes', () => {
             const workfile = make_workfile({
                 gpio1: make_struct("no-os/gpio.yaml", "gpio", []),
                 my_device: make_struct("device.yaml", "device", [
@@ -424,8 +441,7 @@ describe('validate_workfile', () => {
                 ])
             });
             const result = validate_workfile(workfile);
-            expect(result.valid).toBe(false);
-            expect(result.errors[0].message).toContain("must have 2 elements");
+            expect(result.valid).toBe(true);
         });
 
         test('array with missing element fails', () => {
@@ -439,6 +455,45 @@ describe('validate_workfile', () => {
             expect(result.valid).toBe(false);
             expect(result.errors[0].message).toContain("not found");
             expect(result.errors[0].path).toContain("[1]");
+        });
+
+        test('array with valid enum values passes', () => {
+            const workfile = make_workfile({
+                my_device: make_struct("device.yaml", "device", [
+                    make_array("modes", 3, make_include("element", "devices/ad5592r/enums/ad5592r_channel_mode.yaml"), {
+                        value: ["CH_MODE_ADC", "CH_MODE_DAC", "CH_MODE_UNUSED"]
+                    })
+                ])
+            });
+            const result = validate_workfile(workfile);
+            expect(result.valid).toBe(true);
+        });
+
+        test('array with invalid enum value fails', () => {
+            const workfile = make_workfile({
+                my_device: make_struct("device.yaml", "device", [
+                    make_array("modes", 3, make_include("element", "devices/ad5592r/enums/ad5592r_channel_mode.yaml"), {
+                        value: ["CH_MODE_ADC", "INVALID_MODE", "CH_MODE_UNUSED"]
+                    })
+                ])
+            });
+            const result = validate_workfile(workfile);
+            expect(result.valid).toBe(false);
+            expect(result.errors[0].message).toContain("Invalid value");
+            expect(result.errors[0].message).toContain("INVALID_MODE");
+        });
+
+        test('array with non-array value fails', () => {
+            const workfile = make_workfile({
+                my_device: make_struct("device.yaml", "device", [
+                    make_array("modes", 3, make_include("element", "devices/ad5592r/enums/ad5592r_channel_mode.yaml"), {
+                        value: "not an array" as unknown as string[]
+                    })
+                ])
+            });
+            const result = validate_workfile(workfile);
+            expect(result.valid).toBe(false);
+            expect(result.errors[0].message).toContain("Expected array");
         });
     });
 
@@ -969,17 +1024,25 @@ describe('validate_workfile', () => {
             expect(result.valid).toBe(true);
         });
 
-        test('required platform_extra without value fails', () => {
-            const workfile = make_workfile(
-                {
-                    my_spi: make_struct_with_capability("no-os/spi.yaml", "spi_init", "spi", [
-                        make_platform_extra_property("extra", { required: true })
-                    ]),
-                    // A valid extra exists, so the required check should fail
-                    available_extra: make_struct_with_capability("platform/spi_extra.yaml", "spi_extra", "spi", [])
-                },
-                {}
-            );
+        test('required platform_extra without value fails when platform types exist', () => {
+            // Load a real platform that has spi extra structs
+            const PLATFORM_PATH = path.join(__dirname, '../bindings/schemas/platforms/maxim/max32690');
+            const scan_result = scan_platform(PLATFORM_PATH);
+            if (!scan_result.ok) throw new Error("Failed to scan platform");
+
+            const workfile: Workfile = {
+                platform: "max32690",
+                platform_ops: {},
+                symbols: {
+                    my_spi: {
+                        ...make_struct_with_capability("no-os/no_os_spi_init_param.yaml", "no_os_spi_init_param", "spi", [
+                            make_platform_extra_property("extra", { required: true })
+                        ])
+                    }
+                }
+            };
+            load_platform(workfile, scan_result.value);
+
             const result = validate_workfile(workfile);
             expect(result.valid).toBe(false);
             expect(result.errors[0].message).toContain("Required");
