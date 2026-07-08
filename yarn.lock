@@ -1594,6 +1594,17 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@stricli/auto-complete@npm:^1.2.9":
+  version: 1.2.9
+  resolution: "@stricli/auto-complete@npm:1.2.9"
+  dependencies:
+    "@stricli/core": "npm:^1.2.9"
+  bin:
+    auto-complete: dist/bin/cli.js
+  checksum: 10c0/d5ef10711a5da134e45e78f7d331827bbfb3aae7f42e8ea67f1ed6132dbc8dabfe085b460e0fdbb264159e4d6855ce6deb8136bf04ced86d1289108270da6db6
+  languageName: node
+  linkType: hard
+
 "@stricli/core@npm:^1.1.0":
   version: 1.2.8
   resolution: "@stricli/core@npm:1.2.8"
@@ -1605,6 +1616,13 @@ __metadata:
   version: 1.2.6
   resolution: "@stricli/core@npm:1.2.6"
   checksum: 10c0/1a7653f866a6f8f7d38d5a9dd99403d46448c0ca9665dda14c40ece6bc7691189b5ef30c16f5db98c7091f1f8a268a7ac2aa5bd26f27cc809fb9c703b35b81d1
+  languageName: node
+  linkType: hard
+
+"@stricli/core@npm:^1.2.9":
+  version: 1.2.9
+  resolution: "@stricli/core@npm:1.2.9"
+  checksum: 10c0/3585af272827fdcd72a0473f116b6998ec9a4761c3eeac257e7ad4a27b2ff07cbe7e0d8cca9a2df95b00ae0d0f19c45fb7d0cf8d5ac0579be0b4194ce3dce5bc
   languageName: node
   linkType: hard
 
@@ -2701,6 +2719,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "attach-no-os-cli@workspace:packages/attach-no-os-cli"
   dependencies:
+    "@stricli/auto-complete": "npm:^1.2.9"
     "@stricli/core": "npm:^1.1.0"
     "@types/node": "npm:20.x"
     attach-no-os-lib: "workspace:*"
