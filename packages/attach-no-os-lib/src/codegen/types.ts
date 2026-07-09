@@ -10,6 +10,12 @@ export type DeviceInfo = {
 	remove_code: string;       // rendered remove.mustache
 };
 
+export type DescriptorInfo = {
+	symbol_name: string;       // init param name: "my_spi_ip"
+	descriptor_name: string;   // descriptor name: "my_spi"
+	descriptor_type: string;   // descriptor type: "no_os_spi_desc"
+};
+
 export type SourcePaths = {
 	drivers: string[];   // $(DRIVERS)/...
 	include: string[];   // $(INCLUDE)/...
@@ -29,13 +35,22 @@ export type CodegenResult = {
 	files_created: string[];
 };
 
+// Runtime assignment for fields that can't be set at compile time
+export type RuntimeAssignment = {
+	struct_name: string;       // "my_spi_ip" or "adxl355_node"
+	field_path: string;        // "parent" or "comm_init.spi_init"
+	value: string;             // "desc.even_better_spi_desc" or "my_spi_ip"
+};
+
 export type StructView = {
-  type: string;              // "no_os_spi_init_param"
-  name: string;              // "no_os_spi_ip"
-  fields: {
-    name: string;            // "device_id"
-    c_value: string;         // "1" or "&max_spi_ops" or "{ .spi_init = &no_os_spi_ip }"
-  }[];
+	type: string;              // "no_os_spi_init_param"
+	name: string;              // "no_os_spi_ip"
+	is_const: boolean;         // false if needs runtime assignments (direct or transitive)
+	fields: {
+		name: string;            // "device_id"
+		c_value: string;         // "1" or "&max_spi_ops"
+	}[];
+	runtime_assignments: RuntimeAssignment[];  // Fields set at runtime in main()
 };
 
 // All the variables exported for the templates
@@ -59,7 +74,8 @@ export type Views = {
 	common_data_h: {
 		includes: string[];
 		devices: DeviceInfo[];
-		externs: { type: string; name: string }[];
+		descriptors: DescriptorInfo[];
+		externs: { type: string; name: string; is_const: boolean }[];
 	};
 	common_data_c: {
 		includes: string[];
@@ -67,6 +83,7 @@ export type Views = {
 	};
 	main_c: {
 		devices: DeviceInfo[];
+		runtime_assignments: RuntimeAssignment[];
 	};
 	user_app_h: {};
 	user_app_c: {};

@@ -2,14 +2,13 @@ import path from "node:path";
 import fs from "node:fs";
 import Mustache from "mustache";
 import { error, ok, Result } from "../ruleset_parser/result";
-import { Property, RulesetStruct } from "../ruleset_parser/types";
+import { Property, RulesetStruct, UnionProperty } from "../ruleset_parser/types";
 import { Workfile } from "../workfile_handler/types";
-import { CodegenInput, DeviceInfo, SourcePaths, StructView, Views } from "./types";
-import { create_connections_graph } from "../validator/connection_graph";
+import { CodegenInput, DescriptorInfo, DeviceInfo, RuntimeAssignment, SourcePaths, StructView, Views } from "./types";
+import { create_connections_graph, is_referenced_by_others } from "../validator/connection_graph";
+import { ConnectionGraph } from "../validator/types";
 import { get_schemas_path } from "../settings/settings";
 
-// FIXME: I am really not sure where these should go to be good for the project
-// Core no-OS utilities that most projects need
 const CORE_UTIL_SRCS = [
 	"util/no_os_util.c",
 	"util/no_os_alloc.c",
@@ -33,26 +32,41 @@ const CORE_UTIL_INCS = [
 export function build_views(input: CodegenInput): Result<Views> {
 	const sources = collect_sources(input.workfile);
 	const ordered_symbols = order_symbols(input.workfile);
-	// Both structs and devices produce struct views (devices are also C structs)
-	const struct_views = ordered_symbols.map(([name, ruleset]) => build_struct_view(name, ruleset));
+	const graph = create_connections_graph(input.workfile);
 
-	const devices = collect_devices(input.workfile);
+	// Build struct views - initially mark non-const only for direct descriptor refs
+	const struct_views_map = new Map<string, StructView>();
+	for (const [name, ruleset] of ordered_symbols) {
+		struct_views_map.set(name, build_struct_view(name, ruleset));
+	}
+
+	// Propagate non-const through dependencies and collect runtime assignments
+	propagate_non_const(struct_views_map, ordered_symbols, graph);
+
+	// Convert to array in dependency order
+	const struct_views = ordered_symbols.map(([name]) => struct_views_map.get(name)!);
+
+	// Collect all descriptors (any symbol with $descriptor in schema)
+	const descriptors = collect_descriptors(input.workfile);
+
+	// Collect devices that need init/remove code (have templates AND are not referenced by others)
+	const devices = collect_devices(input.workfile, graph);
 	const device_includes = devices.map(d => d.header);
 
 	// Collect all header includes for common_data.h
 	const all_includes = new Set<string>();
-	// Add device headers
 	for (const h of device_includes) {
 		all_includes.add(h);
 	}
-	// Add platform headers (basename only)
 	for (const h of sources.platform.filter(f => f.endsWith(".h"))) {
 		all_includes.add(path.basename(h));
 	}
-	// Add no-os headers from INCLUDE
 	for (const h of sources.include.filter(f => f.endsWith(".h"))) {
 		all_includes.add(h);
 	}
+
+	// Flatten runtime assignments in dependency order
+	const runtime_assignments = struct_views.flatMap(view => view.runtime_assignments);
 
 	return ok({
 		makefile: {
@@ -74,9 +88,11 @@ export function build_views(input: CodegenInput): Result<Views> {
 		common_data_h: {
 			includes: [...all_includes],
 			devices: devices,
-			externs: ordered_symbols.map(([name, ruleset]) => ({
-				type: ruleset.$symbol,
-				name: name
+			descriptors: descriptors,
+			externs: struct_views.map(view => ({
+				type: view.type,
+				name: view.name,
+				is_const: view.is_const
 			}))
 		},
 		common_data_c: {
@@ -85,11 +101,87 @@ export function build_views(input: CodegenInput): Result<Views> {
 		},
 		main_c: {
 			devices: devices,
+			runtime_assignments: runtime_assignments,
 		},
 		user_app_h: {},
 		user_app_c: {}
 	});
 };
+
+// Propagate non-const through the dependency graph and update union fields
+function propagate_non_const(
+	views: Map<string, StructView>,
+	ordered_symbols: [string, RulesetStruct][],
+	graph: ConnectionGraph
+): void {
+	// First pass: identify which structs are non-const (have descriptor refs)
+	const non_const_set = new Set<string>();
+	for (const [name, view] of views) {
+		if (!view.is_const) {
+			non_const_set.add(name);
+		}
+	}
+
+	// Propagate: if A references B (via union or include) and B is non-const, A must be non-const
+	// We iterate until no changes (fixed point)
+	let changed = true;
+	while (changed) {
+		changed = false;
+		for (const [parent, children] of graph) {
+			if (non_const_set.has(parent)) {
+				continue; // Already non-const
+			}
+			for (const child of children) {
+				if (non_const_set.has(child)) {
+					non_const_set.add(parent);
+					const view = views.get(parent);
+					if (view) {
+						view.is_const = false;
+					}
+					changed = true;
+					break;
+				}
+			}
+		}
+	}
+
+	// Second pass: for non-const structs, check union fields that reference other non-const structs
+	// These unions need runtime assignment instead of compile-time initialization
+	for (const [name, ruleset] of ordered_symbols) {
+		const view = views.get(name);
+		if (!view || view.is_const) {
+			continue;
+		}
+
+		// Find union properties that reference non-const structs
+		for (const property of ruleset.properties) {
+			if (property._t !== "UnionProperty" || property.value === undefined) {
+				continue;
+			}
+
+			const union_prop = property as UnionProperty;
+			const value = union_prop.value as Record<string, string>;
+			const [member_name, reference] = Object.entries(value)[0];
+
+			// Check if the referenced struct is non-const
+			if (non_const_set.has(reference)) {
+				// Remove from static fields
+				view.fields = view.fields.filter(f => f.name !== property.name);
+
+				// Find the union member to check if it's a pointer
+				const member = union_prop.members.find(m => m.name === member_name);
+				const is_pointer = member?.pointer ?? false;
+
+				// Add runtime assignment
+				view.runtime_assignments.push({
+					struct_name: name,
+					field_path: `${property.name}.${member_name}`,
+					value: is_pointer ? `&${reference}` : reference,
+				});
+			}
+		}
+	}
+}
 
 function map_noos_path(file_path: string): { variable: "DRIVERS" | "INCLUDE"; path: string } {
 	if (file_path.startsWith("include/")) {
@@ -98,7 +190,6 @@ function map_noos_path(file_path: string): { variable: "DRIVERS" | "INCLUDE"; pa
 	if (file_path.startsWith("drivers/")) {
 		return { variable: "DRIVERS", path: file_path.slice("drivers/".length) };
 	}
-	// Fallback - shouldn't happen with well-formed schemas
 	return { variable: "DRIVERS", path: file_path };
 }
 
@@ -130,7 +221,6 @@ function collect_sources(workfile: Workfile): SourcePaths {
 			platform.add(file);
 		}
 
-		// Merge $header into appropriate set (for device schemas)
 		if (ruleset._t === "RulesetStruct" && ruleset.$header) {
 			const mapped = map_noos_path(ruleset.$header);
 			if (mapped.variable === "INCLUDE") {
@@ -149,12 +239,7 @@ function collect_sources(workfile: Workfile): SourcePaths {
 }
 
 function order_symbols(workfile: Workfile): [string, RulesetStruct][] {
-	// NOTE: graph: parent -> children it references
-	// For topological sort, we need: if A references B, B comes first
-	// So in_degree counts how many symbols references this one
-	// This is just to reuse some logic
 	const graph = create_connections_graph(workfile);
-
 	const in_degree = new Map<string, number>();
 
 	for (const name of graph.keys()) {
@@ -165,7 +250,6 @@ function order_symbols(workfile: Workfile): [string, RulesetStruct][] {
 		in_degree.set(parent, children.length);
 	}
 
-	// Kahn's algorithm - start with nodes nobody depends on (leaves)
 	const queue: string[] = [];
 	for (const [name, degree] of in_degree) {
 		if (degree === 0) {
@@ -176,9 +260,6 @@ function order_symbols(workfile: Workfile): [string, RulesetStruct][] {
 	const sorted: string[] = [];
 
 	while (queue.length > 0) {
-		// NOTE: Added ! at the end because if we get to this point, queue is
-		// obviously not empty (q.len > 0) so the return value | undefined is
-		// actually just value
 		const name = queue.shift()!;
 		sorted.push(name);
 
@@ -205,15 +286,39 @@ function order_symbols(workfile: Workfile): [string, RulesetStruct][] {
 }
 
 function build_struct_view(name: string, ruleset: RulesetStruct): StructView {
+	const runtime_assignments: RuntimeAssignment[] = [];
+
+	const defined_properties = ruleset.properties
+		.filter(property => property.value !== undefined && property.value !== null);
+
+	// Descriptor refs need runtime assignment
+	const descriptor_properties = defined_properties
+		.filter(property => property._t === "IncludeDescriptorProperty");
+
+	for (const property of descriptor_properties) {
+		runtime_assignments.push({
+			struct_name: name,
+			field_path: property.name,
+			value: `desc.${property.value}`,
+		});
+	}
+
+	// Static fields: everything except descriptor refs
+	// (Union fields referencing non-const structs will be removed later in propagate_non_const)
+	const static_properties = defined_properties
+		.filter(property => property._t !== "IncludeDescriptorProperty");
+
+	const has_descriptor_refs = descriptor_properties.length > 0;
+
 	return {
 		type: ruleset.$symbol,
 		name: name,
-		fields: ruleset.properties
-			.filter(property => property.value !== undefined && property.value !== null)
-			.map(property => ({
-				name: property.name,
-				c_value: format_c_value(property),
+		is_const: !has_descriptor_refs,
+		fields: static_properties.map(property => ({
+			name: property.name,
+			c_value: format_c_value(property),
 		})),
+		runtime_assignments: runtime_assignments,
 	};
 }
 
@@ -239,6 +344,12 @@ function format_c_value(property: Property): string {
 			return property.pointer ? `&${property.value}` : String(property.value);
 		}
 
+		case "IncludeDescriptorProperty": {
+			// This shouldn't be called for descriptor properties (they go to runtime)
+			// but keep it for safety
+			return `desc.${property.value}`;
+		}
+
 		case "PlatformOpsProperty": {
 			return `&${property.value}`;
 		}
@@ -248,10 +359,8 @@ function format_c_value(property: Property): string {
 		}
 
 		case "UnionProperty": {
-			// value: { spi_init: "no_os_spi_ip" }
 			const value = property.value as Record<string, string>;
 			const [member_name, reference] = Object.entries(value)[0];
-			// Find the union member to check if it's a pointer
 			const member = property.members.find(member => member.name === member_name);
 			const is_pointer = member?.pointer ?? false;
 			return is_pointer
@@ -341,7 +450,7 @@ function extract_device_info(symbol_name: string, ruleset: RulesetStruct): Resul
 		return templates;
 	}
 
-	const descriptor_name = `${symbol_name}_device`;
+	const descriptor_name = ruleset.$descriptor_name ?? `${symbol_name}_device`;
 	const view = { symbol_name, descriptor_name };
 	const init_code = Mustache.render(templates.value.init, view).trim();
 	const remove_code = Mustache.render(templates.value.remove, view).trim();
@@ -357,7 +466,25 @@ function extract_device_info(symbol_name: string, ruleset: RulesetStruct): Resul
 	});
 }
 
-function collect_devices(workfile: Workfile): DeviceInfo[] {
+function collect_descriptors(workfile: Workfile): DescriptorInfo[] {
+	const result: DescriptorInfo[] = [];
+	for (const [name, symbol] of Object.entries(workfile.symbols)) {
+		if (symbol._t !== "RulesetStruct") {
+			continue;
+		}
+		if (!symbol.$descriptor) {
+			continue;
+		}
+		result.push({
+			symbol_name: name,
+			descriptor_name: symbol.$descriptor_name ?? `${name}_desc`,
+			descriptor_type: symbol.$descriptor,
+		});
+	}
+	return result;
+}
+
+function collect_devices(workfile: Workfile, graph: ConnectionGraph): DeviceInfo[] {
 	const rulesets = Object.entries(workfile.symbols);
 	let result: DeviceInfo[] = [];
 	for (const [name, symbol] of rulesets) {
@@ -365,9 +492,12 @@ function collect_devices(workfile: Workfile): DeviceInfo[] {
 			continue;
 		}
 
+		if (is_referenced_by_others(name, graph)) {
+			continue;
+		}
+
 		const device_info = extract_device_info(name, symbol);
 		if (!device_info.ok) {
-			// FIXME: For now just continue on fail, maybe an error or warning would be nice
 			continue;
 		}
 

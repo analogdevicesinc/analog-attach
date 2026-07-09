@@ -12,7 +12,7 @@ import {
 } from "../ruleset_parser/types";
 import { at, ParseContext } from "../ruleset_parser/validators";
 import { Workfile } from "../workfile_handler/types";
-import { suggest_platform_extra } from "../workfile_handler/workfile_handler";
+import { find_symbol_by_descriptor, suggest_platform_extra } from "../workfile_handler/workfile_handler";
 import { load_resolved_ruleset } from "../resolver/resolver";
 import { apply_overrides } from "./override_resolver";
 import { ChildOverride, ValidationError } from "./types";
@@ -65,6 +65,9 @@ export function validate_property(
 		}
 		case "IncludeProperty": {
 			return validate_include(effective.value as string, effective.include, workfile, property_context);
+		}
+		case "IncludeDescriptorProperty": {
+			return validate_include_descriptor(effective.value as string, effective.include_descriptor, workfile, property_context);
 		}
 		case "EnumProperty": {
 			return validate_enum(effective, property_context);
@@ -310,6 +313,44 @@ function validate_include(
         return [{
             path: context.path,
             message: `Type mismatch: '${value}' is '${target.$id}', expected '${include_path}'`,
+            severity: "error"
+        }];
+    }
+
+    return [];
+}
+
+function validate_include_descriptor(
+    descriptor_name: string,
+    include_descriptor_path: string,
+    workfile: Workfile,
+    context: ParseContext
+): ValidationError[] {
+    // Find the symbol that has this descriptor name
+    const symbol_name = find_symbol_by_descriptor(workfile, descriptor_name);
+
+    if (!symbol_name) {
+        return [{
+            path: context.path,
+            message: `Descriptor '${descriptor_name}' not found. No symbol declares this descriptor name.`,
+            severity: "error"
+        }];
+    }
+
+    const symbol = workfile.symbols[symbol_name];
+    if (!symbol || symbol._t !== "RulesetStruct") {
+        return [{
+            path: context.path,
+            message: `Symbol '${symbol_name}' for descriptor '${descriptor_name}' is not a struct`,
+            severity: "error"
+        }];
+    }
+
+    // Check that the symbol's schema matches the expected include_descriptor path
+    if (symbol.$id !== include_descriptor_path) {
+        return [{
+            path: context.path,
+            message: `Type mismatch: descriptor '${descriptor_name}' belongs to '${symbol.$id}', expected '${include_descriptor_path}'`,
             severity: "error"
         }];
     }

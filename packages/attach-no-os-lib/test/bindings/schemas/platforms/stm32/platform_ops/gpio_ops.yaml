@@ -1,9 +1,0 @@
-$id: "platforms/stm32/platform_ops/gpio_ops.yaml"
-$type: platform_ops
-$ranking: 4
-$symbol: stm32_gpio_ops
-$capability: gpio
-$sources:
-  platform:
-    - "stm32_gpio.h"
-    - "stm32_gpio.c"

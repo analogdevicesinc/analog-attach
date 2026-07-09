@@ -176,4 +176,56 @@ describe('codegen', () => {
 
         expect(common_data_c).toContain(".channel_modes = { CH_MODE_ADC, CH_MODE_DAC }");
     });
+
+    test('include_descriptor generates devices.descriptor reference', () => {
+        const minimal: MinimalWorkfile = {
+            platform: "max32690",
+            symbols: {
+                "parent_spi_ip": {
+                    "$compatible": "no-os/no_os_spi_init_param.yaml",
+                    "$descriptor": "parent_spi",
+                    "device_id": 1,
+                    "chip_select": 0,
+                    "platform_ops": "spi_ops",
+                    "extra": "max_spi_ip"
+                },
+                "max_spi_ip": {
+                    "$compatible": "platforms/maxim/max32690/max_spi_init_param.yaml",
+                    "vssel": "MXC_GPIO_VSSEL_VDDIOH",
+                    "polarity": "SPI_SS_POL_LOW"
+                },
+                "child_spi_ip": {
+                    "$compatible": "no-os/no_os_spi_init_param.yaml",
+                    "$descriptor": "child_spi",
+                    "device_id": 2,
+                    "chip_select": 1,
+                    "platform_ops": "spi_ops",
+                    "extra": "max_spi_ip",
+                    "parent": "parent_spi"
+                }
+            }
+        };
+
+        const import_result = import_minimal(minimal);
+        expectOk(import_result);
+
+        const result = generate_project({
+            workfile: import_result.value,
+            platform_name: "max32690",
+            platform_vendor: "maxim",
+            project_name: "test-project",
+            output_path: temporary_directory,
+            noos_path: "$(realpath ../../../)",
+        });
+
+        expectOk(result);
+
+        const common_data_c = fs.readFileSync(
+            path.join(temporary_directory, "test-project/src/common/common_data.c"),
+            "utf8"
+        );
+
+        // The parent field should reference the descriptor via desc struct
+        expect(common_data_c).toContain(".parent = &desc.parent_spi");
+    });
 });
