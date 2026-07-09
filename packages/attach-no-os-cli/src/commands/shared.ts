@@ -130,6 +130,7 @@ export function format_property_type(t: string): string {
         "PlatformExtraProperty": "platform_extra",
         "CallbackFunctionProperty": "callback",
         "CallbackContextProperty": "callback_ctx",
+        "IncludeDescriptorProperty": "descriptor"
     };
     return map[t] ?? t;
 }

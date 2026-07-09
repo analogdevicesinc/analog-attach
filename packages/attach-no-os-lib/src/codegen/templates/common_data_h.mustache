@@ -6,16 +6,18 @@
 #include "{{{.}}}"
 {{/includes}}
 
-/* All initialized devices */
-struct user_devices {
-{{#devices}}
+/* Descriptors struct */
+struct descriptors {
+{{#descriptors}}
 	struct {{{descriptor_type}}} *{{{descriptor_name}}};
-{{/devices}}
+{{/descriptors}}
 };
+
+extern struct descriptors desc;
 
 /* Init param externs */
 {{#externs}}
-extern const struct {{{type}}} {{{name}}};
+extern {{#is_const}}const {{/is_const}}struct {{{type}}} {{{name}}};
 {{/externs}}
 
 #endif /* COMMON_DATA_H */

@@ -51,6 +51,12 @@ export type IncludeProperty = PropertyBase & {
 	pointer?: boolean,
 }
 
+export type IncludeDescriptorProperty = PropertyBase & {
+	_t: "IncludeDescriptorProperty",
+	include_descriptor: string,  // Path to the init_param schema that produces the descriptor
+	pointer?: boolean,
+}
+
 export type EnumValue = string | number;
 
 export type EnumProperty = PropertyBase & {
@@ -98,7 +104,7 @@ export type ArrayProperty = PropertyBase & {
 	element: ArrayElement,
 }
 
-export type Property = NumberProperty | BooleanProperty | StringProperty | IncludeProperty | EnumProperty | UnionProperty | ArrayProperty | PlatformOpsProperty | PlatformExtraProperty | CallbackFunctionProperty | CallbackContextProperty;
+export type Property = NumberProperty | BooleanProperty | StringProperty | IncludeProperty | IncludeDescriptorProperty | EnumProperty | UnionProperty | ArrayProperty | PlatformOpsProperty | PlatformExtraProperty | CallbackFunctionProperty | CallbackContextProperty;
 
 export type TargetOverride = {
 	_t: "TargetOverride",
@@ -211,7 +217,8 @@ export type RulesetStruct = RulesetBase & {
 	$requires?: string[], // Auto-computed: all capabilities required by properties
 	$capability?: string,
 	$header?: string,      // Device header path, e.g. "drivers/accel/adxl355/adxl355.h"
-	$descriptor?: string,  // Device descriptor type, e.g. "adxl355_dev"
+	$descriptor?: string,  // Device descriptor type from schema, e.g. "adxl355_dev"
+	$descriptor_name?: string,  // User-provided descriptor instance name, e.g. "my_accel"
 };
 
 export type RulesetPlatformOps = RulesetBase & {

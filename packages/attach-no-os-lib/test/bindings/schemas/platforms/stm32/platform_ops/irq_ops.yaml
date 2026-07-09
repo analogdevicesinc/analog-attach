@@ -1,9 +1,0 @@
-$id: "platforms/stm32/platform_ops/irq_ops.yaml"
-$type: platform_ops
-$ranking: 4
-$symbol: stm32_irq_ops
-$capability: irq
-$sources:
-  platform:
-    - "stm32_irq.h"
-    - "stm32_irq.c"

@@ -5,15 +5,20 @@
 int main(void)
 {
 	int ret;
-	struct user_devices devices;
 
+	// Patching the common_data structs
+{{#runtime_assignments}}
+	{{{struct_name}}}.{{{field_path}}} = {{{value}}};
+{{/runtime_assignments}}
+
+	// Init devices and structures
 {{#devices}}
 	ret = {{{init_code}}};
 	if (ret)
 		return ret;
 
 {{/devices}}
-	user_app(&devices);
+	user_app(&desc);
 
 {{#devices}}
 	{{{remove_code}}};
