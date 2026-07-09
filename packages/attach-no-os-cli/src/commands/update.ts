@@ -15,7 +15,7 @@ import {
     get_node_property,
     format_property_type,
     format_property_list,
-    format_suggestions
+    format_property_details
 } from "./shared";
 
 export const updateCommand = buildCommand<
@@ -107,12 +107,12 @@ export const updateCommand = buildCommand<
             return;
         }
 
-        // aa update <node> <property> - show suggestions
+        // aa update <node> <property> - show property details and suggestions
         if (!value) {
             const suggestions = suggest_for_property(context.value.workfile, node, property);
             const empty_suggestions: PropertySuggestions = {};
             const suggestions_value = suggestions.ok ? suggestions.value : empty_suggestions;
-            const text = format_suggestions(lookup.value.property, suggestions_value);
+            const text = format_property_details(lookup.value.property, suggestions_value);
             const json = {
                 property,
                 type: format_property_type(lookup.value.property._t),

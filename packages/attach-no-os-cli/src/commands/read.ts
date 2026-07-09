@@ -14,7 +14,8 @@ import {
     get_node_property,
     format_property_type,
     format_property_value,
-    format_node_list
+    format_node_list,
+    format_property_details
 } from "./shared";
 
 export const readCommand = buildCommand<
@@ -144,86 +145,6 @@ function format_node_summary(name: string, ruleset: Ruleset): string {
     }
 
     out += "\n* = required";
-    return out;
-}
-
-function format_property_details(property: Property, suggestions: PropertySuggestions): string {
-    let out = `${property.name}\n\n`;
-
-    out += `  ${"Type:".padEnd(15)}${format_property_type(property._t)}\n`;
-    out += `  ${"Required:".padEnd(15)}${property.required ? "yes" : "no"}\n`;
-    out += `  ${"Value:".padEnd(15)}${format_property_value(property) || "(not set)"}\n`;
-
-    if ("default" in property && property.default !== undefined) {
-        out += `  ${"Default:".padEnd(15)}${property.default}\n`;
-    }
-
-    if (property.description) {
-        out += `  ${"Description:".padEnd(15)}${property.description}\n`;
-    }
-
-    switch (property._t) {
-        case "NumberProperty": {
-            if (property.minimum !== undefined || property.maximum !== undefined) {
-                out += "\n  Constraints:\n";
-                if (property.minimum !== undefined) { out += `    ${"minimum".padEnd(12)}${property.minimum}\n`; }
-                if (property.maximum !== undefined) { out += `    ${"maximum".padEnd(12)}${property.maximum}\n`; }
-            }
-            break;
-        }
-
-        case "EnumProperty": {
-            out += "\n  Options:\n";
-            for (const value of property.values) {
-                const current = property.value === value;
-                const marker = current ? "●" : "○";
-                const suffix = current ? "  (current)" : "";
-                out += `    ${marker} ${value}${suffix}\n`;
-            }
-            break;
-        }
-
-        case "UnionProperty": {
-            out += "\n  Members:\n";
-            const selectedMember = property.value ? Object.keys(property.value)[0] : undefined;
-            for (const member of property.members) {
-                const selected = member.name === selectedMember;
-                const marker = selected ? "●" : "○";
-                const suffix = selected ? "  (selected)" : "";
-                out += `    ${marker} ${member.name.padEnd(12)}${member.include}${suffix}\n`;
-            }
-            break;
-        }
-
-        case "BooleanProperty": {
-            out += "\n  Options:\n";
-            out += `    ${property.value === true ? "●" : "○"} true${property.value === true ? "  (current)" : ""}\n`;
-            out += `    ${property.value === false ? "●" : "○"} false${property.value === false ? "  (current)" : ""}\n`;
-            break;
-        }
-
-        case "ArrayProperty": {
-            out += `  ${"Max size:".padEnd(15)}${property.size}\n`;
-            out += "\n  Format: comma-separated values\n";
-            out += `    aa update <node> ${property.name} value1,value2,value3\n`;
-            break;
-        }
-    }
-
-    if (suggestions.values && suggestions.values.length > 0) {
-        out += "\n  Suggestions:\n";
-        for (const value of suggestions.values) {
-            out += `    • ${value}\n`;
-        }
-    }
-
-    if (suggestions.types && suggestions.types.length > 0) {
-        out += "\n  Can create:\n";
-        for (const type of suggestions.types) {
-            out += `    + ${type}\n`;
-        }
-    }
-
     return out;
 }
 
