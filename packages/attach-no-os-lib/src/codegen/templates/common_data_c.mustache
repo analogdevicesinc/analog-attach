@@ -2,8 +2,10 @@
 #include "{{{.}}}"
 {{/includes}}
 
+struct descriptors desc = { 0 };
+
 {{#structs}}
-const struct {{{type}}} {{{name}}} = {
+{{#is_const}}const {{/is_const}}struct {{{type}}} {{{name}}} = {
 {{#fields}}
 	.{{{name}}} = {{{c_value}}},
 {{/fields}}
