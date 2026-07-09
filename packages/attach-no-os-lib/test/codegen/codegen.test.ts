@@ -8,7 +8,6 @@ import { expectOk, setup_test_config, teardown_test_config } from '../test_utili
 import { MinimalWorkfile } from '../../src/workfile_handler/types';
 
 const NOOS_ROOT = path.join(__dirname, '../bindings');
-const SCHEMAS_ROOT = path.join(NOOS_ROOT, 'schemas');
 
 const test_workfile: MinimalWorkfile = {
     platform: "max32690",
@@ -220,12 +219,12 @@ describe('codegen', () => {
 
         expectOk(result);
 
-        const common_data_c = fs.readFileSync(
-            path.join(temporary_directory, "test-project/src/common/common_data.c"),
+        const main_c = fs.readFileSync(
+            path.join(temporary_directory, "test-project/src/main.c"),
             "utf8"
         );
 
         // The parent field should reference the descriptor via desc struct
-        expect(common_data_c).toContain(".parent = &desc.parent_spi");
+        expect(main_c).toContain("child_spi_ip.parent = desc.parent_spi");
     });
 });

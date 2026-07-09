@@ -309,9 +309,13 @@ export function suggest_platform_ops(workfile: Workfile, property: PlatformOpsPr
             continue;
         }
 
-        if (property.allowed && property.allowed.includes(ops.$id)) {
-            suggestions.push(name);
+        // When an allowed list is set (from $override), only suggest from that list
+        if (property.allowed) {
+            if (property.allowed.includes(ops.$id)) {
+                suggestions.push(name);
+            }
         } else if (ops.$capability === parent_struct.$capability) {
+            // No override restriction, fall back to capability matching
             suggestions.push(name);
         }
     }
@@ -340,10 +344,13 @@ export function suggest_platform_extra(workfile: Workfile, property: PlatformExt
             continue; // skip self
         }
 
-        const matches_allowed = property.allowed && property.allowed.includes(symbol.$id);
-        const matches_capability = available.value.platform.includes(symbol.$id) && symbol.$capability === parent_struct.$capability;
-
-        if (matches_allowed || matches_capability) {
+        // When an allowed list is set (from $override), only suggest from that list
+        if (property.allowed) {
+            if (property.allowed.includes(symbol.$id)) {
+                values.push(name);
+            }
+        } else if (available.value.platform.includes(symbol.$id) && symbol.$capability === parent_struct.$capability) {
+            // No override restriction, fall back to capability matching
             values.push(name);
         }
     }
@@ -354,10 +361,13 @@ export function suggest_platform_extra(workfile: Workfile, property: PlatformExt
             continue;
         }
 
-        const matches_allowed = property.allowed && property.allowed.includes(ruleset.value.$id);
-        const matches_capability = ruleset.value.$capability === parent_struct.$capability;
-
-        if (matches_allowed || matches_capability) {
+        // When an allowed list is set (from $override), only suggest from that list
+        if (property.allowed) {
+            if (property.allowed.includes(ruleset.value.$id)) {
+                types.push(schema_path);
+            }
+        } else if (ruleset.value.$capability === parent_struct.$capability) {
+            // No override restriction, fall back to capability matching
             types.push(schema_path);
         }
     }
