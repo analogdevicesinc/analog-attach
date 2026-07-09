@@ -1,13 +1,21 @@
 import { Property } from "../ruleset_parser/types";
 import { Workfile } from "../workfile_handler/types";
+import { find_symbol_by_descriptor } from "../workfile_handler/utils";
 import { ChildOverride, ConnectionGraph } from "./types";
 import { load_resolved_ruleset } from "../resolver/resolver";
 
-function get_connected_symbols(property: Property): string[] {
+function get_connected_symbols(property: Property, workfile: Workfile): string[] {
 	switch (property._t) {
 		case "IncludeProperty": {
 			if (typeof property.value === "string") {
 				return [property.value];
+			}
+			return [];
+		}
+		case "IncludeDescriptorProperty": {
+			if (typeof property.value === "string") {
+				const symbol_name = find_symbol_by_descriptor(workfile, property.value);
+				return symbol_name ? [symbol_name] : [];
 			}
 			return [];
 		}
@@ -54,7 +62,7 @@ export function create_connections_graph(workfile: Workfile): ConnectionGraph {
 		}
 
 		for (const property of ruleset.properties) {
-			const children = get_connected_symbols(property);
+			const children = get_connected_symbols(property, workfile);
 			for (const child of children) {
 				const existing = graph.get(symbol_name) ?? [];
 				if (!existing.includes(child)) {
@@ -66,6 +74,15 @@ export function create_connections_graph(workfile: Workfile): ConnectionGraph {
 	}
 
 	return graph;
+}
+
+export function is_referenced_by_others(symbol_name: string, graph: ConnectionGraph): boolean {
+	for (const children of graph.values()) {
+		if (children.includes(symbol_name)) {
+			return true;
+		}
+	}
+	return false;
 }
 
 export function collect_child_overrides(symbol_name: string, workfile: Workfile, graph: ConnectionGraph): ChildOverride[] {

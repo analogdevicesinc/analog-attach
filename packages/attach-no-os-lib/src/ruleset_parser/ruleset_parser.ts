@@ -12,7 +12,7 @@ import {
 } from "./types";
 import YAML from "yaml";
 import { Result, ok, error } from "./result";
-import { asObject, at, boolean_, number_, optional, optionalWithDefault, ParseContext, required, string_, stringArray } from "./validators";
+import { asObject, at, number_, optional, optionalWithDefault, ParseContext, required, string_, stringArray } from "./validators";
 import { RulesetType } from "./types";
 import {
 	parse_array_property,
@@ -21,6 +21,7 @@ import {
 	parse_callback_function_property,
 	parse_enum_property,
 	parse_include_property,
+	parse_include_descriptor_property,
 	parse_number_property,
 	parse_platform_extra_property,
 	parse_platform_ops_property,
@@ -107,6 +108,10 @@ export function parse_property(name: string, value: unknown, context: ParseConte
 		return parse_include_property(name, object.value, context);
 	}
 
+	if ("include_descriptor" in object.value) {
+		return parse_include_descriptor_property(name, object.value, context);
+	}
+
 	const type_ = object.value["type"];
 	if (typeof type_ === "string") {
 		if (type_ === "enum") {
@@ -152,7 +157,7 @@ export function parse_property(name: string, value: unknown, context: ParseConte
 		return error(`Unknown property type '${type_}'`, at(context, type_).path);
 	}
 
-	return error("Cannot determine the property type", context.path);
+	return error(`Cannot determine the property type for '${context.path}'. Expected 'type', 'include', or 'include_descriptor'.`, context.path);
 }
 
 function require_property(context: ParseContext, name: string, scope: OverrideScope): Result<Property> {

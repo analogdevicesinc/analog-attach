@@ -11,7 +11,8 @@ import {
     scan_platforms,
     add_symbol,
     resolve_workfile_path,
-    list_available_structs
+    list_available_structs,
+    set_descriptor_name
 } from "attach-no-os-lib";
 import {
     load_context,
@@ -149,7 +150,7 @@ function format_available_structs(structs: AvailableStructs, platform?: string):
 }
 
 const createNodeCommand = buildCommand<
-    { json?: boolean; filter?: string },
+    { json?: boolean; filter?: string; descriptor?: string },
     [string | undefined, string | undefined]
 >({
     docs: { brief: "Create a new node" },
@@ -164,6 +165,7 @@ const createNodeCommand = buildCommand<
         flags: {
             filter: { kind: "parsed", brief: "Filter available schemas", optional: true, parse: String },
             json: { kind: "boolean", brief: "Output as JSON", optional: true },
+            descriptor: { kind: "parsed", brief: "Descriptor name for the node", optional: true, parse: String },
         }
     },
     func: async (flags, name, schema) => {
@@ -233,6 +235,16 @@ const createNodeCommand = buildCommand<
         }
 
         context.value.workfile = changed.value;
+
+        // Set descriptor name if provided
+        if (flags.descriptor) {
+            const descriptor_result = set_descriptor_name(context.value.workfile, name, flags.descriptor);
+            if (!descriptor_result.ok) {
+                output_error(flags, "set_descriptor_failed", descriptor_result.error.message);
+                return;
+            }
+        }
+
         const save = save_workfile(context.value);
         if (!save.ok) {
             output_error(flags, "save_failed", save.error.message);

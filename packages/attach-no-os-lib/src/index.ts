@@ -1,6 +1,6 @@
 export { parse_ruleset } from "./ruleset_parser/ruleset_parser";
 export { load_resolved_ruleset } from "./resolver/resolver";
-export type { Ruleset, Property, IncludeProperty, RulesetStruct, ArrayProperty } from "./ruleset_parser/types";
+export type { Ruleset, Property, IncludeProperty, IncludeDescriptorProperty, RulesetStruct, ArrayProperty } from "./ruleset_parser/types";
 export { ok, error } from "./ruleset_parser/result";
 export type { Result, ResultError } from "./ruleset_parser/result";
 export {
@@ -10,6 +10,9 @@ export {
     remove_symbol,
     rename_symbol,
     list_symbols,
+    get_descriptor_name,
+    set_descriptor_name,
+    find_symbol_by_descriptor,
     find_any,
     set_value,
     get_value,
@@ -41,6 +44,7 @@ export {
 export { SETTINGS_DEFAULTS, DEFAULT_SYSTEM_CONFIG_PATH, DEFAULT_SYSTEM_CONFIG_FILENAME, SCHEMAS_SUBPATH } from "./settings/globals";
 export type { Setting, SettingsFile } from "./settings/types";
 export { is_setting, is_settings_file } from "./settings/types";
+export type { ConnectionGraph } from "./validator/types";
 export { validate_workfile } from "./validator/validator";
 export type { ValidationResult, ValidationError } from "./validator/types";
 export { generate_project } from "./codegen/codegen";

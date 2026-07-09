@@ -1,9 +1,0 @@
-$id: "platforms/stm32/platform_ops/pwm_ops.yaml"
-$type: platform_ops
-$ranking: 4
-$symbol: stm32_pwm_ops
-$capability: pwm
-$sources:
-  platform:
-    - "stm32_pwm.h"
-    - "stm32_pwm.c"

@@ -4,6 +4,7 @@ import { Result, ok, error } from "../ruleset_parser/result";
 import {
     ArrayProperty,
     EnumProperty,
+    IncludeDescriptorProperty,
     IncludeProperty,
     PlatformExtraProperty,
     PlatformOpsProperty,
@@ -20,6 +21,7 @@ import { collect_child_overrides, create_connections_graph } from "../validator/
 import { apply_overrides } from "../validator/override_resolver";
 import { AvailableStructs, is_minimal_workfile, MinimalWorkfile, Workfile } from "./types";
 import { parse_ruleset } from "../ruleset_parser/ruleset_parser";
+import { find_symbol_by_descriptor } from "./utils";
 
 // --- Workfile Creation ---
 
@@ -135,6 +137,43 @@ export function list_symbols(workfile: Workfile): string[] {
     return Object.keys(workfile.symbols);
 }
 
+// --- Descriptor Names ---
+
+export function get_descriptor_name(workfile: Workfile, symbol_name: string): Result<string> {
+    const ruleset = workfile.symbols[symbol_name];
+    if (!ruleset) {
+        return error(`Symbol '${symbol_name}' not found`, "symbol_name");
+    }
+    if (ruleset._t !== "RulesetStruct") {
+        return error(`Symbol '${symbol_name}' is not a struct`, "symbol_name");
+    }
+    return ok(ruleset.$descriptor_name ?? `${symbol_name}_desc`);
+}
+
+export function set_descriptor_name(workfile: Workfile, symbol_name: string, descriptor_name: string): Result<void> {
+    const ruleset = workfile.symbols[symbol_name];
+    if (!ruleset) {
+        return error(`Symbol '${symbol_name}' not found`, "symbol_name");
+    }
+    if (ruleset._t !== "RulesetStruct") {
+        return error(`Symbol '${symbol_name}' is not a struct`, "symbol_name");
+    }
+    if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(descriptor_name)) {
+        return error(`Descriptor name '${descriptor_name}' is not a valid C name`, "descriptor_name");
+    }
+
+    // Check for uniqueness
+    const existing = find_symbol_by_descriptor(workfile, descriptor_name);
+    if (existing && existing !== symbol_name) {
+        return error(`Descriptor name '${descriptor_name}' is already used by symbol '${existing}'`, "descriptor_name");
+    }
+
+    ruleset.$descriptor_name = descriptor_name;
+    return ok();
+}
+
+export { find_symbol_by_descriptor } from "./utils";
+
 // --- Lookup (checks both platform_ops and symbols) ---
 
 export function find_any(workfile: Workfile, name: string): Ruleset | undefined {
@@ -201,6 +240,30 @@ export function suggest_for_include(workfile: Workfile, include: IncludeProperty
     return ok({
         values: values.length === 0 ? undefined : values,
         types: [include.include],
+    });
+}
+
+export function suggest_for_include_descriptor(workfile: Workfile, include_descriptor: IncludeDescriptorProperty): Result<PropertySuggestions> {
+    const values: string[] = [];
+
+    // Find all symbols whose schema matches the include_descriptor path
+    // and collect their descriptor names
+    for (const [name, ruleset] of Object.entries(workfile.symbols)) {
+        if (ruleset._t !== "RulesetStruct") {
+            continue;
+        }
+        if (ruleset.$id !== include_descriptor.include_descriptor) {
+            continue;
+        }
+        // Use the user-defined descriptor name or default
+        const descriptor_name = ruleset.$descriptor_name ?? `${name}_desc`;
+        values.push(descriptor_name);
+    }
+
+    return ok({
+        values: values.length === 0 ? undefined : values,
+        // Suggest creating symbols of this type if none exist
+        types: [include_descriptor.include_descriptor],
     });
 }
 
@@ -332,6 +395,9 @@ export function suggest_for_property(workfile: Workfile, symbol_name: string, pr
         }
         case "IncludeProperty": {
             return suggest_for_include(workfile, property);
+        }
+        case "IncludeDescriptorProperty": {
+            return suggest_for_include_descriptor(workfile, property);
         }
         case "EnumProperty": {
             return suggest_for_enum(property);
@@ -485,7 +551,8 @@ export function export_minimal(workfile: Workfile): Result<MinimalWorkfile> {
         }
 
         const node: MinimalWorkfile["symbols"][string] = {
-            $compatible: ruleset.$id
+            $compatible: ruleset.$id,
+            $descriptor: ruleset.$descriptor_name ?? `${name}_desc`
         };
 
         for (const property of ruleset.properties) {
@@ -517,13 +584,20 @@ export function import_minimal(minimal: MinimalWorkfile): Result<Workfile> {
             return ruleset_result;
         }
 
-        const add_result = add_symbol(workfile, name, ruleset_result.value);
+        const ruleset = ruleset_result.value;
+
+        // Set descriptor name (user-provided or auto-generated)
+        if (ruleset._t === "RulesetStruct") {
+            ruleset.$descriptor_name = node.$descriptor ?? `${name}_desc`;
+        }
+
+        const add_result = add_symbol(workfile, name, ruleset);
         if (!add_result.ok) {
             return add_result;
         }
 
         for (const [property_name, value] of Object.entries(node)) {
-            if (property_name === "$compatible") {
+            if (property_name === "$compatible" || property_name === "$descriptor") {
                 continue;
             }
             const set_result = set_value(workfile, name, property_name, value);
