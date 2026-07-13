@@ -22,9 +22,9 @@ int main(void)
 {{/devices}}
 	user_app(&desc);
 
-{{#devices}}
+{{#devices_reversed}}
 	{{{remove_code}}};
-{{/devices}}
+{{/devices_reversed}}
 
 	return 0;
 }

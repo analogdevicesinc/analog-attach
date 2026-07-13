@@ -14,6 +14,16 @@ export function validate_workfile(workfile: Workfile): ValidationResult {
 			continue;
 		}
 
+		// A symbol referencing itself (e.g. parent set to its own descriptor) forms a
+		// dependency cycle and cannot be ordered/generated. Reject it explicitly.
+		if ((connections_graph.get(symbol_name) ?? []).includes(symbol_name)) {
+			errors.push({
+				path: symbol_name,
+				message: `Symbol '${symbol_name}' references itself; self-references are not allowed.`,
+				severity: "error",
+			});
+		}
+
 		const child_overrides = collect_child_overrides(symbol_name, workfile, connections_graph);
 		const context: ParseContext = {
 			path: symbol_name,

@@ -77,7 +77,7 @@ describe('Real System Integration', () => {
             expectOk(add_device_result);
 
             // Step 5: ADXL355 needs SPI - load the no-os SPI struct
-            const spi_binding_result = load_resolved_ruleset("no-os/no_os_spi_init_param.yaml");
+            const spi_binding_result = load_resolved_ruleset("no-os/spi/no_os_spi_init_param.yaml");
             expectOk(spi_binding_result);
             const spi_struct = spi_binding_result.value as RulesetStruct;
 
@@ -148,7 +148,7 @@ describe('Real System Integration', () => {
             load_platform(workfile, scan_result.value);
 
             // Add SPI struct
-            const spi_binding_result = load_resolved_ruleset("no-os/no_os_spi_init_param.yaml");
+            const spi_binding_result = load_resolved_ruleset("no-os/spi/no_os_spi_init_param.yaml");
             expectOk(spi_binding_result);
             add_symbol(workfile, "my_spi", spi_binding_result.value as RulesetStruct);
 
@@ -169,7 +169,7 @@ describe('Real System Integration', () => {
             load_platform(workfile, scan_result.value);
 
             // Add SPI struct
-            const spi_binding_result = load_resolved_ruleset("no-os/no_os_spi_init_param.yaml");
+            const spi_binding_result = load_resolved_ruleset("no-os/spi/no_os_spi_init_param.yaml");
             expectOk(spi_binding_result);
             add_symbol(workfile, "my_spi", spi_binding_result.value as RulesetStruct);
 
@@ -234,7 +234,7 @@ describe('Real System Integration', () => {
             expect(list_platform_ops(workfile)).toContain('spi_eng_platform_ops');
 
             // Add no-os SPI struct (resolved)
-            const spi_result = load_resolved_ruleset("no-os/no_os_spi_init_param.yaml");
+            const spi_result = load_resolved_ruleset("no-os/spi/no_os_spi_init_param.yaml");
             expectOk(spi_result);
             add_symbol(workfile, "my_spi", spi_result.value as RulesetStruct);
 
@@ -272,7 +272,7 @@ describe('Real System Integration', () => {
             load_platform(workfile, scan_result.value);
 
             // Add no-os SPI struct (resolved)
-            const spi_result = load_resolved_ruleset("no-os/no_os_spi_init_param.yaml");
+            const spi_result = load_resolved_ruleset("no-os/spi/no_os_spi_init_param.yaml");
             expectOk(spi_result);
             add_symbol(workfile, "my_spi", spi_result.value as RulesetStruct);
 

@@ -17,7 +17,7 @@ const workfile_data: MinimalWorkfile = {
             "polarity": "SPI_SS_POL_LOW"
         },
         "no_os_spi_ip": {
-            "$compatible": "no-os/no_os_spi_init_param.yaml",
+            "$compatible": "no-os/spi/no_os_spi_init_param.yaml",
             "device_id": 4,
             "max_speed_hz": 1000000,
             "chip_select": 0,

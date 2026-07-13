@@ -31,7 +31,11 @@ const CORE_UTIL_INCS = [
 
 export function build_views(input: CodegenInput): Result<Views> {
 	const sources = collect_sources(input.workfile);
-	const ordered_symbols = order_symbols(input.workfile);
+	const ordered_symbols_result = order_symbols(input.workfile);
+	if (!ordered_symbols_result.ok) {
+		return ordered_symbols_result;
+	}
+	const ordered_symbols = ordered_symbols_result.value;
 	const graph = create_connections_graph(input.workfile);
 
 	// Build struct views - initially mark non-const only for direct descriptor refs
@@ -50,8 +54,14 @@ export function build_views(input: CodegenInput): Result<Views> {
 	const descriptors = collect_descriptors(input.workfile);
 
 	// Collect devices that need init/remove code (have templates AND are not referenced by others)
-	const devices = collect_devices(input.workfile, graph);
-	const device_includes = devices.map(d => d.header);
+	const devices_result = collect_devices(input.workfile, graph);
+	if (!devices_result.ok) {
+		return devices_result;
+	}
+	const devices = devices_result.value;
+	// Devices without a $header (e.g. no-OS core peripherals whose header comes in via
+	// $sources) contribute an empty string — skip those to avoid emitting #include "".
+	const device_includes = devices.map(d => d.header).filter(h => h.length > 0);
 
 	// Collect all header includes for common_data.h
 	const all_includes = new Set<string>();
@@ -101,6 +111,9 @@ export function build_views(input: CodegenInput): Result<Views> {
 		},
 		main_c: {
 			devices: devices,
+			// Teardown in reverse init order (LIFO): last initialized is removed first,
+			// so prioritized peripherals (e.g. UART) are torn down last.
+			devices_reversed: [...devices].reverse(),
 			has_runtime_assignments: runtime_assignments.length > 0,
 			runtime_assignments: runtime_assignments,
 		},
@@ -239,7 +252,7 @@ function collect_sources(workfile: Workfile): SourcePaths {
 	};
 }
 
-function order_symbols(workfile: Workfile): [string, RulesetStruct][] {
+function order_symbols(workfile: Workfile): Result<[string, RulesetStruct][]> {
 	const graph = create_connections_graph(workfile);
 	const in_degree = new Map<string, number>();
 
@@ -275,6 +288,13 @@ function order_symbols(workfile: Workfile): [string, RulesetStruct][] {
 		}
 	}
 
+	// Any node not emitted is part of a dependency cycle. Fail loudly instead of
+	// silently dropping it (and everything downstream) from the generated project.
+	if (sorted.length !== graph.size) {
+		const in_cycle = [...graph.keys()].filter(name => !sorted.includes(name));
+		return error(`Dependency cycle detected among symbols: ${in_cycle.join(", ")}`);
+	}
+
 	const result: [string, RulesetStruct][] = [];
 	for (const name of sorted) {
 		const ruleset = workfile.symbols[name];
@@ -283,7 +303,7 @@ function order_symbols(workfile: Workfile): [string, RulesetStruct][] {
 		}
 	}
 
-	return result;
+	return ok(result);
 }
 
 function build_struct_view(name: string, ruleset: RulesetStruct): StructView {
@@ -442,10 +462,6 @@ function load_device_templates(schema_id: string): Result<{ init: string; remove
 }
 
 function extract_device_info(symbol_name: string, ruleset: RulesetStruct): Result<DeviceInfo> {
-	if (!is_device(ruleset.$id)) {
-		return error(`Symbol ${symbol_name} is not a device. (missing init templates)`);
-	}
-
 	const templates = load_device_templates(ruleset.$id);
 	if (!templates.ok) {
 		return templates;
@@ -464,6 +480,7 @@ function extract_device_info(symbol_name: string, ruleset: RulesetStruct): Resul
 		header: ruleset.$header ? path.basename(ruleset.$header) : "",
 		init_code,
 		remove_code,
+		capability: ruleset.$capability,
 	});
 }
 
@@ -485,9 +502,9 @@ function collect_descriptors(workfile: Workfile): DescriptorInfo[] {
 	return result;
 }
 
-function collect_devices(workfile: Workfile, graph: ConnectionGraph): DeviceInfo[] {
+function collect_devices(workfile: Workfile, graph: ConnectionGraph): Result<DeviceInfo[]> {
 	const rulesets = Object.entries(workfile.symbols);
-	let result: DeviceInfo[] = [];
+	const result: DeviceInfo[] = [];
 	for (const [name, symbol] of rulesets) {
 		if (symbol._t !== "RulesetStruct") {
 			continue;
@@ -497,13 +514,39 @@ function collect_devices(workfile: Workfile, graph: ConnectionGraph): DeviceInfo
 			continue;
 		}
 
+		// Not a device (no init template) — normal, skip quietly.
+		if (!is_device(symbol.$id)) {
+			continue;
+		}
+
+		// It IS a device: any failure here is a real error, not a silent skip.
 		const device_info = extract_device_info(name, symbol);
 		if (!device_info.ok) {
-			continue;
+			return device_info;
 		}
 
 		result.push(device_info.value);
 	}
 
-	return result;
+	return ok(prioritize_devices(result));
+}
+
+// Capabilities that must (or should) be initialized before everything else, in order.
+// IRQ controller first: any driver registering an interrupt handler (async UART, timers,
+// data-ready lines) needs it up. UART next: so logging works during the rest of init.
+// Devices without a listed capability keep their original relative order.
+const INIT_PRIORITY: string[] = ["irq", "uart"];
+
+function prioritize_devices(devices: DeviceInfo[]): DeviceInfo[] {
+	const priority_of = (device: DeviceInfo): number => {
+		const index = device.capability ? INIT_PRIORITY.indexOf(device.capability) : -1;
+		return index === -1 ? INIT_PRIORITY.length : index;
+	};
+
+	// Stable sort: prioritized capabilities float to the front in INIT_PRIORITY order,
+	// everything else stays in its existing (workfile) order.
+	return devices
+		.map((device, index) => ({ device, index }))
+		.sort((a, b) => priority_of(a.device) - priority_of(b.device) || a.index - b.index)
+		.map(entry => entry.device);
 }
