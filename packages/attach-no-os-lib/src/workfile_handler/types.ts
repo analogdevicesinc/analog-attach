@@ -4,10 +4,11 @@ import { Ruleset } from "../ruleset_parser/types";
  * Platform manifest - lists ops and structs available for this platform
  */
 export type PlatformManifest = {
-    name: string;       // platform name e.g. "max32690"
-    vendor: string;     // vendor name e.g. "maxim"
-    ops: string[];      // paths to ops yaml files
-    structs: string[];  // paths to struct yaml files (extras)
+    name: string;         // platform name e.g. "max32690"
+    vendor: string;       // vendor name e.g. "maxim"
+    description?: string; // optional human-readable platform description
+    ops: string[];        // paths to ops yaml files
+    structs: string[];    // paths to struct yaml files (extras)
 };
 
 /**
