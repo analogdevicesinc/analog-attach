@@ -101,6 +101,7 @@ export function build_views(input: CodegenInput): Result<Views> {
 		},
 		main_c: {
 			devices: devices,
+			has_runtime_assignments: runtime_assignments.length > 0,
 			runtime_assignments: runtime_assignments,
 		},
 		user_app_h: {},

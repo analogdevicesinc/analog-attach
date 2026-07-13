@@ -6,11 +6,13 @@ int main(void)
 {
 	int ret;
 
+{{#has_runtime_assignments}}
 	// Patching the common_data structs
 {{#runtime_assignments}}
 	{{{struct_name}}}.{{{field_path}}} = {{{value}}};
 {{/runtime_assignments}}
 
+{{/has_runtime_assignments}}
 	// Init devices and structures
 {{#devices}}
 	ret = {{{init_code}}};
