@@ -27,6 +27,30 @@ type AvailablePlatforms = {
     available_platforms: { name: string; description: string }[];
 };
 
+/**
+ * Wrap text to the given width on word boundaries.
+ * Returns one string per line (never empty; a blank input yields [""]).
+ */
+function wrap_text(text: string, width: number): string[] {
+    const words = text.trim().split(/\s+/);
+    const lines: string[] = [];
+    let current = "";
+
+    for (const word of words) {
+        if (current.length === 0) {
+            current = word;
+        } else if (current.length + 1 + word.length <= width) {
+            current += ` ${word}`;
+        } else {
+            lines.push(current);
+            current = word;
+        }
+    }
+    lines.push(current);
+
+    return lines;
+}
+
 function list_available_platforms(): Result<AvailablePlatforms> {
     const schemas_path = get_schemas_path();
     if (!schemas_path.ok) {
@@ -39,9 +63,12 @@ function list_available_platforms(): Result<AvailablePlatforms> {
         return result;
     }
 
-    return ok({
-        available_platforms: Object.keys(result.value).map(name => ({ name, description: "no description yet" }))
-    });
+    const available_platforms = Object.entries(result.value).map(([name, manifest]) => ({
+        name: name,
+        description: manifest.description ?? "No description available"
+    }));
+
+    return ok({ available_platforms });
 }
 
 const createWorkfileCommand = buildCommand<
@@ -72,9 +99,13 @@ const createWorkfileCommand = buildCommand<
         if (!flags.platform) {
             let text = "No platform specified. Available platforms:\n\n";
             for (const p of platforms.value.available_platforms) {
-                text += `  ${p.name.padEnd(14)}${p.description}\n`;
+                text += `  ${p.name}\n`;
+                for (const line of wrap_text(p.description, 76)) {
+                    text += `      ${line}\n`;
+                }
+                text += "\n";
             }
-            text += "\nUse: aa create workfile --platform <name>";
+            text += "Use: aa create workfile --platform <name>";
             output(flags, text, platforms.value);
             return;
         }

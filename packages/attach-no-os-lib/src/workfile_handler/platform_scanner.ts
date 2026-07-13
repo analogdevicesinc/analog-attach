@@ -24,6 +24,11 @@ function parse_manifest(manifest: unknown, platform_path: string): Result<Platfo
 		return vendor;
 	}
 
+	const description =  optional(object.value, "description", context, string_);
+	if (!description.ok) {
+		return description;
+	}
+
 	const ops = optional(object.value, "ops", context, stringArray);
 	if (!ops.ok) {
 		return ops;
@@ -66,6 +71,7 @@ function parse_manifest(manifest: unknown, platform_path: string): Result<Platfo
 	return ok({
 		name: platform_name,
 		vendor: vendor.value,
+		description: description.value,
 		ops: prefixed_ops,
 		structs: prefixed_structs,
 	});
