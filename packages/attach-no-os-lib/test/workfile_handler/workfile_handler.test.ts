@@ -347,6 +347,22 @@ describe('workfile_handler', () => {
             expect(suggestions.value.values).toBeUndefined();
             expect(suggestions.value.types).toEqual(["no-os/spi.yaml"]);
         });
+
+        test('excludes the symbol being edited (no self-reference suggested)', () => {
+            const spi1 = make_struct("no-os/spi.yaml", "spi");
+            spi1.$descriptor_name = "spi1_desc";
+            add_symbol(workfile, "spi1", spi1);
+
+            const spi2 = make_struct("no-os/spi.yaml", "spi");
+            spi2.$descriptor_name = "spi2_desc";
+            add_symbol(workfile, "spi2", spi2);
+
+            const include_descriptor = make_include_descriptor("parent", "no-os/spi.yaml");
+            // Suggesting for spi1 must not offer spi1's own descriptor.
+            const suggestions = suggest_for_include_descriptor(workfile, include_descriptor, "spi1");
+            expectOk(suggestions);
+            expect(suggestions.value.values).toEqual(["spi2_desc"]);
+        });
     });
 
     describe('suggest_for_union', () => {
@@ -695,7 +711,7 @@ describe('workfile_handler', () => {
             expectOk(scan_result);
             load_platform(workfile, scan_result.value);
 
-            const spi_result = load_resolved_ruleset("no-os/no_os_spi_init_param.yaml");
+            const spi_result = load_resolved_ruleset("no-os/spi/no_os_spi_init_param.yaml");
             expectOk(spi_result);
             add_symbol(workfile, "my_spi", spi_result.value);
             set_value(workfile, "my_spi", "device_id", 1);
@@ -723,7 +739,7 @@ describe('workfile_handler', () => {
                 platform: "max32690",
                 symbols: {
                     "my_spi": {
-                        $compatible: "no-os/no_os_spi_init_param.yaml",
+                        $compatible: "no-os/spi/no_os_spi_init_param.yaml",
                         device_id: 1,
                         chip_select: 2,
                     }
@@ -758,7 +774,7 @@ describe('workfile_handler', () => {
             expectOk(scan_result);
             load_platform(workfile, scan_result.value);
 
-            const spi_result = load_resolved_ruleset("no-os/no_os_spi_init_param.yaml");
+            const spi_result = load_resolved_ruleset("no-os/spi/no_os_spi_init_param.yaml");
             expectOk(spi_result);
             add_symbol(workfile, "test_spi", spi_result.value);
             set_value(workfile, "test_spi", "device_id", 42);
@@ -804,7 +820,7 @@ describe('workfile_handler', () => {
                 platform: "max32690",
                 symbols: {
                     "my_spi": {
-                        $compatible: "no-os/no_os_spi_init_param.yaml",
+                        $compatible: "no-os/spi/no_os_spi_init_param.yaml",
                         device_id: 1
                     },
                     "my_adxl355": {

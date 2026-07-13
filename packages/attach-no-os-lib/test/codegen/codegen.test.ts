@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import { import_minimal } from '../../src/workfile_handler/workfile_handler';
 import { generate_project } from '../../src/codegen/codegen';
-import { expectOk, setup_test_config, teardown_test_config } from '../test_utilities';
+import { expectOk, expectError, setup_test_config, teardown_test_config } from '../test_utilities';
 import { MinimalWorkfile } from '../../src/workfile_handler/types';
 
 const NOOS_ROOT = path.join(__dirname, '../bindings');
@@ -18,7 +18,7 @@ const test_workfile: MinimalWorkfile = {
             "polarity": "SPI_SS_POL_LOW"
         },
         "no_os_spi_ip": {
-            "$compatible": "no-os/no_os_spi_init_param.yaml",
+            "$compatible": "no-os/spi/no_os_spi_init_param.yaml",
             "device_id": 1,
             "max_speed_hz": 1_000_000,
             "chip_select": 2,
@@ -181,7 +181,7 @@ describe('codegen', () => {
             platform: "max32690",
             symbols: {
                 "parent_spi_ip": {
-                    "$compatible": "no-os/no_os_spi_init_param.yaml",
+                    "$compatible": "no-os/spi/no_os_spi_init_param.yaml",
                     "$descriptor": "parent_spi",
                     "device_id": 1,
                     "chip_select": 0,
@@ -194,7 +194,7 @@ describe('codegen', () => {
                     "polarity": "SPI_SS_POL_LOW"
                 },
                 "child_spi_ip": {
-                    "$compatible": "no-os/no_os_spi_init_param.yaml",
+                    "$compatible": "no-os/spi/no_os_spi_init_param.yaml",
                     "$descriptor": "child_spi",
                     "device_id": 2,
                     "chip_select": 1,
@@ -226,5 +226,109 @@ describe('codegen', () => {
 
         // The parent field should reference the descriptor via desc struct
         expect(main_c).toContain("child_spi_ip.parent = desc.parent_spi");
+    });
+
+    test('errors when a device has an init template but no remove template', () => {
+        // A schema with init.mustache but no remove.mustache is a half-configured
+        // device. It must surface an error, not be silently dropped from main.c.
+        const broken_schemas = fs.mkdtempSync(path.join(os.tmpdir(), 'broken-schemas-'));
+        try {
+            // NOOS_ROOT/schemas is a symlink to the real schema tree; dereference so we
+            // copy real files into the temp dir and never mutate the source via the link.
+            fs.cpSync(path.join(NOOS_ROOT, 'schemas'), path.join(broken_schemas, 'schemas'), { recursive: true, dereference: true });
+            fs.rmSync(path.join(broken_schemas, 'schemas/devices/adxl355/remove.mustache'));
+
+            teardown_test_config();
+            setup_test_config(broken_schemas);
+
+            const import_result = import_minimal(test_workfile);
+            expectOk(import_result);
+
+            const result = generate_project({
+                workfile: import_result.value,
+                platform_name: "max32690",
+                platform_vendor: "maxim",
+                project_name: "test-project",
+                output_path: temporary_directory,
+                noos_path: "$(realpath ../../../)",
+            });
+
+            expectError(result);
+            expect(result.error.message).toContain("adxl355");
+        } finally {
+            fs.rmSync(broken_schemas, { recursive: true, force: true });
+        }
+    });
+
+    test('initializes UART before other devices regardless of workfile order', () => {
+        // UART is declared LAST here, but must init FIRST so logging works during the
+        // rest of init. Non-prioritized devices keep their relative order.
+        const minimal: MinimalWorkfile = {
+            platform: "max32690",
+            symbols: {
+                "max_spi_ip": {
+                    "$compatible": "platforms/maxim/max32690/max_spi_init_param.yaml",
+                    "vssel": "MXC_GPIO_VSSEL_VDDIOH",
+                    "polarity": "SPI_SS_POL_LOW"
+                },
+                "no_os_spi_ip": {
+                    "$compatible": "no-os/spi/no_os_spi_init_param.yaml",
+                    "device_id": 1,
+                    "max_speed_hz": 1_000_000,
+                    "chip_select": 2,
+                    "platform_ops": "spi_ops",
+                    "extra": "max_spi_ip"
+                },
+                "misp": {
+                    "$compatible": "devices/adxl355/adxl355.yaml",
+                    "comm_type": "ADXL355_SPI_COMM",
+                    "dev_type": "ID_ADXL355",
+                    "comm_init": { "spi_init": "no_os_spi_ip" }
+                },
+                "max_uart_ip": {
+                    "$compatible": "platforms/maxim/max32690/max_uart_init_param.yaml",
+                    "vssel": "MXC_GPIO_VSSEL_VDDIOH"
+                },
+                "my_uart": {
+                    "$compatible": "no-os/uart/no_os_uart_init_param.yaml",
+                    "device_id": 0,
+                    "baud_rate": 115200,
+                    "platform_ops": "uart_ops",
+                    "extra": "max_uart_ip"
+                }
+            }
+        };
+
+        const import_result = import_minimal(minimal);
+        expectOk(import_result);
+
+        const result = generate_project({
+            workfile: import_result.value,
+            platform_name: "max32690",
+            platform_vendor: "maxim",
+            project_name: "test-project",
+            output_path: temporary_directory,
+            noos_path: "$(realpath ../../../)",
+        });
+
+        expectOk(result);
+
+        const main_c = fs.readFileSync(
+            path.join(temporary_directory, "test-project/src/main.c"),
+            "utf8"
+        );
+
+        const uart_init = main_c.indexOf("no_os_uart_init");
+        const adxl_init = main_c.indexOf("adxl355_init");
+        expect(uart_init).toBeGreaterThanOrEqual(0);
+        expect(adxl_init).toBeGreaterThanOrEqual(0);
+        expect(uart_init).toBeLessThan(adxl_init);
+
+        // Teardown is reverse init order: UART inits first, so it is removed last.
+        const uart_remove = main_c.indexOf("no_os_uart_remove");
+        const adxl_remove = main_c.indexOf("adxl355_remove");
+        expect(uart_remove).toBeGreaterThanOrEqual(0);
+        expect(adxl_remove).toBeGreaterThanOrEqual(0);
+        expect(adxl_remove).toBeLessThan(uart_remove);
     });
 });
