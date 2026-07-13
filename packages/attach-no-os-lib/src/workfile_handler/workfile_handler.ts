@@ -85,9 +85,23 @@ export function clear_platform_ops(workfile: Workfile): void {
 
 // --- Symbol CRUD (user-created) ---
 
+const C_NAME_REGEX = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
+
+/**
+ * Validate that a name is a valid C identifier.
+ * `label` is used in the error message (e.g. "Symbol", "Descriptor name").
+ */
+export function validate_c_name(name: string, label = "Symbol", field?: string): Result<void> {
+    if (!C_NAME_REGEX.test(name)) {
+        return error(`${label} '${name}' is not a valid C name`, field);
+    }
+    return ok();
+}
+
 export function add_symbol(workfile: Workfile, name: string, ruleset: Ruleset): Result<Workfile> {
-    if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(name)) {
-        return error(`Symbol '${name}' is not a valid C name`);
+    const valid_name = validate_c_name(name);
+    if (!valid_name.ok) {
+        return valid_name;
     }
     if (name in workfile.symbols) {
         return error(`Symbol '${name}' already exists`, "name");
@@ -114,10 +128,10 @@ export function remove_symbol(workfile: Workfile, name: string): Result<void> {
     return ok();
 }
 
-// TODO: Unify C name validation regex with add_symbol
 export function rename_symbol(workfile: Workfile, old_name: string, new_name: string): Result<Workfile> {
-    if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(new_name)) {
-        return error(`Symbol '${new_name}' is not a valid C name`);
+    const valid_name = validate_c_name(new_name);
+    if (!valid_name.ok) {
+        return valid_name;
     }
     if (!(old_name in workfile.symbols)) {
         return error(`Symbol '${old_name}' not found`, "old_name");
@@ -158,8 +172,9 @@ export function set_descriptor_name(workfile: Workfile, symbol_name: string, des
     if (ruleset._t !== "RulesetStruct") {
         return error(`Symbol '${symbol_name}' is not a struct`, "symbol_name");
     }
-    if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(descriptor_name)) {
-        return error(`Descriptor name '${descriptor_name}' is not a valid C name`, "descriptor_name");
+    const valid_name = validate_c_name(descriptor_name, "Descriptor name", "descriptor_name");
+    if (!valid_name.ok) {
+        return valid_name;
     }
 
     // Check for uniqueness
