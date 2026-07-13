@@ -9,7 +9,7 @@ describe('IncludeDescriptorProperty parsing', () => {
 			expectOk(result);
 			expect(result.value._t).toBe('IncludeDescriptorProperty');
 			const property = result.value as IncludeDescriptorProperty;
-			expect(property.include_descriptor).toBe('no-os/no_os_spi_init_param.yaml');
+			expect(property.include_descriptor).toBe('no-os/spi/no_os_spi_init_param.yaml');
 			expect(property.pointer).toBe(true); // default is true for descriptors
 		});
 
@@ -17,7 +17,7 @@ describe('IncludeDescriptorProperty parsing', () => {
 			const result = loadAndParseProperty('properties/include_descriptor/valid_with_pointer_false.yaml');
 			expectOk(result);
 			const property = result.value as IncludeDescriptorProperty;
-			expect(property.include_descriptor).toBe('no-os/no_os_gpio_init_param.yaml');
+			expect(property.include_descriptor).toBe('no-os/gpio/no_os_gpio_init_param.yaml');
 			expect(property.pointer).toBe(false);
 			expect(property.description).toBe('GPIO descriptor (not a pointer)');
 		});
@@ -26,7 +26,7 @@ describe('IncludeDescriptorProperty parsing', () => {
 			const result = loadAndParseProperty('properties/include_descriptor/valid_with_description.yaml');
 			expectOk(result);
 			const property = result.value as IncludeDescriptorProperty;
-			expect(property.include_descriptor).toBe('no-os/no_os_spi_init_param.yaml');
+			expect(property.include_descriptor).toBe('no-os/spi/no_os_spi_init_param.yaml');
 			expect(property.pointer).toBe(true);
 			expect(property.description).toBe('Parent SPI descriptor for devices behind expanders');
 			expect(property.required).toBe(false);

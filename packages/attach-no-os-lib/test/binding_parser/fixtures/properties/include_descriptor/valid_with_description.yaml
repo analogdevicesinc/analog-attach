@@ -1,4 +1,4 @@
-include_descriptor: "no-os/no_os_spi_init_param.yaml"
+include_descriptor: "no-os/spi/no_os_spi_init_param.yaml"
 pointer: true
 description: "Parent SPI descriptor for devices behind expanders"
 required: false

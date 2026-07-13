@@ -42,7 +42,7 @@ describe('resolver', () => {
 
         test('keeps struct include as IncludeProperty', () => {
             const content = fs.readFileSync(
-                path.join(SCHEMAS_ROOT, 'no-os/no_os_spi_init_param.yaml'),
+                path.join(SCHEMAS_ROOT, 'no-os/spi/no_os_spi_init_param.yaml'),
                 'utf8'
             );
             const parsed = parse_ruleset(content);
@@ -93,7 +93,7 @@ describe('resolver', () => {
 
         test('returns error if schemas_path not set', () => {
             setup_no_config();
-            const result = load_resolved_ruleset('no-os/no_os_spi_init_param.yaml');
+            const result = load_resolved_ruleset('no-os/spi/no_os_spi_init_param.yaml');
             teardown_no_config();
             expect(result.ok).toBe(false);
             if (!result.ok) {

@@ -258,7 +258,7 @@ export function suggest_for_include(workfile: Workfile, include: IncludeProperty
     });
 }
 
-export function suggest_for_include_descriptor(workfile: Workfile, include_descriptor: IncludeDescriptorProperty): Result<PropertySuggestions> {
+export function suggest_for_include_descriptor(workfile: Workfile, include_descriptor: IncludeDescriptorProperty, exclude_symbol?: string): Result<PropertySuggestions> {
     const values: string[] = [];
 
     // Find all symbols whose schema matches the include_descriptor path
@@ -268,6 +268,10 @@ export function suggest_for_include_descriptor(workfile: Workfile, include_descr
             continue;
         }
         if (ruleset.$id !== include_descriptor.include_descriptor) {
+            continue;
+        }
+        // Never suggest a symbol's own descriptor — a self-reference is invalid.
+        if (name === exclude_symbol) {
             continue;
         }
         // Use the user-defined descriptor name or default
@@ -422,7 +426,7 @@ export function suggest_for_property(workfile: Workfile, symbol_name: string, pr
             return suggest_for_include(workfile, property);
         }
         case "IncludeDescriptorProperty": {
-            return suggest_for_include_descriptor(workfile, property);
+            return suggest_for_include_descriptor(workfile, property, symbol_name);
         }
         case "EnumProperty": {
             return suggest_for_enum(property);
