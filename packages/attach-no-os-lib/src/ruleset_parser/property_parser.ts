@@ -55,7 +55,7 @@ export function parse_number_property(name: string, object: Record<string, unkno
 		return default_;
 	}
 
-	// TODO: maybe make this an optionalWithDefault and subtract the value
+	// TODO: maybe make this an optionalWithDefault and figure out the value
 	const minimum = optional(object, "minimum", context, number_);
 	if (!minimum.ok) {
 		return minimum;

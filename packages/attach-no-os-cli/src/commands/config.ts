@@ -6,7 +6,8 @@ import {
     get_settings,
     set_setting_value,
     ok,
-    Result
+    Result,
+    get_settings_file_path
 } from "attach-no-os-lib";
 
 export const configCommand = buildCommand<{ json?: boolean; reset?: boolean }, [string | undefined, string | undefined]>({
@@ -96,7 +97,6 @@ export const configCommand = buildCommand<{ json?: boolean; reset?: boolean }, [
 				return;
 			}
 
-			// FIXME: I feel like this could be simplified
 			switch (key) {
 				case "no_os_path":
 				case "build_command":
@@ -170,7 +170,7 @@ function get_config_list(): Result<ConfigListOutput> {
 	}
 
 	return ok({
-		config_file: "test_path_might_remove_later", // FIXME: This is in the air for now
+		config_file: get_settings_file_path(),
 		settings: settings.value,
 	});
 }

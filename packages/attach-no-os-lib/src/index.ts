@@ -28,7 +28,14 @@ export {
     suggest_for_include
 } from "./workfile_handler/workfile_handler";
 export { scan_platform, scan_platforms } from "./workfile_handler/platform_scanner";
-export type { MinimalWorkfile, PlatformManifest, PlatformSpecs, Workfile, AvailableStructs, PropertySuggestions } from "./workfile_handler/types";
+export type {
+    MinimalWorkfile,
+    PlatformManifest,
+    PlatformSpecs,
+    Workfile,
+    AvailableStructs,
+    PropertySuggestions
+} from "./workfile_handler/types";
 export {
     get_settings,
     set_settings,

@@ -20,7 +20,6 @@ export function validate_workfile(workfile: Workfile): ValidationResult {
 			document: {}
 		};
 
-		// FIXME: Might want to move this to a more specialized location
 		for (const { directive } of child_overrides) {
 			if (directive._t === "OverrideMutex") {
 				errors.push(...validate_mutex(directive, ruleset, context));

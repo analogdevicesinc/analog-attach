@@ -129,7 +129,7 @@ export type OverrideSwitch = {
 export type OverrideCondition = {
 	scope: OverrideScope,
 	target: string,
-	value: unknown // FIXME: Does this need to be unknown?
+	value: unknown
 }
 
 export type OverrideIfThen = {
@@ -158,7 +158,6 @@ export type OverrideScope = "$parent" | "$this";
 
 export type OverrideDirective = OverrideSwitch | OverrideIfThen | OverrideStatic | OverrideMutex;
 
-// TODO: Figure out how to specify the spi/i2c etc types, these are too generic
 export enum RulesetType {
 	RT_STRUCT = "bt_struct",
 	RT_ENUM = "bt_enum",
@@ -199,7 +198,6 @@ type RulesetBase = {
 	$description: string,
 	$ranking: RulesetRank,
 	$sources: RulesetSources,
-	// TODO: add something like maintainer or edited_by?
 }
 
 export type RulesetEnum = RulesetBase & {
@@ -222,7 +220,6 @@ export type RulesetStruct = RulesetBase & {
 };
 
 export type RulesetPlatformOps = RulesetBase & {
-	// FIXME: Rename this type
 	_t: "RulesetPlatformOps",
 	$type: RulesetType.RT_PLATFORM_OPS,
 	$capability?: string,
