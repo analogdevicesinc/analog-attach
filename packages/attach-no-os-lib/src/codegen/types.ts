@@ -8,6 +8,7 @@ export type DeviceInfo = {
 	header: string;            // "adxl355.h"
 	init_code: string;         // rendered init.mustache
 	remove_code: string;       // rendered remove.mustache
+	capability?: string;       // $capability, e.g. "uart" / "irq"; used for init ordering
 };
 
 export type DescriptorInfo = {

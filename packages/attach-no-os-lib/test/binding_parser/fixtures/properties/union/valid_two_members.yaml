@@ -1,6 +1,6 @@
 type: union
 members:
   - spi_init:
-      include: "no-os/no_os_spi_init_param.yaml"
+      include: "no-os/spi/no_os_spi_init_param.yaml"
   - i2c_init:
-      include: "no-os/no_os_i2c_init_param.yaml"
+      include: "no-os/i2c/no_os_i2c_init_param.yaml"
