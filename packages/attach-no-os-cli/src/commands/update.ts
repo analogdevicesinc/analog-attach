@@ -17,6 +17,14 @@ import {
     format_property_list,
     format_property_details
 } from "./shared";
+import {
+    prior_positionals,
+    filter_completions,
+    get_node_names,
+    get_property_names,
+    get_value_suggestions,
+    get_union_value_suggestions
+} from "../completion/completion";
 
 export const updateCommand = buildCommand<
     { json?: boolean; rename?: string },
@@ -27,10 +35,33 @@ export const updateCommand = buildCommand<
         positional: {
             kind: "tuple",
             parameters: [
-                { placeholder: "node", brief: "Node name", optional: true, parse: String },
-                { placeholder: "property", brief: "Property name", optional: true, parse: String },
-                { placeholder: "value", brief: "Value (or union member)", optional: true, parse: String },
-                { placeholder: "union_value", brief: "Value for union member", optional: true, parse: String }
+                {
+                    placeholder: "node", brief: "Node name", optional: true, parse: String,
+                    proposeCompletions(partial: string) {
+                        return filter_completions(get_node_names(), partial);
+                    }
+                },
+                {
+                    placeholder: "property", brief: "Property name", optional: true, parse: String,
+                    proposeCompletions(partial: string) {
+                        const [node] = prior_positionals(this, 1);
+                        return filter_completions(get_property_names(node), partial);
+                    }
+                },
+                {
+                    placeholder: "value", brief: "Value (or union member)", optional: true, parse: String,
+                    proposeCompletions(partial: string) {
+                        const [node, property] = prior_positionals(this, 1);
+                        return filter_completions(get_value_suggestions(node, property), partial);
+                    }
+                },
+                {
+                    placeholder: "union_value", brief: "Value for union member", optional: true, parse: String,
+                    proposeCompletions(partial: string) {
+                        const [node, property, member] = prior_positionals(this, 1);
+                        return filter_completions(get_union_value_suggestions(node, property, member), partial);
+                    }
+                }
             ]
         },
         flags: {
