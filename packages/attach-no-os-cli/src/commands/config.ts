@@ -9,6 +9,12 @@ import {
     Result,
     get_settings_file_path
 } from "attach-no-os-lib";
+import {
+    prior_positionals,
+    filter_completions,
+    get_config_keys,
+    get_config_value_suggestions
+} from "../completion/completion";
 
 export const configCommand = buildCommand<{ json?: boolean; reset?: boolean }, [string | undefined, string | undefined]>({
 	docs: {
@@ -18,8 +24,19 @@ export const configCommand = buildCommand<{ json?: boolean; reset?: boolean }, [
 		positional: {
 			kind: "tuple",
 			parameters: [
-				{ placeholder: "key", brief: "Settings key", optional: true, parse: String },
-				{ placeholder: "value", brief: "Value to set", optional: true, parse: String }
+				{
+					placeholder: "key", brief: "Settings key", optional: true, parse: String,
+					proposeCompletions(partial: string) {
+						return filter_completions(get_config_keys(), partial);
+					}
+				},
+				{
+					placeholder: "value", brief: "Value to set", optional: true, parse: String,
+					proposeCompletions(partial: string) {
+						const [key] = prior_positionals(this, 1);
+						return filter_completions(get_config_value_suggestions(key), partial);
+					}
+				}
 			]
 		},
 		flags: {

@@ -10,6 +10,12 @@ import {
     get_node,
     get_node_property
 } from "./shared";
+import {
+    prior_positionals,
+    filter_completions,
+    get_node_names,
+    get_property_names
+} from "../completion/completion";
 
 export const validateCommand = buildCommand<
     { json?: boolean },
@@ -20,8 +26,19 @@ export const validateCommand = buildCommand<
         positional: {
             kind: "tuple",
             parameters: [
-                { placeholder: "node", brief: "Node name", optional: true, parse: String },
-                { placeholder: "property", brief: "Property name", optional: true, parse: String }
+                {
+                    placeholder: "node", brief: "Node name", optional: true, parse: String,
+                    proposeCompletions(partial: string) {
+                        return filter_completions(get_node_names(), partial);
+                    }
+                },
+                {
+                    placeholder: "property", brief: "Property name", optional: true, parse: String,
+                    proposeCompletions(partial: string) {
+                        const [node] = prior_positionals(this, 1);
+                        return filter_completions(get_property_names(node), partial);
+                    }
+                }
             ]
         },
         flags: {

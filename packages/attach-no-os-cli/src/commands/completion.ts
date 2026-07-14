@@ -18,8 +18,8 @@ const installCommand = buildCommand<{ json?: boolean; user?: boolean }, []>({
         }
     },
     func: async (flags) => {
-        const target_dir = flags.user ? USER_COMPLETION_DIR : SYSTEM_COMPLETION_DIR;
-        const target_path = path.join(target_dir, "aa");
+        const target_directory = flags.user ? USER_COMPLETION_DIR : SYSTEM_COMPLETION_DIR;
+        const target_path = path.join(target_directory, "aa");
 
         // Check if source script exists
         if (!fs.existsSync(COMPLETION_SCRIPT_PATH)) {
@@ -29,20 +29,22 @@ const installCommand = buildCommand<{ json?: boolean; user?: boolean }, []>({
             } else {
                 console.error(`Error: ${error}`);
             }
+            // eslint-disable-next-line unicorn/no-process-exit
             process.exit(1);
         }
 
         // Create target directory if needed (for user install)
-        if (flags.user && !fs.existsSync(target_dir)) {
+        if (flags.user && !fs.existsSync(target_directory)) {
             try {
-                fs.mkdirSync(target_dir, { recursive: true });
-            } catch (err) {
-                const error = `Failed to create directory ${target_dir}: ${err}`;
+                fs.mkdirSync(target_directory, { recursive: true });
+            } catch (error_) {
+                const error = `Failed to create directory ${target_directory}: ${error_}`;
                 if (flags.json) {
                     console.log(JSON.stringify({ ok: false, error }));
                 } else {
                     console.error(`Error: ${error}`);
                 }
+                // eslint-disable-next-line unicorn/no-process-exit
                 process.exit(1);
             }
         }
@@ -51,8 +53,8 @@ const installCommand = buildCommand<{ json?: boolean; user?: boolean }, []>({
         try {
             const script = fs.readFileSync(COMPLETION_SCRIPT_PATH, "utf8");
             fs.writeFileSync(target_path, script);
-        } catch (err) {
-            const is_permission_error = (err as NodeJS.ErrnoException).code === "EACCES";
+        } catch (error_) {
+            const is_permission_error = (error_ as NodeJS.ErrnoException).code === "EACCES";
             if (is_permission_error && !flags.user) {
                 const error = `Permission denied. Try with sudo or use --user for user-local install.`;
                 if (flags.json) {
@@ -62,13 +64,14 @@ const installCommand = buildCommand<{ json?: boolean; user?: boolean }, []>({
                     console.error(`\n  sudo aa completion install\n  or\n  aa completion install --user`);
                 }
             } else {
-                const error = `Failed to install completion script: ${err}`;
+                const error = `Failed to install completion script: ${error_}`;
                 if (flags.json) {
                     console.log(JSON.stringify({ ok: false, error }));
                 } else {
                     console.error(`Error: ${error}`);
                 }
             }
+            // eslint-disable-next-line unicorn/no-process-exit
             process.exit(1);
         }
 
@@ -91,8 +94,8 @@ const uninstallCommand = buildCommand<{ json?: boolean; user?: boolean }, []>({
         }
     },
     func: async (flags) => {
-        const target_dir = flags.user ? USER_COMPLETION_DIR : SYSTEM_COMPLETION_DIR;
-        const target_path = path.join(target_dir, "aa");
+        const target_directory = flags.user ? USER_COMPLETION_DIR : SYSTEM_COMPLETION_DIR;
+        const target_path = path.join(target_directory, "aa");
 
         if (!fs.existsSync(target_path)) {
             if (flags.json) {
@@ -105,8 +108,8 @@ const uninstallCommand = buildCommand<{ json?: boolean; user?: boolean }, []>({
 
         try {
             fs.unlinkSync(target_path);
-        } catch (err) {
-            const is_permission_error = (err as NodeJS.ErrnoException).code === "EACCES";
+        } catch (error_) {
+            const is_permission_error = (error_ as NodeJS.ErrnoException).code === "EACCES";
             if (is_permission_error && !flags.user) {
                 const error = `Permission denied. Try with sudo.`;
                 if (flags.json) {
@@ -116,13 +119,14 @@ const uninstallCommand = buildCommand<{ json?: boolean; user?: boolean }, []>({
                     console.error(`\n  sudo aa completion uninstall`);
                 }
             } else {
-                const error = `Failed to uninstall completion script: ${err}`;
+                const error = `Failed to uninstall completion script: ${error_}`;
                 if (flags.json) {
                     console.log(JSON.stringify({ ok: false, error }));
                 } else {
                     console.error(`Error: ${error}`);
                 }
             }
+            // eslint-disable-next-line unicorn/no-process-exit
             process.exit(1);
         }
 
