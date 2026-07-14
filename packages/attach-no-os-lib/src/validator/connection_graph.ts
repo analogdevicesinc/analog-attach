@@ -89,6 +89,18 @@ export function collect_child_overrides(symbol_name: string, workfile: Workfile,
 	const children = graph.get(symbol_name) ?? [];
 	const overrides: ChildOverride[] = [];
 
+	// The symbol's own $override directives apply to itself ($this scope). These
+	// must be collected too, otherwise a root symbol (one that nothing includes,
+	// e.g. a top-level device) would never have its own $this mutex/switch/if
+	// evaluated. The `child` field carries the symbol whose property values the
+	// $this scope reads from — for self-directives that is the symbol itself.
+	const self = workfile.symbols[symbol_name];
+	if (self && self._t === "RulesetStruct" && self.$override) {
+		for (const directive of self.$override) {
+			overrides.push({ directive, child: self });
+		}
+	}
+
 	for (const child_name of children) {
 		const child = workfile.symbols[child_name];
 		if (!child || child._t !== "RulesetStruct" || !child.$override) {

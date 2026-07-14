@@ -9,7 +9,6 @@ export type PropertyBase = {
 	disabled?: boolean, // NOTE: default is disabled: false
 	value?: any,
 	capability?: string[], // Platform capabilities required for this property
-	_platform_disabled?: boolean, // Internal: set by resolver when capability is missing, not parsed from ruleset
 }
 
 export type PrimitiveSymbol = PrimitiveCType["symbol"];

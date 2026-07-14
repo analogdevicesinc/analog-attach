@@ -60,7 +60,30 @@ export function apply_overrides(
 				break;
 			}
 			case "OverrideMutex": {
-				// NOTE: This case is handled separately in validation as it is simple
+				// The both-set-is-an-error case is reported by validate_mutex. Here we
+				// resolve the other half of the mutex: if this property belongs to the
+				// group, has no value of its own, but a sibling member does have a
+				// value, then this property is disabled — the user picked the sibling,
+				// so a `required` flag on this one must not fire. Only apply in the
+				// scope that actually constrains this symbol.
+				const is_self = child === parent_symbol;
+				const applies = directive.scope === "$this" ? is_self : !is_self;
+				if (!applies || !directive.properties.includes(property.name)) {
+					break;
+				}
+
+				// Values are read from the symbol being validated (parent_symbol in
+				// both enforced scopes: it is either the mutex's own struct or the parent).
+				const self_has_value = parent_symbol.properties
+					.find(p => p.name === property.name)?.value !== undefined;
+				const sibling_has_value = directive.properties.some(name =>
+					name !== property.name &&
+					parent_symbol.properties.find(p => p.name === name)?.value !== undefined
+				);
+
+				if (!self_has_value && sibling_has_value) {
+					effective.disabled = true;
+				}
 				break;
 			}
 		}
@@ -88,12 +111,22 @@ function evaluate_condition(
 export function validate_mutex(
 	mutex: OverrideMutex,
 	symbol: RulesetStruct,
+	declaring_child: RulesetStruct,
 	context: ParseContext
 ): ValidationError[] {
-	if (mutex.scope !== "$parent") {
-		return []; // $this is handled when validating the child
+	// A directive is "self-declared" when the symbol that declared it is the same
+	// one currently being validated. A $this mutex only constrains its own symbol;
+	// a $parent mutex only constrains the parent that includes the declaring child.
+	const is_self = declaring_child === symbol;
+	if (mutex.scope === "$this" && !is_self) {
+		return []; // $this mutex enforced only while validating its own symbol
+	}
+	if (mutex.scope === "$parent" && is_self) {
+		return []; // $parent mutex enforced only while validating the parent
 	}
 
+	// In both enforced cases the constrained properties live on `symbol` (the
+	// symbol being validated is either the mutex's own struct or the parent).
 	const properties_with_values = mutex.properties.filter(property_name => {
 		const property = symbol.properties.find(p => p.name === property_name);
 		return property?.value !== undefined;
