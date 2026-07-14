@@ -20,6 +20,11 @@ import {
     output,
     output_error
 } from "./shared";
+import {
+    filter_completions,
+    get_platform_names,
+    get_schema_paths
+} from "../completion/completion";
 
 // --- Create Workfile ---
 
@@ -84,7 +89,12 @@ const createWorkfileCommand = buildCommand<
             ]
         },
         flags: {
-            platform: { kind: "parsed", brief: "Target platform", optional: true, parse: String },
+            platform: {
+                kind: "parsed", brief: "Target platform", optional: true, parse: String,
+                proposeCompletions(partial: string) {
+                    return filter_completions(get_platform_names(), partial);
+                }
+            },
             json: { kind: "boolean", brief: "Output as JSON", optional: true }
         }
     },
@@ -190,7 +200,12 @@ const createNodeCommand = buildCommand<
             kind: "tuple",
             parameters: [
                 { placeholder: "name", brief: "Node name", optional: true, parse: String },
-                { placeholder: "schema", brief: "Schema path", optional: true, parse: String }
+                {
+                    placeholder: "schema", brief: "Schema path", optional: true, parse: String,
+                    proposeCompletions(partial: string) {
+                        return filter_completions(get_schema_paths(), partial);
+                    }
+                }
             ]
         },
         flags: {

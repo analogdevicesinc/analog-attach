@@ -12,4 +12,6 @@ _aa_complete() {
     COMPREPLY=($(compgen -W "${completions}" -- "${cur}"))
 }
 
-complete -F _aa_complete aa
+# -o nosort preserves the order emitted by `aa --complete` (workfile values and
+# command names first, --flags last) instead of bash re-sorting alphabetically.
+complete -o nosort -F _aa_complete aa
