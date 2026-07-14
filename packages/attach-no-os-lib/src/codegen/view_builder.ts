@@ -14,6 +14,7 @@ const CORE_UTIL_SRCS = [
 	"util/no_os_alloc.c",
 	"util/no_os_mutex.c",
 	"util/no_os_list.c",
+	"util/no_os_lf256fifo.c",
 ];
 
 const CORE_UTIL_INCS = [
