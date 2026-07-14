@@ -30,9 +30,9 @@ export function validate_workfile(workfile: Workfile): ValidationResult {
 			document: {}
 		};
 
-		for (const { directive } of child_overrides) {
+		for (const { directive, child } of child_overrides) {
 			if (directive._t === "OverrideMutex") {
-				errors.push(...validate_mutex(directive, ruleset, context));
+				errors.push(...validate_mutex(directive, ruleset, child, context));
 			}
 		}
 

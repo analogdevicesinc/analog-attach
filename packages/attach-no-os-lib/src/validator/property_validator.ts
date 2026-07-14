@@ -26,11 +26,14 @@ export function validate_property(
 ): ValidationError[] {
 	const property_context = at(context, property.name);
 
-	if (property.disabled) {
+	const effective = apply_overrides(property, child_overrides, parent_symbol);
+
+	// Check disabled AFTER applying overrides: a property may be disabled statically
+	// (disabled: true in the ruleset) or dynamically (e.g. the unchosen member of a
+	// mutex). Either way a disabled property is skipped, including its required check.
+	if (effective.disabled) {
 		return []; // NOTE: Disabled will not be taken into account
 	}
-
-	const effective = apply_overrides(property, child_overrides, parent_symbol);
 
 	if (effective.value === undefined) {
 		if (!effective.required) {
