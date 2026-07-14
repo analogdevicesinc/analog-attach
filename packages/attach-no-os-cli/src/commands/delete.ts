@@ -12,6 +12,10 @@ import {
     get_node_property,
     format_node_list
 } from "./shared";
+import {
+    filter_completions,
+    get_node_names
+} from "../completion/completion";
 
 export const deleteCommand = buildCommand<
     { json?: boolean; reset?: string },
@@ -22,7 +26,12 @@ export const deleteCommand = buildCommand<
         positional: {
             kind: "tuple",
             parameters: [
-                { placeholder: "node", brief: "Node name", optional: true, parse: String }
+                {
+                    placeholder: "node", brief: "Node name", optional: true, parse: String,
+                    proposeCompletions(partial: string) {
+                        return filter_completions(get_node_names(), partial);
+                    }
+                }
             ]
         },
         flags: {
