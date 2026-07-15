@@ -1,0 +1,13 @@
+# Child declares its own opt_a/opt_b and a $this mutex over them (left unset, so
+# satisfied). A parent that includes it and sets same-named props is unaffected.
+$id: "child.yaml"
+$type: struct
+$symbol: child
+$ranking: 4
+$sources: { noos: ["test.h"] }
+opt_a:
+  type: uint32_t
+opt_b:
+  type: uint32_t
+$override:
+  - $mutex: [opt_a, opt_b]

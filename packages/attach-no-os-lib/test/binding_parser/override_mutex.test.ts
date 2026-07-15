@@ -2,22 +2,28 @@ import { describe, test, expect } from 'vitest';
 import { expectOk, expectError, expectErrorContains, loadAndParseRuleset } from '../test_utilities';
 import { RulesetStruct } from '../../src/ruleset_parser/types';
 
-describe('OverrideMutex parsing', () => {
+// $mutex is not a special case: [a, b, ...] lowers to one rule per member,
+// `when hasValue(member) -> disable every sibling`. So N members -> N rules,
+// each with N-1 setDisabled effects.
+describe('mutex override lowering', () => {
 	describe('valid cases', () => {
-		test('parses mutex with two properties', () => {
+		test('lowers mutex with two properties to two disable-rules', () => {
 			const result = loadAndParseRuleset('overrides/mutex/valid_two_props.yaml');
 			expectOk(result);
 			const ruleset = result.value as RulesetStruct;
-			expect(ruleset.$override).toBeDefined();
-			expect(ruleset.$override).toHaveLength(1);
-			expect(ruleset.$override![0]._t).toBe('OverrideMutex');
+			expect(ruleset.rules).toHaveLength(2);
+			expect(ruleset.rules![0].when._t).toBe('PredicateHasValue');
+			expect(ruleset.rules![0].effects[0].op).toBe('setDisabled');
 		});
 
-		test('parses mutex with multiple properties', () => {
+		test('lowers mutex with multiple properties', () => {
 			const result = loadAndParseRuleset('overrides/mutex/valid_multiple_props.yaml');
 			expectOk(result);
 			const ruleset = result.value as RulesetStruct;
-			expect(ruleset.$override![0]._t).toBe('OverrideMutex');
+			// N members -> N rules, each disabling the other N-1.
+			const n = ruleset.rules!.length;
+			expect(n).toBeGreaterThanOrEqual(3);
+			expect(ruleset.rules![0].effects.length).toBe(n - 1);
 		});
 	});
 

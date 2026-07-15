@@ -2,24 +2,28 @@ import { describe, test, expect } from 'vitest';
 import { expectOk, expectError, expectErrorContains, loadAndParseRuleset } from '../test_utilities';
 import { RulesetStruct } from '../../src/ruleset_parser/types';
 
-describe('OverrideSwitch parsing', () => {
+// $switch fans out to one PredicateEquals rule per case, all sharing the $on ref.
+// No switch construct survives lowering.
+describe('switch override lowering', () => {
 	describe('valid cases', () => {
-		test('parses basic switch override', () => {
+		test('fans out cases to equals-rules', () => {
 			const result = loadAndParseRuleset('overrides/switch/valid_basic.yaml');
 			expectOk(result);
 			const ruleset = result.value as RulesetStruct;
-			expect(ruleset.$override).toBeDefined();
-			expect(ruleset.$override).toHaveLength(1);
-			expect(ruleset.$override![0]._t).toBe('OverrideSwitch');
+			expect(ruleset.rules).toBeDefined();
+			expect(ruleset.rules!.length).toBeGreaterThanOrEqual(1);
+			expect(ruleset.rules!.every(r => r.when._t === 'PredicateEquals')).toBe(true);
 		});
 
-		test('parses switch with parent scope', () => {
+		test('parent-scope switch resolves condition ref to parent', () => {
 			const result = loadAndParseRuleset('overrides/switch/valid_with_parent_scope.yaml');
 			expectOk(result);
 			const ruleset = result.value as RulesetStruct;
-			expect(ruleset.$override).toBeDefined();
-			expect(ruleset.$override![0]._t).toBe('OverrideSwitch');
-			expect(ruleset.$override![0].scope).toBe('$parent');
+			const when = ruleset.rules![0].when;
+			expect(when._t).toBe('PredicateEquals');
+			if (when._t === 'PredicateEquals') {
+				expect(when.reference.node).toBe('parent');
+			}
 		});
 	});
 

@@ -72,7 +72,6 @@ export type UnionProperty = PropertyBase & {
 export type PlatformOpsProperty = PropertyBase & {
     _t: "PlatformOpsProperty",
     type: "platform_ops",
-    target: string,
     allowed?: string[], // NOTE: Set by override only
 }
 
@@ -105,57 +104,41 @@ export type ArrayProperty = PropertyBase & {
 
 export type Property = NumberProperty | BooleanProperty | StringProperty | IncludeProperty | IncludeDescriptorProperty | EnumProperty | UnionProperty | ArrayProperty | PlatformOpsProperty | PlatformExtraProperty | CallbackFunctionProperty | CallbackContextProperty;
 
-export type TargetOverride = {
-	_t: "TargetOverride",
-	scope: OverrideScope,
-	target: string, // prop name
-	override: PropertyOverride
-}
-
-export type SwitchCase = {
-	_t: "SwitchCase",
-	condition: string,
-	overrides: TargetOverride[]
-}
-
-export type OverrideSwitch = {
-	_t: "OverrideSwitch",
-	scope: OverrideScope,
-	$on: string,
-	$cases: SwitchCase[],
-}
-
-export type OverrideCondition = {
-	scope: OverrideScope,
-	target: string,
-	value: unknown
-}
-
-export type OverrideIfThen = {
-	_t: "OverrideIfThen",
-	scope: OverrideScope,
-	condition: OverrideCondition,
-	overrides: TargetOverride[],
-}
-
-export type OverrideMutex = {
-	_t: "OverrideMutex",
-	scope: OverrideScope,
-	properties: string[]
-}
-
-export type OverrideStatic = {
-	_t: "OverrideStatic",
-	scope: OverrideScope,
-	target: string,
-	override: PropertyOverride
-}
-
-export type PropertyOverride<T extends Property = Property> = Partial<Omit<T, '_t' | 'type' | 'name'>>;
-
+// The authoring-surface scope tokens. The parser strips these into concrete
+// self/parent OverrideReference nodes during lowering.
 export type OverrideScope = "$parent" | "$this";
 
-export type OverrideDirective = OverrideSwitch | OverrideIfThen | OverrideStatic | OverrideMutex;
+// NOTE: Internal, new override resolution types
+export type OverrideReference = {
+	node: "self" | "parent",
+	property: string
+};
+
+export type OverridePredicate =
+	| { _t: "PredicateAlways" }
+	| { _t: "PredicateEquals", reference: OverrideReference, value: unknown }
+	| { _t: "PredicateHasValue", reference: OverrideReference }
+	| { _t: "PredicateAnd", predicates: OverridePredicate[] };
+
+export type Effect =
+      // merge effects
+      | { op: "setDefault",     reference: OverrideReference, value: unknown }
+      | { op: "setMin",         reference: OverrideReference, value: number }
+      | { op: "setMax",         reference: OverrideReference, value: number }
+      | { op: "setValue",       reference: OverrideReference, value: unknown }   // number/scalar only (C1)
+      | { op: "setRequired",    reference: OverrideReference, value: boolean }
+      | { op: "setDescription", reference: OverrideReference, value: string }
+      | { op: "setPointer",     reference: OverrideReference, value: boolean }
+      | { op: "setDisabled",    reference: OverrideReference, value: boolean, reason?: string }  // reason drives mutex errors (D2)
+      // validate effects
+      | { op: "restrictValues", reference: OverrideReference, values: EnumValue[] }  // enum
+      | { op: "selectMember",   reference: OverrideReference, member: string }       // union (validate, don't mutate)
+      | { op: "restrictAllowed", reference: OverrideReference, ids: string[] };      // include/descriptor/platform_ops/extra
+
+export type Rule = {
+	when: OverridePredicate,
+	effects: Effect[],
+};
 
 export enum RulesetType {
 	RT_STRUCT = "bt_struct",
@@ -210,7 +193,7 @@ export type RulesetStruct = RulesetBase & {
 	_t: "RulesetStruct",
 	$type: RulesetType.RT_STRUCT,
 	properties: Property[],
-	$override?: OverrideDirective[],
+	rules?: Rule[],
 	$requires?: string[], // Auto-computed: all capabilities required by properties
 	$capability?: string,
 	$header?: string,      // Device header path, e.g. "drivers/accel/adxl355/adxl355.h"

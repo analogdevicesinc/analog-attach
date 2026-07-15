@@ -1,0 +1,13 @@
+$id: "child.yaml"
+$type: struct
+$symbol: child
+$ranking: 4
+$sources: { noos: ["test.h"] }
+$override:
+  $parent:
+    - $if:
+        mode:
+          value: fast
+      $then:
+        speed:
+          minimum: 100

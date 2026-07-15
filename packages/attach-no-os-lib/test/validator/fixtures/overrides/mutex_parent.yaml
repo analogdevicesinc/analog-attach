@@ -1,0 +1,8 @@
+$id: "child.yaml"
+$type: struct
+$symbol: child
+$ranking: 4
+$sources: { noos: ["test.h"] }
+$override:
+  $parent:
+    - $mutex: [opt_a, opt_b]
