@@ -2,7 +2,6 @@ import { Workfile } from "../workfile_handler/types";
 import { ValidationError, ValidationResult } from "./types";
 import { ParseContext } from "../ruleset_parser/validators";
 import { validate_property } from "./property_validator";
-import { validate_mutex } from "./override_resolver";
 import { collect_child_overrides, create_connections_graph } from "./connection_graph";
 
 export function validate_workfile(workfile: Workfile): ValidationResult {
@@ -30,14 +29,8 @@ export function validate_workfile(workfile: Workfile): ValidationResult {
 			document: {}
 		};
 
-		for (const { directive, child } of child_overrides) {
-			if (directive._t === "OverrideMutex") {
-				errors.push(...validate_mutex(directive, ruleset, child, context));
-			}
-		}
-
 		for (const property of ruleset.properties) {
-			const property_errors = validate_property(property, child_overrides, ruleset, workfile, context);
+			const property_errors = validate_property(property, child_overrides, ruleset, symbol_name, workfile, context);
 			errors.push(...property_errors);
 		}
 	}

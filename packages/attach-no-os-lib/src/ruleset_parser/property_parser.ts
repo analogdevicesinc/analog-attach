@@ -411,11 +411,6 @@ export function parse_platform_ops_property(name: string, object: Record<string,
         return required_;
     }
 
-    const target = required(object, "target", context, string_);
-    if (!target.ok) {
-        return target;
-    }
-
     const capability = optional(object, "capability", context, capabilityArray);
     if (!capability.ok) {
         return capability;
@@ -427,7 +422,6 @@ export function parse_platform_ops_property(name: string, object: Record<string,
         type: "platform_ops",
         description: description.value,
         required: required_.value,
-        target: target.value,
         capability: capability.value,
     });
 }

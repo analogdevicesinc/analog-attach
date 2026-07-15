@@ -1,0 +1,12 @@
+# Child constrains its OWN device_id (max 4) via a $this override. A parent that
+# includes it and has a same-named device_id must stay unconstrained.
+$id: "child.yaml"
+$type: struct
+$symbol: child
+$ranking: 4
+$sources: { noos: ["test.h"] }
+device_id:
+  type: uint32_t
+$override:
+  - device_id:
+      maximum: 4

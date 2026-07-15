@@ -601,8 +601,7 @@ describe('workfile_handler', () => {
                 _t: "PlatformOpsProperty",
                 name: "platform_ops",
                 description: "",
-                type: "platform_ops",
-                target: "no_os_spi_ops"
+                type: "platform_ops"
             };
 
             const result = suggest_platform_ops(workfile, property, spi_struct);
@@ -626,7 +625,6 @@ describe('workfile_handler', () => {
                 name: "platform_ops",
                 description: "",
                 type: "platform_ops",
-                target: "no_os_spi_ops",
                 allowed: ["platforms/maxim/max32690/platform_ops/spi_ops.yaml"]
             };
 
