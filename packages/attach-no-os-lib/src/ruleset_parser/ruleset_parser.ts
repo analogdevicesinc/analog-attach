@@ -245,9 +245,9 @@ function parse_ruleset_from_object(object: Record<string, unknown>, context: Par
 				context.document.properties.push(property.value);
 			}
 
-			const $override = optional(object, "$override", context, is_override);
-			if (!$override.ok) {
-				return $override;
+			const rules = optional(object, "$override", context, is_override);
+			if (!rules.ok) {
+				return rules;
 			}
 
 			const $capability = optional(object, "$capability", context, string_);
@@ -285,7 +285,7 @@ function parse_ruleset_from_object(object: Record<string, unknown>, context: Par
 				$ranking: $ranking.value,
 				$sources: $sources.value,
 				properties: context.document.properties,
-				$override: $override.value,
+				rules: rules.value,
 				$requires,
 				$capability: $capability.value,
 				$header: $header.value,

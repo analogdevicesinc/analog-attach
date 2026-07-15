@@ -1,0 +1,14 @@
+# $on names a parent property that does not exist — the switch matches nothing.
+$id: "child.yaml"
+$type: struct
+$symbol: child
+$ranking: 4
+$sources: { noos: ["test.h"] }
+$override:
+  $parent:
+    - $switch:
+        $on: nonexistent
+        $cases:
+          fast:
+            speed:
+              minimum: 100

@@ -1,6 +1,9 @@
 import { describe, test, expect } from 'vitest';
 import path from 'node:path';
+import fs from 'node:fs';
 import { validate_workfile } from '../../src/validator/validator';
+import { parse_ruleset } from '../../src/ruleset_parser/ruleset_parser';
+import { expectOk } from '../test_utilities';
 import {
     RulesetStruct,
     RulesetType,
@@ -13,7 +16,6 @@ import {
     BooleanProperty,
     EnumProperty,
     StringProperty,
-    OverrideDirective,
     PlatformOpsProperty,
     PlatformExtraProperty
 } from '../../src/ruleset_parser/types';
@@ -24,8 +26,7 @@ import { load_platform } from '../../src/workfile_handler/workfile_handler';
 function make_struct(
     id: string,
     name: string,
-    properties: RulesetStruct['properties'] = [],
-    overrides?: OverrideDirective[]
+    properties: RulesetStruct['properties'] = []
 ): RulesetStruct {
     return {
         _t: "RulesetStruct",
@@ -36,8 +37,26 @@ function make_struct(
         $ranking: 4,
         $sources: { headers: ["test.h"] },
         properties,
-        $override: overrides,
     };
+}
+
+// Parse a child ruleset from a fixture so its $override block is lowered to real
+// rules[] by the actual parser — override tests exercise lowering + engine
+// end-to-end rather than hand-building internal Rule/Effect literals. The
+// resulting struct's property VALUES are then set from `values` (parsing does
+// not carry user values), so it behaves like a workfile instance.
+function parse_override_fixture(name: string, values: Record<string, unknown> = {}): RulesetStruct {
+    const yaml = fs.readFileSync(path.resolve(__dirname, 'fixtures/overrides', name), 'utf8');
+    const result = parse_ruleset(yaml);
+    expectOk(result);
+    const struct = result.value as RulesetStruct;
+    for (const [property_name, value] of Object.entries(values)) {
+        const property = struct.properties.find(p => p.name === property_name);
+        if (property) {
+            property.value = value;
+        }
+    }
+    return struct;
 }
 
 function make_number(name: string, options: Partial<NumberProperty> = {}): NumberProperty {
@@ -146,7 +165,6 @@ function make_platform_ops_property(name: string, options: Partial<PlatformOpsPr
         name,
         description: "",
         type: "platform_ops",
-        target: "test_ops",
         ...options,
     };
 }
@@ -509,16 +527,14 @@ describe('validate_workfile', () => {
         });
     });
 
+    // Override tests author the child ruleset as YAML and run it through the real
+    // parser, so the $override block is lowered end-to-end. The parent is built with
+    // the make_* helpers (it only needs property values) and links the child via an
+    // include. Refs in a child override resolve to: self = the child (my_child),
+    // parent = whatever includes it (my_parent).
     describe('static override validation', () => {
         test('$parent static override modifies constraints', () => {
-            const child = make_struct("child.yaml", "child", [], [
-                {
-                    _t: "OverrideStatic",
-                    scope: "$parent",
-                    target: "device_id",
-                    override: { maximum: 4 }
-                }
-            ]);
+            const child = parse_override_fixture("static_parent.yaml");
             const parent = make_struct("parent.yaml", "parent", [
                 make_number("device_id", { value: 5, maximum: 10 }),
                 make_include("extra", "child.yaml", { value: "my_child" })
@@ -537,14 +553,10 @@ describe('validate_workfile', () => {
         });
 
         test('$this static override does not affect parent', () => {
-            const child = make_struct("child.yaml", "child", [], [
-                {
-                    _t: "OverrideStatic",
-                    scope: "$this",
-                    target: "device_id",
-                    override: { maximum: 4 }
-                }
-            ]);
+            // Child has its OWN device_id constrained to max 4 via a $this override.
+            // The parent's same-named device_id (value 5) must stay unconstrained —
+            // if scope leaked, 5 > 4 would fail. Child's own device_id (0) satisfies 4.
+            const child = parse_override_fixture("static_this.yaml", { device_id: 0 });
             const parent = make_struct("parent.yaml", "parent", [
                 make_number("device_id", { value: 5, maximum: 10 }),
                 make_include("extra", "child.yaml", { value: "my_child" })
@@ -562,16 +574,7 @@ describe('validate_workfile', () => {
 
     describe('conditional override validation', () => {
         test('$if override applies when condition matches', () => {
-            const child = make_struct("child.yaml", "child", [], [
-                {
-                    _t: "OverrideIfThen",
-                    scope: "$parent",
-                    condition: { scope: "$parent", target: "mode", value: "fast" },
-                    overrides: [
-                        { _t: "TargetOverride", scope: "$parent", target: "speed", override: { minimum: 100 } }
-                    ]
-                }
-            ]);
+            const child = parse_override_fixture("if_parent.yaml");
             const parent = make_struct("parent.yaml", "parent", [
                 make_enum("mode", ["fast", "slow"], { value: "fast" }),
                 make_number("speed", { value: 50 }),
@@ -590,16 +593,7 @@ describe('validate_workfile', () => {
         });
 
         test('$if override does not apply when condition does not match', () => {
-            const child = make_struct("child.yaml", "child", [], [
-                {
-                    _t: "OverrideIfThen",
-                    scope: "$parent",
-                    condition: { scope: "$parent", target: "mode", value: "fast" },
-                    overrides: [
-                        { _t: "TargetOverride", scope: "$parent", target: "speed", override: { minimum: 100 } }
-                    ]
-                }
-            ]);
+            const child = parse_override_fixture("if_parent.yaml");
             const parent = make_struct("parent.yaml", "parent", [
                 make_enum("mode", ["fast", "slow"], { value: "slow" }),
                 make_number("speed", { value: 50 }),
@@ -618,13 +612,7 @@ describe('validate_workfile', () => {
 
     describe('mutex validation', () => {
         test('mutex with one value passes', () => {
-            const child = make_struct("child.yaml", "child", [], [
-                {
-                    _t: "OverrideMutex",
-                    scope: "$parent",
-                    properties: ["opt_a", "opt_b"]
-                }
-            ]);
+            const child = parse_override_fixture("mutex_parent.yaml");
             const parent = make_struct("parent.yaml", "parent", [
                 make_number("opt_a", { value: 1 }),
                 make_number("opt_b"),
@@ -641,13 +629,9 @@ describe('validate_workfile', () => {
         });
 
         test('mutex with multiple values fails', () => {
-            const child = make_struct("child.yaml", "child", [], [
-                {
-                    _t: "OverrideMutex",
-                    scope: "$parent",
-                    properties: ["opt_a", "opt_b"]
-                }
-            ]);
+            // Both opt_a and opt_b set: each disables the other, so both are
+            // disabled-but-set. The engine reports each with its mutex reason.
+            const child = parse_override_fixture("mutex_parent.yaml");
             const parent = make_struct("parent.yaml", "parent", [
                 make_number("opt_a", { value: 1 }),
                 make_number("opt_b", { value: 2 }),
@@ -661,19 +645,17 @@ describe('validate_workfile', () => {
 
             const result = validate_workfile(workfile);
             expect(result.valid).toBe(false);
-            expect(result.errors[0].message).toContain("Mutex");
-            expect(result.errors[0].message).toContain("opt_a");
-            expect(result.errors[0].message).toContain("opt_b");
+            const messages = result.errors.map(error => error.message).join(" | ");
+            expect(messages).toContain("mutually exclusive");
+            expect(messages).toContain("opt_a");
+            expect(messages).toContain("opt_b");
         });
 
         test('$this mutex does not affect parent', () => {
-            const child = make_struct("child.yaml", "child", [], [
-                {
-                    _t: "OverrideMutex",
-                    scope: "$this",
-                    properties: ["opt_a", "opt_b"]
-                }
-            ]);
+            // Child declares its own opt_a/opt_b and a $this mutex over them; both
+            // are left unset so the mutex is satisfied. The parent's same-named
+            // both-set properties are unaffected (no mutex on the parent).
+            const child = parse_override_fixture("mutex_this.yaml");
             const parent = make_struct("parent.yaml", "parent", [
                 make_number("opt_a", { value: 1 }),
                 make_number("opt_b", { value: 2 }),
@@ -692,29 +674,7 @@ describe('validate_workfile', () => {
 
     describe('switch override validation', () => {
         test('$switch override applies matching case', () => {
-            const child = make_struct("child.yaml", "child", [], [
-                {
-                    _t: "OverrideSwitch",
-                    scope: "$parent",
-                    $on: "mode",
-                    $cases: [
-                        {
-                            _t: "SwitchCase",
-                            condition: "fast",
-                            overrides: [
-                                { _t: "TargetOverride", scope: "$parent", target: "speed", override: { minimum: 100 } }
-                            ]
-                        },
-                        {
-                            _t: "SwitchCase",
-                            condition: "slow",
-                            overrides: [
-                                { _t: "TargetOverride", scope: "$parent", target: "speed", override: { maximum: 50 } }
-                            ]
-                        }
-                    ]
-                }
-            ]);
+            const child = parse_override_fixture("switch_parent.yaml");
             const parent = make_struct("parent.yaml", "parent", [
                 make_enum("mode", ["fast", "slow"], { value: "fast" }),
                 make_number("speed", { value: 50 }),
@@ -733,22 +693,7 @@ describe('validate_workfile', () => {
         });
 
         test('$switch override does not apply non-matching case', () => {
-            const child = make_struct("child.yaml", "child", [], [
-                {
-                    _t: "OverrideSwitch",
-                    scope: "$parent",
-                    $on: "mode",
-                    $cases: [
-                        {
-                            _t: "SwitchCase",
-                            condition: "fast",
-                            overrides: [
-                                { _t: "TargetOverride", scope: "$parent", target: "speed", override: { minimum: 100 } }
-                            ]
-                        }
-                    ]
-                }
-            ]);
+            const child = parse_override_fixture("switch_parent_single.yaml");
             const parent = make_struct("parent.yaml", "parent", [
                 make_enum("mode", ["fast", "slow"], { value: "slow" }),
                 make_number("speed", { value: 50 }),
@@ -765,24 +710,7 @@ describe('validate_workfile', () => {
         });
 
         test('$switch with $this scope checks child property', () => {
-            const child = make_struct("child.yaml", "child", [
-                make_enum("child_mode", ["a", "b"], { value: "a" })
-            ], [
-                {
-                    _t: "OverrideSwitch",
-                    scope: "$this",
-                    $on: "child_mode",
-                    $cases: [
-                        {
-                            _t: "SwitchCase",
-                            condition: "a",
-                            overrides: [
-                                { _t: "TargetOverride", scope: "$parent", target: "speed", override: { minimum: 100 } }
-                            ]
-                        }
-                    ]
-                }
-            ]);
+            const child = parse_override_fixture("switch_this.yaml", { child_mode: "a" });
             const parent = make_struct("parent.yaml", "parent", [
                 make_number("speed", { value: 50 }),
                 make_include("extra", "child.yaml", { value: "my_child" })
@@ -799,22 +727,7 @@ describe('validate_workfile', () => {
         });
 
         test('$switch skips when $on property not found', () => {
-            const child = make_struct("child.yaml", "child", [], [
-                {
-                    _t: "OverrideSwitch",
-                    scope: "$parent",
-                    $on: "nonexistent",
-                    $cases: [
-                        {
-                            _t: "SwitchCase",
-                            condition: "fast",
-                            overrides: [
-                                { _t: "TargetOverride", scope: "$parent", target: "speed", override: { minimum: 100 } }
-                            ]
-                        }
-                    ]
-                }
-            ]);
+            const child = parse_override_fixture("switch_missing_on.yaml");
             const parent = make_struct("parent.yaml", "parent", [
                 make_number("speed", { value: 50 }),
                 make_include("extra", "child.yaml", { value: "my_child" })
@@ -832,16 +745,7 @@ describe('validate_workfile', () => {
 
     describe('conditional override edge cases', () => {
         test('$if skips when condition target not found', () => {
-            const child = make_struct("child.yaml", "child", [], [
-                {
-                    _t: "OverrideIfThen",
-                    scope: "$parent",
-                    condition: { scope: "$parent", target: "nonexistent", value: "x" },
-                    overrides: [
-                        { _t: "TargetOverride", scope: "$parent", target: "speed", override: { minimum: 100 } }
-                    ]
-                }
-            ]);
+            const child = parse_override_fixture("if_missing_target.yaml");
             const parent = make_struct("parent.yaml", "parent", [
                 make_number("speed", { value: 50 }),
                 make_include("extra", "child.yaml", { value: "my_child" })

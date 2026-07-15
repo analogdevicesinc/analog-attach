@@ -1,7 +1,7 @@
 import { Property } from "../ruleset_parser/types";
 import { Workfile } from "../workfile_handler/types";
 import { find_symbol_by_descriptor } from "../workfile_handler/utils";
-import { ChildOverride, ConnectionGraph } from "./types";
+import { CollectedRule, ConnectionGraph } from "./types";
 import { load_resolved_ruleset } from "../resolver/resolver";
 
 function get_connected_symbols(property: Property, workfile: Workfile): string[] {
@@ -85,32 +85,47 @@ export function is_referenced_by_others(symbol_name: string, graph: ConnectionGr
 	return false;
 }
 
-export function collect_child_overrides(symbol_name: string, workfile: Workfile, graph: ConnectionGraph): ChildOverride[] {
-	const children = graph.get(symbol_name) ?? [];
-	const overrides: ChildOverride[] = [];
+// The first symbol that includes `symbol_name` (decision: assume single parent).
+// A rule declared on X that references `parent` reads from / writes to this symbol.
+function find_includer(symbol_name: string, graph: ConnectionGraph): string | undefined {
+	for (const [candidate, children] of graph.entries()) {
+		if (children.includes(symbol_name)) {
+			return candidate;
+		}
+	}
+	return undefined;
+}
 
-	// The symbol's own $override directives apply to itself ($this scope). These
-	// must be collected too, otherwise a root symbol (one that nothing includes,
-	// e.g. a top-level device) would never have its own $this mutex/switch/if
-	// evaluated. The `child` field carries the symbol whose property values the
-	// $this scope reads from — for self-directives that is the symbol itself.
+// Collect every rule that can affect `symbol_name`, with its refs pre-resolved to
+// concrete symbol names. A rule declared on symbol D has self = D and parent =
+// D's includer; it affects `symbol_name` when `symbol_name` is D itself (self
+// effects) or D's includer (parent effects). We therefore gather rules from two
+// sources:
+//   1. `symbol_name`'s own rules   — self = symbol_name, parent = its includer
+//   2. each child's rules          — self = child,       parent = symbol_name
+// resolving both refs once here (decision: resolve at collection time) so
+// apply_overrides never re-decides scope.
+export function collect_child_overrides(symbol_name: string, workfile: Workfile, graph: ConnectionGraph): CollectedRule[] {
+	const collected: CollectedRule[] = [];
+
 	const self = workfile.symbols[symbol_name];
-	if (self && self._t === "RulesetStruct" && self.$override) {
-		for (const directive of self.$override) {
-			overrides.push({ directive, child: self });
+	if (self && self._t === "RulesetStruct" && self.rules) {
+		const parent_symbol = find_includer(symbol_name, graph);
+		for (const rule of self.rules) {
+			collected.push({ rule, self_symbol: symbol_name, parent_symbol });
 		}
 	}
 
-	for (const child_name of children) {
+	for (const child_name of graph.get(symbol_name) ?? []) {
 		const child = workfile.symbols[child_name];
-		if (!child || child._t !== "RulesetStruct" || !child.$override) {
+		if (!child || child._t !== "RulesetStruct" || !child.rules) {
 			continue;
 		}
 
-		for (const directive of child.$override) {
-			overrides.push({directive, child });
+		for (const rule of child.rules) {
+			collected.push({ rule, self_symbol: child_name, parent_symbol: symbol_name });
 		}
 	}
 
-	return overrides;
+	return collected;
 }

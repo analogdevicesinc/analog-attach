@@ -1,634 +1,285 @@
 import { error, ok, Result } from "./result";
 import {
-	BooleanProperty,
-	EnumProperty,
-	IncludeProperty,
-	NumberProperty,
-	OverrideDirective,
+	Effect,
+	OverridePredicate,
+	OverrideReference,
 	OverrideScope,
-	PropertyBase,
-	PropertyOverride,
-	UnionProperty,
-	TargetOverride,
-	SwitchCase,
-	Property
+	Property,
+	Rule,
 } from "./types";
-import { required, asObject, at, boolean_, number_, ParseContext, string_, stringArray } from "./validators";
+import { lower_condition, lower_effects } from "./override_model";
+import { asObject, at, ParseContext, required, string_ } from "./validators";
 
-function is_number_property_override(
-	object: Record<string, unknown>,
-	context: ParseContext,
-	property: NumberProperty
-): Result<PropertyOverride<NumberProperty>> {
-	const override: PropertyOverride<NumberProperty> = {};
-
-	if ("minimum" in object) {
-		const min = number_(object.minimum, at(context, "minimum"));
-		if (!min.ok) {return min;}
-		if (property.minimum !== undefined && min.value < property.minimum) {
-			return error(
-				`minimum ${min.value} below type minimum ${property.minimum}`,
-				at(context, "minimum").path
-			);
-		}
-		override.minimum = min.value;
-	}
-
-	if ("maximum" in object) {
-		const max = number_(object.maximum, at(context, "maximum"));
-		if (!max.ok) {return max;}
-		if (property.maximum !== undefined && max.value > property.maximum) {
-			return error(
-				`maximum ${max.value} above type maximum ${property.maximum}`,
-				at(context, "maximum").path
-			);
-		}
-		override.maximum = max.value;
-	}
-
-	if ("default" in object) {
-		const default_ = number_(object.default, at(context, "default"));
-		if (!default_.ok) {return default_;}
-		override.default = default_.value;
-	}
-
-	const common = parse_common_override_fields(object, context);
-	if (!common.ok) {return common;}
-
-	return ok({ ...override, ...common.value });
+// $this refers to the declaring symbol's own property (self); $parent refers to
+// a symbol that includes the declaring symbol. The YAML $this/$parent tokens are
+// the authoring surface; once lowered, every reference is a plain {node, property}
+// relative pointer that the engine resolves to concrete symbols exactly once.
+function scope_to_node(scope: OverrideScope): OverrideReference["node"] {
+	return scope === "$parent" ? "parent" : "self";
 }
 
-function is_enum_property_override(
-	object: Record<string, unknown>,
-	context: ParseContext,
-	property: EnumProperty
-): Result<PropertyOverride<EnumProperty>> {
-	const override: PropertyOverride<EnumProperty> = {};
-
-	if ("default" in object) {
-		const default_ = string_(object.default, at(context, "default"));
-		if (!default_.ok) {return default_;}
-		if (!property.values.includes(default_.value)) {
-			return error(
-				`Invalid default '${default_.value}'. Valid: ${property.values.join(", ")}`,
-				at(context, "default").path
-			);
-		}
-		override.default = default_.value;
-	}
-
-	if ("values" in object) {
-		const vals = stringArray(object.values, at(context, "values"));
-		if (!vals.ok) {return vals;}
-		override.values = vals.value;
-	}
-
-	const common = parse_common_override_fields(object, context);
-	if (!common.ok) {return common;}
-
-	return ok({ ...override, ...common.value });
-}
-
-function is_union_property_override(
-	object: Record<string, unknown>,
-	context: ParseContext,
-	property: UnionProperty
-): Result<PropertyOverride<UnionProperty>> {
-	const override: PropertyOverride<UnionProperty> = {};
-
-	if ("value" in object) {
-		const value = string_(object.value, at(context, "value"));
-		if (!value.ok) {return value;}
-		const members = property.members.map(m => m.name);
-		if (!members.includes(value.value)) {
-			return error(
-				`Invalid union member '${value.value}'. Valid: ${members.join(", ")}`,
-				at(context, "value").path
-			);
-		}
-		override.value = value.value;
-	}
-
-	const common = parse_common_override_fields(object, context);
-	if (!common.ok) {return common;}
-
-	return ok({ ...override, ...common.value });
-}
-
-function is_boolean_property_override(
-	object: Record<string, unknown>,
-	context: ParseContext,
-	_property: BooleanProperty
-): Result<PropertyOverride<BooleanProperty>> {
-	const override: PropertyOverride<BooleanProperty> = {};
-
-	if ("default" in object) {
-		const default_ = boolean_(object.default, at(context, "default"));
-		if (!default_.ok) {return default_;}
-		override.default = default_.value;
-	}
-
-	const common = parse_common_override_fields(object, context);
-	if (!common.ok) {return common;}
-
-	return ok({ ...override, ...common.value });
-}
-
-function is_include_property_override(
-	object: Record<string, unknown>,
-	context: ParseContext,
-	_property: IncludeProperty
-): Result<PropertyOverride<IncludeProperty>> {
-	const override: PropertyOverride<IncludeProperty> = {};
-
-	if ("pointer" in object) {
-		const ptr = boolean_(object.pointer, at(context, "pointer"));
-		if (!ptr.ok) {return ptr;}
-		override.pointer = ptr.value;
-	}
-
-	const common = parse_common_override_fields(object, context);
-	if (!common.ok) {return common;}
-
-	return ok({ ...override, ...common.value });
-}
-
-function parse_common_override_fields(
-	object: Record<string, unknown>,
-	context: ParseContext
-): Result<Partial<Pick<PropertyBase, 'description' | 'required'>>> {
-	const result: Partial<Pick<PropertyBase, 'description' | 'required'>> = {};
-
-	if ("description" in object) {
-		const desc = string_(object.description, at(context, "description"));
-		if (!desc.ok) {return desc;}
-		result.description = desc.value;
-	}
-
-	if ("required" in object) {
-		const request = boolean_(object.required, at(context, "required"));
-		if (!request.ok) {return request;}
-		result.required = request.value;
-	}
-
-	return ok(result);
-}
-
-function is_override_mutex(value: Record<string, unknown>, context: ParseContext, scope: OverrideScope): Result<OverrideDirective> {
-	const $mutex = value["$mutex"];
-
-	if (!Array.isArray($mutex)) {
-		return error("$mutex must be an array of property names", at(context, "$mutex").path);
-	}
-
-	const mutex_context: ParseContext = {
-		path: at(context, "$mutex").path,
-		document: context.document
-	};
-
-	const properties: string[] = [];
-
-	for (const [index, item] of $mutex.entries()) {
-		if (typeof item !== "string") {
-			return error(`Expected string, got ${typeof item}`, at(mutex_context, index).path);
-		}
-
-		const property = require_property(context, item, scope);
-		if (!property.ok) {
-			return property;
-		}
-
-		properties.push(item);
-	}
-
-	if (properties.length < 2) {
-		return error("$mutex must have at least 2 properties", mutex_context.path);
-	}
-
-	return ok({
-		_t: "OverrideMutex",
-		scope: scope,
-		properties: properties
-	});
-}
-
-function is_property_override(
-	value: unknown,
-	context: ParseContext,
-	scope: OverrideScope,
-	property?: Property
-): Result<PropertyOverride> {
-	const object = asObject(value, context);
-	if (!object.ok) {
-		return object;
-	}
-
-	// NOTE : $parent scope will be checked in validator
-	if (scope === "$parent" || !property) {
-		return ok(object.value as PropertyOverride);
-	}
-
-	switch (property?._t) {
-		case "NumberProperty": {
-			return is_number_property_override(object.value, context, property);
-		}
-		case "BooleanProperty": {
-			return is_boolean_property_override(object.value, context, property);
-		}
-		case "IncludeProperty": {
-			return is_include_property_override(object.value, context, property);
-		}
-		case "EnumProperty": {
-			return is_enum_property_override(object.value, context, property);
-		}
-		case "UnionProperty": {
-			return is_union_property_override(object.value, context, property);
-		}
-		default: {
-			return error("Unknown property type", context.path);
-		}
-	}
-}
-
-function is_override_static(value: Record<string, unknown>, context: ParseContext, scope: OverrideScope): Result<OverrideDirective> {
-	const keys = Object.keys(value);
-	if (keys.length !== 1) {
-		return error("Static override must have exactly one property key", context.path);
-	}
-
-	const target_name = keys[0];
-	const override_value = value[target_name];
-
-	const target_property = require_property(context, target_name, scope);
-	if (!target_property.ok) {
-		return target_property;
-	}
-
-	const override_context: ParseContext = {
-		path: at(context, target_name).path,
-		document: context.document,
-	};
-
-	const override = is_property_override(override_value, override_context, scope, target_property.value);
-	if (!override.ok) {
-		return override;
-	}
-
-	return ok({
-		_t: "OverrideStatic",
-		scope: scope,
-		target: target_name,
-		override: override.value
-	});
-}
-
-export function require_property(context: ParseContext, name: string, scope: OverrideScope): Result<Property> {
+// Resolve a property name against the declaring document. $this targets must name
+// a real local property; $parent targets cannot be resolved here (the parent is
+// whatever device includes this symbol later), so they return ok(undefined) and
+// their type-relative checks are deferred to the engine.
+function require_property(context: ParseContext, name: string, scope: OverrideScope): Result<Property> {
 	if (scope === "$parent") {
-		// NOTE: This is a local validation, cannot check the props of the parent
-		// Assuming ok
 		return ok();
 	}
 
 	const property = context.document.properties?.find(p => p.name === name);
 	if (!property) {
 		const known = context.document.properties?.map(p => p.name).join(", ") ?? "none";
-		return error(`Unknown property '${name}'. Known: ${known}`, at(context, "$on").path);
+		return error(`Unknown property '${name}'. Known: ${known}`, at(context, name).path);
 	}
 	return ok(property);
 }
 
-function parse_targeted_override(
-	target_name: string,
-	value: unknown,
-	context: ParseContext,
-	scope: OverrideScope
-): Result<TargetOverride> {
-	const target_property = require_property(context, target_name, scope);
-	if (!target_property.ok) {
-		return target_property;
-	}
-
-	const override_context: ParseContext = {
-		path: at(context, target_name).path,
-		document: context.document
-	};
-
-	const override = is_property_override(value, override_context, scope, target_property.value);
-	if (!override.ok) {
-		return override;
-	}
-
-	return ok({
-		_t: "TargetOverride",
-		scope,
-		target: target_name,
-		override: override.value
-	});
-}
-
-function parse_case_body(
+// A body is the shared shape of a $then block, a $switch case, and a static
+// directive: an object whose keys are either $this/$parent scope selectors (which
+// recurse with a new scope) or property names (which lower to effects). This is
+// the single place target scope is decided for effects.
+function lower_effects_body(
 	object: Record<string, unknown>,
 	context: ParseContext,
-	default_scope: OverrideScope
-): Result<TargetOverride[]> {
-	const overrides: TargetOverride[] = [];
+	scope: OverrideScope,
+): Result<Effect[]> {
+	const effects: Effect[] = [];
 
 	for (const [key, value] of Object.entries(object)) {
-		// Scope selector, parse nested overrides with that scope
-		if (key === "$parent" || key === "$this") {
-			const scope = key as OverrideScope;
-			const nested_object = asObject(value, at(context, key));
-			if (!nested_object.ok) {
-				return nested_object;
-			}
+		if (key === "$this" || key === "$parent") {
+			const nested = asObject(value, at(context, key));
+			if (!nested.ok) { return nested; }
 
-			const nested_context: ParseContext = {
-				path: at(context, key).path,
-				document: context.document
-			};
-
-			for (const [target_name, override_value] of Object.entries(nested_object.value)) {
-				const targeted = parse_targeted_override(
-					target_name,
-					override_value,
-					nested_context,
-					scope
-				);
-				if (!targeted.ok) {
-					return targeted;
-				}
-				overrides.push(targeted.value);
-			}
-		} else {
-			// Direct override - use default scope
-			const targeted = parse_targeted_override(
-				key,
-				value,
-				context,
-				default_scope
-			);
-			if (!targeted.ok) {
-				return targeted;
-			}
-			overrides.push(targeted.value);
+			const nested_effects = lower_effects_body(nested.value, at(context, key), key);
+			if (!nested_effects.ok) { return nested_effects; }
+			effects.push(...nested_effects.value);
+			continue;
 		}
+
+		const target_property = require_property(context, key, scope);
+		if (!target_property.ok) { return target_property; }
+
+		const override_object = asObject(value, at(context, key));
+		if (!override_object.ok) { return override_object; }
+
+		const reference: OverrideReference = { node: scope_to_node(scope), property: key };
+		const lowered = lower_effects(override_object.value, reference, at(context, key), target_property.value);
+		if (!lowered.ok) { return lowered; }
+		effects.push(...lowered.value);
 	}
 
-	return ok(overrides);
+	return ok(effects);
 }
 
-function is_override_if_then(value: Record<string, unknown>, context: ParseContext, scope: OverrideScope): Result<OverrideDirective> {
-	const object = asObject(value["$if"], at(context, "$if"));
-	if (!object.ok) {
-		return object;
-	}
+// Symmetric to lower_effects_body, but for the condition side of a $if. Multiple
+// property tests AND together (P1: PredicateAnd); condition scope is independent
+// of effect scope, and both inherit the enclosing directive scope by default.
+function lower_condition_body(
+	object: Record<string, unknown>,
+	context: ParseContext,
+	scope: OverrideScope,
+): Result<OverridePredicate> {
+	const predicates: OverridePredicate[] = [];
 
-	const if_context: ParseContext = {
-		path: at(context, "$if").path,
-		document: context.document
-	};
+	for (const [key, value] of Object.entries(object)) {
+		if (key === "$this" || key === "$parent") {
+			const nested = asObject(value, at(context, key));
+			if (!nested.ok) { return nested; }
 
-	let condition_scope = scope;
-	let condition_container = object.value;
-	if ("$this" in object.value) {
-		condition_scope = "$this";
-		const inner = asObject(object.value["$this"], at(if_context, "$this"));
-		if (!inner.ok) {
-			return inner;
+			const nested_predicate = lower_condition_body(nested.value, at(context, key), key);
+			if (!nested_predicate.ok) { return nested_predicate; }
+			predicates.push(nested_predicate.value);
+			continue;
 		}
-		condition_container = inner.value;
-	} else if ("$parent" in object.value) {
-		condition_scope = "$parent";
-		const inner = asObject(object.value["$parent"], at(if_context, "$parent"));
-		if (!inner.ok) {
-			return inner;
-		}
-		condition_container = inner.value;
+
+		const target_property = require_property(context, key, scope);
+		if (!target_property.ok) { return target_property; }
+
+		const operator_object = asObject(value, at(context, key));
+		if (!operator_object.ok) { return operator_object; }
+
+		const reference: OverrideReference = { node: scope_to_node(scope), property: key };
+		const predicate = lower_condition(operator_object.value, reference, at(context, key));
+		if (!predicate.ok) { return predicate; }
+		predicates.push(predicate.value);
 	}
 
-	const if_keys = Object.keys(condition_container);
-	if (if_keys.length !== 1) {
-		return error("$if must have exactly one property condition", if_context.path);
+	if (predicates.length === 0) {
+		return error("Condition must specify at least one property", context.path);
 	}
-
-	const condition_target = if_keys[0];
-	const condition_value = condition_container[condition_target];
-
-	const condition_property = require_property(context, condition_target, condition_scope);
-	if (!condition_property.ok) {
-		return condition_property;
+	if (predicates.length === 1) {
+		return ok(predicates[0]);
 	}
-
-	const condition_object = asObject(condition_value, at(if_context, condition_target));
-	if (!condition_object.ok) {
-		return condition_object;
-	}
-
-	const then = asObject(value["$then"], at(context, "$then"));
-	if (!then.ok) {
-		return then;
-	}
-
-	const expected_value = condition_object.value["value"];
-	if (expected_value === undefined) {
-		// TODO: This is temp, in theory, the condition value could also be a minimum, maximum, etc...
-		return error("Condition myst have a 'value' field",at(if_context, condition_target).path);
-	}
-
-	const then_context: ParseContext = {
-		path: at(context, "$then").path,
-		document: context.document
-	};
-
-	const then_overrides = parse_case_body(then.value, then_context, scope);
-	if (!then_overrides.ok) {
-		return then_overrides;
-	}
-
-	return ok({
-		_t: "OverrideIfThen",
-		scope: scope,
-		condition: {
-			scope: condition_scope,
-			target: condition_target,
-			value: expected_value
-		},
-		overrides: then_overrides.value
-	});
+	return ok({ _t: "PredicateAnd", predicates });
 }
 
-function is_override_switch(value: Record<string, unknown>, context: ParseContext, scope: OverrideScope): Result<OverrideDirective> {
-	const object = asObject(value["$switch"], at(context, "$switch"));
-	if (!object.ok) {
-		return object;
-	}
+// Static directive: no condition, always applies.
+function lower_static(object: Record<string, unknown>, context: ParseContext, scope: OverrideScope): Result<Rule[]> {
+	const effects = lower_effects_body(object, context, scope);
+	if (!effects.ok) { return effects; }
+	return ok([{ when: { _t: "PredicateAlways" }, effects: effects.value }]);
+}
 
-	const switch_context: ParseContext = {
-		path: at(context, "$switch").path,
-		document: context.document
-	};
+// $if/$then: one rule whose `when` is the lowered condition and whose effects are
+// the lowered $then body. Condition and effect scopes are independent.
+function lower_if_then(object: Record<string, unknown>, context: ParseContext, scope: OverrideScope): Result<Rule[]> {
+	const if_object = asObject(object["$if"], at(context, "$if"));
+	if (!if_object.ok) { return if_object; }
 
-	const $on = required(object.value, "$on", switch_context, string_);
-	if (!$on.ok) {
-		return $on;
-	}
+	const when = lower_condition_body(if_object.value, at(context, "$if"), scope);
+	if (!when.ok) { return when; }
 
-	const switch_property = require_property(context, $on.value, scope);
-	if (!switch_property.ok) {
-		return switch_property;
-	}
+	const then_object = asObject(object["$then"], at(context, "$then"));
+	if (!then_object.ok) { return then_object; }
 
-	// Parse cases
-	const $cases = required(object.value, "$cases", switch_context, asObject);
-	if (!$cases.ok) {
-		return $cases;
-	}
+	const effects = lower_effects_body(then_object.value, at(context, "$then"), scope);
+	if (!effects.ok) { return effects; }
 
-	const cases_context: ParseContext = {
-		path: at(switch_context, "$cases").path,
-		document: switch_context.document
-	};
+	return ok([{ when: when.value, effects: effects.value }]);
+}
 
-	const parsed_cases: SwitchCase[] = [];
+// $switch fans out to N equals-rules sharing the $on reference (P2): each case
+// becomes Rule{ when: equals(<on>, caseName), effects: <case body> }. No switch
+// construct survives lowering.
+function lower_switch(object: Record<string, unknown>, context: ParseContext, scope: OverrideScope): Result<Rule[]> {
+	const switch_object = asObject(object["$switch"], at(context, "$switch"));
+	if (!switch_object.ok) { return switch_object; }
+
+	const $on = required(switch_object.value, "$on", at(context, "$switch"), string_);
+	if (!$on.ok) { return $on; }
+
+	const on_property = require_property(context, $on.value, scope);
+	if (!on_property.ok) { return on_property; }
+
+	const $cases = required(switch_object.value, "$cases", at(context, "$switch"), asObject);
+	if (!$cases.ok) { return $cases; }
+
+	const cases_context = at(at(context, "$switch"), "$cases");
+	const on_reference: OverrideReference = { node: scope_to_node(scope), property: $on.value };
+	const rules: Rule[] = [];
 
 	for (const [case_name, case_value] of Object.entries($cases.value)) {
-		// Validate case name against enum values (only for $this scope with EnumProperty)
-		if (scope === "$this" && switch_property.value?._t === "EnumProperty" && !switch_property.value.values.includes(case_name)) {
+		if (scope === "$this" && on_property.value?._t === "EnumProperty" && !on_property.value.values.includes(case_name)) {
 			return error(
-				`Invalid case '${case_name}'. Valid values: ${switch_property.value.values.join(", ")}`,
+				`Invalid case '${case_name}'. Valid values: ${on_property.value.values.join(", ")}`,
 				at(cases_context, case_name).path
 			);
 		}
 
 		const case_object = asObject(case_value, at(cases_context, case_name));
-		if (!case_object.ok) {
-			return case_object;
-		}
+		if (!case_object.ok) { return case_object; }
 
-		const case_context: ParseContext = {
-			path: at(cases_context, case_name).path,
-			document: context.document
-		};
+		const effects = lower_effects_body(case_object.value, at(cases_context, case_name), scope);
+		if (!effects.ok) { return effects; }
 
-		// Parse case body - handles $parent/$this scope selectors
-		const overrides = parse_case_body(case_object.value, case_context, scope);
-		if (!overrides.ok) {
-			return overrides;
-		}
-
-		parsed_cases.push({
-			_t: "SwitchCase",
-			condition: case_name,
-			overrides: overrides.value
+		rules.push({
+			when: { _t: "PredicateEquals", reference: on_reference, value: case_name },
+			effects: effects.value,
 		});
 	}
 
-	return ok({
-		_t: "OverrideSwitch",
-		scope,
-		$on: $on.value,
-		$cases: parsed_cases
-	});
+	return ok(rules);
 }
 
-function is_override_directive(value: unknown, context: ParseContext, scope: OverrideScope): Result<OverrideDirective> {
-	const object = asObject(value, context);
-	if (!object.ok) {
-		return object;
+// $mutex lowers to plain rules, not a special case (D2): for each member x,
+// `when hasValue(x) -> disable every sibling, reason "mutually exclusive with x"`.
+// A separate general check (disabled-but-set -> error(reason)) reports the both-set
+// case using that reason, so no mutex-specific evaluator is needed.
+function lower_mutex(object: Record<string, unknown>, context: ParseContext, scope: OverrideScope): Result<Rule[]> {
+	const $mutex = object["$mutex"];
+	if (!Array.isArray($mutex)) {
+		return error("$mutex must be an array of property names", at(context, "$mutex").path);
 	}
+
+	const mutex_context = at(context, "$mutex");
+	const names: string[] = [];
+	for (const [index, item] of $mutex.entries()) {
+		if (typeof item !== "string") {
+			return error(`Expected string, got ${typeof item}`, at(mutex_context, index).path);
+		}
+		const property = require_property(context, item, scope);
+		if (!property.ok) { return property; }
+		names.push(item);
+	}
+
+	if (names.length < 2) {
+		return error("$mutex must have at least 2 properties", mutex_context.path);
+	}
+
+	const node = scope_to_node(scope);
+	const rules: Rule[] = names.map(x => ({
+		when: { _t: "PredicateHasValue", reference: { node, property: x } },
+		effects: names
+			.filter(other => other !== x)
+			.map(other => ({
+				op: "setDisabled" as const,
+				reference: { node, property: other },
+				value: true,
+				reason: `mutually exclusive with ${x}`,
+			})),
+	}));
+
+	return ok(rules);
+}
+
+// One array element -> one or more rules. A leading $this/$parent wrapper only
+// changes the directive scope, then recurses.
+function lower_directive(value: unknown, context: ParseContext, scope: OverrideScope): Result<Rule[]> {
+	const object = asObject(value, context);
+	if (!object.ok) { return object; }
 
 	if ("$parent" in object.value) {
-		// Override the current scope
-		return is_override_directive(
-			object.value.$parent,
-			{ path: at(context, "$parent").path, document: context.document },
-			"$parent"
-		);
+		return lower_directive(object.value.$parent, at(context, "$parent"), "$parent");
 	}
-
 	if ("$this" in object.value) {
-		// Override the current scope
-		return is_override_directive(
-			object.value.$parent,
-			{ path: at(context, "$this").path, document: context.document },
-			"$this"
-		);
+		return lower_directive(object.value.$this, at(context, "$this"), "$this");
 	}
 
 	if ("$switch" in object.value) {
-		return is_override_switch(object.value, context, scope);
+		return lower_switch(object.value, context, scope);
 	}
-
 	if ("$if" in object.value) {
-		return is_override_if_then(object.value, context, scope);
+		return lower_if_then(object.value, context, scope);
 	}
-
 	if ("$mutex" in object.value) {
-		return is_override_mutex(object.value, context, scope);
+		return lower_mutex(object.value, context, scope);
 	}
 
-	return is_override_static(object.value, context, scope);
+	return lower_static(object.value, context, scope);
 }
 
-function is_override(value: unknown, context: ParseContext): Result<OverrideDirective[]> {
-	if (Array.isArray(value)) {
-		// Implicit selector $this
-		return is_override_array(value, context, "$this");
-	}
-
-	const object = asObject(value, context);
-	if (!object.ok) {
-		return object;
-	}
-
-	if ("$parent" in object.value) {
-		return is_override_array(
-			object.value["$parent"],
-			{ path: at(context, "$parent").path, document: context.document },
-			"$parent"
-		);
-	}
-
-	if ("$this" in object.value) {
-		return is_override_array(
-			object.value["$this"],
-			{ path: at(context, "$this").path, document: context.document },
-			"$this"
-		);
-	}
-
-	return error("$override must be an array or object with $this/$parent", context.path);
-}
-
-function is_override_array(value: unknown, context: ParseContext, scope: OverrideScope): Result<OverrideDirective[]> {
+function lower_override_array(value: unknown, context: ParseContext, scope: OverrideScope): Result<Rule[]> {
 	if (!Array.isArray(value)) {
 		return error("Expected array", context.path);
 	}
 
-	const directives: OverrideDirective[] = [];
+	const rules: Rule[] = [];
 	for (const [index, element] of value.entries()) {
-		const directive = is_override_directive(
-			element,
-			{ path: at(context, index).path, document: context.document },
-			scope
-		);
-		if (!directive.ok) {
-			return directive;
-		}
-		directives.push(directive.value);
+		const lowered = lower_directive(element, at(context, index), scope);
+		if (!lowered.ok) { return lowered; }
+		rules.push(...lowered.value);
 	}
 
-	return ok(directives);
+	return ok(rules);
 }
 
-export {
-	parse_common_override_fields,
-	is_enum_property_override,
-	is_union_property_override,
-	is_number_property_override,
-	is_boolean_property_override,
-	is_include_property_override,
-	is_override,
-	is_override_array,
-	is_override_directive,
-};
+// Entry point consumed by parse_ruleset. $override is either a bare array
+// (implicit $this) or an object with a $this/$parent selector wrapping the array.
+export function is_override(value: unknown, context: ParseContext): Result<Rule[]> {
+	if (Array.isArray(value)) {
+		return lower_override_array(value, context, "$this");
+	}
+
+	const object = asObject(value, context);
+	if (!object.ok) { return object; }
+
+	if ("$parent" in object.value) {
+		return lower_override_array(object.value["$parent"], at(context, "$parent"), "$parent");
+	}
+	if ("$this" in object.value) {
+		return lower_override_array(object.value["$this"], at(context, "$this"), "$this");
+	}
+
+	return error("$override must be an array or object with $this/$parent", context.path);
+}

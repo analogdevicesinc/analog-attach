@@ -1,4 +1,4 @@
-import { OverrideDirective, RulesetStruct } from "../ruleset_parser/types";
+import { Rule, RulesetStruct } from "../ruleset_parser/types";
 
 export type ValidationError = {
 	path: string;
@@ -11,9 +11,15 @@ export type ValidationResult = {
 	errors: ValidationError[];
 }
 
-export type ChildOverride = {
-	directive: OverrideDirective,
-	child: RulesetStruct
+// A rule with its relative refs resolved to concrete symbol names (decision:
+// resolve once at collection time). `self_symbol` is the symbol that declared the
+// rule; `parent_symbol` is the symbol that includes it (its includer), found via
+// reverse graph lookup — undefined when nothing includes the declarer. The engine
+// maps ref.node -> one of these names, so scope is decided in exactly one place.
+export type CollectedRule = {
+	rule: Rule,
+	self_symbol: string,
+	parent_symbol?: string
 }
 
 export type ConnectionGraph = Map<string, string[]>;
