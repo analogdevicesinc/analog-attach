@@ -15,18 +15,31 @@ import { Workfile } from "../workfile_handler/types";
 import { find_symbol_by_descriptor, suggest_platform_extra } from "../workfile_handler/workfile_handler";
 import { load_resolved_ruleset } from "../resolver/resolver";
 import { apply_overrides } from "./override_resolver";
-import { ChildOverride, ValidationError } from "./types";
+import { CollectedRule, ValidationError } from "./types";
 
 export function validate_property(
 	property: Property,
-	child_overrides: ChildOverride[],
+	child_overrides: CollectedRule[],
 	parent_symbol: RulesetStruct,
+	symbol_name: string,
 	workfile: Workfile,
 	context: ParseContext
 ): ValidationError[] {
 	const property_context = at(context, property.name);
 
-	const effective = apply_overrides(property, child_overrides, parent_symbol);
+	// symbol_name is the workfile INSTANCE key (e.g. "my_spi"), not parent_symbol.$symbol
+	// (the schema symbol, e.g. "no_os_spi_init_param"). Refs were resolved to instance
+	// keys at collection time, so the engine must match against the instance key too.
+	const { effective, errors: override_errors } = apply_overrides(
+		property, child_overrides, symbol_name, workfile
+	);
+
+	// Errors surfaced by the override engine itself (e.g. a union member that
+	// contradicts a selectMember rule, or a disabled-but-set property). These stand
+	// regardless of the checks below.
+	if (override_errors.length > 0) {
+		return override_errors;
+	}
 
 	// Check disabled AFTER applying overrides: a property may be disabled statically
 	// (disabled: true in the ruleset) or dynamically (e.g. the unchosen member of a

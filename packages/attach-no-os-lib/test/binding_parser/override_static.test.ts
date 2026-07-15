@@ -2,67 +2,76 @@ import { describe, test, expect } from 'vitest';
 import { expectOk, expectError, expectErrorContains, loadAndParseRuleset } from '../test_utilities';
 import { RulesetStruct } from '../../src/ruleset_parser/types';
 
-describe('OverrideStatic parsing', () => {
+// A static override (no $if/$switch/$mutex) lowers to a single always-rule whose
+// effects are the lowered property overrides.
+describe('static override lowering', () => {
 	describe('valid cases', () => {
 		test('parses basic static override', () => {
 			const result = loadAndParseRuleset('overrides/static/valid_basic.yaml');
 			expectOk(result);
 			const ruleset = result.value as RulesetStruct;
-			expect(ruleset.$override).toBeDefined();
-			expect(ruleset.$override).toHaveLength(1);
-			expect(ruleset.$override![0]._t).toBe('OverrideStatic');
+			expect(ruleset.rules).toBeDefined();
+			expect(ruleset.rules).toHaveLength(1);
+			expect(ruleset.rules![0].when._t).toBe('PredicateAlways');
 		});
 
-		test('parses number property override with min/max/default/description', () => {
+		test('lowers number property override to set effects', () => {
 			const result = loadAndParseRuleset('overrides/static/valid_number_override.yaml');
 			expectOk(result);
 			const ruleset = result.value as RulesetStruct;
-			expect(ruleset.$override![0]._t).toBe('OverrideStatic');
+			const ops = ruleset.rules![0].effects.map(effect => effect.op);
+			expect(ops).toContain('setMin');
+			expect(ops).toContain('setMax');
+			expect(ops).toContain('setDefault');
 		});
 
-		test('parses enum property override with default', () => {
+		test('lowers enum property override with default', () => {
 			const result = loadAndParseRuleset('overrides/static/valid_enum_override.yaml');
 			expectOk(result);
 			const ruleset = result.value as RulesetStruct;
-			expect(ruleset.$override![0]._t).toBe('OverrideStatic');
+			expect(ruleset.rules![0].effects.some(effect => effect.op === 'setDefault')).toBe(true);
 		});
 
-		test('parses enum property override with values', () => {
+		test('lowers enum property override with values to restrictValues', () => {
 			const result = loadAndParseRuleset('overrides/static/valid_enum_values_override.yaml');
 			expectOk(result);
 			const ruleset = result.value as RulesetStruct;
-			expect(ruleset.$override![0]._t).toBe('OverrideStatic');
+			expect(ruleset.rules![0].effects.some(effect => effect.op === 'restrictValues')).toBe(true);
 		});
 
-		test('parses boolean property override with default', () => {
+		test('lowers boolean property override with default', () => {
 			const result = loadAndParseRuleset('overrides/static/valid_bool_override.yaml');
 			expectOk(result);
 			const ruleset = result.value as RulesetStruct;
-			expect(ruleset.$override![0]._t).toBe('OverrideStatic');
+			expect(ruleset.rules![0].effects.some(effect => effect.op === 'setDefault')).toBe(true);
 		});
 
-		test('parses include property override with pointer', () => {
+		test('lowers include property override with pointer to setPointer', () => {
 			const result = loadAndParseRuleset('overrides/static/valid_include_override.yaml');
 			expectOk(result);
 			const ruleset = result.value as RulesetStruct;
-			expect(ruleset.$override![0]._t).toBe('OverrideStatic');
+			expect(ruleset.rules![0].effects.some(effect => effect.op === 'setPointer')).toBe(true);
 		});
 
-		test('parses union property override with value', () => {
+		test('lowers union property override with value to selectMember', () => {
 			const result = loadAndParseRuleset('overrides/static/valid_union_override.yaml');
 			expectOk(result);
 			const ruleset = result.value as RulesetStruct;
-			expect(ruleset.$override![0]._t).toBe('OverrideStatic');
+			expect(ruleset.rules![0].effects.some(effect => effect.op === 'selectMember')).toBe(true);
+		});
+
+		test('allows multiple property keys in one static override', () => {
+			// The new model has no single-target limit: multiple keys lower to one
+			// always-rule carrying one effect per key.
+			const result = loadAndParseRuleset('overrides/static/multiple_keys.yaml');
+			expectOk(result);
+			const ruleset = result.value as RulesetStruct;
+			expect(ruleset.rules).toHaveLength(1);
+			expect(ruleset.rules![0].effects.length).toBe(2);
 		});
 	});
 
 	describe('error cases', () => {
-		test('rejects multiple keys in static override', () => {
-			const result = loadAndParseRuleset('overrides/static/multiple_keys.yaml');
-			expectError(result);
-			expectErrorContains(result, 'exactly one property key');
-		});
-
 		test('rejects unknown property', () => {
 			const result = loadAndParseRuleset('overrides/static/unknown_property.yaml');
 			expectError(result);

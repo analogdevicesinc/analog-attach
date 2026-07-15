@@ -26,8 +26,8 @@ describe('RulesetStruct parsing', () => {
 			const result = loadAndParseRuleset('bindings/struct/valid_with_override.yaml');
 			expectOk(result);
 			const binding = result.value as RulesetStruct;
-			expect(binding.$override).toBeDefined();
-			expect(binding.$override).toHaveLength(1);
+			expect(binding.rules).toBeDefined();
+			expect(binding.rules!.length).toBeGreaterThanOrEqual(1);
 		});
 
 		test('auto-computes $requires from property capabilities', () => {

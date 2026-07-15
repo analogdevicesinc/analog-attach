@@ -1,0 +1,9 @@
+$id: "child.yaml"
+$type: struct
+$symbol: child
+$ranking: 4
+$sources: { noos: ["test.h"] }
+$override:
+  $parent:
+    - device_id:
+        maximum: 4

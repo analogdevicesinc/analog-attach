@@ -440,13 +440,13 @@ export function suggest_for_property(workfile: Workfile, symbol_name: string, pr
         case "PlatformOpsProperty": {
             const graph = create_connections_graph(workfile);
             const child_overrides = collect_child_overrides(symbol_name, workfile, graph);
-            const effective = apply_overrides(property, child_overrides, symbol);
+            const { effective } = apply_overrides(property, child_overrides, symbol_name, workfile);
             return suggest_platform_ops(workfile, effective as PlatformOpsProperty, symbol);
         }
         case "PlatformExtraProperty": {
             const graph = create_connections_graph(workfile);
             const child_overrides = collect_child_overrides(symbol_name, workfile, graph);
-            const effective = apply_overrides(property, child_overrides, symbol);
+            const { effective } = apply_overrides(property, child_overrides, symbol_name, workfile);
             return suggest_platform_extra(workfile, effective as PlatformExtraProperty, symbol);
         }
         case "CallbackFunctionProperty": {
