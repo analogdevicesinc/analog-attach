@@ -1,0 +1,23 @@
+#ifndef COMMON_DATA_H
+#define COMMON_DATA_H
+
+/* Includes */
+{% for inc in includes %}
+#include "{{ inc }}"
+{% endfor %}
+
+/* Descriptors struct */
+struct descriptors {
+{% for d in descriptors %}
+	struct {{ d.descriptor_type }} *{{ d.descriptor_name }};
+{% endfor %}
+};
+
+extern struct descriptors desc;
+
+/* Init param externs */
+{% for e in externs %}
+extern {% if e.is_const %}const {% endif %}struct {{ e.type }} {{ e.name }};
+{% endfor %}
+
+#endif /* COMMON_DATA_H */

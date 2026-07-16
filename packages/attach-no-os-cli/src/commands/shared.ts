@@ -238,7 +238,10 @@ export function format_property_details(property: Property, suggestions: Propert
         }
     }
 
-    if (suggestions.values && suggestions.values.length > 0) {
+    // Enums (and booleans) already list every possible value in their Options
+    // block above, so repeating them under Suggestions is just noise.
+    const options_shown = property._t === "EnumProperty" || property._t === "BooleanProperty";
+    if (!options_shown && suggestions.values && suggestions.values.length > 0) {
         out += "\n  Suggestions:\n";
         for (const value of suggestions.values) {
             out += `    • ${value}\n`;
