@@ -111,11 +111,10 @@ export function build_views(input: CodegenInput): Result<Views> {
 			structs: struct_views
 		},
 		main_c: {
-			devices: devices,
 			// Teardown in reverse init order (LIFO): last initialized is removed first,
-			// so prioritized peripherals (e.g. UART) are torn down last.
-			devices_reversed: [...devices].reverse(),
-			has_runtime_assignments: runtime_assignments.length > 0,
+			// so prioritized peripherals (e.g. UART) are torn down last. The reversal is
+			// expressed inline in main_c.njk as `devices | reverse`.
+			devices: devices,
 			runtime_assignments: runtime_assignments,
 		},
 		user_app_h: {},
@@ -174,8 +173,8 @@ function propagate_non_const(
 				continue;
 			}
 
-			const union_prop = property as UnionProperty;
-			const value = union_prop.value as Record<string, string>;
+			const union_property = property as UnionProperty;
+			const value = union_property.value as Record<string, string>;
 			const [member_name, reference] = Object.entries(value)[0];
 
 			// Check if the referenced struct is non-const
@@ -184,7 +183,7 @@ function propagate_non_const(
 				view.fields = view.fields.filter(f => f.name !== property.name);
 
 				// Find the union member to check if it's a pointer
-				const member = union_prop.members.find(m => m.name === member_name);
+				const member = union_property.members.find(m => m.name === member_name);
 				const is_pointer = member?.pointer ?? false;
 
 				// Add runtime assignment
@@ -330,12 +329,12 @@ function build_struct_view(name: string, ruleset: RulesetStruct): StructView {
 	const static_properties = defined_properties
 		.filter(property => property._t !== "IncludeDescriptorProperty");
 
-	const has_descriptor_refs = descriptor_properties.length > 0;
+	const has_descriptor_references = descriptor_properties.length > 0;
 
 	return {
 		type: ruleset.$symbol,
 		name: name,
-		is_const: !has_descriptor_refs,
+		is_const: !has_descriptor_references,
 		fields: static_properties.map(property => ({
 			name: property.name,
 			c_value: format_c_value(property),

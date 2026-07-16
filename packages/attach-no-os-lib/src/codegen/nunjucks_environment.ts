@@ -1,0 +1,32 @@
+import nunjucks from "nunjucks";
+
+// One configured environment for all project-level (.njk) templates.
+//
+// Options, and why each matters for C code generation (not HTML):
+//   autoescape        off  — output is C source; never HTML-escape "&", '"', etc.
+//   throwOnUndefined  on   — a mistyped template variable is a hard error, not a
+//                            silently-empty render. Keeps templates and the Views
+//                            type in lockstep.
+//   trimBlocks        on   — the newline right after a {% %} tag is removed, so
+//                            control-flow lines don't leave blank lines behind.
+//   lstripBlocks      on   — leading whitespace before a {% %} tag is stripped, so
+//                            we can indent tags for readability without indenting
+//                            the emitted C.
+export function make_environment(templates_directory: string): nunjucks.Environment {
+	const environment = new nunjucks.Environment(
+		new nunjucks.FileSystemLoader(templates_directory, { noCache: true }),
+		{
+			autoescape: false,
+			throwOnUndefined: true,
+			trimBlocks: true,
+			lstripBlocks: true,
+		}
+	);
+
+	// Replaces the precomputed `devices_reversed` view field: teardown order is the
+	// reverse of init order, expressed inline in main_c.njk as `devices | reverse`.
+	// eslint-disable-next-line unicorn/no-array-reverse
+	environment.addFilter("reverse", (array: unknown[]) => [...array].reverse());
+
+	return environment;
+}

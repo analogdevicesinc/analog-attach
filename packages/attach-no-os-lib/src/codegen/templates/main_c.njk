@@ -1,0 +1,30 @@
+#include "no_os_error.h"
+#include "common/common_data.h"
+#include "user_app.h"
+
+int main(void)
+{
+	int ret;
+
+{% if runtime_assignments.length %}
+	// Patching the common_data structs
+{% for a in runtime_assignments %}
+	{{ a.struct_name }}.{{ a.field_path }} = {{ a.value }};
+{% endfor %}
+
+{% endif %}
+	// Init devices and structures
+{% for d in devices %}
+	ret = {{ d.init_code }};
+	if (ret)
+		return ret;
+
+{% endfor %}
+	user_app(&desc);
+
+{% for d in devices | reverse %}
+	{{ d.remove_code }};
+{% endfor %}
+
+	return 0;
+}

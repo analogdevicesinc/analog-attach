@@ -83,7 +83,7 @@ export type Views = {
 		structs: StructView[];
 	};
 	main_c: {
-		devices: DeviceInfo[];
+		devices: DeviceInfo[];              // teardown reversal done in-template via `| reverse`
 		runtime_assignments: RuntimeAssignment[];
 	};
 	user_app_h: {};
