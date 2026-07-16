@@ -1,0 +1,14 @@
+{% for inc in includes %}
+#include "{{ inc }}"
+{% endfor %}
+
+struct descriptors desc = { 0 };
+
+{% for s in structs %}
+{% if s.is_const %}const {% endif %}struct {{ s.type }} {{ s.name }} = {
+{% for f in s.fields %}
+	.{{ f.name }} = {{ f.c_value }},
+{% endfor %}
+};
+
+{% endfor %}

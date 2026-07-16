@@ -28,7 +28,8 @@
       "attach-no-os-lib"
     ],
     "external": [
-      "yaml"
+      "yaml",
+      "nunjucks"
     ]
   },
   "devDependencies": {
@@ -41,6 +42,7 @@
   "dependencies": {
     "@stricli/auto-complete": "^1.2.9",
     "@stricli/core": "^1.1.0",
+    "nunjucks": "^3.2.4",
     "yaml": "^2.7.1"
   }
 }
