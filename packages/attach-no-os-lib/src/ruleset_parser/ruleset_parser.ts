@@ -265,6 +265,11 @@ function parse_ruleset_from_object(object: Record<string, unknown>, context: Par
 				return $descriptor;
 			}
 
+			const $exposes = optional(object, "$exposes", context, stringArray);
+			if (!$exposes.ok) {
+				return $exposes;
+			}
+
 			// Collect all capabilities from properties into $requires
 			const capabilities = new Set<string>();
 			for (const property of context.document.properties) {
@@ -286,10 +291,11 @@ function parse_ruleset_from_object(object: Record<string, unknown>, context: Par
 				$sources: $sources.value,
 				properties: context.document.properties,
 				rules: rules.value,
-				$requires,
+				$requires: $requires,
 				$capability: $capability.value,
 				$header: $header.value,
 				$descriptor: $descriptor.value,
+				$exposes: $exposes.value,
 			});
 		}
 		case RulesetType.RT_ENUM: {

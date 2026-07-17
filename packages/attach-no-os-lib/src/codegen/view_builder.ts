@@ -8,6 +8,7 @@ import { CodegenInput, DescriptorInfo, DeviceInfo, RuntimeAssignment, SourcePath
 import { create_connections_graph, is_referenced_by_others } from "../validator/connection_graph";
 import { ConnectionGraph } from "../validator/types";
 import { get_schemas_path } from "../settings/settings";
+import { all_ops } from "../workfile_handler/workfile_handler";
 
 const CORE_UTIL_SRCS = [
 	"util/no_os_util.c",
@@ -213,7 +214,7 @@ function collect_sources(workfile: Workfile): SourcePaths {
 	const platform = new Set<string>();
 
 	const all_rulesets = [
-		...Object.values(workfile.platform_ops),
+		...Object.values(all_ops(workfile)),
 		...Object.values(workfile.symbols),
 	];
 

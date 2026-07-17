@@ -12,7 +12,7 @@ import {
 } from "../ruleset_parser/types";
 import { at, ParseContext } from "../ruleset_parser/validators";
 import { Workfile } from "../workfile_handler/types";
-import { find_symbol_by_descriptor, suggest_platform_extra } from "../workfile_handler/workfile_handler";
+import { all_ops, find_symbol_by_descriptor, suggest_platform_extra } from "../workfile_handler/workfile_handler";
 import { load_resolved_ruleset } from "../resolver/resolver";
 import { apply_overrides } from "./override_resolver";
 import { CollectedRule, ValidationError } from "./types";
@@ -122,7 +122,7 @@ function validate_platform_ops(
 ): ValidationError[] {
 	const symbol_name = property.value as string;
 
-	const ops = workfile.platform_ops[symbol_name];
+	const ops = all_ops(workfile)[symbol_name];
 	if (!ops) {
 		return [{
 			path: context.path,

@@ -198,6 +198,9 @@ export type RulesetStruct = RulesetBase & {
 	$capability?: string,
 	$header?: string,      // Device header path, e.g. "drivers/accel/adxl355/adxl355.h"
 	$descriptor?: string,  // Device descriptor type from schema, e.g. "adxl355_dev"
+	$exposes?: string[],   // List of ops ids that this struct might expose
+
+	// FIXME: This might not be here since this is runtime assigned
 	$descriptor_name?: string,  // User-provided descriptor instance name, e.g. "my_accel"
 };
 
