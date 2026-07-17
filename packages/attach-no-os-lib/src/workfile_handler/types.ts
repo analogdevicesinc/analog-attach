@@ -22,6 +22,7 @@ export type Workfile = {
     platform?: string;                      // platform name e.g. "max32690"
     platform_vendor?: string;               // vendor name e.g. "maxim"
     platform_ops: Record<string, Ruleset>;  // locked, auto-populated from platform, not printed
+    exposed_ops: Record<string, Ruleset>;   // same as platform_ops, but runtime updated
     symbols: Record<string, Ruleset>;       // user-created symbols, printed in codegen
 };
 
