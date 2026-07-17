@@ -24,8 +24,11 @@ import {
     load_platform,
     export_minimal,
     import_minimal,
-    clone_workfile
+    clone_workfile,
+    all_ops,
+    rename_symbol
 } from '../../src/workfile_handler/workfile_handler';
+import { scan_platforms } from '../../src/workfile_handler/platform_scanner';
 import { Workfile } from '../../src/workfile_handler/types';
 import {
     RulesetStruct,
@@ -244,6 +247,98 @@ describe('workfile_handler', () => {
         test('find_any returns undefined for unknown', () => {
             const result = find_any(workfile, "unknown");
             expect(result).toBeUndefined();
+        });
+    });
+
+    describe('Exposed Ops ($exposes)', () => {
+        // Real ops yamls in the (symlinked) schemas repo. Keyed in exposed_ops by their $symbol.
+        const I2C_OPS_PATH = "platforms/maxim/max32690/platform_ops/i2c_ops.yaml";
+        const I2C_OPS_SYMBOL = "max_i2c_ops";
+        const GPIO_OPS_PATH = "platforms/maxim/max32690/platform_ops/gpio_ops.yaml";
+        const GPIO_OPS_SYMBOL = "max_gpio_ops";
+
+        function make_extender(id: string, name: string, exposes: string[]): RulesetStruct {
+            return { ...make_struct(id, name), $exposes: exposes };
+        }
+
+        test('adding a struct with $exposes registers its ops', () => {
+            const result = add_symbol(workfile, "mux", make_extender("dev/mux.yaml", "mux", [I2C_OPS_PATH]));
+            expectOk(result);
+            expect(Object.keys(workfile.exposed_ops)).toEqual([I2C_OPS_SYMBOL]);
+            // Surfaced through the merged view used by suggestions/validation/codegen.
+            expect(list_platform_ops(workfile)).toContain(I2C_OPS_SYMBOL);
+            expect(find_any(workfile, I2C_OPS_SYMBOL)?._t).toBe("RulesetPlatformOps");
+        });
+
+        test('a struct without $exposes registers nothing', () => {
+            add_symbol(workfile, "plain", make_struct("dev/plain.yaml", "plain"));
+            expect(workfile.exposed_ops).toEqual({});
+        });
+
+        test('two extenders exposing the same ops collapse to one entry', () => {
+            expectOk(add_symbol(workfile, "mux_a", make_extender("dev/mux.yaml", "mux", [I2C_OPS_PATH])));
+            expectOk(add_symbol(workfile, "mux_b", make_extender("dev/mux.yaml", "mux", [I2C_OPS_PATH])));
+            expect(Object.keys(workfile.exposed_ops)).toEqual([I2C_OPS_SYMBOL]);
+        });
+
+        test('removing one of two exposers keeps the shared ops', () => {
+            add_symbol(workfile, "mux_a", make_extender("dev/mux.yaml", "mux", [I2C_OPS_PATH]));
+            add_symbol(workfile, "mux_b", make_extender("dev/mux.yaml", "mux", [I2C_OPS_PATH]));
+
+            expectOk(remove_symbol(workfile, "mux_a"));
+            expect(workfile.exposed_ops[I2C_OPS_SYMBOL]).toBeDefined();
+
+            expectOk(remove_symbol(workfile, "mux_b"));
+            expect(workfile.exposed_ops[I2C_OPS_SYMBOL]).toBeUndefined();
+        });
+
+        test('recompute reflects the exact set of present exposers', () => {
+            add_symbol(workfile, "mux", make_extender("dev/mux.yaml", "mux", [I2C_OPS_PATH]));
+            add_symbol(workfile, "expander", make_extender("dev/exp.yaml", "exp", [GPIO_OPS_PATH]));
+            expect(Object.keys(workfile.exposed_ops).sort()).toEqual([GPIO_OPS_SYMBOL, I2C_OPS_SYMBOL].sort());
+
+            remove_symbol(workfile, "mux");
+            expect(Object.keys(workfile.exposed_ops)).toEqual([GPIO_OPS_SYMBOL]);
+        });
+
+        test('one struct exposing multiple ops registers all of them', () => {
+            add_symbol(workfile, "combo", make_extender("dev/combo.yaml", "combo", [I2C_OPS_PATH, GPIO_OPS_PATH]));
+            expect(Object.keys(workfile.exposed_ops).sort()).toEqual([GPIO_OPS_SYMBOL, I2C_OPS_SYMBOL].sort());
+        });
+
+        test('rename keeps exposed ops intact', () => {
+            add_symbol(workfile, "mux", make_extender("dev/mux.yaml", "mux", [I2C_OPS_PATH]));
+            expectOk(rename_symbol(workfile, "mux", "mux_renamed"));
+            expect(Object.keys(workfile.exposed_ops)).toEqual([I2C_OPS_SYMBOL]);
+        });
+
+        test('add rolls back when $exposes target is missing', () => {
+            const result = add_symbol(workfile, "bad", make_extender("dev/bad.yaml", "bad", ["does/not/exist.yaml"]));
+            expectError(result);
+            expect(list_symbols(workfile)).not.toContain("bad");
+            expect(workfile.exposed_ops).toEqual({});
+        });
+
+        test('exposing ops that collide with a platform op is rejected', () => {
+            // Load the maxim platform, which registers max_i2c_ops as a platform op.
+            const platforms = scan_platforms(path.join(SCHEMAS_ROOT, "platforms"));
+            expectOk(platforms);
+            const manifest = platforms.value["max32690"];
+            expect(manifest).toBeDefined();
+            expectOk(load_platform(workfile, manifest));
+            expect(workfile.platform_ops[I2C_OPS_SYMBOL]).toBeDefined();
+
+            // A struct exposing the same ops file would re-register max_i2c_ops.
+            const result = add_symbol(workfile, "mux", make_extender("dev/mux.yaml", "mux", [I2C_OPS_PATH]));
+            expectError(result);
+            expectErrorContains(result, "collides");
+            expect(list_symbols(workfile)).not.toContain("mux");
+        });
+
+        test('all_ops merges platform and exposed ops', () => {
+            add_platform_ops(workfile, "spi_ops", make_platform_ops("ops/spi.yaml", "spi_ops", "spi"));
+            add_symbol(workfile, "mux", make_extender("dev/mux.yaml", "mux", [I2C_OPS_PATH]));
+            expect(Object.keys(all_ops(workfile)).sort()).toEqual(["spi_ops", I2C_OPS_SYMBOL].sort());
         });
     });
 

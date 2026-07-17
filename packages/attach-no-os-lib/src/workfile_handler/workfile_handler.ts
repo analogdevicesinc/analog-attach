@@ -29,6 +29,7 @@ export function create_workfile(platform?: string): Result<Workfile> {
     const workfile: Workfile = {
         platform: platform,
         platform_ops: {},
+        exposed_ops: {},
         symbols: {}
     };
 
@@ -57,6 +58,50 @@ export function create_workfile(platform?: string): Result<Workfile> {
     return load_result; // Error or not, we return this anyway
 }
 
+export function all_ops(workfile: Workfile): Record<string, Ruleset> {
+    return { ...workfile.platform_ops, ...workfile.exposed_ops };
+}
+
+export function recompute_exposed_ops(workfile: Workfile): Result<void> {
+    const rebuilt: Record<string, Ruleset> = {};
+
+    for (const symbol of Object.values(workfile.symbols)) {
+        if (symbol._t !== "RulesetStruct" || !symbol.$exposes) {
+            continue;
+        }
+
+        for (const ops_path of symbol.$exposes) {
+            const loaded = load_resolved_ruleset(ops_path);
+            if (!loaded.ok) {
+                return loaded;
+            }
+
+            const ops = loaded.value;
+            if (ops._t !== "RulesetPlatformOps") {
+                return error(`$exposes target is not platform_ops: ${ops_path}`, ops_path);
+            }
+
+            // Naming collision. 2 different C globals sharing the same identifier
+            if (ops.$symbol in workfile.platform_ops) {
+                return error(`Exposed ops '${ops.$symbol}' collides with a platform op with the same name`, ops.$symbol);
+            }
+
+            // Same guard between two exposed ops: same file exposed by multiple
+            // structs dedupes silently, but two different files sharing a $symbol
+            // is a real collision.
+            const existing = rebuilt[ops.$symbol];
+            if (existing && existing.$id !== ops.$id) {
+                return error(`Exposed ops '${ops.$symbol}' collides with another exposed op with the same name`, ops.$symbol);
+            }
+
+            rebuilt[ops.$symbol] = ops;
+        }
+    }
+
+    workfile.exposed_ops = rebuilt;
+    return ok();
+}
+
 // --- Platform Ops (locked, from manifest) ---
 
 export function add_platform_ops(workfile: Workfile, name: string, ruleset: RulesetPlatformOps): Result<void> {
@@ -76,7 +121,7 @@ export function get_platform_ops(workfile: Workfile, name: string): Result<Rules
 }
 
 export function list_platform_ops(workfile: Workfile): string[] {
-    return Object.keys(workfile.platform_ops);
+    return Object.keys(all_ops(workfile));
 }
 
 export function clear_platform_ops(workfile: Workfile): void {
@@ -110,6 +155,11 @@ export function add_symbol(workfile: Workfile, name: string, ruleset: Ruleset): 
         return error(`Symbol '${name}' conflicts with platform ops`, "name");
     }
     workfile.symbols[name] = ruleset;
+    const recompute = recompute_exposed_ops(workfile);
+    if (!recompute.ok) {
+        delete workfile.symbols[name]; // roll back the add on failure
+        return recompute;
+    }
     return ok(workfile);
 }
 
@@ -125,7 +175,7 @@ export function remove_symbol(workfile: Workfile, name: string): Result<void> {
         return error(`Symbol '${name}' not found`, "name");
     }
     delete workfile.symbols[name];
-    return ok();
+    return recompute_exposed_ops(workfile);
 }
 
 export function rename_symbol(workfile: Workfile, old_name: string, new_name: string): Result<Workfile> {
@@ -144,6 +194,13 @@ export function rename_symbol(workfile: Workfile, old_name: string, new_name: st
     }
     workfile.symbols[new_name] = workfile.symbols[old_name];
     delete workfile.symbols[old_name];
+
+    // recompute might not be needed here, but more uniform
+    const recompute = recompute_exposed_ops(workfile);
+    if (!recompute.ok) {
+        return recompute;
+    }
+
     return ok(workfile);
 }
 
@@ -192,7 +249,7 @@ export { find_symbol_by_descriptor } from "./utils";
 // --- Lookup (checks both platform_ops and symbols) ---
 
 export function find_any(workfile: Workfile, name: string): Ruleset | undefined {
-    return workfile.platform_ops[name] ?? workfile.symbols[name];
+    return all_ops(workfile)[name] ?? workfile.symbols[name];
 }
 
 // --- Property Values ---
@@ -323,7 +380,7 @@ export function suggest_for_enum(property: EnumProperty): Result<PropertySuggest
 export function suggest_platform_ops(workfile: Workfile, property: PlatformOpsProperty, parent_struct: RulesetStruct): Result<PropertySuggestions> {
     const suggestions: string[] = [];
 
-    for (const [name, ops] of Object.entries(workfile.platform_ops)) {
+    for (const [name, ops] of Object.entries(all_ops(workfile))) {
         if (ops._t !== "RulesetPlatformOps") {
             continue;
         }
