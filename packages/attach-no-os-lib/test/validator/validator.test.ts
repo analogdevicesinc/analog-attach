@@ -143,7 +143,7 @@ function make_array(name: string, size: number, element: ArrayProperty['element'
 }
 
 function make_workfile(symbols: Record<string, RulesetStruct>, platform_ops: Record<string, RulesetPlatformOps> = {}): Workfile {
-    return { platform_ops, symbols };
+    return { platform_ops, exposed_ops: {}, symbols };
 }
 
 function make_platform_ops(id: string, name: string, capability?: string): RulesetPlatformOps {
@@ -949,6 +949,7 @@ describe('validate_workfile', () => {
             const workfile: Workfile = {
                 platform: "max32690",
                 platform_ops: {},
+                exposed_ops: {},
                 symbols: {
                     my_spi: {
                         ...make_struct_with_capability("no-os/spi/no_os_spi_init_param.yaml", "no_os_spi_init_param", "spi", [
