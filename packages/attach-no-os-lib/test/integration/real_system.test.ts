@@ -67,8 +67,8 @@ describe('Real System Integration', () => {
             const available_devices = mock_suggest_devices();
             expect(available_devices).toContain("devices/adxl355/adxl355.yaml");
 
-            // Step 4: User selects ADXL355 - load from real binding file
-            const adxl355_result = load_resolved_ruleset("devices/adxl355/adxl355.yaml");
+            // Step 4: User selects ADXL355 - load its init_param binding file
+            const adxl355_result = load_resolved_ruleset("devices/adxl355/adxl355_init_param.yaml");
             expectOk(adxl355_result);
             const adxl355 = adxl355_result.value as RulesetStruct;
             expect(adxl355.$symbol).toBe("adxl355_init_param");

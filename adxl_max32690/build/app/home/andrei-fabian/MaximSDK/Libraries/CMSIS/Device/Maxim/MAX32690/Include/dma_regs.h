@@ -1,0 +1,1 @@
+/home/andrei-fabian/MaximSDK/Libraries//CMSIS/Device/Maxim/MAX32690/Include/dma_regs.h

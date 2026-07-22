@@ -9,7 +9,6 @@ import {
     RulesetType,
     RulesetPlatformOps,
     IncludeProperty,
-    IncludeDescriptorProperty,
     UnionProperty,
     ArrayProperty,
     NumberProperty,
@@ -106,17 +105,6 @@ function make_include(name: string, include: string, options: Partial<IncludePro
         name,
         description: "",
         include,
-        ...options,
-    };
-}
-
-function make_include_descriptor(name: string, include_descriptor: string, options: Partial<IncludeDescriptorProperty> = {}): IncludeDescriptorProperty {
-    return {
-        _t: "IncludeDescriptorProperty",
-        name,
-        description: "",
-        include_descriptor,
-        pointer: true,
         ...options,
     };
 }
@@ -1079,127 +1067,6 @@ describe('validate_workfile', () => {
             const result = validate_workfile(workfile);
             expect(result.valid).toBe(false);
             expect(result.errors[0].message).toContain("not in the allowed list");
-        });
-    });
-
-    describe('include_descriptor property validation', () => {
-        test('valid include_descriptor passes', () => {
-            const parent_spi = make_struct("no-os/spi/no_os_spi_init_param.yaml", "spi_init_param", []);
-            parent_spi.$descriptor = "no_os_spi_desc";
-            parent_spi.$descriptor_name = "parent_spi_desc";
-
-            const child_spi = make_struct("no-os/spi/no_os_spi_init_param.yaml", "spi_init_param", [
-                make_include_descriptor("parent", "no-os/spi/no_os_spi_init_param.yaml", { value: "parent_spi_desc" })
-            ]);
-            child_spi.$descriptor = "no_os_spi_desc";
-            child_spi.$descriptor_name = "child_spi_desc";
-
-            const workfile = make_workfile({
-                parent_spi,
-                child_spi
-            });
-            const result = validate_workfile(workfile);
-            expect(result.valid).toBe(true);
-        });
-
-        test('include_descriptor with missing descriptor fails', () => {
-            const child_spi = make_struct("no-os/spi/no_os_spi_init_param.yaml", "spi_init_param", [
-                make_include_descriptor("parent", "no-os/spi/no_os_spi_init_param.yaml", { value: "nonexistent_desc" })
-            ]);
-            child_spi.$descriptor = "no_os_spi_desc";
-            child_spi.$descriptor_name = "child_spi_desc";
-
-            const workfile = make_workfile({
-                child_spi
-            });
-            const result = validate_workfile(workfile);
-            expect(result.valid).toBe(false);
-            expect(result.errors[0].message).toContain("not found");
-        });
-
-        test('include_descriptor with type mismatch fails', () => {
-            const my_i2c = make_struct("no-os/i2c/no_os_i2c_init_param.yaml", "i2c_init_param", []);
-            my_i2c.$descriptor = "no_os_i2c_desc";
-            my_i2c.$descriptor_name = "my_i2c_desc";
-
-            const my_spi = make_struct("no-os/spi/no_os_spi_init_param.yaml", "spi_init_param", [
-                make_include_descriptor("parent", "no-os/spi/no_os_spi_init_param.yaml", { value: "my_i2c_desc" })
-            ]);
-            my_spi.$descriptor = "no_os_spi_desc";
-            my_spi.$descriptor_name = "my_spi_desc";
-
-            const workfile = make_workfile({
-                my_i2c,
-                my_spi
-            });
-            const result = validate_workfile(workfile);
-            expect(result.valid).toBe(false);
-            expect(result.errors[0].message).toContain("Type mismatch");
-        });
-
-        test('include_descriptor without value passes when not required', () => {
-            const my_spi = make_struct("no-os/spi/no_os_spi_init_param.yaml", "spi_init_param", [
-                make_include_descriptor("parent", "no-os/spi/no_os_spi_init_param.yaml", { required: false })
-            ]);
-            my_spi.$descriptor = "no_os_spi_desc";
-            my_spi.$descriptor_name = "my_spi_desc";
-
-            const workfile = make_workfile({
-                my_spi
-            });
-            const result = validate_workfile(workfile);
-            expect(result.valid).toBe(true);
-        });
-
-        test('include_descriptor without value fails when required', () => {
-            const my_spi = make_struct("no-os/spi/no_os_spi_init_param.yaml", "spi_init_param", [
-                make_include_descriptor("parent", "no-os/spi/no_os_spi_init_param.yaml", { required: true })
-            ]);
-            my_spi.$descriptor = "no_os_spi_desc";
-            my_spi.$descriptor_name = "my_spi_desc";
-
-            const workfile = make_workfile({
-                my_spi
-            });
-            const result = validate_workfile(workfile);
-            expect(result.valid).toBe(false);
-            expect(result.errors[0].message).toContain("Required property has no value");
-        });
-
-        test('include_descriptor with auto-generated descriptor name passes', () => {
-            // When $descriptor_name is not set, it defaults to <symbol_name>_desc
-            const parent_spi = make_struct("no-os/spi/no_os_spi_init_param.yaml", "spi_init_param", []);
-            parent_spi.$descriptor = "no_os_spi_desc";
-            // Not setting $descriptor_name, so it should default to "parent_spi_desc"
-
-            const child_spi = make_struct("no-os/spi/no_os_spi_init_param.yaml", "spi_init_param", [
-                make_include_descriptor("parent", "no-os/spi/no_os_spi_init_param.yaml", { value: "parent_spi_desc" })
-            ]);
-            child_spi.$descriptor = "no_os_spi_desc";
-            child_spi.$descriptor_name = "child_spi_desc";
-
-            const workfile = make_workfile({
-                parent_spi,
-                child_spi
-            });
-            const result = validate_workfile(workfile);
-            expect(result.valid).toBe(true);
-        });
-
-        test('symbol referencing its own descriptor fails (self-reference)', () => {
-            // A symbol whose parent points at its own descriptor forms a self-loop.
-            const my_spi = make_struct("no-os/spi/no_os_spi_init_param.yaml", "spi_init_param", [
-                make_include_descriptor("parent", "no-os/spi/no_os_spi_init_param.yaml", { value: "my_spi_desc" })
-            ]);
-            my_spi.$descriptor = "no_os_spi_desc";
-            my_spi.$descriptor_name = "my_spi_desc";
-
-            const workfile = make_workfile({
-                my_spi
-            });
-            const result = validate_workfile(workfile);
-            expect(result.valid).toBe(false);
-            expect(result.errors.some(e => e.message.includes("references itself"))).toBe(true);
         });
     });
 });

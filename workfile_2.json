@@ -1,0 +1,50 @@
+{
+  "platform": "max32690",
+  "symbols": {
+    "my_adxl_ip": {
+      "$compatible": "devices/adxl355/adxl355_init_param.yaml",
+      "comm_type": "ADXL355_SPI_COMM",
+      "dev_type": "ID_ADXL355",
+      "comm_init": {
+        "spi_init": "adxl_spi_ip"
+      }
+    },
+    "my_adxl": {
+      "$compatible": "devices/adxl355/adxl355.yaml",
+      "init_param": "my_adxl_ip"
+    },
+    "adxl_spi_ip": {
+      "$compatible": "no-os/spi/no_os_spi_init_param.yaml",
+      "device_id": 4,
+      "max_speed_hz": 1000000,
+      "chip_select": 0,
+      "mode": "NO_OS_SPI_MODE_0",
+      "platform_ops": "max_spi_ops",
+      "extra": "max_spi"
+    },
+    "adxl_spi": {
+      "$compatible": "no-os/spi/no_os_spi.yaml",
+      "init_param": "adxl_spi_ip"
+    },
+    "max_spi": {
+      "$compatible": "platforms/maxim/max32690/max_spi_init_param.yaml",
+      "polarity": "SPI_SS_POL_LOW",
+      "vssel": "MXC_GPIO_VSSEL_VDDIOH"
+    },
+    "my_uart_ip": {
+      "$compatible": "no-os/uart/no_os_uart_init_param.yaml",
+      "device_id": 0,
+      "baud_rate": 115200,
+      "platform_ops": "max_uart_ops",
+      "extra": "max_uart"
+    },
+    "my_uart": {
+      "$compatible": "no-os/uart/no_os_uart.yaml",
+      "init_param": "my_uart_ip"
+    },
+    "max_uart": {
+      "$compatible": "platforms/maxim/max32690/max_uart_init_param.yaml",
+      "vssel": "MXC_GPIO_VSSEL_VDDIOH"
+    }
+  }
+}

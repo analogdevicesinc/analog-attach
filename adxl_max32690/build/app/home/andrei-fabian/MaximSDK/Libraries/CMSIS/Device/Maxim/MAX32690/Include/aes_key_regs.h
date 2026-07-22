@@ -1,0 +1,1 @@
+/home/andrei-fabian/MaximSDK/Libraries//CMSIS/Device/Maxim/MAX32690/Include/aes_key_regs.h

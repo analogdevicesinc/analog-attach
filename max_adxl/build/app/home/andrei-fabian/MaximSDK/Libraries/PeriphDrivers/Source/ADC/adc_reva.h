@@ -1,0 +1,1 @@
+/home/andrei-fabian/MaximSDK/Libraries//PeriphDrivers/Source/ADC/adc_reva.h

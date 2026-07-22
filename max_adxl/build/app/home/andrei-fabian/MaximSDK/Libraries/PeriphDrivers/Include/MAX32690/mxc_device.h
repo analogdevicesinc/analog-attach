@@ -1,0 +1,1 @@
+/home/andrei-fabian/MaximSDK/Libraries//PeriphDrivers/Include/MAX32690//mxc_device.h

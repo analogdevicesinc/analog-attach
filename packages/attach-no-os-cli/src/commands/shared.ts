@@ -11,7 +11,8 @@ import {
     Workfile,
     ok,
     error,
-    RulesetStruct
+    RulesetStruct,
+    RulesetDescriptor
 } from "attach-no-os-lib";
 
 // --- Types ---
@@ -76,7 +77,7 @@ export function output_error(flags: OutputFlags, error_code: string, message: st
 // --- Node/Property Lookup ---
 
 export type NodePropertyResult = {
-    node: RulesetStruct;
+    node: RulesetStruct | RulesetDescriptor;
     property: Property;
 };
 
@@ -90,8 +91,8 @@ export function get_node_property(
         return error(`Node '${node_name}' not found. Available: ${Object.keys(context.workfile.symbols).join(", ")}`);
     }
 
-    if (node._t !== "RulesetStruct") {
-        return error(`Node '${node_name}' is not a struct`);
+    if (node._t !== "RulesetStruct" && node._t !== "RulesetDescriptor") {
+        return error(`Node '${node_name}' is not a struct or descriptor`);
     }
 
     const property = node.properties.find(p => p.name === property_name);
@@ -102,14 +103,14 @@ export function get_node_property(
     return ok({ node, property });
 }
 
-export function get_node(context: WorkfileContext, node_name: string): Result<RulesetStruct> {
+export function get_node(context: WorkfileContext, node_name: string): Result<RulesetStruct | RulesetDescriptor> {
     const node = context.workfile.symbols[node_name];
     if (!node) {
         return error(`Node '${node_name}' not found. Available: ${Object.keys(context.workfile.symbols).join(", ")}`);
     }
 
-    if (node._t !== "RulesetStruct") {
-        return error(`Node '${node_name}' is not a struct`);
+    if (node._t !== "RulesetStruct" && node._t !== "RulesetDescriptor") {
+        return error(`Node '${node_name}' is not a struct or descriptor`);
     }
 
     return ok(node);
@@ -130,7 +131,6 @@ export function format_property_type(t: string): string {
         "PlatformExtraProperty": "platform_extra",
         "CallbackFunctionProperty": "callback",
         "CallbackContextProperty": "callback_ctx",
-        "IncludeDescriptorProperty": "descriptor"
     };
     return map[t] ?? t;
 }

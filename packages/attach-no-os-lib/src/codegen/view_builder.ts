@@ -2,13 +2,23 @@ import path from "node:path";
 import fs from "node:fs";
 import Mustache from "mustache";
 import { error, ok, Result } from "../ruleset_parser/result";
-import { Property, RulesetStruct, UnionProperty } from "../ruleset_parser/types";
+import { IncludeProperty, Property, RulesetDescriptor, RulesetStruct, UnionProperty } from "../ruleset_parser/types";
 import { Workfile } from "../workfile_handler/types";
 import { CodegenInput, DescriptorInfo, DeviceInfo, RuntimeAssignment, SourcePaths, StructView, Views } from "./types";
-import { create_connections_graph, is_referenced_by_others } from "../validator/connection_graph";
+import { create_connections_graph } from "../validator/connection_graph";
 import { ConnectionGraph } from "../validator/types";
 import { get_schemas_path } from "../settings/settings";
+import { load_resolved_ruleset } from "../resolver/resolver";
 import { all_ops } from "../workfile_handler/workfile_handler";
+
+// An `include:` field whose target schema is a descriptor ruleset is not a static
+// struct member — it is patched at runtime with `desc.<value>`. We classify by
+// resolving the target schema type (mirrors the enum-precompile check the resolver
+// and connection_graph already do per include).
+function is_descriptor_include(property: IncludeProperty): boolean {
+	const target = load_resolved_ruleset(property.include);
+	return target.ok && target.value._t === "RulesetDescriptor";
+}
 
 const CORE_UTIL_SRCS = [
 	"util/no_os_util.c",
@@ -52,11 +62,15 @@ export function build_views(input: CodegenInput): Result<Views> {
 	// Convert to array in dependency order
 	const struct_views = ordered_symbols.map(([name]) => struct_views_map.get(name)!);
 
-	// Collect all descriptors (any symbol with $descriptor in schema)
-	const descriptors = collect_descriptors(input.workfile);
+	// Collect all descriptors (one per descriptor node)
+	const descriptors_result = collect_descriptors(input.workfile);
+	if (!descriptors_result.ok) {
+		return descriptors_result;
+	}
+	const descriptors = descriptors_result.value;
 
-	// Collect devices that need init/remove code (have templates AND are not referenced by others)
-	const devices_result = collect_devices(input.workfile, graph);
+	// Collect devices that need init/remove code (one per descriptor node)
+	const devices_result = collect_devices(input.workfile);
 	if (!devices_result.ok) {
 		return devices_result;
 	}
@@ -307,15 +321,19 @@ function order_symbols(workfile: Workfile): Result<[string, RulesetStruct][]> {
 	return ok(result);
 }
 
+
+// Descriptor refs need runtime assignment: an include whose target schema is a
+// descriptor ruleset points at a handle initialized elsewhere, patched in main().
+const is_descriptor_reference = (property: Property): boolean =>
+	property._t === "IncludeProperty" && is_descriptor_include(property);
+
 function build_struct_view(name: string, ruleset: RulesetStruct): StructView {
 	const runtime_assignments: RuntimeAssignment[] = [];
 
 	const defined_properties = ruleset.properties
 		.filter(property => property.value !== undefined && property.value !== null);
 
-	// Descriptor refs need runtime assignment
-	const descriptor_properties = defined_properties
-		.filter(property => property._t === "IncludeDescriptorProperty");
+	const descriptor_properties = defined_properties.filter(p => is_descriptor_reference(p));
 
 	for (const property of descriptor_properties) {
 		runtime_assignments.push({
@@ -327,8 +345,7 @@ function build_struct_view(name: string, ruleset: RulesetStruct): StructView {
 
 	// Static fields: everything except descriptor refs
 	// (Union fields referencing non-const structs will be removed later in propagate_non_const)
-	const static_properties = defined_properties
-		.filter(property => property._t !== "IncludeDescriptorProperty");
+	const static_properties = defined_properties.filter(property => !is_descriptor_reference(property));
 
 	const has_descriptor_references = descriptor_properties.length > 0;
 
@@ -363,13 +380,12 @@ function format_c_value(property: Property): string {
 		}
 
 		case "IncludeProperty": {
+			// Descriptor refs are patched at runtime (see build_struct_view); this branch
+			// shouldn't be reached for them, but keep it correct for safety.
+			if (is_descriptor_include(property)) {
+				return `desc.${property.value}`;
+			}
 			return property.pointer ? `&${property.value}` : String(property.value);
-		}
-
-		case "IncludeDescriptorProperty": {
-			// This shouldn't be called for descriptor properties (they go to runtime)
-			// but keep it for safety
-			return `desc.${property.value}`;
 		}
 
 		case "PlatformOpsProperty": {
@@ -433,27 +449,19 @@ function format_c_value(property: Property): string {
 	}
 }
 
-function is_device(schema_id: string): boolean {
-	const schemas_path = get_schemas_path();
-	if (!schemas_path.ok) {
-		return false;
-	}
-	const directory = path.dirname(schema_id);
-	const init_path = path.join(schemas_path.value, directory, "init.mustache");
-	return fs.existsSync(init_path);
-}
-
-function load_device_templates(schema_id: string): Result<{ init: string; remove: string }> {
+function load_device_templates(descriptor: RulesetDescriptor): Result<{ init: string; remove: string }> {
 	const schemas_path = get_schemas_path();
 	if (!schemas_path.ok) {
 		return schemas_path;
 	}
-	const directory = path.dirname(schema_id);
-	const init_path = path.join(schemas_path.value, directory, "init.mustache");
-	const remove_path = path.join(schemas_path.value, directory, "remove.mustache");
+	// Template filenames are declared on the descriptor and resolved relative to its
+	// own schema directory (same dir-adjacency convention as before).
+	const directory = path.dirname(descriptor.$id);
+	const init_path = path.join(schemas_path.value, directory, descriptor.$init_template);
+	const remove_path = path.join(schemas_path.value, directory, descriptor.$remove_template);
 
 	if (!fs.existsSync(init_path) || !fs.existsSync(remove_path)) {
-		return error(`Missing templates for id: ${schema_id}`);
+		return error(`Missing templates for descriptor: ${descriptor.$id}`);
 	}
 
 	return ok({
@@ -462,13 +470,45 @@ function load_device_templates(schema_id: string): Result<{ init: string; remove
 	});
 }
 
-function extract_device_info(symbol_name: string, ruleset: RulesetStruct): Result<DeviceInfo> {
-	const templates = load_device_templates(ruleset.$id);
+// A descriptor node references its init_param node by the value of its single
+// `init_param` include property. Returns the linked init_param node name + ruleset.
+function resolve_init_parameter(
+	descriptor: RulesetDescriptor,
+	workfile: Workfile
+): Result<{ name: string; ruleset: RulesetStruct }> {
+	const init_parameter = descriptor.properties[0];
+	const target_name = init_parameter.value;
+	if (typeof target_name !== "string") {
+		return error(`Descriptor '${descriptor.$id}' has no init_param assigned`);
+	}
+	const target = workfile.symbols[target_name];
+	if (!target) {
+		return error(`Descriptor init_param '${target_name}' not found in workfile`);
+	}
+	if (target._t !== "RulesetStruct") {
+		return error(`Descriptor init_param '${target_name}' is not a struct`);
+	}
+	return ok({ name: target_name, ruleset: target });
+}
+
+function extract_device_info(
+	descriptor_name: string,
+	descriptor: RulesetDescriptor,
+	workfile: Workfile
+): Result<DeviceInfo> {
+	const templates = load_device_templates(descriptor);
 	if (!templates.ok) {
 		return templates;
 	}
 
-	const descriptor_name = ruleset.$descriptor_name ?? `${symbol_name}_device`;
+	const init_parameter = resolve_init_parameter(descriptor, workfile);
+	if (!init_parameter.ok) {
+		return init_parameter;
+	}
+	const symbol_name = init_parameter.value.name;
+	const init_parameter_ruleset = init_parameter.value.ruleset;
+
+	// Templates receive the descriptor instance name and the init_param instance name.
 	const view = { symbol_name, descriptor_name };
 	const init_code = Mustache.render(templates.value.init, view).trim();
 	const remove_code = Mustache.render(templates.value.remove, view).trim();
@@ -476,52 +516,44 @@ function extract_device_info(symbol_name: string, ruleset: RulesetStruct): Resul
 	return ok({
 		symbol_name,
 		descriptor_name,
-		descriptor_type: ruleset.$descriptor ?? "",
-		init_param_type: ruleset.$symbol,
-		header: ruleset.$header ? path.basename(ruleset.$header) : "",
+		descriptor_type: descriptor.$symbol,
+		init_param_type: init_parameter_ruleset.$symbol,
+		header: init_parameter_ruleset.$header ? path.basename(init_parameter_ruleset.$header) : "",
 		init_code,
 		remove_code,
-		capability: ruleset.$capability,
+		capability: init_parameter_ruleset.$capability,
 	});
 }
 
-function collect_descriptors(workfile: Workfile): DescriptorInfo[] {
+function collect_descriptors(workfile: Workfile): Result<DescriptorInfo[]> {
 	const result: DescriptorInfo[] = [];
 	for (const [name, symbol] of Object.entries(workfile.symbols)) {
-		if (symbol._t !== "RulesetStruct") {
+		if (symbol._t !== "RulesetDescriptor") {
 			continue;
 		}
-		if (!symbol.$descriptor) {
-			continue;
+		const init_parameter = resolve_init_parameter(symbol, workfile);
+		if (!init_parameter.ok) {
+			return init_parameter;
 		}
 		result.push({
-			symbol_name: name,
-			descriptor_name: symbol.$descriptor_name ?? `${name}_desc`,
-			descriptor_type: symbol.$descriptor,
+			symbol_name: init_parameter.value.name,
+			descriptor_name: name,
+			descriptor_type: symbol.$symbol,
 		});
 	}
-	return result;
+	return ok(result);
 }
 
-function collect_devices(workfile: Workfile, graph: ConnectionGraph): Result<DeviceInfo[]> {
-	const rulesets = Object.entries(workfile.symbols);
+function collect_devices(workfile: Workfile): Result<DeviceInfo[]> {
 	const result: DeviceInfo[] = [];
-	for (const [name, symbol] of rulesets) {
-		if (symbol._t !== "RulesetStruct") {
+	for (const [name, symbol] of Object.entries(workfile.symbols)) {
+		// Every descriptor node is a device. Whether something references it is
+		// irrelevant — a descriptor is always initialized at top level.
+		if (symbol._t !== "RulesetDescriptor") {
 			continue;
 		}
 
-		if (is_referenced_by_others(name, graph)) {
-			continue;
-		}
-
-		// Not a device (no init template) — normal, skip quietly.
-		if (!is_device(symbol.$id)) {
-			continue;
-		}
-
-		// It IS a device: any failure here is a real error, not a silent skip.
-		const device_info = extract_device_info(name, symbol);
+		const device_info = extract_device_info(name, symbol, workfile);
 		if (!device_info.ok) {
 			return device_info;
 		}

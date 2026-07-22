@@ -1,0 +1,1 @@
+/home/andrei-fabian/MaximSDK/Libraries//CMSIS/Device/Maxim/MAX32690/Source/GCC/startup_max32690.S

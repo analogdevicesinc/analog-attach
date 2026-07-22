@@ -1,0 +1,66 @@
+{
+  "platform": "max32690",
+  "symbols": {
+    "test_ad7124_ip": {
+      "$compatible": "devices/ad7124/ad7124_init_param.yaml"
+    },
+    "test_ad7124": {
+      "$compatible": "devices/ad7124/ad7124.yaml",
+      "init_param": "test_ad7124_ip"
+    },
+    "some_node_ip": {
+      "$compatible": "devices/ad7124/ad7124_init_param.yaml",
+      "spi_init": "my_spi_ip",
+      "use_crc": 1,
+      "mode": "AD7124_IDLE",
+      "active_device": "ID_AD7124_8",
+      "ref_en": false
+    },
+    "some_node": {
+      "$compatible": "devices/ad7124/ad7124.yaml",
+      "init_param": "some_node_ip"
+    },
+    "my_spi_ip": {
+      "$compatible": "no-os/spi/no_os_spi_init_param.yaml",
+      "device_id": 1,
+      "chip_select": 1,
+      "platform_ops": "max_spi_ops",
+      "parent": "newspi"
+    },
+    "my_spi": {
+      "$compatible": "no-os/spi/no_os_spi.yaml",
+      "init_param": "my_spi_ip"
+    },
+    "adxl355_node_ip": {
+      "$compatible": "devices/adxl355/adxl355_init_param.yaml",
+      "comm_type": "ADXL355_SPI_COMM",
+      "dev_type": "ID_ADXL355",
+      "comm_init": {
+        "spi_init": "my_spi_ip"
+      }
+    },
+    "adxl355_node": {
+      "$compatible": "devices/adxl355/adxl355.yaml",
+      "init_param": "adxl355_node_ip"
+    },
+    "ad5592r_test_ip": {
+      "$compatible": "devices/ad5592r/ad5592r_init_param.yaml",
+      "channel_modes": [
+        "CH_MODE_DAC",
+        "CH_MODE_GPO",
+        "CH_MODE_GPI"
+      ]
+    },
+    "ad5592r_test": {
+      "$compatible": "devices/ad5592r/ad5592r.yaml",
+      "init_param": "ad5592r_test_ip"
+    },
+    "newspi_ip": {
+      "$compatible": "no-os/spi/no_os_spi_init_param.yaml"
+    },
+    "newspi": {
+      "$compatible": "no-os/spi/no_os_spi.yaml",
+      "init_param": "newspi_ip"
+    }
+  }
+}

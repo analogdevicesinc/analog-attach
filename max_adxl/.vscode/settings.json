@@ -1,0 +1,4 @@
+{
+    "cortex-debug.gdbPath": "/home/andrei-fabian/MaximSDK/Tools/GNUTools/10.3/bin/arm-none-eabi-gdb",
+    "cortex-debug.openocdPath": "/home/andrei-fabian/MaximSDK/Libraries//../Tools/OpenOCD/openocd"
+}

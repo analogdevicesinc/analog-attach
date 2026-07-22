@@ -1,0 +1,1 @@
+/home/andrei-fabian/adi/no-OS/drivers/accel/adxl355/adxl355.h

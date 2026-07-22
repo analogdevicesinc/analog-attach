@@ -1,0 +1,1 @@
+/home/andrei-fabian/adi/analog-attach/max_adxl/src/common/common_data.c
