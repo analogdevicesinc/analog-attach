@@ -1,0 +1,1 @@
+/home/andrei-fabian/MaximSDK/Libraries//PeriphDrivers/Source/UART/uart_reva_regs.h

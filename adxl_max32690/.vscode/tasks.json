@@ -1,0 +1,14 @@
+{
+    "tasks": [
+        {
+            "label": "maxim Run",
+            "type": "shell",
+            "command": "make run -C ${workspaceFolder} PLATFORM=maxim TARGET=max32690"
+        },
+        {
+            "label": "maxim Build",
+            "type": "shell",
+            "command": "make -C ${workspaceFolder} PLATFORM=maxim TARGET=max32690"
+        }        
+    ]
+}

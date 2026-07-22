@@ -43,7 +43,6 @@ export type PropertySuggestions = {
 
 export type MinimalWorkfileNode = {
     $compatible: string;
-    $descriptor?: string;
     [property: string]: unknown;
 };
 

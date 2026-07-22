@@ -1,0 +1,37 @@
+{
+  "platform": "stm32",
+  "symbols": {
+    "my_ad5592r_ip": {
+      "$compatible": "devices/ad5592r/ad5592r_init_param.yaml",
+      "spi_init": "noos_spi_ip",
+      "ss_init": "noos_gpio_ip",
+      "adc_range": "ZERO_TO_2VREF"
+    },
+    "my_ad5592r": {
+      "$compatible": "devices/ad5592r/ad5592r.yaml",
+      "init_param": "my_ad5592r_ip"
+    },
+    "noos_spi_ip": {
+      "$compatible": "no-os/spi/no_os_spi_init_param.yaml",
+      "device_id": 1,
+      "chip_select": 1,
+      "platform_ops": "stm32_spi_ops",
+      "extra": "stm32_spi"
+    },
+    "noos_spi": {
+      "$compatible": "no-os/spi/no_os_spi.yaml",
+      "init_param": "noos_spi_ip"
+    },
+    "stm32_spi": {
+      "$compatible": "platforms/stm32/stm32_spi_init_param.yaml"
+    },
+    "noos_gpio_ip": {
+      "$compatible": "no-os/gpio/no_os_gpio_init_param.yaml",
+      "number": 1
+    },
+    "noos_gpio": {
+      "$compatible": "no-os/gpio/no_os_gpio.yaml",
+      "init_param": "noos_gpio_ip"
+    }
+  }
+}

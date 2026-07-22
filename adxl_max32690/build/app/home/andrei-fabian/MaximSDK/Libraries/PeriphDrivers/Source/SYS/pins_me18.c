@@ -1,0 +1,1 @@
+/home/andrei-fabian/MaximSDK/Libraries//PeriphDrivers/Source/SYS/pins_me18.c

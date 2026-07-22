@@ -1,0 +1,1 @@
+/home/andrei-fabian/adi/analog-attach/adxl_max32690/src/user_app.c

@@ -1,0 +1,38 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "cwd": "${workspaceFolder}",
+            "executable": "/home/andrei-fabian/adi/analog-attach/adxl_max32690/build/adxl_max32690.elf",
+            "name": "OpenOCD(stlink-dap)",
+            "request": "launch",
+            "type": "cortex-debug",
+            "servertype": "openocd",
+            "preLaunchTask": "maxim Build",
+            "svdFile": "/home/andrei-fabian/MaximSDK/Libraries//CMSIS/Device/Maxim/MAX32690/Include/max32690.svd",
+            "configFiles": [
+                "/home/andrei-fabian/adi/analog-attach/adxl_max32690/build/adxl_max32690.elf.openocd"
+            ],
+            "searchDir": [ "/home/andrei-fabian/MaximSDK/Libraries//../Tools/OpenOCD/scripts" ],
+            "runToEntryPoint": "main",
+            "showDevDebugOutput": "none"
+        },
+        {
+            "cwd": "${workspaceFolder}",
+            "executable": "/home/andrei-fabian/adi/analog-attach/adxl_max32690/build/adxl_max32690.elf",
+            "name": "OpenOCD(CMSIS-dap)",
+            "request": "launch",
+            "type": "cortex-debug",
+            "device": "cmsis-dap",
+            "servertype": "openocd",
+            "preLaunchTask": "maxim Build",
+            "svdFile": "/home/andrei-fabian/MaximSDK/Libraries//CMSIS/Device/Maxim/MAX32690/Include/max32690.svd",
+            "configFiles": [
+                "interface/cmsis-dap.cfg","target/max32690.cfg"
+            ],
+            "searchDir": [ "/home/andrei-fabian/MaximSDK/Libraries//../Tools/OpenOCD/scripts" ],
+            "runToEntryPoint": "main",
+            "showDevDebugOutput": "none"
+        }
+    ]
+}
