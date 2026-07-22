@@ -15,15 +15,13 @@ int main(void)
 {% endif %}
 	// Init devices and structures
 {% for d in devices %}
-	ret = {{ d.init_code }};
-	if (ret)
-		return ret;
+{{ d.init_code | tab_indent }}
 
 {% endfor %}
 	user_app(&desc);
 
 {% for d in devices | reverse %}
-	{{ d.remove_code }};
+{{ d.remove_code | tab_indent }}
 {% endfor %}
 
 	return 0;
