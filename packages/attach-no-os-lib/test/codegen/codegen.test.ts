@@ -241,14 +241,14 @@ describe('codegen', () => {
     });
 
     test('errors when a device has an init template but no remove template', () => {
-        // A schema with init.mustache but no remove.mustache is a half-configured
+        // A schema with init.njk but no remove.njk is a half-configured
         // device. It must surface an error, not be silently dropped from main.c.
         const broken_schemas = fs.mkdtempSync(path.join(os.tmpdir(), 'broken-schemas-'));
         try {
             // NOOS_ROOT/schemas is a symlink to the real schema tree; dereference so we
             // copy real files into the temp dir and never mutate the source via the link.
             fs.cpSync(path.join(NOOS_ROOT, 'schemas'), path.join(broken_schemas, 'schemas'), { recursive: true, dereference: true });
-            fs.rmSync(path.join(broken_schemas, 'schemas/devices/adxl355/remove.mustache'));
+            fs.rmSync(path.join(broken_schemas, 'schemas/devices/adxl355/remove.njk'));
 
             teardown_test_config();
             setup_test_config(broken_schemas);
@@ -343,6 +343,11 @@ describe('codegen', () => {
         expect(uart_init).toBeGreaterThanOrEqual(0);
         expect(adxl_init).toBeGreaterThanOrEqual(0);
         expect(uart_init).toBeLessThan(adxl_init);
+
+        // UART's full-block init template registers the stdio backend after a
+        // successful init; the call must appear after no_os_uart_init.
+        const uart_stdio = main_c.indexOf("no_os_uart_stdio(desc.");
+        expect(uart_stdio).toBeGreaterThan(uart_init);
 
         // Teardown is reverse init order: UART inits first, so it is removed last.
         const uart_remove = main_c.indexOf("no_os_uart_remove");
