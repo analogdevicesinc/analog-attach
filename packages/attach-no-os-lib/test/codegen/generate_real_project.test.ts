@@ -26,10 +26,14 @@ const workfile_data: MinimalWorkfile = {
             "extra": "max_spi_ip"
         },
         "adxl355_ip": {
-            "$compatible": "devices/adxl355/adxl355.yaml",
+            "$compatible": "devices/adxl355/adxl355_init_param.yaml",
             "comm_type": "ADXL355_SPI_COMM",
             "dev_type": "ID_ADXL355",
             "comm_init": { "spi_init": "no_os_spi_ip" }
+        },
+        "adxl355_device": {
+            "$compatible": "devices/adxl355/adxl355.yaml",
+            "init_param": "adxl355_ip"
         }
     }
 };

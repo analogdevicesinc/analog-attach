@@ -4,7 +4,6 @@ import { Result, ok, error } from "../ruleset_parser/result";
 import {
     ArrayProperty,
     EnumProperty,
-    IncludeDescriptorProperty,
     IncludeProperty,
     PlatformExtraProperty,
     PlatformOpsProperty,
@@ -21,7 +20,6 @@ import { collect_child_overrides, create_connections_graph } from "../validator/
 import { apply_overrides } from "../validator/override_resolver";
 import { AvailableStructs, is_minimal_workfile, MinimalWorkfile, Workfile } from "./types";
 import { parse_ruleset } from "../ruleset_parser/ruleset_parser";
-import { find_symbol_by_descriptor } from "./utils";
 
 // --- Workfile Creation ---
 
@@ -208,44 +206,6 @@ export function list_symbols(workfile: Workfile): string[] {
     return Object.keys(workfile.symbols);
 }
 
-// --- Descriptor Names ---
-
-export function get_descriptor_name(workfile: Workfile, symbol_name: string): Result<string> {
-    const ruleset = workfile.symbols[symbol_name];
-    if (!ruleset) {
-        return error(`Symbol '${symbol_name}' not found`, "symbol_name");
-    }
-    if (ruleset._t !== "RulesetStruct") {
-        return error(`Symbol '${symbol_name}' is not a struct`, "symbol_name");
-    }
-    return ok(ruleset.$descriptor_name ?? `${symbol_name}_desc`);
-}
-
-export function set_descriptor_name(workfile: Workfile, symbol_name: string, descriptor_name: string): Result<void> {
-    const ruleset = workfile.symbols[symbol_name];
-    if (!ruleset) {
-        return error(`Symbol '${symbol_name}' not found`, "symbol_name");
-    }
-    if (ruleset._t !== "RulesetStruct") {
-        return error(`Symbol '${symbol_name}' is not a struct`, "symbol_name");
-    }
-    const valid_name = validate_c_name(descriptor_name, "Descriptor name", "descriptor_name");
-    if (!valid_name.ok) {
-        return valid_name;
-    }
-
-    // Check for uniqueness
-    const existing = find_symbol_by_descriptor(workfile, descriptor_name);
-    if (existing && existing !== symbol_name) {
-        return error(`Descriptor name '${descriptor_name}' is already used by symbol '${existing}'`, "descriptor_name");
-    }
-
-    ruleset.$descriptor_name = descriptor_name;
-    return ok();
-}
-
-export { find_symbol_by_descriptor } from "./utils";
-
 // --- Lookup (checks both platform_ops and symbols) ---
 
 export function find_any(workfile: Workfile, name: string): Ruleset | undefined {
@@ -259,7 +219,9 @@ export function set_value(workfile: Workfile, symbol_name: string, property_name
     if (!ruleset) {
         return error(`Symbol '${symbol_name}' not found`, "symbol_name");
     }
-    if (ruleset._t !== "RulesetStruct") {
+    // Descriptor nodes also carry properties (their single `init_param` include),
+    // so their init_param reference is settable through the same path.
+    if (ruleset._t !== "RulesetStruct" && ruleset._t !== "RulesetDescriptor") {
         return error(`Symbol '${symbol_name}' is not a struct or device`, "symbol_name");
     }
 
@@ -274,7 +236,7 @@ export function set_value(workfile: Workfile, symbol_name: string, property_name
 
 export function get_value(workfile: Workfile, symbol_name: string, property_name: string): Result<unknown> {
     const ruleset = workfile.symbols[symbol_name];
-    if (!ruleset || (ruleset._t !== "RulesetStruct")) {
+    if (!ruleset || (ruleset._t !== "RulesetStruct" && ruleset._t !== "RulesetDescriptor")) {
         return error(`Symbol '${symbol_name}' is not a struct or device`, "symbol_name");
     }
 
@@ -312,34 +274,6 @@ export function suggest_for_include(workfile: Workfile, include: IncludeProperty
     return ok({
         values: values.length === 0 ? undefined : values,
         types: [include.include],
-    });
-}
-
-export function suggest_for_include_descriptor(workfile: Workfile, include_descriptor: IncludeDescriptorProperty, exclude_symbol?: string): Result<PropertySuggestions> {
-    const values: string[] = [];
-
-    // Find all symbols whose schema matches the include_descriptor path
-    // and collect their descriptor names
-    for (const [name, ruleset] of Object.entries(workfile.symbols)) {
-        if (ruleset._t !== "RulesetStruct") {
-            continue;
-        }
-        if (ruleset.$id !== include_descriptor.include_descriptor) {
-            continue;
-        }
-        // Never suggest a symbol's own descriptor — a self-reference is invalid.
-        if (name === exclude_symbol) {
-            continue;
-        }
-        // Use the user-defined descriptor name or default
-        const descriptor_name = ruleset.$descriptor_name ?? `${name}_desc`;
-        values.push(descriptor_name);
-    }
-
-    return ok({
-        values: values.length === 0 ? undefined : values,
-        // Suggest creating symbols of this type if none exist
-        types: [include_descriptor.include_descriptor],
     });
 }
 
@@ -460,8 +394,8 @@ export function suggest_for_property(workfile: Workfile, symbol_name: string, pr
         return error(`Could not find symbol with name: "${symbol_name}" in [${Object.keys(workfile.symbols)}]`, "");
     }
 
-    if (symbol._t !== "RulesetStruct") {
-        return error(`Expected type RulesetStruct, got "${symbol._t}"`, "");
+    if (symbol._t !== "RulesetStruct" && symbol._t !== "RulesetDescriptor") {
+        return error(`Expected type RulesetStruct or RulesetDescriptor, got "${symbol._t}"`, "");
     }
 
     const property = symbol.properties.find(p => p.name === property_name);
@@ -482,9 +416,6 @@ export function suggest_for_property(workfile: Workfile, symbol_name: string, pr
         case "IncludeProperty": {
             return suggest_for_include(workfile, property);
         }
-        case "IncludeDescriptorProperty": {
-            return suggest_for_include_descriptor(workfile, property, symbol_name);
-        }
         case "EnumProperty": {
             return suggest_for_enum(property);
         }
@@ -495,12 +426,20 @@ export function suggest_for_property(workfile: Workfile, symbol_name: string, pr
             return suggest_for_array(workfile, property);
         }
         case "PlatformOpsProperty": {
+            // Only structs carry platform_ops; a descriptor node never reaches here.
+            if (symbol._t !== "RulesetStruct") {
+                return error(`Property '${property_name}' is not valid on a descriptor node`, symbol_name);
+            }
             const graph = create_connections_graph(workfile);
             const child_overrides = collect_child_overrides(symbol_name, workfile, graph);
             const { effective } = apply_overrides(property, child_overrides, symbol_name, workfile);
             return suggest_platform_ops(workfile, effective as PlatformOpsProperty, symbol);
         }
         case "PlatformExtraProperty": {
+            // Only structs carry platform_extra; a descriptor node never reaches here.
+            if (symbol._t !== "RulesetStruct") {
+                return error(`Property '${property_name}' is not valid on a descriptor node`, symbol_name);
+            }
             const graph = create_connections_graph(workfile);
             const child_overrides = collect_child_overrides(symbol_name, workfile, graph);
             const { effective } = apply_overrides(property, child_overrides, symbol_name, workfile);
@@ -546,25 +485,25 @@ export function list_available_structs(workfile: Workfile): Result<AvailableStru
         }
     }
 
-    // We should eliminate the enum types from this search as those are not instantiable
+    // Only instantiable rulesets (structs + descriptors) are offered; enums and other
+    // non-instantiable types are filtered out.
     return ok({
-        devices: devices.value.filter(item => filter_enums(path.join(schema_path.value, item))),
-        noos: noos.value.filter(item => filter_enums(path.join(schema_path.value, item))),
-        platform: platform_structs.filter(item => filter_enums(path.join(schema_path.value, item)))
+        devices: devices.value.filter(item => is_instantiable(path.join(schema_path.value, item))),
+        noos: noos.value.filter(item => is_instantiable(path.join(schema_path.value, item))),
+        platform: platform_structs.filter(item => is_instantiable(path.join(schema_path.value, item)))
     });
 }
 
-function filter_enums(path: string) {
+function is_instantiable(path: string) {
     if (!fs.existsSync(path)) {
         return false;
     }
     const contents = fs.readFileSync(path, "utf8");
     const ruleset = parse_ruleset(contents);
-    if (!ruleset.ok || ruleset.value._t !== "RulesetStruct") {
+    if (!ruleset.ok) {
         return false;
     }
-
-    return true;
+    return ruleset.value._t === "RulesetStruct" || ruleset.value._t === "RulesetDescriptor";
 };
 
 function scan_yaml_files(directory: string): Result<string[]> {
@@ -632,13 +571,13 @@ export function export_minimal(workfile: Workfile): Result<MinimalWorkfile> {
     const symbols: MinimalWorkfile["symbols"] = {};
 
     for (const [name, ruleset] of Object.entries(workfile.symbols)) {
-        if (ruleset._t !== "RulesetStruct") {
+        // Struct and descriptor nodes both carry properties and are user-created.
+        if (ruleset._t !== "RulesetStruct" && ruleset._t !== "RulesetDescriptor") {
             continue;
         }
 
         const node: MinimalWorkfile["symbols"][string] = {
             $compatible: ruleset.$id,
-            $descriptor: ruleset.$descriptor_name ?? `${name}_desc`
         };
 
         for (const property of ruleset.properties) {
@@ -672,18 +611,13 @@ export function import_minimal(minimal: MinimalWorkfile): Result<Workfile> {
 
         const ruleset = ruleset_result.value;
 
-        // Set descriptor name (user-provided or auto-generated)
-        if (ruleset._t === "RulesetStruct") {
-            ruleset.$descriptor_name = node.$descriptor ?? `${name}_desc`;
-        }
-
         const add_result = add_symbol(workfile, name, ruleset);
         if (!add_result.ok) {
             return add_result;
         }
 
         for (const [property_name, value] of Object.entries(node)) {
-            if (property_name === "$compatible" || property_name === "$descriptor") {
+            if (property_name === "$compatible") {
                 continue;
             }
             const set_result = set_value(workfile, name, property_name, value);

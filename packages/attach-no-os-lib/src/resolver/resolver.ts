@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { error, ok, Result } from "../ruleset_parser/result";
 import { parse_ruleset } from "../ruleset_parser/ruleset_parser";
-import { EnumProperty, Property, Ruleset } from "../ruleset_parser/types";
+import { EnumProperty, Property, Ruleset, RulesetDescriptor } from "../ruleset_parser/types";
 import { get_schemas_path } from "../settings/settings";
 
 function load_ruleset(ruleset_path: string): Result<Ruleset> {
@@ -20,7 +20,25 @@ function load_ruleset(ruleset_path: string): Result<Ruleset> {
 	}
 }
 
+function resolve_descriptor_ruleset(ruleset: RulesetDescriptor): Result<RulesetDescriptor> {
+	// NOTE: We just validate that the path is right and the included ruleset is a struct
+	const resolved_ruleset = load_ruleset(ruleset.properties[0].include);
+	if (!resolved_ruleset.ok) {
+		return resolved_ruleset;
+	}
+
+	if (resolved_ruleset.value._t !== "RulesetStruct") {
+		return error(`Expected type "struct" to be included in the descriptor ruleset, got ${resolved_ruleset.value._t}`);
+	}
+
+	return ok(ruleset);
+}
+
 export function resolve_ruleset(ruleset: Ruleset): Result<Ruleset> {
+	if (ruleset._t === "RulesetDescriptor") {
+		return resolve_descriptor_ruleset(ruleset);
+	}
+
 	if (ruleset._t !== "RulesetStruct") {
 		return ok(ruleset);
 	}
