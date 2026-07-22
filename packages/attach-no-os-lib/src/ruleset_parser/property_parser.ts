@@ -6,7 +6,6 @@ import {
 	CallbackContextProperty,
 	CallbackFunctionProperty,
 	EnumProperty,
-	IncludeDescriptorProperty,
 	IncludeProperty,
 	is_primitive_symbols,
 	NumberProperty,
@@ -211,43 +210,6 @@ export function parse_include_property(name: string, object: Record<string, unkn
 		description: description.value,
 		required: required_.value,
 		include: include.value,
-		pointer: pointer.value,
-		capability: capability.value,
-	});
-}
-
-export function parse_include_descriptor_property(name: string, object: Record<string, unknown>, context: ParseContext): Result<IncludeDescriptorProperty> {
-	const include_descriptor = required(object, "include_descriptor", context, string_);
-	if (!include_descriptor.ok) {
-		return include_descriptor;
-	}
-
-	const description = optionalWithDefault(object, "description", context, "", string_);
-	if (!description.ok) {
-		return description;
-	}
-
-	const required_ = optionalWithDefault(object, "required", context, false, boolean_);
-	if (!required_.ok) {
-		return required_;
-	}
-
-	const pointer = optionalWithDefault(object, "pointer", context, true, boolean_);
-	if (!pointer.ok) {
-		return pointer;
-	}
-
-	const capability = optional(object, "capability", context, capabilityArray);
-	if (!capability.ok) {
-		return capability;
-	}
-
-	return ok({
-		_t: "IncludeDescriptorProperty",
-		name,
-		description: description.value,
-		required: required_.value,
-		include_descriptor: include_descriptor.value,
 		pointer: pointer.value,
 		capability: capability.value,
 	});

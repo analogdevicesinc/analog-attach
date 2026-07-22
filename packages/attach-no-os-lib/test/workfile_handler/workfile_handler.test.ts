@@ -14,7 +14,6 @@ import {
     set_value,
     get_value,
     suggest_for_include,
-    suggest_for_include_descriptor,
     suggest_for_union,
     suggest_for_array,
     suggest_platform_ops,
@@ -34,7 +33,6 @@ import {
     RulesetStruct,
     RulesetType,
     IncludeProperty,
-    IncludeDescriptorProperty,
     UnionProperty,
     ArrayProperty,
     RulesetPlatformOps,
@@ -101,17 +99,6 @@ function make_array(name: string, size: number, element: ArrayProperty['element'
         description: "",
         size,
         element,
-        value,
-    };
-}
-
-function make_include_descriptor(name: string, include_descriptor: string, value?: string): IncludeDescriptorProperty {
-    return {
-        _t: "IncludeDescriptorProperty",
-        name,
-        description: "",
-        include_descriptor,
-        pointer: true,
         value,
     };
 }
@@ -404,62 +391,6 @@ describe('workfile_handler', () => {
         });
     });
 
-    describe('suggest_for_include_descriptor', () => {
-        test('returns descriptor names from matching symbols', () => {
-            const spi1 = make_struct("no-os/spi.yaml", "spi");
-            spi1.$descriptor_name = "my_spi_desc";
-            add_symbol(workfile, "spi1", spi1);
-
-            const spi2 = make_struct("no-os/spi.yaml", "spi");
-            spi2.$descriptor_name = "another_spi";
-            add_symbol(workfile, "spi2", spi2);
-
-            add_symbol(workfile, "i2c1", make_struct("no-os/i2c.yaml", "i2c"));
-
-            const include_descriptor = make_include_descriptor("parent", "no-os/spi.yaml");
-            const suggestions = suggest_for_include_descriptor(workfile, include_descriptor);
-            expectOk(suggestions);
-            expect(suggestions.value.values).toEqual(["my_spi_desc", "another_spi"]);
-            expect(suggestions.value.types).toEqual(["no-os/spi.yaml"]);
-        });
-
-        test('uses default descriptor name when not specified', () => {
-            add_symbol(workfile, "spi1", make_struct("no-os/spi.yaml", "spi"));
-            add_symbol(workfile, "spi2", make_struct("no-os/spi.yaml", "spi"));
-
-            const include_descriptor = make_include_descriptor("parent", "no-os/spi.yaml");
-            const suggestions = suggest_for_include_descriptor(workfile, include_descriptor);
-            expectOk(suggestions);
-            expect(suggestions.value.values).toEqual(["spi1_desc", "spi2_desc"]);
-        });
-
-        test('returns empty values when no matches', () => {
-            add_symbol(workfile, "i2c1", make_struct("no-os/i2c.yaml", "i2c"));
-
-            const include_descriptor = make_include_descriptor("parent", "no-os/spi.yaml");
-            const suggestions = suggest_for_include_descriptor(workfile, include_descriptor);
-            expectOk(suggestions);
-            expect(suggestions.value.values).toBeUndefined();
-            expect(suggestions.value.types).toEqual(["no-os/spi.yaml"]);
-        });
-
-        test('excludes the symbol being edited (no self-reference suggested)', () => {
-            const spi1 = make_struct("no-os/spi.yaml", "spi");
-            spi1.$descriptor_name = "spi1_desc";
-            add_symbol(workfile, "spi1", spi1);
-
-            const spi2 = make_struct("no-os/spi.yaml", "spi");
-            spi2.$descriptor_name = "spi2_desc";
-            add_symbol(workfile, "spi2", spi2);
-
-            const include_descriptor = make_include_descriptor("parent", "no-os/spi.yaml");
-            // Suggesting for spi1 must not offer spi1's own descriptor.
-            const suggestions = suggest_for_include_descriptor(workfile, include_descriptor, "spi1");
-            expectOk(suggestions);
-            expect(suggestions.value.values).toEqual(["spi2_desc"]);
-        });
-    });
-
     describe('suggest_for_union', () => {
         test('returns matching symbols for member', () => {
             add_symbol(workfile, "spi1", make_struct("no-os/spi.yaml", "spi"));
@@ -649,22 +580,6 @@ describe('workfile_handler', () => {
             const result = suggest_for_property(workfile, "my_struct", "count");
             expectOk(result);
             expect(result.value).toEqual({});
-        });
-
-        test('suggests descriptor names for include_descriptor property', () => {
-            const spi1 = make_struct("no-os/spi.yaml", "spi");
-            spi1.$descriptor_name = "parent_spi";
-            add_symbol(workfile, "spi1", spi1);
-
-            const struct = make_struct("test.yaml", "test", [
-                make_include_descriptor("parent", "no-os/spi.yaml")
-            ]);
-            add_symbol(workfile, "my_struct", struct);
-
-            const result = suggest_for_property(workfile, "my_struct", "parent");
-            expectOk(result);
-            expect(result.value.values).toEqual(["parent_spi"]);
-            expect(result.value.types).toEqual(["no-os/spi.yaml"]);
         });
 
         test('returns error for unknown symbol', () => {
@@ -893,7 +808,7 @@ describe('workfile_handler', () => {
                 platform: "max32690",
                 symbols: {
                     "my_ad5592r": {
-                        $compatible: "devices/ad5592r/ad5592r.yaml",
+                        $compatible: "devices/ad5592r/ad5592r_init_param.yaml",
                         channel_modes: ["CH_MODE_ADC", "CH_MODE_DAC", "CH_MODE_UNUSED"]
                     }
                 }
@@ -917,7 +832,7 @@ describe('workfile_handler', () => {
                         device_id: 1
                     },
                     "my_adxl355": {
-                        $compatible: "devices/adxl355/adxl355.yaml",
+                        $compatible: "devices/adxl355/adxl355_init_param.yaml",
                         comm_type: "ADXL355_SPI_COMM",
                         dev_type: "ID_ADXL355",
                         comm_init: { spi_init: "my_spi" }
@@ -939,7 +854,7 @@ describe('workfile_handler', () => {
                 platform: "max32690",
                 symbols: {
                     "my_ad7124": {
-                        $compatible: "devices/ad7124/ad7124.yaml",
+                        $compatible: "devices/ad7124/ad7124_init_param.yaml",
                         ref_en: false,
                         check_ready: true
                     }

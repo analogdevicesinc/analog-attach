@@ -16,7 +16,6 @@ import {
 	parse_callback_function_property,
 	parse_enum_property,
 	parse_include_property,
-	parse_include_descriptor_property,
 	parse_number_property,
 	parse_platform_extra_property,
 	parse_platform_ops_property,
@@ -48,6 +47,9 @@ function is_ruleset_type(value: unknown, context: ParseContext): Result<RulesetT
 		}
 		case "platform_ops": {
 			return ok(RulesetType.RT_PLATFORM_OPS);
+		}
+		case "descriptor": {
+			return ok(RulesetType.RT_DESCRIPTOR);
 		}
 		default: {
 			return error(`Invalid ruleset type '${s.value}'`, context.path);
@@ -105,10 +107,6 @@ export function parse_property(name: string, value: unknown, context: ParseConte
 		return parse_include_property(name, object.value, context);
 	}
 
-	if ("include_descriptor" in object.value) {
-		return parse_include_descriptor_property(name, object.value, context);
-	}
-
 	const type_ = object.value["type"];
 	if (typeof type_ === "string") {
 		if (type_ === "enum") {
@@ -154,7 +152,7 @@ export function parse_property(name: string, value: unknown, context: ParseConte
 		return error(`Unknown property type '${type_}'`, at(context, type_).path);
 	}
 
-	return error(`Cannot determine the property type for '${context.path}'. Expected 'type', 'include', or 'include_descriptor'.`, context.path);
+	return error(`Cannot determine the property type for '${context.path}'. Expected 'type' or 'include'.`, context.path);
 }
 
 function is_enum_property(value: unknown, context: ParseContext): Result<RulesetEnumValue[]> {
@@ -217,7 +215,11 @@ function parse_ruleset_from_object(object: Record<string, unknown>, context: Par
 		return $description;
 	}
 
-	const $sources = required(object, "$sources", context, is_ruleset_sources);
+	// Descriptor rulesets carry no sources (the init_param they reference does), so
+	// $sources is optional for them and defaults to empty; every other type requires it.
+	const $sources = $type.value === RulesetType.RT_DESCRIPTOR
+		? optionalWithDefault(object, "$sources", context, {}, is_ruleset_sources)
+		: required(object, "$sources", context, is_ruleset_sources);
 	if (!$sources.ok) {
 		return $sources;
 	}
@@ -260,11 +262,6 @@ function parse_ruleset_from_object(object: Record<string, unknown>, context: Par
 				return $header;
 			}
 
-			const $descriptor = optional(object, "$descriptor", context, string_);
-			if (!$descriptor.ok) {
-				return $descriptor;
-			}
-
 			const $exposes = optional(object, "$exposes", context, stringArray);
 			if (!$exposes.ok) {
 				return $exposes;
@@ -294,7 +291,6 @@ function parse_ruleset_from_object(object: Record<string, unknown>, context: Par
 				$requires: $requires,
 				$capability: $capability.value,
 				$header: $header.value,
-				$descriptor: $descriptor.value,
 				$exposes: $exposes.value,
 			});
 		}
@@ -343,6 +339,40 @@ function parse_ruleset_from_object(object: Record<string, unknown>, context: Par
 				$ranking: $ranking.value,
 				$sources: $sources.value,
 				$capability: $capability.value,
+			});
+		}
+		case RulesetType.RT_DESCRIPTOR: {
+			const $init_template = required(object, "$init_template", context, string_);
+			if (!$init_template.ok) {
+				return $init_template;
+			}
+
+			const $remove_template = required(object, "$remove_template", context, string_);
+			if (!$remove_template.ok) {
+				return $remove_template;
+			}
+
+			const init_parameter_object = required(object, "init_param", context, asObject);
+			if (!init_parameter_object.ok) {
+				return init_parameter_object;
+			}
+
+			const init_parameter = parse_include_property("init_param", init_parameter_object.value, at(context, "init_param"));
+			if (!init_parameter.ok) {
+				return init_parameter;
+			}
+
+			return ok({
+				_t: "RulesetDescriptor",
+				$type: RulesetType.RT_DESCRIPTOR,
+				$id: $id.value,
+				$ranking: $ranking.value,
+				$sources: $sources.value,
+				$description: $description.value,
+				$symbol: $symbol.value,
+				$init_template: $init_template.value,
+				$remove_template: $remove_template.value,
+				properties: [init_parameter.value],
 			});
 		}
 	}

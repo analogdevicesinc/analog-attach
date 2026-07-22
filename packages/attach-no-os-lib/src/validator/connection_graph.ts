@@ -1,21 +1,13 @@
 import { Property } from "../ruleset_parser/types";
 import { Workfile } from "../workfile_handler/types";
-import { find_symbol_by_descriptor } from "../workfile_handler/utils";
 import { CollectedRule, ConnectionGraph } from "./types";
 import { load_resolved_ruleset } from "../resolver/resolver";
 
-function get_connected_symbols(property: Property, workfile: Workfile): string[] {
+function get_connected_symbols(property: Property): string[] {
 	switch (property._t) {
 		case "IncludeProperty": {
 			if (typeof property.value === "string") {
 				return [property.value];
-			}
-			return [];
-		}
-		case "IncludeDescriptorProperty": {
-			if (typeof property.value === "string") {
-				const symbol_name = find_symbol_by_descriptor(workfile, property.value);
-				return symbol_name ? [symbol_name] : [];
 			}
 			return [];
 		}
@@ -57,12 +49,14 @@ export function create_connections_graph(workfile: Workfile): ConnectionGraph {
 	}
 
 	for (const [symbol_name, ruleset] of Object.entries(workfile.symbols)) {
-		if (ruleset._t !== "RulesetStruct") {
+		// Descriptor nodes also carry properties (their single `init_param` include),
+		// so the descriptor -> init_param edge is part of the graph.
+		if (ruleset._t !== "RulesetStruct" && ruleset._t !== "RulesetDescriptor") {
 			continue;
 		}
 
 		for (const property of ruleset.properties) {
-			const children = get_connected_symbols(property, workfile);
+			const children = get_connected_symbols(property);
 			for (const child of children) {
 				const existing = graph.get(symbol_name) ?? [];
 				if (!existing.includes(child)) {

@@ -50,12 +50,6 @@ export type IncludeProperty = PropertyBase & {
 	pointer?: boolean,
 }
 
-export type IncludeDescriptorProperty = PropertyBase & {
-	_t: "IncludeDescriptorProperty",
-	include_descriptor: string,  // Path to the init_param schema that produces the descriptor
-	pointer?: boolean,
-}
-
 export type EnumValue = string | number;
 
 export type EnumProperty = PropertyBase & {
@@ -102,7 +96,7 @@ export type ArrayProperty = PropertyBase & {
 	element: ArrayElement,
 }
 
-export type Property = NumberProperty | BooleanProperty | StringProperty | IncludeProperty | IncludeDescriptorProperty | EnumProperty | UnionProperty | ArrayProperty | PlatformOpsProperty | PlatformExtraProperty | CallbackFunctionProperty | CallbackContextProperty;
+export type Property = NumberProperty | BooleanProperty | StringProperty | IncludeProperty | EnumProperty | UnionProperty | ArrayProperty | PlatformOpsProperty | PlatformExtraProperty | CallbackFunctionProperty | CallbackContextProperty;
 
 // The authoring-surface scope tokens. The parser strips these into concrete
 // self/parent OverrideReference nodes during lowering.
@@ -140,10 +134,12 @@ export type Rule = {
 	effects: Effect[],
 };
 
+// TODO : Rename these bt_struct -> rt_struct
 export enum RulesetType {
 	RT_STRUCT = "bt_struct",
 	RT_ENUM = "bt_enum",
 	RT_PLATFORM_OPS = "bt_platform_ops",
+	RT_DESCRIPTOR = "bt_descriptor",
 };
 
 enum RulesetRank {
@@ -197,11 +193,15 @@ export type RulesetStruct = RulesetBase & {
 	$requires?: string[], // Auto-computed: all capabilities required by properties
 	$capability?: string,
 	$header?: string,      // Device header path, e.g. "drivers/accel/adxl355/adxl355.h"
-	$descriptor?: string,  // Device descriptor type from schema, e.g. "adxl355_dev"
 	$exposes?: string[],   // List of ops ids that this struct might expose
+};
 
-	// FIXME: This might not be here since this is runtime assigned
-	$descriptor_name?: string,  // User-provided descriptor instance name, e.g. "my_accel"
+export type RulesetDescriptor = RulesetBase & {
+	_t: "RulesetDescriptor",
+	$type: RulesetType.RT_DESCRIPTOR,
+	$init_template: string,
+	$remove_template: string,
+	properties: [IncludeProperty]
 };
 
 export type RulesetPlatformOps = RulesetBase & {
@@ -210,4 +210,4 @@ export type RulesetPlatformOps = RulesetBase & {
 	$capability?: string,
 };
 
-export type Ruleset = RulesetStruct | RulesetEnum | RulesetPlatformOps;
+export type Ruleset = RulesetStruct | RulesetEnum | RulesetPlatformOps | RulesetDescriptor;

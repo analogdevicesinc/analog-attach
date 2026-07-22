@@ -25,11 +25,15 @@ const test_workfile: MinimalWorkfile = {
             "platform_ops": "spi_ops",
             "extra": "max_spi_ip"
         },
-        "misp": {
-            "$compatible": "devices/adxl355/adxl355.yaml",
+        "misp_ip": {
+            "$compatible": "devices/adxl355/adxl355_init_param.yaml",
             "comm_type": "ADXL355_SPI_COMM",
             "dev_type": "ID_ADXL355",
             "comm_init": { "spi_init": "no_os_spi_ip" }
+        },
+        "misp": {
+            "$compatible": "devices/adxl355/adxl355.yaml",
+            "init_param": "misp_ip"
         }
     }
 };
@@ -115,7 +119,7 @@ describe('codegen', () => {
             platform: "max32690",
             symbols: {
                 "my_ad5592r": {
-                    "$compatible": "devices/ad5592r/ad5592r.yaml",
+                    "$compatible": "devices/ad5592r/ad5592r_init_param.yaml",
                     "channel_modes": []
                 }
             }
@@ -148,7 +152,7 @@ describe('codegen', () => {
             platform: "max32690",
             symbols: {
                 "my_ad5592r": {
-                    "$compatible": "devices/ad5592r/ad5592r.yaml",
+                    "$compatible": "devices/ad5592r/ad5592r_init_param.yaml",
                     "channel_modes": ["CH_MODE_ADC", "CH_MODE_DAC"]
                 }
             }
@@ -176,31 +180,39 @@ describe('codegen', () => {
         expect(common_data_c).toContain(".channel_modes = { CH_MODE_ADC, CH_MODE_DAC }");
     });
 
-    test('include_descriptor generates devices.descriptor reference', () => {
+    test('descriptor-typed include generates devices.descriptor reference', () => {
+        // A child SPI whose `parent` field points at another SPI's *descriptor* node
+        // must be patched at runtime with `desc.<parent_descriptor>`.
         const minimal: MinimalWorkfile = {
             platform: "max32690",
             symbols: {
-                "parent_spi_ip": {
-                    "$compatible": "no-os/spi/no_os_spi_init_param.yaml",
-                    "$descriptor": "parent_spi",
-                    "device_id": 1,
-                    "chip_select": 0,
-                    "platform_ops": "spi_ops",
-                    "extra": "max_spi_ip"
-                },
                 "max_spi_ip": {
                     "$compatible": "platforms/maxim/max32690/max_spi_init_param.yaml",
                     "vssel": "MXC_GPIO_VSSEL_VDDIOH",
                     "polarity": "SPI_SS_POL_LOW"
                 },
+                "parent_spi_ip": {
+                    "$compatible": "no-os/spi/no_os_spi_init_param.yaml",
+                    "device_id": 1,
+                    "chip_select": 0,
+                    "platform_ops": "spi_ops",
+                    "extra": "max_spi_ip"
+                },
+                "parent_spi": {
+                    "$compatible": "no-os/spi/no_os_spi.yaml",
+                    "init_param": "parent_spi_ip"
+                },
                 "child_spi_ip": {
                     "$compatible": "no-os/spi/no_os_spi_init_param.yaml",
-                    "$descriptor": "child_spi",
                     "device_id": 2,
                     "chip_select": 1,
                     "platform_ops": "spi_ops",
                     "extra": "max_spi_ip",
                     "parent": "parent_spi"
+                },
+                "child_spi": {
+                    "$compatible": "no-os/spi/no_os_spi.yaml",
+                    "init_param": "child_spi_ip"
                 }
             }
         };
@@ -279,22 +291,30 @@ describe('codegen', () => {
                     "platform_ops": "spi_ops",
                     "extra": "max_spi_ip"
                 },
-                "misp": {
-                    "$compatible": "devices/adxl355/adxl355.yaml",
+                "misp_ip": {
+                    "$compatible": "devices/adxl355/adxl355_init_param.yaml",
                     "comm_type": "ADXL355_SPI_COMM",
                     "dev_type": "ID_ADXL355",
                     "comm_init": { "spi_init": "no_os_spi_ip" }
+                },
+                "misp": {
+                    "$compatible": "devices/adxl355/adxl355.yaml",
+                    "init_param": "misp_ip"
                 },
                 "max_uart_ip": {
                     "$compatible": "platforms/maxim/max32690/max_uart_init_param.yaml",
                     "vssel": "MXC_GPIO_VSSEL_VDDIOH"
                 },
-                "my_uart": {
+                "my_uart_ip": {
                     "$compatible": "no-os/uart/no_os_uart_init_param.yaml",
                     "device_id": 0,
                     "baud_rate": 115200,
                     "platform_ops": "uart_ops",
                     "extra": "max_uart_ip"
+                },
+                "my_uart": {
+                    "$compatible": "no-os/uart/no_os_uart.yaml",
+                    "init_param": "my_uart_ip"
                 }
             }
         };

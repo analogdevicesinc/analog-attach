@@ -146,8 +146,8 @@ export const readCommand = buildCommand<
 // ------- FORMATTERS --------
 
 function format_node_summary(name: string, ruleset: Ruleset): string {
-    if (ruleset._t !== "RulesetStruct") {
-        return `${name} is not a struct`;
+    if (ruleset._t !== "RulesetStruct" && ruleset._t !== "RulesetDescriptor") {
+        return `${name} is not a struct or descriptor`;
     }
 
     let out = `${name}\n`;
