@@ -1,6 +1,5 @@
 import path from "node:path";
 import fs from "node:fs";
-import Mustache from "mustache";
 import { error, ok, Result } from "../ruleset_parser/result";
 import { IncludeProperty, Property, RulesetDescriptor, RulesetStruct, UnionProperty } from "../ruleset_parser/types";
 import { Workfile } from "../workfile_handler/types";
@@ -10,6 +9,7 @@ import { ConnectionGraph } from "../validator/types";
 import { get_schemas_path } from "../settings/settings";
 import { load_resolved_ruleset } from "../resolver/resolver";
 import { all_ops } from "../workfile_handler/workfile_handler";
+import { make_string_environment } from "./nunjucks_environment";
 
 // An `include:` field whose target schema is a descriptor ruleset is not a static
 // struct member — it is patched at runtime with `desc.<value>`. We classify by
@@ -509,9 +509,12 @@ function extract_device_info(
 	const init_parameter_ruleset = init_parameter.value.ruleset;
 
 	// Templates receive the descriptor instance name and the init_param instance name.
+	// They now emit full statement blocks (their own `ret =` / check), rendered with the
+	// same nunjucks engine as the project-level templates.
 	const view = { symbol_name, descriptor_name };
-	const init_code = Mustache.render(templates.value.init, view).trim();
-	const remove_code = Mustache.render(templates.value.remove, view).trim();
+	const environment = make_string_environment();
+	const init_code = environment.renderString(templates.value.init, view).trim();
+	const remove_code = environment.renderString(templates.value.remove, view).trim();
 
 	return ok({
 		symbol_name,
