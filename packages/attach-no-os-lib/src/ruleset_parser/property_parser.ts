@@ -1,5 +1,6 @@
-import { error, ok, Result } from "./result";
-import {
+import type { Result } from "./result";
+import { error, ok } from "./result";
+import type {
 	ArrayElement,
 	ArrayProperty,
 	BooleanProperty,
@@ -7,7 +8,6 @@ import {
 	CallbackFunctionProperty,
 	EnumProperty,
 	IncludeProperty,
-	is_primitive_symbols,
 	NumberProperty,
 	PlatformExtraProperty,
 	PlatformOpsProperty,
@@ -15,13 +15,17 @@ import {
 	UnionProperty
 } from "./types";
 import {
+	is_primitive_symbols
+} from "./types";
+import type {
+	ParseContext} from "./validators";
+import {
 	asObject,
 	at,
 	boolean_,
 	number_,
 	optional,
 	optionalWithDefault,
-	ParseContext,
 	required,
 	string_,
 	enumValueArray,
@@ -169,7 +173,7 @@ export function parse_enum_property(name: string, object: Record<string, unknown
 	}
 
 	if (default_.value !== undefined && !values.value.includes(default_.value)) {
-		return error(`Default value '${default_.value}' is not present in the 'values' field (${JSON.stringify(values.value)})`, at(context, "default").path);
+		return error(`Default value '${default_.value.toString()}' is not present in the 'values' field (${JSON.stringify(values.value)})`, at(context, "default").path);
 	}
 
 	const capability = optional(object, "capability", context, capabilityArray);
@@ -220,11 +224,11 @@ function parse_union_member(value: unknown, context: ParseContext): Result<Inclu
 	if (!object.ok) {return object;}
 
 	const keys = Object.keys(object.value);
-	if (keys.length !== 1) {
+	const name = keys[0];
+	if (keys.length !== 1 || name === undefined) {
 		return error(`Union member must have exactly one key`, context.path);
 	}
 
-	const name = keys[0]!;
 	const inner = asObject(object.value[name], at(context, name));
 	if (!inner.ok) {return inner;}
 
@@ -314,7 +318,7 @@ export function parse_array_property(name: string, object: Record<string, unknow
 		}
 		element = include.value;
 	} else if ("type" in element_object.value) {
-		const type_ = element_object.value["type"];
+		const type_ = element_object.value.type;
 
 		if (typeof type_ !== "string") {
 			return error("Type of 'type' should be string", at(element_context, "type").path);
@@ -332,7 +336,7 @@ export function parse_array_property(name: string, object: Record<string, unknow
 				return enum_;
 			}
 			element = enum_.value;
-		} else if (is_primitive_symbols(type_ as string)) {
+		} else if (is_primitive_symbols(type_)) {
 			const number_property = parse_number_property("element", element_object.value, element_context);
 			if (!number_property.ok) {
 				return number_property;

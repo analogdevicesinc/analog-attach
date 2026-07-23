@@ -1,10 +1,12 @@
 import * as fs from "node:fs";
 import path from "node:path";
 import YAML from "yaml";
-import { Result, ok, error } from "../ruleset_parser/result";
-import { asObject, at, optional, required, ParseContext, stringArray, string_ } from "../ruleset_parser/validators";
+import type { Result} from "../ruleset_parser/result";
+import { ok, error } from "../ruleset_parser/result";
+import type { ParseContext} from "../ruleset_parser/validators";
+import { asObject, at, optional, required, stringArray, string_ } from "../ruleset_parser/validators";
 import { get_schemas_path } from "../settings/settings";
-import { PlatformManifest, PlatformSpecs } from "./types";
+import type { PlatformManifest, PlatformSpecs } from "./types";
 
 const MANIFEST_FILENAME = "platform.yaml";
 
@@ -106,7 +108,8 @@ export function scan_platform(platform_path: string): Result<PlatformManifest> {
 	try {
 		parsed = YAML.parse(manifest_content);
 	} catch (parse_error) {
-		return error(`Failed to parse ${MANIFEST_FILENAME}: ${parse_error}`, MANIFEST_FILENAME);
+		const reason = parse_error instanceof Error ? parse_error.message : String(parse_error);
+		return error(`Failed to parse ${MANIFEST_FILENAME}: ${reason}`, MANIFEST_FILENAME);
 	}
 
 	return parse_manifest(parsed, platform_path);

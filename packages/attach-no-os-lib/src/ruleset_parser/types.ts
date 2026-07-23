@@ -1,13 +1,13 @@
-import {
+import type {
 	PrimitiveCType
 } from "./primitive_c_types";
 
-export type PropertyBase = {
+export interface PropertyBase {
 	name: string,
 	description: string,
 	required?: boolean
 	disabled?: boolean, // NOTE: default is disabled: false
-	value?: any,
+	value?: unknown,
 	capability?: string[], // Platform capabilities required for this property
 }
 
@@ -103,7 +103,7 @@ export type Property = NumberProperty | BooleanProperty | StringProperty | Inclu
 export type OverrideScope = "$parent" | "$this";
 
 // NOTE: Internal, new override resolution types
-export type OverrideReference = {
+export interface OverrideReference {
 	node: "self" | "parent",
 	property: string
 };
@@ -129,7 +129,7 @@ export type Effect =
       | { op: "selectMember",   reference: OverrideReference, member: string }       // union (validate, don't mutate)
       | { op: "restrictAllowed", reference: OverrideReference, ids: string[] };      // include/descriptor/platform_ops/extra
 
-export type Rule = {
+export interface Rule {
 	when: OverridePredicate,
 	effects: Effect[],
 };
@@ -150,7 +150,7 @@ enum RulesetRank {
 	RR_DRAFT = 4, // Experimental, may not fully validate
 };
 
-export type RulesetHeaderSources = {
+export interface RulesetHeaderSources {
 	headers?: string[],
 	sources?: string[],
 };
@@ -163,12 +163,12 @@ export type RulesetSources = RulesetHeaderSources & {
 	$note?: string
 };
 
-export type RulesetEnumValue = {
+export interface RulesetEnumValue {
 	name: string | number,
 	description?: string,
 };
 
-type RulesetBase = {
+interface RulesetBase {
 	_t: string,
 	$id: string,
 	$type: RulesetType,

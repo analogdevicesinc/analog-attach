@@ -1,9 +1,9 @@
-import { Ruleset } from "../ruleset_parser/types";
+import type { Ruleset } from "../ruleset_parser/types";
 
 /**
  * Platform manifest - lists ops and structs available for this platform
  */
-export type PlatformManifest = {
+export interface PlatformManifest {
     name: string;         // platform name e.g. "max32690"
     vendor: string;       // vendor name e.g. "maxim"
     description?: string; // optional human-readable platform description
@@ -14,11 +14,9 @@ export type PlatformManifest = {
 /**
  * Platform specs indexed by platform ID
  */
-export type PlatformSpecs = {
-    [platform_id: string]: PlatformManifest;
-};
+export type PlatformSpecs = Record<string, PlatformManifest>;
 
-export type Workfile = {
+export interface Workfile {
     platform?: string;                      // platform name e.g. "max32690"
     platform_vendor?: string;               // vendor name e.g. "maxim"
     platform_ops: Record<string, Ruleset>;  // locked, auto-populated from platform, not printed
@@ -26,27 +24,27 @@ export type Workfile = {
     symbols: Record<string, Ruleset>;       // user-created symbols, printed in codegen
 };
 
-export type LoadPlatformResult = {
+export interface LoadPlatformResult {
     available_structs: string[];
 };
 
-export type AvailableStructs = {
+export interface AvailableStructs {
     devices: string[];
     noos: string[];
     platform: string[];
 };
 
-export type PropertySuggestions = {
+export interface PropertySuggestions {
     values?: string[], // for normal values / instantiated symbols
     types?: string[], // types that can be instantiated and become symbols/values (that fit in this case)
 }
 
-export type MinimalWorkfileNode = {
+export interface MinimalWorkfileNode {
     $compatible: string;
     [property: string]: unknown;
 };
 
-export type MinimalWorkfile = {
+export interface MinimalWorkfile {
     platform: string; // e.g. max32690
     symbols: Record<string, MinimalWorkfileNode>;
 }
