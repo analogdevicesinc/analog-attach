@@ -349,25 +349,61 @@ function order_symbols(workfile: Workfile): Result<[string, RulesetStruct][]> {
 const is_descriptor_reference = (property: Property): boolean =>
 	property._t === "IncludeProperty" && is_descriptor_include(property);
 
+// The declared default for a property, if its type carries one.
+function property_default(property: Property): unknown {
+	switch (property._t) {
+		case "NumberProperty":
+		case "StringProperty":
+		case "EnumProperty":
+		case "BooleanProperty":
+		case "CallbackFunctionProperty":
+		case "CallbackContextProperty": {
+			return property.default;
+		}
+		default: {
+			return undefined;
+		}
+	}
+}
+
+// The value codegen should emit: the explicit value if set, otherwise the
+// declared default. `undefined` means "no value to emit".
+function effective_value(property: Property): unknown {
+	if (property.value !== undefined && property.value !== null) {
+		return property.value;
+	}
+	return property_default(property);
+}
+
+// A pointer include with no effective value is emitted as `NULL` rather than
+// being omitted, so the generated struct field is explicitly null-initialized.
+function is_null_pointer(property: Property): boolean {
+	return property._t === "IncludeProperty"
+		&& property.pointer === true
+		&& effective_value(property) === undefined;
+}
+
 function build_struct_view(name: string, ruleset: RulesetStruct): StructView {
 	const runtime_assignments: RuntimeAssignment[] = [];
 
-	const defined_properties = ruleset.properties
-		.filter(property => property.value !== undefined && property.value !== null);
-
-	const descriptor_properties = defined_properties.filter(p => is_descriptor_reference(p));
+	// Descriptor refs with a value are patched at runtime; the rest become static fields.
+	const descriptor_properties = ruleset.properties
+		.filter(property => is_descriptor_reference(property) && effective_value(property) !== undefined);
 
 	for (const property of descriptor_properties) {
 		runtime_assignments.push({
 			struct_name: name,
 			field_path: property.name,
-			value: `desc.${String(property.value)}`,
+			value: `desc.${String(effective_value(property))}`,
 		});
 	}
 
-	// Static fields: everything except descriptor refs
+	// Static fields: every non-descriptor property that has an effective value
+	// (explicit or default), plus unset pointer includes (emitted as NULL).
 	// (Union fields referencing non-const structs will be removed later in propagate_non_const)
-	const static_properties = defined_properties.filter(property => !is_descriptor_reference(property));
+	const static_properties = ruleset.properties.filter(property =>
+		!descriptor_properties.includes(property)
+		&& (effective_value(property) !== undefined || is_null_pointer(property)));
 
 	const has_descriptor_references = descriptor_properties.length > 0;
 
@@ -384,30 +420,37 @@ function build_struct_view(name: string, ruleset: RulesetStruct): StructView {
 }
 
 function format_c_value(property: Property): string {
+	// Use the explicit value if set, otherwise fall back to the declared default.
+	const value = effective_value(property);
+
 	switch (property._t) {
 		case "NumberProperty": {
-			return String(property.value);
+			return String(value);
 		}
 
 		case "BooleanProperty": {
-			return property.value ? "true" : "false";
+			return value ? "true" : "false";
 		}
 
 		case "EnumProperty": {
-			return String(property.value);
+			return String(value);
 		}
 
 		case "StringProperty": {
-			return `"${String(property.value)}"`;
+			return `"${String(value)}"`;
 		}
 
 		case "IncludeProperty": {
+			// A pointer include with no value is explicitly null-initialized.
+			if (property.pointer === true && value === undefined) {
+				return "NULL";
+			}
 			// Descriptor refs are patched at runtime (see build_struct_view); this branch
 			// shouldn't be reached for them, but keep it correct for safety.
 			if (is_descriptor_include(property)) {
-				return `desc.${String(property.value)}`;
+				return `desc.${String(value)}`;
 			}
-			return property.pointer ? `&${String(property.value)}` : String(property.value);
+			return property.pointer ? `&${String(value)}` : String(value);
 		}
 
 		case "PlatformOpsProperty": {
@@ -419,8 +462,8 @@ function format_c_value(property: Property): string {
 		}
 
 		case "UnionProperty": {
-			const value = property.value as Record<string, string>;
-			const first_entry = Object.entries(value)[0];
+			const union_value = property.value as Record<string, string>;
+			const first_entry = Object.entries(union_value)[0];
 			if (!first_entry) {
 				// FIXME: This would be error, but i don't think this is reachable
 				return "NULL";
@@ -463,11 +506,11 @@ function format_c_value(property: Property): string {
 		}
 
 		case "CallbackFunctionProperty": {
-			return typeof property.value === "string" && property.value ? property.value : "NULL";
+			return typeof value === "string" && value ? value : "NULL";
 		}
 
 		case "CallbackContextProperty": {
-			return typeof property.value === "string" && property.value ? property.value : "NULL";
+			return typeof value === "string" && value ? value : "NULL";
 		}
 
 		default: {
