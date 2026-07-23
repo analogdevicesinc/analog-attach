@@ -179,6 +179,96 @@ describe('workfile_handler', () => {
         });
     });
 
+    describe('rename_symbol', () => {
+        test('renames the symbol key', () => {
+            add_symbol(workfile, "old", make_struct("test/foo.yaml", "foo"));
+            expectOk(rename_symbol(workfile, "old", "renamed"));
+            expect(list_symbols(workfile)).toContain("renamed");
+            expect(list_symbols(workfile)).not.toContain("old");
+        });
+
+        test('returns error for unknown symbol', () => {
+            const result = rename_symbol(workfile, "missing", "renamed");
+            expectError(result);
+            expectErrorContains(result, "not found");
+        });
+
+        test('rejects an invalid C name', () => {
+            add_symbol(workfile, "old", make_struct("test/foo.yaml", "foo"));
+            const result = rename_symbol(workfile, "old", "1bad");
+            expectError(result);
+        });
+
+        test('rejects a name that already exists', () => {
+            add_symbol(workfile, "a", make_struct("test/foo.yaml", "foo"));
+            add_symbol(workfile, "b", make_struct("test/foo.yaml", "foo"));
+            const result = rename_symbol(workfile, "a", "b");
+            expectError(result);
+            expectErrorContains(result, "already exists");
+        });
+
+        test('rewrites an include reference held by another symbol', () => {
+            add_symbol(workfile, "child", make_struct("test/child.yaml", "child"));
+            add_symbol(workfile, "parent", make_struct("test/parent.yaml", "parent", [
+                make_include("dev", "test/child.yaml", "child")
+            ]));
+            expectOk(rename_symbol(workfile, "child", "child_renamed"));
+            const dev = get_value(workfile, "parent", "dev");
+            expectOk(dev);
+            expect(dev.value).toBe("child_renamed");
+        });
+
+        test('rewrites a platform_extra reference held by another symbol', () => {
+            add_symbol(workfile, "child", make_struct("test/child.yaml", "child"));
+            const extra: PlatformExtraProperty = {
+                _t: "PlatformExtraProperty", name: "extra", description: "", type: "platform_extra", value: "child"
+            };
+            add_symbol(workfile, "parent", make_struct("test/parent.yaml", "parent", [extra]));
+            expectOk(rename_symbol(workfile, "child", "child_renamed"));
+            const value = get_value(workfile, "parent", "extra");
+            expectOk(value);
+            expect(value.value).toBe("child_renamed");
+        });
+
+        test('rewrites matching members of a union reference', () => {
+            add_symbol(workfile, "child", make_struct("test/child.yaml", "child"));
+            add_symbol(workfile, "other", make_struct("test/other.yaml", "other"));
+            add_symbol(workfile, "parent", make_struct("test/parent.yaml", "parent", [
+                make_union("u", [
+                    make_include("m1", "test/child.yaml"),
+                    make_include("m2", "test/other.yaml"),
+                ], { m1: "child", m2: "other" })
+            ]));
+            expectOk(rename_symbol(workfile, "child", "child_renamed"));
+            const value = get_value(workfile, "parent", "u");
+            expectOk(value);
+            expect(value.value).toEqual({ m1: "child_renamed", m2: "other" });
+        });
+
+        test('rewrites matching entries of an array reference', () => {
+            add_symbol(workfile, "child", make_struct("test/child.yaml", "child"));
+            add_symbol(workfile, "parent", make_struct("test/parent.yaml", "parent", [
+                make_array("arr", 2, make_include("el", "test/child.yaml"), ["child", "other"])
+            ]));
+            expectOk(rename_symbol(workfile, "child", "child_renamed"));
+            const value = get_value(workfile, "parent", "arr");
+            expectOk(value);
+            expect(value.value).toEqual(["child_renamed", "other"]);
+        });
+
+        test('leaves unrelated references untouched', () => {
+            add_symbol(workfile, "child", make_struct("test/child.yaml", "child"));
+            add_symbol(workfile, "parent", make_struct("test/parent.yaml", "parent", [
+                make_include("dev", "test/child.yaml", "child")
+            ]));
+            expectOk(rename_symbol(workfile, "parent", "parent_renamed"));
+            // child's reference target was not renamed, so the value stays "child".
+            const value = get_value(workfile, "parent_renamed", "dev");
+            expectOk(value);
+            expect(value.value).toBe("child");
+        });
+    });
+
     describe('Platform Ops', () => {
         test('add_platform_ops adds ops', () => {
             const ops = make_platform_ops("ops/spi.yaml", "spi_ops", "spi");
