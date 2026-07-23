@@ -65,6 +65,20 @@ export function validate_property(
 			}
 		}
 
+		// A raw value is opaque: we can't offer any assistance and can't blame the
+		// user for leaving it empty (they may fill it in before/after codegen). A
+		// declared default satisfies the requirement; otherwise warn only.
+		if (effective._t === "RawProperty") {
+			if (effective.default !== undefined) {
+				return [];
+			}
+			return [{
+				path: property_context.path,
+				message: "Required property has no value; the driver may need it",
+				severity: "warning"
+			}];
+		}
+
 		return [{
 			path: property_context.path,
 			message: "Required property has no value",
@@ -108,11 +122,8 @@ export function validate_property(
 			}
 			return validate_platform_extra(effective, workfile, parent_symbol, property_context);
 		}
-		case "CallbackFunctionProperty": {
-			return []; // NOTE: Nothing to validate
-		}
-		case "CallbackContextProperty": {
-			return []; // NOTE: Nothing to validate
+		case "RawProperty": {
+			return []; // NOTE: Opaque value, emitted verbatim — nothing to validate
 		}
 		default: {
 			// NOTE: No validation error as this case should have

@@ -4,13 +4,12 @@ import type {
 	ArrayElement,
 	ArrayProperty,
 	BooleanProperty,
-	CallbackContextProperty,
-	CallbackFunctionProperty,
 	EnumProperty,
 	IncludeProperty,
 	NumberProperty,
 	PlatformExtraProperty,
 	PlatformOpsProperty,
+	RawProperty,
 	StringProperty,
 	UnionProperty
 } from "./types";
@@ -418,45 +417,7 @@ export function parse_platform_extra_property(name: string, object: Record<strin
     });
 }
 
-export function parse_callback_function_property(name: string, object: Record<string, unknown>, context: ParseContext): Result<CallbackFunctionProperty> {
-    const description = optionalWithDefault(object, "description", context, "", string_);
-    if (!description.ok) {
-        return description;
-    }
-
-    const required_ = optionalWithDefault(object, "required", context, false, boolean_);
-    if (!required_.ok) {
-        return required_;
-    }
-
-    const signature = required(object, "signature", context, string_);
-    if (!signature.ok) {
-        return signature;
-    }
-
-    const default_ = optional(object, "default", context, string_);
-    if (!default_.ok) {
-        return default_;
-    }
-
-    const capability = optional(object, "capability", context, capabilityArray);
-    if (!capability.ok) {
-        return capability;
-    }
-
-    return ok({
-        _t: "CallbackFunctionProperty",
-        name,
-        type: "callback_func",
-        description: description.value,
-        required: required_.value,
-        signature: signature.value,
-        default: default_.value,
-        capability: capability.value,
-    });
-}
-
-export function parse_callback_context_property(name: string, object: Record<string, unknown>, context: ParseContext): Result<CallbackContextProperty> {
+export function parse_raw_property(name: string, object: Record<string, unknown>, context: ParseContext): Result<RawProperty> {
     const description = optionalWithDefault(object, "description", context, "", string_);
     if (!description.ok) {
         return description;
@@ -478,9 +439,9 @@ export function parse_callback_context_property(name: string, object: Record<str
     }
 
     return ok({
-        _t: "CallbackContextProperty",
+        _t: "RawProperty",
         name,
-        type: "callback_ctx",
+        type: "raw",
         description: description.value,
         required: required_.value,
         default: default_.value,

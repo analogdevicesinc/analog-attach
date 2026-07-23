@@ -169,7 +169,7 @@ function lower_value_effect(
 		}
 
 		default: {
-			// NumberProperty / Boolean / String / callback scalar → exact force.
+			// NumberProperty / Boolean / String / raw scalar → exact force.
 			return ok({ op: "setValue", reference, value: raw });
 		}
 	}
