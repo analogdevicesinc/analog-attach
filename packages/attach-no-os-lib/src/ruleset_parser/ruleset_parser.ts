@@ -16,13 +16,12 @@ import { RulesetType } from "./types";
 import {
 	parse_array_property,
 	parse_bool_property,
-	parse_callback_context_property,
-	parse_callback_function_property,
 	parse_enum_property,
 	parse_include_property,
 	parse_number_property,
 	parse_platform_extra_property,
 	parse_platform_ops_property,
+	parse_raw_property,
 	parse_string_property,
 	parse_union_property
 } from "./property_parser";
@@ -147,12 +146,8 @@ export function parse_property(name: string, value: unknown, context: ParseConte
 			return parse_platform_extra_property(name, object.value, context);
 		}
 
-		if (type_ === "callback_func") {
-			return parse_callback_function_property(name, object.value, context);
-		}
-
-		if (type_ === "callback_ctx") {
-			return parse_callback_context_property(name, object.value, context);
+		if (type_ === "raw") {
+			return parse_raw_property(name, object.value, context);
 		}
 
 		return error(`Unknown property type '${type_}'`, at(context, type_).path);

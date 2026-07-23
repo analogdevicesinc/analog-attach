@@ -129,8 +129,7 @@ export function format_property_type(t: string): string {
         "ArrayProperty": "array",
         "PlatformOpsProperty": "platform_ops",
         "PlatformExtraProperty": "platform_extra",
-        "CallbackFunctionProperty": "callback",
-        "CallbackContextProperty": "callback_ctx",
+        "RawProperty": "raw",
     };
     return map[t] ?? t;
 }
@@ -234,6 +233,17 @@ export function format_property_details(property: Property, suggestions: Propert
             out += `  ${"Max size:".padEnd(15)}${property.size}\n`;
             out += "\n  Format: comma-separated values\n";
             out += `    aa update <node> ${property.name} value1,value2,value3\n`;
+            break;
+        }
+
+        case "RawProperty": {
+            // Raw values are emitted to the generated code byte-for-byte, so the
+            // user must type the exact C token. String literals need quotes that
+            // survive the shell (which strips bare ""), hence the escaping hint.
+            out += "\n  Format: written to generated code verbatim (exactly as typed)\n";
+            out += `    aa update <node> ${property.name} &my_handle       -> &my_handle\n`;
+            out += `    aa update <node> ${property.name} '\"some text\"'    -> \"some text\"\n`;
+            out += "  To emit a C string literal, keep the quotes: use '\"...\"' or \\\"...\\\"\n";
             break;
         }
     }

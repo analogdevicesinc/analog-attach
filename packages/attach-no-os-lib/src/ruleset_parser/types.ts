@@ -75,16 +75,15 @@ export type PlatformExtraProperty = PropertyBase & {
     allowed?: string[], // NOTE: Set by override only
 }
 
-export type CallbackFunctionProperty = PropertyBase & {
-    _t: "CallbackFunctionProperty",
-    type: "callback_func",
-    signature: string,
-    default?: string,
-}
-
-export type CallbackContextProperty = PropertyBase & {
-    _t: "CallbackContextProperty",
-    type: "callback_ctx",
+// An opaque value emitted to codegen byte-for-byte, with no interpretation.
+// Used for things we can't reason about: callback function pointers, external
+// SDK handles, arbitrary expressions. The author writes the exact C token
+// (including any `"`, `&`, etc.); it is stored and emitted verbatim. If a raw
+// value is required but unset the validator warns only — we can't help, but the
+// driver may need it (the user can fill it in before/after codegen).
+export type RawProperty = PropertyBase & {
+    _t: "RawProperty",
+    type: "raw",
     default?: string,
 }
 
@@ -96,7 +95,7 @@ export type ArrayProperty = PropertyBase & {
 	element: ArrayElement,
 }
 
-export type Property = NumberProperty | BooleanProperty | StringProperty | IncludeProperty | EnumProperty | UnionProperty | ArrayProperty | PlatformOpsProperty | PlatformExtraProperty | CallbackFunctionProperty | CallbackContextProperty;
+export type Property = NumberProperty | BooleanProperty | StringProperty | IncludeProperty | EnumProperty | UnionProperty | ArrayProperty | PlatformOpsProperty | PlatformExtraProperty | RawProperty;
 
 // The authoring-surface scope tokens. The parser strips these into concrete
 // self/parent OverrideReference nodes during lowering.

@@ -356,8 +356,7 @@ function property_default(property: Property): unknown {
 		case "StringProperty":
 		case "EnumProperty":
 		case "BooleanProperty":
-		case "CallbackFunctionProperty":
-		case "CallbackContextProperty": {
+		case "RawProperty": {
 			return property.default;
 		}
 		default: {
@@ -505,12 +504,10 @@ function format_c_value(property: Property): string {
 			return `{ ${formatted.join(", ")} }`;
 		}
 
-		case "CallbackFunctionProperty": {
-			return typeof value === "string" && value ? value : "NULL";
-		}
-
-		case "CallbackContextProperty": {
-			return typeof value === "string" && value ? value : "NULL";
+		case "RawProperty": {
+			// Emitted byte-for-byte: the author wrote the exact C token
+			// (including any quotes or `&`). Only reached with an effective value.
+			return String(value);
 		}
 
 		default: {
