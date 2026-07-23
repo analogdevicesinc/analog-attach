@@ -1,0 +1,2 @@
+type: raw
+description: "Opaque callback function pointer, written verbatim to codegen"

@@ -1,2 +1,0 @@
-type: callback_func
-signature: "int (*)(void *ctx, uint8_t *data, size_t len)"

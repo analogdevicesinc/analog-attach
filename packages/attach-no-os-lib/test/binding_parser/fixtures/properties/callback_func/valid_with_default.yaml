@@ -1,4 +1,0 @@
-type: callback_func
-signature: "void (*)(void)"
-default: "NULL"
-description: "Optional callback"
