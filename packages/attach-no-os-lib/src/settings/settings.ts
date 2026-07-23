@@ -1,9 +1,11 @@
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
-import { is_settings_file, Setting, SettingsFile } from "./types";
+import type { Setting, SettingsFile } from "./types";
+import { is_settings_file } from "./types";
 import { DEFAULT_SYSTEM_CONFIG_FILENAME, DEFAULT_SYSTEM_CONFIG_PATH, SCHEMAS_SUBPATH } from "./globals";
-import { Result, error, ok } from "../ruleset_parser/result";
+import type { Result} from "../ruleset_parser/result";
+import { error, ok } from "../ruleset_parser/result";
 
 let config_path_override: string | undefined;
 
@@ -26,7 +28,12 @@ export function get_settings(): Result<SettingsFile> {
 	}
 
 	const content = fs.readFileSync(config_path, "utf8");
-	const parsed = JSON.parse(content);
+	let parsed;
+	try {
+		parsed = JSON.parse(content) as Record<string, unknown>;
+	} catch (error_) {
+		return error(String(error_));
+	}
 	if (!is_settings_file(parsed)) {
 		return error(`Malformed settings file at: ${config_path}`);
 	}

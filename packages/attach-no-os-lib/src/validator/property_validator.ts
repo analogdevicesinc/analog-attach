@@ -1,4 +1,4 @@
-import {
+import type {
 	ArrayProperty,
 	BooleanProperty,
 	EnumProperty,
@@ -11,12 +11,13 @@ import {
 	StringProperty,
 	UnionProperty
 } from "../ruleset_parser/types";
-import { at, ParseContext } from "../ruleset_parser/validators";
-import { Workfile } from "../workfile_handler/types";
+import type { ParseContext } from "../ruleset_parser/validators";
+import { at } from "../ruleset_parser/validators";
+import type { Workfile } from "../workfile_handler/types";
 import { all_ops, suggest_platform_extra } from "../workfile_handler/workfile_handler";
 import { load_resolved_ruleset } from "../resolver/resolver";
 import { apply_overrides } from "./override_resolver";
-import { CollectedRule, ValidationError } from "./types";
+import type { CollectedRule, ValidationError } from "./types";
 
 export function validate_property(
 	property: Property,
@@ -155,7 +156,7 @@ function validate_platform_ops(
 			}];
 		}
 
-		if (parent_struct.$capability && ops.$capability !== parent_struct.$capability) {
+		if (parent_struct.$capability && ops.$capability && ops.$capability !== parent_struct.$capability) {
 			return [{
 				path: context.path,
 				message: `Capability mismatch: ops is '${ops.$capability}', expected ${parent_struct.$capability} (allowed by override)`,
@@ -166,7 +167,7 @@ function validate_platform_ops(
 		return [];
 	}
 
-	if (parent_struct.$capability && ops.$capability !== parent_struct.$capability) {
+	if (parent_struct.$capability && ops.$capability && ops.$capability !== parent_struct.$capability) {
 		return [{
 			path: context.path,
 			message: `Capability mismatch: ops is '${ops.$capability}', expected '${parent_struct.$capability}'`,
@@ -211,7 +212,7 @@ function validate_platform_extra(
 			}];
 		}
 
-		if (parent_struct.$capability && extra.$capability !== parent_struct.$capability) {
+		if (parent_struct.$capability && extra.$capability && extra.$capability !== parent_struct.$capability) {
 			return [{
 				path: context.path,
 				message: `Capability mismatch: extra is '${extra.$capability}', expected ${parent_struct.$capability} (allowed by override)`,
@@ -222,7 +223,7 @@ function validate_platform_extra(
 		return [];
 	}
 	
-	if (parent_struct.$capability && extra.$capability !== parent_struct.$capability) {
+	if (parent_struct.$capability && extra.$capability && extra.$capability !== parent_struct.$capability) {
 		return [{
 			path: context.path,
 			message: `Capability mismatch: extra is '${extra.$capability}', expected '${parent_struct.$capability}'`,
@@ -249,7 +250,7 @@ function validate_number(property: NumberProperty, context: ParseContext): Valid
 	if (property.minimum !== undefined && value < property.minimum) {
 		errors.push({
 			path: context.path,
-			message: `Value ${value} is below the minimum ${property.minimum}`,
+			message: `Value ${value.toString()} is below the minimum ${property.minimum.toString()}`,
 			severity: "error"
 		});
 	}
@@ -257,7 +258,7 @@ function validate_number(property: NumberProperty, context: ParseContext): Valid
 	if (property.maximum !== undefined && value > property.maximum) {
 		errors.push({
 			path: context.path,
-			message: `Value ${value} is above the maximum ${property.maximum}`,
+			message: `Value ${value.toString()} is above the maximum ${property.maximum.toString()}`,
 			severity: "error"
 		});
 	}
@@ -291,11 +292,18 @@ function validate_string(property: StringProperty, context: ParseContext): Valid
 
 function validate_enum(property: EnumProperty, context: ParseContext): ValidationError[] {
     const value = property.value;
+	if (typeof value !== "number" && typeof value !== "string") {
+		return [{
+			path: context.path,
+			message: `Invalid value type '${typeof value}. Expected number or string'`,
+			severity: "error"
+		}];
+	}
 
     if (!property.values.includes(value)) {
         return [{
             path: context.path,
-            message: `Invalid value '${value}'. Expected one of: ${property.values.join(", ")}`,
+            message: `Invalid value '${value.toString()}'. Expected one of: ${property.values.join(", ")}`,
             severity: "error"
         }];
     }
@@ -323,7 +331,6 @@ function validate_include(
     }
 
     const target = workfile.symbols[value];
-
     if (!target) {
         return [{
             path: context.path,
@@ -351,7 +358,8 @@ function validate_union(
     const value = property.value as Record<string, string>;
 
     const keys = Object.keys(value);
-    if (keys.length !== 1) {
+    const selected_member_name = keys[0];
+    if (keys.length !== 1 || selected_member_name === undefined) {
         return [{
             path: context.path,
             message: `Union value must have exactly one key`,
@@ -359,8 +367,14 @@ function validate_union(
         }];
     }
 
-    const selected_member_name = keys[0];
     const target_symbol_name = value[selected_member_name];
+    if (target_symbol_name === undefined) {
+        return [{
+            path: at(context, selected_member_name).path,
+            message: `Union member '${selected_member_name}' has no bound target`,
+            severity: "error"
+        }];
+    }
 
     const member = property.members.find(m => m.name === selected_member_name);
     if (!member) {
@@ -418,7 +432,7 @@ function validate_array(
     if (value.length > property.size) {
         return [{
             path: context.path,
-            message: `Array exceeds maximum size of ${property.size}, got ${value.length}`,
+            message: `Array exceeds maximum size of ${property.size.toString()}, got ${value.length.toString()}`,
             severity: "error"
         }];
     }

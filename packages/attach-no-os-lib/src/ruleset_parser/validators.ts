@@ -1,13 +1,14 @@
-import { Result, ok, error } from "./result";
-import { RulesetStruct } from "./types";
+import type { Result} from "./result";
+import { ok, error } from "./result";
+import type { RulesetStruct } from "./types";
 
-type ParseContext = {
+interface ParseContext {
 	path: string,
 	document: Partial<RulesetStruct>
 }
 
 function at(context: ParseContext, key: string | number): ParseContext {
-	const suffix = typeof key === "number" ? `[${key}]` : key;
+	const suffix = typeof key === "number" ? `[${key.toString()}]` : key;
 	return {
 		path: context.path ? `${context.path}.${suffix}` : suffix,
 		document: context.document

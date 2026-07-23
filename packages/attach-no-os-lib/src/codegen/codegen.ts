@@ -1,10 +1,13 @@
 import fs from "node:fs";
 import path from "node:path";
+
 import { fileURLToPath } from "node:url";
-import { CodegenInput, CodegenResult } from "./types";
-import { Result, ok } from "../ruleset_parser/result";
+import { ok } from "../ruleset_parser/result";
 import { build_views } from "./view_builder";
 import { make_environment } from "./nunjucks_environment";
+
+import type { CodegenInput, CodegenResult } from "./types";
+import type { Result } from "../ruleset_parser/result";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const TEMPLATES_DIR = path.join(__dirname, "templates");

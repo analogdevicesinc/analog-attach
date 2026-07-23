@@ -1,5 +1,6 @@
-import { error, ok, Result } from "./result";
-import {
+import type { Result } from "./result";
+import { error, ok } from "./result";
+import type {
 	Effect,
 	OverridePredicate,
 	OverrideReference,
@@ -8,7 +9,8 @@ import {
 	Rule,
 } from "./types";
 import { lower_condition, lower_effects } from "./override_model";
-import { asObject, at, ParseContext, required, string_ } from "./validators";
+import type { ParseContext} from "./validators";
+import { asObject, at, required, string_ } from "./validators";
 
 // $this refers to the declaring symbol's own property (self); $parent refers to
 // a symbol that includes the declaring symbol. The YAML $this/$parent tokens are
@@ -124,13 +126,13 @@ function lower_static(object: Record<string, unknown>, context: ParseContext, sc
 // $if/$then: one rule whose `when` is the lowered condition and whose effects are
 // the lowered $then body. Condition and effect scopes are independent.
 function lower_if_then(object: Record<string, unknown>, context: ParseContext, scope: OverrideScope): Result<Rule[]> {
-	const if_object = asObject(object["$if"], at(context, "$if"));
+	const if_object = asObject(object.$if, at(context, "$if"));
 	if (!if_object.ok) { return if_object; }
 
 	const when = lower_condition_body(if_object.value, at(context, "$if"), scope);
 	if (!when.ok) { return when; }
 
-	const then_object = asObject(object["$then"], at(context, "$then"));
+	const then_object = asObject(object.$then, at(context, "$then"));
 	if (!then_object.ok) { return then_object; }
 
 	const effects = lower_effects_body(then_object.value, at(context, "$then"), scope);
@@ -143,7 +145,7 @@ function lower_if_then(object: Record<string, unknown>, context: ParseContext, s
 // becomes Rule{ when: equals(<on>, caseName), effects: <case body> }. No switch
 // construct survives lowering.
 function lower_switch(object: Record<string, unknown>, context: ParseContext, scope: OverrideScope): Result<Rule[]> {
-	const switch_object = asObject(object["$switch"], at(context, "$switch"));
+	const switch_object = asObject(object.$switch, at(context, "$switch"));
 	if (!switch_object.ok) { return switch_object; }
 
 	const $on = required(switch_object.value, "$on", at(context, "$switch"), string_);
@@ -160,7 +162,11 @@ function lower_switch(object: Record<string, unknown>, context: ParseContext, sc
 	const rules: Rule[] = [];
 
 	for (const [case_name, case_value] of Object.entries($cases.value)) {
-		if (scope === "$this" && on_property.value?._t === "EnumProperty" && !on_property.value.values.includes(case_name)) {
+		if (
+			scope === "$this" &&
+			on_property.value._t === "EnumProperty" &&
+			!on_property.value.values.includes(case_name)
+		) {
 			return error(
 				`Invalid case '${case_name}'. Valid values: ${on_property.value.values.join(", ")}`,
 				at(cases_context, case_name).path
@@ -187,7 +193,7 @@ function lower_switch(object: Record<string, unknown>, context: ParseContext, sc
 // A separate general check (disabled-but-set -> error(reason)) reports the both-set
 // case using that reason, so no mutex-specific evaluator is needed.
 function lower_mutex(object: Record<string, unknown>, context: ParseContext, scope: OverrideScope): Result<Rule[]> {
-	const $mutex = object["$mutex"];
+	const $mutex = object.$mutex;
 	if (!Array.isArray($mutex)) {
 		return error("$mutex must be an array of property names", at(context, "$mutex").path);
 	}
@@ -275,10 +281,10 @@ export function is_override(value: unknown, context: ParseContext): Result<Rule[
 	if (!object.ok) { return object; }
 
 	if ("$parent" in object.value) {
-		return lower_override_array(object.value["$parent"], at(context, "$parent"), "$parent");
+		return lower_override_array(object.value.$parent, at(context, "$parent"), "$parent");
 	}
 	if ("$this" in object.value) {
-		return lower_override_array(object.value["$this"], at(context, "$this"), "$this");
+		return lower_override_array(object.value.$this, at(context, "$this"), "$this");
 	}
 
 	return error("$override must be an array or object with $this/$parent", context.path);
