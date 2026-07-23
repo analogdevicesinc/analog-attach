@@ -452,10 +452,7 @@ export function suggest_for_property(workfile: Workfile, symbol_name: string, pr
             const { effective } = apply_overrides(property, child_overrides, symbol_name, workfile);
             return suggest_platform_extra(workfile, effective as PlatformExtraProperty, symbol);
         }
-        case "CallbackFunctionProperty": {
-            return ok({});
-        }
-        case "CallbackContextProperty": {
+        case "RawProperty": {
             return ok({});
         }
         default: {
