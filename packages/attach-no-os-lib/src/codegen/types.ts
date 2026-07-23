@@ -1,6 +1,6 @@
-import { Workfile } from "../workfile_handler/types";
+import type { Workfile } from "../workfile_handler/types";
 
-export type DeviceInfo = {
+export interface DeviceInfo {
 	symbol_name: string;       // init param name: "my_accel"
 	descriptor_name: string;   // descriptor name: "my_accel_device"
 	descriptor_type: string;   // descriptor type: "adxl355_dev"
@@ -11,19 +11,19 @@ export type DeviceInfo = {
 	capability?: string;       // $capability, e.g. "uart" / "irq"; used for init ordering
 };
 
-export type DescriptorInfo = {
+export interface DescriptorInfo {
 	symbol_name: string;       // init param name: "my_spi_ip"
 	descriptor_name: string;   // descriptor name: "my_spi"
 	descriptor_type: string;   // descriptor type: "no_os_spi_desc"
 };
 
-export type SourcePaths = {
+export interface SourcePaths {
 	drivers: string[];   // $(DRIVERS)/...
 	include: string[];   // $(INCLUDE)/...
 	platform: string[];  // $(PLATFORM_DRIVERS)/...
 };
 
-export type CodegenInput = {
+export interface CodegenInput {
 	workfile: Workfile;
 	platform_name: string;
 	platform_vendor: string;
@@ -32,18 +32,18 @@ export type CodegenInput = {
 	noos_path: string;
 };
 
-export type CodegenResult = {
+export interface CodegenResult {
 	files_created: string[];
 };
 
 // Runtime assignment for fields that can't be set at compile time
-export type RuntimeAssignment = {
+export interface RuntimeAssignment {
 	struct_name: string;       // "my_spi_ip" or "adxl355_node"
 	field_path: string;        // "parent" or "comm_init.spi_init"
 	value: string;             // "desc.even_better_spi_desc" or "my_spi_ip"
 };
 
-export type StructView = {
+export interface StructView {
 	type: string;              // "no_os_spi_init_param"
 	name: string;              // "no_os_spi_ip"
 	is_const: boolean;         // false if needs runtime assignments (direct or transitive)
@@ -55,7 +55,7 @@ export type StructView = {
 };
 
 // All the variables exported for the templates
-export type Views = {
+export interface Views {
 	makefile: {
 		project_name: string;
 		platform_vendor: string;
@@ -86,6 +86,6 @@ export type Views = {
 		devices: DeviceInfo[];              // teardown reversal done in-template via `| reverse`
 		runtime_assignments: RuntimeAssignment[];
 	};
-	user_app_h: {};
-	user_app_c: {};
+	user_app_h: object;
+	user_app_c: object;
 };

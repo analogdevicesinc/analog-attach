@@ -1,13 +1,13 @@
-import {
+import type {
 	Effect,
 	OverridePredicate,
 	OverrideReference,
 	Property,
 } from "../ruleset_parser/types";
-import { Workfile } from "../workfile_handler/types";
-import { CollectedRule, ValidationError } from "./types";
+import type { Workfile } from "../workfile_handler/types";
+import type { CollectedRule, ValidationError } from "./types";
 
-export type OverrideResult = {
+export interface OverrideResult {
 	effective: Property,
 	errors: ValidationError[],
 };
@@ -29,7 +29,7 @@ function read_reference(reference: OverrideReference, collected: CollectedRule, 
 		return undefined;
 	}
 	const symbol = workfile.symbols[symbol_name];
-	if (!symbol || symbol._t !== "RulesetStruct") {
+	if (symbol?._t !== "RulesetStruct") {
 		return undefined;
 	}
 	return symbol.properties.find(p => p.name === reference.property)?.value;
@@ -55,6 +55,9 @@ function evaluate_predicate(predicate: OverridePredicate, collected: CollectedRu
 // Fold one effect onto the effective property. Merge effects write a field;
 // selectMember is the sole validate effect (decision #5: never overwrite the
 // user's binding, only error if the fired selector contradicts it).
+// `effective` is the caller's structuredClone working copy — mutating it in place
+// is this function's contract, so no-param-reassign is disabled for the fold.
+/* eslint-disable no-param-reassign */
 function apply_effect(
 	effective: Property,
 	effect: Effect,
@@ -114,7 +117,7 @@ function apply_effect(
 			const value = effective.value as Record<string, unknown> | undefined;
 			if (value && typeof value === "object") {
 				const chosen = Object.keys(value)[0];
-				if (chosen !== effect.member) {
+				if (chosen !== undefined && chosen !== effect.member) {
 					errors.push({
 						path: `${symbol_name}.${effect.reference.property}`,
 						message: `Union member '${chosen}' contradicts the required member '${effect.member}'`,
@@ -126,6 +129,7 @@ function apply_effect(
 		}
 	}
 }
+/* eslint-enable no-param-reassign */
 
 // Compute the effective property for `property` (which belongs to `symbol_name`)
 // by folding every collected rule whose condition holds. Refs are already resolved

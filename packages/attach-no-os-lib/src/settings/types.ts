@@ -1,11 +1,11 @@
-export type Setting = {
+export interface Setting {
 	value?: string;
 	description: string;
 	required: boolean;
 	default?: string;
 };
 
-export type SettingsFile = {
+export interface SettingsFile {
 	no_os_path: Setting;
 	build_command: Setting;
 	deploy_command: Setting;

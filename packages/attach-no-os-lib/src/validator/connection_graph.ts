@@ -1,6 +1,6 @@
-import { Property } from "../ruleset_parser/types";
-import { Workfile } from "../workfile_handler/types";
-import { CollectedRule, ConnectionGraph } from "./types";
+import type { Property } from "../ruleset_parser/types";
+import type { Workfile } from "../workfile_handler/types";
+import type { CollectedRule, ConnectionGraph } from "./types";
 import { load_resolved_ruleset } from "../resolver/resolver";
 
 function get_connected_symbols(property: Property): string[] {
@@ -103,7 +103,7 @@ export function collect_child_overrides(symbol_name: string, workfile: Workfile,
 	const collected: CollectedRule[] = [];
 
 	const self = workfile.symbols[symbol_name];
-	if (self && self._t === "RulesetStruct" && self.rules) {
+	if (self?._t === "RulesetStruct" && self.rules) {
 		const parent_symbol = find_includer(symbol_name, graph);
 		for (const rule of self.rules) {
 			collected.push({ rule, self_symbol: symbol_name, parent_symbol });
@@ -112,7 +112,7 @@ export function collect_child_overrides(symbol_name: string, workfile: Workfile,
 
 	for (const child_name of graph.get(symbol_name) ?? []) {
 		const child = workfile.symbols[child_name];
-		if (!child || child._t !== "RulesetStruct" || !child.rules) {
+		if (child?._t !== "RulesetStruct" || !child.rules) {
 			continue;
 		}
 

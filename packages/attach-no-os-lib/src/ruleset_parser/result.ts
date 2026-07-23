@@ -1,4 +1,4 @@
-export type ResultError = {
+export interface ResultError {
 	message: string,
 	path?: string
 }

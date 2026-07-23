@@ -1,7 +1,8 @@
 import path from "node:path";
 import fs from "node:fs";
-import { Result, ok, error } from "../ruleset_parser/result";
-import {
+import type { Result} from "../ruleset_parser/result";
+import { ok, error } from "../ruleset_parser/result";
+import type {
     ArrayProperty,
     EnumProperty,
     IncludeProperty,
@@ -13,12 +14,13 @@ import {
     UnionProperty
 } from "../ruleset_parser/types";
 import { scan_platforms } from "./platform_scanner";
-import { PlatformManifest, PropertySuggestions } from "./types";
+import type { PlatformManifest, PropertySuggestions } from "./types";
 import { load_resolved_ruleset } from "../resolver/resolver";
 import { get_schemas_path } from "../settings/settings";
 import { collect_child_overrides, create_connections_graph } from "../validator/connection_graph";
 import { apply_overrides } from "../validator/override_resolver";
-import { AvailableStructs, is_minimal_workfile, MinimalWorkfile, Workfile } from "./types";
+import type { AvailableStructs, MinimalWorkfile, Workfile } from "./types";
+import { is_minimal_workfile } from "./types";
 import { parse_ruleset } from "../ruleset_parser/ruleset_parser";
 
 // --- Workfile Creation ---
@@ -181,7 +183,8 @@ export function rename_symbol(workfile: Workfile, old_name: string, new_name: st
     if (!valid_name.ok) {
         return valid_name;
     }
-    if (!(old_name in workfile.symbols)) {
+    const symbol = workfile.symbols[old_name];
+    if (!symbol) {
         return error(`Symbol '${old_name}' not found`, "old_name");
     }
     if (new_name in workfile.symbols) {
@@ -190,7 +193,7 @@ export function rename_symbol(workfile: Workfile, old_name: string, new_name: st
     if (new_name in workfile.platform_ops) {
         return error(`Symbol '${new_name}' conflicts with platform ops`, "new_name");
     }
-    workfile.symbols[new_name] = workfile.symbols[old_name];
+    workfile.symbols[new_name] = symbol;
     delete workfile.symbols[old_name];
 
     // recompute might not be needed here, but more uniform
@@ -301,7 +304,8 @@ export function suggest_for_array(workfile: Workfile, array: ArrayProperty): Res
         case "BooleanProperty": {
             return ok({ values: ["true", "false"] });
         }
-        default: {
+        case "NumberProperty": {
+            // Numbers have no discrete set of suggestions.
             return ok({});
         }
     }
@@ -391,7 +395,7 @@ export function suggest_platform_extra(workfile: Workfile, property: PlatformExt
 export function suggest_for_property(workfile: Workfile, symbol_name: string, property_name: string, union_member?: string): Result<PropertySuggestions> {
     const symbol = workfile.symbols[symbol_name];
     if (!symbol) {
-        return error(`Could not find symbol with name: "${symbol_name}" in [${Object.keys(workfile.symbols)}]`, "");
+        return error(`Could not find symbol with name: "${symbol_name}" in [${Object.keys(workfile.symbols).join(", ")}]`, "");
     }
 
     if (symbol._t !== "RulesetStruct" && symbol._t !== "RulesetDescriptor") {
@@ -400,7 +404,7 @@ export function suggest_for_property(workfile: Workfile, symbol_name: string, pr
 
     const property = symbol.properties.find(p => p.name === property_name);
     if (!property) {
-        return error(`Could not find property "${property_name}" in [${symbol.properties.join(", ")}]`, symbol_name);
+        return error(`Could not find property "${property_name}" in [${symbol.properties.map(p => p.name).join(", ")}]`, symbol_name);
     }
 
     switch (property._t) {
@@ -510,10 +514,6 @@ function scan_yaml_files(directory: string): Result<string[]> {
     const schema_path = get_schemas_path();
     if (!schema_path.ok) {
         return schema_path;
-    }
-
-    if (!fs.readdirSync(directory)) {
-        return error(`Cannot read directory ${directory}`);
     }
 
     const results: string[] = [];

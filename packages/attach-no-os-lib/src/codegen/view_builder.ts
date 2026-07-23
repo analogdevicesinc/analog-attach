@@ -1,11 +1,27 @@
 import path from "node:path";
 import fs from "node:fs";
-import { error, ok, Result } from "../ruleset_parser/result";
-import { IncludeProperty, Property, RulesetDescriptor, RulesetStruct, UnionProperty } from "../ruleset_parser/types";
-import { Workfile } from "../workfile_handler/types";
-import { CodegenInput, DescriptorInfo, DeviceInfo, RuntimeAssignment, SourcePaths, StructView, Views } from "./types";
+
+import type { Result } from "../ruleset_parser/result";
+import type {
+	IncludeProperty,
+	Property,
+	RulesetDescriptor,
+	RulesetStruct
+} from "../ruleset_parser/types";
+import type { Workfile } from "../workfile_handler/types";
+import type {
+	CodegenInput,
+	DescriptorInfo,
+	DeviceInfo,
+	RuntimeAssignment,
+	SourcePaths,
+	StructView,
+	Views
+} from "./types";
+import type { ConnectionGraph } from "../validator/types";
+
+import { error, ok } from "../ruleset_parser/result";
 import { create_connections_graph } from "../validator/connection_graph";
-import { ConnectionGraph } from "../validator/types";
 import { get_schemas_path } from "../settings/settings";
 import { load_resolved_ruleset } from "../resolver/resolver";
 import { all_ops } from "../workfile_handler/workfile_handler";
@@ -60,7 +76,9 @@ export function build_views(input: CodegenInput): Result<Views> {
 	propagate_non_const(struct_views_map, ordered_symbols, graph);
 
 	// Convert to array in dependency order
-	const struct_views = ordered_symbols.map(([name]) => struct_views_map.get(name)!);
+	const struct_views = ordered_symbols
+							.map(([name]) => struct_views_map.get(name))
+							.filter(p => p !== undefined);
 
 	// Collect all descriptors (one per descriptor node)
 	const descriptors_result = collect_descriptors(input.workfile);
@@ -188,9 +206,14 @@ function propagate_non_const(
 				continue;
 			}
 
-			const union_property = property as UnionProperty;
+			const union_property = property;
 			const value = union_property.value as Record<string, string>;
-			const [member_name, reference] = Object.entries(value)[0];
+
+			const first_entry = Object.entries(value)[0];
+			if (!first_entry) {
+				continue;
+			}
+			const [member_name, reference] = first_entry;
 
 			// Check if the referenced struct is non-const
 			if (non_const_set.has(reference)) {
@@ -233,10 +256,6 @@ function collect_sources(workfile: Workfile): SourcePaths {
 	];
 
 	for (const ruleset of all_rulesets) {
-		if (!ruleset.$sources) {
-			continue;
-		}
-
 		for (const file of ruleset.$sources.noos ?? []) {
 			const mapped = map_noos_path(file);
 			if (mapped.variable === "INCLUDE") {
@@ -289,7 +308,10 @@ function order_symbols(workfile: Workfile): Result<[string, RulesetStruct][]> {
 	const sorted: string[] = [];
 
 	while (queue.length > 0) {
-		const name = queue.shift()!;
+		const name = queue.shift();
+		if (name === undefined) {
+			continue;
+		}
 		sorted.push(name);
 
 		for (const [parent, children] of graph) {
@@ -313,7 +335,7 @@ function order_symbols(workfile: Workfile): Result<[string, RulesetStruct][]> {
 	const result: [string, RulesetStruct][] = [];
 	for (const name of sorted) {
 		const ruleset = workfile.symbols[name];
-		if (ruleset._t === "RulesetStruct") {
+		if (ruleset?._t === "RulesetStruct") {
 			result.push([name, ruleset]);
 		}
 	}
@@ -339,7 +361,7 @@ function build_struct_view(name: string, ruleset: RulesetStruct): StructView {
 		runtime_assignments.push({
 			struct_name: name,
 			field_path: property.name,
-			value: `desc.${property.value}`,
+			value: `desc.${String(property.value)}`,
 		});
 	}
 
@@ -376,29 +398,34 @@ function format_c_value(property: Property): string {
 		}
 
 		case "StringProperty": {
-			return `"${property.value}"`;
+			return `"${String(property.value)}"`;
 		}
 
 		case "IncludeProperty": {
 			// Descriptor refs are patched at runtime (see build_struct_view); this branch
 			// shouldn't be reached for them, but keep it correct for safety.
 			if (is_descriptor_include(property)) {
-				return `desc.${property.value}`;
+				return `desc.${String(property.value)}`;
 			}
-			return property.pointer ? `&${property.value}` : String(property.value);
+			return property.pointer ? `&${String(property.value)}` : String(property.value);
 		}
 
 		case "PlatformOpsProperty": {
-			return `&${property.value}`;
+			return `&${String(property.value)}`;
 		}
 
 		case "PlatformExtraProperty": {
-			return `&${property.value}`;
+			return `&${String(property.value)}`;
 		}
 
 		case "UnionProperty": {
 			const value = property.value as Record<string, string>;
-			const [member_name, reference] = Object.entries(value)[0];
+			const first_entry = Object.entries(value)[0];
+			if (!first_entry) {
+				// FIXME: This would be error, but i don't think this is reachable
+				return "NULL";
+			}
+			const [member_name, reference] = first_entry;
 			const member = property.members.find(member => member.name === member_name);
 			const is_pointer = member?.pointer ?? false;
 			return is_pointer
@@ -424,7 +451,7 @@ function format_c_value(property: Property): string {
 						return String(value);
 					}
 					case "IncludeProperty": {
-						return property.element.pointer ? `&${value}` : String(value);
+						return property.element.pointer ? `&${String(value)}` : String(value);
 					}
 					default: {
 						return String(value);
@@ -436,11 +463,11 @@ function format_c_value(property: Property): string {
 		}
 
 		case "CallbackFunctionProperty": {
-			return property.value ? String(property.value) : "NULL";
+			return typeof property.value === "string" && property.value ? property.value : "NULL";
 		}
 
 		case "CallbackContextProperty": {
-			return property.value ? String(property.value) : "NULL";
+			return typeof property.value === "string" && property.value ? property.value : "NULL";
 		}
 
 		default: {
@@ -481,11 +508,11 @@ function resolve_init_parameter(
 	if (typeof target_name !== "string") {
 		return error(`Descriptor '${descriptor.$id}' has no init_param assigned`);
 	}
-	const target = workfile.symbols[target_name];
-	if (!target) {
+	if (!(target_name in workfile.symbols)) {
 		return error(`Descriptor init_param '${target_name}' not found in workfile`);
 	}
-	if (target._t !== "RulesetStruct") {
+	const target = workfile.symbols[target_name];
+	if (target?._t !== "RulesetStruct") {
 		return error(`Descriptor init_param '${target_name}' is not a struct`);
 	}
 	return ok({ name: target_name, ruleset: target });

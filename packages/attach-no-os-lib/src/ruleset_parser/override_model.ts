@@ -1,6 +1,8 @@
-import { Effect, EnumValue, OverrideReference, OverridePredicate, Property } from "./types";
-import { boolean_, string_, number_, at, ParseContext, stringArray } from "./validators";
-import { Result, error, ok } from "./result";
+import type { Effect, EnumValue, OverrideReference, OverridePredicate, Property } from "./types";
+import type { ParseContext} from "./validators";
+import { boolean_, string_, number_, at, stringArray } from "./validators";
+import type { Result} from "./result";
+import { error, ok } from "./result";
 
 export function lower_effects(
 	object: Record<string, unknown>,
@@ -29,7 +31,7 @@ export function lower_effects(
 		// undefined) can't be checked here and pass through.
 		if (property?._t === "EnumProperty" && !property.values.includes(object.default as EnumValue)) {
 			return error(
-				`Invalid default '${object.default}'. Valid: ${property.values.join(", ")}`,
+				`Invalid default '${String(object.default)}'. Valid: ${property.values.join(", ")}`,
 				at(context, "default").path
 			);
 		}
@@ -68,7 +70,7 @@ export function lower_effects(
 		}
 
 		if (property?._t === "NumberProperty" && property.minimum !== undefined && minimum.value < property.minimum) {
-			return error(`minimum ${minimum.value} below type minimum ${property.minimum}`, at(context, "minimum").path);
+			return error(`minimum ${String(minimum.value)} below type minimum ${String(property.minimum)}`, at(context, "minimum").path);
 		}
 
 		effects.push({ op: "setMin", reference, value: minimum.value });
@@ -81,7 +83,7 @@ export function lower_effects(
 		}
 
 		if (property?._t === "NumberProperty" && property.maximum !== undefined && maximum.value > property.maximum) {
-			return error(`maximum ${maximum.value} above type maximum ${property.maximum}`, at(context, "maximum").path);
+			return error(`maximum ${String(maximum.value)} above type maximum ${String(property.maximum)}`, at(context, "maximum").path);
 		}
 
 		effects.push({ op: "setMax", reference, value: maximum.value });

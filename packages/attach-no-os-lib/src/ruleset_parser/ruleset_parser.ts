@@ -1,13 +1,17 @@
-import {
+import type {
 	RulesetSources,
-	is_primitive_symbols,
 	Property,
 	RulesetEnumValue,
 	Ruleset
 } from "./types";
+import {
+	is_primitive_symbols
+} from "./types";
 import YAML from "yaml";
-import { Result, ok, error } from "./result";
-import { asObject, at, number_, optional, optionalWithDefault, ParseContext, required, string_, stringArray } from "./validators";
+import type { Result} from "./result";
+import { ok, error } from "./result";
+import type { ParseContext} from "./validators";
+import { asObject, at, number_, optional, optionalWithDefault, required, string_, stringArray } from "./validators";
 import { RulesetType } from "./types";
 import {
 	parse_array_property,
@@ -28,7 +32,9 @@ import {
 import { resolve_ruleset } from "../resolver/resolver";
 
 export function unwrap<T>(result: Result<T>): T {
-	if (!result.ok) {throw result.error;}
+	if (!result.ok) {
+		throw new Error(JSON.stringify(result.error));
+	}
 	return result.value;
 }
 
@@ -107,7 +113,7 @@ export function parse_property(name: string, value: unknown, context: ParseConte
 		return parse_include_property(name, object.value, context);
 	}
 
-	const type_ = object.value["type"];
+	const type_ = object.value.type;
 	if (typeof type_ === "string") {
 		if (type_ === "enum") {
 			return parse_enum_property(name, object.value, context);
@@ -162,7 +168,7 @@ function is_enum_property(value: unknown, context: ParseContext): Result<Ruleset
 			if (typeof item === "string" || typeof item === "number") {
 				values.push({ name: item, description: undefined });
 			} else {
-				return error(`Expected string or number at index ${index}`, at(context, index).path);
+				return error(`Expected string or number at index ${index.toString()}`, at(context, index).path);
 			}
 		}
 		return ok(values);
@@ -181,7 +187,7 @@ function is_enum_property(value: unknown, context: ParseContext): Result<Ruleset
 				description: value
 			});
 		} else if (typeof value === "object" && value !== null) {
-			const description = (value as Record<string, unknown>)["description"];
+			const description = (value as Record<string, unknown>).description;
 			values.push({
 				name: name,
 				description: typeof description === "string" ? description : undefined
@@ -234,6 +240,7 @@ function parse_ruleset_from_object(object: Record<string, unknown>, context: Par
 
 	switch ($type.value) {
 		case RulesetType.RT_STRUCT: {
+			// eslint-disable-next-line no-param-reassign -- context.document is the parse accumulator being built up
 			context.document.properties = [];
 			for (const key of Object.keys(object)) {
 				if (key.startsWith("$")) {
@@ -383,7 +390,7 @@ export function parse_ruleset(contents: string): Result<Ruleset> {
 	try {
 		parsed = YAML.parse(contents);
 	} catch (_error) {
-		return error(`YAML parse error at: ${_error}`, "");
+		return error(`YAML parse error at: ${String(_error)}`, "");
 	}
 
 	return parse_ruleset_from_object(parsed as Record<string, unknown>, { path: "", document: {} });
