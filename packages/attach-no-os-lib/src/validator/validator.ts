@@ -1,6 +1,6 @@
-import { Workfile } from "../workfile_handler/types";
-import { ValidationError, ValidationResult } from "./types";
-import { ParseContext } from "../ruleset_parser/validators";
+import type { Workfile } from "../workfile_handler/types";
+import type { ValidationError, ValidationResult } from "./types";
+import type { ParseContext } from "../ruleset_parser/validators";
 import { validate_property } from "./property_validator";
 import { collect_child_overrides, create_connections_graph } from "./connection_graph";
 

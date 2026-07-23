@@ -1,12 +1,12 @@
-import { Rule, RulesetStruct } from "../ruleset_parser/types";
+import type { Rule } from "../ruleset_parser/types";
 
-export type ValidationError = {
+export interface ValidationError {
 	path: string;
 	message: string;
 	severity: "error" | "warning";
 };
 
-export type ValidationResult = {
+export interface ValidationResult {
 	valid: boolean;
 	errors: ValidationError[];
 }
@@ -16,7 +16,7 @@ export type ValidationResult = {
 // rule; `parent_symbol` is the symbol that includes it (its includer), found via
 // reverse graph lookup — undefined when nothing includes the declarer. The engine
 // maps ref.node -> one of these names, so scope is decided in exactly one place.
-export type CollectedRule = {
+export interface CollectedRule {
 	rule: Rule,
 	self_symbol: string,
 	parent_symbol?: string

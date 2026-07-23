@@ -1,5 +1,5 @@
 import path from "node:path";
-import { SettingsFile } from "./types";
+import type { SettingsFile } from "./types";
 
 export const SETTINGS_DEFAULTS: SettingsFile = {
 	no_os_path: {

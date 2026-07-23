@@ -1,8 +1,9 @@
 import fs from "node:fs";
 import path from "node:path";
-import { error, ok, Result } from "../ruleset_parser/result";
+import { error, ok } from "../ruleset_parser/result";
+import type { Result } from "../ruleset_parser/result";
 import { parse_ruleset } from "../ruleset_parser/ruleset_parser";
-import { EnumProperty, Property, Ruleset, RulesetDescriptor } from "../ruleset_parser/types";
+import type { EnumProperty, Property, Ruleset, RulesetDescriptor } from "../ruleset_parser/types";
 import { get_schemas_path } from "../settings/settings";
 
 function load_ruleset(ruleset_path: string): Result<Ruleset> {
