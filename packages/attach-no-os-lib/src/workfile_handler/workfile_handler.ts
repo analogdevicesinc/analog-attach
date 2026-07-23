@@ -17,7 +17,7 @@ import { scan_platforms } from "./platform_scanner";
 import type { PlatformManifest, PropertySuggestions } from "./types";
 import { load_resolved_ruleset } from "../resolver/resolver";
 import { get_schemas_path } from "../settings/settings";
-import { collect_child_overrides, create_connections_graph } from "../validator/connection_graph";
+import { collect_child_overrides, create_connections_graph, rename_symbol_references } from "../validator/connection_graph";
 import { apply_overrides } from "../validator/override_resolver";
 import type { AvailableStructs, MinimalWorkfile, Workfile } from "./types";
 import { is_minimal_workfile } from "./types";
@@ -195,6 +195,9 @@ export function rename_symbol(workfile: Workfile, old_name: string, new_name: st
     }
     workfile.symbols[new_name] = symbol;
     delete workfile.symbols[old_name];
+
+    // Rewrite references to the old name held in other symbols' property values.
+    rename_symbol_references(workfile, old_name, new_name);
 
     // recompute might not be needed here, but more uniform
     const recompute = recompute_exposed_ops(workfile);
