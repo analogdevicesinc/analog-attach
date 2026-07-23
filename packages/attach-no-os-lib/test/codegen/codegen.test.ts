@@ -180,6 +180,91 @@ describe('codegen', () => {
         expect(common_data_c).toContain(".channel_modes = { CH_MODE_ADC, CH_MODE_DAC }");
     });
 
+    test('unset pointer include is emitted as NULL', () => {
+        // `parent` on no_os_spi_init_param is a `pointer: true` include. When left
+        // unset it must be explicitly null-initialized, not omitted from the struct.
+        const minimal: MinimalWorkfile = {
+            platform: "max32690",
+            symbols: {
+                "max_spi_ip": {
+                    "$compatible": "platforms/maxim/max32690/max_spi_init_param.yaml",
+                    "vssel": "MXC_GPIO_VSSEL_VDDIOH",
+                    "polarity": "SPI_SS_POL_LOW"
+                },
+                "no_os_spi_ip": {
+                    "$compatible": "no-os/spi/no_os_spi_init_param.yaml",
+                    "device_id": 1,
+                    "chip_select": 2,
+                    "platform_ops": "spi_ops",
+                    "extra": "max_spi_ip"
+                }
+            }
+        };
+
+        const import_result = import_minimal(minimal);
+        expectOk(import_result);
+
+        const result = generate_project({
+            workfile: import_result.value,
+            platform_name: "max32690",
+            platform_vendor: "maxim",
+            project_name: "test-project",
+            output_path: temporary_directory,
+            noos_path: "$(realpath ../../../)",
+        });
+
+        expectOk(result);
+
+        const common_data_c = fs.readFileSync(
+            path.join(temporary_directory, "test-project/src/common/common_data.c"),
+            "utf8"
+        );
+
+        expect(common_data_c).toContain(".parent = NULL");
+    });
+
+    test('unset property with a default emits the default value', () => {
+        // `asynchronous_rx` on no_os_uart_init_param has `default: false`. Even
+        // though it is never set in the workfile, codegen emits the default.
+        const minimal: MinimalWorkfile = {
+            platform: "max32690",
+            symbols: {
+                "max_uart_ip": {
+                    "$compatible": "platforms/maxim/max32690/max_uart_init_param.yaml",
+                    "vssel": "MXC_GPIO_VSSEL_VDDIOH"
+                },
+                "my_uart_ip": {
+                    "$compatible": "no-os/uart/no_os_uart_init_param.yaml",
+                    "device_id": 0,
+                    "baud_rate": 115200,
+                    "platform_ops": "uart_ops",
+                    "extra": "max_uart_ip"
+                }
+            }
+        };
+
+        const import_result = import_minimal(minimal);
+        expectOk(import_result);
+
+        const result = generate_project({
+            workfile: import_result.value,
+            platform_name: "max32690",
+            platform_vendor: "maxim",
+            project_name: "test-project",
+            output_path: temporary_directory,
+            noos_path: "$(realpath ../../../)",
+        });
+
+        expectOk(result);
+
+        const common_data_c = fs.readFileSync(
+            path.join(temporary_directory, "test-project/src/common/common_data.c"),
+            "utf8"
+        );
+
+        expect(common_data_c).toContain(".asynchronous_rx = false");
+    });
+
     test('descriptor-typed include generates devices.descriptor reference', () => {
         // A child SPI whose `parent` field points at another SPI's *descriptor* node
         // must be patched at runtime with `desc.<parent_descriptor>`.
