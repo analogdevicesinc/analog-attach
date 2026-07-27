@@ -30,31 +30,10 @@ export function make_environment(templates_directory: string): Eta {
 	});
 }
 
-// Helpers passed to every template under `it.h` — the Eta replacement for the
-// custom nunjucks filters that used to live on the environment. Templates call
-// them as functions (`it.h.tab_indent(x)`) instead of piping (`x | tab_indent`).
-export const template_helpers = {
-	// Was the `reverse` filter. Teardown runs in reverse init order; main_c.eta
-	// calls this instead of the `| reverse` filter.
-	// eslint-disable-next-line unicorn/no-array-reverse
-	reverse: <T>(array: T[]): T[] => [...array].reverse(),
-
-	// Was the `tab_indent` filter. Indent every non-empty line of a (possibly
-	// multi-line) block by one tab; empty lines are left bare to avoid trailing
-	// whitespace. Device init/remove templates emit full statement blocks and the
-	// main_c.eta loop only indents the first line, so the rest is re-indented here.
-	tab_indent: (text: unknown): string =>
-		String(text)
-			.split("\n")
-			.map(line => (line.length > 0 ? "\t" + line : line))
-			.join("\n"),
-};
-
-export type TemplateHelpers = typeof template_helpers;
-
 // A minimal engine for rendering template strings that don't live on disk —
-// specifically the device init/remove templates read out of the schemas repo.
-// Same C-code-safe options as make_environment, used via renderString().
+// specifically the device init/remove templates read out of the schemas repo
+// (see device_loader.ts). Same C-code-safe options as make_environment, used via
+// renderString().
 export function make_string_environment(): Eta {
 	return new Eta({
 		autoEscape: false,

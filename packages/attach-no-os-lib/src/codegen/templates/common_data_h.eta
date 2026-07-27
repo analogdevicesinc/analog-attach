@@ -1,14 +1,15 @@
+<% const H = include("./_helpers"); const devices = it.h.devices(it.workfile); const includes = H.common_data_includes(it.workfile, devices.map(d => d.header).filter(h => h.length > 0)); const descriptors = H.collect_descriptors(it.workfile); const externs = H.struct_views(it.workfile).map(view => ({ type: view.type, name: view.name, is_const: view.is_const })); -%>
 #ifndef COMMON_DATA_H
 #define COMMON_DATA_H
 
 /* Includes */
-<% for (const inc of it.includes) { -%>
+<% for (const inc of includes) { -%>
 #include "<%= inc %>"
 <% } -%>
 
 /* Descriptors struct */
 struct descriptors {
-<% for (const d of it.descriptors) { -%>
+<% for (const d of descriptors) { -%>
 	struct <%= d.descriptor_type %> *<%= d.descriptor_name %>;
 <% } -%>
 };
@@ -16,7 +17,7 @@ struct descriptors {
 extern struct descriptors desc;
 
 /* Init param externs */
-<% for (const e of it.externs) { -%>
+<% for (const e of externs) { -%>
 extern <%= e.is_const ? "const " : "" %>struct <%= e.type %> <%= e.name %>;
 <% } -%>
 
