@@ -89,3 +89,13 @@ export interface Views {
 	user_app_h: object;
 	user_app_c: object;
 };
+
+// One generated file: which template renders it, where it lands in the project,
+// which view slice feeds it, and whether an existing copy is preserved.
+// `view` is a string key into Views — the JSON references slices by name.
+export interface FileSpec {
+	template: string;
+	output: string;
+	view: keyof Views;
+	protect: boolean;
+}
