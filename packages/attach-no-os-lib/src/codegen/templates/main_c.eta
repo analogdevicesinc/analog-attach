@@ -1,0 +1,28 @@
+#include "no_os_error.h"
+#include "common/common_data.h"
+#include "user_app.h"
+
+int main(void)
+{
+	int ret;
+
+<% if (it.runtime_assignments.length) { -%>
+	// Patching the common_data structs
+<% for (const a of it.runtime_assignments) { -%>
+	<%= a.struct_name %>.<%= a.field_path %> = <%= a.value %>;
+<% } -%>
+
+<% } -%>
+	// Init devices and structures
+<% for (const d of it.devices) { -%>
+<%= it.h.tab_indent(d.init_code) %>
+
+<% } -%>
+	user_app(&desc);
+
+<% for (const d of it.h.reverse(it.devices)) { -%>
+<%= it.h.tab_indent(d.remove_code) %>
+<% } -%>
+
+	return 0;
+}

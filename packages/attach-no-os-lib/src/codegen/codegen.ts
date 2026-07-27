@@ -4,7 +4,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { error, ok } from "../ruleset_parser/result";
 import { build_views } from "./view_builder";
-import { make_environment } from "./nunjucks_environment";
+import { make_environment, template_helpers } from "./eta_environment";
 
 import type { CodegenInput, CodegenResult, Views } from "./types";
 import type { Result } from "../ruleset_parser/result";
@@ -90,7 +90,10 @@ export function generate_project(input: CodegenInput): Result<CodegenResult> {
 
 		fs.mkdirSync(path.dirname(file_path), { recursive: true });
 
-		const content = environment.render(file.template, views[file.view]);
+		// Templates reach the shared helpers (tab_indent, reverse) via `it.h`.
+		// Step 1 still feeds per-file view slices; the helpers ride alongside them.
+		const view = { ...views[file.view], h: template_helpers };
+		const content = environment.render(file.template, view);
 		fs.writeFileSync(file_path, content);
 		files_created.push(file_path);
 	}

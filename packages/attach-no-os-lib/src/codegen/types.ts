@@ -6,8 +6,8 @@ export interface DeviceInfo {
 	descriptor_type: string;   // descriptor type: "adxl355_dev"
 	init_param_type: string;   // init param type: "adxl355_init_param"
 	header: string;            // "adxl355.h"
-	init_code: string;         // rendered init.njk (full statement block)
-	remove_code: string;       // rendered remove.njk (full statement block)
+	init_code: string;         // rendered init.eta (full statement block)
+	remove_code: string;       // rendered remove.eta (full statement block)
 	capability?: string;       // $capability, e.g. "uart" / "irq"; used for init ordering
 };
 

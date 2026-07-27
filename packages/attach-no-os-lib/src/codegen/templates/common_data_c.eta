@@ -1,0 +1,14 @@
+<% for (const inc of it.includes) { -%>
+#include "<%= inc %>"
+<% } -%>
+
+struct descriptors desc = { 0 };
+
+<% for (const s of it.structs) { -%>
+<%= s.is_const ? "const " : "" %>struct <%= s.type %> <%= s.name %> = {
+<% for (const f of s.fields) { -%>
+	.<%= f.name %> = <%= f.c_value %>,
+<% } -%>
+};
+
+<% } -%>
