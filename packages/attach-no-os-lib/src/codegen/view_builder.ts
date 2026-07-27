@@ -25,7 +25,7 @@ import { create_connections_graph } from "../validator/connection_graph";
 import { get_schemas_path } from "../settings/settings";
 import { load_resolved_ruleset } from "../resolver/resolver";
 import { all_ops } from "../workfile_handler/workfile_handler";
-import { make_string_environment } from "./nunjucks_environment";
+import { make_string_environment } from "./eta_environment";
 
 // An `include:` field whose target schema is a descriptor ruleset is not a static
 // struct member — it is patched at runtime with `desc.<value>`. We classify by
@@ -146,7 +146,7 @@ export function build_views(input: CodegenInput): Result<Views> {
 		main_c: {
 			// Teardown in reverse init order (LIFO): last initialized is removed first,
 			// so prioritized peripherals (e.g. UART) are torn down last. The reversal is
-			// expressed inline in main_c.njk as `devices | reverse`.
+			// expressed inline in main_c.eta as `it.h.reverse(it.devices)`.
 			devices: devices,
 			runtime_assignments: runtime_assignments,
 		},
@@ -575,9 +575,10 @@ function extract_device_info(
 	const symbol_name = init_parameter.value.name;
 	const init_parameter_ruleset = init_parameter.value.ruleset;
 
-	// Templates receive the descriptor instance name and the init_param instance name.
-	// They now emit full statement blocks (their own `ret =` / check), rendered with the
-	// same nunjucks engine as the project-level templates.
+	// Templates receive the descriptor instance name and the init_param instance name
+	// (reached in-template as `it.descriptor_name` / `it.symbol_name`). They emit full
+	// statement blocks (their own `ret =` / check), rendered with the same Eta engine as
+	// the project-level templates.
 	const view = { symbol_name, descriptor_name };
 	const environment = make_string_environment();
 	const init_code = environment.renderString(templates.value.init, view).trim();

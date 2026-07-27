@@ -1820,13 +1820,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@types/nunjucks@npm:^3.2.6":
-  version: 3.2.6
-  resolution: "@types/nunjucks@npm:3.2.6"
-  checksum: 10c0/bc62c5c9305c0c63a49a55c3553393fdc84d123b4831668212380077ee6646c3ba52bc49e3c651257addf3a47d775707dcefeaf5e1b76cf7f680096939894142
-  languageName: node
-  linkType: hard
-
 "@types/react-dom@npm:^19.0.0":
   version: 19.2.3
   resolution: "@types/react-dom@npm:19.2.3"
@@ -2581,13 +2574,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"a-sync-waterfall@npm:^1.0.0":
-  version: 1.0.1
-  resolution: "a-sync-waterfall@npm:1.0.1"
-  checksum: 10c0/1c7b258da2c77eb1447dcc683afb10ca3dc8880de990562ccbb7b282538aba01e910345ce9e8500c1458272c7866b85fcfa5ca8159e33550b011ab5c586ec5a4
-  languageName: node
-  linkType: hard
-
 "abbrev@npm:^4.0.0":
   version: 4.0.0
   resolution: "abbrev@npm:4.0.0"
@@ -2851,13 +2837,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"asap@npm:^2.0.3":
-  version: 2.0.6
-  resolution: "asap@npm:2.0.6"
-  checksum: 10c0/c6d5e39fe1f15e4b87677460bd66b66050cd14c772269cee6688824c1410a08ab20254bb6784f9afb75af9144a9f9a7692d49547f4d19d715aeb7c0318f3136d
-  languageName: node
-  linkType: hard
-
 "assertion-error@npm:^2.0.1":
   version: 2.0.1
   resolution: "assertion-error@npm:2.0.1"
@@ -2920,7 +2899,7 @@ __metadata:
     "@stricli/core": "npm:^1.1.0"
     "@types/node": "npm:20.x"
     attach-no-os-lib: "workspace:*"
-    nunjucks: "npm:^3.2.4"
+    eta: "npm:^3.5.0"
     tsup: "npm:^6.7.0"
     typescript: "npm:^5.7.2"
     vitest: "npm:^4.0.18"
@@ -2935,11 +2914,10 @@ __metadata:
   resolution: "attach-no-os-lib@workspace:packages/attach-no-os-lib"
   dependencies:
     "@types/node": "npm:20.x"
-    "@types/nunjucks": "npm:^3.2.6"
     "@vitest/coverage-v8": "npm:^4.0.18"
     eslint: "npm:^9.39.2"
     eslint-plugin-unicorn: "npm:^60.0.0"
-    nunjucks: "npm:^3.2.4"
+    eta: "npm:^3.5.0"
     typescript: "npm:^5.7.2"
     typescript-eslint: "npm:^8.54.0"
     vite: "npm:^7.3.1"
@@ -3338,13 +3316,6 @@ __metadata:
   version: 4.1.1
   resolution: "commander@npm:4.1.1"
   checksum: 10c0/84a76c08fe6cc08c9c93f62ac573d2907d8e79138999312c92d4155bc2325d487d64d13f669b2000c9f8caf70493c1be2dac74fec3c51d5a04f8bc3ae1830bab
-  languageName: node
-  linkType: hard
-
-"commander@npm:^5.1.0":
-  version: 5.1.0
-  resolution: "commander@npm:5.1.0"
-  checksum: 10c0/da9d71dbe4ce039faf1fe9eac3771dca8c11d66963341f62602f7b66e36d2a3f8883407af4f9a37b1db1a55c59c0c1325f186425764c2e963dc1d67aec2a4b6d
   languageName: node
   linkType: hard
 
@@ -4084,6 +4055,13 @@ __metadata:
   version: 2.0.3
   resolution: "esutils@npm:2.0.3"
   checksum: 10c0/9a2fe69a41bfdade834ba7c42de4723c97ec776e40656919c62cbd13607c45e127a003f05f724a1ea55e5029a4cf2de444b13009f2af71271e42d93a637137c7
+  languageName: node
+  linkType: hard
+
+"eta@npm:^3.5.0":
+  version: 3.5.0
+  resolution: "eta@npm:3.5.0"
+  checksum: 10c0/28ffc23658e3d77c1ab2660d0158b979688457659fc190d0edca26c186ab34039bec9d6745d975e5f0543981e285cd757bff85b47ea2374ab11444e2b7271dd0
   languageName: node
   linkType: hard
 
@@ -5639,24 +5617,6 @@ __metadata:
   dependencies:
     path-key: "npm:^3.0.0"
   checksum: 10c0/6f9353a95288f8455cf64cbeb707b28826a7f29690244c1e4bb61ec573256e021b6ad6651b394eb1ccfd00d6ec50147253aba2c5fe58a57ceb111fad62c519ac
-  languageName: node
-  linkType: hard
-
-"nunjucks@npm:^3.2.4":
-  version: 3.2.4
-  resolution: "nunjucks@npm:3.2.4"
-  dependencies:
-    a-sync-waterfall: "npm:^1.0.0"
-    asap: "npm:^2.0.3"
-    commander: "npm:^5.1.0"
-  peerDependencies:
-    chokidar: ^3.3.0
-  peerDependenciesMeta:
-    chokidar:
-      optional: true
-  bin:
-    nunjucks-precompile: bin/precompile
-  checksum: 10c0/7fe5197559b7c09972c79e2a86f9c093459b9075bc9b41134cd2bc599ae93567b53bd09d472a748edc736192d9ccd2998aa8c20cfcbe6a3fffd281f91897c888
   languageName: node
   linkType: hard
 

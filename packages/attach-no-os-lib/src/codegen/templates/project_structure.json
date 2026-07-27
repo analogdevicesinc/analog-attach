@@ -1,11 +1,11 @@
 {
 	"files": [
-		{ "template": "makefile.njk",      "output": "Makefile",                 "view": "makefile",      "protect": false },
-		{ "template": "src_mk.njk",        "output": "src.mk",                   "view": "src_mk",        "protect": false },
-		{ "template": "main_c.njk",        "output": "src/main.c",               "view": "main_c",        "protect": false },
-		{ "template": "common_data_h.njk", "output": "src/common/common_data.h", "view": "common_data_h", "protect": false },
-		{ "template": "common_data_c.njk", "output": "src/common/common_data.c", "view": "common_data_c", "protect": false },
-		{ "template": "user_app_h.njk",    "output": "src/user_app.h",           "view": "user_app_h",    "protect": true  },
-		{ "template": "user_app_c.njk",    "output": "src/user_app.c",           "view": "user_app_c",    "protect": true  }
+		{ "template": "makefile.eta",      "output": "Makefile",                 "view": "makefile",      "protect": false },
+		{ "template": "src_mk.eta",        "output": "src.mk",                   "view": "src_mk",        "protect": false },
+		{ "template": "main_c.eta",        "output": "src/main.c",               "view": "main_c",        "protect": false },
+		{ "template": "common_data_h.eta", "output": "src/common/common_data.h", "view": "common_data_h", "protect": false },
+		{ "template": "common_data_c.eta", "output": "src/common/common_data.c", "view": "common_data_c", "protect": false },
+		{ "template": "user_app_h.eta",    "output": "src/user_app.h",           "view": "user_app_h",    "protect": true  },
+		{ "template": "user_app_c.eta",    "output": "src/user_app.c",           "view": "user_app_c",    "protect": true  }
 	]
 }

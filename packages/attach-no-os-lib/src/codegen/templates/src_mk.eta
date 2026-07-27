@@ -1,0 +1,36 @@
+# Auto-generated src.mk
+# Do not edit manually
+
+# Sources
+<% for (const src of it.util_srcs) { -%>
+SRCS += $(NO-OS)/<%= src %>
+<% } -%>
+
+<% for (const src of it.drivers_srcs) { -%>
+SRCS += $(DRIVERS)/<%= src %>
+<% } -%>
+
+<% for (const src of it.platform_srcs) { -%>
+SRCS += $(PLATFORM_DRIVERS)/<%= src %>
+<% } -%>
+
+<% for (const src of it.project_srcs) { -%>
+SRCS += $(PROJECT)/<%= src %>
+<% } -%>
+
+# Includes
+<% for (const inc of it.drivers_incs) { -%>
+INCS += $(DRIVERS)/<%= inc %>
+<% } -%>
+
+<% for (const inc of it.include_incs) { -%>
+INCS += $(INCLUDE)/<%= inc %>
+<% } -%>
+
+<% for (const inc of it.platform_incs) { -%>
+INCS += $(PLATFORM_DRIVERS)/<%= inc %>
+<% } -%>
+
+<% for (const inc of it.project_incs) { -%>
+INCS += $(PROJECT)/<%= inc %>
+<% } -%>

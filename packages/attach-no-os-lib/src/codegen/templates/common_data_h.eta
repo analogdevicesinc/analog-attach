@@ -1,0 +1,23 @@
+#ifndef COMMON_DATA_H
+#define COMMON_DATA_H
+
+/* Includes */
+<% for (const inc of it.includes) { -%>
+#include "<%= inc %>"
+<% } -%>
+
+/* Descriptors struct */
+struct descriptors {
+<% for (const d of it.descriptors) { -%>
+	struct <%= d.descriptor_type %> *<%= d.descriptor_name %>;
+<% } -%>
+};
+
+extern struct descriptors desc;
+
+/* Init param externs */
+<% for (const e of it.externs) { -%>
+extern <%= e.is_const ? "const " : "" %>struct <%= e.type %> <%= e.name %>;
+<% } -%>
+
+#endif /* COMMON_DATA_H */
