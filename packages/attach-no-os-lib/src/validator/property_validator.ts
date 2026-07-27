@@ -11,6 +11,7 @@ import type {
 	StringProperty,
 	UnionProperty
 } from "../ruleset_parser/types";
+import { is_integer_symbol } from "../ruleset_parser/types";
 import type { ParseContext } from "../ruleset_parser/validators";
 import { at } from "../ruleset_parser/validators";
 import type { Workfile } from "../workfile_handler/types";
@@ -256,6 +257,26 @@ function validate_number(property: NumberProperty, context: ParseContext): Valid
 			severity: "error"
 		});
 		return errors; // No reason to continue
+	}
+
+	// NaN/Infinity have no C literal we could emit for any numeric type.
+	if (!Number.isFinite(value)) {
+		errors.push({
+			path: context.path,
+			message: `Value ${value.toString()} is not a finite number`,
+			severity: "error"
+		});
+		return errors; // Range checks below are meaningless for a non-finite value
+	}
+
+	// A fractional value in an integer field would be truncated by the C compiler
+	// without warning, so reject it rather than silently changing the value.
+	if (is_integer_symbol(property.type) && !Number.isInteger(value)) {
+		errors.push({
+			path: context.path,
+			message: `Value ${value.toString()} is not an integer, but '${property.type}' is an integer type`,
+			severity: "error"
+		});
 	}
 
 	if (property.minimum !== undefined && value < property.minimum) {

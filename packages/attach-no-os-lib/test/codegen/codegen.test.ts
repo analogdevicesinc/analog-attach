@@ -326,14 +326,14 @@ describe('codegen', () => {
     });
 
     test('errors when a device has an init template but no remove template', () => {
-        // A schema with init.njk but no remove.njk is a half-configured
+        // A schema with init.eta but no remove.eta is a half-configured
         // device. It must surface an error, not be silently dropped from main.c.
         const broken_schemas = fs.mkdtempSync(path.join(os.tmpdir(), 'broken-schemas-'));
         try {
             // NOOS_ROOT/schemas is a symlink to the real schema tree; dereference so we
             // copy real files into the temp dir and never mutate the source via the link.
             fs.cpSync(path.join(NOOS_ROOT, 'schemas'), path.join(broken_schemas, 'schemas'), { recursive: true, dereference: true });
-            fs.rmSync(path.join(broken_schemas, 'schemas/devices/adxl355/remove.njk'));
+            fs.rmSync(path.join(broken_schemas, 'schemas/devices/adxl355/remove.eta'));
 
             teardown_test_config();
             setup_test_config(broken_schemas);

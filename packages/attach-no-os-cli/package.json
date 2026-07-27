@@ -29,7 +29,7 @@
     ],
     "external": [
       "yaml",
-      "nunjucks"
+      "eta"
     ]
   },
   "devDependencies": {
@@ -42,7 +42,7 @@
   "dependencies": {
     "@stricli/auto-complete": "^1.2.9",
     "@stricli/core": "^1.1.0",
-    "nunjucks": "^3.2.4",
+    "eta": "^3.5.0",
     "yaml": "^2.7.1"
   }
 }

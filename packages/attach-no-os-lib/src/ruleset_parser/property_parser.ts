@@ -14,6 +14,7 @@ import type {
 	UnionProperty
 } from "./types";
 import {
+	is_integer_symbol,
 	is_primitive_symbols
 } from "./types";
 import type {
@@ -22,6 +23,7 @@ import {
 	asObject,
 	at,
 	boolean_,
+	integer_,
 	number_,
 	optional,
 	optionalWithDefault,
@@ -42,6 +44,9 @@ export function parse_number_property(name: string, object: Record<string, unkno
 		return error(`Invalid number type '${type_.value}`, at(context, "type").path);
 	}
 
+	// Integer primitives reject fractional bounds and defaults; float/double accept them.
+	const numeric = is_integer_symbol(type_.value) ? integer_ : number_;
+
 	const description = optionalWithDefault(object, "description", context, "", string_);
 	if (!description.ok) {
 		return description;
@@ -52,18 +57,18 @@ export function parse_number_property(name: string, object: Record<string, unkno
 		return required_;
 	}
 
-	const default_ = optional(object, "default", context, number_);
+	const default_ = optional(object, "default", context, numeric);
 	if (!default_.ok) {
 		return default_;
 	}
 
 	// TODO: maybe make this an optionalWithDefault and figure out the value
-	const minimum = optional(object, "minimum", context, number_);
+	const minimum = optional(object, "minimum", context, numeric);
 	if (!minimum.ok) {
 		return minimum;
 	}
 
-	const maximum = optional(object, "maximum", context, number_);
+	const maximum = optional(object, "maximum", context, numeric);
 	if (!maximum.ok) {
 		return maximum;
 	}
@@ -282,7 +287,7 @@ export function parse_union_property(name: string, object: Record<string, unknow
 }
 
 export function parse_array_property(name: string, object: Record<string, unknown>, context: ParseContext): Result<ArrayProperty> {
-	const size = required(object, "size", context, number_);
+	const size = required(object, "size", context, integer_);
 	if (!size.ok) {
 		return size;
 	}

@@ -553,8 +553,11 @@ describe('workfile_handler', () => {
             const result = load_platform(workfile, scan_result.value);
             expectOk(result);
 
+            // Derived from the scan rather than hardcoded: what matters here is that
+            // load_platform loads every op it was handed, not how many the platform
+            // manifest happens to declare today.
             const ops_list = list_platform_ops(workfile);
-            expect(ops_list).toHaveLength(7);
+            expect(ops_list).toHaveLength(scan_result.value.ops.length);
             expect(ops_list).toContain('max_spi_ops');
             expect(ops_list).toContain('max_i2c_ops');
             expect(ops_list).toContain('max_gpio_ops');

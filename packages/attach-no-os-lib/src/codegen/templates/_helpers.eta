@@ -1,0 +1,164 @@
+<%
+/*
+ * Shared no-OS assembly helpers for the project templates.
+ *
+ * This whole file is one JS block that ends in `return { ... }`. Eta include()
+ * hands back whatever a template produces, so returning an object gives callers
+ * the functions. Because a partial does NOT inherit the parent `it`, consumers
+ * pass it in: `<% const H = include("./_helpers", { h: it.h }) %>`. The functions
+ * below close over that `it.h` for the typed property primitives (effective_value,
+ * is_descriptor_reference, is_null_pointer, connected_symbols) which live in core TS.
+ *
+ * Only genuinely cross-template no-OS logic stays here: struct const-ness
+ * (agreed on by common_data.c/.h and main.c) and source collection (src.mk and
+ * common_data.h). Single-consumer logic lives in its own template.
+ *
+ * NOTE: apostrophes break the Eta parser even inside comments, so this file uses
+ * only block comments and apostrophe-free prose.
+ */
+
+/*
+ * One struct: split its properties into descriptor references (patched at runtime
+ * as `desc.x`) and static fields (emitted in the const initializer). A struct with
+ * any descriptor reference cannot be const.
+ */
+function build_struct_view(name, ruleset, wf) {
+	const runtime_assignments = [];
+	const fields = [];
+
+	for (const property of ruleset.properties) {
+		if (it.h.is_descriptor_reference(property, wf) && it.h.effective_value(property) !== undefined) {
+			runtime_assignments.push({
+				struct_name: name,
+				field_path: property.name,
+				value: `desc.${String(it.h.effective_value(property))}`,
+			});
+		} else if (it.h.effective_value(property) !== undefined || it.h.is_null_pointer(property)) {
+			fields.push(property);
+		}
+	}
+
+	return {
+		type: ruleset.$symbol,
+		name: name,
+		is_const: runtime_assignments.length === 0,
+		fields: fields,
+		runtime_assignments: runtime_assignments,
+	};
+}
+
+function struct_views(wf) {
+	const views = new Map();
+	const non_const = new Set();
+
+	for (const [name, ruleset] of Object.entries(wf.symbols)) {
+		if (ruleset._t !== "RulesetStruct") {
+			continue;
+		}
+
+		const view = build_struct_view(name, ruleset, wf);
+
+		/* A struct referencing an already-seen non-const struct is itself non-const. */
+		if (view.is_const) {
+			for (const property of ruleset.properties) {
+				if (it.h.connected_symbols(property).some(child => non_const.has(child))) {
+					view.is_const = false;
+					break;
+				}
+			}
+		}
+
+		if (!view.is_const) {
+			non_const.add(name);
+		}
+		views.set(name, view);
+	}
+
+	/* Second pass: union fields pointing at non-const structs become runtime. */
+	for (const [name, view] of views) {
+		if (view.is_const) {
+			continue;
+		}
+		const ruleset = wf.symbols[name];
+		for (const property of ruleset.properties) {
+			if (property._t !== "UnionProperty" || property.value === undefined) {
+				continue;
+			}
+			const first_entry = Object.entries(property.value)[0];
+			if (!first_entry) {
+				continue;
+			}
+			const [member_name, reference] = first_entry;
+			if (non_const.has(reference)) {
+				view.fields = view.fields.filter(f => f.name !== property.name);
+				const member = property.members.find(m => m.name === member_name);
+				const is_pointer = member?.pointer ?? false;
+				view.runtime_assignments.push({
+					struct_name: name,
+					field_path: `${property.name}.${member_name}`,
+					value: is_pointer ? `&${reference}` : reference,
+				});
+			}
+		}
+	}
+
+	return [...views.values()];
+}
+
+function map_noos_path(file_path) {
+	if (file_path.startsWith("include/")) {
+		return { variable: "INCLUDE", path: file_path.slice("include/".length) };
+	}
+	if (file_path.startsWith("drivers/")) {
+		return { variable: "DRIVERS", path: file_path.slice("drivers/".length) };
+	}
+	return { variable: "DRIVERS", path: file_path };
+}
+
+function collect_sources(wf) {
+	const drivers = new Set();
+	const include = new Set();
+	const platform = new Set();
+
+	const all_rulesets = [
+		...Object.values(wf.platform_ops),
+		...Object.values(wf.exposed_ops),
+		...Object.values(wf.symbols),
+	];
+
+	for (const ruleset of all_rulesets) {
+		for (const file of ruleset.$sources.noos ?? []) {
+			const mapped = map_noos_path(file);
+			if (mapped.variable === "INCLUDE") {
+				include.add(mapped.path);
+			} else {
+				drivers.add(mapped.path);
+			}
+		}
+
+		for (const file of ruleset.$sources.platform ?? []) {
+			platform.add(file);
+		}
+
+		if (ruleset._t === "RulesetStruct" && ruleset.$header) {
+			const mapped = map_noos_path(ruleset.$header);
+			if (mapped.variable === "INCLUDE") {
+				include.add(mapped.path);
+			} else {
+				drivers.add(mapped.path);
+			}
+		}
+	}
+
+	return {
+		drivers: [...drivers],
+		include: [...include],
+		platform: [...platform],
+	};
+}
+
+return {
+	struct_views,
+	collect_sources,
+};
+%>

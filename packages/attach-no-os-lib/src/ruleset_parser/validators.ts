@@ -33,7 +33,24 @@ function number_(value: unknown, context: ParseContext): Result<number> {
 	if (typeof value !== "number") {
 		return error(`Expected number, got ${typeof value}`, context.path);
 	}
+	if (!Number.isFinite(value)) {
+		return error(`Expected a finite number, got ${String(value)}`, context.path);
+	}
 	return ok(value);
+}
+
+// A number that must land on a whole value — used for the integer primitives,
+// where a fractional bound or default would be silently truncated by the C
+// compiler. Floats go through plain `number_`.
+function integer_(value: unknown, context: ParseContext): Result<number> {
+	const number_value = number_(value, context);
+	if (!number_value.ok) {
+		return number_value;
+	}
+	if (!Number.isInteger(number_value.value)) {
+		return error(`Expected an integer, got ${String(number_value.value)}`, context.path);
+	}
+	return ok(number_value.value);
 }
 
 function boolean_(value: unknown, context: ParseContext): Result<boolean> {
@@ -126,4 +143,4 @@ function optionalWithDefault<T>(
 	return validate(object[key], at(context, key));
 }
 
-export { ParseContext, asObject, at, string_, number_, boolean_, stringArray, enumValueArray, stringOrNumber_, capabilityArray, required, optional, optionalWithDefault };
+export { ParseContext, asObject, at, string_, number_, integer_, boolean_, stringArray, enumValueArray, stringOrNumber_, capabilityArray, required, optional, optionalWithDefault };
