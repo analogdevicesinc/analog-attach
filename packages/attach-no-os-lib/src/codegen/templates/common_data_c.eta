@@ -1,10 +1,11 @@
-<% for (const inc of it.includes) { -%>
+<% const H = include("./_helpers"); const includes = ["common_data.h"]; const structs = H.struct_views(it.workfile); -%>
+<% for (const inc of includes) { -%>
 #include "<%= inc %>"
 <% } -%>
 
 struct descriptors desc = { 0 };
 
-<% for (const s of it.structs) { -%>
+<% for (const s of structs) { -%>
 <%= s.is_const ? "const " : "" %>struct <%= s.type %> <%= s.name %> = {
 <% for (const f of s.fields) { -%>
 	.<%= f.name %> = <%= f.c_value %>,

@@ -1,0 +1,581 @@
+<%
+/*
+ * Shared pure helpers for the no-OS project templates.
+ *
+ * This whole file is one JS block that ends in `return { ... }`. Eta include()
+ * hands back whatever a template produces, so returning an object gives callers
+ * the functions: `<% const H = include("./_helpers") %>` then `H.struct_views(wf)`.
+ *
+ * PURITY BOUNDARY: nothing here touches the filesystem, the resolver, or `it.h`.
+ * Every fact is derived from the in-memory (already resolved) workfile alone.
+ * Symbols are stored resolved, so enum includes are collapsed to EnumProperty
+ * before codegen and reference classification needs only the `_t` discriminant
+ * plus symbol-key membership. The one operation that cannot be pure -- rendering
+ * each device init/remove block from the external schemas repo -- lives in the
+ * injected `it.h.devices(wf)` helper, and its results flow in here as params.
+ *
+ * NOTE: apostrophes break the Eta parser even inside comments, so this file uses
+ * only block comments and apostrophe-free prose.
+ */
+
+/* ---- small utilities ---------------------------------------------------- */
+
+/* Basename without node path: everything after the last slash. */
+function basename(file_path) {
+	return String(file_path).slice(String(file_path).lastIndexOf("/") + 1);
+}
+
+/* The union of platform_ops and exposed_ops, mirroring workfile_handler all_ops. */
+function all_ops(wf) {
+	return { ...wf.platform_ops, ...wf.exposed_ops };
+}
+
+/* ---- graph / order ------------------------------------------------------ */
+
+/*
+ * Symbol names a single property references. Mirrors connection_graph
+ * get_connected_symbols, but the array-of-enum exclusion is done purely: an
+ * array element value is an edge only when it is an actual symbol key. Enum
+ * values (CH_MODE_ADC, ...) are never symbol keys, so they drop out with no
+ * disk read; genuine symbol-reference arrays keep every value.
+ */
+function connected_symbols(property, wf) {
+	switch (property._t) {
+		case "IncludeProperty": {
+			if (typeof property.value === "string") {
+				return [property.value];
+			}
+			return [];
+		}
+		case "UnionProperty": {
+			const value = property.value;
+			if (value) {
+				return Object.values(value);
+			}
+			return [];
+		}
+		case "ArrayProperty": {
+			if (property.element._t === "IncludeProperty" && Array.isArray(property.value)) {
+				return property.value.filter(v => v in wf.symbols);
+			}
+			return [];
+		}
+		case "PlatformExtraProperty": {
+			if (typeof property.value === "string") {
+				return [property.value];
+			}
+			return [];
+		}
+		default: {
+			return [];
+		}
+	}
+}
+
+/* Adjacency map symbol -> [referenced symbols]. Port of create_connections_graph. */
+function build_graph(wf) {
+	const graph = new Map();
+
+	for (const symbol_name of Object.keys(wf.symbols)) {
+		graph.set(symbol_name, []);
+	}
+
+	for (const [symbol_name, ruleset] of Object.entries(wf.symbols)) {
+		if (ruleset._t !== "RulesetStruct" && ruleset._t !== "RulesetDescriptor") {
+			continue;
+		}
+		for (const property of ruleset.properties) {
+			const children = connected_symbols(property, wf);
+			for (const child of children) {
+				const existing = graph.get(symbol_name) ?? [];
+				if (!existing.includes(child)) {
+					existing.push(child);
+				}
+				graph.set(symbol_name, existing);
+			}
+		}
+	}
+
+	return graph;
+}
+
+/*
+ * Topological order of symbol names, dependencies before dependents. Exact port
+ * of order_symbols: it seeds out-degree = children.length and decrements a
+ * parent when one of its children is emitted, so the emit order matches the old
+ * view builder byte-for-byte. Do not "fix" this to standard in-degree or the
+ * ordering flips. Throws on a dependency cycle (Eta has no Result type).
+ */
+function topo_sorted_names(wf) {
+	const graph = build_graph(wf);
+	const in_degree = new Map();
+
+	for (const name of graph.keys()) {
+		in_degree.set(name, 0);
+	}
+
+	for (const [parent, children] of graph) {
+		in_degree.set(parent, children.length);
+	}
+
+	const queue = [];
+	for (const [name, degree] of in_degree) {
+		if (degree === 0) {
+			queue.push(name);
+		}
+	}
+
+	const sorted = [];
+
+	while (queue.length > 0) {
+		const name = queue.shift();
+		if (name === undefined) {
+			continue;
+		}
+		sorted.push(name);
+
+		for (const [parent, children] of graph) {
+			if (children.includes(name)) {
+				const new_degree = (in_degree.get(parent) ?? 1) - 1;
+				in_degree.set(parent, new_degree);
+				if (new_degree === 0) {
+					queue.push(parent);
+				}
+			}
+		}
+	}
+
+	if (sorted.length !== graph.size) {
+		const in_cycle = [...graph.keys()].filter(name => !sorted.includes(name));
+		throw new Error(`Dependency cycle detected among symbols: ${in_cycle.join(", ")}`);
+	}
+
+	return sorted;
+}
+
+/* The struct symbols in dependency order, as [name, ruleset] pairs. */
+function ordered_structs(wf) {
+	const result = [];
+	for (const name of topo_sorted_names(wf)) {
+		const ruleset = wf.symbols[name];
+		if (ruleset?._t === "RulesetStruct") {
+			result.push([name, ruleset]);
+		}
+	}
+	return result;
+}
+
+/* ---- const-ness / struct views ----------------------------------------- */
+
+/* The declared default for a property, if its type carries one. */
+function property_default(property) {
+	switch (property._t) {
+		case "NumberProperty":
+		case "StringProperty":
+		case "EnumProperty":
+		case "BooleanProperty":
+		case "RawProperty": {
+			return property.default;
+		}
+		default: {
+			return undefined;
+		}
+	}
+}
+
+/*
+ * The value codegen should emit: the explicit value if set, otherwise the
+ * declared default. undefined means "no value to emit".
+ */
+function effective_value(property) {
+	if (property.value !== undefined && property.value !== null) {
+		return property.value;
+	}
+	return property_default(property);
+}
+
+/* A pointer include with no effective value is emitted as NULL, not omitted. */
+function is_null_pointer(property) {
+	return property._t === "IncludeProperty"
+		&& property.pointer === true
+		&& effective_value(property) === undefined;
+}
+
+/*
+ * An include whose target symbol is a descriptor node is patched at runtime with
+ * desc.<value>, not emitted as a static field. Pure replacement for the old
+ * is_descriptor_include schema resolve: the target symbol type is enough.
+ */
+function is_descriptor_ref(property, wf) {
+	return property._t === "IncludeProperty"
+		&& typeof property.value === "string"
+		&& wf.symbols[property.value]?._t === "RulesetDescriptor";
+}
+
+/* Format a single property as its C initializer token. Port of format_c_value. */
+function cval(property, wf) {
+	const value = effective_value(property);
+
+	switch (property._t) {
+		case "NumberProperty": {
+			return String(value);
+		}
+		case "BooleanProperty": {
+			return value ? "true" : "false";
+		}
+		case "EnumProperty": {
+			return String(value);
+		}
+		case "StringProperty": {
+			return `"${String(value)}"`;
+		}
+		case "IncludeProperty": {
+			if (property.pointer === true && value === undefined) {
+				return "NULL";
+			}
+			if (is_descriptor_ref(property, wf)) {
+				return `desc.${String(value)}`;
+			}
+			return property.pointer ? `&${String(value)}` : String(value);
+		}
+		case "PlatformOpsProperty": {
+			return `&${String(property.value)}`;
+		}
+		case "PlatformExtraProperty": {
+			return `&${String(property.value)}`;
+		}
+		case "UnionProperty": {
+			const union_value = property.value;
+			const first_entry = Object.entries(union_value)[0];
+			if (!first_entry) {
+				return "NULL";
+			}
+			const [member_name, reference] = first_entry;
+			const member = property.members.find(m => m.name === member_name);
+			const is_pointer = member?.pointer ?? false;
+			return is_pointer
+				? `{ .${member_name} = &${reference} }`
+				: `{ .${member_name} = ${reference} }`;
+		}
+		case "ArrayProperty": {
+			if (!Array.isArray(property.value) || property.value.length === 0) {
+				return "{ 0 }";
+			}
+			const element_type = property.element._t;
+			const formatted = property.value.map(v => {
+				switch (element_type) {
+					case "NumberProperty": {
+						return String(v);
+					}
+					case "BooleanProperty": {
+						return v ? "true" : "false";
+					}
+					case "EnumProperty": {
+						return String(v);
+					}
+					case "IncludeProperty": {
+						return property.element.pointer ? `&${String(v)}` : String(v);
+					}
+					default: {
+						return String(v);
+					}
+				}
+			});
+			return `{ ${formatted.join(", ")} }`;
+		}
+		case "RawProperty": {
+			return String(value);
+		}
+		default: {
+			return "/* unknown */";
+		}
+	}
+}
+
+/* Initial view for one struct symbol. Port of build_struct_view. */
+function build_struct_view(name, ruleset, wf) {
+	const runtime_assignments = [];
+
+	const descriptor_properties = ruleset.properties
+		.filter(property => is_descriptor_ref(property, wf) && effective_value(property) !== undefined);
+
+	for (const property of descriptor_properties) {
+		runtime_assignments.push({
+			struct_name: name,
+			field_path: property.name,
+			value: `desc.${String(effective_value(property))}`,
+		});
+	}
+
+	const static_properties = ruleset.properties.filter(property =>
+		!descriptor_properties.includes(property)
+		&& (effective_value(property) !== undefined || is_null_pointer(property)));
+
+	const has_descriptor_references = descriptor_properties.length > 0;
+
+	return {
+		type: ruleset.$symbol,
+		name: name,
+		is_const: !has_descriptor_references,
+		fields: static_properties.map(property => ({
+			name: property.name,
+			c_value: cval(property, wf),
+		})),
+		runtime_assignments: runtime_assignments,
+	};
+}
+
+/*
+ * All struct views in dependency order, with non-const propagated through the
+ * graph and union fields that reference non-const structs converted to runtime
+ * assignments. Ports build_views struct handling + propagate_non_const.
+ */
+function struct_views(wf) {
+	const ordered = ordered_structs(wf);
+	const graph = build_graph(wf);
+
+	const views = new Map();
+	for (const [name, ruleset] of ordered) {
+		views.set(name, build_struct_view(name, ruleset, wf));
+	}
+
+	/* First pass: seed the non-const set from direct descriptor refs. */
+	const non_const_set = new Set();
+	for (const [name, view] of views) {
+		if (!view.is_const) {
+			non_const_set.add(name);
+		}
+	}
+
+	/* Fixed point: a struct referencing a non-const struct is itself non-const. */
+	let changed = true;
+	while (changed) {
+		changed = false;
+		for (const [parent, children] of graph) {
+			if (non_const_set.has(parent)) {
+				continue;
+			}
+			for (const child of children) {
+				if (non_const_set.has(child)) {
+					non_const_set.add(parent);
+					const view = views.get(parent);
+					if (view) {
+						view.is_const = false;
+					}
+					changed = true;
+					break;
+				}
+			}
+		}
+	}
+
+	/* Second pass: union fields pointing at non-const structs become runtime. */
+	for (const [name, ruleset] of ordered) {
+		const view = views.get(name);
+		if (!view || view.is_const) {
+			continue;
+		}
+		for (const property of ruleset.properties) {
+			if (property._t !== "UnionProperty" || property.value === undefined) {
+				continue;
+			}
+			const value = property.value;
+			const first_entry = Object.entries(value)[0];
+			if (!first_entry) {
+				continue;
+			}
+			const [member_name, reference] = first_entry;
+			if (non_const_set.has(reference)) {
+				view.fields = view.fields.filter(f => f.name !== property.name);
+				const member = property.members.find(m => m.name === member_name);
+				const is_pointer = member?.pointer ?? false;
+				view.runtime_assignments.push({
+					struct_name: name,
+					field_path: `${property.name}.${member_name}`,
+					value: is_pointer ? `&${reference}` : reference,
+				});
+			}
+		}
+	}
+
+	return ordered
+		.map(([name]) => views.get(name))
+		.filter(view => view !== undefined);
+}
+
+/* Runtime assignments flattened in dependency order. Port of build_views :113. */
+function runtime_assignments(wf) {
+	return struct_views(wf).flatMap(view => view.runtime_assignments);
+}
+
+/* ---- sources ------------------------------------------------------------ */
+
+const CORE_UTIL_SRCS = [
+	"util/no_os_util.c",
+	"util/no_os_alloc.c",
+	"util/no_os_mutex.c",
+	"util/no_os_list.c",
+	"util/no_os_lf256fifo.c",
+];
+
+const CORE_UTIL_INCS = [
+	"no_os_util.h",
+	"no_os_alloc.h",
+	"no_os_mutex.h",
+	"no_os_error.h",
+	"no_os_delay.h",
+	"no_os_print_log.h",
+	"no_os_units.h",
+	"no_os_init.h",
+	"no_os_list.h",
+	"no_os_lf256fifo.h",
+];
+
+/* Map a no-OS source path to its make variable. Port of map_noos_path. */
+function map_noos_path(file_path) {
+	if (file_path.startsWith("include/")) {
+		return { variable: "INCLUDE", path: file_path.slice("include/".length) };
+	}
+	if (file_path.startsWith("drivers/")) {
+		return { variable: "DRIVERS", path: file_path.slice("drivers/".length) };
+	}
+	return { variable: "DRIVERS", path: file_path };
+}
+
+/* Gather driver/include/platform source paths. Port of collect_sources. */
+function collect_sources(wf) {
+	const drivers = new Set();
+	const include = new Set();
+	const platform = new Set();
+
+	const all_rulesets = [
+		...Object.values(all_ops(wf)),
+		...Object.values(wf.symbols),
+	];
+
+	for (const ruleset of all_rulesets) {
+		for (const file of ruleset.$sources.noos ?? []) {
+			const mapped = map_noos_path(file);
+			if (mapped.variable === "INCLUDE") {
+				include.add(mapped.path);
+			} else {
+				drivers.add(mapped.path);
+			}
+		}
+
+		for (const file of ruleset.$sources.platform ?? []) {
+			platform.add(file);
+		}
+
+		if (ruleset._t === "RulesetStruct" && ruleset.$header) {
+			const mapped = map_noos_path(ruleset.$header);
+			if (mapped.variable === "INCLUDE") {
+				include.add(mapped.path);
+			} else {
+				drivers.add(mapped.path);
+			}
+		}
+	}
+
+	return {
+		drivers: [...drivers],
+		include: [...include],
+		platform: [...platform],
+	};
+}
+
+/* The src.mk view. Port of build_views src_mk slice. */
+function src_mk_view(wf) {
+	const sources = collect_sources(wf);
+	return {
+		drivers_srcs: sources.drivers.filter(file => file.endsWith(".c")),
+		drivers_incs: sources.drivers.filter(file => file.endsWith(".h")),
+		include_incs: [...new Set([...sources.include.filter(file => file.endsWith(".h")), ...CORE_UTIL_INCS])],
+		util_srcs: CORE_UTIL_SRCS,
+		platform_srcs: sources.platform.filter(file => file.endsWith(".c")),
+		platform_incs: sources.platform.filter(file => file.endsWith(".h")),
+		project_srcs: ["src/main.c", "src/common/common_data.c", "src/user_app.c"],
+		project_incs: ["src/common/common_data.h", "src/user_app.h"],
+	};
+}
+
+/*
+ * The #include list for common_data.h. device_headers are the already-basenamed,
+ * non-empty $header values from it.h.devices(wf) -- passed in so this stays pure.
+ * Port of build_views all_includes.
+ */
+function common_data_includes(wf, device_headers) {
+	const all_includes = new Set();
+	for (const header of device_headers) {
+		all_includes.add(header);
+	}
+	const sources = collect_sources(wf);
+	for (const header of sources.platform.filter(file => file.endsWith(".h"))) {
+		all_includes.add(basename(header));
+	}
+	for (const header of sources.include.filter(file => file.endsWith(".h"))) {
+		all_includes.add(header);
+	}
+	return [...all_includes];
+}
+
+/* ---- descriptors (no I/O) ----------------------------------------------- */
+
+/*
+ * The init_param node a descriptor references via its single init_param include.
+ * Port of resolve_init_parameter; throws instead of returning a Result.
+ */
+function resolve_init_param(descriptor, wf) {
+	const init_parameter = descriptor.properties[0];
+	const target_name = init_parameter.value;
+	if (typeof target_name !== "string") {
+		throw new Error(`Descriptor ${descriptor.$id} has no init_param assigned`);
+	}
+	if (!(target_name in wf.symbols)) {
+		throw new Error(`Descriptor init_param ${target_name} not found in workfile`);
+	}
+	const target = wf.symbols[target_name];
+	if (target?._t !== "RulesetStruct") {
+		throw new Error(`Descriptor init_param ${target_name} is not a struct`);
+	}
+	return { name: target_name, ruleset: target };
+}
+
+/* One DescriptorInfo per descriptor node. Port of collect_descriptors. */
+function collect_descriptors(wf) {
+	const result = [];
+	for (const [name, symbol] of Object.entries(wf.symbols)) {
+		if (symbol._t !== "RulesetDescriptor") {
+			continue;
+		}
+		const init_parameter = resolve_init_param(symbol, wf);
+		result.push({
+			symbol_name: init_parameter.name,
+			descriptor_name: name,
+			descriptor_type: symbol.$symbol,
+		});
+	}
+	return result;
+}
+
+return {
+	basename,
+	connected_symbols,
+	build_graph,
+	topo_sorted_names,
+	ordered_structs,
+	property_default,
+	effective_value,
+	is_null_pointer,
+	is_descriptor_ref,
+	cval,
+	struct_views,
+	runtime_assignments,
+	map_noos_path,
+	collect_sources,
+	src_mk_view,
+	common_data_includes,
+	resolve_init_param,
+	collect_descriptors,
+};
+%>

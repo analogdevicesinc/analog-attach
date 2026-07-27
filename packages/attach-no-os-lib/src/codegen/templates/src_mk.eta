@@ -1,36 +1,37 @@
+<% const H = include("./_helpers"); const v = H.src_mk_view(it.workfile); -%>
 # Auto-generated src.mk
 # Do not edit manually
 
 # Sources
-<% for (const src of it.util_srcs) { -%>
+<% for (const src of v.util_srcs) { -%>
 SRCS += $(NO-OS)/<%= src %>
 <% } -%>
 
-<% for (const src of it.drivers_srcs) { -%>
+<% for (const src of v.drivers_srcs) { -%>
 SRCS += $(DRIVERS)/<%= src %>
 <% } -%>
 
-<% for (const src of it.platform_srcs) { -%>
+<% for (const src of v.platform_srcs) { -%>
 SRCS += $(PLATFORM_DRIVERS)/<%= src %>
 <% } -%>
 
-<% for (const src of it.project_srcs) { -%>
+<% for (const src of v.project_srcs) { -%>
 SRCS += $(PROJECT)/<%= src %>
 <% } -%>
 
 # Includes
-<% for (const inc of it.drivers_incs) { -%>
+<% for (const inc of v.drivers_incs) { -%>
 INCS += $(DRIVERS)/<%= inc %>
 <% } -%>
 
-<% for (const inc of it.include_incs) { -%>
+<% for (const inc of v.include_incs) { -%>
 INCS += $(INCLUDE)/<%= inc %>
 <% } -%>
 
-<% for (const inc of it.platform_incs) { -%>
+<% for (const inc of v.platform_incs) { -%>
 INCS += $(PLATFORM_DRIVERS)/<%= inc %>
 <% } -%>
 
-<% for (const inc of it.project_incs) { -%>
+<% for (const inc of v.project_incs) { -%>
 INCS += $(PROJECT)/<%= inc %>
 <% } -%>

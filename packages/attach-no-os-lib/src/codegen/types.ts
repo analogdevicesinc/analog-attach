@@ -17,12 +17,6 @@ export interface DescriptorInfo {
 	descriptor_type: string;   // descriptor type: "no_os_spi_desc"
 };
 
-export interface SourcePaths {
-	drivers: string[];   // $(DRIVERS)/...
-	include: string[];   // $(INCLUDE)/...
-	platform: string[];  // $(PLATFORM_DRIVERS)/...
-};
-
 export interface CodegenInput {
 	workfile: Workfile;
 	platform_name: string;
@@ -36,66 +30,11 @@ export interface CodegenResult {
 	files_created: string[];
 };
 
-// Runtime assignment for fields that can't be set at compile time
-export interface RuntimeAssignment {
-	struct_name: string;       // "my_spi_ip" or "adxl355_node"
-	field_path: string;        // "parent" or "comm_init.spi_init"
-	value: string;             // "desc.even_better_spi_desc" or "my_spi_ip"
-};
-
-export interface StructView {
-	type: string;              // "no_os_spi_init_param"
-	name: string;              // "no_os_spi_ip"
-	is_const: boolean;         // false if needs runtime assignments (direct or transitive)
-	fields: {
-		name: string;            // "device_id"
-		c_value: string;         // "1" or "&max_spi_ops"
-	}[];
-	runtime_assignments: RuntimeAssignment[];  // Fields set at runtime in main()
-};
-
-// All the variables exported for the templates
-export interface Views {
-	makefile: {
-		project_name: string;
-		platform_vendor: string;
-		platform_name: string;
-		noos_path: string;
-	};
-	src_mk: {
-		drivers_srcs: string[];
-		drivers_incs: string[];
-		include_incs: string[];
-		util_srcs: string[];
-		platform_srcs: string[];
-		platform_incs: string[];
-		project_srcs: string[];
-		project_incs: string[];
-	};
-	common_data_h: {
-		includes: string[];
-		devices: DeviceInfo[];
-		descriptors: DescriptorInfo[];
-		externs: { type: string; name: string; is_const: boolean }[];
-	};
-	common_data_c: {
-		includes: string[];
-		structs: StructView[];
-	};
-	main_c: {
-		devices: DeviceInfo[];              // teardown reversal done in-template via `| reverse`
-		runtime_assignments: RuntimeAssignment[];
-	};
-	user_app_h: object;
-	user_app_c: object;
-};
-
 // One generated file: which template renders it, where it lands in the project,
-// which view slice feeds it, and whether an existing copy is preserved.
-// `view` is a string key into Views — the JSON references slices by name.
+// and whether an existing copy is preserved. Every template now receives the same
+// whole-workfile context, so there is no per-file view key.
 export interface FileSpec {
 	template: string;
 	output: string;
-	view: keyof Views;
 	protect: boolean;
 }
