@@ -1,0 +1,29 @@
+<% const H = include("./_helpers", { h: it.h }); const runtime_assignments = H.struct_views(it.workfile).flatMap(view => view.runtime_assignments); const devices = it.h.devices(it.workfile); -%>
+#include "no_os_error.h"
+#include "common/common_data.h"
+#include "user_app.h"
+
+int main(void)
+{
+	int ret;
+
+<% if (runtime_assignments.length) { -%>
+	// Patching the common_data structs
+<% for (const a of runtime_assignments) { -%>
+	<%= a.struct_name %>.<%= a.field_path %> = <%= a.value %>;
+<% } -%>
+
+<% } -%>
+	// Init devices and structures
+<% for (const d of devices) { -%>
+<%= it.h.tab_indent(d.init_code) %>
+
+<% } -%>
+	user_app(&desc);
+
+<% for (const d of it.h.reverse(devices)) { -%>
+<%= it.h.tab_indent(d.remove_code) %>
+<% } -%>
+
+	return 0;
+}
