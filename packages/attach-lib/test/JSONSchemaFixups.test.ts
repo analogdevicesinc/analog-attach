@@ -6,7 +6,7 @@ import $RefParser from '@apidevtools/json-schema-ref-parser';
 
 import { BindingTestData, write_to_directory } from './testing_utils';
 
-import { test, expect } from 'vitest';
+import { describe, test, expect } from 'vitest';
 
 
 describe('JSONSchema Fixups Test', () => {

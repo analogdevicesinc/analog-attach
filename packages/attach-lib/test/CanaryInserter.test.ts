@@ -6,7 +6,7 @@ import $RefParser from '@apidevtools/json-schema-ref-parser';
 
 import { write_to_directory, BindingTestData } from './testing_utils';
 
-import { test, expect } from 'vitest';
+import { describe, test, expect } from 'vitest';
 
 describe('Canary Inserter Test', () => {
     const adxl345: BindingTestData = {
