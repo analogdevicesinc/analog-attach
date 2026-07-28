@@ -5,7 +5,7 @@ import { Attach, insert_known_structures, parse_dts, query_devicetree } from 'at
 
 import { bigIntReplacer, BindingTestData, write_to_directory } from './testing_utils';
 
-import { test, expect } from 'vitest';
+import { describe, test, expect } from 'vitest';
 
 
 describe('Insert Known Structures Test', () => {

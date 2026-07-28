@@ -3,7 +3,7 @@
     "target": "ES2022",
     "module": "ES2022",
     "lib": [
-      "ES2022"
+      "ES2022",
     ],
     "declaration": true,
     "declarationMap": true,
@@ -19,11 +19,12 @@
     "composite": true,
     "types": [
       "node",
-      "vitest/importMeta"
-    ]
+      "vitest/importMeta",
+      "vitest/globals",
+    ],
   },
   "include": [
-    "src/**/*"
+    "src/**/*",
   ],
   "exclude": [
     "node_modules",
