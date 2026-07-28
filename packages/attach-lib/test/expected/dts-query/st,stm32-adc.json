@@ -237,7 +237,7 @@
                     {
                         "_t": "array",
                         "minItems": 1,
-                        "maxItems": 1
+                        "maxItems": 1024
                     }
                 ]
             }

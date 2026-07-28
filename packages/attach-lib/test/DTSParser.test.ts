@@ -449,7 +449,7 @@ describe("comments", async () => {
   test("metadata is correctly parsed", async () => {
     const source = await readFile(path.resolve(TEST_DTS_FILES_DIR_PATH, "comments.dts"), "utf8");
     const parse_result = parse_dts(source);
-    if (Result.isError(parse_result)) {
+    if (Result.is_err(parse_result)) {
       expect.fail(`Failed to parse input file because: ${parse_result.error.message}`);
     }
 
@@ -468,7 +468,7 @@ describe("comments", async () => {
 
     const serialized_dts_with_metadata = print_dts(dts1, metadata1);
     const parse_result_from_serialized = parse_dts(serialized_dts_with_metadata);
-    if (Result.isError(parse_result_from_serialized)) {
+    if (Result.is_err(parse_result_from_serialized)) {
       expect.fail("Failed to parse again what has been serialized");
     }
 
@@ -493,7 +493,7 @@ async function basic_round_trip_test_impl(filename: string) {
 
   const serialized_dts = print_dts(dts1, metadata1);
   const second_parse_result = parse_dts(serialized_dts);
-  if (Result.isError(second_parse_result)) {
+  if (Result.is_err(second_parse_result)) {
     expect.fail(`Parser failed: ${second_parse_result.error.message}`);
   }
 
@@ -509,7 +509,7 @@ async function basic_round_trip_test_impl(filename: string) {
 async function bad_tokens_test_impl(filename: string) {
   const source = await readFile(path.resolve(TEST_DTS_FILES_DIR_PATH, filename), "utf8");
   const parse_result = parse_dts(source);
-  if (Result.isOk(parse_result)) {
+  if (Result.is_ok(parse_result)) {
     expect.fail("Should have failed to parse this file");
   }
 }
@@ -517,7 +517,7 @@ async function bad_tokens_test_impl(filename: string) {
 async function parse_dts_from_file(filename: string): Promise<DTSParseResult> {
   const source = await readFile(path.resolve(TEST_DTS_FILES_DIR_PATH, filename), "utf8");
   const parse_result = parse_dts(source);
-  if (Result.isError(parse_result)) {
+  if (Result.is_err(parse_result)) {
     expect.fail(`Failed to parse input file because: ${parse_result.error.message}`);
   }
   return parse_result.value;
@@ -526,7 +526,7 @@ async function parse_dts_from_file(filename: string): Promise<DTSParseResult> {
 async function parse_dto_from_file(filename: string): Promise<DTO> {
   const source = await readFile(path.resolve(TEST_DTS_FILES_DIR_PATH, filename), "utf8");
   const parse_result = parse_dto(source);
-  if (Result.isError(parse_result)) {
+  if (Result.is_err(parse_result)) {
     expect.fail(`Failed to parse input file because: ${parse_result.error.message}`);
   }
   return parse_result.value.dto;
