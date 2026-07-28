@@ -66,9 +66,6 @@ export class LexerInputStream {
   }
 
   public try_consume(regex: RegExp): Option<string> {
-    if (!regex.flags.includes("y")) {
-      throw new Error("The regex must have the \'y\' flag set for performance");
-    }
 
     regex.lastIndex = this.pos;
     const match = this.content.match(regex);
