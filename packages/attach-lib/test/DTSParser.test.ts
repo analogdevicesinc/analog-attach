@@ -1,5 +1,5 @@
 import path from 'node:path';
-import { readFile } from 'node:fs/promises';
+import * as fs from 'node:fs';
 
 import { test, expect, describe } from 'vitest';
 import { Result } from '../src/result';
@@ -13,31 +13,31 @@ import { stringify as stringify_as_yaml } from "yaml";
 
 const TEST_DTS_FILES_DIR_PATH = path.resolve(__dirname, "dts_source/");
 
-describe("round trip", async () => {
-  test('minimal', async () => {
-    await basic_round_trip_test_impl("minimal.dts");
+describe("round trip", () => {
+  test('minimal', () => {
+    basic_round_trip_test_impl("minimal.dts");
   });
 
-  test("types", async () => {
-    await basic_round_trip_test_impl("basic_types.dts");
+  test("types", () => {
+    basic_round_trip_test_impl("basic_types.dts");
   });
 
-  test("preprocessed", async () => {
-    await basic_round_trip_test_impl("rpi.prepro.dts");
+  test("preprocessed", () => {
+    basic_round_trip_test_impl("rpi.prepro.dts");
   });
 
-  test("zephyr", async () => {
-    await basic_round_trip_test_impl("zephyr.dts");
+  test("zephyr", () => {
+    basic_round_trip_test_impl("zephyr.dts");
   });
 
-  test("metadata", async () => {
-    await basic_round_trip_test_impl("comments.dts");
+  test("metadata", () => {
+    basic_round_trip_test_impl("comments.dts");
   });
 });
 
-describe("types", async () => {
-  test('bytestring supports compact hex with spaces', async () => {
-    const { dts } = await parse_dts_from_file("basic_types.dts");
+describe("types", () => {
+  test('bytestring supports compact hex with spaces', () => {
+    const { dts } = parse_dts_from_file("basic_types.dts");
 
     const bytes_property = dts.root.properties.find(p => p.name === 'bytes');
     expect.assert.isDefined(bytes_property);
@@ -59,8 +59,8 @@ describe("types", async () => {
       .toStrictEqual([0x00, 0x00, 0x00, 0x1B, 0x73, 0x74, 0x61, 0x74, 0x75, 0x73, 0x00]);
   });
 
-  test("bytestring supports compact hex without spaces", async () => {
-    const { dts } = await parse_dts_from_file("basic_types.dts");
+  test("bytestring supports compact hex without spaces", () => {
+    const { dts } = parse_dts_from_file("basic_types.dts");
 
     const bytes_property = dts.root.properties.find(p => p.name === 'bytes2');
     expect.assert.isDefined(bytes_property);
@@ -83,9 +83,9 @@ describe("types", async () => {
   });
 });
 
-describe("merging behaviour", async () => {
-  test("later root overrides earlier", async () => {
-    const { dts: dts1 } = await parse_dts_from_file("merge_input.dts");
+describe("merging behavior", () => {
+  test("later root overrides earlier", () => {
+    const { dts: dts1 } = parse_dts_from_file("merge_input.dts");
     const child_node = dts1.root.children.find(c => c.name === 'node' && (c.labels ?? []).includes('a'));
 
     expect.assert.isDefined(child_node);
@@ -93,15 +93,15 @@ describe("merging behaviour", async () => {
     const property = child_node.properties.find(p => p.name === 'x');
     expect.assert.isDefined(property);
 
-    const { dts: dts2 } = await parse_dts_from_file("merge_output.dts");
+    const { dts: dts2 } = parse_dts_from_file("merge_output.dts");
     expect(normalize(dts1))
       .toStrictEqual(normalize(dts2));
   });
 });
 
-describe("delete behaviour", async () => {
-  test("/delete-property/ removes alias intc", async () => {
-    const { dts } = await parse_dts_from_file("delete_merge_alias.dts");
+describe("delete behavior", () => {
+  test("/delete-property/ removes alias intc", () => {
+    const { dts } = parse_dts_from_file("delete_merge_alias.dts");
     const aliases = dts.root.children.find(c => c.name === 'aliases');
 
     expect.assert.isDefined(aliases);
@@ -129,16 +129,16 @@ describe("delete behaviour", async () => {
     }
   });
 
-  test("delete from overlay is relative and does not remove same-named root node", async () => {
-    const { dts } = await parse_dts_from_file("relative_delete_node_with_overlay.dts");
+  test("delete from overlay is relative and does not remove same-named root node", () => {
+    const { dts } = parse_dts_from_file("relative_delete_node_with_overlay.dts");
 
     const leds = dts.root.children.find(c => c.name === "leds");
     expect.assert.isDefined(leds);
     expect(leds.labels.includes("leds"), "Missing label on leds node");
   });
 
-  test("delete node from overlay successful delete", async () => {
-    const { dts } = await parse_dts_from_file("delete_node_with_overlay.dts");
+  test("delete node from overlay successful delete", () => {
+    const { dts } = parse_dts_from_file("delete_node_with_overlay.dts");
 
     const leds = dts.root.children.find(c => c.name === "leds");
     expect.assert.isDefined(leds, "Missing leds node");
@@ -147,8 +147,8 @@ describe("delete behaviour", async () => {
     expect.assert.isUndefined(foo, "This node should have been deleted");
   });
 
-  test("delete property from overlay successful delete", async () => {
-    const { dts } = await parse_dts_from_file("delete_property_with_overlay.dts");
+  test("delete property from overlay successful delete", () => {
+    const { dts } = parse_dts_from_file("delete_property_with_overlay.dts");
 
     const leds = dts.root.children.find(c => c.name === "leds");
     expect.assert.isDefined(leds, "Missing leds node");
@@ -158,9 +158,9 @@ describe("delete behaviour", async () => {
   });
 });
 
-describe("labeling", async () => {
-  test("basic", async () => {
-    const { dts } = await parse_dts_from_file("basic_types.dts");
+describe("labeling", () => {
+  test("basic", () => {
+    const { dts } = parse_dts_from_file("basic_types.dts");
 
     const model_property = dts.root.properties.find(p => p.name === "model");
     expect.assert.isDefined(model_property);
@@ -204,8 +204,8 @@ describe("labeling", async () => {
     expect(interrupt_controller.labels[0]).toStrictEqual("mpic");
   });
 
-  test('stack labels', async () => {
-    const { dts } = await parse_dts_from_file("stack_labels.dts");
+  test('stack labels', () => {
+    const { dts } = parse_dts_from_file("stack_labels.dts");
 
     const property = dts.root.properties.find(p => p.name === "prop");
     expect.assert.isDefined(property);
@@ -233,64 +233,64 @@ describe("labeling", async () => {
   });
 });
 
-describe("bad tokens", async () => {
+describe("bad tokens", () => {
 
-  test("simple bad char", async () => {
-    await bad_tokens_test_impl("bad_character.dts");
+  test("simple bad char", () => {
+    bad_tokens_test_impl("bad_character.dts");
   });
 
-  test("missing version tag", async () => {
-    await bad_tokens_test_impl("missing_version.dts");
+  test("missing version tag", () => {
+    bad_tokens_test_impl("missing_version.dts");
   });
 
-  describe("missing semicolons", async () => {
-    test("after version tag", async () => {
-      await bad_tokens_test_impl("missing_semicolons/version_tag.dts");
+  describe("missing semicolons", () => {
+    test("after version tag", () => {
+      bad_tokens_test_impl("missing_semicolons/version_tag.dts");
     });
 
-    test("after memreserve statement", async () => {
-      await bad_tokens_test_impl("missing_semicolons/memreserve.dts");
+    test("after memreserve statement", () => {
+      bad_tokens_test_impl("missing_semicolons/memreserve.dts");
     });
 
-    test("after slash directive", async () => {
-      await bad_tokens_test_impl("missing_semicolons/slash_directive.dts");
+    test("after slash directive", () => {
+      bad_tokens_test_impl("missing_semicolons/slash_directive.dts");
     });
 
-    test("after property", async () => {
-      await bad_tokens_test_impl("missing_semicolons/property.dts");
+    test("after property", () => {
+      bad_tokens_test_impl("missing_semicolons/property.dts");
     });
 
-    test("after node", async () => {
-      await bad_tokens_test_impl("missing_semicolons/node.dts");
+    test("after node", () => {
+      bad_tokens_test_impl("missing_semicolons/node.dts");
     });
   });
 
-  describe("extra semicolons", async () => {
-    test("after version tag", async () => {
-      await bad_tokens_test_impl("extra_semicolons/version_tag.dts");
+  describe("extra semicolons", () => {
+    test("after version tag", () => {
+      bad_tokens_test_impl("extra_semicolons/version_tag.dts");
     });
 
-    test("after memreserve statement", async () => {
-      await bad_tokens_test_impl("extra_semicolons/memreserve.dts");
+    test("after memreserve statement", () => {
+      bad_tokens_test_impl("extra_semicolons/memreserve.dts");
     });
 
-    test("after slash directive", async () => {
-      await bad_tokens_test_impl("extra_semicolons/slash_directive.dts");
+    test("after slash directive", () => {
+      bad_tokens_test_impl("extra_semicolons/slash_directive.dts");
     });
 
-    test("after property", async () => {
-      await bad_tokens_test_impl("extra_semicolons/property.dts");
+    test("after property", () => {
+      bad_tokens_test_impl("extra_semicolons/property.dts");
     });
 
-    test("after node", async () => {
-      await bad_tokens_test_impl("extra_semicolons/node.dts");
+    test("after node", () => {
+      bad_tokens_test_impl("extra_semicolons/node.dts");
     });
   });
 });
 
-describe("overlays (DTOs)", async () => {
-  test("label/path references become fragments", async () => {
-    const dto = await parse_dto_from_file("dtso/references.dtso");
+describe("overlays (DTOs)", () => {
+  test("label/path references become fragments", () => {
+    const dto = parse_dto_from_file("dtso/references.dtso");
 
     expect(dto.root.properties).toHaveLength(0);
     expect(dto.root.children).toHaveLength(2);
@@ -364,8 +364,8 @@ describe("overlays (DTOs)", async () => {
     expect(new_node1.properties).toHaveLength(2);
   });
 
-  test("fragments are correctly parsed", async () => {
-    const dto = await parse_dto_from_file("dtso/fragments.dtso");
+  test("fragments are correctly parsed", () => {
+    const dto = parse_dto_from_file("dtso/fragments.dtso");
 
     expect(dto.root.properties).toHaveLength(0);
     expect(dto.root.children).toHaveLength(3);
@@ -445,9 +445,9 @@ describe("overlays (DTOs)", async () => {
   });
 });
 
-describe("comments", async () => {
-  test("metadata is correctly parsed", async () => {
-    const source = await readFile(path.resolve(TEST_DTS_FILES_DIR_PATH, "comments.dts"), "utf8");
+describe("comments", () => {
+  test("metadata is correctly parsed", () => {
+    const source = fs.readFileSync(path.resolve(TEST_DTS_FILES_DIR_PATH, "comments.dts"), "utf8");
     const parse_result = parse_dts(source);
     if (Result.is_err(parse_result)) {
       expect.fail(`Failed to parse input file because: ${parse_result.error.message}`);
@@ -488,8 +488,8 @@ describe("comments", async () => {
 
 // Utilities
 
-async function basic_round_trip_test_impl(filename: string) {
-  const { dts: dts1, metadata: metadata1 } = await parse_dts_from_file(filename);
+function basic_round_trip_test_impl(filename: string) {
+  const { dts: dts1, metadata: metadata1 } = parse_dts_from_file(filename);
 
   const serialized_dts = print_dts(dts1, metadata1);
   const second_parse_result = parse_dts(serialized_dts);
@@ -506,16 +506,16 @@ async function basic_round_trip_test_impl(filename: string) {
     .toStrictEqual(stringify_as_yaml(metadata2));
 }
 
-async function bad_tokens_test_impl(filename: string) {
-  const source = await readFile(path.resolve(TEST_DTS_FILES_DIR_PATH, filename), "utf8");
+function bad_tokens_test_impl(filename: string) {
+  const source = fs.readFileSync(path.resolve(TEST_DTS_FILES_DIR_PATH, filename), "utf8");
   const parse_result = parse_dts(source);
   if (Result.is_ok(parse_result)) {
     expect.fail("Should have failed to parse this file");
   }
 }
 
-async function parse_dts_from_file(filename: string): Promise<DTSParseResult> {
-  const source = await readFile(path.resolve(TEST_DTS_FILES_DIR_PATH, filename), "utf8");
+function parse_dts_from_file(filename: string): DTSParseResult {
+  const source = fs.readFileSync(path.resolve(TEST_DTS_FILES_DIR_PATH, filename), "utf8");
   const parse_result = parse_dts(source);
   if (Result.is_err(parse_result)) {
     expect.fail(`Failed to parse input file because: ${parse_result.error.message}`);
@@ -523,8 +523,8 @@ async function parse_dts_from_file(filename: string): Promise<DTSParseResult> {
   return parse_result.value;
 }
 
-async function parse_dto_from_file(filename: string): Promise<DTO> {
-  const source = await readFile(path.resolve(TEST_DTS_FILES_DIR_PATH, filename), "utf8");
+function parse_dto_from_file(filename: string): DTO {
+  const source = fs.readFileSync(path.resolve(TEST_DTS_FILES_DIR_PATH, filename), "utf8");
   const parse_result = parse_dto(source);
   if (Result.is_err(parse_result)) {
     expect.fail(`Failed to parse input file because: ${parse_result.error.message}`);
