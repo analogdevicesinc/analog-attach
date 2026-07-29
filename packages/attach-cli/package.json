@@ -23,6 +23,7 @@
     "build": "tsup --silent --dts",
     "postinstall": "node scripts/postinstall.js",
     "prepublishOnly": "npm run build",
+    "dev-link": "yarn build && mkdir -p $HOME/.local/bin && ln -sf \"$(pwd)/dist/cli.js\" $HOME/.local/bin/attach && chmod +x dist/cli.js && echo 'attach linked to $HOME/.local/bin/attach'",
     "clean": "rm -rf dist tsconfig.tsbuildinfo node_modules",
     "test": "vitest",
     "test:watch": "vitest --watch",
