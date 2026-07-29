@@ -494,6 +494,68 @@ describe("comments", () => {
   });
 });
 
+describe("expressions", () => {
+  test("simple parenthesized expression is parsed as expression element", () => {
+    const { dts } = parse_dts_from_file("expression_simple.dts");
+
+    const prop = dts.root.properties.find(p => p.name === "prop");
+    expect.assert.isDefined(prop);
+
+    if (is_dt_flag(prop.value)) {
+      expect.fail("Expected non-empty property value");
+    }
+
+    expect(prop.value).toHaveLength(1);
+
+    const component = prop.value[0];
+    if (component.kind !== "array") {
+      expect.fail("Expected cell array");
+    }
+
+    expect(component.elements).toHaveLength(1);
+
+    const element = component.elements[0];
+    if (element.kind !== "expression") {
+      expect.fail("Expected expression element");
+    }
+
+    expect(element.value).toStrictEqual("(1+2)");
+  });
+
+  test("nested parentheses are tracked correctly", () => {
+    const { dts } = parse_dts_from_file("expression_nested.dts");
+
+    const prop = dts.root.properties.find(p => p.name === "prop");
+    expect.assert.isDefined(prop);
+
+    if (is_dt_flag(prop.value)) {
+      expect.fail("Expected non-empty property value");
+    }
+
+    const component = prop.value[0];
+    if (component.kind !== "array") {
+      expect.fail("Expected cell array");
+    }
+
+    expect(component.elements).toHaveLength(1);
+
+    const element = component.elements[0];
+    if (element.kind !== "expression") {
+      expect.fail("Expected expression element");
+    }
+
+    expect(element.value).toStrictEqual("((1+2)*3)");
+  });
+
+  test("unclosed parenthesis in expression returns error", () => {
+    bad_tokens_test_impl("expression_unclosed.dts");
+  });
+
+  test("unparenthesized arithmetic in cell array returns error", () => {
+    bad_tokens_test_impl("expression_unparenthesized.dts");
+  });
+});
+
 // Utilities
 
 function basic_round_trip_test_impl(filename: string) {
