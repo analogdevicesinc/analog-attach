@@ -1,14 +1,99 @@
-<% const H = include("./_helpers"); const includes = ["common_data.h"]; const structs = H.struct_views(it.workfile); -%>
-<% for (const inc of includes) { -%>
-#include "<%= inc %>"
-<% } -%>
+<%
+const H = include("./_helpers", { h: it.h });
+const wf = it.workfile;
+const structs = H.struct_views(wf);
+
+/*
+ * Format a single property as its C initializer token. Port of format_c_value.
+ * Lives here because common_data.c is the only template that emits initializer
+ * text; every other template needs struct const-ness, not the values.
+ */
+function cval(property) {
+	const value = it.h.effective_value(property);
+
+	switch (property._t) {
+		case "NumberProperty": {
+			return String(value);
+		}
+		case "BooleanProperty": {
+			return value ? "true" : "false";
+		}
+		case "EnumProperty": {
+			return String(value);
+		}
+		case "StringProperty": {
+			return `"${String(value)}"`;
+		}
+		case "IncludeProperty": {
+			if (property.pointer === true && value === undefined) {
+				return "NULL";
+			}
+			if (it.h.is_descriptor_reference(property, wf)) {
+				return `desc.${String(value)}`;
+			}
+			return property.pointer ? `&${String(value)}` : String(value);
+		}
+		case "PlatformOpsProperty": {
+			return `&${String(property.value)}`;
+		}
+		case "PlatformExtraProperty": {
+			return `&${String(property.value)}`;
+		}
+		case "UnionProperty": {
+			const first_entry = Object.entries(property.value)[0];
+			if (!first_entry) {
+				return "NULL";
+			}
+			const [member_name, reference] = first_entry;
+			const member = property.members.find(m => m.name === member_name);
+			const is_pointer = member?.pointer ?? false;
+			return is_pointer
+				? `{ .${member_name} = &${reference} }`
+				: `{ .${member_name} = ${reference} }`;
+		}
+		case "ArrayProperty": {
+			if (!Array.isArray(property.value) || property.value.length === 0) {
+				return "{ 0 }";
+			}
+			const element_type = property.element._t;
+			const formatted = property.value.map(v => {
+				switch (element_type) {
+					case "NumberProperty": {
+						return String(v);
+					}
+					case "BooleanProperty": {
+						return v ? "true" : "false";
+					}
+					case "EnumProperty": {
+						return String(v);
+					}
+					case "IncludeProperty": {
+						return property.element.pointer ? `&${String(v)}` : String(v);
+					}
+					default: {
+						return String(v);
+					}
+				}
+			});
+			return `{ ${formatted.join(", ")} }`;
+		}
+		case "RawProperty": {
+			return String(value);
+		}
+		default: {
+			return "/* unknown */";
+		}
+	}
+}
+-%>
+#include "common_data.h"
 
 struct descriptors desc = { 0 };
 
 <% for (const s of structs) { -%>
 <%= s.is_const ? "const " : "" %>struct <%= s.type %> <%= s.name %> = {
 <% for (const f of s.fields) { -%>
-	.<%= f.name %> = <%= f.c_value %>,
+	.<%= f.name %> = <%= cval(f) %>,
 <% } -%>
 };
 

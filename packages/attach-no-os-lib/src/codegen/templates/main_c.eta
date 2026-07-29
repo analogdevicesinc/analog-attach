@@ -1,4 +1,4 @@
-<% const H = include("./_helpers"); const runtime_assignments = H.runtime_assignments(it.workfile); const devices = it.h.devices(it.workfile); -%>
+<% const H = include("./_helpers", { h: it.h }); const runtime_assignments = H.struct_views(it.workfile).flatMap(view => view.runtime_assignments); const devices = it.h.devices(it.workfile); -%>
 #include "no_os_error.h"
 #include "common/common_data.h"
 #include "user_app.h"

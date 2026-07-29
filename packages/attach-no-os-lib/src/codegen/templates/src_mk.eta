@@ -1,4 +1,45 @@
-<% const H = include("./_helpers"); const v = H.src_mk_view(it.workfile); -%>
+<%
+const H = include("./_helpers", { h: it.h });
+const wf = it.workfile;
+
+/*
+ * Core no-OS util sources/includes, always linked regardless of device set. Live
+ * here because src.mk is the only template that lists make sources.
+ */
+const CORE_UTIL_SRCS = [
+	"util/no_os_util.c",
+	"util/no_os_alloc.c",
+	"util/no_os_mutex.c",
+	"util/no_os_list.c",
+	"util/no_os_lf256fifo.c",
+];
+
+const CORE_UTIL_INCS = [
+	"no_os_util.h",
+	"no_os_alloc.h",
+	"no_os_mutex.h",
+	"no_os_error.h",
+	"no_os_delay.h",
+	"no_os_print_log.h",
+	"no_os_units.h",
+	"no_os_init.h",
+	"no_os_list.h",
+	"no_os_lf256fifo.h",
+];
+
+/* The src.mk view. Port of build_views src_mk slice. */
+const sources = H.collect_sources(wf);
+const v = {
+	drivers_srcs: sources.drivers.filter(file => file.endsWith(".c")),
+	drivers_incs: sources.drivers.filter(file => file.endsWith(".h")),
+	include_incs: [...new Set([...sources.include.filter(file => file.endsWith(".h")), ...CORE_UTIL_INCS])],
+	util_srcs: CORE_UTIL_SRCS,
+	platform_srcs: sources.platform.filter(file => file.endsWith(".c")),
+	platform_incs: sources.platform.filter(file => file.endsWith(".h")),
+	project_srcs: ["src/main.c", "src/common/common_data.c", "src/user_app.c"],
+	project_incs: ["src/common/common_data.h", "src/user_app.h"],
+};
+-%>
 # Auto-generated src.mk
 # Do not edit manually
 

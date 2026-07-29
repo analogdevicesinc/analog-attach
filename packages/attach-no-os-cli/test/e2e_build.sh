@@ -54,28 +54,34 @@ if [ ! -f "workfile.json" ]; then
 fi
 echo -e "${GREEN}OK: workfile.json created${NC}"
 
-# Create nodes
-echo -e "${YELLOW}[4/8] Creating ADXL355 device node...${NC}"
-$AA create node max_spi platforms/maxim/max32690/max_spi_init_param.yaml
-$AA create node spi_ip no-os/no_os_spi_init_param.yaml
-$AA create node accel devices/adxl355/adxl355.yaml
+# Create nodes. A device is a descriptor node (adxl355_device) paired with its
+# init_param struct (adxl355_ip); the init_param references the no-OS SPI init_param,
+# which in turn references the platform (Maxim) SPI init_param.
+echo -e "${YELLOW}[4/8] Creating ADXL355 device nodes...${NC}"
+$AA create node max_spi_ip platforms/maxim/max32690/max_spi_init_param.yaml
+$AA create node no_os_spi_ip no-os/spi/no_os_spi_init_param.yaml
+$AA create node adxl355_ip devices/adxl355/adxl355_init_param.yaml
+$AA create node adxl355_device devices/adxl355/adxl355.yaml
 
-# Configure max_spi
+# Configure the Maxim SPI init_param
 echo -e "${YELLOW}[5/8] Configuring SPI parameters...${NC}"
-$AA update max_spi vssel MXC_GPIO_VSSEL_VDDIOH
-$AA update max_spi polarity SPI_SS_POL_LOW
+$AA update max_spi_ip vssel MXC_GPIO_VSSEL_VDDIOH
+$AA update max_spi_ip polarity SPI_SS_POL_LOW
 
-# Configure spi_ip
-$AA update spi_ip device_id 1
-$AA update spi_ip max_speed_hz 1000000
-$AA update spi_ip chip_select 0
-$AA update spi_ip platform_ops max_spi_ops
-$AA update spi_ip extra max_spi
+# Configure the no-OS SPI init_param (references the Maxim ops + extra)
+$AA update no_os_spi_ip device_id 1
+$AA update no_os_spi_ip max_speed_hz 1000000
+$AA update no_os_spi_ip chip_select 0
+$AA update no_os_spi_ip platform_ops max_spi_ops
+$AA update no_os_spi_ip extra max_spi_ip
 
-# Configure accelerometer
-$AA update accel comm_type ADXL355_SPI_COMM
-$AA update accel dev_type ID_ADXL355
-$AA update accel comm_init spi_init spi_ip
+# Configure the ADXL355 init_param (comm_init is a union: <member> <value>)
+$AA update adxl355_ip comm_type ADXL355_SPI_COMM
+$AA update adxl355_ip dev_type ID_ADXL355
+$AA update adxl355_ip comm_init spi_init no_os_spi_ip
+
+# Point the descriptor at its init_param
+$AA update adxl355_device init_param adxl355_ip
 
 echo -e "${GREEN}OK: Device configured${NC}"
 
