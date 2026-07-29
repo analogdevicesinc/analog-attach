@@ -1,20 +1,5 @@
 import type { DTS, DTNode } from './dts';
 
-/** Mark all nodes and properties in the tree as modified by user */
-export function markNodesModified(node: DTNode) {
-  //node.modified_by_user = true;
-
-  // Mark all properties
-  for (const property of node.properties) {
-    //property.modified_by_user = true;
-  }
-
-  // Recursively mark children
-  for (const child of node.children) {
-    markNodesModified(child);
-  }
-}
-
 export function get_node_key(n: DTNode): string {
   if (n.name === '/') {
     return '/';

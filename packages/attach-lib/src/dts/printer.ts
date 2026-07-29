@@ -217,11 +217,6 @@ function fmt_big_hex(n: bigint): string {
   return `${sign}0x${abs.toString(16)}`;
 }
 
-/** Two-digit hexadecimal for a byte. */
-function to_hex_2(n: bigint): string {
-  return n.toString(16).padStart(2, "0");
-}
-
 /** Decimal BigInt as string. */
 function fmt_big_dec(n: bigint): string {
   return n.toString(10);
