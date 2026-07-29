@@ -2,10 +2,8 @@ import * as fs from 'node:fs';
 import path from 'node:path';
 
 import { execFileSync, spawnSync } from 'node:child_process';
-import { parse_dts } from '../src/dts/parser';
-import { print_dts } from '../src/dts/printer';
-import { Result } from '../src/result';
-import { ensure_directory } from './testing_utils';
+import { parse_dts, printDts } from 'attach-lib';
+import { ensure_directory } from '../testing_utils';
 
 import { test, expect } from 'vitest';
 
@@ -48,11 +46,7 @@ function assertIdenticalDts(
   const origDecompiled = fs.readFileSync(origDecompiledPath, 'utf8');
 
   const document = parse_dts(originalText);
-  if (Result.is_err(document)) {
-    expect.fail(`${JSON.stringify(document.error)}`);
-  }
-
-  const ourText = print_dts(document.value.dts);
+  const ourText = printDts(document);
   const ourDtsPath = path.join(absolute_cache_directory, our_dts_name);
   fs.writeFileSync(ourDtsPath, ourText, 'utf8');
 
@@ -74,8 +68,8 @@ test('local rpi roundtrip compile+decompile equals original compile+decompile', 
     context.skip();
   }
 
-  const absolute_cache_directory = path.resolve(__dirname, 'expected/cache');
-  const absolute_source_path = path.resolve(__dirname, 'dts_source/rpi.prepro.dts');
+  const absolute_cache_directory = path.resolve(__dirname, '../expected/cache');
+  const absolute_source_path = path.resolve(__dirname, '../dts_source/rpi.prepro.dts');
   const our_dt = 'my_rpi';
 
   assertIdenticalDts(
@@ -92,9 +86,8 @@ test('local zephyr roundtrip compile+decompile equals original compile+decompile
     // dtc is required for this test; skip when not available in environment
     context.skip();
   }
-
-  const absolute_cache_directory = path.resolve(__dirname, 'expected/cache');
-  const absolute_source_path = path.resolve(__dirname, 'dts_source/zephyr.dts');
+  const absolute_cache_directory = path.resolve(__dirname, '../expected/cache');
+  const absolute_source_path = path.resolve(__dirname, '../dts_source/zephyr.dts');
   const our_dt = 'my_zephyr';
 
   assertIdenticalDts(
@@ -115,11 +108,11 @@ test('linux repo arm broadcom roundtrip comp+decomp === original comp+decomp', f
     console.warn('WARNING: cpp is required for this test; skip when not available in environment');
     context.skip();
   }
-  const absolute_cache_directory = path.resolve(__dirname, 'expected/cache');
+  const absolute_cache_directory = path.resolve(__dirname, '../expected/cache');
   ensure_directory(absolute_cache_directory);
 
-  const path_to_dts_folder = path.resolve(__dirname, 'linux/arch/arm/boot/dts/broadcom/');
-  const path_to_linux_include = path.resolve(__dirname, 'linux/include');
+  const path_to_dts_folder = path.resolve(__dirname, '../linux/arch/arm/boot/dts/broadcom/');
+  const path_to_linux_include = path.resolve(__dirname, '../linux/include');
 
   if (!fs.existsSync(path_to_dts_folder)) {
     console.warn(`WARNING: could not find ${path_to_dts_folder}`);
@@ -167,7 +160,7 @@ test('linux repo arm broadcom roundtrip comp+decomp === original comp+decomp', f
 
     for (const file of dts_files) {
       const file_name = file.file_name.replaceAll('.dts', '.prepro.dts');
-      const cache = path.resolve(__dirname, 'expected/cache');
+      const cache = path.resolve(__dirname, '../expected/cache');
       const prepro_path = path.resolve(cache, file_name);
 
       try {
@@ -188,7 +181,7 @@ test('linux repo arm broadcom roundtrip comp+decomp === original comp+decomp', f
     try {
       assertIdenticalDts(absolute_cache_directory, prepro_dts.file_path, `my_${dt_name}`);
     } catch (error) {
-      expect.fail(`Failed for ${dt_name} with :\n${JSON.stringify(error)}`);
+      expect.fail(`Failed for ${dt_name} with :\n${error}`);
     }
   }
 

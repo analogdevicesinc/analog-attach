@@ -3,7 +3,7 @@ import path from 'node:path';
 
 import { printDts, printDtso, mergeDtso, DtsDocument, DtsReference } from 'attach-lib';
 
-import { parse_dts } from '../../dist';
+import { parse_dts } from 'attach-lib';
 
 import { test, expect } from 'vitest';
 
@@ -41,7 +41,7 @@ test('arrays, refs, bytes, labels', () => {
   const source = fs.readFileSync(source_path, 'utf8');
 
   const document = parse_dts(source);
-  
+
   const out = printDts(document);
 
   const document2 = parse_dts(out);

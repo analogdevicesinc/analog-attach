@@ -265,6 +265,14 @@ describe("bad tokens", () => {
     });
   });
 
+  test("0x-prefixed number in bytestring returns error", () => {
+    bad_tokens_test_impl("bytestring_0x_prefix.dts");
+  });
+
+  test("0x-prefixed spaced bytes in bytestring returns error", () => {
+    bad_tokens_test_impl("bytestring_0x_prefix_spaced.dts");
+  });
+
   describe("extra semicolons", () => {
     test("after version tag", () => {
       bad_tokens_test_impl("extra_semicolons/version_tag.dts");
