@@ -37,7 +37,7 @@ export const suggest_parents_command = buildCommand({
         }
     },
     docs: {
-        brief: "List available devices in linux repo"
+        brief: "Suggest valid parent nodes for a device in a DTS context"
     },
     async func(flags: Flags) {
         const { linux, dtSchema, context, compatible } = flags;

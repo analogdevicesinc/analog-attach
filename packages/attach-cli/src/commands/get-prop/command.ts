@@ -4,9 +4,6 @@ import { parseDtso, print_value, search_node_in_dts } from "attach-lib";
 import * as fs from 'node:fs';
 
 type Flags = {
-    linux: string,
-    dtSchema: string,
-    context: string,
     node: string,
     input: string,
     property: string,
@@ -15,21 +12,6 @@ type Flags = {
 export const get_property_command = buildCommand({
     parameters: {
         flags: {
-            linux: {
-                kind: "parsed",
-                parse: String,
-                brief: "Path to Linux repo"
-            },
-            dtSchema: {
-                kind: "parsed",
-                parse: String,
-                brief: "Path to dt-schema repo"
-            },
-            context: {
-                kind: "parsed",
-                parse: String,
-                brief: "The target dts"
-            },
             node: {
                 kind: "parsed",
                 parse: String,
@@ -48,7 +30,7 @@ export const get_property_command = buildCommand({
         }
     },
     docs: {
-        brief: "Set the value of a property of a node from a dtso"
+        brief: "Get the value of a property of a node from a DTSO"
     },
     async func(flags: Flags) {
         const { node, input, property } = flags;

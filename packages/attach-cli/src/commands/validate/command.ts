@@ -34,17 +34,17 @@ export const validate_command = buildCommand({
             node: {
                 kind: "parsed",
                 parse: String,
-                brief: "Compatible string of the desired device binding"
+                brief: "Target node name to validate"
             },
             input: {
                 kind: "parsed",
                 parse: String,
-                brief: "Compatible string of the desired device binding"
+                brief: "Path to the DTSO file containing the node"
             }
         }
     },
     docs: {
-        brief: "List available devices in linux repo"
+        brief: "Validate a device node in a DTSO against its binding"
     },
     async func(flags: Flags) {
         const { linux, dtSchema, context, node, input } = flags;

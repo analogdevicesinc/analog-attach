@@ -33,13 +33,13 @@ export const create_command = buildCommand({
             parent: {
                 kind: "parsed",
                 parse: String,
-                brief: "Compatible string of the desired device binding",
+                brief: "Parent node label or path (e.g. spi0 or /soc/spi@...)",
                 optional: true
             },
             output: {
                 kind: "parsed",
                 parse: String,
-                brief: "Compatible string of the desired device binding",
+                brief: "Output file path; prints to stdout if omitted",
                 optional: true
             }
         }

@@ -38,7 +38,7 @@ export const get_schema_command = buildCommand({
         }
     },
     docs: {
-        brief: "List available devices in linux repo"
+        brief: "Get the parsed binding schema for a device"
     },
     async func(flags: Flags) {
         const { linux, dtSchema, context, compatible } = flags;
