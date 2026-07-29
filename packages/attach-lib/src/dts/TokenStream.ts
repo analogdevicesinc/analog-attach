@@ -1,5 +1,5 @@
-import { Option } from "../option";
-import { Token } from "./tokens";
+import { Option } from "../option.js";
+import { Token } from "./tokens.js";
 
 export class TokenStream {
   private pos = 0;

@@ -1,9 +1,9 @@
-import { WithRowAndCol, LexerInputStream } from "./LexerInputStream";
-import { Option } from "../option";
-import { Result } from "../result";
-import { assert_never } from "../utilities";
-import { TokenStream } from "./TokenStream";
-import { TokenKind, RawToken, Token, is_dt_directive, is_char_token } from "./tokens";
+import { WithRowAndCol, LexerInputStream } from "./LexerInputStream.js";
+import { Option } from "../option.js";
+import { Result } from "../result.js";
+import { assert_never } from "../utilities.js";
+import { TokenStream } from "./TokenStream.js";
+import { TokenKind, RawToken, Token, is_dt_directive, is_char_token } from "./tokens.js";
 
 const TOKEN_KIND_AND_REGEX_PAIRS = [
   // 1. Comments (Highest priority - they must consume slashes before anything else)
