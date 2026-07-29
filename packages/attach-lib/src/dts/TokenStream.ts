@@ -13,7 +13,7 @@ export class TokenStream {
     return this.tokens[this.pos];
   }
 
-  public get get_current_then_advance(): Token {
+  public get_current_then_advance(): Token {
     if (this.pos >= this.tokens.length) {
       throw new Error("Out of bound index");
     }

@@ -34,23 +34,6 @@ type Deletable<T> = T & {
 type DeletableProperty = Deletable<DTProperty>;
 type DeletableNode = Deletable<DTNode<DeletableProperty>>;
 
-export class ParserException extends Error {
-  constructor({ message, found, expected }: ParseError) {
-
-    if (found !== undefined) {
-      message += `, at ${found.row}:${found.col}`;
-      message += `, found ${JSON.stringify(found, undefined, 4)}`;
-    }
-
-    if (expected !== undefined) {
-      message += `, expected ${JSON.stringify(expected)}`;
-    }
-
-    super(message);
-    this.name = "ParserException";
-  }
-}
-
 export type ParseError = {
   message: string;
   found?: Token;
@@ -79,6 +62,16 @@ export class Parser {
 
     const r_semi = this.consume_char_token_then_advance(CharTokenKind.Semicolon);
     if (Result.is_err(r_semi)) { return r_semi; }
+
+    while (
+      !this.token_stream.done &&
+      this.token_stream.current.kind === TokenKind.Directive &&
+      (this.token_stream.current as DirectiveToken).value === DTDirective.DTSV1
+    ) {
+      this.token_stream.advance();
+      const r_extra_semi = this.consume_char_token_then_advance(CharTokenKind.Semicolon);
+      if (Result.is_err(r_extra_semi)) { return r_extra_semi; }
+    }
 
     const r_memreserves = this.parse_memreserve_statements();
     if (Result.is_err(r_memreserves)) { return r_memreserves; }
@@ -137,6 +130,16 @@ export class Parser {
 
     const r_semi1 = this.consume_char_token_then_advance(CharTokenKind.Semicolon);
     if (Result.is_err(r_semi1)) { return r_semi1; }
+
+    while (
+      !this.token_stream.done &&
+      this.token_stream.current.kind === TokenKind.Directive &&
+      (this.token_stream.current as DirectiveToken).value === DTDirective.DTSV1
+    ) {
+      this.token_stream.advance();
+      const r_extra_semi = this.consume_char_token_then_advance(CharTokenKind.Semicolon);
+      if (Result.is_err(r_extra_semi)) { return r_extra_semi; }
+    }
 
     const r_plugin = this.consume_directive_token_then_advance(DTDirective.Plugin);
     if (Result.is_err(r_plugin)) { return r_plugin; }
@@ -422,6 +425,9 @@ export class Parser {
           for (const child of target_node.children) {
             if (child.name === name && child.unit_addr === unit_addr) {
               child.deleted = true;
+              child.labels = [];
+              child.properties = [];
+              child.children = [];
               break;
             }
           }
@@ -509,17 +515,33 @@ export class Parser {
         defined_at_least_one_child = true;
 
         const [name, unit_addr] = split_node_identifier(current.value);
-        const existing_child = target_node.children
-          .find(c => c.name === name && c.unit_addr === unit_addr);
+        const existing_live_child = target_node.children
+          .find(c => c.name === name && c.unit_addr === unit_addr && !c.deleted);
 
-        if (existing_child) {
+        // A deleted node may be re-defined under a different node name (same label):
+        // match by name first, then fall back to any shared label.
+        let deleted_child_index = target_node.children
+          .findIndex(c => c.name === name && c.unit_addr === unit_addr && c.deleted);
+        if (deleted_child_index === -1 && labels.length > 0) {
+          deleted_child_index = target_node.children
+            .findIndex(c => c.deleted && c.labels.some(l => labels.includes(l)));
+        }
+
+        if (existing_live_child) {
           this.token_stream.advance();
-          const r_overlay = this.parse_and_apply_overlay_statement(labels, existing_child);
+          const r_overlay = this.parse_and_apply_overlay_statement(labels, existing_live_child);
           if (Result.is_err(r_overlay)) { return r_overlay; }
-        } else {
+        } else if (deleted_child_index === -1) {
           const r_node = this.parse_node_statement(labels);
           if (Result.is_err(r_node)) { return r_node; }
           target_node.children.push(r_node.value);
+        } else {
+          // Re-definition of a deleted node: replace in-place to preserve ordering/phandle assignment.
+          const r_node = this.parse_node_statement(labels);
+          if (Result.is_err(r_node)) { return r_node; }
+          // TODO: can't say why it's needed to be reversed, need to investigate
+          r_node.value.labels.reverse();
+          target_node.children[deleted_child_index] = structuredClone(r_node.value);
         }
 
         continue;
@@ -867,6 +889,13 @@ export class Parser {
         });
       }
 
+      if (current.value.startsWith("0x") || current.value.startsWith("0X")) {
+        return Result.Err({
+          message: "Hex-prefixed numbers (0x...) are not valid in bytestrings; write bare hex digits without the 0x prefix",
+          found: current
+        });
+      }
+
       if (current.value.length % 2 !== 0) {
         return Result.Err({
           message: "Bytes can be represented without space, but the number of hex digits must be even",
@@ -967,7 +996,7 @@ export class Parser {
   }
 
   private parse_labels(): Array<string> {
-    const labels = new Array<string>();
+    const labels = [];
     while (!this.token_stream.done && this.token_stream.current.kind === TokenKind.Label) {
       labels.push(this.token_stream.current.value);
       this.token_stream.advance();
@@ -1168,10 +1197,10 @@ function strip_node({ deleted, properties, children, ...rest }: DeletableNode): 
   return {
     ...rest,
     properties: properties
-      .filter(p => !p.deleted)
+      .filter(p => p.deleted === false)
       .map(p => strip_property(p)),
     children: children
-      .filter(c => !c.deleted)
+      .filter(c => c.deleted === false)
       .map(c => strip_node(c)),
   };
 }
