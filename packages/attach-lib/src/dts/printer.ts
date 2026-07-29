@@ -1,4 +1,4 @@
-import type {
+import {
   DTCellArray,
   DTNode,
   DTProperty,
@@ -8,11 +8,12 @@ import type {
   DTPath,
   DTO,
   DTMetadata,
-} from "./ast";
-import { Bits, is_dt_flag } from "./ast.js";
+  Bits,
+  is_dt_flag
+} from "./ast.js";
 
 import { stringify as stringify_as_yaml } from "yaml";
-import { DTS_METADATA_HEADER } from "./parser";
+import { DTS_METADATA_HEADER } from "./parser.js";
 
 import { assert_never } from "../utilities.js";
 

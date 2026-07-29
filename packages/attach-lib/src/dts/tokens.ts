@@ -1,4 +1,4 @@
-import { WithRowAndCol } from "./LexerInputStream";
+import { WithRowAndCol } from "./LexerInputStream.js";
 
 export enum TokenKind {
   CommentLine = "CommentLine",

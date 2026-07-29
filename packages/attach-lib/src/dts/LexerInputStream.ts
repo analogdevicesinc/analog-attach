@@ -1,4 +1,4 @@
-import { Option } from "../option";
+import { Option } from "../option.js";
 
 const WHITE_SPACE_CODES = new Set([
   9,  // tab
