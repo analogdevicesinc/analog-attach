@@ -5,6 +5,7 @@ import { parse } from "smol-toml";
 export interface AttachConfig {
     linux?: string;
     dtSchema?: string;
+    context?: string;
 }
 
 export function load_config(): AttachConfig {
@@ -20,5 +21,6 @@ export function load_config(): AttachConfig {
     return {
         linux: typeof parsed["linux"] === "string" ? parsed["linux"] : undefined,
         dtSchema: typeof parsed["dt-schema"] === "string" ? parsed["dt-schema"] : undefined,
+        context: typeof parsed["context"] === "string" ? parsed["context"] : undefined,
     };
 }

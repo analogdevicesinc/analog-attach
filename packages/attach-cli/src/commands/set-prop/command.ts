@@ -19,7 +19,7 @@ import { load_config } from "../../config";
 type Flags = {
     linux?: string,
     dtSchema?: string,
-    context: string,
+    context?: string,
     node: string,
     input: string,
     property: string,
@@ -44,7 +44,8 @@ export const set_property_command = buildCommand({
             context: {
                 kind: "parsed",
                 parse: String,
-                brief: "The target dts"
+                brief: "The target dts",
+                optional: true,
             },
             node: {
                 kind: "parsed",
@@ -75,7 +76,8 @@ export const set_property_command = buildCommand({
         const config = load_config();
         const linux = flags.linux ?? config.linux;
         const dtSchema = flags.dtSchema ?? config.dtSchema;
-        const { context, node, input, property, value } = flags;
+        const context = flags.context ?? config.context;
+        const { node, input, property, value } = flags;
 
         if (linux === undefined) {
             console.log("Missing: --linux (no config.toml found)");
@@ -84,6 +86,11 @@ export const set_property_command = buildCommand({
 
         if (dtSchema === undefined) {
             console.log("Missing: --dt-schema (no config.toml found)");
+            return;
+        }
+
+        if (context === undefined) {
+            console.log("Missing: --context (no config.toml found)");
             return;
         }
 
