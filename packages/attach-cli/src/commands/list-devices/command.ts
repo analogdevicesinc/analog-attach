@@ -5,10 +5,11 @@ import path from "node:path";
 import * as fs from 'node:fs';
 
 import { get_all_file_paths } from "../../utilities";
+import { load_config } from "../../config";
 
 type Flags = {
-    linux: string,
-    dtSchema: string,
+    linux?: string,
+    dtSchema?: string,
     includesWord?: string,
 }
 
@@ -18,12 +19,14 @@ export const list_devices_command = buildCommand({
             linux: {
                 kind: "parsed",
                 parse: String,
-                brief: "Path to Linux repo"
+                brief: "Path to Linux repo",
+                optional: true,
             },
             dtSchema: {
                 kind: "parsed",
                 parse: String,
-                brief: "Path to dt-schema repo"
+                brief: "Path to dt-schema repo",
+                optional: true,
             },
             includesWord: {
                 kind: "parsed",
@@ -37,7 +40,20 @@ export const list_devices_command = buildCommand({
         brief: "List available devices in linux repo"
     },
     async func(flags: Flags) {
-        const { linux, dtSchema, includesWord } = flags;
+        const config = load_config();
+        const linux = flags.linux ?? config.linux;
+        const dtSchema = flags.dtSchema ?? config.dtSchema;
+        const { includesWord } = flags;
+
+        if (linux === undefined) {
+            console.log("Missing: --linux (no config.toml found)");
+            return;
+        }
+
+        if (dtSchema === undefined) {
+            console.log("Missing: --dt-schema (no config.toml found)");
+            return;
+        }
 
         if (!fs.existsSync(linux)) {
             console.log(`Missing: ${linux}`);

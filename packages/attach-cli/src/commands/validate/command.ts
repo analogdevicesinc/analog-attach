@@ -4,10 +4,11 @@ import { Attach, insert_known_structures, mergeDtso, parse_dts, parseDtso, query
 import * as fs from 'node:fs';
 
 import { bigIntReplacer, find_binding, parse_dts_node } from "../../utilities";
+import { load_config } from "../../config";
 
 type Flags = {
-    linux: string,
-    dtSchema: string,
+    linux?: string,
+    dtSchema?: string,
     context: string,
     node: string,
     input: string,
@@ -19,12 +20,14 @@ export const validate_command = buildCommand({
             linux: {
                 kind: "parsed",
                 parse: String,
-                brief: "Path to Linux repo"
+                brief: "Path to Linux repo",
+                optional: true,
             },
             dtSchema: {
                 kind: "parsed",
                 parse: String,
-                brief: "Path to dt-schema repo"
+                brief: "Path to dt-schema repo",
+                optional: true,
             },
             context: {
                 kind: "parsed",
@@ -47,7 +50,20 @@ export const validate_command = buildCommand({
         brief: "Validate a device node in a DTSO against its binding"
     },
     async func(flags: Flags) {
-        const { linux, dtSchema, context, node, input } = flags;
+        const config = load_config();
+        const linux = flags.linux ?? config.linux;
+        const dtSchema = flags.dtSchema ?? config.dtSchema;
+        const { context, node, input } = flags;
+
+        if (linux === undefined) {
+            console.log("Missing: --linux (no config.toml found)");
+            return;
+        }
+
+        if (dtSchema === undefined) {
+            console.log("Missing: --dt-schema (no config.toml found)");
+            return;
+        }
 
         if (!fs.existsSync(context)) {
             console.log(`Missing: ${context}`);

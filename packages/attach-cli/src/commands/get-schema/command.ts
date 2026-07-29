@@ -4,10 +4,11 @@ import { Attach, insert_known_structures, parse_dts, query_devicetree } from "at
 import * as fs from 'node:fs';
 
 import { bigIntReplacer, find_binding } from "../../utilities";
+import { load_config } from "../../config";
 
 type Flags = {
-    linux: string,
-    dtSchema: string,
+    linux?: string,
+    dtSchema?: string,
     context: string,
     compatible: string,
 }
@@ -18,12 +19,14 @@ export const get_schema_command = buildCommand({
             linux: {
                 kind: "parsed",
                 parse: String,
-                brief: "Path to Linux repo"
+                brief: "Path to Linux repo",
+                optional: true,
             },
             dtSchema: {
                 kind: "parsed",
                 parse: String,
-                brief: "Path to dt-schema repo"
+                brief: "Path to dt-schema repo",
+                optional: true,
             },
             context: {
                 kind: "parsed",
@@ -41,7 +44,20 @@ export const get_schema_command = buildCommand({
         brief: "Get the parsed binding schema for a device"
     },
     async func(flags: Flags) {
-        const { linux, dtSchema, context, compatible } = flags;
+        const config = load_config();
+        const linux = flags.linux ?? config.linux;
+        const dtSchema = flags.dtSchema ?? config.dtSchema;
+        const { context, compatible } = flags;
+
+        if (linux === undefined) {
+            console.log("Missing: --linux (no config.toml found)");
+            return;
+        }
+
+        if (dtSchema === undefined) {
+            console.log("Missing: --dt-schema (no config.toml found)");
+            return;
+        }
 
         if (!fs.existsSync(context)) {
             console.log(`Missing: ${context}`);

@@ -10,9 +10,11 @@ import { get_property_command } from "./commands/get-prop/command";
 import { set_property_command } from "./commands/set-prop/command";
 import { install_skill_command } from "./commands/skill/install-skill";
 import { uninstall_skill_command } from "./commands/skill/uninstall-skill";
+import { init_command } from "./commands/init/command";
 
 const routes = buildRouteMap({
     routes: {
+        init: init_command,
         listDevices: list_devices_command,
         getSchema: get_schema_command,
         suggestParents: suggest_parents_command,

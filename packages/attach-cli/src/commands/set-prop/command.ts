@@ -4,6 +4,7 @@ import { Attach, AttachEnumType, create_cell_array, create_flag, create_string_a
 import * as fs from 'node:fs';
 
 import { bigIntReplacer, find_binding, parse_dts_node } from "../../utilities";
+import { load_config } from "../../config";
 
 // set-prop --property compatible --value adi,ad7124-8
 // set-prop --property compatible --value [adi,ad7124-8; adi,ad7124-4]
@@ -16,8 +17,8 @@ import { bigIntReplacer, find_binding, parse_dts_node } from "../../utilities";
 
 
 type Flags = {
-    linux: string,
-    dtSchema: string,
+    linux?: string,
+    dtSchema?: string,
     context: string,
     node: string,
     input: string,
@@ -31,12 +32,14 @@ export const set_property_command = buildCommand({
             linux: {
                 kind: "parsed",
                 parse: String,
-                brief: "Path to Linux repo"
+                brief: "Path to Linux repo",
+                optional: true,
             },
             dtSchema: {
                 kind: "parsed",
                 parse: String,
-                brief: "Path to dt-schema repo"
+                brief: "Path to dt-schema repo",
+                optional: true,
             },
             context: {
                 kind: "parsed",
@@ -69,7 +72,20 @@ export const set_property_command = buildCommand({
         brief: "Set the value of a property in a node in a dtso"
     },
     async func(flags: Flags) {
-        const { linux, dtSchema, context, node, input, property, value } = flags;
+        const config = load_config();
+        const linux = flags.linux ?? config.linux;
+        const dtSchema = flags.dtSchema ?? config.dtSchema;
+        const { context, node, input, property, value } = flags;
+
+        if (linux === undefined) {
+            console.log("Missing: --linux (no config.toml found)");
+            return;
+        }
+
+        if (dtSchema === undefined) {
+            console.log("Missing: --dt-schema (no config.toml found)");
+            return;
+        }
 
         if (!fs.existsSync(context)) {
             console.log(`Missing: ${context}`);
