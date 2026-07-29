@@ -7,16 +7,26 @@ import { bigIntReplacer, find_binding, parse_dts_node } from "../../utilities";
 import { load_config } from "../../config";
 
 type Flags = {
+    node: string,
+    overlay: string,
     linux?: string,
     dtSchema?: string,
     context?: string,
-    node: string,
-    input: string,
 }
 
 export const validate_command = buildCommand({
     parameters: {
         flags: {
+            node: {
+                kind: "parsed",
+                parse: String,
+                brief: "Target node name to validate"
+            },
+            overlay: {
+                kind: "parsed",
+                parse: String,
+                brief: "Path to the DTSO file containing the node"
+            },
             linux: {
                 kind: "parsed",
                 parse: String,
@@ -35,16 +45,6 @@ export const validate_command = buildCommand({
                 brief: "The target dts",
                 optional: true,
             },
-            node: {
-                kind: "parsed",
-                parse: String,
-                brief: "Target node name to validate"
-            },
-            input: {
-                kind: "parsed",
-                parse: String,
-                brief: "Path to the DTSO file containing the node"
-            }
         }
     },
     docs: {
@@ -55,7 +55,7 @@ export const validate_command = buildCommand({
         const linux = flags.linux ?? config.linux;
         const dtSchema = flags.dtSchema ?? config.dtSchema;
         const context = flags.context ?? config.context;
-        const { node, input } = flags;
+        const { node, overlay: input } = flags;
 
         if (linux === undefined) {
             console.log("Missing: --linux (no config.toml found)");

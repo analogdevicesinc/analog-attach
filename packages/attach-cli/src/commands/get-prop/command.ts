@@ -5,8 +5,8 @@ import * as fs from 'node:fs';
 
 type Flags = {
     node: string,
-    input: string,
     property: string,
+    overlay: string,
 }
 
 export const get_property_command = buildCommand({
@@ -17,23 +17,23 @@ export const get_property_command = buildCommand({
                 parse: String,
                 brief: "Target node"
             },
-            input: {
-                kind: "parsed",
-                parse: String,
-                brief: "dtso"
-            },
             property: {
                 kind: "parsed",
                 parse: String,
                 brief: "Target property"
-            }
+            },
+            overlay: {
+                kind: "parsed",
+                parse: String,
+                brief: "dtso"
+            },
         }
     },
     docs: {
         brief: "Get the value of a property of a node from a DTSO"
     },
     async func(flags: Flags) {
-        const { node, input, property } = flags;
+        const { node, overlay: input, property } = flags;
 
         const input_content = fs.readFileSync(input, 'utf8');
 

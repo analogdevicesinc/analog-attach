@@ -8,14 +8,20 @@ import { get_all_file_paths } from "../../utilities";
 import { load_config } from "../../config";
 
 type Flags = {
+    includesWord?: string,
     linux?: string,
     dtSchema?: string,
-    includesWord?: string,
 }
 
 export const list_devices_command = buildCommand({
     parameters: {
         flags: {
+            includesWord: {
+                kind: "parsed",
+                parse: String,
+                brief: "word to be present in device name",
+                optional: true
+            },
             linux: {
                 kind: "parsed",
                 parse: String,
@@ -28,12 +34,6 @@ export const list_devices_command = buildCommand({
                 brief: "Path to dt-schema repo",
                 optional: true,
             },
-            includesWord: {
-                kind: "parsed",
-                parse: String,
-                brief: "word to be present in device name",
-                optional: true
-            }
         }
     },
     docs: {

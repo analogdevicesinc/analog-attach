@@ -7,15 +7,26 @@ import { bigIntReplacer, find_binding } from "../../utilities";
 import { load_config } from "../../config";
 
 type Flags = {
+    compatible: string,
+    context?: string,
     linux?: string,
     dtSchema?: string,
-    context?: string,
-    compatible: string,
 }
 
 export const get_schema_command = buildCommand({
     parameters: {
         flags: {
+            compatible: {
+                kind: "parsed",
+                parse: String,
+                brief: "Compatible string of the desired device binding"
+            },
+            context: {
+                kind: "parsed",
+                parse: String,
+                brief: "The target dts",
+                optional: true,
+            },
             linux: {
                 kind: "parsed",
                 parse: String,
@@ -28,17 +39,6 @@ export const get_schema_command = buildCommand({
                 brief: "Path to dt-schema repo",
                 optional: true,
             },
-            context: {
-                kind: "parsed",
-                parse: String,
-                brief: "The target dts",
-                optional: true,
-            },
-            compatible: {
-                kind: "parsed",
-                parse: String,
-                brief: "Compatible string of the desired device binding"
-            }
         }
     },
     docs: {

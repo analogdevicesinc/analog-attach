@@ -17,18 +17,44 @@ import { load_config } from "../../config";
 
 
 type Flags = {
-    linux?: string,
-    dtSchema?: string,
-    context?: string,
     node: string,
-    input: string,
     property: string,
     value: string,
+    overlay: string,
+    context?: string,
+    linux?: string,
+    dtSchema?: string,
 }
 
 export const set_property_command = buildCommand({
     parameters: {
         flags: {
+            node: {
+                kind: "parsed",
+                parse: String,
+                brief: "Target node"
+            },
+            property: {
+                kind: "parsed",
+                parse: String,
+                brief: "Target property"
+            },
+            value: {
+                kind: "parsed",
+                parse: String,
+                brief: "Value to be set"
+            },
+            overlay: {
+                kind: "parsed",
+                parse: String,
+                brief: "dtso"
+            },
+            context: {
+                kind: "parsed",
+                parse: String,
+                brief: "The target dts",
+                optional: true,
+            },
             linux: {
                 kind: "parsed",
                 parse: String,
@@ -41,32 +67,6 @@ export const set_property_command = buildCommand({
                 brief: "Path to dt-schema repo",
                 optional: true,
             },
-            context: {
-                kind: "parsed",
-                parse: String,
-                brief: "The target dts",
-                optional: true,
-            },
-            node: {
-                kind: "parsed",
-                parse: String,
-                brief: "Target node"
-            },
-            input: {
-                kind: "parsed",
-                parse: String,
-                brief: "dtso"
-            },
-            property: {
-                kind: "parsed",
-                parse: String,
-                brief: "Target property"
-            },
-            value: {
-                kind: "parsed",
-                parse: String,
-                brief: "Value to be set"
-            }
         }
     },
     docs: {
@@ -77,7 +77,7 @@ export const set_property_command = buildCommand({
         const linux = flags.linux ?? config.linux;
         const dtSchema = flags.dtSchema ?? config.dtSchema;
         const context = flags.context ?? config.context;
-        const { node, input, property, value } = flags;
+        const { node, overlay: input, property, value } = flags;
 
         if (linux === undefined) {
             console.log("Missing: --linux (no config.toml found)");

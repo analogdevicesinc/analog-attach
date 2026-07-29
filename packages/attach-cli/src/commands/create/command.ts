@@ -6,28 +6,16 @@ import { find_binding } from "../../utilities";
 import { load_config } from "../../config";
 
 type Flags = {
-    linux?: string,
-    dtSchema?: string,
     compatible: string,
     parent?: string,
     output?: string,
+    linux?: string,
+    dtSchema?: string,
 }
 
 export const create_command = buildCommand({
     parameters: {
         flags: {
-            linux: {
-                kind: "parsed",
-                parse: String,
-                brief: "Path to Linux repo",
-                optional: true,
-            },
-            dtSchema: {
-                kind: "parsed",
-                parse: String,
-                brief: "Path to dt-schema repo",
-                optional: true,
-            },
             compatible: {
                 kind: "parsed",
                 parse: String,
@@ -44,7 +32,19 @@ export const create_command = buildCommand({
                 parse: String,
                 brief: "Output file path; prints to stdout if omitted",
                 optional: true
-            }
+            },
+            linux: {
+                kind: "parsed",
+                parse: String,
+                brief: "Path to Linux repo",
+                optional: true,
+            },
+            dtSchema: {
+                kind: "parsed",
+                parse: String,
+                brief: "Path to dt-schema repo",
+                optional: true,
+            },
         }
     },
     docs: {
