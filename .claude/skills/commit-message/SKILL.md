@@ -7,7 +7,7 @@ Run `git diff --cached` to see the staged changes, and `git log --oneline -10` t
 
 Using the changes and the current conversation context as input, compose a single commit message that:
 
-- Follows the conventional-commits style already used in this repo (e.g. `attach-cli:`, `attach-lib::`, `extension:`)
+- Follows the conventional-commits style already used in this repo (e.g. `attach-cli:`, `attach-lib:`, `extension:`)
 - Subject line: imperative mood, ≤72 characters, no trailing period
 - Body (if needed): wrap at 72 characters, explain *why* not *what*
 - Trailer (always required):
