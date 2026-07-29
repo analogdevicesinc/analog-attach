@@ -13,7 +13,7 @@ import {
 } from "./ast.js";
 
 import { stringify as stringify_as_yaml } from "yaml";
-import { DTS_METADATA_HEADER } from "./parser.js";
+import { DTS_METADATA_HEADER } from "./constants.js";
 
 import { assert_never } from "../utilities.js";
 
