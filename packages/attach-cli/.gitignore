@@ -27,3 +27,4 @@ jspm_packages/
 dist
 
 *.dtso
+.analog-attach/
