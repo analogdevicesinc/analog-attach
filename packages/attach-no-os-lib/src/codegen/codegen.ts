@@ -5,6 +5,8 @@ import { fileURLToPath } from "node:url";
 import { error, ok } from "../ruleset_parser/result";
 import { make_environment } from "./eta_environment";
 import { load_devices } from "./device_loader";
+import { get_connected_symbols, reorder_symbols_topologically } from "../validator/connection_graph";
+import { effective_value, is_descriptor_reference, is_null_pointer, property_default } from "./codegen_helpers";
 
 import type { CodegenInput, CodegenResult } from "./types";
 import type { Result } from "../ruleset_parser/result";
@@ -17,10 +19,6 @@ const STRUCTURE_FILE = path.join(TEMPLATES_DIR, "project_structure.json");
 // Helpers injected into every template under `it.h` — the Eta replacement for the
 // custom nunjucks filters that used to live on the environment. Templates call them
 // as functions (`it.h.tab_indent(x)`) instead of piping (`x | tab_indent`).
-//
-// `reverse` and `tab_indent` are pure string/array primitives; `devices` is the one
-// impure helper (reads the external schemas repo, see device_loader.ts) — kept out
-// of the pure `_helpers.eta` partial, which never touches `it.h`.
 const template_helpers = {
 	// Was the `reverse` filter. Teardown runs in reverse init order; main_c.eta
 	// calls this instead of the `| reverse` filter.
@@ -41,6 +39,15 @@ const template_helpers = {
 	// helper: it reads the schemas repo. Templates that need device headers pass
 	// `devices(wf).map(d => d.header)` into the pure `_helpers.eta` collectors.
 	devices: load_devices,
+
+	// Typed property primitives (see codegen_helpers.ts) plus the validator's own
+	// reference-collector, so templates never re-implement "what does this property
+	// point at / resolve to".
+	effective_value,
+	property_default,
+	is_null_pointer,
+	is_descriptor_reference,
+	connected_symbols: get_connected_symbols,
 };
 
 // The project layout is data, not code: `project_structure.json` next to the
@@ -115,6 +122,13 @@ export function generate_project(input: CodegenInput): Result<CodegenResult> {
 	// structure alone determines the project layout. A template that throws (e.g. a
 	// dependency cycle or a half-configured device) is surfaced as a Result error.
 	try {
+		// Lay symbols out dependency-first, in place, so every `Object.entries(symbols)`
+		// in the templates walks referenced structs before their referrers. Codegen used
+		// to topo-sort inside the Eta helpers; doing it once here in code keeps the
+		// templates free of graph logic (and reuses the core connection graph). Throws on
+		// a dependency cycle, caught below as a Result error.
+		reorder_symbols_topologically(input.workfile);
+
 		for (const file of files) {
 			const file_path = path.join(project_directory, file.output);
 

@@ -3,7 +3,7 @@ import type { Workfile } from "../workfile_handler/types";
 import type { CollectedRule, ConnectionGraph } from "./types";
 import { load_resolved_ruleset } from "../resolver/resolver";
 
-function get_connected_symbols(property: Property): string[] {
+export function get_connected_symbols(property: Property): string[] {
 	switch (property._t) {
 		case "IncludeProperty": {
 			if (typeof property.value === "string") {
@@ -114,6 +114,72 @@ export function create_connections_graph(workfile: Workfile): ConnectionGraph {
 	}
 
 	return graph;
+}
+
+// Topological order of symbol names, dependencies before dependents. Seeds
+// out-degree = children.length and decrements a parent when one of its children is
+// emitted, so the emit order is deterministic and stable for identical graphs. Used
+// by codegen to lay symbols out with every referenced struct declared before the
+// struct that references it. Throws on a dependency cycle.
+export function topo_sorted_symbols(workfile: Workfile): string[] {
+	const graph = create_connections_graph(workfile);
+	const in_degree = new Map<string, number>();
+
+	for (const name of graph.keys()) {
+		in_degree.set(name, 0);
+	}
+	for (const [parent, children] of graph) {
+		in_degree.set(parent, children.length);
+	}
+
+	const queue: string[] = [];
+	for (const [name, degree] of in_degree) {
+		if (degree === 0) {
+			queue.push(name);
+		}
+	}
+
+	const sorted: string[] = [];
+	while (queue.length > 0) {
+		const name = queue.shift();
+		if (name === undefined) {
+			continue;
+		}
+		sorted.push(name);
+
+		for (const [parent, children] of graph) {
+			if (children.includes(name)) {
+				const new_degree = (in_degree.get(parent) ?? 1) - 1;
+				in_degree.set(parent, new_degree);
+				if (new_degree === 0) {
+					queue.push(parent);
+				}
+			}
+		}
+	}
+
+	if (sorted.length !== graph.size) {
+		const in_cycle = [...graph.keys()].filter(name => !sorted.includes(name));
+		throw new Error(`Dependency cycle detected among symbols: ${in_cycle.join(", ")}`);
+	}
+
+	return sorted;
+}
+
+// Rebuild `workfile.symbols` in topological (dependency-first) order, in place.
+// JS objects preserve insertion order, so after this every `Object.entries(symbols)`
+// — in codegen templates and elsewhere — walks symbols with each referenced struct
+// ahead of its referrer. Codegen relies on this instead of sorting inside templates.
+export function reorder_symbols_topologically(workfile: Workfile): void {
+	const ordered = topo_sorted_symbols(workfile);
+	const reordered: Workfile["symbols"] = {};
+	for (const name of ordered) {
+		const symbol = workfile.symbols[name];
+		if (symbol !== undefined) {
+			reordered[name] = symbol;
+		}
+	}
+	workfile.symbols = reordered;
 }
 
 export function is_referenced_by_others(symbol_name: string, graph: ConnectionGraph): boolean {

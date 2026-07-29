@@ -1,4 +1,69 @@
-<% const H = include("./_helpers"); const devices = it.h.devices(it.workfile); const includes = H.common_data_includes(it.workfile, devices.map(d => d.header).filter(h => h.length > 0)); const descriptors = H.collect_descriptors(it.workfile); const externs = H.struct_views(it.workfile).map(view => ({ type: view.type, name: view.name, is_const: view.is_const })); -%>
+<%
+const H = include("./_helpers", { h: it.h });
+const wf = it.workfile;
+
+/* Basename without node path: everything after the last slash. */
+function basename(file_path) {
+	return String(file_path).slice(String(file_path).lastIndexOf("/") + 1);
+}
+
+/* Header files this device set pulls in from the schemas repo (impure helper). */
+const device_headers = it.h.devices(wf).map(d => d.header).filter(h => h.length > 0);
+
+/*
+ * The #include list for common_data.h: device headers, then platform headers
+ * (basenamed), then no-OS include headers. Port of build_views all_includes;
+ * lives here because common_data.h is the only consumer.
+ */
+function common_data_includes() {
+	const all_includes = new Set();
+	for (const header of device_headers) {
+		all_includes.add(header);
+	}
+	const sources = H.collect_sources(wf);
+	for (const header of sources.platform.filter(file => file.endsWith(".h"))) {
+		all_includes.add(basename(header));
+	}
+	for (const header of sources.include.filter(file => file.endsWith(".h"))) {
+		all_includes.add(header);
+	}
+	return [...all_includes];
+}
+
+/*
+ * One descriptor field per descriptor node, resolving each descriptor to the
+ * init_param struct it points at. Ports collect_descriptors + resolve_init_param;
+ * lives here because common_data.h is the only consumer. Throws on a mis-linked
+ * descriptor (templates have no Result type).
+ */
+function collect_descriptors() {
+	const result = [];
+	for (const [name, symbol] of Object.entries(wf.symbols)) {
+		if (symbol._t !== "RulesetDescriptor") {
+			continue;
+		}
+		const target_name = symbol.properties[0].value;
+		if (typeof target_name !== "string") {
+			throw new Error(`Descriptor ${symbol.$id} has no init_param assigned`);
+		}
+		if (!(target_name in wf.symbols)) {
+			throw new Error(`Descriptor init_param ${target_name} not found in workfile`);
+		}
+		if (wf.symbols[target_name]._t !== "RulesetStruct") {
+			throw new Error(`Descriptor init_param ${target_name} is not a struct`);
+		}
+		result.push({
+			descriptor_name: name,
+			descriptor_type: symbol.$symbol,
+		});
+	}
+	return result;
+}
+
+const includes = common_data_includes();
+const descriptors = collect_descriptors();
+const externs = H.struct_views(wf);
+-%>
 #ifndef COMMON_DATA_H
 #define COMMON_DATA_H
 
