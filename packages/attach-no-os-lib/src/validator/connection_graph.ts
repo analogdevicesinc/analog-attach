@@ -1,22 +1,35 @@
 import type { Property } from "../ruleset_parser/types";
 import type { Workfile } from "../workfile_handler/types";
-import type { CollectedRule, ConnectionGraph } from "./types";
+import type { CollectedRule, ConnectionGraph, ReferenceKind, SymbolReference } from "./types";
 import { load_resolved_ruleset } from "../resolver/resolver";
 
-export function get_connected_symbols(property: Property): string[] {
+// A `pointer: true` include stores only an address, so it is not an ordering
+// constraint; anything else embeds the referenced struct by value and is.
+function kind_of(pointer: boolean | undefined): ReferenceKind {
+	return pointer === true ? "pointer" : "value";
+}
+
+export function get_symbol_references(property: Property): SymbolReference[] {
 	switch (property._t) {
 		case "IncludeProperty": {
 			if (typeof property.value === "string") {
-				return [property.value];
+				return [{ name: property.value, kind: kind_of(property.pointer) }];
 			}
 			return [];
 		}
 		case "UnionProperty": {
 			const value = property.value as Record<string, string> | undefined;
-			if (value) {
-				return Object.values(value);
+			if (!value) {
+				return [];
 			}
-			return [];
+			// Each member carries its own `pointer` flag (codegen already emits
+			// `{ .member = &ref }` vs `{ .member = ref }` from it), so classify per
+			// member rather than per union. No schema sets it on a member today, so
+			// every union reference is currently a value edge.
+			return Object.entries(value).map(([member_name, reference]) => ({
+				name: reference,
+				kind: kind_of(property.members.find(m => m.name === member_name)?.pointer),
+			}));
 		}
 		case "ArrayProperty": {
 			if (property.element._t === "IncludeProperty" && Array.isArray(property.value)) {
@@ -25,13 +38,21 @@ export function get_connected_symbols(property: Property): string[] {
 				if (resolved.ok && resolved.value._t === "RulesetEnum") {
 					return [];
 				}
-				return property.value as string[];
+				// Every element shares the element declaration, so one kind for all of
+				// them: an array of pointer includes (i3c's `devs`) is a pointer edge,
+				// an array of embedded structs (ad7124's `setups`) is a value edge.
+				const kind = kind_of(property.element.pointer);
+				return (property.value as string[]).map(name => ({ name, kind }));
 			}
 			return [];
 		}
 		case "PlatformExtraProperty": {
+			// Emitted as `&extra` (it is `void *` in C), so strictly a pointer. Kept as a
+			// value edge on purpose: platform structs never reference anything back, so
+			// they cannot form a cycle, and relaxing them would reshuffle the struct
+			// order in every existing project's common_data.c for no gain.
 			if (typeof property.value === "string") {
-				return [property.value];
+				return [{ name: property.value, kind: "value" }];
 			}
 			return [];
 		}
@@ -39,6 +60,10 @@ export function get_connected_symbols(property: Property): string[] {
 			return [];
 		}
 	}
+}
+
+export function get_connected_symbols(property: Property): string[] {
+	return get_symbol_references(property).map(reference => reference.name);
 }
 
 // Rewrite every reference to `old_name` across all symbols to `new_name`. Mutates
@@ -102,10 +127,17 @@ export function create_connections_graph(workfile: Workfile): ConnectionGraph {
 		}
 
 		for (const property of ruleset.properties) {
-			const children = get_connected_symbols(property);
-			for (const child of children) {
+			for (const child of get_symbol_references(property)) {
 				const existing = graph.get(symbol_name) ?? [];
-				if (!existing.includes(child)) {
+				// A symbol referenced twice from the same parent is one edge. Keep the
+				// stronger kind: a value reference anywhere means the definition really
+				// is needed first, whatever the other reference does.
+				const duplicate = existing.find(reference => reference.name === child.name);
+				if (duplicate) {
+					if (child.kind === "value") {
+						duplicate.kind = "value";
+					}
+				} else {
 					existing.push(child);
 				}
 				graph.set(symbol_name, existing);
@@ -116,19 +148,25 @@ export function create_connections_graph(workfile: Workfile): ConnectionGraph {
 	return graph;
 }
 
-// Topological order of symbol names, dependencies before dependents. Seeds
-// out-degree = children.length and decrements a parent when one of its children is
-// emitted, so the emit order is deterministic and stable for identical graphs. Used
-// by codegen to lay symbols out with every referenced struct declared before the
-// struct that references it. Throws on a dependency cycle.
+export function child_names(graph: ConnectionGraph, symbol_name: string): string[] {
+	return (graph.get(symbol_name) ?? []).map(reference => reference.name);
+}
+
+export function value_children(graph: ConnectionGraph, symbol_name: string): string[] {
+	return (graph.get(symbol_name) ?? [])
+		.filter(reference => reference.kind === "value")
+		.map(reference => reference.name);
+}
+
 export function topo_sorted_symbols(workfile: Workfile): string[] {
 	const graph = create_connections_graph(workfile);
-	const in_degree = new Map<string, number>();
-
+	const dependencies = new Map<string, string[]>();
 	for (const name of graph.keys()) {
-		in_degree.set(name, 0);
+		dependencies.set(name, value_children(graph, name));
 	}
-	for (const [parent, children] of graph) {
+
+	const in_degree = new Map<string, number>();
+	for (const [parent, children] of dependencies) {
 		in_degree.set(parent, children.length);
 	}
 
@@ -147,7 +185,7 @@ export function topo_sorted_symbols(workfile: Workfile): string[] {
 		}
 		sorted.push(name);
 
-		for (const [parent, children] of graph) {
+		for (const [parent, children] of dependencies) {
 			if (children.includes(name)) {
 				const new_degree = (in_degree.get(parent) ?? 1) - 1;
 				in_degree.set(parent, new_degree);
@@ -182,9 +220,10 @@ export function reorder_symbols_topologically(workfile: Workfile): void {
 	workfile.symbols = reordered;
 }
 
+// Any kind of reference counts: a symbol only pointed at is still in use.
 export function is_referenced_by_others(symbol_name: string, graph: ConnectionGraph): boolean {
 	for (const children of graph.values()) {
-		if (children.includes(symbol_name)) {
+		if (children.some(reference => reference.name === symbol_name)) {
 			return true;
 		}
 	}
@@ -193,9 +232,12 @@ export function is_referenced_by_others(symbol_name: string, graph: ConnectionGr
 
 // The first symbol that includes `symbol_name` (decision: assume single parent).
 // A rule declared on X that references `parent` reads from / writes to this symbol.
+// NOTE: mutually-referencing symbols (i3c bus <-> device) are each other's includer,
+// so "first" is whichever comes first in workfile order. See P3 in the i3c work: a real
+// answer needs an override-scoping rule that does not exist yet.
 function find_includer(symbol_name: string, graph: ConnectionGraph): string | undefined {
 	for (const [candidate, children] of graph.entries()) {
-		if (children.includes(symbol_name)) {
+		if (children.some(reference => reference.name === symbol_name)) {
 			return candidate;
 		}
 	}
@@ -222,7 +264,7 @@ export function collect_child_overrides(symbol_name: string, workfile: Workfile,
 		}
 	}
 
-	for (const child_name of graph.get(symbol_name) ?? []) {
+	for (const child_name of child_names(graph, symbol_name)) {
 		const child = workfile.symbols[child_name];
 		if (child?._t !== "RulesetStruct" || !child.rules) {
 			continue;

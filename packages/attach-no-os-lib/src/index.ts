@@ -60,7 +60,7 @@ export {
 } from "./settings/globals";
 export type { Setting, SettingsFile } from "./settings/types";
 export { is_setting, is_settings_file } from "./settings/types";
-export type { ConnectionGraph } from "./validator/types";
+export type { ConnectionGraph, SymbolReference, ReferenceKind } from "./validator/types";
 export { validate_workfile } from "./validator/validator";
 export type { ValidationResult, ValidationError } from "./validator/types";
 export { generate_project } from "./codegen/codegen";

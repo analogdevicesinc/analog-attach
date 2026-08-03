@@ -6,7 +6,7 @@ import { error, ok } from "../ruleset_parser/result";
 import { make_environment } from "./eta_environment";
 import { load_devices } from "./device_loader";
 import { get_connected_symbols, reorder_symbols_topologically } from "../validator/connection_graph";
-import { effective_value, is_descriptor_reference, is_null_pointer, property_default } from "./codegen_helpers";
+import { effective_value, is_descriptor_reference, is_null_pointer, number_literal, property_default } from "./codegen_helpers";
 
 import type { CodegenInput, CodegenResult } from "./types";
 import type { Result } from "../ruleset_parser/result";
@@ -47,6 +47,7 @@ const template_helpers = {
 	property_default,
 	is_null_pointer,
 	is_descriptor_reference,
+	number_literal,
 	connected_symbols: get_connected_symbols,
 };
 

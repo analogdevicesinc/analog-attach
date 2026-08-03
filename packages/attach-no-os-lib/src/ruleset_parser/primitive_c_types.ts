@@ -63,7 +63,25 @@ interface primitive_size_t {
 	maximum: undefined;
 };
 
-export type PrimitiveCType =
+// IEEE 754 binary32. The bounds are the largest finite magnitudes representable;
+// a value inside them may still lose precision, which we do not model.
+interface primitive_float {
+	_t: "primitive_float";
+	symbol: "float";
+	minimum: -3.402_823_466_385_288_6e38;
+	maximum: 3.402_823_466_385_288_6e38;
+};
+
+// IEEE 754 binary64 — the same width as a JavaScript number, so every value we
+// can hold is representable.
+interface primitive_double {
+	_t: "primitive_double";
+	symbol: "double";
+	minimum: -1.797_693_134_862_315_7e308;
+	maximum: 1.797_693_134_862_315_7e308;
+};
+
+export type PrimitiveIntegerCType =
 	| primitive_uint8_t
 	| primitive_uint16_t
 	| primitive_uint32_t
@@ -73,4 +91,10 @@ export type PrimitiveCType =
 	| primitive_int32_t
 	| primitive_int64_t
 	| primitive_size_t;
+
+export type PrimitiveFloatCType =
+	| primitive_float
+	| primitive_double;
+
+export type PrimitiveCType = PrimitiveIntegerCType | PrimitiveFloatCType;
 

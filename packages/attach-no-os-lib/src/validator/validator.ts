@@ -2,7 +2,7 @@ import type { Workfile } from "../workfile_handler/types";
 import type { ValidationError, ValidationResult } from "./types";
 import type { ParseContext } from "../ruleset_parser/validators";
 import { validate_property } from "./property_validator";
-import { collect_child_overrides, create_connections_graph } from "./connection_graph";
+import { child_names, collect_child_overrides, create_connections_graph } from "./connection_graph";
 
 export function validate_workfile(workfile: Workfile): ValidationResult {
 	const errors: ValidationError[] = [];
@@ -17,7 +17,10 @@ export function validate_workfile(workfile: Workfile): ValidationResult {
 
 		// A symbol referencing itself (e.g. parent set to its own descriptor) forms a
 		// dependency cycle and cannot be ordered/generated. Reject it explicitly.
-		if ((connections_graph.get(symbol_name) ?? []).includes(symbol_name)) {
+		// Pointer self-references included: `.bus = &itself` is legal C but never a
+		// meaningful device model, so it stays an error (unlike the mutual pointer
+		// references between two DIFFERENT symbols that i3c needs).
+		if (child_names(connections_graph, symbol_name).includes(symbol_name)) {
 			errors.push({
 				path: symbol_name,
 				message: `Symbol '${symbol_name}' references itself; self-references are not allowed.`,
