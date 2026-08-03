@@ -59,6 +59,38 @@ describe('NumberProperty parsing', () => {
 			const property = result.value as NumberProperty;
 			expect(property.capability).toEqual(['dma']);
 		});
+
+		test('parses float type', () => {
+			const result = loadAndParseProperty('properties/number/valid_float.yaml');
+			expectOk(result);
+			expect(result.value._t).toBe('NumberProperty');
+			expect((result.value as NumberProperty).type).toBe('float');
+		});
+
+		test('parses double type', () => {
+			const result = loadAndParseProperty('properties/number/valid_double.yaml');
+			expectOk(result);
+			expect(result.value._t).toBe('NumberProperty');
+			expect((result.value as NumberProperty).type).toBe('double');
+		});
+
+		test('parses fractional default on a double', () => {
+			const result = loadAndParseProperty('properties/number/valid_double_with_default.yaml');
+			expectOk(result);
+			expect((result.value as NumberProperty).default).toBe(3.3);
+		});
+
+		test('parses float with fractional default and bounds', () => {
+			const result = loadAndParseProperty('properties/number/valid_float_with_all_options.yaml');
+			expectOk(result);
+			const property = result.value as NumberProperty;
+			expect(property.type).toBe('float');
+			expect(property.description).toBe('Sample rate in Hz');
+			expect(property.required).toBe(true);
+			expect(property.default).toBe(1000.5);
+			expect(property.minimum).toBe(0.1);
+			expect(property.maximum).toBe(51_200);
+		});
 	});
 
 	describe('error cases', () => {
@@ -86,6 +118,27 @@ describe('NumberProperty parsing', () => {
 			expectError(result);
 			expectErrorPath(result, 'minimum');
 			expectErrorContains(result, 'Expected number');
+		});
+
+		test('rejects fractional default on an integer type', () => {
+			const result = loadAndParseProperty('properties/number/default_fractional_int.yaml');
+			expectError(result);
+			expectErrorPath(result, 'default');
+			expectErrorContains(result, 'Expected an integer');
+		});
+
+		test('rejects fractional minimum on an integer type', () => {
+			const result = loadAndParseProperty('properties/number/minimum_fractional_int.yaml');
+			expectError(result);
+			expectErrorPath(result, 'minimum');
+			expectErrorContains(result, 'Expected an integer');
+		});
+
+		test('rejects fractional maximum on an integer type', () => {
+			const result = loadAndParseProperty('properties/number/maximum_fractional_int.yaml');
+			expectError(result);
+			expectErrorPath(result, 'maximum');
+			expectErrorContains(result, 'Expected an integer');
 		});
 	});
 });

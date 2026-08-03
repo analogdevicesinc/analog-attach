@@ -1,4 +1,5 @@
-import type { Property } from "../ruleset_parser/types";
+import type { NumberProperty, Property } from "../ruleset_parser/types";
+import { is_float_symbol } from "../ruleset_parser/types";
 import type { Workfile } from "../workfile_handler/types";
 
 // Typed, reusable property primitives injected into every template under `it.h`.
@@ -29,6 +30,39 @@ export function effective_value(property: Property): unknown {
 		return property.value;
 	}
 	return property_default(property);
+}
+
+// The C literal for one numeric value, given the property that types it.
+//
+// Integers print as-is. Floats always carry a decimal point, so a whole value
+// stays a floating-point token (`1.0`, not `1`) — this matters where the token is
+// used in an expression, since `1 / 2` is integer division in C while `1.0 / 2`
+// is not. `float` additionally takes the `f` suffix: an unsuffixed literal is a
+// `double` in C, and assigning it to a `float` field costs an implicit narrowing
+// conversion that -Wfloat-conversion flags.
+//
+// Exponent notation from JS (`1e+30`) is already a valid C literal; the `e` form
+// counts as having a decimal point for our purposes, so it is left alone.
+// Takes `unknown` because the callers hand over a raw property/array value: array
+// elements in particular arrive as strings from the CLI, which stores them
+// unparsed. Anything that is not a finite number is passed through verbatim rather
+// than decorated — the validator is what reports it, codegen does not second-guess.
+export function number_literal(value: unknown, property: NumberProperty): string {
+	const numeric = typeof value === "number" ? value : Number(value);
+	if (!Number.isFinite(numeric) || (typeof value === "string" && value.trim() === "")) {
+		return String(value);
+	}
+
+	if (!is_float_symbol(property.type)) {
+		return String(numeric);
+	}
+
+	let text = String(numeric);
+	if (!text.includes(".") && !text.includes("e") && !text.includes("E")) {
+		text += ".0";
+	}
+
+	return property.type === "float" ? `${text}f` : text;
 }
 
 // A pointer include with no value resolves to NULL rather than being omitted.

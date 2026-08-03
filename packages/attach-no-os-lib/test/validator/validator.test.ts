@@ -235,6 +235,65 @@ describe('validate_workfile', () => {
             expect(result.valid).toBe(false);
             expect(result.errors[0].message).toContain("Expected number");
         });
+
+        test('fractional value on an integer type fails', () => {
+            const workfile = make_workfile({
+                my_struct: make_struct("test.yaml", "test", [
+                    make_number("count", { type: "uint32_t", value: 1.5 })
+                ])
+            });
+            const result = validate_workfile(workfile);
+            expect(result.valid).toBe(false);
+            expect(result.errors).toHaveLength(1);
+            expect(result.errors[0].path).toBe("my_struct.count");
+            expect(result.errors[0].message).toContain("is not an integer");
+        });
+
+        test('fractional value on a float passes', () => {
+            const workfile = make_workfile({
+                my_struct: make_struct("test.yaml", "test", [
+                    make_number("gain", { type: "float", value: 1.5, minimum: 0, maximum: 2 })
+                ])
+            });
+            const result = validate_workfile(workfile);
+            expect(result.valid).toBe(true);
+            expect(result.errors).toHaveLength(0);
+        });
+
+        test('fractional value on a double passes', () => {
+            const workfile = make_workfile({
+                my_struct: make_struct("test.yaml", "test", [
+                    make_number("vref", { type: "double", value: 3.3 })
+                ])
+            });
+            const result = validate_workfile(workfile);
+            expect(result.valid).toBe(true);
+            expect(result.errors).toHaveLength(0);
+        });
+
+        test('float below minimum fails', () => {
+            const workfile = make_workfile({
+                my_struct: make_struct("test.yaml", "test", [
+                    make_number("gain", { type: "float", value: 0.05, minimum: 0.1 })
+                ])
+            });
+            const result = validate_workfile(workfile);
+            expect(result.valid).toBe(false);
+            expect(result.errors).toHaveLength(1);
+            expect(result.errors[0].message).toContain("below");
+        });
+
+        test('non-finite value fails', () => {
+            const workfile = make_workfile({
+                my_struct: make_struct("test.yaml", "test", [
+                    make_number("gain", { type: "float", value: Number.POSITIVE_INFINITY })
+                ])
+            });
+            const result = validate_workfile(workfile);
+            expect(result.valid).toBe(false);
+            expect(result.errors).toHaveLength(1);
+            expect(result.errors[0].message).toContain("not a finite number");
+        });
     });
 
     describe('boolean property validation', () => {

@@ -1,5 +1,7 @@
 import type {
-	PrimitiveCType
+	PrimitiveCType,
+	PrimitiveFloatCType,
+	PrimitiveIntegerCType
 } from "./primitive_c_types";
 
 export interface PropertyBase {
@@ -12,16 +14,37 @@ export interface PropertyBase {
 }
 
 export type PrimitiveSymbol = PrimitiveCType["symbol"];
+export type PrimitiveIntegerSymbol = PrimitiveIntegerCType["symbol"];
+export type PrimitiveFloatSymbol = PrimitiveFloatCType["symbol"];
 
-export const PRIMITIVE_SYMBOLS: PrimitiveSymbol[] = [
+export const PRIMITIVE_INTEGER_SYMBOLS: PrimitiveIntegerSymbol[] = [
 	"uint8_t", "uint16_t", "uint32_t", "uint64_t",
 	"int8_t", "int16_t", "int32_t", "int64_t",
 	"size_t"
 ];
 
+export const PRIMITIVE_FLOAT_SYMBOLS: PrimitiveFloatSymbol[] = [
+	"float", "double"
+];
+
+export const PRIMITIVE_SYMBOLS: PrimitiveSymbol[] = [
+	...PRIMITIVE_INTEGER_SYMBOLS,
+	...PRIMITIVE_FLOAT_SYMBOLS
+];
+
 // TODO : Rename this, bool is separate primitive
 export function is_primitive_symbols(s: string): s is PrimitiveSymbol {
 	return (PRIMITIVE_SYMBOLS as readonly string[]).includes(s);
+}
+
+export function is_integer_symbol(s: string): s is PrimitiveIntegerSymbol {
+	return (PRIMITIVE_INTEGER_SYMBOLS as readonly string[]).includes(s);
+}
+
+// `float`/`double` accept fractional values and are emitted with a decimal point
+// (and an `f` suffix for `float`) so C does not read the token as an int.
+export function is_float_symbol(s: string): s is PrimitiveFloatSymbol {
+	return (PRIMITIVE_FLOAT_SYMBOLS as readonly string[]).includes(s);
 }
 
 export type NumberProperty<S extends PrimitiveSymbol = PrimitiveSymbol> = PropertyBase & {

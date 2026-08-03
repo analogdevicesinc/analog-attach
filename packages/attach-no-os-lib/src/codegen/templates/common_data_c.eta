@@ -4,16 +4,99 @@ const wf = it.workfile;
 const structs = H.struct_views(wf);
 
 /*
+ * A member declared as an array of POINTER includes is a pointer-to-pointer in C, not
+ * an array. no-OS declares the i3c bus member as
+ *
+ *     const struct no_os_i3c_init_param **devs;
+ *
+ * so a braced list (`.devs = { &eeprom_i3c_ip }`) does not compile: braces initialize
+ * an array, and this member is a single pointer. The addresses must live in a real
+ * array object which then DECAYS to the pointer-to-pointer the member wants. So for
+ * every such member we hoist a file-scope array just above the owning struct and point
+ * the member at it by name.
+ *
+ * Arrays of EMBEDDED includes (ad7124 `setups`) are genuine C arrays and keep their
+ * inline braces; only `pointer: true` elements need this.
+ */
+function is_pointer_include_array(property) {
+	return property._t === "ArrayProperty"
+		&& property.element._t === "IncludeProperty"
+		&& property.element.pointer === true;
+}
+
+/* Mechanical and unique: the (symbol, property) pair names exactly one array. */
+function hoisted_array_name(struct_name, property) {
+	return `${struct_name}_${property.name}`;
+}
+
+/*
+ * The hoisted arrays one struct needs, in field order. Throws rather than emitting
+ * broken C: codegen turns a template throw into a Result error.
+ *
+ * The element type is read off the referenced workfile symbols rather than re-resolved
+ * from the schema, so this stays a pure function of the context it was handed.
+ * Elements are emitted `const` because that is what the member is declared as; a
+ * non-const `**` member would need the qualifier dropped, and nothing in the schema
+ * models member const-ness today.
+ */
+function hoisted_arrays(view) {
+	const arrays = [];
+
+	for (const property of view.fields) {
+		if (!is_pointer_include_array(property) || !Array.isArray(property.value) || property.value.length === 0) {
+			continue;
+		}
+
+		const name = hoisted_array_name(view.name, property);
+		if (wf.symbols[name] !== undefined) {
+			throw new Error(
+				`Cannot emit '${view.name}.${property.name}': the generated array name '${name}' collides with symbol '${name}'. Rename that symbol.`
+			);
+		}
+
+		/*
+		 * Every element binds the same include, so they all share one C type. Verify
+		 * that instead of trusting it, because emitting one type for a mixed array
+		 * would compile into the wrong pointer arithmetic.
+		 */
+		let element_type;
+		const elements = [];
+		for (const element of property.value) {
+			const reference = String(element);
+			const referenced = wf.symbols[reference];
+			if (referenced === undefined) {
+				throw new Error(
+					`Cannot emit '${view.name}.${property.name}': element '${reference}' is not a symbol in this workfile.`
+				);
+			}
+			if (element_type !== undefined && referenced.$symbol !== element_type) {
+				throw new Error(
+					`Cannot emit '${view.name}.${property.name}': mixed element types '${element_type}' and '${referenced.$symbol}'.`
+				);
+			}
+			element_type = referenced.$symbol;
+			elements.push(`&${reference}`);
+		}
+
+		arrays.push({ name: name, element_type: element_type, elements: elements });
+	}
+
+	return arrays;
+}
+
+/*
  * Format a single property as its C initializer token. Port of format_c_value.
  * Lives here because common_data.c is the only template that emits initializer
  * text; every other template needs struct const-ness, not the values.
+ *
+ * `struct_name` is the owning symbol, needed only to name a hoisted pointer array.
  */
-function cval(property) {
+function cval(property, struct_name) {
 	const value = it.h.effective_value(property);
 
 	switch (property._t) {
 		case "NumberProperty": {
-			return String(value);
+			return it.h.number_literal(value, property);
 		}
 		case "BooleanProperty": {
 			return value ? "true" : "false";
@@ -53,13 +136,18 @@ function cval(property) {
 		}
 		case "ArrayProperty": {
 			if (!Array.isArray(property.value) || property.value.length === 0) {
-				return "{ 0 }";
+				/* A `**` member has no array to point at, so it is a null pointer. */
+				return is_pointer_include_array(property) ? "NULL" : "{ 0 }";
+			}
+			/* Pointer elements live in the hoisted array emitted just above the struct. */
+			if (is_pointer_include_array(property)) {
+				return hoisted_array_name(struct_name, property);
 			}
 			const element_type = property.element._t;
 			const formatted = property.value.map(v => {
 				switch (element_type) {
 					case "NumberProperty": {
-						return String(v);
+						return it.h.number_literal(v, property.element);
 					}
 					case "BooleanProperty": {
 						return v ? "true" : "false";
@@ -91,9 +179,12 @@ function cval(property) {
 struct descriptors desc = { 0 };
 
 <% for (const s of structs) { -%>
+<% for (const a of hoisted_arrays(s)) { -%>
+const struct <%= a.element_type %> *<%= a.name %>[] = { <%= a.elements.join(", ") %> };
+<% } -%>
 <%= s.is_const ? "const " : "" %>struct <%= s.type %> <%= s.name %> = {
 <% for (const f of s.fields) { -%>
-	.<%= f.name %> = <%= cval(f) %>,
+	.<%= f.name %> = <%= cval(f, s.name) %>,
 <% } -%>
 };
 
