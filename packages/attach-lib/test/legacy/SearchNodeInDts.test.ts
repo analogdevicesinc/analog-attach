@@ -78,6 +78,30 @@ describe('search_node_in_dts', () => {
     expect(result?.parent).toBe('/soc');
   });
 
+  test('found_path is always the absolute path even when the node has a label (path lookup)', () => {
+    const document = parse_source();
+
+    const result = search_node_in_dts(document, '/soc/spi@0/imu@0');
+
+    expect(result?.found_path).toBe('/soc/spi@0/imu@0');
+  });
+
+  test('found_path is always the absolute path even when the node has a label (label lookup)', () => {
+    const document = parse_source();
+
+    const result = search_node_in_dts(document, '&imu1');
+
+    expect(result?.found_path).toBe('/soc/spi@0/imu@0');
+  });
+
+  test('found_path includes unit_addr segments from ancestor nodes', () => {
+    const document = parse_source();
+
+    const result = search_node_in_dts(document, 'spi0');
+
+    expect(result?.found_path).toBe('/soc/spi@0');
+  });
+
   test('returns undefined for a path that does not exist', () => {
     const document = parse_source();
 

@@ -82,7 +82,8 @@ function search_node_by_predicate(root: DtsNode, path: string[], predicate: (nod
     }
 
     for (const child of root.children) {
-        const next = search_node_by_predicate(child, [...path, child.name], predicate, root);
+        const child_key = child.unit_addr !== undefined ? `${child.name}@${child.unit_addr}` : child.name;
+        const next = search_node_by_predicate(child, [...path, child_key], predicate, root);
 
         if (next === undefined) {
             continue;
