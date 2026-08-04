@@ -2,6 +2,8 @@ import { buildCommand } from "@stricli/core";
 import * as fs from "node:fs";
 import * as path from "node:path";
 
+import { build_compat_index } from "../../utilities";
+
 type Flags = {
     linux: string;
     dtSchema: string;
@@ -30,7 +32,7 @@ export const init_command = buildCommand({
         },
     },
     docs: {
-        brief: "Create .analog-attach/config.toml with Linux and dt-schema paths",
+        brief: "Create .analog-attach/config.toml and compat-index.json with Linux and dt-schema paths",
     },
     async func(flags: Flags) {
         const { linux, dtSchema, context } = flags;
@@ -62,5 +64,10 @@ export const init_command = buildCommand({
 
         fs.writeFileSync(config_path, content);
         console.log(`Written: ${config_path}`);
+
+        const compat_index = await build_compat_index(linux, dtSchema);
+        const compat_index_path = path.join(dir, "compat-index.json");
+        fs.writeFileSync(compat_index_path, JSON.stringify(compat_index, undefined, 2));
+        console.log(`Written: ${compat_index_path}`);
     },
 });

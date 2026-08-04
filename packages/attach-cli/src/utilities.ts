@@ -24,6 +24,43 @@ export function get_all_file_paths(directory: string): string[] {
     return results.sort(); // Sort to make hash order-independent
 }
 
+export async function build_compat_index(linux: string, dtSchema: string): Promise<Record<string, string>> {
+    const bindings_folder = path.resolve(linux, "Documentation", "devicetree", "bindings");
+    const index: Record<string, string> = {};
+
+    if (!fs.existsSync(bindings_folder)) {
+        return index;
+    }
+
+    const all_files = get_all_file_paths(bindings_folder);
+    const yaml_files = all_files.filter(file => file.endsWith(".yaml"));
+
+    for (const file of yaml_files) {
+        const attach = Attach.new();
+        const binding = await attach.parse_binding(file, linux, dtSchema);
+
+        if (binding === undefined) {
+            continue;
+        }
+
+        const compatible = extract_compatible(binding.parsed_binding);
+
+        if (compatible === undefined) {
+            continue;
+        }
+
+        for (const entry of compatible) {
+            // TODO fix why entry could be undefined
+            // arm/actions.yaml
+            if (entry !== undefined && !(entry in index)) {
+                index[entry] = file;
+            }
+        }
+    }
+
+    return index;
+}
+
 export async function find_binding(linux: string, dtSchema: string, compatible_to_find: string): Promise<string | undefined> {
     const bindings_folder = path.resolve(linux, "Documentation", "devicetree", "bindings");
 
