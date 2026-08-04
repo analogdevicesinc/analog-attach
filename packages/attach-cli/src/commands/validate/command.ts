@@ -3,7 +3,7 @@ import { Attach, get_node_key, insert_known_structures, mergeDtso, parse_dts, pa
 
 import * as fs from 'node:fs';
 
-import { bigIntReplacer, find_binding, parse_dts_node } from "../../utilities";
+import { bigIntReplacer, find_binding, parse_dts_node, resolve_node_identifier } from "../../utilities";
 import { load_config } from "../../config";
 
 type Flags = {
@@ -130,7 +130,7 @@ export const validate_command = buildCommand({
             node: {
                 kind: "parsed",
                 parse: String,
-                brief: "Target node name to validate"
+                brief: "Target node to validate: label, &label, path, &{path}, or label/child (e.g. spi0, &spi0, /soc/spi@0, &{/soc/spi@0}, spi0/adi,ad7124-8)"
             },
             overlay: {
                 kind: "parsed",
@@ -257,7 +257,7 @@ export const validate_command = buildCommand({
                 })();
          */
 
-        const searched_node = search_node_in_dts(input_document_merged, node);
+        const searched_node = search_node_in_dts(input_document_merged, resolve_node_identifier(input_document_merged, node));
 
         if (searched_node === undefined) {
             console.log(`Couldn't find ${node} in ${input}`);

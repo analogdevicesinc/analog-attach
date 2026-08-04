@@ -200,14 +200,16 @@ attach suggest-parents --linux <path> --context <dts-file> --compatible <string>
 attach create --linux <path> --compatible <string> --parent <node> --label <label> --output <file>
 ```
 
+**Always pass `--label`** (e.g. `--label imu1`) — later commands (`validate`, `get-prop`, `set-prop`, `add --parent`) identify this node by label or path only, never by its bare name.
+
 **Parameters**:
 | Parameter | Required | Description |
 |-----------|----------|-------------|
 | `--linux` | Yes | Path to Linux kernel repository |
 | `--dt-schema` | No | Path to dt-schema repository (uses bundled version by default) |
 | `--compatible` | Yes | Device compatible string |
-| `--parent` | No | Parent node label or path (e.g., `spi0` or `/soc/spi@...`) |
-| `--label` | No | Label to attach to the new node (e.g. `imu1`), so it can be referenced later as `&label` (e.g. as a `--parent` for `add`) |
+| `--parent` | No | Parent node: label, `&label`, path, `&{path}`, or `label/child` (e.g. `spi0`, `&spi0`, `/soc/spi@...`, `&{/soc/spi@...}`) — a bare name/`name@unit` is NOT matched, since it isn't guaranteed unique across the tree |
+| `--label` | No | Label to attach to the new node (e.g. `imu1`), so it can be referenced later as `&label` (e.g. as a `--parent` for `add`). **Always set this** — without a label, the new node can only be referenced later by its full path, which most other commands cannot compute for you |
 | `--output` | Yes | Output file path (should end in `.dtso`) |
 
 **Output**: Creates a file and prints confirmation.
@@ -253,16 +255,17 @@ attach add --linux <path> --context <dts-file> --overlay <dtso-file> [--compatib
 | `--overlay` | Yes | Path to the existing `.dtso` file to modify (file is updated in place; must already exist — use `create` first) |
 | `--compatible` | At least one of `--compatible`/`--name` | Compatible string of the device binding to add |
 | `--name` | At least one of `--compatible`/`--name` | Node name (e.g. `channel@0`); defaults to `--compatible` if omitted |
-| `--parent` | No | Where to attach the new node: a bus label/path (e.g. `spi0`, `/soc/spi@...`), or the name of a node already in the base `.dts` or the overlay (e.g. `adi,ad7124-8`, to nest a subnode under it). Defaults to root `/` if omitted |
-| `--label` | No | Label to attach to the new node (e.g. `imu1`), so it can be referenced later as `&label` (e.g. as a `--parent` for a subsequent `add`) |
+| `--parent` | No | Where to attach the new node: label, `&label`, path, `&{path}`, or `label/child` of a node already in the base `.dts` or the overlay (e.g. `spi0`, `&spi0`, `/soc/spi@...`, `spi0/adi,ad7124-8`). Defaults to root `/` if omitted. A bare name/`name@unit` is NOT matched — a node added via `create`/`add` without `--label` can only be targeted by its full path |
+| `--label` | No | Label to attach to the new node (e.g. `imu1`), so it can be referenced later as `&label` (e.g. as a `--parent` for a subsequent `add`). **Always set this** when the new node might need to be referenced again later |
 
 **Examples**:
 ```bash
 # Add a second sibling device under the same bus
 attach add --linux ~/linux --context ~/ctx.dts --overlay overlay.dtso --compatible adi,ad7124-4 --parent spi0
 
-# Add a bare subnode (e.g. a channel) under a device already in the overlay
-attach add --linux ~/linux --context ~/ctx.dts --overlay overlay.dtso --name channel@0 --parent adi,ad7124-8
+# Add a bare subnode (e.g. a channel) under a device already in the overlay, targeting it by
+# the full path of the device added earlier via `create` (no --label was set for it)
+attach add --linux ~/linux --context ~/ctx.dts --overlay overlay.dtso --name channel@0 --parent /soc/spi@7e204000/adi,ad7124-8
 ```
 
 **Next Steps After Add**:
@@ -288,7 +291,7 @@ attach validate --linux <path> --context <dts-file> --node <name> --input <dtso-
 | `--linux` | Yes | Path to Linux kernel repository |
 | `--dt-schema` | No | Path to dt-schema repository (uses bundled version by default) |
 | `--context` | Yes | Path to base `.dts` file |
-| `--node` | Yes | Name of node to validate (e.g., `adi,ad7124-8`) |
+| `--node` | Yes | Target node: label, `&label`, path, `&{path}`, or `label/child` (e.g. `imu1`, `&imu1`, `/soc/spi@0/imu@0`, `spi0/adi,ad7124-8`) — a bare name/`name@unit` is NOT matched, since it isn't guaranteed unique across the tree |
 | `--input` | Yes | Path to `.dtso` file containing the node |
 
 **Output Format**: Two JSON lines:
@@ -337,7 +340,7 @@ attach get-prop --linux <path> --context <dts-file> --node <name> --input <dtso-
 | `--linux` | Yes | Path to Linux kernel repository |
 | `--dt-schema` | No | Path to dt-schema repository (uses bundled version by default) |
 | `--context` | Yes | Path to base `.dts` file |
-| `--node` | Yes | Name of node containing the property (e.g., `adi,ad7124-8`) |
+| `--node` | Yes | Target node: label, `&label`, path, `&{path}`, or `label/child` (e.g. `imu1`, `&imu1`, `/soc/spi@0/imu@0`, `spi0/adi,ad7124-8`) — a bare name/`name@unit` is NOT matched, since it isn't guaranteed unique across the tree |
 | `--input` | Yes | Path to `.dtso` file containing the node |
 | `--property` | Yes | Name of the property to read |
 
@@ -346,11 +349,11 @@ attach get-prop --linux <path> --context <dts-file> --node <name> --input <dtso-
 **Examples**:
 ```bash
 # Get the reg property value
-attach get-prop --linux ~/linux --context ~/linux/arch/arm/boot/dts/broadcom/bcm2837-rpi-3-b.dts --node adi,ad7124-8 --input overlay.dtso --property reg
+attach get-prop --linux ~/linux --context ~/linux/arch/arm/boot/dts/broadcom/bcm2837-rpi-3-b.dts --node &imu1 --input overlay.dtso --property reg
 # Output: <0x00>
 
 # Get a boolean/flag property (returns "true" if present)
-attach get-prop --linux ~/linux --context ~/linux/arch/arm/boot/dts/broadcom/bcm2837-rpi-3-b.dts --node adi,ad7124-8 --input overlay.dtso --property spi-cpha
+attach get-prop --linux ~/linux --context ~/linux/arch/arm/boot/dts/broadcom/bcm2837-rpi-3-b.dts --node &imu1 --input overlay.dtso --property spi-cpha
 # Output: true
 ```
 
@@ -375,7 +378,7 @@ attach set-prop --linux <path> --context <dts-file> --node <name> --input <dtso-
 | `--linux` | Yes | Path to Linux kernel repository |
 | `--dt-schema` | No | Path to dt-schema repository (uses bundled version by default) |
 | `--context` | Yes | Path to base `.dts` file |
-| `--node` | Yes | Name of node to modify (e.g., `adi,ad7124-8`) |
+| `--node` | Yes | Target node: label, `&label`, path, `&{path}`, or `label/child` (e.g. `imu1`, `&imu1`, `/soc/spi@0/imu@0`, `spi0/adi,ad7124-8`) — a bare name/`name@unit` is NOT matched, since it isn't guaranteed unique across the tree |
 | `--input` | Yes | Path to `.dtso` file to modify (file is updated in place) |
 | `--property` | Yes | Name of the property to set |
 | `--value` | Yes | Value to set (see Value Formats below) |
@@ -395,25 +398,25 @@ attach set-prop --linux <path> --context <dts-file> --node <name> --input <dtso-
 **Examples**:
 ```bash
 # Set a simple integer property
-attach set-prop --linux ~/linux --context ~/ctx.dts --node adi,ad7124-8 --input overlay.dtso --property reg --value 0
+attach set-prop --linux ~/linux --context ~/ctx.dts --node &imu1 --input overlay.dtso --property reg --value 0
 
 # Set SPI frequency
-attach set-prop --linux ~/linux --context ~/ctx.dts --node adi,ad7124-8 --input overlay.dtso --property spi-max-frequency --value 5000000
+attach set-prop --linux ~/linux --context ~/ctx.dts --node &imu1 --input overlay.dtso --property spi-max-frequency --value 5000000
 
 # Enable a boolean flag
-attach set-prop --linux ~/linux --context ~/ctx.dts --node adi,ad7124-8 --input overlay.dtso --property spi-cpha --value true
+attach set-prop --linux ~/linux --context ~/ctx.dts --node &imu1 --input overlay.dtso --property spi-cpha --value true
 
 # Disable/remove a boolean flag
-attach set-prop --linux ~/linux --context ~/ctx.dts --node adi,ad7124-8 --input overlay.dtso --property spi-cpha --value false
+attach set-prop --linux ~/linux --context ~/ctx.dts --node &imu1 --input overlay.dtso --property spi-cpha --value false
 
 # Set an interrupt array
-attach set-prop --linux ~/linux --context ~/ctx.dts --node adi,ad7124-8 --input overlay.dtso --property interrupts --value "[25; IRQ_TYPE_EDGE_FALLING]"
+attach set-prop --linux ~/linux --context ~/ctx.dts --node &imu1 --input overlay.dtso --property interrupts --value "[25; IRQ_TYPE_EDGE_FALLING]"
 
 # Set a phandle reference for interrupt-parent
-attach set-prop --linux ~/linux --context ~/ctx.dts --node adi,ad7124-8 --input overlay.dtso --property interrupt-parent --value gpio
+attach set-prop --linux ~/linux --context ~/ctx.dts --node &imu1 --input overlay.dtso --property interrupt-parent --value gpio
 
 # Set string array (e.g., clock-names)
-attach set-prop --linux ~/linux --context ~/ctx.dts --node adi,ad7124-8 --input overlay.dtso --property clock-names --value "[spi; pclk]"
+attach set-prop --linux ~/linux --context ~/ctx.dts --node &imu1 --input overlay.dtso --property clock-names --value "[spi; pclk]"
 ```
 
 **Validation**: The command validates the value against the device binding schema before applying. If the value is invalid, an error message is displayed explaining the valid options.

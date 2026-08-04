@@ -1,8 +1,37 @@
-import { Attach, extract_compatible, type CellArrayElement, type DtsNode, type DtsReference, type DtsValue, type DtsValueComponent, type ParsedBinding } from 'attach-lib';
+import { Attach, extract_compatible, search_node_in_dts, type CellArrayElement, type DtsDocument, type DtsNode, type DtsReference, type DtsValue, type DtsValueComponent, type ParsedBinding } from 'attach-lib';
 import * as fs from 'node:fs';
 import path from "node:path";
 
 import { load_compat_index, save_compat_index, type CompatIndex } from "./config";
+
+/**
+ * Expand `spi0/rest` or `&spi0/rest` into `&{/abs/path/rest}` so
+ * search_node_in_dts can resolve it via an absolute-path lookup.
+ * Identifiers without a `/` (or already starting with `&{/`) are returned unchanged.
+ */
+export function resolve_node_identifier(document: DtsDocument, identifier: string): string {
+    if (identifier.startsWith("&{/")) {
+        return identifier;
+    }
+
+    const slash = identifier.indexOf('/');
+    if (slash === -1) {
+        return identifier;
+    }
+
+    const raw_prefix = identifier.slice(0, slash);
+    const suffix = identifier.slice(slash + 1);
+
+    // Normalise to a bare label or absolute-path prefix for lookup
+    const prefix = raw_prefix.startsWith("&") ? raw_prefix.slice(1) : raw_prefix;
+
+    const resolved = search_node_in_dts(document, prefix);
+    if (resolved === undefined) {
+        return identifier;
+    }
+
+    return `&{${resolved.found_path}/${suffix}}`;
+}
 
 export function bigIntReplacer(_key: string, value: any): any {
     return typeof value === 'bigint' ? Number(value) : value;
@@ -301,6 +330,7 @@ function parse_cell_array_element(element: CellArrayElement): string | bigint {
 if (import.meta.vitest) {
 
     const { test, expect } = import.meta.vitest;
+    const { parse_dts } = await import('attach-lib');
 
     let counter = 0;
 
@@ -321,6 +351,41 @@ if (import.meta.vitest) {
 
         expect(parsed_input).toStrictEqual("gpio");
 
+    });
+
+    const dts_source = `/dts-v1/;
+/ {
+    soc {
+        spi0: spi@7e204000 {
+            imu1: adi,ad7124-8@0 {
+            };
+        };
+    };
+};`;
+
+    test(`${resolve_node_identifier.name} - bare label/child expands to &{/abs/path/child}`, () => {
+        const doc = parse_dts(dts_source);
+        expect(resolve_node_identifier(doc, 'spi0/adi,ad7124-8@0')).toBe('&{/soc/spi@7e204000/adi,ad7124-8@0}');
+    });
+
+    test(`${resolve_node_identifier.name} - &label/child expands to &{/abs/path/child}`, () => {
+        const doc = parse_dts(dts_source);
+        expect(resolve_node_identifier(doc, '&spi0/adi,ad7124-8@0')).toBe('&{/soc/spi@7e204000/adi,ad7124-8@0}');
+    });
+
+    test(`${resolve_node_identifier.name} - already-absolute &{/path} is returned unchanged`, () => {
+        const doc = parse_dts(dts_source);
+        expect(resolve_node_identifier(doc, '&{/soc/spi@7e204000}')).toBe('&{/soc/spi@7e204000}');
+    });
+
+    test(`${resolve_node_identifier.name} - bare label with no slash is returned unchanged`, () => {
+        const doc = parse_dts(dts_source);
+        expect(resolve_node_identifier(doc, 'spi0')).toBe('spi0');
+    });
+
+    test(`${resolve_node_identifier.name} - unresolvable prefix is returned unchanged`, () => {
+        const doc = parse_dts(dts_source);
+        expect(resolve_node_identifier(doc, 'nonexistent/child@0')).toBe('nonexistent/child@0');
     });
 
 }

@@ -3,7 +3,7 @@ import { mergeDtso, parse_dts, parseDtso, printDtso, search_node_in_dts } from "
 
 import * as fs from 'node:fs';
 
-import { find_binding } from "../../utilities";
+import { find_binding, resolve_node_identifier } from "../../utilities";
 import { load_config } from "../../config";
 
 type Flags = {
@@ -35,7 +35,7 @@ export const add_command = buildCommand({
             parent: {
                 kind: "parsed",
                 parse: String,
-                brief: "Parent node label, path, or existing node name (e.g. spi0 or adi,ad7124-8)",
+                brief: "Parent node: label, &label, path, &{path}, or label/child (e.g. spi0, &spi0, /soc/spi@0, &{/soc/spi@0}, spi0/adi,ad7124-8)",
                 optional: true,
             },
             label: {
@@ -163,17 +163,16 @@ export const add_command = buildCommand({
 
         const input_document_merged = mergeDtso(document, input_content, true);
 
-        const target = (() => {
-            if (parent === undefined) {
-                return "/";
-            }
+        const searched_parent = parent === undefined ? undefined : search_node_in_dts(input_document_merged, resolve_node_identifier(input_document_merged, parent));
 
-            const searched_parent = search_node_in_dts(input_document_merged, parent);
+        if (parent !== undefined && searched_parent === undefined) {
+            console.log(`Couldn't find parent node ${parent} in ${context} or ${input}`);
+            return;
+        }
 
-            const resolved = searched_parent === undefined ? parent : searched_parent.parent;
-
-            return resolved.startsWith("/") ? `&{${resolved}}` : `&${resolved}`;
-        })();
+        const target = searched_parent === undefined ? "/" : (
+            searched_parent.parent.startsWith("/") ? `&{${searched_parent.parent}}` : `&${searched_parent.parent}`
+        );
 
         const dtso_fragment = String.raw`/dts-v1/;
 /plugin/;

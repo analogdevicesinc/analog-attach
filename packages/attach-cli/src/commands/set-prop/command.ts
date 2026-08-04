@@ -3,7 +3,7 @@ import { Attach, AttachEnumType, create_cell_array, create_flag, create_string_a
 
 import * as fs from 'node:fs';
 
-import { bigIntReplacer, find_binding, parse_dts_node } from "../../utilities";
+import { bigIntReplacer, find_binding, parse_dts_node, resolve_node_identifier } from "../../utilities";
 import { load_config } from "../../config";
 
 // set-prop --property compatible --value adi,ad7124-8
@@ -32,7 +32,7 @@ export const set_property_command = buildCommand({
             node: {
                 kind: "parsed",
                 parse: String,
-                brief: "Target node"
+                brief: "Target node: label, &label, path, &{path}, or label/child (e.g. spi0, &spi0, /soc/spi@0, &{/soc/spi@0}, spi0/adi,ad7124-8)"
             },
             property: {
                 kind: "parsed",
@@ -148,7 +148,7 @@ export const set_property_command = buildCommand({
 
         const input_document_merged = mergeDtso(document, input_content, true);
 
-        const searched_node = search_node_in_dts(input_document_merged, node);
+        const searched_node = search_node_in_dts(input_document_merged, resolve_node_identifier(input_document_merged, node));
 
         if (searched_node === undefined) {
             console.log(`Couldn't find ${node} in ${input}`);

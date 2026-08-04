@@ -3,6 +3,8 @@ import { parseDtso, print_value, search_node_in_dts } from "attach-lib";
 
 import * as fs from 'node:fs';
 
+import { resolve_node_identifier } from "../../utilities";
+
 type Flags = {
     node: string,
     property: string,
@@ -15,7 +17,7 @@ export const get_property_command = buildCommand({
             node: {
                 kind: "parsed",
                 parse: String,
-                brief: "Target node"
+                brief: "Target node: label, &label, path, &{path}, or label/child (e.g. spi0, &spi0, /soc/spi@0, &{/soc/spi@0}, spi0/adi,ad7124-8)"
             },
             property: {
                 kind: "parsed",
@@ -51,7 +53,7 @@ export const get_property_command = buildCommand({
             return;
         }
 
-        const found_node = search_node_in_dts(input_document, node);
+        const found_node = search_node_in_dts(input_document, resolve_node_identifier(input_document, node));
 
         if (found_node === undefined) {
             console.log(`Couldn't find ${node} in ${input}`);
