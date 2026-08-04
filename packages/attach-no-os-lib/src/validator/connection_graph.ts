@@ -158,7 +158,16 @@ export function value_children(graph: ConnectionGraph, symbol_name: string): str
 		.map(reference => reference.name);
 }
 
-export function topo_sorted_symbols(workfile: Workfile): string[] {
+// Dependency-first order, plus any value-reference cycles that made a complete order
+// impossible. `cycles` empty means `order` covers every symbol; otherwise `order` holds
+// only what could be placed and the caller decides how to report the rest.
+// Each cycle lists its members in loop order, so `["a", "b"]` means a -> b -> a.
+export interface TopoResult {
+	order: string[],
+	cycles: string[][]
+}
+
+export function topo_sorted_symbols(workfile: Workfile): TopoResult {
 	const graph = create_connections_graph(workfile);
 	const dependencies = new Map<string, string[]>();
 	for (const name of graph.keys()) {
@@ -196,12 +205,61 @@ export function topo_sorted_symbols(workfile: Workfile): string[] {
 		}
 	}
 
-	if (sorted.length !== graph.size) {
-		const in_cycle = [...graph.keys()].filter(name => !sorted.includes(name));
-		throw new Error(`Dependency cycle detected among symbols: ${in_cycle.join(", ")}`);
+	// Kahn's stops as soon as nothing has in-degree zero, so the leftovers are the cycle
+	// members PLUS everything that (transitively) depends on one — a descriptor merely
+	// pointing at a cycle member is left over too, though it sits on no loop. Trace the
+	// actual loops out of the leftovers rather than blaming the whole set.
+	const stuck = [...graph.keys()].filter(name => !sorted.includes(name));
+
+	return { order: sorted, cycles: stuck.length > 0 ? trace_cycles(stuck, dependencies) : [] };
+}
+
+// The loops hidden inside a stalled Kahn's leftover set.
+//
+// Every leftover has at least one value child that is also a leftover — that unresolved
+// dependency is exactly why it never reached in-degree zero. So following children
+// within the set can never dead-end; it must eventually revisit a symbol, and that
+// revisit is where the loop closes. Whatever preceded it on the walk was a lead-in tail
+// (the innocent descriptor) and gets sliced off.
+function trace_cycles(stuck: string[], dependencies: Map<string, string[]>): string[][] {
+	const remaining = new Set(stuck);
+	const cycles: string[][] = [];
+
+	while (remaining.size > 0) {
+		const path: string[] = [];
+		const position = new Map<string, number>();
+		let current: string | undefined = [...remaining][0];
+
+		while (current !== undefined && !position.has(current)) {
+			position.set(current, path.length);
+			path.push(current);
+			current = (dependencies.get(current) ?? []).find(child => remaining.has(child));
+		}
+
+		if (current === undefined) {
+			// Unreachable given the invariant above, but a graph built by a future caller
+			// could break it. Drop the dead-ended walk instead of looping forever.
+			for (const name of path) {
+				remaining.delete(name);
+			}
+			continue;
+		}
+
+		const cycle = path.slice(position.get(current));
+		cycles.push(cycle);
+		// Retire the whole walk: its tail is not on a loop, and its members are now
+		// reported. Anything still stuck on a DIFFERENT cycle stays in `remaining`.
+		for (const name of path) {
+			remaining.delete(name);
+		}
 	}
 
-	return sorted;
+	return cycles;
+}
+
+// "a -> b -> a", the shape a reader can follow edge by edge.
+export function describe_cycle(cycle: string[]): string {
+	return [...cycle, cycle[0]].join(" -> ");
 }
 
 // Rebuild `workfile.symbols` in topological (dependency-first) order, in place.
@@ -209,9 +267,16 @@ export function topo_sorted_symbols(workfile: Workfile): string[] {
 // — in codegen templates and elsewhere — walks symbols with each referenced struct
 // ahead of its referrer. Codegen relies on this instead of sorting inside templates.
 export function reorder_symbols_topologically(workfile: Workfile): void {
-	const ordered = topo_sorted_symbols(workfile);
+	const { order, cycles } = topo_sorted_symbols(workfile);
+	// Codegen runs after validation, which reports cycles as ValidationErrors, so this
+	// should be unreachable. Kept as a throw because a partial order would silently emit
+	// C with structs used before they are defined.
+	if (cycles.length > 0) {
+		throw new Error(`Dependency cycle detected: ${cycles.map(c => describe_cycle(c)).join("; ")}`);
+	}
+
 	const reordered: Workfile["symbols"] = {};
-	for (const name of ordered) {
+	for (const name of order) {
 		const symbol = workfile.symbols[name];
 		if (symbol !== undefined) {
 			reordered[name] = symbol;
