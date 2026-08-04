@@ -10,6 +10,7 @@ type Flags = {
     compatible?: string,
     name?: string,
     parent?: string,
+    label?: string,
     overlay: string,
     context?: string,
     linux?: string,
@@ -35,6 +36,12 @@ export const add_command = buildCommand({
                 kind: "parsed",
                 parse: String,
                 brief: "Parent node label, path, or existing node name (e.g. spi0 or adi,ad7124-8)",
+                optional: true,
+            },
+            label: {
+                kind: "parsed",
+                parse: String,
+                brief: "Label to attach to the new node (e.g. imu1), for later reference as &label",
                 optional: true,
             },
             overlay: {
@@ -70,7 +77,7 @@ export const add_command = buildCommand({
         const linux = flags.linux ?? config.linux;
         const dtSchema = flags.dtSchema ?? config.dtSchema;
         const context = flags.context ?? config.context;
-        const { compatible, name, parent, overlay: input } = flags;
+        const { compatible, name, parent, label, overlay: input } = flags;
 
         if (compatible === undefined && name === undefined) {
             console.log("Missing: --compatible or --name (at least one is required)");
@@ -172,7 +179,7 @@ export const add_command = buildCommand({
 /plugin/;
 
 ${target} {
-        ${node_name} {
+        ${label !== undefined ? `${label}: ` : ""}${node_name} {
             ${compatible === undefined ? "" : `compatible = "${compatible}";`}
         };
 };

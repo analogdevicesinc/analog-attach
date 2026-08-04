@@ -8,6 +8,7 @@ import { load_config } from "../../config";
 type Flags = {
     compatible: string,
     parent?: string,
+    label?: string,
     output?: string,
     linux?: string,
     dtSchema?: string,
@@ -25,6 +26,12 @@ export const create_command = buildCommand({
                 kind: "parsed",
                 parse: String,
                 brief: "Parent node label or path (e.g. spi0 or /soc/spi@...)",
+                optional: true
+            },
+            label: {
+                kind: "parsed",
+                parse: String,
+                brief: "Label to attach to the new node (e.g. imu1), for later reference as &label",
                 optional: true
             },
             output: {
@@ -54,7 +61,7 @@ export const create_command = buildCommand({
         const config = load_config();
         const linux = flags.linux ?? config.linux;
         const dtSchema = flags.dtSchema ?? config.dtSchema;
-        const { compatible, parent, output } = flags;
+        const { compatible, parent, label, output } = flags;
 
         if (linux === undefined) {
             console.log("Missing: --linux (no config.toml found)");
@@ -100,7 +107,7 @@ export const create_command = buildCommand({
 /plugin/;
 
 ${path} {
-        ${compatible} {
+        ${label !== undefined ? `${label}: ` : ""}${compatible} {
             compatible = "${compatible}";
         };
 };

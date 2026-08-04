@@ -197,7 +197,7 @@ attach suggest-parents --linux <path> --context <dts-file> --compatible <string>
 
 **Syntax**:
 ```bash
-attach create --linux <path> --compatible <string> --parent <node> --output <file>
+attach create --linux <path> --compatible <string> --parent <node> --label <label> --output <file>
 ```
 
 **Parameters**:
@@ -207,6 +207,7 @@ attach create --linux <path> --compatible <string> --parent <node> --output <fil
 | `--dt-schema` | No | Path to dt-schema repository (uses bundled version by default) |
 | `--compatible` | Yes | Device compatible string |
 | `--parent` | No | Parent node label or path (e.g., `spi0` or `/soc/spi@...`) |
+| `--label` | No | Label to attach to the new node (e.g. `imu1`), so it can be referenced later as `&label` (e.g. as a `--parent` for `add`) |
 | `--output` | Yes | Output file path (should end in `.dtso`) |
 
 **Output**: Creates a file and prints confirmation.
@@ -240,7 +241,7 @@ attach create --linux <path> --compatible <string> --parent <node> --output <fil
 
 **Syntax**:
 ```bash
-attach add --linux <path> --context <dts-file> --overlay <dtso-file> [--compatible <string>] [--name <node-name>] [--parent <node>]
+attach add --linux <path> --context <dts-file> --overlay <dtso-file> [--compatible <string>] [--name <node-name>] [--parent <node>] [--label <label>]
 ```
 
 **Parameters**:
@@ -253,6 +254,7 @@ attach add --linux <path> --context <dts-file> --overlay <dtso-file> [--compatib
 | `--compatible` | At least one of `--compatible`/`--name` | Compatible string of the device binding to add |
 | `--name` | At least one of `--compatible`/`--name` | Node name (e.g. `channel@0`); defaults to `--compatible` if omitted |
 | `--parent` | No | Where to attach the new node: a bus label/path (e.g. `spi0`, `/soc/spi@...`), or the name of a node already in the base `.dts` or the overlay (e.g. `adi,ad7124-8`, to nest a subnode under it). Defaults to root `/` if omitted |
+| `--label` | No | Label to attach to the new node (e.g. `imu1`), so it can be referenced later as `&label` (e.g. as a `--parent` for a subsequent `add`) |
 
 **Examples**:
 ```bash
