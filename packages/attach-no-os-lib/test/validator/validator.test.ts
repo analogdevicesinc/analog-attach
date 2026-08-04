@@ -1128,4 +1128,124 @@ describe('validate_workfile', () => {
             expect(result.errors[0].message).toContain("not in the allowed list");
         });
     });
+
+    // A struct embedded BY VALUE must be defined before the struct embedding it, so a loop
+    // of value references has no valid C layout. Pointer references (i3c bus <-> device)
+    // only store an address and stay legal — covered in test/codegen/i3c_pointer_cycle.
+    describe('dependency cycle validation', () => {
+        function cycle_errors(result: ReturnType<typeof validate_workfile>) {
+            return result.errors.filter(error => error.message.includes("dependency cycle"));
+        }
+
+        test('a two-symbol value cycle is an error on both symbols', () => {
+            const workfile = make_workfile({
+                bus: make_struct("bus.yaml", "bus_t", [
+                    make_include("dev", "dev.yaml", { value: "dev" })
+                ]),
+                dev: make_struct("dev.yaml", "dev_t", [
+                    make_include("bus", "bus.yaml", { value: "bus" })
+                ])
+            });
+
+            const result = validate_workfile(workfile);
+
+            expect(result.valid).toBe(false);
+            expect(cycle_errors(result).map(error => error.path).sort()).toEqual(["bus", "dev"]);
+        });
+
+        // The message must spell out the loop, so it can be followed edge by edge instead
+        // of just naming a set of suspects.
+        test('the error names the chain that closes the loop', () => {
+            const workfile = make_workfile({
+                a: make_struct("a.yaml", "a_t", [make_include("to_b", "b.yaml", { value: "b" })]),
+                b: make_struct("b.yaml", "b_t", [make_include("to_c", "c.yaml", { value: "c" })]),
+                c: make_struct("c.yaml", "c_t", [make_include("to_a", "a.yaml", { value: "a" })])
+            });
+
+            const result = validate_workfile(workfile);
+
+            for (const error of cycle_errors(result)) {
+                // Whichever member the trace enters from, the chain returns to it.
+                expect(error.message).toMatch(/\((\w+) -> \w+ -> \w+ -> \1\)/);
+            }
+        });
+
+        // Kahn's algorithm also strands everything DEPENDING on a cycle, so reading its
+        // leftovers would blame `observer`, which sits on no loop. This is why the cycle is
+        // traced rather than taken from the leftover set.
+        test('a symbol that only depends on a cycle is not blamed for it', () => {
+            const workfile = make_workfile({
+                a: make_struct("a.yaml", "a_t", [make_include("to_b", "b.yaml", { value: "b" })]),
+                b: make_struct("b.yaml", "b_t", [make_include("to_a", "a.yaml", { value: "a" })]),
+                observer: make_struct("obs.yaml", "obs_t", [
+                    make_include("watches", "a.yaml", { value: "a" })
+                ])
+            });
+
+            const result = validate_workfile(workfile);
+
+            expect(cycle_errors(result).map(error => error.path).sort()).toEqual(["a", "b"]);
+        });
+
+        // Two unrelated loops are two findings; retiring one walk must not hide the other.
+        test('independent cycles are reported separately', () => {
+            const workfile = make_workfile({
+                a: make_struct("a.yaml", "a_t", [make_include("to_b", "b.yaml", { value: "b" })]),
+                b: make_struct("b.yaml", "b_t", [make_include("to_a", "a.yaml", { value: "a" })]),
+                x: make_struct("x.yaml", "x_t", [make_include("to_y", "y.yaml", { value: "y" })]),
+                y: make_struct("y.yaml", "y_t", [make_include("to_x", "x.yaml", { value: "x" })])
+            });
+
+            const result = validate_workfile(workfile);
+
+            expect(cycle_errors(result).map(error => error.path).sort()).toEqual(["a", "b", "x", "y"]);
+        });
+
+        // A self-reference is the same defect with one member. It has its own message and
+        // must not ALSO be reported as a cycle, so one defect stays one error.
+        test('a value self-reference is reported once, as a self-reference', () => {
+            const workfile = make_workfile({
+                loop: make_struct("loop.yaml", "loop_t", [
+                    make_include("me", "loop.yaml", { value: "loop" })
+                ])
+            });
+
+            const result = validate_workfile(workfile);
+
+            expect(result.valid).toBe(false);
+            expect(result.errors).toHaveLength(1);
+            expect(result.errors[0].message).toContain("references itself");
+        });
+
+        // `.bus = &itself` compiles, so the cycle check (value edges only) cannot see it —
+        // the separate self-reference rule looks at ALL edges and still rejects it.
+        test('a pointer self-reference is still rejected', () => {
+            const workfile = make_workfile({
+                loop: make_struct("loop.yaml", "loop_t", [
+                    make_include("me", "loop.yaml", { value: "loop", pointer: true })
+                ])
+            });
+
+            const result = validate_workfile(workfile);
+
+            expect(result.valid).toBe(false);
+            expect(result.errors.some(error => error.message.includes("references itself"))).toBe(true);
+        });
+
+        // An array of embedded structs is a value edge too, so a loop through one counts.
+        test('a cycle through an array of embedded includes is caught', () => {
+            const workfile = make_workfile({
+                parent: make_struct("parent.yaml", "parent_t", [
+                    make_array("kids", 2, make_include("kid", "child.yaml"), { value: ["child"] })
+                ]),
+                child: make_struct("child.yaml", "child_t", [
+                    make_include("owner", "parent.yaml", { value: "parent" })
+                ])
+            });
+
+            const result = validate_workfile(workfile);
+
+            expect(cycle_errors(result).map(error => error.path).sort()).toEqual(["child", "parent"]);
+        });
+    });
 });

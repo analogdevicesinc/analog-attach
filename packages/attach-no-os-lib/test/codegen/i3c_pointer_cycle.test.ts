@@ -80,26 +80,25 @@ describe('i3c pointer cycle', () => {
 
     // Every symbol must appear exactly once, with the two pointer-linked symbols in
     // SOME order — a pointer cycle has no dependency-first order, and does not need one.
-    test('topo sort orders a pointer cycle instead of throwing', () => {
+    test('topo sort orders a pointer cycle instead of reporting one', () => {
         const import_result = import_minimal(i3c_workfile);
         expectOk(import_result);
 
-        const sorted = topo_sorted_symbols(import_result.value);
+        const { order, cycles } = topo_sorted_symbols(import_result.value);
 
-        expect([...sorted].sort()).toEqual(
+        expect(cycles).toEqual([]);
+        expect([...order].sort()).toEqual(
             Object.keys(i3c_workfile.symbols).sort()
         );
     });
 
-    // Value (non-pointer) references still genuinely need the referenced struct defined
-    // first, so a cycle through them remains unorderable and must keep throwing. This is
-    // the guard that breaking pointer edges did not make the sort accept everything.
-    test('a value cycle still throws', () => {
+    // Same graph shape as i3c, but with both edges demoted to VALUE edges: each struct
+    // would have to be defined before the other, which no ordering satisfies.
+    function value_cycle_workfile() {
         const import_result = import_minimal(i3c_workfile);
         expectOk(import_result);
         const workfile = import_result.value;
 
-        // Same graph shape as i3c, but with both edges demoted to value edges.
         const bus = workfile.symbols["i3c1_ip"];
         const device = workfile.symbols["eeprom_i3c_ip"];
         if (bus._t !== "RulesetStruct" || device._t !== "RulesetStruct") {
@@ -117,7 +116,50 @@ describe('i3c pointer cycle', () => {
         devs.element.pointer = false;
         bus_reference.pointer = false;
 
-        expect(() => topo_sorted_symbols(workfile)).toThrow(/cycle/i);
+        return workfile;
+    }
+
+    // The guard that breaking pointer edges did not make the sort accept everything: a
+    // value cycle is still unorderable and must be reported.
+    test('a value cycle is reported by the topo sort', () => {
+        const { cycles } = topo_sorted_symbols(value_cycle_workfile());
+
+        expect(cycles).toHaveLength(1);
+        expect([...cycles[0]].sort()).toEqual(["eeprom_i3c_ip", "i3c1_ip"]);
+    });
+
+    // Innocent symbols left stranded by the stalled sort are covered in
+    // test/validator/validator.test.ts ('only depends on a cycle is not blamed'): it
+    // cannot be shown here, because a descriptor's `init_param` is `pointer: true` and so
+    // never gets stuck behind a cycle in the first place.
+
+    // P4: a value cycle is a workfile defect, so it belongs in the validation result with
+    // a path per involved symbol — not a thrown error surfaced as a generic Result later.
+    test('a value cycle is a validation error naming every member and the loop', () => {
+        const validation = validate_workfile(value_cycle_workfile());
+
+        expect(validation.valid).toBe(false);
+        expect([...validation.errors].map(e => e.path).sort())
+            .toEqual(["eeprom_i3c_ip", "i3c1_ip"]);
+        // The chain is spelled out so the reader can follow it edge by edge.
+        for (const error of validation.errors) {
+            expect(error.message).toMatch(/i3c1_ip -> eeprom_i3c_ip -> i3c1_ip|eeprom_i3c_ip -> i3c1_ip -> eeprom_i3c_ip/);
+        }
+    });
+
+    // Codegen runs after validation, so this is a backstop rather than the user-facing
+    // path: a partial order must never quietly emit C with structs used before defined.
+    test('generation refuses a value cycle instead of emitting a partial order', () => {
+        const result = generate_project({
+            workfile: value_cycle_workfile(),
+            platform_name: "stm32",
+            platform_vendor: "stm32",
+            project_name: "value_cycle",
+            output_path: temporary_directory,
+            noos_path: "../..",
+        });
+
+        expect(result.ok).toBe(false);
     });
 
     // End to end: the whole point of the fix. Emitting the project must succeed, and the
