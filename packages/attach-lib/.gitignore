@@ -1,6 +1,7 @@
 coverage/*
 
 test/expected/cache/*
+test/legacy/expected/cache/*
 
 #SYMLINKS
 test/dt-schema

@@ -1,0 +1,15 @@
+/dts-v1/;
+
+/ {
+	compatible = "simple-bus";
+
+	soc {
+		spi0: spi@0 {
+			compatible = "spi-controller";
+
+			imu1: imu@0 {
+				compatible = "adi,ad7124-8";
+			};
+		};
+	};
+};

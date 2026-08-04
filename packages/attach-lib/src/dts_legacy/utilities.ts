@@ -23,13 +23,29 @@ export function get_node_key(n: DtsNode): string {
     return n.unit_addr ? `${n.name}@${n.unit_addr}` : n.name;
 }
 
-export function search_node_in_dts(document: DtsDocument, node_name: string): { found_node: DtsNode, parent: string, parent_node?: DtsNode } | undefined {
+/**
+ * Search a document for a node identified by, in priority order:
+ * - `&{/absolute/path}` or bare `/absolute/path`
+ * - `&label` or a bare label
+ */
+export function search_node_in_dts(document: DtsDocument, node_identifier: string): { found_node: DtsNode, parent: string, parent_node?: DtsNode } | undefined {
 
-    const { name, unit } = split_node_key(node_name);
+    const identifier = node_identifier.trim();
 
-    const node = search_node_impl(document.root, [document.root.name], name, unit);
+    if (identifier.startsWith("&{") && identifier.endsWith("}")) {
+        return search_node_by_path(document.root, identifier.slice(2, -1));
+    }
 
-    return node;
+    if (identifier.startsWith("&")) {
+        const label = identifier.slice(1);
+        return search_node_by_predicate(document.root, [document.root.name], (node) => node.labels.includes(label));
+    }
+
+    if (identifier.startsWith("/")) {
+        return search_node_by_path(document.root, identifier);
+    }
+
+    return search_node_by_predicate(document.root, [document.root.name], (node) => node.labels.includes(identifier));
 }
 
 export function search_node_in_unresolved_overlays(unresolved_overlays: Array<UnresolvedOverlay>, node_name: string): { node: DtsNode, parent: string, parent_node?: DtsNode } | undefined {
@@ -38,7 +54,11 @@ export function search_node_in_unresolved_overlays(unresolved_overlays: Array<Un
 
     for (const unresolved of unresolved_overlays) {
 
-        const node = search_node_impl(unresolved.overlay_node, [unresolved.overlay_node.name], name, unit);
+        const node = search_node_by_predicate(
+            unresolved.overlay_node,
+            [unresolved.overlay_node.name],
+            (candidate) => candidate.name === name && candidate.unit_addr === unit
+        );
 
         if (node !== undefined) {
             return { node: node.found_node, parent: node.parent, parent_node: node.parent_node };
@@ -48,26 +68,18 @@ export function search_node_in_unresolved_overlays(unresolved_overlays: Array<Un
     return undefined;
 }
 
-function search_node_impl(root: DtsNode, path: string[], name: string, unit?: string, parent_node?: DtsNode): { found_node: DtsNode, parent: string, parent_node?: DtsNode } | undefined {
+function search_node_by_predicate(root: DtsNode, path: string[], predicate: (node: DtsNode) => boolean, parent_node?: DtsNode): { found_node: DtsNode, parent: string, parent_node?: DtsNode } | undefined {
 
-    if (root.name === name && root.unit_addr === unit) {
-        const actual_path: string = (() => {
-            let output = path.join("/");
-            if (output.startsWith("//")) {
-                return output.slice(1);
-            }
-            return output;
-        })();
-
+    if (predicate(root)) {
         return {
             found_node: root,
-            parent: root.labels.at(-1) ?? actual_path,
+            parent: root.labels.at(-1) ?? build_path(path),
             parent_node: parent_node
         };
     }
 
     for (const child of root.children) {
-        const next = search_node_impl(child, [...path, child.name], name, unit, root);
+        const next = search_node_by_predicate(child, [...path, child.name], predicate, root);
 
         if (next === undefined) {
             continue;
@@ -77,6 +89,55 @@ function search_node_impl(root: DtsNode, path: string[], name: string, unit?: st
     }
 
     return;
+}
+
+function build_path(path: string[]): string {
+    const output = path.join("/");
+
+    if (output.startsWith("//")) {
+        return output.slice(1);
+    }
+
+    return output;
+}
+
+/** Resolve a node by absolute path like `/soc/interrupt-controller@40000`, tracking its immediate parent along the way. */
+function search_node_by_path(root: DtsNode, path: string): { found_node: DtsNode, parent: string, parent_node?: DtsNode } | undefined {
+    if (path === "" || path[0] !== '/') {
+        return undefined;
+    }
+
+    const parts = path.split('/').slice(1);
+
+    let current: DtsNode = root;
+    let parent_node: DtsNode | undefined;
+
+    if (!(parts.length === 1 && parts[0] === "")) {
+        for (const part of parts) {
+            if (part === "") {
+                continue;
+            }
+
+            const { name, unit } = split_node_key(part);
+
+            const next: DtsNode | undefined = current.children.find(
+                (n) => n.name === name && (unit ? n.unit_addr === unit : true)
+            );
+
+            if (next === undefined) {
+                return undefined;
+            }
+
+            parent_node = current;
+            current = next;
+        }
+    }
+
+    return {
+        found_node: current,
+        parent: current.labels.at(-1) ?? path,
+        parent_node: parent_node
+    };
 }
 
 export function split_node_key(node_key: string): { name: string; unit?: string } {

@@ -68,7 +68,7 @@ test('local rpi roundtrip compile+decompile equals original compile+decompile', 
     context.skip();
   }
 
-  const absolute_cache_directory = path.resolve(__dirname, '../expected/cache');
+  const absolute_cache_directory = path.resolve(__dirname, 'expected/cache');
   const absolute_source_path = path.resolve(__dirname, '../dts_source/rpi.prepro.dts');
   const our_dt = 'my_rpi';
 
@@ -86,7 +86,7 @@ test('local zephyr roundtrip compile+decompile equals original compile+decompile
     // dtc is required for this test; skip when not available in environment
     context.skip();
   }
-  const absolute_cache_directory = path.resolve(__dirname, '../expected/cache');
+  const absolute_cache_directory = path.resolve(__dirname, 'expected/cache');
   const absolute_source_path = path.resolve(__dirname, '../dts_source/zephyr.dts');
   const our_dt = 'my_zephyr';
 
@@ -108,7 +108,7 @@ test('linux repo arm broadcom roundtrip comp+decomp === original comp+decomp', f
     console.warn('WARNING: cpp is required for this test; skip when not available in environment');
     context.skip();
   }
-  const absolute_cache_directory = path.resolve(__dirname, '../expected/cache');
+  const absolute_cache_directory = path.resolve(__dirname, 'expected/cache');
   ensure_directory(absolute_cache_directory);
 
   const path_to_dts_folder = path.resolve(__dirname, '../linux/arch/arm/boot/dts/broadcom/');
@@ -160,7 +160,7 @@ test('linux repo arm broadcom roundtrip comp+decomp === original comp+decomp', f
 
     for (const file of dts_files) {
       const file_name = file.file_name.replaceAll('.dts', '.prepro.dts');
-      const cache = path.resolve(__dirname, '../expected/cache');
+      const cache = path.resolve(__dirname, 'expected/cache');
       const prepro_path = path.resolve(cache, file_name);
 
       try {
