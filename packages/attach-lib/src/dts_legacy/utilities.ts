@@ -28,7 +28,7 @@ export function get_node_key(n: DtsNode): string {
  * - `&{/absolute/path}` or bare `/absolute/path`
  * - `&label` or a bare label
  */
-export function search_node_in_dts(document: DtsDocument, node_identifier: string): { found_node: DtsNode, parent: string, parent_node?: DtsNode } | undefined {
+export function search_node_in_dts(document: DtsDocument, node_identifier: string): { found_node: DtsNode, found_path: string, parent: string, parent_node?: DtsNode } | undefined {
 
     const identifier = node_identifier.trim();
 
@@ -68,12 +68,15 @@ export function search_node_in_unresolved_overlays(unresolved_overlays: Array<Un
     return undefined;
 }
 
-function search_node_by_predicate(root: DtsNode, path: string[], predicate: (node: DtsNode) => boolean, parent_node?: DtsNode): { found_node: DtsNode, parent: string, parent_node?: DtsNode } | undefined {
+function search_node_by_predicate(root: DtsNode, path: string[], predicate: (node: DtsNode) => boolean, parent_node?: DtsNode): { found_node: DtsNode, found_path: string, parent: string, parent_node?: DtsNode } | undefined {
+
+    const node_path = build_path(path);
 
     if (predicate(root)) {
         return {
             found_node: root,
-            parent: root.labels.at(-1) ?? build_path(path),
+            found_path: node_path,
+            parent: root.labels.at(-1) ?? node_path,
             parent_node: parent_node
         };
     }
@@ -102,7 +105,7 @@ function build_path(path: string[]): string {
 }
 
 /** Resolve a node by absolute path like `/soc/interrupt-controller@40000`, tracking its immediate parent along the way. */
-function search_node_by_path(root: DtsNode, path: string): { found_node: DtsNode, parent: string, parent_node?: DtsNode } | undefined {
+function search_node_by_path(root: DtsNode, path: string): { found_node: DtsNode, found_path: string, parent: string, parent_node?: DtsNode } | undefined {
     if (path === "" || path[0] !== '/') {
         return undefined;
     }
@@ -135,6 +138,7 @@ function search_node_by_path(root: DtsNode, path: string): { found_node: DtsNode
 
     return {
         found_node: current,
+        found_path: path,
         parent: current.labels.at(-1) ?? path,
         parent_node: parent_node
     };
