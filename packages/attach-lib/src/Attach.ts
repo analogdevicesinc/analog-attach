@@ -20,6 +20,9 @@ export class Attach {
 
     private validation_function: ValidateFunction | undefined;
 
+    private pattern_validation_functions: Map<string, ValidateFunction> = new Map();
+    private pattern_current_bindings: Map<string, DtBindingSchema> = new Map();
+
     private constructor() {
     }
 
@@ -111,6 +114,20 @@ export class Attach {
             ajv.addKeyword(typeSizeKeyword);
 
             this.validation_function = ajv.compile(this.original_binding as Object);
+
+            const pattern_ajv = new Ajv2019({ allErrors: true, logger: false });
+            pattern_ajv.addKeyword(typeSizeKeyword);
+
+            for (const [pattern, schema] of Object.entries(this.original_binding.patternProperties ?? {})) {
+                const cast_schema = schema as DtBindingSchema;
+
+                if (typeof cast_schema === 'boolean' || !("properties" in cast_schema)) {
+                    continue;
+                }
+
+                this.pattern_validation_functions.set(pattern, pattern_ajv.compile(structuredClone(cast_schema) as Object));
+                this.pattern_current_bindings.set(pattern, structuredClone(cast_schema));
+            }
         } catch {
             //console.log(error instanceof Error ? error.message : "Failed to compile validation function");
             return undefined;
@@ -128,6 +145,45 @@ export class Attach {
             return;
         }
 
+        const result = this.run_validation(this.original_binding, this.current_binding, this.validation_function, data);
+
+        if (result === undefined) {
+            return;
+        }
+
+        this.current_binding = result.current_binding;
+
+        return { binding: result.binding, errors: result.errors };
+    }
+
+    public update_pattern_binding_by_changes(pattern: string, data: string): { binding: ParsedBinding, errors: BindingErrors[] } | undefined {
+
+        const original = this.original_binding?.patternProperties?.[pattern] as DtBindingSchema | undefined;
+        const current = this.pattern_current_bindings.get(pattern);
+        const validator = this.pattern_validation_functions.get(pattern);
+
+        if (original === undefined || current === undefined || validator === undefined) {
+            return;
+        }
+
+        const result = this.run_validation(original, current, validator, data);
+
+        if (result === undefined) {
+            return;
+        }
+
+        this.pattern_current_bindings.set(pattern, result.current_binding);
+
+        return { binding: result.binding, errors: result.errors };
+    }
+
+    private run_validation(
+        original: DtBindingSchema,
+        current: DtBindingSchema,
+        validator: ValidateFunction,
+        data: string
+    ): { current_binding: DtBindingSchema, binding: ParsedBinding, errors: BindingErrors[] } | undefined {
+
         let canary_data;
 
         try {
@@ -139,20 +195,20 @@ export class Attach {
 
         canary_data["__canary__"] = true;
 
-        if (this.validation_function(canary_data) === true) {
-            const binding = translate_JSONSchema(this.current_binding);
-            return { binding, errors: [] };
+        if (validator(canary_data) === true) {
+            const binding = translate_JSONSchema(current);
+            return { current_binding: current, binding, errors: [] };
         }
 
-        if (this.validation_function.errors === undefined || this.validation_function.errors === null) {
+        if (validator.errors === undefined || validator.errors === null) {
             return;
         }
 
-        this.current_binding = structuredClone(this.original_binding);
+        let current_binding = structuredClone(original);
 
         let error_accumulator: BindingErrors[] = [];
 
-        for (const error of this.validation_function.errors) {
+        for (const error of validator.errors) {
 
             const decoded_error_schema_path = decodeURIComponent(error.schemaPath);
 
@@ -161,10 +217,14 @@ export class Attach {
                 const then_tag_index = schema_path.indexOf("then");
                 const sub_schema_to_apply = schema_path.slice(0, then_tag_index + 1);
 
-                const sub_schema = getByPath(this.original_binding, sub_schema_to_apply) as Record<string, any>;
+                const sub_schema = getByPath(original, sub_schema_to_apply) as Record<string, any>;
                 const strip_canaries = delete_path(sub_schema, [["properties", "__canary__"]]);
 
-                this.current_binding = deep_merge(this.current_binding, strip_canaries);
+                current_binding = deep_merge(current_binding, strip_canaries);
+            } else if (error.keyword === "additionalProperties" && error.params["additionalProperty"] === "__canary__") {
+                // The injected canary marker itself tripped additionalProperties:false on a
+                // schema with no allOf/then branch to narrow into (e.g. a patternProperties
+                // sub-schema) — not a real validation error, so it is dropped.
             } else if (error.keyword === "required") {
 
                 const instance = error.instancePath.split('/').slice(1);
@@ -210,9 +270,9 @@ export class Attach {
 
         }
 
-        const binding = translate_JSONSchema(this.current_binding);
+        const binding = translate_JSONSchema(current_binding);
 
-        return { binding: binding, errors: error_accumulator };
+        return { current_binding, binding, errors: error_accumulator };
     }
 }
 

@@ -23,7 +23,7 @@ export function get_node_key(n: DtsNode): string {
     return n.unit_addr ? `${n.name}@${n.unit_addr}` : n.name;
 }
 
-export function search_node_in_dts(document: DtsDocument, node_name: string): { found_node: DtsNode, parent: string } | undefined {
+export function search_node_in_dts(document: DtsDocument, node_name: string): { found_node: DtsNode, parent: string, parent_node?: DtsNode } | undefined {
 
     const { name, unit } = split_node_key(node_name);
 
@@ -32,7 +32,7 @@ export function search_node_in_dts(document: DtsDocument, node_name: string): { 
     return node;
 }
 
-export function search_node_in_unresolved_overlays(unresolved_overlays: Array<UnresolvedOverlay>, node_name: string): { node: DtsNode, parent: string } | undefined {
+export function search_node_in_unresolved_overlays(unresolved_overlays: Array<UnresolvedOverlay>, node_name: string): { node: DtsNode, parent: string, parent_node?: DtsNode } | undefined {
 
     const { name, unit } = split_node_key(node_name);
 
@@ -41,14 +41,14 @@ export function search_node_in_unresolved_overlays(unresolved_overlays: Array<Un
         const node = search_node_impl(unresolved.overlay_node, [unresolved.overlay_node.name], name, unit);
 
         if (node !== undefined) {
-            return { node: node.found_node, parent: node.parent };
+            return { node: node.found_node, parent: node.parent, parent_node: node.parent_node };
         }
     }
 
     return undefined;
 }
 
-function search_node_impl(root: DtsNode, path: string[], name: string, unit?: string): { found_node: DtsNode, parent: string } | undefined {
+function search_node_impl(root: DtsNode, path: string[], name: string, unit?: string, parent_node?: DtsNode): { found_node: DtsNode, parent: string, parent_node?: DtsNode } | undefined {
 
     if (root.name === name && root.unit_addr === unit) {
         const actual_path: string = (() => {
@@ -61,12 +61,13 @@ function search_node_impl(root: DtsNode, path: string[], name: string, unit?: st
 
         return {
             found_node: root,
-            parent: root.labels.at(-1) ?? actual_path
+            parent: root.labels.at(-1) ?? actual_path,
+            parent_node: parent_node
         };
     }
 
     for (const child of root.children) {
-        const next = search_node_impl(child, [...path, child.name], name, unit);
+        const next = search_node_impl(child, [...path, child.name], name, unit, root);
 
         if (next === undefined) {
             continue;
