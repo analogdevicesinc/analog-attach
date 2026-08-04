@@ -2,6 +2,8 @@ import { Attach, extract_compatible, type CellArrayElement, type DtsNode, type D
 import * as fs from 'node:fs';
 import path from "node:path";
 
+import { load_compat_index, save_compat_index, type CompatIndex } from "./config";
+
 export function bigIntReplacer(_key: string, value: any): any {
     return typeof value === 'bigint' ? Number(value) : value;
 }
@@ -22,6 +24,39 @@ export function get_all_file_paths(directory: string): string[] {
     }
 
     return results.sort(); // Sort to make hash order-independent
+}
+
+export function get_latest_mtime(directory: string): number {
+    if (!fs.existsSync(directory)) {
+        return 0;
+    }
+
+    let latest = fs.statSync(directory).mtimeMs;
+    const list = fs.readdirSync(directory);
+
+    for (const file of list) {
+        if (file === ".git") {
+            continue;
+        }
+
+        const filePath = path.join(directory, file);
+        const stat = fs.statSync(filePath);
+
+        latest = Math.max(latest, stat.isDirectory() ? get_latest_mtime(filePath) : stat.mtimeMs);
+    }
+
+    return latest;
+}
+
+function is_compat_index_stale(index: CompatIndex, linux: string, dtSchema: string): boolean {
+    if (typeof index.generated_at !== "number" || index.entries === undefined) {
+        return true;
+    }
+
+    const bindings_folder = path.resolve(linux, "Documentation", "devicetree", "bindings");
+    const latest_mtime = Math.max(get_latest_mtime(bindings_folder), get_latest_mtime(dtSchema));
+
+    return latest_mtime > index.generated_at;
 }
 
 export async function build_compat_index(linux: string, dtSchema: string): Promise<Record<string, string>> {
@@ -62,6 +97,24 @@ export async function build_compat_index(linux: string, dtSchema: string): Promi
 }
 
 export async function find_binding(linux: string, dtSchema: string, compatible_to_find: string): Promise<string | undefined> {
+    const cached_index = load_compat_index();
+
+    if (cached_index !== undefined) {
+        if (is_compat_index_stale(cached_index, linux, dtSchema)) {
+            console.log("compat-index.json is stale, rebuilding...");
+            const entries = await build_compat_index(linux, dtSchema);
+            const compat_index_path = save_compat_index(entries);
+            console.log(`Written: ${compat_index_path}`);
+            return entries[compatible_to_find];
+        }
+
+        const cached_path = cached_index.entries[compatible_to_find];
+
+        if (cached_path !== undefined && fs.existsSync(cached_path)) {
+            return cached_path;
+        }
+    }
+
     const bindings_folder = path.resolve(linux, "Documentation", "devicetree", "bindings");
 
     if (!fs.existsSync(bindings_folder)) {

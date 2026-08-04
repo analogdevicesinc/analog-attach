@@ -3,6 +3,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 
 import { build_compat_index } from "../../utilities";
+import { save_compat_index } from "../../config";
 
 type Flags = {
     linux: string;
@@ -66,8 +67,7 @@ export const init_command = buildCommand({
         console.log(`Written: ${config_path}`);
 
         const compat_index = await build_compat_index(linux, dtSchema);
-        const compat_index_path = path.join(dir, "compat-index.json");
-        fs.writeFileSync(compat_index_path, JSON.stringify(compat_index, undefined, 2));
+        const compat_index_path = save_compat_index(compat_index);
         console.log(`Written: ${compat_index_path}`);
     },
 });
