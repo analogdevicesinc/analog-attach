@@ -32,7 +32,7 @@ Before using any commands, gather the **Linux kernel source path** (`--linux`) f
 
 **Per-command requirements**:
 - `list-devices`, `create`: Only need `--linux`
-- `get-schema`, `suggest-parents`, `validate`, `get-prop`, `set-prop`: Also need `--context` (a `.dts` file representing the target platform)
+- `get-schema`, `suggest-parents`, `validate`, `get-prop`, `set-prop`, `add`: Also need `--context` (a `.dts` file representing the target platform)
 
 **Bundled dt-schema**: The CLI includes a bundled version of dt-schema, so `--dt-schema` is optional for all commands. Only specify it if you need to use a different version.
 
@@ -228,12 +228,49 @@ attach create --linux <path> --compatible <string> --parent <node> --output <fil
 2. Use `get-schema` to identify required and optional properties
 3. Use `set-prop` to add all required properties
 4. Use `set-prop` to add optional properties based on user needs
-5. Validate with `validate` command
-6. Fix any errors using `set-prop`, repeat validation until clean
+5. If the user needs another device or a subnode (e.g. a channel), use `add`
+6. Validate with `validate` command
+7. Fix any errors using `set-prop`, repeat validation until clean
 
 ---
 
-### 5. `validate` - Check Configuration
+### 5. `add` - Add a Node to an Existing Overlay
+
+**Purpose**: Add a new node into an already-existing `.dtso` file (created by `create`) — either another top-level device sibling, or a subnode (e.g. a channel) nested under a node already present in the overlay.
+
+**Syntax**:
+```bash
+attach add --linux <path> --context <dts-file> --overlay <dtso-file> [--compatible <string>] [--name <node-name>] [--parent <node>]
+```
+
+**Parameters**:
+| Parameter | Required | Description |
+|-----------|----------|--------------|
+| `--linux` | Yes | Path to Linux kernel repository |
+| `--dt-schema` | No | Path to dt-schema repository (uses bundled version by default) |
+| `--context` | Yes | Path to base `.dts` file |
+| `--overlay` | Yes | Path to the existing `.dtso` file to modify (file is updated in place; must already exist — use `create` first) |
+| `--compatible` | At least one of `--compatible`/`--name` | Compatible string of the device binding to add |
+| `--name` | At least one of `--compatible`/`--name` | Node name (e.g. `channel@0`); defaults to `--compatible` if omitted |
+| `--parent` | No | Where to attach the new node: a bus label/path (e.g. `spi0`, `/soc/spi@...`), or the name of a node already in the base `.dts` or the overlay (e.g. `adi,ad7124-8`, to nest a subnode under it). Defaults to root `/` if omitted |
+
+**Examples**:
+```bash
+# Add a second sibling device under the same bus
+attach add --linux ~/linux --context ~/ctx.dts --overlay overlay.dtso --compatible adi,ad7124-4 --parent spi0
+
+# Add a bare subnode (e.g. a channel) under a device already in the overlay
+attach add --linux ~/linux --context ~/ctx.dts --overlay overlay.dtso --name channel@0 --parent adi,ad7124-8
+```
+
+**Next Steps After Add**:
+1. Read the overlay to verify the new node's placement
+2. If the new node has a `--compatible`, use `get-schema` and `set-prop` to configure it, same as after `create`
+3. If the new node is a bare subnode (`--name` only, no `--compatible`), its properties currently cannot be set with `set-prop` (see Limitations below) — edit the `.dtso` directly for those
+
+---
+
+### 6. `validate` - Check Configuration
 
 **Purpose**: Validate a device tree node against its binding schema.
 
@@ -280,7 +317,7 @@ attach validate --linux <path> --context <dts-file> --node <name> --input <dtso-
 
 ---
 
-### 6. `get-prop` - Read Property Value
+### 7. `get-prop` - Read Property Value
 
 **Purpose**: Read the current value of a property from a node in a `.dtso` file.
 
@@ -318,7 +355,7 @@ attach get-prop --linux ~/linux --context ~/linux/arch/arm/boot/dts/broadcom/bcm
 
 ---
 
-### 7. `set-prop` - Set Property Value
+### 8. `set-prop` - Set Property Value
 
 **Purpose**: Set or update a property value in a node within a `.dtso` file. **This is the required method for configuring device properties.**
 
@@ -384,7 +421,7 @@ Property spi-max-frequency accepts values <= 5000000
 ```
 
 **Limitations**:
-- **Channel/subnode properties are NOT supported** - The `set-prop` command currently only works on properties of the main device node. Properties inside child nodes (e.g., `channel@0`, `channel@1`) cannot be set using this command. For channel configuration, you must manually edit the `.dtso` file.
+- **Channel/subnode properties are NOT supported** - The `set-prop` command currently only works on properties of the main device node. Properties inside child nodes (e.g., `channel@0`, `channel@1`) cannot be set using this command, even after creating the subnode with `add`. For channel configuration, you must manually edit the `.dtso` file.
 
 ---
 
@@ -436,7 +473,15 @@ Property spi-max-frequency accepts values <= 5000000
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
-│ 7. VALIDATE                                                 │
+│ 7. ADD MORE NODES (optional)                                 │
+│    attach add --compatible/--name <..> --parent <..>        │
+│    → Add sibling devices or subnodes (e.g. channels)         │
+│    → Repeat step 6 to configure any added device's props    │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│ 8. VALIDATE                                                 │
 │    attach validate --node <name> --input <file.dtso>        │
 │    → Fix any errors with set-prop, repeat until clean       │
 └─────────────────────────────────────────────────────────────┘
@@ -514,7 +559,8 @@ node-name {
 5. **Use `get-prop` to check current values** - Before modifying, verify current state
 6. **Use schema descriptions** - They explain what each property does
 7. **Check required vs optional** - Only required properties must be set
-8. **Pattern properties = channels** - If present, help user configure each channel (manual editing required)
+8. **Pattern properties = channels** - If present, help user create each channel node with `add`, then configure it manually (property editing is manual-only, see tip 3)
 9. **Phandle references** - When setting phandle properties with `set-prop`, just use the label name (e.g., `--value gpio`)
 10. **Macros need includes** - If schema shows macros, the overlay may need `#include` directives
 11. **Interrupts need interrupt-parent** - When using the `interrupts` property, first set `interrupt-parent` using `set-prop --property interrupt-parent --value <controller>` (e.g., `--value gpio`). The interrupt controller determines how many cells are needed in the `interrupts` array.
+12. **Use `add` for additional nodes** - Once an overlay exists, use `add` to attach another sibling device (with `--compatible`) or a bare subnode like a channel (with `--name`) instead of hand-editing the `.dtso`
