@@ -269,6 +269,7 @@ attach add --linux ~/linux --context ~/ctx.dts --overlay overlay.dtso --name cha
 1. Read the overlay to verify the new node's placement
 2. If the new node has a `--compatible`, use `get-schema` and `set-prop` to configure it, same as after `create`
 3. If the new node is a bare subnode (`--name` only, no `--compatible`), its properties currently cannot be set with `set-prop` (see Limitations below) — edit the `.dtso` directly for those
+4. `validate` works on bare subnodes too — it checks the node's name against the parent's `pattern_properties` (see `get-schema`) and reports the same error types (`missing_required`, `number_limit`, etc.)
 
 ---
 
@@ -316,6 +317,8 @@ attach validate --linux <path> --context <dts-file> --node <name> --input <dtso-
 2. For `missing_required`: add the property to the overlay using `set-prop`
 3. For `number_limit`: adjust value to be within bounds using `set-prop`
 4. For `failed_dependency`: add the missing dependent property using `set-prop`
+
+**Bare subnodes (channels, etc.)**: If `--node` has no `compatible` property (e.g. a channel added via `add --name channel@0`), `validate` checks the node's name against its parent's `pattern_properties` (see `get-schema`). If the node name matches one of the parent's patterns (e.g. `^channel@([0-9]|1[0-5])$`), it is validated against that pattern's `properties`/`required` rules, same error types as above. If the node has no `compatible` and its parent has none either, or the node name matches none of the parent's patterns, validation cannot proceed and an explanatory message is printed instead.
 
 ---
 
