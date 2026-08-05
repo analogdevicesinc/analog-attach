@@ -1,0 +1,25 @@
+$id: "test/switch_numeric_enum"
+$type: struct
+$symbol: test_struct
+$ranking: 4
+$sources:
+  headers:
+    - "test.h"
+
+mode:
+  type: enum
+  values: [0, 1]
+
+speed:
+  type: uint32_t
+
+$override:
+  - $switch:
+      $on: mode
+      $cases:
+        0:
+          speed:
+            default: 100
+        1:
+          speed:
+            default: 200

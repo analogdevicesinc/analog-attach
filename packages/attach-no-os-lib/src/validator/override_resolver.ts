@@ -43,6 +43,11 @@ function evaluate_predicate(predicate: OverridePredicate, collected: CollectedRu
 		case "PredicateEquals": {
 			return read_reference(predicate.reference, collected, workfile) === predicate.value;
 		}
+		case "PredicateNoneOf": {
+			// An unset property matches no case, so the default must not fire either.
+			const value = read_reference(predicate.reference, collected, workfile);
+			return value !== undefined && !predicate.values.includes(value);
+		}
 		case "PredicateHasValue": {
 			return read_reference(predicate.reference, collected, workfile) !== undefined;
 		}
