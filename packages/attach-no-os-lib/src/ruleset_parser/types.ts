@@ -133,6 +133,7 @@ export interface OverrideReference {
 export type OverridePredicate =
 	| { _t: "PredicateAlways" }
 	| { _t: "PredicateEquals", reference: OverrideReference, value: unknown }
+	| { _t: "PredicateNoneOf", reference: OverrideReference, values: unknown[] }
 	| { _t: "PredicateHasValue", reference: OverrideReference }
 	| { _t: "PredicateAnd", predicates: OverridePredicate[] };
 

@@ -1,0 +1,19 @@
+# $switch on a NUMERIC parent property. YAML gives the case names as strings while
+# the workfile holds real numbers, so this fixture is what proves the lowering
+# converts them (otherwise no case fires and the constraint is silently dead).
+$id: "child.yaml"
+$type: struct
+$symbol: child
+$ranking: 4
+$sources: { noos: ["test.h"] }
+$override:
+  $parent:
+    - $switch:
+        $on: device_id
+        $cases:
+          0:
+            speed:
+              minimum: 100
+          1:
+            speed:
+              maximum: 10

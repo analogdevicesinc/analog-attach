@@ -15,6 +15,44 @@ describe('switch override lowering', () => {
 			expect(ruleset.rules!.every(r => r.when._t === 'PredicateEquals')).toBe(true);
 		});
 
+		// YAML hands back every mapping key as a string, but the workfile stores a
+		// uint32_t answer as a number and the engine compares with strict ===. Numeric
+		// case names must therefore arrive as numbers or the case can never fire.
+		test('lowers numeric case names to numbers', () => {
+			const result = loadAndParseRuleset('overrides/switch/valid_numeric_cases.yaml');
+			expectOk(result);
+			const ruleset = result.value as RulesetStruct;
+			const values = ruleset.rules!.map(r => r.when._t === 'PredicateEquals' ? r.when.value : undefined);
+			expect(values).toEqual([0, 1]);
+		});
+
+		test('lowers numeric case names for a numeric-valued enum', () => {
+			const result = loadAndParseRuleset('overrides/switch/valid_numeric_enum_cases.yaml');
+			expectOk(result);
+			const ruleset = result.value as RulesetStruct;
+			const values = ruleset.rules!.map(r => r.when._t === 'PredicateEquals' ? r.when.value : undefined);
+			expect(values).toEqual([0, 1]);
+		});
+
+		test('keeps non-numeric case names as authored', () => {
+			const result = loadAndParseRuleset('overrides/switch/valid_basic.yaml');
+			expectOk(result);
+			const ruleset = result.value as RulesetStruct;
+			const values = ruleset.rules!.map(r => r.when._t === 'PredicateEquals' ? r.when.value : undefined);
+			expect(values).toEqual(['SPI', 'I2C']);
+		});
+
+		test('lowers `_` to a none-of over the sibling case values', () => {
+			const result = loadAndParseRuleset('overrides/switch/valid_default_case.yaml');
+			expectOk(result);
+			const ruleset = result.value as RulesetStruct;
+			expect(ruleset.rules!.map(r => r.when._t)).toEqual(['PredicateEquals', 'PredicateNoneOf']);
+			const fallback = ruleset.rules![1].when;
+			if (fallback._t === 'PredicateNoneOf') {
+				expect(fallback.values).toEqual(['SPI']);
+			}
+		});
+
 		test('parent-scope switch resolves condition ref to parent', () => {
 			const result = loadAndParseRuleset('overrides/switch/valid_with_parent_scope.yaml');
 			expectOk(result);

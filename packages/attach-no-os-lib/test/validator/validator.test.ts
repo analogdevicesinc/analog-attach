@@ -773,6 +773,105 @@ describe('validate_workfile', () => {
             expect(result.errors[0].message).toContain("below");
         });
 
+        // Regression: the numeric case names arrive from YAML as strings while the
+        // workfile stores device_id as a number, so a strict === made every case in a
+        // numeric switch dead. Both real users of this (the MAX32690/MAX32650 SPI
+        // chip_select tables) were fully inert.
+        test('$switch matches a numeric case against a numeric value', () => {
+            const child = parse_override_fixture("switch_numeric_parent.yaml");
+            const parent = make_struct("parent.yaml", "parent", [
+                make_number("device_id", { value: 0 }),
+                make_number("speed", { value: 50 }),
+                make_include("extra", "child.yaml", { value: "my_child" })
+            ]);
+
+            const workfile = make_workfile({
+                my_child: child,
+                my_parent: parent
+            });
+
+            const result = validate_workfile(workfile);
+            expect(result.valid).toBe(false);
+            expect(result.errors[0].path).toBe("my_parent.speed");
+            expect(result.errors[0].message).toContain("below");
+        });
+
+        test('$switch numeric case does not fire for a different value', () => {
+            // device_id 1 selects the maximum: 10 case, which speed 50 violates —
+            // proving the OTHER numeric case was selected, not merely that one fired.
+            const child = parse_override_fixture("switch_numeric_parent.yaml");
+            const parent = make_struct("parent.yaml", "parent", [
+                make_number("device_id", { value: 1 }),
+                make_number("speed", { value: 50 }),
+                make_include("extra", "child.yaml", { value: "my_child" })
+            ]);
+
+            const workfile = make_workfile({
+                my_child: child,
+                my_parent: parent
+            });
+
+            const result = validate_workfile(workfile);
+            expect(result.valid).toBe(false);
+            expect(result.errors[0].path).toBe("my_parent.speed");
+            expect(result.errors[0].message).toContain("above the maximum 10");
+        });
+
+        test('$switch `_` case fires when no other case matches', () => {
+            const child = parse_override_fixture("switch_default_parent.yaml");
+            const parent = make_struct("parent.yaml", "parent", [
+                make_number("device_id", { value: 7 }),
+                make_number("speed", { value: 50 }),
+                make_include("extra", "child.yaml", { value: "my_child" })
+            ]);
+
+            const workfile = make_workfile({
+                my_child: child,
+                my_parent: parent
+            });
+
+            const result = validate_workfile(workfile);
+            expect(result.valid).toBe(false);
+            expect(result.errors[0].path).toBe("my_parent.speed");
+            expect(result.errors[0].message).toContain("above the maximum 10");
+        });
+
+        test('$switch `_` case yields to a matching case', () => {
+            // device_id 0 hits the explicit case, so only its minimum applies and the
+            // default's maximum: 10 must not also fire.
+            const child = parse_override_fixture("switch_default_parent.yaml");
+            const parent = make_struct("parent.yaml", "parent", [
+                make_number("device_id", { value: 0 }),
+                make_number("speed", { value: 100 }),
+                make_include("extra", "child.yaml", { value: "my_child" })
+            ]);
+
+            const workfile = make_workfile({
+                my_child: child,
+                my_parent: parent
+            });
+
+            const result = validate_workfile(workfile);
+            expect(result.valid).toBe(true);
+        });
+
+        test('$switch `_` case does not fire when $on is unset', () => {
+            const child = parse_override_fixture("switch_default_parent.yaml");
+            const parent = make_struct("parent.yaml", "parent", [
+                make_number("device_id"),
+                make_number("speed", { value: 50 }),
+                make_include("extra", "child.yaml", { value: "my_child" })
+            ]);
+
+            const workfile = make_workfile({
+                my_child: child,
+                my_parent: parent
+            });
+
+            const result = validate_workfile(workfile);
+            expect(result.valid).toBe(true);
+        });
+
         test('$switch skips when $on property not found', () => {
             const child = parse_override_fixture("switch_missing_on.yaml");
             const parent = make_struct("parent.yaml", "parent", [
