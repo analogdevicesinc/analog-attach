@@ -13,6 +13,14 @@ type DTReference = {
 
 export type TraversalOrder = "DFS" | "BFS";
 
+export type UnitAddr = { value: bigint; repr: "hex" | "dec" };
+
+function format_unit_addr_part(addr: UnitAddr): string {
+    return addr.repr === "hex"
+        ? addr.value.toString(16)
+        : addr.value.toString(10);
+}
+
 class Stream<T, P = never> implements Iterable<[P] extends [never] ? T : [T, P]> {
     constructor(private iterable: Iterable<[P] extends [never] ? T : [T, P]>) { }
 
@@ -188,6 +196,22 @@ export class DeviceTree {
         }
 
         node.name = new_name;
+        return true;
+    }
+
+    public set_unit_addr(target: DTReference, addr: UnitAddr | UnitAddr[] | undefined): boolean {
+        const node = this.deref_node(target);
+        if (node === undefined) {
+            return false;
+        }
+
+        if (addr === undefined) {
+            node.unit_addr = undefined;
+            return true;
+        }
+
+        const parts = Array.isArray(addr) ? addr : [addr];
+        node.unit_addr = parts.map((element) => format_unit_addr_part(element)).join(",");
         return true;
     }
 
