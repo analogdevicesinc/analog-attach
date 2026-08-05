@@ -141,6 +141,14 @@ function lower_if_then(object: Record<string, unknown>, context: ParseContext, s
 	return ok([{ when: when.value, effects: effects.value }]);
 }
 
+function case_name_to_value(case_name: string): string | number {
+	if (case_name.trim() === "") {
+		return case_name;
+	}
+	const numeric = Number(case_name);
+	return Number.isNaN(numeric) ? case_name : numeric;
+}
+
 // $switch fans out to N equals-rules sharing the $on reference (P2): each case
 // becomes Rule{ when: equals(<on>, caseName), effects: <case body> }. No switch
 // construct survives lowering.
@@ -161,27 +169,44 @@ function lower_switch(object: Record<string, unknown>, context: ParseContext, sc
 	const on_reference: OverrideReference = { node: scope_to_node(scope), property: $on.value };
 	const rules: Rule[] = [];
 
-	for (const [case_name, case_value] of Object.entries($cases.value)) {
-		if (
-			scope === "$this" &&
-			on_property.value._t === "EnumProperty" &&
-			!on_property.value.values.includes(case_name)
-		) {
+	let default_effects: Effect[] | undefined;
+	const case_values: unknown[] = [];
+
+	for (const [case_name, case_body] of Object.entries($cases.value)) {
+		const enum_values = scope === "$this" && on_property.value._t === "EnumProperty"
+			? on_property.value.values
+			: undefined;
+		const case_value = enum_values?.includes(case_name) ? case_name : case_name_to_value(case_name);
+
+		if (case_name !== "_" && enum_values && !enum_values.includes(case_value)) {
 			return error(
-				`Invalid case '${case_name}'. Valid values: ${on_property.value.values.join(", ")}`,
+				`Invalid case '${case_name}'. Valid values: ${enum_values.join(", ")}`,
 				at(cases_context, case_name).path
 			);
 		}
 
-		const case_object = asObject(case_value, at(cases_context, case_name));
+		const case_object = asObject(case_body, at(cases_context, case_name));
 		if (!case_object.ok) { return case_object; }
 
 		const effects = lower_effects_body(case_object.value, at(cases_context, case_name), scope);
 		if (!effects.ok) { return effects; }
 
+		if (case_name === "_") {
+			default_effects = effects.value;
+			continue;
+		}
+
+		case_values.push(case_value);
 		rules.push({
-			when: { _t: "PredicateEquals", reference: on_reference, value: case_name },
+			when: { _t: "PredicateEquals", reference: on_reference, value: case_value },
 			effects: effects.value,
+		});
+	}
+
+	if (default_effects) {
+		rules.push({
+			when: { _t: "PredicateNoneOf", reference: on_reference, values: case_values },
+			effects: default_effects,
 		});
 	}
 

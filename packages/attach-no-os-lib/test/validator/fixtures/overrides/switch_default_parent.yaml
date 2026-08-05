@@ -1,0 +1,17 @@
+# Numeric cases plus a `_` default, mirroring the MAX32690/MAX32650 SPI tables.
+$id: "child.yaml"
+$type: struct
+$symbol: child
+$ranking: 4
+$sources: { noos: ["test.h"] }
+$override:
+  $parent:
+    - $switch:
+        $on: device_id
+        $cases:
+          0:
+            speed:
+              minimum: 100
+          _:
+            speed:
+              maximum: 10

@@ -1,0 +1,25 @@
+$id: "test/switch_default"
+$type: struct
+$symbol: test_struct
+$ranking: 4
+$sources:
+  headers:
+    - "test.h"
+
+comm_type:
+  type: enum
+  values: [SPI, I2C]
+
+speed:
+  type: uint32_t
+
+$override:
+  - $switch:
+      $on: comm_type
+      $cases:
+        SPI:
+          speed:
+            default: 1000000
+        _:
+          speed:
+            default: 400000
