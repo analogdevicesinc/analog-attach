@@ -276,6 +276,34 @@ attach add --linux ~/linux --context ~/ctx.dts --overlay overlay.dtso --name cha
 
 ---
 
+### 5b. `delete` - Remove an Overlay-Added Node
+
+**Purpose**: Remove a node that the current overlay introduced. Only overlay-added nodes can be deleted — base device-tree nodes are refused. If the parent reference block becomes empty after deletion it is also removed from the output.
+
+**Syntax**:
+```bash
+attach delete --context <dts-file> --overlay <dtso-file> --node <node>
+```
+
+**Flags**:
+| Flag | Required | Description |
+|------|----------|-------------|
+| `--node` | Yes | Node to delete: label, `&label`, path, `&{path}`, or `label/child` |
+| `--overlay` | Yes | The `.dtso` file to edit |
+| `--context` | If no `config.toml` | Base `.dts` file — needed to distinguish overlay nodes from base nodes |
+
+**Example**:
+```bash
+# Remove a node previously added with `add`
+attach delete --context ~/ctx.dts --overlay overlay.dtso --node imu1
+```
+
+**Error messages**:
+- `Couldn't find node <node> in <overlay>` — the node is not in the merged tree at all.
+- `<node> is part of the base device tree, not this overlay` — the node came from the `.dts`, not the overlay; delete is refused.
+
+---
+
 ### 6. `validate` - Check Configuration
 
 **Purpose**: Validate a device tree node against its binding schema.
@@ -572,3 +600,4 @@ node-name {
 10. **Macros need includes** - If schema shows macros, the overlay may need `#include` directives
 11. **Interrupts need interrupt-parent** - When using the `interrupts` property, first set `interrupt-parent` using `set-prop --property interrupt-parent --value <controller>` (e.g., `--value gpio`). The interrupt controller determines how many cells are needed in the `interrupts` array.
 12. **Use `add` for additional nodes** - Once an overlay exists, use `add` to attach another sibling device (with `--compatible`) or a bare subnode like a channel (with `--name`) instead of hand-editing the `.dtso`
+13. **Use `delete` to undo an `add`** - `delete --node <label>` removes an overlay-added node cleanly; it also drops the parent reference block if that block is now empty. It refuses to touch base-tree nodes.
