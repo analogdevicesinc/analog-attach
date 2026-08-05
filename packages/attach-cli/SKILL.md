@@ -33,6 +33,7 @@ Before using any commands, gather the **Linux kernel source path** (`--linux`) f
 **Per-command requirements**:
 - `list-devices`, `create`: Only need `--linux`
 - `get-schema`, `suggest-parents`, `validate`, `get-prop`, `set-prop`, `add`: Also need `--context` (a `.dts` file representing the target platform)
+- `delete`, `rename`, `move`, `unset-prop`, `enable`, `disable`: Only need `--context` (no `--linux` required)
 
 **Bundled dt-schema**: The CLI includes a bundled version of dt-schema, so `--dt-schema` is optional for all commands. Only specify it if you need to use a different version.
 
@@ -304,6 +305,71 @@ attach delete --context ~/ctx.dts --overlay overlay.dtso --node imu1
 
 ---
 
+### 5c. `rename` - Rename an Overlay-Added Node
+
+**Purpose**: Change the node key (`name@unit_addr`) of a node that the current overlay introduced. Only overlay-added nodes can be renamed — base device-tree nodes are refused. Labels are left untouched.
+
+**Syntax**:
+```bash
+attach rename --context <dts-file> --overlay <dtso-file> --node <node> --to <new-key>
+```
+
+**Flags**:
+| Flag | Required | Description |
+|------|----------|-------------|
+| `--node` | Yes | Node to rename: label, `&label`, path, `&{path}`, or `label/child` |
+| `--to` | Yes | New node key. If `@` is omitted the existing unit address is preserved (e.g. `--to my_adc` on `adi,ad7124-8@0` → `my_adc@0`). Include `@unit` to override (e.g. `--to my_adc@1` → `my_adc@1`) |
+| `--overlay` | Yes | The `.dtso` file to edit |
+| `--context` | If no `config.toml` | Base `.dts` file |
+
+**Example**:
+```bash
+attach rename --context ~/ctx.dts --overlay overlay.dtso --node imu1 --to my_adc
+# renames adi,ad7124-8@0 → my_adc@0 (unit address preserved)
+
+attach rename --context ~/ctx.dts --overlay overlay.dtso --node imu1 --to my_adc@1
+# renames adi,ad7124-8@0 → my_adc@1 (unit address overridden)
+```
+
+**Error messages**:
+- `Couldn't find node <node>` — node not in the merged tree.
+- `<node> is part of the base device tree` — rename refused; overlay-added only.
+- `<to> already exists under the same parent` — key conflict at destination.
+
+---
+
+### 5d. `move` - Move an Overlay-Added Node to a Different Parent
+
+**Purpose**: Relocate a node introduced by the current overlay under a different parent. The node's key and labels are preserved. Only overlay-added nodes can be moved — base device-tree nodes are refused.
+
+**Syntax**:
+```bash
+attach move --context <dts-file> --overlay <dtso-file> --node <node> --parent <dest>
+```
+
+**Flags**:
+| Flag | Required | Description |
+|------|----------|-------------|
+| `--node` | Yes | Node to move: label, `&label`, path, `&{path}`, or `label/child` |
+| `--parent` | Yes | Destination parent: label, `&label`, path, `&{path}`, or `label/child` |
+| `--overlay` | Yes | The `.dtso` file to edit |
+| `--context` | If no `config.toml` | Base `.dts` file |
+
+**Example**:
+```bash
+# Move imu1 from spi0 to spi1
+attach move --context ~/ctx.dts --overlay overlay.dtso --node imu1 --parent spi1
+```
+
+**Error messages**:
+- `Couldn't find node <node>` — node not in the merged tree.
+- `<node> is part of the base device tree` — move refused; overlay-added only.
+- `Couldn't find parent node <parent>` — destination not found.
+- `Cannot move <node> into itself or one of its descendants` — cycle detected.
+- `<parent> already has a child named <key>` — key conflict at destination.
+
+---
+
 ### 6. `validate` - Check Configuration
 
 **Purpose**: Validate a device tree node against its binding schema.
@@ -461,6 +527,68 @@ Property spi-max-frequency accepts values <= 5000000
 
 ---
 
+### 9. `unset-prop` - Remove an Overlay-Set Property
+
+**Purpose**: Remove a property that was set by the overlay from a node. Only properties carrying the overlay's `modified_by_user` mark can be removed — properties that exist only in the base device tree are refused. Removing an overlay override of a base property effectively restores the base value.
+
+**Syntax**:
+```bash
+attach unset-prop --context <dts-file> --overlay <dtso-file> --node <node> --property <prop-name>
+```
+
+**Flags**:
+| Flag | Required | Description |
+|------|----------|-------------|
+| `--node` | Yes | Target node: label, `&label`, path, `&{path}`, or `label/child` |
+| `--property` | Yes | Name of the property to remove |
+| `--overlay` | Yes | The `.dtso` file to edit |
+| `--context` | If no `config.toml` | Base `.dts` file |
+
+**Example**:
+```bash
+attach unset-prop --context ~/ctx.dts --overlay overlay.dtso --node imu1 --property spi-max-frequency
+```
+
+**Note**: The printer auto-inserts `status = "okay"` whenever a node has overlay-added child nodes and no explicit `status` property. Unsetting `status` on such a node will still produce `status = "okay"` in the output — this is correct printer behaviour.
+
+**Error messages**:
+- `Couldn't find node <node>` — node not found.
+- `Couldn't find property <prop> in <node>` — property not present.
+- `<prop> in <node> is not set by this overlay` — property exists only in the base tree; unset refused.
+
+---
+
+### 10. `enable` / `disable` - Set Node Status
+
+**Purpose**: Convenience wrappers that set `status = "okay"` (`enable`) or `status = "disabled"` (`disable`) on a node. Works on both base-tree nodes and overlay-added nodes — setting status on a base-tree node is a common and valid overlay use case.
+
+**Syntax**:
+```bash
+attach enable  --context <dts-file> --overlay <dtso-file> --node <node>
+attach disable --context <dts-file> --overlay <dtso-file> --node <node>
+```
+
+**Flags**:
+| Flag | Required | Description |
+|------|----------|-------------|
+| `--node` | Yes | Target node: label, `&label`, path, `&{path}`, or `label/child` |
+| `--overlay` | Yes | The `.dtso` file to edit |
+| `--context` | If no `config.toml` | Base `.dts` file |
+
+**Examples**:
+```bash
+# Enable a peripheral that is disabled in the base tree
+attach enable --context ~/ctx.dts --overlay overlay.dtso --node spi0
+
+# Disable a node
+attach disable --context ~/ctx.dts --overlay overlay.dtso --node spi1
+```
+
+**Error messages**:
+- `Couldn't find node <node>` — node not found in the merged tree.
+
+---
+
 ## Recommended Workflow
 
 ```
@@ -601,3 +729,7 @@ node-name {
 11. **Interrupts need interrupt-parent** - When using the `interrupts` property, first set `interrupt-parent` using `set-prop --property interrupt-parent --value <controller>` (e.g., `--value gpio`). The interrupt controller determines how many cells are needed in the `interrupts` array.
 12. **Use `add` for additional nodes** - Once an overlay exists, use `add` to attach another sibling device (with `--compatible`) or a bare subnode like a channel (with `--name`) instead of hand-editing the `.dtso`
 13. **Use `delete` to undo an `add`** - `delete --node <label>` removes an overlay-added node cleanly; it also drops the parent reference block if that block is now empty. It refuses to touch base-tree nodes.
+14. **Use `rename` to change a node's key** - `rename --node <label> --to <new-key>` renames `name@unit_addr`; omitting `@` in `--to` preserves the existing unit address. Only overlay-added nodes.
+15. **Use `move` to reparent a node** - `move --node <label> --parent <dest>` relocates an overlay-added node; labels and the node key are preserved. Refuses base-tree nodes and cycles.
+16. **Use `unset-prop` to remove an overlay-set property** - `unset-prop --node <label> --property <name>` removes a property the overlay added or overrode; restores the base value if one exists. Refuses base-only properties.
+17. **Use `enable`/`disable` for status** - Shorthand for setting `status = "okay"` or `status = "disabled"`. Works on both base-tree and overlay-added nodes — enabling a disabled peripheral is a primary overlay use case.
