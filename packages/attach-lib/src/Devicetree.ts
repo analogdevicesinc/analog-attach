@@ -3,6 +3,7 @@ import { DTS, DTNode, parse_dts, parse_dto, DTLabel, DTPath, get_full_node_name,
 import { print_dts, print_dto } from "./dts/printer";
 import path from 'node:path';
 import * as fs from 'node:fs';
+import { Result } from "./result";
 
 type DTReference = {
     node_name: string,
@@ -58,11 +59,11 @@ export class DeviceTree {
         try {
             const dts = parse_dts(devicetree_content);
 
-            if (typeof dts === 'string') {
+            if (Result.is_err(dts)) {
                 return "Failed to parse!";
             }
 
-            return new DeviceTree(dts);
+            return new DeviceTree(dts.value.dts);
         } catch (error) {
             return error instanceof Error ? error.message : "Failed to parse!";
         }
@@ -347,11 +348,11 @@ export class DeviceTreeOverlay {
         try {
             const dto = parse_dto(content);
 
-            if (typeof dto === 'string') {
+            if (Result.is_err(dto)) {
                 return "Failed to parse overlay!";
             }
 
-            return new DeviceTreeOverlay(dto, base_dts);
+            return new DeviceTreeOverlay(dto.value.dto, base_dts);
         } catch (error) {
             return error instanceof Error ? error.message : "Failed to parse overlay!";
         }
@@ -461,7 +462,7 @@ export class DeviceTreeOverlay {
 
     public get_fragments(): DTNode[] {
         return this.as_stream()
-            .filter((node) => node.name === "fragment" || node.name.startsWith("fragment@"))
+            .filter((node) => node.name === "fragment")
             .toArray()
             .map(([node]) => node);
     }
