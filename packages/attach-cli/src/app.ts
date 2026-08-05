@@ -13,11 +13,13 @@ import { install_skill_command } from "./commands/skill/install-skill";
 import { uninstall_skill_command } from "./commands/skill/uninstall-skill";
 import { init_command } from "./commands/init/command";
 import { delete_command } from "./commands/delete/command";
+import { rename_command } from "./commands/rename/command";
 
 const routes = buildRouteMap({
     routes: {
         init: init_command,
         delete: delete_command,
+        rename: rename_command,
         listDevices: list_devices_command,
         getSchema: get_schema_command,
         suggestParents: suggest_parents_command,
