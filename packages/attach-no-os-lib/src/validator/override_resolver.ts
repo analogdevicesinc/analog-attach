@@ -153,7 +153,27 @@ export function apply_overrides(
 	let disable_reason: string | undefined;
 
 	for (const collected of collected_rules) {
-		if (!evaluate_predicate(collected.rule.when, collected, workfile)) {
+		const when = collected.rule.when;
+
+		// The parser only type-checks case names in $this scope; a $parent target isn't
+		// known until refs are resolved. An unmatchable case leaves the rule silently
+		// inert, so report it here, where the enum it reads is finally in hand. The
+		// sibling values on a PredicateNoneOf are the same set, so this covers `_` too.
+		if (
+			property._t === "EnumProperty" &&
+			when._t === "PredicateEquals" &&
+			when.reference.property === property.name &&
+			resolve_node(when.reference.node, collected) === symbol_name &&
+			!property.values.includes(when.value as string | number)
+		) {
+			errors.push({
+				path: `${symbol_name}.${property.name}`,
+				message: `Case '${String(when.value)}' never matches '${property.name}'. Valid values: ${property.values.join(", ")}`,
+				severity: "warning",
+			});
+		}
+
+		if (!evaluate_predicate(when, collected, workfile)) {
 			continue;
 		}
 
