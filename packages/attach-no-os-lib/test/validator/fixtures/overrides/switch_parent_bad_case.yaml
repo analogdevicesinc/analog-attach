@@ -1,0 +1,15 @@
+# A typo'd case name on a $parent enum. The parser cannot catch this (the parent's
+# type is unknown until refs resolve), so the validator must.
+$id: "child.yaml"
+$type: struct
+$symbol: child
+$ranking: 4
+$sources: { noos: ["test.h"] }
+$override:
+  $parent:
+    - $switch:
+        $on: mode
+        $cases:
+          FAAAST:
+            speed:
+              minimum: 100

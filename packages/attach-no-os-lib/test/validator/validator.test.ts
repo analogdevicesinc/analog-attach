@@ -872,6 +872,26 @@ describe('validate_workfile', () => {
             expect(result.valid).toBe(true);
         });
 
+        test('$switch reports a case that can never match a $parent enum', () => {
+            const child = parse_override_fixture("switch_parent_bad_case.yaml");
+            const parent = make_struct("parent.yaml", "parent", [
+                make_enum("mode", ["fast", "slow"], { value: "fast" }),
+                make_number("speed", { value: 150 }),
+                make_include("extra", "child.yaml", { value: "my_child" })
+            ]);
+
+            const workfile = make_workfile({
+                my_child: child,
+                my_parent: parent
+            });
+
+            // A warning, not an error: the ruleset still generates, the case is just dead.
+            const result = validate_workfile(workfile);
+            const warning = result.errors.find(e => e.message.includes("never matches"));
+            expect(warning?.severity).toBe("warning");
+            expect(warning?.message).toContain("Case 'FAAAST' never matches");
+        });
+
         test('$switch skips when $on property not found', () => {
             const child = parse_override_fixture("switch_missing_on.yaml");
             const parent = make_struct("parent.yaml", "parent", [
