@@ -56,7 +56,8 @@ export {
     SETTINGS_DEFAULTS,
     DEFAULT_SYSTEM_CONFIG_PATH,
     DEFAULT_SYSTEM_CONFIG_FILENAME,
-    SCHEMAS_SUBPATH
+    SCHEMAS_SUBPATH,
+    DEFAULT_TEMPLATE_SET
 } from "./settings/globals";
 export type { Setting, SettingsFile } from "./settings/types";
 export { is_setting, is_settings_file } from "./settings/types";
@@ -65,3 +66,10 @@ export { validate_workfile } from "./validator/validator";
 export type { ValidationResult, ValidationError } from "./validator/types";
 export { generate_project } from "./codegen/codegen";
 export type { CodegenInput, CodegenResult } from "./codegen/types";
+export {
+    list_template_sets,
+    resolve_template_set,
+    configured_template_set,
+    TEMPLATES_ROOT,
+    STRUCTURE_FILENAME
+} from "./codegen/template_sets";

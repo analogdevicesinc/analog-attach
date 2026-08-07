@@ -1,20 +1,16 @@
 import fs from "node:fs";
 import path from "node:path";
 
-import { fileURLToPath } from "node:url";
 import { error, ok } from "../ruleset_parser/result";
 import { make_environment } from "./eta_environment";
 import { load_devices } from "./device_loader";
 import { get_connected_symbols, reorder_symbols_topologically } from "../validator/connection_graph";
 import { effective_value, is_descriptor_reference, is_null_pointer, number_literal, property_default } from "./codegen_helpers";
+import { STRUCTURE_FILENAME, resolve_template_set } from "./template_sets";
 
 import type { CodegenInput, CodegenResult } from "./types";
 import type { Result } from "../ruleset_parser/result";
 import type { FileSpec } from "./types";
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const TEMPLATES_DIR = path.join(__dirname, "templates");
-const STRUCTURE_FILE = path.join(TEMPLATES_DIR, "project_structure.json");
 
 // Helpers injected into every template under `it.h` — the Eta replacement for the
 // custom nunjucks filters that used to live on the environment. Templates call them
@@ -51,20 +47,22 @@ const template_helpers = {
 	connected_symbols: get_connected_symbols,
 };
 
-// The project layout is data, not code: `project_structure.json` next to the
-// templates declares which files exist and how they map to templates. Parsed and
-// validated here so a malformed structure fails loudly (a Result error) rather
-// than producing a half-written project.
-function load_file_specs(): Result<FileSpec[]> {
+// The project layout is data, not code: `project_structure.json` inside the
+// chosen template set declares which files exist and how they map to templates.
+// Parsed and validated here so a malformed structure fails loudly (a Result
+// error) rather than producing a half-written project.
+function load_file_specs(templates_directory: string): Result<FileSpec[]> {
+	const structure_file = path.join(templates_directory, STRUCTURE_FILENAME);
+
 	let parsed: unknown;
 	try {
-		parsed = JSON.parse(fs.readFileSync(STRUCTURE_FILE, "utf8"));
+		parsed = JSON.parse(fs.readFileSync(structure_file, "utf8"));
 	} catch (error_) {
-		return error(`Could not read project structure '${STRUCTURE_FILE}': ${String(error_)}`);
+		return error(`Could not read project structure '${structure_file}': ${String(error_)}`);
 	}
 
 	if (typeof parsed !== "object" || parsed === null || !Array.isArray((parsed as { files?: unknown }).files)) {
-		return error(`Project structure '${STRUCTURE_FILE}' must be an object with a 'files' array`);
+		return error(`Project structure '${structure_file}' must be an object with a 'files' array`);
 	}
 
 	const specs: FileSpec[] = [];
@@ -81,7 +79,7 @@ function load_file_specs(): Result<FileSpec[]> {
 		if (typeof protect !== "boolean") {
 			return error(`Project structure entry #${position} ('${output}') needs a boolean 'protect'`);
 		}
-		if (!fs.existsSync(path.join(TEMPLATES_DIR, template))) {
+		if (!fs.existsSync(path.join(templates_directory, template))) {
 			return error(`Project structure entry '${output}' references missing template '${template}'`);
 		}
 
@@ -95,8 +93,17 @@ export function generate_project(input: CodegenInput): Result<CodegenResult> {
 	const { output_path, project_name } = input;
 	const files_created: string[] = [];
 
-	// Load the declarative file->template map.
-	const specs_result = load_file_specs();
+	// Which set of templates to render with — the per-call override, else the
+	// `template_set` setting, else the bundled default. Resolved (and checked to
+	// exist) before anything is written.
+	const templates_result = resolve_template_set(input.template_set);
+	if (!templates_result.ok) {
+		return templates_result;
+	}
+	const templates_directory = templates_result.value;
+
+	// Load the declarative file->template map of that set.
+	const specs_result = load_file_specs(templates_directory);
 	if (!specs_result.ok) {
 		return specs_result;
 	}
@@ -117,7 +124,7 @@ export function generate_project(input: CodegenInput): Result<CodegenResult> {
 	};
 
 	const project_directory = path.join(output_path, project_name);
-	const environment = make_environment(TEMPLATES_DIR);
+	const environment = make_environment(templates_directory);
 
 	// Generate files. Directories are derived from each output path, so the JSON
 	// structure alone determines the project layout. A template that throws (e.g. a

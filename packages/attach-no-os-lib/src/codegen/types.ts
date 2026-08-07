@@ -24,6 +24,10 @@ export interface CodegenInput {
 	project_name: string;
 	output_path: string;
 	noos_path: string;
+	// Which template set (folder under codegen/templates, or a path to an
+	// out-of-tree folder) renders the project. Omitted: the `template_set`
+	// setting, falling back to the bundled default.
+	template_set?: string;
 };
 
 export interface CodegenResult {

@@ -3,7 +3,7 @@ import path from "node:path";
 import os from "node:os";
 import type { Setting, SettingsFile } from "./types";
 import { is_settings_file } from "./types";
-import { DEFAULT_SYSTEM_CONFIG_FILENAME, DEFAULT_SYSTEM_CONFIG_PATH, SCHEMAS_SUBPATH } from "./globals";
+import { DEFAULT_SYSTEM_CONFIG_FILENAME, DEFAULT_SYSTEM_CONFIG_PATH, SCHEMAS_SUBPATH, SETTINGS_DEFAULTS } from "./globals";
 import type { Result} from "../ruleset_parser/result";
 import { error, ok } from "../ruleset_parser/result";
 
@@ -38,7 +38,11 @@ export function get_settings(): Result<SettingsFile> {
 		return error(`Malformed settings file at: ${config_path}`);
 	}
 
-	return ok(parsed);
+	// Settings introduced after a config file was written are missing from it.
+	// Backfill them from the defaults so `get_setting`/`config` see every key and
+	// an older config keeps working untouched (the file is only rewritten when
+	// something is actually set).
+	return ok({ ...SETTINGS_DEFAULTS, ...parsed });
 }
 
 export function set_settings(settings: SettingsFile): Result<undefined> {

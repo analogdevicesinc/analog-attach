@@ -102,6 +102,14 @@ export const configCommand = buildCommand<{ json?: boolean; reset?: boolean }, [
 					}
 					break;
 				}
+				case "template_set": {
+					if (flags.json) {
+						console.log(JSON.stringify(setting.template_set, undefined, 2));
+					} else {
+						console.log(format_single_config(key, setting.template_set));
+					}
+					break;
+				}
 				default: {
 					output_error(flags, "unknown_setting", `Unknown setting: ${key}`);
 				}
@@ -118,7 +126,8 @@ export const configCommand = buildCommand<{ json?: boolean; reset?: boolean }, [
 			switch (key) {
 				case "no_os_path":
 				case "build_command":
-				case "deploy_command":{
+				case "deploy_command":
+				case "template_set":{
 					key_value_set(key, value, flags);
 					break;
 				}
