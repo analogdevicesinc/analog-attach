@@ -1,8 +1,11 @@
 import { buildCommand } from "@stricli/core";
 import {
+    configured_template_set,
     generate_project,
     get_setting_value,
+    list_template_sets,
 } from "attach-no-os-lib";
+import { filter_completions } from "../completion/completion";
 import type { AttachContext } from "./shared";
 import {
     load_context,
@@ -11,7 +14,7 @@ import {
 } from "./shared";
 
 export const generateCommand = buildCommand<
-    { json?: boolean; output?: string },
+    { json?: boolean; output?: string; templateSet?: string },
     [string],
     AttachContext
 >({
@@ -26,6 +29,15 @@ export const generateCommand = buildCommand<
         flags: {
             json: { kind: "boolean", brief: "Output as JSON", optional: true },
             output: { kind: "parsed", brief: "Output directory (default: current directory)", optional: true, parse: String },
+            templateSet: {
+                kind: "parsed",
+                brief: "Template set to render with (default: the 'template_set' setting)",
+                optional: true,
+                parse: String,
+                proposeCompletions(partial: string) {
+                    return filter_completions(list_template_sets(), partial);
+                }
+            },
         }
     },
     func: async function (flags, project_name) {
@@ -56,6 +68,7 @@ export const generateCommand = buildCommand<
             project_name: project_name,
             output_path: output_path,
             noos_path: noos_path.value,
+            template_set: flags.templateSet,
         });
 
         if (!result.ok) {
@@ -63,7 +76,11 @@ export const generateCommand = buildCommand<
             return;
         }
 
-        const text = `Generated project '${project_name}'\n\n` +
+        // Which template set produced the project is worth reporting now that it
+        // is configurable — the same workfile can generate different output.
+        const template_set = flags.templateSet ?? configured_template_set();
+
+        const text = `Generated project '${project_name}' (templates: ${template_set})\n\n` +
             `  Files created:\n` +
             result.value.files_created.map(f => `    ${f}`).join("\n") +
             `\n\n  ${result.value.files_created.length} files created`;
@@ -71,6 +88,7 @@ export const generateCommand = buildCommand<
         const json = {
             project: project_name,
             output_path: output_path,
+            template_set: template_set,
             files_created: result.value.files_created
         };
 
