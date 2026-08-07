@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import type { ApplicationContext } from "@stricli/core";
 import {
     export_minimal,
     import_minimal,
@@ -17,6 +18,16 @@ import {
 
 // --- Types ---
 
+/**
+ * Context stricli passes to every command as `this`. Commands declare it as their
+ * CONTEXT type parameter, which is how the --workfile path reaches them without a
+ * module-level variable.
+ */
+export type AttachContext = ApplicationContext & {
+    /** From the global --workfile flag (see src/argv.ts). */
+    readonly workfile_path?: string;
+};
+
 export type WorkfileContext = {
     path: string;
     minimal: MinimalWorkfile;
@@ -29,10 +40,16 @@ export type OutputFlags = {
 
 // --- Workfile Loading ---
 
-export function load_context(custom_path?: string): Result<WorkfileContext> {
-    const path = resolve_workfile_path(custom_path);
+export function load_context(requested?: string): Result<WorkfileContext> {
+    // resolve_workfile_path only names workfile.json inside a directory, but reading
+    // an existing file under any name is fine — attach-meta passes --workfile as a
+    // file path. Creation still goes through resolve_workfile_path (see create.ts).
+    const path = requested && fs.existsSync(requested) && fs.statSync(requested).isFile()
+        ? requested
+        : resolve_workfile_path(requested);
+
     if (!path) {
-        return error("No workfile found in current directory");
+        return error(`No workfile found at '${requested}'`);
     }
 
     const minimal = load_minimal_workfile(path);
@@ -71,6 +88,9 @@ export function output(flags: OutputFlags, text: string, json: unknown): void {
 }
 
 export function output_error(flags: OutputFlags, error_code: string, message: string): void {
+    // stricli's run() does `exitCode ??= ...`, so setting it here survives and the
+    // shell (and attach-meta) sees a failure.
+    process.exitCode = 1;
     output(flags, message, { error: error_code, message });
 }
 
@@ -137,9 +157,13 @@ export function format_property_type(t: string): string {
 export function format_property_value(property: Property): string {
     if (property.value === undefined) { return "-"; }
 
-    if (property._t === "UnionProperty" && typeof property.value === "object") {
-        const [key, value] = Object.entries(property.value)[0];
-        return `${key} = ${value}`;
+    // A set union renders as `member = value`; `typeof null === "object"` in JS, so
+    // the null check is what makes this a safe Object.entries target.
+    if (property._t === "UnionProperty" && typeof property.value === "object" && property.value !== null) {
+        const entry = Object.entries(property.value)[0];
+        if (entry) {
+            return `${entry[0]} = ${entry[1]}`;
+        }
     }
 
     return String(property.value);
