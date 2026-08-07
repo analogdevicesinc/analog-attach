@@ -13,6 +13,7 @@ import {
     resolve_workfile_path,
     list_available_structs
 } from "attach-no-os-lib";
+import type { AttachContext } from "./shared";
 import {
     load_context,
     save_workfile,
@@ -191,7 +192,8 @@ function format_available_structs(structs: AvailableStructs, platform?: string):
 
 const createNodeCommand = buildCommand<
     { json?: boolean; filter?: string },
-    [string | undefined, string | undefined]
+    [string | undefined, string | undefined],
+    AttachContext
 >({
     docs: { brief: "Create a new node" },
     parameters: {
@@ -212,8 +214,8 @@ const createNodeCommand = buildCommand<
             json: { kind: "boolean", brief: "Output as JSON", optional: true },
         }
     },
-    func: async (flags, name, schema) => {
-        const context = load_context();
+    func: async function (flags, name, schema) {
+        const context = load_context(this.workfile_path);
         if (!context.ok) {
             output_error(flags, "load_failed", context.error.message);
             return;

@@ -6,6 +6,7 @@ import {
     suggest_for_property,
     IncludeProperty
 } from "attach-no-os-lib";
+import type { AttachContext } from "./shared";
 import {
     load_context,
     output,
@@ -27,7 +28,8 @@ import {
 
 export const readCommand = buildCommand<
     { json?: boolean },
-    [string | undefined, string | undefined, string | undefined]
+    [string | undefined, string | undefined, string | undefined],
+    AttachContext
 >({
     docs: { brief: "Read workfile, node, or property" },
     parameters: {
@@ -60,8 +62,8 @@ export const readCommand = buildCommand<
             json: { kind: "boolean", brief: "Output as JSON", optional: true }
         }
     },
-    func: async (flags, node, property, union_member) => {
-        const context = load_context();
+    func: async function (flags, node, property, union_member) {
+        const context = load_context(this.workfile_path);
         if (!context.ok) {
             output_error(flags, "load_failed", context.error.message);
             return;
@@ -134,7 +136,8 @@ export const readCommand = buildCommand<
         // aa read <node> <property>
         const suggestions = suggest_for_property(context.value.workfile, node, property);
         if (!suggestions.ok) {
-            console.log(`Warning: suggest_for_property failed: ${suggestions.error.message}`);
+            // stderr: stdout carries the --json body that consumers parse.
+            console.warn(`Warning: suggest_for_property failed: ${suggestions.error.message}`);
         }
         const suggestions_value = suggestions.ok ? suggestions.value : {};
         const text = format_property_details(lookup.value.property, suggestions_value);

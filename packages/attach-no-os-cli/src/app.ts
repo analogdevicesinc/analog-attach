@@ -9,6 +9,8 @@ import { generateCommand } from "./commands/generate";
 import { buildCommandDefinition } from "./commands/build";
 import { deployCommand } from "./commands/deploy";
 import { completionCommand } from "./commands/completion";
+import { discoveryCommand } from "./commands/discovery";
+import { TOOL_DESCRIPTION, TOOL_VERSION } from "./protocol";
 
 const routes = buildRouteMap({
 	routes: {
@@ -22,15 +24,16 @@ const routes = buildRouteMap({
 		build: buildCommandDefinition,
 		deploy: deployCommand,
 		completion: completionCommand,
+		discovery: discoveryCommand,
 	},
 	docs: {
-		brief: "Analog Attach CLI for no-OS workfiles",
+		brief: TOOL_DESCRIPTION,
 	},
 });
 
 export const app = buildApplication(routes, {
 	name: "aa",
 	versionInfo: {
-		currentVersion: "0.1.0",
+		currentVersion: TOOL_VERSION,
 	}
 });

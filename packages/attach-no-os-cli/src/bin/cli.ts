@@ -2,27 +2,35 @@
 import { proposeCompletions, run } from "@stricli/core";
 import { app } from "../app";
 import { CompletionContext } from "../completion/completion";
+import { normalize_argv } from "../argv";
+import type { AttachContext } from "../commands/shared";
+import { resolve_route } from "../protocol";
 
-const arguments_ = process.argv.slice(2);
+const raw_arguments = process.argv.slice(2);
 
-// Handle hidden --complete flag for shell completion.
-// aa.bash invokes `aa --complete "${COMP_LINE}"`, so the whole command line
-// arrives as one string. We split it into words, drop the leading "aa", and —
-// when the line ends in whitespace — append an empty token so stricli knows a
-// new argument is being started.
-if (arguments_[0] === "--complete") {
-    const line = arguments_.slice(1).join(" ");
-    const words = line.trimStart().split(/\s+/).filter(Boolean).slice(1);
-    if (/\s$/.test(line)) {
-        words.push("");
+// --- completions ---
+//
+// `aa complete <route> <partial> [prior tokens...]`, shared by attach-meta and
+// completion/aa.bash. <route> is a discovery key (`create_node`), a literal route
+// word (`create`), or empty to complete the top-level routes; resolve_route maps all
+// three to the prefix stricli expects, so the per-parameter proposeCompletions hooks
+// do the real work unchanged.
+if (raw_arguments[0] === "complete") {
+    const [, key, partial, ...tokens] = raw_arguments;
+
+    const route = resolve_route(key);
+    if (!route) {
+        // Unsupported key. Exit silent: a completion request is not user-visible, and
+        // anything printed here lands in their shell.
+        process.exit(0);
     }
 
+    const words = [...route, ...tokens, partial ?? ""];
     const context: CompletionContext = { process, completionInputs: words };
     const completions = await proposeCompletions(app, words, context);
 
-    // Emit workfile values / command names first and flags (--foo) last, each
-    // group sorted alphabetically. aa.bash registers completion with -o nosort
-    // so bash preserves this order instead of interleaving flags into the list.
+    // Values and command names first, flags last, each group sorted. aa.bash registers
+    // with -o nosort so bash preserves this instead of interleaving flags.
     const is_flag = (c: (typeof completions)[number]) => c.kind === "argument:flag";
     const by_completion = (a: (typeof completions)[number], b: (typeof completions)[number]) =>
         a.completion.localeCompare(b.completion);
@@ -36,4 +44,9 @@ if (arguments_[0] === "--complete") {
     process.exit(0);
 }
 
-run(app, arguments_, { process });
+const { argv, workfile } = normalize_argv(raw_arguments);
+
+// stricli hands this to each command as `this`, which is how --workfile reaches
+// load_context.
+const context: AttachContext = { process, workfile_path: workfile };
+await run(app, argv, context);

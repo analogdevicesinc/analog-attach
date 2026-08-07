@@ -3,6 +3,7 @@ import {
     remove_symbol,
     set_value
 } from "attach-no-os-lib";
+import type { AttachContext } from "./shared";
 import {
     load_context,
     save_workfile,
@@ -22,7 +23,8 @@ import {
 
 export const deleteCommand = buildCommand<
     { json?: boolean; yes?: boolean },
-    [string | undefined, string | undefined, string | undefined]
+    [string | undefined, string | undefined, string | undefined],
+    AttachContext
 >({
     docs: { brief: "Delete a node, or reset a property or union member" },
     parameters: {
@@ -56,8 +58,8 @@ export const deleteCommand = buildCommand<
             yes: { kind: "boolean", brief: "Confirm node deletion (required to delete a node)", optional: true }
         }
     },
-    func: async (flags, node, property, member) => {
-        const context = load_context();
+    func: async function (flags, node, property, member) {
+        const context = load_context(this.workfile_path);
         if (!context.ok) {
             output_error(flags, "load_failed", context.error.message);
             return;

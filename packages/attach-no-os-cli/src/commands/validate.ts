@@ -3,6 +3,7 @@ import {
     validate_workfile,
     ValidationError
 } from "attach-no-os-lib";
+import type { AttachContext } from "./shared";
 import {
     load_context,
     output,
@@ -19,7 +20,8 @@ import {
 
 export const validateCommand = buildCommand<
     { json?: boolean },
-    [string | undefined, string | undefined]
+    [string | undefined, string | undefined],
+    AttachContext
 >({
     docs: { brief: "Validate workfile, node, or property" },
     parameters: {
@@ -45,8 +47,8 @@ export const validateCommand = buildCommand<
             json: { kind: "boolean", brief: "Output as JSON", optional: true }
         }
     },
-    func: async (flags, node, property) => {
-        const context = load_context();
+    func: async function (flags, node, property) {
+        const context = load_context(this.workfile_path);
         if (!context.ok) {
             output_error(flags, "load_failed", context.error.message);
             return;

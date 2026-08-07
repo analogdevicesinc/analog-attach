@@ -8,7 +8,7 @@ import {
     SettingsFile,
     MinimalWorkfile,
 } from "attach-no-os-lib";
-import type { ApplicationContext } from "@stricli/core";
+import type { AttachContext } from "../commands/shared";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -16,7 +16,7 @@ import path from "node:path";
 // words so per-parameter proposeCompletions hooks can read the positionals the
 // user already typed (a hook's `this` is this object; stricli does not hand it
 // the sibling positionals directly).
-export type CompletionContext = ApplicationContext & { completionInputs?: readonly string[] };
+export type CompletionContext = AttachContext & { completionInputs?: readonly string[] };
 
 /**
  * Positional arguments already typed for the current command.
