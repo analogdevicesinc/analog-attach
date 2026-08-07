@@ -5,6 +5,7 @@ import {
     scan_platforms,
     get_schemas_path,
     get_settings,
+    list_template_sets,
     SettingsFile,
     MinimalWorkfile,
 } from "attach-no-os-lib";
@@ -129,6 +130,12 @@ export function get_config_keys(): string[] {
 }
 
 export function get_config_value_suggestions(key: string): string[] {
+    // template_set has a known, enumerable set of valid values — the bundled
+    // template folders — so propose those rather than just the current one.
+    if (key === "template_set") {
+        return list_template_sets();
+    }
+
     const settings = get_settings();
     if (!settings.ok) {
         return [];
