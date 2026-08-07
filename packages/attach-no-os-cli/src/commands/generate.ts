@@ -3,6 +3,7 @@ import {
     generate_project,
     get_setting_value,
 } from "attach-no-os-lib";
+import type { AttachContext } from "./shared";
 import {
     load_context,
     output,
@@ -10,8 +11,9 @@ import {
 } from "./shared";
 
 export const generateCommand = buildCommand<
-    { json?: boolean; output?: string; workfile?: string },
-    [string]
+    { json?: boolean; output?: string },
+    [string],
+    AttachContext
 >({
     docs: { brief: "Generate a no-OS project from the workfile" },
     parameters: {
@@ -24,11 +26,10 @@ export const generateCommand = buildCommand<
         flags: {
             json: { kind: "boolean", brief: "Output as JSON", optional: true },
             output: { kind: "parsed", brief: "Output directory (default: current directory)", optional: true, parse: String },
-            workfile: { kind: "parsed", brief: "Path to workfile.json", optional: true, parse: String }
         }
     },
-    func: async (flags, project_name) => {
-        const context = load_context(flags.workfile);
+    func: async function (flags, project_name) {
+        const context = load_context(this.workfile_path);
         if (!context.ok) {
             output_error(flags, "load_failed", context.error.message);
             return;

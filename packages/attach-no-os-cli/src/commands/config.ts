@@ -15,6 +15,7 @@ import {
     get_config_keys,
     get_config_value_suggestions
 } from "../completion/completion";
+import { output_error } from "./shared";
 
 export const configCommand = buildCommand<{ json?: boolean; reset?: boolean }, [string | undefined, string | undefined]>({
 	docs: {
@@ -56,7 +57,7 @@ export const configCommand = buildCommand<{ json?: boolean; reset?: boolean }, [
 		if (!key) {
 			const data = get_config_list();
 			if (!data.ok) {
-				console.log(data.error);
+				output_error(flags, "config_read_failed", data.error.message);
 				return;
 			}
 
@@ -70,7 +71,7 @@ export const configCommand = buildCommand<{ json?: boolean; reset?: boolean }, [
 		if (key && !value) {
 			const data = get_settings();
 			if (!data.ok) {
-				console.log(data.error);
+				output_error(flags, "config_read_failed", data.error.message);
 				return;
 			}
 
@@ -102,7 +103,7 @@ export const configCommand = buildCommand<{ json?: boolean; reset?: boolean }, [
 					break;
 				}
 				default: {
-					console.warn(`Unknown setting: ${value}`);
+					output_error(flags, "unknown_setting", `Unknown setting: ${key}`);
 				}
 			}
 		}
@@ -110,7 +111,7 @@ export const configCommand = buildCommand<{ json?: boolean; reset?: boolean }, [
 		if (key && value) {
 			const data = get_config_list();
 			if (!data.ok) {
-				console.log(data.error);
+				output_error(flags, "config_read_failed", data.error.message);
 				return;
 			}
 
@@ -122,7 +123,7 @@ export const configCommand = buildCommand<{ json?: boolean; reset?: boolean }, [
 					break;
 				}
 				default: {
-					console.warn(`Unknown setting: ${value}`);
+					output_error(flags, "unknown_setting", `Unknown setting: ${key}`);
 					break;
 				}
 			}
@@ -133,13 +134,13 @@ export const configCommand = buildCommand<{ json?: boolean; reset?: boolean }, [
 function key_value_set(key: keyof SettingsFile, value: string, flags: { json?: boolean, reset?: boolean }) {
 	const result = set_setting_value(key, value);
 	if (!result.ok) {
-		console.log(result.error);
+		output_error(flags, "config_write_failed", result.error.message);
 		return;
 	}
 
 	const readback = get_setting_value(key);
 	if (!readback.ok) {
-		console.log(readback.error);
+		output_error(flags, "config_read_failed", readback.error.message);
 		return;
 	}
 
