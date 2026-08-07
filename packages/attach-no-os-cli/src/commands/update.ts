@@ -6,6 +6,7 @@ import {
     set_value,
     suggest_for_property
 } from "attach-no-os-lib";
+import type { AttachContext } from "./shared";
 import {
     load_context,
     save_workfile,
@@ -28,7 +29,8 @@ import {
 
 export const updateCommand = buildCommand<
     { json?: boolean; rename?: string },
-    [string | undefined, string | undefined, string | undefined, string | undefined]
+    [string | undefined, string | undefined, string | undefined, string | undefined],
+    AttachContext
 >({
     docs: { brief: "Update a node property or rename a node" },
     parameters: {
@@ -69,8 +71,8 @@ export const updateCommand = buildCommand<
             rename: { kind: "parsed", brief: "Rename node to this name", optional: true, parse: String }
         }
     },
-    func: async (flags, node, property, value, union_value) => {
-        const context = load_context();
+    func: async function (flags, node, property, value, union_value) {
+        const context = load_context(this.workfile_path);
         if (!context.ok) {
             output_error(flags, "load_failed", context.error.message);
             return;
