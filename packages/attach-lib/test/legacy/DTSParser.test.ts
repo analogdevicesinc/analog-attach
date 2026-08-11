@@ -3,7 +3,7 @@ import path from 'node:path';
 
 import { printDts, printDtso, mergeDtso, DtsDocument, DtsReference } from 'attach-lib';
 
-import { parse_dts } from 'attach-lib';
+import { parseDtsWithLabelMap as parse_dts } from 'attach-lib';
 
 import { test, expect } from 'vitest';
 
@@ -28,11 +28,11 @@ test('minimal root and string property', () => {
   const source_path = path.resolve(__dirname, '../dts_source/minimal.dts');
   const source = fs.readFileSync(source_path, 'utf8');
 
-  const document = parse_dts(source);
+  const document = parse_dts(source, false).document;
 
   const out = printDts(document);
 
-  const document2 = parse_dts(out);
+  const document2 = parse_dts(out, false).document;
   expect(normalize(document2)).toStrictEqual(normalize(document));
 });
 
@@ -40,11 +40,11 @@ test('arrays, refs, bytes, labels', () => {
   const source_path = path.resolve(__dirname, '../dts_source/basic_types.dts');
   const source = fs.readFileSync(source_path, 'utf8');
 
-  const document = parse_dts(source);
+  const document = parse_dts(source, false).document;
 
   const out = printDts(document);
 
-  const document2 = parse_dts(out);
+  const document2 = parse_dts(out, false).document;
   expect(normalize(document2)).toStrictEqual(normalize(document));
 });
 
@@ -52,11 +52,11 @@ test('roundtrip rpi.prepro.dts', () => {
   const source_path = path.resolve(__dirname, '../dts_source/rpi.prepro.dts');
   const source = fs.readFileSync(source_path, 'utf8');
 
-  const document = parse_dts(source);
+  const document = parse_dts(source, false).document;
 
   const out = printDts(document);
 
-  const document2 = parse_dts(out);
+  const document2 = parse_dts(out, false).document;
   expect(normalize(document2)).toStrictEqual(normalize(document));
 });
 
@@ -64,11 +64,11 @@ test('roundtrip zephyr.dts', () => {
   const dts_source = path.resolve(__dirname, '../dts_source/zephyr.dts');
   const source = fs.readFileSync(dts_source, 'utf8');
 
-  const document = parse_dts(source);
+  const document = parse_dts(source, false).document;
 
   const out = printDts(document);
 
-  const document2 = parse_dts(out);
+  const document2 = parse_dts(out, false).document;
   expect(normalize(document2)).toStrictEqual(normalize(document));
 });
 
@@ -76,7 +76,7 @@ test('byte strings support compact hex with spaces', () => {
   const source_path = path.resolve(__dirname, '../dts_source/basic_types.dts');
   const source = fs.readFileSync(source_path, 'utf8');
 
-  const document = parse_dts(source);
+  const document = parse_dts(source, false).document;
 
   const bytesProperty = document.root.properties.find((p) => p.name === 'bytes');
 
@@ -93,7 +93,7 @@ test('byte strings support compact hex with spaces', () => {
   expect(values).toStrictEqual([0x00, 0x00, 0x00, 0x1B, 0x73, 0x74, 0x61, 0x74, 0x75, 0x73, 0x00]);
 
   const out = printDts(document);
-  const document2 = parse_dts(out);
+  const document2 = parse_dts(out, false).document;
 
   expect(normalize(document2)).toStrictEqual(normalize(document));
 });
@@ -102,7 +102,7 @@ test('byte strings support compact hex without spaces', () => {
   const source_path = path.resolve(__dirname, '../dts_source/basic_types.dts');
   const source = fs.readFileSync(source_path, 'utf8');
 
-  const document = parse_dts(source);
+  const document = parse_dts(source, false).document;
 
   const bytesProperty = document.root.properties.find((p) => p.name === 'bytes2');
 
@@ -119,7 +119,7 @@ test('byte strings support compact hex without spaces', () => {
   expect(values).toStrictEqual([0x00, 0x00, 0x00, 0x1B, 0x73, 0x74, 0x61, 0x74, 0x75, 0x73, 0x00]);
 
   const out = printDts(document);
-  const document2 = parse_dts(out);
+  const document2 = parse_dts(out, false).document;
 
   expect(normalize(document2)).toStrictEqual(normalize(document));
 });
@@ -128,7 +128,7 @@ test('merge behavior: later root overrides earlier', () => {
   const source_path = path.resolve(__dirname, '../dts_source/merge_input.dts');
   const source = fs.readFileSync(source_path, 'utf8');
 
-  const document = parse_dts(source);
+  const document = parse_dts(source, false).document;
 
   const a = document.root.children.find((c) => c.name === 'node' && (c.labels ?? []).includes('a'));
 
@@ -157,7 +157,7 @@ test('merge behavior: later root overrides earlier', () => {
 test('delete-property removes alias intc', () => {
   const source_path = path.resolve(__dirname, '../dts_source/delete_merge_alias.dts');
   const source = fs.readFileSync(source_path, 'utf8');
-  const document = parse_dts(source);
+  const document = parse_dts(source, false).document;
 
   const aliases = document.root.children.find((c) => c.name === 'aliases');
 
@@ -193,7 +193,7 @@ test('delete-property removes alias intc', () => {
 test('labeling', () => {
   const source_path = path.resolve(__dirname, '../dts_source/basic_types.dts');
   const source = fs.readFileSync(source_path, 'utf8');
-  const document = parse_dts(source);
+  const document = parse_dts(source, false).document;
 
   const model = document.root.properties.find((value) => value.name === 'model');
 
@@ -249,7 +249,7 @@ test('labeling', () => {
 test('stack labels', () => {
   const source_path = path.resolve(__dirname, '../dts_source/stack_labels.dts');
   const source = fs.readFileSync(source_path, 'utf8');
-  const document = parse_dts(source);
+  const document = parse_dts(source, false).document;
 
   const property = document.root.properties.find((value) => value.name === "prop");
 
@@ -287,74 +287,74 @@ test('bad character in dts', () => {
   const source_path = path.resolve(__dirname, '../dts_source/bad_character.dts');
   const source = fs.readFileSync(source_path, 'utf8');
 
-  expect(() => parse_dts(source)).toThrowError(Error);
+  expect(() => parse_dts(source, false).document).toThrowError(Error);
 });
 
 test('missing semicolon in dts', () => {
   const version_tag_path = path.resolve(__dirname, '../dts_source/missing_semicolons/version_tag.dts');
   const version_tag = fs.readFileSync(version_tag_path, 'utf8');
 
-  expect(() => parse_dts(version_tag)).toThrowError(Error);
+  expect(() => parse_dts(version_tag, false).document).toThrowError(Error);
 
   const memreserve_path = path.resolve(__dirname, '../dts_source/missing_semicolons/memreserve.dts');
   const memreserve = fs.readFileSync(memreserve_path, 'utf8');
 
-  expect(() => parse_dts(memreserve)).toThrowError(Error);
+  expect(() => parse_dts(memreserve, false).document).toThrowError(Error);
 
   const slash_directive_path = path.resolve(__dirname, '../dts_source/missing_semicolons/slash_directive.dts');
   const slash_directive = fs.readFileSync(slash_directive_path, 'utf8');
 
-  expect(() => parse_dts(slash_directive)).toThrowError(Error);
+  expect(() => parse_dts(slash_directive, false).document).toThrowError(Error);
 
   const property_path = path.resolve(__dirname, '../dts_source/missing_semicolons/property.dts');
   const property = fs.readFileSync(property_path, 'utf8');
 
-  expect(() => parse_dts(property)).toThrowError(Error);
+  expect(() => parse_dts(property, false).document).toThrowError(Error);
 
   const node_path = path.resolve(__dirname, '../dts_source/missing_semicolons/node.dts');
   const node = fs.readFileSync(node_path, 'utf8');
 
-  expect(() => parse_dts(node)).toThrowError(Error);
+  expect(() => parse_dts(node, false).document).toThrowError(Error);
 });
 
 test('extra semicolon in dts', () => {
   const version_tag_path = path.resolve(__dirname, '../dts_source/extra_semicolons/version_tag.dts');
   const version_tag = fs.readFileSync(version_tag_path, 'utf8');
 
-  expect(() => parse_dts(version_tag)).toThrowError(Error);
+  expect(() => parse_dts(version_tag, false).document).toThrowError(Error);
 
   const memreserve_path = path.resolve(__dirname, '../dts_source/extra_semicolons/memreserve.dts');
   const memreserve = fs.readFileSync(memreserve_path, 'utf8');
 
-  expect(() => parse_dts(memreserve)).toThrowError(Error);
+  expect(() => parse_dts(memreserve, false).document).toThrowError(Error);
 
   const slash_directive_path = path.resolve(__dirname, '../dts_source/extra_semicolons/slash_directive.dts');
   const slash_directive = fs.readFileSync(slash_directive_path, 'utf8');
 
-  expect(() => parse_dts(slash_directive)).toThrowError(Error);
+  expect(() => parse_dts(slash_directive, false).document).toThrowError(Error);
 
   const property_path = path.resolve(__dirname, '../dts_source/extra_semicolons/property.dts');
   const property = fs.readFileSync(property_path, 'utf8');
 
-  expect(() => parse_dts(property)).toThrowError(Error);
+  expect(() => parse_dts(property, false).document).toThrowError(Error);
 
   const node_path = path.resolve(__dirname, '../dts_source/extra_semicolons/node.dts');
   const node = fs.readFileSync(node_path, 'utf8');
 
-  expect(() => parse_dts(node)).toThrowError(Error);
+  expect(() => parse_dts(node, false).document).toThrowError(Error);
 });
 
 test('missing version tag', () => {
   const source_path = path.resolve(__dirname, '../dts_source/missing_version.dts');
   const source = fs.readFileSync(source_path, 'utf8');
 
-  expect(() => parse_dts(source)).toThrowError(Error);
+  expect(() => parse_dts(source, false).document).toThrowError(Error);
 });
 
 test('delete from overlay is relative and does not remove same-named root node', () => {
   const source_path = path.resolve(__dirname, '../dts_source/relative_delete_node_with_overlay.dts');
   const source = fs.readFileSync(source_path, 'utf8');
-  const document = parse_dts(source);
+  const document = parse_dts(source, false).document;
 
   const leds = document.root.children.find((c) => c.name === 'leds');
 
@@ -369,7 +369,7 @@ test('delete from overlay is relative and does not remove same-named root node',
 test('delete node from overlay successful delete', () => {
   const source_path = path.resolve(__dirname, '../dts_source/delete_node_with_overlay.dts');
   const source = fs.readFileSync(source_path, 'utf8');
-  const document = parse_dts(source);
+  const document = parse_dts(source, false).document;
 
   const leds = document.root.children.find((c) => c.name === 'leds');
 
@@ -383,7 +383,7 @@ test('delete node from overlay successful delete', () => {
 test('delete property from overlay successful delete', () => {
   const source_path = path.resolve(__dirname, '../dts_source/delete_property_with_overlay.dts');
   const source = fs.readFileSync(source_path, 'utf8');
-  const document = parse_dts(source);
+  const document = parse_dts(source, false).document;
 
   const leds = document.root.children.find((c) => c.name === 'leds');
 
@@ -397,7 +397,7 @@ test('delete property from overlay successful delete', () => {
 test('printDtso merges overlays with reference as full path and enables direct parent (status property)', () => {
   const source_path = path.resolve(__dirname, '../dts_source/dtso/base.dts');
   const source = fs.readFileSync(source_path, 'utf8');
-  const base = parse_dts(source);
+  const base = parse_dts(source, false).document;
 
   const flag_overlay_path = path.resolve(__dirname, '../dts_source/dtso/add_flag.dtso');
   const flag_overlay_source = fs.readFileSync(flag_overlay_path, 'utf8');
@@ -420,12 +420,12 @@ test('comments are correctly parsed', () => {
   const source_path = path.resolve(__dirname, './comments.dts');
   const source = fs.readFileSync(source_path, 'utf8');
 
-  const document = parse_dts(source);
+  const document = parse_dts(source, false).document;
   expect(document.metadata).toBeDefined();
 
   const out = printDts(document);
 
-  const document2 = parse_dts(out);
+  const document2 = parse_dts(out, false).document;
   expect(document2.metadata).toBeDefined();
   expect(normalize(document2)).toStrictEqual(normalize(document));
 });

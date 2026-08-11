@@ -1,15 +1,15 @@
 import * as fs from 'node:fs';
 import path from 'node:path';
 
-import { parse_dts, search_node_in_dts } from 'attach-lib';
+import { DtsDocument, parseDtsWithLabelMap as parse_dts, search_node_in_dts } from 'attach-lib';
 
 import { test, expect, describe } from 'vitest';
 
-function parse_source(): ReturnType<typeof parse_dts> {
+function parse_source(): DtsDocument {
   const source_path = path.resolve(__dirname, 'dts_source/search_node.dts');
   const source = fs.readFileSync(source_path, 'utf8');
 
-  return parse_dts(source);
+  return parse_dts(source, false).document;
 }
 
 describe('search_node_in_dts', () => {

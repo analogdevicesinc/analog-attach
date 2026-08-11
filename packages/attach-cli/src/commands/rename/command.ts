@@ -1,9 +1,9 @@
 import { buildCommand } from "@stricli/core";
-import { mergeDtso, parse_dts, parseDtso, printDtso, search_node_in_dts, type DtsDocument } from "attach-lib";
+import { DeviceTree, DeviceTreeOverlay, get_full_node_name } from "attach-lib";
 
 import * as fs from 'node:fs';
 
-import { resolve_node_identifier } from "../../utilities";
+
 import { load_config } from "../../config";
 
 type Flags = {
@@ -63,39 +63,22 @@ export const rename_command = buildCommand({
         }
 
         const context_content = fs.readFileSync(context, 'utf8');
+        const base = DeviceTree.new_from_string(context_content);
 
-        const base_document = (() => {
-            try {
-                return parse_dts(context_content);
-            } catch {
-                return;
-            }
-        })();
-
-        if (base_document === undefined) {
-            console.log(`Failed to parse dts ${context}`);
+        if (typeof base === "string") {
+            console.log(`Failed to parse dts ${context}: ${base}`);
             return;
         }
 
         const input_content = fs.readFileSync(input, 'utf8');
+        const overlay = DeviceTreeOverlay.new_from_string(input_content, base);
 
-        const input_document = (() => {
-            try {
-                return parseDtso(input_content);
-            } catch (error) {
-                console.log(`${error}`);
-                return;
-            }
-        })();
-
-        if (input_document === undefined) {
-            console.log(`Failed to parse dtso ${input}`);
+        if (typeof overlay === "string") {
+            console.log(`Failed to parse dtso ${input}: ${overlay}`);
             return;
         }
 
-        const merged = mergeDtso(base_document, input_content, true);
-
-        const result = rename_overlay_node(base_document, merged, node, to);
+        const result = rename_overlay_node(base, overlay, node, to);
 
         switch (result) {
             case "not-found": {
@@ -115,7 +98,7 @@ export const rename_command = buildCommand({
                 return;
             }
             case "renamed": {
-                fs.writeFileSync(input, printDtso(merged));
+                fs.writeFileSync(input, overlay.print());
                 console.log(`Renamed ${node} to ${to} in ${input}`);
                 return;
             }
@@ -124,38 +107,39 @@ export const rename_command = buildCommand({
 });
 
 export function rename_overlay_node(
-    base: DtsDocument,
-    merged: DtsDocument,
+    base: DeviceTree,
+    overlay: DeviceTreeOverlay,
     identifier: string,
     to: string,
 ): "renamed" | "not-found" | "in-base" | "is-root" | "conflict" {
-    const resolved = resolve_node_identifier(merged, identifier);
-    const found = search_node_in_dts(merged, resolved);
+    const found = overlay.find_node(identifier);
+
     if (found === undefined) { return "not-found"; }
+    if (found.is_in_base) { return "in-base"; }
     if (found.parent_node === undefined) { return "is-root"; }
-    if (search_node_in_dts(base, resolved) !== undefined) { return "in-base"; }
 
     const at = to.indexOf('@');
     const new_name = at === -1 ? to : to.slice(0, at);
     const new_unit = at === -1
-        ? found.found_node.unit_addr
+        ? found.node.unit_addr
         : (to.slice(at + 1) === "" ? undefined : to.slice(at + 1));
 
     const siblings = found.parent_node.children;
     const collision = siblings.some(
-        (s) => s !== found.found_node && s.name === new_name && s.unit_addr === new_unit
+        (s) => s !== found.node && s.name === new_name && s.unit_addr === new_unit
     );
+
     if (collision) { return "conflict"; }
 
-    found.found_node.name = new_name;
-    found.found_node.unit_addr = new_unit;
-    found.found_node.modified_by_user = true;
+    found.node.name = new_name;
+    found.node.unit_addr = new_unit;
+
     return "renamed";
 }
 
 if (import.meta.vitest) {
     const { test, expect } = import.meta.vitest;
-    const { parse_dts: parse_dts_v } = await import('attach-lib');
+    const { DeviceTree: DT, DeviceTreeOverlay: DTO_cls } = await import('attach-lib');
 
     const base_dts = `/dts-v1/;
 / {
@@ -187,53 +171,65 @@ if (import.meta.vitest) {
 };`;
 
     test("rename_overlay_node - renames node key, output has new key not old", () => {
-        const base = parse_dts_v(base_dts);
-        const merged = mergeDtso(base, overlay_with_imu, true);
-        const result = rename_overlay_node(base, merged, "imu1", "my_adc@0");
+        const base = DT.new_from_string(base_dts);
+        if (typeof base === "string") { throw new TypeError(base); }
+        const overlay = DTO_cls.new_from_string(overlay_with_imu, base);
+        if (typeof overlay === "string") { throw new TypeError(overlay); }
+        const result = rename_overlay_node(base, overlay, "imu1", "my_adc@0");
         expect(result).toBe("renamed");
-        const output = printDtso(merged);
+        const output = overlay.print();
         expect(output).toContain("my_adc@0");
         expect(output).not.toContain("adi,ad7124-8@0");
     });
 
     test("rename_overlay_node - --to without @ preserves existing unit addr", () => {
-        const base = parse_dts_v(base_dts);
-        const merged = mergeDtso(base, overlay_with_imu, true);
-        const result = rename_overlay_node(base, merged, "imu1", "my_adc");
+        const base = DT.new_from_string(base_dts);
+        if (typeof base === "string") { throw new TypeError(base); }
+        const overlay = DTO_cls.new_from_string(overlay_with_imu, base);
+        if (typeof overlay === "string") { throw new TypeError(overlay); }
+        const result = rename_overlay_node(base, overlay, "imu1", "my_adc");
         expect(result).toBe("renamed");
-        const output = printDtso(merged);
+        const output = overlay.print();
         expect(output).toContain("my_adc@0");
         expect(output).not.toContain("adi,ad7124-8@0");
     });
 
     test("rename_overlay_node - --to with @ overrides unit addr", () => {
-        const base = parse_dts_v(base_dts);
-        const merged = mergeDtso(base, overlay_with_imu, true);
-        const result = rename_overlay_node(base, merged, "imu1", "my_adc@3");
+        const base = DT.new_from_string(base_dts);
+        if (typeof base === "string") { throw new TypeError(base); }
+        const overlay = DTO_cls.new_from_string(overlay_with_imu, base);
+        if (typeof overlay === "string") { throw new TypeError(overlay); }
+        const result = rename_overlay_node(base, overlay, "imu1", "my_adc@3");
         expect(result).toBe("renamed");
-        const output = printDtso(merged);
+        const output = overlay.print();
         expect(output).toContain("my_adc@3");
         expect(output).not.toContain("adi,ad7124-8@0");
     });
 
     test("rename_overlay_node - refuses base-tree node", () => {
-        const base = parse_dts_v(base_dts);
-        const merged = mergeDtso(base, overlay_with_imu, true);
-        const result = rename_overlay_node(base, merged, "spi0", "spi1");
+        const base = DT.new_from_string(base_dts);
+        if (typeof base === "string") { throw new TypeError(base); }
+        const overlay = DTO_cls.new_from_string(overlay_with_imu, base);
+        if (typeof overlay === "string") { throw new TypeError(overlay); }
+        const result = rename_overlay_node(base, overlay, "spi0", "spi1");
         expect(result).toBe("in-base");
     });
 
     test("rename_overlay_node - returns not-found for unknown label", () => {
-        const base = parse_dts_v(base_dts);
-        const merged = mergeDtso(base, overlay_with_imu, true);
-        const result = rename_overlay_node(base, merged, "nonexistent", "foo");
+        const base = DT.new_from_string(base_dts);
+        if (typeof base === "string") { throw new TypeError(base); }
+        const overlay = DTO_cls.new_from_string(overlay_with_imu, base);
+        if (typeof overlay === "string") { throw new TypeError(overlay); }
+        const result = rename_overlay_node(base, overlay, "nonexistent", "foo");
         expect(result).toBe("not-found");
     });
 
     test("rename_overlay_node - returns conflict when new key collides with sibling", () => {
-        const base = parse_dts_v(base_dts);
-        const merged = mergeDtso(base, overlay_two_children, true);
-        const result = rename_overlay_node(base, merged, "imu1", "adi,ad7124-8@1");
+        const base = DT.new_from_string(base_dts);
+        if (typeof base === "string") { throw new TypeError(base); }
+        const overlay = DTO_cls.new_from_string(overlay_two_children, base);
+        if (typeof overlay === "string") { throw new TypeError(overlay); }
+        const result = rename_overlay_node(base, overlay, "imu1", "adi,ad7124-8@1");
         expect(result).toBe("conflict");
     });
 
@@ -249,11 +245,13 @@ if (import.meta.vitest) {
         };
     };
 };`;
-        const base = parse_dts_v(base_dts);
-        const merged = mergeDtso(base, overlay_nested, true);
-        const result = rename_overlay_node(base, merged, "imu1/channel@0", "channel@1");
+        const base = DT.new_from_string(base_dts);
+        if (typeof base === "string") { throw new TypeError(base); }
+        const overlay = DTO_cls.new_from_string(overlay_nested, base);
+        if (typeof overlay === "string") { throw new TypeError(overlay); }
+        const result = rename_overlay_node(base, overlay, "imu1/channel@0", "channel@1");
         expect(result).toBe("renamed");
-        const output = printDtso(merged);
+        const output = overlay.print();
         expect(output).toContain("channel@1");
         expect(output).not.toContain("channel@0");
         expect(output).toContain("imu1");

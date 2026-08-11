@@ -1,9 +1,9 @@
 import { buildCommand } from "@stricli/core";
-import { mergeDtso, parse_dts, parseDtso, printDtso, search_node_in_dts, type DtsDocument } from "attach-lib";
+import { DeviceTree, DeviceTreeOverlay } from "attach-lib";
 
 import * as fs from 'node:fs';
 
-import { resolve_node_identifier } from "../../utilities";
+
 import { load_config } from "../../config";
 
 type Flags = {
@@ -57,39 +57,22 @@ export const delete_command = buildCommand({
         }
 
         const context_content = fs.readFileSync(context, 'utf8');
+        const base = DeviceTree.new_from_string(context_content);
 
-        const base_document = (() => {
-            try {
-                return parse_dts(context_content);
-            } catch {
-                return;
-            }
-        })();
-
-        if (base_document === undefined) {
-            console.log(`Failed to parse dts ${context}`);
+        if (typeof base === "string") {
+            console.log(`Failed to parse dts ${context}: ${base}`);
             return;
         }
 
         const input_content = fs.readFileSync(input, 'utf8');
+        const overlay = DeviceTreeOverlay.new_from_string(input_content, base);
 
-        const input_document = (() => {
-            try {
-                return parseDtso(input_content);
-            } catch (error) {
-                console.log(`${error}`);
-                return;
-            }
-        })();
-
-        if (input_document === undefined) {
-            console.log(`Failed to parse dtso ${input}`);
+        if (typeof overlay === "string") {
+            console.log(`Failed to parse dtso ${input}: ${overlay}`);
             return;
         }
 
-        const merged = mergeDtso(base_document, input_content, true);
-
-        const result = delete_overlay_node(base_document, merged, node);
+        const result = delete_overlay_node(base, overlay, node);
 
         switch (result) {
             case "not-found": {
@@ -105,7 +88,7 @@ export const delete_command = buildCommand({
                 return;
             }
             case "deleted": {
-                fs.writeFileSync(input, printDtso(merged));
+                fs.writeFileSync(input, overlay.print());
                 console.log(`Deleted ${node} from ${input}`);
                 return;
             }
@@ -114,25 +97,26 @@ export const delete_command = buildCommand({
 });
 
 export function delete_overlay_node(
-    base: DtsDocument,
-    merged: DtsDocument,
+    base: DeviceTree,
+    overlay: DeviceTreeOverlay,
     identifier: string,
 ): "deleted" | "not-found" | "in-base" | "is-root" {
-    const resolved = resolve_node_identifier(merged, identifier);
-    const found = search_node_in_dts(merged, resolved);
+    const found = overlay.find_node(identifier);
+
     if (found === undefined) { return "not-found"; }
+    if (found.is_in_base) { return "in-base"; }
     if (found.parent_node === undefined) { return "is-root"; }
-    if (search_node_in_dts(base, resolved) !== undefined) { return "in-base"; }
-    const siblings = found.parent_node.children;
-    const index = siblings.indexOf(found.found_node);
-    if (index === -1) { return "not-found"; }
-    siblings.splice(index, 1);
+
+    if (!overlay.remove_node({ kind: "path", labels: [], path: found.node_path })) {
+        return "not-found";
+    }
+
     return "deleted";
 }
 
 if (import.meta.vitest) {
     const { test, expect } = import.meta.vitest;
-    const { parse_dts: parse_dts_v } = await import('attach-lib');
+    const { DeviceTree: DT, DeviceTreeOverlay: DTO_cls } = await import('attach-lib');
 
     const base_dts = `/dts-v1/;
 / {
@@ -161,39 +145,79 @@ if (import.meta.vitest) {
     };
 };`;
 
-    test("delete_overlay_node - removes overlay-added node, whole &spi0 block gone when empty", () => {
-        const base = parse_dts_v(base_dts);
-        const merged = mergeDtso(base, overlay_with_imu, true);
-        const result = delete_overlay_node(base, merged, "imu1");
+    test("delete_overlay_node - removes overlay-added node", () => {
+        const base = DT.new_from_string(base_dts);
+        if (typeof base === "string") { throw new TypeError(base); }
+
+        const overlay = DTO_cls.new_from_string(overlay_with_imu, base);
+        if (typeof overlay === "string") { throw new TypeError(overlay); }
+
+        const result = delete_overlay_node(base, overlay, "imu1");
+
         expect(result).toBe("deleted");
-        const output = printDtso(merged);
+
+        const output = overlay.print();
+
         expect(output).not.toContain("imu1");
-        expect(output).not.toContain("spi0");
     });
 
-    test("delete_overlay_node - &spi0 block remains when spi0 has user-set properties", () => {
-        const base = parse_dts_v(base_dts);
-        const merged = mergeDtso(base, overlay_spi_with_status, true);
-        const result = delete_overlay_node(base, merged, "imu1");
+    test("delete_overlay_node - &spi0 block remains when spi0 has overlay properties", () => {
+        const base = DT.new_from_string(base_dts);
+        if (typeof base === "string") { throw new TypeError(base); }
+
+        const overlay = DTO_cls.new_from_string(overlay_spi_with_status, base);
+        if (typeof overlay === "string") { throw new TypeError(overlay); }
+
+        const result = delete_overlay_node(base, overlay, "imu1");
+
         expect(result).toBe("deleted");
-        const output = printDtso(merged);
+
+        const output = overlay.print();
+
         expect(output).not.toContain("imu1");
         expect(output).toContain("spi0");
         expect(output).toContain('status = "okay"');
     });
 
     test("delete_overlay_node - refuses base-tree node", () => {
-        const base = parse_dts_v(base_dts);
-        const merged = mergeDtso(base, overlay_with_imu, true);
-        const result = delete_overlay_node(base, merged, "spi0");
+        const base = DT.new_from_string(base_dts);
+        if (typeof base === "string") { throw new TypeError(base); }
+
+        const overlay = DTO_cls.new_from_string(overlay_with_imu, base);
+        if (typeof overlay === "string") { throw new TypeError(overlay); }
+
+        const result = delete_overlay_node(base, overlay, "spi0");
+
         expect(result).toBe("in-base");
     });
 
     test("delete_overlay_node - returns not-found for unknown label", () => {
-        const base = parse_dts_v(base_dts);
-        const merged = mergeDtso(base, overlay_with_imu, true);
-        const result = delete_overlay_node(base, merged, "nonexistent");
+        const base = DT.new_from_string(base_dts);
+        if (typeof base === "string") { throw new TypeError(base); }
+
+        const overlay = DTO_cls.new_from_string(overlay_with_imu, base);
+        if (typeof overlay === "string") { throw new TypeError(overlay); }
+
+        const result = delete_overlay_node(base, overlay, "nonexistent");
+
         expect(result).toBe("not-found");
+    });
+
+    test("delete_overlay_node - fragment pruned when __overlay__ becomes empty", () => {
+        const base = DT.new_from_string(base_dts);
+        if (typeof base === "string") { throw new TypeError(base); }
+
+        const overlay = DTO_cls.new_from_string(overlay_with_imu, base);
+        if (typeof overlay === "string") { throw new TypeError(overlay); }
+
+        const result = delete_overlay_node(base, overlay, "imu1");
+
+        expect(result).toBe("deleted");
+
+        const output = overlay.print();
+
+        expect(output).not.toContain("imu1");
+        expect(output).not.toContain("spi0");
     });
 
     test("delete_overlay_node - removes overlay grandchild via label/child syntax", () => {
@@ -208,11 +232,18 @@ if (import.meta.vitest) {
         };
     };
 };`;
-        const base = parse_dts_v(base_dts);
-        const merged = mergeDtso(base, overlay_nested, true);
-        const result = delete_overlay_node(base, merged, "imu1/channel@0");
+        const base = DT.new_from_string(base_dts);
+        if (typeof base === "string") { throw new TypeError(base); }
+
+        const overlay = DTO_cls.new_from_string(overlay_nested, base);
+        if (typeof overlay === "string") { throw new TypeError(overlay); }
+
+        const result = delete_overlay_node(base, overlay, "imu1/channel@0");
+
         expect(result).toBe("deleted");
-        const output = printDtso(merged);
+
+        const output = overlay.print();
+
         expect(output).not.toContain("channel@0");
         expect(output).toContain("imu1");
     });

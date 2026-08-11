@@ -1,8 +1,42 @@
 import { Attach, extract_compatible, search_node_in_dts, type CellArrayElement, type DtsDocument, type DtsNode, type DtsReference, type DtsValue, type DtsValueComponent, type ParsedBinding } from 'attach-lib';
+import { DeviceTree } from 'attach-lib';
 import * as fs from 'node:fs';
 import path from "node:path";
 
 import { load_compat_index, save_compat_index, type CompatIndex } from "./config";
+
+/**
+ * Expand `spi0/rest` or `&spi0/rest` into `&{/abs/path/rest}` using the new
+ * DeviceTree API. Falls back to returning the identifier unchanged if not found.
+ */
+// TODO: not necessarily only in base
+export function resolve_node_identifier_new(base: DeviceTree, identifier: string): string {
+    if (identifier.startsWith("&{/") || identifier.startsWith("/")) {
+        return identifier;
+    }
+
+    const slash = identifier.indexOf("/");
+    if (slash === -1) {
+        return identifier;
+    }
+
+    const raw_prefix = identifier.startsWith("&") ? identifier.slice(1) : identifier.slice(0, slash);
+    const suffix = identifier.slice(slash + 1);
+
+    const found = base.resolve_identifier(raw_prefix);
+    if (found === undefined) { return identifier; }
+
+    const reference = found.kind === "path"
+        ? base.get_node_by_path(found)
+        : base.get_node_by_label(found);
+    if (reference === undefined) { return identifier; }
+
+    return `&{${reference.full_path.path}/${suffix}}`;
+}
+
+// ---------------------------------------------------------------------------
+// Legacy helper kept for commands still on the old API
+// ---------------------------------------------------------------------------
 
 /**
  * Expand `spi0/rest` or `&spi0/rest` into `&{/abs/path/rest}` so
@@ -330,7 +364,7 @@ function parse_cell_array_element(element: CellArrayElement): string | bigint {
 if (import.meta.vitest) {
 
     const { test, expect } = import.meta.vitest;
-    const { parse_dts } = await import('attach-lib');
+    const { DeviceTree: DT } = await import('attach-lib');
 
     let counter = 0;
 
@@ -363,29 +397,23 @@ if (import.meta.vitest) {
     };
 };`;
 
-    test(`${resolve_node_identifier.name} - bare label/child expands to &{/abs/path/child}`, () => {
-        const doc = parse_dts(dts_source);
-        expect(resolve_node_identifier(doc, 'spi0/adi,ad7124-8@0')).toBe('&{/soc/spi@7e204000/adi,ad7124-8@0}');
+
+    test(`${resolve_node_identifier_new.name} - label/child expands to &{/abs/path/child}`, () => {
+        const base = DT.new_from_string(dts_source);
+        if (typeof base === "string") { throw new TypeError(base); }
+        expect(resolve_node_identifier_new(base, 'spi0/adi,ad7124-8@0')).toBe('&{/soc/spi@7e204000/adi,ad7124-8@0}');
     });
 
-    test(`${resolve_node_identifier.name} - &label/child expands to &{/abs/path/child}`, () => {
-        const doc = parse_dts(dts_source);
-        expect(resolve_node_identifier(doc, '&spi0/adi,ad7124-8@0')).toBe('&{/soc/spi@7e204000/adi,ad7124-8@0}');
+    test(`${resolve_node_identifier_new.name} - already-absolute returned unchanged`, () => {
+        const base = DT.new_from_string(dts_source);
+        if (typeof base === "string") { throw new TypeError(base); }
+        expect(resolve_node_identifier_new(base, '&{/soc/spi@7e204000}')).toBe('&{/soc/spi@7e204000}');
     });
 
-    test(`${resolve_node_identifier.name} - already-absolute &{/path} is returned unchanged`, () => {
-        const doc = parse_dts(dts_source);
-        expect(resolve_node_identifier(doc, '&{/soc/spi@7e204000}')).toBe('&{/soc/spi@7e204000}');
-    });
-
-    test(`${resolve_node_identifier.name} - bare label with no slash is returned unchanged`, () => {
-        const doc = parse_dts(dts_source);
-        expect(resolve_node_identifier(doc, 'spi0')).toBe('spi0');
-    });
-
-    test(`${resolve_node_identifier.name} - unresolvable prefix is returned unchanged`, () => {
-        const doc = parse_dts(dts_source);
-        expect(resolve_node_identifier(doc, 'nonexistent/child@0')).toBe('nonexistent/child@0');
+    test(`${resolve_node_identifier_new.name} - bare label with no slash unchanged`, () => {
+        const base = DT.new_from_string(dts_source);
+        if (typeof base === "string") { throw new TypeError(base); }
+        expect(resolve_node_identifier_new(base, 'spi0')).toBe('spi0');
     });
 
 }

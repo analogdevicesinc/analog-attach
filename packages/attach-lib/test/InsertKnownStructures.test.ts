@@ -1,7 +1,7 @@
 import * as fs from 'node:fs';
 import path from 'node:path';
 
-import { Attach, insert_known_structures, parse_dts, query_devicetree } from 'attach-lib';
+import { Attach, insert_known_structures, parseDtsWithLabelMap as parse_dts, query_devicetree } from 'attach-lib';
 
 import { bigIntReplacer, BindingTestData, write_to_directory } from './testing_utils';
 
@@ -188,7 +188,7 @@ describe('Insert Known Structures Test', () => {
 async function test_impl(data: BindingTestData) {
     const dt_source_path = path.resolve(__dirname, 'dts_source/rpi.prepro.dts');
     const dt_source = fs.readFileSync(dt_source_path, 'utf8');
-    const document = parse_dts(dt_source);
+    const document = parse_dts(dt_source, false).document;
 
     const binding_path = path.resolve(__dirname, data.path);
     const linux_path = path.resolve(__dirname, 'linux');

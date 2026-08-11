@@ -2,7 +2,7 @@ import * as fs from 'node:fs';
 import path from 'node:path';
 
 import { execFileSync, spawnSync } from 'node:child_process';
-import { parse_dts, printDts } from 'attach-lib';
+import { parseDtsWithLabelMap as parse_dts, printDts } from 'attach-lib';
 import { ensure_directory } from '../testing_utils';
 
 import { test, expect } from 'vitest';
@@ -45,7 +45,7 @@ function assertIdenticalDts(
 
   const origDecompiled = fs.readFileSync(origDecompiledPath, 'utf8');
 
-  const document = parse_dts(originalText);
+  const document = parse_dts(originalText, false).document;
   const ourText = printDts(document);
   const ourDtsPath = path.join(absolute_cache_directory, our_dts_name);
   fs.writeFileSync(ourDtsPath, ourText, 'utf8');

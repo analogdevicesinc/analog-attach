@@ -1,7 +1,7 @@
 import path from 'node:path';
 import * as fs from 'node:fs';
 
-import { Attach, bidirectional_custom_resolve, circular_custom_resolve, find_in_object, insert_known_structures, parse_dts, query_devicetree, } from 'attach-lib';
+import { Attach, bidirectional_custom_resolve, circular_custom_resolve, find_in_object, insert_known_structures, parseDtsWithLabelMap as parse_dts, query_devicetree, } from 'attach-lib';
 import { write_to_directory } from './testing_utils';
 import $RefParser from '@apidevtools/json-schema-ref-parser';
 
@@ -83,7 +83,7 @@ describe.runIf(run)('Completion suite', () => {
 
         const dt_source_path = path.resolve(__dirname, 'dts_source/rpi.prepro.dts');
         const dt_source = fs.readFileSync(dt_source_path, 'utf8');
-        const document = parse_dts(dt_source);
+        const document = parse_dts(dt_source, false).document;
 
         let binding_count = 0;
         let parsed_binding_count = 0;

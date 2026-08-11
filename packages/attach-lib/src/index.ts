@@ -7,9 +7,24 @@ export * from './DtBindingSchema.js';
 export * from './StructuralTypes.js';
 export * from './RegexExpansion.js';
 
-// DTS parsing and manipulation
-export * from './dts_legacy/index.js';
+// DTS parsing and manipulation — legacy (dts_legacy types prefixed with Dts*)
+export {
+    type DtsDocument, type DtsNode, type DtsProperty, type DtsValue, type DtsValueComponent,
+    type DtsString, type DtsByteArray, type DtsCellArray, type DtsReference,
+    type CellArrayNumber, type CellArrayU64, type ConstExpression, type Macro,
+    type UnresolvedOverlay, type DtsMetadata, type AbsolutePathToDTSNode,
+    isDtsMetadata, isAbsolutePathToDTSNode, isArrayOfAbsolutePathToDTSNode,
+    parseDtsWithLabelMap, ensure_node_by_path,
+    printDts,
+    mergeDocument, mergeNode,
+    markNodesModified, search_node_in_dts, search_node_in_unresolved_overlays, get_node_key,
+} from './dts_legacy/index.js';
 export * from './dtso/index.js';
+
+// New DTS AST, parser, printer, and ergonomic wrappers
+export * from './dts/index.js';
+export { DeviceTree, DeviceTreeOverlay, type DTReference, type TraversalOrder, type UnitAddr, type FoundNodeResult } from './Devicetree.js';
+export { NodeBuilder, PropertyBuilder, type INodeBuilderBase } from './DTBuilder/DTBuilder.js';
 
 // binding resolving
 export * from './binding-processor/index.js';

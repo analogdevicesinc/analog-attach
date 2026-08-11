@@ -1,9 +1,9 @@
 import { buildCommand } from "@stricli/core";
-import { mergeDtso, parse_dts, parseDtso, printDtso, search_node_in_dts } from "attach-lib";
+import { DeviceTree, DeviceTreeOverlay, NodeBuilder, PropertyBuilder, type DTProperty } from "attach-lib";
 
 import * as fs from 'node:fs';
 
-import { find_binding, resolve_node_identifier } from "../../utilities";
+import { find_binding } from "../../utilities";
 import { load_config } from "../../config";
 
 type Flags = {
@@ -120,33 +120,18 @@ export const add_command = buildCommand({
         }
 
         const context_content = fs.readFileSync(context, 'utf8');
+        const base = DeviceTree.new_from_string(context_content);
 
-        const document = (() => {
-            try {
-                return parse_dts(context_content);
-            } catch {
-                return;
-            }
-        })();
-
-        if (document === undefined) {
-            console.log(`Failed to parse dts ${context}`);
+        if (typeof base === "string") {
+            console.log(`Failed to parse dts ${context}: ${base}`);
             return;
         }
 
         const input_content = fs.readFileSync(input, 'utf8');
+        const overlay = DeviceTreeOverlay.new_from_string(input_content, base);
 
-        const input_document = (() => {
-            try {
-                return parseDtso(input_content);
-            } catch (error) {
-                console.log(`${error}`);
-                return;
-            }
-        })();
-
-        if (input_document === undefined) {
-            console.log(`Failed to parse dtso ${input}`);
+        if (typeof overlay === "string") {
+            console.log(`Failed to parse dtso ${input}: ${overlay}`);
             return;
         }
 
@@ -160,33 +145,184 @@ export const add_command = buildCommand({
         }
 
         const node_name = name ?? compatible!;
+        const result = add_overlay_node(base, overlay, node_name, parent, label, compatible);
 
-        const input_document_merged = mergeDtso(document, input_content, true);
+        switch (result) {
+            case "parent-not-found": {
+                console.log(`Couldn't find parent node ${parent} in ${context} or ${input}`);
+                return;
+            }
+            case "added": {
+                fs.writeFileSync(input, overlay.print());
+                console.log(`Added ${node_name} to ${input}`);
+                return;
+            }
+        }
+    }
+});
 
-        const searched_parent = parent === undefined ? undefined : search_node_in_dts(input_document_merged, resolve_node_identifier(input_document_merged, parent));
+export function add_overlay_node(
+    base: DeviceTree,
+    overlay: DeviceTreeOverlay,
+    node_name: string,
+    parent_identifier: string | undefined,
+    label: string | undefined,
+    compatible: string | undefined,
+): "added" | "parent-not-found" {
 
-        if (parent !== undefined && searched_parent === undefined) {
-            console.log(`Couldn't find parent node ${parent} in ${context} or ${input}`);
+    const compatible_property: DTProperty | undefined = (() => {
+        if (compatible === undefined) {
             return;
         }
 
-        const target = searched_parent === undefined ? "/" : (
-            searched_parent.parent.startsWith("/") ? `&{${searched_parent.parent}}` : `&${searched_parent.parent}`
-        );
+        return PropertyBuilder.build_string()
+            .with_value(compatible)
+            .with_name("compatible")
+            .build();
+    })();
 
-        const dtso_fragment = String.raw`/dts-v1/;
+    const at = node_name.indexOf('@');
+    const name = at === -1 ? node_name : node_name.slice(0, at);
+    const unit = at === -1 ? undefined : node_name.slice(at + 1);
+
+    const new_node = NodeBuilder.new()
+        .with_name(name)
+        .with_unit_address(unit)
+        .with_label(label ?? [])
+        .with_properties(compatible_property);
+
+    if (parent_identifier === undefined) {
+        // Add to root — create a fragment targeting "/"
+        // eslint-disable-next-line unicorn/no-useless-undefined
+        overlay.add_fragment({ kind: "path", labels: [], path: "/" }, new_node, undefined);
+        return "added";
+    }
+
+    // Try to find parent in overlay (could be in an existing fragment's __overlay__)
+    const in_overlay = overlay.find_node(parent_identifier);
+    if (in_overlay !== undefined) {
+        in_overlay.node.children.push(new_node.build());
+        return "added";
+    }
+
+    // Try to find parent in base
+    const in_base = base.resolve_identifier(parent_identifier);
+    if (in_base === undefined) {
+        return "parent-not-found";
+    }
+
+    // eslint-disable-next-line unicorn/no-useless-undefined
+    overlay.add_fragment(in_base, new_node, undefined);
+
+    return "added";
+}
+
+if (import.meta.vitest) {
+    const { test, expect } = import.meta.vitest;
+    const { DeviceTree: DT, DeviceTreeOverlay: DTO_cls } = await import('attach-lib');
+
+    const base_dts = `/dts-v1/;
+/ {
+    soc {
+        spi0: spi@7e204000 {
+        };
+        spi1: spi@7e205000 {
+        };
+    };
+};`;
+
+    const empty_overlay = `/dts-v1/;
 /plugin/;
 
-${target} {
-        ${label !== undefined ? `${label}: ` : ""}${node_name} {
-            ${compatible === undefined ? "" : `compatible = "${compatible}";`}
-        };
-};
-`;
+&spi0 {
+};`;
 
-        const merged_with_new = mergeDtso(input_document_merged, dtso_fragment, true);
+    test("add_overlay_node - adds node to existing overlay fragment", () => {
+        const base = DT.new_from_string(base_dts);
+        if (typeof base === "string") { throw new TypeError(base); }
 
-        fs.writeFileSync(input, printDtso(merged_with_new));
-        console.log(`Added ${node_name} to ${input}`);
-    }
-});
+        const overlay = DTO_cls.new_from_string(empty_overlay, base);
+        if (typeof overlay === "string") { throw new TypeError(overlay); }
+
+        const result = add_overlay_node(base, overlay, "adi,ad7124-8@0", "spi0", "imu1", "adi,ad7124-8");
+
+        expect(result).toBe("added");
+
+        const output = overlay.print();
+
+        expect(output).toContain("adi,ad7124-8@0");
+        expect(output).toContain('compatible = "adi,ad7124-8"');
+        expect(output).toContain("spi0");
+    });
+
+    test("add_overlay_node - creates new fragment when parent not yet in overlay", () => {
+        const base = DT.new_from_string(base_dts);
+        if (typeof base === "string") { throw new TypeError(base); }
+
+        const overlay = DTO_cls.new_from_string(empty_overlay, base);
+        if (typeof overlay === "string") { throw new TypeError(overlay); }
+
+        const result = add_overlay_node(base, overlay, "adi,ad7124-8@0", "spi1", "imu2", "adi,ad7124-8");
+
+        expect(result).toBe("added");
+
+        const output = overlay.print();
+
+        expect(output).toContain("adi,ad7124-8@0");
+        expect(output).toContain("spi1");
+    });
+
+    test("add_overlay_node - adds to root when no parent specified", () => {
+        const base = DT.new_from_string(base_dts);
+        if (typeof base === "string") { throw new TypeError(base); }
+
+        const overlay = DTO_cls.new_from_string(empty_overlay, base);
+        if (typeof overlay === "string") { throw new TypeError(overlay); }
+
+        // eslint-disable-next-line unicorn/no-useless-undefined
+        const result = add_overlay_node(base, overlay, "my-device", undefined, undefined, undefined);
+
+        expect(result).toBe("added");
+
+        const output = overlay.print();
+
+        expect(output).toContain("my-device");
+    });
+
+    test("add_overlay_node - returns parent-not-found for unknown parent", () => {
+        const base = DT.new_from_string(base_dts);
+        if (typeof base === "string") { throw new TypeError(base); }
+
+        const overlay = DTO_cls.new_from_string(empty_overlay, base);
+        if (typeof overlay === "string") { throw new TypeError(overlay); }
+
+        const result = add_overlay_node(base, overlay, "adi,ad7124-8@0", "i2c0", "imu1", "adi,ad7124-8");
+        expect(result).toBe("parent-not-found");
+    });
+
+    test("add_overlay_node - adds grandchild to overlay-added parent", () => {
+        const overlay_with_imu = `/dts-v1/;
+/plugin/;
+
+&spi0 {
+    imu1: adi,ad7124-8@0 {
+        compatible = "adi,ad7124-8";
+    };
+};`;
+        const base = DT.new_from_string(base_dts);
+        if (typeof base === "string") { throw new TypeError(base); }
+
+        const overlay = DTO_cls.new_from_string(overlay_with_imu, base);
+        if (typeof overlay === "string") { throw new TypeError(overlay); }
+
+        // eslint-disable-next-line unicorn/no-useless-undefined
+        const result = add_overlay_node(base, overlay, "channel@0", "imu1", undefined, undefined);
+
+        expect(result).toBe("added");
+
+        const output = overlay.print();
+
+        expect(output).toContain("channel@0");
+        expect(output).toContain("imu1");
+    });
+}

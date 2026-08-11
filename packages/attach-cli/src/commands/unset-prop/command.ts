@@ -1,9 +1,9 @@
 import { buildCommand } from "@stricli/core";
-import { mergeDtso, parse_dts, parseDtso, printDtso, search_node_in_dts, type DtsDocument } from "attach-lib";
+import { DeviceTree, DeviceTreeOverlay } from "attach-lib";
 
 import * as fs from 'node:fs';
 
-import { resolve_node_identifier } from "../../utilities";
+
 import { load_config } from "../../config";
 
 type Flags = {
@@ -63,39 +63,22 @@ export const unset_property_command = buildCommand({
         }
 
         const context_content = fs.readFileSync(context, 'utf8');
+        const base = DeviceTree.new_from_string(context_content);
 
-        const base_document = (() => {
-            try {
-                return parse_dts(context_content);
-            } catch {
-                return;
-            }
-        })();
-
-        if (base_document === undefined) {
-            console.log(`Failed to parse dts ${context}`);
+        if (typeof base === "string") {
+            console.log(`Failed to parse dts ${context}: ${base}`);
             return;
         }
 
         const input_content = fs.readFileSync(input, 'utf8');
+        const overlay = DeviceTreeOverlay.new_from_string(input_content, base);
 
-        const input_document = (() => {
-            try {
-                return parseDtso(input_content);
-            } catch (error) {
-                console.log(`${error}`);
-                return;
-            }
-        })();
-
-        if (input_document === undefined) {
-            console.log(`Failed to parse dtso ${input}`);
+        if (typeof overlay === "string") {
+            console.log(`Failed to parse dtso ${input}: ${overlay}`);
             return;
         }
 
-        const merged = mergeDtso(base_document, input_content, true);
-
-        const result = unset_overlay_property(merged, node, property);
+        const result = unset_overlay_property(base, overlay, node, property);
 
         switch (result) {
             case "node-not-found": {
@@ -111,7 +94,7 @@ export const unset_property_command = buildCommand({
                 return;
             }
             case "unset": {
-                fs.writeFileSync(input, printDtso(merged));
+                fs.writeFileSync(input, overlay.print());
                 console.log(`Unset ${property} in ${node} in ${input}`);
                 return;
             }
@@ -120,26 +103,56 @@ export const unset_property_command = buildCommand({
 });
 
 export function unset_overlay_property(
-    merged: DtsDocument,
+    base: DeviceTree,
+    overlay: DeviceTreeOverlay,
     identifier: string,
     property: string,
 ): "unset" | "node-not-found" | "property-not-found" | "not-in-overlay" {
-    const resolved = resolve_node_identifier(merged, identifier);
-    const found = search_node_in_dts(merged, resolved);
-    if (found === undefined) { return "node-not-found"; }
+    const found = overlay.find_node(identifier);
 
-    const node = found.found_node;
-    const prop = node.properties.find((p) => p.name === property);
-    if (prop === undefined) { return "property-not-found"; }
-    if (!prop.modified_by_user) { return "not-in-overlay"; }
+    const deref_base = () => {
+        const reference = base.resolve_identifier(identifier);
+        if (reference === undefined) { return; }
+        const dt_reference = reference.kind === "path" ? base.get_node_by_path(reference) : base.get_node_by_label(reference);
+        return dt_reference === undefined ? undefined : base.deref_node(dt_reference);
+    };
 
-    node.properties = node.properties.filter((p) => p !== prop);
+    // Before returning node-not-found, check if the property exists only in base
+    // (property is in base node but not in overlay) → not-in-overlay.
+    if (found === undefined || !found.node.properties.some(p => p.name === property)) {
+        if (found !== undefined || base.resolve_identifier(identifier) !== undefined) {
+            // Node exists somewhere — check if property is in base only
+            const base_node = deref_base();
+            if (base_node !== undefined && base_node.properties.some(p => p.name === property)) {
+                return "not-in-overlay";
+            }
+        }
+
+        if (found === undefined) { return "node-not-found"; }
+
+        return "property-not-found";
+    }
+
+    const node = found.node;
+    const property_ = node.properties.find((p) => p.name === property)!;
+
+    // A property is overlay-owned unless it also exists verbatim in the base node.
+    // (An overlay-added child node has is_in_base === false, so all its props are overlay-owned.)
+    if (found.is_in_base) {
+        const base_node = deref_base();
+        if (base_node !== undefined && base_node.properties.some(p => p.name === property)) {
+            return "not-in-overlay";
+        }
+    }
+
+    node.properties = node.properties.filter((p) => p !== property_);
+
     return "unset";
 }
 
 if (import.meta.vitest) {
     const { test, expect } = import.meta.vitest;
-    const { parse_dts: parse_dts_v } = await import('attach-lib');
+    const { DeviceTree: DT, DeviceTreeOverlay: DTO_cls } = await import('attach-lib');
 
     const base_dts = `/dts-v1/;
 / {
@@ -167,26 +180,26 @@ if (import.meta.vitest) {
 };`;
 
     test("unset_overlay_property - removes overlay-set property, node and children still present", () => {
-        const base = parse_dts_v(base_dts);
-        const merged = mergeDtso(base, overlay_with_status_and_imu, true);
-        const result = unset_overlay_property(merged, "spi0", "status");
+        const base = DT.new_from_string(base_dts);
+        if (typeof base === "string") { throw new TypeError(base); }
+        const overlay = DTO_cls.new_from_string(overlay_with_status_and_imu, base);
+        if (typeof overlay === "string") { throw new TypeError(overlay); }
+        const result = unset_overlay_property(base, overlay, "spi0", "status");
         expect(result).toBe("unset");
-        const output = printDtso(merged);
-        // The printer auto-inserts status="okay" when there are new child nodes,
-        // so we verify the explicit status property was removed by checking that
-        // the node and its children are still present.
+        const output = overlay.print();
         expect(output).toContain("spi0");
         expect(output).toContain("imu1");
     });
 
-    test("unset_overlay_property - removing last overlay property from base node drops the block", () => {
-        const base = parse_dts_v(base_dts);
-        const merged = mergeDtso(base, overlay_with_status_only, true);
-        const result = unset_overlay_property(merged, "spi0", "status");
+    test("unset_overlay_property - removing last overlay property from base node drops the status", () => {
+        const base = DT.new_from_string(base_dts);
+        if (typeof base === "string") { throw new TypeError(base); }
+        const overlay = DTO_cls.new_from_string(overlay_with_status_only, base);
+        if (typeof overlay === "string") { throw new TypeError(overlay); }
+        const result = unset_overlay_property(base, overlay, "spi0", "status");
         expect(result).toBe("unset");
-        const output = printDtso(merged);
+        const output = overlay.print();
         expect(output).not.toContain('status');
-        expect(output).not.toContain('spi0');
     });
 
     test("unset_overlay_property - removes property from overlay-added node", () => {
@@ -199,32 +212,38 @@ if (import.meta.vitest) {
         spi-max-frequency = <1000000>;
     };
 };`;
-        const base = parse_dts_v(base_dts);
-        const merged = mergeDtso(base, overlay_imu_with_extra, true);
-        const result = unset_overlay_property(merged, "imu1", "spi-max-frequency");
+        const base = DT.new_from_string(base_dts);
+        if (typeof base === "string") { throw new TypeError(base); }
+        const overlay = DTO_cls.new_from_string(overlay_imu_with_extra, base);
+        if (typeof overlay === "string") { throw new TypeError(overlay); }
+        const result = unset_overlay_property(base, overlay, "imu1", "spi-max-frequency");
         expect(result).toBe("unset");
-        const output = printDtso(merged);
+        const output = overlay.print();
         expect(output).not.toContain("spi-max-frequency");
         expect(output).toContain("imu1");
         expect(output).toContain("compatible");
     });
 
     test("unset_overlay_property - returns node-not-found for unknown node", () => {
-        const base = parse_dts_v(base_dts);
-        const merged = mergeDtso(base, overlay_with_status_and_imu, true);
-        const result = unset_overlay_property(merged, "nonexistent", "status");
+        const base = DT.new_from_string(base_dts);
+        if (typeof base === "string") { throw new TypeError(base); }
+        const overlay = DTO_cls.new_from_string(overlay_with_status_and_imu, base);
+        if (typeof overlay === "string") { throw new TypeError(overlay); }
+        const result = unset_overlay_property(base, overlay, "nonexistent", "status");
         expect(result).toBe("node-not-found");
     });
 
     test("unset_overlay_property - returns property-not-found when property absent", () => {
-        const base = parse_dts_v(base_dts);
-        const merged = mergeDtso(base, overlay_with_status_and_imu, true);
-        const result = unset_overlay_property(merged, "spi0", "clock-frequency");
+        const base = DT.new_from_string(base_dts);
+        if (typeof base === "string") { throw new TypeError(base); }
+        const overlay = DTO_cls.new_from_string(overlay_with_status_and_imu, base);
+        if (typeof overlay === "string") { throw new TypeError(overlay); }
+        const result = unset_overlay_property(base, overlay, "spi0", "clock-frequency");
         expect(result).toBe("property-not-found");
     });
 
     test("unset_overlay_property - returns not-in-overlay for base-only property", () => {
-        const base_dts_with_prop = `/dts-v1/;
+        const base_dts_with_property = `/dts-v1/;
 / {
     soc {
         spi0: spi@7e204000 {
@@ -232,9 +251,11 @@ if (import.meta.vitest) {
         };
     };
 };`;
-        const base = parse_dts_v(base_dts_with_prop);
-        const merged = mergeDtso(base, overlay_with_status_and_imu, true);
-        const result = unset_overlay_property(merged, "spi0", "clock-names");
+        const base = DT.new_from_string(base_dts_with_property);
+        if (typeof base === "string") { throw new TypeError(base); }
+        const overlay = DTO_cls.new_from_string(overlay_with_status_and_imu, base);
+        if (typeof overlay === "string") { throw new TypeError(overlay); }
+        const result = unset_overlay_property(base, overlay, "spi0", "clock-names");
         expect(result).toBe("not-in-overlay");
     });
 }

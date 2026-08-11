@@ -204,9 +204,9 @@ export interface INodeBuilderBase {
 
 interface INodeBuilderCallOnce {
     with_label: (label: string | string[]) => void;
-    with_unit_address: (unit_address: string) => void;
-    with_properties: (properties: DTProperty | DTProperty[]) => void;
-    with_children: (children: INodeBuilderBase | INodeBuilderBase[]) => void;
+    with_unit_address: (unit_address: string | undefined) => void;
+    with_properties: (properties: DTProperty | DTProperty[] | undefined) => void;
+    with_children: (children: INodeBuilderBase | INodeBuilderBase[] | undefined) => void;
 }
 
 type INodeBuilder = AddCallOnce<INodeBuilderBase, INodeBuilderCallOnce>;
@@ -241,17 +241,27 @@ export class NodeBuilder implements INodeNameBuilder, INodeBuilder {
         return this;
     }
 
-    with_unit_address(unit_address: string): INodeBuilder {
-        this.node.unit_addr = unit_address;
+    with_unit_address(unit_address: string | undefined): INodeBuilder {
+        if (unit_address !== undefined) {
+            this.node.unit_addr = unit_address;
+        }
         return this;
     }
 
-    with_properties(properties: DTProperty | DTProperty[]): INodeBuilder {
+    with_properties(properties: DTProperty | DTProperty[] | undefined): INodeBuilder {
+        if (properties === undefined) {
+            return this;
+        }
+
         this.node.properties = Array.isArray(properties) ? properties : [properties];
         return this;
     }
 
-    with_children(children: INodeBuilderBase | INodeBuilderBase[]): INodeBuilder {
+    with_children(children: INodeBuilderBase | INodeBuilderBase[] | undefined): INodeBuilder {
+        if (children === undefined) {
+            return this;
+        }
+
         const childArray = Array.isArray(children) ? children : [children];
         this.node.children = childArray.map(child => child.build());
         return this;

@@ -1,9 +1,8 @@
 import { buildCommand } from "@stricli/core";
-import { parseDtso, print_value, search_node_in_dts } from "attach-lib";
+import { DeviceTreeOverlay, is_dt_flag, print_property } from "attach-lib";
 
 import * as fs from 'node:fs';
 
-import { resolve_node_identifier } from "../../utilities";
 
 type Flags = {
     node: string,
@@ -39,39 +38,32 @@ export const get_property_command = buildCommand({
 
         const input_content = fs.readFileSync(input, 'utf8');
 
-        const input_document = (() => {
-            try {
-                return parseDtso(input_content);
-            } catch (error) {
-                console.log(`${error}`);
-                return;
-            }
-        })();
+        const overlay = DeviceTreeOverlay.new_from_string(input_content);
 
-        if (input_document === undefined) {
-            console.log(`Failed to parse dtso ${input}`);
+        if (typeof overlay === "string") {
+            console.log(`Failed to parse dtso ${input}: ${overlay}`);
             return;
         }
 
-        const found_node = search_node_in_dts(input_document, resolve_node_identifier(input_document, node));
+        const found = overlay.find_node(node);
 
-        if (found_node === undefined) {
+        if (found === undefined) {
             console.log(`Couldn't find ${node} in ${input}`);
             return;
         }
 
-        const found_property = found_node.found_node.properties.find((value) => value.name === property);
+        const found_property = found.node.properties.find((p) => p.name === property);
 
         if (found_property === undefined) {
             console.log(`Couldn't find ${property} in ${node} in ${input}`);
             return;
         }
 
-        if (found_property.value === undefined) {
+        // TODO: inconsistent 
+        if (is_dt_flag(found_property.value)) {
             console.log("true");
         } else {
-            console.log(print_value(found_property.value));
+            console.log(print_property(found_property, "", 0).trim());
         }
-
     }
 });
