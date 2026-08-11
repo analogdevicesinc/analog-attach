@@ -1,10 +1,9 @@
 import * as fs from 'node:fs';
 import path from 'node:path';
 
-import { Attach, DeviceTree } from 'attach-lib';
-import { suggest_parents } from '../src/intelligence/parents.js';
+import { Attach, parseDtsWithLabelMap as parse_dts, suggest_parents } from 'attach-lib';
 
-import { BindingTestData, write_to_directory } from './testing_utils';
+import { BindingTestData, write_to_directory } from '../testing_utils';
 
 import { describe, test, expect } from 'vitest';
 
@@ -188,17 +187,13 @@ describe('Devicetree Query Test', () => {
 
 
 async function test_impl(data: BindingTestData) {
-    const dt_source_path = path.resolve(__dirname, 'dts_source/rpi.prepro.dts');
+    const dt_source_path = path.resolve(__dirname, '../dts_source/rpi.prepro.dts');
     const dt_source = fs.readFileSync(dt_source_path, 'utf8');
-    const dt = DeviceTree.new_from_string(dt_source);
+    const document = parse_dts(dt_source, false).document;
 
-    if (typeof dt === 'string') {
-        throw new TypeError(`Failed to parse rpi.prepro.dts: ${dt}`);
-    }
-
-    const binding_path = path.resolve(__dirname, data.path);
-    const linux_path = path.resolve(__dirname, 'linux');
-    const dt_schema_path = path.resolve(__dirname, 'dt-schema');
+    const binding_path = path.resolve(__dirname, `../${data.path}`);
+    const linux_path = path.resolve(__dirname, '../linux');
+    const dt_schema_path = path.resolve(__dirname, '../dt-schema');
 
     const attach = Attach.new();
 
@@ -206,17 +201,17 @@ async function test_impl(data: BindingTestData) {
 
     expect.assert.isDefined(binding);
 
-    const parents = suggest_parents(dt, binding.parsed_binding);
+    const parents = suggest_parents(document, binding.parsed_binding);
 
     if (data.debug === true) {
         write_to_directory(
-            path.resolve(__dirname, "expected/parent-suggestion"),
+            path.resolve(__dirname, "../expected/parent-suggestion"),
             data.name,
             parents
         );
     }
 
-    const expected_path = path.resolve(__dirname, `expected/parent-suggestion/${data.name}.json`);
+    const expected_path = path.resolve(__dirname, `../expected/parent-suggestion/${data.name}.json`);
     const expected = JSON.stringify(JSON.parse(fs.readFileSync(expected_path, 'utf8')));
 
     expect(JSON.stringify(parents)).toStrictEqual(expected);

@@ -1,7 +1,8 @@
 import * as fs from 'node:fs';
 import path from 'node:path';
 
-import { Attach, parseDtsWithLabelMap as parse_dts, query_devicetree, suggest_parents } from 'attach-lib';
+import { Attach, DeviceTree } from 'attach-lib';
+import { query_devicetree } from '../src/intelligence/query.js';
 
 import { BindingTestData, write_to_directory } from './testing_utils';
 
@@ -188,7 +189,11 @@ describe('Devicetree Query Test', () => {
 async function test_impl(data: BindingTestData) {
     const dt_source_path = path.resolve(__dirname, 'dts_source/rpi.prepro.dts');
     const dt_source = fs.readFileSync(dt_source_path, 'utf8');
-    const document = parse_dts(dt_source, false).document;
+    const dt = DeviceTree.new_from_string(dt_source);
+
+    if (typeof dt === 'string') {
+        throw new TypeError(`Failed to parse rpi.prepro.dts: ${dt}`);
+    }
 
     const binding_path = path.resolve(__dirname, data.path);
     const linux_path = path.resolve(__dirname, 'linux');
@@ -204,7 +209,7 @@ async function test_impl(data: BindingTestData) {
     };
 
     binding.parsed_binding.properties = query_devicetree(
-        document,
+        dt,
         binding.parsed_binding.properties,
         JSON.stringify(input_data),
         "spi@7e204000"
