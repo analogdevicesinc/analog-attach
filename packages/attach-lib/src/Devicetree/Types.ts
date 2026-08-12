@@ -1,5 +1,24 @@
-import { Bits, CellArrayElement, DTCellArray } from "./parser";
+import { Bits, CellArrayElement, DTCellArray, DTLabel, DTNode, DTPath } from "./parser";
 import { Labeled, MakeArray, is_array, is_labeled, make_array, make_labeled } from "./TypeUtilities";
+
+export type DTReference = {
+    node_name: string,
+    full_path: DTPath,
+    labels: DTLabel[],
+};
+
+export type TraversalOrder = "DFS" | "BFS";
+
+export type UnitAddr = { value: bigint; repr: "hex" | "dec" };
+
+export type FoundNodeResult = {
+    node: DTNode;
+    path: string;
+    node_path: string;
+    parent_node: DTNode | undefined;
+    fragment_root_path: string;
+    is_in_base: boolean;
+};
 
 type DTString = string;
 type DTString_Array = MakeArray<DTString>;
