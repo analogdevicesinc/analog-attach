@@ -25,7 +25,7 @@ export * from './dtso/index.js';
 export * from './Devicetree/index.js';
 
 // binding resolving
-export * from './binding-processor/index.js';
+export * from './Bindings/index.js';
 
 // DT Query — legacy implementation kept for internal use; only extract_compatible re-exported
 export { extract_compatible } from './DtQuery.js';

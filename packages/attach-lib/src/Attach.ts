@@ -1,17 +1,17 @@
 import { $RefParser } from "@apidevtools/json-schema-ref-parser";
 import { BindingErrors, ParsedBinding, ResolvedProperty } from './AttachTypes.js';
-import { resolve_references } from './binding-processor/RefResolver.js';
-import { resolve_properties } from './binding-processor/PropertyResolver.js';
-import { merge_redefinitions } from './binding-processor/RedefinitionMerger.js';
-import { insert_canaries } from './binding-processor/CanaryInserter.js';
-import { apply_JSONSchema_fixups } from './binding-processor/JSONSchemaFixups.js';
+import { resolve_references } from './Bindings/RefResolver.js';
+import { resolve_properties } from './Bindings/PropertyResolver.js';
+import { merge_redefinitions } from './Bindings/RedefinitionMerger.js';
+import { insert_canaries } from './Bindings/CanaryInserter.js';
+import { apply_JSONSchema_fixups } from './Bindings/JSONSchemaFixups.js';
 
 import { DtBindingSchema } from "./DtBindingSchema.js";
 import { AttachArray, AttachType, AttachEnumType, FixedIndex } from "./StructuralTypes.js";
 import { PatternPropertyRule } from "./AttachTypes.js";
 
 import Ajv2019, { ValidateFunction, KeywordDefinition } from "ajv/dist/2019.js";
-import { deep_merge, delete_path, find_entry_in_object, getByPath } from "./binding-processor/ObjectUtilities.js";
+import { deep_merge, delete_path, find_entry_in_object, getByPath } from "./Bindings/ObjectUtilities.js";
 
 export class Attach {
 
