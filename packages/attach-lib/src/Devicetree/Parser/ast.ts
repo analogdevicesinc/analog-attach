@@ -1,5 +1,5 @@
 // TODO: ok for now, unify with WIP Devicetree branch
-export type Labeled = {
+export type WithLabel = {
   labels: string[];
 }
 
@@ -37,7 +37,7 @@ export type DTO<T extends DTNode = DTNode<DTProperty>> = {
   root: T;
 }
 
-export interface DTNode<T extends DTProperty = DTProperty> extends Labeled {
+export interface DTNode<T extends DTProperty = DTProperty> extends WithLabel {
   name: string;
   unit_addr: string | undefined;
   properties: T[];
@@ -48,7 +48,7 @@ export function get_full_node_name(node: DTNode): string {
   return `${node.name}${node.unit_addr === undefined ? "" : `@${node.unit_addr}`}`;
 }
 
-export type DTProperty = Labeled & {
+export type DTProperty = WithLabel & {
   name: string;
   value: DTValue[] | DTFlag;
 }
@@ -82,12 +82,12 @@ export type DTValue =
   | DTLabel
   | DTPath
 
-export type DTString = Labeled & {
+export type DTString = WithLabel & {
   kind: "string";
   value: string;
 }
 
-export type DTCellArray = Labeled & {
+export type DTCellArray = WithLabel & {
   kind: "array";
   bit_width: Bits;
   elements: CellArrayElement[];
@@ -99,23 +99,23 @@ export type CellArrayElement =
   | DTPath
   | DTExpression
 
-export type DTNumber = Labeled & {
+export type DTNumber = WithLabel & {
   kind: "number";
   value: bigint;
   repr: "dec" | "hex";
 }
 
-export type DTExpression = Labeled & {
+export type DTExpression = WithLabel & {
   kind: "expression",
   value: string
 }
 
-export type DTLabel = Labeled & {
+export type DTLabel = WithLabel & {
   kind: "label";
   name: string
 }
 
-export type DTPath = Labeled & {
+export type DTPath = WithLabel & {
   kind: "path";
   path: string
 }
