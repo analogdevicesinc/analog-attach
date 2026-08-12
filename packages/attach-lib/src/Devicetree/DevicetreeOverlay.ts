@@ -11,7 +11,7 @@ import {
     DTO,
     parse_dto,
     print_dto
-} from "./parser";
+} from "./Parser";
 
 import * as fs from 'node:fs';
 import { Result } from "../result";

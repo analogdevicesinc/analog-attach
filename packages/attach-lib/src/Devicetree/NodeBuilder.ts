@@ -1,4 +1,4 @@
-import { DTNode, DTProperty } from "./parser";
+import { DTNode, DTProperty } from "./Parser";
 import { AddCallOnce } from "./TypeUtilities";
 
 interface INodeNameBuilder {

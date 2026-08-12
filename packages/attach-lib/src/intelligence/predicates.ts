@@ -1,5 +1,5 @@
 import { DeviceTree } from "../Devicetree/Devicetree.js";
-import { DTNode, is_dt_flag } from "../Devicetree/parser";
+import { DTNode, is_dt_flag } from "../Devicetree/Parser";
 
 export function is_interrupt_controller(node: DTNode): boolean {
     return node.properties.some(

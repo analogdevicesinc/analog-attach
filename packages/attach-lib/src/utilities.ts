@@ -1,4 +1,4 @@
-import type { DTS, DTNode } from './Devicetree/parser';
+import type { DTS, DTNode } from './Devicetree/Parser';
 
 export function get_node_key(n: DTNode): string {
   if (n.name === '/') {

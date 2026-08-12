@@ -1,6 +1,6 @@
 import { ParsedBinding } from "../AttachTypes.js";
 import { DeviceTree } from "../Devicetree/Devicetree.js";
-import { DTNode } from "../Devicetree/parser";
+import { DTNode } from "../Devicetree/Parser";
 import { extract_compatible } from "../DtQuery.js";
 
 export type PathAndLabel = {

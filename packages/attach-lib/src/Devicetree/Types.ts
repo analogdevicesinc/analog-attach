@@ -1,4 +1,4 @@
-import { Bits, CellArrayElement, DTCellArray, DTLabel, DTNode, DTPath } from "./parser";
+import { Bits, CellArrayElement, DTCellArray, DTLabel, DTNode, DTPath } from "./Parser";
 import { Labeled, MakeArray, is_array, is_labeled, make_array, make_labeled } from "./TypeUtilities";
 
 export type DTReference = {

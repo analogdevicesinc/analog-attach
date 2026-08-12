@@ -11,7 +11,7 @@ import {
     get_full_node_name,
     DTProperty,
     is_dt_flag
-} from "./parser";
+} from "./Parser";
 
 import path from 'node:path';
 import * as fs from 'node:fs';

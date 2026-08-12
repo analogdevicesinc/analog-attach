@@ -1,5 +1,5 @@
-import { Bits, DTCellArray, DTProperty } from "./parser/ast";
-import { print_property } from "./parser/printer";
+import { Bits, DTCellArray, DTProperty } from "./Parser";
+import { print_property } from "./Parser";
 import {
     CellArray,
     CellEntry,
