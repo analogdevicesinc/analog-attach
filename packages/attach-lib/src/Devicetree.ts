@@ -1,5 +1,5 @@
-import { INodeBuilderBase, NodeBuilder } from "./DTBuilder/NodeBuilder";
-import { PropertyBuilder } from "./DTBuilder/PropertyBuilder";
+import { INodeBuilderBase, NodeBuilder } from "./Devicetree/NodeBuilder";
+import { PropertyBuilder } from "./Devicetree/PropertyBuilder";
 
 import {
     print_dts,
@@ -14,7 +14,7 @@ import {
     DTProperty,
     is_dt_flag,
     DTO
-} from "./DTBuilder/parser";
+} from "./Devicetree/parser";
 
 import path from 'node:path';
 import * as fs from 'node:fs';

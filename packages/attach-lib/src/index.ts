@@ -22,11 +22,11 @@ export {
 export * from './dtso/index.js';
 
 // New DTS AST, parser, printer, and ergonomic wrappers
-export * from './DTBuilder/parser/index.js';
+export * from './Devicetree/parser/index.js';
 export { DeviceTree, DeviceTreeOverlay, type DTReference, type TraversalOrder, type UnitAddr, type FoundNodeResult } from './Devicetree.js';
-export { NodeBuilder, type INodeBuilderBase } from './DTBuilder/NodeBuilder.js';
-export { PropertyBuilder } from './DTBuilder/PropertyBuilder.js';
-export type { CellValue } from './DTBuilder/Types.js';
+export { NodeBuilder, type INodeBuilderBase } from './Devicetree/NodeBuilder.js';
+export { PropertyBuilder } from './Devicetree/PropertyBuilder.js';
+export type { CellValue } from './Devicetree/Types.js';
 
 // binding resolving
 export * from './binding-processor/index.js';
