@@ -1,9 +1,19 @@
 import { buildCommand } from "@stricli/core";
-import { Attach, get_node_key, insert_known_structures, mergeDtso, parse_dts, parseDtso, query_devicetree, search_node_in_dts, search_node_in_unresolved_overlays, type CellArrayElement, type DtsDocument, type DtsNode, type DtsProperty, type DtsValue, type DtsValueComponent, type ParsedBinding, type PatternPropertyRule } from "attach-lib";
+import {
+    Attach,
+    DeviceTree,
+    DeviceTreeOverlay,
+    insert_known_structures,
+    query_devicetree,
+    is_dt_flag,
+    type DTNode,
+    type DTProperty,
+    type PatternPropertyRule
+} from "attach-lib";
 
 import * as fs from 'node:fs';
 
-import { bigIntReplacer, find_binding, parse_dts_node, resolve_node_identifier } from "../../utilities";
+import { bigIntReplacer, find_binding, parse_dt_node, resolve_node_identifier_new } from "../../utilities";
 import { load_config } from "../../config";
 
 type Flags = {
@@ -14,25 +24,23 @@ type Flags = {
     context?: string,
 }
 
-function extract_compatible_value(compatible: DtsProperty): string | undefined {
-    if (compatible.value?.components[0]?.kind === 'string') {
-        return compatible.value.components[0].value;
-    }
-
-    return;
+function extract_compatible_value(compatible: DTProperty): string | undefined {
+    if (is_dt_flag(compatible.value)) { return; }
+    const first = compatible.value[0];
+    if (first === undefined || first.kind !== 'string') { return; }
+    return first.value;
 }
 
-async function validate_pattern_matched_child(arguments_: {
-    found_node: DtsNode,
+async function validate_pattern_matched_child(
+    found_node: DTNode,
     parent: string,
-    parent_node: DtsNode | undefined,
+    parent_node: DTNode | undefined,
     node: string,
     input: string,
     linux: string,
     dtSchema: string,
-    document: DtsDocument,
-}): Promise<void> {
-    const { found_node, parent, parent_node, node, input, linux, dtSchema, document } = arguments_;
+    base_dt: DeviceTree,
+): Promise<void> {
 
     if (parent_node === undefined) {
         console.log(`${node} has no compatible and no parent to check patternProperties against`);
@@ -69,7 +77,7 @@ async function validate_pattern_matched_child(arguments_: {
         return;
     }
 
-    const node_key = get_node_key(found_node);
+    const node_key = found_node.unit_addr ? `${found_node.name}@${found_node.unit_addr}` : found_node.name;
 
     const matched_pattern = parent_binding.patterns.find((pattern) => new RegExp(pattern).test(node_key));
 
@@ -87,10 +95,20 @@ async function validate_pattern_matched_child(arguments_: {
         return;
     }
 
-    const partial_input_data = Object.fromEntries(parse_dts_node(found_node, { required_properties: rule.required, properties: rule.properties, pattern_properties: undefined, examples: [] }));
+    const partial_input_data = Object.fromEntries(
+        parse_dt_node(
+            found_node,
+            {
+                required_properties: rule.required,
+                properties: rule.properties,
+                pattern_properties: undefined,
+                examples: []
+            }
+        )
+    );
 
     rule.properties = query_devicetree(
-        document,
+        base_dt,
         rule.properties,
         JSON.stringify(partial_input_data, bigIntReplacer),
         parent
@@ -98,7 +116,18 @@ async function validate_pattern_matched_child(arguments_: {
 
     rule.properties = insert_known_structures(rule.properties);
 
-    const input_data = Object.fromEntries(parse_dts_node(found_node, { required_properties: rule.required, properties: rule.properties, pattern_properties: undefined, examples: [] }));
+    const input_data = Object.fromEntries(
+        parse_dt_node(
+            found_node,
+            {
+                required_properties: rule.required,
+                properties: rule.properties,
+                pattern_properties: undefined,
+                examples: []
+            }
+        )
+    );
+
     console.log(JSON.stringify(input_data, bigIntReplacer));
 
     const update = parent_attach.update_pattern_binding_by_changes(matched_pattern, JSON.stringify(input_data, bigIntReplacer));
@@ -109,7 +138,7 @@ async function validate_pattern_matched_child(arguments_: {
     }
 
     let updated_properties = query_devicetree(
-        document,
+        base_dt,
         update.binding.properties,
         JSON.stringify(input_data, bigIntReplacer),
         parent
@@ -198,79 +227,43 @@ export const validate_command = buildCommand({
         }
 
         if (!fs.existsSync(input)) {
-            console.log(`Missing: ${dtSchema}`);
+            console.log(`Missing: ${input}`);
             return;
         }
 
         const context_content = fs.readFileSync(context, 'utf8');
-
-        const document = (() => {
-            try {
-                return parse_dts(context_content);
-            } catch {
-                return;
-            }
-        })();
-
         const input_content = fs.readFileSync(input, 'utf8');
 
-        const input_document = (() => {
-            try {
-                return parseDtso(input_content);
-            } catch (error) {
-                console.log(`${error}`);
-                return;
-            }
-        })();
+        const base_dt = DeviceTree.new_from_string(context_content);
 
-        if (document === undefined) {
-            console.log(`Failed to parse dts ${context}`);
+        if (typeof base_dt === 'string') {
+            console.log(`Failed to parse dts ${context}: ${base_dt}`);
             return;
         }
 
-        if (input_document === undefined) {
-            console.log(`Failed to parse dtso ${input}`);
+        const overlay = DeviceTreeOverlay.new_from_string(input_content, base_dt);
+
+        if (typeof overlay === 'string') {
+            console.log(`Failed to parse dtso ${input}: ${overlay}`);
             return;
         }
 
-        const input_document_merged = mergeDtso(document, input_content, true);
-        /* 
-                const found_node: { target_node: DtsNode, parent?: string } | undefined = (() => {
-                    const node_with_parent = search_node_in_unresolved_overlays(input_document.unresolved_overlays, node);
-        
-                    if (node_with_parent !== undefined) {
-                        return {
-                            target_node: node_with_parent.node,
-                            parent: node_with_parent.overlay.overlay_target_ref.ref.kind === 'label' ?
-                                node_with_parent.overlay.overlay_target_ref.ref.name :
-                                node_with_parent.overlay.overlay_target_ref.ref.path
-                        };
-                    }
-        
-                    const node_without_parent = search_node_in_dts(input_document, node);
-        
-                    if (node_without_parent !== undefined) {
-                        return { target_node: node_without_parent, parent: "/" };
-                    }
-        
-                    return;
-                })();
-         */
-
-        const searched_node = search_node_in_dts(input_document_merged, resolve_node_identifier(input_document_merged, node));
+        const identifier = resolve_node_identifier_new(base_dt, node);
+        const searched_node = overlay.find_node(identifier);
 
         if (searched_node === undefined) {
             console.log(`Couldn't find ${node} in ${input}`);
             return;
         }
 
-        const { found_node, parent, parent_node } = searched_node;
+        const { node: found_node, parent_node } = searched_node;
+        const parent = found_node.labels.at(-1) ?? searched_node.node_path;
 
         const compatible = found_node.properties.find((property) => property.name === "compatible");
 
         if (compatible === undefined) {
             await validate_pattern_matched_child(
-                { found_node, parent, parent_node, node, input, linux, dtSchema, document }
+                found_node, parent, parent_node, node, input, linux, dtSchema, base_dt
             );
             return;
         }
@@ -285,7 +278,7 @@ export const validate_command = buildCommand({
         const binding_path = await find_binding(linux, dtSchema, compatible_value);
 
         if (binding_path === undefined) {
-            console.log(`Failed to find binding for ${compatible}`);
+            console.log(`Failed to find binding for ${compatible_value}`);
             return;
         }
 
@@ -298,12 +291,12 @@ export const validate_command = buildCommand({
             return;
         }
 
-        const partial_input_data = Object.fromEntries(parse_dts_node(found_node, binding.parsed_binding));
+        const partial_input_data = Object.fromEntries(parse_dt_node(found_node, binding.parsed_binding));
 
         const extended_binding = structuredClone(binding);
 
         extended_binding.parsed_binding.properties = query_devicetree(
-            document,
+            base_dt,
             binding.parsed_binding.properties,
             JSON.stringify(partial_input_data, bigIntReplacer),
             parent
@@ -313,7 +306,7 @@ export const validate_command = buildCommand({
 
         for (const pattern of extended_binding.parsed_binding.pattern_properties ?? []) {
             pattern.properties = query_devicetree(
-                document,
+                base_dt,
                 pattern.properties,
                 JSON.stringify(partial_input_data, bigIntReplacer),
                 parent
@@ -322,20 +315,20 @@ export const validate_command = buildCommand({
             pattern.properties = insert_known_structures(pattern.properties);
         }
 
-        const input_data = Object.fromEntries(parse_dts_node(found_node, extended_binding.parsed_binding));
+        const input_data = Object.fromEntries(parse_dt_node(found_node, extended_binding.parsed_binding));
         console.log(JSON.stringify(input_data, bigIntReplacer));
 
         const update = attach.update_binding_by_changes(JSON.stringify(input_data, bigIntReplacer));
 
         if (update === undefined) {
-            console.log(`Failed to update with set compatible "${compatible}" for ${binding_path}`);
+            console.log(`Failed to update with set compatible "${compatible_value}" for ${binding_path}`);
             return;
         }
 
         binding = { parsed_binding: update.binding, patterns: binding.patterns };
 
         binding.parsed_binding.properties = query_devicetree(
-            document,
+            base_dt,
             binding.parsed_binding.properties,
             JSON.stringify(input_data, bigIntReplacer),
             parent
@@ -346,7 +339,7 @@ export const validate_command = buildCommand({
         if (binding.parsed_binding.pattern_properties !== undefined) {
             for (const pattern of binding.parsed_binding.pattern_properties) {
                 pattern.properties = query_devicetree(
-                    document,
+                    base_dt,
                     pattern.properties,
                     JSON.stringify(input_data, bigIntReplacer),
                     parent

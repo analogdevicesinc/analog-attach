@@ -1,5 +1,5 @@
 import { buildCommand } from "@stricli/core";
-import { Attach, parse_dts, suggest_parents } from "attach-lib";
+import { Attach, DeviceTree, suggest_parents } from "attach-lib";
 
 import * as fs from 'node:fs';
 import { find_binding } from "../../utilities";
@@ -80,16 +80,10 @@ export const suggest_parents_command = buildCommand({
 
         const context_content = fs.readFileSync(context, 'utf8');
 
-        const document = (() => {
-            try {
-                return parse_dts(context_content);
-            } catch {
-                return;
-            }
-        })();
+        const dt = DeviceTree.new_from_string(context_content);
 
-        if (document === undefined) {
-            console.log(`Failed to parse dts ${context}`);
+        if (typeof dt === 'string') {
+            console.log(`Failed to parse dts ${context}: ${dt}`);
             return;
         }
 
@@ -100,7 +94,7 @@ export const suggest_parents_command = buildCommand({
             return;
         }
 
-        let attach = Attach.new();
+        const attach = Attach.new();
 
         const binding = await attach.parse_binding(binding_path, linux, dtSchema);
 
@@ -109,7 +103,7 @@ export const suggest_parents_command = buildCommand({
             return;
         }
 
-        const parents = suggest_parents(document, binding.parsed_binding);
+        const parents = suggest_parents(dt, binding.parsed_binding);
 
         console.log(JSON.stringify(parents));
     }

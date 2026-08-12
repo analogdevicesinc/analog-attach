@@ -1,4 +1,4 @@
-import { Attach, extract_compatible, search_node_in_dts, type CellArrayElement, type DtsDocument, type DtsNode, type DtsReference, type DtsValue, type DtsValueComponent, type ParsedBinding } from 'attach-lib';
+import { Attach, extract_compatible, is_dt_flag, type DTNode, type DTProperty, type DTValue, type DTNumber, type DTLabel, type DTPath, type DTExpression, type ParsedBinding } from 'attach-lib';
 import { DeviceTree } from 'attach-lib';
 import * as fs from 'node:fs';
 import path from "node:path";
@@ -32,39 +32,6 @@ export function resolve_node_identifier_new(base: DeviceTree, identifier: string
     if (reference === undefined) { return identifier; }
 
     return `&{${reference.full_path.path}/${suffix}}`;
-}
-
-// ---------------------------------------------------------------------------
-// Legacy helper kept for commands still on the old API
-// ---------------------------------------------------------------------------
-
-/**
- * Expand `spi0/rest` or `&spi0/rest` into `&{/abs/path/rest}` so
- * search_node_in_dts can resolve it via an absolute-path lookup.
- * Identifiers without a `/` (or already starting with `&{/`) are returned unchanged.
- */
-export function resolve_node_identifier(document: DtsDocument, identifier: string): string {
-    if (identifier.startsWith("&{/")) {
-        return identifier;
-    }
-
-    const slash = identifier.indexOf('/');
-    if (slash === -1) {
-        return identifier;
-    }
-
-    const raw_prefix = identifier.slice(0, slash);
-    const suffix = identifier.slice(slash + 1);
-
-    // Normalise to a bare label or absolute-path prefix for lookup
-    const prefix = raw_prefix.startsWith("&") ? raw_prefix.slice(1) : raw_prefix;
-
-    const resolved = search_node_in_dts(document, prefix);
-    if (resolved === undefined) {
-        return identifier;
-    }
-
-    return `&{${resolved.found_path}/${suffix}}`;
 }
 
 export function bigIntReplacer(_key: string, value: any): any {
@@ -220,16 +187,13 @@ export async function find_binding(linux: string, dtSchema: string, compatible_t
     return;
 }
 
-export function parse_dts_node(node: DtsNode, parsed_binding: ParsedBinding): Map<string, unknown> {
+export function parse_dt_node(node: DTNode, parsed_binding: ParsedBinding): Map<string, unknown> {
     const map = new Map<string, unknown>();
     for (const property of node.properties) {
-        if (property.name === "status") {
-            continue;
-        }
+        if (property.name === "status") { continue; }
 
-        const value = parse_dts_value(property.value);
-
-        const definition = parsed_binding.properties.find((value) => value.key === property.name);
+        const value = _parse_dt_property(property);
+        const definition = parsed_binding.properties.find((v) => v.key === property.name);
 
         if (definition === undefined) {
             map.set(property.name, value);
@@ -243,24 +207,19 @@ export function parse_dts_node(node: DtsNode, parsed_binding: ParsedBinding): Ma
             case "fixed_index":
             case "number_array":
             case "string_array": {
-
                 if (Array.isArray(value)) {
                     map.set(property.name, value);
                     continue;
                 }
-
                 map.set(property.name, [value]);
                 continue;
             }
             case "matrix": {
-
                 if (Array.isArray(value)) {
-
                     if (value.every((entry) => Array.isArray(entry))) {
                         map.set(property.name, value);
                         continue;
                     }
-
                     map.set(property.name, [value]);
                     continue;
                 } else {
@@ -273,7 +232,6 @@ export function parse_dts_node(node: DtsNode, parsed_binding: ParsedBinding): Ma
                     map.set(property.name, value[0]);
                     continue;
                 }
-
                 map.set(property.name, value);
             }
             case "boolean":
@@ -287,11 +245,7 @@ export function parse_dts_node(node: DtsNode, parsed_binding: ParsedBinding): Ma
                 map.set(property.name, value);
                 continue;
             }
-            case "object": {
-                // TODO: finish?
-                continue;
-            }
-
+            case "object": { continue; }
             default: {
                 const _x: never = definition_type;
                 throw new Error("Exhaustion check failed!");
@@ -301,91 +255,59 @@ export function parse_dts_node(node: DtsNode, parsed_binding: ParsedBinding): Ma
     return map;
 }
 
-function parse_dts_value(value: DtsValue | undefined): unknown {
-
-    if (value === undefined) {
-        return true;
+function _parse_dt_property(property: DTProperty): unknown {
+    if (is_dt_flag(property.value)) { return true; }
+    const values = property.value;
+    if (values.length === 1 && values[0] !== undefined) {
+        return _parse_dt_value(values[0]);
     }
-
-    if (value.components.length === 1 && value.components[0] !== undefined) {
-        return parse_dts_value_component(value.components[0]);
-    }
-
-    return value.components.map((component) => parse_dts_value_component(component));
+    return values.map((v) => _parse_dt_value(v));
 }
 
-function parse_dts_value_component(component: DtsValueComponent): string | number[] | (string | bigint)[] {
-    const kind = component.kind;
-
-    switch (kind) {
+function _parse_dt_value(v: DTValue): unknown {
+    switch (v.kind) {
         case "string": {
-            return component.value;
+            return v.value;
         }
-        case "ref": {
-            return component.ref.kind === "label" ? component.ref.name : component.ref.path;
+        case "label": {
+            return v.name;
         }
-        case "bytes": {
-            return component.bytes.map((byte) => byte.value);
+        case "path": {
+            return v.path;
         }
         case "array": {
-            return component.elements.map((element) => parse_cell_array_element(element));
+            return v.elements.map((element) => _parse_dt_cell_element(element));
         }
         default: {
-            const _x: never = kind;
+            const _x: never = v;
             throw new Error("Exhaustion check failed!");
         }
     }
 }
 
-function parse_cell_array_element(element: CellArrayElement): string | bigint {
-    const kind = element.item.kind;
-
-    switch (kind) {
-        case "number":
-        case "u64": {
-            return BigInt(element.item.value);
+function _parse_dt_cell_element(element: DTNumber | DTLabel | DTPath | DTExpression): string | bigint {
+    switch (element.kind) {
+        case "number": {
+            return element.value;
         }
-        case "macro": {
-            return element.item.value;
+        case "label": {
+            return element.name;
         }
-        case "ref": {
-            return element.item.ref.kind === "label" ? element.item.ref.name : element.item.ref.path;
+        case "path": {
+            return element.path;
         }
         case "expression": {
-            return element.item.value;
+            return element.value;
         }
         default: {
-            const _x: never = kind;
+            const _x: never = element;
             throw new Error("Exhaustive check failed!");
         }
     }
 }
 
 if (import.meta.vitest) {
-
     const { test, expect } = import.meta.vitest;
-    const { DeviceTree: DT } = await import('attach-lib');
-
-    let counter = 0;
-
-    test(`${parse_cell_array_element.name} - ${++counter}`, () => {
-
-        const input: CellArrayElement = {
-            item: {
-                kind: "ref",
-                labels: [],
-                ref: {
-                    kind: "label",
-                    name: "gpio"
-                }
-            }
-        };
-
-        const parsed_input = parse_cell_array_element(input);
-
-        expect(parsed_input).toStrictEqual("gpio");
-
-    });
 
     const dts_source = `/dts-v1/;
 / {
@@ -397,21 +319,20 @@ if (import.meta.vitest) {
     };
 };`;
 
-
     test(`${resolve_node_identifier_new.name} - label/child expands to &{/abs/path/child}`, () => {
-        const base = DT.new_from_string(dts_source);
+        const base = DeviceTree.new_from_string(dts_source);
         if (typeof base === "string") { throw new TypeError(base); }
         expect(resolve_node_identifier_new(base, 'spi0/adi,ad7124-8@0')).toBe('&{/soc/spi@7e204000/adi,ad7124-8@0}');
     });
 
     test(`${resolve_node_identifier_new.name} - already-absolute returned unchanged`, () => {
-        const base = DT.new_from_string(dts_source);
+        const base = DeviceTree.new_from_string(dts_source);
         if (typeof base === "string") { throw new TypeError(base); }
         expect(resolve_node_identifier_new(base, '&{/soc/spi@7e204000}')).toBe('&{/soc/spi@7e204000}');
     });
 
     test(`${resolve_node_identifier_new.name} - bare label with no slash unchanged`, () => {
-        const base = DT.new_from_string(dts_source);
+        const base = DeviceTree.new_from_string(dts_source);
         if (typeof base === "string") { throw new TypeError(base); }
         expect(resolve_node_identifier_new(base, 'spi0')).toBe('spi0');
     });

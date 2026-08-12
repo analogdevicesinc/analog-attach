@@ -1,5 +1,5 @@
 import { buildCommand } from "@stricli/core";
-import { Attach, insert_known_structures, parse_dts, query_devicetree } from "attach-lib";
+import { Attach, DeviceTree, query_devicetree, insert_known_structures } from "attach-lib";
 
 import * as fs from 'node:fs';
 
@@ -81,16 +81,10 @@ export const get_schema_command = buildCommand({
 
         const context_content = fs.readFileSync(context, 'utf8');
 
-        const document = (() => {
-            try {
-                return parse_dts(context_content);
-            } catch {
-                return;
-            }
-        })();
+        const dt = DeviceTree.new_from_string(context_content);
 
-        if (document === undefined) {
-            console.log(`Failed to parse dts ${context}`);
+        if (typeof dt === 'string') {
+            console.log(`Failed to parse dts ${context}: ${dt}`);
             return;
         }
 
@@ -124,7 +118,7 @@ export const get_schema_command = buildCommand({
         binding = { parsed_binding: update.binding, patterns: binding.patterns };
 
         binding.parsed_binding.properties = query_devicetree(
-            document,
+            dt,
             binding.parsed_binding.properties,
             JSON.stringify(input_data, bigIntReplacer),
             ""
@@ -135,7 +129,7 @@ export const get_schema_command = buildCommand({
         if (binding.parsed_binding.pattern_properties !== undefined) {
             for (const pattern of binding.parsed_binding.pattern_properties) {
                 pattern.properties = query_devicetree(
-                    document,
+                    dt,
                     pattern.properties,
                     JSON.stringify(input_data, bigIntReplacer),
                     ""
