@@ -3,7 +3,7 @@ import { Option } from "../../option.js";
 import { Result } from "../../result.js";
 import { assert_never } from "../../utilities.js";
 import { TokenStream } from "./TokenStream.js";
-import { TokenKind, RawToken, Token, is_dt_directive, is_char_token } from "./tokens.js";
+import { TokenKind, RawToken, Token, is_dt_directive, is_char_token } from "./Tokens.js";
 
 const TOKEN_KIND_AND_REGEX_PAIRS = [
   // 1. Comments (Highest priority - they must consume slashes before anything else)

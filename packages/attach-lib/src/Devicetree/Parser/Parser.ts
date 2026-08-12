@@ -11,20 +11,20 @@ import {
   DTCellArray,
   DTMetadata,
   isDTMetadata
-} from "./ast.js";
+} from "./AST.js";
 
 import { TokenStream } from "./TokenStream.js";
 import {
   CharToken, CharTokenKind, DirectiveToken,
   DTDirective, RawToken, Token, TokenKind
-} from "./tokens.js";
+} from "./Tokens.js";
 import { Option } from "../../option.js";
 import { Result } from "../../result.js";
 import { WithRowAndCol } from "./LexerInputStream.js";
 import { lex } from "./Lexer.js";
 import { parse as parse_yaml_string } from "yaml";
 
-import { DTS_METADATA_HEADER } from "./constants.js";
+import { DTS_METADATA_HEADER } from "./Constants.js";
 
 type Deletable<T> = T & {
   deleted: boolean;

@@ -10,12 +10,12 @@ import {
   DTMetadata,
   Bits,
   is_dt_flag
-} from "./ast.js";
+} from "./Parser/AST.js";
 
 import { stringify as stringify_as_yaml } from "yaml";
-import { DTS_METADATA_HEADER } from "./constants.js";
+import { DTS_METADATA_HEADER } from "./Parser/Constants.js";
 
-import { assert_never } from "../../utilities.js";
+import { assert_never } from "../utilities.js";
 
 /**
  * Print a DtsDocument back to DTS text.
