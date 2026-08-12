@@ -1,6 +1,6 @@
 import { buildCommand } from "@stricli/core";
 import * as fs from "node:fs";
-import * as path from "node:path";
+import path from "node:path";
 
 import { build_compat_index } from "../../utilities";
 import { save_compat_index } from "../../config";
@@ -38,8 +38,8 @@ export const init_command = buildCommand({
     async func(flags: Flags) {
         const { linux, dtSchema, context } = flags;
 
-        const dir = path.join(process.cwd(), ".analog-attach");
-        const config_path = path.join(dir, "config.toml");
+        const directory = path.join(process.cwd(), ".analog-attach");
+        const config_path = path.join(directory, "config.toml");
 
         if (!fs.existsSync(linux)) {
             console.log(`Missing: ${linux}`);
@@ -56,7 +56,7 @@ export const init_command = buildCommand({
             return;
         }
 
-        fs.mkdirSync(dir, { recursive: true });
+        fs.mkdirSync(directory, { recursive: true });
 
         let content = `linux = ${JSON.stringify(linux)}\ndt-schema = ${JSON.stringify(dtSchema)}\n`;
         if (context !== undefined) {

@@ -1,8 +1,7 @@
 import { buildCommand } from "@stricli/core";
-import { DeviceTree, DeviceTreeOverlay, NodeBuilder, get_full_node_name, type DTNode } from "attach-lib";
+import { DeviceTree, DeviceTreeOverlay, get_full_node_name, type DTNode } from "attach-lib";
 
 import * as fs from 'node:fs';
-
 
 import { load_config } from "../../config";
 

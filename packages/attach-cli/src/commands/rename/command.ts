@@ -1,8 +1,7 @@
 import { buildCommand } from "@stricli/core";
-import { DeviceTree, DeviceTreeOverlay, get_full_node_name } from "attach-lib";
+import { DeviceTree, DeviceTreeOverlay } from "attach-lib";
 
 import * as fs from 'node:fs';
-
 
 import { load_config } from "../../config";
 
@@ -78,7 +77,7 @@ export const rename_command = buildCommand({
             return;
         }
 
-        const result = rename_overlay_node(base, overlay, node, to);
+        const result = rename_overlay_node(overlay, node, to);
 
         switch (result) {
             case "not-found": {
@@ -107,7 +106,6 @@ export const rename_command = buildCommand({
 });
 
 export function rename_overlay_node(
-    base: DeviceTree,
     overlay: DeviceTreeOverlay,
     identifier: string,
     to: string,
@@ -139,7 +137,6 @@ export function rename_overlay_node(
 
 if (import.meta.vitest) {
     const { test, expect } = import.meta.vitest;
-    const { DeviceTree: DT, DeviceTreeOverlay: DTO_cls } = await import('attach-lib');
 
     const base_dts = `/dts-v1/;
 / {
@@ -171,65 +168,89 @@ if (import.meta.vitest) {
 };`;
 
     test("rename_overlay_node - renames node key, output has new key not old", () => {
-        const base = DT.new_from_string(base_dts);
+        const base = DeviceTree.new_from_string(base_dts);
         if (typeof base === "string") { throw new TypeError(base); }
-        const overlay = DTO_cls.new_from_string(overlay_with_imu, base);
+
+        const overlay = DeviceTreeOverlay.new_from_string(overlay_with_imu, base);
         if (typeof overlay === "string") { throw new TypeError(overlay); }
-        const result = rename_overlay_node(base, overlay, "imu1", "my_adc@0");
+
+        const result = rename_overlay_node(overlay, "imu1", "my_adc@0");
+
         expect(result).toBe("renamed");
+
         const output = overlay.print();
+
         expect(output).toContain("my_adc@0");
         expect(output).not.toContain("adi,ad7124-8@0");
     });
 
     test("rename_overlay_node - --to without @ preserves existing unit addr", () => {
-        const base = DT.new_from_string(base_dts);
+        const base = DeviceTree.new_from_string(base_dts);
         if (typeof base === "string") { throw new TypeError(base); }
-        const overlay = DTO_cls.new_from_string(overlay_with_imu, base);
+
+        const overlay = DeviceTreeOverlay.new_from_string(overlay_with_imu, base);
         if (typeof overlay === "string") { throw new TypeError(overlay); }
-        const result = rename_overlay_node(base, overlay, "imu1", "my_adc");
+
+        const result = rename_overlay_node(overlay, "imu1", "my_adc");
+
         expect(result).toBe("renamed");
+
         const output = overlay.print();
+
         expect(output).toContain("my_adc@0");
         expect(output).not.toContain("adi,ad7124-8@0");
     });
 
     test("rename_overlay_node - --to with @ overrides unit addr", () => {
-        const base = DT.new_from_string(base_dts);
+        const base = DeviceTree.new_from_string(base_dts);
         if (typeof base === "string") { throw new TypeError(base); }
-        const overlay = DTO_cls.new_from_string(overlay_with_imu, base);
+
+        const overlay = DeviceTreeOverlay.new_from_string(overlay_with_imu, base);
         if (typeof overlay === "string") { throw new TypeError(overlay); }
-        const result = rename_overlay_node(base, overlay, "imu1", "my_adc@3");
+
+        const result = rename_overlay_node(overlay, "imu1", "my_adc@3");
+
         expect(result).toBe("renamed");
+
         const output = overlay.print();
+
         expect(output).toContain("my_adc@3");
         expect(output).not.toContain("adi,ad7124-8@0");
     });
 
     test("rename_overlay_node - refuses base-tree node", () => {
-        const base = DT.new_from_string(base_dts);
+        const base = DeviceTree.new_from_string(base_dts);
         if (typeof base === "string") { throw new TypeError(base); }
-        const overlay = DTO_cls.new_from_string(overlay_with_imu, base);
+
+        const overlay = DeviceTreeOverlay.new_from_string(overlay_with_imu, base);
         if (typeof overlay === "string") { throw new TypeError(overlay); }
-        const result = rename_overlay_node(base, overlay, "spi0", "spi1");
+
+        const result = rename_overlay_node(overlay, "spi0", "spi1");
+
         expect(result).toBe("in-base");
     });
 
     test("rename_overlay_node - returns not-found for unknown label", () => {
-        const base = DT.new_from_string(base_dts);
+        const base = DeviceTree.new_from_string(base_dts);
         if (typeof base === "string") { throw new TypeError(base); }
-        const overlay = DTO_cls.new_from_string(overlay_with_imu, base);
+
+        const overlay = DeviceTreeOverlay.new_from_string(overlay_with_imu, base);
         if (typeof overlay === "string") { throw new TypeError(overlay); }
-        const result = rename_overlay_node(base, overlay, "nonexistent", "foo");
+
+        const result = rename_overlay_node(overlay, "nonexistent", "foo");
+
         expect(result).toBe("not-found");
     });
 
     test("rename_overlay_node - returns conflict when new key collides with sibling", () => {
-        const base = DT.new_from_string(base_dts);
+        const base = DeviceTree.new_from_string(base_dts);
         if (typeof base === "string") { throw new TypeError(base); }
-        const overlay = DTO_cls.new_from_string(overlay_two_children, base);
+
+        const overlay = DeviceTreeOverlay.new_from_string(overlay_two_children, base);
         if (typeof overlay === "string") { throw new TypeError(overlay); }
-        const result = rename_overlay_node(base, overlay, "imu1", "adi,ad7124-8@1");
+
+        const result = rename_overlay_node(overlay, "imu1", "adi,ad7124-8@1");
+
         expect(result).toBe("conflict");
     });
 
@@ -245,13 +266,18 @@ if (import.meta.vitest) {
         };
     };
 };`;
-        const base = DT.new_from_string(base_dts);
+        const base = DeviceTree.new_from_string(base_dts);
         if (typeof base === "string") { throw new TypeError(base); }
-        const overlay = DTO_cls.new_from_string(overlay_nested, base);
+
+        const overlay = DeviceTreeOverlay.new_from_string(overlay_nested, base);
         if (typeof overlay === "string") { throw new TypeError(overlay); }
-        const result = rename_overlay_node(base, overlay, "imu1/channel@0", "channel@1");
+
+        const result = rename_overlay_node(overlay, "imu1/channel@0", "channel@1");
+
         expect(result).toBe("renamed");
+
         const output = overlay.print();
+
         expect(output).toContain("channel@1");
         expect(output).not.toContain("channel@0");
         expect(output).toContain("imu1");

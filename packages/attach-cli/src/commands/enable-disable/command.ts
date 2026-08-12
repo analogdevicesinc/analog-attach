@@ -1,5 +1,5 @@
 import { buildCommand } from "@stricli/core";
-import { DeviceTree, DeviceTreeOverlay, NodeBuilder, PropertyBuilder, type DTNode, type DTProperty } from "attach-lib";
+import { DeviceTree, DeviceTreeOverlay, PropertyBuilder } from "attach-lib";
 
 import * as fs from 'node:fs';
 
@@ -131,7 +131,6 @@ export function set_node_status(
 
 if (import.meta.vitest) {
     const { test, expect } = import.meta.vitest;
-    const { DeviceTree: DT, DeviceTreeOverlay: DTO_cls } = await import('attach-lib');
 
     const base_dts = `/dts-v1/;
 / {
@@ -158,10 +157,10 @@ if (import.meta.vitest) {
 };`;
 
     test("set_node_status - enable adds status = okay to node without one", () => {
-        const base = DT.new_from_string(base_dts);
+        const base = DeviceTree.new_from_string(base_dts);
         if (typeof base === "string") { throw new TypeError(base); }
 
-        const overlay = DTO_cls.new_from_string(overlay_with_imu, base);
+        const overlay = DeviceTreeOverlay.new_from_string(overlay_with_imu, base);
         if (typeof overlay === "string") { throw new TypeError(overlay); }
 
         const result = set_node_status(base, overlay, "spi0", "okay");
@@ -174,10 +173,10 @@ if (import.meta.vitest) {
     });
 
     test("set_node_status - disable adds status = disabled", () => {
-        const base = DT.new_from_string(base_dts);
+        const base = DeviceTree.new_from_string(base_dts);
         if (typeof base === "string") { throw new TypeError(base); }
 
-        const overlay = DTO_cls.new_from_string(overlay_with_imu, base);
+        const overlay = DeviceTreeOverlay.new_from_string(overlay_with_imu, base);
         if (typeof overlay === "string") { throw new TypeError(overlay); }
 
         const result = set_node_status(base, overlay, "spi0", "disabled");
@@ -190,10 +189,10 @@ if (import.meta.vitest) {
     });
 
     test("set_node_status - overwrites existing status value", () => {
-        const base = DT.new_from_string(base_dts);
+        const base = DeviceTree.new_from_string(base_dts);
         if (typeof base === "string") { throw new TypeError(base); }
 
-        const overlay = DTO_cls.new_from_string(overlay_with_status, base);
+        const overlay = DeviceTreeOverlay.new_from_string(overlay_with_status, base);
         if (typeof overlay === "string") { throw new TypeError(overlay); }
 
         const result = set_node_status(base, overlay, "spi0", "okay");
@@ -207,10 +206,10 @@ if (import.meta.vitest) {
     });
 
     test("set_node_status - returns not-found for unknown node", () => {
-        const base = DT.new_from_string(base_dts);
+        const base = DeviceTree.new_from_string(base_dts);
         if (typeof base === "string") { throw new TypeError(base); }
 
-        const overlay = DTO_cls.new_from_string(overlay_with_imu, base);
+        const overlay = DeviceTreeOverlay.new_from_string(overlay_with_imu, base);
         if (typeof overlay === "string") { throw new TypeError(overlay); }
 
         const result = set_node_status(base, overlay, "nonexistent", "okay");
@@ -219,10 +218,10 @@ if (import.meta.vitest) {
     });
 
     test("set_node_status - enable works on base-tree node (sets status in overlay)", () => {
-        const base = DT.new_from_string(base_dts);
+        const base = DeviceTree.new_from_string(base_dts);
         if (typeof base === "string") { throw new TypeError(base); }
 
-        const overlay = DTO_cls.new_from_string(overlay_with_imu, base);
+        const overlay = DeviceTreeOverlay.new_from_string(overlay_with_imu, base);
         if (typeof overlay === "string") { throw new TypeError(overlay); }
 
         const result = set_node_status(base, overlay, "spi0", "okay");
@@ -236,12 +235,12 @@ if (import.meta.vitest) {
     });
 
     test("set_node_status - creates new fragment when base node not yet in overlay", () => {
-        const base = DT.new_from_string(base_dts);
+        const base = DeviceTree.new_from_string(base_dts);
         if (typeof base === "string") { throw new TypeError(base); }
 
         // Start with an overlay that targets a different node
         const overlay_other = `/dts-v1/;\n/plugin/;\n\n&spi0 {\n};\n`;
-        const overlay = DTO_cls.new_from_string(overlay_other, base);
+        const overlay = DeviceTreeOverlay.new_from_string(overlay_other, base);
         if (typeof overlay === "string") { throw new TypeError(overlay); }
 
         // Disable spi0 — it has an existing fragment, should update its __overlay__

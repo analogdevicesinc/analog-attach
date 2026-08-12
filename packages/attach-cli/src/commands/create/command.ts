@@ -107,7 +107,7 @@ export const create_command = buildCommand({
 /plugin/;
 
 ${path} {
-        ${label !== undefined ? `${label}: ` : ""}${compatible} {
+        ${label === undefined ? "" : `${label}: `}${compatible} {
             compatible = "${compatible}";
         };
 };

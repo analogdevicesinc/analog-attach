@@ -1,5 +1,5 @@
 import * as fs from "node:fs";
-import * as path from "node:path";
+import path from "node:path";
 import { parse } from "smol-toml";
 
 export interface AttachConfig {
@@ -25,10 +25,10 @@ export function load_compat_index(): CompatIndex | undefined {
 }
 
 export function save_compat_index(entries: Record<string, string>): string {
-    const dir = path.join(process.cwd(), ".analog-attach");
-    fs.mkdirSync(dir, { recursive: true });
+    const directory = path.join(process.cwd(), ".analog-attach");
+    fs.mkdirSync(directory, { recursive: true });
 
-    const index_path = path.join(dir, "compat-index.json");
+    const index_path = path.join(directory, "compat-index.json");
     const index: CompatIndex = { generated_at: Date.now(), entries };
     fs.writeFileSync(index_path, JSON.stringify(index, undefined, 2));
 

@@ -116,7 +116,6 @@ export function delete_overlay_node(
 
 if (import.meta.vitest) {
     const { test, expect } = import.meta.vitest;
-    const { DeviceTree: DT, DeviceTreeOverlay: DTO_cls } = await import('attach-lib');
 
     const base_dts = `/dts-v1/;
 / {
@@ -146,10 +145,10 @@ if (import.meta.vitest) {
 };`;
 
     test("delete_overlay_node - removes overlay-added node", () => {
-        const base = DT.new_from_string(base_dts);
+        const base = DeviceTree.new_from_string(base_dts);
         if (typeof base === "string") { throw new TypeError(base); }
 
-        const overlay = DTO_cls.new_from_string(overlay_with_imu, base);
+        const overlay = DeviceTreeOverlay.new_from_string(overlay_with_imu, base);
         if (typeof overlay === "string") { throw new TypeError(overlay); }
 
         const result = delete_overlay_node(base, overlay, "imu1");
@@ -162,10 +161,10 @@ if (import.meta.vitest) {
     });
 
     test("delete_overlay_node - &spi0 block remains when spi0 has overlay properties", () => {
-        const base = DT.new_from_string(base_dts);
+        const base = DeviceTree.new_from_string(base_dts);
         if (typeof base === "string") { throw new TypeError(base); }
 
-        const overlay = DTO_cls.new_from_string(overlay_spi_with_status, base);
+        const overlay = DeviceTreeOverlay.new_from_string(overlay_spi_with_status, base);
         if (typeof overlay === "string") { throw new TypeError(overlay); }
 
         const result = delete_overlay_node(base, overlay, "imu1");
@@ -180,10 +179,10 @@ if (import.meta.vitest) {
     });
 
     test("delete_overlay_node - refuses base-tree node", () => {
-        const base = DT.new_from_string(base_dts);
+        const base = DeviceTree.new_from_string(base_dts);
         if (typeof base === "string") { throw new TypeError(base); }
 
-        const overlay = DTO_cls.new_from_string(overlay_with_imu, base);
+        const overlay = DeviceTreeOverlay.new_from_string(overlay_with_imu, base);
         if (typeof overlay === "string") { throw new TypeError(overlay); }
 
         const result = delete_overlay_node(base, overlay, "spi0");
@@ -192,10 +191,10 @@ if (import.meta.vitest) {
     });
 
     test("delete_overlay_node - returns not-found for unknown label", () => {
-        const base = DT.new_from_string(base_dts);
+        const base = DeviceTree.new_from_string(base_dts);
         if (typeof base === "string") { throw new TypeError(base); }
 
-        const overlay = DTO_cls.new_from_string(overlay_with_imu, base);
+        const overlay = DeviceTreeOverlay.new_from_string(overlay_with_imu, base);
         if (typeof overlay === "string") { throw new TypeError(overlay); }
 
         const result = delete_overlay_node(base, overlay, "nonexistent");
@@ -204,10 +203,10 @@ if (import.meta.vitest) {
     });
 
     test("delete_overlay_node - fragment pruned when __overlay__ becomes empty", () => {
-        const base = DT.new_from_string(base_dts);
+        const base = DeviceTree.new_from_string(base_dts);
         if (typeof base === "string") { throw new TypeError(base); }
 
-        const overlay = DTO_cls.new_from_string(overlay_with_imu, base);
+        const overlay = DeviceTreeOverlay.new_from_string(overlay_with_imu, base);
         if (typeof overlay === "string") { throw new TypeError(overlay); }
 
         const result = delete_overlay_node(base, overlay, "imu1");
@@ -232,10 +231,10 @@ if (import.meta.vitest) {
         };
     };
 };`;
-        const base = DT.new_from_string(base_dts);
+        const base = DeviceTree.new_from_string(base_dts);
         if (typeof base === "string") { throw new TypeError(base); }
 
-        const overlay = DTO_cls.new_from_string(overlay_nested, base);
+        const overlay = DeviceTreeOverlay.new_from_string(overlay_nested, base);
         if (typeof overlay === "string") { throw new TypeError(overlay); }
 
         const result = delete_overlay_node(base, overlay, "imu1/channel@0");
