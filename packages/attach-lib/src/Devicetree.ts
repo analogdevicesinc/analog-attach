@@ -603,6 +603,123 @@ export class DeviceTreeOverlay {
         return this.remove_by_base_path(reference.path);
     }
 
+    public remove_property(target: DTReference | DTLabel | DTPath, property: string): boolean {
+        if ("node_name" in target) {
+            if (target.labels.length > 0) {
+                return this.remove_property_by_label(target.labels[0]!.name, property);
+            }
+            return this.remove_property_by_path(target.full_path.path, property);
+        }
+        if (target.kind === "label") {
+            return this.remove_property_by_label(target.name, property);
+        }
+        return this.remove_property_by_path(target.path, property);
+    }
+
+    private remove_property_by_label(label_name: string, property: string): boolean {
+        for (const fragment of this.get_fragments()) {
+            const overlay_node = fragment.children.find(c => c.name === "__overlay__");
+            if (overlay_node === undefined) { continue; }
+
+            const root_path = this.get_fragment_root_path(fragment);
+
+            if (root_path !== undefined && this.base_dts !== undefined) {
+                const reference = this.base_dts.resolve_identifier(label_name);
+
+                if (reference !== undefined) {
+                    const dt_node = reference.kind === "path"
+                        ? this.base_dts.get_node_by_path(reference)
+                        : this.base_dts.get_node_by_label(reference);
+
+                    if (dt_node?.full_path.path === root_path) {
+                        return this.remove_property_from_overlay_node(fragment, overlay_node, property);
+                    }
+                }
+            }
+
+            const child = this.find_labeled_in_overlay(overlay_node, label_name);
+
+            if (child !== undefined) {
+                const property_index = child.properties.findIndex(p => p.name === property);
+                if (property_index === -1) { continue; }
+
+                child.properties.splice(property_index, 1);
+
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private remove_property_by_path(path: string, property: string): boolean {
+        for (const fragment of this.get_fragments()) {
+            const root_path = this.get_fragment_root_path(fragment);
+            if (root_path === undefined) { continue; }
+
+            const overlay_node = fragment.children.find(c => c.name === "__overlay__");
+            if (overlay_node === undefined) { continue; }
+
+            if (path === root_path) {
+                return this.remove_property_from_overlay_node(fragment, overlay_node, property);
+            }
+
+            const normalized_root = root_path === "/" ? "" : root_path;
+            if (!path.startsWith(normalized_root + "/")) { continue; }
+
+            const relative_path = path.slice(normalized_root.length + 1);
+            const segments = relative_path.split("/").filter(s => s.length > 0);
+            if (segments.length === 0) { continue; }
+
+            const child = this.find_in_overlay_by_segments(overlay_node, segments);
+            if (child === undefined) { continue; }
+
+            const property_index = child.properties.findIndex(p => p.name === property);
+            if (property_index === -1) { continue; }
+
+            child.properties.splice(property_index, 1);
+
+            return true;
+        }
+        return false;
+    }
+
+    private remove_property_from_overlay_node(fragment: DTNode, overlay_node: DTNode, property: string): boolean {
+        const property_index = overlay_node.properties.findIndex(p => p.name === property);
+        if (property_index === -1) { return false; }
+
+        overlay_node.properties.splice(property_index, 1);
+
+        if (overlay_node.children.length === 0 && overlay_node.properties.length === 0) {
+            const index = this.overlay.root.children.indexOf(fragment);
+            if (index !== -1) { this.overlay.root.children.splice(index, 1); }
+            this.renumber_fragments();
+        }
+
+        return true;
+    }
+
+    private find_labeled_in_overlay(parent: DTNode, label_name: string): DTNode | undefined {
+        for (const child of parent.children) {
+            if (child.labels.includes(label_name)) { return child; }
+
+            const found = this.find_labeled_in_overlay(child, label_name);
+
+            if (found !== undefined) { return found; }
+        }
+
+        return undefined;
+    }
+
+    private find_in_overlay_by_segments(parent: DTNode, segments: string[]): DTNode | undefined {
+        const [head, ...rest] = segments;
+        if (head === undefined) { return undefined; }
+
+        const child = parent.children.find(c => get_full_node_name(c) === head);
+        if (child === undefined) { return undefined; }
+
+        return rest.length === 0 ? child : this.find_in_overlay_by_segments(child, rest);
+    }
+
     private remove_by_label(label_name: string): boolean {
         for (const fragment of this.get_fragments()) {
             const overlay_node = fragment.children.find(c => c.name === "__overlay__");

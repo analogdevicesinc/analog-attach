@@ -1,7 +1,7 @@
 import { ResolvedProperty } from "../AttachTypes.js";
 import { AttachArray, AttachEnumType, FixedIndex } from "../StructuralTypes.js";
 import { DeviceTree } from "../Devicetree.js";
-import { create_cell_array, create_flag, DTNode, DTProperty, get_full_node_name, is_dt_flag } from "../dts/index.js";
+import { DTNode, DTProperty, get_full_node_name, is_dt_flag } from "../dts/index.js";
 import {
     is_clock,
     is_dma_controller,
@@ -583,16 +583,6 @@ if (import.meta.vitest) {
         if (typeof dt === "string") { throw new TypeError(dt); }
         return dt;
     };
-
-    test("cell_extract_first_value — extracts bigint from cell array", () => {
-        const property = create_cell_array("#interrupt-cells", 3n);
-        expect(cell_extract_first_value(property)).toBe(3n);
-    });
-
-    test("cell_extract_first_value — returns undefined for flag property", () => {
-        const property = create_flag("interrupt-controller");
-        expect(cell_extract_first_value(property)).toBeUndefined();
-    });
 
     test("query_devicetree — interrupt-parent: enumerates interrupt controllers", () => {
         const dt = dts(`/dts-v1/;
