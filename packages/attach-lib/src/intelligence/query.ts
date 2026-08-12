@@ -1,7 +1,7 @@
 import { ResolvedProperty } from "../AttachTypes.js";
 import { AttachArray, AttachEnumType, FixedIndex } from "../StructuralTypes.js";
 import { DeviceTree } from "../Devicetree.js";
-import { DTNode, DTProperty, get_full_node_name, is_dt_flag } from "../dts/index.js";
+import { create_cell_array, create_flag, DTNode, DTProperty, get_full_node_name, is_dt_flag } from "../dts/index.js";
 import {
     is_clock,
     is_dma_controller,
@@ -577,8 +577,6 @@ export function query_devicetree(
 
 if (import.meta.vitest) {
     const { test, expect } = import.meta.vitest;
-    const { DeviceTree } = await import("../Devicetree.js");
-    const { create_cell_array, create_flag } = await import("../dts/index.js");
 
     const dts = (source: string) => {
         const dt = DeviceTree.new_from_string(source);

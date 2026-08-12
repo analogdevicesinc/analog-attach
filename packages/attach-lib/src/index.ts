@@ -25,12 +25,15 @@ export * from './dtso/index.js';
 export * from './dts/index.js';
 export { DeviceTree, DeviceTreeOverlay, type DTReference, type TraversalOrder, type UnitAddr, type FoundNodeResult } from './Devicetree.js';
 export { NodeBuilder, PropertyBuilder, type INodeBuilderBase } from './DTBuilder/DTBuilder.js';
+export type { CellValue } from './DTBuilder/Types.js';
 
 // binding resolving
 export * from './binding-processor/index.js';
 
-// DT Query
-export * from './DtQuery.js';
+// DT Query — legacy implementation kept for internal use; only extract_compatible re-exported
+export { extract_compatible } from './DtQuery.js';
+// New intelligence module (DeviceTree-based)
+export * from './intelligence/index.js';
 
 // BigInt Serialization
 export * from './BigIntSerializer.js';

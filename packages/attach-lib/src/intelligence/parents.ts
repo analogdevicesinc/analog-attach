@@ -124,7 +124,6 @@ export function suggest_parents_impl(devicetree: DeviceTree, parent_types: DTCom
 
 if (import.meta.vitest) {
     const { test, expect } = import.meta.vitest;
-    const { DeviceTree } = await import("../Devicetree.js");
 
     const dts = (source: string) => {
         const dt = DeviceTree.new_from_string(source);

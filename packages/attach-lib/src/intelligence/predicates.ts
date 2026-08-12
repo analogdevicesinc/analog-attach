@@ -1,3 +1,4 @@
+import { DeviceTree } from "../Devicetree.js";
 import { DTNode, is_dt_flag } from "../dts/index.js";
 
 export function is_interrupt_controller(node: DTNode): boolean {
@@ -40,7 +41,6 @@ export function is_pwm_controller(node: DTNode): boolean {
 
 if (import.meta.vitest) {
     const { test, expect } = import.meta.vitest;
-    const { DeviceTree } = await import("../Devicetree.js");
 
     const dts = (source: string) => {
         const dt = DeviceTree.new_from_string(source);
