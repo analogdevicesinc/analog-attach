@@ -13,7 +13,10 @@
     "clean": "rm -rf dist tsconfig.tsbuildinfo node_modules",
     "test": "vitest",
     "test:watch": "vitest --watch",
-    "test:e2e": "./test/e2e_build.sh"
+    "test:e2e": "./test/e2e_build_all.sh",
+    "test:e2e:adxl355": "./test/e2e_build.sh",
+    "test:e2e:adt7420": "./test/e2e_build_adt7420.sh",
+    "test:e2e:ad7124": "./test/e2e_build_ad7124.sh"
   },
   "tsup": {
     "entry": [
