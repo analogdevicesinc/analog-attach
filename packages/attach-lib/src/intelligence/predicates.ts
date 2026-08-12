@@ -1,4 +1,4 @@
-import { DeviceTree } from "../Devicetree.js";
+import { DeviceTree } from "../Devicetree/Devicetree.js";
 import { DTNode, is_dt_flag } from "../Devicetree/parser";
 
 export function is_interrupt_controller(node: DTNode): boolean {

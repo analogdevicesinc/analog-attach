@@ -23,7 +23,7 @@ export * from './dtso/index.js';
 
 // New DTS AST, parser, printer, and ergonomic wrappers
 export * from './Devicetree/parser/index.js';
-export { DeviceTree, DeviceTreeOverlay, type DTReference, type TraversalOrder, type UnitAddr, type FoundNodeResult } from './Devicetree.js';
+export { DeviceTree, DeviceTreeOverlay, type DTReference, type TraversalOrder, type UnitAddr, type FoundNodeResult } from './Devicetree/Devicetree.js';
 export { NodeBuilder, type INodeBuilderBase } from './Devicetree/NodeBuilder.js';
 export { PropertyBuilder } from './Devicetree/PropertyBuilder.js';
 export type { CellValue } from './Devicetree/Types.js';

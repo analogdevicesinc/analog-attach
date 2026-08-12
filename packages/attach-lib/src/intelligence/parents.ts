@@ -1,5 +1,5 @@
 import { ParsedBinding } from "../AttachTypes.js";
-import { DeviceTree } from "../Devicetree.js";
+import { DeviceTree } from "../Devicetree/Devicetree.js";
 import { DTNode } from "../Devicetree/parser";
 import { extract_compatible } from "../DtQuery.js";
 
