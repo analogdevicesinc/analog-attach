@@ -3,7 +3,6 @@ import { DeviceTree, DeviceTreeOverlay } from "attach-lib";
 
 import * as fs from 'node:fs';
 
-
 import { load_config } from "../../config";
 
 type Flags = {
@@ -78,7 +77,7 @@ export const unset_property_command = buildCommand({
             return;
         }
 
-        const result = unset_overlay_property(base, overlay, node, property);
+        const result = unset_overlay_property(overlay, node, property);
 
         switch (result) {
             case "node-not-found": {
@@ -103,56 +102,40 @@ export const unset_property_command = buildCommand({
 });
 
 export function unset_overlay_property(
-    base: DeviceTree,
     overlay: DeviceTreeOverlay,
     identifier: string,
     property: string,
 ): "unset" | "node-not-found" | "property-not-found" | "not-in-overlay" {
+
+    const base = overlay.get_base_dts()!;
     const found = overlay.find_node(identifier);
 
-    const deref_base = () => {
-        const reference = base.resolve_identifier(identifier);
-        if (reference === undefined) { return; }
-        const dt_reference = reference.kind === "path" ? base.get_node_by_path(reference) : base.get_node_by_label(reference);
-        return dt_reference === undefined ? undefined : base.deref_node(dt_reference);
-    };
-
-    // Before returning node-not-found, check if the property exists only in base
-    // (property is in base node but not in overlay) → not-in-overlay.
-    if (found === undefined || !found.node.properties.some(p => p.name === property)) {
-        if (found !== undefined || base.resolve_identifier(identifier) !== undefined) {
-            // Node exists somewhere — check if property is in base only
-            const base_node = deref_base();
-            if (base_node !== undefined && base_node.properties.some(p => p.name === property)) {
-                return "not-in-overlay";
-            }
+    if (found === undefined) {
+        if (base.resolve_identifier(identifier) !== undefined) {
+            return "not-in-overlay";
         }
-
-        if (found === undefined) { return "node-not-found"; }
-
-        return "property-not-found";
+        return "node-not-found";
     }
 
-    const node = found.node;
-    const property_ = node.properties.find((p) => p.name === property)!;
+    if (found.node.properties.some(p => p.name === property)) {
+        overlay.remove_property({ kind: "path", labels: [], path: found.node_path }, property);
+        return "unset";
+    }
 
-    // A property is overlay-owned unless it also exists verbatim in the base node.
-    // (An overlay-added child node has is_in_base === false, so all its props are overlay-owned.)
+    // Property not in overlay fragment — check if it's base-only
     if (found.is_in_base) {
-        const base_node = deref_base();
-        if (base_node !== undefined && base_node.properties.some(p => p.name === property)) {
+        const dt_reference = base.get_node_by_path({ kind: "path", labels: [], path: found.node_path })!;
+        const base_node = base.deref_node(dt_reference);
+        if (base_node?.properties.some(p => p.name === property)) {
             return "not-in-overlay";
         }
     }
 
-    node.properties = node.properties.filter((p) => p !== property_);
-
-    return "unset";
+    return "property-not-found";
 }
 
 if (import.meta.vitest) {
     const { test, expect } = import.meta.vitest;
-    const { DeviceTree: DT, DeviceTreeOverlay: DTO_cls } = await import('attach-lib');
 
     const base_dts = `/dts-v1/;
 / {
@@ -180,25 +163,35 @@ if (import.meta.vitest) {
 };`;
 
     test("unset_overlay_property - removes overlay-set property, node and children still present", () => {
-        const base = DT.new_from_string(base_dts);
+        const base = DeviceTree.new_from_string(base_dts);
         if (typeof base === "string") { throw new TypeError(base); }
-        const overlay = DTO_cls.new_from_string(overlay_with_status_and_imu, base);
+
+        const overlay = DeviceTreeOverlay.new_from_string(overlay_with_status_and_imu, base);
         if (typeof overlay === "string") { throw new TypeError(overlay); }
-        const result = unset_overlay_property(base, overlay, "spi0", "status");
+
+        const result = unset_overlay_property(overlay, "spi0", "status");
+
         expect(result).toBe("unset");
+
         const output = overlay.print();
+
         expect(output).toContain("spi0");
         expect(output).toContain("imu1");
     });
 
     test("unset_overlay_property - removing last overlay property from base node drops the status", () => {
-        const base = DT.new_from_string(base_dts);
+        const base = DeviceTree.new_from_string(base_dts);
         if (typeof base === "string") { throw new TypeError(base); }
-        const overlay = DTO_cls.new_from_string(overlay_with_status_only, base);
+
+        const overlay = DeviceTreeOverlay.new_from_string(overlay_with_status_only, base);
         if (typeof overlay === "string") { throw new TypeError(overlay); }
-        const result = unset_overlay_property(base, overlay, "spi0", "status");
+
+        const result = unset_overlay_property(overlay, "spi0", "status");
+
         expect(result).toBe("unset");
+
         const output = overlay.print();
+
         expect(output).not.toContain('status');
     });
 
@@ -212,33 +205,75 @@ if (import.meta.vitest) {
         spi-max-frequency = <1000000>;
     };
 };`;
-        const base = DT.new_from_string(base_dts);
+        const base = DeviceTree.new_from_string(base_dts);
         if (typeof base === "string") { throw new TypeError(base); }
-        const overlay = DTO_cls.new_from_string(overlay_imu_with_extra, base);
+
+        const overlay = DeviceTreeOverlay.new_from_string(overlay_imu_with_extra, base);
         if (typeof overlay === "string") { throw new TypeError(overlay); }
-        const result = unset_overlay_property(base, overlay, "imu1", "spi-max-frequency");
+
+        const result = unset_overlay_property(overlay, "imu1", "spi-max-frequency");
+
         expect(result).toBe("unset");
+
         const output = overlay.print();
+
         expect(output).not.toContain("spi-max-frequency");
         expect(output).toContain("imu1");
         expect(output).toContain("compatible");
     });
 
-    test("unset_overlay_property - returns node-not-found for unknown node", () => {
-        const base = DT.new_from_string(base_dts);
+    test("unset_overlay_property - removes overlay override of a base property", () => {
+        const base_dts_with_status = `/dts-v1/;
+/ {
+    soc {
+        spi0: spi@7e204000 {
+            status = "disabled";
+        };
+    };
+};`;
+        const overlay_overrides_status = `/dts-v1/;
+/plugin/;
+
+&spi0 {
+    status = "okay";
+};`;
+        const base = DeviceTree.new_from_string(base_dts_with_status);
         if (typeof base === "string") { throw new TypeError(base); }
-        const overlay = DTO_cls.new_from_string(overlay_with_status_and_imu, base);
+
+        const overlay = DeviceTreeOverlay.new_from_string(overlay_overrides_status, base);
         if (typeof overlay === "string") { throw new TypeError(overlay); }
-        const result = unset_overlay_property(base, overlay, "nonexistent", "status");
+
+        const result = unset_overlay_property(overlay, "spi0", "status");
+
+        expect(result).toBe("unset");
+
+        const output = overlay.print();
+
+        expect(output).not.toContain('status = "okay"');
+        expect(output).not.toContain('spi0');
+    });
+
+    test("unset_overlay_property - returns node-not-found for unknown node", () => {
+        const base = DeviceTree.new_from_string(base_dts);
+        if (typeof base === "string") { throw new TypeError(base); }
+
+        const overlay = DeviceTreeOverlay.new_from_string(overlay_with_status_and_imu, base);
+        if (typeof overlay === "string") { throw new TypeError(overlay); }
+
+        const result = unset_overlay_property(overlay, "nonexistent", "status");
+
         expect(result).toBe("node-not-found");
     });
 
     test("unset_overlay_property - returns property-not-found when property absent", () => {
-        const base = DT.new_from_string(base_dts);
+        const base = DeviceTree.new_from_string(base_dts);
         if (typeof base === "string") { throw new TypeError(base); }
-        const overlay = DTO_cls.new_from_string(overlay_with_status_and_imu, base);
+
+        const overlay = DeviceTreeOverlay.new_from_string(overlay_with_status_and_imu, base);
         if (typeof overlay === "string") { throw new TypeError(overlay); }
-        const result = unset_overlay_property(base, overlay, "spi0", "clock-frequency");
+
+        const result = unset_overlay_property(overlay, "spi0", "clock-frequency");
+
         expect(result).toBe("property-not-found");
     });
 
@@ -251,11 +286,14 @@ if (import.meta.vitest) {
         };
     };
 };`;
-        const base = DT.new_from_string(base_dts_with_property);
+        const base = DeviceTree.new_from_string(base_dts_with_property);
         if (typeof base === "string") { throw new TypeError(base); }
-        const overlay = DTO_cls.new_from_string(overlay_with_status_and_imu, base);
+
+        const overlay = DeviceTreeOverlay.new_from_string(overlay_with_status_and_imu, base);
         if (typeof overlay === "string") { throw new TypeError(overlay); }
-        const result = unset_overlay_property(base, overlay, "spi0", "clock-names");
+
+        const result = unset_overlay_property(overlay, "spi0", "clock-names");
+
         expect(result).toBe("not-in-overlay");
     });
 }
