@@ -78,7 +78,7 @@ export function get_latest_mtime(directory: string): number {
     return latest;
 }
 
-function is_compat_index_stale(index: CompatIndex, linux: string, dtSchema: string): boolean {
+export function is_compat_index_stale(index: CompatIndex, linux: string, dtSchema: string): boolean {
     if (typeof index.generated_at !== "number" || index.entries === undefined) {
         return true;
     }

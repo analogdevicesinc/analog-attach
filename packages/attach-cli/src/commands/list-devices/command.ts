@@ -1,16 +1,10 @@
 import { buildCommand } from "@stricli/core";
-import { Attach, extract_compatible } from "attach-lib";
 
-import path from "node:path";
-import * as fs from 'node:fs';
-
-import { get_all_file_paths } from "../../utilities";
-import { load_config } from "../../config";
+import { load_compat_index, load_config, save_compat_index } from "../../config";
+import { is_compat_index_stale, build_compat_index } from "../../utilities";
 
 type Flags = {
     includesWord?: string,
-    linux?: string,
-    dtSchema?: string,
 }
 
 export const list_devices_command = buildCommand({
@@ -22,91 +16,42 @@ export const list_devices_command = buildCommand({
                 brief: "word to be present in device name",
                 optional: true
             },
-            linux: {
-                kind: "parsed",
-                parse: String,
-                brief: "Path to Linux repo",
-                optional: true,
-            },
-            dtSchema: {
-                kind: "parsed",
-                parse: String,
-                brief: "Path to dt-schema repo",
-                optional: true,
-            },
         }
     },
     docs: {
-        brief: "List available devices in linux repo"
+        brief: "List available devices from the compat index"
     },
     async func(flags: Flags) {
-        const config = load_config();
-        const linux = flags.linux ?? config.linux;
-        const dtSchema = flags.dtSchema ?? config.dtSchema;
         const { includesWord } = flags;
 
-        if (linux === undefined) {
-            console.log("Missing: --linux (no config.toml found)");
+        let index = load_compat_index();
+
+        if (index === undefined) {
+            console.log("No compat-index.json found. Run 'attach init' first.");
             return;
         }
 
-        if (dtSchema === undefined) {
-            console.log("Missing: --dt-schema (no config.toml found)");
-            return;
+        const config = load_config();
+
+        if (
+            config.linux !== undefined &&
+            config.dtSchema !== undefined &&
+            is_compat_index_stale(index, config.linux, config.dtSchema)
+        ) {
+            console.log("compat-index.json is stale, rebuilding...");
+
+            const entries = await build_compat_index(config.linux, config.dtSchema);
+            const compat_index_path = save_compat_index(entries);
+
+            console.log(`Written: ${compat_index_path}`);
+            index = { generated_at: Date.now(), entries };
         }
 
-        if (!fs.existsSync(linux)) {
-            console.log(`Missing: ${linux}`);
-            return;
-        }
-
-        if (!fs.existsSync(dtSchema)) {
-            console.log(`Missing: ${dtSchema}`);
-            return;
-        }
-
-        const bindings_folder = path.resolve(linux, "Documentation", "devicetree", "bindings");
-
-        if (!fs.existsSync(bindings_folder)) {
-            console.log(`Missing: ${bindings_folder}`);
-            return;
-        }
-
-        const all_files = get_all_file_paths(bindings_folder);
-        const yaml_files = all_files.filter(file => file.endsWith(".yaml"));
-
-        for (const file of yaml_files) {
-
-            if (includesWord !== undefined && !fs.readFileSync(file, 'utf8').includes(includesWord)) {
-                continue;
-            }
-
-            const attach = Attach.new();
-            const binding = await attach.parse_binding(file, linux, dtSchema);
-
-            if (binding === undefined) {
-                continue;
-            }
-
-            const compatible = extract_compatible(binding.parsed_binding);
-
-            if (compatible === undefined) {
-                continue;
-            }
-
-            for (const entry of compatible) {
-                // TODO fix why entry could be undefined
-                // arm/actions.yaml
-                if (entry !== undefined) {
-                    if (includesWord !== undefined && entry.includes(includesWord)) {
-                        console.log(`${entry}`);
-                    } else if (includesWord === undefined) {
-                        console.log(`${entry}`);
-                    }
-                }
+        for (const entry of Object.keys(index.entries)) {
+            if (includesWord === undefined || entry.includes(includesWord)) {
+                console.log(entry);
             }
         }
-
     }
 });
 
