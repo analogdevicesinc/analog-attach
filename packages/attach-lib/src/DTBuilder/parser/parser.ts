@@ -18,8 +18,8 @@ import {
   CharToken, CharTokenKind, DirectiveToken,
   DTDirective, RawToken, Token, TokenKind
 } from "./tokens.js";
-import { Option } from "../option.js";
-import { Result } from "../result.js";
+import { Option } from "../../option.js";
+import { Result } from "../../result.js";
 import { WithRowAndCol } from "./LexerInputStream.js";
 import { lex } from "./Lexer.js";
 import { parse as parse_yaml_string } from "yaml";

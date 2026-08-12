@@ -1,7 +1,7 @@
 import { WithRowAndCol, LexerInputStream } from "./LexerInputStream.js";
-import { Option } from "../option.js";
-import { Result } from "../result.js";
-import { assert_never } from "../utilities.js";
+import { Option } from "../../option.js";
+import { Result } from "../../result.js";
+import { assert_never } from "../../utilities.js";
 import { TokenStream } from "./TokenStream.js";
 import { TokenKind, RawToken, Token, is_dt_directive, is_char_token } from "./tokens.js";
 

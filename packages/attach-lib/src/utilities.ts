@@ -1,4 +1,4 @@
-import type { DTS, DTNode } from './dts';
+import type { DTS, DTNode } from './DTBuilder/parser';
 
 export function get_node_key(n: DTNode): string {
   if (n.name === '/') {

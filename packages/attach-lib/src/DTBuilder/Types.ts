@@ -1,4 +1,4 @@
-import { Bits, CellArrayElement, DTCellArray } from "../dts";
+import { Bits, CellArrayElement, DTCellArray } from "./parser";
 import { Labeled, MakeArray, is_array, is_labeled, make_array, make_labeled } from "./TypeUtilities";
 
 type DTString = string;

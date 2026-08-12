@@ -1,6 +1,21 @@
-import { INodeBuilderBase, NodeBuilder, PropertyBuilder } from "./DTBuilder/DTBuilder";
-import { DTS, DTNode, parse_dts, parse_dto, DTLabel, DTPath, get_full_node_name, DTProperty, is_dt_flag, DTO } from "./dts";
-import { print_dts, print_dto } from "./dts/printer";
+import { INodeBuilderBase, NodeBuilder } from "./DTBuilder/NodeBuilder";
+import { PropertyBuilder } from "./DTBuilder/PropertyBuilder";
+
+import {
+    print_dts,
+    print_dto,
+    DTS,
+    DTNode,
+    parse_dts,
+    parse_dto,
+    DTLabel,
+    DTPath,
+    get_full_node_name,
+    DTProperty,
+    is_dt_flag,
+    DTO
+} from "./DTBuilder/parser";
+
 import path from 'node:path';
 import * as fs from 'node:fs';
 import { Result } from "./result";
