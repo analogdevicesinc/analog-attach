@@ -11,9 +11,10 @@ import { DtBindingSchema } from "./DtBindingSchema.js";
 import Ajv2019, { ValidateFunction, KeywordDefinition } from "ajv/dist/2019.js";
 import { deep_merge, delete_path, getByPath } from "../Bindings/ObjectUtilities.js";
 import { translate_JSONSchema } from "../Bindings/JSONSchemaTranslate.js";
-import { DeviceTree } from "../Devicetree/index.js";
+import { DeviceTree, DTNode } from "../Devicetree/index.js";
 import { query_devicetree } from "../Intelligence/query.js";
 import { insert_known_structures } from "../Intelligence/known_properties.js";
+import { dt_to_validator_input } from "./DTxBinding.js";
 
 export class Attach {
 
@@ -146,7 +147,7 @@ export class Attach {
         linux_path: string,
         dt_schema_path: string,
         devicetree: DeviceTree,
-        data: string,
+        data: string | DTNode,
         parent_name?: string,
     ): Promise<{ attach: Attach, parsed_binding: ParsedBinding, patterns: string[] } | undefined> {
         const attach = Attach.new();
@@ -156,12 +157,19 @@ export class Attach {
             return undefined;
         }
 
-        result.parsed_binding.properties = query_devicetree(devicetree, result.parsed_binding.properties, data, parent_name);
+        const data_string = typeof data === 'string'
+            ? data
+            : JSON.stringify(
+                Object.fromEntries(dt_to_validator_input(data, result.parsed_binding)),
+                (_key, value) => typeof value === 'bigint' ? Number(value) : value
+            );
+
+        result.parsed_binding.properties = query_devicetree(devicetree, result.parsed_binding.properties, data_string, parent_name);
         result.parsed_binding.properties = insert_known_structures(result.parsed_binding.properties);
 
         if (result.parsed_binding.pattern_properties !== undefined) {
             for (const pattern of result.parsed_binding.pattern_properties) {
-                pattern.properties = query_devicetree(devicetree, pattern.properties, data, parent_name);
+                pattern.properties = query_devicetree(devicetree, pattern.properties, data_string, parent_name);
                 pattern.properties = insert_known_structures(pattern.properties);
             }
         }
