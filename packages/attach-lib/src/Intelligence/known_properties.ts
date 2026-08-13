@@ -1,4 +1,4 @@
-import { ResolvedProperty } from "../AttachTypes.js";
+import { ResolvedProperty } from "../Attach/AttachTypes.js";
 
 export function insert_known_structures(properties: ResolvedProperty[]): ResolvedProperty[] {
 

@@ -1,5 +1,5 @@
-import { ResolvedProperty } from "../AttachTypes.js";
-import { AttachArray, AttachEnumType, FixedIndex } from "../StructuralTypes.js";
+import { ResolvedProperty } from "../Attach/AttachTypes.js";
+import { AttachArray, AttachEnumType, FixedIndex } from "../Attach/StructuralTypes.js";
 import { DeviceTree, DTNode, DTProperty, get_full_node_name, is_dt_flag } from "../Devicetree/index.js";
 import {
     is_clock,

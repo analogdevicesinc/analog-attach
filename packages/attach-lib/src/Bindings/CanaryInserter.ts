@@ -1,4 +1,4 @@
-import { DtBindingSchema } from "../DtBindingSchema";
+import { DtBindingSchema } from "../Attach/DtBindingSchema";
 import { deep_merge, find_entry_in_object, overwrite_object_with_path_value } from "./ObjectUtilities.js";
 import { PathValue } from "./UtilityTypes.js";
 

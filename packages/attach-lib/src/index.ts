@@ -1,10 +1,10 @@
 // Main entry point for attach-lib package
 // Re-export all public APIs
 
-export * from './Attach.js';
-export * from './AttachTypes.js';
-export * from './DtBindingSchema.js';
-export * from './StructuralTypes.js';
+export * from './Attach/Attach.js';
+export * from './Attach/AttachTypes.js';
+export * from './Attach/DtBindingSchema.js';
+export * from './Attach/StructuralTypes.js';
 export * from './RegexExpansion.js';
 
 // DTS parsing and manipulation — legacy (dts_legacy types prefixed with Dts*)

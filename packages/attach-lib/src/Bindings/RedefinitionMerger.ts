@@ -1,5 +1,5 @@
 import { JSONSchema } from "@apidevtools/json-schema-ref-parser/dist/lib/types";
-import { DtBindingSchema } from "../DtBindingSchema";
+import { DtBindingSchema } from "../Attach/DtBindingSchema";
 import { bidirectional_custom_resolve } from "./RefResolver.js";
 import { $RefParser } from "@apidevtools/json-schema-ref-parser";
 import { deep_merge, delete_path, find_entry_in_object, overwrite_object_with_path_value } from "./ObjectUtilities.js";

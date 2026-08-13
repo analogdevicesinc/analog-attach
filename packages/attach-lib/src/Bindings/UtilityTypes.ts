@@ -1,5 +1,5 @@
 /* eslint-disable unicorn/prevent-abbreviations */
-import { DtBindingSchema } from "../DtBindingSchema";
+import { DtBindingSchema } from "../Attach/DtBindingSchema";
 
 export type RefResolvedBinding = {
     root_binding: DtBindingSchema,

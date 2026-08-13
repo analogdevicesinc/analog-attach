@@ -1,6 +1,6 @@
-import { ParsedBinding, ResolvedProperty, PatternPropertyRule } from "../AttachTypes";
-import { DtBindingSchema } from "../DtBindingSchema";
-import { AttachType, AttachEnumType, AttachArray, FixedIndex } from "../StructuralTypes";
+import { ParsedBinding, ResolvedProperty, PatternPropertyRule } from "../Attach/AttachTypes";
+import { DtBindingSchema } from "../Attach/DtBindingSchema";
+import { AttachType, AttachEnumType, AttachArray, FixedIndex } from "../Attach/StructuralTypes";
 import { find_entry_in_object } from "./ObjectUtilities";
 
 export function translate_JSONSchema(fixuped: DtBindingSchema): ParsedBinding {

@@ -1,16 +1,16 @@
 import { $RefParser } from "@apidevtools/json-schema-ref-parser";
 import { BindingErrors, ParsedBinding } from './AttachTypes.js';
-import { resolve_references } from './Bindings/RefResolver.js';
-import { resolve_properties } from './Bindings/PropertyResolver.js';
-import { merge_redefinitions } from './Bindings/RedefinitionMerger.js';
-import { insert_canaries } from './Bindings/CanaryInserter.js';
-import { apply_JSONSchema_fixups } from './Bindings/JSONSchemaFixups.js';
+import { resolve_references } from '../Bindings/RefResolver.js';
+import { resolve_properties } from '../Bindings/PropertyResolver.js';
+import { merge_redefinitions } from '../Bindings/RedefinitionMerger.js';
+import { insert_canaries } from '../Bindings/CanaryInserter.js';
+import { apply_JSONSchema_fixups } from '../Bindings/JSONSchemaFixups.js';
 
 import { DtBindingSchema } from "./DtBindingSchema.js";
 
 import Ajv2019, { ValidateFunction, KeywordDefinition } from "ajv/dist/2019.js";
-import { deep_merge, delete_path, getByPath } from "./Bindings/ObjectUtilities.js";
-import { translate_JSONSchema } from "./Bindings/JSONSchemaTranslate.js";
+import { deep_merge, delete_path, getByPath } from "../Bindings/ObjectUtilities.js";
+import { translate_JSONSchema } from "../Bindings/JSONSchemaTranslate.js";
 
 export class Attach {
 
@@ -117,7 +117,7 @@ export class Attach {
             const pattern_ajv = new Ajv2019({ allErrors: true, logger: false });
             pattern_ajv.addKeyword(typeSizeKeyword);
 
-            for (const [pattern, schema] of Object.entries(this.original_binding.patternProperties ?? {})) {
+            for (const [pattern, schema] of Object.entries(this.original_binding!.patternProperties ?? {})) {
                 const cast_schema = schema as DtBindingSchema;
 
                 if (typeof cast_schema === 'boolean' || !("properties" in cast_schema)) {

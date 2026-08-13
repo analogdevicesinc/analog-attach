@@ -1,7 +1,7 @@
 /* eslint-disable unicorn/prevent-abbreviations */
 
 import { $RefParser, FileInfo, JSONSchema, ResolverError } from "@apidevtools/json-schema-ref-parser";
-import { DtBindingSchema, isDtBindingSchema } from "../DtBindingSchema.js";
+import { DtBindingSchema, isDtBindingSchema } from "../Attach/DtBindingSchema.js";
 import { RefResolvedBinding } from './UtilityTypes.js';
 
 import * as os from 'node:os';

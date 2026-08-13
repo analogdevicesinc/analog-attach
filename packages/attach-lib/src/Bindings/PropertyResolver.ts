@@ -1,6 +1,6 @@
 /* eslint-disable unicorn/prevent-abbreviations */
 import { $RefParser } from "@apidevtools/json-schema-ref-parser";
-import { DtBindingSchema } from "../DtBindingSchema";
+import { DtBindingSchema } from "../Attach/DtBindingSchema";
 import { bidirectional_custom_resolve } from "./RefResolver.js";
 import { PathValue, RefResolvedBinding } from "./UtilityTypes.js";
 import { compare_arrays, find_entry_in_object, find_in_object, map_object } from "./ObjectUtilities.js";
