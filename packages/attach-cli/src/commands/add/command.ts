@@ -3,7 +3,7 @@ import { DeviceTree, DeviceTreeOverlay, NodeBuilder, PropertyBuilder, type DTPro
 
 import * as fs from 'node:fs';
 
-import { find_binding } from "../../utilities";
+import { find_binding, resolve_node_identifier } from "../../utilities";
 import { load_config } from "../../config";
 
 type Flags = {
@@ -199,7 +199,7 @@ export function add_overlay_node(
     }
 
     // Try to find parent in overlay (could be in an existing fragment's __overlay__)
-    const in_overlay = overlay.find_node(parent_identifier);
+    const in_overlay = overlay.find_node(resolve_node_identifier(parent_identifier, overlay));
     if (in_overlay !== undefined) {
         in_overlay.node.children.push(new_node.build());
         return "added";

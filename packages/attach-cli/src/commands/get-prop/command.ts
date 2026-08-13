@@ -3,6 +3,8 @@ import { DeviceTreeOverlay, is_dt_flag, print_property } from "attach-lib";
 
 import * as fs from 'node:fs';
 
+import { resolve_node_identifier } from "../../utilities";
+
 type Flags = {
     node: string,
     property: string,
@@ -14,7 +16,7 @@ export function get_property(
     node: string,
     property: string,
 ): string | "node-not-found" | "property-not-found" {
-    const found = overlay.find_node(node);
+    const found = overlay.find_node(resolve_node_identifier(node, overlay));
     if (found === undefined) { return "node-not-found"; }
 
     const found_property = found.node.properties.find((p) => p.name === property);

@@ -3,8 +3,8 @@ import { DeviceTree, DeviceTreeOverlay, PropertyBuilder } from "attach-lib";
 
 import * as fs from 'node:fs';
 
-
 import { load_config } from "../../config";
+import { resolve_node_identifier } from "../../utilities";
 
 type Flags = {
     node: string,
@@ -106,7 +106,7 @@ export function set_node_status(
         .build();
 
     // Check if there's already an overlay fragment touching this node
-    const found = overlay.find_node(identifier);
+    const found = overlay.find_node(resolve_node_identifier(identifier, overlay));
     if (found !== undefined) {
         const index = found.node.properties.findIndex(p => p.name === "status");
 

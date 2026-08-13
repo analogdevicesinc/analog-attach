@@ -4,6 +4,7 @@ import { DeviceTree, DeviceTreeOverlay } from "attach-lib";
 import * as fs from 'node:fs';
 
 import { load_config } from "../../config";
+import { resolve_node_identifier } from "../../utilities";
 
 type Flags = {
     node: string,
@@ -108,7 +109,7 @@ export function unset_overlay_property(
 ): "unset" | "node-not-found" | "property-not-found" | "not-in-overlay" {
 
     const base = overlay.get_base_dts()!;
-    const found = overlay.find_node(identifier);
+    const found = overlay.find_node(resolve_node_identifier(identifier, overlay));
 
     if (found === undefined) {
         if (base.resolve_identifier(identifier) !== undefined) {

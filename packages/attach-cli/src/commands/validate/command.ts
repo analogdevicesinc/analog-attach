@@ -13,7 +13,7 @@ import {
 
 import * as fs from 'node:fs';
 
-import { bigIntReplacer, find_binding, parse_dt_node, resolve_node_identifier_new } from "../../utilities";
+import { bigIntReplacer, find_binding, parse_dt_node, resolve_node_identifier } from "../../utilities";
 import { load_config } from "../../config";
 
 type Flags = {
@@ -248,8 +248,7 @@ export const validate_command = buildCommand({
             return;
         }
 
-        const identifier = resolve_node_identifier_new(base_dt, node);
-        const searched_node = overlay.find_node(identifier);
+        const searched_node = overlay.find_node(resolve_node_identifier(node, overlay));
 
         if (searched_node === undefined) {
             console.log(`Couldn't find ${node} in ${input}`);

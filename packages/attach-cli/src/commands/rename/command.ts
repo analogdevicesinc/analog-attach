@@ -4,6 +4,7 @@ import { DeviceTree, DeviceTreeOverlay } from "attach-lib";
 import * as fs from 'node:fs';
 
 import { load_config } from "../../config";
+import { resolve_node_identifier } from "../../utilities";
 
 type Flags = {
     node: string,
@@ -110,7 +111,7 @@ export function rename_overlay_node(
     identifier: string,
     to: string,
 ): "renamed" | "not-found" | "in-base" | "is-root" | "conflict" {
-    const found = overlay.find_node(identifier);
+    const found = overlay.find_node(resolve_node_identifier(identifier, overlay));
 
     if (found === undefined) { return "not-found"; }
     if (found.is_in_base) { return "in-base"; }

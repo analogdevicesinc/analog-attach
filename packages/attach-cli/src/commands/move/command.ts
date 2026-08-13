@@ -3,6 +3,8 @@ import { DeviceTree, DeviceTreeOverlay, get_full_node_name, type DTNode } from "
 
 import * as fs from 'node:fs';
 
+import { resolve_node_identifier } from "../../utilities";
+
 import { load_config } from "../../config";
 
 type Flags = {
@@ -102,7 +104,7 @@ export const move_command = buildCommand({
             }
             case "conflict": {
                 // Compute the full node name for the error message
-                const found = overlay.find_node(node);
+                const found = overlay.find_node(resolve_node_identifier(node, overlay));
                 const node_key = found === undefined ? node : get_full_node_name(found.node);
                 console.log(`${parent} already has a child named ${node_key}`);
                 return;
@@ -123,7 +125,7 @@ export function move_overlay_node(
     parent_identifier: string,
 ): "moved" | "not-found" | "in-base" | "is-root" | "parent-not-found" | "conflict" | "into-self" {
 
-    const found = overlay.find_node(identifier);
+    const found = overlay.find_node(resolve_node_identifier(identifier, overlay));
 
     if (found === undefined) { return "not-found"; }
     if (found.is_in_base) { return "in-base"; }
@@ -131,7 +133,7 @@ export function move_overlay_node(
 
     const node = found.node;
 
-    const destination_in_overlay = overlay.find_node(parent_identifier);
+    const destination_in_overlay = overlay.find_node(resolve_node_identifier(parent_identifier, overlay));
 
     const destination_node: DTNode | "parent-not-found" = (() => {
         if (destination_in_overlay === undefined) {

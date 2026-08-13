@@ -1,37 +1,65 @@
-import { Attach, extract_compatible, is_dt_flag, type DTNode, type DTProperty, type DTValue, type DTNumber, type DTLabel, type DTPath, type DTExpression, type ParsedBinding } from 'attach-lib';
-import { DeviceTree } from 'attach-lib';
+import {
+    Attach,
+    extract_compatible,
+    is_dt_flag,
+    type DTNode,
+    type DTProperty,
+    type DTValue,
+    type DTNumber,
+    type DTLabel,
+    type DTPath,
+    type DTExpression,
+    type ParsedBinding
+} from 'attach-lib';
+
+import { DeviceTreeOverlay } from 'attach-lib';
 import * as fs from 'node:fs';
 import path from "node:path";
 
 import { load_compat_index, save_compat_index, type CompatIndex } from "./config";
 
-/**
- * Expand `spi0/rest` or `&spi0/rest` into `&{/abs/path/rest}` using the new
- * DeviceTree API. Falls back to returning the identifier unchanged if not found.
- */
-// TODO: not necessarily only in base
-export function resolve_node_identifier_new(base: DeviceTree, identifier: string): string {
-    if (identifier.startsWith("&{/") || identifier.startsWith("/")) {
-        return identifier;
+export function resolve_node_identifier(
+    identifier: string,
+    overlay: DeviceTreeOverlay
+): DTLabel | DTPath {
+    const clean = identifier.startsWith("&") ? identifier.slice(1) : identifier;
+
+    if (clean.startsWith("{/") && clean.endsWith("}")) {
+        return { kind: "path", labels: [], path: clean.slice(1, -1) };
+    }
+    if (identifier.startsWith("/")) {
+        return { kind: "path", labels: [], path: identifier };
     }
 
-    const slash = identifier.indexOf("/");
+    const slash = clean.indexOf("/");
     if (slash === -1) {
-        return identifier;
+        return { kind: "label", labels: [], name: clean };
     }
 
-    const raw_prefix = identifier.startsWith("&") ? identifier.slice(1) : identifier.slice(0, slash);
-    const suffix = identifier.slice(slash + 1);
+    const label_part = clean.slice(0, slash);
+    const child_part = clean.slice(slash + 1);
 
-    const found = base.resolve_identifier(raw_prefix);
-    if (found === undefined) { return identifier; }
+    const base = overlay.get_base_dts();
 
-    const reference = found.kind === "path"
-        ? base.get_node_by_path(found)
-        : base.get_node_by_label(found);
-    if (reference === undefined) { return identifier; }
+    if (base !== undefined) {
+        const found = base.resolve_identifier(label_part);
+        if (found !== undefined) {
+            const reference = found.kind === "path"
+                ? base.get_node_by_path(found)
+                : base.get_node_by_label(found);
+            if (reference !== undefined) {
+                return { kind: "path", labels: [], path: `${reference.full_path.path}/${child_part}` };
+            }
+        }
+    }
 
-    return `&{${reference.full_path.path}/${suffix}}`;
+    const in_overlay = overlay.find_node({ kind: "label", labels: [], name: label_part });
+
+    if (in_overlay !== undefined) {
+        return { kind: "path", labels: [], path: `${in_overlay.node_path}/${child_part}` };
+    }
+
+    return { kind: "label", labels: [], name: label_part };
 }
 
 export function bigIntReplacer(_key: string, value: any): any {
@@ -187,6 +215,7 @@ export async function find_binding(linux: string, dtSchema: string, compatible_t
     return;
 }
 
+// TODO: this should be in lib: it's practically translating raw data to something the validator can ingest
 export function parse_dt_node(node: DTNode, parsed_binding: ParsedBinding): Map<string, unknown> {
     const map = new Map<string, unknown>();
     for (const property of node.properties) {
@@ -304,37 +333,4 @@ function _parse_dt_cell_element(element: DTNumber | DTLabel | DTPath | DTExpress
             throw new Error("Exhaustive check failed!");
         }
     }
-}
-
-if (import.meta.vitest) {
-    const { test, expect } = import.meta.vitest;
-
-    const dts_source = `/dts-v1/;
-/ {
-    soc {
-        spi0: spi@7e204000 {
-            imu1: adi,ad7124-8@0 {
-            };
-        };
-    };
-};`;
-
-    test(`${resolve_node_identifier_new.name} - label/child expands to &{/abs/path/child}`, () => {
-        const base = DeviceTree.new_from_string(dts_source);
-        if (typeof base === "string") { throw new TypeError(base); }
-        expect(resolve_node_identifier_new(base, 'spi0/adi,ad7124-8@0')).toBe('&{/soc/spi@7e204000/adi,ad7124-8@0}');
-    });
-
-    test(`${resolve_node_identifier_new.name} - already-absolute returned unchanged`, () => {
-        const base = DeviceTree.new_from_string(dts_source);
-        if (typeof base === "string") { throw new TypeError(base); }
-        expect(resolve_node_identifier_new(base, '&{/soc/spi@7e204000}')).toBe('&{/soc/spi@7e204000}');
-    });
-
-    test(`${resolve_node_identifier_new.name} - bare label with no slash unchanged`, () => {
-        const base = DeviceTree.new_from_string(dts_source);
-        if (typeof base === "string") { throw new TypeError(base); }
-        expect(resolve_node_identifier_new(base, 'spi0')).toBe('spi0');
-    });
-
 }
