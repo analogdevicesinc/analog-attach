@@ -5,8 +5,6 @@ import {
     DeviceTree,
     DeviceTreeOverlay,
     PropertyBuilder,
-    insert_known_structures,
-    query_devicetree,
     is_dt_flag,
     to_attach_array,
     dt_to_validator_input,
@@ -182,72 +180,26 @@ export const set_property_command = buildCommand({
             return;
         }
 
-        // TODO: most of this process should be in the lib
+        const initial = await Attach.new_populated_binding(binding_path, linux, dtSchema, base_dt, found_node, parent);
 
-        const attach = Attach.new();
-
-        let binding = await attach.parse_binding(binding_path, linux, dtSchema);
-
-        if (binding === undefined) {
+        if (initial === undefined) {
             console.log(`Failed to parse binding ${binding_path}`);
             return;
         }
 
-        const partial_input_data = Object.fromEntries(dt_to_validator_input(found_node, binding.parsed_binding));
+        const input_data = Object.fromEntries(dt_to_validator_input(found_node, initial.parsed_binding));
 
-        const extended_binding = structuredClone(binding);
-
-        extended_binding.parsed_binding.properties = query_devicetree(
-            base_dt,
-            binding.parsed_binding.properties,
-            JSON.stringify(partial_input_data, bigIntReplacer),
-            parent
-        );
-
-        extended_binding.parsed_binding.properties = insert_known_structures(extended_binding.parsed_binding.properties);
-
-        for (const pattern of extended_binding.parsed_binding.pattern_properties ?? []) {
-            pattern.properties = query_devicetree(
-                base_dt,
-                pattern.properties,
-                JSON.stringify(partial_input_data, bigIntReplacer),
-                parent
-            );
-
-            pattern.properties = insert_known_structures(pattern.properties);
-        }
-
-        const input_data = Object.fromEntries(dt_to_validator_input(found_node, extended_binding.parsed_binding));
-
-        const update = attach.update_binding_by_changes(JSON.stringify(input_data, bigIntReplacer));
+        const update = initial.attach.update_binding_by_changes(JSON.stringify(input_data, bigIntReplacer));
 
         if (update === undefined) {
             console.log(`Failed to update with set compatible "${compatible_value}" for ${binding_path}`);
             return;
         }
 
-        binding = { parsed_binding: update.binding, patterns: binding.patterns };
-
-        binding.parsed_binding.properties = query_devicetree(
-            base_dt,
-            binding.parsed_binding.properties,
-            JSON.stringify(input_data, bigIntReplacer),
-            parent
-        );
-
-        binding.parsed_binding.properties = insert_known_structures(binding.parsed_binding.properties);
-
-        if (binding.parsed_binding.pattern_properties !== undefined) {
-            for (const pattern of binding.parsed_binding.pattern_properties) {
-                pattern.properties = query_devicetree(
-                    base_dt,
-                    pattern.properties,
-                    JSON.stringify(input_data, bigIntReplacer),
-                    parent
-                );
-                pattern.properties = insert_known_structures(pattern.properties);
-            }
-        }
+        const binding = {
+            parsed_binding: Attach.populate_parsed_binding(update.binding, base_dt, JSON.stringify(input_data, bigIntReplacer), parent),
+            patterns: initial.patterns,
+        };
 
         const property_binding_definition = binding.parsed_binding.properties.find((entry) => entry.key === property);
 
