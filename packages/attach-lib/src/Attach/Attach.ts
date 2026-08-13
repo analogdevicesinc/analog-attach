@@ -1,5 +1,5 @@
 import { $RefParser } from "@apidevtools/json-schema-ref-parser";
-import { BindingErrors, ParsedBinding } from './AttachTypes.js';
+import { BindingErrors, ParsedBinding, ResolvedProperty } from './AttachTypes.js';
 import { resolve_references } from '../Bindings/RefResolver.js';
 import { resolve_properties } from '../Bindings/PropertyResolver.js';
 import { merge_redefinitions } from '../Bindings/RedefinitionMerger.js';
@@ -142,6 +142,38 @@ export class Attach {
         };
     }
 
+    public static populate_properties(
+        properties: ResolvedProperty[],
+        devicetree: DeviceTree,
+        data: string,
+        parent_name?: string,
+    ): ResolvedProperty[] {
+        return insert_known_structures(query_devicetree(devicetree, properties, data, parent_name));
+    }
+
+    public static populate_parsed_binding(
+        parsed_binding: ParsedBinding,
+        devicetree: DeviceTree,
+        data: string | DTNode,
+        parent_name?: string,
+    ): ParsedBinding {
+        const data_string = typeof data === 'string'
+            ? data
+            : JSON.stringify(
+                Object.fromEntries(dt_to_validator_input(data, parsed_binding)),
+                (_key, value) => typeof value === 'bigint' ? Number(value) : value
+            );
+
+        return {
+            ...parsed_binding,
+            properties: Attach.populate_properties(parsed_binding.properties, devicetree, data_string, parent_name),
+            pattern_properties: parsed_binding.pattern_properties?.map(pattern => ({
+                ...pattern,
+                properties: Attach.populate_properties(pattern.properties, devicetree, data_string, parent_name),
+            })),
+        };
+    }
+
     public static async new_populated_binding(
         binding_path: string,
         linux_path: string,
@@ -157,24 +189,11 @@ export class Attach {
             return undefined;
         }
 
-        const data_string = typeof data === 'string'
-            ? data
-            : JSON.stringify(
-                Object.fromEntries(dt_to_validator_input(data, result.parsed_binding)),
-                (_key, value) => typeof value === 'bigint' ? Number(value) : value
-            );
-
-        result.parsed_binding.properties = query_devicetree(devicetree, result.parsed_binding.properties, data_string, parent_name);
-        result.parsed_binding.properties = insert_known_structures(result.parsed_binding.properties);
-
-        if (result.parsed_binding.pattern_properties !== undefined) {
-            for (const pattern of result.parsed_binding.pattern_properties) {
-                pattern.properties = query_devicetree(devicetree, pattern.properties, data_string, parent_name);
-                pattern.properties = insert_known_structures(pattern.properties);
-            }
-        }
-
-        return { attach, ...result };
+        return {
+            attach,
+            parsed_binding: Attach.populate_parsed_binding(result.parsed_binding, devicetree, data, parent_name),
+            patterns: result.patterns,
+        };
     }
 
     public update_binding_by_changes(data: string): { binding: ParsedBinding, errors: BindingErrors[] } | undefined {
