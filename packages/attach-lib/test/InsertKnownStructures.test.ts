@@ -1,7 +1,7 @@
 import * as fs from 'node:fs';
 import path from 'node:path';
 
-import { Attach, DeviceTree, insert_known_structures, query_devicetree } from 'attach-lib';
+import { Attach, DeviceTree } from 'attach-lib';
 import { bigIntReplacer, BindingTestData, write_to_directory } from './testing_utils';
 
 import { describe, test, expect } from 'vitest';
@@ -196,46 +196,22 @@ async function test_impl(data: BindingTestData) {
     const linux_path = path.resolve(__dirname, 'linux');
     const dt_schema_path = path.resolve(__dirname, 'dt-schema');
 
-    const attach = Attach.new();
+    const result = await Attach.new_populated_binding(binding_path, linux_path, dt_schema_path, document, '{}', "spi@7e204000");
 
-    const binding = await attach.parse_binding(binding_path, linux_path, dt_schema_path);
+    expect.assert.isDefined(result);
 
-    expect.assert.isDefined(binding);
-
-    const input_data = {
-    };
-
-    binding.parsed_binding.properties = query_devicetree(
-        document,
-        binding.parsed_binding.properties,
-        JSON.stringify(input_data),
-        "spi@7e204000"
-    );
-
-    binding.parsed_binding.properties = insert_known_structures(binding.parsed_binding.properties);
-
-    if (binding.parsed_binding.pattern_properties !== undefined) {
-        for (const pattern of binding.parsed_binding.pattern_properties) {
-            pattern.properties = query_devicetree(
-                document,
-                pattern.properties,
-                JSON.stringify(input_data),
-                "spi@7e204000"
-            );
-            pattern.properties = insert_known_structures(pattern.properties);
-        }
-    }
+    const { parsed_binding } = result;
 
     if (data.debug === true) {
         write_to_directory(
             path.resolve(__dirname, "expected/insert-known-structures"),
             data.name,
-            binding.parsed_binding
+            parsed_binding
         );
     }
 
     const expected_path = path.resolve(__dirname, `expected/insert-known-structures/${data.name}.json`);
     const expected = JSON.stringify(JSON.parse(fs.readFileSync(expected_path, 'utf8')));
 
-    expect(JSON.stringify(binding.parsed_binding, bigIntReplacer)).toStrictEqual(expected);
+    expect(JSON.stringify(parsed_binding, bigIntReplacer)).toStrictEqual(expected);
 }

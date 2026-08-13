@@ -11,6 +11,9 @@ import { DtBindingSchema } from "./DtBindingSchema.js";
 import Ajv2019, { ValidateFunction, KeywordDefinition } from "ajv/dist/2019.js";
 import { deep_merge, delete_path, getByPath } from "../Bindings/ObjectUtilities.js";
 import { translate_JSONSchema } from "../Bindings/JSONSchemaTranslate.js";
+import { DeviceTree } from "../Devicetree/index.js";
+import { query_devicetree } from "../Intelligence/query.js";
+import { insert_known_structures } from "../Intelligence/known_properties.js";
 
 export class Attach {
 
@@ -136,6 +139,34 @@ export class Attach {
             parsed_binding: parsed_binding,
             patterns: parsed_binding.pattern_properties === undefined ? [] : parsed_binding.pattern_properties.map(pattern => pattern.pattern)
         };
+    }
+
+    public static async new_populated_binding(
+        binding_path: string,
+        linux_path: string,
+        dt_schema_path: string,
+        devicetree: DeviceTree,
+        data: string,
+        parent_name?: string,
+    ): Promise<{ attach: Attach, parsed_binding: ParsedBinding, patterns: string[] } | undefined> {
+        const attach = Attach.new();
+        const result = await attach.parse_binding(binding_path, linux_path, dt_schema_path);
+
+        if (result === undefined) {
+            return undefined;
+        }
+
+        result.parsed_binding.properties = query_devicetree(devicetree, result.parsed_binding.properties, data, parent_name);
+        result.parsed_binding.properties = insert_known_structures(result.parsed_binding.properties);
+
+        if (result.parsed_binding.pattern_properties !== undefined) {
+            for (const pattern of result.parsed_binding.pattern_properties) {
+                pattern.properties = query_devicetree(devicetree, pattern.properties, data, parent_name);
+                pattern.properties = insert_known_structures(pattern.properties);
+            }
+        }
+
+        return { attach, ...result };
     }
 
     public update_binding_by_changes(data: string): { binding: ParsedBinding, errors: BindingErrors[] } | undefined {

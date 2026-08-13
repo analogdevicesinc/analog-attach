@@ -1,7 +1,7 @@
 import path from 'node:path';
 import * as fs from 'node:fs';
 
-import { Attach, bidirectional_custom_resolve, circular_custom_resolve, DeviceTree, find_in_object, insert_known_structures, query_devicetree } from 'attach-lib';
+import { Attach, bidirectional_custom_resolve, circular_custom_resolve, DeviceTree, find_in_object } from 'attach-lib';
 import { write_to_directory } from './testing_utils';
 import $RefParser from '@apidevtools/json-schema-ref-parser';
 
@@ -100,46 +100,32 @@ describe.runIf(run)('Completion suite', () => {
         await walk_directory(path.resolve(__dirname, 'linux/Documentation/devicetree/bindings'), async (file: string) => {
             binding_count++;
 
-            const attach = Attach.new();
+            const result = await Attach.new_populated_binding(file, linux_path, dt_schema_path, document, '{}', "spi@7e204000");
 
-            const binding = await attach.parse_binding(file, linux_path, dt_schema_path);
-
-            if (binding === undefined) {
+            if (result === undefined) {
                 failed_to_parse_bindings.push(file);
                 return;
             }
 
             parsed_binding_count++;
 
-
-            const data = {
-            };
-
-            binding.parsed_binding.properties = query_devicetree(document, binding.parsed_binding.properties, JSON.stringify(data), "spi@7e204000");
-            binding.parsed_binding.properties = insert_known_structures(binding.parsed_binding.properties);
-
-            if (binding.parsed_binding.pattern_properties !== undefined) {
-                for (const pattern of binding.parsed_binding.pattern_properties) {
-                    pattern.properties = query_devicetree(document, pattern.properties, JSON.stringify(data), "spi@7e204000");
-                    pattern.properties = insert_known_structures(pattern.properties);
-                }
-            }
+            const { parsed_binding } = result;
 
             const no_generic_property = (() => {
                 let returnValue = true;
 
-                for (const property of binding.parsed_binding.properties) {
+                for (const property of parsed_binding.properties) {
                     if (property.value._t === 'generic') {
                         returnValue = false;
                         generics_and_files.push({ generic_property: property.key, file: file });
                     }
                 }
 
-                if (binding.parsed_binding.pattern_properties === undefined) {
+                if (parsed_binding.pattern_properties === undefined) {
                     return returnValue;
                 }
 
-                for (const pattern of binding.parsed_binding.pattern_properties) {
+                for (const pattern of parsed_binding.pattern_properties) {
                     for (const property of pattern.properties) {
                         if (property.value._t === 'generic') {
                             returnValue = false;
@@ -154,18 +140,18 @@ describe.runIf(run)('Completion suite', () => {
             const no_generic_array = (() => {
                 let returnValue = true;
 
-                for (const property of binding.parsed_binding.properties) {
+                for (const property of parsed_binding.properties) {
                     if (property.value._t === 'array') {
                         returnValue = false;
                         generic_arrays_and_files.push({ generic_array: property.key, file: file });
                     }
                 }
 
-                if (binding.parsed_binding.pattern_properties === undefined) {
+                if (parsed_binding.pattern_properties === undefined) {
                     return returnValue;
                 }
 
-                for (const pattern of binding.parsed_binding.pattern_properties) {
+                for (const pattern of parsed_binding.pattern_properties) {
                     for (const property of pattern.properties) {
                         if (property.value._t === 'array') {
                             returnValue = false;
