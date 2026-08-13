@@ -6,6 +6,7 @@ import {
     insert_known_structures,
     query_devicetree,
     is_dt_flag,
+    dt_to_validator_input,
     type DTNode,
     type DTProperty,
     type PatternPropertyRule
@@ -13,7 +14,7 @@ import {
 
 import * as fs from 'node:fs';
 
-import { bigIntReplacer, find_binding, parse_dt_node, resolve_node_identifier } from "../../utilities";
+import { bigIntReplacer, find_binding, resolve_node_identifier } from "../../utilities";
 import { load_config } from "../../config";
 
 type Flags = {
@@ -96,7 +97,7 @@ async function validate_pattern_matched_child(
     }
 
     const partial_input_data = Object.fromEntries(
-        parse_dt_node(
+        dt_to_validator_input(
             found_node,
             {
                 required_properties: rule.required,
@@ -117,7 +118,7 @@ async function validate_pattern_matched_child(
     rule.properties = insert_known_structures(rule.properties);
 
     const input_data = Object.fromEntries(
-        parse_dt_node(
+        dt_to_validator_input(
             found_node,
             {
                 required_properties: rule.required,
@@ -290,7 +291,7 @@ export const validate_command = buildCommand({
             return;
         }
 
-        const partial_input_data = Object.fromEntries(parse_dt_node(found_node, binding.parsed_binding));
+        const partial_input_data = Object.fromEntries(dt_to_validator_input(found_node, binding.parsed_binding));
 
         const extended_binding = structuredClone(binding);
 
@@ -314,7 +315,7 @@ export const validate_command = buildCommand({
             pattern.properties = insert_known_structures(pattern.properties);
         }
 
-        const input_data = Object.fromEntries(parse_dt_node(found_node, extended_binding.parsed_binding));
+        const input_data = Object.fromEntries(dt_to_validator_input(found_node, extended_binding.parsed_binding));
         console.log(JSON.stringify(input_data, bigIntReplacer));
 
         const update = attach.update_binding_by_changes(JSON.stringify(input_data, bigIntReplacer));

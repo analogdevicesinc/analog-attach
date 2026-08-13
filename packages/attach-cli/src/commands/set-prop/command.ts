@@ -9,6 +9,7 @@ import {
     query_devicetree,
     is_dt_flag,
     to_attach_array,
+    dt_to_validator_input,
     type AttachArray,
     type CellValue,
     type DTNode,
@@ -18,7 +19,7 @@ import {
 
 import * as fs from 'node:fs';
 
-import { bigIntReplacer, find_binding, parse_dt_node, resolve_node_identifier } from "../../utilities";
+import { bigIntReplacer, find_binding, resolve_node_identifier } from "../../utilities";
 import { load_config } from "../../config";
 
 // set-prop --property compatible --value adi,ad7124-8
@@ -192,7 +193,7 @@ export const set_property_command = buildCommand({
             return;
         }
 
-        const partial_input_data = Object.fromEntries(parse_dt_node(found_node, binding.parsed_binding));
+        const partial_input_data = Object.fromEntries(dt_to_validator_input(found_node, binding.parsed_binding));
 
         const extended_binding = structuredClone(binding);
 
@@ -216,7 +217,7 @@ export const set_property_command = buildCommand({
             pattern.properties = insert_known_structures(pattern.properties);
         }
 
-        const input_data = Object.fromEntries(parse_dt_node(found_node, extended_binding.parsed_binding));
+        const input_data = Object.fromEntries(dt_to_validator_input(found_node, extended_binding.parsed_binding));
 
         const update = attach.update_binding_by_changes(JSON.stringify(input_data, bigIntReplacer));
 
