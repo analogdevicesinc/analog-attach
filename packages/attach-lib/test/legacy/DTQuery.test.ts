@@ -1,7 +1,8 @@
 import * as fs from 'node:fs';
 import path from 'node:path';
 
-import { Attach, parseDtsWithLabelMap as parse_dts, query_devicetree } from 'attach-lib';
+import { Attach, parseDtsWithLabelMap as parse_dts } from 'attach-lib';
+import { query_devicetree } from '../../src/DtQuery.js';
 
 import { BindingTestData, write_to_directory } from '../testing_utils';
 

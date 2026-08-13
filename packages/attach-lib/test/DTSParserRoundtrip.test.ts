@@ -2,8 +2,7 @@ import * as fs from 'node:fs';
 import path from 'node:path';
 
 import { execFileSync, spawnSync } from 'node:child_process';
-import { parse_dts } from '../src/dts/parser';
-import { print_dts } from '../src/dts/printer';
+import { parse_dts, print_dts } from '../src/Devicetree/Parser/index.js';
 import { Result } from '../src/result';
 import { ensure_directory } from './testing_utils';
 

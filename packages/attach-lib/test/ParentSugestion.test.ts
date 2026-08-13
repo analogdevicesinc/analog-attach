@@ -2,7 +2,7 @@ import * as fs from 'node:fs';
 import path from 'node:path';
 
 import { Attach, DeviceTree } from 'attach-lib';
-import { suggest_parents } from '../src/intelligence/parents.js';
+import { suggest_parents } from '../src/Intelligence/parents.js';
 
 import { BindingTestData, write_to_directory } from './testing_utils';
 

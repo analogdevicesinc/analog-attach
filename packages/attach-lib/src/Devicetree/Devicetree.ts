@@ -367,7 +367,7 @@ if (import.meta.vitest !== undefined) {
 
     test("Overwrite node and print DTS", () => {
 
-        const dts_path = path.resolve(__dirname, '../test/dts_source', 'rpi.prepro.dts');
+        const dts_path = path.resolve(__dirname, '../../test/dts_source', 'rpi.prepro.dts');
         const content = fs.readFileSync(dts_path, 'utf8');
 
         const dt = DeviceTree.new_from_string(content);
