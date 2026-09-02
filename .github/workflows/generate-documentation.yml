@@ -21,8 +21,8 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.x"
 
@@ -35,13 +35,13 @@ jobs:
       - name: Build doc
         working-directory: docs
         run: |
-          make html SPHINXOPTS='-W --keep-going'
+          make dirhtml SPHINXOPTS='-W --keep-going'
 
       - name: Store the generated doc
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: html
-          path: docs/_build/html
+          path: docs/_build/dirhtml
 
   deploy-doc:
     runs-on: ubuntu-latest
@@ -54,7 +54,7 @@ jobs:
       contents: write
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -64,7 +64,7 @@ jobs:
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
 
       - name: Download build
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: html
           path: ${{ runner.temp }}/site
