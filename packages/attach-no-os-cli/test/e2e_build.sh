@@ -6,7 +6,9 @@
 
 source "$(cd "$(dirname "$0")" && pwd)/e2e_common.sh"
 
-PROJECT_NAME="e2e_test_adxl355"
+# Overridable so e2e_build_in_tree.sh can reuse this device configuration under a
+# different project name and layout without repeating it.
+PROJECT_NAME="${PROJECT_NAME:-e2e_test_adxl355}"
 TARGET_MCU="max32690"
 
 configure_nodes() {
