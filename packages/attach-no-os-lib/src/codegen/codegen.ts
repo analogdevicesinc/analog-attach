@@ -113,13 +113,19 @@ export function generate_project(input: CodegenInput): Result<CodegenResult> {
 	// project metadata and the injected helpers under `it.h`. Templates derive
 	// everything else via the pure `_helpers.eta` partial (`include("./_helpers")`).
 	// The workfile is nested under `it.workfile` so its own `platform_vendor` does
-	// not clash with the codegen input's `platform_vendor` (used by makefile.eta).
+	// not clash with the codegen input's `platform_vendor`.
+	//
+	// `files` is the manifest itself: cmakelists_txt.eta builds its `target_sources`
+	// and `target_include_directories` lists from it, so adding a file to the project
+	// is a one-line manifest change that CMake cannot fall out of step with.
 	const context = {
 		workfile: input.workfile,
 		project_name: input.project_name,
 		platform_vendor: input.platform_vendor,
 		platform_name: input.platform_name,
+		board: input.board,
 		noos_path: input.noos_path,
+		files: files,
 		h: template_helpers,
 	};
 

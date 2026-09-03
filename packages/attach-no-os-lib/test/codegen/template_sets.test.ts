@@ -12,7 +12,7 @@ import {
     resolve_template_set,
 } from '../../src/codegen/template_sets';
 import { set_setting_value } from '../../src/settings/settings';
-import { expectOk, expectError, setup_test_config, teardown_test_config } from '../test_utilities';
+import { expectOk, expectError, setup_test_config, teardown_test_config, TEST_BOARD } from '../test_utilities';
 import { MinimalWorkfile } from '../../src/workfile_handler/types';
 
 const NOOS_ROOT = path.join(__dirname, '../bindings');
@@ -61,6 +61,7 @@ describe('template sets', () => {
             workfile: import_result.value,
             platform_name: "max32690",
             platform_vendor: "maxim",
+            board: TEST_BOARD,
             project_name: "test-project",
             output_path: temporary_directory,
             noos_path: "$(realpath ../../../)",
@@ -135,7 +136,7 @@ describe('template sets', () => {
             const result = generate_with();
             expectOk(result);
 
-            expect(fs.existsSync(path.join(temporary_directory, 'test-project/Makefile'))).toBe(true);
+            expect(fs.existsSync(path.join(temporary_directory, 'test-project/CMakeLists.txt'))).toBe(true);
             expect(fs.existsSync(path.join(temporary_directory, 'test-project/src/main.c'))).toBe(true);
         });
 
@@ -148,7 +149,7 @@ describe('template sets', () => {
             const readme = path.join(temporary_directory, 'test-project/README.md');
             expect(fs.readFileSync(readme, 'utf8')).toBe('Project: test-project\n');
             // The no-OS layout must NOT appear — the set fully replaces it.
-            expect(fs.existsSync(path.join(temporary_directory, 'test-project/Makefile'))).toBe(false);
+            expect(fs.existsSync(path.join(temporary_directory, 'test-project/CMakeLists.txt'))).toBe(false);
         });
 
         test('the setting alone switches what codegen renders', () => {
@@ -158,7 +159,7 @@ describe('template sets', () => {
             expectOk(result);
 
             expect(fs.existsSync(path.join(temporary_directory, 'test-project/README.md'))).toBe(true);
-            expect(fs.existsSync(path.join(temporary_directory, 'test-project/Makefile'))).toBe(false);
+            expect(fs.existsSync(path.join(temporary_directory, 'test-project/CMakeLists.txt'))).toBe(false);
         });
 
         test('an unknown set writes nothing at all', () => {

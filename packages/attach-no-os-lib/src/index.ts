@@ -32,7 +32,17 @@ export {
     suggest_for_include
 } from "./workfile_handler/workfile_handler";
 export { scan_platform, scan_platforms } from "./workfile_handler/platform_scanner";
+export {
+    scan_boards,
+    find_board,
+    platform_for_board,
+    boards_for_platform,
+    resolve_board,
+    resolve_platform_from_board
+} from "./workfile_handler/board_scanner";
+export type { ResolvedBoard } from "./workfile_handler/board_scanner";
 export type {
+    Board,
     MinimalWorkfile,
     PlatformManifest,
     PlatformSpecs,

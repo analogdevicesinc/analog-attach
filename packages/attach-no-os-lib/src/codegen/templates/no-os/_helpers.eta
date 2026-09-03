@@ -10,8 +10,14 @@
  * is_descriptor_reference, is_null_pointer, connected_symbols) which live in core TS.
  *
  * Only genuinely cross-template no-OS logic stays here: struct const-ness
- * (agreed on by common_data.c/.h and main.c) and source collection (src.mk and
- * common_data.h). Single-consumer logic lives in its own template.
+ * (agreed on by common_data.c/.h and main.c) and the two collectors over the
+ * ruleset set. Single-consumer logic lives in its own template.
+ *
+ * collect_config_symbols and collect_headers walk the same rulesets but answer
+ * unrelated questions - which Kconfig symbols the build needs, and which headers the
+ * emitted C must include. They were one function while src.mk existed, which fused
+ * build metadata with generated-code metadata; CMake needs only the former and
+ * common_data.h only the latter, so they are separate.
  *
  * NOTE: apostrophes break the Eta parser even inside comments, so this file uses
  * only block comments and apostrophe-free prose.
@@ -105,60 +111,73 @@ function struct_views(wf) {
 	return [...views.values()];
 }
 
-function map_noos_path(file_path) {
-	if (file_path.startsWith("include/")) {
-		return { variable: "INCLUDE", path: file_path.slice("include/".length) };
-	}
-	if (file_path.startsWith("drivers/")) {
-		return { variable: "DRIVERS", path: file_path.slice("drivers/".length) };
-	}
-	return { variable: "DRIVERS", path: file_path };
-}
-
-function collect_sources(wf) {
-	const drivers = new Set();
-	const include = new Set();
-	const platform = new Set();
-
-	const all_rulesets = [
+/* Every ruleset that contributes to the build: locked platform ops, runtime ops, user symbols. */
+function all_rulesets(wf) {
+	return [
 		...Object.values(wf.platform_ops),
 		...Object.values(wf.exposed_ops),
 		...Object.values(wf.symbols),
 	];
+}
 
-	for (const ruleset of all_rulesets) {
+/*
+ * The Kconfig symbols this workfile needs, as bare names without the CONFIG_ prefix.
+ * Each ruleset declares the symbols it owns in $config; the union is the project
+ * defconfig. Sorted so regenerating an unchanged workfile produces an unchanged
+ * project.conf.
+ *
+ * No mapping happens here on purpose: turning source files into symbols is the job
+ * of the schemas (scripts/sources_to_config.ts did it once), so codegen never has to
+ * know that, say, drivers/eeprom is gated by EEPROM_DRIVERS.
+ */
+function collect_config_symbols(wf) {
+	const symbols = new Set();
+
+	for (const ruleset of all_rulesets(wf)) {
+		for (const symbol of ruleset.$config ?? []) {
+			symbols.add(symbol);
+		}
+	}
+
+	return [...symbols].sort();
+}
+
+/*
+ * Headers the generated common_data.h must include. This is generated-code metadata,
+ * not build metadata: CMake compiles no-OS from Kconfig symbols and needs no file
+ * list, but the C we emit still has to include the declarations it references.
+ *
+ * noos entries are repo-relative (include/no_os_spi.h) and included by the name
+ * no-OS puts on its include path (no_os_spi.h); platform entries are basenamed
+ * because some are written relative to a sibling directory (../common/maxim_dma.h).
+ */
+function collect_headers(wf) {
+	const noos = new Set();
+	const platform = new Set();
+
+	for (const ruleset of all_rulesets(wf)) {
 		for (const file of ruleset.$sources.noos ?? []) {
-			const mapped = map_noos_path(file);
-			if (mapped.variable === "INCLUDE") {
-				include.add(mapped.path);
-			} else {
-				drivers.add(mapped.path);
+			if (file.startsWith("include/") && file.endsWith(".h")) {
+				noos.add(file.slice("include/".length));
 			}
 		}
 
 		for (const file of ruleset.$sources.platform ?? []) {
-			platform.add(file);
-		}
-
-		if (ruleset._t === "RulesetStruct" && ruleset.$header) {
-			const mapped = map_noos_path(ruleset.$header);
-			if (mapped.variable === "INCLUDE") {
-				include.add(mapped.path);
-			} else {
-				drivers.add(mapped.path);
+			if (file.endsWith(".h")) {
+				platform.add(file.slice(file.lastIndexOf("/") + 1));
 			}
 		}
 	}
 
 	return {
-		drivers: [...drivers],
-		include: [...include],
+		noos: [...noos],
 		platform: [...platform],
 	};
 }
 
 return {
 	struct_views,
-	collect_sources,
+	collect_config_symbols,
+	collect_headers,
 };
 %>

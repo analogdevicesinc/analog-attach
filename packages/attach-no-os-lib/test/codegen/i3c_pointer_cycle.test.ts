@@ -6,7 +6,7 @@ import { import_minimal } from '../../src/workfile_handler/workfile_handler';
 import { topo_sorted_symbols } from '../../src/validator/connection_graph';
 import { validate_workfile } from '../../src/validator/validator';
 import { generate_project } from '../../src/codegen/codegen';
-import { expectOk, setup_test_config, teardown_test_config } from '../test_utilities';
+import { expectOk, setup_test_config, teardown_test_config, TEST_BOARD } from '../test_utilities';
 import { MinimalWorkfile } from '../../src/workfile_handler/types';
 
 // i3c is the first model with a genuine two-node reference cycle:
@@ -154,6 +154,7 @@ describe('i3c pointer cycle', () => {
             workfile: value_cycle_workfile(),
             platform_name: "stm32",
             platform_vendor: "stm32",
+            board: TEST_BOARD,
             project_name: "value_cycle",
             output_path: temporary_directory,
             noos_path: "../..",
@@ -172,6 +173,7 @@ describe('i3c pointer cycle', () => {
             workfile: import_result.value,
             platform_name: "stm32",
             platform_vendor: "stm32",
+            board: TEST_BOARD,
             project_name: "i3c_cycle",
             output_path: temporary_directory,
             noos_path: "../..",

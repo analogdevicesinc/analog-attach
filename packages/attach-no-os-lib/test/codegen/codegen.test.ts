@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import { import_minimal } from '../../src/workfile_handler/workfile_handler';
 import { generate_project } from '../../src/codegen/codegen';
-import { expectOk, expectError, setup_test_config, teardown_test_config } from '../test_utilities';
+import { expectOk, expectError, setup_test_config, teardown_test_config, TEST_BOARD } from '../test_utilities';
 import { MinimalWorkfile } from '../../src/workfile_handler/types';
 
 const NOOS_ROOT = path.join(__dirname, '../bindings');
@@ -38,6 +38,25 @@ const test_workfile: MinimalWorkfile = {
     }
 };
 
+/* Every generated file, recursively, as [relative path, contents]. */
+function generated_files(root: string): [string, string][] {
+    const found: [string, string][] = [];
+
+    const walk = (directory: string) => {
+        for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+            const full = path.join(directory, entry.name);
+            if (entry.isDirectory()) {
+                walk(full);
+            } else {
+                found.push([path.relative(root, full), fs.readFileSync(full, 'utf8')]);
+            }
+        }
+    };
+
+    walk(root);
+    return found;
+}
+
 describe('codegen', () => {
     let temporary_directory: string;
 
@@ -63,6 +82,7 @@ describe('codegen', () => {
             workfile,
             platform_name: "max32690",
             platform_vendor: "maxim",
+            board: TEST_BOARD,
             project_name: "test-project",
             output_path: temporary_directory,
             noos_path: "$(realpath ../../../)",
@@ -89,13 +109,20 @@ describe('codegen', () => {
         console.log("\n=== common_data.c ===");
         console.log(common_data_c);
 
-        // Print src.mk for visual inspection
-        const source_mk = fs.readFileSync(
-            path.join(temporary_directory, "test-project/src.mk"),
+        // Print the build files for visual inspection
+        const cmakelists = fs.readFileSync(
+            path.join(temporary_directory, "test-project/CMakeLists.txt"),
             "utf8"
         );
-        console.log("\n=== src.mk ===");
-        console.log(source_mk);
+        console.log("\n=== CMakeLists.txt ===");
+        console.log(cmakelists);
+
+        const project_conf = fs.readFileSync(
+            path.join(temporary_directory, "test-project/project.conf"),
+            "utf8"
+        );
+        console.log("\n=== project.conf ===");
+        console.log(project_conf);
 
         // Print main.c for visual inspection
         const main_c = fs.readFileSync(
@@ -132,6 +159,7 @@ describe('codegen', () => {
             workfile: import_result.value,
             platform_name: "max32690",
             platform_vendor: "maxim",
+            board: TEST_BOARD,
             project_name: "test-project",
             output_path: temporary_directory,
             noos_path: "$(realpath ../../../)",
@@ -165,6 +193,7 @@ describe('codegen', () => {
             workfile: import_result.value,
             platform_name: "max32690",
             platform_vendor: "maxim",
+            board: TEST_BOARD,
             project_name: "test-project",
             output_path: temporary_directory,
             noos_path: "$(realpath ../../../)",
@@ -208,6 +237,7 @@ describe('codegen', () => {
             workfile: import_result.value,
             platform_name: "max32690",
             platform_vendor: "maxim",
+            board: TEST_BOARD,
             project_name: "test-project",
             output_path: temporary_directory,
             noos_path: "$(realpath ../../../)",
@@ -250,6 +280,7 @@ describe('codegen', () => {
             workfile: import_result.value,
             platform_name: "max32690",
             platform_vendor: "maxim",
+            board: TEST_BOARD,
             project_name: "test-project",
             output_path: temporary_directory,
             noos_path: "$(realpath ../../../)",
@@ -309,6 +340,7 @@ describe('codegen', () => {
             workfile: import_result.value,
             platform_name: "max32690",
             platform_vendor: "maxim",
+            board: TEST_BOARD,
             project_name: "test-project",
             output_path: temporary_directory,
             noos_path: "$(realpath ../../../)",
@@ -345,6 +377,7 @@ describe('codegen', () => {
                 workfile: import_result.value,
                 platform_name: "max32690",
                 platform_vendor: "maxim",
+                board: TEST_BOARD,
                 project_name: "test-project",
                 output_path: temporary_directory,
                 noos_path: "$(realpath ../../../)",
@@ -411,6 +444,7 @@ describe('codegen', () => {
             workfile: import_result.value,
             platform_name: "max32690",
             platform_vendor: "maxim",
+            board: TEST_BOARD,
             project_name: "test-project",
             output_path: temporary_directory,
             noos_path: "$(realpath ../../../)",
@@ -440,5 +474,79 @@ describe('codegen', () => {
         expect(uart_remove).toBeGreaterThanOrEqual(0);
         expect(adxl_remove).toBeGreaterThanOrEqual(0);
         expect(adxl_remove).toBeLessThan(uart_remove);
+    });
+
+    describe('CMake build files', () => {
+        function generate() {
+            const import_result = import_minimal(test_workfile);
+            expectOk(import_result);
+
+            const result = generate_project({
+                workfile: import_result.value,
+                platform_name: "max32690",
+                platform_vendor: "maxim",
+                board: TEST_BOARD,
+                project_name: "test-project",
+                output_path: temporary_directory,
+                noos_path: "/opt/no-OS",
+            });
+            expectOk(result);
+
+            return path.join(temporary_directory, "test-project");
+        }
+
+        test('CMakeLists.txt names the project and links no-os', () => {
+            const cmakelists = fs.readFileSync(path.join(generate(), "CMakeLists.txt"), "utf8");
+
+            expect(cmakelists).toContain("add_executable(test-project)");
+            expect(cmakelists).toContain("target_link_libraries(test-project no-os)");
+
+            // The in-tree/out-of-tree guard, and the toolchain set inside it: without
+            // both, one of the two build contexts breaks.
+            expect(cmakelists).toContain("if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)");
+            expect(cmakelists).toContain('set(NO_OS_PATH "/opt/no-OS"');
+            expect(cmakelists).toContain("set(CMAKE_TOOLCHAIN_FILE");
+
+            // Sources come from the manifest, so every generated .c must appear once.
+            expect(cmakelists).toContain("${CMAKE_CURRENT_SOURCE_DIR}/src/main.c");
+            expect(cmakelists).toContain("${CMAKE_CURRENT_SOURCE_DIR}/src/common/common_data.c");
+            expect(cmakelists).toContain("${CMAKE_CURRENT_SOURCE_DIR}/src/user_app.c");
+
+            // And no header directory twice, which CMake tolerates but which means the
+            // dedupe in the template has stopped working.
+            const src_includes = cmakelists.match(/\$\{CMAKE_CURRENT_SOURCE_DIR}\/src$/gm) ?? [];
+            expect(src_includes).toHaveLength(1);
+        });
+
+        test('project.conf lists the Kconfig symbols the workfile owns', () => {
+            const project_conf = fs.readFileSync(path.join(generate(), "project.conf"), "utf8");
+            const symbols = project_conf
+                .split("\n")
+                .filter(line => line.startsWith("CONFIG_"));
+
+            // The adxl355 driver and its menu parent: without the parent, Kconfig caps
+            // the leaf at n and the driver silently vanishes from the build.
+            expect(symbols).toContain("CONFIG_ACCEL=y");
+            expect(symbols).toContain("CONFIG_ACCEL_ADXL355=y");
+            expect(symbols).toContain("CONFIG_SPI=y");
+
+            // Sorted and deduped, so regenerating the same workfile is a no-op diff.
+            expect(symbols).toStrictEqual([...new Set(symbols)].sort());
+        });
+
+        test('CMakePresets.json includes the no-OS presets', () => {
+            const presets = JSON.parse(fs.readFileSync(path.join(generate(), "CMakePresets.json"), "utf8"));
+
+            expect(presets.include).toStrictEqual(["/opt/no-OS/CMakePresets.json"]);
+        });
+
+        test('no generated file contains the literal "undefined"', () => {
+            // Eta renders a missing context key as the string "undefined" rather than
+            // failing, so a renamed key would otherwise silently corrupt output. This
+            // is the cheap global guard against that.
+            for (const [relative, contents] of generated_files(generate())) {
+                expect(contents, `${relative} contains "undefined"`).not.toContain("undefined");
+            }
+        });
     });
 });

@@ -12,15 +12,16 @@ export const SETTINGS_DEFAULTS: SettingsFile = {
 		description: "Path to the root of the no-OS repository",
 		required: true,
 	},
+	// no-OS builds with CMake and Kconfig, which needs a configure step and a board
+	// preset rather than one command. So these are escape hatches now: set one to take
+	// over the step entirely, leave it unset to let `aa build`/`aa deploy` drive CMake.
 	build_command: {
-		description: "Command to run at the base of the project at the 'build' step",
+		description: "Override the 'build' step with this command, run at the base of the project (unset: drive CMake directly)",
 		required: false,
-		default: "make"
 	},
 	deploy_command: {
-		description: "Command to run at the base of the project at the 'deploy' step",
+		description: "Override the 'deploy' step with this command, run at the base of the project (unset: build the CMake flash target)",
 		required: false,
-		default: "make run"
 	},
 	template_set: {
 		description: "Template set used by codegen: a folder name under codegen/templates, or a path to your own template folder",

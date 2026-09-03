@@ -591,6 +591,9 @@ export function export_minimal(workfile: Workfile): Result<MinimalWorkfile> {
 
     return ok({
         platform: workfile.platform,
+        // Only written once a board has been chosen, so workfiles that predate
+        // boards (and those left to resolve theirs from the chip) stay as they are.
+        ...(workfile.board === undefined ? {} : { board: workfile.board }),
         symbols: symbols
     });
 }
@@ -602,6 +605,7 @@ export function import_minimal(minimal: MinimalWorkfile): Result<Workfile> {
     }
 
     const workfile = workfile_result.value;
+    workfile.board = minimal.board;
 
     for (const [name, node] of Object.entries(minimal.symbols)) {
         const ruleset_result = load_resolved_ruleset(node.$compatible);

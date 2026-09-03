@@ -3,13 +3,17 @@ import {
     import_minimal,
     suggest_for_property,
     scan_platforms,
+    scan_boards,
+    boards_for_platform,
     get_schemas_path,
+    get_setting_value,
     get_settings,
     list_template_sets,
     SettingsFile,
     MinimalWorkfile,
 } from "attach-no-os-lib";
 import type { AttachContext } from "../commands/shared";
+import { get_platform_specs } from "../commands/shared";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -165,6 +169,30 @@ export function get_platform_names(): string[] {
     }
 
     return Object.keys(result.value);
+}
+
+/**
+ * no-OS board presets. Narrowed to the boards belonging to the workfile's platform
+ * when there is a workfile to read, since generating for another platform cannot work;
+ * the full list otherwise, so `--board` still completes outside a project directory
+ * (which is the board-first case: `aa create workfile --board <tab>`).
+ */
+export function get_board_names(): string[] {
+    const noos_path = get_setting_value("no_os_path");
+    if (!noos_path.ok) {
+        return [];
+    }
+
+    const platform = load_workfile_for_completion()?.platform;
+    const specs = get_platform_specs();
+    const result = platform && specs.ok
+        ? boards_for_platform(noos_path.value, platform, specs.value)
+        : scan_boards(noos_path.value);
+    if (!result.ok) {
+        return [];
+    }
+
+    return result.value.map(board => board.name);
 }
 
 export function get_schema_paths(): string[] {

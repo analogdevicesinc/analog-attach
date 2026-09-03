@@ -2,6 +2,7 @@ import { buildApplication, buildRouteMap } from "@stricli/core";
 import { configCommand } from "./commands/config";
 import { createCommand } from "./commands/create";
 import { readCommand } from "./commands/read";
+import { listCommand } from "./commands/list";
 import { updateCommand } from "./commands/update";
 import { deleteCommand } from "./commands/delete";
 import { validateCommand } from "./commands/validate";
@@ -17,6 +18,7 @@ const routes = buildRouteMap({
 		config: configCommand,
 		create: createCommand,
 		read: readCommand,
+		list: listCommand,
 		update: updateCommand,
 		delete: deleteCommand,
 		validate: validateCommand,

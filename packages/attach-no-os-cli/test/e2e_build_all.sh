@@ -1,6 +1,11 @@
 #!/bin/bash
-# Run every per-device end-to-end test. The CLI is built once up front and each
-# device test reuses that build (E2E_SKIP_CLI_BUILD), so this is not 3x the work.
+# Run every end-to-end test. The CLI is built once up front and each test reuses that
+# build (E2E_SKIP_CLI_BUILD), so this is not 4x the work.
+#
+# Three device tests cover the schema and codegen side out-of-tree; the fourth builds
+# one of them again in-tree, which is the only difference the generated CMakeLists.txt
+# cares about. Covering every device in both layouts would double the runtime to test
+# the same twenty lines of CMake twice.
 #
 # Keeps going after a failure so one broken device does not hide the others, then
 # prints a summary and exits non-zero if anything failed.
@@ -17,6 +22,7 @@ TESTS=(
     "e2e_build.sh"           # adxl355 — SPI + union
     "e2e_build_adt7420.sh"   # adt7420 — I2C + $switch override
     "e2e_build_ad7124.sh"    # ad7124  — SPI + pointer init_param + arrays
+    "e2e_build_in_tree.sh"   # adxl355 again, generated inside <no-OS>/projects
 )
 
 echo -e "${YELLOW}=== Building CLI once for all device tests ===${NC}"
