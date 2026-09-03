@@ -1,0 +1,38 @@
+<%
+/*
+ * CMakePresets.json for a standalone project, so `cmake --preset <board>` works from
+ * the generated directory the same way it does from the no-OS root.
+ *
+ * It includes the no-OS presets by absolute path rather than copying the selected
+ * cacheVariables out of them. That keeps every board buildable from this project with
+ * no duplication, and the board list cannot drift from upstream. The relative
+ * includes inside that file (board_configs/<vendor>/CMakePresets.json) resolve
+ * against its own directory, not ours, so following one level is enough.
+ *
+ * The one preset defined here, `project`, inherits the board this project was
+ * generated for. It is what records the board choice inside the project, so
+ * `cmake --preset project` needs no arguments and `aa build` can recover the board
+ * from a project directory alone. Every other board stays reachable by name.
+ *
+ * Version 7 is required for the include field and matches the no-OS root.
+ */
+-%>
+{
+	"version": 7,
+	"cmakeMinimumRequired": {
+		"major": 3,
+		"minor": 28,
+		"patch": 0
+	},
+	"include": [
+		"<%= it.noos_path %>/CMakePresets.json"
+	],
+	"configurePresets": [
+		{
+			"name": "project",
+			"displayName": "<%= it.project_name %> on <%= it.board.name %>",
+			"inherits": "<%= it.board.name %>",
+			"binaryDir": "${sourceDir}/build/<%= it.board.name %>"
+		}
+	]
+}

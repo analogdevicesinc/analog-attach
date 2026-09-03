@@ -5,7 +5,7 @@ import os from 'node:os';
 import { import_minimal } from '../../src/workfile_handler/workfile_handler';
 import { generate_project } from '../../src/codegen/codegen';
 import { validate_workfile } from '../../src/validator/validator';
-import { expectOk, setup_test_config, teardown_test_config } from '../test_utilities';
+import { expectOk, setup_test_config, teardown_test_config, TEST_BOARD } from '../test_utilities';
 import { MinimalWorkfile } from '../../src/workfile_handler/types';
 
 const NOOS_ROOT = path.join(__dirname, '../bindings');
@@ -45,6 +45,7 @@ describe('float codegen', () => {
             workfile: import_result.value,
             platform_name: "max32690",
             platform_vendor: "maxim",
+            board: TEST_BOARD,
             project_name: "float-test",
             output_path: temporary_directory,
             noos_path: "$(realpath ../../../)",

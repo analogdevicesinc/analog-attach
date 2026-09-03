@@ -1,4 +1,4 @@
-import type { Workfile } from "../workfile_handler/types";
+import type { Board, Workfile } from "../workfile_handler/types";
 
 export interface DeviceInfo {
 	symbol_name: string;       // init param name: "my_accel"
@@ -21,6 +21,11 @@ export interface CodegenInput {
 	workfile: Workfile;
 	platform_name: string;
 	platform_vendor: string;
+	// The board the project builds for, resolved from a no-OS CMake preset. Required
+	// here even though `Workfile.board` is optional: resolution (explicit choice, or
+	// the single board matching the chip) happens before codegen, so templates never
+	// have to handle a missing board.
+	board: Board;
 	project_name: string;
 	output_path: string;
 	noos_path: string;

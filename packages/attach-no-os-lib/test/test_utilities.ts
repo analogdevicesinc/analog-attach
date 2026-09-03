@@ -10,6 +10,22 @@ import { Ruleset } from '../src/ruleset_parser/types';
 import { set_settings, set_config_path_override } from '../src/settings/settings';
 import { SETTINGS_DEFAULTS } from '../src/settings/globals';
 import { SettingsFile } from '../src/settings/types';
+import { Board } from '../src/workfile_handler/types';
+
+/*
+ * The board every codegen test generates for. Copied from the real
+ * `ad-apard32690-sl` preset in no-OS board_configs/maxim/CMakePresets.json so the
+ * generated CMakeLists.txt and project.conf are the ones a build would actually see,
+ * but frozen here so the tests do not need a no-OS checkout to run.
+ */
+export const TEST_BOARD: Board = {
+	name: 'ad-apard32690-sl',
+	board: 'ad-apard32690-sl',
+	vendor: 'maxim',
+	chip: 'max32690',
+	target_num: '32690',
+	board_config_file: 'ad-apard32690-sl_defconfig',
+};
 
 export function expectOk<T>(result: Result<T>): asserts result is { ok: true; value: T } {
 	if (!result.ok) {
