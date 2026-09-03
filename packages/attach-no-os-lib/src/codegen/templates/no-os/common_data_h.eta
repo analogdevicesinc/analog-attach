@@ -2,11 +2,6 @@
 const H = include("./_helpers", { h: it.h });
 const wf = it.workfile;
 
-/* Basename without node path: everything after the last slash. */
-function basename(file_path) {
-	return String(file_path).slice(String(file_path).lastIndexOf("/") + 1);
-}
-
 /* Header files this device set pulls in from the schemas repo (impure helper). */
 const device_headers = it.h.devices(wf).map(d => d.header).filter(h => h.length > 0);
 
@@ -20,11 +15,11 @@ function common_data_includes() {
 	for (const header of device_headers) {
 		all_includes.add(header);
 	}
-	const sources = H.collect_sources(wf);
-	for (const header of sources.platform.filter(file => file.endsWith(".h"))) {
-		all_includes.add(basename(header));
+	const headers = H.collect_headers(wf);
+	for (const header of headers.platform) {
+		all_includes.add(header);
 	}
-	for (const header of sources.include.filter(file => file.endsWith(".h"))) {
+	for (const header of headers.noos) {
 		all_includes.add(header);
 	}
 	return [...all_includes];

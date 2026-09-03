@@ -225,7 +225,14 @@ function parse_ruleset_from_object(object: Record<string, unknown>, context: Par
 		return $sources;
 	}
 
-	const $ranking = required(object, "$ranking", context, number_);	
+	// Kconfig symbols owned by this ruleset. Optional while the schemas migrate off
+	// $sources; it becomes required for non-descriptors once every file carries it.
+	const $config = optional(object, "$config", context, stringArray);
+	if (!$config.ok) {
+		return $config;
+	}
+
+	const $ranking = required(object, "$ranking", context, number_);
 	if (!$ranking.ok) {
 		return $ranking;
 	}
@@ -288,6 +295,7 @@ function parse_ruleset_from_object(object: Record<string, unknown>, context: Par
 				$description: $description.value,
 				$ranking: $ranking.value,
 				$sources: $sources.value,
+				$config: $config.value,
 				properties: context.document.properties,
 				rules: rules.value,
 				$requires: $requires,
@@ -322,6 +330,7 @@ function parse_ruleset_from_object(object: Record<string, unknown>, context: Par
 				$description: $description.value,
 				$ranking: $ranking.value,
 				$sources: $sources.value,
+				$config: $config.value,
 				values: values.value,
 				default: default_.value,
 			});
@@ -340,6 +349,7 @@ function parse_ruleset_from_object(object: Record<string, unknown>, context: Par
 				$description: $description.value,
 				$ranking: $ranking.value,
 				$sources: $sources.value,
+				$config: $config.value,
 				$capability: $capability.value,
 			});
 		}
@@ -370,6 +380,7 @@ function parse_ruleset_from_object(object: Record<string, unknown>, context: Par
 				$id: $id.value,
 				$ranking: $ranking.value,
 				$sources: $sources.value,
+				$config: $config.value,
 				$description: $description.value,
 				$symbol: $symbol.value,
 				$init_template: $init_template.value,

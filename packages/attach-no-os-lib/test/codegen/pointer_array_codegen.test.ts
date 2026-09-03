@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import { import_minimal } from '../../src/workfile_handler/workfile_handler';
 import { generate_project } from '../../src/codegen/codegen';
-import { expectOk, setup_test_config, teardown_test_config } from '../test_utilities';
+import { expectOk, setup_test_config, teardown_test_config, TEST_BOARD } from '../test_utilities';
 import { MinimalWorkfile } from '../../src/workfile_handler/types';
 
 // An array of POINTER includes is a pointer-to-pointer in C, not an array. no-OS
@@ -68,6 +68,7 @@ function generate(workfile: MinimalWorkfile, output_path: string, project_name: 
         workfile: import_result.value,
         platform_name: "stm32",
         platform_vendor: "stm32",
+        board: TEST_BOARD,
         project_name: project_name,
         output_path: output_path,
         noos_path: "../..",

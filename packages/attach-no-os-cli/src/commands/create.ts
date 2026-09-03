@@ -1,14 +1,12 @@
 import { buildCommand, buildRouteMap } from "@stricli/core";
 import fs from "node:fs";
-import path from "node:path";
 import {
     create_workfile,
     export_minimal,
-    get_schemas_path,
     load_resolved_ruleset,
-    ok,
-    Result,
-    scan_platforms,
+    get_setting_value,
+    PlatformSpecs,
+    resolve_platform_from_board,
     add_symbol,
     resolve_workfile_path,
     list_available_structs
@@ -17,11 +15,13 @@ import type { AttachContext } from "./shared";
 import {
     load_context,
     save_workfile,
+    get_platform_specs,
     output,
     output_error
 } from "./shared";
 import {
     filter_completions,
+    get_board_names,
     get_platform_names,
     get_schema_paths
 } from "../completion/completion";
@@ -56,28 +56,17 @@ function wrap_text(text: string, width: number): string[] {
     return lines;
 }
 
-function list_available_platforms(): Result<AvailablePlatforms> {
-    const schemas_path = get_schemas_path();
-    if (!schemas_path.ok) {
-        return schemas_path;
-    }
-
-    const platforms_path = path.join(schemas_path.value, "platforms");
-    const result = scan_platforms(platforms_path);
-    if (!result.ok) {
-        return result;
-    }
-
-    const available_platforms = Object.entries(result.value).map(([name, manifest]) => ({
+function describe_platforms(specs: PlatformSpecs): AvailablePlatforms {
+    const available_platforms = Object.entries(specs).map(([name, manifest]) => ({
         name: name,
         description: manifest.description ?? "No description available"
     }));
 
-    return ok({ available_platforms });
+    return { available_platforms };
 }
 
 const createWorkfileCommand = buildCommand<
-    { platform?: string; json?: boolean },
+    { platform?: string; board?: string; json?: boolean },
     [string | undefined]
 >({
     docs: { brief: "Create a new workfile" },
@@ -90,48 +79,102 @@ const createWorkfileCommand = buildCommand<
         },
         flags: {
             platform: {
-                kind: "parsed", brief: "Target platform", optional: true, parse: String,
+                kind: "parsed",
+                brief: "Target platform; only needed without a board (linux, mbed, max32662)",
+                optional: true,
+                parse: String,
                 proposeCompletions(partial: string) {
                     return filter_completions(get_platform_names(), partial);
+                }
+            },
+            board: {
+                kind: "parsed",
+                brief: "no-OS board to build for; sets the platform on its own (see: aa list boards)",
+                optional: true,
+                parse: String,
+                proposeCompletions(partial: string) {
+                    return filter_completions(get_board_names(), partial);
                 }
             },
             json: { kind: "boolean", brief: "Output as JSON", optional: true }
         }
     },
     func: async (flags, workfile_path_argument) => {
-        const platforms = list_available_platforms();
-        if (!platforms.ok) {
-            output_error(flags, "cannot_list_platforms", platforms.error.message);
+        const specs = get_platform_specs();
+        if (!specs.ok) {
+            output_error(flags, "cannot_list_platforms", specs.error.message);
             return;
         }
+        const platforms = describe_platforms(specs.value);
 
-        // No platform specified - show available platforms
-        if (!flags.platform) {
-            let text = "No platform specified. Available platforms:\n\n";
-            for (const p of platforms.value.available_platforms) {
+        // Nothing to go on: name the board flag first, since a board is what a user
+        // has on the bench and it settles the platform on its own.
+        if (flags.platform === undefined && flags.board === undefined) {
+            let text = "No board or platform specified.\n\n";
+            text += "Use: aa create workfile --board <name>       (see: aa list boards)\n";
+            text += "     aa create workfile --platform <name>    (no board yet, or a platform with no boards)\n\n";
+            text += "Available platforms:\n\n";
+            for (const p of platforms.available_platforms) {
                 text += `  ${p.name}\n`;
                 for (const line of wrap_text(p.description, 76)) {
                     text += `      ${line}\n`;
                 }
                 text += "\n";
             }
-            text += "Use: aa create workfile --platform <name>";
-            output(flags, text, platforms.value);
+            output(flags, text.trimEnd(), platforms);
             return;
         }
 
-        // Validate platform
-        const match = platforms.value.available_platforms.find(p => p.name === flags.platform);
+        // The board is the primary axis: it names its own platform, so --platform only
+        // has to be given for the platforms that have no boards at all (linux, mbed,
+        // max32662) or to create a workfile before the board is decided.
+        let platform_name = flags.platform;
+        let board_name: string | undefined;
+
+        if (flags.board !== undefined) {
+            const noos_path = get_setting_value("no_os_path");
+            if (!noos_path.ok) {
+                output_error(flags, "config_missing", "no_os_path is not configured. Run: aa config no_os_path <path>");
+                return;
+            }
+
+            const resolved = resolve_platform_from_board(noos_path.value, flags.board, specs.value);
+            if (!resolved.ok) {
+                output_error(flags, "board_unresolved", resolved.error.message);
+                return;
+            }
+
+            if (platform_name !== undefined && platform_name !== resolved.value.platform) {
+                output_error(
+                    flags,
+                    "platform_mismatch",
+                    `Board '${flags.board}' belongs to platform ${resolved.value.platform}, not ${platform_name}`
+                );
+                return;
+            }
+
+            platform_name = resolved.value.platform;
+            board_name = resolved.value.board.name;
+        }
+
+        // Can only fail on --platform: a derived platform came out of `specs` already.
+        const match = platforms.available_platforms.find(p => p.name === platform_name);
         if (!match) {
-            output_error(flags, "platform_mismatch", `Platform ${flags.platform} does not match the available platforms: ${platforms.value.available_platforms.map(p => p.name).join(", ")}`);
+            output_error(flags, "platform_mismatch", `Platform ${platform_name} does not match the available platforms: ${platforms.available_platforms.map(p => p.name).join(", ")}`);
             return;
         }
 
-        // Create workfile
-        const workfile = create_workfile(flags.platform);
+        const workfile = create_workfile(platform_name);
         if (!workfile.ok) {
             output_error(flags, "create_failed", workfile.error.message);
             return;
+        }
+
+        // Recorded so the board travels with the workfile; `aa generate --board` still
+        // overrides it, which is what makes building the same design for a second
+        // board a one-flag change.
+        if (board_name !== undefined) {
+            workfile.value.board = board_name;
         }
 
         const minimal_workfile = export_minimal(workfile.value);

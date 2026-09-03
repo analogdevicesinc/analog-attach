@@ -199,6 +199,12 @@ interface RulesetBase {
 	$description: string,
 	$ranking: RulesetRank,
 	$sources: RulesetSources,
+	// Kconfig symbols this ruleset owns, without the CONFIG_ prefix (e.g. ["ACCEL",
+	// "ACCEL_ADXL355"]). These become CONFIG_<sym>=y lines in the generated project
+	// defconfig. Only symbols the ruleset owns are listed: a Kconfig `select` closes
+	// the rest, but `depends on` is a constraint that is never auto-satisfied, so a
+	// parent menu symbol has to be named alongside its leaf.
+	$config?: string[],
 }
 
 export type RulesetEnum = RulesetBase & {
