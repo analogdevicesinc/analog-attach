@@ -6,6 +6,7 @@ export interface AttachConfig {
     linux?: string;
     dtSchema?: string;
     context?: string;
+    overlay?: string;
 }
 
 export interface CompatIndex {
@@ -49,5 +50,32 @@ export function load_config(): AttachConfig {
         linux: typeof parsed["linux"] === "string" ? parsed["linux"] : undefined,
         dtSchema: typeof parsed["dt-schema"] === "string" ? parsed["dt-schema"] : undefined,
         context: typeof parsed["context"] === "string" ? parsed["context"] : undefined,
+        overlay: typeof parsed["overlay"] === "string" ? parsed["overlay"] : undefined,
     };
+}
+
+export function save_config(fields: Partial<AttachConfig>): void {
+    const directory = path.join(process.cwd(), ".analog-attach");
+    fs.mkdirSync(directory, { recursive: true });
+
+    const config_path = path.join(directory, "config.toml");
+    const existing = load_config();
+    const merged = { ...existing, ...fields };
+
+    const field_map: Record<string, string> = {
+        linux: "linux",
+        dtSchema: "dt-schema",
+        context: "context",
+        overlay: "overlay",
+    };
+
+    let content = "";
+    for (const [key, toml_key] of Object.entries(field_map)) {
+        const value = merged[key as keyof AttachConfig];
+        if (value !== undefined) {
+            content += `${toml_key} = ${JSON.stringify(value)}\n`;
+        }
+    }
+
+    fs.writeFileSync(config_path, content);
 }

@@ -159,10 +159,10 @@ export async function find_binding(linux: string, dtSchema: string, compatible_t
 
     if (cached_index !== undefined) {
         if (is_compat_index_stale(cached_index, linux, dtSchema)) {
-            console.log("compat-index.json is stale, rebuilding...");
+            console.error("compat-index.json is stale, rebuilding...");
             const entries = await build_compat_index(linux, dtSchema);
             const compat_index_path = save_compat_index(entries);
-            console.log(`Written: ${compat_index_path}`);
+            console.error(`Written: ${compat_index_path}`);
             return entries[compatible_to_find];
         }
 
@@ -176,7 +176,7 @@ export async function find_binding(linux: string, dtSchema: string, compatible_t
     const bindings_folder = path.resolve(linux, "Documentation", "devicetree", "bindings");
 
     if (!fs.existsSync(bindings_folder)) {
-        console.log(`Missing ${bindings_folder}`);
+        console.error(`Missing ${bindings_folder}`);
         return;
     }
 

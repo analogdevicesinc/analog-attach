@@ -228,7 +228,7 @@ type ArrayInput = (bigint | string)[];
  * - number/string (can be mixed) array separated by ';' and marked with '[' and ']'
  * - array of above mentioned array separated by ','
  */
-function parse_value(value: string): ParsedInputValue {
+export function parse_value(value: string): ParsedInputValue {
     value = value.trim();
 
     if (!value.startsWith('[')) {
@@ -292,7 +292,7 @@ function to_cell_value(entry: bigint | string, enum_type: AttachEnumType): CellV
 
 // TODO: ResolvedProperty to DTProperty mapping should be in lib
 
-function set_property(
+export function set_property(
     parsed_value: ParsedInputValue,
     found_node: DTNode,
     property: string,

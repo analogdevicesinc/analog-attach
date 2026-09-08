@@ -5,66 +5,74 @@ import * as fs from 'node:fs';
 
 import { find_binding, resolve_node_identifier } from "../../utilities";
 import { load_config } from "../../config";
+import { respond, respond_fail, input_error } from "../../protocol/output";
+import type { AddResponse } from "../../protocol/types";
+import type { LocalContext } from "../../context";
 
 type Flags = {
-    compatible?: string,
+    key?: string,
     name?: string,
     parent?: string,
     label?: string,
-    overlay: string,
+    overlay?: string,
     context?: string,
     linux?: string,
     dtSchema?: string,
 }
 
+export type AddResult =
+    | { status: "added"; key: string; path: string[] }
+    | { status: "parent-not-found" };
+
 export const add_command = buildCommand({
     parameters: {
         flags: {
-            compatible: {
+            key: {
                 kind: "parsed",
                 parse: String,
-                brief: "Compatible string of the device binding to add",
+                brief: "Device key / compatible string of the device binding to add",
                 optional: true,
             },
             name: {
                 kind: "parsed",
                 parse: String,
-                brief: "Node name (e.g. channel@0); defaults to --compatible",
+                brief: "Node name (e.g. channel@0); defaults to --key",
                 optional: true,
             },
             parent: {
                 kind: "parsed",
                 parse: String,
-                brief: "Parent node: label, &label, path, &{path}, or label/child (e.g. spi0, &spi0, /soc/spi@0, &{/soc/spi@0}, spi0/adi,ad7124-8)",
+                brief: "Parent node: label, &label, path, &{path}, or label/child",
                 optional: true,
             },
             label: {
                 kind: "parsed",
                 parse: String,
-                brief: "Label to attach to the new node (e.g. imu1), for later reference as &label",
+                brief: "Label to attach to the new node (e.g. imu1)",
                 optional: true,
             },
             overlay: {
                 kind: "parsed",
                 parse: String,
-                brief: "dtso"
+                brief: "Path to the dtso file (falls back to config.toml)",
+                optional: true,
             },
             context: {
                 kind: "parsed",
                 parse: String,
-                brief: "The target dts",
+                brief: "The target dts (falls back to config.toml)",
                 optional: true,
             },
             linux: {
                 kind: "parsed",
                 parse: String,
-                brief: "Path to Linux repo",
+                brief: "Path to Linux repo (falls back to config.toml)",
                 optional: true,
             },
             dtSchema: {
                 kind: "parsed",
                 parse: String,
-                brief: "Path to dt-schema repo",
+                brief: "Path to dt-schema repo (falls back to config.toml)",
                 optional: true,
             },
         }
@@ -72,50 +80,65 @@ export const add_command = buildCommand({
     docs: {
         brief: "Add a new node to an existing dtso"
     },
-    async func(flags: Flags) {
+    async func(this: LocalContext, flags: Flags) {
         const config = load_config();
         const linux = flags.linux ?? config.linux;
         const dtSchema = flags.dtSchema ?? config.dtSchema;
         const context = flags.context ?? config.context;
-        const { compatible, name, parent, label, overlay: input } = flags;
+        const input = flags.overlay ?? config.overlay;
+        const { key, name, parent, label } = flags;
 
-        if (compatible === undefined && name === undefined) {
-            console.log("Missing: --compatible or --name (at least one is required)");
+        if (key === undefined && name === undefined) {
+            if (this.json) { input_error("--key or --name required"); return; }
+            console.log("Missing: --key or --name (at least one is required)");
             return;
         }
 
         if (linux === undefined) {
+            if (this.json) { input_error("--linux not set (run config-set)"); return; }
             console.log("Missing: --linux (no config.toml found)");
             return;
         }
 
         if (dtSchema === undefined) {
+            if (this.json) { input_error("--dt-schema not set (run config-set)"); return; }
             console.log("Missing: --dt-schema (no config.toml found)");
             return;
         }
 
         if (context === undefined) {
+            if (this.json) { input_error("--context not set (run config-set)"); return; }
             console.log("Missing: --context (no config.toml found)");
             return;
         }
 
+        if (input === undefined) {
+            if (this.json) { input_error("--overlay not set (run config-set)"); return; }
+            console.log("Missing: --overlay (no config.toml found)");
+            return;
+        }
+
         if (!fs.existsSync(context)) {
+            if (this.json) { input_error(`Missing: ${context}`); return; }
             console.log(`Missing: ${context}`);
             return;
         }
 
         if (!fs.existsSync(linux)) {
+            if (this.json) { input_error(`Missing: ${linux}`); return; }
             console.log(`Missing: ${linux}`);
             return;
         }
 
         if (!fs.existsSync(dtSchema)) {
+            if (this.json) { input_error(`Missing: ${dtSchema}`); return; }
             console.log(`Missing: ${dtSchema}`);
             return;
         }
 
         if (!fs.existsSync(input)) {
-            console.log(`Missing: ${input} (use "create" to generate a new overlay first)`);
+            if (this.json) { input_error(`Missing: ${input}`); return; }
+            console.log(`Missing: ${input} (use "create-workfile" to generate a new overlay first)`);
             return;
         }
 
@@ -123,6 +146,7 @@ export const add_command = buildCommand({
         const base = DeviceTree.new_from_string(context_content);
 
         if (typeof base === "string") {
+            if (this.json) { input_error(`Failed to parse dts ${context}: ${base}`); return; }
             console.log(`Failed to parse dts ${context}: ${base}`);
             return;
         }
@@ -131,29 +155,49 @@ export const add_command = buildCommand({
         const overlay = DeviceTreeOverlay.new_from_string(input_content, base);
 
         if (typeof overlay === "string") {
+            if (this.json) { input_error(`Failed to parse dtso ${input}: ${overlay}`); return; }
             console.log(`Failed to parse dtso ${input}: ${overlay}`);
             return;
         }
 
-        if (compatible !== undefined) {
-            const binding_path = await find_binding(linux, dtSchema, compatible);
+        if (key !== undefined) {
+            const binding_path = await find_binding(linux, dtSchema, key);
 
             if (binding_path === undefined) {
-                console.log(`Failed to find binding for ${compatible}`);
+                if (this.json) {
+                    respond_fail({ ok: false, message: `Failed to find binding for ${key}`, severity: "error" });
+                    return;
+                }
+                console.log(`Failed to find binding for ${key}`);
                 return;
             }
         }
 
-        const node_name = name ?? compatible!;
-        const result = add_overlay_node(base, overlay, node_name, parent, label, compatible);
+        const node_name = name ?? key!;
+        const result = add_overlay_node(base, overlay, node_name, parent, label, key);
 
-        switch (result) {
+        switch (result.status) {
             case "parent-not-found": {
+                if (this.json) {
+                    respond_fail({ ok: false, message: `Parent node ${parent} not found`, severity: "error" });
+                    return;
+                }
                 console.log(`Couldn't find parent node ${parent} in ${context} or ${input}`);
                 return;
             }
             case "added": {
                 fs.writeFileSync(input, overlay.print());
+                if (this.json) {
+                    const response: AddResponse = {
+                        ok: true,
+                        message: `Added ${node_name}`,
+                        severity: "info",
+                        key: result.key,
+                        path: result.path,
+                    };
+                    respond(response);
+                    return;
+                }
                 console.log(`Added ${node_name} to ${input}`);
                 return;
             }
@@ -161,6 +205,7 @@ export const add_command = buildCommand({
     }
 });
 
+// TODO: this will gladly add 2 nodes with the same name to the same parent => BUG!
 export function add_overlay_node(
     base: DeviceTree,
     overlay: DeviceTreeOverlay,
@@ -168,7 +213,7 @@ export function add_overlay_node(
     parent_identifier: string | undefined,
     label: string | undefined,
     compatible: string | undefined,
-): "added" | "parent-not-found" {
+): AddResult {
 
     const compatible_property: DTProperty | undefined = (() => {
         if (compatible === undefined) {
@@ -185,6 +230,8 @@ export function add_overlay_node(
     const name = at === -1 ? node_name : node_name.slice(0, at);
     const unit = at === -1 ? undefined : node_name.slice(at + 1);
 
+    const node_key = unit === undefined ? name : `${name}@${unit}`;
+
     const new_node = NodeBuilder.new()
         .with_name(name)
         .with_unit_address(unit)
@@ -192,29 +239,49 @@ export function add_overlay_node(
         .with_properties(compatible_property);
 
     if (parent_identifier === undefined) {
-        // Add to root — create a fragment targeting "/"
         // eslint-disable-next-line unicorn/no-useless-undefined
         overlay.add_fragment({ kind: "path", labels: [], path: "/" }, new_node, undefined);
-        return "added";
+
+        const found = overlay.find_node(
+            label === undefined
+                ? { kind: "label", labels: [], name: name }
+                : { kind: "label", labels: [], name: label }
+        );
+        const path_segments = found === undefined ? [node_key] : found.node_path.split("/").filter(Boolean);
+
+        return { status: "added", key: node_key, path: path_segments };
     }
 
-    // Try to find parent in overlay (could be in an existing fragment's __overlay__)
     const in_overlay = overlay.find_node(resolve_node_identifier(parent_identifier, overlay));
     if (in_overlay !== undefined) {
         in_overlay.node.children.push(new_node.build());
-        return "added";
+
+        const found = overlay.find_node(
+            label === undefined
+                ? { kind: "path", labels: [], path: `${in_overlay.node_path}/${node_key}` }
+                : { kind: "label", labels: [], name: label }
+        );
+        const path_segments = found === undefined ? [node_key] : found.node_path.split("/").filter(Boolean);
+
+        return { status: "added", key: node_key, path: path_segments };
     }
 
-    // Try to find parent in base
     const in_base = base.resolve_identifier(parent_identifier);
     if (in_base === undefined) {
-        return "parent-not-found";
+        return { status: "parent-not-found" };
     }
 
     // eslint-disable-next-line unicorn/no-useless-undefined
     overlay.add_fragment(in_base, new_node, undefined);
 
-    return "added";
+    const found = overlay.find_node(
+        label === undefined
+            ? { kind: "label", labels: [], name: name }
+            : { kind: "label", labels: [], name: label }
+    );
+    const path_segments = found === undefined ? [node_key] : found.node_path.split("/").filter(Boolean);
+
+    return { status: "added", key: node_key, path: path_segments };
 }
 
 if (import.meta.vitest) {
@@ -246,7 +313,10 @@ if (import.meta.vitest) {
 
         const result = add_overlay_node(base, overlay, "adi,ad7124-8@0", "spi0", "imu1", "adi,ad7124-8");
 
-        expect(result).toBe("added");
+        expect(result.status).toBe("added");
+        if (result.status !== "added") { return; }
+        expect(result.key).toBe("adi,ad7124-8@0");
+        expect(result.path.length).toBeGreaterThan(0);
 
         const output = overlay.print();
 
@@ -264,7 +334,9 @@ if (import.meta.vitest) {
 
         const result = add_overlay_node(base, overlay, "adi,ad7124-8@0", "spi1", "imu2", "adi,ad7124-8");
 
-        expect(result).toBe("added");
+        expect(result.status).toBe("added");
+        if (result.status !== "added") { return; }
+        expect(result.key).toBe("adi,ad7124-8@0");
 
         const output = overlay.print();
 
@@ -282,7 +354,9 @@ if (import.meta.vitest) {
         // eslint-disable-next-line unicorn/no-useless-undefined
         const result = add_overlay_node(base, overlay, "my-device", undefined, undefined, undefined);
 
-        expect(result).toBe("added");
+        expect(result.status).toBe("added");
+        if (result.status !== "added") { return; }
+        expect(result.key).toBe("my-device");
 
         const output = overlay.print();
 
@@ -297,7 +371,7 @@ if (import.meta.vitest) {
         if (typeof overlay === "string") { throw new TypeError(overlay); }
 
         const result = add_overlay_node(base, overlay, "adi,ad7124-8@0", "i2c0", "imu1", "adi,ad7124-8");
-        expect(result).toBe("parent-not-found");
+        expect(result.status).toBe("parent-not-found");
     });
 
     test("add_overlay_node - adds grandchild to overlay-added parent", () => {
@@ -318,7 +392,9 @@ if (import.meta.vitest) {
         // eslint-disable-next-line unicorn/no-useless-undefined
         const result = add_overlay_node(base, overlay, "channel@0", "imu1", undefined, undefined);
 
-        expect(result).toBe("added");
+        expect(result.status).toBe("added");
+        if (result.status !== "added") { return; }
+        expect(result.key).toBe("channel@0");
 
         const output = overlay.print();
 

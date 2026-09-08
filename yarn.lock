@@ -1583,17 +1583,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@stricli/auto-complete@npm:^1.2.6":
-  version: 1.2.6
-  resolution: "@stricli/auto-complete@npm:1.2.6"
-  dependencies:
-    "@stricli/core": "npm:^1.2.6"
-  bin:
-    auto-complete: dist/bin/cli.js
-  checksum: 10c0/c07882ff90147617131a4cc66438edf71182a19d453e4fa4ec95b37a2a3fa5aafbbb5ed77cdf8195c6ecbe7cd41b05f0ee7b924659808591f5aef17c652058b1
-  languageName: node
-  linkType: hard
-
 "@stricli/core@npm:^1.2.6":
   version: 1.2.6
   resolution: "@stricli/core@npm:1.2.6"
@@ -2651,18 +2640,20 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "attach-cli@workspace:packages/attach-cli"
   dependencies:
-    "@stricli/auto-complete": "npm:^1.2.6"
     "@stricli/core": "npm:^1.2.6"
     "@types/node": "npm:25.x"
+    "@typescript-eslint/eslint-plugin": "npm:^8.17.0"
+    "@typescript-eslint/parser": "npm:^8.17.0"
     "@vitest/coverage-v8": "npm:^4.0.18"
     attach-lib: "npm:*"
+    eslint: "npm:^9.31.0"
+    eslint-plugin-unicorn: "npm:^60.0.0"
     smol-toml: "npm:^1.7.1"
     tsup: "npm:^6.7.0"
     typescript: "npm:5.6.x"
     vitest: "npm:^4.0.18"
     yaml: "npm:^2.8.3"
   bin:
-    __attach_bash_complete: dist/bash-complete.js
     attach: dist/cli.js
   languageName: unknown
   linkType: soft

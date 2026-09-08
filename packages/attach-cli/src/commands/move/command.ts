@@ -3,26 +3,21 @@ import { DeviceTree, DeviceTreeOverlay, get_full_node_name, type DTNode } from "
 
 import * as fs from 'node:fs';
 
+import type { LocalContext } from "../../context";
 import { resolve_node_identifier } from "../../utilities";
-
 import { load_config } from "../../config";
+import { respond, respond_fail, input_error } from "../../protocol/output";
 
 type Flags = {
-    node: string,
-    parent: string,
-    overlay: string,
+    to: string,
+    overlay?: string,
     context?: string,
 }
 
 export const move_command = buildCommand({
     parameters: {
         flags: {
-            node: {
-                kind: "parsed",
-                parse: String,
-                brief: "Node to move: label, &label, path, &{path}, or label/child",
-            },
-            parent: {
+            to: {
                 kind: "parsed",
                 parse: String,
                 brief: "Destination parent: label, &label, path, &{path}, or label/child",
@@ -31,6 +26,7 @@ export const move_command = buildCommand({
                 kind: "parsed",
                 parse: String,
                 brief: "dtso",
+                optional: true,
             },
             context: {
                 kind: "parsed",
@@ -38,27 +34,50 @@ export const move_command = buildCommand({
                 brief: "The target dts",
                 optional: true,
             },
-        }
+        },
+        positional: {
+            kind: "array" as const,
+            parameter: {
+                parse: String,
+                brief: "Path to node (ValidIdentifier segments)",
+            },
+        },
     },
     docs: {
         brief: "Move an overlay-added node to a different parent in an existing dtso"
     },
-    async func(flags: Flags) {
+    async func(this: LocalContext, flags: Flags, ...path: string[]) {
         const config = load_config();
         const context = flags.context ?? config.context;
-        const { node, parent, overlay: input } = flags;
+        const input = flags.overlay ?? config.overlay;
+        const { to } = flags;
+
+        if (path.length === 0) {
+            if (this.json) { input_error("path is required"); return; }
+            console.log("Missing: path (positional arguments)");
+            return;
+        }
 
         if (context === undefined) {
+            if (this.json) { input_error("missing config: context"); return; }
             console.log("Missing: --context (no config.toml found)");
             return;
         }
 
+        if (input === undefined) {
+            if (this.json) { input_error("missing config: overlay"); return; }
+            console.log("Missing: --overlay (no config.toml found)");
+            return;
+        }
+
         if (!fs.existsSync(context)) {
+            if (this.json) { input_error(`file not found: ${context}`); return; }
             console.log(`Missing: ${context}`);
             return;
         }
 
         if (!fs.existsSync(input)) {
+            if (this.json) { input_error(`file not found: ${input}`); return; }
             console.log(`Missing: ${input} (use "create" to generate a new overlay first)`);
             return;
         }
@@ -67,6 +86,7 @@ export const move_command = buildCommand({
         const base = DeviceTree.new_from_string(context_content);
 
         if (typeof base === "string") {
+            if (this.json) { input_error(`failed to parse dts: ${base}`); return; }
             console.log(`Failed to parse dts ${context}: ${base}`);
             return;
         }
@@ -75,44 +95,81 @@ export const move_command = buildCommand({
         const overlay = DeviceTreeOverlay.new_from_string(input_content, base);
 
         if (typeof overlay === "string") {
+            if (this.json) { input_error(`failed to parse dtso: ${overlay}`); return; }
             console.log(`Failed to parse dtso ${input}: ${overlay}`);
             return;
         }
 
-        const result = move_overlay_node(base, overlay, node, parent);
+        const identifier = path.join("/");
+        const result = move_overlay_node(base, overlay, identifier, to);
 
-        switch (result) {
-            case "not-found": {
-                console.log(`Couldn't find node ${node} in ${input}`);
-                return;
+        if (this.json) {
+            switch (result) {
+                case "moved": {
+                    fs.writeFileSync(input, overlay.print());
+                    respond({ ok: true, message: `Moved ${identifier} to ${to}`, severity: "info" });
+                    return;
+                }
+                case "not-found": {
+                    respond_fail({ ok: false, message: `Node ${identifier} not found`, severity: "error" });
+                    return;
+                }
+                case "in-base": {
+                    respond_fail({ ok: false, message: `${identifier} is part of the base device tree, not this overlay`, severity: "error" });
+                    return;
+                }
+                case "is-root": {
+                    respond_fail({ ok: false, message: "Cannot move the root node", severity: "error" });
+                    return;
+                }
+                case "parent-not-found": {
+                    respond_fail({ ok: false, message: `Parent node ${to} not found`, severity: "error" });
+                    return;
+                }
+                case "into-self": {
+                    respond_fail({ ok: false, message: `Cannot move ${identifier} into itself or one of its descendants`, severity: "error" });
+                    return;
+                }
+                case "conflict": {
+                    const found = overlay.find_node(resolve_node_identifier(identifier, overlay));
+                    const node_key = found === undefined ? identifier : get_full_node_name(found.node);
+                    respond_fail({ ok: false, message: `${to} already has a child named ${node_key}`, severity: "error" });
+                    return;
+                }
             }
-            case "in-base": {
-                console.log(`${node} is part of the base device tree (${context}), not this overlay; move only applies to overlay-added nodes`);
-                return;
-            }
-            case "is-root": {
-                console.log("Refusing to move the root node");
-                return;
-            }
-            case "parent-not-found": {
-                console.log(`Couldn't find parent node ${parent} in ${context} or ${input}`);
-                return;
-            }
-            case "into-self": {
-                console.log(`Cannot move ${node} into itself or one of its descendants`);
-                return;
-            }
-            case "conflict": {
-                // Compute the full node name for the error message
-                const found = overlay.find_node(resolve_node_identifier(node, overlay));
-                const node_key = found === undefined ? node : get_full_node_name(found.node);
-                console.log(`${parent} already has a child named ${node_key}`);
-                return;
-            }
-            case "moved": {
-                fs.writeFileSync(input, overlay.print());
-                console.log(`Moved ${node} to ${parent} in ${input}`);
-                return;
+        } else {
+            switch (result) {
+                case "not-found": {
+                    console.log(`Couldn't find node ${identifier} in ${input}`);
+                    return;
+                }
+                case "in-base": {
+                    console.log(`${identifier} is part of the base device tree (${context}), not this overlay; move only applies to overlay-added nodes`);
+                    return;
+                }
+                case "is-root": {
+                    console.log("Refusing to move the root node");
+                    return;
+                }
+                case "parent-not-found": {
+                    console.log(`Couldn't find parent node ${to} in ${context} or ${input}`);
+                    return;
+                }
+                case "into-self": {
+                    console.log(`Cannot move ${identifier} into itself or one of its descendants`);
+                    return;
+                }
+                case "conflict": {
+                    const found = overlay.find_node(resolve_node_identifier(identifier, overlay));
+                    const node_key = found === undefined ? identifier : get_full_node_name(found.node);
+                    console.log(`${to} already has a child named ${node_key}`);
+                    return;
+                }
+                case "moved": {
+                    fs.writeFileSync(input, overlay.print());
+                    console.log(`Moved ${identifier} to ${to} in ${input}`);
+                    return;
+                }
             }
         }
     }
