@@ -111,10 +111,13 @@ function cval(property, struct_name) {
 			if (property.pointer === true && value === undefined) {
 				return "NULL";
 			}
-			if (it.h.is_descriptor_reference(property, wf)) {
-				return `desc.${String(value)}`;
-			}
-			return property.pointer ? `&${String(value)}` : String(value);
+			/*
+			 * A reference names a node or one readonly member of one, and knows on its
+			 * own whether an `&` is needed. Enum-backed includes hold a value rather
+			 * than a reference, so they fall through to the plain spelling.
+			 */
+			return it.h.reference_expression(property, wf)
+				?? (property.pointer ? `&${String(value)}` : String(value));
 		}
 		case "PlatformOpsProperty": {
 			return `&${String(property.value)}`;

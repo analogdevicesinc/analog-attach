@@ -16,6 +16,7 @@ import {
     Workfile,
     ok,
     error,
+    Ruleset,
     RulesetStruct,
     RulesetDescriptor
 } from "attach-no-os-lib";
@@ -145,14 +146,26 @@ export function get_node_property(
     return ok({ node, property });
 }
 
+// For commands that work on a node's properties. An extern has none, so it is rejected here.
 export function get_node(context: WorkfileContext, node_name: string): Result<RulesetStruct | RulesetDescriptor> {
+    const node = get_any_node(context, node_name);
+    if (!node.ok) {
+        return node;
+    }
+
+    if (node.value._t !== "RulesetStruct" && node.value._t !== "RulesetDescriptor") {
+        return error(`Node '${node_name}' has no properties to configure`);
+    }
+
+    return ok(node.value);
+}
+
+// For commands that only need the node to exist - `aa delete`, `aa read <node>`. Any kind
+// the user can create counts, including an extern, which is a name with nothing to set.
+export function get_any_node(context: WorkfileContext, node_name: string): Result<Ruleset> {
     const node = context.workfile.symbols[node_name];
     if (!node) {
         return error(`Node '${node_name}' not found. Available: ${Object.keys(context.workfile.symbols).join(", ")}`);
-    }
-
-    if (node._t !== "RulesetStruct" && node._t !== "RulesetDescriptor") {
-        return error(`Node '${node_name}' is not a struct or descriptor`);
     }
 
     return ok(node);

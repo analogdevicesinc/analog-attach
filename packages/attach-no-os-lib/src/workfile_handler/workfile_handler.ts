@@ -11,8 +11,10 @@ import type {
     Ruleset,
     RulesetPlatformOps,
     RulesetStruct,
+    RulesetType,
     UnionProperty
 } from "../ruleset_parser/types";
+import { provided_id } from "../ruleset_parser/types";
 import { scan_platforms } from "./platform_scanner";
 import type { PlatformManifest, PropertySuggestions } from "./types";
 import { load_resolved_ruleset } from "../resolver/resolver";
@@ -225,8 +227,8 @@ export function set_value(workfile: Workfile, symbol_name: string, property_name
     if (!ruleset) {
         return error(`Symbol '${symbol_name}' not found`, "symbol_name");
     }
-    // Descriptor nodes also carry properties (their single `init_param` include),
-    // so their init_param reference is settable through the same path.
+    // Descriptor nodes also carry properties (their `$init_param` include, plus their own members),
+    // so their $init_param reference is settable through the same path.
     if (ruleset._t !== "RulesetStruct" && ruleset._t !== "RulesetDescriptor") {
         return error(`Symbol '${symbol_name}' is not a struct or device`, "symbol_name");
     }
@@ -234,6 +236,13 @@ export function set_value(workfile: Workfile, symbol_name: string, property_name
     const property = ruleset.properties.find(p => p.name === property_name);
     if (!property) {
         return error(`Property '${property_name}' not found in '${symbol_name}'`, "property_name");
+    }
+
+    // A readonly field is filled in by generated code — an init function for a descriptor
+    // member, the target template for a derived struct field — so a user value would either
+    // be overwritten or contradict what the code does.
+    if (property.readonly === true) {
+        return error(`Property '${property_name}' of '${symbol_name}' is filled in by generated code and cannot be assigned`, "property_name");
     }
 
     property.value = value;
@@ -253,10 +262,100 @@ export function get_value(workfile: Workfile, symbol_name: string, property_name
     return ok(property.value);
 }
 
+// --- References ---
+
+// What a property value points at. A value is either a whole node ("accel_iio") or one
+// readonly member of one ("accel_iio.iio_dev"), and both need the same two answers: the
+// $id to type-check against, and the C expression that reaches it.
+export interface ResolvedReference {
+    // The type an including property must match. A node's own $id, or — for a member — the
+    // $id that member's own include names.
+    $id: string,
+    // The C expression naming it, with no `&`: the caller adds that from its own pointer-ness.
+    expr: string,
+    // True when reaching it goes through a descriptor, so the expression is only valid after
+    // that descriptor's init has run. Such fields are patched at runtime, not initialized.
+    runtime: boolean,
+    // False when the thing reached is a value rather than a pointer, so a consumer declaring
+    // a pointer field needs to take its address.
+    pointer: boolean,
+}
+
+// One level deep, matching `runtime_assignments.field_path`, which already caps at
+// `property.name.member`.
+export function resolve_reference(workfile: Workfile, value: string): ResolvedReference | undefined {
+    const dot = value.indexOf(".");
+    if (dot === -1) {
+        const node = find_any(workfile, value);
+        if (!node) {
+            return undefined;
+        }
+
+        // An extern is the library's own global, so the C expression is the symbol it
+        // names, not the workfile node name the user chose for it. An array symbol already
+        // decays to a pointer, so it reports itself as one and no `&` is added.
+        if (node._t === "RulesetExtern") {
+            return {
+                $id: node.$provides,
+                expr: node.$symbol,
+                runtime: false,
+                pointer: node.$array === true,
+            };
+        }
+
+        const runtime = node._t === "RulesetDescriptor";
+        return {
+            $id: node.$id,
+            // `struct descriptors` holds descriptors as pointers, so a descriptor node is
+            // already a pointer while a plain struct is a value.
+            expr: runtime ? `desc.${value}` : value,
+            runtime: runtime,
+            pointer: runtime,
+        };
+    }
+
+    const owner_name = value.slice(0, dot);
+    const member_name = value.slice(dot + 1);
+    if (member_name.includes(".")) {
+        return undefined;
+    }
+
+    const owner = workfile.symbols[owner_name];
+    if (!owner || (owner._t !== "RulesetStruct" && owner._t !== "RulesetDescriptor")) {
+        return undefined;
+    }
+
+    const member = owner.properties.find(p => p.name === member_name);
+    // Only a readonly member is referenceable: a settable one has no value until the user
+    // gives it one, so pointing at it would name nothing.
+    if (member?.readonly !== true) {
+        return undefined;
+    }
+
+    // The member has to name a type of its own for the reference to be type-checked, which
+    // means a concrete `include`. A raw or numeric member describes no type to match.
+    if (member._t !== "IncludeProperty" || member.include === undefined) {
+        return undefined;
+    }
+
+    const owner_is_descriptor = owner._t === "RulesetDescriptor";
+    return {
+        $id: member.include,
+        expr: owner_is_descriptor ? `desc.${owner_name}->${member_name}` : `${owner_name}.${member_name}`,
+        runtime: owner_is_descriptor,
+        pointer: member.pointer === true,
+    };
+}
+
 // --- Suggestions ---
 
 export function suggest_for_include(workfile: Workfile, include: IncludeProperty): Result<PropertySuggestions> {
-    const resolved = load_resolved_ruleset(include.include);
+    if (include.include === undefined) {
+        return suggest_for_include_type(workfile, include.include_type);
+    }
+
+    const include_path = include.include;
+    const resolved = load_resolved_ruleset(include_path);
     if (resolved.ok && resolved.value._t === "RulesetEnum") {
         return ok({
             values: resolved.value.values.map(v => typeof v.name === "number" ? v.name.toString() : v.name),
@@ -267,19 +366,68 @@ export function suggest_for_include(workfile: Workfile, include: IncludeProperty
 
     // add the already declared symbols
     for (const [name, ruleset] of Object.entries(workfile.platform_ops)) {
-        if (ruleset.$id === include.include) {
+        if (ruleset.$id === include_path) {
             values.push(name);
         }
     }
     for (const [name, ruleset] of Object.entries(workfile.symbols)) {
-        if (ruleset.$id === include.include) {
+        // `provided_id`, not `$id`: an extern matches on the type of the global it names.
+        if (provided_id(ruleset) === include_path) {
+            values.push(name);
+        }
+    }
+
+    // A readonly member of another node is just as referenceable as a whole node, so offer
+    // those too. This is how a driver's iio wrapper hands over its `iio_dev`.
+    values.push(...member_references(workfile, include_path));
+
+    return ok({
+        values: values.length === 0 ? undefined : values,
+        types: [include_path],
+    });
+}
+
+// Every `node.member` in the workfile whose member names `include_path`.
+function member_references(workfile: Workfile, include_path: string): string[] {
+    const values: string[] = [];
+
+    for (const [name, ruleset] of Object.entries(workfile.symbols)) {
+        if (ruleset._t !== "RulesetStruct" && ruleset._t !== "RulesetDescriptor") {
+            continue;
+        }
+
+        for (const property of ruleset.properties) {
+            if (property.readonly !== true || property._t !== "IncludeProperty") {
+                continue;
+            }
+            if (property.include === include_path) {
+                values.push(`${name}.${property.name}`);
+            }
+        }
+    }
+
+    return values;
+}
+
+// Same shape as above, matching on the target's kind instead of its $id. No `types`:
+// any ruleset of that type qualifies, so there is no one thing to offer creating —
+// `list_available_structs` is the call for browsing those.
+function suggest_for_include_type(workfile: Workfile, include_type: RulesetType): Result<PropertySuggestions> {
+    const values: string[] = [];
+
+    for (const [name, ruleset] of Object.entries(workfile.platform_ops)) {
+        if (ruleset.$type === include_type) {
+            values.push(name);
+        }
+    }
+    for (const [name, ruleset] of Object.entries(workfile.symbols)) {
+        if (ruleset.$type === include_type) {
             values.push(name);
         }
     }
 
     return ok({
         values: values.length === 0 ? undefined : values,
-        types: [include.include],
     });
 }
 
@@ -507,7 +655,11 @@ function is_instantiable(path: string) {
     if (!ruleset.ok) {
         return false;
     }
-    return ruleset.value._t === "RulesetStruct" || ruleset.value._t === "RulesetDescriptor";
+    // An extern is instantiable even though it configures nothing: adding it to the
+    // workfile is what makes its symbol referenceable and pulls in its $config.
+    return ruleset.value._t === "RulesetStruct"
+        || ruleset.value._t === "RulesetDescriptor"
+        || ruleset.value._t === "RulesetExtern";
 };
 
 function scan_yaml_files(directory: string): Result<string[]> {
@@ -571,8 +723,9 @@ export function export_minimal(workfile: Workfile): Result<MinimalWorkfile> {
     const symbols: MinimalWorkfile["symbols"] = {};
 
     for (const [name, ruleset] of Object.entries(workfile.symbols)) {
-        // Struct and descriptor nodes both carry properties and are user-created.
-        if (ruleset._t !== "RulesetStruct" && ruleset._t !== "RulesetDescriptor") {
+        // Every user-created node kind. Platform ops are excluded because the platform
+        // manifest reloads them, not the workfile.
+        if (ruleset._t !== "RulesetStruct" && ruleset._t !== "RulesetDescriptor" && ruleset._t !== "RulesetExtern") {
             continue;
         }
 
@@ -580,9 +733,12 @@ export function export_minimal(workfile: Workfile): Result<MinimalWorkfile> {
             $compatible: ruleset.$id,
         };
 
-        for (const property of ruleset.properties) {
-            if (property.value !== undefined) {
-                node[property.name] = property.value;
+        // An extern has no properties, so `$compatible` alone round-trips it.
+        if (ruleset._t !== "RulesetExtern") {
+            for (const property of ruleset.properties) {
+                if (property.value !== undefined) {
+                    node[property.name] = property.value;
+                }
             }
         }
 
@@ -626,7 +782,12 @@ export function import_minimal(minimal: MinimalWorkfile): Result<Workfile> {
             }
             const set_result = set_value(workfile, name, property_name, value);
             if (!set_result.ok) {
-                return set_result;
+                // A stored value the current schemas reject is a stale workfile, not a bad
+                // command, so say which key to remove rather than only why it was refused.
+                return error(
+                    `Workfile symbol '${name}' cannot be loaded: ${set_result.error.message}. Remove '${property_name}' from it.`,
+                    set_result.error.path
+                );
             }
         }
     }

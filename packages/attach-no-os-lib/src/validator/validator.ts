@@ -38,7 +38,7 @@ export function validate_workfile(workfile: Workfile): ValidationResult {
 
 	for (const [symbol_name, ruleset] of Object.entries(workfile.symbols)) {
 		// Both structs and descriptors carry properties to validate (a descriptor's
-		// single required init_param include, in particular).
+		// single required $init_param include, in particular).
 		if (ruleset._t !== "RulesetStruct" && ruleset._t !== "RulesetDescriptor") {
 			continue;
 		}
