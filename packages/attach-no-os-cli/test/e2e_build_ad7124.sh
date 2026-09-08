@@ -6,6 +6,8 @@
 #     holds spi_init as a pointer include, so codegen emits `&` on both edges
 #   - ARRAY properties left empty (setups[8], chan_map[16]) -> `{ 0 }` initializers
 #   - two enum includes (mode, power_mode) alongside an inline enum (active_device)
+#   - an ARRAY EXTERN (`regs`): `ad7124_regs` emitted with no `&`, unlike the struct
+#     externs, because an array name is already a pointer
 
 source "$(cd "$(dirname "$0")" && pwd)/e2e_common.sh"
 
@@ -17,6 +19,9 @@ configure_nodes() {
     $AA create node no_os_spi_ip no-os/spi/no_os_spi_init_param.yaml
     $AA create node ad7124_ip devices/ad7124/ad7124_init_param.yaml
     $AA create node ad7124_device devices/ad7124/ad7124.yaml
+    # The driver's power-on register table. Required: ad7124_setup assigns it and then
+    # dereferences it (ad7124.c:1491,1512), so a NULL table faults.
+    $AA create node ad7124_regs devices/ad7124/ad7124_regs.yaml
 
     # Configure the Maxim SPI init_param
     $AA update max_spi_ip vssel MXC_GPIO_VSSEL_VDDIOH
@@ -32,6 +37,7 @@ configure_nodes() {
     # Configure the AD7124 init_param. spi_init is a pointer include, so this is a
     # plain reference and codegen decides the `&`.
     $AA update ad7124_ip spi_init no_os_spi_ip
+    $AA update ad7124_ip regs ad7124_regs
     $AA update ad7124_ip active_device ID_AD7124_4
     $AA update ad7124_ip mode AD7124_CONTINUOUS
     $AA update ad7124_ip power_mode AD7124_HIGH_POWER
@@ -39,7 +45,7 @@ configure_nodes() {
     $AA update ad7124_ip use_crc 0
     $AA update ad7124_ip check_ready 1
 
-    $AA update ad7124_device init_param ad7124_ip
+    $AA update ad7124_device '$init_param' ad7124_ip
 }
 
 run_e2e

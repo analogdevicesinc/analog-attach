@@ -5,13 +5,15 @@ import type {
 	Ruleset
 } from "./types";
 import {
-	is_primitive_symbols
+	is_integer_symbol,
+	is_primitive_symbols,
+	ruleset_type_from_token
 } from "./types";
 import YAML from "yaml";
 import type { Result} from "./result";
 import { ok, error } from "./result";
 import type { ParseContext} from "./validators";
-import { asObject, at, number_, optional, optionalWithDefault, required, string_, stringArray } from "./validators";
+import { asObject, at, boolean_, number_, optional, optionalWithDefault, required, string_, stringArray } from "./validators";
 import { RulesetType } from "./types";
 import {
 	parse_array_property,
@@ -23,7 +25,9 @@ import {
 	parse_platform_ops_property,
 	parse_raw_property,
 	parse_string_property,
-	parse_union_property
+	parse_union_property,
+	parse_readonly,
+	reject_include_type
 } from "./property_parser";
 import {
 	is_override,
@@ -43,23 +47,12 @@ function is_ruleset_type(value: unknown, context: ParseContext): Result<RulesetT
 		return s;
 	}
 
-	switch (s.value) {
-		case "struct": {
-			return ok(RulesetType.RT_STRUCT);
-		}
-		case "enum": {
-			return ok(RulesetType.RT_ENUM);
-		}
-		case "platform_ops": {
-			return ok(RulesetType.RT_PLATFORM_OPS);
-		}
-		case "descriptor": {
-			return ok(RulesetType.RT_DESCRIPTOR);
-		}
-		default: {
-			return error(`Invalid ruleset type '${s.value}'`, context.path);
-		}
+	const type_ = ruleset_type_from_token(s.value);
+	if (type_ === undefined) {
+		return error(`Invalid ruleset type '${s.value}'`, context.path);
 	}
+
+	return ok(type_);
 }
 
 function is_ruleset_sources(value: unknown, context: ParseContext): Result<RulesetSources> {
@@ -108,7 +101,7 @@ export function parse_property(name: string, value: unknown, context: ParseConte
 		return object;
 	}
 
-	if ("include" in object.value) {
+	if ("include" in object.value || "include_type" in object.value) {
 		return parse_include_property(name, object.value, context);
 	}
 
@@ -195,6 +188,63 @@ function is_enum_property(value: unknown, context: ParseContext): Result<Ruleset
 	return ok(values);
 }
 
+// Every non-`$` key of a ruleset body, as a property decorated with `readonly`.
+//
+// Structs and descriptors share this surface: a `$`-prefixed key is metadata, and every
+// other key is a field of the C struct, because a schema describes its struct 1:1. Either
+// kind can have a field that something other than the user fills in — an init function for
+// a descriptor member, the target template for a derived struct field — so `readonly` is
+// read here rather than in one branch.
+function parse_members(object: Record<string, unknown>, context: ParseContext): Result<Property[]> {
+	const members: Property[] = [];
+
+	for (const key of Object.keys(object)) {
+		if (key.startsWith("$")) {
+			continue;
+		}
+
+		const property = parse_property(key, object[key], at(context, key));
+		if (!property.ok) {
+			return property;
+		}
+
+		const member_object = asObject(object[key], at(context, key));
+		if (!member_object.ok) {
+			return member_object;
+		}
+
+		const member = parse_readonly(property.value, member_object.value, at(context, key));
+		if (!member.ok) {
+			return member;
+		}
+
+		members.push(member.value);
+	}
+
+	// A `count` has to name a real sibling that can hold a length, and has to agree with the
+	// pointer about who fills it in: a derived list whose count the user could still set
+	// would just have that value overwritten.
+	for (const member of members) {
+		if (member._t !== "IncludeProperty" || member.count === undefined) {
+			continue;
+		}
+
+		const path = at(context, member.name).path;
+		const counter = members.find(m => m.name === member.count);
+		if (counter === undefined) {
+			return error(`Property '${member.name}' declares count '${member.count}', which is not a field of this struct`, path);
+		}
+		if (counter._t !== "NumberProperty" || !is_integer_symbol(counter.type)) {
+			return error(`Property '${member.name}' declares count '${member.count}', which must be an integer field`, path);
+		}
+		if ((member.readonly === true) !== (counter.readonly === true)) {
+			return error(`Property '${member.name}' and its count '${member.count}' must both be readonly or neither`, path);
+		}
+	}
+
+	return ok(members);
+}
+
 function parse_ruleset_from_object(object: Record<string, unknown>, context: ParseContext): Result<Ruleset> {
 	const $id = required(object, "$id", context, string_);
 	if (!$id.ok) {
@@ -216,9 +266,10 @@ function parse_ruleset_from_object(object: Record<string, unknown>, context: Par
 		return $description;
 	}
 
-	// Descriptor rulesets carry no sources (the init_param they reference does), so
-	// $sources is optional for them and defaults to empty; every other type requires it.
-	const $sources = $type.value === RulesetType.RT_DESCRIPTOR
+	// Descriptor rulesets carry no sources (the $init_param they reference does) and an
+	// extern names a symbol the library already compiles, so $sources is optional for both
+	// and defaults to empty; every other type requires it.
+	const $sources = $type.value === RulesetType.RT_DESCRIPTOR || $type.value === RulesetType.RT_EXTERN
 		? optionalWithDefault(object, "$sources", context, {}, is_ruleset_sources)
 		: required(object, "$sources", context, is_ruleset_sources);
 	if (!$sources.ok) {
@@ -242,19 +293,12 @@ function parse_ruleset_from_object(object: Record<string, unknown>, context: Par
 
 	switch ($type.value) {
 		case RulesetType.RT_STRUCT: {
-			// eslint-disable-next-line no-param-reassign -- context.document is the parse accumulator being built up
-			context.document.properties = [];
-			for (const key of Object.keys(object)) {
-				if (key.startsWith("$")) {
-					continue;
-				}
-
-				const property = parse_property(key, object[key], at(context, key));
-				if (!property.ok) {
-					return property;
-				}
-				context.document.properties.push(property.value);
+			const properties = parse_members(object, context);
+			if (!properties.ok) {
+				return properties;
 			}
+			// eslint-disable-next-line no-param-reassign -- context.document is the parse accumulator being built up
+			context.document.properties = properties.value;
 
 			const rules = optional(object, "$override", context, is_override);
 			if (!rules.ok) {
@@ -353,6 +397,38 @@ function parse_ruleset_from_object(object: Record<string, unknown>, context: Par
 				$capability: $capability.value,
 			});
 		}
+		case RulesetType.RT_EXTERN: {
+			// No property loop: an extern has nothing to configure. `$provides` is the
+			// only key that carries meaning, since it is what an `include` matches.
+			const $provides = required(object, "$provides", context, string_);
+			if (!$provides.ok) {
+				return $provides;
+			}
+
+			const $header = optional(object, "$header", context, string_);
+			if (!$header.ok) {
+				return $header;
+			}
+
+			const $array = optionalWithDefault(object, "$array", context, false, boolean_);
+			if (!$array.ok) {
+				return $array;
+			}
+
+			return ok({
+				_t: "RulesetExtern",
+				$id: $id.value,
+				$type: $type.value,
+				$symbol: $symbol.value,
+				$description: $description.value,
+				$ranking: $ranking.value,
+				$sources: $sources.value,
+				$config: $config.value,
+				$provides: $provides.value,
+				$header: $header.value,
+				$array: $array.value,
+			});
+		}
 		case RulesetType.RT_DESCRIPTOR: {
 			const $init_template = required(object, "$init_template", context, string_);
 			if (!$init_template.ok) {
@@ -364,14 +440,30 @@ function parse_ruleset_from_object(object: Record<string, unknown>, context: Par
 				return $remove_template;
 			}
 
-			const init_parameter_object = required(object, "init_param", context, asObject);
+			// `$`-prefixed, like the rest of a descriptor's metadata: it says which struct
+			// configures this device, not what the C struct contains. That also keeps it out
+			// of the member loop below for free.
+			const init_parameter_object = required(object, "$init_param", context, asObject);
 			if (!init_parameter_object.ok) {
 				return init_parameter_object;
 			}
 
-			const init_parameter = parse_include_property("init_param", init_parameter_object.value, at(context, "init_param"));
+			const init_parameter_property = parse_include_property("$init_param", init_parameter_object.value, at(context, "$init_param"));
+			if (!init_parameter_property.ok) {
+				return init_parameter_property;
+			}
+
+			const init_parameter = reject_include_type(init_parameter_property.value, at(context, "$init_param"));
 			if (!init_parameter.ok) {
 				return init_parameter;
+			}
+
+			// The descriptor's own members, so the C struct is described 1:1. Most of them
+			// are `readonly`, since an init function fills the struct in. A descriptor emits
+			// no initializer, so these are declarations for referencing, never printed.
+			const members = parse_members(object, context);
+			if (!members.ok) {
+				return members;
 			}
 
 			return ok({
@@ -385,7 +477,7 @@ function parse_ruleset_from_object(object: Record<string, unknown>, context: Par
 				$symbol: $symbol.value,
 				$init_template: $init_template.value,
 				$remove_template: $remove_template.value,
-				properties: [init_parameter.value],
+				properties: [init_parameter.value, ...members.value],
 			});
 		}
 	}

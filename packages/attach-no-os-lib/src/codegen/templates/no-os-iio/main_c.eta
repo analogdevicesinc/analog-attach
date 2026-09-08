@@ -1,0 +1,155 @@
+<%
+/*
+ * main.c for an iio_app project.
+ *
+ * The shape is fixed by what iio_app_init needs and when things exist, and follows the
+ * upstream examples (projects/eval-adxl355-pmdz/src/examples/iio_trigger_example/
+ * iio_trigger_example.c:100-152) statement for statement:
+ *
+ *   1. patch the file-scope structs, each patch placed after the init that makes its value
+ *      live rather than all of them up front (see patch_schedule.ts)
+ *   2. run every init EXCEPT the app's
+ *   3. build the two lists as block-scope locals - their element initializers name
+ *      descriptors, which are not constant expressions, so they cannot live at file scope
+ *   4. point the app init_param at the lists and count them with NO_OS_ARRAY_SIZE
+ *   5. init the app
+ *   6. patch each hardware trigger with the iio_desc the app just created
+ *   7. hand control to iio_app_run, which does not return
+ *
+ * Step 2 has to exclude the app explicitly rather than rely on ordering: with `trigs` left
+ * for this template to derive, nothing in the workfile makes the app depend on a trigger, so
+ * the topological order is free to put them either way round.
+ *
+ * There is no teardown. Every upstream example returns iio_app_run directly, and
+ * iio_app_remove is broken upstream anyway (it unwinds through an always-NULL irq_desc).
+ *
+ * NOTE: apostrophes break the Eta parser even inside comments, so this file uses only block
+ * comments and apostrophe-free prose.
+ */
+const H = include("./_helpers", { h: it.h });
+const wf = it.workfile;
+const runtime_assignments = H.struct_views(wf).flatMap(view => view.runtime_assignments);
+
+const app = H.app_descriptor(wf);
+if (app === undefined) {
+	throw new Error(
+		"The no-os-iio target needs an iio_app node (no-os/iio/iio_app.yaml) in the workfile. Use the no-os target for a project without one."
+	);
+}
+
+const all_inits = it.h.devices(wf);
+const app_init = all_inits.find(d => d.descriptor_name === app.name);
+if (app_init === undefined) {
+	throw new Error(`iio_app '${app.name}' produced no init code; check its $init_template.`);
+}
+const other_inits = all_inits.filter(d => d.descriptor_name !== app.name);
+
+/*
+ * The two lists, each read out of the app init_param schema rather than named here: the field
+ * that points at the element type, the field holding its length, and the name of the local
+ * that carries it. See H.derived_list.
+ */
+const devices = H.derived_list(app.init_param_ruleset, wf, H.APP_DEVICE_ID, "device");
+const trigs = H.derived_list(app.init_param_ruleset, wf, H.TRIGGER_INIT_ID, "trigger");
+
+if (devices.entries.length === 0) {
+	throw new Error("An iio_app exposes at least one device; the workfile has no iio_app_device node.");
+}
+
+/*
+ * `trig->iio_desc = app->iio_desc` after the app init. Mandatory in every hardware-trigger
+ * example: the trigger is built before the app, so the iio_desc it needs does not exist yet.
+ * Derived from each trigger entry rather than from every iio_hw_trig node, so a trigger the
+ * app does not publish is left alone.
+ */
+const backpatches = [];
+for (const entry of trigs.entries) {
+	const trig = entry.ruleset.properties.find(p => p.name === "trig");
+	const expression = trig === undefined ? undefined : it.h.reference_expression(trig, wf);
+	if (expression === undefined) {
+		throw new Error(`Trigger entry '${entry.name}' has no 'trig' set, so there is nothing to attach it to.`);
+	}
+	if (!backpatches.includes(expression)) {
+		backpatches.push(expression);
+	}
+}
+
+/*
+ * The app inits last however the topological order came out (see step 2 above), so that is
+ * the order the patches are scheduled against.
+ */
+const patches = it.h.schedule_patches(
+	runtime_assignments,
+	[...other_inits.map(d => d.descriptor_name), app.name]
+);
+-%>
+#include "no_os_error.h"
+#include "no_os_util.h"
+#include "common/common_data.h"
+
+int main(void)
+{
+	int ret;
+
+<% if (patches.before.length) { -%>
+	// Patching the common_data structs
+<% for (const a of patches.before) { -%>
+	<%= a.struct_name %>.<%= a.field_path %> = <%= a.value %>;
+<% } -%>
+
+<% } -%>
+	// Init devices and structures
+<% for (const d of other_inits) { -%>
+<%= it.h.tab_indent(d.init_code) %>
+<% for (const a of patches.after.get(d.descriptor_name) ?? []) { -%>
+	<%= a.struct_name %>.<%= a.field_path %> = <%= a.value %>;
+<% } -%>
+
+<% } -%>
+	// The device list the app publishes. Local, because the entries name descriptors.
+	struct <%= devices.entries[0].ruleset.$symbol %> <%= devices.array %>[] = {
+<% for (const entry of devices.entries) { -%>
+		{
+<% for (const f of H.printable_fields(entry.ruleset)) { -%>
+			.<%= f.name %> = <%= H.cval(f, entry.name, wf) %>,
+<% } -%>
+		},
+<% } -%>
+	};
+
+<% if (trigs.entries.length) { -%>
+	// The triggers the app publishes
+	struct <%= trigs.entries[0].ruleset.$symbol %> <%= trigs.array %>[] = {
+<% for (const entry of trigs.entries) { -%>
+		{
+<% for (const f of H.printable_fields(entry.ruleset)) { -%>
+			.<%= f.name %> = <%= H.cval(f, entry.name, wf) %>,
+<% } -%>
+		},
+<% } -%>
+	};
+
+<% } -%>
+	// Hand the lists to the app
+	<%= app.init_param %>.<%= devices.field %> = <%= devices.array %>;
+	<%= app.init_param %>.<%= devices.count %> = NO_OS_ARRAY_SIZE(<%= devices.array %>);
+<% if (trigs.entries.length) { -%>
+	<%= app.init_param %>.<%= trigs.field %> = <%= trigs.array %>;
+	<%= app.init_param %>.<%= trigs.count %> = NO_OS_ARRAY_SIZE(<%= trigs.array %>);
+<% } -%>
+
+<%= it.h.tab_indent(app_init.init_code) %>
+<% for (const a of patches.after.get(app.name) ?? []) { -%>
+	<%= a.struct_name %>.<%= a.field_path %> = <%= a.value %>;
+<% } -%>
+
+<% if (backpatches.length) { -%>
+	// Every trigger needs the iio_desc the app has only just created
+<% for (const target of backpatches) { -%>
+	<%= target %>->iio_desc = desc.<%= app.name %>->iio_desc;
+<% } -%>
+
+<% } -%>
+	// Runs the IIO server loop and does not return
+	return iio_app_run(desc.<%= app.name %>);
+}

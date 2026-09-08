@@ -1,0 +1,7 @@
+$id: "test/extern_array"
+$type: extern
+$symbol: test_regs
+$ranking: 4
+$provides: "test/reg"
+$array: true
+$header: "drivers/test/test_regs.h"

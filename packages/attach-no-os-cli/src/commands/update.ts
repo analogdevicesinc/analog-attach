@@ -120,10 +120,15 @@ export const updateCommand = buildCommand<
                 return;
             }
 
-            const text = format_property_list(node, node_result.value.properties) + "\nUse: aa update <node> <property> [value]";
+            // Readonly fields are part of the struct but not part of this list: generated
+            // code fills them in, so `aa update` would only reject them. `aa read` still
+            // shows them.
+            const settable = node_result.value.properties.filter(p => p.readonly !== true);
+
+            const text = format_property_list(node, settable) + "\nUse: aa update <node> <property> [value]";
             const json = {
                 node,
-                properties: node_result.value.properties.map(p => ({
+                properties: settable.map(p => ({
                     name: p.name,
                     type: format_property_type(p._t),
                     value: p.value

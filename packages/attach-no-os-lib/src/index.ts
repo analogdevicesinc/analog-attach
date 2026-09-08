@@ -8,6 +8,7 @@ export type {
     RulesetDescriptor,
     ArrayProperty
 } from "./ruleset_parser/types";
+export { ruleset_type_token } from "./ruleset_parser/types";
 export { ok, error } from "./ruleset_parser/result";
 export type { Result, ResultError } from "./ruleset_parser/result";
 export {

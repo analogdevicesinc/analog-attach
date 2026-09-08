@@ -37,7 +37,7 @@ configure_nodes() {
     $AA update adxl355_ip comm_init spi_init no_os_spi_ip
 
     # Point the descriptor at its init_param
-    $AA update adxl355_device init_param adxl355_ip
+    $AA update adxl355_device '$init_param' adxl355_ip
 }
 
 run_e2e

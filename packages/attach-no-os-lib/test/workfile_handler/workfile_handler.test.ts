@@ -25,7 +25,8 @@ import {
     import_minimal,
     clone_workfile,
     all_ops,
-    rename_symbol
+    rename_symbol,
+    resolve_reference
 } from '../../src/workfile_handler/workfile_handler';
 import { scan_platforms } from '../../src/workfile_handler/platform_scanner';
 import { Workfile } from '../../src/workfile_handler/types';
@@ -36,6 +37,7 @@ import {
     UnionProperty,
     ArrayProperty,
     RulesetPlatformOps,
+    RulesetExtern,
     EnumProperty,
     BooleanProperty,
     PlatformOpsProperty,
@@ -56,6 +58,20 @@ function make_struct(id: string, name: string, properties: RulesetStruct['proper
         $ranking: 4,
         $sources: { headers: ["test.h"] },
         properties,
+    };
+}
+
+function make_extern(id: string, symbol: string, provides: string, array?: boolean): RulesetExtern {
+    return {
+        _t: "RulesetExtern",
+        $id: id,
+        $type: RulesetType.RT_EXTERN,
+        $symbol: symbol,
+        $description: "Test extern",
+        $ranking: 4,
+        $sources: {},
+        $provides: provides,
+        $array: array,
     };
 }
 
@@ -444,6 +460,19 @@ describe('workfile_handler', () => {
             const result = set_value(workfile, "my_foo", "unknown", 42);
             expectError(result);
             expectErrorContains(result, "not found");
+        });
+
+        // A readonly field is filled in by generated code — a descriptor member by its
+        // init function, a struct field by the target template — so a user value would
+        // either be overwritten or contradict what the code does.
+        test('set_value refuses a readonly property', () => {
+            const ruleset = make_struct("test/foo.yaml", "foo", [
+                { _t: "NumberProperty", name: "nb_devices", description: "", type: "uint32_t", readonly: true }
+            ]);
+            add_symbol(workfile, "my_foo", ruleset);
+            const result = set_value(workfile, "my_foo", "nb_devices", 3);
+            expectError(result);
+            expectErrorContains(result, "filled in by generated code");
         });
     });
 
@@ -962,6 +991,37 @@ describe('workfile_handler', () => {
 
             expect(exported.value.symbols["my_ad7124"]["ref_en"]).toBe(false);
             expect(exported.value.symbols["my_ad7124"]["check_ready"]).toBe(true);
+        });
+    });
+
+    describe('resolve_reference on externs', () => {
+        // An extern names a global the library already compiles, so the expression is its
+        // `$symbol` rather than the workfile node name the user picked.
+        test('resolves to the library symbol, not the node name', () => {
+            add_symbol(workfile, "my_dev",
+                make_extern("test/iio_dev.yaml", "iio_ad7124_device", "test/iio_device.yaml"));
+
+            const resolved = resolve_reference(workfile, "my_dev");
+            expect(resolved?.expr).toBe("iio_ad7124_device");
+            expect(resolved?.$id).toBe("test/iio_device.yaml");
+            expect(resolved?.runtime).toBe(false);
+        });
+
+        // A struct extern is a value, so a `pointer: true` consumer has to take its address.
+        test('a struct extern is not a pointer', () => {
+            add_symbol(workfile, "my_dev",
+                make_extern("test/iio_dev.yaml", "iio_ad7124_device", "test/iio_device.yaml"));
+
+            expect(resolve_reference(workfile, "my_dev")?.pointer).toBe(false);
+        });
+
+        // An array name already decays to a pointer. Reporting it as one is what stops the
+        // caller adding an `&`, which would give `struct x (*)[57]` instead of `struct x *`.
+        test('an array extern reports itself as a pointer', () => {
+            add_symbol(workfile, "my_regs",
+                make_extern("test/regs.yaml", "ad7124_regs", "test/reg.yaml", true));
+
+            expect(resolve_reference(workfile, "my_regs")?.pointer).toBe(true);
         });
     });
 

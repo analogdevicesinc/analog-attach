@@ -1,6 +1,7 @@
 import type { NumberProperty, Property } from "../ruleset_parser/types";
 import { is_float_symbol } from "../ruleset_parser/types";
 import type { Workfile } from "../workfile_handler/types";
+import { resolve_reference } from "../workfile_handler/workfile_handler";
 
 // Typed, reusable property primitives injected into every template under `it.h`.
 // These read a single Property with no target-specific (no-OS) knowledge, so they are
@@ -72,10 +73,30 @@ export function is_null_pointer(property: Property): boolean {
 		&& effective_value(property) === undefined;
 }
 
-// An include whose value names a descriptor symbol. Such properties are patched at
-// runtime (`desc.x`) rather than emitted in a const initializer.
+// An include whose value is reached through a descriptor, either naming one outright
+// ("irq_ctrl") or a member of one ("accel_iio.iio_dev"). Such properties are patched at
+// runtime rather than emitted in a const initializer, because a descriptor does not exist
+// until its init has run.
 export function is_descriptor_reference(property: Property, workfile: Workfile): boolean {
-	return property._t === "IncludeProperty"
-		&& typeof property.value === "string"
-		&& workfile.symbols[property.value]?._t === "RulesetDescriptor";
+	if (property._t !== "IncludeProperty" || typeof property.value !== "string") {
+		return false;
+	}
+
+	return resolve_reference(workfile, property.value)?.runtime === true;
+}
+
+// The C expression a reference-valued property emits, with `&` added when the property
+// declares a pointer but the thing referenced is a value. Descriptors are already pointers,
+// so a whole-descriptor reference never takes an address.
+export function reference_expression(property: Property, workfile: Workfile): string | undefined {
+	if (property._t !== "IncludeProperty" || typeof property.value !== "string") {
+		return undefined;
+	}
+
+	const target = resolve_reference(workfile, property.value);
+	if (!target) {
+		return undefined;
+	}
+
+	return property.pointer === true && !target.pointer ? `&${target.expr}` : target.expr;
 }

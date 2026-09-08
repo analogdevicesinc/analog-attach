@@ -39,13 +39,13 @@ function collect_descriptors() {
 		}
 		const target_name = symbol.properties[0].value;
 		if (typeof target_name !== "string") {
-			throw new Error(`Descriptor ${symbol.$id} has no init_param assigned`);
+			throw new Error(`Descriptor ${symbol.$id} has no $init_param assigned`);
 		}
 		if (!(target_name in wf.symbols)) {
-			throw new Error(`Descriptor init_param ${target_name} not found in workfile`);
+			throw new Error(`Descriptor $init_param ${target_name} not found in workfile`);
 		}
 		if (wf.symbols[target_name]._t !== "RulesetStruct") {
-			throw new Error(`Descriptor init_param ${target_name} is not a struct`);
+			throw new Error(`Descriptor $init_param ${target_name} is not a struct`);
 		}
 		result.push({
 			descriptor_name: name,

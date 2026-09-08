@@ -1,4 +1,19 @@
-<% const H = include("./_helpers", { h: it.h }); const runtime_assignments = H.struct_views(it.workfile).flatMap(view => view.runtime_assignments); const devices = it.h.devices(it.workfile); -%>
+<%
+/*
+ * main.c: patch the file-scope structs, init every device, run the user app, unwind.
+ *
+ * A patch is NOT emitted in one block up front. `desc.x` is NULL until x has been
+ * inited, so a patch reading it has to follow that init; `it.h.schedule_patches` works
+ * out where each one goes (see patch_schedule.ts).
+ *
+ * NOTE: apostrophes break the Eta parser even inside comments, so this file uses only
+ * block comments and apostrophe-free prose.
+ */
+const H = include("./_helpers", { h: it.h });
+const runtime_assignments = H.struct_views(it.workfile).flatMap(view => view.runtime_assignments);
+const devices = it.h.devices(it.workfile);
+const patches = it.h.schedule_patches(runtime_assignments, devices.map(d => d.descriptor_name));
+-%>
 #include "no_os_error.h"
 #include "common/common_data.h"
 #include "user_app.h"
@@ -7,9 +22,9 @@ int main(void)
 {
 	int ret;
 
-<% if (runtime_assignments.length) { -%>
+<% if (patches.before.length) { -%>
 	// Patching the common_data structs
-<% for (const a of runtime_assignments) { -%>
+<% for (const a of patches.before) { -%>
 	<%= a.struct_name %>.<%= a.field_path %> = <%= a.value %>;
 <% } -%>
 
@@ -17,6 +32,9 @@ int main(void)
 	// Init devices and structures
 <% for (const d of devices) { -%>
 <%= it.h.tab_indent(d.init_code) %>
+<% for (const a of patches.after.get(d.descriptor_name) ?? []) { -%>
+	<%= a.struct_name %>.<%= a.field_path %> = <%= a.value %>;
+<% } -%>
 
 <% } -%>
 	user_app(&desc);

@@ -33,7 +33,7 @@ const test_workfile: MinimalWorkfile = {
         },
         "misp": {
             "$compatible": "devices/adxl355/adxl355.yaml",
-            "init_param": "misp_ip"
+            "$init_param": "misp_ip"
         }
     }
 };
@@ -316,7 +316,7 @@ describe('codegen', () => {
                 },
                 "parent_spi": {
                     "$compatible": "no-os/spi/no_os_spi.yaml",
-                    "init_param": "parent_spi_ip"
+                    "$init_param": "parent_spi_ip"
                 },
                 "child_spi_ip": {
                     "$compatible": "no-os/spi/no_os_spi_init_param.yaml",
@@ -328,7 +328,7 @@ describe('codegen', () => {
                 },
                 "child_spi": {
                     "$compatible": "no-os/spi/no_os_spi.yaml",
-                    "init_param": "child_spi_ip"
+                    "$init_param": "child_spi_ip"
                 }
             }
         };
@@ -355,6 +355,16 @@ describe('codegen', () => {
 
         // The parent field should reference the descriptor via desc struct
         expect(main_c).toContain("child_spi_ip.parent = desc.parent_spi");
+
+        // And it must be READ after the init that fills it, not before: emitting the
+        // patch up front copies NULL. See patch_schedule.ts.
+        const parent_init = main_c.indexOf("no_os_spi_init(&desc.parent_spi");
+        const patch = main_c.indexOf("child_spi_ip.parent = desc.parent_spi");
+        const child_init = main_c.indexOf("no_os_spi_init(&desc.child_spi");
+        expect(parent_init).toBeGreaterThan(-1);
+        expect(child_init).toBeGreaterThan(-1);
+        expect(patch).toBeGreaterThan(parent_init);
+        expect(patch).toBeLessThan(child_init);
     });
 
     test('errors when a device has an init template but no remove template', () => {
@@ -417,7 +427,7 @@ describe('codegen', () => {
                 },
                 "misp": {
                     "$compatible": "devices/adxl355/adxl355.yaml",
-                    "init_param": "misp_ip"
+                    "$init_param": "misp_ip"
                 },
                 "max_uart_ip": {
                     "$compatible": "platforms/maxim/max32690/max_uart_init_param.yaml",
@@ -432,7 +442,7 @@ describe('codegen', () => {
                 },
                 "my_uart": {
                     "$compatible": "no-os/uart/no_os_uart.yaml",
-                    "init_param": "my_uart_ip"
+                    "$init_param": "my_uart_ip"
                 }
             }
         };

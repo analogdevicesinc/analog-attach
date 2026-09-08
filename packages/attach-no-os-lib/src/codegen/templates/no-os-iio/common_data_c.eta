@@ -1,0 +1,84 @@
+<%
+/*
+ * common_data.c for an iio_app project. Same file-scope struct table as the base set, plus
+ * the backing storage the IIO data buffers point at.
+ *
+ * cval and the hoisted-pointer-array logic moved into _helpers.eta for this set, because
+ * main.c has to format initializer tokens too (the two app lists are block-scope locals).
+ *
+ * NOTE: apostrophes break the Eta parser even inside comments, so this file uses only block
+ * comments and apostrophe-free prose.
+ */
+const H = include("./_helpers", { h: it.h });
+const wf = it.workfile;
+const structs = H.struct_views(wf);
+const buffers = H.data_buffers(wf);
+
+/*
+ * The hoisted arrays one struct needs, in field order. Throws rather than emitting broken
+ * C: codegen turns a template throw into a Result error. The element type is read off the
+ * referenced workfile symbols rather than re-resolved from the schema, so this stays a pure
+ * function of the context it was handed.
+ */
+function hoisted_arrays(view) {
+	const arrays = [];
+
+	for (const property of view.fields) {
+		if (!H.is_pointer_include_array(property) || !Array.isArray(property.value) || property.value.length === 0) {
+			continue;
+		}
+
+		const name = H.hoisted_array_name(view.name, property);
+		if (wf.symbols[name] !== undefined) {
+			throw new Error(
+				`Cannot emit '${view.name}.${property.name}': the generated array name '${name}' collides with symbol '${name}'. Rename that symbol.`
+			);
+		}
+
+		let element_type;
+		const elements = [];
+		for (const element of property.value) {
+			const reference = String(element);
+			const referenced = wf.symbols[reference];
+			if (referenced === undefined) {
+				throw new Error(
+					`Cannot emit '${view.name}.${property.name}': element '${reference}' is not a symbol in this workfile.`
+				);
+			}
+			if (element_type !== undefined && referenced.$symbol !== element_type) {
+				throw new Error(
+					`Cannot emit '${view.name}.${property.name}': mixed element types '${element_type}' and '${referenced.$symbol}'.`
+				);
+			}
+			element_type = referenced.$symbol;
+			elements.push(`&${reference}`);
+		}
+
+		arrays.push({ name: name, element_type: element_type, elements: elements });
+	}
+
+	return arrays;
+}
+-%>
+#include "common_data.h"
+
+struct descriptors desc = { 0 };
+
+<% if (buffers.length) { -%>
+/* Backing storage for the IIO data buffers, sized from each buffer's `size` */
+<% for (const b of buffers) { -%>
+uint8_t <%= b.storage %>[<%= b.size %>];
+<% } -%>
+
+<% } -%>
+<% for (const s of structs) { -%>
+<% for (const a of hoisted_arrays(s)) { -%>
+const struct <%= a.element_type %> *<%= a.name %>[] = { <%= a.elements.join(", ") %> };
+<% } -%>
+<%= s.is_const ? "const " : "" %>struct <%= s.type %> <%= s.name %> = {
+<% for (const f of s.fields) { -%>
+	.<%= f.name %> = <%= H.cval(f, s.name, wf) %>,
+<% } -%>
+};
+
+<% } -%>

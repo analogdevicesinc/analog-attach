@@ -24,6 +24,15 @@
  */
 
 /*
+ * The symbol a patch READS, which is what decides where the patch may be emitted (see
+ * patch_schedule.ts). A reference value is either `node` or `node.member`, and either way
+ * the value is only live once `node` has been initialized.
+ */
+function patch_source(value) {
+	return String(value).split(".")[0];
+}
+
+/*
  * One struct: split its properties into descriptor references (patched at runtime
  * as `desc.x`) and static fields (emitted in the const initializer). A struct with
  * any descriptor reference cannot be const.
@@ -33,11 +42,21 @@ function build_struct_view(name, ruleset, wf) {
 	const fields = [];
 
 	for (const property of ruleset.properties) {
+		/*
+		 * A readonly field is filled in by generated code, so it is neither a static field
+		 * nor a patch. Skipped before the checks below because an unset readonly pointer
+		 * would otherwise print as `.field = NULL` and then be assigned anyway.
+		 */
+		if (property.readonly === true) {
+			continue;
+		}
+
 		if (it.h.is_descriptor_reference(property, wf) && it.h.effective_value(property) !== undefined) {
 			runtime_assignments.push({
 				struct_name: name,
 				field_path: property.name,
-				value: `desc.${String(it.h.effective_value(property))}`,
+				value: it.h.reference_expression(property, wf),
+				source: patch_source(it.h.effective_value(property)),
 			});
 		} else if (it.h.effective_value(property) !== undefined || it.h.is_null_pointer(property)) {
 			fields.push(property);
@@ -103,6 +122,7 @@ function struct_views(wf) {
 					struct_name: name,
 					field_path: `${property.name}.${member_name}`,
 					value: is_pointer ? `&${reference}` : reference,
+					source: reference,
 				});
 			}
 		}
@@ -156,6 +176,17 @@ function collect_headers(wf) {
 	const platform = new Set();
 
 	for (const ruleset of all_rulesets(wf)) {
+		/*
+		 * $header names the one header that declares this ruleset - a driver header
+		 * (drivers/accel/adxl355/adxl355.h) or the header an extern is declared in.
+		 * Basenamed like platform entries, because every driver directory is on the
+		 * no-OS include path. $sources only ever covered include/, so anything under
+		 * drivers/ or iio/ needs this route.
+		 */
+		if (ruleset.$header) {
+			noos.add(ruleset.$header.slice(ruleset.$header.lastIndexOf("/") + 1));
+		}
+
 		for (const file of ruleset.$sources.noos ?? []) {
 			if (file.startsWith("include/") && file.endsWith(".h")) {
 				noos.add(file.slice("include/".length));

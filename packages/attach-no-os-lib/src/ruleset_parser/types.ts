@@ -11,6 +11,11 @@ export interface PropertyBase {
 	disabled?: boolean, // NOTE: default is disabled: false
 	value?: unknown,
 	capability?: string[], // Platform capabilities required for this property
+	// A field something other than the user fills in: it can be referenced but never set,
+	// and is never emitted in an initializer. Two cases, both parsed by `parse_members`:
+	// a descriptor member an init function writes, and a struct field the target template
+	// derives (an iio_app_init_param device list, whose value is a local in main).
+	readonly?: boolean,
 }
 
 export type PrimitiveSymbol = PrimitiveCType["symbol"];
@@ -67,11 +72,28 @@ export type StringProperty = PropertyBase & {
 	default?: string,
 }
 
+// Exactly one of `include` / `include_type` is set; the parser rejects both and neither.
+//
+//   include:      "no-os/spi/no_os_spi_init_param.yaml"  -> match the one ruleset with that $id
+//   include_type: descriptor                             -> match any ruleset of that type
+//
+// `include_type` exists for C's polymorphic fields: `iio_app_device.dev` is a `void *`
+// that takes whichever driver descriptor the user picked, so no single $id describes it.
+// It narrows what we suggest, it does not pin down a type — every descriptor matches.
+export type IncludeMatch =
+	| { include: string, include_type?: undefined }
+	| { include?: undefined, include_type: RulesetType };
+
+// `count` names the sibling field holding how many elements this pointer points at. C has
+// no fat pointers, so a list is always a pair of fields (`devices` / `nb_devices`,
+// `ctx_attrs` / `nb_ctx_attr`), and only the schema knows which number goes with which
+// pointer. Declaring the pair means a consumer that found the pointer — by type, say —
+// finds its length without guessing at a naming convention.
 export type IncludeProperty = PropertyBase & {
 	_t: "IncludeProperty",
-	include: string,
 	pointer?: boolean,
-}
+	count?: string,
+} & IncludeMatch;
 
 export type EnumValue = string | number;
 
@@ -163,7 +185,32 @@ export enum RulesetType {
 	RT_ENUM = "bt_enum",
 	RT_PLATFORM_OPS = "bt_platform_ops",
 	RT_DESCRIPTOR = "bt_descriptor",
+	RT_EXTERN = "bt_extern",
 };
+
+// The YAML spelling of a ruleset type. One vocabulary, used by both `$type:` on a
+// ruleset and `include_type:` on a property, so the two can never drift apart.
+export function ruleset_type_from_token(token: string): RulesetType | undefined {
+	switch (token) {
+		case "struct": { return RulesetType.RT_STRUCT; }
+		case "enum": { return RulesetType.RT_ENUM; }
+		case "platform_ops": { return RulesetType.RT_PLATFORM_OPS; }
+		case "descriptor": { return RulesetType.RT_DESCRIPTOR; }
+		case "extern": { return RulesetType.RT_EXTERN; }
+		default: { return undefined; }
+	}
+}
+
+// Inverse of the above, for error messages: report the spelling the author wrote.
+export function ruleset_type_token(type_: RulesetType): string {
+	switch (type_) {
+		case RulesetType.RT_STRUCT: { return "struct"; }
+		case RulesetType.RT_ENUM: { return "enum"; }
+		case RulesetType.RT_PLATFORM_OPS: { return "platform_ops"; }
+		case RulesetType.RT_DESCRIPTOR: { return "descriptor"; }
+		case RulesetType.RT_EXTERN: { return "extern"; }
+	}
+}
 
 enum RulesetRank {
 	RR_PRODUCTION = 0, // Deployed in shipping products/apps, hardware validated across all variants
@@ -230,7 +277,10 @@ export type RulesetDescriptor = RulesetBase & {
 	$type: RulesetType.RT_DESCRIPTOR,
 	$init_template: string,
 	$remove_template: string,
-	properties: [IncludeProperty]
+	// `$init_param` is always first, so `properties[0]` keeps naming it. The rest are the
+	// descriptor's own members, declared so the struct is described 1:1 and so they can be
+	// referenced; a descriptor emits no initializer, so none of them are ever printed.
+	properties: [IncludeProperty, ...Property[]]
 };
 
 export type RulesetPlatformOps = RulesetBase & {
@@ -239,4 +289,33 @@ export type RulesetPlatformOps = RulesetBase & {
 	$capability?: string,
 };
 
-export type Ruleset = RulesetStruct | RulesetEnum | RulesetPlatformOps | RulesetDescriptor;
+// A symbol the library already defines, so we reference it and never emit it:
+//
+//   extern struct iio_device iio_ad7124_device;   /* drivers/adc/ad7124/iio_ad7124.h */
+//
+// Modelling that as a struct would emit a second definition and fail to link. An extern
+// has no properties — there is nothing to configure — so it makes no graph edges and its
+// placement in the emission order is free. `$header` is what makes the declaration
+// visible; `$config` is what gets the defining .c file compiled.
+export type RulesetExtern = RulesetBase & {
+	_t: "RulesetExtern",
+	$type: RulesetType.RT_EXTERN,
+	// The $id an `include` must name to accept this node, i.e. the C type of the global.
+	// Externs are the one kind whose matching type is not their own $id: the $id names
+	// this schema file, `$provides` names the type the symbol has.
+	$provides: string,
+	$header?: string,
+	// The symbol is an array (`extern struct ad7124_st_reg ad7124_regs[AD7124_REG_NO];`).
+	// An array name already decays to a pointer, so a `pointer: true` consumer must NOT
+	// take its address: `&ad7124_regs` has type `struct ad7124_st_reg (*)[57]`, not
+	// `struct ad7124_st_reg *`. Without this key the emitted `&` is a type error.
+	$array?: boolean,
+};
+
+export type Ruleset = RulesetStruct | RulesetEnum | RulesetPlatformOps | RulesetDescriptor | RulesetExtern;
+
+// The $id a node offers for `include` matching. Every kind answers with its own $id
+// except an extern, which answers with the type of the symbol it names.
+export function provided_id(ruleset: Ruleset): string {
+	return ruleset._t === "RulesetExtern" ? ruleset.$provides : ruleset.$id;
+}

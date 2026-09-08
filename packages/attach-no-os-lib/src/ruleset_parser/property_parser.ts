@@ -5,17 +5,20 @@ import type {
 	ArrayProperty,
 	BooleanProperty,
 	EnumProperty,
+	IncludeMatch,
 	IncludeProperty,
 	NumberProperty,
 	PlatformExtraProperty,
 	PlatformOpsProperty,
+	Property,
 	RawProperty,
 	StringProperty,
 	UnionProperty
 } from "./types";
 import {
 	is_integer_symbol,
-	is_primitive_symbols
+	is_primitive_symbols,
+	ruleset_type_from_token
 } from "./types";
 import type {
 	ParseContext} from "./validators";
@@ -197,8 +200,8 @@ export function parse_enum_property(name: string, object: Record<string, unknown
 }
 
 export function parse_include_property(name: string, object: Record<string, unknown>, context: ParseContext): Result<IncludeProperty> {
-	const include = required(object, "include", context, string_);
-	if (!include.ok) {return include;}
+	const match = parse_include_match(object, context);
+	if (!match.ok) {return match;}
 
 	const description = optionalWithDefault(object, "description", context, "", string_);
 	if (!description.ok) {return description;}
@@ -212,15 +215,66 @@ export function parse_include_property(name: string, object: Record<string, unkn
 	const capability = optional(object, "capability", context, capabilityArray);
 	if (!capability.ok) {return capability;}
 
+	// The sibling field holding this pointer's element count (see IncludeProperty.count).
+	// Only meaningful for a pointer: a by-value member is one element and needs no count.
+	const count = optional(object, "count", context, string_);
+	if (!count.ok) {return count;}
+	if (count.value !== undefined && !pointer.value) {
+		return error(`'count' names the length of a list, so it needs 'pointer: true'`, at(context, "count").path);
+	}
+
 	return ok({
 		_t: "IncludeProperty",
 		name,
 		description: description.value,
 		required: required_.value,
-		include: include.value,
 		pointer: pointer.value,
+		count: count.value,
 		capability: capability.value,
+		...match.value,
 	});
+}
+
+// `include` names one ruleset by $id, `include_type` names a whole ruleset type.
+// Exactly one, so every consumer knows which question to ask.
+function parse_include_match(object: Record<string, unknown>, context: ParseContext): Result<IncludeMatch> {
+	const has_include = "include" in object;
+	const has_include_type = "include_type" in object;
+
+	if (has_include && has_include_type) {
+		return error(`'include' and 'include_type' are mutually exclusive`, context.path);
+	}
+
+	if (has_include) {
+		const include = required(object, "include", context, string_);
+		if (!include.ok) {return include;}
+		return ok({ include: include.value });
+	}
+
+	if (has_include_type) {
+		const token = required(object, "include_type", context, string_);
+		if (!token.ok) {return token;}
+
+		const include_type = ruleset_type_from_token(token.value);
+		if (include_type === undefined) {
+			return error(`Invalid include_type '${token.value}'`, at(context, "include_type").path);
+		}
+
+		return ok({ include_type });
+	}
+
+	return error(`Missing required field 'include' (or 'include_type')`, context.path);
+}
+
+// `include_type` is only wired up for plain properties. Union members, array elements and
+// a descriptor's $init_param all resolve their target's $id, so they need a concrete path;
+// say so here instead of failing further down with a confusing message.
+export function reject_include_type(property: IncludeProperty, context: ParseContext): Result<IncludeProperty> {
+	if (property.include === undefined) {
+		return error(`'include_type' is not supported here, use 'include'`, context.path);
+	}
+
+	return ok(property);
 }
 
 function parse_union_member(value: unknown, context: ParseContext): Result<IncludeProperty> {
@@ -238,7 +292,10 @@ function parse_union_member(value: unknown, context: ParseContext): Result<Inclu
 
 	// NOTE: For now, the union members being includes is enforced
 	// for the lack of counter examples and to reduce complexity
-	return parse_include_property(name, inner.value, at(context, name));
+	const member = parse_include_property(name, inner.value, at(context, name));
+	if (!member.ok) {return member;}
+
+	return reject_include_type(member.value, at(context, name));
 }
 
 export function parse_union_property(name: string, object: Record<string, unknown>, context: ParseContext): Result<UnionProperty> {
@@ -315,12 +372,17 @@ export function parse_array_property(name: string, object: Record<string, unknow
 	const element_context = at(context, "element");
 	let element: ArrayElement;
 
-	if ("include" in element_object.value) {
+	if ("include" in element_object.value || "include_type" in element_object.value) {
 		const include = parse_include_property("element", element_object.value, element_context);
 		if (!include.ok) {
 			return include;
 		}
-		element = include.value;
+
+		const concrete = reject_include_type(include.value, element_context);
+		if (!concrete.ok) {
+			return concrete;
+		}
+		element = concrete.value;
 	} else if ("type" in element_object.value) {
 		const type_ = element_object.value.type;
 
@@ -452,4 +514,16 @@ export function parse_raw_property(name: string, object: Record<string, unknown>
         default: default_.value,
         capability: capability.value,
     });
+}
+
+// `readonly` marks a member the init function fills in: referenceable, never settable, and
+// never emitted. Read here as a decoration rather than in each parse_*_property, because
+// only a descriptor's members can be readonly and every property kind can be one.
+export function parse_readonly(property: Property, object: Record<string, unknown>, context: ParseContext): Result<Property> {
+	const readonly_ = optionalWithDefault(object, "readonly", context, false, boolean_);
+	if (!readonly_.ok) {
+		return readonly_;
+	}
+
+	return ok({ ...property, readonly: readonly_.value });
 }

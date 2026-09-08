@@ -23,7 +23,12 @@ function load_ruleset(ruleset_path: string): Result<Ruleset> {
 
 function resolve_descriptor_ruleset(ruleset: RulesetDescriptor): Result<RulesetDescriptor> {
 	// NOTE: We just validate that the path is right and the included ruleset is a struct
-	const resolved_ruleset = load_ruleset(ruleset.properties[0].include);
+	const init_parameter_path = ruleset.properties[0].include;
+	if (init_parameter_path === undefined) {
+		return error(`A descriptor's $init_param must name a struct with 'include'`);
+	}
+
+	const resolved_ruleset = load_ruleset(init_parameter_path);
 	if (!resolved_ruleset.ok) {
 		return resolved_ruleset;
 	}
@@ -61,6 +66,12 @@ export function resolve_ruleset(ruleset: Ruleset): Result<Ruleset> {
 
 function resolve_property(property: Property): Result<Property> {
 	if (property._t !== "IncludeProperty") {
+		return ok(property);
+	}
+
+	// An `include_type` property names a kind, not a path, so there is nothing to load
+	// and nothing to lower into an enum.
+	if (property.include === undefined) {
 		return ok(property);
 	}
 

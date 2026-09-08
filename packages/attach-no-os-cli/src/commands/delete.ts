@@ -9,7 +9,7 @@ import {
     save_workfile,
     output,
     output_error,
-    get_node,
+    get_any_node,
     get_node_property,
     format_node_list
 } from "./shared";
@@ -79,7 +79,7 @@ export const deleteCommand = buildCommand<
         }
 
         // Check node exists
-        const node_result = get_node(context.value, node);
+        const node_result = get_any_node(context.value, node);
         if (!node_result.ok) {
             output_error(flags, "node_not_found", node_result.error.message);
             return;

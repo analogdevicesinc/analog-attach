@@ -401,6 +401,30 @@ describe('validate_workfile', () => {
         });
     });
 
+    // A readonly field is empty in every valid workfile, because `set_value` refuses to
+    // give it one, so there is nothing to validate — not even its required-ness.
+    describe('readonly property validation', () => {
+        test('readonly property is skipped', () => {
+            const workfile = make_workfile({
+                my_struct: make_struct("test.yaml", "test", [
+                    make_number("nb_devices", { readonly: true, required: true })
+                ])
+            });
+            const result = validate_workfile(workfile);
+            expect(result.valid).toBe(true);
+        });
+
+        test('a readonly include is not required to point anywhere', () => {
+            const workfile = make_workfile({
+                my_struct: make_struct("test.yaml", "test", [
+                    make_include("devices", "missing.yaml", { readonly: true, pointer: true, required: true })
+                ])
+            });
+            const result = validate_workfile(workfile);
+            expect(result.valid).toBe(true);
+        });
+    });
+
     describe('include property validation', () => {
         test('valid include passes', () => {
             const workfile = make_workfile({

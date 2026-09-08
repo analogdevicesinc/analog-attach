@@ -78,7 +78,7 @@ export function get_property_names(node_name: string): string[] {
     }
 
     const symbol = result.value.symbols[node_name];
-    // Both structs and descriptors carry properties (a descriptor's single init_param).
+    // Both structs and descriptors carry properties (a descriptor's $init_param).
     if (!symbol || (symbol._t !== "RulesetStruct" && symbol._t !== "RulesetDescriptor")) {
         return [];
     }

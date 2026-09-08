@@ -42,7 +42,7 @@ const workfile_data: MinimalWorkfile = {
         },
         "adxl355_device": {
             "$compatible": "devices/adxl355/adxl355.yaml",
-            "init_param": "adxl355_ip"
+            "$init_param": "adxl355_ip"
         }
     }
 };

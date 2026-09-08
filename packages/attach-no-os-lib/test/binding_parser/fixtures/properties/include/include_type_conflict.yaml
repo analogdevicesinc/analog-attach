@@ -1,0 +1,2 @@
+include: "path/to/other.yaml"
+include_type: descriptor

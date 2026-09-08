@@ -1,0 +1,17 @@
+$id: "test/count_readonly_mismatch"
+$type: struct
+$symbol: bad_init_param
+$description: "A derived list whose count the user could still set"
+$ranking: 2
+$sources:
+  headers:
+    - "app.h"
+
+devices:
+  include: "test/element"
+  pointer: true
+  count: nb_devices
+  readonly: true
+
+nb_devices:
+  type: uint32_t

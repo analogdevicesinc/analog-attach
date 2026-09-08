@@ -1,0 +1,13 @@
+$id: "test/count_missing_sibling"
+$type: struct
+$symbol: bad_init_param
+$description: "The count names a field this struct does not have"
+$ranking: 2
+$sources:
+  headers:
+    - "app.h"
+
+devices:
+  include: "test/element"
+  pointer: true
+  count: nb_devices

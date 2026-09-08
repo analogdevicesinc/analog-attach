@@ -4,6 +4,7 @@ import {
     Property,
     PropertySuggestions,
     suggest_for_property,
+    ruleset_type_token,
     IncludeProperty
 } from "attach-no-os-lib";
 import type { AttachContext } from "./shared";
@@ -11,7 +12,7 @@ import {
     load_context,
     output,
     output_error,
-    get_node,
+    get_any_node,
     get_node_property,
     format_property_type,
     format_property_value,
@@ -85,7 +86,7 @@ export const readCommand = buildCommand<
 
         // aa read <node> - show node properties
         if (!property) {
-            const node_result = get_node(context.value, node);
+            const node_result = get_any_node(context.value, node);
             if (!node_result.ok) {
                 output_error(flags, "node_not_found", node_result.error.message);
                 return;
@@ -149,15 +150,24 @@ export const readCommand = buildCommand<
 // ------- FORMATTERS --------
 
 function format_node_summary(name: string, ruleset: Ruleset): string {
-    if (ruleset._t !== "RulesetStruct" && ruleset._t !== "RulesetDescriptor") {
-        return `${name} is not a struct or descriptor`;
-    }
-
     let out = `${name}\n`;
     out += `  ${ruleset.$id}\n`;
     if (ruleset.$description) {
         out += `  ${ruleset.$description}\n`;
     }
+
+    // An extern is a name for a symbol the library already defines, so there is no property
+    // table to print - what the user wants to see is the C symbol and the type it satisfies.
+    if (ruleset._t === "RulesetExtern") {
+        out += `\n  ${"Symbol:".padEnd(15)}${ruleset.$symbol}\n`;
+        out += `  ${"Provides:".padEnd(15)}${ruleset.$provides}\n`;
+        return out + "\n  Defined by the library; nothing to configure.";
+    }
+
+    if (ruleset._t !== "RulesetStruct" && ruleset._t !== "RulesetDescriptor") {
+        return `${name} is not a struct or descriptor`;
+    }
+
     out += "\n";
 
     out += `  ${"Property".padEnd(20)}${"Type".padEnd(18)}${"Value".padEnd(18)}\n`;
@@ -175,9 +185,16 @@ function format_node_summary(name: string, ruleset: Ruleset): string {
     return out;
 }
 
+// What an include accepts: a schema $id, or - for C's polymorphic `void *` fields - any node
+// of a kind. A union member is always the $id spelling, since the parser rejects include_type
+// there, but the type cannot say so, so both are handled in the one place that prints them.
+function include_target(property: IncludeProperty): string {
+    return property.include ?? `any ${ruleset_type_token(property.include_type)}`;
+}
+
 function format_union_member_details(property: string, member: IncludeProperty, suggestions: PropertySuggestions): string {
     let out = `${property} → ${member.name}\n\n`;
-    out += `  ${"Schema:".padEnd(15)}${member.include}\n`;
+    out += `  ${"Schema:".padEnd(15)}${include_target(member)}\n`;
 
     if (suggestions.values && suggestions.values.length > 0) {
         out += "\n  Suggestions:\n";
@@ -249,13 +266,13 @@ function format_property_json(property: Property, suggestions: PropertySuggestio
         case "UnionProperty": {
             base.members = property.members.map(m => ({
                 name: m.name,
-                schema: m.include
+                schema: include_target(m)
             }));
             break;
         }
 
         case "IncludeProperty": {
-            base.schema = property.include;
+            base.schema = include_target(property);
             break;
         }
 
