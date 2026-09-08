@@ -1,15 +1,20 @@
 <%
+/*
+ * common_data.h for an iio_app project. Identical in shape to the base set; it lives here
+ * only because `include("./_helpers")` has to reach THIS set's helpers, whose struct_views
+ * leaves the app list nodes out (main.c renders those inline, so they get neither a
+ * file-scope definition nor an extern here).
+ *
+ * NOTE: apostrophes break the Eta parser even inside comments, so this file uses only block
+ * comments and apostrophe-free prose.
+ */
 const H = include("./_helpers", { h: it.h });
 const wf = it.workfile;
 
 /* Header files this device set pulls in from the schemas repo (impure helper). */
 const device_headers = it.h.devices(wf).map(d => d.header).filter(h => h.length > 0);
 
-/*
- * The #include list for common_data.h: device headers, then platform headers
- * (basenamed), then no-OS include headers. Port of build_views all_includes;
- * lives here because common_data.h is the only consumer.
- */
+/* The #include list: device headers, then platform headers (basenamed), then no-OS ones. */
 function common_data_includes() {
 	const all_includes = new Set();
 	for (const header of device_headers) {
@@ -26,10 +31,8 @@ function common_data_includes() {
 }
 
 /*
- * One descriptor field per descriptor node, resolving each descriptor to the
- * init_param struct it points at. Ports collect_descriptors + resolve_init_param;
- * lives here because common_data.h is the only consumer. Throws on a mis-linked
- * descriptor (templates have no Result type).
+ * One descriptor field per descriptor node. Throws on a mis-linked descriptor (templates
+ * have no Result type).
  */
 function collect_descriptors() {
 	const result = [];

@@ -1,0 +1,500 @@
+<%
+/*
+ * Assembly helpers for the no-os-iio template set.
+ *
+ * Same contract as the base set: one JS block returning an object, and consumers pass
+ * `it.h` in because a partial does not inherit the parent `it`
+ * (`include("./_helpers", { h: it.h })`).
+ *
+ * This set exists because an iio_app is not a struct graph the base set can print. Three
+ * of its pieces are block-scope locals in main, not file-scope constants:
+ *
+ *   - the iio_app_device[] and iio_trigger_init[] lists, whose element initializers name
+ *     descriptors (`desc.x`) and therefore are not constant expressions;
+ *   - the four app_init_param fields that point at those lists and count them;
+ *   - the trigger backpatch, which needs an iio_desc that only exists after the app init.
+ *
+ * So the list nodes are pulled OUT of struct_views (see is_app_list_node) and rendered
+ * inline by main_c.eta instead, and the app init_param is forced non-const so main can
+ * assign into it.
+ *
+ * NOTE: struct_views, collect_config_symbols, collect_headers, all_rulesets and cval are
+ * carried over from the base no-os set with only the exclusions above changed. A template
+ * set is self-contained on purpose (resolve_template_set accepts an out-of-tree folder, so
+ * a set may not reach into a sibling), which is what the duplication buys. The three
+ * collectors are pure functions of the ruleset set with no template logic left in them and
+ * are the obvious candidates for moving into `it.h` next, which would delete most of it.
+ *
+ * NOTE: apostrophes break the Eta parser even inside comments, so this file uses only
+ * block comments and apostrophe-free prose.
+ */
+
+/* The schema $ids this set treats specially, rather than as ordinary structs. */
+const APP_ID = "no-os/iio/iio_app.yaml";
+const APP_DEVICE_ID = "no-os/iio/iio_app_device.yaml";
+const TRIGGER_INIT_ID = "no-os/iio/iio_trigger_init.yaml";
+const DATA_BUFFER_ID = "no-os/iio/iio_data_buffer.yaml";
+const HW_TRIG_ID = "no-os/iio/iio_hw_trig.yaml";
+
+/*
+ * A data buffer is never const, however static its contents look. iio_app_device declares
+ * `struct iio_data_buffer *read_buff` without a qualifier (iio_app.h:76), so taking the
+ * address of a const one discards it and GCC warns. The base rule (const unless patched at
+ * runtime) has no notion of member const-ness, so this set states the exception; the app
+ * init_param is the other one, forced below because main writes into it.
+ */
+const NON_CONST_IDS = new Set([DATA_BUFFER_ID]);
+
+/*
+ * A node main.c renders inline as an array element rather than as its own struct. Both
+ * kinds hold descriptor references, which cannot appear in a file-scope initializer, and
+ * both are only ever reached through the app.
+ */
+function is_app_list_node(ruleset) {
+	return ruleset.$id === APP_DEVICE_ID || ruleset.$id === TRIGGER_INIT_ID;
+}
+
+/* Every node of one schema, in workfile (topologically ordered) order. */
+function app_list(wf, id) {
+	return Object.entries(wf.symbols)
+		.filter(([, ruleset]) => ruleset.$id === id)
+		.map(([name, ruleset]) => ({ name: name, ruleset: ruleset }));
+}
+
+/*
+ * The one iio_app node, and the init_param struct it is built from. Undefined when the
+ * workfile has no app at all, which is what tells main_c.eta the wrong template set was
+ * chosen. More than one app is a hard error: iio_app_run never returns, so a second app
+ * could not be started.
+ */
+function app_descriptor(wf) {
+	const apps = app_list(wf, APP_ID);
+	if (apps.length === 0) {
+		return undefined;
+	}
+	if (apps.length > 1) {
+		throw new Error(
+			`This target supports one iio_app, but the workfile has ${apps.length}: ${apps.map(a => a.name).join(", ")}.`
+		);
+	}
+
+	const app = apps[0];
+	const init_param = app.ruleset.properties[0].value;
+	if (typeof init_param !== "string") {
+		throw new Error(`iio_app '${app.name}' has no $init_param assigned`);
+	}
+	if (wf.symbols[init_param] === undefined) {
+		throw new Error(`iio_app '${app.name}' points at missing init_param '${init_param}'`);
+	}
+
+	return { name: app.name, init_param: init_param, init_param_ruleset: wf.symbols[init_param] };
+}
+
+/*
+ * One list the app publishes: which init_param field points at it, which field holds its
+ * length, and the nodes that make up its elements.
+ *
+ * Nothing here is a hardcoded field name. The pointer is found by what it includes - in a
+ * struct describing its C type 1:1 there is exactly one field pointing at iio_app_device, and
+ * that is the device list by definition - and its length comes from the `count` the schema
+ * declares beside it. So renaming a field upstream changes the generated code and nothing
+ * else; only the two element schema $ids are target knowledge, and an iio_app is what this
+ * target IS.
+ *
+ * `array` is the name of the local main.c emits, derived from the field so two lists cannot
+ * collide.
+ */
+function derived_list(init_param_ruleset, wf, element_id, label) {
+	const field = init_param_ruleset.properties.find(
+		property => property._t === "IncludeProperty" && property.include === element_id
+	);
+	if (field === undefined) {
+		throw new Error(
+			`This target builds the ${label} list, but ${init_param_ruleset.$symbol} has no field including '${element_id}'.`
+		);
+	}
+	if (field.count === undefined) {
+		throw new Error(
+			`${init_param_ruleset.$symbol}.${field.name} needs a 'count' in its schema so this target knows which field holds the ${label} count.`
+		);
+	}
+
+	const array = `iio_${field.name}`;
+	if (wf.symbols[array] !== undefined) {
+		throw new Error(
+			`Cannot emit the ${label} list: the generated array name '${array}' collides with symbol '${array}'. Rename that symbol.`
+		);
+	}
+
+	return {
+		field: field.name,
+		count: field.count,
+		array: array,
+		entries: app_list(wf, element_id),
+	};
+}
+
+/*
+ * The properties of one node that carry something to print, in declaration order.
+ * Readonly members and unset fields drop out; an unset pointer include stays, because
+ * NULL is a value. Same rule the base set applies, minus the descriptor split - inside a
+ * block-scope initializer `desc.x` is a perfectly good expression.
+ */
+function printable_fields(ruleset) {
+	return ruleset.properties.filter(
+		property => property.readonly !== true
+			&& (it.h.effective_value(property) !== undefined || it.h.is_null_pointer(property))
+	);
+}
+
+/*
+ * The IIO data buffers and the storage each one needs. `buff` names an array that no
+ * ruleset can describe (see the NOTE in iio_data_buffer.yaml), so this set emits it from
+ * `size`, at file scope in common_data.c, and the struct points at it by name.
+ */
+function data_buffers(wf) {
+	const buffers = [];
+
+	for (const [name, ruleset] of Object.entries(wf.symbols)) {
+		if (ruleset.$id !== DATA_BUFFER_ID) {
+			continue;
+		}
+
+		const size_property = ruleset.properties.find(p => p.name === "size");
+		const buff_property = ruleset.properties.find(p => p.name === "buff");
+		const size = size_property === undefined ? undefined : it.h.effective_value(size_property);
+		const storage = buff_property === undefined ? undefined : it.h.effective_value(buff_property);
+
+		if (size === undefined || storage === undefined) {
+			throw new Error(`IIO data buffer '${name}' needs both 'size' and 'buff' set.`);
+		}
+		if (wf.symbols[String(storage)] !== undefined) {
+			throw new Error(
+				`IIO data buffer '${name}': storage name '${storage}' collides with symbol '${storage}'. Rename one.`
+			);
+		}
+
+		buffers.push({
+			owner: name,
+			storage: String(storage),
+			size: it.h.number_literal(size, size_property),
+		});
+	}
+
+	return buffers;
+}
+
+/*
+ * A member declared as an array of POINTER includes is a pointer-to-pointer in C, not an
+ * array, so a braced list does not compile: the addresses must live in a real array object
+ * that then decays to the pointer. Carried over from the base set together with cval.
+ */
+function is_pointer_include_array(property) {
+	return property._t === "ArrayProperty"
+		&& property.element._t === "IncludeProperty"
+		&& property.element.pointer === true;
+}
+
+/* Mechanical and unique: the (symbol, property) pair names exactly one array. */
+function hoisted_array_name(struct_name, property) {
+	return `${struct_name}_${property.name}`;
+}
+
+/*
+ * The symbol a patch READS, which is what decides where the patch may be emitted (see
+ * patch_schedule.ts). A reference value is either `node` or `node.member`, and either way
+ * the value is only live once `node` has been initialized.
+ */
+function patch_source(value) {
+	return String(value).split(".")[0];
+}
+
+/*
+ * One struct: split its properties into descriptor references (patched at runtime as
+ * `desc.x`) and static fields (emitted in the const initializer). A struct with any
+ * descriptor reference cannot be const.
+ */
+function build_struct_view(name, ruleset, wf) {
+	const runtime_assignments = [];
+	const fields = [];
+
+	for (const property of ruleset.properties) {
+		/*
+		 * A readonly field is filled in by generated code, so it is neither a static field
+		 * nor a patch. Skipped before the checks below because an unset readonly pointer
+		 * would otherwise print as `.field = NULL` and then be assigned anyway. This is
+		 * what replaces the old hardcoded list of derived app fields.
+		 */
+		if (property.readonly === true) {
+			continue;
+		}
+
+		if (it.h.is_descriptor_reference(property, wf) && it.h.effective_value(property) !== undefined) {
+			runtime_assignments.push({
+				struct_name: name,
+				field_path: property.name,
+				value: it.h.reference_expression(property, wf),
+				source: patch_source(it.h.effective_value(property)),
+			});
+		} else if (it.h.effective_value(property) !== undefined || it.h.is_null_pointer(property)) {
+			fields.push(property);
+		}
+	}
+
+	return {
+		type: ruleset.$symbol,
+		name: name,
+		is_const: runtime_assignments.length === 0,
+		fields: fields,
+		runtime_assignments: runtime_assignments,
+	};
+}
+
+function struct_views(wf) {
+	const views = new Map();
+	const non_const = new Set();
+	const app = app_descriptor(wf);
+
+	for (const [name, ruleset] of Object.entries(wf.symbols)) {
+		if (ruleset._t !== "RulesetStruct" || is_app_list_node(ruleset)) {
+			continue;
+		}
+
+		const view = build_struct_view(name, ruleset, wf);
+
+		if (NON_CONST_IDS.has(ruleset.$id)) {
+			view.is_const = false;
+		}
+
+		/*
+		 * The app init_param is written to from main - the two list pointers and their
+		 * counts - so it can never be const, however static the rest of it is. Those four
+		 * fields are `readonly` in the schema, so build_struct_view has already left them
+		 * out; all that is left here is the const-ness the base rule cannot see.
+		 */
+		if (app !== undefined && name === app.init_param) {
+			view.is_const = false;
+		}
+
+		/* A struct referencing an already-seen non-const struct is itself non-const. */
+		if (view.is_const) {
+			for (const property of ruleset.properties) {
+				if (it.h.connected_symbols(property).some(child => non_const.has(child))) {
+					view.is_const = false;
+					break;
+				}
+			}
+		}
+
+		if (!view.is_const) {
+			non_const.add(name);
+		}
+		views.set(name, view);
+	}
+
+	/* Second pass: union fields pointing at non-const structs become runtime. */
+	for (const [name, view] of views) {
+		if (view.is_const) {
+			continue;
+		}
+		const ruleset = wf.symbols[name];
+		for (const property of ruleset.properties) {
+			if (property._t !== "UnionProperty" || property.value === undefined) {
+				continue;
+			}
+			const first_entry = Object.entries(property.value)[0];
+			if (!first_entry) {
+				continue;
+			}
+			const [member_name, reference] = first_entry;
+			if (non_const.has(reference)) {
+				view.fields = view.fields.filter(f => f.name !== property.name);
+				const member = property.members.find(m => m.name === member_name);
+				const is_pointer = member?.pointer ?? false;
+				view.runtime_assignments.push({
+					struct_name: name,
+					field_path: `${property.name}.${member_name}`,
+					value: is_pointer ? `&${reference}` : reference,
+					source: reference,
+				});
+			}
+		}
+	}
+
+	return [...views.values()];
+}
+
+/*
+ * Format a single property as its C initializer token. Lives here rather than in
+ * common_data_c.eta because this set has two consumers: the file-scope structs and the
+ * inline array elements main.c builds.
+ *
+ * `struct_name` is the owning symbol, needed only to name a hoisted pointer array.
+ */
+function cval(property, struct_name, wf) {
+	const value = it.h.effective_value(property);
+
+	switch (property._t) {
+		case "NumberProperty": {
+			return it.h.number_literal(value, property);
+		}
+		case "BooleanProperty": {
+			return value ? "true" : "false";
+		}
+		case "EnumProperty": {
+			return String(value);
+		}
+		case "StringProperty": {
+			return `"${String(value)}"`;
+		}
+		case "IncludeProperty": {
+			if (property.pointer === true && value === undefined) {
+				return "NULL";
+			}
+			/*
+			 * A reference names a node or one readonly member of one, and knows on its own
+			 * whether an `&` is needed. Enum-backed includes hold a value rather than a
+			 * reference, so they fall through to the plain spelling.
+			 */
+			return it.h.reference_expression(property, wf)
+				?? (property.pointer ? `&${String(value)}` : String(value));
+		}
+		case "PlatformOpsProperty": {
+			return `&${String(property.value)}`;
+		}
+		case "PlatformExtraProperty": {
+			return `&${String(property.value)}`;
+		}
+		case "UnionProperty": {
+			const first_entry = Object.entries(property.value)[0];
+			if (!first_entry) {
+				return "NULL";
+			}
+			const [member_name, reference] = first_entry;
+			const member = property.members.find(m => m.name === member_name);
+			const is_pointer = member?.pointer ?? false;
+			return is_pointer
+				? `{ .${member_name} = &${reference} }`
+				: `{ .${member_name} = ${reference} }`;
+		}
+		case "ArrayProperty": {
+			if (!Array.isArray(property.value) || property.value.length === 0) {
+				/* A `**` member has no array to point at, so it is a null pointer. */
+				return is_pointer_include_array(property) ? "NULL" : "{ 0 }";
+			}
+			/* Pointer elements live in the hoisted array emitted just above the struct. */
+			if (is_pointer_include_array(property)) {
+				return hoisted_array_name(struct_name, property);
+			}
+			const element_type = property.element._t;
+			const formatted = property.value.map(v => {
+				switch (element_type) {
+					case "NumberProperty": {
+						return it.h.number_literal(v, property.element);
+					}
+					case "BooleanProperty": {
+						return v ? "true" : "false";
+					}
+					case "EnumProperty": {
+						return String(v);
+					}
+					case "IncludeProperty": {
+						return property.element.pointer ? `&${String(v)}` : String(v);
+					}
+					default: {
+						return String(v);
+					}
+				}
+			});
+			return `{ ${formatted.join(", ")} }`;
+		}
+		case "RawProperty": {
+			return String(value);
+		}
+		default: {
+			return "/* unknown */";
+		}
+	}
+}
+
+/* Every ruleset that contributes to the build: locked platform ops, runtime ops, user symbols. */
+function all_rulesets(wf) {
+	return [
+		...Object.values(wf.platform_ops),
+		...Object.values(wf.exposed_ops),
+		...Object.values(wf.symbols),
+	];
+}
+
+/*
+ * The Kconfig symbols this workfile needs, as bare names without the CONFIG_ prefix.
+ * Each ruleset declares the symbols it owns in $config; the union is the project
+ * defconfig. Sorted so regenerating an unchanged workfile produces an unchanged
+ * project.conf.
+ */
+function collect_config_symbols(wf) {
+	const symbols = new Set();
+
+	for (const ruleset of all_rulesets(wf)) {
+		for (const symbol of ruleset.$config ?? []) {
+			symbols.add(symbol);
+		}
+	}
+
+	return [...symbols].sort();
+}
+
+/*
+ * Headers the generated common_data.h must include. This is generated-code metadata, not
+ * build metadata: CMake compiles no-OS from Kconfig symbols and needs no file list, but the
+ * C we emit still has to include the declarations it references.
+ *
+ * The app list nodes are excluded from struct_views but NOT from here: main.c still names
+ * their types, so iio_app.h and iio/iio.h have to be included.
+ */
+function collect_headers(wf) {
+	const noos = new Set();
+	const platform = new Set();
+
+	for (const ruleset of all_rulesets(wf)) {
+		if (ruleset.$header) {
+			noos.add(ruleset.$header.slice(ruleset.$header.lastIndexOf("/") + 1));
+		}
+
+		for (const file of ruleset.$sources.noos ?? []) {
+			if (file.startsWith("include/") && file.endsWith(".h")) {
+				noos.add(file.slice("include/".length));
+			}
+		}
+
+		for (const file of ruleset.$sources.platform ?? []) {
+			if (file.endsWith(".h")) {
+				platform.add(file.slice(file.lastIndexOf("/") + 1));
+			}
+		}
+	}
+
+	return {
+		noos: [...noos],
+		platform: [...platform],
+	};
+}
+
+return {
+	APP_ID,
+	APP_DEVICE_ID,
+	TRIGGER_INIT_ID,
+	HW_TRIG_ID,
+	app_list,
+	app_descriptor,
+	derived_list,
+	printable_fields,
+	data_buffers,
+	is_pointer_include_array,
+	hoisted_array_name,
+	struct_views,
+	cval,
+	collect_config_symbols,
+	collect_headers,
+};
+%>

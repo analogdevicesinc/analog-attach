@@ -12,15 +12,25 @@ _aa_complete() {
     # aa complete <route> <partial> [prior tokens...] — the same entrypoint
     # attach-meta uses. The route is the first non-flag word; the words between it
     # and the cursor are the prior tokens that give parameter hooks their context.
+    #
+    # Flags after the route must stay in the token list. A flag's value completion is
+    # reached only by handing stricli the flag itself as the preceding word, so
+    # dropping it turns `--template-set <TAB>` into a bare `generate <TAB>` and
+    # proposes flag names instead of the set names. Positional hooks are unaffected:
+    # prior_positionals() in src/completion/completion.ts filters flags out again.
     local route=""
     local tokens=()
     local index
     for (( index = 1; index < COMP_CWORD; index++ )); do
         local word="${COMP_WORDS[index]}"
-        [[ "$word" == -* ]] && continue
         if [[ -z "$route" ]]; then
+            # Anything before the route is a global flag such as --workfile; skip it.
+            [[ "$word" == -* ]] && continue
             route="$word"
         else
+            # COMP_WORDBREAKS splits `--flag=value` into three words, leaving a bare
+            # `=` that stricli would read as a positional.
+            [[ "$word" == "=" ]] && continue
             tokens+=("$word")
         fi
     done

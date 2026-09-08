@@ -1,0 +1,4 @@
+include: "path/to/element.yaml"
+pointer: true
+count: nb_elements
+description: "A list of elements, counted by nb_elements"

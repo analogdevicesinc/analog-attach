@@ -1,4 +1,4 @@
-import type { Property } from "../ruleset_parser/types";
+import type { IncludeProperty, Property } from "../ruleset_parser/types";
 import type { Workfile } from "../workfile_handler/types";
 import type { CollectedRule, ConnectionGraph, ReferenceKind, SymbolReference } from "./types";
 import { load_resolved_ruleset } from "../resolver/resolver";
@@ -9,11 +9,41 @@ function kind_of(pointer: boolean | undefined): ReferenceKind {
 	return pointer === true ? "pointer" : "value";
 }
 
+// An include whose target is an enum stores an enum value, not a symbol name, so it
+// makes no edges and must not be renamed. `include_type` can never name an enum
+// ruleset's *values*, only its kind, so it is never one of these.
+function is_enum_include(include: IncludeProperty): boolean {
+	if (include.include === undefined) {
+		return false;
+	}
+
+	const resolved = load_resolved_ruleset(include.include);
+	return resolved.ok && resolved.value._t === "RulesetEnum";
+}
+
+// A reference is either a whole node ("accel_iio") or one readonly member of one
+// ("accel_iio.iio_dev"). The graph only ever knows about nodes, so the edge — and the
+// ordering it forces — belongs to the owner either way.
+function owner_of(value: string): string {
+	const dot = value.indexOf(".");
+	return dot === -1 ? value : value.slice(0, dot);
+}
+
+// Rename the owner half of a reference, leaving the member half alone.
+function rewrite_reference(value: string, old_name: string, new_name: string): string {
+	const dot = value.indexOf(".");
+	if (dot === -1) {
+		return value === old_name ? new_name : value;
+	}
+
+	return value.slice(0, dot) === old_name ? `${new_name}${value.slice(dot)}` : value;
+}
+
 export function get_symbol_references(property: Property): SymbolReference[] {
 	switch (property._t) {
 		case "IncludeProperty": {
 			if (typeof property.value === "string") {
-				return [{ name: property.value, kind: kind_of(property.pointer) }];
+				return [{ name: owner_of(property.value), kind: kind_of(property.pointer) }];
 			}
 			return [];
 		}
@@ -27,22 +57,21 @@ export function get_symbol_references(property: Property): SymbolReference[] {
 			// member rather than per union. No schema sets it on a member today, so
 			// every union reference is currently a value edge.
 			return Object.entries(value).map(([member_name, reference]) => ({
-				name: reference,
+				name: owner_of(reference),
 				kind: kind_of(property.members.find(m => m.name === member_name)?.pointer),
 			}));
 		}
 		case "ArrayProperty": {
 			if (property.element._t === "IncludeProperty" && Array.isArray(property.value)) {
 				// Check if the include points to an enum - enum values are not symbol references
-				const resolved = load_resolved_ruleset(property.element.include);
-				if (resolved.ok && resolved.value._t === "RulesetEnum") {
+				if (is_enum_include(property.element)) {
 					return [];
 				}
 				// Every element shares the element declaration, so one kind for all of
 				// them: an array of pointer includes (i3c's `devs`) is a pointer edge,
 				// an array of embedded structs (ad7124's `setups`) is a value edge.
 				const kind = kind_of(property.element.pointer);
-				return (property.value as string[]).map(name => ({ name, kind }));
+				return (property.value as string[]).map(name => ({ name: owner_of(name), kind }));
 			}
 			return [];
 		}
@@ -79,8 +108,8 @@ export function rename_symbol_references(workfile: Workfile, old_name: string, n
 			switch (property._t) {
 				case "IncludeProperty":
 				case "PlatformExtraProperty": {
-					if (property.value === old_name) {
-						property.value = new_name;
+					if (typeof property.value === "string") {
+						property.value = rewrite_reference(property.value, old_name, new_name);
 					}
 					break;
 				}
@@ -88,9 +117,7 @@ export function rename_symbol_references(workfile: Workfile, old_name: string, n
 					const value = property.value as Record<string, string> | undefined;
 					if (value) {
 						for (const [member, target] of Object.entries(value)) {
-							if (target === old_name) {
-								value[member] = new_name;
-							}
+							value[member] = rewrite_reference(target, old_name, new_name);
 						}
 					}
 					break;
@@ -98,11 +125,10 @@ export function rename_symbol_references(workfile: Workfile, old_name: string, n
 				case "ArrayProperty": {
 					if (property.element._t === "IncludeProperty" && Array.isArray(property.value)) {
 						// Enum-backed includes hold enum values, not symbol references.
-						const resolved = load_resolved_ruleset(property.element.include);
-						if (resolved.ok && resolved.value._t === "RulesetEnum") {
+						if (is_enum_include(property.element)) {
 							break;
 						}
-						property.value = (property.value as string[]).map(v => v === old_name ? new_name : v);
+						property.value = (property.value as string[]).map(v => rewrite_reference(v, old_name, new_name));
 					}
 					break;
 				}
@@ -120,8 +146,8 @@ export function create_connections_graph(workfile: Workfile): ConnectionGraph {
 	}
 
 	for (const [symbol_name, ruleset] of Object.entries(workfile.symbols)) {
-		// Descriptor nodes also carry properties (their single `init_param` include),
-		// so the descriptor -> init_param edge is part of the graph.
+		// Descriptor nodes also carry properties (their `$init_param` include, plus their own members),
+		// so the descriptor -> $init_param edge is part of the graph.
 		if (ruleset._t !== "RulesetStruct" && ruleset._t !== "RulesetDescriptor") {
 			continue;
 		}

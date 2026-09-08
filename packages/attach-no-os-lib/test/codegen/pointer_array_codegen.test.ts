@@ -55,7 +55,7 @@ const i3c_workfile: MinimalWorkfile = {
         },
         "i3c1": {
             "$compatible": "no-os/i3c_bus/no_os_i3c_bus.yaml",
-            "init_param": "i3c1_ip"
+            "$init_param": "i3c1_ip"
         }
     }
 };
