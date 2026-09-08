@@ -5,9 +5,11 @@ import { error, ok } from "../ruleset_parser/result";
 import { make_environment } from "./eta_environment";
 import { load_devices } from "./device_loader";
 import { get_connected_symbols, reorder_symbols_topologically } from "../validator/connection_graph";
-import { effective_value, is_descriptor_reference, is_null_pointer, number_literal, property_default } from "./codegen_helpers";
+import { effective_value, is_descriptor_reference, is_null_pointer, number_literal, property_default, reference_expression } from "./codegen_helpers";
 import { STRUCTURE_FILENAME, resolve_template_set } from "./template_sets";
+import { schedule_patches } from "./patch_schedule";
 
+import type { Eta } from "eta";
 import type { CodegenInput, CodegenResult } from "./types";
 import type { Result } from "../ruleset_parser/result";
 import type { FileSpec } from "./types";
@@ -43,14 +45,26 @@ const template_helpers = {
 	property_default,
 	is_null_pointer,
 	is_descriptor_reference,
+	reference_expression,
 	number_literal,
 	connected_symbols: get_connected_symbols,
+
+	// Where each runtime patch goes relative to the init calls (see patch_schedule.ts).
+	// A template decides WHAT to patch; this decides WHEN, which is ordering logic worth
+	// having in tested TS rather than duplicated in every set.
+	schedule_patches,
 };
 
 // The project layout is data, not code: `project_structure.json` inside the
 // chosen template set declares which files exist and how they map to templates.
 // Parsed and validated here so a malformed structure fails loudly (a Result
 // error) rather than producing a half-written project.
+//
+// A set may declare `"extends": "<set>"`. Templates it does not carry itself are
+// then taken from that base set, so a variant target (no-os-iio) ships only the
+// templates that genuinely differ instead of a copy of the whole folder. One level
+// only: a base set that itself extends is not followed, which keeps resolution
+// obvious and cannot loop.
 function load_file_specs(templates_directory: string): Result<FileSpec[]> {
 	const structure_file = path.join(templates_directory, STRUCTURE_FILENAME);
 
@@ -63,6 +77,23 @@ function load_file_specs(templates_directory: string): Result<FileSpec[]> {
 
 	if (typeof parsed !== "object" || parsed === null || !Array.isArray((parsed as { files?: unknown }).files)) {
 		return error(`Project structure '${structure_file}' must be an object with a 'files' array`);
+	}
+
+	const extends_name = (parsed as { extends?: unknown }).extends;
+	if (extends_name !== undefined && typeof extends_name !== "string") {
+		return error(`Project structure '${structure_file}' has a non-string 'extends'`);
+	}
+
+	let base_directory: string | undefined;
+	if (extends_name !== undefined) {
+		const base = resolve_template_set(extends_name);
+		if (!base.ok) {
+			return error(`Project structure '${structure_file}' extends an unusable set: ${base.error.message}`);
+		}
+		if (path.resolve(base.value) === path.resolve(templates_directory)) {
+			return error(`Project structure '${structure_file}' extends itself`);
+		}
+		base_directory = base.value;
 	}
 
 	const specs: FileSpec[] = [];
@@ -79,11 +110,17 @@ function load_file_specs(templates_directory: string): Result<FileSpec[]> {
 		if (typeof protect !== "boolean") {
 			return error(`Project structure entry #${position} ('${output}') needs a boolean 'protect'`);
 		}
-		if (!fs.existsSync(path.join(templates_directory, template))) {
-			return error(`Project structure entry '${output}' references missing template '${template}'`);
+
+		// The set itself wins; the base is only consulted for what the set omits.
+		let directory = templates_directory;
+		if (!fs.existsSync(path.join(directory, template))) {
+			if (base_directory === undefined || !fs.existsSync(path.join(base_directory, template))) {
+				return error(`Project structure entry '${output}' references missing template '${template}'`);
+			}
+			directory = base_directory;
 		}
 
-		specs.push({ template, output, protect });
+		specs.push({ template, output, protect, directory });
 	}
 
 	return ok(specs);
@@ -130,7 +167,20 @@ export function generate_project(input: CodegenInput): Result<CodegenResult> {
 	};
 
 	const project_directory = path.join(output_path, project_name);
-	const environment = make_environment(templates_directory);
+
+	// One Eta engine per owning set, not one per project. A template borrowed from a
+	// base set must render with `views` pointing at THAT set, or its
+	// `include("./_helpers")` would reach the borrowing set's helpers instead of the
+	// ones it was written against. Cached because a set typically owns several files.
+	const environments = new Map<string, Eta>();
+	const environment_for = (directory: string): Eta => {
+		let environment = environments.get(directory);
+		if (!environment) {
+			environment = make_environment(directory);
+			environments.set(directory, environment);
+		}
+		return environment;
+	};
 
 	// Generate files. Directories are derived from each output path, so the JSON
 	// structure alone determines the project layout. A template that throws (e.g. a
@@ -153,7 +203,7 @@ export function generate_project(input: CodegenInput): Result<CodegenResult> {
 
 			fs.mkdirSync(path.dirname(file_path), { recursive: true });
 
-			const content = environment.render(file.template, context);
+			const content = environment_for(file.directory).render(file.template, context);
 			fs.writeFileSync(file_path, content);
 			files_created.push(file_path);
 		}

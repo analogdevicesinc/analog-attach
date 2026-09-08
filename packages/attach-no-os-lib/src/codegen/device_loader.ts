@@ -17,7 +17,7 @@ import { make_string_environment } from "./eta_environment";
 // here in TypeScript and is injected into templates as `it.h.devices(wf)`; the pure
 // partial never reaches it.
 
-// The init_param node a descriptor references via its single init_param include.
+// The init_param node a descriptor references via its $init_param include.
 // Throws (templates have no Result type) on a mis-linked descriptor.
 function resolve_init_parameter(
 	descriptor: RulesetDescriptor,
@@ -26,14 +26,14 @@ function resolve_init_parameter(
 	const init_parameter = descriptor.properties[0];
 	const target_name = init_parameter.value;
 	if (typeof target_name !== "string") {
-		throw new TypeError(`Descriptor '${descriptor.$id}' has no init_param assigned`);
+		throw new TypeError(`Descriptor '${descriptor.$id}' has no $init_param assigned`);
 	}
 	if (!(target_name in workfile.symbols)) {
-		throw new Error(`Descriptor init_param '${target_name}' not found in workfile`);
+		throw new Error(`Descriptor $init_param '${target_name}' not found in workfile`);
 	}
 	const target = workfile.symbols[target_name];
 	if (target?._t !== "RulesetStruct") {
-		throw new Error(`Descriptor init_param '${target_name}' is not a struct`);
+		throw new Error(`Descriptor $init_param '${target_name}' is not a struct`);
 	}
 	return { name: target_name, ruleset: target };
 }
@@ -60,7 +60,7 @@ function load_device_templates(descriptor: RulesetDescriptor): { init: string; r
 	};
 }
 
-// Build the DeviceInfo for one descriptor node: resolve its init_param, read the
+// Build the DeviceInfo for one descriptor node: resolve its $init_param, read the
 // schemas-repo templates, and sub-render them to full statement blocks.
 function extract_device_info(
 	descriptor_name: string,

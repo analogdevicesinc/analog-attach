@@ -2,20 +2,22 @@ import type {
 	ArrayProperty,
 	BooleanProperty,
 	EnumProperty,
+	IncludeMatch,
 	NumberProperty,
 	PlatformExtraProperty,
 	PlatformOpsProperty,
 	Property,
 	RulesetDescriptor,
 	RulesetStruct,
+	RulesetType,
 	StringProperty,
 	UnionProperty
 } from "../ruleset_parser/types";
-import { is_integer_symbol } from "../ruleset_parser/types";
+import { is_integer_symbol, ruleset_type_token } from "../ruleset_parser/types";
 import type { ParseContext } from "../ruleset_parser/validators";
 import { at } from "../ruleset_parser/validators";
 import type { Workfile } from "../workfile_handler/types";
-import { all_ops, suggest_platform_extra } from "../workfile_handler/workfile_handler";
+import { all_ops, resolve_reference, suggest_platform_extra } from "../workfile_handler/workfile_handler";
 import { load_resolved_ruleset } from "../resolver/resolver";
 import { apply_overrides } from "./override_resolver";
 import type { CollectedRule, ValidationError } from "./types";
@@ -49,6 +51,12 @@ export function validate_property(
 	// mutex). Either way a disabled property is skipped, including its required check.
 	if (effective.disabled) {
 		return []; // NOTE: Disabled will not be taken into account
+	}
+
+	// A readonly field has nothing to validate: generated code fills it in, so it is
+	// empty in every valid workfile, and `set_value` refuses to give it a value.
+	if (effective.readonly === true) {
+		return [];
 	}
 
 	if (effective.value === undefined) {
@@ -98,7 +106,7 @@ export function validate_property(
 			return validate_string(effective, property_context);
 		}
 		case "IncludeProperty": {
-			return validate_include(effective.value as string, effective.include, workfile, property_context);
+			return validate_include(effective.value as string, effective, workfile, property_context);
 		}
 		case "EnumProperty": {
 			return validate_enum(effective, property_context);
@@ -344,10 +352,15 @@ function validate_enum(property: EnumProperty, context: ParseContext): Validatio
 
 function validate_include(
     value: string,
-    include_path: string,
+    match: IncludeMatch,
     workfile: Workfile,
     context: ParseContext
 ): ValidationError[] {
+    if (match.include === undefined) {
+        return validate_include_type(value, match.include_type, workfile, context);
+    }
+
+    const include_path = match.include;
     const resolved = load_resolved_ruleset(include_path);
 
     if (resolved.ok && resolved.value._t === "RulesetEnum") {
@@ -362,6 +375,38 @@ function validate_include(
         return [];
     }
 
+    // `value` names a whole node or one readonly member of one; both resolve to the $id
+    // that has to match here.
+    const target = resolve_reference(workfile, value);
+    if (!target) {
+        return [{
+            path: context.path,
+            message: value.includes(".")
+                ? `Reference '${value}' does not name a readonly member of an existing node`
+                : `Target symbol '${value}' not found`,
+            severity: "error"
+        }];
+    }
+
+    if (target.$id !== include_path) {
+        return [{
+            path: context.path,
+            message: `Type mismatch: '${value}' is '${target.$id}', expected '${include_path}'`,
+            severity: "error"
+        }];
+    }
+
+    return [];
+}
+
+// `include_type` checks the target's kind, not its identity: any node of that type is
+// accepted. That is as tight as C's `void *` lets us be.
+function validate_include_type(
+    value: string,
+    include_type: RulesetType,
+    workfile: Workfile,
+    context: ParseContext
+): ValidationError[] {
     const target = workfile.symbols[value];
     if (!target) {
         return [{
@@ -371,10 +416,10 @@ function validate_include(
         }];
     }
 
-    if (target.$id !== include_path) {
+    if (target.$type !== include_type) {
         return [{
             path: context.path,
-            message: `Type mismatch: '${value}' is '${target.$id}', expected '${include_path}'`,
+            message: `Type mismatch: '${value}' is a ${ruleset_type_token(target.$type)}, expected any ${ruleset_type_token(include_type)}`,
             severity: "error"
         }];
     }
@@ -417,24 +462,9 @@ function validate_union(
         }];
     }
 
-    const target = workfile.symbols[target_symbol_name];
-    if (!target) {
-        return [{
-            path: at(context, selected_member_name).path,
-            message: `Target symbol '${target_symbol_name}' not found`,
-            severity: "error"
-        }];
-    }
-
-    if (target.$id !== member.include) {
-        return [{
-            path: at(context, selected_member_name).path,
-            message: `Type mismatch: '${target_symbol_name}' is '${target.$id}', expected '${member.include}'`,
-            severity: "error"
-        }];
-    }
-
-    return [];
+    // A member is an include like any other, so reuse the same check rather than
+    // repeating the $id comparison here.
+    return validate_include(target_symbol_name, member, workfile, at(context, selected_member_name));
 }
 
 function validate_array(
@@ -473,7 +503,7 @@ function validate_array(
         for (const [index, element_value] of value.entries()) {
             const element_errors = validate_include(
                 element_value,
-                property.element.include,
+                property.element,
                 workfile,
                 at(context, index)
             );

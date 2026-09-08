@@ -1,6 +1,6 @@
 import { describe, test, expect } from 'vitest';
 import { expectOk, expectError, expectErrorPath, expectErrorContains, loadAndParseRuleset } from '../test_utilities';
-import { RulesetStruct, RulesetType } from '../../src/ruleset_parser/types';
+import { IncludeProperty, RulesetStruct, RulesetType } from '../../src/ruleset_parser/types';
 
 describe('RulesetStruct parsing', () => {
 	describe('valid cases', () => {
@@ -59,6 +59,45 @@ describe('RulesetStruct parsing', () => {
 			expectOk(result);
 			const binding = result.value as RulesetStruct;
 			expect(binding.$capability).toBeUndefined();
+		});
+	});
+
+	// A struct field can be filled in by generated code too, not just a descriptor member,
+	// and a pointer field can name the sibling holding its length. Both are read by the
+	// shared member loop, so a struct sees them.
+	describe('readonly and count', () => {
+		test('parses readonly on a struct member and its count', () => {
+			const result = loadAndParseRuleset('bindings/struct/valid_with_readonly_list.yaml');
+			expectOk(result);
+			const binding = result.value as RulesetStruct;
+
+			const devices = binding.properties.find(p => p.name === 'devices') as IncludeProperty;
+			expect(devices.readonly).toBe(true);
+			expect(devices.count).toBe('nb_devices');
+
+			expect(binding.properties.find(p => p.name === 'nb_devices')?.readonly).toBe(true);
+			// Every member goes through the same parse, so an ordinary field says so
+			// explicitly rather than being left undefined.
+			expect(binding.properties.find(p => p.name === 'name')?.readonly).toBe(false);
+		});
+
+		test('rejects a count naming a field the struct does not have', () => {
+			const result = loadAndParseRuleset('bindings/struct/count_missing_sibling.yaml');
+			expectError(result);
+			expectErrorContains(result, "not a field of this struct");
+		});
+
+		test('rejects a count naming a non-integer field', () => {
+			const result = loadAndParseRuleset('bindings/struct/count_not_integer.yaml');
+			expectError(result);
+			expectErrorContains(result, "must be an integer field");
+		});
+
+		// Otherwise the user could set a length that the generated code then overwrites.
+		test('rejects a readonly list whose count is settable', () => {
+			const result = loadAndParseRuleset('bindings/struct/count_readonly_mismatch.yaml');
+			expectError(result);
+			expectErrorContains(result, "must both be readonly or neither");
 		});
 	});
 

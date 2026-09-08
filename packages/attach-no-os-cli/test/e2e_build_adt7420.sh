@@ -35,7 +35,7 @@ configure_nodes() {
     $AA update adt7420_ip resolution_setting 1
     $AA update adt7420_ip interface_init i2c_init no_os_i2c_ip
 
-    $AA update adt7420_device init_param adt7420_ip
+    $AA update adt7420_device '$init_param' adt7420_ip
 }
 
 run_e2e
