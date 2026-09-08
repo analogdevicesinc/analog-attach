@@ -28,11 +28,16 @@ You are helping a user configure Linux device tree overlays for hardware devices
 
 ## Prerequisites
 
-Before using any commands, gather the **Linux kernel source path** (`--linux`) from the user. This is a directory containing a Linux kernel repository with `Documentation/devicetree/bindings/`.
+Run `attach init` once per project before anything else. It writes `.analog-attach/config.toml` (storing `--linux`, `--dt-schema`, and optionally `--context`) and builds the `compat-index.json` that `list-devices` reads.
 
-**Per-command requirements**:
-- `list-devices`, `create`: Only need `--linux`
-- `get-schema`, `suggest-parents`, `validate`, `get-prop`, `set-prop`, `add`: Also need `--context` (a `.dts` file representing the target platform)
+After `init`, most commands pick up `--linux`, `--dt-schema`, and `--context` from `config.toml` automatically — you only need to pass them explicitly if you want to override.
+
+**Per-command requirements** (when no `config.toml` is present):
+- `init`: Needs `--linux` and `--dt-schema`; `--context` optional
+- `list-devices`: No flags required (reads `compat-index.json` built by `init`)
+- `create`: Needs `--linux` (falls back to `config.toml`)
+- `get-schema`, `suggest-parents`, `validate`, `set-prop`, `add`: Need `--linux` and `--context` (fall back to `config.toml`)
+- `get-prop`: Only needs `--node`, `--property`, `--overlay` — no `--linux`/`--context` required
 - `delete`, `rename`, `move`, `unset-prop`, `enable`, `disable`: Only need `--context` (no `--linux` required)
 
 **Bundled dt-schema**: The CLI includes a bundled version of dt-schema, so `--dt-schema` is optional for all commands. Only specify it if you need to use a different version.
@@ -43,21 +48,43 @@ Help users locate appropriate `.dts` files when needed - they're typically in `a
 
 ## Commands Reference
 
-### 1. `list-devices` - Find Available Devices
+### 0. `init` - Initialize Project Configuration
 
-**Purpose**: Search for device bindings supported by the Linux kernel.
+**Purpose**: Create `.analog-attach/config.toml` and build `compat-index.json`. Run this once per project before using any other commands. `list-devices` will not work without it.
 
 **Syntax**:
 ```bash
-attach list-devices --linux <path> --includes-word <filter>
+attach init --linux <path> --dt-schema <path> [--context <dts-file>]
 ```
 
 **Parameters**:
 | Parameter | Required | Description |
 |-----------|----------|-------------|
 | `--linux` | Yes | Path to Linux kernel repository |
-| `--dt-schema` | No | Path to dt-schema repository (uses bundled version by default) |
-| `--includes-word` | Yes | Filter string (e.g., "ad7124", "adi"). Empty string will return everything (large list) |
+| `--dt-schema` | Yes | Path to dt-schema repository |
+| `--context` | No | Path to target `.dts` file; stored in `config.toml` so other commands pick it up automatically |
+
+**Output**: Writes `.analog-attach/config.toml` and `.analog-attach/compat-index.json`, printing the path of each written file.
+
+**What it stores**: `config.toml` records the `linux`, `dt-schema`, and optionally `context` paths. All subsequent commands that accept those flags will read them from this file if the flags are not explicitly provided.
+
+---
+
+### 1. `list-devices` - Find Available Devices
+
+**Purpose**: Search the pre-built `compat-index.json` (built by `init`) for device compatible strings.
+
+**Syntax**:
+```bash
+attach list-devices [--includes-word <filter>]
+```
+
+**Parameters**:
+| Parameter | Required | Description |
+|-----------|----------|-------------|
+| `--includes-word` | No | Filter string (e.g., "ad7124", "adi"). Omitting it returns all entries |
+
+**Note**: Requires `compat-index.json` to exist (run `init` first). If the index is stale relative to the paths stored in `config.toml`, it is automatically rebuilt before listing.
 
 **Output Format**: Plain text, one compatible string per line.
 
@@ -206,14 +233,14 @@ attach create --linux <path> --compatible <string> --parent <node> --label <labe
 **Parameters**:
 | Parameter | Required | Description |
 |-----------|----------|-------------|
-| `--linux` | Yes | Path to Linux kernel repository |
+| `--linux` | No | Path to Linux kernel repository (falls back to `config.toml`) |
 | `--dt-schema` | No | Path to dt-schema repository (uses bundled version by default) |
 | `--compatible` | Yes | Device compatible string |
 | `--parent` | No | Parent node: label, `&label`, path, `&{path}`, or `label/child` (e.g. `spi0`, `&spi0`, `/soc/spi@...`, `&{/soc/spi@...}`) — a bare name/`name@unit` is NOT matched, since it isn't guaranteed unique across the tree |
 | `--label` | No | Label to attach to the new node (e.g. `imu1`), so it can be referenced later as `&label` (e.g. as a `--parent` for `add`). **Always set this** — without a label, the new node can only be referenced later by its full path, which most other commands cannot compute for you |
-| `--output` | Yes | Output file path (should end in `.dtso`) |
+| `--output` | No | Output file path (should end in `.dtso`). If omitted, the overlay is printed to stdout |
 
-**Output**: Creates a file and prints confirmation.
+**Output**: If `--output` is given, writes the file and prints confirmation. If omitted, prints the overlay to stdout.
 
 **Generated File Structure**:
 ```dts
@@ -376,21 +403,22 @@ attach move --context ~/ctx.dts --overlay overlay.dtso --node imu1 --parent spi1
 
 **Syntax**:
 ```bash
-attach validate --linux <path> --context <dts-file> --node <name> --input <dtso-file>
+attach validate --node <name> --overlay <dtso-file> [--linux <path>] [--context <dts-file>]
 ```
 
 **Parameters**:
 | Parameter | Required | Description |
 |-----------|----------|-------------|
-| `--linux` | Yes | Path to Linux kernel repository |
+| `--linux` | No | Path to Linux kernel repository (falls back to `config.toml`) |
 | `--dt-schema` | No | Path to dt-schema repository (uses bundled version by default) |
-| `--context` | Yes | Path to base `.dts` file |
+| `--context` | No | Path to base `.dts` file (falls back to `config.toml`) |
 | `--node` | Yes | Target node: label, `&label`, path, `&{path}`, or `label/child` (e.g. `imu1`, `&imu1`, `/soc/spi@0/imu@0`, `spi0/adi,ad7124-8`) — a bare name/`name@unit` is NOT matched, since it isn't guaranteed unique across the tree |
-| `--input` | Yes | Path to `.dtso` file containing the node |
+| `--overlay` | Yes | Path to `.dtso` file containing the node |
 
-**Output Format**: Two JSON lines:
-1. Parsed node values (what was found)
-2. Array of validation errors
+**Output Format**: Three sections printed to stdout:
+1. JSON object of parsed node values (what was found)
+2. `============= UPDATED BINDING =============` header followed by the full updated binding JSON
+3. `============= VALIDATION ERRORS =============` header followed by the errors array JSON
 
 **Error Types**:
 
@@ -425,29 +453,28 @@ attach validate --linux <path> --context <dts-file> --node <name> --input <dtso-
 
 **Syntax**:
 ```bash
-attach get-prop --linux <path> --context <dts-file> --node <name> --input <dtso-file> --property <prop-name>
+attach get-prop --node <name> --overlay <dtso-file> --property <prop-name>
 ```
 
 **Parameters**:
 | Parameter | Required | Description |
 |-----------|----------|-------------|
-| `--linux` | Yes | Path to Linux kernel repository |
-| `--dt-schema` | No | Path to dt-schema repository (uses bundled version by default) |
-| `--context` | Yes | Path to base `.dts` file |
 | `--node` | Yes | Target node: label, `&label`, path, `&{path}`, or `label/child` (e.g. `imu1`, `&imu1`, `/soc/spi@0/imu@0`, `spi0/adi,ad7124-8`) — a bare name/`name@unit` is NOT matched, since it isn't guaranteed unique across the tree |
-| `--input` | Yes | Path to `.dtso` file containing the node |
+| `--overlay` | Yes | Path to `.dtso` file containing the node |
 | `--property` | Yes | Name of the property to read |
+
+**Note**: `get-prop` reads directly from the overlay file and does not require `--linux`, `--context`, or `--dt-schema`.
 
 **Output Format**: Plain text value printed to stdout.
 
 **Examples**:
 ```bash
 # Get the reg property value
-attach get-prop --linux ~/linux --context ~/linux/arch/arm/boot/dts/broadcom/bcm2837-rpi-3-b.dts --node &imu1 --input overlay.dtso --property reg
+attach get-prop --node &imu1 --overlay overlay.dtso --property reg
 # Output: <0x00>
 
 # Get a boolean/flag property (returns "true" if present)
-attach get-prop --linux ~/linux --context ~/linux/arch/arm/boot/dts/broadcom/bcm2837-rpi-3-b.dts --node &imu1 --input overlay.dtso --property spi-cpha
+attach get-prop --node &imu1 --overlay overlay.dtso --property spi-cpha
 # Output: true
 ```
 
@@ -463,17 +490,17 @@ attach get-prop --linux ~/linux --context ~/linux/arch/arm/boot/dts/broadcom/bcm
 
 **Syntax**:
 ```bash
-attach set-prop --linux <path> --context <dts-file> --node <name> --input <dtso-file> --property <prop-name> --value <value>
+attach set-prop --node <name> --overlay <dtso-file> --property <prop-name> --value <value> [--linux <path>] [--context <dts-file>]
 ```
 
 **Parameters**:
 | Parameter | Required | Description |
 |-----------|----------|-------------|
-| `--linux` | Yes | Path to Linux kernel repository |
+| `--linux` | No | Path to Linux kernel repository (falls back to `config.toml`) |
 | `--dt-schema` | No | Path to dt-schema repository (uses bundled version by default) |
-| `--context` | Yes | Path to base `.dts` file |
+| `--context` | No | Path to base `.dts` file (falls back to `config.toml`) |
 | `--node` | Yes | Target node: label, `&label`, path, `&{path}`, or `label/child` (e.g. `imu1`, `&imu1`, `/soc/spi@0/imu@0`, `spi0/adi,ad7124-8`) — a bare name/`name@unit` is NOT matched, since it isn't guaranteed unique across the tree |
-| `--input` | Yes | Path to `.dtso` file to modify (file is updated in place) |
+| `--overlay` | Yes | Path to `.dtso` file to modify (file is updated in place) |
 | `--property` | Yes | Name of the property to set |
 | `--value` | Yes | Value to set (see Value Formats below) |
 
@@ -486,31 +513,31 @@ attach set-prop --linux <path> --context <dts-file> --node <name> --input <dtso-
 | Boolean | `true` or `false` | For flag properties (true = add flag, false = remove flag) |
 | Array | `[0; 1; 2]` | Array of values separated by `;` |
 | Mixed array | `[25; IRQ_FALLING_EDGE]` | Array with numbers and macros |
-| Matrix/nested | `[0; 1], [2; 3]` | Multiple arrays separated by `,` |
+| Multi-group array | `[0; 1], [2; 3]` | Multiple bracket groups separated by `,` — all values are flattened into a single array (produces `[0, 1, 2, 3]`) |
 | Phandle ref | `gpio` | Reference to another node (used with `<&gpio>` syntax) |
 
 **Examples**:
 ```bash
 # Set a simple integer property
-attach set-prop --linux ~/linux --context ~/ctx.dts --node &imu1 --input overlay.dtso --property reg --value 0
+attach set-prop --node &imu1 --overlay overlay.dtso --property reg --value 0
 
 # Set SPI frequency
-attach set-prop --linux ~/linux --context ~/ctx.dts --node &imu1 --input overlay.dtso --property spi-max-frequency --value 5000000
+attach set-prop --node &imu1 --overlay overlay.dtso --property spi-max-frequency --value 5000000
 
 # Enable a boolean flag
-attach set-prop --linux ~/linux --context ~/ctx.dts --node &imu1 --input overlay.dtso --property spi-cpha --value true
+attach set-prop --node &imu1 --overlay overlay.dtso --property spi-cpha --value true
 
 # Disable/remove a boolean flag
-attach set-prop --linux ~/linux --context ~/ctx.dts --node &imu1 --input overlay.dtso --property spi-cpha --value false
+attach set-prop --node &imu1 --overlay overlay.dtso --property spi-cpha --value false
 
 # Set an interrupt array
-attach set-prop --linux ~/linux --context ~/ctx.dts --node &imu1 --input overlay.dtso --property interrupts --value "[25; IRQ_TYPE_EDGE_FALLING]"
+attach set-prop --node &imu1 --overlay overlay.dtso --property interrupts --value "[25; IRQ_TYPE_EDGE_FALLING]"
 
 # Set a phandle reference for interrupt-parent
-attach set-prop --linux ~/linux --context ~/ctx.dts --node &imu1 --input overlay.dtso --property interrupt-parent --value gpio
+attach set-prop --node &imu1 --overlay overlay.dtso --property interrupt-parent --value gpio
 
 # Set string array (e.g., clock-names)
-attach set-prop --linux ~/linux --context ~/ctx.dts --node &imu1 --input overlay.dtso --property clock-names --value "[spi; pclk]"
+attach set-prop --node &imu1 --overlay overlay.dtso --property clock-names --value "[spi; pclk]"
 ```
 
 **Validation**: The command validates the value against the device binding schema before applying. If the value is invalid, an error message is displayed explaining the valid options.
@@ -593,8 +620,17 @@ attach disable --context ~/ctx.dts --overlay overlay.dtso --node spi1
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
+│ 0. INITIALIZE (once per project)                            │
+│    attach init --linux <path> --dt-schema <path>            │
+│               [--context <dts-file>]                        │
+│    → Writes config.toml + compat-index.json                 │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
 │ 1. GATHER INFO                                              │
 │    Ask user for: linux path, dt-schema path, target .dts    │
+│    (if not already stored via init)                         │
 └─────────────────────────────────────────────────────────────┘
                               │
                               ▼
@@ -646,7 +682,7 @@ attach disable --context ~/ctx.dts --overlay overlay.dtso --node spi1
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
 │ 8. VALIDATE                                                 │
-│    attach validate --node <name> --input <file.dtso>        │
+│    attach validate --node <name> --overlay <file.dtso>      │
 │    → Fix any errors with set-prop, repeat until clean       │
 └─────────────────────────────────────────────────────────────┘
 ```
