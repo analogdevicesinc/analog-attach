@@ -686,6 +686,10 @@ export class DeviceTreeOverlay {
         return { node: current, parent_node: parent, actual_segments };
     }
 
+    public delete_all(): void {
+        this.overlay.root.children = [];
+    }
+
     public print(): string {
         return print_dto(this.overlay);
     }
