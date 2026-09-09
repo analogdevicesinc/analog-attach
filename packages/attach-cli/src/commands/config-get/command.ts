@@ -13,6 +13,7 @@ const CONFIG_FIELDS: Config[] = [
         type: "path",
         required: true,
         default: null,
+        value: null,
     },
     {
         field_name: "dt-schema",
@@ -20,6 +21,7 @@ const CONFIG_FIELDS: Config[] = [
         type: "path",
         required: true,
         default: null,
+        value: null,
     },
     {
         field_name: "context",
@@ -27,6 +29,7 @@ const CONFIG_FIELDS: Config[] = [
         type: "path",
         required: true,
         default: null,
+        value: null,
     },
     {
         field_name: "overlay",
@@ -34,6 +37,7 @@ const CONFIG_FIELDS: Config[] = [
         type: "path",
         required: false,
         default: null,
+        value: null,
     },
 ];
 
@@ -68,7 +72,7 @@ export const config_get_command = buildCommand({
         const result: Config[] = configs.map(c => {
             const key = FIELD_TO_CONFIG_KEY[c.field_name];
             const value = key === undefined ? undefined : current[key];
-            return { ...c, default: value ?? null };
+            return { ...c, value: value ?? null };
         });
 
         const response: ToolConfigResponse = {
@@ -82,9 +86,9 @@ export const config_get_command = buildCommand({
             respond(response);
         } else {
             for (const c of result) {
-                const value = c.default === null ? "(not set)" : c.default;
+                const display = c.value === null ? "(not set)" : c.value;
                 const request = c.required ? " [required]" : "";
-                console.log(`${c.field_name}${request}: ${value}`);
+                console.log(`${c.field_name}${request}: ${display}`);
             }
         }
     },

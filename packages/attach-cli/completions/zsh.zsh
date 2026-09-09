@@ -11,7 +11,21 @@ _attach_device_keys() {
 }
 
 _attach_parents() {
-    local key="${opt_args[--key]}"
+    local key="" skip_next=false
+    local w
+    for w in "${words[@]}"; do
+        if $skip_next; then
+            skip_next=false
+            continue
+        fi
+        case "$w" in
+            attach|add|--json) ;;
+            --name|--to|--label|--overlay|--context|--linux|--dt-schema)
+                skip_next=true ;;
+            --*) ;;
+            *) [[ -n "$w" ]] && { key="$w"; break } ;;
+        esac
+    done
     [[ -z "$key" ]] && return
     _attach_suggest parent "$key"
 }
@@ -59,9 +73,9 @@ _attach() {
             case $line[1] in
                 add)
                     _arguments \
-                        '--key[Device key / compatible string]:key:_attach_device_keys' \
+                        ':device key / compatible string:_attach_device_keys' \
                         '--name[Node name (e.g. channel@0)]:name:' \
-                        '--parent[Parent node]:parent:_attach_parents' \
+                        '--to[Parent node]:to:_attach_parents' \
                         '--label[Label to attach to the new node]:label:' \
                         '--overlay[Path to the dtso file]:overlay:_files' \
                         '--context[The target dts]:context:_files' \

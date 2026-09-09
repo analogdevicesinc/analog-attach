@@ -13,6 +13,7 @@ export interface Config {
     type: "numeric" | "string" | "bool" | "path" | ConfigEnum;
     required: boolean;
     default: string | number | boolean | null;
+    value: string | number | boolean | null;
 }
 
 export interface ConfigEnum {

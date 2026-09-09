@@ -10,9 +10,8 @@ import type { AddResponse } from "../../protocol/types";
 import type { LocalContext } from "../../context";
 
 type Flags = {
-    key?: string,
     name?: string,
-    parent?: string,
+    to?: string,
     label?: string,
     overlay?: string,
     context?: string,
@@ -27,19 +26,13 @@ export type AddResult =
 export const add_command = buildCommand({
     parameters: {
         flags: {
-            key: {
-                kind: "parsed",
-                parse: String,
-                brief: "Device key / compatible string of the device binding to add",
-                optional: true,
-            },
             name: {
                 kind: "parsed",
                 parse: String,
-                brief: "Node name (e.g. channel@0); defaults to --key",
+                brief: "Node name (e.g. channel@0); defaults to the positional key",
                 optional: true,
             },
-            parent: {
+            to: {
                 kind: "parsed",
                 parse: String,
                 brief: "Parent node: label, &label, path, &{path}, or label/child",
@@ -75,22 +68,30 @@ export const add_command = buildCommand({
                 brief: "Path to dt-schema repo (falls back to config.toml)",
                 optional: true,
             },
-        }
+        },
+        positional: {
+            kind: "array" as const,
+            parameter: {
+                parse: String,
+                brief: "Device key / compatible string of the device binding to add",
+            },
+        },
     },
     docs: {
         brief: "Add a new node to an existing dtso"
     },
-    async func(this: LocalContext, flags: Flags) {
+    async func(this: LocalContext, flags: Flags, ...positionals: string[]) {
         const config = load_config();
         const linux = flags.linux ?? config.linux;
         const dtSchema = flags.dtSchema ?? config.dtSchema;
         const context = flags.context ?? config.context;
         const input = flags.overlay ?? config.overlay;
-        const { key, name, parent, label } = flags;
+        const key = positionals[0];
+        const { name, to, label } = flags;
 
         if (key === undefined && name === undefined) {
-            if (this.json) { input_error("--key or --name required"); return; }
-            console.log("Missing: --key or --name (at least one is required)");
+            if (this.json) { input_error("key or --name required"); return; }
+            console.log("Missing: key (positional) or --name (at least one is required)");
             return;
         }
 
@@ -174,15 +175,15 @@ export const add_command = buildCommand({
         }
 
         const node_name = name ?? key!;
-        const result = add_overlay_node(base, overlay, node_name, parent, label, key);
+        const result = add_overlay_node(base, overlay, node_name, to, label, key);
 
         switch (result.status) {
             case "parent-not-found": {
                 if (this.json) {
-                    respond_fail({ ok: false, message: `Parent node ${parent} not found`, severity: "error" });
+                    respond_fail({ ok: false, message: `Parent node ${to} not found`, severity: "error" });
                     return;
                 }
-                console.log(`Couldn't find parent node ${parent} in ${context} or ${input}`);
+                console.log(`Couldn't find parent node ${to} in ${context} or ${input}`);
                 return;
             }
             case "added": {

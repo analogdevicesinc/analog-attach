@@ -44,7 +44,7 @@ export const attach_manifest_command = buildCommand({
                     },
                     completions: [
                         {
-                            arg: "key",
+                            arg: "add",
                             kind: "device-key"
                         }
                     ]
