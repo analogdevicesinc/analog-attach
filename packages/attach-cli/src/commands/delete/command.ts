@@ -1,4 +1,4 @@
-import { buildCommand } from "@stricli/core";
+import { Command } from "commander";
 import { DeviceTree, DeviceTreeOverlay, type DTNode } from "attach-lib";
 
 import * as fs from 'node:fs';
@@ -9,188 +9,157 @@ import { resolve_node_identifier } from "../../utilities";
 import { respond, respond_fail, input_error } from "../../protocol/output";
 import type { DeletePreview } from "../../protocol/types";
 
-type Flags = {
-    overlay?: string,
-    context?: string,
-    force?: boolean,
-}
+export function build_delete_command(ctx: LocalContext): Command {
+    return new Command("delete")
+        .description("Delete a node or property from an existing dtso")
+        .option("--overlay <value>", "dtso")
+        .option("--context <value>", "The target dts")
+        .option("--force", "Force delete of non-leaf nodes (waterfall delete)")
+        .argument("[path...]", "Path to node or property (ValidIdentifier segments)")
+        .action(async (path: string[], options) => {
+            const config = load_config();
+            const context = options.context ?? config.context;
+            const input = options.overlay ?? config.overlay;
 
-export const delete_command = buildCommand({
-    parameters: {
-        flags: {
-            overlay: {
-                kind: "parsed",
-                parse: String,
-                brief: "dtso",
-                optional: true,
-            },
-            context: {
-                kind: "parsed",
-                parse: String,
-                brief: "The target dts",
-                optional: true,
-            },
-            force: {
-                kind: "boolean",
-                brief: "Force delete of non-leaf nodes (waterfall delete)",
-                optional: true,
-            },
-        },
-        positional: {
-            kind: "array" as const,
-            parameter: {
-                parse: String,
-                brief: "Path to node or property (ValidIdentifier segments)",
-            },
-        },
-    },
-    docs: {
-        brief: "Delete a node or property from an existing dtso"
-    },
-    async func(this: LocalContext, flags: Flags, ...path: string[]) {
-        const config = load_config();
-        const context = flags.context ?? config.context;
-        const input = flags.overlay ?? config.overlay;
+            if (context === undefined) {
+                if (ctx.json) { input_error("missing config: context"); return; }
+                console.log("Missing: --context (no config.toml found)");
+                return;
+            }
 
-        if (context === undefined) {
-            if (this.json) { input_error("missing config: context"); return; }
-            console.log("Missing: --context (no config.toml found)");
-            return;
-        }
+            if (input === undefined) {
+                if (ctx.json) { input_error("missing config: overlay"); return; }
+                console.log("Missing: --overlay (no config.toml found)");
+                return;
+            }
 
-        if (input === undefined) {
-            if (this.json) { input_error("missing config: overlay"); return; }
-            console.log("Missing: --overlay (no config.toml found)");
-            return;
-        }
+            if (!fs.existsSync(context)) {
+                if (ctx.json) { input_error(`file not found: ${context}`); return; }
+                console.log(`Missing: ${context}`);
+                return;
+            }
 
-        if (!fs.existsSync(context)) {
-            if (this.json) { input_error(`file not found: ${context}`); return; }
-            console.log(`Missing: ${context}`);
-            return;
-        }
+            if (!fs.existsSync(input)) {
+                if (ctx.json) { input_error(`file not found: ${input}`); return; }
+                console.log(`Missing: ${input} (use "create" to generate a new overlay first)`);
+                return;
+            }
 
-        if (!fs.existsSync(input)) {
-            if (this.json) { input_error(`file not found: ${input}`); return; }
-            console.log(`Missing: ${input} (use "create" to generate a new overlay first)`);
-            return;
-        }
+            const context_content = fs.readFileSync(context, 'utf8');
+            const base = DeviceTree.new_from_string(context_content);
 
-        const context_content = fs.readFileSync(context, 'utf8');
-        const base = DeviceTree.new_from_string(context_content);
+            if (typeof base === "string") {
+                if (ctx.json) { input_error(`failed to parse dts: ${base}`); return; }
+                console.log(`Failed to parse dts ${context}: ${base}`);
+                return;
+            }
 
-        if (typeof base === "string") {
-            if (this.json) { input_error(`failed to parse dts: ${base}`); return; }
-            console.log(`Failed to parse dts ${context}: ${base}`);
-            return;
-        }
+            const input_content = fs.readFileSync(input, 'utf8');
+            const overlay = DeviceTreeOverlay.new_from_string(input_content, base);
 
-        const input_content = fs.readFileSync(input, 'utf8');
-        const overlay = DeviceTreeOverlay.new_from_string(input_content, base);
+            if (typeof overlay === "string") {
+                if (ctx.json) { input_error(`failed to parse dtso: ${overlay}`); return; }
+                console.log(`Failed to parse dtso ${input}: ${overlay}`);
+                return;
+            }
 
-        if (typeof overlay === "string") {
-            if (this.json) { input_error(`failed to parse dtso: ${overlay}`); return; }
-            console.log(`Failed to parse dtso ${input}: ${overlay}`);
-            return;
-        }
+            if (path.length === 0) {
+                const preview = count_overlay_root(overlay);
 
-        if (path.length === 0) {
-            const preview = count_overlay_root(overlay);
+                if (!options.force) {
+                    const response: DeletePreview = {
+                        ok: true,
+                        message: `Would delete ${preview.node_count} node(s) and ${preview.property_count} property(ies)`,
+                        severity: "warn",
+                        node_count: preview.node_count,
+                        property_count: preview.property_count,
+                        paths: preview.paths,
+                    };
+                    if (ctx.json) {
+                        respond(response);
+                    } else {
+                        console.log(`Would delete ${preview.node_count} node(s) and ${preview.property_count} property(ies)`);
+                        for (const p of preview.paths) { console.log(`  ${p.join("/")}`); }
+                    }
+                    return;
+                }
 
-            if (!flags.force) {
-                const response: DeletePreview = {
-                    ok: true,
-                    message: `Would delete ${preview.node_count} node(s) and ${preview.property_count} property(ies)`,
-                    severity: "warn",
-                    node_count: preview.node_count,
-                    property_count: preview.property_count,
-                    paths: preview.paths,
-                };
-                if (this.json) {
-                    respond(response);
+                overlay.delete_all();
+                fs.writeFileSync(input, overlay.print());
+                if (ctx.json) {
+                    respond({ ok: true, message: "Deleted all overlay content", severity: "info" });
                 } else {
-                    console.log(`Would delete ${preview.node_count} node(s) and ${preview.property_count} property(ies)`);
-                    for (const p of preview.paths) { console.log(`  ${p.join("/")}`); }
+                    console.log(`Deleted all overlay content from ${input}`);
                 }
                 return;
             }
 
-            overlay.delete_all();
-            fs.writeFileSync(input, overlay.print());
-            if (this.json) {
-                respond({ ok: true, message: "Deleted all overlay content", severity: "info" });
+            const identifier = path.join("/");
+
+            if (ctx.json) {
+                const found = overlay.find_node(resolve_node_identifier(identifier, overlay));
+
+                if (found !== undefined && !found.is_in_base && found.parent_node !== undefined
+                    && found.node.children.length > 0 && !options.force) {
+                    const preview = count_subtree(found.node);
+                    const response: DeletePreview = {
+                        ok: true,
+                        message: `Would delete ${preview.node_count} node(s) and ${preview.property_count} property(ies)`,
+                        severity: "warn",
+                        node_count: preview.node_count,
+                        property_count: preview.property_count,
+                        paths: preview.paths,
+                    };
+                    respond(response);
+                    return;
+                }
+
+                const result = delete_overlay_node(base, overlay, identifier);
+
+                switch (result) {
+                    case "deleted": {
+                        fs.writeFileSync(input, overlay.print());
+                        respond({ ok: true, message: `Deleted ${identifier}`, severity: "info" });
+                        return;
+                    }
+                    case "not-found": {
+                        respond_fail({ ok: false, message: `Node ${identifier} not found`, severity: "error" });
+                        return;
+                    }
+                    case "in-base": {
+                        respond_fail({ ok: false, message: `${identifier} is part of the base device tree, not this overlay`, severity: "error" });
+                        return;
+                    }
+                    case "is-root": {
+                        respond_fail({ ok: false, message: "Cannot delete the root node without --force", severity: "error" });
+                        return;
+                    }
+                }
             } else {
-                console.log(`Deleted all overlay content from ${input}`);
-            }
-            return;
-        }
+                const result = delete_overlay_node(base, overlay, identifier);
 
-        const identifier = path.join("/");
-
-        if (this.json) {
-            const found = overlay.find_node(resolve_node_identifier(identifier, overlay));
-
-            if (found !== undefined && !found.is_in_base && found.parent_node !== undefined
-                && found.node.children.length > 0 && !flags.force) {
-                const preview = count_subtree(found.node);
-                const response: DeletePreview = {
-                    ok: true,
-                    message: `Would delete ${preview.node_count} node(s) and ${preview.property_count} property(ies)`,
-                    severity: "warn",
-                    node_count: preview.node_count,
-                    property_count: preview.property_count,
-                    paths: preview.paths,
-                };
-                respond(response);
-                return;
-            }
-
-            const result = delete_overlay_node(base, overlay, identifier);
-
-            switch (result) {
-                case "deleted": {
-                    fs.writeFileSync(input, overlay.print());
-                    respond({ ok: true, message: `Deleted ${identifier}`, severity: "info" });
-                    return;
-                }
-                case "not-found": {
-                    respond_fail({ ok: false, message: `Node ${identifier} not found`, severity: "error" });
-                    return;
-                }
-                case "in-base": {
-                    respond_fail({ ok: false, message: `${identifier} is part of the base device tree, not this overlay`, severity: "error" });
-                    return;
-                }
-                case "is-root": {
-                    respond_fail({ ok: false, message: "Cannot delete the root node without --force", severity: "error" });
-                    return;
+                switch (result) {
+                    case "not-found": {
+                        console.log(`Couldn't find node ${identifier} in ${input}`);
+                        return;
+                    }
+                    case "in-base": {
+                        console.log(`${identifier} is part of the base device tree (${context}), not this overlay; delete only removes overlay-added nodes`);
+                        return;
+                    }
+                    case "is-root": {
+                        console.log("Refusing to delete the root node");
+                        return;
+                    }
+                    case "deleted": {
+                        fs.writeFileSync(input, overlay.print());
+                        console.log(`Deleted ${identifier} from ${input}`);
+                        return;
+                    }
                 }
             }
-        } else {
-            const result = delete_overlay_node(base, overlay, identifier);
-
-            switch (result) {
-                case "not-found": {
-                    console.log(`Couldn't find node ${identifier} in ${input}`);
-                    return;
-                }
-                case "in-base": {
-                    console.log(`${identifier} is part of the base device tree (${context}), not this overlay; delete only removes overlay-added nodes`);
-                    return;
-                }
-                case "is-root": {
-                    console.log("Refusing to delete the root node");
-                    return;
-                }
-                case "deleted": {
-                    fs.writeFileSync(input, overlay.print());
-                    console.log(`Deleted ${identifier} from ${input}`);
-                    return;
-                }
-            }
-        }
-    }
-});
+        });
+}
 
 function count_overlay_root(overlay: DeviceTreeOverlay): { node_count: number; property_count: number; paths: string[][] } {
     let node_count = 0;

@@ -1583,13 +1583,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@stricli/core@npm:^1.2.6":
-  version: 1.2.6
-  resolution: "@stricli/core@npm:1.2.6"
-  checksum: 10c0/1a7653f866a6f8f7d38d5a9dd99403d46448c0ca9665dda14c40ece6bc7691189b5ef30c16f5db98c7091f1f8a268a7ac2aa5bd26f27cc809fb9c703b35b81d1
-  languageName: node
-  linkType: hard
-
 "@tanstack/react-virtual@npm:^3.13.18":
   version: 3.13.18
   resolution: "@tanstack/react-virtual@npm:3.13.18"
@@ -2640,12 +2633,12 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "attach-cli@workspace:packages/attach-cli"
   dependencies:
-    "@stricli/core": "npm:^1.2.6"
     "@types/node": "npm:25.x"
     "@typescript-eslint/eslint-plugin": "npm:^8.17.0"
     "@typescript-eslint/parser": "npm:^8.17.0"
     "@vitest/coverage-v8": "npm:^4.0.18"
     attach-lib: "npm:*"
+    commander: "npm:^13.1.0"
     eslint: "npm:^9.31.0"
     eslint-plugin-unicorn: "npm:^60.0.0"
     smol-toml: "npm:^1.7.1"
@@ -3035,6 +3028,13 @@ __metadata:
   version: 10.0.1
   resolution: "commander@npm:10.0.1"
   checksum: 10c0/53f33d8927758a911094adadda4b2cbac111a5b377d8706700587650fd8f45b0bbe336de4b5c3fe47fd61f420a3d9bd452b6e0e6e5600a7e74d7bf0174f6efe3
+  languageName: node
+  linkType: hard
+
+"commander@npm:^13.1.0":
+  version: 13.1.0
+  resolution: "commander@npm:13.1.0"
+  checksum: 10c0/7b8c5544bba704fbe84b7cab2e043df8586d5c114a4c5b607f83ae5060708940ed0b5bd5838cf8ce27539cde265c1cbd59ce3c8c6b017ed3eec8943e3a415164
   languageName: node
   linkType: hard
 

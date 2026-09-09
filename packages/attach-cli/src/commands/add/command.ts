@@ -1,210 +1,154 @@
-import { buildCommand } from "@stricli/core";
+import { Command } from "commander";
 import { DeviceTree, DeviceTreeOverlay, NodeBuilder, PropertyBuilder, type DTProperty } from "attach-lib";
 
 import * as fs from 'node:fs';
 
+import type { LocalContext } from "../../context";
 import { find_binding, resolve_node_identifier } from "../../utilities";
 import { load_config } from "../../config";
 import { respond, respond_fail, input_error } from "../../protocol/output";
 import type { AddResponse } from "../../protocol/types";
-import type { LocalContext } from "../../context";
-
-type Flags = {
-    name?: string,
-    to?: string,
-    label?: string,
-    overlay?: string,
-    context?: string,
-    linux?: string,
-    dtSchema?: string,
-}
 
 export type AddResult =
     | { status: "added"; key: string; path: string[] }
     | { status: "parent-not-found" };
 
-export const add_command = buildCommand({
-    parameters: {
-        flags: {
-            name: {
-                kind: "parsed",
-                parse: String,
-                brief: "Node name (e.g. channel@0); defaults to the positional key",
-                optional: true,
-            },
-            to: {
-                kind: "parsed",
-                parse: String,
-                brief: "Parent node: label, &label, path, &{path}, or label/child",
-                optional: true,
-            },
-            label: {
-                kind: "parsed",
-                parse: String,
-                brief: "Label to attach to the new node (e.g. imu1)",
-                optional: true,
-            },
-            overlay: {
-                kind: "parsed",
-                parse: String,
-                brief: "Path to the dtso file (falls back to config.toml)",
-                optional: true,
-            },
-            context: {
-                kind: "parsed",
-                parse: String,
-                brief: "The target dts (falls back to config.toml)",
-                optional: true,
-            },
-            linux: {
-                kind: "parsed",
-                parse: String,
-                brief: "Path to Linux repo (falls back to config.toml)",
-                optional: true,
-            },
-            dtSchema: {
-                kind: "parsed",
-                parse: String,
-                brief: "Path to dt-schema repo (falls back to config.toml)",
-                optional: true,
-            },
-        },
-        positional: {
-            kind: "array" as const,
-            parameter: {
-                parse: String,
-                brief: "Device key / compatible string of the device binding to add",
-            },
-        },
-    },
-    docs: {
-        brief: "Add a new node to an existing dtso"
-    },
-    async func(this: LocalContext, flags: Flags, ...positionals: string[]) {
-        const config = load_config();
-        const linux = flags.linux ?? config.linux;
-        const dtSchema = flags.dtSchema ?? config.dtSchema;
-        const context = flags.context ?? config.context;
-        const input = flags.overlay ?? config.overlay;
-        const key = positionals[0];
-        const { name, to, label } = flags;
+export function build_add_command(ctx: LocalContext): Command {
+    return new Command("add")
+        .description("Add a new node to an existing dtso")
+        .option("--name <value>", "Node name (e.g. channel@0); defaults to the positional key")
+        .option("--to <value>", "Parent node: label, &label, path, &{path}, or label/child")
+        .option("--label <value>", "Label to attach to the new node (e.g. imu1)")
+        .option("--overlay <value>", "Path to the dtso file (falls back to config.toml)")
+        .option("--context <value>", "The target dts (falls back to config.toml)")
+        .option("--linux <value>", "Path to Linux repo (falls back to config.toml)")
+        .option("--dt-schema <value>", "Path to dt-schema repo (falls back to config.toml)")
+        .argument("[keys...]", "Device key / compatible string of the device binding to add")
+        .action(async (keys: string[], options) => {
+            const config = load_config();
+            const linux = options.linux ?? config.linux;
+            const dtSchema = options.dtSchema ?? config.dtSchema;
+            const context = options.context ?? config.context;
+            const input = options.overlay ?? config.overlay;
+            const key = keys[0];
+            const { name, to, label } = options;
 
-        if (key === undefined && name === undefined) {
-            if (this.json) { input_error("key or --name required"); return; }
-            console.log("Missing: key (positional) or --name (at least one is required)");
-            return;
-        }
-
-        if (linux === undefined) {
-            if (this.json) { input_error("--linux not set (run config-set)"); return; }
-            console.log("Missing: --linux (no config.toml found)");
-            return;
-        }
-
-        if (dtSchema === undefined) {
-            if (this.json) { input_error("--dt-schema not set (run config-set)"); return; }
-            console.log("Missing: --dt-schema (no config.toml found)");
-            return;
-        }
-
-        if (context === undefined) {
-            if (this.json) { input_error("--context not set (run config-set)"); return; }
-            console.log("Missing: --context (no config.toml found)");
-            return;
-        }
-
-        if (input === undefined) {
-            if (this.json) { input_error("--overlay not set (run config-set)"); return; }
-            console.log("Missing: --overlay (no config.toml found)");
-            return;
-        }
-
-        if (!fs.existsSync(context)) {
-            if (this.json) { input_error(`Missing: ${context}`); return; }
-            console.log(`Missing: ${context}`);
-            return;
-        }
-
-        if (!fs.existsSync(linux)) {
-            if (this.json) { input_error(`Missing: ${linux}`); return; }
-            console.log(`Missing: ${linux}`);
-            return;
-        }
-
-        if (!fs.existsSync(dtSchema)) {
-            if (this.json) { input_error(`Missing: ${dtSchema}`); return; }
-            console.log(`Missing: ${dtSchema}`);
-            return;
-        }
-
-        if (!fs.existsSync(input)) {
-            if (this.json) { input_error(`Missing: ${input}`); return; }
-            console.log(`Missing: ${input} (use "create-workfile" to generate a new overlay first)`);
-            return;
-        }
-
-        const context_content = fs.readFileSync(context, 'utf8');
-        const base = DeviceTree.new_from_string(context_content);
-
-        if (typeof base === "string") {
-            if (this.json) { input_error(`Failed to parse dts ${context}: ${base}`); return; }
-            console.log(`Failed to parse dts ${context}: ${base}`);
-            return;
-        }
-
-        const input_content = fs.readFileSync(input, 'utf8');
-        const overlay = DeviceTreeOverlay.new_from_string(input_content, base);
-
-        if (typeof overlay === "string") {
-            if (this.json) { input_error(`Failed to parse dtso ${input}: ${overlay}`); return; }
-            console.log(`Failed to parse dtso ${input}: ${overlay}`);
-            return;
-        }
-
-        if (key !== undefined) {
-            const binding_path = await find_binding(linux, dtSchema, key);
-
-            if (binding_path === undefined) {
-                if (this.json) {
-                    respond_fail({ ok: false, message: `Failed to find binding for ${key}`, severity: "error" });
-                    return;
-                }
-                console.log(`Failed to find binding for ${key}`);
+            if (key === undefined && name === undefined) {
+                if (ctx.json) { input_error("key or --name required"); return; }
+                console.log("Missing: key (positional) or --name (at least one is required)");
                 return;
             }
-        }
 
-        const node_name = name ?? key!;
-        const result = add_overlay_node(base, overlay, node_name, to, label, key);
-
-        switch (result.status) {
-            case "parent-not-found": {
-                if (this.json) {
-                    respond_fail({ ok: false, message: `Parent node ${to} not found`, severity: "error" });
-                    return;
-                }
-                console.log(`Couldn't find parent node ${to} in ${context} or ${input}`);
+            if (linux === undefined) {
+                if (ctx.json) { input_error("--linux not set (run config-set)"); return; }
+                console.log("Missing: --linux (no config.toml found)");
                 return;
             }
-            case "added": {
-                fs.writeFileSync(input, overlay.print());
-                if (this.json) {
-                    const response: AddResponse = {
-                        ok: true,
-                        message: `Added ${node_name}`,
-                        severity: "info",
-                        key: result.key,
-                        path: result.path,
-                    };
-                    respond(response);
-                    return;
-                }
-                console.log(`Added ${node_name} to ${input}`);
+
+            if (dtSchema === undefined) {
+                if (ctx.json) { input_error("--dt-schema not set (run config-set)"); return; }
+                console.log("Missing: --dt-schema (no config.toml found)");
                 return;
             }
-        }
-    }
-});
+
+            if (context === undefined) {
+                if (ctx.json) { input_error("--context not set (run config-set)"); return; }
+                console.log("Missing: --context (no config.toml found)");
+                return;
+            }
+
+            if (input === undefined) {
+                if (ctx.json) { input_error("--overlay not set (run config-set)"); return; }
+                console.log("Missing: --overlay (no config.toml found)");
+                return;
+            }
+
+            if (!fs.existsSync(context)) {
+                if (ctx.json) { input_error(`Missing: ${context}`); return; }
+                console.log(`Missing: ${context}`);
+                return;
+            }
+
+            if (!fs.existsSync(linux)) {
+                if (ctx.json) { input_error(`Missing: ${linux}`); return; }
+                console.log(`Missing: ${linux}`);
+                return;
+            }
+
+            if (!fs.existsSync(dtSchema)) {
+                if (ctx.json) { input_error(`Missing: ${dtSchema}`); return; }
+                console.log(`Missing: ${dtSchema}`);
+                return;
+            }
+
+            if (!fs.existsSync(input)) {
+                if (ctx.json) { input_error(`Missing: ${input}`); return; }
+                console.log(`Missing: ${input} (use "create-workfile" to generate a new overlay first)`);
+                return;
+            }
+
+            const context_content = fs.readFileSync(context, 'utf8');
+            const base = DeviceTree.new_from_string(context_content);
+
+            if (typeof base === "string") {
+                if (ctx.json) { input_error(`Failed to parse dts ${context}: ${base}`); return; }
+                console.log(`Failed to parse dts ${context}: ${base}`);
+                return;
+            }
+
+            const input_content = fs.readFileSync(input, 'utf8');
+            const overlay = DeviceTreeOverlay.new_from_string(input_content, base);
+
+            if (typeof overlay === "string") {
+                if (ctx.json) { input_error(`Failed to parse dtso ${input}: ${overlay}`); return; }
+                console.log(`Failed to parse dtso ${input}: ${overlay}`);
+                return;
+            }
+
+            if (key !== undefined) {
+                const binding_path = await find_binding(linux, dtSchema, key);
+
+                if (binding_path === undefined) {
+                    if (ctx.json) {
+                        respond_fail({ ok: false, message: `Failed to find binding for ${key}`, severity: "error" });
+                        return;
+                    }
+                    console.log(`Failed to find binding for ${key}`);
+                    return;
+                }
+            }
+
+            const node_name = name ?? key!;
+            const result = add_overlay_node(base, overlay, node_name, to, label, key);
+
+            switch (result.status) {
+                case "parent-not-found": {
+                    if (ctx.json) {
+                        respond_fail({ ok: false, message: `Parent node ${to} not found`, severity: "error" });
+                        return;
+                    }
+                    console.log(`Couldn't find parent node ${to} in ${context} or ${input}`);
+                    return;
+                }
+                case "added": {
+                    fs.writeFileSync(input, overlay.print());
+                    if (ctx.json) {
+                        const response: AddResponse = {
+                            ok: true,
+                            message: `Added ${node_name}`,
+                            severity: "info",
+                            key: result.key,
+                            path: result.path,
+                        };
+                        respond(response);
+                        return;
+                    }
+                    console.log(`Added ${node_name} to ${input}`);
+                    return;
+                }
+            }
+        });
+}
 
 // TODO: this will gladly add 2 nodes with the same name to the same parent => BUG!
 export function add_overlay_node(

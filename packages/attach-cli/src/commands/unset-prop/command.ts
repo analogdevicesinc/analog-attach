@@ -1,106 +1,78 @@
-import { buildCommand } from "@stricli/core";
+import { Command } from "commander";
 import { DeviceTree, DeviceTreeOverlay } from "attach-lib";
 
 import * as fs from 'node:fs';
 
 import { load_config } from "../../config";
 import { resolve_node_identifier } from "../../utilities";
+import type { LocalContext } from "../../context";
 
-type Flags = {
-    node: string,
-    property: string,
-    overlay: string,
-    context?: string,
+export function build_unset_property_command(_ctx: LocalContext): Command {
+    return new Command("unset-prop")
+        .description("Remove a property set by the overlay from a node in a dtso")
+        .requiredOption("--node <value>", "Target node: label, &label, path, &{path}, or label/child")
+        .requiredOption("--property <value>", "Property name to remove")
+        .requiredOption("--overlay <value>", "dtso")
+        .option("--context <value>", "The target dts")
+        .action(async (options) => {
+            const config = load_config();
+            const context = options.context ?? config.context;
+            const { node, property, overlay: input } = options;
+
+            if (context === undefined) {
+                console.log("Missing: --context (no config.toml found)");
+                return;
+            }
+
+            if (!fs.existsSync(context)) {
+                console.log(`Missing: ${context}`);
+                return;
+            }
+
+            if (!fs.existsSync(input)) {
+                console.log(`Missing: ${input} (use "create" to generate a new overlay first)`);
+                return;
+            }
+
+            const context_content = fs.readFileSync(context, 'utf8');
+            const base = DeviceTree.new_from_string(context_content);
+
+            if (typeof base === "string") {
+                console.log(`Failed to parse dts ${context}: ${base}`);
+                return;
+            }
+
+            const input_content = fs.readFileSync(input, 'utf8');
+            const overlay = DeviceTreeOverlay.new_from_string(input_content, base);
+
+            if (typeof overlay === "string") {
+                console.log(`Failed to parse dtso ${input}: ${overlay}`);
+                return;
+            }
+
+            const result = unset_overlay_property(overlay, node, property);
+
+            switch (result) {
+                case "node-not-found": {
+                    console.log(`Couldn't find node ${node} in ${input}`);
+                    return;
+                }
+                case "property-not-found": {
+                    console.log(`Couldn't find property ${property} in ${node}`);
+                    return;
+                }
+                case "not-in-overlay": {
+                    console.log(`${property} in ${node} is not set by this overlay`);
+                    return;
+                }
+                case "unset": {
+                    fs.writeFileSync(input, overlay.print());
+                    console.log(`Unset ${property} in ${node} in ${input}`);
+                    return;
+                }
+            }
+        });
 }
-
-export const unset_property_command = buildCommand({
-    parameters: {
-        flags: {
-            node: {
-                kind: "parsed",
-                parse: String,
-                brief: "Target node: label, &label, path, &{path}, or label/child",
-            },
-            property: {
-                kind: "parsed",
-                parse: String,
-                brief: "Property name to remove",
-            },
-            overlay: {
-                kind: "parsed",
-                parse: String,
-                brief: "dtso",
-            },
-            context: {
-                kind: "parsed",
-                parse: String,
-                brief: "The target dts",
-                optional: true,
-            },
-        }
-    },
-    docs: {
-        brief: "Remove a property set by the overlay from a node in a dtso"
-    },
-    async func(flags: Flags) {
-        const config = load_config();
-        const context = flags.context ?? config.context;
-        const { node, property, overlay: input } = flags;
-
-        if (context === undefined) {
-            console.log("Missing: --context (no config.toml found)");
-            return;
-        }
-
-        if (!fs.existsSync(context)) {
-            console.log(`Missing: ${context}`);
-            return;
-        }
-
-        if (!fs.existsSync(input)) {
-            console.log(`Missing: ${input} (use "create" to generate a new overlay first)`);
-            return;
-        }
-
-        const context_content = fs.readFileSync(context, 'utf8');
-        const base = DeviceTree.new_from_string(context_content);
-
-        if (typeof base === "string") {
-            console.log(`Failed to parse dts ${context}: ${base}`);
-            return;
-        }
-
-        const input_content = fs.readFileSync(input, 'utf8');
-        const overlay = DeviceTreeOverlay.new_from_string(input_content, base);
-
-        if (typeof overlay === "string") {
-            console.log(`Failed to parse dtso ${input}: ${overlay}`);
-            return;
-        }
-
-        const result = unset_overlay_property(overlay, node, property);
-
-        switch (result) {
-            case "node-not-found": {
-                console.log(`Couldn't find node ${node} in ${input}`);
-                return;
-            }
-            case "property-not-found": {
-                console.log(`Couldn't find property ${property} in ${node}`);
-                return;
-            }
-            case "not-in-overlay": {
-                console.log(`${property} in ${node} is not set by this overlay`);
-                return;
-            }
-            case "unset": {
-                fs.writeFileSync(input, overlay.print());
-                console.log(`Unset ${property} in ${node} in ${input}`);
-                return;
-            }
-        }
-    }
-});
 
 export function unset_overlay_property(
     overlay: DeviceTreeOverlay,
@@ -123,7 +95,6 @@ export function unset_overlay_property(
         return "unset";
     }
 
-    // Property not in overlay fragment — check if it's base-only
     if (found.is_in_base) {
         const dt_reference = base.get_node_by_path({ kind: "path", labels: [], path: found.node_path })!;
         const base_node = base.deref_node(dt_reference);

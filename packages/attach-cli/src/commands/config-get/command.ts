@@ -1,5 +1,5 @@
 /* eslint-disable unicorn/no-null */
-import { buildCommand } from "@stricli/core";
+import { Command } from "commander";
 
 import type { LocalContext } from "../../context";
 import { load_config } from "../../config";
@@ -48,48 +48,39 @@ const FIELD_TO_CONFIG_KEY: Record<string, keyof ReturnType<typeof load_config>> 
     "overlay": "overlay",
 };
 
-export const config_get_command = buildCommand({
-    parameters: {
-        positional: {
-            kind: "array" as const,
-            parameter: {
-                parse: String,
-                brief: "Config field names to retrieve (omit for all)",
-            },
-        },
-    },
-    docs: {
-        brief: "Get tool configuration fields",
-    },
-    async func(this: LocalContext, _flags: {}, ...fields: string[]) {
-        const current = load_config();
+export function build_config_get_command(ctx: LocalContext): Command {
+    return new Command("config-get")
+        .description("Get tool configuration fields")
+        .argument("[fields...]", "Config field names to retrieve (omit for all)")
+        .action(async (fields: string[]) => {
+            const current = load_config();
 
-        let configs = CONFIG_FIELDS;
-        if (fields.length > 0) {
-            configs = configs.filter(c => fields.includes(c.field_name));
-        }
-
-        const result: Config[] = configs.map(c => {
-            const key = FIELD_TO_CONFIG_KEY[c.field_name];
-            const value = key === undefined ? undefined : current[key];
-            return { ...c, value: value ?? null };
-        });
-
-        const response: ToolConfigResponse = {
-            ok: true,
-            message: `${result.length} config field(s)`,
-            severity: "info",
-            configs: result,
-        };
-
-        if (this.json) {
-            respond(response);
-        } else {
-            for (const c of result) {
-                const display = c.value === null ? "(not set)" : c.value;
-                const request = c.required ? " [required]" : "";
-                console.log(`${c.field_name}${request}: ${display}`);
+            let configs = CONFIG_FIELDS;
+            if (fields.length > 0) {
+                configs = configs.filter(c => fields.includes(c.field_name));
             }
-        }
-    },
-});
+
+            const result: Config[] = configs.map(c => {
+                const key = FIELD_TO_CONFIG_KEY[c.field_name];
+                const value = key === undefined ? undefined : current[key];
+                return { ...c, value: value ?? null };
+            });
+
+            const response: ToolConfigResponse = {
+                ok: true,
+                message: `${result.length} config field(s)`,
+                severity: "info",
+                configs: result,
+            };
+
+            if (ctx.json) {
+                respond(response);
+            } else {
+                for (const c of result) {
+                    const display = c.value === null ? "(not set)" : c.value;
+                    const request = c.required ? " [required]" : "";
+                    console.log(`${c.field_name}${request}: ${display}`);
+                }
+            }
+        });
+}

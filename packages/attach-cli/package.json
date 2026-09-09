@@ -49,7 +49,7 @@
     ]
   },
   "dependencies": {
-    "@stricli/core": "^1.2.6",
+    "commander": "^13.1.0",
     "smol-toml": "^1.7.1",
     "yaml": "^2.8.3"
   },

@@ -1,78 +1,72 @@
-import { buildApplication, buildRouteMap } from "@stricli/core";
+import { Command } from "commander";
 import { name, version, description } from "../package.json";
+import type { LocalContext } from "./context";
 
-import { list_devices_command } from "./commands/list-devices/command";
-import { get_schema_command } from "./commands/get-schema/command";
-import { suggest_parents_command } from "./commands/suggest-parents/command";
-import { create_command } from "./commands/create/command";
-import { add_command } from "./commands/add/command";
-import { validate_command } from "./commands/validate/command";
-import { get_property_command } from "./commands/get-prop/command";
-import { set_property_command } from "./commands/set-prop/command";
-import { unset_property_command } from "./commands/unset-prop/command";
-import { enable_command, disable_command } from "./commands/enable-disable/command";
-import { install_skill_command } from "./commands/skill/install-skill";
-import { uninstall_skill_command } from "./commands/skill/uninstall-skill";
-import { init_command } from "./commands/init/command";
-import { delete_command } from "./commands/delete/command";
-import { rename_command } from "./commands/rename/command";
-import { move_command } from "./commands/move/command";
+import { build_attach_manifest_command } from "./commands/attach-manifest/command";
+import { build_config_get_command } from "./commands/config-get/command";
+import { build_config_set_command } from "./commands/config-set/command";
+import { build_create_workfile_command } from "./commands/create-workfile/command";
+import { build_list_devices_command } from "./commands/list-devices/command";
+import { build_add_command } from "./commands/add/command";
+import { build_read_command } from "./commands/read/command";
+import { build_update_command } from "./commands/update/command";
+import { build_delete_command } from "./commands/delete/command";
+import { build_validate_command } from "./commands/validate/command";
+import { build_move_command } from "./commands/move/command";
+import { build_rename_command } from "./commands/rename/command";
+import { build_list_intelligence_command } from "./commands/list-intelligence/command";
+import { build_suggest_command } from "./commands/suggest/command";
+import { build_init_command } from "./commands/init/command";
+import { build_create_command } from "./commands/create/command";
+import { build_get_schema_command } from "./commands/get-schema/command";
+import { build_suggest_parents_command } from "./commands/suggest-parents/command";
+import { build_get_property_command } from "./commands/get-prop/command";
+import { build_set_property_command } from "./commands/set-prop/command";
+import { build_unset_property_command } from "./commands/unset-prop/command";
+import { build_enable_command, build_disable_command } from "./commands/enable-disable/command";
+import { build_install_skill_command } from "./commands/skill/install-skill";
+import { build_uninstall_skill_command } from "./commands/skill/uninstall-skill";
+import { build_completion_command } from "./commands/completion/command";
 
-import { attach_manifest_command } from "./commands/attach-manifest/command";
-import { config_get_command } from "./commands/config-get/command";
-import { config_set_command } from "./commands/config-set/command";
-import { create_workfile_command } from "./commands/create-workfile/command";
-import { read_command } from "./commands/read/command";
-import { update_command } from "./commands/update/command";
-import { list_intelligence_command } from "./commands/list-intelligence/command";
-import { suggest_command } from "./commands/suggest/command";
-import { completion_command } from "./commands/completion/command";
+export function buildApp(ctx: LocalContext): Command {
+    const program = new Command();
+    program
+        .name(name)
+        .description(description)
+        .version(version)
+        .allowUnknownOption(false);
 
-const routes = buildRouteMap({
-    routes: {
-        // protocol commands
-        attachManifest: attach_manifest_command,
-        configGet: config_get_command,
-        configSet: config_set_command,
-        createWorkfile: create_workfile_command,
-        listDevices: list_devices_command,
-        add: add_command,
-        read: read_command,
-        update: update_command,
-        delete: delete_command,
-        validate: validate_command,
-        move: move_command,
-        rename: rename_command,
-        listIntelligence: list_intelligence_command,
-        suggest: suggest_command,
+    // protocol commands
+    program.addCommand(build_attach_manifest_command(ctx));
+    program.addCommand(build_config_get_command(ctx));
+    program.addCommand(build_config_set_command(ctx));
+    program.addCommand(build_create_workfile_command(ctx));
+    program.addCommand(build_list_devices_command(ctx));
+    program.addCommand(build_add_command(ctx));
+    program.addCommand(build_read_command(ctx));
+    program.addCommand(build_update_command(ctx));
+    program.addCommand(build_delete_command(ctx));
+    program.addCommand(build_validate_command(ctx));
+    program.addCommand(build_move_command(ctx));
+    program.addCommand(build_rename_command(ctx));
+    program.addCommand(build_list_intelligence_command(ctx));
+    program.addCommand(build_suggest_command(ctx));
 
-        // human-only commands (not in manifest)
-        init: init_command,
-        create: create_command,
-        getSchema: get_schema_command,
-        suggestParents: suggest_parents_command,
-        getProp: get_property_command,
-        setProp: set_property_command,
-        unsetProp: unset_property_command,
-        enable: enable_command,
-        disable: disable_command,
+    // human-only commands
+    program.addCommand(build_init_command(ctx));
+    program.addCommand(build_create_command(ctx));
+    program.addCommand(build_get_schema_command(ctx));
+    program.addCommand(build_suggest_parents_command(ctx));
+    program.addCommand(build_get_property_command(ctx));
+    program.addCommand(build_set_property_command(ctx));
+    program.addCommand(build_unset_property_command(ctx));
+    program.addCommand(build_enable_command(ctx));
+    program.addCommand(build_disable_command(ctx));
 
-        // skill + completion management
-        installSkill: install_skill_command,
-        uninstallSkill: uninstall_skill_command,
-        completion: completion_command,
-    },
-    docs: {
-        brief: description,
-    },
-});
+    // skill + completion management
+    program.addCommand(build_install_skill_command(ctx));
+    program.addCommand(build_uninstall_skill_command(ctx));
+    program.addCommand(build_completion_command(ctx));
 
-export const app = buildApplication(routes, {
-    name,
-    versionInfo: {
-        currentVersion: version,
-    },
-    scanner: {
-        caseStyle: "allow-kebab-for-camel"
-    }
-});
+    return program;
+}

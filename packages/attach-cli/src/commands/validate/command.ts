@@ -1,4 +1,4 @@
-import { buildCommand } from "@stricli/core";
+import { Command } from "commander";
 import {
     Attach,
     DeviceTree,
@@ -18,11 +18,191 @@ import type { LocalContext } from "../../context";
 import type { ValidationError, ValidationResponse } from "../../protocol/types";
 import { respond, input_error } from "../../protocol/output";
 
-type Flags = {
-    overlay?: string,
-    linux?: string,
-    dtSchema?: string,
-    context?: string,
+export function build_validate_command(ctx: LocalContext): Command {
+    return new Command("validate")
+        .description("Validate a device node in a DTSO against its binding")
+        .option("--overlay <value>", "Path to the DTSO file containing the node")
+        .option("--linux <value>", "Path to Linux repo")
+        .option("--dt-schema <value>", "Path to dt-schema repo")
+        .option("--context <value>", "The target dts")
+        .argument("[path...]", "Path segments to the node to validate (e.g. spi0 imu1, or /soc/spi@7e204000/imu1)")
+        .action(async (path_arguments: string[], options) => {
+            const config = load_config();
+            const linux = options.linux ?? config.linux;
+            const dtSchema = options.dtSchema ?? config.dtSchema;
+            const context = options.context ?? config.context;
+            const input = options.overlay ?? config.overlay;
+
+            if (linux === undefined) {
+                if (ctx.json) { input_error("Missing: linux (no config.toml found)"); return; }
+                console.log("Missing: --linux (no config.toml found)");
+                return;
+            }
+
+            if (dtSchema === undefined) {
+                if (ctx.json) { input_error("Missing: dt-schema (no config.toml found)"); return; }
+                console.log("Missing: --dt-schema (no config.toml found)");
+                return;
+            }
+
+            if (context === undefined) {
+                if (ctx.json) { input_error("Missing: context (no config.toml found)"); return; }
+                console.log("Missing: --context (no config.toml found)");
+                return;
+            }
+
+            if (input === undefined) {
+                if (ctx.json) { input_error("Missing: overlay (no config.toml found)"); return; }
+                console.log("Missing: --overlay (no config.toml found)");
+                return;
+            }
+
+            if (!fs.existsSync(context)) {
+                if (ctx.json) { input_error(`Missing: ${context}`); return; }
+                console.log(`Missing: ${context}`);
+                return;
+            }
+
+            if (!fs.existsSync(linux)) {
+                if (ctx.json) { input_error(`Missing: ${linux}`); return; }
+                console.log(`Missing: ${linux}`);
+                return;
+            }
+
+            if (!fs.existsSync(dtSchema)) {
+                if (ctx.json) { input_error(`Missing: ${dtSchema}`); return; }
+                console.log(`Missing: ${dtSchema}`);
+                return;
+            }
+
+            if (!fs.existsSync(input)) {
+                if (ctx.json) { input_error(`Missing: ${input}`); return; }
+                console.log(`Missing: ${input}`);
+                return;
+            }
+
+            const context_content = fs.readFileSync(context, 'utf8');
+            const input_content = fs.readFileSync(input, 'utf8');
+
+            const base_dt = DeviceTree.new_from_string(context_content);
+
+            if (typeof base_dt === 'string') {
+                if (ctx.json) { input_error(`Failed to parse dts ${context}: ${base_dt}`); return; }
+                console.log(`Failed to parse dts ${context}: ${base_dt}`);
+                return;
+            }
+
+            const overlay = DeviceTreeOverlay.new_from_string(input_content, base_dt);
+
+            if (typeof overlay === 'string') {
+                if (ctx.json) { input_error(`Failed to parse dtso ${input}: ${overlay}`); return; }
+                console.log(`Failed to parse dtso ${input}: ${overlay}`);
+                return;
+            }
+
+            const node_identifier = resolve_positional_path(path_arguments);
+
+            if (node_identifier === undefined) {
+                if (ctx.json) {
+                    respond({ errors: [], warnings: [] } satisfies ValidationResponse);
+                    return;
+                }
+                console.log("No node specified");
+                return;
+            }
+
+            const searched_node = overlay.find_node(resolve_node_identifier(node_identifier, overlay));
+
+            if (searched_node === undefined) {
+                if (ctx.json) { input_error(`Couldn't find ${node_identifier} in ${input}`); return; }
+                console.log(`Couldn't find ${node_identifier} in ${input}`);
+                return;
+            }
+
+            const { node: found_node, parent_node } = searched_node;
+            const parent = found_node.labels.at(-1) ?? searched_node.node_path;
+            const path_segs = node_path_segments(searched_node.node_path);
+
+            const compatible = found_node.properties.find((property) => property.name === "compatible");
+
+            if (compatible === undefined) {
+                if (ctx.json) {
+                    const result = await validate_pattern_matched_child_proto(
+                        found_node, parent, parent_node, path_segs, linux, dtSchema, base_dt
+                    );
+                    respond(result);
+                    return;
+                }
+                await validate_pattern_matched_child(
+                    found_node, parent, parent_node, node_identifier, input, linux, dtSchema, base_dt
+                );
+                return;
+            }
+
+            const compatible_value = extract_compatible_value(compatible);
+
+            if (compatible_value === undefined) {
+                if (ctx.json) { input_error(`Unexpected value in compatible of ${node_identifier} in ${input}`); return; }
+                console.log(`Unexpected value in compatible of ${node_identifier} in ${input}`);
+                return;
+            }
+
+            const binding_path = await find_binding(linux, dtSchema, compatible_value);
+
+            if (binding_path === undefined) {
+                if (ctx.json) {
+                    respond({ errors: [{ kind: "generic", path: path_segs, message: `Failed to find binding for ${compatible_value}` }], warnings: [] } satisfies ValidationResponse);
+                    return;
+                }
+                console.log(`Failed to find binding for ${compatible_value}`);
+                return;
+            }
+
+            const initial = await Attach.new_populated_binding(binding_path, linux, dtSchema, base_dt, found_node, parent);
+
+            if (initial === undefined) {
+                if (ctx.json) {
+                    respond({ errors: [{ kind: "generic", path: [], message: `Failed to parse binding ${binding_path}` }], warnings: [] } satisfies ValidationResponse);
+                    return;
+                }
+                console.log(`Failed to parse binding ${binding_path}`);
+                return;
+            }
+
+            const input_data = Object.fromEntries(dt_to_validator_input(found_node, initial.parsed_binding));
+
+            const update = initial.attach.update_binding_by_changes(JSON.stringify(input_data, bigIntReplacer));
+
+            if (update === undefined) {
+                if (ctx.json) {
+                    respond({ errors: [{ kind: "generic", path: [], message: `Failed to update with set compatible "${compatible_value}" for ${binding_path}` }], warnings: [] } satisfies ValidationResponse);
+                    return;
+                }
+                console.log(`Failed to update with set compatible "${compatible_value}" for ${binding_path}`);
+                return;
+            }
+
+            if (ctx.json) {
+                const result: ValidationResponse = {
+                    errors: map_validation_errors(update.errors, path_segs),
+                    warnings: [],
+                };
+                respond(result);
+                return;
+            }
+
+            console.log(JSON.stringify(input_data, bigIntReplacer));
+
+            const binding = {
+                parsed_binding: Attach.populate_parsed_binding(update.binding, base_dt, JSON.stringify(input_data, bigIntReplacer), parent),
+                patterns: initial.patterns,
+            };
+
+            console.log(`============= UPDATED BINDING =============`);
+            console.log(JSON.stringify(binding.parsed_binding, bigIntReplacer, 4));
+            console.log(`============= VALIDATION ERRORS =============`);
+            console.log(JSON.stringify(update.errors));
+        });
 }
 
 function extract_compatible_value(compatible: DTProperty): string | undefined {
@@ -71,8 +251,6 @@ async function validate_pattern_matched_child_proto(
     dtSchema: string,
     base_dt: DeviceTree,
 ): Promise<ValidationResponse> {
-    const empty: ValidationResponse = { errors: [], warnings: [] };
-
     if (parent_node === undefined) {
         return { errors: [{ kind: "generic", path: node_path, message: "Node has no compatible and no parent to check patternProperties against" }], warnings: [] };
     }
@@ -250,234 +428,11 @@ async function validate_pattern_matched_child(
     console.log(JSON.stringify(update.errors));
 }
 
-export const validate_command = buildCommand({
-    parameters: {
-        flags: {
-            overlay: {
-                kind: "parsed",
-                parse: String,
-                brief: "Path to the DTSO file containing the node",
-                optional: true,
-            },
-            linux: {
-                kind: "parsed",
-                parse: String,
-                brief: "Path to Linux repo",
-                optional: true,
-            },
-            dtSchema: {
-                kind: "parsed",
-                parse: String,
-                brief: "Path to dt-schema repo",
-                optional: true,
-            },
-            context: {
-                kind: "parsed",
-                parse: String,
-                brief: "The target dts",
-                optional: true,
-            },
-        },
-        positional: {
-            kind: "array" as const,
-            parameter: {
-                parse: String,
-                brief: "Path segments to the node to validate (e.g. spi0 imu1, or /soc/spi@7e204000/imu1)",
-            },
-        },
-    },
-    docs: {
-        brief: "Validate a device node in a DTSO against its binding"
-    },
-    async func(this: LocalContext, flags: Flags, ...path_arguments: string[]) {
-        const config = load_config();
-        const linux = flags.linux ?? config.linux;
-        const dtSchema = flags.dtSchema ?? config.dtSchema;
-        const context = flags.context ?? config.context;
-        const input = flags.overlay ?? config.overlay;
-
-        if (linux === undefined) {
-            if (this.json) { input_error("Missing: linux (no config.toml found)"); return; }
-            console.log("Missing: --linux (no config.toml found)");
-            return;
-        }
-
-        if (dtSchema === undefined) {
-            if (this.json) { input_error("Missing: dt-schema (no config.toml found)"); return; }
-            console.log("Missing: --dt-schema (no config.toml found)");
-            return;
-        }
-
-        if (context === undefined) {
-            if (this.json) { input_error("Missing: context (no config.toml found)"); return; }
-            console.log("Missing: --context (no config.toml found)");
-            return;
-        }
-
-        if (input === undefined) {
-            if (this.json) { input_error("Missing: overlay (no config.toml found)"); return; }
-            console.log("Missing: --overlay (no config.toml found)");
-            return;
-        }
-
-        if (!fs.existsSync(context)) {
-            if (this.json) { input_error(`Missing: ${context}`); return; }
-            console.log(`Missing: ${context}`);
-            return;
-        }
-
-        if (!fs.existsSync(linux)) {
-            if (this.json) { input_error(`Missing: ${linux}`); return; }
-            console.log(`Missing: ${linux}`);
-            return;
-        }
-
-        if (!fs.existsSync(dtSchema)) {
-            if (this.json) { input_error(`Missing: ${dtSchema}`); return; }
-            console.log(`Missing: ${dtSchema}`);
-            return;
-        }
-
-        if (!fs.existsSync(input)) {
-            if (this.json) { input_error(`Missing: ${input}`); return; }
-            console.log(`Missing: ${input}`);
-            return;
-        }
-
-        const context_content = fs.readFileSync(context, 'utf8');
-        const input_content = fs.readFileSync(input, 'utf8');
-
-        const base_dt = DeviceTree.new_from_string(context_content);
-
-        if (typeof base_dt === 'string') {
-            if (this.json) { input_error(`Failed to parse dts ${context}: ${base_dt}`); return; }
-            console.log(`Failed to parse dts ${context}: ${base_dt}`);
-            return;
-        }
-
-        const overlay = DeviceTreeOverlay.new_from_string(input_content, base_dt);
-
-        if (typeof overlay === 'string') {
-            if (this.json) { input_error(`Failed to parse dtso ${input}: ${overlay}`); return; }
-            console.log(`Failed to parse dtso ${input}: ${overlay}`);
-            return;
-        }
-
-        // Resolve positional path to node identifier
-        const node_identifier = resolve_positional_path(path_arguments);
-
-        if (node_identifier === undefined) {
-            if (this.json) {
-                // No path = validate full workfile, return empty for now
-                respond({ errors: [], warnings: [] } satisfies ValidationResponse);
-                return;
-            }
-            console.log("No node specified");
-            return;
-        }
-
-        const searched_node = overlay.find_node(resolve_node_identifier(node_identifier, overlay));
-
-        if (searched_node === undefined) {
-            if (this.json) { input_error(`Couldn't find ${node_identifier} in ${input}`); return; }
-            console.log(`Couldn't find ${node_identifier} in ${input}`);
-            return;
-        }
-
-        const { node: found_node, parent_node } = searched_node;
-        const parent = found_node.labels.at(-1) ?? searched_node.node_path;
-        const path_segs = node_path_segments(searched_node.node_path);
-
-        const compatible = found_node.properties.find((property) => property.name === "compatible");
-
-        if (compatible === undefined) {
-            if (this.json) {
-                const result = await validate_pattern_matched_child_proto(
-                    found_node, parent, parent_node, path_segs, linux, dtSchema, base_dt
-                );
-                respond(result);
-                return;
-            }
-            await validate_pattern_matched_child(
-                found_node, parent, parent_node, node_identifier, input, linux, dtSchema, base_dt
-            );
-            return;
-        }
-
-        const compatible_value = extract_compatible_value(compatible);
-
-        if (compatible_value === undefined) {
-            if (this.json) { input_error(`Unexpected value in compatible of ${node_identifier} in ${input}`); return; }
-            console.log(`Unexpected value in compatible of ${node_identifier} in ${input}`);
-            return;
-        }
-
-        const binding_path = await find_binding(linux, dtSchema, compatible_value);
-
-        if (binding_path === undefined) {
-            if (this.json) {
-                respond({ errors: [{ kind: "generic", path: path_segs, message: `Failed to find binding for ${compatible_value}` }], warnings: [] } satisfies ValidationResponse);
-                return;
-            }
-            console.log(`Failed to find binding for ${compatible_value}`);
-            return;
-        }
-
-        const initial = await Attach.new_populated_binding(binding_path, linux, dtSchema, base_dt, found_node, parent);
-
-        if (initial === undefined) {
-            if (this.json) {
-                respond({ errors: [{ kind: "generic", path: [], message: `Failed to parse binding ${binding_path}` }], warnings: [] } satisfies ValidationResponse);
-                return;
-            }
-            console.log(`Failed to parse binding ${binding_path}`);
-            return;
-        }
-
-        const input_data = Object.fromEntries(dt_to_validator_input(found_node, initial.parsed_binding));
-
-        const update = initial.attach.update_binding_by_changes(JSON.stringify(input_data, bigIntReplacer));
-
-        if (update === undefined) {
-            if (this.json) {
-                respond({ errors: [{ kind: "generic", path: [], message: `Failed to update with set compatible "${compatible_value}" for ${binding_path}` }], warnings: [] } satisfies ValidationResponse);
-                return;
-            }
-            console.log(`Failed to update with set compatible "${compatible_value}" for ${binding_path}`);
-            return;
-        }
-
-        if (this.json) {
-            const result: ValidationResponse = {
-                errors: map_validation_errors(update.errors, path_segs),
-                warnings: [],
-            };
-            respond(result);
-            return;
-        }
-
-        // Human mode: existing 3-section output
-        console.log(JSON.stringify(input_data, bigIntReplacer));
-
-        const binding = {
-            parsed_binding: Attach.populate_parsed_binding(update.binding, base_dt, JSON.stringify(input_data, bigIntReplacer), parent),
-            patterns: initial.patterns,
-        };
-
-        console.log(`============= UPDATED BINDING =============`);
-        console.log(JSON.stringify(binding.parsed_binding, bigIntReplacer, 4));
-        console.log(`============= VALIDATION ERRORS =============`);
-        console.log(JSON.stringify(update.errors));
-    }
-});
-
 function resolve_positional_path(arguments_: string[]): string | undefined {
     if (arguments_.length === 0) { return undefined; }
     const first = arguments_[0]!;
     if (first.startsWith("/") || first.startsWith("&")) {
-        // DTS-style identifier — use first arg as-is, join rest with /
         return arguments_.length === 1 ? first : `${first}/${arguments_.slice(1).join("/")}`;
     }
-    // Protocol-style segments: join with /
     return arguments_.join("/");
 }

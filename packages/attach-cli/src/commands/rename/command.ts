@@ -1,4 +1,4 @@
-import { buildCommand } from "@stricli/core";
+import { Command } from "commander";
 import { DeviceTree, DeviceTreeOverlay } from "attach-lib";
 
 import * as fs from 'node:fs';
@@ -8,152 +8,121 @@ import { load_config } from "../../config";
 import { resolve_node_identifier } from "../../utilities";
 import { respond, respond_fail, input_error } from "../../protocol/output";
 
-type Flags = {
-    to: string,
-    overlay?: string,
-    context?: string,
+export function build_rename_command(ctx: LocalContext): Command {
+    return new Command("rename")
+        .description("Rename an overlay-added node in an existing dtso")
+        .requiredOption("--to <value>", "New node key: 'name' preserves unit addr, 'name@unit' overrides it")
+        .option("--overlay <value>", "dtso")
+        .option("--context <value>", "The target dts")
+        .argument("[path...]", "Path to node (ValidIdentifier segments)")
+        .action(async (path: string[], options) => {
+            const config = load_config();
+            const context = options.context ?? config.context;
+            const input = options.overlay ?? config.overlay;
+            const { to } = options;
+
+            if (path.length === 0) {
+                if (ctx.json) { input_error("path is required"); return; }
+                console.log("Missing: path (positional arguments)");
+                return;
+            }
+
+            if (context === undefined) {
+                if (ctx.json) { input_error("missing config: context"); return; }
+                console.log("Missing: --context (no config.toml found)");
+                return;
+            }
+
+            if (input === undefined) {
+                if (ctx.json) { input_error("missing config: overlay"); return; }
+                console.log("Missing: --overlay (no config.toml found)");
+                return;
+            }
+
+            if (!fs.existsSync(context)) {
+                if (ctx.json) { input_error(`file not found: ${context}`); return; }
+                console.log(`Missing: ${context}`);
+                return;
+            }
+
+            if (!fs.existsSync(input)) {
+                if (ctx.json) { input_error(`file not found: ${input}`); return; }
+                console.log(`Missing: ${input} (use "create" to generate a new overlay first)`);
+                return;
+            }
+
+            const context_content = fs.readFileSync(context, 'utf8');
+            const base = DeviceTree.new_from_string(context_content);
+
+            if (typeof base === "string") {
+                if (ctx.json) { input_error(`failed to parse dts: ${base}`); return; }
+                console.log(`Failed to parse dts ${context}: ${base}`);
+                return;
+            }
+
+            const input_content = fs.readFileSync(input, 'utf8');
+            const overlay = DeviceTreeOverlay.new_from_string(input_content, base);
+
+            if (typeof overlay === "string") {
+                if (ctx.json) { input_error(`failed to parse dtso: ${overlay}`); return; }
+                console.log(`Failed to parse dtso ${input}: ${overlay}`);
+                return;
+            }
+
+            const identifier = path.join("/");
+            const result = rename_overlay_target(overlay, identifier, to, path);
+
+            if (ctx.json) {
+                switch (result) {
+                    case "renamed": {
+                        fs.writeFileSync(input, overlay.print());
+                        respond({ ok: true, message: `Renamed ${identifier} to ${to}`, severity: "info" });
+                        return;
+                    }
+                    case "not-found": {
+                        respond_fail({ ok: false, message: `${identifier} not found`, severity: "error" });
+                        return;
+                    }
+                    case "in-base": {
+                        respond_fail({ ok: false, message: `${identifier} is part of the base device tree, not this overlay`, severity: "error" });
+                        return;
+                    }
+                    case "is-root": {
+                        respond_fail({ ok: false, message: "Cannot rename the root node", severity: "error" });
+                        return;
+                    }
+                    case "conflict": {
+                        respond_fail({ ok: false, message: `${to} already exists under the same parent`, severity: "error" });
+                        return;
+                    }
+                }
+            } else {
+                switch (result) {
+                    case "not-found": {
+                        console.log(`Couldn't find ${identifier} in ${input}`);
+                        return;
+                    }
+                    case "in-base": {
+                        console.log(`${identifier} is part of the base device tree (${context}), not this overlay; rename only applies to overlay-added nodes`);
+                        return;
+                    }
+                    case "is-root": {
+                        console.log("Refusing to rename the root node");
+                        return;
+                    }
+                    case "conflict": {
+                        console.log(`${to} already exists under the same parent`);
+                        return;
+                    }
+                    case "renamed": {
+                        fs.writeFileSync(input, overlay.print());
+                        console.log(`Renamed ${identifier} to ${to} in ${input}`);
+                        return;
+                    }
+                }
+            }
+        });
 }
-
-export const rename_command = buildCommand({
-    parameters: {
-        flags: {
-            to: {
-                kind: "parsed",
-                parse: String,
-                brief: "New node key: 'name' preserves unit addr, 'name@unit' overrides it",
-            },
-            overlay: {
-                kind: "parsed",
-                parse: String,
-                brief: "dtso",
-                optional: true,
-            },
-            context: {
-                kind: "parsed",
-                parse: String,
-                brief: "The target dts",
-                optional: true,
-            },
-        },
-        positional: {
-            kind: "array" as const,
-            parameter: {
-                parse: String,
-                brief: "Path to node (ValidIdentifier segments)",
-            },
-        },
-    },
-    docs: {
-        brief: "Rename an overlay-added node in an existing dtso"
-    },
-    async func(this: LocalContext, flags: Flags, ...path: string[]) {
-        const config = load_config();
-        const context = flags.context ?? config.context;
-        const input = flags.overlay ?? config.overlay;
-        const { to } = flags;
-
-        if (path.length === 0) {
-            if (this.json) { input_error("path is required"); return; }
-            console.log("Missing: path (positional arguments)");
-            return;
-        }
-
-        if (context === undefined) {
-            if (this.json) { input_error("missing config: context"); return; }
-            console.log("Missing: --context (no config.toml found)");
-            return;
-        }
-
-        if (input === undefined) {
-            if (this.json) { input_error("missing config: overlay"); return; }
-            console.log("Missing: --overlay (no config.toml found)");
-            return;
-        }
-
-        if (!fs.existsSync(context)) {
-            if (this.json) { input_error(`file not found: ${context}`); return; }
-            console.log(`Missing: ${context}`);
-            return;
-        }
-
-        if (!fs.existsSync(input)) {
-            if (this.json) { input_error(`file not found: ${input}`); return; }
-            console.log(`Missing: ${input} (use "create" to generate a new overlay first)`);
-            return;
-        }
-
-        const context_content = fs.readFileSync(context, 'utf8');
-        const base = DeviceTree.new_from_string(context_content);
-
-        if (typeof base === "string") {
-            if (this.json) { input_error(`failed to parse dts: ${base}`); return; }
-            console.log(`Failed to parse dts ${context}: ${base}`);
-            return;
-        }
-
-        const input_content = fs.readFileSync(input, 'utf8');
-        const overlay = DeviceTreeOverlay.new_from_string(input_content, base);
-
-        if (typeof overlay === "string") {
-            if (this.json) { input_error(`failed to parse dtso: ${overlay}`); return; }
-            console.log(`Failed to parse dtso ${input}: ${overlay}`);
-            return;
-        }
-
-        const identifier = path.join("/");
-        const result = rename_overlay_target(overlay, identifier, to, path);
-
-        if (this.json) {
-            switch (result) {
-                case "renamed": {
-                    fs.writeFileSync(input, overlay.print());
-                    respond({ ok: true, message: `Renamed ${identifier} to ${to}`, severity: "info" });
-                    return;
-                }
-                case "not-found": {
-                    respond_fail({ ok: false, message: `${identifier} not found`, severity: "error" });
-                    return;
-                }
-                case "in-base": {
-                    respond_fail({ ok: false, message: `${identifier} is part of the base device tree, not this overlay`, severity: "error" });
-                    return;
-                }
-                case "is-root": {
-                    respond_fail({ ok: false, message: "Cannot rename the root node", severity: "error" });
-                    return;
-                }
-                case "conflict": {
-                    respond_fail({ ok: false, message: `${to} already exists under the same parent`, severity: "error" });
-                    return;
-                }
-            }
-        } else {
-            switch (result) {
-                case "not-found": {
-                    console.log(`Couldn't find ${identifier} in ${input}`);
-                    return;
-                }
-                case "in-base": {
-                    console.log(`${identifier} is part of the base device tree (${context}), not this overlay; rename only applies to overlay-added nodes`);
-                    return;
-                }
-                case "is-root": {
-                    console.log("Refusing to rename the root node");
-                    return;
-                }
-                case "conflict": {
-                    console.log(`${to} already exists under the same parent`);
-                    return;
-                }
-                case "renamed": {
-                    fs.writeFileSync(input, overlay.print());
-                    console.log(`Renamed ${identifier} to ${to} in ${input}`);
-                    return;
-                }
-            }
-        }
-    }
-});
 
 type RenameResult = "renamed" | "not-found" | "in-base" | "is-root" | "conflict";
 

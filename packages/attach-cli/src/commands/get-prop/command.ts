@@ -1,15 +1,10 @@
-import { buildCommand } from "@stricli/core";
+import { Command } from "commander";
 import { DeviceTreeOverlay, is_dt_flag, print_property } from "attach-lib";
 
 import * as fs from 'node:fs';
 
+import type { LocalContext } from "../../context";
 import { resolve_node_identifier } from "../../utilities";
-
-type Flags = {
-    node: string,
-    property: string,
-    overlay: string,
-}
 
 export function get_property(
     overlay: DeviceTreeOverlay,
@@ -29,58 +24,41 @@ export function get_property(
     return print_property(found_property, "", 0).trim();
 }
 
-export const get_property_command = buildCommand({
-    parameters: {
-        flags: {
-            node: {
-                kind: "parsed",
-                parse: String,
-                brief: "Target node: label, &label, path, &{path}, or label/child (e.g. spi0, &spi0, /soc/spi@0, &{/soc/spi@0}, spi0/adi,ad7124-8)"
-            },
-            property: {
-                kind: "parsed",
-                parse: String,
-                brief: "Target property"
-            },
-            overlay: {
-                kind: "parsed",
-                parse: String,
-                brief: "dtso"
-            },
-        }
-    },
-    docs: {
-        brief: "Get the value of a property of a node from a DTSO"
-    },
-    async func(flags: Flags) {
-        const { node, overlay: input, property } = flags;
+export function build_get_property_command(_ctx: LocalContext): Command {
+    return new Command("get-prop")
+        .description("Get the value of a property of a node from a DTSO")
+        .requiredOption("--node <value>", "Target node: label, &label, path, &{path}, or label/child (e.g. spi0, &spi0, /soc/spi@0, &{/soc/spi@0}, spi0/adi,ad7124-8)")
+        .requiredOption("--property <value>", "Target property")
+        .requiredOption("--overlay <value>", "dtso")
+        .action(async (options) => {
+            const { node, overlay: input, property } = options;
 
-        const input_content = fs.readFileSync(input, 'utf8');
+            const input_content = fs.readFileSync(input, 'utf8');
 
-        const overlay = DeviceTreeOverlay.new_from_string(input_content);
+            const overlay = DeviceTreeOverlay.new_from_string(input_content);
 
-        if (typeof overlay === "string") {
-            console.log(`Failed to parse dtso ${input}: ${overlay}`);
-            return;
-        }
-
-        const result = get_property(overlay, node, property);
-
-        switch (result) {
-            case "node-not-found": {
-                console.log(`Couldn't find ${node} in ${input}`);
+            if (typeof overlay === "string") {
+                console.log(`Failed to parse dtso ${input}: ${overlay}`);
                 return;
             }
-            case "property-not-found": {
-                console.log(`Couldn't find ${property} in ${node} in ${input}`);
-                return;
+
+            const result = get_property(overlay, node, property);
+
+            switch (result) {
+                case "node-not-found": {
+                    console.log(`Couldn't find ${node} in ${input}`);
+                    return;
+                }
+                case "property-not-found": {
+                    console.log(`Couldn't find ${property} in ${node} in ${input}`);
+                    return;
+                }
+                default: {
+                    console.log(result);
+                }
             }
-            default: {
-                console.log(result);
-            }
-        }
-    }
-});
+        });
+}
 
 if (import.meta.vitest) {
     const { test, expect } = import.meta.vitest;

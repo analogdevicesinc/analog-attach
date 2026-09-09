@@ -1,46 +1,22 @@
-import { buildCommand } from "@stricli/core";
+import { Command } from "commander";
 import { DeviceTree, DeviceTreeOverlay, PropertyBuilder } from "attach-lib";
 
 import * as fs from 'node:fs';
 
+import type { LocalContext } from "../../context";
 import { load_config } from "../../config";
 import { resolve_node_identifier } from "../../utilities";
 
-type Flags = {
-    node: string,
-    overlay: string,
-    context?: string,
-}
-
-function make_command(status_value: "okay" | "disabled", verb: string) {
-    return buildCommand({
-        parameters: {
-            flags: {
-                node: {
-                    kind: "parsed",
-                    parse: String,
-                    brief: "Target node: label, &label, path, &{path}, or label/child",
-                },
-                overlay: {
-                    kind: "parsed",
-                    parse: String,
-                    brief: "dtso",
-                },
-                context: {
-                    kind: "parsed",
-                    parse: String,
-                    brief: "The target dts",
-                    optional: true,
-                },
-            }
-        },
-        docs: {
-            brief: `${verb} a node in a dtso by setting status = "${status_value}"`,
-        },
-        async func(flags: Flags) {
+function make_command(commandName: string, status_value: "okay" | "disabled", verb: string) {
+    return (_ctx: LocalContext): Command => new Command(commandName)
+        .description(`${verb} a node in a dtso by setting status = "${status_value}"`)
+        .requiredOption("--node <value>", "Target node: label, &label, path, &{path}, or label/child")
+        .requiredOption("--overlay <value>", "dtso")
+        .option("--context <value>", "The target dts")
+        .action(async (options) => {
             const config = load_config();
-            const context = flags.context ?? config.context;
-            const { node, overlay: input } = flags;
+            const context = options.context ?? config.context;
+            const { node, overlay: input } = options;
 
             if (context === undefined) {
                 console.log("Missing: --context (no config.toml found)");
@@ -86,12 +62,11 @@ function make_command(status_value: "okay" | "disabled", verb: string) {
                     return;
                 }
             }
-        }
-    });
+        });
 }
 
-export const enable_command = make_command("okay", "Enable");
-export const disable_command = make_command("disabled", "Disable");
+export const build_enable_command = make_command("enable", "okay", "Enable");
+export const build_disable_command = make_command("disable", "disabled", "Disable");
 
 export function set_node_status(
     base: DeviceTree,

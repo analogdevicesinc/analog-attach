@@ -1,11 +1,12 @@
 #!/usr/bin/env node
-import { run } from "@stricli/core";
 import { buildContext } from "../context";
-import { app } from "../app";
+import { buildApp } from "../app";
 
-const arguments_ = process.argv.slice(2);
-const jsonIndex = arguments_.indexOf("--json");
+const argv = process.argv.slice(2);
+const jsonIndex = argv.indexOf("--json");
 const json = jsonIndex !== -1;
-if (json) {arguments_.splice(jsonIndex, 1);}
+if (json) { argv.splice(jsonIndex, 1); }
 
-await run(app, arguments_, buildContext(process, json));
+const ctx = buildContext(json);
+const app = buildApp(ctx);
+await app.parseAsync(argv, { from: "user" });

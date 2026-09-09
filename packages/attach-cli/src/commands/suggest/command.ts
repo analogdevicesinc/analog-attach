@@ -1,4 +1,4 @@
-import { buildCommand } from "@stricli/core";
+import { Command } from "commander";
 import { Attach, DeviceTree, suggest_parents } from "attach-lib";
 import * as fs from "node:fs";
 
@@ -8,48 +8,39 @@ import { load_compat_index, save_compat_index } from "../../config";
 import { find_binding, is_compat_index_stale, build_compat_index } from "../../utilities";
 import { respond, respond_fail, input_error } from "../../protocol/output";
 
-export const suggest_command = buildCommand({
-    parameters: {
-        positional: {
-            kind: "array" as const,
-            parameter: {
-                parse: String,
-                brief: "kind followed by kind-specific args",
-            },
-        },
-    },
-    docs: {
-        brief: "Provide suggestions for a given intelligence kind",
-    },
-    async func(this: LocalContext, _flags: {}, ...arguments_: string[]) {
-        const kind = arguments_[0];
+export function build_suggest_command(ctx: LocalContext): Command {
+    return new Command("suggest")
+        .description("Provide suggestions for a given intelligence kind")
+        .argument("[args...]", "kind followed by kind-specific args")
+        .action(async (arguments_: string[]) => {
+            const kind = arguments_[0];
 
-        if (kind === undefined) {
-            if (this.json) { input_error("kind is required"); return; }
-            console.log("Missing: kind (first positional argument)");
-            return;
-        }
-
-        switch (kind) {
-            case "parent": {
-                await suggest_parent(this, arguments_.slice(1));
+            if (kind === undefined) {
+                if (ctx.json) { input_error("kind is required"); return; }
+                console.log("Missing: kind (first positional argument)");
                 return;
             }
-            case "device-key": {
-                await suggest_device_key(this, arguments_.slice(1));
-                return;
-            }
-            default: {
-                if (this.json) {
-                    respond_fail({ ok: false, message: `Unknown suggestion kind: ${kind}`, severity: "error" });
-                } else {
-                    console.log(`Unknown suggestion kind: ${kind}`);
+
+            switch (kind) {
+                case "parent": {
+                    await suggest_parent(ctx, arguments_.slice(1));
+                    return;
                 }
-                return;
+                case "device-key": {
+                    await suggest_device_key(ctx, arguments_.slice(1));
+                    return;
+                }
+                default: {
+                    if (ctx.json) {
+                        respond_fail({ ok: false, message: `Unknown suggestion kind: ${kind}`, severity: "error" });
+                    } else {
+                        console.log(`Unknown suggestion kind: ${kind}`);
+                    }
+                    return;
+                }
             }
-        }
-    },
-});
+        });
+}
 
 async function suggest_parent(context_: LocalContext, arguments_: string[]): Promise<void> {
     const compatible = arguments_[0];
