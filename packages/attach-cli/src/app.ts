@@ -17,12 +17,8 @@ import { build_move_command } from "./commands/move/command";
 import { build_rename_command } from "./commands/rename/command";
 import { build_list_intelligence_command } from "./commands/list-intelligence/command";
 import { build_suggest_command } from "./commands/suggest/command";
-import { build_init_command } from "./commands/init/command";
-import { build_create_command } from "./commands/create/command";
 import { build_get_schema_command } from "./commands/get-schema/command";
 import { build_suggest_parents_command } from "./commands/suggest-parents/command";
-import { build_get_property_command } from "./commands/get-prop/command";
-import { build_unset_property_command } from "./commands/unset-prop/command";
 import { build_enable_command, build_disable_command } from "./commands/enable-disable/command";
 import { build_install_skill_command } from "./commands/skill/install-skill";
 import { build_uninstall_skill_command } from "./commands/skill/uninstall-skill";
@@ -54,12 +50,8 @@ export function buildApp(context: LocalContext): Command {
     program.addCommand(build_suggest_command(context));
 
     // human-only commands
-    program.addCommand(build_init_command(context));
-    program.addCommand(build_create_command(context));
     program.addCommand(build_get_schema_command(context));
     program.addCommand(build_suggest_parents_command(context));
-    program.addCommand(build_get_property_command(context));
-    program.addCommand(build_unset_property_command(context));
     program.addCommand(build_enable_command(context));
     program.addCommand(build_disable_command(context));
 
