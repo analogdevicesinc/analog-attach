@@ -30,19 +30,36 @@ The `prebuild` step runs `tsc --noEmit` for type-checking; the actual output is 
 
 ### Command structure
 
-Commands are registered in `src/app.ts` using `@stricli/core`. Each command lives in `src/commands/<name>/command.ts` and exports a single `buildCommand(...)` value. Adding a new command requires:
+Commands are registered in `src/app.ts` using `commander`. Each command lives in `src/commands/<name>/command.ts` and exports a `build_<name>_command(ctx)` function. Adding a new command requires:
 1. Creating `src/commands/<name>/command.ts`
 2. Importing and registering it in `src/app.ts`
 
-Entry points are `src/bin/cli.ts` (the `attach` binary) and `src/bin/bash-complete.ts` (shell completion helper).
+The entry point is `src/bin/cli.ts`, which strips the `--json` flag from argv before handing off to `commander`, then builds a `LocalContext` with `json: boolean` that every command receives.
+
+### JSON protocol mode
+
+All commands accept a global `--json` flag (stripped in `cli.ts` before `commander` sees it) that switches output from human-readable `console.log` to JSON on stdout. The protocol layer lives in `src/protocol/`:
+
+- `output.ts`: `respond()` / `respond_fail()` write JSON to stdout; `input_error()` writes to stderr with exit code 2; `diagnostic()` writes non-fatal info to stderr.
+- `types.ts`: Typed response interfaces for each command (`AddResponse`, `ReadResponse`, `ValidationResponse`, etc.) as well as the shared `CommonResponse`.
+
+Commands in `src/app.ts` are annotated with `// protocol commands` (used by AI tooling) vs `// human-only commands`.
+
+### Configuration and workspace state
+
+`src/config.ts` manages two files in `.analog-attach/` (relative to CWD):
+- `config.toml`: stores `linux`, `dt-schema`, `context`, `overlay` paths; loaded by every command that operates on files.
+- `compat-index.json`: a binding compatibility index keyed by compatible string → YAML file path; rebuilt when stale (mtime-based).
+
+Every command resolves its paths as: `--flag` → `config.toml` value → `undefined` (print diagnostic and return).
 
 ### Dependency on attach-lib
 
-`attach-lib` is a dev dependency resolved from the workspace. `tsup` bundles it into the output via `noExternal: ["attach-lib"]`, so the published `dist/` is self-contained. The `yaml` package is intentionally kept external (it stays a runtime dependency in `node_modules`).
+`attach-lib` is a dev dependency resolved from the workspace. `tsup` bundles it into the output via `noExternal: ["attach-lib"]`, so the published `dist/` is self-contained. The `yaml` package is intentionally kept external.
 
 ### Bundled dt-schema
 
-A bundled copy of `dt-schema` lives at `bundled/dt-schema/` inside the package. Commands accept `--dt-schema` to override this path, but the bundled version is used by default. The path to the bundled copy is resolved at runtime relative to the dist directory in `src/commands/skill/utilities.ts:getBundledDtSchemaPath`.
+A bundled copy of `dt-schema` lives at `bundled/dt-schema/` inside the package. Commands accept `--dt-schema` to override this path, but the bundled version is used by default. The path is resolved at runtime relative to the dist directory in `src/commands/skill/utilities.ts:getBundledDtSchemaPath`.
 
 ### set-prop value format
 
@@ -53,15 +70,15 @@ The `--value` argument for `set-prop` uses a custom mini-syntax parsed in `src/c
 - Array: `[item1; item2; item3]` (semicolon-separated, no trailing)
 - Matrix row: `[a; b], [c; d]` (comma-separated bracket groups)
 
-Numbers are parsed as `bigint`. Strings that aren't numbers stay as strings. This distinction drives which `create_cell_array` / `create_string_array` helper from `attach-lib` gets called.
+Numbers are parsed as `bigint`. Strings that aren't numbers stay as strings.
 
 ### Skill installation
 
-`installSkill` / `uninstallSkill` commands copy `SKILL.md` to `~/.claude/skills/attach/SKILL.md`. The same logic runs as a `postinstall` script (`scripts/postinstall.js`) but prompts interactively and skips in CI (`CI` env var). The installed skill teaches Claude Code how to use each CLI command.
+`installSkill` / `uninstallSkill` commands copy `SKILL.md` to `~/.claude/skills/attach/SKILL.md`. The same logic runs as a `postinstall` script (`scripts/postinstall.js`) but prompts interactively and skips in CI (`CI` env var).
 
 ## Key Conventions
 
-- All commands follow the pattern: validate flag paths → parse files → call `attach-lib` → `console.log` output. Commands never throw to the user; they print a diagnostic and return early.
+- All commands follow the pattern: validate flag paths → parse files → call `attach-lib` → `console.log` or `respond()` output. Commands never throw to the user; they print a diagnostic and return early.
 - `bigIntReplacer` in `src/utilities.ts` must be passed to `JSON.stringify` whenever output contains `BigInt` values (DTS cell arrays are always `bigint`).
-- Inline tests use Vitest's `includeSource` feature — `if (import.meta.vitest)` blocks sit directly in source files (see `src/utilities.ts`).
+- Inline tests use Vitest's `includeSource` feature — `if (import.meta.vitest)` blocks sit directly in source files (see `src/commands/add/command.ts`).
 - TypeScript is configured with `noUncheckedIndexedAccess`, `noPropertyAccessFromIndexSignature`, and `verbatimModuleSyntax` — stricter than the monorepo baseline. Index access always requires a `undefined` check.
