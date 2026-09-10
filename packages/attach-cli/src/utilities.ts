@@ -1,15 +1,8 @@
 import {
     Attach,
     extract_compatible,
-    is_dt_flag,
-    type DTNode,
-    type DTProperty,
-    type DTValue,
-    type DTNumber,
     type DTLabel,
-    type DTPath,
-    type DTExpression,
-    type ParsedBinding
+    type DTPath
 } from 'attach-lib';
 
 import { DeviceTreeOverlay } from 'attach-lib';
