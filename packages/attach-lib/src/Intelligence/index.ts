@@ -18,6 +18,7 @@ export {
 export {
     suggest_parents,
     suggest_parents_impl,
+    extract_compatible,
     DTCommDeviceTypes,
     type PathAndLabel,
 } from "./parents.js";

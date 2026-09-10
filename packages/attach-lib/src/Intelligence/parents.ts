@@ -1,6 +1,5 @@
 import { ParsedBinding } from "../Attach/AttachTypes.js";
 import { DeviceTree, DTNode } from "../Devicetree/index.js";
-import { extract_compatible } from "../DtQuery.js";
 
 export type PathAndLabel = {
     path: string[];
@@ -120,6 +119,32 @@ export function suggest_parents_impl(devicetree: DeviceTree, parent_types: DTCom
 
     return suggestions;
 }
+
+export function extract_compatible(node: ParsedBinding): string[] | undefined {
+
+    const compatible = node.properties.find((value) => value.key === "compatible");
+
+    if (compatible === undefined) {
+        return;
+    }
+
+    if (compatible.value._t === "enum_array") {
+        let compatible_accumulator: string[] = [];
+
+        for (const entry of compatible.value.enum) {
+            if (typeof entry === 'string') {
+                compatible_accumulator.push(entry);
+            } else if (Array.isArray(entry)) {
+                compatible_accumulator = [...compatible_accumulator, ...entry];
+            }
+        }
+
+        return compatible_accumulator;
+    } else if (compatible.value._t === 'const') {
+        return [compatible.value.const];
+    }
+}
+
 
 if (import.meta.vitest) {
     const { test, expect } = import.meta.vitest;

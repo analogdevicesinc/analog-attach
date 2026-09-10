@@ -142,6 +142,7 @@ export class Attach {
         };
     }
 
+
     public static populate_properties(
         properties: ResolvedProperty[],
         devicetree: DeviceTree,
