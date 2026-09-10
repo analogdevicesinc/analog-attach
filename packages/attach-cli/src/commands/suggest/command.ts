@@ -8,7 +8,7 @@ import { load_compat_index, save_compat_index } from "../../config";
 import { find_binding, is_compat_index_stale, build_compat_index } from "../../utilities";
 import { respond, respond_fail, input_error } from "../../protocol/output";
 
-export function build_suggest_command(ctx: LocalContext): Command {
+export function build_suggest_command(context: LocalContext): Command {
     return new Command("suggest")
         .description("Provide suggestions for a given intelligence kind")
         .argument("[args...]", "kind followed by kind-specific args")
@@ -16,22 +16,22 @@ export function build_suggest_command(ctx: LocalContext): Command {
             const kind = arguments_[0];
 
             if (kind === undefined) {
-                if (ctx.json) { input_error("kind is required"); return; }
+                if (context.json) { input_error("kind is required"); return; }
                 console.log("Missing: kind (first positional argument)");
                 return;
             }
 
             switch (kind) {
                 case "parent": {
-                    await suggest_parent(ctx, arguments_.slice(1));
+                    await suggest_parent(context, arguments_.slice(1));
                     return;
                 }
                 case "device-key": {
-                    await suggest_device_key(ctx, arguments_.slice(1));
+                    await suggest_device_key(context, arguments_.slice(1));
                     return;
                 }
                 default: {
-                    if (ctx.json) {
+                    if (context.json) {
                         respond_fail({ ok: false, message: `Unknown suggestion kind: ${kind}`, severity: "error" });
                     } else {
                         console.log(`Unknown suggestion kind: ${kind}`);

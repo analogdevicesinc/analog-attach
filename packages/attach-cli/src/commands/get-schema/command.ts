@@ -7,7 +7,7 @@ import type { LocalContext } from "../../context";
 import { bigIntReplacer, find_binding } from "../../utilities";
 import { load_config } from "../../config";
 
-export function build_get_schema_command(_ctx: LocalContext): Command {
+export function build_get_schema_command(_context: LocalContext): Command {
     return new Command("get-schema")
         .description("Get the parsed binding schema for a device")
         .requiredOption("--compatible <value>", "Compatible string of the desired device binding")

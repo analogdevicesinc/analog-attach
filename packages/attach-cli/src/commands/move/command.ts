@@ -8,7 +8,7 @@ import { resolve_node_identifier } from "../../utilities";
 import { load_config } from "../../config";
 import { respond, respond_fail, input_error } from "../../protocol/output";
 
-export function build_move_command(ctx: LocalContext): Command {
+export function build_move_command(context_: LocalContext): Command {
     return new Command("move")
         .description("Move an overlay-added node to a different parent in an existing dtso")
         .requiredOption("--to <value...>", "Destination parent: label, &label, path, &{path}, or label/child")
@@ -22,31 +22,31 @@ export function build_move_command(ctx: LocalContext): Command {
             const to: string = (options.to as string[]).join("/");
 
             if (path.length === 0) {
-                if (ctx.json) { input_error("path is required"); return; }
+                if (context_.json) { input_error("path is required"); return; }
                 console.log("Missing: path (positional arguments)");
                 return;
             }
 
             if (context === undefined) {
-                if (ctx.json) { input_error("missing config: context"); return; }
+                if (context_.json) { input_error("missing config: context"); return; }
                 console.log("Missing: --context (no config.toml found)");
                 return;
             }
 
             if (input === undefined) {
-                if (ctx.json) { input_error("missing config: overlay"); return; }
+                if (context_.json) { input_error("missing config: overlay"); return; }
                 console.log("Missing: --overlay (no config.toml found)");
                 return;
             }
 
             if (!fs.existsSync(context)) {
-                if (ctx.json) { input_error(`file not found: ${context}`); return; }
+                if (context_.json) { input_error(`file not found: ${context}`); return; }
                 console.log(`Missing: ${context}`);
                 return;
             }
 
             if (!fs.existsSync(input)) {
-                if (ctx.json) { input_error(`file not found: ${input}`); return; }
+                if (context_.json) { input_error(`file not found: ${input}`); return; }
                 console.log(`Missing: ${input} (use "create" to generate a new overlay first)`);
                 return;
             }
@@ -55,7 +55,7 @@ export function build_move_command(ctx: LocalContext): Command {
             const base = DeviceTree.new_from_string(context_content);
 
             if (typeof base === "string") {
-                if (ctx.json) { input_error(`failed to parse dts: ${base}`); return; }
+                if (context_.json) { input_error(`failed to parse dts: ${base}`); return; }
                 console.log(`Failed to parse dts ${context}: ${base}`);
                 return;
             }
@@ -64,7 +64,7 @@ export function build_move_command(ctx: LocalContext): Command {
             const overlay = DeviceTreeOverlay.new_from_string(input_content, base);
 
             if (typeof overlay === "string") {
-                if (ctx.json) { input_error(`failed to parse dtso: ${overlay}`); return; }
+                if (context_.json) { input_error(`failed to parse dtso: ${overlay}`); return; }
                 console.log(`Failed to parse dtso ${input}: ${overlay}`);
                 return;
             }
@@ -72,7 +72,7 @@ export function build_move_command(ctx: LocalContext): Command {
             const identifier = path.join("/");
             const result = move_overlay_node(base, overlay, identifier, to);
 
-            if (ctx.json) {
+            if (context_.json) {
                 switch (result) {
                     case "moved": {
                         fs.writeFileSync(input, overlay.print());

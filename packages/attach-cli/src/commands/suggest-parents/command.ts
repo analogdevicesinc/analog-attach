@@ -7,7 +7,7 @@ import type { LocalContext } from "../../context";
 import { find_binding } from "../../utilities";
 import { load_config } from "../../config";
 
-export function build_suggest_parents_command(_ctx: LocalContext): Command {
+export function build_suggest_parents_command(_context: LocalContext): Command {
     return new Command("suggest-parents")
         .description("Suggest valid parent nodes for a device in a DTS context")
         .requiredOption("--compatible <value>", "Compatible string of the desired device binding")

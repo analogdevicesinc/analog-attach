@@ -7,7 +7,7 @@ import { load_config, save_config } from "../../config";
 import { find_binding } from "../../utilities";
 import { respond, respond_fail, input_error } from "../../protocol/output";
 
-export function build_create_workfile_command(ctx: LocalContext): Command {
+export function build_create_workfile_command(context: LocalContext): Command {
     return new Command("create-workfile")
         .description("Create a new workfile (DTSO overlay)")
         .option("--compatible <value>", "Compatible string of the desired device binding")
@@ -22,25 +22,25 @@ export function build_create_workfile_command(ctx: LocalContext): Command {
             const { compatible, parent, label } = options;
 
             if (linux === undefined) {
-                if (ctx.json) { input_error("Missing: linux (not configured)"); return; }
+                if (context.json) { input_error("Missing: linux (not configured)"); return; }
                 console.log("Missing: --linux (no config.toml found)");
                 return;
             }
 
             if (dtSchema === undefined) {
-                if (ctx.json) { input_error("Missing: dt-schema (not configured)"); return; }
+                if (context.json) { input_error("Missing: dt-schema (not configured)"); return; }
                 console.log("Missing: --dt-schema (no config.toml found)");
                 return;
             }
 
             if (!fs.existsSync(linux)) {
-                if (ctx.json) { input_error(`Missing: ${linux}`); return; }
+                if (context.json) { input_error(`Missing: ${linux}`); return; }
                 console.log(`Missing: ${linux}`);
                 return;
             }
 
             if (!fs.existsSync(dtSchema)) {
-                if (ctx.json) { input_error(`Missing: ${dtSchema}`); return; }
+                if (context.json) { input_error(`Missing: ${dtSchema}`); return; }
                 console.log(`Missing: ${dtSchema}`);
                 return;
             }
@@ -48,7 +48,7 @@ export function build_create_workfile_command(ctx: LocalContext): Command {
             if (compatible !== undefined) {
                 const binding = await find_binding(linux, dtSchema, compatible);
                 if (binding === undefined) {
-                    if (ctx.json) {
+                    if (context.json) {
                         respond_fail({ ok: false, message: `Failed to find binding for ${compatible}`, severity: "error" });
                     } else {
                         console.log(`Failed to find binding for ${compatible}`);
@@ -83,7 +83,7 @@ ${target_reference} {
 
             save_config({ overlay: output_path });
 
-            if (ctx.json) {
+            if (context.json) {
                 respond({ ok: true, message: `Created workfile`, severity: "info", path: output_path });
             } else {
                 console.log(`Wrote ${output_path}`);

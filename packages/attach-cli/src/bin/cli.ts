@@ -7,6 +7,6 @@ const jsonIndex = argv.indexOf("--json");
 const json = jsonIndex !== -1;
 if (json) { argv.splice(jsonIndex, 1); }
 
-const ctx = buildContext(json);
-const app = buildApp(ctx);
+const context = buildContext(json);
+const app = buildApp(context);
 await app.parseAsync(argv, { from: "user" });

@@ -2,7 +2,7 @@ import { Command } from "commander";
 import { isSkillInstalled, uninstallSkill } from "./utilities";
 import type { LocalContext } from "../../context";
 
-export function build_uninstall_skill_command(_ctx: LocalContext): Command {
+export function build_uninstall_skill_command(_context: LocalContext): Command {
     return new Command("uninstall-skill")
         .description("Uninstall the Attach skill from Claude Code")
         .action(async () => {

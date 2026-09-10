@@ -18,7 +18,7 @@ import type { LocalContext } from "../../context";
 import type { ValidationError, ValidationResponse } from "../../protocol/types";
 import { respond, input_error } from "../../protocol/output";
 
-export function build_validate_command(ctx: LocalContext): Command {
+export function build_validate_command(context_: LocalContext): Command {
     return new Command("validate")
         .description("Validate a device node in a DTSO against its binding")
         .option("--overlay <value>", "Path to the DTSO file containing the node")
@@ -34,49 +34,49 @@ export function build_validate_command(ctx: LocalContext): Command {
             const input = options.overlay ?? config.overlay;
 
             if (linux === undefined) {
-                if (ctx.json) { input_error("Missing: linux (no config.toml found)"); return; }
+                if (context_.json) { input_error("Missing: linux (no config.toml found)"); return; }
                 console.log("Missing: --linux (no config.toml found)");
                 return;
             }
 
             if (dtSchema === undefined) {
-                if (ctx.json) { input_error("Missing: dt-schema (no config.toml found)"); return; }
+                if (context_.json) { input_error("Missing: dt-schema (no config.toml found)"); return; }
                 console.log("Missing: --dt-schema (no config.toml found)");
                 return;
             }
 
             if (context === undefined) {
-                if (ctx.json) { input_error("Missing: context (no config.toml found)"); return; }
+                if (context_.json) { input_error("Missing: context (no config.toml found)"); return; }
                 console.log("Missing: --context (no config.toml found)");
                 return;
             }
 
             if (input === undefined) {
-                if (ctx.json) { input_error("Missing: overlay (no config.toml found)"); return; }
+                if (context_.json) { input_error("Missing: overlay (no config.toml found)"); return; }
                 console.log("Missing: --overlay (no config.toml found)");
                 return;
             }
 
             if (!fs.existsSync(context)) {
-                if (ctx.json) { input_error(`Missing: ${context}`); return; }
+                if (context_.json) { input_error(`Missing: ${context}`); return; }
                 console.log(`Missing: ${context}`);
                 return;
             }
 
             if (!fs.existsSync(linux)) {
-                if (ctx.json) { input_error(`Missing: ${linux}`); return; }
+                if (context_.json) { input_error(`Missing: ${linux}`); return; }
                 console.log(`Missing: ${linux}`);
                 return;
             }
 
             if (!fs.existsSync(dtSchema)) {
-                if (ctx.json) { input_error(`Missing: ${dtSchema}`); return; }
+                if (context_.json) { input_error(`Missing: ${dtSchema}`); return; }
                 console.log(`Missing: ${dtSchema}`);
                 return;
             }
 
             if (!fs.existsSync(input)) {
-                if (ctx.json) { input_error(`Missing: ${input}`); return; }
+                if (context_.json) { input_error(`Missing: ${input}`); return; }
                 console.log(`Missing: ${input}`);
                 return;
             }
@@ -87,7 +87,7 @@ export function build_validate_command(ctx: LocalContext): Command {
             const base_dt = DeviceTree.new_from_string(context_content);
 
             if (typeof base_dt === 'string') {
-                if (ctx.json) { input_error(`Failed to parse dts ${context}: ${base_dt}`); return; }
+                if (context_.json) { input_error(`Failed to parse dts ${context}: ${base_dt}`); return; }
                 console.log(`Failed to parse dts ${context}: ${base_dt}`);
                 return;
             }
@@ -95,7 +95,7 @@ export function build_validate_command(ctx: LocalContext): Command {
             const overlay = DeviceTreeOverlay.new_from_string(input_content, base_dt);
 
             if (typeof overlay === 'string') {
-                if (ctx.json) { input_error(`Failed to parse dtso ${input}: ${overlay}`); return; }
+                if (context_.json) { input_error(`Failed to parse dtso ${input}: ${overlay}`); return; }
                 console.log(`Failed to parse dtso ${input}: ${overlay}`);
                 return;
             }
@@ -103,7 +103,7 @@ export function build_validate_command(ctx: LocalContext): Command {
             const node_identifier = resolve_positional_path(path_arguments);
 
             if (node_identifier === undefined) {
-                if (ctx.json) {
+                if (context_.json) {
                     respond({ errors: [], warnings: [] } satisfies ValidationResponse);
                     return;
                 }
@@ -114,7 +114,7 @@ export function build_validate_command(ctx: LocalContext): Command {
             const searched_node = overlay.find_node(resolve_node_identifier(node_identifier, overlay));
 
             if (searched_node === undefined) {
-                if (ctx.json) { input_error(`Couldn't find ${node_identifier} in ${input}`); return; }
+                if (context_.json) { input_error(`Couldn't find ${node_identifier} in ${input}`); return; }
                 console.log(`Couldn't find ${node_identifier} in ${input}`);
                 return;
             }
@@ -126,7 +126,7 @@ export function build_validate_command(ctx: LocalContext): Command {
             const compatible = found_node.properties.find((property) => property.name === "compatible");
 
             if (compatible === undefined) {
-                if (ctx.json) {
+                if (context_.json) {
                     const result = await validate_pattern_matched_child_proto(
                         found_node, parent, parent_node, path_segs, linux, dtSchema, base_dt
                     );
@@ -142,7 +142,7 @@ export function build_validate_command(ctx: LocalContext): Command {
             const compatible_value = extract_compatible_value(compatible);
 
             if (compatible_value === undefined) {
-                if (ctx.json) { input_error(`Unexpected value in compatible of ${node_identifier} in ${input}`); return; }
+                if (context_.json) { input_error(`Unexpected value in compatible of ${node_identifier} in ${input}`); return; }
                 console.log(`Unexpected value in compatible of ${node_identifier} in ${input}`);
                 return;
             }
@@ -150,7 +150,7 @@ export function build_validate_command(ctx: LocalContext): Command {
             const binding_path = await find_binding(linux, dtSchema, compatible_value);
 
             if (binding_path === undefined) {
-                if (ctx.json) {
+                if (context_.json) {
                     respond({ errors: [{ kind: "generic", path: path_segs, message: `Failed to find binding for ${compatible_value}` }], warnings: [] } satisfies ValidationResponse);
                     return;
                 }
@@ -161,7 +161,7 @@ export function build_validate_command(ctx: LocalContext): Command {
             const initial = await Attach.new_populated_binding(binding_path, linux, dtSchema, base_dt, found_node, parent);
 
             if (initial === undefined) {
-                if (ctx.json) {
+                if (context_.json) {
                     respond({ errors: [{ kind: "generic", path: [], message: `Failed to parse binding ${binding_path}` }], warnings: [] } satisfies ValidationResponse);
                     return;
                 }
@@ -174,7 +174,7 @@ export function build_validate_command(ctx: LocalContext): Command {
             const update = initial.attach.update_binding_by_changes(JSON.stringify(input_data, bigIntReplacer));
 
             if (update === undefined) {
-                if (ctx.json) {
+                if (context_.json) {
                     respond({ errors: [{ kind: "generic", path: [], message: `Failed to update with set compatible "${compatible_value}" for ${binding_path}` }], warnings: [] } satisfies ValidationResponse);
                     return;
                 }
@@ -182,7 +182,7 @@ export function build_validate_command(ctx: LocalContext): Command {
                 return;
             }
 
-            if (ctx.json) {
+            if (context_.json) {
                 const result: ValidationResponse = {
                     errors: map_validation_errors(update.errors, path_segs),
                     warnings: [],

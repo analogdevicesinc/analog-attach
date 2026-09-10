@@ -48,7 +48,7 @@ const FIELD_TO_CONFIG_KEY: Record<string, keyof ReturnType<typeof load_config>> 
     "overlay": "overlay",
 };
 
-export function build_config_get_command(ctx: LocalContext): Command {
+export function build_config_get_command(context: LocalContext): Command {
     return new Command("config-get")
         .description("Get tool configuration fields")
         .argument("[fields...]", "Config field names to retrieve (omit for all)")
@@ -73,7 +73,7 @@ export function build_config_get_command(ctx: LocalContext): Command {
                 configs: result,
             };
 
-            if (ctx.json) {
+            if (context.json) {
                 respond(response);
             } else {
                 for (const c of result) {

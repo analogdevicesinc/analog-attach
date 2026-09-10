@@ -28,7 +28,7 @@ import { build_install_skill_command } from "./commands/skill/install-skill";
 import { build_uninstall_skill_command } from "./commands/skill/uninstall-skill";
 import { build_completion_command } from "./commands/completion/command";
 
-export function buildApp(ctx: LocalContext): Command {
+export function buildApp(context: LocalContext): Command {
     const program = new Command();
     program
         .name(name)
@@ -37,36 +37,36 @@ export function buildApp(ctx: LocalContext): Command {
         .allowUnknownOption(false);
 
     // protocol commands
-    program.addCommand(build_attach_manifest_command(ctx));
-    program.addCommand(build_config_get_command(ctx));
-    program.addCommand(build_config_set_command(ctx));
-    program.addCommand(build_create_workfile_command(ctx));
-    program.addCommand(build_list_devices_command(ctx));
-    program.addCommand(build_add_command(ctx));
-    program.addCommand(build_read_command(ctx));
-    program.addCommand(build_update_command(ctx));
-    program.addCommand(build_delete_command(ctx));
-    program.addCommand(build_validate_command(ctx));
-    program.addCommand(build_move_command(ctx));
-    program.addCommand(build_rename_command(ctx));
-    program.addCommand(build_list_intelligence_command(ctx));
-    program.addCommand(build_suggest_command(ctx));
+    program.addCommand(build_attach_manifest_command(context));
+    program.addCommand(build_config_get_command(context));
+    program.addCommand(build_config_set_command(context));
+    program.addCommand(build_create_workfile_command(context));
+    program.addCommand(build_list_devices_command(context));
+    program.addCommand(build_add_command(context));
+    program.addCommand(build_read_command(context));
+    program.addCommand(build_update_command(context));
+    program.addCommand(build_delete_command(context));
+    program.addCommand(build_validate_command(context));
+    program.addCommand(build_move_command(context));
+    program.addCommand(build_rename_command(context));
+    program.addCommand(build_list_intelligence_command(context));
+    program.addCommand(build_suggest_command(context));
 
     // human-only commands
-    program.addCommand(build_init_command(ctx));
-    program.addCommand(build_create_command(ctx));
-    program.addCommand(build_get_schema_command(ctx));
-    program.addCommand(build_suggest_parents_command(ctx));
-    program.addCommand(build_get_property_command(ctx));
-    program.addCommand(build_set_property_command(ctx));
-    program.addCommand(build_unset_property_command(ctx));
-    program.addCommand(build_enable_command(ctx));
-    program.addCommand(build_disable_command(ctx));
+    program.addCommand(build_init_command(context));
+    program.addCommand(build_create_command(context));
+    program.addCommand(build_get_schema_command(context));
+    program.addCommand(build_suggest_parents_command(context));
+    program.addCommand(build_get_property_command(context));
+    program.addCommand(build_set_property_command(context));
+    program.addCommand(build_unset_property_command(context));
+    program.addCommand(build_enable_command(context));
+    program.addCommand(build_disable_command(context));
 
     // skill + completion management
-    program.addCommand(build_install_skill_command(ctx));
-    program.addCommand(build_uninstall_skill_command(ctx));
-    program.addCommand(build_completion_command(ctx));
+    program.addCommand(build_install_skill_command(context));
+    program.addCommand(build_uninstall_skill_command(context));
+    program.addCommand(build_completion_command(context));
 
     return program;
 }

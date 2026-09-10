@@ -4,7 +4,7 @@ import type { LocalContext } from "../../context";
 import { respond } from "../../protocol/output";
 import type { ListIntelligenceResponse } from "../../protocol/types";
 
-export function build_list_intelligence_command(ctx: LocalContext): Command {
+export function build_list_intelligence_command(context: LocalContext): Command {
     return new Command("list-intelligence")
         .description("List available suggestion kinds for tab-completion and smart suggestions")
         .action(async () => {
@@ -36,7 +36,7 @@ export function build_list_intelligence_command(ctx: LocalContext): Command {
                 ],
             };
 
-            if (ctx.json) {
+            if (context.json) {
                 respond(response);
             } else {
                 for (const index of response.intelligence) {

@@ -8,7 +8,7 @@ import { load_config } from "../../config";
 import { resolve_node_identifier } from "../../utilities";
 
 function make_command(commandName: string, status_value: "okay" | "disabled", verb: string) {
-    return (_ctx: LocalContext): Command => new Command(commandName)
+    return (_context: LocalContext): Command => new Command(commandName)
         .description(`${verb} a node in a dtso by setting status = "${status_value}"`)
         .requiredOption("--node <value>", "Target node: label, &label, path, &{path}, or label/child")
         .requiredOption("--overlay <value>", "dtso")

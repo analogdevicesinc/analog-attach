@@ -6,7 +6,7 @@ import type { LocalContext } from "../../context";
 import { build_compat_index } from "../../utilities";
 import { save_compat_index } from "../../config";
 
-export function build_init_command(_ctx: LocalContext): Command {
+export function build_init_command(_context: LocalContext): Command {
     return new Command("init")
         .description("Create .analog-attach/config.toml and compat-index.json with Linux and dt-schema paths")
         .requiredOption("--linux <value>", "Path to Linux repo")

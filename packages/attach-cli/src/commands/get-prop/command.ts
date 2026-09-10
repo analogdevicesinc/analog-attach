@@ -24,7 +24,7 @@ export function get_property(
     return print_property(found_property, "", 0).trim();
 }
 
-export function build_get_property_command(_ctx: LocalContext): Command {
+export function build_get_property_command(_context: LocalContext): Command {
     return new Command("get-prop")
         .description("Get the value of a property of a node from a DTSO")
         .requiredOption("--node <value>", "Target node: label, &label, path, &{path}, or label/child (e.g. spi0, &spi0, /soc/spi@0, &{/soc/spi@0}, spi0/adi,ad7124-8)")

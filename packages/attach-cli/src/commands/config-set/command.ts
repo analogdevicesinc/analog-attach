@@ -11,7 +11,7 @@ const VALID_FIELDS: Record<string, keyof AttachConfig> = {
     "overlay": "overlay",
 };
 
-export function build_config_set_command(ctx: LocalContext): Command {
+export function build_config_set_command(context: LocalContext): Command {
     return new Command("config-set")
         .description("Set a tool configuration field")
         .argument("<field>", "Config field name")
@@ -21,7 +21,7 @@ export function build_config_set_command(ctx: LocalContext): Command {
 
             if (config_key === undefined) {
                 const valid = Object.keys(VALID_FIELDS).join(", ");
-                if (ctx.json) {
+                if (context.json) {
                     respond_fail({ ok: false, message: `Unknown config field: ${field}. Valid fields: ${valid}`, severity: "error" });
                 } else {
                     console.log(`Unknown config field: ${field}. Valid fields: ${valid}`);
@@ -31,7 +31,7 @@ export function build_config_set_command(ctx: LocalContext): Command {
 
             save_config({ [config_key]: value });
 
-            if (ctx.json) {
+            if (context.json) {
                 respond({ ok: true, message: `Set ${field} = ${value}`, severity: "info" });
             } else {
                 console.log(`Set ${field} = ${value}`);

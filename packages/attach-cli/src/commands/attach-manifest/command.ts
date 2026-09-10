@@ -3,7 +3,7 @@ import * as fs from "node:fs";
 import path from "node:path";
 import type { LocalContext } from "../../context";
 
-export function build_attach_manifest_command(_ctx: LocalContext): Command {
+export function build_attach_manifest_command(_context: LocalContext): Command {
     return new Command("attach-manifest")
         .description("Write the attach-meta manifest and print its path to stdout")
         .action(async () => {

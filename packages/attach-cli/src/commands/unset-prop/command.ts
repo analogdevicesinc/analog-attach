@@ -7,7 +7,7 @@ import { load_config } from "../../config";
 import { resolve_node_identifier } from "../../utilities";
 import type { LocalContext } from "../../context";
 
-export function build_unset_property_command(_ctx: LocalContext): Command {
+export function build_unset_property_command(_context: LocalContext): Command {
     return new Command("unset-prop")
         .description("Remove a property set by the overlay from a node in a dtso")
         .requiredOption("--node <value>", "Target node: label, &label, path, &{path}, or label/child")

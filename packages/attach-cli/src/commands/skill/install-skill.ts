@@ -2,7 +2,7 @@ import { Command } from "commander";
 import { isClaudeInstalled, isSkillInstalled, installSkill } from "./utilities";
 import type { LocalContext } from "../../context";
 
-export function build_install_skill_command(_ctx: LocalContext): Command {
+export function build_install_skill_command(_context: LocalContext): Command {
     return new Command("install-skill")
         .description("Install the Attach skill for Claude Code")
         .option("--force", "Overwrite existing skill installation")

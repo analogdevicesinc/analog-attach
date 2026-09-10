@@ -9,7 +9,7 @@ import { respond, respond_fail, input_error } from "../../protocol/output";
 import { convert_node, convert_property } from "../../protocol/dt-to-protocol";
 import type { Node } from "../../protocol/types";
 
-export function build_read_command(ctx: LocalContext): Command {
+export function build_read_command(context_: LocalContext): Command {
     return new Command("read")
         .description("Read a node subtree or property value from the overlay")
         .option("--overlay <value>", "dtso")
@@ -21,13 +21,13 @@ export function build_read_command(ctx: LocalContext): Command {
             const context = options.context ?? config.context;
 
             if (input === undefined) {
-                if (ctx.json) { input_error("Missing: overlay (not configured)"); return; }
+                if (context_.json) { input_error("Missing: overlay (not configured)"); return; }
                 console.log("Missing: --overlay (no config.toml found)");
                 return;
             }
 
             if (!fs.existsSync(input)) {
-                if (ctx.json) { input_error(`Missing: ${input}`); return; }
+                if (context_.json) { input_error(`Missing: ${input}`); return; }
                 console.log(`Missing: ${input}`);
                 return;
             }
@@ -46,7 +46,7 @@ export function build_read_command(ctx: LocalContext): Command {
                 : DeviceTreeOverlay.new_from_string(input_content, base);
 
             if (typeof overlay === "string") {
-                if (ctx.json) { input_error(`Failed to parse dtso: ${overlay}`); return; }
+                if (context_.json) { input_error(`Failed to parse dtso: ${overlay}`); return; }
                 console.log(`Failed to parse dtso ${input}: ${overlay}`);
                 return;
             }
@@ -65,7 +65,7 @@ export function build_read_command(ctx: LocalContext): Command {
                     children: children.map(c => convert_node(c)),
                 };
 
-                if (ctx.json) {
+                if (context_.json) {
                     respond(root);
                 } else {
                     console.log(overlay.print());
@@ -81,7 +81,7 @@ export function build_read_command(ctx: LocalContext): Command {
             const found = overlay.find_node(resolve_node_identifier(identifier, overlay));
 
             if (found !== undefined) {
-                if (ctx.json) {
+                if (context_.json) {
                     respond(convert_node(found.node));
                 } else {
                     print_node_human(found.node);
@@ -90,7 +90,7 @@ export function build_read_command(ctx: LocalContext): Command {
             }
 
             if (node_path.length === 0) {
-                if (ctx.json) {
+                if (context_.json) {
                     respond_fail({ ok: false, message: `Not found: ${identifier}`, severity: "error" });
                 } else {
                     console.log(`Couldn't find ${identifier} in ${input}`);
@@ -102,7 +102,7 @@ export function build_read_command(ctx: LocalContext): Command {
             const parent_found = overlay.find_node(resolve_node_identifier(parent_identifier, overlay));
 
             if (parent_found === undefined) {
-                if (ctx.json) {
+                if (context_.json) {
                     respond_fail({ ok: false, message: `Not found: ${identifier}`, severity: "error" });
                 } else {
                     console.log(`Couldn't find ${parent_identifier} in ${input}`);
@@ -112,7 +112,7 @@ export function build_read_command(ctx: LocalContext): Command {
 
             const property = parent_found.node.properties.find(p => p.name === last_segment);
             if (property === undefined) {
-                if (ctx.json) {
+                if (context_.json) {
                     respond_fail({ ok: false, message: `Not found: ${identifier}`, severity: "error" });
                 } else {
                     console.log(`Couldn't find ${last_segment} in ${parent_identifier} in ${input}`);
@@ -120,7 +120,7 @@ export function build_read_command(ctx: LocalContext): Command {
                 return;
             }
 
-            if (ctx.json) {
+            if (context_.json) {
                 respond(convert_property(property));
             } else {
                 if (is_dt_flag(property.value)) {

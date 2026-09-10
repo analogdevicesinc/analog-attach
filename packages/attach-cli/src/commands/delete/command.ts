@@ -9,7 +9,7 @@ import { resolve_node_identifier } from "../../utilities";
 import { respond, respond_fail, input_error } from "../../protocol/output";
 import type { DeletePreview } from "../../protocol/types";
 
-export function build_delete_command(ctx: LocalContext): Command {
+export function build_delete_command(context_: LocalContext): Command {
     return new Command("delete")
         .description("Delete a node or property from an existing dtso")
         .option("--overlay <value>", "dtso")
@@ -22,25 +22,25 @@ export function build_delete_command(ctx: LocalContext): Command {
             const input = options.overlay ?? config.overlay;
 
             if (context === undefined) {
-                if (ctx.json) { input_error("missing config: context"); return; }
+                if (context_.json) { input_error("missing config: context"); return; }
                 console.log("Missing: --context (no config.toml found)");
                 return;
             }
 
             if (input === undefined) {
-                if (ctx.json) { input_error("missing config: overlay"); return; }
+                if (context_.json) { input_error("missing config: overlay"); return; }
                 console.log("Missing: --overlay (no config.toml found)");
                 return;
             }
 
             if (!fs.existsSync(context)) {
-                if (ctx.json) { input_error(`file not found: ${context}`); return; }
+                if (context_.json) { input_error(`file not found: ${context}`); return; }
                 console.log(`Missing: ${context}`);
                 return;
             }
 
             if (!fs.existsSync(input)) {
-                if (ctx.json) { input_error(`file not found: ${input}`); return; }
+                if (context_.json) { input_error(`file not found: ${input}`); return; }
                 console.log(`Missing: ${input} (use "create" to generate a new overlay first)`);
                 return;
             }
@@ -49,7 +49,7 @@ export function build_delete_command(ctx: LocalContext): Command {
             const base = DeviceTree.new_from_string(context_content);
 
             if (typeof base === "string") {
-                if (ctx.json) { input_error(`failed to parse dts: ${base}`); return; }
+                if (context_.json) { input_error(`failed to parse dts: ${base}`); return; }
                 console.log(`Failed to parse dts ${context}: ${base}`);
                 return;
             }
@@ -58,7 +58,7 @@ export function build_delete_command(ctx: LocalContext): Command {
             const overlay = DeviceTreeOverlay.new_from_string(input_content, base);
 
             if (typeof overlay === "string") {
-                if (ctx.json) { input_error(`failed to parse dtso: ${overlay}`); return; }
+                if (context_.json) { input_error(`failed to parse dtso: ${overlay}`); return; }
                 console.log(`Failed to parse dtso ${input}: ${overlay}`);
                 return;
             }
@@ -75,7 +75,7 @@ export function build_delete_command(ctx: LocalContext): Command {
                         property_count: preview.property_count,
                         paths: preview.paths,
                     };
-                    if (ctx.json) {
+                    if (context_.json) {
                         respond(response);
                     } else {
                         console.log(`Would delete ${preview.node_count} node(s) and ${preview.property_count} property(ies)`);
@@ -86,7 +86,7 @@ export function build_delete_command(ctx: LocalContext): Command {
 
                 overlay.delete_all();
                 fs.writeFileSync(input, overlay.print());
-                if (ctx.json) {
+                if (context_.json) {
                     respond({ ok: true, message: "Deleted all overlay content", severity: "info" });
                 } else {
                     console.log(`Deleted all overlay content from ${input}`);
@@ -96,7 +96,7 @@ export function build_delete_command(ctx: LocalContext): Command {
 
             const identifier = path.join("/");
 
-            if (ctx.json) {
+            if (context_.json) {
                 const found = overlay.find_node(resolve_node_identifier(identifier, overlay));
 
                 if (found !== undefined && !found.is_in_base && found.parent_node !== undefined

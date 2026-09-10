@@ -6,7 +6,7 @@ import type { LocalContext } from "../../context";
 import { find_binding } from "../../utilities";
 import { load_config } from "../../config";
 
-export function build_create_command(_ctx: LocalContext): Command {
+export function build_create_command(_context: LocalContext): Command {
     return new Command("create")
         .description("Create dtso of the node with set compatible")
         .requiredOption("--compatible <value>", "Compatible string of the desired device binding")

@@ -30,7 +30,7 @@ import type { LocalContext } from "../../context";
 // set-prop --property refin1-supply --value 5regulator
 // subnodes??????????????????????????????????
 
-export function build_set_property_command(_ctx: LocalContext): Command {
+export function build_set_property_command(_context: LocalContext): Command {
     return new Command("set-prop")
         .description("Set the value of a property in a node in a dtso")
         .requiredOption("--node <value>", "Target node: label, &label, path, &{path}, or label/child (e.g. spi0, &spi0, /soc/spi@0, &{/soc/spi@0}, spi0/adi,ad7124-8)")

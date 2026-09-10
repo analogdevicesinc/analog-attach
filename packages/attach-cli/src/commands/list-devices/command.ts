@@ -6,7 +6,7 @@ import { respond, input_error } from "../../protocol/output";
 import type { ListDevicesResponse } from "../../protocol/types";
 import type { LocalContext } from "../../context";
 
-export function build_list_devices_command(ctx: LocalContext): Command {
+export function build_list_devices_command(context: LocalContext): Command {
     return new Command("list-devices")
         .description("List available devices from the compat index")
         .option("--includes-word <value>", "word to be present in device name")
@@ -16,7 +16,7 @@ export function build_list_devices_command(ctx: LocalContext): Command {
             let index = load_compat_index();
 
             if (index === undefined) {
-                if (ctx.json) {
+                if (context.json) {
                     input_error("No compat-index.json found. Run config-set first.");
                     return;
                 }
@@ -44,7 +44,7 @@ export function build_list_devices_command(ctx: LocalContext): Command {
                 entry => includesWord === undefined || entry.includes(includesWord)
             );
 
-            if (ctx.json) {
+            if (context.json) {
                 const devices = matching.map(entry => ({ tag: entry, key: entry }));
                 const response: ListDevicesResponse = {
                     ok: true,

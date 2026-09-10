@@ -15,7 +15,7 @@ import { respond, respond_fail, input_error } from "../../protocol/output";
 
 import { set_property, parse_value } from "../set-prop/command";
 
-export function build_update_command(ctx: LocalContext): Command {
+export function build_update_command(context_: LocalContext): Command {
     return new Command("update")
         .description("Update (upsert) a property value on a node in the overlay")
         .requiredOption("--with <value>", "Value to set (raw string, parsed by the tool)")
@@ -34,7 +34,7 @@ export function build_update_command(ctx: LocalContext): Command {
 
             if (path.length < 2) {
                 const message = "Path must include at least a node and a property name";
-                if (ctx.json) { input_error(message); return; }
+                if (context_.json) { input_error(message); return; }
                 console.log(message);
                 return;
             }
@@ -43,29 +43,29 @@ export function build_update_command(ctx: LocalContext): Command {
             const node_identifier = path.slice(0, -1).join("/");
 
             if (input === undefined) {
-                if (ctx.json) { input_error("Missing: overlay (not configured)"); return; }
+                if (context_.json) { input_error("Missing: overlay (not configured)"); return; }
                 console.log("Missing: --overlay (no config.toml found)");
                 return;
             }
             if (context === undefined) {
-                if (ctx.json) { input_error("Missing: context (not configured)"); return; }
+                if (context_.json) { input_error("Missing: context (not configured)"); return; }
                 console.log("Missing: --context (no config.toml found)");
                 return;
             }
             if (linux === undefined) {
-                if (ctx.json) { input_error("Missing: linux (not configured)"); return; }
+                if (context_.json) { input_error("Missing: linux (not configured)"); return; }
                 console.log("Missing: --linux (no config.toml found)");
                 return;
             }
             if (dtSchema === undefined) {
-                if (ctx.json) { input_error("Missing: dt-schema (not configured)"); return; }
+                if (context_.json) { input_error("Missing: dt-schema (not configured)"); return; }
                 console.log("Missing: --dt-schema (no config.toml found)");
                 return;
             }
 
             for (const p of [context, linux, dtSchema, input]) {
                 if (!fs.existsSync(p)) {
-                    if (ctx.json) { input_error(`Missing: ${p}`); return; }
+                    if (context_.json) { input_error(`Missing: ${p}`); return; }
                     console.log(`Missing: ${p}`);
                     return;
                 }
@@ -76,21 +76,21 @@ export function build_update_command(ctx: LocalContext): Command {
 
             const base_dt = DeviceTree.new_from_string(context_content);
             if (typeof base_dt === "string") {
-                if (ctx.json) { input_error(`Failed to parse dts: ${base_dt}`); return; }
+                if (context_.json) { input_error(`Failed to parse dts: ${base_dt}`); return; }
                 console.log(`Failed to parse dts ${context}: ${base_dt}`);
                 return;
             }
 
             const overlay = DeviceTreeOverlay.new_from_string(input_content, base_dt);
             if (typeof overlay === "string") {
-                if (ctx.json) { input_error(`Failed to parse dtso: ${overlay}`); return; }
+                if (context_.json) { input_error(`Failed to parse dtso: ${overlay}`); return; }
                 console.log(`Failed to parse dtso ${input}: ${overlay}`);
                 return;
             }
 
             const searched_node = overlay.find_node(resolve_node_identifier(node_identifier, overlay));
             if (searched_node === undefined) {
-                if (ctx.json) {
+                if (context_.json) {
                     respond_fail({ ok: false, message: `Node ${node_identifier} not found`, severity: "error" });
                 } else {
                     console.log(`Couldn't find ${node_identifier} in ${input}`);
@@ -103,7 +103,7 @@ export function build_update_command(ctx: LocalContext): Command {
 
             const compatible = found_node.properties.find(p => p.name === "compatible");
             if (compatible === undefined) {
-                if (ctx.json) {
+                if (context_.json) {
                     respond_fail({ ok: false, message: `Missing compatible in ${node_identifier}`, severity: "error" });
                 } else {
                     console.log(`Missing compatible in ${node_identifier} from ${input}`);
@@ -119,7 +119,7 @@ export function build_update_command(ctx: LocalContext): Command {
             })();
 
             if (compatible_value === undefined) {
-                if (ctx.json) {
+                if (context_.json) {
                     respond_fail({ ok: false, message: `Unexpected compatible value in ${node_identifier}`, severity: "error" });
                 } else {
                     console.log(`Unexpected value in compatible of ${node_identifier} in ${input}`);
@@ -129,7 +129,7 @@ export function build_update_command(ctx: LocalContext): Command {
 
             const binding_path = await find_binding(linux, dtSchema, compatible_value);
             if (binding_path === undefined) {
-                if (ctx.json) {
+                if (context_.json) {
                     respond_fail({ ok: false, message: `No binding found for ${compatible_value}`, severity: "error" });
                 } else {
                     console.log(`Failed to find binding for ${compatible_value}`);
@@ -139,7 +139,7 @@ export function build_update_command(ctx: LocalContext): Command {
 
             const initial = await Attach.new_populated_binding(binding_path, linux, dtSchema, base_dt, found_node, parent);
             if (initial === undefined) {
-                if (ctx.json) {
+                if (context_.json) {
                     respond_fail({ ok: false, message: `Failed to parse binding ${binding_path}`, severity: "error" });
                 } else {
                     console.log(`Failed to parse binding ${binding_path}`);
@@ -151,7 +151,7 @@ export function build_update_command(ctx: LocalContext): Command {
             const update = initial.attach.update_binding_by_changes(JSON.stringify(input_data, bigIntReplacer));
 
             if (update === undefined) {
-                if (ctx.json) {
+                if (context_.json) {
                     respond_fail({ ok: false, message: `Failed to update binding for ${compatible_value}`, severity: "error" });
                 } else {
                     console.log(`Failed to update with set compatible "${compatible_value}" for ${binding_path}`);
@@ -167,7 +167,7 @@ export function build_update_command(ctx: LocalContext): Command {
             const property_definition = binding.parsed_binding.properties.find(entry => entry.key === property_name);
 
             if (property_definition === undefined) {
-                if (ctx.json) {
+                if (context_.json) {
                     respond_fail({ ok: false, message: `Property ${property_name} not found in ${compatible_value} binding`, severity: "error" });
                 } else {
                     console.log(`Couldn't find ${property_name} in ${compatible_value} binding`);
@@ -180,13 +180,13 @@ export function build_update_command(ctx: LocalContext): Command {
 
             if (success) {
                 fs.writeFileSync(input, overlay.print());
-                if (ctx.json) {
+                if (context_.json) {
                     respond({ ok: true, message: `Updated ${property_name}`, severity: "info" });
                 } else {
                     console.log(`Set ${property_name} on ${node_identifier}`);
                 }
             } else {
-                if (ctx.json) {
+                if (context_.json) {
                     respond_fail({ ok: false, message: `Failed to set ${property_name}`, severity: "error" });
                 }
             }
