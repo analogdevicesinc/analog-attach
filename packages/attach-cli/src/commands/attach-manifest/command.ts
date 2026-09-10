@@ -58,7 +58,7 @@ export function build_attach_manifest_command(_context: LocalContext): Command {
                         argv: ["attach", "--json", "delete"],
                     },
                     "validate": {
-                        argv: ["attach", "--json", "validate"],
+                        argv: ["attach", "--json", "validate2"],
                     },
                     "move": {
                         argv: ["attach", "--json", "move"],

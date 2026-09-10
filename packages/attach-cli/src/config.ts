@@ -7,6 +7,7 @@ export interface AttachConfig {
     dtSchema?: string;
     context?: string;
     overlay?: string;
+    validationJson?: string;
 }
 
 export interface CompatIndex {
@@ -51,6 +52,7 @@ export function load_config(): AttachConfig {
         dtSchema: typeof parsed["dt-schema"] === "string" ? parsed["dt-schema"] : undefined,
         context: typeof parsed["context"] === "string" ? parsed["context"] : undefined,
         overlay: typeof parsed["overlay"] === "string" ? parsed["overlay"] : undefined,
+        validationJson: typeof parsed["validation-json"] === "string" ? parsed["validation-json"] : undefined,
     };
 }
 
@@ -67,6 +69,7 @@ export function save_config(fields: Partial<AttachConfig>): void {
         dtSchema: "dt-schema",
         context: "context",
         overlay: "overlay",
+        validationJson: "validation-json",
     };
 
     let content = "";
