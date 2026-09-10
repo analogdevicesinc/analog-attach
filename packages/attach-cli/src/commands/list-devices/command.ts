@@ -14,19 +14,24 @@ export function build_list_devices_command(context: LocalContext): Command {
             const { includesWord } = options;
 
             let index = load_compat_index();
-
-            if (index === undefined) {
-                if (context.json) {
-                    input_error("No compat-index.json found. Run config-set first.");
-                    return;
-                }
-                console.log("No compat-index.json found. Run 'attach init' first.");
-                return;
-            }
-
             const config = load_config();
 
-            if (
+            if (index === undefined) {
+                if (config.linux === undefined || config.dtSchema === undefined) {
+                    if (context.json) {
+                        input_error("No compat-index.json found and linux/dt-schema not configured. Run 'attach config-set' first.");
+                        return;
+                    }
+                    console.log("No compat-index.json found and linux/dt-schema not configured. Run 'attach config-set' first.");
+                    return;
+                }
+
+                console.error("compat-index.json not found, building...");
+                const entries = await build_compat_index(config.linux, config.dtSchema);
+                const compat_index_path = save_compat_index(entries);
+                console.error(`Written: ${compat_index_path}`);
+                index = { generated_at: Date.now(), entries };
+            } else if (
                 config.linux !== undefined &&
                 config.dtSchema !== undefined &&
                 is_compat_index_stale(index, config.linux, config.dtSchema)

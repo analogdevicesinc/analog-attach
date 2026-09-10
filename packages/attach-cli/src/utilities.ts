@@ -155,61 +155,27 @@ export async function build_compat_index(linux: string, dtSchema: string): Promi
 }
 
 export async function find_binding(linux: string, dtSchema: string, compatible_to_find: string): Promise<string | undefined> {
-    const cached_index = load_compat_index();
+    let cached_index = load_compat_index();
 
-    if (cached_index !== undefined) {
-        if (is_compat_index_stale(cached_index, linux, dtSchema)) {
-            console.error("compat-index.json is stale, rebuilding...");
-            const entries = await build_compat_index(linux, dtSchema);
-            const compat_index_path = save_compat_index(entries);
-            console.error(`Written: ${compat_index_path}`);
-            return entries[compatible_to_find];
-        }
-
-        const cached_path = cached_index.entries[compatible_to_find];
-
-        if (cached_path !== undefined && fs.existsSync(cached_path)) {
-            return cached_path;
-        }
+    if (cached_index === undefined) {
+        const entries = await build_compat_index(linux, dtSchema);
+        const compat_index_path = save_compat_index(entries);
+        console.error(`Written: ${compat_index_path}`);
+        return entries[compatible_to_find];
     }
 
-    const bindings_folder = path.resolve(linux, "Documentation", "devicetree", "bindings");
-
-    if (!fs.existsSync(bindings_folder)) {
-        console.error(`Missing ${bindings_folder}`);
-        return;
+    if (is_compat_index_stale(cached_index, linux, dtSchema)) {
+        console.error("compat-index.json is stale, rebuilding...");
+        const entries = await build_compat_index(linux, dtSchema);
+        const compat_index_path = save_compat_index(entries);
+        console.error(`Written: ${compat_index_path}`);
+        return entries[compatible_to_find];
     }
 
-    const all_files = get_all_file_paths(bindings_folder);
-    const yaml_files = all_files.filter(file => file.endsWith(".yaml"));
+    const cached_path = cached_index.entries[compatible_to_find];
 
-    for (const file of yaml_files) {
-
-        if (!fs.readFileSync(file, 'utf8').includes(compatible_to_find)) {
-            continue;
-        }
-
-        const attach = Attach.new();
-        const binding = await attach.parse_binding(file, linux, dtSchema);
-
-        if (binding === undefined) {
-            continue;
-        }
-
-        const compatible = extract_compatible(binding.parsed_binding);
-
-        if (compatible === undefined) {
-            continue;
-        }
-
-        for (const entry of compatible) {
-            // TODO fix why entry could be undefined
-            // arm/actions.yaml
-            if (entry !== undefined && entry === compatible_to_find) {
-                return file;
-            }
-        }
-
+    if (cached_path !== undefined && fs.existsSync(cached_path)) {
+        return cached_path;
     }
 
     return;

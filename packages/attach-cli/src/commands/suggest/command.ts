@@ -115,14 +115,19 @@ async function suggest_device_key(context: LocalContext, arguments_: string[]): 
     const filter = arguments_[0];
 
     let index = load_compat_index();
-    if (index === undefined) {
-        if (context.json) { input_error("No compat-index.json found. Run init or config-set first."); return; }
-        console.log("No compat-index.json found. Run 'attach init' first.");
-        return;
-    }
-
     const config = load_config();
-    if (config.linux !== undefined && config.dtSchema !== undefined && is_compat_index_stale(index, config.linux, config.dtSchema)) {
+
+    if (index === undefined) {
+        if (config.linux === undefined || config.dtSchema === undefined) {
+            if (context.json) { input_error("No compat-index.json found and linux/dt-schema not configured. Run 'attach config-set' first."); return; }
+            console.log("No compat-index.json found and linux/dt-schema not configured. Run 'attach config-set' first.");
+            return;
+        }
+
+        const entries = await build_compat_index(config.linux, config.dtSchema);
+        save_compat_index(entries);
+        index = { generated_at: Date.now(), entries };
+    } else if (config.linux !== undefined && config.dtSchema !== undefined && is_compat_index_stale(index, config.linux, config.dtSchema)) {
         const entries = await build_compat_index(config.linux, config.dtSchema);
         save_compat_index(entries);
         index = { generated_at: Date.now(), entries };
