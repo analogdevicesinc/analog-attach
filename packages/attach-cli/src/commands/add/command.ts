@@ -17,7 +17,7 @@ export function build_add_command(ctx: LocalContext): Command {
     return new Command("add")
         .description("Add a new node to an existing dtso")
         .option("--name <value>", "Node name (e.g. channel@0); defaults to the positional key")
-        .option("--to <value>", "Parent node: label, &label, path, &{path}, or label/child")
+        .option("--to <value...>", "Parent node: label, &label, path, &{path}, or label/child")
         .option("--label <value>", "Label to attach to the new node (e.g. imu1)")
         .option("--overlay <value>", "Path to the dtso file (falls back to config.toml)")
         .option("--context <value>", "The target dts (falls back to config.toml)")
@@ -31,7 +31,8 @@ export function build_add_command(ctx: LocalContext): Command {
             const context = options.context ?? config.context;
             const input = options.overlay ?? config.overlay;
             const key = keys[0];
-            const { name, to, label } = options;
+            const { name, label } = options;
+            const to: string | undefined = options.to === undefined ? undefined : (options.to as string[]).join("/");
 
             if (key === undefined && name === undefined) {
                 if (ctx.json) { input_error("key or --name required"); return; }

@@ -11,7 +11,7 @@ import { respond, respond_fail, input_error } from "../../protocol/output";
 export function build_move_command(ctx: LocalContext): Command {
     return new Command("move")
         .description("Move an overlay-added node to a different parent in an existing dtso")
-        .requiredOption("--to <value>", "Destination parent: label, &label, path, &{path}, or label/child")
+        .requiredOption("--to <value...>", "Destination parent: label, &label, path, &{path}, or label/child")
         .option("--overlay <value>", "dtso")
         .option("--context <value>", "The target dts")
         .argument("[path...]", "Path to node (ValidIdentifier segments)")
@@ -19,7 +19,7 @@ export function build_move_command(ctx: LocalContext): Command {
             const config = load_config();
             const context = options.context ?? config.context;
             const input = options.overlay ?? config.overlay;
-            const { to } = options;
+            const to: string = (options.to as string[]).join("/");
 
             if (path.length === 0) {
                 if (ctx.json) { input_error("path is required"); return; }
