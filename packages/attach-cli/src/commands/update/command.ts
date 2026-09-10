@@ -38,15 +38,19 @@ export function build_update_command(context_: LocalContext): Command {
             const dtSchema = options.dtSchema ?? config.dtSchema;
             const withValue: string = options['with'];
 
-            if (path.length < 2) {
+            const full_path = path.join("/");
+            const last_slash = full_path.lastIndexOf("/");
+            const property_name = last_slash >= 0 ? full_path.slice(last_slash + 1) : "";
+            const node_identifier = last_slash > 0
+                ? full_path.slice(0, last_slash)
+                : last_slash === 0 ? "/" : "";
+
+            if (!property_name || !node_identifier) {
                 const message = "Path must include at least a node and a property name";
                 if (context_.json) { input_error(message); return; }
                 console.log(message);
                 return;
             }
-
-            const property_name = path.at(-1)!;
-            const node_identifier = path.slice(0, -1).join("/");
 
             if (input === undefined) {
                 if (context_.json) { input_error("Missing: overlay (not configured)"); return; }
