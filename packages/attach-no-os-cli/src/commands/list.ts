@@ -1,4 +1,4 @@
-import { buildCommand, buildRouteMap } from "@stricli/core";
+import { buildCommand } from "@stricli/core";
 import {
     Board,
     boards_for_platform,
@@ -12,6 +12,7 @@ import {
     output,
     output_error,
 } from "./shared";
+import { common_ok } from "../protocol/responses";
 
 /*
  * Read-only inventory of what the tool can target. It exists because the two halves of
@@ -46,7 +47,7 @@ function describe_boards(boards: Board[], specs: PlatformSpecs): ListedBoards {
     };
 }
 
-const listBoardsCommand = buildCommand<{ json?: boolean }, []>({
+export const listBoardsCommand = buildCommand<{ json?: boolean }, []>({
     docs: { brief: "List the no-OS boards that can be generated for" },
     parameters: {
         positional: { kind: "tuple", parameters: [] },
@@ -57,19 +58,19 @@ const listBoardsCommand = buildCommand<{ json?: boolean }, []>({
     func: async (flags) => {
         const noos_path = get_setting_value("no_os_path");
         if (!noos_path.ok) {
-            output_error(flags, "config_missing", "no_os_path is not configured. Run: aa config no_os_path <path>");
+            output_error(flags, "no_os_path is not configured. Run: aa tool-config-set no_os_path <path>");
             return;
         }
 
         const specs = get_platform_specs();
         if (!specs.ok) {
-            output_error(flags, "cannot_list_platforms", specs.error.message);
+            output_error(flags, specs.error.message);
             return;
         }
 
         const boards = scan_boards(noos_path.value);
         if (!boards.ok) {
-            output_error(flags, "cannot_list_boards", boards.error.message);
+            output_error(flags, boards.error.message);
             return;
         }
 
@@ -103,9 +104,10 @@ const listBoardsCommand = buildCommand<{ json?: boolean }, []>({
         }
 
         text += `${data.generatable.length} of ${data.generatable.length + data.unsupported.length} boards can be generated for.\n`;
-        text += "Use: aa create workfile --board <name>";
+        text += "Use: aa tool-config-set board <name>, then aa create-workfile";
 
-        output(flags, text, data);
+        const message = `${data.generatable.length} of ${data.generatable.length + data.unsupported.length} boards can be generated for`;
+        output(flags, text, { ...common_ok(message), ...data });
     }
 });
 
@@ -131,7 +133,7 @@ function describe_platforms(specs: PlatformSpecs, noos_path?: string): ListedPla
     });
 }
 
-const listPlatformsCommand = buildCommand<{ json?: boolean }, []>({
+export const listPlatformsCommand = buildCommand<{ json?: boolean }, []>({
     docs: { brief: "List the schema platforms and their boards" },
     parameters: {
         positional: { kind: "tuple", parameters: [] },
@@ -142,7 +144,7 @@ const listPlatformsCommand = buildCommand<{ json?: boolean }, []>({
     func: async (flags) => {
         const specs = get_platform_specs();
         if (!specs.ok) {
-            output_error(flags, "cannot_list_platforms", specs.error.message);
+            output_error(flags, specs.error.message);
             return;
         }
 
@@ -166,14 +168,6 @@ const listPlatformsCommand = buildCommand<{ json?: boolean }, []>({
             text += "\n\nno_os_path is not configured, so boards are not shown.";
         }
 
-        output(flags, text, { platforms });
+        output(flags, text, { ...common_ok(`${platforms.length} platform${platforms.length === 1 ? "" : "s"}`), platforms });
     }
-});
-
-export const listCommand = buildRouteMap({
-    routes: {
-        boards: listBoardsCommand,
-        platforms: listPlatformsCommand,
-    },
-    docs: { brief: "List the boards and platforms this tool can target" }
 });

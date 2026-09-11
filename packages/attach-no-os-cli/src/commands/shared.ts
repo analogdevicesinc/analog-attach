@@ -3,7 +3,9 @@ import path from "node:path";
 import type { ApplicationContext } from "@stricli/core";
 import {
     export_minimal,
+    get_effective_setting_value,
     get_schemas_path,
+    get_workfile_path,
     scan_platforms,
     PlatformSpecs,
     import_minimal,
@@ -11,7 +13,6 @@ import {
     MinimalWorkfile,
     Property,
     PropertySuggestions,
-    resolve_workfile_path,
     Result,
     Workfile,
     ok,
@@ -20,18 +21,19 @@ import {
     RulesetStruct,
     RulesetDescriptor
 } from "attach-no-os-lib";
+import { RESERVED_PREFIX } from "../protocol/convert";
+import { common_error } from "../protocol/responses";
 
 // --- Types ---
 
 /**
- * Context stricli passes to every command as `this`. Commands declare it as their
- * CONTEXT type parameter, which is how the --workfile path reaches them without a
- * module-level variable.
+ * Context stricli passes to every command as `this`.
+ *
+ * There is nothing session-scoped left to carry: attach-meta forwards no global flags, so
+ * the workfile a command acts on comes from the `workfile` setting rather than from a
+ * `--workfile` flag threaded through here.
  */
-export type AttachContext = ApplicationContext & {
-    /** From the global --workfile flag (see src/argv.ts). */
-    readonly workfile_path?: string;
-};
+export type AttachContext = ApplicationContext;
 
 export type WorkfileContext = {
     path: string;
@@ -63,16 +65,15 @@ export function get_platform_specs(): Result<PlatformSpecs> {
 
 // --- Workfile Loading ---
 
-export function load_context(requested?: string): Result<WorkfileContext> {
-    // resolve_workfile_path only names workfile.json inside a directory, but reading
-    // an existing file under any name is fine — attach-meta passes --workfile as a
-    // file path. Creation still goes through resolve_workfile_path (see create.ts).
-    const path = requested && fs.existsSync(requested) && fs.statSync(requested).isFile()
-        ? requested
-        : resolve_workfile_path(requested);
+export function load_context(): Result<WorkfileContext> {
+    const resolved = get_workfile_path();
+    if (!resolved.ok) {
+        return resolved;
+    }
 
-    if (!path) {
-        return error(`No workfile found at '${requested}'`);
+    const path = resolved.value;
+    if (!fs.existsSync(path)) {
+        return error(`No workfile at '${path}'. Create one with 'aa create-workfile', or point the 'workfile' setting elsewhere.`);
     }
 
     const minimal = load_minimal_workfile(path);
@@ -86,6 +87,71 @@ export function load_context(requested?: string): Result<WorkfileContext> {
     }
 
     return ok({ path, minimal: minimal.value, workfile: workfile.value });
+}
+
+/**
+ * The root node's key.
+ *
+ * attach-meta never puts the root in a path — an empty path *is* the root — so this only
+ * has to be recognisable, and the workfile's own name is the most recognisable thing there
+ * is. `read` needs it because a `Node` must have a key; `add` needs it to explain that the
+ * root is the only place a node can go.
+ */
+export function root_key(context: WorkfileContext): string {
+    return path.basename(context.path, path.extname(context.path));
+}
+
+// --- Project Location ---
+
+/**
+ * Name of the project `generate` writes.
+ *
+ * attach-meta calls `generate` with no arguments, so the name comes from the
+ * `project_name` setting — and when that is unset, from the workfile's own directory,
+ * which is the name of the thing being built in every layout we have seen.
+ */
+export function get_project_name(context: WorkfileContext): Result<string> {
+    const configured = get_effective_setting_value("project_name");
+    if (!configured.ok) {
+        return configured;
+    }
+
+    return ok(configured.value || path.basename(path.dirname(context.path)));
+}
+
+/**
+ * Directory `build` and `deploy` act on.
+ *
+ * `project_path` names it outright. Otherwise it is where `generate` would have put the
+ * project — `<output_path>/<project_name>` — which keeps generate/build/deploy pointed at
+ * the same place from one setting. With neither, the current directory: that is the
+ * "I am already in the project" case.
+ */
+export function get_project_path(): Result<string> {
+    const configured = get_effective_setting_value("project_path");
+    if (!configured.ok) {
+        return configured;
+    }
+
+    if (configured.value) {
+        return ok(path.resolve(process.cwd(), configured.value));
+    }
+
+    const name = get_effective_setting_value("project_name");
+    if (!name.ok) {
+        return name;
+    }
+
+    if (!name.value) {
+        return ok(process.cwd());
+    }
+
+    const output_path = get_effective_setting_value("output_path");
+    if (!output_path.ok) {
+        return output_path;
+    }
+
+    return ok(path.resolve(process.cwd(), output_path.value ?? ".", name.value));
 }
 
 // --- Workfile Saving ---
@@ -110,11 +176,30 @@ export function output(flags: OutputFlags, text: string, json: unknown): void {
     }
 }
 
-export function output_error(flags: OutputFlags, error_code: string, message: string): void {
-    // stricli's run() does `exitCode ??= ...`, so setting it here survives and the
-    // shell (and attach-meta) sees a failure.
-    process.exitCode = 1;
-    output(flags, message, { error: error_code, message });
+/**
+ * Report a failed operation.
+ *
+ * The exit code is deliberately asymmetric. A shell needs a non-zero status to know the
+ * command failed, but attach-meta treats a non-zero exit as a *transport* error — the
+ * subtool is broken — and never looks at the JSON it printed. So under `--json` a failure
+ * is a successful run that reports `ok: false`, and the exit code stays 0.
+ *
+ * `response` overrides the body for the two responses that have no `ok` field of their own
+ * (see `read_failure` and `validation_failure`); `text` replaces what a human is shown when
+ * the failure is worth more than one line.
+ */
+export type ErrorOutput = {
+    response?: unknown;
+    text?: string;
+};
+
+export function output_error(flags: OutputFlags, message: string, options: ErrorOutput = {}): void {
+    if (!flags.json) {
+        // stricli's run() does `exitCode ??= ...`, so setting it here survives.
+        process.exitCode = 1;
+    }
+
+    output(flags, options.text ?? message, options.response ?? common_error(message));
 }
 
 // --- Node/Property Lookup ---
@@ -123,6 +208,32 @@ export type NodePropertyResult = {
     node: RulesetStruct | RulesetDescriptor;
     property: Property;
 };
+
+/**
+ * The property `name` refers to, supplying a leading `$` if that is what it takes to match.
+ *
+ * `$init_param` is the property people type most, and `$` is the one character a shell will
+ * not hand us: unquoted, `$init_param` expands to nothing, so it has to be written
+ * `'$init_param'` every single time. Accepting a bare `init_param` costs nothing and spares
+ * that. An exact match always wins, so a schema that one day declares a real `init_param`
+ * field keeps it, and a name that matches neither form is returned unchanged so the caller
+ * reports it the way the user typed it.
+ *
+ * Callers should use the resolved name from here on — `lookup.value.property.name` after a
+ * `get_node_property`, which is always the canonical one — since the lib only knows the
+ * workfile's own spelling.
+ */
+export function resolve_property_name(
+    node: RulesetStruct | RulesetDescriptor,
+    name: string
+): string {
+    if (node.properties.some(candidate => candidate.name === name)) {
+        return name;
+    }
+
+    const reserved = `${RESERVED_PREFIX}${name}`;
+    return node.properties.some(candidate => candidate.name === reserved) ? reserved : name;
+}
 
 export function get_node_property(
     context: WorkfileContext,
@@ -138,7 +249,8 @@ export function get_node_property(
         return error(`Node '${node_name}' is not a struct or descriptor`);
     }
 
-    const property = node.properties.find(p => p.name === property_name);
+    const resolved = resolve_property_name(node, property_name);
+    const property = node.properties.find(p => p.name === resolved);
     if (!property) {
         return error(`Property '${property_name}' not found. Available: ${node.properties.map(p => p.name).join(", ")}`);
     }

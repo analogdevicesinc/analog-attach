@@ -13,10 +13,10 @@ PROJECT_NAME="e2e_test_adt7420"
 TARGET_MCU="max32690"
 
 configure_nodes() {
-    $AA create node max_i2c_ip platforms/maxim/max32690/max_i2c_init_param.yaml
-    $AA create node no_os_i2c_ip no-os/i2c/no_os_i2c_init_param.yaml
-    $AA create node adt7420_ip devices/adt7420/adt7420_init_param.yaml
-    $AA create node adt7420_device devices/adt7420/adt7420.yaml
+    $AA add --name max_i2c_ip --key platforms/maxim/max32690/max_i2c_init_param.yaml
+    $AA add --name no_os_i2c_ip --key no-os/i2c/no_os_i2c_init_param.yaml
+    $AA add --name adt7420_ip --key devices/adt7420/adt7420_init_param.yaml
+    $AA add --name adt7420_device --key devices/adt7420/adt7420.yaml
 
     # Configure the Maxim I2C init_param
     $AA update max_i2c_ip vssel MXC_GPIO_VSSEL_VDDIOH

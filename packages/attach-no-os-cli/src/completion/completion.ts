@@ -8,12 +8,15 @@ import {
     get_schemas_path,
     get_setting_value,
     get_settings,
+    get_workfile_path,
     list_template_sets,
     SettingsFile,
     MinimalWorkfile,
+    Workfile,
 } from "attach-no-os-lib";
 import type { AttachContext } from "../commands/shared";
-import { get_platform_specs } from "../commands/shared";
+import { get_platform_specs, resolve_property_name } from "../commands/shared";
+import { RESERVED_PREFIX } from "../protocol/convert";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -43,13 +46,16 @@ export function filter_completions(suggestions: string[], partial: string): stri
     return suggestions.filter(s => s.startsWith(partial));
 }
 
+// Read straight off disk rather than through load_context: a completion request must
+// answer in milliseconds and must never print, so a malformed workfile degrades to no
+// suggestions instead of an error.
 function load_workfile_for_completion(): MinimalWorkfile | undefined {
-    const workfile_path = path.join(process.cwd(), "workfile.json");
-    if (!fs.existsSync(workfile_path)) {
+    const resolved = get_workfile_path();
+    if (!resolved.ok || !fs.existsSync(resolved.value)) {
         return;
     }
     try {
-        const content = fs.readFileSync(workfile_path, "utf8");
+        const content = fs.readFileSync(resolved.value, "utf8");
         return JSON.parse(content) as MinimalWorkfile;
     } catch {
         return;
@@ -83,7 +89,27 @@ export function get_property_names(node_name: string): string[] {
         return [];
     }
 
-    return symbol.properties.filter(p => !p.disabled).map(p => p.name);
+    return symbol.properties
+        .filter(p => !p.disabled)
+        // Proposed without the `$`, which is the form that survives being typed: a shell
+        // expands an unquoted `$init_param` to nothing, and every command that takes a
+        // property name accepts the bare spelling (resolve_property_name). `read` still
+        // *displays* the workfile's own key, since that is what the file contains.
+        .map(p => p.name.startsWith(RESERVED_PREFIX) ? p.name.slice(RESERVED_PREFIX.length) : p.name);
+}
+
+/**
+ * A typed property name as the lib spells it, so value suggestions survive the bare form
+ * proposed above. Falls back to the input for anything unresolvable — a completion never
+ * errors, it just runs out of suggestions.
+ */
+function canonical_property_name(workfile: Workfile, node_name: string, property_name: string): string {
+    const symbol = workfile.symbols[node_name];
+    if (!symbol || (symbol._t !== "RulesetStruct" && symbol._t !== "RulesetDescriptor")) {
+        return property_name;
+    }
+
+    return resolve_property_name(symbol, property_name);
 }
 
 export function get_value_suggestions(node_name: string, property_name: string): string[] {
@@ -97,7 +123,8 @@ export function get_value_suggestions(node_name: string, property_name: string):
         return [];
     }
 
-    const suggestions = suggest_for_property(result.value, node_name, property_name);
+    const resolved = canonical_property_name(result.value, node_name, property_name);
+    const suggestions = suggest_for_property(result.value, node_name, resolved);
     if (!suggestions.ok) {
         return [];
     }
@@ -117,7 +144,8 @@ export function get_union_value_suggestions(node_name: string, property_name: st
     }
 
     // The lib resolves the union member's include type and returns the matching symbols.
-    const suggestions = suggest_for_property(result.value, node_name, property_name, member_name);
+    const resolved = canonical_property_name(result.value, node_name, property_name);
+    const suggestions = suggest_for_property(result.value, node_name, resolved, member_name);
     if (!suggestions.ok) {
         return [];
     }

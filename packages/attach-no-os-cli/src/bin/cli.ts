@@ -4,28 +4,25 @@ import { app } from "../app";
 import { CompletionContext } from "../completion/completion";
 import { normalize_argv } from "../argv";
 import type { AttachContext } from "../commands/shared";
-import { resolve_route } from "../protocol";
 
 const raw_arguments = process.argv.slice(2);
 
 // --- completions ---
 //
-// `aa complete <route> <partial> [prior tokens...]`, shared by attach-meta and
-// completion/aa.bash. <route> is a discovery key (`create_node`), a literal route
-// word (`create`), or empty to complete the top-level routes; resolve_route maps all
-// three to the prefix stricli expects, so the per-parameter proposeCompletions hooks
-// do the real work unchanged.
+// `aa complete <route> <partial> [prior tokens...]`, used by completion/aa.bash.
+//
+// attach-meta does not come through here: it drives completion through `list-intelligence`
+// and `suggest` instead (see src/commands/intelligence.ts). This entry point exists for the
+// shell, where stricli's own per-parameter hooks give better answers than a suggestion kind
+// can — they know about flags too.
 if (raw_arguments[0] === "complete") {
     const [, key, partial, ...tokens] = raw_arguments;
 
-    const route = resolve_route(key);
-    if (!route) {
-        // Unsupported key. Exit silent: a completion request is not user-visible, and
-        // anything printed here lands in their shell.
-        process.exit(0);
-    }
-
-    const words = [...route, ...tokens, partial ?? ""];
+    // Every route is one word now that the commands are named after the protocol, so the
+    // route is the key itself; an empty key completes the top-level route names. A
+    // two-word route (`completion install`) arrives with its second word among the tokens,
+    // which land after the route either way.
+    const words = [...(key ? [key] : []), ...tokens, partial ?? ""];
     const context: CompletionContext = { process, completionInputs: words };
     const completions = await proposeCompletions(app, words, context);
 
@@ -44,9 +41,7 @@ if (raw_arguments[0] === "complete") {
     process.exit(0);
 }
 
-const { argv, workfile } = normalize_argv(raw_arguments);
+const { argv } = normalize_argv(raw_arguments);
 
-// stricli hands this to each command as `this`, which is how --workfile reaches
-// load_context.
-const context: AttachContext = { process, workfile_path: workfile };
+const context: AttachContext = { process };
 await run(app, argv, context);

@@ -1,9 +1,12 @@
 import { buildCommand } from "@stricli/core";
 import {
+    get_connected_symbols,
     remove_symbol,
-    set_value
+    set_value,
+    type Result,
+    type Workfile
 } from "attach-no-os-lib";
-import type { AttachContext } from "./shared";
+import type { AttachContext, WorkfileContext } from "./shared";
 import {
     load_context,
     save_workfile,
@@ -11,22 +14,51 @@ import {
     output_error,
     get_any_node,
     get_node_property,
-    format_node_list
+    root_key
 } from "./shared";
 import {
     prior_positionals,
     filter_completions,
     get_node_names,
-    get_property_names,
-    get_value_suggestions
+    get_property_names
 } from "../completion/completion";
+import { common_ok, type DeletePreview } from "../protocol/responses";
 
+type DeleteFlags = {
+    json?: boolean;
+    force?: boolean;
+};
+
+/** One property, somewhere in the workfile, whose value points at the node being deleted. */
+type Reference = {
+    owner: string;
+    property: string;
+};
+
+/**
+ * `aa delete [node] [property]` — remove a node, or reset one of its properties.
+ *
+ * A property is a fixed part of its node's schema, so "deleting" one means clearing its
+ * value; that is never destructive beyond the one value and needs no confirmation. A node
+ * is different: other nodes may point at it, and removing it would strand them. Those
+ * references are what makes a node "non-leaf" here, so a node that is referenced returns a
+ * DeletePreview and changes nothing until `--force` says to clear the references too.
+ *
+ * With no arguments the target is the root — the whole workfile — which is always a preview
+ * first.
+ */
 export const deleteCommand = buildCommand<
-    { json?: boolean; yes?: boolean },
-    [string | undefined, string | undefined, string | undefined],
+    DeleteFlags,
+    [string | undefined, string | undefined],
     AttachContext
 >({
-    docs: { brief: "Delete a node, or reset a property or union member" },
+    docs: {
+        brief: "Delete a node, or reset a property",
+        fullDescription:
+            "With <node> <property>, clears that property's value.\n" +
+            "With <node>, removes the node; --force is required if anything references it.\n" +
+            "With no arguments, removes every node; --force is required."
+    },
     parameters: {
         positional: {
             kind: "tuple",
@@ -43,121 +75,240 @@ export const deleteCommand = buildCommand<
                         const [node] = prior_positionals(this, 1);
                         return filter_completions(get_property_names(node), partial);
                     }
-                },
-                {
-                    placeholder: "member", brief: "Union member to reset", optional: true, parse: String,
-                    proposeCompletions(partial: string) {
-                        const [node, property] = prior_positionals(this, 1);
-                        return filter_completions(get_value_suggestions(node, property), partial);
-                    }
                 }
             ]
         },
         flags: {
             json: { kind: "boolean", brief: "Output as JSON", optional: true },
-            yes: { kind: "boolean", brief: "Confirm node deletion (required to delete a node)", optional: true }
+            force: { kind: "boolean", brief: "Carry out a delete that would affect more than its target", optional: true }
         }
     },
-    func: async function (flags, node, property, member) {
-        const context = load_context(this.workfile_path);
+    func: async (flags: DeleteFlags, node, property) => {
+        const context = load_context();
         if (!context.ok) {
-            output_error(flags, "load_failed", context.error.message);
+            output_error(flags, context.error.message);
             return;
         }
 
-        // aa delete - list deletable nodes
+        // aa delete — the root, meaning everything in it
         if (!node) {
-            const text = format_node_list(context.value.minimal, "Nodes that can be deleted:") + "\nUse: aa delete <node>";
-            const json = {
-                nodes: Object.entries(context.value.minimal.symbols).map(([name, n]) => ({
-                    name,
-                    schema: n.$compatible
-                }))
-            };
-            output(flags, text, json);
+            delete_everything(flags, context.value);
             return;
         }
 
-        // Check node exists
-        const node_result = get_any_node(context.value, node);
-        if (!node_result.ok) {
-            output_error(flags, "node_not_found", node_result.error.message);
+        const found = get_any_node(context.value, node);
+        if (!found.ok) {
+            output_error(flags, found.error.message);
             return;
         }
 
-        // aa delete <node> <property> [member] - reset a property or union member
+        // aa delete <node> <property> — clear one value
         if (property) {
-            const lookup = get_node_property(context.value, node, property);
-            if (!lookup.ok) {
-                output_error(flags, "property_not_found", lookup.error.message);
-                return;
-            }
-
-            // aa delete <node> <property> <member> - reset a single union member
-            if (member) {
-                if (lookup.value.property._t !== "UnionProperty") {
-                    output_error(flags, "not_a_union", `Property '${property}' is not a union; omit the member to reset it`);
-                    return;
-                }
-
-                const union_member = lookup.value.property.members.find(m => m.name === member);
-                if (!union_member) {
-                    output_error(flags, "invalid_union_member", `Invalid union member '${member}'. Available: ${lookup.value.property.members.map(m => m.name).join(", ")}`);
-                    return;
-                }
-
-                // eslint-disable-next-line unicorn/no-null
-                const result = set_value(context.value.workfile, node, property, { [member]: null });
-                if (!result.ok) {
-                    output_error(flags, "reset_failed", result.error.message);
-                    return;
-                }
-
-                const save = save_workfile(context.value);
-                if (!save.ok) {
-                    output_error(flags, "save_failed", save.error.message);
-                    return;
-                }
-
-                output(flags, `Reset ${node}.${property} member ${member}`, { reset: { node, property, member } });
-                return;
-            }
-
-            // aa delete <node> <property> - reset the whole property
-            const result = set_value(context.value.workfile, node, property);
-            if (!result.ok) {
-                output_error(flags, "reset_failed", result.error.message);
-                return;
-            }
-
-            const save = save_workfile(context.value);
-            if (!save.ok) {
-                output_error(flags, "save_failed", save.error.message);
-                return;
-            }
-
-            output(flags, `Reset ${node}.${property}`, { reset: { node, property } });
+            reset_property(flags, context.value, node, property);
             return;
         }
 
-        // aa delete <node> - delete the node (requires --yes)
-        if (!flags.yes) {
-            output_error(flags, "confirmation_required", `This will delete node '${node}'. Re-run with --yes to confirm.`);
-            return;
-        }
-
-        const result = remove_symbol(context.value.workfile, node);
-        if (!result.ok) {
-            output_error(flags, "delete_failed", result.error.message);
-            return;
-        }
-
-        const save = save_workfile(context.value);
-        if (!save.ok) {
-            output_error(flags, "save_failed", save.error.message);
-            return;
-        }
-
-        output(flags, `Deleted node ${node}`, { deleted: node });
+        // aa delete <node> — remove the node, and whatever pointed at it
+        delete_node(flags, context.value, node);
     }
 });
+
+// ------- OPERATIONS --------
+
+function reset_property(flags: DeleteFlags, context: WorkfileContext, node: string, property: string): void {
+    const lookup = get_node_property(context, node, property);
+    if (!lookup.ok) {
+        output_error(flags, lookup.error.message);
+        return;
+    }
+
+    // The lookup's own name, not what was typed: `delete <node> init_param` resolves to
+    // `$init_param`, and the lib only knows the workfile's spelling.
+    const resolved = lookup.value.property.name;
+
+    // No value argument: set_value clears the property.
+    const cleared = set_value(context.workfile, node, resolved);
+    if (!cleared.ok) {
+        output_error(flags, cleared.error.message);
+        return;
+    }
+
+    if (!write(flags, context)) {
+        return;
+    }
+
+    const message = `Reset ${node}.${resolved}`;
+    output(flags, message, common_ok(message));
+}
+
+function delete_node(flags: DeleteFlags, context: WorkfileContext, node: string): void {
+    const references = find_references(context.workfile, node);
+
+    if (references.length > 0 && !flags.force) {
+        preview(
+            flags,
+            `'${node}' is referenced by ${count(references.length, "property")}; deleting it would clear ${references.length === 1 ? "that reference" : "those references"}. Re-run with --force.`,
+            {
+                node_count: 1,
+                property_count: references.length,
+                paths: [[node], ...references.map(reference => [reference.owner, reference.property])]
+            },
+            `${node} — referenced by:\n\n`
+            + references.map(reference => `  ${reference.owner}.${reference.property}\n`).join("")
+            + "\nNothing was changed. Re-run with --force to delete the node and clear those references."
+        );
+        return;
+    }
+
+    for (const reference of references) {
+        const cleared = clear_reference(context.workfile, reference, node);
+        if (!cleared.ok) {
+            output_error(
+                flags,
+                `Cannot delete '${node}': ${reference.owner}.${reference.property} references it and could not be `
+                + `cleared (${cleared.error.message}). Delete '${reference.owner}' instead.`
+            );
+            return;
+        }
+    }
+
+    const removed = remove_symbol(context.workfile, node);
+    if (!removed.ok) {
+        output_error(flags, removed.error.message);
+        return;
+    }
+
+    if (!write(flags, context)) {
+        return;
+    }
+
+    const message = references.length > 0
+        ? `Deleted '${node}' and cleared ${count(references.length, "reference")} to it`
+        : `Deleted '${node}'`;
+    output(flags, message, common_ok(message));
+}
+
+function delete_everything(flags: DeleteFlags, context: WorkfileContext): void {
+    const names = Object.keys(context.workfile.symbols);
+
+    if (names.length === 0) {
+        const message = "Nothing to delete: the workfile has no nodes";
+        output(flags, message, common_ok(message));
+        return;
+    }
+
+    if (!flags.force) {
+        preview(
+            flags,
+            `Deleting the root removes every node in the workfile (${count(names.length, "node")}). Re-run with --force.`,
+            {
+                node_count: names.length,
+                property_count: property_count(context.workfile),
+                paths: names.map(name => [name])
+            },
+            `${root_key(context)} — would delete ${count(names.length, "node")}:\n\n`
+            + names.map(name => `  ${name}\n`).join("")
+            + "\nNothing was changed. Re-run with --force to delete them all."
+        );
+        return;
+    }
+
+    for (const name of names) {
+        const removed = remove_symbol(context.workfile, name);
+        if (!removed.ok) {
+            output_error(flags, removed.error.message);
+            return;
+        }
+    }
+
+    if (!write(flags, context)) {
+        return;
+    }
+
+    const message = `Deleted ${count(names.length, "node")}`;
+    output(flags, message, common_ok(message));
+}
+
+// ------- HELPERS --------
+
+/** Save, reporting the failure the same way every other step does. False means it failed. */
+function write(flags: DeleteFlags, context: WorkfileContext): boolean {
+    const saved = save_workfile(context);
+    if (!saved.ok) {
+        output_error(flags, saved.error.message);
+        return false;
+    }
+
+    return true;
+}
+
+/**
+ * A refused delete: what *would* go, with nothing written.
+ *
+ * `ok: true` on purpose — being asked to confirm is not a failure, and the counts are the
+ * answer to the question attach-meta asked.
+ */
+function preview(
+    flags: DeleteFlags,
+    message: string,
+    counts: Pick<DeletePreview, "node_count" | "property_count" | "paths">,
+    text: string
+): void {
+    const response: DeletePreview = { ...common_ok(message, "warn"), ...counts };
+    output(flags, text, response);
+}
+
+/** Every property, in any other node, whose value points at `target`. */
+function find_references(workfile: Workfile, target: string): Reference[] {
+    const references: Reference[] = [];
+
+    for (const [owner, ruleset] of Object.entries(workfile.symbols)) {
+        if (owner === target || (ruleset._t !== "RulesetStruct" && ruleset._t !== "RulesetDescriptor")) {
+            continue;
+        }
+
+        for (const property of ruleset.properties) {
+            if (get_connected_symbols(property).includes(target)) {
+                references.push({ owner, property: property.name });
+            }
+        }
+    }
+
+    return references;
+}
+
+/**
+ * Unpoint one property from `target`.
+ *
+ * An array can hold several references, and the siblings are still valid, so only the
+ * deleted name is dropped from it. Everything else holds exactly one reference and is
+ * cleared outright.
+ */
+function clear_reference(workfile: Workfile, reference: Reference, target: string): Result<void> {
+    const owner = workfile.symbols[reference.owner];
+    const property = owner?._t === "RulesetStruct" || owner?._t === "RulesetDescriptor"
+        ? owner.properties.find(candidate => candidate.name === reference.property)
+        : undefined;
+
+    if (property?._t === "ArrayProperty" && Array.isArray(property.value)) {
+        const kept = (property.value as unknown[]).filter(element => element !== target);
+        return set_value(workfile, reference.owner, reference.property, kept.length > 0 ? kept : undefined);
+    }
+
+    return set_value(workfile, reference.owner, reference.property);
+}
+
+function property_count(workfile: Workfile): number {
+    let total = 0;
+    for (const ruleset of Object.values(workfile.symbols)) {
+        if (ruleset._t === "RulesetStruct" || ruleset._t === "RulesetDescriptor") {
+            total += ruleset.properties.length;
+        }
+    }
+
+    return total;
+}
+
+function count(amount: number, noun: string): string {
+    return `${amount} ${noun}${amount === 1 ? "" : "s"}`;
+}
