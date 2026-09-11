@@ -1,16 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { normalize_argv } from "../src/argv";
-import { COMMANDS, PROTOCOL_VERSION, resolve_route } from "../src/protocol";
+import { build_manifest } from "../src/protocol/manifest";
 
 describe("normalize_argv", () => {
     it("moves a leading --json past the route", () => {
         expect(normalize_argv(["--json", "read"]).argv).toEqual(["read", "--json"]);
-    });
-
-    it("moves a leading --json past a two-word route", () => {
-        expect(normalize_argv(["--json", "create", "node"]).argv).toEqual([
-            "create", "node", "--json",
-        ]);
     });
 
     it("moves --json past positionals", () => {
@@ -19,35 +13,20 @@ describe("normalize_argv", () => {
         ]);
     });
 
-    it("extracts --workfile rather than passing it to stricli", () => {
-        const result = normalize_argv(["read", "--workfile", "/tmp/wf.json"]);
-        expect(result.workfile).toBe("/tmp/wf.json");
-        expect(result.argv).toEqual(["read"]);
-    });
-
-    it("extracts --workfile= form", () => {
-        const result = normalize_argv(["read", "--workfile=/tmp/wf.json"]);
-        expect(result.workfile).toBe("/tmp/wf.json");
-        expect(result.argv).toEqual(["read"]);
-    });
-
-    it("handles the full attach-meta argv shape", () => {
-        // <binary> --json <argv...> --workfile <path> <trailing...>
-        const result = normalize_argv([
-            "--json", "read", "--workfile", "/tmp/wf.json", "adxl0",
-        ]);
-        expect(result.workfile).toBe("/tmp/wf.json");
-        expect(result.argv).toEqual(["read", "adxl0", "--json"]);
-    });
-
-    it("reports no workfile when the flag is absent", () => {
-        expect(normalize_argv(["read"]).workfile).toBeUndefined();
-    });
-
     it("leaves command-specific flags in place", () => {
-        expect(normalize_argv(["--json", "update", "--rename", "new_name"]).argv).toEqual([
-            "update", "--rename", "new_name", "--json",
+        expect(normalize_argv(["--json", "update", "adxl0", "spi_desc", "--with", "spi0"]).argv).toEqual([
+            "update", "adxl0", "spi_desc", "--with", "spi0", "--json",
         ]);
+    });
+
+    it("keeps a trailing --json where it already is", () => {
+        expect(normalize_argv(["read", "adxl0", "--json"]).argv).toEqual([
+            "read", "adxl0", "--json",
+        ]);
+    });
+
+    it("collapses a repeated --json to the single trailing one stricli expects", () => {
+        expect(normalize_argv(["--json", "read", "--json"]).argv).toEqual(["read", "--json"]);
     });
 
     it("passes through an unknown route untouched so stricli reports it", () => {
@@ -58,59 +37,55 @@ describe("normalize_argv", () => {
         expect(normalize_argv(["read", "adxl0"]).argv).toEqual(["read", "adxl0"]);
     });
 
-    it("needs no per-command knowledge to normalize any route", () => {
-        for (const [key, entry] of Object.entries(COMMANDS)) {
-            if (!entry.supported) { continue; }
-            const result = normalize_argv(["--json", ...entry.argv]);
-            expect(result.argv, `${key} not normalized`).toEqual([...entry.argv, "--json"]);
+    it("splits an array flag's values into the repetitions stricli parses", () => {
+        // attach-meta sends an array flag as the flag word once followed by every value
+        // (`--to a b c`); stricli only understands one value per occurrence.
+        expect(normalize_argv(["--json", "add", "adxl355", "--to", "root", "extra"]).argv).toEqual([
+            "add", "adxl355", "--to", "root", "--to", "extra", "--json",
+        ]);
+    });
+
+    it("leaves a single-valued array flag alone", () => {
+        expect(normalize_argv(["add", "adxl355", "--to", "root", "--json"]).argv).toEqual([
+            "add", "adxl355", "--to", "root", "--json",
+        ]);
+    });
+
+    it("keeps a valueless array flag so stricli reports the missing value", () => {
+        expect(normalize_argv(["add", "--to", "--name", "adxl0"]).argv).toEqual([
+            "add", "--to", "--name", "adxl0",
+        ]);
+    });
+
+    it("expands only the array flags of the route it was given", () => {
+        // `--with` is a single-valued flag of `update`; a second word after it is a
+        // positional, not another value, and must not be duplicated behind the flag.
+        expect(normalize_argv(["update", "adxl0", "spi_desc", "--with", "spi0"]).argv).toEqual([
+            "update", "adxl0", "spi_desc", "--with", "spi0",
+        ]);
+        expect(normalize_argv(["move", "adxl0", "--to", "a", "b"]).argv).toEqual([
+            "move", "adxl0", "--to", "a", "--to", "b",
+        ]);
+    });
+
+    it("does not expand a flag named --to on a route that has no array flags", () => {
+        expect(normalize_argv(["rename", "adxl0", "--to", "adxl1"]).argv).toEqual([
+            "rename", "adxl0", "--to", "adxl1",
+        ]);
+    });
+
+    it("needs no per-command knowledge to normalize any declared command", () => {
+        // attach-meta dispatches `<prefix> <route> --json <its own args...>`, which is what
+        // the manifest's argv describes; whatever it hands us has to come out unchanged
+        // apart from --json moving to the end.
+        for (const [name, mapping] of Object.entries(build_manifest().commands)) {
+            // The prefix's leading words are the interpreter and script, which never reach
+            // normalize_argv — process.argv.slice(2) starts at the route.
+            const route = mapping!.argv.slice(-2, -1);
+            const dispatched = [...route, "--json", "some_node"];
+            expect(normalize_argv(dispatched).argv, `${name} not normalized`).toEqual([
+                ...route, "some_node", "--json",
+            ]);
         }
-    });
-});
-
-describe("protocol table", () => {
-    it("advertises the version attach-meta 0.2.x requires", () => {
-        // attach-meta compares the breaking segment against its own crate version;
-        // if this changes, aa-meta's Cargo.toml must match.
-        expect(PROTOCOL_VERSION.split(".").slice(0, 2).join(".")).toBe("0.2");
-    });
-
-    it("covers every discovery key attach-meta knows about", () => {
-        // Mirrors DiscoveryKey::ALL in aa-meta/src/schema.rs.
-        const expected = [
-            "create_node", "create_property", "create_workfile",
-            "read_node", "read_property", "update",
-            "delete_node", "delete_property", "validate",
-            "generate", "build", "deploy", "config",
-            "init", "list_devices", "complete",
-        ];
-        expect(Object.keys(COMMANDS).sort()).toEqual(expected.sort());
-    });
-
-    it("gives every supported command a non-empty argv", () => {
-        for (const [key, entry] of Object.entries(COMMANDS)) {
-            if (entry.supported) {
-                expect(entry.argv.length, `${key} is supported but has no argv`).toBeGreaterThan(0);
-            }
-        }
-    });
-
-    it("resolves discovery keys to route words", () => {
-        expect(resolve_route("create_node")).toEqual(["create", "node"]);
-        expect(resolve_route("read_property")).toEqual(["read"]);
-    });
-
-    it("passes literal route words through so aa.bash can share the entrypoint", () => {
-        expect(resolve_route("create")).toEqual(["create"]);
-        expect(resolve_route("read")).toEqual(["read"]);
-    });
-
-    it("resolves no token to the top-level routes", () => {
-        const absent: string | undefined = undefined;
-        expect(resolve_route(absent)).toEqual([]);
-        expect(resolve_route("")).toEqual([]);
-    });
-
-    it("resolves an unsupported key to undefined", () => {
-        expect(resolve_route("create_property")).toBeUndefined();
     });
 });

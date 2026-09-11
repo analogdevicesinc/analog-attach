@@ -37,6 +37,7 @@
   },
   "devDependencies": {
     "@types/node": "20.x",
+    "ajv": "^8.17.1",
     "attach-no-os-lib": "workspace:*",
     "tsup": "^6.7.0",
     "typescript": "^5.7.2",

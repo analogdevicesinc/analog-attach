@@ -1,7 +1,6 @@
-import { buildCommand } from "@stricli/core";
-import path from "node:path";
 import fs from "node:fs";
-import { get_setting_value } from "attach-no-os-lib";
+import { buildCommand } from "@stricli/core";
+import { DEFAULT_PROBE, PROBE_OPTIONS, get_effective_setting_value, get_setting_value } from "attach-no-os-lib";
 import {
     build_arguments,
     configure_arguments,
@@ -11,28 +10,33 @@ import {
     run_shell,
 } from "../build/cmake_build";
 import { filter_completions, get_board_names } from "../completion/completion";
-import { output, output_error } from "./shared";
-
-// Probes no-OS knows how to flash with (cmake/FlashTools.cmake). Without PROBE set,
-// the configure step emits a warning and creates no `flash` target at all.
-const PROBES = ["openocd", "jlink"];
-const DEFAULT_PROBE = "openocd";
+import { common_ok } from "../protocol/responses";
+import { get_project_path, output, output_error } from "./shared";
 
 // no-OS names the flash target `flash`, not after the project.
 const FLASH_TARGET = "flash";
 
-export const deployCommand = buildCommand<
-    { json?: boolean; board?: string; probe?: string },
-    [string | undefined]
->({
-    docs: { brief: "Deploy a no-OS project" },
+type DeployFlags = {
+    json?: boolean;
+    board?: string;
+    probe?: string;
+};
+
+/**
+ * `aa deploy` — flash the built project.
+ *
+ * Same as `build`: the project comes from settings, and so does the probe, since attach-meta
+ * passes no arguments.
+ */
+export const deployCommand = buildCommand<DeployFlags, []>({
+    docs: {
+        brief: "Deploy a no-OS project",
+        fullDescription:
+            "Flashes the project named by the 'project_path' setting, or the one 'generate' would\n" +
+            "have written ('<output_path>/<project_name>'), or the current directory."
+    },
     parameters: {
-        positional: {
-            kind: "tuple",
-            parameters: [
-                { placeholder: "project_path", brief: "Path to project (default: current directory)", optional: true, parse: String }
-            ]
-        },
+        positional: { kind: "tuple", parameters: [] },
         flags: {
             json: { kind: "boolean", brief: "Output as JSON", optional: true },
             board: {
@@ -46,31 +50,42 @@ export const deployCommand = buildCommand<
             },
             probe: {
                 kind: "parsed",
-                brief: `Debug probe used to flash: ${PROBES.join(" or ")} (default: ${DEFAULT_PROBE})`,
+                brief: `Debug probe used to flash: ${PROBE_OPTIONS.join(" or ")} (default: the 'probe' setting)`,
                 optional: true,
                 parse: String,
                 proposeCompletions(partial: string) {
-                    return filter_completions(PROBES, partial);
+                    return filter_completions(PROBE_OPTIONS, partial);
                 }
             },
         }
     },
-    func: async (flags, project_path) => {
-        const target_path = project_path ? path.resolve(project_path) : process.cwd();
+    func: async (flags: DeployFlags) => {
+        const resolved = get_project_path();
+        if (!resolved.ok) {
+            output_error(flags, resolved.error.message);
+            return;
+        }
+
+        const target_path = resolved.value;
 
         if (!fs.existsSync(target_path)) {
-            output_error(flags, "path_not_found", `Project path does not exist: ${target_path}`);
+            output_error(flags, `Project path does not exist: ${target_path}`);
             return;
         }
 
         if (!fs.statSync(target_path).isDirectory()) {
-            output_error(flags, "not_directory", `Project path is not a directory: ${target_path}`);
+            output_error(flags, `Project path is not a directory: ${target_path}`);
             return;
         }
 
         // An explicit deploy_command takes the step over completely.
-        const override = get_setting_value("deploy_command");
-        if (override.ok) {
+        const override = get_effective_setting_value("deploy_command");
+        if (!override.ok) {
+            output_error(flags, override.error.message);
+            return;
+        }
+
+        if (override.value) {
             if (!flags.json) {
                 console.log(`Deploying project in ${target_path}`);
                 console.log(`Running: ${override.value}\n`);
@@ -78,39 +93,42 @@ export const deployCommand = buildCommand<
 
             const result = await run_shell(override.value, target_path);
             if (result.exit_code !== 0) {
-                output_error(flags, "deploy_failed", `Deploy failed with exit code ${result.exit_code}`);
+                output_error(flags, `Deploy failed with exit code ${result.exit_code}`);
                 return;
             }
 
-            output(flags, "Deploy completed successfully", {
-                project_path: target_path,
-                command: override.value,
-                exit_code: result.exit_code
-            });
+            const message = `Deployed ${target_path} with '${override.value}'`;
+            output(flags, "Deploy completed successfully", common_ok(message));
             return;
         }
 
-        const probe = flags.probe ?? DEFAULT_PROBE;
-        if (!PROBES.includes(probe)) {
-            output_error(flags, "unknown_probe", `Unknown probe '${probe}'. Supported: ${PROBES.join(", ")}`);
+        const configured_probe = get_effective_setting_value("probe");
+        if (!configured_probe.ok) {
+            output_error(flags, configured_probe.error.message);
+            return;
+        }
+
+        const probe = flags.probe ?? configured_probe.value ?? DEFAULT_PROBE;
+        if (!PROBE_OPTIONS.includes(probe)) {
+            output_error(flags, `Unknown probe '${probe}'. Supported: ${PROBE_OPTIONS.join(", ")}`);
             return;
         }
 
         const noos_path = get_setting_value("no_os_path");
         if (!noos_path.ok) {
-            output_error(flags, "config_missing", "no_os_path is not configured. Run: aa config no_os_path <path>");
+            output_error(flags, "no_os_path is not configured. Run: aa tool-config-set no_os_path <path>");
             return;
         }
 
         const checks = preflight(noos_path.value);
         if (!checks.ok) {
-            output_error(flags, "preflight_failed", checks.error.message);
+            output_error(flags, checks.error.message);
             return;
         }
 
         const plan = plan_build(target_path, noos_path.value, flags.board);
         if (!plan.ok) {
-            output_error(flags, "plan_failed", plan.error.message);
+            output_error(flags, plan.error.message);
             return;
         }
 
@@ -131,7 +149,7 @@ export const deployCommand = buildCommand<
             plan.value.source_directory,
         );
         if (configure.exit_code !== 0) {
-            output_error(flags, "configure_failed", `CMake configure failed with exit code ${configure.exit_code}`);
+            output_error(flags, `CMake configure failed with exit code ${configure.exit_code}`);
             return;
         }
 
@@ -141,17 +159,11 @@ export const deployCommand = buildCommand<
             plan.value.source_directory,
         );
         if (flash.exit_code !== 0) {
-            output_error(flags, "deploy_failed", `Deploy failed with exit code ${flash.exit_code}`);
+            output_error(flags, `Deploy failed with exit code ${flash.exit_code}`);
             return;
         }
 
-        output(flags, "Deploy completed successfully", {
-            project_path: target_path,
-            project_name: plan.value.project_name,
-            board: plan.value.board,
-            mode: plan.value.mode,
-            probe: probe,
-            exit_code: flash.exit_code
-        });
+        const message = `Flashed ${plan.value.project_name} to ${plan.value.board} via ${probe} (${plan.value.mode})`;
+        output(flags, "Deploy completed successfully", common_ok(message));
     }
 });

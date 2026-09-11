@@ -10,13 +10,13 @@
 #
 #   source "$(dirname "$0")/e2e_common.sh"
 #   PROJECT_NAME="e2e_test_foo"
-#   configure_nodes() { $AA create node ...; $AA update ...; }
+#   configure_nodes() { $AA add --name ... --key ...; $AA update ...; }
 #   run_e2e
 #
 # no-OS builds with CMake and Kconfig, so a project is pinned to a *board*, not to
 # the PLATFORM/TARGET pair the Make build system took from the environment. The
 # board travels inside the generated CMakePresets.json, which is why the build step
-# here passes nothing but a path.
+# here passes nothing at all.
 #
 # Both project layouts are covered, selected with E2E_MODE:
 #   out-of-tree  the project is generated into the test's temporary directory and is
@@ -40,12 +40,11 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CLI_DIR="$(dirname "$SCRIPT_DIR")"
-REPO_ROOT="$(dirname "$(dirname "$CLI_DIR")")"
 NOOS_PATH="${NOOS_PATH:-$HOME/adi/no-OS}"
 
 # Defaults a device script may override before calling run_e2e.
 TARGET_MCU="${TARGET_MCU:-max32690}"
-# Named rather than left to `aa generate`, so the test asserts on one fixed board
+# Configured rather than left to `aa generate`, so the test asserts on one fixed board
 # instead of whichever one the platform happens to resolve to. max32690 has exactly
 # one board today; max32650 has two, and there generation would refuse to guess.
 BOARD="${BOARD:-ad-apard32690-sl}"
@@ -128,19 +127,31 @@ run_e2e() {
     fi
     echo -e "${GREEN}OK: cmake, ninja and a CMake-era no-OS checkout${NC}"
 
-    # Set up config
+    # Set up config.
+    #
+    # Written as a project-local config in $TEST_DIR rather than with `aa
+    # tool-config-set`, which writes the *global* one: the run then leaves the
+    # developer's own configuration alone, and every command below can be invoked with
+    # no arguments at all — which is exactly how attach-meta dispatches them.
     echo -e "${YELLOW}[3/9] Configuring paths...${NC}"
     cd "$TEST_DIR"
 
-    # Point to the test schemas
-    export ATTACH_SCHEMAS_PATH="$REPO_ROOT/packages/attach-no-os-lib/test/bindings/schemas"
-    $AA config no_os_path "$NOOS_PATH"
+    cat > .analog-attach.json <<EOF
+{
+  "no_os_path": "$NOOS_PATH",
+  "workfile": "workfile.json",
+  "board": "$BOARD",
+  "project_name": "$PROJECT_NAME",
+  "output_path": "$OUTPUT_DIR",
+  "project_path": "$PROJECT_DIR"
+}
+EOF
 
-    # Create workfile. Named by board rather than platform, which is the primary way
-    # in: the board settles the platform on its own, so this also checks that the
+    # Create workfile. Configured by board rather than platform, which is the primary
+    # way in: the board settles the platform on its own, so this also checks that the
     # derived platform is the one the device nodes below are loaded from.
     echo -e "${YELLOW}[4/9] Creating workfile for $BOARD...${NC}"
-    $AA create workfile --board "$BOARD"
+    $AA create-workfile
 
     if [ ! -f "workfile.json" ]; then
         echo -e "${RED}FAIL: workfile.json not created${NC}"
@@ -163,8 +174,11 @@ run_e2e() {
 
     # Validate
     echo -e "${YELLOW}[6/9] Validating workfile...${NC}"
+    # A protocol ValidationResponse is `{"errors": [...], "warnings": [...]}` and has no
+    # ok/valid field of its own — an empty `errors` is what "valid" means. Warnings are
+    # deliberately not fatal here.
     VALIDATE_OUTPUT=$($AA validate --json 2>&1)
-    if echo "$VALIDATE_OUTPUT" | grep -q '"valid": true'; then
+    if echo "$VALIDATE_OUTPUT" | grep -q '"errors": \[\]'; then
         echo -e "${GREEN}OK: Validation passed${NC}"
     else
         echo -e "${RED}FAIL: Validation errors:${NC}"
@@ -173,8 +187,10 @@ run_e2e() {
     fi
 
     # Generate project
+    # Name, output directory and board all come from the config written above, so this
+    # is the zero-argument dispatch attach-meta performs.
     echo -e "${YELLOW}[7/9] Generating no-OS project ($E2E_MODE)...${NC}"
-    $AA generate "$PROJECT_NAME" --board "$BOARD" --output "$OUTPUT_DIR"
+    $AA generate
 
     if [ ! -d "$PROJECT_DIR" ]; then
         echo -e "${RED}FAIL: Project not generated${NC}"
@@ -204,7 +220,7 @@ run_e2e() {
         exit 1
     fi
     # The board is recorded as the `project` preset's parent, which is what lets the
-    # build step below take a path and nothing else.
+    # build step below take no arguments at all.
     if ! grep -q "\"inherits\": \"$BOARD\"" "$PROJECT_DIR/CMakePresets.json"; then
         echo -e "${RED}FAIL: CMakePresets.json does not pin the project to $BOARD${NC}"
         cat "$PROJECT_DIR/CMakePresets.json"
@@ -218,15 +234,16 @@ run_e2e() {
     fi
     echo -e "${GREEN}OK: CMakeLists.txt, CMakePresets.json and project.conf look sane${NC}"
 
-    # Build the project using aa build. No PLATFORM/TARGET in the environment: the
-    # board came from the generated preset, and the mode from where the project sits.
+    # Build the project using aa build. Nothing is passed: the project directory comes
+    # from the `project_path` setting, the board from the generated preset, and the mode
+    # from where the project sits. No PLATFORM/TARGET in the environment either.
     echo -e "${YELLOW}[9/9] Building project with aa build...${NC}"
 
     BUILD_LOG="/tmp/build_output_${PROJECT_NAME}.log"
     # pipefail is required here: without it the `if` sees tail's exit status (always
     # 0) instead of aa build's, so a failed build gets reported as a pass.
     set -o pipefail
-    if $AA build "$PROJECT_DIR" 2>&1 | tee "$BUILD_LOG" | tail -20; then
+    if $AA build 2>&1 | tee "$BUILD_LOG" | tail -20; then
         echo -e "${GREEN}OK: Build successful${NC}"
     else
         echo -e "${RED}FAIL: Build failed${NC}"
