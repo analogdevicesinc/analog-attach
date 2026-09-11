@@ -1,9 +1,9 @@
 [meta]
-default_tool = "attach"
+default_tool = "attach-linux"
 
 [[tools]]
-name = "attach"
-binary = "attach"
+name = "attach-linux"
+binary = "attach-linux"
 manifest_path = "/home/petrid/analog-attach/packages/attach-cli/.analog-attach/manifest.json"
 manifest_sha256 = "5ab2b4c064fdbb9aeef6e42f9b01b7f15e520c1362b1b4b90d8dc6967aa891bd"
 

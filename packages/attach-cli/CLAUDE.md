@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Overview
 
-`attach-cli` is the standalone `attach` binary — a CLI tool for AI coding assistants to configure Linux device tree overlays. It wraps `attach-lib` (bundled at build time) and exposes all DTS/binding operations as subcommands.
+`attach-cli` is the standalone `attach-linux` binary — a CLI tool for AI coding assistants to configure Linux device tree overlays. It wraps `attach-lib` (bundled at build time) and exposes all DTS/binding operations as subcommands.
 
 ## Commands
 
@@ -18,7 +18,7 @@ yarn workspace attach-cli test --run <file>   # single test file
 
 # From this package directory
 yarn build                        # prebuild (tsc type-check) then tsup bundle
-yarn dev-link                     # build + symlink dist/cli.js to ~/.local/bin/attach
+yarn dev-link                     # build + symlink dist/cli.js to ~/.local/bin/attach-linux
 yarn test                         # vitest (watch mode)
 yarn test --run                   # vitest single-run
 yarn coverage                     # run tests with coverage
@@ -74,7 +74,7 @@ Numbers are parsed as `bigint`. Strings that aren't numbers stay as strings.
 
 ### Skill installation
 
-`installSkill` / `uninstallSkill` commands copy `SKILL.md` to `~/.claude/skills/attach/SKILL.md`. The same logic runs as a `postinstall` script (`scripts/postinstall.js`) but prompts interactively and skips in CI (`CI` env var).
+`installSkill` / `uninstallSkill` commands copy `SKILL.md` to `~/.claude/skills/attach-linux/SKILL.md`. The same logic runs as a `postinstall` script (`scripts/postinstall.js`) but prompts interactively and skips in CI (`CI` env var).
 
 ## Key Conventions
 

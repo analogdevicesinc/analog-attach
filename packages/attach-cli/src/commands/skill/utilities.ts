@@ -8,7 +8,7 @@ const __dirname = path.dirname(__filename);
 
 export function getSkillDirectory(): string {
     const homeDirectory = process.env['HOME'] || process.env['USERPROFILE'] || '';
-    return path.join(homeDirectory, '.claude', 'skills', 'attach');
+    return path.join(homeDirectory, '.claude', 'skills', 'attach-linux');
 }
 
 export function getSourceSkillPath(): string {

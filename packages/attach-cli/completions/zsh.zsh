@@ -1,16 +1,16 @@
-#compdef attach
+#compdef attach-linux
 
-_attach_suggest() {
+_attach_linux_suggest() {
     local -a results
-    results=(${(f)"$(attach --json suggest "$@" 2>/dev/null | grep -o '"value":"[^"]*"' | sed 's/"value":"//;s/"$//')"})
+    results=(${(f)"$(attach-linux --json suggest "$@" 2>/dev/null | grep -o '"value":"[^"]*"' | sed 's/"value":"//;s/"$//')"})
     compadd -o nosort -- "${results[@]}"
 }
 
-_attach_device_keys() {
-    _attach_suggest device-key "${words[CURRENT]}"
+_attach_linux_device_keys() {
+    _attach_linux_suggest device-key "${words[CURRENT]}"
 }
 
-_attach_parents() {
+_attach_linux_parents() {
     local key="" skip_next=false
     local w
     for w in "${words[@]}"; do
@@ -19,7 +19,7 @@ _attach_parents() {
             continue
         fi
         case "$w" in
-            attach|add|--json) ;;
+            attach-linux|add|--json) ;;
             --name|--to|--label|--overlay|--context|--linux|--dt-schema)
                 skip_next=true ;;
             --*) ;;
@@ -27,10 +27,10 @@ _attach_parents() {
         esac
     done
     [[ -z "$key" ]] && return
-    _attach_suggest parent "$key"
+    _attach_linux_suggest parent "$key"
 }
 
-_attach() {
+_attach_linux() {
     local curcontext="$curcontext" state line
     typeset -A opt_args
 
@@ -73,9 +73,9 @@ _attach() {
             case $line[1] in
                 add)
                     _arguments \
-                        ':device key / compatible string:_attach_device_keys' \
+                        ':device key / compatible string:_attach_linux_device_keys' \
                         '--name[Node name (e.g. channel@0)]:name:' \
-                        '--to[Parent node]:to:_attach_parents' \
+                        '--to[Parent node]:to:_attach_linux_parents' \
                         '--label[Label to attach to the new node]:label:' \
                         '--overlay[Path to the dtso file]:overlay:_files' \
                         '--context[The target dts]:context:_files' \
@@ -84,7 +84,7 @@ _attach() {
                     ;;
                 create-workfile)
                     _arguments \
-                        '--compatible[Compatible string]:compatible:_attach_device_keys' \
+                        '--compatible[Compatible string]:compatible:_attach_linux_device_keys' \
                         '--parent[Parent node]:parent:' \
                         '--label[Label for the new node]:label:' \
                         '--linux[Path to Linux repo]:linux:_files -/' \
@@ -92,7 +92,7 @@ _attach() {
                     ;;
                 create)
                     _arguments \
-                        '--compatible[Compatible string]:compatible:_attach_device_keys' \
+                        '--compatible[Compatible string]:compatible:_attach_linux_device_keys' \
                         '--parent[Parent node]:parent:' \
                         '--label[Label for the new node]:label:' \
                         '--output[Output file]:output:_files' \
@@ -174,7 +174,7 @@ _attach() {
                     ;;
                 get-schema|suggest-parents)
                     _arguments \
-                        '--compatible[Compatible string]:compatible:_attach_device_keys' \
+                        '--compatible[Compatible string]:compatible:_attach_linux_device_keys' \
                         '--context[The target dts]:context:_files' \
                         '--linux[Path to Linux repo]:linux:_files -/' \
                         '--dt-schema[Path to dt-schema repo]:dt-schema:_files -/'
@@ -208,4 +208,4 @@ _attach() {
     esac
 }
 
-_attach "$@"
+_attach_linux "$@"

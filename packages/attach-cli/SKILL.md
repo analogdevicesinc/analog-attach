@@ -1,6 +1,6 @@
 # Analog Attach CLI - Device Tree Configuration Assistant
 
-You are helping a user configure Linux device tree overlays for hardware devices using the `attach` CLI tool.
+You are helping a user configure Linux device tree overlays for hardware devices using the `attach-linux` CLI tool.
 
 ## Interaction Style: Use Interactive Selection Questions
 
@@ -28,7 +28,7 @@ You are helping a user configure Linux device tree overlays for hardware devices
 
 ## Prerequisites
 
-Run `attach init` once per project before anything else. It writes `.analog-attach/config.toml` (storing `--linux`, `--dt-schema`, and optionally `--context`) and builds the `compat-index.json` that `list-devices` reads.
+Run `attach-linux init` once per project before anything else. It writes `.analog-attach/config.toml` (storing `--linux`, `--dt-schema`, and optionally `--context`) and builds the `compat-index.json` that `list-devices` reads.
 
 After `init`, most commands pick up `--linux`, `--dt-schema`, and `--context` from `config.toml` automatically — you only need to pass them explicitly if you want to override.
 
@@ -54,7 +54,7 @@ Help users locate appropriate `.dts` files when needed - they're typically in `a
 
 **Syntax**:
 ```bash
-attach init --linux <path> --dt-schema <path> [--context <dts-file>]
+attach-linux init --linux <path> --dt-schema <path> [--context <dts-file>]
 ```
 
 **Parameters**:
@@ -76,7 +76,7 @@ attach init --linux <path> --dt-schema <path> [--context <dts-file>]
 
 **Syntax**:
 ```bash
-attach list-devices [--includes-word <filter>]
+attach-linux list-devices [--includes-word <filter>]
 ```
 
 **Parameters**:
@@ -106,7 +106,7 @@ adi,ad7173-8
 
 **Syntax**:
 ```bash
-attach get-schema --linux <path> --context <dts-file> --compatible <string>
+attach-linux get-schema --linux <path> --context <dts-file> --compatible <string>
 ```
 
 **Parameters**:
@@ -176,7 +176,7 @@ attach get-schema --linux <path> --context <dts-file> --compatible <string>
 
 **Syntax**:
 ```bash
-attach suggest-parents --linux <path> --context <dts-file> --compatible <string>
+attach-linux suggest-parents --linux <path> --context <dts-file> --compatible <string>
 ```
 
 **Parameters**:
@@ -225,7 +225,7 @@ attach suggest-parents --linux <path> --context <dts-file> --compatible <string>
 
 **Syntax**:
 ```bash
-attach create --linux <path> --compatible <string> --parent <node> --label <label> --output <file>
+attach-linux create --linux <path> --compatible <string> --parent <node> --label <label> --output <file>
 ```
 
 **Always pass `--label`** (e.g. `--label imu1`) — later commands (`validate`, `get-prop`, `set-prop`, `add --to`) identify this node by label or path only, never by its bare name.
@@ -271,7 +271,7 @@ attach create --linux <path> --compatible <string> --parent <node> --label <labe
 
 **Syntax**:
 ```bash
-attach add --linux <path> --context <dts-file> --overlay <dtso-file> [<compatible-string>] [--name <node-name>] [--to <node>] [--label <label>]
+attach-linux add --linux <path> --context <dts-file> --overlay <dtso-file> [<compatible-string>] [--name <node-name>] [--to <node>] [--label <label>]
 ```
 
 **Parameters**:
@@ -289,11 +289,11 @@ attach add --linux <path> --context <dts-file> --overlay <dtso-file> [<compatibl
 **Examples**:
 ```bash
 # Add a second sibling device under the same bus
-attach add --linux ~/linux --context ~/ctx.dts --overlay overlay.dtso adi,ad7124-4 --to spi0
+attach-linux add --linux ~/linux --context ~/ctx.dts --overlay overlay.dtso adi,ad7124-4 --to spi0
 
 # Add a bare subnode (e.g. a channel) under a device already in the overlay, targeting it by
 # the full path of the device added earlier via `create` (no --label was set for it)
-attach add --linux ~/linux --context ~/ctx.dts --overlay overlay.dtso --name channel@0 --to /soc/spi@7e204000/adi,ad7124-8
+attach-linux add --linux ~/linux --context ~/ctx.dts --overlay overlay.dtso --name channel@0 --to /soc/spi@7e204000/adi,ad7124-8
 ```
 
 **Next Steps After Add**:
@@ -310,7 +310,7 @@ attach add --linux ~/linux --context ~/ctx.dts --overlay overlay.dtso --name cha
 
 **Syntax**:
 ```bash
-attach delete --context <dts-file> --overlay <dtso-file> --node <node>
+attach-linux delete --context <dts-file> --overlay <dtso-file> --node <node>
 ```
 
 **Flags**:
@@ -323,7 +323,7 @@ attach delete --context <dts-file> --overlay <dtso-file> --node <node>
 **Example**:
 ```bash
 # Remove a node previously added with `add`
-attach delete --context ~/ctx.dts --overlay overlay.dtso --node imu1
+attach-linux delete --context ~/ctx.dts --overlay overlay.dtso --node imu1
 ```
 
 **Error messages**:
@@ -338,7 +338,7 @@ attach delete --context ~/ctx.dts --overlay overlay.dtso --node imu1
 
 **Syntax**:
 ```bash
-attach rename --context <dts-file> --overlay <dtso-file> --node <node> --to <new-key>
+attach-linux rename --context <dts-file> --overlay <dtso-file> --node <node> --to <new-key>
 ```
 
 **Flags**:
@@ -351,10 +351,10 @@ attach rename --context <dts-file> --overlay <dtso-file> --node <node> --to <new
 
 **Example**:
 ```bash
-attach rename --context ~/ctx.dts --overlay overlay.dtso --node imu1 --to my_adc
+attach-linux rename --context ~/ctx.dts --overlay overlay.dtso --node imu1 --to my_adc
 # renames adi,ad7124-8@0 → my_adc@0 (unit address preserved)
 
-attach rename --context ~/ctx.dts --overlay overlay.dtso --node imu1 --to my_adc@1
+attach-linux rename --context ~/ctx.dts --overlay overlay.dtso --node imu1 --to my_adc@1
 # renames adi,ad7124-8@0 → my_adc@1 (unit address overridden)
 ```
 
@@ -371,7 +371,7 @@ attach rename --context ~/ctx.dts --overlay overlay.dtso --node imu1 --to my_adc
 
 **Syntax**:
 ```bash
-attach move --context <dts-file> --overlay <dtso-file> --node <node> --parent <dest>
+attach-linux move --context <dts-file> --overlay <dtso-file> --node <node> --parent <dest>
 ```
 
 **Flags**:
@@ -385,7 +385,7 @@ attach move --context <dts-file> --overlay <dtso-file> --node <node> --parent <d
 **Example**:
 ```bash
 # Move imu1 from spi0 to spi1
-attach move --context ~/ctx.dts --overlay overlay.dtso --node imu1 --parent spi1
+attach-linux move --context ~/ctx.dts --overlay overlay.dtso --node imu1 --parent spi1
 ```
 
 **Error messages**:
@@ -403,7 +403,7 @@ attach move --context ~/ctx.dts --overlay overlay.dtso --node imu1 --parent spi1
 
 **Syntax**:
 ```bash
-attach validate --node <name> --overlay <dtso-file> [--linux <path>] [--context <dts-file>]
+attach-linux validate --node <name> --overlay <dtso-file> [--linux <path>] [--context <dts-file>]
 ```
 
 **Parameters**:
@@ -453,7 +453,7 @@ attach validate --node <name> --overlay <dtso-file> [--linux <path>] [--context 
 
 **Syntax**:
 ```bash
-attach get-prop --node <name> --overlay <dtso-file> --property <prop-name>
+attach-linux get-prop --node <name> --overlay <dtso-file> --property <prop-name>
 ```
 
 **Parameters**:
@@ -470,11 +470,11 @@ attach get-prop --node <name> --overlay <dtso-file> --property <prop-name>
 **Examples**:
 ```bash
 # Get the reg property value
-attach get-prop --node &imu1 --overlay overlay.dtso --property reg
+attach-linux get-prop --node &imu1 --overlay overlay.dtso --property reg
 # Output: <0x00>
 
 # Get a boolean/flag property (returns "true" if present)
-attach get-prop --node &imu1 --overlay overlay.dtso --property spi-cpha
+attach-linux get-prop --node &imu1 --overlay overlay.dtso --property spi-cpha
 # Output: true
 ```
 
@@ -490,7 +490,7 @@ attach get-prop --node &imu1 --overlay overlay.dtso --property spi-cpha
 
 **Syntax**:
 ```bash
-attach set-prop --node <name> --overlay <dtso-file> --property <prop-name> --value <value> [--linux <path>] [--context <dts-file>]
+attach-linux set-prop --node <name> --overlay <dtso-file> --property <prop-name> --value <value> [--linux <path>] [--context <dts-file>]
 ```
 
 **Parameters**:
@@ -519,25 +519,25 @@ attach set-prop --node <name> --overlay <dtso-file> --property <prop-name> --val
 **Examples**:
 ```bash
 # Set a simple integer property
-attach set-prop --node &imu1 --overlay overlay.dtso --property reg --value 0
+attach-linux set-prop --node &imu1 --overlay overlay.dtso --property reg --value 0
 
 # Set SPI frequency
-attach set-prop --node &imu1 --overlay overlay.dtso --property spi-max-frequency --value 5000000
+attach-linux set-prop --node &imu1 --overlay overlay.dtso --property spi-max-frequency --value 5000000
 
 # Enable a boolean flag
-attach set-prop --node &imu1 --overlay overlay.dtso --property spi-cpha --value true
+attach-linux set-prop --node &imu1 --overlay overlay.dtso --property spi-cpha --value true
 
 # Disable/remove a boolean flag
-attach set-prop --node &imu1 --overlay overlay.dtso --property spi-cpha --value false
+attach-linux set-prop --node &imu1 --overlay overlay.dtso --property spi-cpha --value false
 
 # Set an interrupt array
-attach set-prop --node &imu1 --overlay overlay.dtso --property interrupts --value "[25; IRQ_TYPE_EDGE_FALLING]"
+attach-linux set-prop --node &imu1 --overlay overlay.dtso --property interrupts --value "[25; IRQ_TYPE_EDGE_FALLING]"
 
 # Set a phandle reference for interrupt-parent
-attach set-prop --node &imu1 --overlay overlay.dtso --property interrupt-parent --value gpio
+attach-linux set-prop --node &imu1 --overlay overlay.dtso --property interrupt-parent --value gpio
 
 # Set string array (e.g., clock-names)
-attach set-prop --node &imu1 --overlay overlay.dtso --property clock-names --value "[spi; pclk]"
+attach-linux set-prop --node &imu1 --overlay overlay.dtso --property clock-names --value "[spi; pclk]"
 ```
 
 **Validation**: The command validates the value against the device binding schema before applying. If the value is invalid, an error message is displayed explaining the valid options.
@@ -560,7 +560,7 @@ Property spi-max-frequency accepts values <= 5000000
 
 **Syntax**:
 ```bash
-attach unset-prop --context <dts-file> --overlay <dtso-file> --node <node> --property <prop-name>
+attach-linux unset-prop --context <dts-file> --overlay <dtso-file> --node <node> --property <prop-name>
 ```
 
 **Flags**:
@@ -573,7 +573,7 @@ attach unset-prop --context <dts-file> --overlay <dtso-file> --node <node> --pro
 
 **Example**:
 ```bash
-attach unset-prop --context ~/ctx.dts --overlay overlay.dtso --node imu1 --property spi-max-frequency
+attach-linux unset-prop --context ~/ctx.dts --overlay overlay.dtso --node imu1 --property spi-max-frequency
 ```
 
 **Note**: The printer auto-inserts `status = "okay"` whenever a node has overlay-added child nodes and no explicit `status` property. Unsetting `status` on such a node will still produce `status = "okay"` in the output — this is correct printer behaviour.
@@ -591,8 +591,8 @@ attach unset-prop --context ~/ctx.dts --overlay overlay.dtso --node imu1 --prope
 
 **Syntax**:
 ```bash
-attach enable  --context <dts-file> --overlay <dtso-file> --node <node>
-attach disable --context <dts-file> --overlay <dtso-file> --node <node>
+attach-linux enable  --context <dts-file> --overlay <dtso-file> --node <node>
+attach-linux disable --context <dts-file> --overlay <dtso-file> --node <node>
 ```
 
 **Flags**:
@@ -605,10 +605,10 @@ attach disable --context <dts-file> --overlay <dtso-file> --node <node>
 **Examples**:
 ```bash
 # Enable a peripheral that is disabled in the base tree
-attach enable --context ~/ctx.dts --overlay overlay.dtso --node spi0
+attach-linux enable --context ~/ctx.dts --overlay overlay.dtso --node spi0
 
 # Disable a node
-attach disable --context ~/ctx.dts --overlay overlay.dtso --node spi1
+attach-linux disable --context ~/ctx.dts --overlay overlay.dtso --node spi1
 ```
 
 **Error messages**:
@@ -621,7 +621,7 @@ attach disable --context ~/ctx.dts --overlay overlay.dtso --node spi1
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │ 0. INITIALIZE (once per project)                            │
-│    attach init --linux <path> --dt-schema <path>            │
+│    attach-linux init --linux <path> --dt-schema <path>            │
 │               [--context <dts-file>]                        │
 │    → Writes config.toml + compat-index.json                 │
 └─────────────────────────────────────────────────────────────┘
@@ -636,35 +636,35 @@ attach disable --context ~/ctx.dts --overlay overlay.dtso --node spi1
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
 │ 2. FIND DEVICE                                              │
-│    attach list-devices --includes-word <chip-name>          │
+│    attach-linux list-devices --includes-word <chip-name>          │
 │    → Get compatible string                                  │
 └─────────────────────────────────────────────────────────────┘
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
 │ 3. GET SCHEMA                                               │
-│    attach get-schema --compatible <string>                  │
+│    attach-linux get-schema --compatible <string>                  │
 │    → Understand required/optional properties                │
 └─────────────────────────────────────────────────────────────┘
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
 │ 4. FIND PARENT                                              │
-│    attach suggest-parents --compatible <string>             │
-│    → Determine which bus to attach to                       │
+│    attach-linux suggest-parents --compatible <string>             │
+│    → Determine which bus to attach-linux to                       │
 └─────────────────────────────────────────────────────────────┘
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
 │ 5. CREATE OVERLAY                                           │
-│    attach create --parent <bus> --output <file.dtso>        │
+│    attach-linux create --parent <bus> --output <file.dtso>        │
 │    → Generate skeleton file                                 │
 └─────────────────────────────────────────────────────────────┘
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
 │ 6. CONFIGURE (using set-prop command)                       │
-│    attach set-prop --property <name> --value <value> ...    │
+│    attach-linux set-prop --property <name> --value <value> ...    │
 │    - Set all required_properties                            │
 │    - Set user-requested optional properties                 │
 │    - For channels: manually edit .dtso (set-prop unsupported)│
@@ -674,7 +674,7 @@ attach disable --context ~/ctx.dts --overlay overlay.dtso --node spi1
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
 │ 7. ADD MORE NODES (optional)                                 │
-│    attach add [<compatible>] --name <..> --to <..>          │
+│    attach-linux add [<compatible>] --name <..> --to <..>          │
 │    → Add sibling devices or subnodes (e.g. channels)         │
 │    → Repeat step 6 to configure any added device's props    │
 └─────────────────────────────────────────────────────────────┘
@@ -682,7 +682,7 @@ attach disable --context ~/ctx.dts --overlay overlay.dtso --node spi1
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
 │ 8. VALIDATE                                                 │
-│    attach validate --node <name> --overlay <file.dtso>      │
+│    attach-linux validate --node <name> --overlay <file.dtso>      │
 │    → Fix any errors with set-prop, repeat until clean       │
 └─────────────────────────────────────────────────────────────┘
 ```
@@ -763,7 +763,7 @@ node-name {
 9. **Phandle references** - When setting phandle properties with `set-prop`, just use the label name (e.g., `--value gpio`)
 10. **Macros need includes** - If schema shows macros, the overlay may need `#include` directives
 11. **Interrupts need interrupt-parent** - When using the `interrupts` property, first set `interrupt-parent` using `set-prop --property interrupt-parent --value <controller>` (e.g., `--value gpio`). The interrupt controller determines how many cells are needed in the `interrupts` array.
-12. **Use `add` for additional nodes** - Once an overlay exists, use `add` to attach another sibling device (with a positional compatible string) or a bare subnode like a channel (with `--name`) instead of hand-editing the `.dtso`
+12. **Use `add` for additional nodes** - Once an overlay exists, use `add` to attach-linux another sibling device (with a positional compatible string) or a bare subnode like a channel (with `--name`) instead of hand-editing the `.dtso`
 13. **Use `delete` to undo an `add`** - `delete --node <label>` removes an overlay-added node cleanly; it also drops the parent reference block if that block is now empty. It refuses to touch base-tree nodes.
 14. **Use `rename` to change a node's key** - `rename --node <label> --to <new-key>` renames `name@unit_addr`; omitting `@` in `--to` preserves the existing unit address. Only overlay-added nodes.
 15. **Use `move` to reparent a node** - `move --node <label> --parent <dest>` relocates an overlay-added node; labels and the node key are preserved. Refuses base-tree nodes and cycles.

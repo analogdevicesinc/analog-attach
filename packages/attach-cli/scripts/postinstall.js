@@ -20,7 +20,7 @@ function isClaudeInstalled() {
 
 function getSkillDirectory() {
     const homeDirectory = process.env.HOME || process.env.USERPROFILE || '';
-    return path.join(homeDirectory, '.claude', 'skills', 'attach');
+    return path.join(homeDirectory, '.claude', 'skills', 'attach-linux');
 }
 
 function getSourceSkillPath() {
@@ -87,7 +87,7 @@ async function main() {
         console.log('');
         console.log('Claude Code not detected. To enable Claude Code integration later:');
         console.log('  1. Install Claude Code: https://claude.ai/code');
-        console.log('  2. Run: attach install-skill');
+        console.log('  2. Run: attach-linux install-skill');
         console.log('');
         return;
     }
@@ -119,7 +119,7 @@ async function main() {
     if (answer === 'n' || answer === 'no') {
         console.log('');
         console.log('Skipped skill installation.');
-        console.log('Run "attach install-skill" later to install.');
+        console.log('Run "attach-linux install-skill" later to install.');
         console.log('');
         return;
     }
@@ -132,12 +132,12 @@ async function main() {
         console.log('Claude Code will now assist with device tree configuration.');
         console.log('Try asking: "help me configure an ADC for my Raspberry Pi"');
         console.log('');
-        console.log('To uninstall later: attach uninstall-skill');
+        console.log('To uninstall later: attach-linux uninstall-skill');
         console.log('');
     } else {
         console.log('');
         console.log('Failed to install skill automatically.');
-        console.log('Try running manually: attach install-skill');
+        console.log('Try running manually: attach-linux install-skill');
         console.log('');
     }
 }

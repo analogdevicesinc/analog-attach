@@ -12,7 +12,7 @@
     "SKILL.md"
   ],
   "bin": {
-    "attach": "dist/cli.js"
+    "attach-linux": "dist/cli.js"
   },
   "engines": {
     "node": ">=20"
@@ -22,7 +22,7 @@
     "build": "tsup --silent --dts",
     "postinstall": "node scripts/postinstall.js",
     "prepublishOnly": "npm run build",
-    "dev-link": "yarn build && mkdir -p $HOME/.local/bin && ln -sf \"$(pwd)/dist/cli.js\" $HOME/.local/bin/attach && chmod +x dist/cli.js && echo 'attach linked to $HOME/.local/bin/attach'",
+    "dev-link": "yarn build && mkdir -p $HOME/.local/bin && ln -sf \"$(pwd)/dist/cli.js\" $HOME/.local/bin/attach-linux && chmod +x dist/cli.js && echo 'attach-linux linked to $HOME/.local/bin/attach-linux'",
     "clean": "rm -rf dist tsconfig.tsbuildinfo node_modules",
     "lint": "eslint src",
     "format": "eslint . --fix",
