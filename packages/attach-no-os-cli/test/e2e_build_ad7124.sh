@@ -15,13 +15,13 @@ PROJECT_NAME="e2e_test_ad7124"
 TARGET_MCU="max32690"
 
 configure_nodes() {
-    $AA create node max_spi_ip platforms/maxim/max32690/max_spi_init_param.yaml
-    $AA create node no_os_spi_ip no-os/spi/no_os_spi_init_param.yaml
-    $AA create node ad7124_ip devices/ad7124/ad7124_init_param.yaml
-    $AA create node ad7124_device devices/ad7124/ad7124.yaml
+    $AA add --name max_spi_ip --key platforms/maxim/max32690/max_spi_init_param.yaml
+    $AA add --name no_os_spi_ip --key no-os/spi/no_os_spi_init_param.yaml
+    $AA add --name ad7124_ip --key devices/ad7124/ad7124_init_param.yaml
+    $AA add --name ad7124_device --key devices/ad7124/ad7124.yaml
     # The driver's power-on register table. Required: ad7124_setup assigns it and then
     # dereferences it (ad7124.c:1491,1512), so a NULL table faults.
-    $AA create node ad7124_regs devices/ad7124/ad7124_regs.yaml
+    $AA add --name ad7124_regs --key devices/ad7124/ad7124_regs.yaml
 
     # Configure the Maxim SPI init_param
     $AA update max_spi_ip vssel MXC_GPIO_VSSEL_VDDIOH

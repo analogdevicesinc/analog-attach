@@ -2901,6 +2901,7 @@ __metadata:
     "@stricli/auto-complete": "npm:^1.2.9"
     "@stricli/core": "npm:^1.1.0"
     "@types/node": "npm:20.x"
+    ajv: "npm:^8.17.1"
     attach-no-os-lib: "workspace:*"
     eta: "npm:^3.5.0"
     tsup: "npm:^6.7.0"

@@ -1,11 +1,5 @@
 import { buildCommand } from "@stricli/core";
-import {
-    Property,
-    PropertySuggestions,
-    rename_symbol,
-    set_value,
-    suggest_for_property
-} from "attach-no-os-lib";
+import { set_value } from "attach-no-os-lib";
 import type { AttachContext } from "./shared";
 import {
     load_context,
@@ -14,9 +8,8 @@ import {
     output_error,
     get_node,
     get_node_property,
-    format_property_type,
-    format_property_list,
-    format_property_details
+    resolve_property_name,
+    format_property_value
 } from "./shared";
 import {
     prior_positionals,
@@ -26,13 +19,38 @@ import {
     get_value_suggestions,
     get_union_value_suggestions
 } from "../completion/completion";
+import { ELEMENT_SEPARATOR, READONLY_KEYS, RESERVED_PREFIX, parse_property_value } from "../protocol/convert";
+import { common_ok } from "../protocol/responses";
 
+type UpdateFlags = {
+    json?: boolean;
+    with?: string;
+};
+
+/**
+ * `aa update <node> <property> --with <value>` — set one property.
+ *
+ * The protocol's `update` is an upsert: an unknown property is inserted. Ours cannot be.
+ * A node's properties come from its schema, which is the C struct it generates — a property
+ * that is not in the schema is a field that does not exist — so an unknown name is refused
+ * with the list of names that do exist.
+ *
+ * `--with` is a raw string by protocol, and none of the type information survives the trip,
+ * so parsing it back into a number, an enum member or a union is entirely our job (see
+ * parse_property_value).
+ */
 export const updateCommand = buildCommand<
-    { json?: boolean; rename?: string },
+    UpdateFlags,
     [string | undefined, string | undefined, string | undefined, string | undefined],
     AttachContext
 >({
-    docs: { brief: "Update a node property or rename a node" },
+    docs: {
+        brief: "Set a property on a node",
+        fullDescription:
+            "Sets <property> on <node>. The value can be given with --with or as a positional.\n" +
+            `A union takes '<member>${ELEMENT_SEPARATOR}<value>' (or two positionals), an array a comma-separated list.\n` +
+            `A property whose name starts with '${RESERVED_PREFIX}' can be written without it: init_param means ${RESERVED_PREFIX}init_param.`
+    },
     parameters: {
         positional: {
             kind: "tuple",
@@ -51,14 +69,14 @@ export const updateCommand = buildCommand<
                     }
                 },
                 {
-                    placeholder: "value", brief: "Value (or union member)", optional: true, parse: String,
+                    placeholder: "value", brief: "Value to set (or a union member)", optional: true, parse: String,
                     proposeCompletions(partial: string) {
                         const [node, property] = prior_positionals(this, 1);
                         return filter_completions(get_value_suggestions(node, property), partial);
                     }
                 },
                 {
-                    placeholder: "union_value", brief: "Value for union member", optional: true, parse: String,
+                    placeholder: "union_value", brief: "Value for the union member named before it", optional: true, parse: String,
                     proposeCompletions(partial: string) {
                         const [node, property, member] = prior_positionals(this, 1);
                         return filter_completions(get_union_value_suggestions(node, property, member), partial);
@@ -68,173 +86,102 @@ export const updateCommand = buildCommand<
         },
         flags: {
             json: { kind: "boolean", brief: "Output as JSON", optional: true },
-            rename: { kind: "parsed", brief: "Rename node to this name", optional: true, parse: String }
+            with: {
+                kind: "parsed",
+                brief: "Value to set, as one string",
+                optional: true,
+                parse: String,
+                proposeCompletions(partial: string) {
+                    const [node, property] = prior_positionals(this, 1);
+                    return filter_completions(get_value_suggestions(node, property), partial);
+                }
+            }
         }
     },
-    func: async function (flags, node, property, value, union_value) {
-        const context = load_context(this.workfile_path);
+    func: async (flags: UpdateFlags, node, property, value, union_value) => {
+        if (!node || !property) {
+            output_error(
+                flags,
+                "Nothing to update: pass <node> <property> --with <value>. " +
+                "Use 'aa read' to see the nodes and 'aa read <node>' to see their properties."
+            );
+            return;
+        }
+
+        const context = load_context();
         if (!context.ok) {
-            output_error(flags, "load_failed", context.error.message);
+            output_error(flags, context.error.message);
             return;
         }
 
-        // aa update - list nodes
-        if (!node) {
-            const text = "Nodes:\n\n" + Object.entries(context.value.minimal.symbols)
-                .map(([name, n]) => `  ${name.padEnd(18)}${n.$compatible}`)
-                .join("\n") + "\n\nUse: aa update <node> <property> <value>";
-            const json = {
-                nodes: Object.entries(context.value.minimal.symbols).map(([name, n]) => ({
-                    name,
-                    schema: n.$compatible
-                }))
-            };
-            output(flags, text, json);
+        if (READONLY_KEYS.has(property)) {
+            output_error(flags, `'${property}' describes the node rather than configuring it, and cannot be set`);
             return;
         }
 
-        // aa update <node> --rename <new_name>
-        if (flags.rename) {
-            const result = rename_symbol(context.value.workfile, node, flags.rename);
-            if (!result.ok) {
-                output_error(flags, "rename_failed", result.error.message);
-                return;
-            }
-
-            context.value.workfile = result.value;
-            const save = save_workfile(context.value);
-            if (!save.ok) {
-                output_error(flags, "save_failed", save.error.message);
-                return;
-            }
-
-            output(flags, `Renamed ${node} to ${flags.rename}`, { renamed: { from: node, to: flags.rename } });
+        const owner = get_node(context.value, node);
+        if (!owner.ok) {
+            output_error(flags, owner.error.message);
             return;
         }
 
-        // aa update <node> - list properties
-        if (!property) {
-            const node_result = get_node(context.value, node);
-            if (!node_result.ok) {
-                output_error(flags, "node_not_found", node_result.error.message);
-                return;
-            }
+        // What the user typed, spelled the way the workfile spells it: `init_param` for
+        // `$init_param`. Everything below uses this, not `property`.
+        const resolved = resolve_property_name(owner.value, property);
 
-            // Readonly fields are part of the struct but not part of this list: generated
-            // code fills them in, so `aa update` would only reject them. `aa read` still
-            // shows them.
-            const settable = node_result.value.properties.filter(p => p.readonly !== true);
-
-            const text = format_property_list(node, settable) + "\nUse: aa update <node> <property> [value]";
-            const json = {
-                node,
-                properties: settable.map(p => ({
-                    name: p.name,
-                    type: format_property_type(p._t),
-                    value: p.value
-                }))
-            };
-            output(flags, text, json);
+        // The upsert half of the protocol's update: refused, with the names that would work.
+        if (!owner.value.properties.some(candidate => candidate.name === resolved)) {
+            output_error(
+                flags,
+                `'${node}' has no property '${property}', and one cannot be added: its properties are ` +
+                `fixed by its schema (${owner.value.$id}). Available: ` +
+                owner.value.properties.map(candidate => candidate.name).join(", ")
+            );
             return;
         }
 
-        // Check property exists
-        const lookup = get_node_property(context.value, node, property);
+        const lookup = get_node_property(context.value, node, resolved);
         if (!lookup.ok) {
-            output_error(flags, "lookup_failed", lookup.error.message);
+            output_error(flags, lookup.error.message);
             return;
         }
 
-        // aa update <node> <property> - show property details and suggestions
-        if (!value) {
-            const suggestions = suggest_for_property(context.value.workfile, node, property);
-            const empty_suggestions: PropertySuggestions = {};
-            const suggestions_value = suggestions.ok ? suggestions.value : empty_suggestions;
-            const text = format_property_details(lookup.value.property, suggestions_value);
-            const json = {
-                property,
-                type: format_property_type(lookup.value.property._t),
-                current: lookup.value.property.value,
-                suggestions: suggestions_value.values ?? [],
-                types: suggestions_value.types ?? []
-            };
-            output(flags, text, json);
+        // `--with` wins; the positional form is the human shorthand. Two positionals for a
+        // union ('<member> <value>') fold into the one string the parser expects.
+        const raw = flags.with ?? (
+            value !== undefined && union_value !== undefined
+                ? `${value}${ELEMENT_SEPARATOR}${union_value}`
+                : value
+        );
+
+        if (raw === undefined) {
+            output_error(
+                flags,
+                `No value given for '${node}.${property}'. Pass --with <value>; ` +
+                `'aa read ${node} ${property}' lists what it accepts.`
+            );
             return;
         }
 
-        // Handle union type
-        if (lookup.value.property._t === "UnionProperty") {
-            const member = lookup.value.property.members.find(m => m.name === value);
-            if (!member) {
-                output_error(flags, "invalid_union_member", `Invalid union member '${value}'. Available: ${lookup.value.property.members.map(m => m.name).join(", ")}`);
-                return;
-            }
-
-            // eslint-disable-next-line unicorn/no-null
-            const union_object = { [value]: union_value ?? null };
-            const result = set_value(context.value.workfile, node, property, union_object);
-            if (!result.ok) {
-                output_error(flags, "set_failed", result.error.message);
-                return;
-            }
-
-            const save = save_workfile(context.value);
-            if (!save.ok) {
-                output_error(flags, "save_failed", save.error.message);
-                return;
-            }
-
-            const display_value = union_value ?? "(none)";
-            output(flags, `Set ${node}.${property} = ${value}: ${display_value}`, {
-                // eslint-disable-next-line unicorn/no-null
-                updated: { node, property, member: value, value: union_value ?? null }
-            });
+        const parsed = parse_property_value(raw, lookup.value.property);
+        if (!parsed.ok) {
+            output_error(flags, parsed.error.message);
             return;
         }
 
-        // aa update <node> <property> <value> - set non-union value
-        const parsed_value = parse_value(value, lookup.value.property);
-        const result = set_value(context.value.workfile, node, property, parsed_value);
-        if (!result.ok) {
-            output_error(flags, "set_failed", result.error.message);
+        const updated = set_value(context.value.workfile, node, resolved, parsed.value);
+        if (!updated.ok) {
+            output_error(flags, updated.error.message);
             return;
         }
 
-        const save = save_workfile(context.value);
-        if (!save.ok) {
-            output_error(flags, "save_failed", save.error.message);
+        const saved = save_workfile(context.value);
+        if (!saved.ok) {
+            output_error(flags, saved.error.message);
             return;
         }
 
-        output(flags, `Set ${node}.${property} = ${parsed_value}`, {
-            updated: { node, property, value: parsed_value }
-        });
+        const message = `Set ${node}.${resolved} = ${format_property_value(lookup.value.property)}`;
+        output(flags, message, common_ok(message));
     }
 });
-
-// ------- HELPERS --------
-
-function parse_value(value: string, property: Property): unknown {
-    switch (property._t) {
-        case "NumberProperty": {
-            return Number(value);
-        }
-        case "BooleanProperty": {
-            return value === "true";
-        }
-        case "EnumProperty": {
-            const number_ = Number(value);
-            if (!Number.isNaN(number_) && property.values.includes(number_)) {
-                return number_;
-            }
-            return value;
-        }
-        case "ArrayProperty": {
-            return value.split(",").map(v => v.trim()).filter(v => v.length > 0);
-        }
-        default: {
-            return value;
-        }
-    }
-}
-
