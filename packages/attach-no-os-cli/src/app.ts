@@ -1,32 +1,55 @@
 import { buildApplication, buildRouteMap } from "@stricli/core";
-import { configCommand } from "./commands/config";
-import { createCommand } from "./commands/create";
-import { readCommand } from "./commands/read";
-import { listCommand } from "./commands/list";
-import { updateCommand } from "./commands/update";
-import { deleteCommand } from "./commands/delete";
-import { validateCommand } from "./commands/validate";
-import { generateCommand } from "./commands/generate";
+import { addCommand } from "./commands/add";
+import { attachManifestCommand } from "./commands/attach_manifest";
 import { buildCommandDefinition } from "./commands/build";
-import { deployCommand } from "./commands/deploy";
 import { completionCommand } from "./commands/completion";
-import { discoveryCommand } from "./commands/discovery";
-import { TOOL_DESCRIPTION, TOOL_VERSION } from "./protocol";
+import { toolConfigGetCommand, toolConfigSetCommand } from "./commands/config";
+import { createWorkfileCommand } from "./commands/create_workfile";
+import { deleteCommand } from "./commands/delete";
+import { deployCommand } from "./commands/deploy";
+import { generateCommand } from "./commands/generate";
+import { listIntelligenceCommand, suggestCommand } from "./commands/intelligence";
+import { listBoardsCommand, listPlatformsCommand } from "./commands/list";
+import { listDevicesCommand } from "./commands/list_devices";
+import { moveCommand } from "./commands/move";
+import { readCommand } from "./commands/read";
+import { renameCommand } from "./commands/rename";
+import { updateCommand } from "./commands/update";
+import { validateCommand } from "./commands/validate";
+import { TOOL_DESCRIPTION, TOOL_VERSION } from "./protocol/manifest";
 
+/**
+ * One route per protocol command, spelled exactly as the protocol spells it.
+ *
+ * There is no separate machine interface: attach-meta invokes these same routes with
+ * `--json` appended (that is all its manifest entry adds), so a person and attach-meta walk
+ * the same commands and see the same behaviour in two renderings.
+ *
+ * `list-boards`, `list-platforms` and `completion` are ours alone — attach-meta has no
+ * command that means either — and `attach-manifest` is the one fixed name it requires.
+ */
 const routes = buildRouteMap({
 	routes: {
-		config: configCommand,
-		create: createCommand,
+		"attach-manifest": attachManifestCommand,
+		"tool-config-get": toolConfigGetCommand,
+		"tool-config-set": toolConfigSetCommand,
+		"create-workfile": createWorkfileCommand,
+		"list-devices": listDevicesCommand,
+		add: addCommand,
 		read: readCommand,
-		list: listCommand,
 		update: updateCommand,
 		delete: deleteCommand,
+		rename: renameCommand,
+		move: moveCommand,
 		validate: validateCommand,
 		generate: generateCommand,
 		build: buildCommandDefinition,
 		deploy: deployCommand,
+		"list-intelligence": listIntelligenceCommand,
+		suggest: suggestCommand,
+		"list-boards": listBoardsCommand,
+		"list-platforms": listPlatformsCommand,
 		completion: completionCommand,
-		discovery: discoveryCommand,
 	},
 	docs: {
 		brief: TOOL_DESCRIPTION,

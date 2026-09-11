@@ -97,7 +97,10 @@ describe('resolver', () => {
             teardown_no_config();
             expect(result.ok).toBe(false);
             if (!result.ok) {
-                expect(result.error.message).toContain('No global config');
+                // A missing config file is no longer an error in itself — attach-meta reads
+                // the settings before anything is configured — so the failure comes from
+                // the setting being unset.
+                expect(result.error.message).toContain('"no_os_path" is not configured');
             }
         });
     });

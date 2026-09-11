@@ -15,10 +15,10 @@ configure_nodes() {
     # A device is a descriptor node (adxl355_device) paired with its init_param struct
     # (adxl355_ip); the init_param references the no-OS SPI init_param, which in turn
     # references the platform (Maxim) SPI init_param.
-    $AA create node max_spi_ip platforms/maxim/max32690/max_spi_init_param.yaml
-    $AA create node no_os_spi_ip no-os/spi/no_os_spi_init_param.yaml
-    $AA create node adxl355_ip devices/adxl355/adxl355_init_param.yaml
-    $AA create node adxl355_device devices/adxl355/adxl355.yaml
+    $AA add --name max_spi_ip --key platforms/maxim/max32690/max_spi_init_param.yaml
+    $AA add --name no_os_spi_ip --key no-os/spi/no_os_spi_init_param.yaml
+    $AA add --name adxl355_ip --key devices/adxl355/adxl355_init_param.yaml
+    $AA add --name adxl355_device --key devices/adxl355/adxl355.yaml
 
     # Configure the Maxim SPI init_param
     $AA update max_spi_ip vssel MXC_GPIO_VSSEL_VDDIOH
