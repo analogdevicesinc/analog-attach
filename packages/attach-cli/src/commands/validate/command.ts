@@ -128,13 +128,13 @@ export function build_validate_command(context_: LocalContext): Command {
             if (compatible === undefined) {
                 if (context_.json) {
                     const result = await validate_pattern_matched_child_proto(
-                        found_node, parent, parent_node, path_segs, linux, dtSchema, base_dt
+                        found_node, parent, parent_node, path_segs, linux, dtSchema, base_dt, context_.json
                     );
                     respond(result);
                     return;
                 }
                 await validate_pattern_matched_child(
-                    found_node, parent, parent_node, node_identifier, input, linux, dtSchema, base_dt
+                    found_node, parent, parent_node, node_identifier, input, linux, dtSchema, base_dt, context_.json
                 );
                 return;
             }
@@ -147,7 +147,7 @@ export function build_validate_command(context_: LocalContext): Command {
                 return;
             }
 
-            const binding_path = await find_binding(linux, dtSchema, compatible_value);
+            const binding_path = await find_binding(linux, dtSchema, compatible_value, context_.json);
 
             if (binding_path === undefined) {
                 if (context_.json) {
@@ -250,6 +250,7 @@ async function validate_pattern_matched_child_proto(
     linux: string,
     dtSchema: string,
     base_dt: DeviceTree,
+    silent: boolean,
 ): Promise<ValidationResponse> {
     if (parent_node === undefined) {
         return { errors: [{ kind: "generic", path: node_path, message: "Node has no compatible and no parent to check patternProperties against" }], warnings: [] };
@@ -267,7 +268,7 @@ async function validate_pattern_matched_child_proto(
         return { errors: [{ kind: "generic", path: node_path, message: "Unexpected value in compatible of parent node" }], warnings: [] };
     }
 
-    const parent_binding_path = await find_binding(linux, dtSchema, parent_compatible_value);
+    const parent_binding_path = await find_binding(linux, dtSchema, parent_compatible_value, silent);
 
     if (parent_binding_path === undefined) {
         return { errors: [{ kind: "generic", path: node_path, message: `Failed to find binding for ${parent_compatible_value}` }], warnings: [] };
@@ -329,6 +330,7 @@ async function validate_pattern_matched_child(
     linux: string,
     dtSchema: string,
     base_dt: DeviceTree,
+    silent: boolean,
 ): Promise<void> {
 
     if (parent_node === undefined) {
@@ -350,7 +352,7 @@ async function validate_pattern_matched_child(
         return;
     }
 
-    const parent_binding_path = await find_binding(linux, dtSchema, parent_compatible_value);
+    const parent_binding_path = await find_binding(linux, dtSchema, parent_compatible_value, silent);
 
     if (parent_binding_path === undefined) {
         console.log(`Failed to find binding for ${parent_compatible_value}`);

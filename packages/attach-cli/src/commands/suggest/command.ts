@@ -76,7 +76,7 @@ async function suggest_parent(context_: LocalContext, arguments_: string[]): Pro
         return;
     }
 
-    const binding_path = await find_binding(linux, dtSchema, compatible);
+    const binding_path = await find_binding(linux, dtSchema, compatible, context_.json);
     if (binding_path === undefined) {
         if (context_.json) {
             respond({ ok: true, message: `No binding found for ${compatible}`, severity: "warn", suggestions: [] });

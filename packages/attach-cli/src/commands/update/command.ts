@@ -137,7 +137,7 @@ export function build_update_command(context_: LocalContext): Command {
                 return;
             }
 
-            const binding_path = await find_binding(linux, dtSchema, compatible_value);
+            const binding_path = await find_binding(linux, dtSchema, compatible_value, context_.json);
             if (binding_path === undefined) {
                 if (context_.json) {
                     respond_fail({ ok: false, message: `No binding found for ${compatible_value}`, severity: "error" });

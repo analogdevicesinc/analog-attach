@@ -107,7 +107,7 @@ export function build_add_command(context_: LocalContext): Command {
             }
 
             if (key !== undefined) {
-                const binding_path = await find_binding(linux, dtSchema, key);
+                const binding_path = await find_binding(linux, dtSchema, key, context_.json);
 
                 if (binding_path === undefined) {
                     if (context_.json) {

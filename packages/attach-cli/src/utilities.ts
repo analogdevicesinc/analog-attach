@@ -147,21 +147,21 @@ export async function build_compat_index(linux: string, dtSchema: string): Promi
     return index;
 }
 
-export async function find_binding(linux: string, dtSchema: string, compatible_to_find: string): Promise<string | undefined> {
+export async function find_binding(linux: string, dtSchema: string, compatible_to_find: string, silent = false): Promise<string | undefined> {
     let cached_index = load_compat_index();
 
     if (cached_index === undefined) {
         const entries = await build_compat_index(linux, dtSchema);
         const compat_index_path = save_compat_index(entries);
-        console.error(`Written: ${compat_index_path}`);
+        if (!silent) { console.error(`Written: ${compat_index_path}`); }
         return entries[compatible_to_find];
     }
 
     if (is_compat_index_stale(cached_index, linux, dtSchema)) {
-        console.error("compat-index.json is stale, rebuilding...");
+        if (!silent) { console.error("compat-index.json is stale, rebuilding..."); }
         const entries = await build_compat_index(linux, dtSchema);
         const compat_index_path = save_compat_index(entries);
-        console.error(`Written: ${compat_index_path}`);
+        if (!silent) { console.error(`Written: ${compat_index_path}`); }
         return entries[compatible_to_find];
     }
 
