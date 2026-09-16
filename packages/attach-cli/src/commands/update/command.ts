@@ -5,6 +5,8 @@ import {
     DeviceTree,
     DeviceTreeOverlay,
     PropertyBuilder,
+    INTERRUPT_MACROS,
+    GPIO_MACROS,
     is_dt_flag,
     to_attach_array,
     dt_to_validator_input,
@@ -265,6 +267,8 @@ function upsert_property(found_node: DTNode, property: DTProperty): void {
     existing.value = structuredClone(property.value);
 }
 
+const ALL_MACROS = [...INTERRUPT_MACROS, ...GPIO_MACROS];
+
 function to_cell_value(entry: bigint | string, enum_type: AttachEnumType): CellValue {
     if (typeof entry === "bigint") {
         return PropertyBuilder.tag_number(entry);
@@ -275,6 +279,10 @@ function to_cell_value(entry: bigint | string, enum_type: AttachEnumType): CellV
             return PropertyBuilder.tag_label(entry);
         }
         case AttachEnumType.MACRO: {
+            const resolved = ALL_MACROS.find(m => m.name === entry);
+            if (resolved !== undefined) {
+                return PropertyBuilder.tag_number(BigInt(resolved.value));
+            }
             return PropertyBuilder.tag_expression(entry);
         }
         default: {
