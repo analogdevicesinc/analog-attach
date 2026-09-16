@@ -1,7 +1,9 @@
 import {
     Attach,
     extract_compatible,
+    is_dt_flag,
     type DTLabel,
+    type DTNode,
     type DTPath
 } from 'attach-lib';
 
@@ -154,6 +156,62 @@ export function resolve_positional_path(arguments_: string[]): string | undefine
         return arguments_.length === 1 ? first : `${first}/${arguments_.slice(1).join("/")}`;
     }
     return arguments_.join("/");
+}
+
+export function fragment_target(fragment: DTNode): string | undefined {
+    const target = fragment.properties.find(p => p.name === "target");
+    if (target !== undefined && !is_dt_flag(target.value)) {
+        for (const value of target.value) {
+            if (value.kind !== "array") { continue; }
+            for (const element of value.elements) {
+                if (element.kind === "label") {
+                    const name = element.name.startsWith("&") ? element.name.slice(1) : element.name;
+                    return `&${name}`;
+                }
+                if (element.kind === "path") {
+                    return `&{${element.path}}`;
+                }
+            }
+        }
+    }
+
+    const target_path = fragment.properties.find(p => p.name === "target-path");
+    if (target_path !== undefined && !is_dt_flag(target_path.value)) {
+        for (const value of target_path.value) {
+            if (value.kind === "string") { return value.value; }
+        }
+    }
+
+    return undefined;
+}
+
+if (import.meta.vitest) {
+    const { test, expect } = import.meta.vitest;
+    const { DeviceTree: DT, DeviceTreeOverlay: DTO } = await import("attach-lib");
+
+    const base_dts = `/dts-v1/; / { soc { spi0: spi@7e204000 {}; }; };`;
+
+    const parse_overlay = (overlay_src: string): DeviceTreeOverlay => {
+        const base = DT.new_from_string(base_dts);
+        if (typeof base === "string") { throw new TypeError(base); }
+        const overlay = DTO.new_from_string(overlay_src, base);
+        if (typeof overlay === "string") { throw new TypeError(overlay); }
+        return overlay;
+    };
+
+    test("fragment_target reads a label target as &label", () => {
+        const overlay = parse_overlay(`/dts-v1/; /plugin/; &spi0 { };`);
+        const [fragment] = overlay.get_fragments();
+        expect(fragment).toBeDefined();
+        expect(fragment_target(fragment!)).toBe("&spi0");
+    });
+
+    test("fragment_target reads a path target as the absolute path", () => {
+        const overlay = parse_overlay(`/dts-v1/; /plugin/; &{/soc/spi@7e204000} { };`);
+        const [fragment] = overlay.get_fragments();
+        expect(fragment).toBeDefined();
+        expect(fragment_target(fragment!)).toBe("/soc/spi@7e204000");
+    });
 }
 
 export async function find_binding(linux: string, dtSchema: string, compatible_to_find: string, silent = false): Promise<string | undefined> {

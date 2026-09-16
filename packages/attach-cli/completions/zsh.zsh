@@ -30,6 +30,26 @@ _attach_linux_parents() {
     _attach_linux_suggest parent "$key"
 }
 
+_attach_linux_navigate() {
+    local -a segments
+    local skip_next=false w i
+    for (( i = 1; i < CURRENT; i++ )); do
+        w="${(Q)words[i]}"
+        if $skip_next; then
+            skip_next=false
+            continue
+        fi
+        case "$w" in
+            attach-linux|update|read|delete|--json) ;;
+            --with|--overlay|--context|--linux|--dt-schema)
+                skip_next=true ;;
+            --*) ;;
+            *) [[ -n "$w" ]] && segments+=("$w") ;;
+        esac
+    done
+    _attach_linux_suggest navigate "${segments[@]}"
+}
+
 _attach_linux() {
     local curcontext="$curcontext" state line
     typeset -A opt_args
@@ -141,13 +161,13 @@ _attach_linux() {
                         '--overlay[Path to the dtso file]:overlay:_files' \
                         '--context[The target dts]:context:_files' \
                         '--force[Force deletion]' \
-                        '*:args:'
+                        '*:path:_attach_linux_navigate'
                     ;;
                 read)
                     _arguments \
                         '--overlay[Path to the dtso file]:overlay:_files' \
                         '--context[The target dts]:context:_files' \
-                        '*:args:'
+                        '*:path:_attach_linux_navigate'
                     ;;
                 update)
                     _arguments \
@@ -156,7 +176,7 @@ _attach_linux() {
                         '--context[The target dts]:context:_files' \
                         '--linux[Path to Linux repo]:linux:_files -/' \
                         '--dt-schema[Path to dt-schema repo]:dt-schema:_files -/' \
-                        '*:args:'
+                        '*:path:_attach_linux_navigate'
                     ;;
                 move)
                     _arguments \

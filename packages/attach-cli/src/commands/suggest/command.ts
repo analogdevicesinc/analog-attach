@@ -1,14 +1,14 @@
 import { Command } from "commander";
-import { Attach, DeviceTree, DeviceTreeOverlay, is_dt_flag, suggest_parents, dt_to_validator_input } from "attach-lib";
+import { Attach, DeviceTree, DeviceTreeOverlay, get_full_node_name, is_dt_flag, suggest_parents, dt_to_validator_input, type DTNode } from "attach-lib";
 import * as fs from "node:fs";
 
 import type { LocalContext } from "../../context";
 import { load_config } from "../../config";
 import { load_compat_index, save_compat_index } from "../../config";
-import { find_binding, is_compat_index_stale, build_compat_index, resolve_node_identifier, resolve_positional_path, bigIntReplacer } from "../../utilities";
+import { find_binding, fragment_target, is_compat_index_stale, build_compat_index, resolve_node_identifier, resolve_positional_path, bigIntReplacer } from "../../utilities";
 import { respond, respond_fail, input_error } from "../../protocol/output";
 import { attach_type_to_protocol_type } from "../../protocol/dt-to-protocol";
-import type { TypeResponse } from "../../protocol/types";
+import type { TypeResponse, Suggestion } from "../../protocol/types";
 
 export function build_suggest_command(context: LocalContext): Command {
     return new Command("suggest")
@@ -34,6 +34,10 @@ export function build_suggest_command(context: LocalContext): Command {
                 }
                 case "node-prop": {
                     await suggest_node_property(context, arguments_.slice(1));
+                    return;
+                }
+                case "navigate": {
+                    await suggest_navigate(context, arguments_.slice(1));
                     return;
                 }
                 case "type": {
@@ -284,6 +288,153 @@ async function suggest_node_property(context_: LocalContext, arguments_: string[
                 ...(required.has(p.key) ? ["required"] : []),
             ].join(", ");
             console.log(markers ? `${p.key} (${markers})` : p.key);
+        }
+    }
+}
+
+// Binding-aware property suggestions for a node, mirroring `node-prop`: every
+// property the binding declares, with `set`/`required` labels. Returns
+// `undefined` when no binding can be resolved (missing/unusable `compatible`,
+// no matching binding, or parse failure) so callers can fall back to the
+// structurally-present properties.
+async function binding_property_suggestions(
+    found_node: DTNode,
+    linux: string,
+    dtSchema: string,
+    json: boolean,
+): Promise<Suggestion[] | undefined> {
+    const compatible_property = found_node.properties.find(p => p.name === "compatible");
+    if (compatible_property === undefined) { return undefined; }
+
+    const compatible_value = (() => {
+        if (is_dt_flag(compatible_property.value)) { return; }
+        const first = compatible_property.value[0];
+        if (first === undefined || first.kind !== "string") { return; }
+        return first.value;
+    })();
+    if (compatible_value === undefined) { return undefined; }
+
+    const binding_path = await find_binding(linux, dtSchema, compatible_value, json);
+    if (binding_path === undefined) { return undefined; }
+
+    const attach = Attach.new();
+    const binding = await attach.parse_binding(binding_path, linux, dtSchema);
+    if (binding === undefined) { return undefined; }
+
+    const required = new Set(binding.parsed_binding.required_properties);
+    const existing_keys = new Set(found_node.properties.map(p => p.name));
+
+    return binding.parsed_binding.properties.map(p => {
+        const labels = [
+            ...(existing_keys.has(p.key) ? ["set"] : []),
+            ...(required.has(p.key) ? ["required"] : []),
+        ].join(", ");
+        return {
+            value: p.key,
+            ...(labels ? { display_string: `${p.key} (${labels})` } : {}),
+        };
+    });
+}
+
+async function suggest_navigate(context_: LocalContext, arguments_: string[]): Promise<void> {
+    const config = load_config();
+    const context = config.context;
+    const overlay_path = config.overlay;
+    const linux = config.linux;
+    const dtSchema = config.dtSchema;
+
+    if (context === undefined || overlay_path === undefined) {
+        if (context_.json) { input_error("Tool config incomplete: context and overlay must be set"); return; }
+        console.log("Missing config: context and overlay must be set");
+        return;
+    }
+
+    for (const p of [context, overlay_path]) {
+        if (!fs.existsSync(p)) {
+            if (context_.json) { input_error(`Configured path does not exist: ${p}`); return; }
+            console.log(`Configured path does not exist: ${p}`);
+            return;
+        }
+    }
+
+    const base_dt = DeviceTree.new_from_string(fs.readFileSync(context, "utf8"));
+    if (typeof base_dt === "string") {
+        if (context_.json) { input_error(`Failed to parse dts: ${base_dt}`); return; }
+        console.log(`Failed to parse dts ${context}: ${base_dt}`);
+        return;
+    }
+
+    const overlay = DeviceTreeOverlay.new_from_string(fs.readFileSync(overlay_path, "utf8"), base_dt);
+    if (typeof overlay === "string") {
+        if (context_.json) { input_error(`Failed to parse dtso: ${overlay}`); return; }
+        console.log(`Failed to parse dtso ${overlay_path}: ${overlay}`);
+        return;
+    }
+
+    if (arguments_.length === 0) {
+        const targets = [...new Set(
+            overlay.get_fragments()
+                .map(fragment => fragment_target(fragment))
+                .filter((target): target is string => target !== undefined)
+        )];
+
+        if (context_.json) {
+            respond({ ok: true, message: `Found ${targets.length} entry points`, severity: "info", suggestions: targets.map(value => ({ value })) });
+        } else {
+            for (const target of targets) {
+                console.log(target);
+            }
+        }
+        return;
+    }
+
+    const identifier = resolve_positional_path(arguments_)!;
+    const found = overlay.find_node(resolve_node_identifier(identifier, overlay));
+    if (found === undefined) {
+        // The path may terminate at a property (a leaf), which has nothing to
+        // navigate into but is not an error.
+        const last_slash = identifier.lastIndexOf("/");
+        if (last_slash > 0) {
+            const parent_identifier = identifier.slice(0, last_slash);
+            const property_name = identifier.slice(last_slash + 1);
+            const parent = overlay.find_node(resolve_node_identifier(parent_identifier, overlay));
+            if (parent !== undefined && parent.node.properties.some(p => p.name === property_name)) {
+                if (context_.json) {
+                    respond({ ok: true, message: `${property_name} is a property`, severity: "info", suggestions: [] });
+                }
+                return;
+            }
+        }
+
+        if (context_.json) {
+            respond_fail({ ok: false, message: `Node ${identifier} not found`, severity: "error" });
+        } else {
+            console.log(`Node not found: ${identifier}`);
+        }
+        return;
+    }
+
+    const { node: found_node } = found;
+
+    // Child nodes let the user keep drilling deeper (e.g. into a `channel@0`).
+    const child_suggestions: Suggestion[] = found_node.children.map(child => ({ value: get_full_node_name(child) }));
+
+    // Prefer the binding-declared properties (like `node-prop`) so unset but
+    // settable properties show up; fall back to what's structurally present
+    // when there's no binding (or linux/dt-schema isn't configured).
+    let property_suggestions: Suggestion[] | undefined;
+    if (linux !== undefined && dtSchema !== undefined && fs.existsSync(linux) && fs.existsSync(dtSchema)) {
+        property_suggestions = await binding_property_suggestions(found_node, linux, dtSchema, context_.json);
+    }
+    property_suggestions ??= found_node.properties.map(p => ({ value: p.name }));
+
+    const suggestions = [...child_suggestions, ...property_suggestions];
+
+    if (context_.json) {
+        respond({ ok: true, message: `Found ${suggestions.length} items`, severity: "info", suggestions });
+    } else {
+        for (const suggestion of suggestions) {
+            console.log(suggestion.display_string ?? suggestion.value);
         }
     }
 }
