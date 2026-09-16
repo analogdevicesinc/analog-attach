@@ -147,6 +147,15 @@ export async function build_compat_index(linux: string, dtSchema: string): Promi
     return index;
 }
 
+export function resolve_positional_path(arguments_: string[]): string | undefined {
+    if (arguments_.length === 0) { return undefined; }
+    const first = arguments_[0]!;
+    if (first.startsWith("/") || first.startsWith("&")) {
+        return arguments_.length === 1 ? first : `${first}/${arguments_.slice(1).join("/")}`;
+    }
+    return arguments_.join("/");
+}
+
 export async function find_binding(linux: string, dtSchema: string, compatible_to_find: string, silent = false): Promise<string | undefined> {
     let cached_index = load_compat_index();
 

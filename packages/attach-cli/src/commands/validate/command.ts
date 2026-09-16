@@ -12,7 +12,7 @@ import {
 
 import * as fs from 'node:fs';
 
-import { bigIntReplacer, find_binding, resolve_node_identifier } from "../../utilities";
+import { bigIntReplacer, find_binding, resolve_node_identifier, resolve_positional_path } from "../../utilities";
 import { load_config } from "../../config";
 import type { LocalContext } from "../../context";
 import type { ValidationError, ValidationResponse } from "../../protocol/types";
@@ -430,11 +430,3 @@ async function validate_pattern_matched_child(
     console.log(JSON.stringify(update.errors));
 }
 
-function resolve_positional_path(arguments_: string[]): string | undefined {
-    if (arguments_.length === 0) { return undefined; }
-    const first = arguments_[0]!;
-    if (first.startsWith("/") || first.startsWith("&")) {
-        return arguments_.length === 1 ? first : `${first}/${arguments_.slice(1).join("/")}`;
-    }
-    return arguments_.join("/");
-}
