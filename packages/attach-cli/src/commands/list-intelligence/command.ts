@@ -10,7 +10,7 @@ export function build_list_intelligence_command(context: LocalContext): Command 
         .action(async () => {
             const response: ListIntelligenceResponse = {
                 ok: true,
-                message: "3 intelligence kinds available",
+                message: "4 intelligence kinds available",
                 severity: "info",
                 intelligence: [
                     {
@@ -41,6 +41,17 @@ export function build_list_intelligence_command(context: LocalContext): Command 
                                 description: "Node reference (one or more segments, spaces act as path separators): bare label (imu1), &label (&imu1), absolute path (/soc/spi@7e204000/imu@0), &{path} (&{/soc/spi@7e204000/imu@0}), label/child (spi0/imu@0 or spi0 imu@0), multi-segment path (soc spi@7e204000 imu@0)",
                                 required: true,
                                 kind: "node-ref",
+                            },
+                        ],
+                    },
+                    {
+                        kind: "type",
+                        args: [
+                            {
+                                name: "prop",
+                                description: "Property reference: node reference followed by a property name as the last segment (spaces act as separators). Examples: imu1 reg, spi0 imu@0 interrupts, /soc/spi@7e204000/imu@0/spi-max-frequency",
+                                required: true,
+                                kind: "prop-ref",
                             },
                         ],
                     },

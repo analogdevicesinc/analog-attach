@@ -112,3 +112,7 @@ export interface Suggestion {
 export interface SuggestResponse extends CommonResponse {
     suggestions: Suggestion[];
 }
+
+export interface TypeResponse extends CommonResponse {
+    type: Types;
+}

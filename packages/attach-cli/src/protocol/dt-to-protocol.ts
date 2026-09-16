@@ -2,6 +2,8 @@
 import {
     is_dt_flag,
     get_full_node_name,
+    AttachEnumType,
+    type AttachType,
     type DTNode,
     type DTProperty as AttachDTProperty,
     type DTValue,
@@ -93,6 +95,79 @@ function convert_cell_array(elements: CellArrayElement[]): { type: Types; value:
         type: { kind: "array", items: { kind: "number", subtype: "int" } },
         value: converted.map(c => c.value),
     };
+}
+
+export function attach_type_to_protocol_type(value: AttachType): Types {
+    switch (value._t) {
+        case "boolean": {
+            return { kind: "bool" };
+        }
+        case "integer": {
+            return { kind: "number", subtype: "int" };
+        }
+        case "enum_integer": {
+            return { kind: "enum", options: value.enum.map(v => ({ value: Number(v) })) };
+        }
+        case "const": {
+            return typeof value.const === "string" ? { kind: "string" } : { kind: "number", subtype: "int" };
+        }
+        case "generic": {
+            return { kind: "string" };
+        }
+        case "object": {
+            return { kind: "string" };
+        }
+        case "string_array": {
+            return value.maxItems === 1
+                ? { kind: "string" }
+                : { kind: "array", items: { kind: "string" } };
+        }
+        case "enum_array": {
+            const options = value.enum.map(v =>
+                value.enum_type === AttachEnumType.NUMBER
+                    ? { value: Number(v) as number }
+                    : { value: String(v) }
+            );
+            return value.maxItems === 1
+                ? { kind: "enum", options }
+                : { kind: "array", items: { kind: "enum", options } };
+        }
+        case "number_array": {
+            return value.maxItems === 1
+                ? { kind: "number", subtype: "int" }
+                : { kind: "array", items: { kind: "number", subtype: "int" } };
+        }
+        case "array": {
+            return { kind: "array", items: { kind: "number", subtype: "int" } };
+        }
+        case "fixed_index": {
+            return {
+                kind: "tuple",
+                items: value.prefixItems.map(item =>
+                    item._t === "number"
+                        ? { kind: "number", subtype: "int" } as Types
+                        : {
+                            kind: "enum", options: item.enum.map(v =>
+                                item.enum_type === AttachEnumType.NUMBER
+                                    ? { value: Number(v) as number }
+                                    : { value: String(v) }
+                            )
+                        } as Types
+                ),
+            };
+        }
+        case "matrix": {
+            const row = value.values[0];
+            return {
+                kind: "array",
+                items: row === undefined ? { kind: "number", subtype: "int" } : attach_type_to_protocol_type(row),
+            };
+        }
+        default: {
+            const _x: never = value;
+            throw new Error("Exhaustive check failed");
+        }
+    }
 }
 
 function convert_cell_element(element: CellArrayElement): { type: Types; value: PropertyValue } {

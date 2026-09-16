@@ -40,10 +40,10 @@ export function build_update_command(context_: LocalContext): Command {
 
             const full_path = path.join("/");
             const last_slash = full_path.lastIndexOf("/");
-            const property_name = last_slash >= 0 ? full_path.slice(last_slash + 1) : "";
+            const property_name = last_slash === -1 ? "" : full_path.slice(last_slash + 1);
             const node_identifier = last_slash > 0
                 ? full_path.slice(0, last_slash)
-                : last_slash === 0 ? "/" : "";
+                : (last_slash === 0 ? "/" : "");
 
             if (!property_name || !node_identifier) {
                 const message = "Path must include at least a node and a property name";
