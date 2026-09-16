@@ -104,7 +104,10 @@ export function build_validate2_command(context_: LocalContext): Command {
                     } else {
                         const intc_node = base_dt === undefined ? undefined : find_node_by_label(base_dt, intc_info.interrupt_parent_label);
                         if (intc_node !== undefined) {
-                            inner_lines.push(print_dtnode(intc_node, '\t\t'));
+                            const interrupt_cells = get_cell_value(intc_node, '#interrupt-cells') ?? 1n;
+                            const label_prefix = intc_node.labels.length > 0 ? `${intc_node.labels.join(': ')}: ` : '';
+                            const key = intc_node.unit_addr === undefined ? intc_node.name : `${intc_node.name}@${intc_node.unit_addr}`;
+                            inner_lines.push(`\t\t${label_prefix}${key} {`, `\t\t\t#interrupt-cells = <${interrupt_cells}>;`, `\t\t\tinterrupt-controller;`, `\t\t};`);
                         }
                     }
                 }
