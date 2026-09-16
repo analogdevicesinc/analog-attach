@@ -49,7 +49,7 @@ export function build_list_intelligence_command(context: LocalContext): Command 
                         args: [
                             {
                                 name: "prop",
-                                description: "Property reference: node reference followed by a property name as the last segment (spaces act as separators). Examples: imu1 reg, spi0 imu@0 interrupts, /soc/spi@7e204000/imu@0/spi-max-frequency",
+                                description: "Property reference (one or more segments, spaces act as path separators): bare label (imu1/reg), &label (&imu1/reg), absolute path (/soc/spi@7e204000/imu@0/reg), &{path} (&{/soc/spi@7e204000/imu@0/reg}), label/child (spi0/imu@0/reg or spi0 imu@0 reg), multi-segment path (soc spi@7e204000 imu@0 reg)",
                                 required: true,
                                 kind: "prop-ref",
                             },

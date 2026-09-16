@@ -263,18 +263,27 @@ async function suggest_node_property(context_: LocalContext, arguments_: string[
     }
 
     const required = new Set(binding.parsed_binding.required_properties);
-    const available = binding.parsed_binding.properties
-        .filter(p => !existing_keys.has(p.key));
+    const all_properties = binding.parsed_binding.properties;
 
     if (context_.json) {
-        const suggestions = available.map(p => ({
-            value: p.key,
-            ...(required.has(p.key) ? { display_string: `${p.key} (required)` } : {}),
-        }));
-        respond({ ok: true, message: `Found ${suggestions.length} available properties`, severity: "info", suggestions });
+        const suggestions = all_properties.map(p => {
+            const labels = [
+                ...(existing_keys.has(p.key) ? ["set"] : []),
+                ...(required.has(p.key) ? ["required"] : []),
+            ].join(", ");
+            return {
+                value: p.key,
+                ...(labels ? { display_string: `${p.key} (${labels})` } : {}),
+            };
+        });
+        respond({ ok: true, message: `Found ${suggestions.length} properties`, severity: "info", suggestions });
     } else {
-        for (const p of available) {
-            console.log(required.has(p.key) ? `${p.key} *` : p.key);
+        for (const p of all_properties) {
+            const markers = [
+                ...(existing_keys.has(p.key) ? ["set"] : []),
+                ...(required.has(p.key) ? ["required"] : []),
+            ].join(", ");
+            console.log(markers ? `${p.key} (${markers})` : p.key);
         }
     }
 }
