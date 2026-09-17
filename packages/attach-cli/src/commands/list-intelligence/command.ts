@@ -61,7 +61,7 @@ export function build_list_intelligence_command(context: LocalContext): Command 
                     },
                     {
                         kind: "type",
-                        description: "Reports the expected value type of a single property (number, string, bool, enum with its options, or array/tuple of those) resolved from the node's binding. Works for nodes with their own `compatible` and for pattern-matched child nodes whose schema comes from the parent binding's patternProperties. Use before calling set-prop to learn the exact value format a property accepts.",
+                        description: "Reports the expected value type of a single property (number, string, bool, enum with its options, or array/tuple of those) resolved from the node's binding. Works for nodes with their own `compatible` and for pattern-matched child nodes whose schema comes from the parent binding's patternProperties. Use before calling set-prop to learn the exact value format a property accepts. The response includes an optional `description` field — read it when present, as it explains the property's purpose and valid values and helps you configure it correctly.",
                         args: [
                             {
                                 name: "prop",

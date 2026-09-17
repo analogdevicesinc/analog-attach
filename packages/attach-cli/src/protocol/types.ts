@@ -116,4 +116,5 @@ export interface SuggestResponse extends CommonResponse {
 
 export interface TypeResponse extends CommonResponse {
     type: Types;
+    description?: string;
 }

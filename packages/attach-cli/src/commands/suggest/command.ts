@@ -484,7 +484,7 @@ async function suggest_type(context_: LocalContext, arguments_: string[]): Promi
     const type = attach_type_to_protocol_type(property_definition.value);
 
     if (context_.json) {
-        const response: TypeResponse = { ok: true, message: `Type of ${property_name}`, severity: "info", type };
+        const response: TypeResponse = { ok: true, message: `Type of ${property_name}`, severity: "info", type, description: property_definition.value.description };
         respond(response);
     } else {
         console.log(format_type(type));
