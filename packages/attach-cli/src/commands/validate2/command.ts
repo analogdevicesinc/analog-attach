@@ -113,9 +113,6 @@ export function build_validate2_command(context_: LocalContext): Command {
                 }
 
                 if (overlay_child !== undefined) {
-                    for (const property of overlay_child.properties) {
-                        inner_lines.push(print_dtprop(property, '\t\t'));
-                    }
                     for (const child of overlay_child.children) {
                         inner_lines.push(print_dtnode(child, '\t\t'));
                     }
