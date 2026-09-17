@@ -152,9 +152,11 @@ export function build_update_command(context_: LocalContext): Command {
             const parsed = parse_value(withValue);
             const success = set_property(parsed, found_node, property_name, property_definition);
 
-            if (!success) {
+            if (success !== true) {
                 if (context_.json) {
-                    respond_fail({ ok: false, message: `Failed to set ${property_name}`, severity: "error" });
+                    respond_fail({ ok: false, message: success, severity: "error" });
+                } else {
+                    console.log(success);
                 }
                 return;
             }
@@ -258,12 +260,11 @@ export function set_property(
     found_node: DTNode,
     property: string,
     definition: ResolvedProperty
-): boolean {
+): string | true {
     switch (definition.value._t) {
         case "boolean": {
             if (typeof parsed_value !== 'boolean') {
-                console.log(`Property ${property} is a flag and can be set to appear with 'true' or disappear with 'false'`);
-                return false;
+                return `Property ${property} is a flag and can be set to appear with 'true' or disappear with 'false'`;
             }
 
             const existing = found_node.properties.find(p => p.name === property);
@@ -284,24 +285,19 @@ export function set_property(
         case "enum_integer":
         case "const": {
             if (Array.isArray(parsed_value)) {
-                console.log(`Definition in binding for property '${property}' requires a singular value`);
-                return false;
+                return `Definition in binding for property '${property}' requires a singular value`;
             }
             if (typeof parsed_value === 'boolean') {
-                console.log(`Property '${property}' isn't a flag => can't have boolean values`);
-                return false;
+                return `Property '${property}' isn't a flag => can't have boolean values`;
             }
             if (typeof parsed_value === 'string') {
-                console.log(`Property ${property} in binding demands numbers`);
-                return false;
+                return `Property ${property} in binding demands numbers`;
             }
             if (definition.value._t === 'enum_integer' && !definition.value.enum.includes(parsed_value)) {
-                console.log(`Values for property ${property} are: ${JSON.stringify(definition.value.enum)}`);
-                return false;
+                return `Values for property ${property} are: ${JSON.stringify(definition.value.enum)}`;
             }
             if (definition.value._t === 'const' && BigInt(definition.value.const) !== parsed_value) {
-                console.log(`Value for property ${property} is: ${JSON.stringify(definition.value.const)}`);
-                return false;
+                return `Value for property ${property} is: ${JSON.stringify(definition.value.const)}`;
             }
 
             upsert_property(
@@ -322,8 +318,7 @@ export function set_property(
         case "enum_array":
         case "fixed_index": {
             if (typeof parsed_value === 'boolean') {
-                console.log(`Property '${property}' isn't a flag => can't have boolean values`);
-                return false;
+                return `Property '${property}' isn't a flag => can't have boolean values`;
             }
 
             const array_definition = to_attach_array(definition);
@@ -339,12 +334,10 @@ export function set_property(
         }
         case "matrix": {
             if (typeof parsed_value === 'boolean') {
-                console.log(`Property '${property}' isn't a flag => can't have boolean values`);
-                return false;
+                return `Property '${property}' isn't a flag => can't have boolean values`;
             }
             if (definition.value.minItems > 1) {
-                console.log(`Property ${property} requires more values`);
-                return false;
+                return `Property ${property} requires more values`;
             }
 
             return set_array_property(
@@ -355,12 +348,10 @@ export function set_property(
             );
         }
         case "object": {
-            console.log(`Property '${property}' is defined as an object!`);
-            return false;
+            return `Property '${property}' is defined as an object!`;
         }
         case "generic": {
-            console.log(`Property '${property}' couldn't be interpreted!`);
-            return false;
+            return `Property '${property}' couldn't be interpreted!`;
         }
         default: {
             const _x: never = definition.value;
@@ -374,7 +365,7 @@ function set_array_property(
     found_node: DTNode,
     property: string,
     definition: AttachArray
-): boolean {
+): string | true {
     switch (definition._t) {
         case "array": {
             const tagged = values.map(element =>
@@ -393,8 +384,7 @@ function set_array_property(
         }
         case "number_array": {
             if (!values.every((element): element is bigint => typeof element === "bigint")) {
-                console.log(`Property ${property} in binding demands numbers`);
-                return false;
+                return `Property ${property} in binding demands numbers`;
             }
 
             upsert_property(
@@ -410,8 +400,7 @@ function set_array_property(
         }
         case "string_array": {
             if (!values.every((element): element is string => typeof element === "string")) {
-                console.log(`Property ${property} in binding demands string`);
-                return false;
+                return `Property ${property} in binding demands string`;
             }
 
             upsert_property(
@@ -426,16 +415,13 @@ function set_array_property(
         }
         case "enum_array": {
             if (!values.every(element => definition.enum.includes(element))) {
-                console.log(`Values for property ${property} are ${JSON.stringify(definition.enum)}`);
-                return false;
+                return `Values for property ${property} are ${JSON.stringify(definition.enum)}`;
             }
             if (definition.minItems > values.length || definition.maxItems < values.length) {
-                console.log(`Property ${property} accepts between ${definition.minItems} and ${definition.maxItems} items from ${JSON.stringify(definition.enum)}`);
-                return false;
+                return `Property ${property} accepts between ${definition.minItems} and ${definition.maxItems} items from ${JSON.stringify(definition.enum)}`;
             }
             if (values.some(element => typeof element === "bigint") && definition.enum_type !== AttachEnumType.NUMBER) {
-                console.log(`Values for property ${property} are ${JSON.stringify(definition.enum)}`);
-                return false;
+                return `Values for property ${property} are ${JSON.stringify(definition.enum)}`;
             }
 
             if (definition.enum_type === AttachEnumType.STRING &&
@@ -461,8 +447,7 @@ function set_array_property(
         }
         case "fixed_index": {
             if (definition.minItems > values.length || definition.maxItems < values.length) {
-                console.log(`Property ${property} accepts between ${definition.minItems} and ${definition.maxItems} items`);
-                return false;
+                return `Property ${property} accepts between ${definition.minItems} and ${definition.maxItems} items`;
             }
 
             const cell_values: CellValue[] = [];
@@ -475,19 +460,16 @@ function set_array_property(
 
                 if (typeof v === "bigint") {
                     if (item_definition._t !== "number") {
-                        console.log(`Property ${property} doesn't require a number at index ${index}`);
-                        return false;
+                        return `Property ${property} doesn't require a number at index ${index}`;
                     }
 
                     cell_values.push(PropertyBuilder.tag_number(v));
                 } else {
                     if (item_definition._t === "number") {
-                        console.log(`Property ${property} requires a number at index ${index}`);
-                        return false;
+                        return `Property ${property} requires a number at index ${index}`;
                     }
                     if (!item_definition.enum.includes(v)) {
-                        console.log(`Property ${property} at index ${index} require a value from ${JSON.stringify(item_definition.enum)}`);
-                        return false;
+                        return `Property ${property} at index ${index} require a value from ${JSON.stringify(item_definition.enum)}`;
                     }
 
                     if (item_definition.enum_type === AttachEnumType.STRING) {

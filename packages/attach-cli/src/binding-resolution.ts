@@ -17,8 +17,8 @@ export type NodeBinding = {
     properties: ResolvedProperty[];
     required_properties: string[];
     origin:
-        | { kind: "compatible"; compatible: string }
-        | { kind: "pattern"; parent_compatible: string; pattern: string };
+    | { kind: "compatible"; compatible: string }
+    | { kind: "pattern"; parent_compatible: string; pattern: string };
     narrow_and_populate(node: DTNode): { properties: ResolvedProperty[]; errors: unknown[] } | undefined;
 };
 
@@ -73,7 +73,7 @@ export async function resolve_node_binding(
                 const input_data = Object.fromEntries(dt_to_validator_input(node, initial.parsed_binding));
                 const input_json = JSON.stringify(input_data, bigIntReplacer);
                 const update = initial.attach.update_binding_by_changes(input_json);
-                if (update === undefined) { return undefined; }
+                if (update === undefined) { return; }
                 const populated = Attach.populate_parsed_binding(update.binding, base_dt, input_json, parent_name);
                 return { properties: populated.properties, errors: update.errors as unknown[] };
             },
@@ -144,7 +144,7 @@ export async function resolve_node_binding(
 
             const input_json = JSON.stringify(input_data, bigIntReplacer);
             const update = parent_attach.update_pattern_binding_by_changes(match.pattern, input_json);
-            if (update === undefined) { return undefined; }
+            if (update === undefined) { return; }
 
             const populated_properties = Attach.populate_properties(
                 update.binding.properties, base_dt, input_json, parent_name
