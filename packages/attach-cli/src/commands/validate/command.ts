@@ -7,12 +7,12 @@ import {
     dt_to_validator_input,
     type DTNode,
     type DTProperty,
-    type PatternPropertyRule
 } from "attach-lib";
 
 import * as fs from 'node:fs';
 
 import { bigIntReplacer, find_binding, resolve_node_identifier, resolve_positional_path } from "../../utilities";
+import { resolve_node_binding } from "../../binding-resolution";
 import { load_config } from "../../config";
 import type { LocalContext } from "../../context";
 import type { ValidationError, ValidationResponse } from "../../protocol/types";
@@ -126,16 +126,43 @@ export function build_validate_command(context_: LocalContext): Command {
             const compatible = found_node.properties.find((property) => property.name === "compatible");
 
             if (compatible === undefined) {
-                if (context_.json) {
-                    const result = await validate_pattern_matched_child_proto(
-                        found_node, parent, parent_node, path_segs, linux, dtSchema, base_dt, context_.json
-                    );
-                    respond(result);
+                const binding = await resolve_node_binding(found_node, parent_node, parent, base_dt, linux, dtSchema, context_.json);
+
+                if ('error' in binding) {
+                    if (context_.json) {
+                        respond({ errors: [{ kind: "generic", path: path_segs, message: binding.error }], warnings: [] } satisfies ValidationResponse);
+                        return;
+                    }
+                    console.log(binding.error);
                     return;
                 }
-                await validate_pattern_matched_child(
-                    found_node, parent, parent_node, node_identifier, input, linux, dtSchema, base_dt, context_.json
-                );
+
+                const result = binding.narrow_and_populate(found_node);
+
+                if (result === undefined) {
+                    const msg = binding.origin.kind === "pattern"
+                        ? `Failed to validate against pattern "${binding.origin.pattern}" of ${binding.origin.parent_compatible}`
+                        : `Failed to validate binding`;
+                    if (context_.json) {
+                        respond({ errors: [{ kind: "generic", path: path_segs, message: msg }], warnings: [] } satisfies ValidationResponse);
+                        return;
+                    }
+                    console.log(msg);
+                    return;
+                }
+
+                if (context_.json) {
+                    respond({ errors: map_validation_errors(result.errors, path_segs), warnings: [] } satisfies ValidationResponse);
+                    return;
+                }
+
+                if (binding.origin.kind === "pattern") {
+                    console.log(`Validating as pattern-matched child of ${binding.origin.parent_compatible} (pattern: ${binding.origin.pattern})`);
+                }
+                console.log(`============= UPDATED BINDING =============`);
+                console.log(JSON.stringify({ properties: result.properties }, bigIntReplacer, 4));
+                console.log(`============= VALIDATION ERRORS =============`);
+                console.log(JSON.stringify(result.errors));
                 return;
             }
 
@@ -242,191 +269,4 @@ function map_validation_errors(errors: any[], node_path: string[]): ValidationEr
     });
 }
 
-async function validate_pattern_matched_child_proto(
-    found_node: DTNode,
-    parent: string,
-    parent_node: DTNode | undefined,
-    node_path: string[],
-    linux: string,
-    dtSchema: string,
-    base_dt: DeviceTree,
-    silent: boolean,
-): Promise<ValidationResponse> {
-    if (parent_node === undefined) {
-        return { errors: [{ kind: "generic", path: node_path, message: "Node has no compatible and no parent to check patternProperties against" }], warnings: [] };
-    }
-
-    const parent_compatible = parent_node.properties.find((property) => property.name === "compatible");
-
-    if (parent_compatible === undefined) {
-        return { errors: [{ kind: "generic", path: node_path, message: "Node has no compatible and its parent also has no compatible" }], warnings: [] };
-    }
-
-    const parent_compatible_value = extract_compatible_value(parent_compatible);
-
-    if (parent_compatible_value === undefined) {
-        return { errors: [{ kind: "generic", path: node_path, message: "Unexpected value in compatible of parent node" }], warnings: [] };
-    }
-
-    const parent_binding_path = await find_binding(linux, dtSchema, parent_compatible_value, silent);
-
-    if (parent_binding_path === undefined) {
-        return { errors: [{ kind: "generic", path: node_path, message: `Failed to find binding for ${parent_compatible_value}` }], warnings: [] };
-    }
-
-    const parent_attach = Attach.new();
-    const parent_binding = await parent_attach.parse_binding(parent_binding_path, linux, dtSchema);
-
-    if (parent_binding === undefined) {
-        return { errors: [{ kind: "generic", path: node_path, message: `Failed to parse binding ${parent_binding_path}` }], warnings: [] };
-    }
-
-    const node_key = found_node.unit_addr ? `${found_node.name}@${found_node.unit_addr}` : found_node.name;
-    const matched_pattern = parent_binding.patterns.find((pattern) => new RegExp(pattern).test(node_key));
-
-    if (matched_pattern === undefined) {
-        return { errors: [{ kind: "generic", path: node_path, message: `Node does not match any patternProperties of ${parent_compatible_value}` }], warnings: [] };
-    }
-
-    const rule: PatternPropertyRule | undefined = parent_binding.parsed_binding.pattern_properties?.find(
-        (pattern) => pattern.pattern === matched_pattern
-    );
-
-    if (rule === undefined) {
-        return { errors: [{ kind: "generic", path: node_path, message: `Node does not match any patternProperties of ${parent_compatible_value}` }], warnings: [] };
-    }
-
-    const partial_input_data = Object.fromEntries(
-        dt_to_validator_input(
-            found_node,
-            { required_properties: rule.required, properties: rule.properties, pattern_properties: undefined, examples: [] }
-        )
-    );
-
-    rule.properties = Attach.populate_properties(rule.properties, base_dt, JSON.stringify(partial_input_data, bigIntReplacer), parent);
-
-    const input_data = Object.fromEntries(
-        dt_to_validator_input(
-            found_node,
-            { required_properties: rule.required, properties: rule.properties, pattern_properties: undefined, examples: [] }
-        )
-    );
-
-    const update = parent_attach.update_pattern_binding_by_changes(matched_pattern, JSON.stringify(input_data, bigIntReplacer));
-
-    if (update === undefined) {
-        return { errors: [{ kind: "generic", path: node_path, message: `Failed to validate against pattern "${matched_pattern}" of ${parent_compatible_value}` }], warnings: [] };
-    }
-
-    return { errors: map_validation_errors(update.errors, node_path), warnings: [] };
-}
-
-async function validate_pattern_matched_child(
-    found_node: DTNode,
-    parent: string,
-    parent_node: DTNode | undefined,
-    node: string,
-    input: string,
-    linux: string,
-    dtSchema: string,
-    base_dt: DeviceTree,
-    silent: boolean,
-): Promise<void> {
-
-    if (parent_node === undefined) {
-        console.log(`${node} has no compatible and no parent to check patternProperties against`);
-        return;
-    }
-
-    const parent_compatible = parent_node.properties.find((property) => property.name === "compatible");
-
-    if (parent_compatible === undefined) {
-        console.log(`Missing compatible in ${node} from ${input}, and its parent also has no compatible`);
-        return;
-    }
-
-    const parent_compatible_value = extract_compatible_value(parent_compatible);
-
-    if (parent_compatible_value === undefined) {
-        console.log(`Unexpected value in compatible of the parent of ${node} in ${input}`);
-        return;
-    }
-
-    const parent_binding_path = await find_binding(linux, dtSchema, parent_compatible_value, silent);
-
-    if (parent_binding_path === undefined) {
-        console.log(`Failed to find binding for ${parent_compatible_value}`);
-        return;
-    }
-
-    const parent_attach = Attach.new();
-
-    const parent_binding = await parent_attach.parse_binding(parent_binding_path, linux, dtSchema);
-
-    if (parent_binding === undefined) {
-        console.log(`Failed to parse binding ${parent_binding_path}`);
-        return;
-    }
-
-    const node_key = found_node.unit_addr ? `${found_node.name}@${found_node.unit_addr}` : found_node.name;
-
-    const matched_pattern = parent_binding.patterns.find((pattern) => new RegExp(pattern).test(node_key));
-
-    if (matched_pattern === undefined) {
-        console.log(`${node} does not match any patternProperties of ${parent_compatible_value}`);
-        return;
-    }
-
-    const rule: PatternPropertyRule | undefined = parent_binding.parsed_binding.pattern_properties?.find(
-        (pattern) => pattern.pattern === matched_pattern
-    );
-
-    if (rule === undefined) {
-        console.log(`${node} does not match any patternProperties of ${parent_compatible_value}`);
-        return;
-    }
-
-    const partial_input_data = Object.fromEntries(
-        dt_to_validator_input(
-            found_node,
-            {
-                required_properties: rule.required,
-                properties: rule.properties,
-                pattern_properties: undefined,
-                examples: []
-            }
-        )
-    );
-
-    rule.properties = Attach.populate_properties(rule.properties, base_dt, JSON.stringify(partial_input_data, bigIntReplacer), parent);
-
-    const input_data = Object.fromEntries(
-        dt_to_validator_input(
-            found_node,
-            {
-                required_properties: rule.required,
-                properties: rule.properties,
-                pattern_properties: undefined,
-                examples: []
-            }
-        )
-    );
-
-    console.log(JSON.stringify(input_data, bigIntReplacer));
-
-    const update = parent_attach.update_pattern_binding_by_changes(matched_pattern, JSON.stringify(input_data, bigIntReplacer));
-
-    if (update === undefined) {
-        console.log(`Failed to validate ${node} against pattern "${matched_pattern}" of ${parent_compatible_value}`);
-        return;
-    }
-
-    const updated_properties = Attach.populate_properties(update.binding.properties, base_dt, JSON.stringify(input_data, bigIntReplacer), parent);
-
-    console.log(`Validating ${node} as pattern-matched child of ${parent_compatible_value} (pattern: ${matched_pattern})`);
-    console.log(`============= UPDATED BINDING =============`);
-    console.log(JSON.stringify({ ...update.binding, properties: updated_properties }, bigIntReplacer, 4));
-    console.log(`============= VALIDATION ERRORS =============`);
-    console.log(JSON.stringify(update.errors));
-}
 

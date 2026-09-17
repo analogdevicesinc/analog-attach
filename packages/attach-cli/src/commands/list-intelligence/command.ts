@@ -37,7 +37,7 @@ export function build_list_intelligence_command(context: LocalContext): Command 
                     },
                     {
                         kind: "node-prop",
-                        description: "Lists every property a node's binding declares, each labelled `set` (already present on the node) and/or `required`. The node must have a `compatible` value with a resolvable binding. Use to discover which properties can or must be configured on a device node before setting them.",
+                        description: "Lists every property a node's binding declares, each labelled `set` (already present on the node) and/or `required`. Works for nodes with their own `compatible` and for pattern-matched child nodes (e.g. channel@0) whose schema is defined by the parent binding's patternProperties. Use to discover which properties can or must be configured on a device node before setting them.",
                         args: [
                             {
                                 name: "node",
@@ -61,7 +61,7 @@ export function build_list_intelligence_command(context: LocalContext): Command 
                     },
                     {
                         kind: "type",
-                        description: "Reports the expected value type of a single property (number, string, bool, enum with its options, or array/tuple of those) resolved from the node's binding. Use before calling set-prop to learn the exact value format a property accepts.",
+                        description: "Reports the expected value type of a single property (number, string, bool, enum with its options, or array/tuple of those) resolved from the node's binding. Works for nodes with their own `compatible` and for pattern-matched child nodes whose schema comes from the parent binding's patternProperties. Use before calling set-prop to learn the exact value format a property accepts.",
                         args: [
                             {
                                 name: "prop",

@@ -1,13 +1,14 @@
 import { Command } from "commander";
-import { Attach, DeviceTree, DeviceTreeOverlay, get_full_node_name, is_dt_flag, suggest_parents, dt_to_validator_input, type DTNode } from "attach-lib";
+import { Attach, DeviceTree, DeviceTreeOverlay, get_full_node_name, suggest_parents, type DTNode } from "attach-lib";
 import * as fs from "node:fs";
 
 import type { LocalContext } from "../../context";
 import { load_config } from "../../config";
 import { load_compat_index, save_compat_index } from "../../config";
-import { find_binding, fragment_target, is_compat_index_stale, build_compat_index, resolve_node_identifier, resolve_positional_path, bigIntReplacer } from "../../utilities";
+import { find_binding, fragment_target, is_compat_index_stale, build_compat_index, resolve_node_identifier, resolve_positional_path } from "../../utilities";
 import { respond, respond_fail, input_error } from "../../protocol/output";
 import { attach_type_to_protocol_type } from "../../protocol/dt-to-protocol";
+import { resolve_node_binding } from "../../binding-resolution";
 import type { TypeResponse, Suggestion } from "../../protocol/types";
 
 export function build_suggest_command(context: LocalContext): Command {
@@ -215,59 +216,22 @@ async function suggest_node_property(context_: LocalContext, arguments_: string[
         return;
     }
 
-    const { node: found_node } = found;
+    const { node: found_node, parent_node, node_path } = found;
     const existing_keys = new Set(found_node.properties.map(p => p.name));
+    const parent_name = found_node.labels.at(-1) ?? node_path;
 
-    const compatible_property = found_node.properties.find(p => p.name === "compatible");
-    if (compatible_property === undefined) {
+    const binding = await resolve_node_binding(found_node, parent_node, parent_name, base_dt, linux, dtSchema, context_.json);
+    if ('error' in binding) {
         if (context_.json) {
-            // TODO: not 100% sure this is right, maybe we should suggest the basic, always present, properties
-            respond_fail({ ok: true, message: `Node ${identifier} has no compatible property`, severity: "warn" });
+            respond_fail({ ok: false, message: binding.error, severity: "error" });
         } else {
-            console.log(`Node ${identifier} has no compatible property`);
+            console.log(binding.error);
         }
         return;
     }
 
-    const compatible_value = (() => {
-        if (is_dt_flag(compatible_property.value)) { return; }
-        const first = compatible_property.value[0];
-        if (first === undefined || first.kind !== "string") { return; }
-        return first.value;
-    })();
-
-    if (compatible_value === undefined) {
-        if (context_.json) {
-            respond_fail({ ok: false, message: `Unexpected compatible value on ${identifier}`, severity: "error" });
-        } else {
-            console.log(`Unexpected compatible value on ${identifier}`);
-        }
-        return;
-    }
-
-    const binding_path = await find_binding(linux, dtSchema, compatible_value, context_.json);
-    if (binding_path === undefined) {
-        if (context_.json) {
-            respond({ ok: true, message: `No binding found for ${compatible_value}`, severity: "warn", suggestions: [] });
-        } else {
-            console.log(`Failed to find binding for ${compatible_value}`);
-        }
-        return;
-    }
-
-    const attach = Attach.new();
-    const binding = await attach.parse_binding(binding_path, linux, dtSchema);
-    if (binding === undefined) {
-        if (context_.json) {
-            respond_fail({ ok: false, message: `Failed to parse binding ${binding_path}`, severity: "error" });
-        } else {
-            console.log(`Failed to parse binding ${binding_path}`);
-        }
-        return;
-    }
-
-    const required = new Set(binding.parsed_binding.required_properties);
-    const all_properties = binding.parsed_binding.properties;
+    const required = new Set(binding.required_properties);
+    const all_properties = binding.properties;
 
     if (context_.json) {
         const suggestions = all_properties.map(p => {
@@ -292,39 +256,22 @@ async function suggest_node_property(context_: LocalContext, arguments_: string[
     }
 }
 
-// Binding-aware property suggestions for a node, mirroring `node-prop`: every
-// property the binding declares, with `set`/`required` labels. Returns
-// `undefined` when no binding can be resolved (missing/unusable `compatible`,
-// no matching binding, or parse failure) so callers can fall back to the
-// structurally-present properties.
 async function binding_property_suggestions(
     found_node: DTNode,
+    parent_node: DTNode | undefined,
+    parent_name: string,
+    base_dt: DeviceTree,
     linux: string,
     dtSchema: string,
     json: boolean,
 ): Promise<Suggestion[] | undefined> {
-    const compatible_property = found_node.properties.find(p => p.name === "compatible");
-    if (compatible_property === undefined) { return undefined; }
+    const binding = await resolve_node_binding(found_node, parent_node, parent_name, base_dt, linux, dtSchema, json);
+    if ('error' in binding) { return undefined; }
 
-    const compatible_value = (() => {
-        if (is_dt_flag(compatible_property.value)) { return; }
-        const first = compatible_property.value[0];
-        if (first === undefined || first.kind !== "string") { return; }
-        return first.value;
-    })();
-    if (compatible_value === undefined) { return undefined; }
-
-    const binding_path = await find_binding(linux, dtSchema, compatible_value, json);
-    if (binding_path === undefined) { return undefined; }
-
-    const attach = Attach.new();
-    const binding = await attach.parse_binding(binding_path, linux, dtSchema);
-    if (binding === undefined) { return undefined; }
-
-    const required = new Set(binding.parsed_binding.required_properties);
+    const required = new Set(binding.required_properties);
     const existing_keys = new Set(found_node.properties.map(p => p.name));
 
-    return binding.parsed_binding.properties.map(p => {
+    return binding.properties.map(p => {
         const labels = [
             ...(existing_keys.has(p.key) ? ["set"] : []),
             ...(required.has(p.key) ? ["required"] : []),
@@ -414,17 +361,14 @@ async function suggest_navigate(context_: LocalContext, arguments_: string[]): P
         return;
     }
 
-    const { node: found_node } = found;
+    const { node: found_node, parent_node, node_path } = found;
 
-    // Child nodes let the user keep drilling deeper (e.g. into a `channel@0`).
     const child_suggestions: Suggestion[] = found_node.children.map(child => ({ value: get_full_node_name(child) }));
 
-    // Prefer the binding-declared properties (like `node-prop`) so unset but
-    // settable properties show up; fall back to what's structurally present
-    // when there's no binding (or linux/dt-schema isn't configured).
     let property_suggestions: Suggestion[] | undefined;
     if (linux !== undefined && dtSchema !== undefined && fs.existsSync(linux) && fs.existsSync(dtSchema)) {
-        property_suggestions = await binding_property_suggestions(found_node, linux, dtSchema, context_.json);
+        const nav_parent_name = found_node.labels.at(-1) ?? node_path;
+        property_suggestions = await binding_property_suggestions(found_node, parent_node, nav_parent_name, base_dt, linux, dtSchema, context_.json);
     }
     property_suggestions ??= found_node.properties.map(p => ({ value: p.name }));
 
@@ -497,76 +441,42 @@ async function suggest_type(context_: LocalContext, arguments_: string[]): Promi
         return;
     }
 
-    const { node: found_node } = searched_node;
-    const parent = found_node.labels.at(-1) ?? searched_node.node_path;
-    const compatible_property = found_node.properties.find(p => p.name === "compatible");
-    if (compatible_property === undefined) {
+    const { node: found_node, parent_node, node_path } = searched_node;
+    const parent_name = found_node.labels.at(-1) ?? node_path;
+
+    const binding = await resolve_node_binding(found_node, parent_node, parent_name, base_dt, linux, dtSchema, context_.json);
+    if ('error' in binding) {
         if (context_.json) {
-            respond_fail({ ok: false, message: `Node ${node_identifier} has no compatible property`, severity: "error" });
+            respond_fail({ ok: false, message: binding.error, severity: "error" });
         } else {
-            console.log(`Node ${node_identifier} has no compatible property`);
+            console.log(binding.error);
         }
         return;
     }
 
-    const compatible_value = (() => {
-        if (is_dt_flag(compatible_property.value)) { return; }
-        const first = compatible_property.value[0];
-        if (first === undefined || first.kind !== "string") { return; }
-        return first.value;
-    })();
-
-    if (compatible_value === undefined) {
+    const result = binding.narrow_and_populate(found_node);
+    if (result === undefined) {
+        const msg = binding.origin.kind === "compatible"
+            ? `Failed to narrow binding for ${binding.origin.compatible}`
+            : `Failed to validate against pattern "${binding.origin.pattern}" of ${binding.origin.parent_compatible}`;
         if (context_.json) {
-            respond_fail({ ok: false, message: `Unexpected compatible value on ${node_identifier}`, severity: "error" });
+            respond_fail({ ok: false, message: msg, severity: "error" });
         } else {
-            console.log(`Unexpected compatible value on ${node_identifier}`);
+            console.log(msg);
         }
         return;
     }
 
-    const binding_path = await find_binding(linux, dtSchema, compatible_value, context_.json);
-    if (binding_path === undefined) {
-        if (context_.json) {
-            respond_fail({ ok: false, message: `No binding found for ${compatible_value}`, severity: "error" });
-        } else {
-            console.log(`Failed to find binding for ${compatible_value}`);
-        }
-        return;
-    }
+    const origin_desc = binding.origin.kind === "compatible"
+        ? `${binding.origin.compatible} binding`
+        : `pattern "${binding.origin.pattern}" of ${binding.origin.parent_compatible}`;
 
-    const initial = await Attach.new_populated_binding(binding_path, linux, dtSchema, base_dt, found_node, parent);
-    if (initial === undefined) {
-        if (context_.json) {
-            respond_fail({ ok: false, message: `Failed to parse binding ${binding_path}`, severity: "error" });
-        } else {
-            console.log(`Failed to parse binding ${binding_path}`);
-        }
-        return;
-    }
-
-    const input_data = Object.fromEntries(dt_to_validator_input(found_node, initial.parsed_binding));
-    const update = initial.attach.update_binding_by_changes(JSON.stringify(input_data, bigIntReplacer));
-
-    if (update === undefined) {
-        if (context_.json) {
-            respond_fail({ ok: false, message: `Failed to update binding for ${compatible_value}`, severity: "error" });
-        } else {
-            console.log(`Failed to update binding for ${compatible_value}`);
-        }
-        return;
-    }
-
-    const binding = {
-        parsed_binding: Attach.populate_parsed_binding(update.binding, base_dt, JSON.stringify(input_data, bigIntReplacer), parent),
-    };
-
-    const property_definition = binding.parsed_binding.properties.find(p => p.key === property_name);
+    const property_definition = result.properties.find(p => p.key === property_name);
     if (property_definition === undefined) {
         if (context_.json) {
-            respond_fail({ ok: false, message: `Property ${property_name} not found in ${compatible_value} binding`, severity: "error" });
+            respond_fail({ ok: false, message: `Property ${property_name} not found in ${origin_desc}`, severity: "error" });
         } else {
-            console.log(`Property ${property_name} not found in ${compatible_value} binding`);
+            console.log(`Property ${property_name} not found in ${origin_desc}`);
         }
         return;
     }

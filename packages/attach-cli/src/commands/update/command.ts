@@ -1,15 +1,12 @@
 import { Command } from "commander";
 import {
-    Attach,
     AttachEnumType,
     DeviceTree,
     DeviceTreeOverlay,
     PropertyBuilder,
     INTERRUPT_MACROS,
     GPIO_MACROS,
-    is_dt_flag,
     to_attach_array,
-    dt_to_validator_input,
     type AttachArray,
     type CellValue,
     type DTNode,
@@ -20,7 +17,8 @@ import * as fs from "node:fs";
 
 import type { LocalContext } from "../../context";
 import { load_config } from "../../config";
-import { bigIntReplacer, find_binding, resolve_node_identifier } from "../../utilities";
+import { resolve_node_identifier } from "../../utilities";
+import { resolve_node_binding } from "../../binding-resolution";
 import { respond, respond_fail, input_error } from "../../protocol/output";
 
 export function build_update_command(context_: LocalContext): Command {
@@ -110,79 +108,43 @@ export function build_update_command(context_: LocalContext): Command {
                 return;
             }
 
-            const { node: found_node } = searched_node;
-            const parent = found_node.labels.at(-1) ?? searched_node.node_path;
+            const { node: found_node, parent_node, node_path } = searched_node;
+            const parent_name = found_node.labels.at(-1) ?? node_path;
 
-            const compatible = found_node.properties.find(p => p.name === "compatible");
-            if (compatible === undefined) {
+            const binding = await resolve_node_binding(found_node, parent_node, parent_name, base_dt, linux, dtSchema, context_.json);
+            if ('error' in binding) {
                 if (context_.json) {
-                    respond_fail({ ok: false, message: `Missing compatible in ${node_identifier}`, severity: "error" });
+                    respond_fail({ ok: false, message: binding.error, severity: "error" });
                 } else {
-                    console.log(`Missing compatible in ${node_identifier} from ${input}`);
+                    console.log(binding.error);
                 }
                 return;
             }
 
-            const compatible_value = (() => {
-                if (is_dt_flag(compatible.value)) { return; }
-                const first = compatible.value[0];
-                if (first === undefined || first.kind !== "string") { return; }
-                return first.value;
-            })();
-
-            if (compatible_value === undefined) {
+            const result = binding.narrow_and_populate(found_node);
+            if (result === undefined) {
+                const msg = binding.origin.kind === "compatible"
+                    ? `Failed to narrow binding for ${binding.origin.compatible}`
+                    : `Failed to validate against pattern "${binding.origin.pattern}" of ${binding.origin.parent_compatible}`;
                 if (context_.json) {
-                    respond_fail({ ok: false, message: `Unexpected compatible value in ${node_identifier}`, severity: "error" });
+                    respond_fail({ ok: false, message: msg, severity: "error" });
                 } else {
-                    console.log(`Unexpected value in compatible of ${node_identifier} in ${input}`);
+                    console.log(msg);
                 }
                 return;
             }
 
-            const binding_path = await find_binding(linux, dtSchema, compatible_value, context_.json);
-            if (binding_path === undefined) {
-                if (context_.json) {
-                    respond_fail({ ok: false, message: `No binding found for ${compatible_value}`, severity: "error" });
-                } else {
-                    console.log(`Failed to find binding for ${compatible_value}`);
-                }
-                return;
-            }
+            const origin_desc = binding.origin.kind === "compatible"
+                ? `${binding.origin.compatible} binding`
+                : `pattern "${binding.origin.pattern}" of ${binding.origin.parent_compatible}`;
 
-            const initial = await Attach.new_populated_binding(binding_path, linux, dtSchema, base_dt, found_node, parent);
-            if (initial === undefined) {
-                if (context_.json) {
-                    respond_fail({ ok: false, message: `Failed to parse binding ${binding_path}`, severity: "error" });
-                } else {
-                    console.log(`Failed to parse binding ${binding_path}`);
-                }
-                return;
-            }
-
-            const input_data = Object.fromEntries(dt_to_validator_input(found_node, initial.parsed_binding));
-            const update = initial.attach.update_binding_by_changes(JSON.stringify(input_data, bigIntReplacer));
-
-            if (update === undefined) {
-                if (context_.json) {
-                    respond_fail({ ok: false, message: `Failed to update binding for ${compatible_value}`, severity: "error" });
-                } else {
-                    console.log(`Failed to update with set compatible "${compatible_value}" for ${binding_path}`);
-                }
-                return;
-            }
-
-            const binding = {
-                parsed_binding: Attach.populate_parsed_binding(update.binding, base_dt, JSON.stringify(input_data, bigIntReplacer), parent),
-                patterns: initial.patterns,
-            };
-
-            const property_definition = binding.parsed_binding.properties.find(entry => entry.key === property_name);
+            const property_definition = result.properties.find(entry => entry.key === property_name);
 
             if (property_definition === undefined) {
                 if (context_.json) {
-                    respond_fail({ ok: false, message: `Property ${property_name} not found in ${compatible_value} binding`, severity: "error" });
+                    respond_fail({ ok: false, message: `Property ${property_name} not found in ${origin_desc}`, severity: "error" });
                 } else {
-                    console.log(`Couldn't find ${property_name} in ${compatible_value} binding`);
+                    console.log(`Couldn't find ${property_name} in ${origin_desc}`);
                 }
                 return;
             }
