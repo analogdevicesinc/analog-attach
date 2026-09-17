@@ -232,7 +232,7 @@ function narrow_object(object: any): AttachType {
 
                         return {
                             _t: 'enum_integer',
-                            enum: object.enum,
+                            enum: (object.enum as number[]).map(BigInt),
                             typeSize: typeSize,
                             description: description,
                             default: default_value
