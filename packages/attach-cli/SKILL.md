@@ -269,10 +269,19 @@ attach-linux create --linux <path> --compatible <string> --parent <node> --label
 
 **Purpose**: Add a new node into an already-existing `.dtso` file (created by `create`) — either another top-level device sibling, or a subnode (e.g. a channel) nested under a node already present in the overlay.
 
-**Syntax**:
+There are two distinct usage patterns depending on whether the node has a `compatible` property:
+
+**Pattern A — device node with a compatible string** (e.g. a second ADC on the same bus):
 ```bash
-attach-linux add --linux <path> --context <dts-file> --overlay <dtso-file> [<compatible-string>] [--name <node-name>] [--to <node>] [--label <label>]
+attach-linux add --linux <path> --context <dts-file> --overlay <dtso-file> <compatible-string> [--name <node-name>] [--to <node>] [--label <label>]
 ```
+
+**Pattern B — bare subnode without compatible** (e.g. a channel, an alias, any structural node):
+```bash
+attach-linux add --linux <path> --context <dts-file> --overlay <dtso-file> --name <node-name> --to <valid-path> [--label <label>]
+```
+
+> **Rule**: nodes that have no `compatible` property — channels, aliases, bus sub-nodes, etc. — **must not** receive the positional device-key argument. Pass `--name` and `--to` only; omitting `--to` adds the node at root `/`.
 
 **Parameters**:
 | Parameter | Required | Description |
@@ -281,25 +290,27 @@ attach-linux add --linux <path> --context <dts-file> --overlay <dtso-file> [<com
 | `--dt-schema` | No | Path to dt-schema repository (uses bundled version by default) |
 | `--context` | Yes | Path to base `.dts` file |
 | `--overlay` | Yes | Path to the existing `.dtso` file to modify (file is updated in place; must already exist — use `create` first) |
-| `<compatible-string>` | At least one of positional/`--name` | Compatible string of the device binding to add (positional arg) |
-| `--name` | At least one of positional/`--name` | Node name (e.g. `channel@0`); defaults to the positional compatible string if omitted |
+| `<compatible-string>` | Pattern A only | Compatible string of the device binding to add (positional arg). **Do not pass for bare subnodes** (channels, aliases, etc.) |
+| `--name` | Required for Pattern B; optional for Pattern A | Node name (e.g. `channel@0`); for Pattern A defaults to the positional compatible string if omitted |
 | `--to` | No | Where to attach the new node: label, `&label`, path, `&{path}`, or `label/child` of a node already in the base `.dts` or the overlay (e.g. `spi0`, `&spi0`, `/soc/spi@...`, `spi0/adi,ad7124-8`). Defaults to root `/` if omitted. A bare name/`name@unit` is NOT matched — a node added via `create`/`add` without `--label` can only be targeted by its full path |
 | `--label` | No | Label to attach to the new node (e.g. `imu1`), so it can be referenced later as `&label` (e.g. as a `--to` for a subsequent `add`). **Always set this** when the new node might need to be referenced again later |
 
 **Examples**:
 ```bash
-# Add a second sibling device under the same bus
+# Pattern A: add a second sibling device under the same bus
 attach-linux add --linux ~/linux --context ~/ctx.dts --overlay overlay.dtso adi,ad7124-4 --to spi0
 
-# Add a bare subnode (e.g. a channel) under a device already in the overlay, targeting it by
-# the full path of the device added earlier via `create` (no --label was set for it)
+# Pattern B: add a channel subnode (no compatible) under a labeled device
+attach-linux add --linux ~/linux --context ~/ctx.dts --overlay overlay.dtso --name channel@0 --to imu1
+
+# Pattern B: add a channel when no label was set — target by full path instead
 attach-linux add --linux ~/linux --context ~/ctx.dts --overlay overlay.dtso --name channel@0 --to /soc/spi@7e204000/adi,ad7124-8
 ```
 
 **Next Steps After Add**:
 1. Read the overlay to verify the new node's placement
-2. If the new node has a compatible string (positional), use `get-schema` and `set-prop` to configure it, same as after `create`
-3. If the new node is a bare subnode (`--name` only, no compatible string), its properties currently cannot be set with `set-prop` (see Limitations below) — edit the `.dtso` directly for those
+2. If the new node has a compatible string (Pattern A), use `get-schema` and `set-prop` to configure it, same as after `create`
+3. If the new node is a bare subnode (Pattern B — `--name` only, no compatible string), its properties currently cannot be set with `set-prop` (see Limitations below) — edit the `.dtso` directly for those
 4. `validate` works on bare subnodes too — it checks the node's name against the parent's `pattern_properties` (see `get-schema`) and reports the same error types (`missing_required`, `number_limit`, etc.)
 
 ---
@@ -674,8 +685,8 @@ attach-linux disable --context ~/ctx.dts --overlay overlay.dtso --node spi1
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
 │ 7. ADD MORE NODES (optional)                                 │
-│    attach-linux add [<compatible>] --name <..> --to <..>          │
-│    → Add sibling devices or subnodes (e.g. channels)         │
+│    Device node:  add <compatible> --to <..>                  │
+│    Channel/alias: add --name <..> --to <..>  (no compat key) │
 │    → Repeat step 6 to configure any added device's props    │
 └─────────────────────────────────────────────────────────────┘
                               │
@@ -763,7 +774,7 @@ node-name {
 9. **Phandle references** - When setting phandle properties with `set-prop`, just use the label name (e.g., `--value gpio`)
 10. **Macros need includes** - If schema shows macros, the overlay may need `#include` directives
 11. **Interrupts need interrupt-parent** - When using the `interrupts` property, first set `interrupt-parent` using `set-prop --property interrupt-parent --value <controller>` (e.g., `--value gpio`). The interrupt controller determines how many cells are needed in the `interrupts` array.
-12. **Use `add` for additional nodes** - Once an overlay exists, use `add` to attach-linux another sibling device (with a positional compatible string) or a bare subnode like a channel (with `--name`) instead of hand-editing the `.dtso`
+12. **Use `add` for additional nodes** - Once an overlay exists, use `add` to attach another sibling device (pass the compatible string as positional arg) or a bare subnode like a channel/alias (pass `--name <node-name> --to <parent>` only — **no positional arg** for nodes without `compatible`) instead of hand-editing the `.dtso`
 13. **Use `delete` to undo an `add`** - `delete --node <label>` removes an overlay-added node cleanly; it also drops the parent reference block if that block is now empty. It refuses to touch base-tree nodes.
 14. **Use `rename` to change a node's key** - `rename --node <label> --to <new-key>` renames `name@unit_addr`; omitting `@` in `--to` preserves the existing unit address. Only overlay-added nodes.
 15. **Use `move` to reparent a node** - `move --node <label> --parent <dest>` relocates an overlay-added node; labels and the node key are preserved. Refuses base-tree nodes and cycles.

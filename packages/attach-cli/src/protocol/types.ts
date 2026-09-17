@@ -97,6 +97,7 @@ export interface IntelligenceArgument {
 
 export interface Intelligence {
     kind: string;
+    description: string;
     args: IntelligenceArgument[];
 }
 
