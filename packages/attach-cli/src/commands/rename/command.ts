@@ -5,7 +5,7 @@ import * as fs from 'node:fs';
 
 import type { LocalContext } from "../../context";
 import { load_config } from "../../config";
-import { resolve_node_identifier } from "../../utilities";
+import { resolve_node_identifier, split_property_reference } from "../../utilities";
 import { respond, respond_fail, input_error } from "../../protocol/output";
 
 export function build_rename_command(context_: LocalContext): Command {
@@ -70,7 +70,7 @@ export function build_rename_command(context_: LocalContext): Command {
             }
 
             const identifier = path.join("/");
-            const result = rename_overlay_target(overlay, identifier, to, path);
+            const result = rename_overlay_target(overlay, identifier, to);
 
             if (context_.json) {
                 switch (result) {
@@ -130,17 +130,17 @@ function rename_overlay_target(
     overlay: DeviceTreeOverlay,
     identifier: string,
     to: string,
-    path: string[],
 ): RenameResult {
     const node_result = rename_overlay_node(overlay, identifier, to);
     if (node_result !== "not-found") { return node_result; }
 
-    if (path.length < 2) { return "not-found"; }
+    // Not a node: reinterpret the trailing segment as a property name, splitting
+    // the joined identifier so every reference form works whether written as one
+    // slash-joined token (imu1/status) or as separate tokens (imu1 status).
+    const { node_identifier, property_name } = split_property_reference(identifier);
+    if (property_name === undefined) { return "not-found"; }
 
-    const property_name = path.at(-1)!;
-    const parent_identifier = path.slice(0, -1).join("/");
-
-    return rename_overlay_property(overlay, parent_identifier, property_name, to);
+    return rename_overlay_property(overlay, node_identifier, property_name, to);
 }
 
 function rename_overlay_property(
@@ -309,6 +309,32 @@ if (import.meta.vitest) {
         const result = rename_overlay_node(overlay, "imu1", "adi,ad7124-8@1");
 
         expect(result).toBe("conflict");
+    });
+
+    test("rename_overlay_target - renames a property via single-token slash form", () => {
+        const overlay_with_prop = `/dts-v1/;
+/plugin/;
+
+&spi0 {
+    imu1: adi,ad7124-8@0 {
+        compatible = "adi,ad7124-8";
+        status = "okay";
+    };
+};`;
+        const base = DeviceTree.new_from_string(base_dts);
+        if (typeof base === "string") { throw new TypeError(base); }
+
+        const overlay = DeviceTreeOverlay.new_from_string(overlay_with_prop, base);
+        if (typeof overlay === "string") { throw new TypeError(overlay); }
+
+        const result = rename_overlay_target(overlay, "imu1/status", "status-x");
+
+        expect(result).toBe("renamed");
+
+        const output = overlay.print();
+
+        expect(output).toContain("status-x");
+        expect(output).not.toMatch(/\bstatus =/);
     });
 
     test("rename_overlay_node - renames grandchild via label/child syntax", () => {

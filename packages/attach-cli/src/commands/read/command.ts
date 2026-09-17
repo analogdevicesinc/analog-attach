@@ -4,7 +4,7 @@ import * as fs from "node:fs";
 
 import type { LocalContext } from "../../context";
 import { load_config } from "../../config";
-import { resolve_node_identifier } from "../../utilities";
+import { resolve_node_identifier, split_property_reference } from "../../utilities";
 import { respond, respond_fail, input_error } from "../../protocol/output";
 import { convert_node, convert_property } from "../../protocol/dt-to-protocol";
 import type { Node } from "../../protocol/types";
@@ -75,9 +75,6 @@ export function build_read_command(context_: LocalContext): Command {
 
             const identifier = path.join("/");
 
-            const last_segment = path.at(-1)!;
-            const node_path = path.slice(0, -1);
-
             const found = overlay.find_node(resolve_node_identifier(identifier, overlay));
 
             if (found !== undefined) {
@@ -89,7 +86,13 @@ export function build_read_command(context_: LocalContext): Command {
                 return;
             }
 
-            if (node_path.length === 0) {
+            // Not a node: reinterpret the trailing segment as a property name.
+            // Splitting the joined identifier (not the argv tokens) means every
+            // reference form works whether written as one slash-joined token
+            // (spi0/status) or as separate tokens (spi0 status).
+            const { node_identifier, property_name } = split_property_reference(identifier);
+
+            if (property_name === undefined) {
                 if (context_.json) {
                     respond_fail({ ok: false, message: `Not found: ${identifier}`, severity: "error" });
                 } else {
@@ -98,24 +101,23 @@ export function build_read_command(context_: LocalContext): Command {
                 return;
             }
 
-            const parent_identifier = node_path.join("/");
-            const parent_found = overlay.find_node(resolve_node_identifier(parent_identifier, overlay));
+            const parent_found = overlay.find_node(resolve_node_identifier(node_identifier, overlay));
 
             if (parent_found === undefined) {
                 if (context_.json) {
                     respond_fail({ ok: false, message: `Not found: ${identifier}`, severity: "error" });
                 } else {
-                    console.log(`Couldn't find ${parent_identifier} in ${input}`);
+                    console.log(`Couldn't find ${node_identifier} in ${input}`);
                 }
                 return;
             }
 
-            const property = parent_found.node.properties.find(p => p.name === last_segment);
+            const property = parent_found.node.properties.find(p => p.name === property_name);
             if (property === undefined) {
                 if (context_.json) {
                     respond_fail({ ok: false, message: `Not found: ${identifier}`, severity: "error" });
                 } else {
-                    console.log(`Couldn't find ${last_segment} in ${parent_identifier} in ${input}`);
+                    console.log(`Couldn't find ${property_name} in ${node_identifier} in ${input}`);
                 }
                 return;
             }

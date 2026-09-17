@@ -57,6 +57,31 @@ export function resolve_node_identifier(
     return { kind: "label", labels: [], name: label_part };
 }
 
+// Split a joined node reference into its node part and an optional trailing
+// property segment. The property is the text after the final '/' that lies
+// outside any sigil-path brace group (`&{/...}`) — a '/' inside the braces is
+// part of the path, not a separator. Returns `property_name === undefined` when
+// there is no separable trailing segment (bare label, absolute or sigil path,
+// or a slash only inside braces); callers try the whole identifier as a node
+// first and fall back to this, so an absolute node path never mis-splits.
+export function split_property_reference(
+    identifier: string
+): { node_identifier: string; property_name: string | undefined } {
+    const brace_close = identifier.lastIndexOf("}");
+    const last_slash = identifier.lastIndexOf("/");
+
+    if (last_slash <= 0 || last_slash < brace_close) {
+        return { node_identifier: identifier, property_name: undefined };
+    }
+
+    const property_name = identifier.slice(last_slash + 1);
+    if (property_name.length === 0) {
+        return { node_identifier: identifier, property_name: undefined };
+    }
+
+    return { node_identifier: identifier.slice(0, last_slash), property_name };
+}
+
 export function bigIntReplacer(_key: string, value: any): any {
     return typeof value === 'bigint' ? Number(value) : value;
 }
@@ -211,6 +236,38 @@ if (import.meta.vitest) {
         const [fragment] = overlay.get_fragments();
         expect(fragment).toBeDefined();
         expect(fragment_target(fragment!)).toBe("/soc/spi@7e204000");
+    });
+
+    test("split_property_reference - splits a label/property reference", () => {
+        expect(split_property_reference("spi0/status")).toEqual({ node_identifier: "spi0", property_name: "status" });
+    });
+
+    test("split_property_reference - splits a sigil label/property reference", () => {
+        expect(split_property_reference("&imu1/reg")).toEqual({ node_identifier: "&imu1", property_name: "reg" });
+    });
+
+    test("split_property_reference - splits an absolute path/property reference", () => {
+        expect(split_property_reference("/soc/spi@7e204000/reg"))
+            .toEqual({ node_identifier: "/soc/spi@7e204000", property_name: "reg" });
+    });
+
+    test("split_property_reference - splits a sigil-path/property reference outside the braces", () => {
+        expect(split_property_reference("&{/soc/spi@7e204000}/reg"))
+            .toEqual({ node_identifier: "&{/soc/spi@7e204000}", property_name: "reg" });
+    });
+
+    test("split_property_reference - no property for a bare label", () => {
+        expect(split_property_reference("spi0")).toEqual({ node_identifier: "spi0", property_name: undefined });
+    });
+
+    test("split_property_reference - no property for a sigil path (slash only inside braces)", () => {
+        expect(split_property_reference("&{/soc/spi@7e204000}"))
+            .toEqual({ node_identifier: "&{/soc/spi@7e204000}", property_name: undefined });
+    });
+
+    test("split_property_reference - deepest slash wins for nested label/child/property", () => {
+        expect(split_property_reference("imu1/channel@0/reg"))
+            .toEqual({ node_identifier: "imu1/channel@0", property_name: "reg" });
     });
 }
 

@@ -11,7 +11,7 @@ import type { DeletePreview } from "../../protocol/types";
 
 export function build_delete_command(context_: LocalContext): Command {
     return new Command("delete")
-        .description("Delete a node or property from an existing dtso")
+        .description("Delete an overlay-added node, or remove a property from an overlay node or a base-tree node (base-tree nodes themselves cannot be deleted)")
         .option("--overlay <value>", "dtso")
         .option("--context <value>", "The target dts")
         .option("--force", "Force delete of non-leaf nodes (waterfall delete)")
@@ -123,6 +123,11 @@ export function build_delete_command(context_: LocalContext): Command {
                         return;
                     }
                     case "not-found": {
+                        if (remove_overlay_property(overlay, identifier) === "removed") {
+                            fs.writeFileSync(input, overlay.print());
+                            respond({ ok: true, message: `Removed ${identifier}`, severity: "info" });
+                            return;
+                        }
                         respond_fail({ ok: false, message: `Node ${identifier} not found`, severity: "error" });
                         return;
                     }
@@ -140,6 +145,11 @@ export function build_delete_command(context_: LocalContext): Command {
 
                 switch (result) {
                     case "not-found": {
+                        if (remove_overlay_property(overlay, identifier) === "removed") {
+                            fs.writeFileSync(input, overlay.print());
+                            console.log(`Removed ${identifier} from ${input}`);
+                            return;
+                        }
                         console.log(`Couldn't find node ${identifier} in ${input}`);
                         return;
                     }
@@ -217,6 +227,25 @@ export function delete_overlay_node(
     }
 
     return "deleted";
+}
+
+// Remove an overlay property when the identifier's last slash-delimited segment is a
+// property name. Works for properties added onto base-tree nodes (the fragment root)
+// and properties on overlay-added nodes; the fragment is pruned if it becomes empty.
+export function remove_overlay_property(
+    overlay: DeviceTreeOverlay,
+    identifier: string,
+): "removed" | "not-found" {
+    const last_slash = identifier.lastIndexOf("/");
+    if (last_slash <= 0) { return "not-found"; }
+
+    const property_name = identifier.slice(last_slash + 1);
+    const node_identifier = identifier.slice(0, last_slash);
+    if (property_name.length === 0) { return "not-found"; }
+
+    return overlay.remove_property(resolve_node_identifier(node_identifier, overlay), property_name)
+        ? "removed"
+        : "not-found";
 }
 
 if (import.meta.vitest) {
@@ -350,5 +379,79 @@ if (import.meta.vitest) {
 
         expect(output).not.toContain("channel@0");
         expect(output).toContain("imu1");
+    });
+
+    test("remove_overlay_property - removes a property added onto a base node", () => {
+        const base = DeviceTree.new_from_string(base_dts);
+        if (typeof base === "string") { throw new TypeError(base); }
+
+        const overlay = DeviceTreeOverlay.new_from_string(overlay_spi_with_status, base);
+        if (typeof overlay === "string") { throw new TypeError(overlay); }
+
+        const result = remove_overlay_property(overlay, "spi0/status");
+
+        expect(result).toBe("removed");
+
+        const output = overlay.print();
+
+        expect(output).not.toContain('status = "okay"');
+        expect(output).toContain("imu1");
+        expect(output).toContain("spi0");
+    });
+
+    test("remove_overlay_property - prunes the fragment when the last property is removed", () => {
+        const overlay_only_status = `/dts-v1/;
+/plugin/;
+
+&spi0 {
+    status = "okay";
+};`;
+        const base = DeviceTree.new_from_string(base_dts);
+        if (typeof base === "string") { throw new TypeError(base); }
+
+        const overlay = DeviceTreeOverlay.new_from_string(overlay_only_status, base);
+        if (typeof overlay === "string") { throw new TypeError(overlay); }
+
+        expect(remove_overlay_property(overlay, "spi0/status")).toBe("removed");
+
+        const output = overlay.print();
+
+        expect(output).not.toContain("status");
+        expect(output).not.toContain("spi0");
+    });
+
+    test("remove_overlay_property - removes a property from an overlay-added node", () => {
+        const base = DeviceTree.new_from_string(base_dts);
+        if (typeof base === "string") { throw new TypeError(base); }
+
+        const overlay = DeviceTreeOverlay.new_from_string(overlay_with_imu, base);
+        if (typeof overlay === "string") { throw new TypeError(overlay); }
+
+        expect(remove_overlay_property(overlay, "imu1/compatible")).toBe("removed");
+
+        const output = overlay.print();
+
+        expect(output).not.toContain('compatible = "adi,ad7124-8"');
+        expect(output).toContain("imu1");
+    });
+
+    test("remove_overlay_property - not-found for a missing property", () => {
+        const base = DeviceTree.new_from_string(base_dts);
+        if (typeof base === "string") { throw new TypeError(base); }
+
+        const overlay = DeviceTreeOverlay.new_from_string(overlay_with_imu, base);
+        if (typeof overlay === "string") { throw new TypeError(overlay); }
+
+        expect(remove_overlay_property(overlay, "imu1/nonexistent")).toBe("not-found");
+    });
+
+    test("remove_overlay_property - not-found when identifier has no property segment", () => {
+        const base = DeviceTree.new_from_string(base_dts);
+        if (typeof base === "string") { throw new TypeError(base); }
+
+        const overlay = DeviceTreeOverlay.new_from_string(overlay_with_imu, base);
+        if (typeof overlay === "string") { throw new TypeError(overlay); }
+
+        expect(remove_overlay_property(overlay, "imu1")).toBe("not-found");
     });
 }
