@@ -35,8 +35,8 @@
                         "_t": "number_array",
                         "minItems": 1,
                         "maxItems": 1,
-                        "minimum": "0",
-                        "maximum": "4294967295"
+                        "minimum": 0,
+                        "maximum": 4294967295
                     }
                 ]
             }

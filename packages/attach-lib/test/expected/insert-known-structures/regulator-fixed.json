@@ -107,8 +107,8 @@
                 "_t": "number_array",
                 "minItems": 1,
                 "maxItems": 1,
-                "minimum": "0",
-                "maximum": "4294967295",
+                "minimum": 0,
+                "maximum": 4294967295,
                 "description": "startup time in microseconds"
             }
         },
@@ -118,8 +118,8 @@
                 "_t": "number_array",
                 "minItems": 1,
                 "maxItems": 1,
-                "minimum": "0",
-                "maximum": "4294967295",
+                "minimum": 0,
+                "maximum": 4294967295,
                 "description": "off delay time in microseconds"
             }
         },
@@ -217,8 +217,8 @@
                 "_t": "number_array",
                 "minItems": 1,
                 "maxItems": 1,
-                "minimum": "-2147483648",
-                "maximum": "2147483647",
+                "minimum": -2147483648,
+                "maximum": 2147483647,
                 "description": "smallest voltage consumers may set"
             }
         },
@@ -228,8 +228,8 @@
                 "_t": "number_array",
                 "minItems": 1,
                 "maxItems": 1,
-                "minimum": "-2147483648",
-                "maximum": "2147483647",
+                "minimum": -2147483648,
+                "maximum": 2147483647,
                 "description": "largest voltage consumers may set"
             }
         },
@@ -249,8 +249,8 @@
                 "_t": "number_array",
                 "minItems": 1,
                 "maxItems": 1,
-                "minimum": "0",
-                "maximum": "4294967295",
+                "minimum": 0,
+                "maximum": 4294967295,
                 "description": "smallest current consumers may set"
             }
         },
@@ -260,8 +260,8 @@
                 "_t": "number_array",
                 "minItems": 1,
                 "maxItems": 1,
-                "minimum": "0",
-                "maximum": "4294967295",
+                "minimum": 0,
+                "maximum": 4294967295,
                 "description": "largest current consumers may set"
             }
         },
@@ -271,8 +271,8 @@
                 "_t": "number_array",
                 "minItems": 1,
                 "maxItems": 1,
-                "minimum": "0",
-                "maximum": "4294967295",
+                "minimum": 0,
+                "maximum": 4294967295,
                 "description": "maximum input current regulator allows"
             }
         },
@@ -330,8 +330,8 @@
                 "_t": "number_array",
                 "minItems": 1,
                 "maxItems": 1,
-                "minimum": "0",
-                "maximum": "4294967295",
+                "minimum": 0,
+                "maximum": 4294967295,
                 "description": "Settling time, in microseconds, for voltage change if regulator have the constant time for any level voltage change. This is useful when regulator have exponential voltage change."
             }
         },
@@ -341,8 +341,8 @@
                 "_t": "number_array",
                 "minItems": 1,
                 "maxItems": 1,
-                "minimum": "0",
-                "maximum": "4294967295",
+                "minimum": 0,
+                "maximum": 4294967295,
                 "description": "Settling time, in microseconds, for voltage increase if the regulator needs a constant time to settle after voltage increases of any level. This is useful for regulators with exponential voltage changes."
             }
         },
@@ -352,8 +352,8 @@
                 "_t": "number_array",
                 "minItems": 1,
                 "maxItems": 1,
-                "minimum": "0",
-                "maximum": "4294967295",
+                "minimum": 0,
+                "maximum": 4294967295,
                 "description": "Settling time, in microseconds, for voltage decrease if the regulator needs a constant time to settle after voltage decreases of any level. This is useful for regulators with exponential voltage changes."
             }
         },
@@ -415,8 +415,8 @@
                 "_t": "number_array",
                 "minItems": 1,
                 "maxItems": 1,
-                "minimum": "0",
-                "maximum": "4294967295",
+                "minimum": 0,
+                "maximum": 4294967295,
                 "description": "Set over current protection limit. This is a limit where hardware performs emergency shutdown. Zero can be passed to disable protection and value '1' indicates that protection should be enabled but limit setting can be omitted."
             }
         },
@@ -426,8 +426,8 @@
                 "_t": "number_array",
                 "minItems": 1,
                 "maxItems": 1,
-                "minimum": "0",
-                "maximum": "4294967295",
+                "minimum": 0,
+                "maximum": 4294967295,
                 "description": "Set over current error limit. This is a limit where part of the hardware probably is malfunctional and damage prevention is requested. Zero can be passed to disable error detection and value '1' indicates that detection should be enabled but limit setting can be omitted."
             }
         },
@@ -437,8 +437,8 @@
                 "_t": "number_array",
                 "minItems": 1,
                 "maxItems": 1,
-                "minimum": "0",
-                "maximum": "4294967295",
+                "minimum": 0,
+                "maximum": 4294967295,
                 "description": "Set over current warning limit. This is a limit where hardware is assumed still to be functional but approaching limit where it gets damaged. Recovery actions should be initiated. Zero can be passed to disable detection and value '1' indicates that detection should be enabled but limit setting can be omitted."
             }
         },
@@ -448,8 +448,8 @@
                 "_t": "number_array",
                 "minItems": 1,
                 "maxItems": 1,
-                "minimum": "-2147483648",
-                "maximum": "2147483647",
+                "minimum": -2147483648,
+                "maximum": 2147483647,
                 "description": "Set over voltage protection limit. This is a limit where hardware performs emergency shutdown. Zero can be passed to disable protection and value '1' indicates that protection should be enabled but limit setting can be omitted. Limit is given as microvolt offset from voltage set to regulator."
             }
         },
@@ -459,8 +459,8 @@
                 "_t": "number_array",
                 "minItems": 1,
                 "maxItems": 1,
-                "minimum": "-2147483648",
-                "maximum": "2147483647",
+                "minimum": -2147483648,
+                "maximum": 2147483647,
                 "description": "Set over voltage error limit. This is a limit where part of the hardware probably is malfunctional and damage prevention is requested Zero can be passed to disable error detection and value '1' indicates that detection should be enabled but limit setting can be omitted. Limit is given as microvolt offset from voltage set to regulator."
             }
         },
@@ -470,8 +470,8 @@
                 "_t": "number_array",
                 "minItems": 1,
                 "maxItems": 1,
-                "minimum": "-2147483648",
-                "maximum": "2147483647",
+                "minimum": -2147483648,
+                "maximum": 2147483647,
                 "description": "Set over voltage warning limit. This is a limit where hardware is assumed still to be functional but approaching limit where it gets damaged. Recovery actions should be initiated. Zero can be passed to disable detection and value '1' indicates that detection should be enabled but limit setting can be omitted. Limit is given as microvolt offset from voltage set to regulator."
             }
         },
@@ -481,8 +481,8 @@
                 "_t": "number_array",
                 "minItems": 1,
                 "maxItems": 1,
-                "minimum": "-2147483648",
-                "maximum": "2147483647",
+                "minimum": -2147483648,
+                "maximum": 2147483647,
                 "description": "Set over under voltage protection limit. This is a limit where hardware performs emergency shutdown. Zero can be passed to disable protection and value '1' indicates that protection should be enabled but limit setting can be omitted. Limit is given as microvolt offset from voltage set to regulator."
             }
         },
@@ -492,8 +492,8 @@
                 "_t": "number_array",
                 "minItems": 1,
                 "maxItems": 1,
-                "minimum": "-2147483648",
-                "maximum": "2147483647",
+                "minimum": -2147483648,
+                "maximum": 2147483647,
                 "description": "Set under voltage error limit. This is a limit where part of the hardware probably is malfunctional and damage prevention is requested Zero can be passed to disable error detection and value '1' indicates that detection should be enabled but limit setting can be omitted. Limit is given as microvolt offset from voltage set to regulator."
             }
         },
@@ -503,8 +503,8 @@
                 "_t": "number_array",
                 "minItems": 1,
                 "maxItems": 1,
-                "minimum": "-2147483648",
-                "maximum": "2147483647",
+                "minimum": -2147483648,
+                "maximum": 2147483647,
                 "description": "Set over under voltage warning limit. This is a limit where hardware is assumed still to be functional but approaching limit where it gets damaged. Recovery actions should be initiated. Zero can be passed to disable detection and value '1' indicates that detection should be enabled but limit setting can be omitted. Limit is given as microvolt offset from voltage set to regulator."
             }
         },
@@ -514,8 +514,8 @@
                 "_t": "number_array",
                 "minItems": 1,
                 "maxItems": 1,
-                "minimum": "0",
-                "maximum": "4294967295",
+                "minimum": 0,
+                "maximum": 4294967295,
                 "description": "Specifies the time window (in milliseconds) following a critical under-voltage event during which the system can continue to operate safely while performing less critical operations. This property provides a defined duration before a more severe reaction to the under-voltage event is needed, allowing for certain non-urgent actions to be carried out in preparation for potential power loss."
             }
         },
@@ -525,8 +525,8 @@
                 "_t": "number_array",
                 "minItems": 1,
                 "maxItems": 1,
-                "minimum": "0",
-                "maximum": "4294967295",
+                "minimum": 0,
+                "maximum": 4294967295,
                 "description": "Set over temperature protection limit. This is a limit where hardware performs emergency shutdown. Zero can be passed to disable protection and value '1' indicates that protection should be enabled but limit setting can be omitted."
             }
         },
@@ -536,8 +536,8 @@
                 "_t": "number_array",
                 "minItems": 1,
                 "maxItems": 1,
-                "minimum": "0",
-                "maximum": "4294967295",
+                "minimum": 0,
+                "maximum": 4294967295,
                 "description": "Set over temperature error limit. This is a limit where part of the hardware probably is malfunctional and damage prevention is requested Zero can be passed to disable error detection and value '1' indicates that detection should be enabled but limit setting can be omitted."
             }
         },
@@ -547,8 +547,8 @@
                 "_t": "number_array",
                 "minItems": 1,
                 "maxItems": 1,
-                "minimum": "0",
-                "maximum": "4294967295",
+                "minimum": 0,
+                "maximum": 4294967295,
                 "description": "Set over temperature warning limit. This is a limit where hardware is assumed still to be functional but approaching limit where it gets damaged. Recovery actions should be initiated. Zero can be passed to disable detection and value '1' indicates that detection should be enabled but limit setting can be omitted."
             }
         },
@@ -589,8 +589,8 @@
                 "_t": "number_array",
                 "minItems": 1,
                 "maxItems": 1,
-                "minimum": "-2147483648",
-                "maximum": "2147483647",
+                "minimum": -2147483648,
+                "maximum": 2147483647,
                 "description": "Maximum difference between current and target voltages that can be changed safely in a single step."
             }
         }

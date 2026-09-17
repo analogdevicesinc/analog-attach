@@ -21,7 +21,7 @@ export function clean_directory(directory_path: string) {
 }
 
 export function bigIntReplacer(_key: string, value: any): any {
-    return typeof value === 'bigint' ? value.toString() : value;
+    return typeof value === 'bigint' ? Number(value) : value;
 }
 
 export function write_to_directory(directory_path: string, file_name: string, content: any) {

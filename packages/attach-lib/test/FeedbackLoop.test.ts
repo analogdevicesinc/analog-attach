@@ -3,7 +3,7 @@ import * as fs from 'node:fs';
 
 import { Attach } from 'attach-lib';
 
-import { BindingTestData, write_to_directory } from './testing_utils';
+import { BindingTestData, write_to_directory, bigIntReplacer } from './testing_utils';
 
 import { test, expect } from 'vitest';
 
@@ -43,7 +43,7 @@ test(adis16475.name, async () => {
     const expected_1_path = path.resolve(__dirname, `expected/feedback-loop/${adis16475.name}-1.json`);
     const expected_1 = JSON.stringify(JSON.parse(fs.readFileSync(expected_1_path, 'utf8')));
 
-    expect(JSON.stringify(new_binding_1.binding)).toStrictEqual(expected_1);
+    expect(JSON.stringify(new_binding_1.binding, bigIntReplacer)).toStrictEqual(expected_1);
 
     for (const error of new_binding_1.errors) {
         switch (error._t) {
@@ -81,7 +81,7 @@ test(adis16475.name, async () => {
     const expected_2_path = path.resolve(__dirname, `expected/feedback-loop/${adis16475.name}-2.json`);
     const expected_2 = JSON.stringify(JSON.parse(fs.readFileSync(expected_2_path, 'utf8')));
 
-    expect(JSON.stringify(new_binding_2.binding)).toStrictEqual(expected_2);
+    expect(JSON.stringify(new_binding_2.binding, bigIntReplacer)).toStrictEqual(expected_2);
 
     for (const error of new_binding_2.errors) {
         switch (error._t) {
@@ -117,7 +117,7 @@ test(adis16475.name, async () => {
     const expected_3_path = path.resolve(__dirname, `expected/feedback-loop/${adis16475.name}-3.json`);
     const expected_3 = JSON.stringify(JSON.parse(fs.readFileSync(expected_3_path, 'utf8')));
 
-    expect(JSON.stringify(new_binding_3.binding)).toStrictEqual(expected_3);
+    expect(JSON.stringify(new_binding_3.binding, bigIntReplacer)).toStrictEqual(expected_3);
 
     for (const error of new_binding_3.errors) {
         switch (error._t) {
@@ -163,7 +163,7 @@ test(adis16475.name, async () => {
     const expected_4_path = path.resolve(__dirname, `expected/feedback-loop/${adis16475.name}-4.json`);
     const expected_4 = JSON.stringify(JSON.parse(fs.readFileSync(expected_4_path, 'utf8')));
 
-    expect(JSON.stringify(new_binding_4.binding)).toStrictEqual(expected_4);
+    expect(JSON.stringify(new_binding_4.binding, bigIntReplacer)).toStrictEqual(expected_4);
 
     for (const error of new_binding_4.errors) {
         switch (error._t) {

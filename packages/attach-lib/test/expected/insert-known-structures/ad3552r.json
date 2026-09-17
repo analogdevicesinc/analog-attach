@@ -155,8 +155,8 @@
                 "_t": "number_array",
                 "minItems": 1,
                 "maxItems": 1,
-                "minimum": "0",
-                "maximum": "4294967295",
+                "minimum": 0,
+                "maximum": 4294967295,
                 "description": "Delay in nanoseconds to be introduced by the controller after CS is asserted."
             }
         },
@@ -166,8 +166,8 @@
                 "_t": "number_array",
                 "minItems": 1,
                 "maxItems": 1,
-                "minimum": "0",
-                "maximum": "4294967295",
+                "minimum": 0,
+                "maximum": 4294967295,
                 "description": "Delay in nanoseconds to be introduced by the controller before CS is de-asserted."
             }
         },
@@ -177,8 +177,8 @@
                 "_t": "number_array",
                 "minItems": 1,
                 "maxItems": 1,
-                "minimum": "0",
-                "maximum": "4294967295",
+                "minimum": 0,
+                "maximum": 4294967295,
                 "description": "Delay in nanoseconds to be introduced by the controller after CS is de-asserted."
             }
         },
@@ -204,8 +204,8 @@
                 "_t": "number_array",
                 "minItems": 1,
                 "maxItems": 1,
-                "minimum": "0",
-                "maximum": "4294967295",
+                "minimum": 0,
+                "maximum": 4294967295,
                 "description": "Delay, in microseconds, after a read transfer."
             }
         },
@@ -215,8 +215,8 @@
                 "_t": "number_array",
                 "minItems": 1,
                 "maxItems": 1,
-                "minimum": "0",
-                "maximum": "4294967295",
+                "minimum": 0,
+                "maximum": 4294967295,
                 "description": "SPI Rx sample delay offset, unit is nanoseconds. The delay from the default sample time before the actual sample of the rxd input signal occurs."
             }
         },
@@ -242,8 +242,8 @@
                 "_t": "number_array",
                 "minItems": 1,
                 "maxItems": 1,
-                "minimum": "0",
-                "maximum": "4294967295",
+                "minimum": 0,
+                "maximum": 4294967295,
                 "description": "Delay, in microseconds, after a write transfer."
             }
         },
@@ -277,8 +277,8 @@
                 "_t": "number_array",
                 "minItems": 1,
                 "maxItems": 1,
-                "minimum": "0",
-                "maximum": "4294967295",
+                "minimum": 0,
+                "maximum": 4294967295,
                 "description": "Only for STM32H7, (Master Inter-Data Idleness) minimum time\ndelay in nanoseconds inserted between two consecutive data frames.\n"
             }
         },
@@ -379,8 +379,8 @@
                 "_t": "number_array",
                 "minItems": 1,
                 "maxItems": 1,
-                "minimum": "0",
-                "maximum": "4294967295",
+                "minimum": 0,
+                "maximum": 4294967295,
                 "description": "Delay in nanoseconds for the length that the master mode chip select outputs are de-asserted between transactions."
             }
         },
@@ -390,8 +390,8 @@
                 "_t": "number_array",
                 "minItems": 1,
                 "maxItems": 1,
-                "minimum": "0",
-                "maximum": "4294967295",
+                "minimum": 0,
+                "maximum": 4294967295,
                 "description": "Delay in nanoseconds between one chip select being de-activated and the activation of another."
             }
         },
@@ -401,8 +401,8 @@
                 "_t": "number_array",
                 "minItems": 1,
                 "maxItems": 1,
-                "minimum": "0",
-                "maximum": "4294967295",
+                "minimum": 0,
+                "maximum": 4294967295,
                 "description": "Delay in nanoseconds between last bit of current transaction and deasserting the device chip select (qspi_n_ss_out)."
             }
         },
@@ -412,8 +412,8 @@
                 "_t": "number_array",
                 "minItems": 1,
                 "maxItems": 1,
-                "minimum": "0",
-                "maximum": "4294967295",
+                "minimum": 0,
+                "maximum": 4294967295,
                 "description": "Delay in nanoseconds between setting qspi_n_ss_out low and first bit transfer."
             }
         },
@@ -513,8 +513,8 @@
                         "_t": "number_array",
                         "minItems": 1,
                         "maxItems": 1,
-                        "minimum": "-2147483648",
-                        "maximum": "2147483647"
+                        "minimum": -2147483648,
+                        "maximum": 2147483647
                     }
                 },
                 {
@@ -565,8 +565,8 @@
                                     "_t": "number_array",
                                     "minItems": 1,
                                     "maxItems": 1,
-                                    "minimum": "0",
-                                    "maximum": "4294967295",
+                                    "minimum": 0,
+                                    "maximum": 4294967295,
                                     "description": "Feedback Resistor"
                                 }
                             }

@@ -3,7 +3,7 @@ import * as fs from 'node:fs';
 
 import { Attach, } from 'attach-lib';
 
-import { BindingTestData, write_to_directory } from './testing_utils';
+import { BindingTestData, write_to_directory, bigIntReplacer } from './testing_utils';
 
 import { describe, test, expect } from 'vitest';
 
@@ -206,5 +206,5 @@ async function test_impl(data: BindingTestData) {
     const expected_path = path.resolve(__dirname, `expected/binding-parser/${data.name}.json`);
     const expected = JSON.stringify(JSON.parse(fs.readFileSync(expected_path, 'utf8')));
 
-    expect(JSON.stringify(binding.parsed_binding)).toStrictEqual(expected);
+    expect(JSON.stringify(binding.parsed_binding, bigIntReplacer)).toStrictEqual(expected);
 }

@@ -260,8 +260,8 @@
                 "values": [
                     {
                         "_t": "number_array",
-                        "minimum": "0",
-                        "maximum": "4294967295",
+                        "minimum": 0,
+                        "maximum": 4294967295,
                         "minItems": 1,
                         "maxItems": 1
                     }
@@ -284,7 +284,7 @@
                 "maxItems": 16,
                 "minimum": 0,
                 "maximum": 15,
-                "description": "Analog inputs to apply a voltage bias of (AVDD − AVSS) / 2 to."
+                "description": "Analog inputs to apply a voltage bias of (AVDD \u2212 AVSS) / 2 to."
             }
         },
         {
@@ -307,8 +307,8 @@
                 "_t": "number_array",
                 "minItems": 1,
                 "maxItems": 1,
-                "minimum": "0",
-                "maximum": "4294967295",
+                "minimum": 0,
+                "maximum": 4294967295,
                 "description": "Delay in nanoseconds to be introduced by the controller after CS is asserted."
             }
         },
@@ -318,8 +318,8 @@
                 "_t": "number_array",
                 "minItems": 1,
                 "maxItems": 1,
-                "minimum": "0",
-                "maximum": "4294967295",
+                "minimum": 0,
+                "maximum": 4294967295,
                 "description": "Delay in nanoseconds to be introduced by the controller before CS is de-asserted."
             }
         },
@@ -329,8 +329,8 @@
                 "_t": "number_array",
                 "minItems": 1,
                 "maxItems": 1,
-                "minimum": "0",
-                "maximum": "4294967295",
+                "minimum": 0,
+                "maximum": 4294967295,
                 "description": "Delay in nanoseconds to be introduced by the controller after CS is de-asserted."
             }
         },
@@ -356,8 +356,8 @@
                 "_t": "number_array",
                 "minItems": 1,
                 "maxItems": 1,
-                "minimum": "0",
-                "maximum": "4294967295",
+                "minimum": 0,
+                "maximum": 4294967295,
                 "description": "Delay, in microseconds, after a read transfer."
             }
         },
@@ -367,8 +367,8 @@
                 "_t": "number_array",
                 "minItems": 1,
                 "maxItems": 1,
-                "minimum": "0",
-                "maximum": "4294967295",
+                "minimum": 0,
+                "maximum": 4294967295,
                 "description": "SPI Rx sample delay offset, unit is nanoseconds. The delay from the default sample time before the actual sample of the rxd input signal occurs."
             }
         },
@@ -394,8 +394,8 @@
                 "_t": "number_array",
                 "minItems": 1,
                 "maxItems": 1,
-                "minimum": "0",
-                "maximum": "4294967295",
+                "minimum": 0,
+                "maximum": 4294967295,
                 "description": "Delay, in microseconds, after a write transfer."
             }
         },
@@ -429,8 +429,8 @@
                 "_t": "number_array",
                 "minItems": 1,
                 "maxItems": 1,
-                "minimum": "0",
-                "maximum": "4294967295",
+                "minimum": 0,
+                "maximum": 4294967295,
                 "description": "Only for STM32H7, (Master Inter-Data Idleness) minimum time\ndelay in nanoseconds inserted between two consecutive data frames.\n"
             }
         },
@@ -531,8 +531,8 @@
                 "_t": "number_array",
                 "minItems": 1,
                 "maxItems": 1,
-                "minimum": "0",
-                "maximum": "4294967295",
+                "minimum": 0,
+                "maximum": 4294967295,
                 "description": "Delay in nanoseconds for the length that the master mode chip select outputs are de-asserted between transactions."
             }
         },
@@ -542,8 +542,8 @@
                 "_t": "number_array",
                 "minItems": 1,
                 "maxItems": 1,
-                "minimum": "0",
-                "maximum": "4294967295",
+                "minimum": 0,
+                "maximum": 4294967295,
                 "description": "Delay in nanoseconds between one chip select being de-activated and the activation of another."
             }
         },
@@ -553,8 +553,8 @@
                 "_t": "number_array",
                 "minItems": 1,
                 "maxItems": 1,
-                "minimum": "0",
-                "maximum": "4294967295",
+                "minimum": 0,
+                "maximum": 4294967295,
                 "description": "Delay in nanoseconds between last bit of current transaction and deasserting the device chip select (qspi_n_ss_out)."
             }
         },
@@ -564,8 +564,8 @@
                 "_t": "number_array",
                 "minItems": 1,
                 "maxItems": 1,
-                "minimum": "0",
-                "maximum": "4294967295",
+                "minimum": 0,
+                "maximum": 4294967295,
                 "description": "Delay in nanoseconds between setting qspi_n_ss_out low and first bit transfer."
             }
         },
@@ -656,7 +656,7 @@
                         "minimum": 0,
                         "maximum": 29,
                         "typeSize": 32,
-                        "description": "Besides the analog inputs available, internal inputs can be used.\n16: Internal temperature sensor.\n17: AVSS\n18: Internal reference\n19: DGND\n20: (AVDD − AVSS)/6+\n21: (AVDD − AVSS)/6-\n22: (IOVDD − DGND)/6+\n23: (IOVDD − DGND)/6-\n24: (ALDO − AVSS)/6+\n25: (ALDO − AVSS)/6-\n26: (DLDO − DGND)/6+\n27: (DLDO − DGND)/6-\n28: V_MV_P\n29: V_MV_M\n"
+                        "description": "Besides the analog inputs available, internal inputs can be used.\n16: Internal temperature sensor.\n17: AVSS\n18: Internal reference\n19: DGND\n20: (AVDD \u2212 AVSS)/6+\n21: (AVDD \u2212 AVSS)/6-\n22: (IOVDD \u2212 DGND)/6+\n23: (IOVDD \u2212 DGND)/6-\n24: (ALDO \u2212 AVSS)/6+\n25: (ALDO \u2212 AVSS)/6-\n26: (DLDO \u2212 DGND)/6+\n27: (DLDO \u2212 DGND)/6-\n28: V_MV_P\n29: V_MV_M\n"
                     }
                 },
                 {
@@ -670,7 +670,7 @@
                             3
                         ],
                         "typeSize": 32,
-                        "description": "Select the reference source to use when converting on the\nspecific channel. Valid values are:\n0: REFIN1(+)/REFIN1(−)\n1: REFIN2(+)/REFIN2(−)\n2: REFOUT/AVSS (Internal reference)\n3: AVDD/AVSS\nIf not specified, REFIN1 is used.\n",
+                        "description": "Select the reference source to use when converting on the\nspecific channel. Valid values are:\n0: REFIN1(+)/REFIN1(\u2212)\n1: REFIN2(+)/REFIN2(\u2212)\n2: REFOUT/AVSS (Internal reference)\n3: AVDD/AVSS\nIf not specified, REFIN1 is used.\n",
                         "default": 0
                     }
                 },
@@ -702,8 +702,8 @@
                         "_t": "number_array",
                         "minItems": 1,
                         "maxItems": 1,
-                        "minimum": "0",
-                        "maximum": "4294967295",
+                        "minimum": 0,
+                        "maximum": 4294967295,
                         "description": "Excitation current in nanoamps to be applied to pin specified in\nadi,excitation-pin-0 while this channel is active.\n"
                     }
                 },
@@ -713,8 +713,8 @@
                         "_t": "number_array",
                         "minItems": 1,
                         "maxItems": 1,
-                        "minimum": "0",
-                        "maximum": "4294967295",
+                        "minimum": 0,
+                        "maximum": 4294967295,
                         "description": "Excitation current in nanoamps to be applied to pin specified in\nadi,excitation-pin-1 while this channel is active.\n"
                     }
                 },
@@ -724,8 +724,8 @@
                         "_t": "number_array",
                         "minItems": 1,
                         "maxItems": 1,
-                        "minimum": "0",
-                        "maximum": "4294967295",
+                        "minimum": 0,
+                        "maximum": 4294967295,
                         "description": "Burnout current in nanoamps to be applied for this channel.\n"
                     }
                 },
