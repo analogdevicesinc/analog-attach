@@ -64,7 +64,8 @@
                     "vdd_3v3_reg",
                     "vdd_5v0_reg"
                 ],
-                "enum_type": "phandle"
+                "enum_type": "phandle",
+                "description": "The regulator supply for ADC reference voltage.\n"
             }
         },
         {

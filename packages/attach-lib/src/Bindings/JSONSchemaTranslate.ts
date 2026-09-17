@@ -333,7 +333,8 @@ function narrow_object(object: any): AttachType {
         "const" in object &&
         object.const !== undefined
     ) {
-        return { _t: "const", const: object.const };
+        const description = "description" in object ? object.description : undefined;
+        return { _t: "const", const: object.const, description: description };
     }
 
     if (
@@ -341,8 +342,10 @@ function narrow_object(object: any): AttachType {
         "type" in object &&
         object.type === "object"
     ) {
+        const description = "description" in object ? object.description : undefined;
         return {
             _t: "object",
+            description: description,
             properties: translate_JSONSchema(object).properties
         };
     }
@@ -457,6 +460,7 @@ function narrow_array_object(object: any): AttachArray {
             _t: 'fixed_index',
             minItems: minItems,
             maxItems: maxItems,
+            description: description,
             prefixItems: prefix_items
         };
     }

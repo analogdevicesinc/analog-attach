@@ -31,7 +31,7 @@
                 "_t": "integer",
                 "description": "Legacy property for single, fixed frequency clocks",
                 "minimum": 0,
-                "maximum": 18446744073709551615
+                "maximum": 18446744073709552000
             }
         },
         {

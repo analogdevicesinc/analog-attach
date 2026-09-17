@@ -183,7 +183,8 @@
                     "gpio",
                     "expgpio"
                 ],
-                "enum_type": "phandle"
+                "enum_type": "phandle",
+                "description": "Must be the device tree identifier of the RESET pin. If specified, it will be asserted during driver probe. As the line is active low, it should be marked GPIO_ACTIVE_LOW."
             }
         },
         {

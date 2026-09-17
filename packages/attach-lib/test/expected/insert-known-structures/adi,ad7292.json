@@ -55,7 +55,8 @@
                     "vdd_3v3_reg",
                     "vdd_5v0_reg"
                 ],
-                "enum_type": "phandle"
+                "enum_type": "phandle",
+                "description": "The regulator supply for ADC and DAC reference voltage.\n"
             }
         },
         {

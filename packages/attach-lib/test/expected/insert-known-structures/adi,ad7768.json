@@ -45,6 +45,7 @@
                 "_t": "matrix",
                 "minItems": 1,
                 "maxItems": 1,
+                "description": "Master clock",
                 "values": [
                     {
                         "_t": "fixed_index",
@@ -152,7 +153,8 @@
                     "vdd_3v3_reg",
                     "vdd_5v0_reg"
                 ],
-                "enum_type": "phandle"
+                "enum_type": "phandle",
+                "description": "Reference voltage - difference voltage between the REFx+ and REFx- pins."
             }
         },
         {

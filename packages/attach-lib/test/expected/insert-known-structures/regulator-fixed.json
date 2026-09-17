@@ -38,7 +38,8 @@
                     "gpio",
                     "expgpio"
                 ],
-                "enum_type": "phandle"
+                "enum_type": "phandle",
+                "description": "gpio to use for enable control"
             }
         },
         {
@@ -60,6 +61,7 @@
                 "_t": "matrix",
                 "minItems": 1,
                 "maxItems": 1,
+                "description": "clock to use for enable control. This binding is only available if the compatible is chosen to regulator-fixed-clock. The clock binding is mandatory if compatible is chosen to regulator-fixed-clock.",
                 "values": [
                     {
                         "_t": "fixed_index",
@@ -151,7 +153,8 @@
                     "vdd_3v3_reg",
                     "vdd_5v0_reg"
                 ],
-                "enum_type": "phandle"
+                "enum_type": "phandle",
+                "description": "Input supply phandle."
             }
         },
         {
@@ -160,6 +163,7 @@
                 "_t": "matrix",
                 "minItems": 1,
                 "maxItems": 1,
+                "description": "Interrupt signaling a critical under-voltage event.",
                 "values": [
                     {
                         "_t": "fixed_index",

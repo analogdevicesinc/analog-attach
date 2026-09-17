@@ -107,6 +107,7 @@
                 "_t": "matrix",
                 "minItems": 1,
                 "maxItems": 1,
+                "description": "phandle to the master clock (mclk)",
                 "values": [
                     {
                         "_t": "fixed_index",
@@ -187,7 +188,8 @@
                     "vdd_3v3_reg",
                     "vdd_5v0_reg"
                 ],
-                "enum_type": "phandle"
+                "enum_type": "phandle",
+                "description": "refin1 supply. Can be used as reference for conversion."
             }
         },
         {
@@ -204,7 +206,8 @@
                     "vdd_3v3_reg",
                     "vdd_5v0_reg"
                 ],
-                "enum_type": "phandle"
+                "enum_type": "phandle",
+                "description": "refin2 supply. Can be used as reference for conversion."
             }
         },
         {
@@ -221,7 +224,8 @@
                     "vdd_3v3_reg",
                     "vdd_5v0_reg"
                 ],
-                "enum_type": "phandle"
+                "enum_type": "phandle",
+                "description": "AVDD voltage supply. Can be used as reference for conversion."
             }
         },
         {
@@ -238,7 +242,8 @@
                     "vdd_3v3_reg",
                     "vdd_5v0_reg"
                 ],
-                "enum_type": "phandle"
+                "enum_type": "phandle",
+                "description": "IOVDD voltage supply. Used for the chip interface."
             }
         },
         {

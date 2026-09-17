@@ -42,6 +42,7 @@
                 "_t": "matrix",
                 "minItems": 1,
                 "maxItems": 2,
+                "description": "One or more interrupts for ADC block, depending on part used:\n  - stm32f4 and stm32h7 share a common ADC interrupt line.\n  - stm32mp1 has two separate interrupt lines, one for each ADC within\n    ADC block.\n  - stm32mp13 has an interrupt line per ADC block.\n",
                 "values": [
                     {
                         "_t": "fixed_index",
@@ -105,6 +106,7 @@
                 "_t": "matrix",
                 "minItems": 1,
                 "maxItems": 1,
+                "description": "Core can use up to two clocks, depending on part used:\n  - \"adc\" clock: for the analog circuitry, common to all ADCs.\n    It's required on stm32f4.\n    It's optional on stm32h7 and stm32mp1.\n  - \"bus\" clock: for registers access, common to all ADCs.\n    It's not present on stm32f4.\n    It's required on stm32h7 and stm32mp1.\n",
                 "values": [
                     {
                         "_t": "fixed_index",
@@ -151,7 +153,8 @@
                     "vdd_3v3_reg",
                     "vdd_5v0_reg"
                 ],
-                "enum_type": "phandle"
+                "enum_type": "phandle",
+                "description": "Phandle to the vdda input analog voltage."
             }
         },
         {
@@ -168,7 +171,8 @@
                     "vdd_3v3_reg",
                     "vdd_5v0_reg"
                 ],
-                "enum_type": "phandle"
+                "enum_type": "phandle",
+                "description": "Phandle to the vref input analog reference voltage."
             }
         },
         {
@@ -206,7 +210,8 @@
                     "vdd_3v3_reg",
                     "vdd_5v0_reg"
                 ],
-                "enum_type": "phandle"
+                "enum_type": "phandle",
+                "description": "Phandle to the embedded booster regulator that can be used to supply ADC analog input switches on stm32h7 and stm32mp1."
             }
         },
         {
@@ -223,7 +228,8 @@
                     "vdd_3v3_reg",
                     "vdd_5v0_reg"
                 ],
-                "enum_type": "phandle"
+                "enum_type": "phandle",
+                "description": "Phandle to the vdd input voltage. It can be used to supply ADC analog input switches on stm32mp1."
             }
         },
         {

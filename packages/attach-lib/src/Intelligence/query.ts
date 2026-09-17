@@ -204,6 +204,7 @@ export function query_devicetree(
                                         _t: "matrix",
                                         minItems: new_interrupt.value.minItems,
                                         maxItems: new_interrupt.value.maxItems,
+                                        description: new_interrupt.value.description,
                                         values: [new_value]
                                     };
                                 }
@@ -223,6 +224,7 @@ export function query_devicetree(
                     enum: phandles,
                     default: is_set,
                     enum_type: AttachEnumType.PHANDLE,
+                    description: property.value.description,
                 };
 
                 continue;
@@ -240,6 +242,7 @@ export function query_devicetree(
                     _t: "matrix",
                     minItems: 1,
                     maxItems: 1,
+                    description: property.value.description,
                     values: [
                         {
                             _t: "fixed_index",
@@ -284,6 +287,7 @@ export function query_devicetree(
                         _t: 'matrix',
                         minItems: property.value.minItems,
                         maxItems: property.value.maxItems,
+                        description: property.value.description,
                         values: [
                             {
                                 _t: "fixed_index",
@@ -351,6 +355,7 @@ export function query_devicetree(
                                 _t: 'matrix',
                                 minItems: "minItems" in property.value ? property.value.minItems : 1,
                                 maxItems: "maxItems" in property.value ? property.value.maxItems : 1,
+                                description: property.value.description,
                                 values: [
                                     new_value
                                 ]
@@ -387,6 +392,7 @@ export function query_devicetree(
                         _t: 'matrix',
                         minItems: property.value.minItems,
                         maxItems: property.value.maxItems,
+                        description: property.value.description,
                         values: [
                             {
                                 _t: "fixed_index",
@@ -450,6 +456,7 @@ export function query_devicetree(
                                 _t: 'matrix',
                                 minItems: property.value.minItems,
                                 maxItems: property.value.maxItems,
+                                description: property.value.description,
                                 values: [
                                     new_value
                                 ]
@@ -477,6 +484,7 @@ export function query_devicetree(
                 maxItems: 1,
                 enum: phandles,
                 enum_type: AttachEnumType.PHANDLE,
+                description: property.value.description,
             };
 
             continue;
@@ -504,6 +512,7 @@ export function query_devicetree(
                     maxItems: 1,
                     enum: phandles,
                     enum_type: AttachEnumType.PHANDLE,
+                    description: property.value.description,
                 };
 
                 continue;
@@ -539,6 +548,7 @@ export function query_devicetree(
                             prefixItems: [],
                             minItems: Number(new_length),
                             maxItems: Number(new_length),
+                            description: property.value.description,
                         };
 
                         new_value.prefixItems.push(

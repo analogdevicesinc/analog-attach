@@ -71,7 +71,8 @@
                     "gpio",
                     "expgpio"
                 ],
-                "enum_type": "phandle"
+                "enum_type": "phandle",
+                "description": "LDAC pin to be used as a hardware trigger to update the DAC channels.\n"
             }
         },
         {
@@ -88,7 +89,8 @@
                     "vdd_3v3_reg",
                     "vdd_5v0_reg"
                 ],
-                "enum_type": "phandle"
+                "enum_type": "phandle",
+                "description": "The regulator to use as an external reference. If it does not exists the internal reference will be used. External reference must be 2.5V"
             }
         },
         {
@@ -473,6 +475,7 @@
                     "key": "custom-output-range-config",
                     "value": {
                         "_t": "object",
+                        "description": "Configuration of custom range when adi,output-range-microvolt is not present. The formulas for calculation the output voltages are Vout_fs = 2.5 + [(GainN + Offset/1024) * 2.5 * Rfbx * 1.03] Vout_zs = 2.5 - [(GainP + Offset/1024) * 2.5 * Rfbx * 1.03]",
                         "properties": [
                             {
                                 "key": "adi,gain-offset",

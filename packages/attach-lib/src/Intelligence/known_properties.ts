@@ -73,6 +73,7 @@ export function insert_known_structures(properties: ResolvedProperty[]): Resolve
                     minItems: 9,
                     maxItems: 9,
                     unique_items: false,
+                    description: property.value.description,
                 };
                 break;
             }
@@ -106,6 +107,7 @@ export function insert_known_structures(properties: ResolvedProperty[]): Resolve
                     _t: "matrix",
                     minItems: property.value.minItems,
                     maxItems: property.value.maxItems,
+                    description: property.value.description,
                     values: [
                         {
                             _t: "number_array",

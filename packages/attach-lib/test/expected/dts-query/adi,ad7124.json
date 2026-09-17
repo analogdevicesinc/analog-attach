@@ -42,6 +42,7 @@
                 "_t": "matrix",
                 "minItems": 1,
                 "maxItems": 1,
+                "description": "IRQ line for the ADC",
                 "values": [
                     {
                         "_t": "fixed_index",
@@ -92,6 +93,7 @@
                 "_t": "matrix",
                 "minItems": 1,
                 "maxItems": 1,
+                "description": "Optional external clock connected to the CLK pin.",
                 "values": [
                     {
                         "_t": "fixed_index",
@@ -119,7 +121,8 @@
             "key": "#clock-cells",
             "value": {
                 "_t": "const",
-                "const": 0
+                "const": 0,
+                "description": "The CLK pin can be used as an output. When that is the case, include this property."
             }
         },
         {
@@ -146,7 +149,8 @@
                     "gpio",
                     "expgpio"
                 ],
-                "enum_type": "phandle"
+                "enum_type": "phandle",
+                "description": "GPIO reading the R̅D̅Y̅ line. Having such a GPIO is technically optional but highly recommended because DOUT/R̅D̅Y̅ toggles during SPI transfers (in its DOUT aka MISO role) and so usually triggers a spurious interrupt. The distinction between such a spurious event and a real one can only be done by reading such a GPIO. (There is a register telling the same information, but accessing that one needs a SPI transfer which then triggers another interrupt event.)"
             }
         },
         {
@@ -177,7 +181,8 @@
                     "vdd_3v3_reg",
                     "vdd_5v0_reg"
                 ],
-                "enum_type": "phandle"
+                "enum_type": "phandle",
+                "description": "refin1 supply can be used as reference for conversion."
             }
         },
         {
@@ -194,7 +199,8 @@
                     "vdd_3v3_reg",
                     "vdd_5v0_reg"
                 ],
-                "enum_type": "phandle"
+                "enum_type": "phandle",
+                "description": "refin2 supply can be used as reference for conversion."
             }
         },
         {
@@ -211,7 +217,8 @@
                     "vdd_3v3_reg",
                     "vdd_5v0_reg"
                 ],
-                "enum_type": "phandle"
+                "enum_type": "phandle",
+                "description": "avdd supply can be used as reference for conversion."
             }
         },
         {

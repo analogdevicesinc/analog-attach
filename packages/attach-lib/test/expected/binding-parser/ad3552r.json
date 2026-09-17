@@ -454,6 +454,7 @@
                     "key": "custom-output-range-config",
                     "value": {
                         "_t": "object",
+                        "description": "Configuration of custom range when adi,output-range-microvolt is not present. The formulas for calculation the output voltages are Vout_fs = 2.5 + [(GainN + Offset/1024) * 2.5 * Rfbx * 1.03] Vout_zs = 2.5 - [(GainP + Offset/1024) * 2.5 * Rfbx * 1.03]",
                         "properties": [
                             {
                                 "key": "adi,gain-offset",
