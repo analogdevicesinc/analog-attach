@@ -522,10 +522,12 @@ attach-linux set-prop --node <name> --overlay <dtso-file> --property <prop-name>
 | Single number | `0` | Integer value |
 | Single string | `adi,ad7124-8` | String value |
 | Boolean | `true` or `false` | For flag properties (true = add flag, false = remove flag) |
-| Array | `[0; 1; 2]` | Array of values separated by `;` |
-| Mixed array | `[25; IRQ_FALLING_EDGE]` | Array with numbers and macros |
-| Multi-group array | `[0; 1], [2; 3]` | Multiple bracket groups separated by `,` — all values are flattened into a single array (produces `[0, 1, 2, 3]`) |
+| Array | `0 1 2` | Space-separated items |
+| Mixed array | `25 IRQ_FALLING_EDGE` | Numbers and macros, space-separated |
+| Matrix rows | `0 1,2 3` | Comma separates rows, space separates items within a row — produces a true multi-row matrix `<0 1>, <2 3>;` |
 | Phandle ref | `gpio` | Reference to another node (used with `<&gpio>` syntax) |
+
+Comma is only a row separator; it can't appear in labels, macros, or numbers.
 
 **Examples**:
 ```bash
@@ -542,13 +544,13 @@ attach-linux set-prop --node &imu1 --overlay overlay.dtso --property spi-cpha --
 attach-linux set-prop --node &imu1 --overlay overlay.dtso --property spi-cpha --value false
 
 # Set an interrupt array
-attach-linux set-prop --node &imu1 --overlay overlay.dtso --property interrupts --value "[25; IRQ_TYPE_EDGE_FALLING]"
+attach-linux set-prop --node &imu1 --overlay overlay.dtso --property interrupts --value "25 IRQ_TYPE_EDGE_FALLING"
 
 # Set a phandle reference for interrupt-parent
 attach-linux set-prop --node &imu1 --overlay overlay.dtso --property interrupt-parent --value gpio
 
 # Set string array (e.g., clock-names)
-attach-linux set-prop --node &imu1 --overlay overlay.dtso --property clock-names --value "[spi; pclk]"
+attach-linux set-prop --node &imu1 --overlay overlay.dtso --property clock-names --value "spi pclk"
 ```
 
 **Validation**: The command validates the value against the device binding schema before applying. If the value is invalid, an error message is displayed explaining the valid options.

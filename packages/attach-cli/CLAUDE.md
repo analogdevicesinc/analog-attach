@@ -61,16 +61,16 @@ Every command resolves its paths as: `--flag` → `config.toml` value → `undef
 
 A bundled copy of `dt-schema` lives at `bundled/dt-schema/` inside the package. Commands accept `--dt-schema` to override this path, but the bundled version is used by default. The path is resolved at runtime relative to the dist directory in `src/commands/skill/utilities.ts:getBundledDtSchemaPath`.
 
-### set-prop value format
+### update --with value format
 
-The `--value` argument for `set-prop` uses a custom mini-syntax parsed in `src/commands/set-prop/command.ts:parse_value`:
+The `--with` argument for `update` uses a custom mini-syntax parsed in `src/commands/update/command.ts:parse_value`:
 - Single number: `0`
 - Single string: `some_label`
 - Boolean flag: `true` / `false`
-- Array: `[item1; item2; item3]` (semicolon-separated, no trailing)
-- Matrix row: `[a; b], [c; d]` (comma-separated bracket groups)
+- Array: `a b c` (space-separated items)
+- Matrix rows: `a b,c d` (comma separates rows, space separates items within a row) — emits a true multi-row matrix, `prop = <a b>, <c d>;`
 
-Numbers are parsed as `bigint`. Strings that aren't numbers stay as strings.
+Comma is only a row separator; it can't appear in labels, macros, or numbers. Numbers are parsed as `bigint`. Strings that aren't numbers stay as strings.
 
 ### Skill installation
 
