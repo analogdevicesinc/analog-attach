@@ -2,7 +2,7 @@
 import { Command } from "commander";
 
 import type { LocalContext } from "../../context";
-import { load_config } from "../../config";
+import { load_config, DEFAULT_BUILD_COMMAND } from "../../config";
 import { respond } from "../../protocol/output";
 import type { Config, ToolConfigResponse } from "../../protocol/types";
 
@@ -39,6 +39,46 @@ const CONFIG_FIELDS: Config[] = [
         default: null,
         value: null,
     },
+    {
+        field_name: "build-command",
+        description: "dtc command used to compile the overlay; {input}/{output} are substituted with the .dtso and .dtbo paths",
+        type: "string",
+        required: false,
+        default: DEFAULT_BUILD_COMMAND,
+        value: null,
+    },
+    {
+        field_name: "overlay-compiled",
+        description: "Path to the compiled DTBO artifact (written by the build command, read by deploy)",
+        type: "path",
+        required: false,
+        default: null,
+        value: null,
+    },
+    {
+        field_name: "deploy-ip",
+        description: "IP address or hostname of the remote device to deploy to",
+        type: "string",
+        required: false,
+        default: null,
+        value: null,
+    },
+    {
+        field_name: "deploy-user",
+        description: "SSH username on the remote device",
+        type: "string",
+        required: false,
+        default: null,
+        value: null,
+    },
+    {
+        field_name: "deploy-password",
+        description: "SSH password on the remote device (stored plaintext in config.toml)",
+        type: "string",
+        required: false,
+        default: null,
+        value: null,
+    },
 ];
 
 const FIELD_TO_CONFIG_KEY: Record<string, keyof ReturnType<typeof load_config>> = {
@@ -46,6 +86,11 @@ const FIELD_TO_CONFIG_KEY: Record<string, keyof ReturnType<typeof load_config>> 
     "dt-schema": "dtSchema",
     "context": "context",
     "overlay": "overlay",
+    "build-command": "buildCommand",
+    "overlay-compiled": "overlayCompiled",
+    "deploy-ip": "deployIp",
+    "deploy-user": "deployUser",
+    "deploy-password": "deployPassword",
 };
 
 export function build_config_get_command(context: LocalContext): Command {

@@ -2,12 +2,19 @@ import * as fs from "node:fs";
 import path from "node:path";
 import { parse } from "smol-toml";
 
+export const DEFAULT_BUILD_COMMAND = "dtc -@ -I dts -O dtb -o {output} {input}";
+
 export interface AttachConfig {
     linux?: string;
     dtSchema?: string;
     context?: string;
     overlay?: string;
     validationJson?: string;
+    buildCommand?: string;
+    overlayCompiled?: string;
+    deployIp?: string;
+    deployUser?: string;
+    deployPassword?: string;
 }
 
 export interface CompatIndex {
@@ -53,6 +60,11 @@ export function load_config(): AttachConfig {
         context: typeof parsed["context"] === "string" ? parsed["context"] : undefined,
         overlay: typeof parsed["overlay"] === "string" ? parsed["overlay"] : undefined,
         validationJson: typeof parsed["validation-json"] === "string" ? parsed["validation-json"] : undefined,
+        buildCommand: typeof parsed["build-command"] === "string" ? parsed["build-command"] : undefined,
+        overlayCompiled: typeof parsed["overlay-compiled"] === "string" ? parsed["overlay-compiled"] : undefined,
+        deployIp: typeof parsed["deploy-ip"] === "string" ? parsed["deploy-ip"] : undefined,
+        deployUser: typeof parsed["deploy-user"] === "string" ? parsed["deploy-user"] : undefined,
+        deployPassword: typeof parsed["deploy-password"] === "string" ? parsed["deploy-password"] : undefined,
     };
 }
 
@@ -70,6 +82,11 @@ export function save_config(fields: Partial<AttachConfig>): void {
         context: "context",
         overlay: "overlay",
         validationJson: "validation-json",
+        buildCommand: "build-command",
+        overlayCompiled: "overlay-compiled",
+        deployIp: "deploy-ip",
+        deployUser: "deploy-user",
+        deployPassword: "deploy-password",
     };
 
     let content = "";

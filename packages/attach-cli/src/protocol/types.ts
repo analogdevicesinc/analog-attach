@@ -118,3 +118,12 @@ export interface TypeResponse extends CommonResponse {
     type: Types;
     description?: string;
 }
+
+export interface BuildResponse extends CommonResponse {
+    path: string;
+}
+
+export interface DeployResponse extends CommonResponse {
+    host: string;
+    remote_path: string;
+}

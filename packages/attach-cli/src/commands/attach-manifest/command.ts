@@ -87,6 +87,14 @@ export function build_attach_manifest_command(_context: LocalContext): Command {
                         description: "Return completion candidates for a suggestion kind. First positional arg is the kind; remaining args depend on the kind — call list-intelligence to discover available kinds and their arguments.",
                         argv: ["attach-linux", "--json", "suggest"],
                     },
+                    "build": {
+                        description: "Compile the overlay DTSO into a DTBO using dtc. Reads the overlay config field for the source path (--overlay overrides) and writes the compiled .dtbo next to it, saving that path to the overlay-compiled config field for deploy to pick up. The compile command comes from the build-command config field (default: dtc -@ -I dts -O dtb -o {output} {input}); {input}/{output} are substituted with the source and artifact paths. --build-command overrides the template for one run. Fails with an input-error if overlay is unset, the source is missing, or dtc is not installed; returns the artifact path on success.",
+                        argv: ["attach-linux", "--json", "build"],
+                    },
+                    "deploy": {
+                        description: "Copy the compiled DTBO to a remote device's /boot/overlays over sshpass+scp and reboot it. Reads overlay-compiled (the .dtbo path, written by build), deploy-ip, deploy-user, and deploy-password config fields; --dtbo, --ip, --user, --password override them. Fails with an input-error listing any unset field, if the .dtbo is missing, or if sshpass is not installed. Always reboots after a successful copy.",
+                        argv: ["attach-linux", "--json", "deploy"],
+                    },
                 },
             };
 

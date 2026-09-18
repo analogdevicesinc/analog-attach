@@ -9,6 +9,11 @@ const VALID_FIELDS: Record<string, keyof AttachConfig> = {
     "dt-schema": "dtSchema",
     "context": "context",
     "overlay": "overlay",
+    "build-command": "buildCommand",
+    "overlay-compiled": "overlayCompiled",
+    "deploy-ip": "deployIp",
+    "deploy-user": "deployUser",
+    "deploy-password": "deployPassword",
 };
 
 export function build_config_set_command(context: LocalContext): Command {
