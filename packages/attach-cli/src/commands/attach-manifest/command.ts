@@ -68,7 +68,7 @@ export function build_attach_manifest_command(_context: LocalContext): Command {
                         argv: ["attach-linux", "--json", "delete"],
                     },
                     "validate": {
-                        description: "Validate the overlay against Linux dt-schema binding rules using dt-validate. Requires linux and overlay config fields. On first run generates .analog-attach/validation.json by running dt-mk-schema over the Linux bindings — this can take a minute; subsequent runs reuse the cached file. Empty errors array means validation passed; warnings may still be present.",
+                        description: "Validate the overlay against Linux dt-schema binding rules using dt-validate. Requires linux and overlay config fields. On first run generates .attach-linux/validation.json by running dt-mk-schema over the Linux bindings — this can take a minute; subsequent runs reuse the cached file. Empty errors array means validation passed; warnings may still be present.",
                         argv: ["attach-linux", "--json", "validate2"],
                     },
                     "move": {
@@ -98,7 +98,7 @@ export function build_attach_manifest_command(_context: LocalContext): Command {
                 },
             };
 
-            const directory = path.join(process.cwd(), ".analog-attach");
+            const directory = path.join(process.cwd(), ".attach-linux");
             fs.mkdirSync(directory, { recursive: true });
 
             const manifest_path = path.resolve(directory, "manifest.json");

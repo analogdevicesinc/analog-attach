@@ -27,4 +27,5 @@ jspm_packages/
 dist
 
 *.dtso
-.analog-attach/
+.analog-attach.toml
+.attach-linux/

@@ -23,7 +23,7 @@ export interface CompatIndex {
 }
 
 export function load_compat_index(): CompatIndex | undefined {
-    const index_path = path.join(process.cwd(), ".analog-attach", "compat-index.json");
+    const index_path = path.join(process.cwd(), ".attach-linux", "compat-index.json");
 
     if (!fs.existsSync(index_path)) {
         return undefined;
@@ -34,7 +34,7 @@ export function load_compat_index(): CompatIndex | undefined {
 }
 
 export function save_compat_index(entries: Record<string, string>): string {
-    const directory = path.join(process.cwd(), ".analog-attach");
+    const directory = path.join(process.cwd(), ".attach-linux");
     fs.mkdirSync(directory, { recursive: true });
 
     const index_path = path.join(directory, "compat-index.json");
@@ -45,7 +45,7 @@ export function save_compat_index(entries: Record<string, string>): string {
 }
 
 export function load_config(): AttachConfig {
-    const config_path = path.join(process.cwd(), ".analog-attach", "config.toml");
+    const config_path = path.join(process.cwd(), ".attach-linux", "config.toml");
 
     if (!fs.existsSync(config_path)) {
         return {};
@@ -69,7 +69,7 @@ export function load_config(): AttachConfig {
 }
 
 export function save_config(fields: Partial<AttachConfig>): void {
-    const directory = path.join(process.cwd(), ".analog-attach");
+    const directory = path.join(process.cwd(), ".attach-linux");
     fs.mkdirSync(directory, { recursive: true });
 
     const config_path = path.join(directory, "config.toml");

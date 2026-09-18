@@ -28,7 +28,7 @@ You are helping a user configure Linux device tree overlays for hardware devices
 
 ## Prerequisites
 
-Run `attach-linux init` once per project before anything else. It writes `.analog-attach/config.toml` (storing `--linux`, `--dt-schema`, and optionally `--context`) and builds the `compat-index.json` that `list-devices` reads.
+Run `attach-linux init` once per project before anything else. It writes `.attach-linux/config.toml` (storing `--linux`, `--dt-schema`, and optionally `--context`) and builds the `compat-index.json` that `list-devices` reads.
 
 After `init`, most commands pick up `--linux`, `--dt-schema`, and `--context` from `config.toml` automatically — you only need to pass them explicitly if you want to override.
 
@@ -50,7 +50,7 @@ Help users locate appropriate `.dts` files when needed - they're typically in `a
 
 ### 0. `init` - Initialize Project Configuration
 
-**Purpose**: Create `.analog-attach/config.toml` and build `compat-index.json`. Run this once per project before using any other commands. `list-devices` will not work without it.
+**Purpose**: Create `.attach-linux/config.toml` and build `compat-index.json`. Run this once per project before using any other commands. `list-devices` will not work without it.
 
 **Syntax**:
 ```bash
@@ -64,7 +64,7 @@ attach-linux init --linux <path> --dt-schema <path> [--context <dts-file>]
 | `--dt-schema` | Yes | Path to dt-schema repository |
 | `--context` | No | Path to target `.dts` file; stored in `config.toml` so other commands pick it up automatically |
 
-**Output**: Writes `.analog-attach/config.toml` and `.analog-attach/compat-index.json`, printing the path of each written file.
+**Output**: Writes `.attach-linux/config.toml` and `.attach-linux/compat-index.json`, printing the path of each written file.
 
 **What it stores**: `config.toml` records the `linux`, `dt-schema`, and optionally `context` paths. All subsequent commands that accept those flags will read them from this file if the flags are not explicitly provided.
 

@@ -124,7 +124,7 @@ export function build_validate2_command(context_: LocalContext): Command {
 
             const output = fill_template(template, node_blocks);
 
-            const config_dir = path.join(process.cwd(), '.analog-attach');
+            const config_dir = path.join(process.cwd(), '.attach-linux');
             fs.mkdirSync(config_dir, { recursive: true });
 
             let validation_json_path = config.validationJson;

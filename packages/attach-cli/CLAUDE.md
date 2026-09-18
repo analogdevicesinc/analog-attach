@@ -47,7 +47,7 @@ Commands in `src/app.ts` are annotated with `// protocol commands` (used by AI t
 
 ### Configuration and workspace state
 
-`src/config.ts` manages two files in `.analog-attach/` (relative to CWD):
+`src/config.ts` manages two files in `.attach-linux/` (relative to CWD):
 - `config.toml`: stores `linux`, `dt-schema`, `context`, `overlay` paths; loaded by every command that operates on files.
 - `compat-index.json`: a binding compatibility index keyed by compatible string → YAML file path; rebuilt when stale (mtime-based).
 
