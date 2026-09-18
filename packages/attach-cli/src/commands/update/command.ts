@@ -366,6 +366,24 @@ function to_cell_value(entry: bigint | string, enum_type: AttachEnumType): CellV
     }
 }
 
+// The numeric values a MACRO enum accepts: each enum name resolved to its macro value.
+// A bare number is a valid MACRO value only if it appears here (e.g. 2 == IRQ_TYPE_EDGE_FALLING).
+function macro_enum_values(enum_names: unknown[]): Set<bigint> {
+    const values = new Set<bigint>();
+    for (const name of enum_names) {
+        const resolved = ALL_MACROS.find(m => m.name === name);
+        if (resolved !== undefined) { values.add(BigInt(resolved.value)); }
+    }
+    return values;
+}
+
+// An enum accepts a value if it names one of its members, or (for MACRO enums) if it is
+// the numeric value one of those macros resolves to.
+function enum_accepts(element: bigint | string, enum_values: unknown[], macro_values: Set<bigint> | undefined): boolean {
+    if (enum_values.includes(element)) { return true; }
+    return typeof element === "bigint" && macro_values !== undefined && macro_values.has(element);
+}
+
 // Validate a single matrix row against its row definition and return the row's cell
 // values, or an error string. Matrix rows are always cell-valued (`<...>`): string
 // shapes (string_array, string-typed enums) are rejected rather than emitted.
@@ -389,7 +407,9 @@ function build_row_cells(values: ArrayInput, definition: AttachArray, property: 
             return MATRIX_STRING_ROW_ERROR(property);
         }
         case "enum_array": {
-            if (!values.every(element => definition.enum.includes(element))) {
+            const macro_values = definition.enum_type === AttachEnumType.MACRO
+                ? macro_enum_values(definition.enum) : undefined;
+            if (!values.every(element => enum_accepts(element, definition.enum, macro_values))) {
                 return `Values for property ${property} are ${JSON.stringify(definition.enum)}`;
             }
             if (definition.minItems > values.length || definition.maxItems < values.length) {
@@ -398,7 +418,9 @@ function build_row_cells(values: ArrayInput, definition: AttachArray, property: 
             if (definition.enum_type === AttachEnumType.STRING) {
                 return MATRIX_STRING_ROW_ERROR(property);
             }
-            if (values.some(element => typeof element === "bigint") && definition.enum_type !== AttachEnumType.NUMBER) {
+            if (values.some(element => typeof element === "bigint")
+                && definition.enum_type !== AttachEnumType.NUMBER
+                && definition.enum_type !== AttachEnumType.MACRO) {
                 return `Values for property ${property} are ${JSON.stringify(definition.enum)}`;
             }
             return values.map(element => to_cell_value(element, definition.enum_type));
@@ -415,10 +437,16 @@ function build_row_cells(values: ArrayInput, definition: AttachArray, property: 
                 const item_definition = definition.prefixItems[index]!;
 
                 if (typeof v === "bigint") {
-                    if (item_definition._t !== "number") {
+                    if (item_definition._t === "number") {
+                        cell_values.push(PropertyBuilder.tag_number(v));
+                    } else if (item_definition.enum_type === AttachEnumType.MACRO) {
+                        if (!macro_enum_values(item_definition.enum).has(v)) {
+                            return `Property ${property} at index ${index} accepts a macro from ${JSON.stringify(item_definition.enum)} or its numeric value`;
+                        }
+                        cell_values.push(PropertyBuilder.tag_number(v));
+                    } else {
                         return `Property ${property} doesn't require a number at index ${index}`;
                     }
-                    cell_values.push(PropertyBuilder.tag_number(v));
                 } else {
                     if (item_definition._t === "number") {
                         return `Property ${property} requires a number at index ${index}`;
@@ -630,13 +658,17 @@ function set_array_property(
             return true;
         }
         case "enum_array": {
-            if (!values.every(element => definition.enum.includes(element))) {
+            const macro_values = definition.enum_type === AttachEnumType.MACRO
+                ? macro_enum_values(definition.enum) : undefined;
+            if (!values.every(element => enum_accepts(element, definition.enum, macro_values))) {
                 return `Values for property ${property} are ${JSON.stringify(definition.enum)}`;
             }
             if (definition.minItems > values.length || definition.maxItems < values.length) {
                 return `Property ${property} accepts between ${definition.minItems} and ${definition.maxItems} items from ${JSON.stringify(definition.enum)}`;
             }
-            if (values.some(element => typeof element === "bigint") && definition.enum_type !== AttachEnumType.NUMBER) {
+            if (values.some(element => typeof element === "bigint")
+                && definition.enum_type !== AttachEnumType.NUMBER
+                && definition.enum_type !== AttachEnumType.MACRO) {
                 return `Values for property ${property} are ${JSON.stringify(definition.enum)}`;
             }
 
@@ -675,11 +707,16 @@ function set_array_property(
                 const item_definition = definition.prefixItems[index]!;
 
                 if (typeof v === "bigint") {
-                    if (item_definition._t !== "number") {
+                    if (item_definition._t === "number") {
+                        cell_values.push(PropertyBuilder.tag_number(v));
+                    } else if (item_definition.enum_type === AttachEnumType.MACRO) {
+                        if (!macro_enum_values(item_definition.enum).has(v)) {
+                            return `Property ${property} at index ${index} accepts a macro from ${JSON.stringify(item_definition.enum)} or its numeric value`;
+                        }
+                        cell_values.push(PropertyBuilder.tag_number(v));
+                    } else {
                         return `Property ${property} doesn't require a number at index ${index}`;
                     }
-
-                    cell_values.push(PropertyBuilder.tag_number(v));
                 } else {
                     if (item_definition._t === "number") {
                         return `Property ${property} requires a number at index ${index}`;
@@ -807,6 +844,34 @@ if (import.meta.vitest) {
         // Too many rows (maxItems = 2) is rejected with a message.
         const scratch2: DTNode = { name: "s", unit_addr: undefined, labels: [], properties: [], children: [] };
         expect(typeof set_property([[1n], [2n], [3n]], scratch2, "reg", definition)).toBe("string");
+    });
+
+    test("set_property - accepts a macro's numeric value at a MACRO enum index", () => {
+        const definition: ResolvedProperty = {
+            key: "interrupts",
+            value: {
+                _t: "fixed_index",
+                minItems: 2,
+                maxItems: 2,
+                prefixItems: [
+                    { _t: "number", minimum: 0n, maximum: 0xFF_FF_FF_FFn },
+                    { _t: "enum", enum: INTERRUPT_MACROS.map(m => m.name), enum_type: AttachEnumType.MACRO },
+                ],
+            },
+        };
+
+        // 2 == IRQ_TYPE_EDGE_FALLING, so the bare number is accepted.
+        const scratch: DTNode = { name: "s", unit_addr: undefined, labels: [], properties: [], children: [] };
+        expect(set_property([25n, 2n], scratch, "interrupts", definition)).toBe(true);
+        expect(scratch.properties.find(p => p.name === "interrupts")?.value).toMatchObject([{ kind: "array" }]);
+
+        // The macro name still works.
+        const scratch2: DTNode = { name: "s", unit_addr: undefined, labels: [], properties: [], children: [] };
+        expect(set_property([25n, "IRQ_TYPE_EDGE_FALLING"], scratch2, "interrupts", definition)).toBe(true);
+
+        // A number that is not any IRQ macro value is rejected.
+        const scratch3: DTNode = { name: "s", unit_addr: undefined, labels: [], properties: [], children: [] };
+        expect(typeof set_property([25n, 99n], scratch3, "interrupts", definition)).toBe("string");
     });
 
     test("place_property - writes a true multi-row matrix as separate <...> groups", () => {
