@@ -1,3 +1,5 @@
+/* eslint-disable unicorn/no-nested-ternary */
+/* eslint-disable unicorn/consistent-function-scoping */
 import { describe, test, expect, vi, beforeEach, afterEach } from "vitest";
 
 import { buildApp } from "./app";
@@ -5,7 +7,16 @@ import { buildContext } from "./context";
 import { build_completion_command } from "./commands/completion/command";
 import { run_complete } from "./commands/completion/complete";
 import { COMPLETION_SPEC, NO_VALUE_COMPLETION, FILES_DIRECTIVE, DIRS_DIRECTIVE } from "./commands/completion/spec";
+import { CONFIG_REGISTRY } from "./config";
 import * as suggest from "./commands/suggest/command";
+
+// config-set/config-get complete exactly the settable (non-internal) registry
+// fields. Derived from the registry so this test tracks it automatically — if a
+// field is added, both the completion spec and this expectation move together.
+const SETTABLE_FIELD_NAMES = CONFIG_REGISTRY
+    .filter(spec => !spec.internal)
+    .map(spec => spec.toml)
+    .sort();
 
 function registered_commands(): string[] {
     return buildApp(buildContext(false)).commands.map(c => c.name());
@@ -75,36 +86,37 @@ describe("__complete engine", () => {
     test("a subcommand's flags come from commander, filtered by prefix", async () => {
         const flags = values(await complete(["add", "--"]));
         expect(flags).toContain("--name");
-        expect(flags).toContain("--overlay");
-        expect(flags).toContain("--dt-schema");
+        expect(flags).toContain("--to");
         expect(flags).toContain("--help");
+        expect(flags).not.toContain("--overlay");
+        expect(flags).not.toContain("--linux");
     });
 
     test("already-used flags are excluded", async () => {
-        const flags = values(await complete(["add", "--overlay", "o.dtso", "--"]));
-        expect(flags).not.toContain("--overlay");
-        expect(flags).toContain("--name");
+        const flags = values(await complete(["add", "--name", "foo", "--"]));
+        expect(flags).not.toContain("--name");
+        expect(flags).toContain("--to");
     });
 
     test("validate2 offers no bogus flags (only --help)", async () => {
         expect(values(await complete(["validate2", "--"]))).toEqual(["--help"]);
     });
 
-    test("a file-valued flag emits the file directive", async () => {
-        expect(await complete(["add", "--overlay", ""])).toEqual([FILES_DIRECTIVE]);
-    });
-
-    test("a dir-valued flag emits the dir directive", async () => {
-        expect(await complete(["add", "--linux", ""])).toEqual([DIRS_DIRECTIVE]);
+    test("a file-valued positional emits the file directive", async () => {
+        expect(await complete(["config-set", "linux", ""])).toEqual([FILES_DIRECTIVE]);
     });
 
     test("completion positional offers the shells", async () => {
         expect(values(await complete(["completion", ""])).sort()).toEqual(["bash", "fish", "zsh"]);
     });
 
-    test("config-set completes fields then a file path", async () => {
-        expect(values(await complete(["config-set", ""])).sort()).toEqual(["context", "dt-schema", "linux", "overlay"]);
+    test("config-set completes every settable field then a file path", async () => {
+        expect(values(await complete(["config-set", ""])).sort()).toEqual(SETTABLE_FIELD_NAMES);
         expect(await complete(["config-set", "linux", ""])).toEqual([FILES_DIRECTIVE]);
+    });
+
+    test("config-get completes every settable field", async () => {
+        expect(values(await complete(["config-get", ""])).sort()).toEqual(SETTABLE_FIELD_NAMES);
     });
 
     test("a free-value flag (no spec entry) yields no candidates", async () => {
@@ -115,8 +127,8 @@ describe("__complete engine", () => {
 describe("__complete delegates dynamic values to suggest in-process", () => {
     beforeEach(() => {
         // Stand in for the real intelligence: emit the JSON `suggest` protocol.
-        vi.spyOn(suggest, "run_suggest").mockImplementation(async (context, args) => {
-            const [kind] = args;
+        vi.spyOn(suggest, "run_suggest").mockImplementation(async (context, arguments_) => {
+            const [kind] = arguments_;
             const suggestions =
                 kind === "device-key" ? [{ value: "ad7124" }, { value: "ad5940" }]
                 : kind === "parent" ? [{ value: "spi0", display_string: "/soc/spi@0" }]
@@ -144,7 +156,7 @@ describe("__complete delegates dynamic values to suggest in-process", () => {
         const lines = await complete(["add", "ad7124", "--to", ""]);
         expect(values(lines)).toEqual(["spi0"]);
         expect(vi.mocked(suggest.run_suggest).mock.calls.some(
-            ([, args]) => args[0] === "parent" && args[1] === "ad7124",
+            ([, arguments_]) => arguments_[0] === "parent" && arguments_[1] === "ad7124",
         )).toBe(true);
     });
 });

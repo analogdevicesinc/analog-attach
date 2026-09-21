@@ -3,7 +3,7 @@ import { DeviceTree, DeviceTreeOverlay, is_dt_flag, print_property } from "attac
 import * as fs from "node:fs";
 
 import type { LocalContext } from "../../context";
-import { load_config } from "../../config";
+import { resolve_config } from "../../resolve-config";
 import { resolve_node_identifier, split_property_reference } from "../../utilities";
 import { respond, respond_fail, input_error } from "../../protocol/output";
 import { convert_node, convert_property } from "../../protocol/dt-to-protocol";
@@ -12,25 +12,12 @@ import type { Node } from "../../protocol/types";
 export function build_read_command(context_: LocalContext): Command {
     return new Command("read")
         .description("Read a node subtree or property value from the overlay")
-        .option("--overlay <value>", "dtso")
-        .option("--context <value>", "The target dts")
         .argument("[path...]", "Path to node or property (ValidIdentifier segments)")
         .action(async (path: string[], options) => {
-            const config = load_config();
-            const input = options.overlay ?? config.overlay;
-            const context = options.context ?? config.context;
-
-            if (input === undefined) {
-                if (context_.json) { input_error("Missing: overlay (not configured)"); return; }
-                console.log("Missing: --overlay (no config.toml found)");
-                return;
-            }
-
-            if (!fs.existsSync(input)) {
-                if (context_.json) { input_error(`Missing: ${input}`); return; }
-                console.log(`Missing: ${input}`);
-                return;
-            }
+            const resolved = resolve_config(context_, ["overlay"]);
+            if (resolved === undefined) { return; }
+            const input = resolved.values.overlay;
+            const context = resolved.config.context;
 
             const input_content = fs.readFileSync(input, "utf8");
 

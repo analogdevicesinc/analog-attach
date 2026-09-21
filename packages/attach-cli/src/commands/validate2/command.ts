@@ -15,7 +15,8 @@ import path from "node:path";
 import { execSync } from "node:child_process";
 
 import type { LocalContext } from "../../context";
-import { load_config, save_config } from "../../config";
+import { save_config } from "../../config";
+import { resolve_config } from "../../resolve-config";
 import { respond, input_error } from "../../protocol/output";
 import type { ValidationResponse, ValidationError } from "../../protocol/types";
 
@@ -42,21 +43,11 @@ export function build_validate2_command(context_: LocalContext): Command {
     return new Command("validate2")
         .description("Validate a device node against its binding (alternative implementation)")
         .action(async () => {
-            const config = load_config();
-            const input = config.overlay;
+            const resolved = resolve_config(context_, ["overlay"]);
+            if (resolved === undefined) { return; }
+            const config = resolved.config;
+            const input = resolved.values.overlay;
             const context = config.context;
-
-            if (input === undefined) {
-                if (context_.json) { input_error("Missing: overlay (not configured)"); return; }
-                console.log("Missing: overlay (no config.toml found)");
-                return;
-            }
-
-            if (!fs.existsSync(input)) {
-                if (context_.json) { input_error(`Missing: ${input}`); return; }
-                console.log(`Missing: ${input}`);
-                return;
-            }
 
             const input_content = fs.readFileSync(input, "utf8");
 

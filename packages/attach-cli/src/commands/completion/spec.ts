@@ -1,3 +1,5 @@
+import { CONFIG_REGISTRY } from "../../config";
+
 // Single source of truth for value completion.
 //
 // Command names, flag names and their descriptions are read directly from the
@@ -38,53 +40,29 @@ export interface CommandSpec {
 }
 
 const FILE: ValueSource = { kind: "file" };
-const DIR: ValueSource = { kind: "dir" };
-const CONFIG_FIELDS: ValueSource = { kind: "values", values: ["linux", "dt-schema", "context", "overlay"] };
-
-// Flags shared by many commands.
-const FILE_CONTEXT = { "--overlay": FILE, "--context": FILE } as const;
-const LINUX_SCHEMA_DIRS = { "--linux": DIR, "--dt-schema": DIR } as const;
+// Complete exactly the fields config-set accepts and config-get returns — the
+// settable (non-internal) registry fields, so this list never drifts from it.
+const CONFIG_FIELDS: ValueSource = {
+    kind: "values",
+    values: CONFIG_REGISTRY.filter(spec => !spec.internal).map(spec => spec.toml),
+};
 
 export const COMPLETION_SPEC: Readonly<Record<string, CommandSpec>> = {
     add: {
         positional: { mode: "all", source: { kind: "suggest", suggest: "device-key" } },
-        flags: { ...FILE_CONTEXT, ...LINUX_SCHEMA_DIRS, "--to": { kind: "suggest", suggest: "parent" } },
+        flags: { "--to": { kind: "suggest", suggest: "parent" } },
     },
     read: {
         positional: { mode: "all", source: { kind: "suggest", suggest: "navigate" } },
-        flags: { ...FILE_CONTEXT },
     },
     update: {
         positional: { mode: "all", source: { kind: "suggest", suggest: "navigate" } },
-        flags: { ...FILE_CONTEXT, ...LINUX_SCHEMA_DIRS },
     },
     delete: {
         positional: { mode: "all", source: { kind: "suggest", suggest: "navigate" } },
-        flags: { ...FILE_CONTEXT },
-    },
-    validate: {
-        flags: { ...FILE_CONTEXT, ...LINUX_SCHEMA_DIRS },
-    },
-    move: {
-        flags: { ...FILE_CONTEXT },
-    },
-    rename: {
-        flags: { ...FILE_CONTEXT },
-    },
-    enable: {
-        flags: { ...FILE_CONTEXT },
-    },
-    disable: {
-        flags: { ...FILE_CONTEXT },
     },
     "get-schema": {
-        flags: { "--compatible": { kind: "suggest", suggest: "device-key" }, "--context": FILE, ...LINUX_SCHEMA_DIRS },
-    },
-    build: {
-        flags: { "--overlay": FILE },
-    },
-    deploy: {
-        flags: { "--dtbo": FILE },
+        flags: { "--compatible": { kind: "suggest", suggest: "device-key" } },
     },
     completion: {
         positional: { mode: "byIndex", sources: [{ kind: "values", values: ["bash", "fish", "zsh"] }] },
@@ -99,6 +77,13 @@ export const COMPLETION_SPEC: Readonly<Record<string, CommandSpec>> = {
 
 // Commands that complete their flag names but have no value completion.
 export const NO_VALUE_COMPLETION: readonly string[] = [
+    "validate",
+    "move",
+    "rename",
+    "enable",
+    "disable",
+    "build",
+    "deploy",
     "attach-manifest",
     "create-workfile",
     "list-devices",

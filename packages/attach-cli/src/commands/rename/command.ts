@@ -4,7 +4,7 @@ import { DeviceTree, DeviceTreeOverlay } from "attach-lib";
 import * as fs from 'node:fs';
 
 import type { LocalContext } from "../../context";
-import { load_config } from "../../config";
+import { resolve_config } from "../../resolve-config";
 import { resolve_node_identifier, split_property_reference } from "../../utilities";
 import { respond, respond_fail, input_error } from "../../protocol/output";
 
@@ -12,13 +12,8 @@ export function build_rename_command(context_: LocalContext): Command {
     return new Command("rename")
         .description("Rename an overlay-added node in an existing dtso")
         .requiredOption("--to <value>", "New node key: 'name' preserves unit addr, 'name@unit' overrides it")
-        .option("--overlay <value>", "dtso")
-        .option("--context <value>", "The target dts")
         .argument("[path...]", "Path to node (ValidIdentifier segments)")
         .action(async (path: string[], options) => {
-            const config = load_config();
-            const context = options.context ?? config.context;
-            const input = options.overlay ?? config.overlay;
             const { to } = options;
 
             if (path.length === 0) {
@@ -27,29 +22,9 @@ export function build_rename_command(context_: LocalContext): Command {
                 return;
             }
 
-            if (context === undefined) {
-                if (context_.json) { input_error("missing config: context"); return; }
-                console.log("Missing: --context (no config.toml found)");
-                return;
-            }
-
-            if (input === undefined) {
-                if (context_.json) { input_error("missing config: overlay"); return; }
-                console.log("Missing: --overlay (no config.toml found)");
-                return;
-            }
-
-            if (!fs.existsSync(context)) {
-                if (context_.json) { input_error(`file not found: ${context}`); return; }
-                console.log(`Missing: ${context}`);
-                return;
-            }
-
-            if (!fs.existsSync(input)) {
-                if (context_.json) { input_error(`file not found: ${input}`); return; }
-                console.log(`Missing: ${input} (use "create" to generate a new overlay first)`);
-                return;
-            }
+            const resolved = resolve_config(context_, ["context", "overlay"]);
+            if (resolved === undefined) { return; }
+            const { context, overlay: input } = resolved.values;
 
             const context_content = fs.readFileSync(context, 'utf8');
             const base = DeviceTree.new_from_string(context_content);
@@ -312,7 +287,7 @@ if (import.meta.vitest) {
     });
 
     test("rename_overlay_target - renames a property via single-token slash form", () => {
-        const overlay_with_prop = `/dts-v1/;
+        const overlay_with_property = `/dts-v1/;
 /plugin/;
 
 &spi0 {
@@ -324,7 +299,7 @@ if (import.meta.vitest) {
         const base = DeviceTree.new_from_string(base_dts);
         if (typeof base === "string") { throw new TypeError(base); }
 
-        const overlay = DeviceTreeOverlay.new_from_string(overlay_with_prop, base);
+        const overlay = DeviceTreeOverlay.new_from_string(overlay_with_property, base);
         if (typeof overlay === "string") { throw new TypeError(overlay); }
 
         const result = rename_overlay_target(overlay, "imu1/status", "status-x");

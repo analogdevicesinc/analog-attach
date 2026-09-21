@@ -1,7 +1,7 @@
 import { Command } from "commander";
 
-import { load_compat_index, load_config, save_compat_index } from "../../config";
-import { is_compat_index_stale, build_compat_index } from "../../utilities";
+import { load_config } from "../../config";
+import { get_or_build_compat_index } from "../../utilities";
 import { respond, input_error } from "../../protocol/output";
 import type { ListDevicesResponse } from "../../protocol/types";
 import type { LocalContext } from "../../context";
@@ -13,36 +13,17 @@ export function build_list_devices_command(context: LocalContext): Command {
         .action(async (options) => {
             const { includesWord } = options;
 
-            let index = load_compat_index();
-            const config = load_config();
+            const config = load_config() ?? {};
+
+            const index = await get_or_build_compat_index(config.linux, config.dtSchema, (message) => console.error(message));
 
             if (index === undefined) {
-                if (config.linux === undefined || config.dtSchema === undefined) {
-                    if (context.json) {
-                        input_error("No compat-index.json found and linux/dt-schema not configured. Run 'attach config-set' first.");
-                        return;
-                    }
-                    console.log("No compat-index.json found and linux/dt-schema not configured. Run 'attach config-set' first.");
+                if (context.json) {
+                    input_error("No compat-index.json found and linux/dt-schema not configured. Run 'attach config-set' first.");
                     return;
                 }
-
-                console.error("compat-index.json not found, building...");
-                const entries = await build_compat_index(config.linux, config.dtSchema);
-                const compat_index_path = save_compat_index(entries);
-                console.error(`Written: ${compat_index_path}`);
-                index = { generated_at: Date.now(), entries };
-            } else if (
-                config.linux !== undefined &&
-                config.dtSchema !== undefined &&
-                is_compat_index_stale(index, config.linux, config.dtSchema)
-            ) {
-                console.error("compat-index.json is stale, rebuilding...");
-
-                const entries = await build_compat_index(config.linux, config.dtSchema);
-                const compat_index_path = save_compat_index(entries);
-
-                console.error(`Written: ${compat_index_path}`);
-                index = { generated_at: Date.now(), entries };
+                console.log("No compat-index.json found and linux/dt-schema not configured. Run 'attach config-set' first.");
+                return;
             }
 
             const matching = Object.keys(index.entries).filter(

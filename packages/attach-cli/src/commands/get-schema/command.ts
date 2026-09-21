@@ -5,49 +5,26 @@ import * as fs from 'node:fs';
 
 import type { LocalContext } from "../../context";
 import { bigIntReplacer, find_binding } from "../../utilities";
-import { load_config } from "../../config";
+import { load_config, check_config, check_failure_message } from "../../config";
 
 export function build_get_schema_command(_context: LocalContext): Command {
     return new Command("get-schema")
         .description("Get the parsed binding schema for a device")
         .requiredOption("--compatible <value>", "Compatible string of the desired device binding")
-        .option("--context <value>", "The target dts")
-        .option("--linux <value>", "Path to Linux repo")
-        .option("--dt-schema <value>", "Path to dt-schema repo")
         .action(async (options) => {
             const config = load_config();
-            const linux = options.linux ?? config.linux;
-            const dtSchema = options.dtSchema ?? config.dtSchema;
-            const context = options.context ?? config.context;
+            if (config === undefined) {
+                console.log("No config.toml (run config-set)");
+                return;
+            }
             const { compatible } = options;
 
-            if (linux === undefined) {
-                console.log("Missing: --linux (no config.toml found)");
+            const checked = check_config(config, ["linux", "dtSchema", "context"]);
+            if (!checked.ok) {
+                console.log(check_failure_message(checked).human);
                 return;
             }
-
-            if (dtSchema === undefined) {
-                console.log("Missing: --dt-schema (no config.toml found)");
-                return;
-            }
-
-            if (context === undefined) {
-                console.log("Missing: --context (no config.toml found)");
-                return;
-            }
-
-            if (!fs.existsSync(context)) {
-                console.log(`Missing: ${context}`);
-                return;
-            }
-            if (!fs.existsSync(linux)) {
-                console.log(`Missing: ${linux}`);
-                return;
-            }
-            if (!fs.existsSync(dtSchema)) {
-                console.log(`Missing: ${dtSchema}`);
-                return;
-            }
+            const { linux, dtSchema, context } = checked.values;
 
             const context_content = fs.readFileSync(context, 'utf8');
 

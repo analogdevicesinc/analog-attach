@@ -5,7 +5,7 @@ import * as fs from 'node:fs';
 
 import type { LocalContext } from "../../context";
 import { find_binding, resolve_node_identifier } from "../../utilities";
-import { load_config } from "../../config";
+import { resolve_config } from "../../resolve-config";
 import { respond, respond_fail, input_error } from "../../protocol/output";
 import type { AddResponse } from "../../protocol/types";
 
@@ -19,17 +19,12 @@ export function build_add_command(context_: LocalContext): Command {
         .option("--name <value>", "Node name (e.g. channel@0); defaults to the positional key")
         .option("--to <value...>", "Parent node: label, path, or label/child (e.g. spi0, /soc/spi@7e204000, spi0/mux)")
         .option("--label <value>", "Label to attach to the new node (e.g. imu1)")
-        .option("--overlay <value>", "Path to the dtso file (falls back to config.toml)")
-        .option("--context <value>", "The target dts (falls back to config.toml)")
-        .option("--linux <value>", "Path to Linux repo (falls back to config.toml)")
-        .option("--dt-schema <value>", "Path to dt-schema repo (falls back to config.toml)")
         .argument("[keys...]", "Device key / compatible string of the device binding to add")
         .action(async (keys: string[], options) => {
-            const config = load_config();
-            const linux = options.linux ?? config.linux;
-            const dtSchema = options.dtSchema ?? config.dtSchema;
-            const context = options.context ?? config.context;
-            const input = options.overlay ?? config.overlay;
+            const resolved = resolve_config(context_, ["linux", "dtSchema", "context", "overlay"]);
+            if (resolved === undefined) { return; }
+            const { linux, dtSchema, context, overlay: input } = resolved.values;
+
             const key = keys[0];
             const { name, label } = options;
             const to: string | undefined = options.to === undefined ? undefined : (options.to as string[]).join("/");
@@ -37,54 +32,6 @@ export function build_add_command(context_: LocalContext): Command {
             if (key === undefined && name === undefined) {
                 if (context_.json) { input_error("key or --name required"); return; }
                 console.log("Missing: key (positional) or --name (at least one is required)");
-                return;
-            }
-
-            if (linux === undefined) {
-                if (context_.json) { input_error("--linux not set (run config-set)"); return; }
-                console.log("Missing: --linux (no config.toml found)");
-                return;
-            }
-
-            if (dtSchema === undefined) {
-                if (context_.json) { input_error("--dt-schema not set (run config-set)"); return; }
-                console.log("Missing: --dt-schema (no config.toml found)");
-                return;
-            }
-
-            if (context === undefined) {
-                if (context_.json) { input_error("--context not set (run config-set)"); return; }
-                console.log("Missing: --context (no config.toml found)");
-                return;
-            }
-
-            if (input === undefined) {
-                if (context_.json) { input_error("--overlay not set (run config-set)"); return; }
-                console.log("Missing: --overlay (no config.toml found)");
-                return;
-            }
-
-            if (!fs.existsSync(context)) {
-                if (context_.json) { input_error(`Missing: ${context}`); return; }
-                console.log(`Missing: ${context}`);
-                return;
-            }
-
-            if (!fs.existsSync(linux)) {
-                if (context_.json) { input_error(`Missing: ${linux}`); return; }
-                console.log(`Missing: ${linux}`);
-                return;
-            }
-
-            if (!fs.existsSync(dtSchema)) {
-                if (context_.json) { input_error(`Missing: ${dtSchema}`); return; }
-                console.log(`Missing: ${dtSchema}`);
-                return;
-            }
-
-            if (!fs.existsSync(input)) {
-                if (context_.json) { input_error(`Missing: ${input}`); return; }
-                console.log(`Missing: ${input} (use "create-workfile" to generate a new overlay first)`);
                 return;
             }
 

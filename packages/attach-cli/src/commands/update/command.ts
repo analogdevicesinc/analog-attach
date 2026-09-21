@@ -19,7 +19,7 @@ import {
 import * as fs from "node:fs";
 
 import type { LocalContext } from "../../context";
-import { load_config } from "../../config";
+import { resolve_config } from "../../resolve-config";
 import { resolve_node_identifier } from "../../utilities";
 import { resolve_node_binding } from "../../binding-resolution";
 import { respond, respond_fail, input_error, diagnostic } from "../../protocol/output";
@@ -28,17 +28,8 @@ export function build_update_command(context_: LocalContext): Command {
     return new Command("update")
         .description("Update (upsert) a property value on an overlay-added node or a base-tree node (writes into an overlay fragment; the base tree is never modified)")
         .requiredOption("--with <value>", "Value to set (raw string, parsed by the tool)")
-        .option("--overlay <value>", "dtso")
-        .option("--context <value>", "The target dts")
-        .option("--linux <value>", "Path to Linux repo")
-        .option("--dt-schema <value>", "Path to dt-schema repo")
         .argument("[path...]", "Path to property: node path segments followed by property name")
         .action(async (path: string[], options) => {
-            const config = load_config();
-            const context = options.context ?? config.context;
-            const input = options.overlay ?? config.overlay;
-            const linux = options.linux ?? config.linux;
-            const dtSchema = options.dtSchema ?? config.dtSchema;
             const withValue: string = options['with'];
 
             const full_path = path.join("/");
@@ -55,34 +46,9 @@ export function build_update_command(context_: LocalContext): Command {
                 return;
             }
 
-            if (input === undefined) {
-                if (context_.json) { input_error("Missing: overlay (not configured)"); return; }
-                console.log("Missing: --overlay (no config.toml found)");
-                return;
-            }
-            if (context === undefined) {
-                if (context_.json) { input_error("Missing: context (not configured)"); return; }
-                console.log("Missing: --context (no config.toml found)");
-                return;
-            }
-            if (linux === undefined) {
-                if (context_.json) { input_error("Missing: linux (not configured)"); return; }
-                console.log("Missing: --linux (no config.toml found)");
-                return;
-            }
-            if (dtSchema === undefined) {
-                if (context_.json) { input_error("Missing: dt-schema (not configured)"); return; }
-                console.log("Missing: --dt-schema (no config.toml found)");
-                return;
-            }
-
-            for (const p of [context, linux, dtSchema, input]) {
-                if (!fs.existsSync(p)) {
-                    if (context_.json) { input_error(`Missing: ${p}`); return; }
-                    console.log(`Missing: ${p}`);
-                    return;
-                }
-            }
+            const resolved = resolve_config(context_, ["overlay", "context", "linux", "dtSchema"]);
+            if (resolved === undefined) { return; }
+            const { overlay: input, context, linux, dtSchema } = resolved.values;
 
             const context_content = fs.readFileSync(context, "utf8");
             const input_content = fs.readFileSync(input, "utf8");

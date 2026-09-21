@@ -1,20 +1,12 @@
 import { Command } from "commander";
 
 import type { LocalContext } from "../../context";
-import { save_config, type AttachConfig } from "../../config";
+import { save_config, CONFIG_REGISTRY, type FieldSpec } from "../../config";
 import { respond, respond_fail } from "../../protocol/output";
 
-const VALID_FIELDS: Record<string, keyof AttachConfig> = {
-    "linux": "linux",
-    "dt-schema": "dtSchema",
-    "context": "context",
-    "overlay": "overlay",
-    "build-command": "buildCommand",
-    "overlay-compiled": "overlayCompiled",
-    "deploy-ip": "deployIp",
-    "deploy-user": "deployUser",
-    "deploy-password": "deployPassword",
-};
+const SETTABLE_FIELDS: Map<string, FieldSpec> = new Map(
+    CONFIG_REGISTRY.filter((spec) => !spec.internal).map((spec) => [spec.toml, spec]),
+);
 
 export function build_config_set_command(context: LocalContext): Command {
     return new Command("config-set")
@@ -22,10 +14,10 @@ export function build_config_set_command(context: LocalContext): Command {
         .argument("<field>", "Config field name")
         .argument("<value>", "Value to set")
         .action(async (field: string, value: string) => {
-            const config_key = VALID_FIELDS[field];
+            const spec = SETTABLE_FIELDS.get(field);
 
-            if (config_key === undefined) {
-                const valid = Object.keys(VALID_FIELDS).join(", ");
+            if (spec === undefined) {
+                const valid = [...SETTABLE_FIELDS.keys()].join(", ");
                 if (context.json) {
                     respond_fail({ ok: false, message: `Unknown config field: ${field}. Valid fields: ${valid}`, severity: "error" });
                 } else {
@@ -34,7 +26,18 @@ export function build_config_set_command(context: LocalContext): Command {
                 return;
             }
 
-            save_config({ [config_key]: value });
+            const validation_error = spec.validate?.(value);
+            if (validation_error !== undefined) {
+                const message = `Invalid ${field}: ${validation_error}`;
+                if (context.json) {
+                    respond_fail({ ok: false, message, severity: "error" });
+                } else {
+                    console.log(message);
+                }
+                return;
+            }
+
+            save_config({ [spec.key]: value });
 
             if (context.json) {
                 respond({ ok: true, message: `Set ${field} = ${value}`, severity: "info" });

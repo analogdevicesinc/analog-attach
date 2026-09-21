@@ -4,34 +4,27 @@ import { DeviceTree, DeviceTreeOverlay, PropertyBuilder } from "attach-lib";
 import * as fs from 'node:fs';
 
 import type { LocalContext } from "../../context";
-import { load_config } from "../../config";
+import { load_config, check_config, check_failure_message } from "../../config";
 import { resolve_node_identifier } from "../../utilities";
 
 function make_command(commandName: string, status_value: "okay" | "disabled", verb: string) {
     return (_context: LocalContext): Command => new Command(commandName)
         .description(`${verb} a node in a dtso by setting status = "${status_value}"`)
         .requiredOption("--node <value>", "Target node: label, path, or label/child (e.g. spi0, /soc/spi@7e204000, spi0/mux)")
-        .requiredOption("--overlay <value>", "dtso")
-        .option("--context <value>", "The target dts")
         .action(async (options) => {
             const config = load_config();
-            const context = options.context ?? config.context;
-            const { node, overlay: input } = options;
-
-            if (context === undefined) {
-                console.log("Missing: --context (no config.toml found)");
+            if (config === undefined) {
+                console.log("No config.toml (run config-set)");
                 return;
             }
+            const { node } = options;
 
-            if (!fs.existsSync(context)) {
-                console.log(`Missing: ${context}`);
+            const checked = check_config(config, ["overlay", "context"]);
+            if (!checked.ok) {
+                console.log(check_failure_message(checked).human);
                 return;
             }
-
-            if (!fs.existsSync(input)) {
-                console.log(`Missing: ${input} (use "create" to generate a new overlay first)`);
-                return;
-            }
+            const { overlay: input, context } = checked.values;
 
             const context_content = fs.readFileSync(context, 'utf8');
             const base = DeviceTree.new_from_string(context_content);

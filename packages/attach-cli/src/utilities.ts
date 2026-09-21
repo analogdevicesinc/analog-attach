@@ -281,25 +281,45 @@ if (import.meta.vitest) {
     });
 }
 
+/**
+ * Load the compat index, building it if missing and rebuilding it if stale.
+ * Returns undefined only when the index is absent and linux/dtSchema are unset
+ * (so it cannot be built). `log` receives progress lines (stderr-worthy).
+ */
+export async function get_or_build_compat_index(
+    linux: string | undefined,
+    dtSchema: string | undefined,
+    log?: (message: string) => void,
+): Promise<CompatIndex | undefined> {
+    const index = load_compat_index();
+
+    if (index === undefined) {
+        if (linux === undefined || dtSchema === undefined) { return undefined; }
+        log?.("compat-index.json not found, building...");
+        const entries = await build_compat_index(linux, dtSchema);
+        const compat_index_path = save_compat_index(entries);
+        log?.(`Written: ${compat_index_path}`);
+        return { generated_at: Date.now(), entries };
+    }
+
+    if (linux !== undefined && dtSchema !== undefined && is_compat_index_stale(index, linux, dtSchema)) {
+        log?.("compat-index.json is stale, rebuilding...");
+        const entries = await build_compat_index(linux, dtSchema);
+        const compat_index_path = save_compat_index(entries);
+        log?.(`Written: ${compat_index_path}`);
+        return { generated_at: Date.now(), entries };
+    }
+
+    return index;
+}
+
 export async function find_binding(linux: string, dtSchema: string, compatible_to_find: string, silent = false): Promise<string | undefined> {
-    let cached_index = load_compat_index();
+    const index = await get_or_build_compat_index(linux, dtSchema, silent ? undefined : (message) => console.error(message));
 
-    if (cached_index === undefined) {
-        const entries = await build_compat_index(linux, dtSchema);
-        const compat_index_path = save_compat_index(entries);
-        if (!silent) { console.error(`Written: ${compat_index_path}`); }
-        return entries[compatible_to_find];
-    }
+    // linux/dtSchema are defined here, so the index is always built.
+    if (index === undefined) { return undefined; }
 
-    if (is_compat_index_stale(cached_index, linux, dtSchema)) {
-        if (!silent) { console.error("compat-index.json is stale, rebuilding..."); }
-        const entries = await build_compat_index(linux, dtSchema);
-        const compat_index_path = save_compat_index(entries);
-        if (!silent) { console.error(`Written: ${compat_index_path}`); }
-        return entries[compatible_to_find];
-    }
-
-    const cached_path = cached_index.entries[compatible_to_find];
+    const cached_path = index.entries[compatible_to_find];
 
     if (cached_path !== undefined && fs.existsSync(cached_path)) {
         return cached_path;

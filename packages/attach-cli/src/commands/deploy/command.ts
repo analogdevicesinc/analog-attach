@@ -1,9 +1,8 @@
 import { Command } from "commander";
-import * as fs from "node:fs";
 import { execSync } from "node:child_process";
 
 import type { LocalContext } from "../../context";
-import { load_config } from "../../config";
+import { resolve_config } from "../../resolve-config";
 import { respond, respond_fail, input_error } from "../../protocol/output";
 import type { DeployResponse } from "../../protocol/types";
 
@@ -36,35 +35,10 @@ function is_tool_available(check: string): boolean {
 export function build_deploy_command(context_: LocalContext): Command {
     return new Command("deploy")
         .description("Copy the compiled DTBO to a remote device and reboot it")
-        .option("--dtbo <value>", "Path to the compiled DTBO to deploy")
-        .option("--ip <value>", "IP address or hostname of the remote device")
-        .option("--user <value>", "SSH username on the remote device")
-        .option("--password <value>", "SSH password on the remote device")
-        .action(async (options) => {
-            const config = load_config();
-            const dtbo = options.dtbo ?? config.overlayCompiled;
-            const ip = options.ip ?? config.deployIp;
-            const user = options.user ?? config.deployUser;
-            const password = options.password ?? config.deployPassword;
-
-            const missing: string[] = [];
-            if (dtbo === undefined) { missing.push("overlay-compiled"); }
-            if (ip === undefined) { missing.push("deploy-ip"); }
-            if (user === undefined) { missing.push("deploy-user"); }
-            if (password === undefined) { missing.push("deploy-password"); }
-
-            if (missing.length > 0) {
-                const message = `Missing: ${missing.join(", ")} (not configured)`;
-                if (context_.json) { input_error(message); return; }
-                console.log(message);
-                return;
-            }
-
-            if (!fs.existsSync(dtbo)) {
-                if (context_.json) { input_error(`Missing: ${dtbo}`); return; }
-                console.log(`Missing: ${dtbo}`);
-                return;
-            }
+        .action(async () => {
+            const resolved = resolve_config(context_, ["overlayCompiled", "deployIp", "deployUser", "deployPassword"]);
+            if (resolved === undefined) { return; }
+            const { overlayCompiled: dtbo, deployIp: ip, deployUser: user, deployPassword: password } = resolved.values;
 
             if (!is_tool_available("sshpass -V")) {
                 if (context_.json) { input_error("sshpass not found on PATH"); return; }
@@ -72,10 +46,10 @@ export function build_deploy_command(context_: LocalContext): Command {
                 return;
             }
 
-            const env = { ...process.env, SSHPASS: password };
+            const environment = { ...process.env, SSHPASS: password };
 
             try {
-                execSync(build_scp_command(dtbo, user, ip), { stdio: "pipe", env });
+                execSync(build_scp_command(dtbo, user, ip), { stdio: "pipe", env: environment });
             } catch (error: any) {
                 const stderr: string = (error.stderr as Buffer | undefined)?.toString() ?? String(error);
                 if (context_.json) { respond_fail({ ok: false, message: `scp failed: ${stderr}`, severity: "error" }); return; }
@@ -86,7 +60,7 @@ export function build_deploy_command(context_: LocalContext): Command {
             // The reboot drops the ssh connection, so a non-zero exit here is expected — the copy
             // already succeeded with these credentials, so we treat the reboot as best-effort.
             try {
-                execSync(build_reboot_command(user, ip), { stdio: "pipe", env });
+                execSync(build_reboot_command(user, ip), { stdio: "pipe", env: environment });
             } catch {
                 // connection closed by reboot — ignore
             }

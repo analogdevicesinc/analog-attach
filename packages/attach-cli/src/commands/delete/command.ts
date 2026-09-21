@@ -4,7 +4,7 @@ import { DeviceTree, DeviceTreeOverlay, type DTNode } from "attach-lib";
 import * as fs from 'node:fs';
 
 import type { LocalContext } from "../../context";
-import { load_config } from "../../config";
+import { resolve_config } from "../../resolve-config";
 import { resolve_node_identifier } from "../../utilities";
 import { respond, respond_fail, input_error } from "../../protocol/output";
 import type { DeletePreview } from "../../protocol/types";
@@ -12,38 +12,12 @@ import type { DeletePreview } from "../../protocol/types";
 export function build_delete_command(context_: LocalContext): Command {
     return new Command("delete")
         .description("Delete an overlay-added node, or remove a property from an overlay node or a base-tree node (base-tree nodes themselves cannot be deleted)")
-        .option("--overlay <value>", "dtso")
-        .option("--context <value>", "The target dts")
         .option("--force", "Force delete of non-leaf nodes (waterfall delete)")
         .argument("[path...]", "Path to node or property (ValidIdentifier segments)")
         .action(async (path: string[], options) => {
-            const config = load_config();
-            const context = options.context ?? config.context;
-            const input = options.overlay ?? config.overlay;
-
-            if (context === undefined) {
-                if (context_.json) { input_error("missing config: context"); return; }
-                console.log("Missing: --context (no config.toml found)");
-                return;
-            }
-
-            if (input === undefined) {
-                if (context_.json) { input_error("missing config: overlay"); return; }
-                console.log("Missing: --overlay (no config.toml found)");
-                return;
-            }
-
-            if (!fs.existsSync(context)) {
-                if (context_.json) { input_error(`file not found: ${context}`); return; }
-                console.log(`Missing: ${context}`);
-                return;
-            }
-
-            if (!fs.existsSync(input)) {
-                if (context_.json) { input_error(`file not found: ${input}`); return; }
-                console.log(`Missing: ${input} (use "create" to generate a new overlay first)`);
-                return;
-            }
+            const resolved = resolve_config(context_, ["context", "overlay"]);
+            if (resolved === undefined) { return; }
+            const { context, overlay: input } = resolved.values;
 
             const context_content = fs.readFileSync(context, 'utf8');
             const base = DeviceTree.new_from_string(context_content);

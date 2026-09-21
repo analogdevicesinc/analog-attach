@@ -4,8 +4,8 @@ import * as fs from "node:fs";
 
 import type { LocalContext } from "../../context";
 import { load_config } from "../../config";
-import { load_compat_index, save_compat_index } from "../../config";
-import { find_binding, fragment_target, is_compat_index_stale, build_compat_index, resolve_node_identifier, resolve_positional_path } from "../../utilities";
+import { resolve_config } from "../../resolve-config";
+import { find_binding, fragment_target, get_or_build_compat_index, resolve_node_identifier, resolve_positional_path } from "../../utilities";
 import { respond, respond_fail, input_error } from "../../protocol/output";
 import { attach_type_to_protocol_type } from "../../protocol/dt-to-protocol";
 import { resolve_node_binding } from "../../binding-resolution";
@@ -71,22 +71,9 @@ async function suggest_parent(context_: LocalContext, arguments_: string[]): Pro
         return;
     }
 
-    const config = load_config();
-    const linux = config.linux;
-    const dtSchema = config.dtSchema;
-    const context = config.context;
-
-    if (linux === undefined || dtSchema === undefined || context === undefined) {
-        if (context_.json) { input_error("Tool config incomplete: linux, dt-schema, and context must be set"); return; }
-        console.log("Missing config: linux, dt-schema, and context must be set");
-        return;
-    }
-
-    if (!fs.existsSync(context) || !fs.existsSync(linux) || !fs.existsSync(dtSchema)) {
-        if (context_.json) { input_error("Configured path does not exist"); return; }
-        console.log("One or more configured paths do not exist");
-        return;
-    }
+    const resolved = resolve_config(context_, ["linux", "dtSchema", "context"]);
+    if (resolved === undefined) { return; }
+    const { linux, dtSchema, context } = resolved.values;
 
     const context_content = fs.readFileSync(context, "utf8");
     const dt = DeviceTree.new_from_string(context_content);
@@ -135,23 +122,14 @@ async function suggest_parent(context_: LocalContext, arguments_: string[]): Pro
 async function suggest_device_key(context: LocalContext, arguments_: string[]): Promise<void> {
     const filter = arguments_[0];
 
-    let index = load_compat_index();
-    const config = load_config();
+    const config = load_config() ?? {};
+
+    const index = await get_or_build_compat_index(config.linux, config.dtSchema);
 
     if (index === undefined) {
-        if (config.linux === undefined || config.dtSchema === undefined) {
-            if (context.json) { input_error("No compat-index.json found and linux/dt-schema not configured. Run 'attach config-set' first."); return; }
-            console.log("No compat-index.json found and linux/dt-schema not configured. Run 'attach config-set' first.");
-            return;
-        }
-
-        const entries = await build_compat_index(config.linux, config.dtSchema);
-        save_compat_index(entries);
-        index = { generated_at: Date.now(), entries };
-    } else if (config.linux !== undefined && config.dtSchema !== undefined && is_compat_index_stale(index, config.linux, config.dtSchema)) {
-        const entries = await build_compat_index(config.linux, config.dtSchema);
-        save_compat_index(entries);
-        index = { generated_at: Date.now(), entries };
+        if (context.json) { input_error("No compat-index.json found and linux/dt-schema not configured. Run 'attach config-set' first."); return; }
+        console.log("No compat-index.json found and linux/dt-schema not configured. Run 'attach config-set' first.");
+        return;
     }
 
     const entries = Object.keys(index.entries);
@@ -178,25 +156,9 @@ async function suggest_node_property(context_: LocalContext, arguments_: string[
         return;
     }
 
-    const config = load_config();
-    const linux = config.linux;
-    const dtSchema = config.dtSchema;
-    const context = config.context;
-    const overlay_path = config.overlay;
-
-    if (linux === undefined || dtSchema === undefined || context === undefined || overlay_path === undefined) {
-        if (context_.json) { input_error("Tool config incomplete: linux, dt-schema, context, and overlay must be set"); return; }
-        console.log("Missing config: linux, dt-schema, context, and overlay must be set");
-        return;
-    }
-
-    for (const p of [linux, dtSchema, context, overlay_path]) {
-        if (!fs.existsSync(p)) {
-            if (context_.json) { input_error(`Configured path does not exist: ${p}`); return; }
-            console.log(`Configured path does not exist: ${p}`);
-            return;
-        }
-    }
+    const resolved = resolve_config(context_, ["linux", "dtSchema", "context", "overlay"]);
+    if (resolved === undefined) { return; }
+    const { linux, dtSchema, context, overlay: overlay_path } = resolved.values;
 
     const base_dt = DeviceTree.new_from_string(fs.readFileSync(context, "utf8"));
     if (typeof base_dt === "string") {
@@ -290,25 +252,11 @@ async function binding_property_suggestions(
 }
 
 async function suggest_navigate(context_: LocalContext, arguments_: string[]): Promise<void> {
-    const config = load_config();
-    const context = config.context;
-    const overlay_path = config.overlay;
-    const linux = config.linux;
-    const dtSchema = config.dtSchema;
-
-    if (context === undefined || overlay_path === undefined) {
-        if (context_.json) { input_error("Tool config incomplete: context and overlay must be set"); return; }
-        console.log("Missing config: context and overlay must be set");
-        return;
-    }
-
-    for (const p of [context, overlay_path]) {
-        if (!fs.existsSync(p)) {
-            if (context_.json) { input_error(`Configured path does not exist: ${p}`); return; }
-            console.log(`Configured path does not exist: ${p}`);
-            return;
-        }
-    }
+    const resolved = resolve_config(context_, ["context", "overlay"]);
+    if (resolved === undefined) { return; }
+    const { context, overlay: overlay_path } = resolved.values;
+    const linux = resolved.config.linux;
+    const dtSchema = resolved.config.dtSchema;
 
     const base_dt = DeviceTree.new_from_string(fs.readFileSync(context, "utf8"));
     if (typeof base_dt === "string") {
@@ -403,25 +351,9 @@ async function suggest_type(context_: LocalContext, arguments_: string[]): Promi
         return;
     }
 
-    const config = load_config();
-    const linux = config.linux;
-    const dtSchema = config.dtSchema;
-    const context = config.context;
-    const overlay_path = config.overlay;
-
-    if (linux === undefined || dtSchema === undefined || context === undefined || overlay_path === undefined) {
-        if (context_.json) { input_error("Tool config incomplete: linux, dt-schema, context, and overlay must be set"); return; }
-        console.log("Missing config: linux, dt-schema, context, and overlay must be set");
-        return;
-    }
-
-    for (const p of [linux, dtSchema, context, overlay_path]) {
-        if (!fs.existsSync(p)) {
-            if (context_.json) { input_error(`Configured path does not exist: ${p}`); return; }
-            console.log(`Configured path does not exist: ${p}`);
-            return;
-        }
-    }
+    const resolved = resolve_config(context_, ["linux", "dtSchema", "context", "overlay"]);
+    if (resolved === undefined) { return; }
+    const { linux, dtSchema, context, overlay: overlay_path } = resolved.values;
 
     const base_dt = DeviceTree.new_from_string(fs.readFileSync(context, "utf8"));
     if (typeof base_dt === "string") {
@@ -462,13 +394,13 @@ async function suggest_type(context_: LocalContext, arguments_: string[]): Promi
 
     const result = binding.narrow_and_populate(found_node);
     if (result === undefined) {
-        const msg = binding.origin.kind === "compatible"
+        const message = binding.origin.kind === "compatible"
             ? `Failed to narrow binding for ${binding.origin.compatible}`
             : `Failed to validate against pattern "${binding.origin.pattern}" of ${binding.origin.parent_compatible}`;
         if (context_.json) {
-            respond_fail({ ok: false, message: msg, severity: "error" });
+            respond_fail({ ok: false, message: message, severity: "error" });
         } else {
-            console.log(msg);
+            console.log(message);
         }
         return;
     }

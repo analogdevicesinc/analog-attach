@@ -1,9 +1,9 @@
 import { Command } from "commander";
-import * as fs from "node:fs";
 import { execSync } from "node:child_process";
 
 import type { LocalContext } from "../../context";
-import { load_config, save_config, DEFAULT_BUILD_COMMAND } from "../../config";
+import { save_config, DEFAULT_BUILD_COMMAND } from "../../config";
+import { resolve_config } from "../../resolve-config";
 import { respond, respond_fail, input_error } from "../../protocol/output";
 import type { BuildResponse } from "../../protocol/types";
 
@@ -30,26 +30,13 @@ function is_tool_available(check: string): boolean {
 export function build_build_command(context_: LocalContext): Command {
     return new Command("build")
         .description("Compile the overlay DTSO into a DTBO using dtc")
-        .option("--overlay <value>", "Path to the DTSO overlay to compile")
-        .option("--build-command <value>", "dtc command template ({input}/{output} substituted)")
-        .action(async (options) => {
-            const config = load_config();
-            const input = options.overlay ?? config.overlay;
-
-            if (input === undefined) {
-                if (context_.json) { input_error("Missing: overlay (not configured)"); return; }
-                console.log("Missing: --overlay (no overlay configured)");
-                return;
-            }
-
-            if (!fs.existsSync(input)) {
-                if (context_.json) { input_error(`Missing: ${input}`); return; }
-                console.log(`Missing: ${input}`);
-                return;
-            }
+        .action(async () => {
+            const resolved = resolve_config(context_, ["overlay"]);
+            if (resolved === undefined) { return; }
+            const input = resolved.values.overlay;
 
             const output = derive_dtbo_path(input);
-            const template = options.buildCommand ?? config.buildCommand ?? DEFAULT_BUILD_COMMAND;
+            const template = resolved.config.buildCommand ?? DEFAULT_BUILD_COMMAND;
             const command = substitute_build_command(template, input, output);
 
             if (!is_tool_available("dtc --version")) {
