@@ -41,7 +41,7 @@ export function build_list_intelligence_command(context: LocalContext): Command 
                         args: [
                             {
                                 name: "node",
-                                description: "Node reference (one or more segments, spaces act as path separators): bare label (imu1), &label (&imu1), absolute path (/soc/spi@7e204000/imu@0), &{path} (&{/soc/spi@7e204000/imu@0}), label/child (spi0/imu@0 or spi0 imu@0), multi-segment path (soc spi@7e204000 imu@0)",
+                                description: "Node reference (one or more segments, spaces act as path separators): bare label (imu1), absolute path (/soc/spi@7e204000/imu@0), label/child (spi0/imu@0 or spi0 imu@0), multi-segment path (soc spi@7e204000 imu@0)",
                                 required: true,
                                 kind: "node-ref",
                             },
@@ -53,7 +53,7 @@ export function build_list_intelligence_command(context: LocalContext): Command 
                         args: [
                             {
                                 name: "node",
-                                description: "Node reference to list children and properties of; omit to list top-level overlay entry points. One or more segments, spaces act as path separators: bare label (imu1), &label (&imu1), absolute path (/soc/spi@7e204000/imu@0), &{path} (&{/soc/spi@7e204000/imu@0}), label/child (spi0/imu@0 or spi0 imu@0), multi-segment path (soc spi@7e204000 imu@0)",
+                                description: "Node reference to list children and properties of; omit to list top-level overlay entry points. One or more segments, spaces act as path separators: bare label (imu1), absolute path (/soc/spi@7e204000/imu@0), label/child (spi0/imu@0 or spi0 imu@0), multi-segment path (soc spi@7e204000 imu@0)",
                                 required: false,
                                 kind: "node-ref",
                             },
@@ -65,7 +65,7 @@ export function build_list_intelligence_command(context: LocalContext): Command 
                         args: [
                             {
                                 name: "prop",
-                                description: "Property reference (one or more segments, spaces act as path separators): bare label (imu1/reg), &label (&imu1/reg), absolute path (/soc/spi@7e204000/imu@0/reg), &{path} (&{/soc/spi@7e204000/imu@0/reg}), label/child (spi0/imu@0/reg or spi0 imu@0 reg), multi-segment path (soc spi@7e204000 imu@0 reg)",
+                                description: "Property reference (one or more segments, spaces act as path separators): bare label (imu1/reg), absolute path (/soc/spi@7e204000/imu@0/reg), label/child (spi0/imu@0/reg or spi0 imu@0 reg), multi-segment path (soc spi@7e204000 imu@0 reg)",
                                 required: true,
                                 kind: "prop-ref",
                             },

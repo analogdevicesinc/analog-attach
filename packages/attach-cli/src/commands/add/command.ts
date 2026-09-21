@@ -17,7 +17,7 @@ export function build_add_command(context_: LocalContext): Command {
     return new Command("add")
         .description("Add a new node to an existing dtso. Two patterns: (A) device node with a compatible string — pass the compatible string as a positional arg (e.g. `add adi,ad7124-8 --to spi0`); (B) bare structural subnode without a compatible (channel, alias, bus sub-node) — pass `--name <node-name> --to <parent>` only, no positional arg.")
         .option("--name <value>", "Node name (e.g. channel@0); defaults to the positional key")
-        .option("--to <value...>", "Parent node: label, &label, path, &{path}, or label/child")
+        .option("--to <value...>", "Parent node: label, path, or label/child (e.g. spi0, /soc/spi@7e204000, spi0/mux)")
         .option("--label <value>", "Label to attach to the new node (e.g. imu1)")
         .option("--overlay <value>", "Path to the dtso file (falls back to config.toml)")
         .option("--context <value>", "The target dts (falls back to config.toml)")

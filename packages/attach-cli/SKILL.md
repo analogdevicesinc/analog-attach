@@ -236,8 +236,8 @@ attach-linux create --linux <path> --compatible <string> --parent <node> --label
 | `--linux` | No | Path to Linux kernel repository (falls back to `config.toml`) |
 | `--dt-schema` | No | Path to dt-schema repository (uses bundled version by default) |
 | `--compatible` | Yes | Device compatible string |
-| `--parent` | No | Parent node: label, `&label`, path, `&{path}`, or `label/child` (e.g. `spi0`, `&spi0`, `/soc/spi@...`, `&{/soc/spi@...}`) — a bare name/`name@unit` is NOT matched, since it isn't guaranteed unique across the tree |
-| `--label` | No | Label to attach to the new node (e.g. `imu1`), so it can be referenced later as `&label` (e.g. as a `--to` for `add`). **Always set this** — without a label, the new node can only be referenced later by its full path, which most other commands cannot compute for you |
+| `--parent` | No | Parent node: label, path, or `label/child` (e.g. `spi0`, `/soc/spi@...`, `spi0/mux`) — a bare name/`name@unit` is NOT matched, since it isn't guaranteed unique across the tree |
+| `--label` | No | Label to attach to the new node (e.g. `imu1`), so it can be referenced later by that label (e.g. as a `--to` for `add`). **Always set this** — without a label, the new node can only be referenced later by its full path, which most other commands cannot compute for you |
 | `--output` | No | Output file path (should end in `.dtso`). If omitted, the overlay is printed to stdout |
 
 **Output**: If `--output` is given, writes the file and prints confirmation. If omitted, prints the overlay to stdout.
@@ -292,8 +292,8 @@ attach-linux add --linux <path> --context <dts-file> --overlay <dtso-file> --nam
 | `--overlay` | Yes | Path to the existing `.dtso` file to modify (file is updated in place; must already exist — use `create` first) |
 | `<compatible-string>` | Pattern A only | Compatible string of the device binding to add (positional arg). **Do not pass for bare subnodes** (channels, aliases, etc.) |
 | `--name` | Required for Pattern B; optional for Pattern A | Node name (e.g. `channel@0`); for Pattern A defaults to the positional compatible string if omitted |
-| `--to` | No | Where to attach the new node: label, `&label`, path, `&{path}`, or `label/child` of a node already in the base `.dts` or the overlay (e.g. `spi0`, `&spi0`, `/soc/spi@...`, `spi0/adi,ad7124-8`). Defaults to root `/` if omitted. A bare name/`name@unit` is NOT matched — a node added via `create`/`add` without `--label` can only be targeted by its full path |
-| `--label` | No | Label to attach to the new node (e.g. `imu1`), so it can be referenced later as `&label` (e.g. as a `--to` for a subsequent `add`). **Always set this** when the new node might need to be referenced again later |
+| `--to` | No | Where to attach the new node: label, path, or `label/child` of a node already in the base `.dts` or the overlay (e.g. `spi0`, `/soc/spi@...`, `spi0/adi,ad7124-8`). Defaults to root `/` if omitted. A bare name/`name@unit` is NOT matched — a node added via `create`/`add` without `--label` can only be targeted by its full path |
+| `--label` | No | Label to attach to the new node (e.g. `imu1`), so it can be referenced later by that label (e.g. as a `--to` for a subsequent `add`). **Always set this** when the new node might need to be referenced again later |
 
 **Examples**:
 ```bash
@@ -327,7 +327,7 @@ attach-linux delete --context <dts-file> --overlay <dtso-file> --node <node>
 **Flags**:
 | Flag | Required | Description |
 |------|----------|-------------|
-| `--node` | Yes | Node to delete: label, `&label`, path, `&{path}`, or `label/child` |
+| `--node` | Yes | Node to delete: label, path, or `label/child` |
 | `--overlay` | Yes | The `.dtso` file to edit |
 | `--context` | If no `config.toml` | Base `.dts` file — needed to distinguish overlay nodes from base nodes |
 
@@ -355,7 +355,7 @@ attach-linux rename --context <dts-file> --overlay <dtso-file> --node <node> --t
 **Flags**:
 | Flag | Required | Description |
 |------|----------|-------------|
-| `--node` | Yes | Node to rename: label, `&label`, path, `&{path}`, or `label/child` |
+| `--node` | Yes | Node to rename: label, path, or `label/child` |
 | `--to` | Yes | New node key. If `@` is omitted the existing unit address is preserved (e.g. `--to my_adc` on `adi,ad7124-8@0` → `my_adc@0`). Include `@unit` to override (e.g. `--to my_adc@1` → `my_adc@1`) |
 | `--overlay` | Yes | The `.dtso` file to edit |
 | `--context` | If no `config.toml` | Base `.dts` file |
@@ -388,8 +388,8 @@ attach-linux move --context <dts-file> --overlay <dtso-file> --node <node> --par
 **Flags**:
 | Flag | Required | Description |
 |------|----------|-------------|
-| `--node` | Yes | Node to move: label, `&label`, path, `&{path}`, or `label/child` |
-| `--parent` | Yes | Destination parent: label, `&label`, path, `&{path}`, or `label/child` |
+| `--node` | Yes | Node to move: label, path, or `label/child` |
+| `--parent` | Yes | Destination parent: label, path, or `label/child` |
 | `--overlay` | Yes | The `.dtso` file to edit |
 | `--context` | If no `config.toml` | Base `.dts` file |
 
@@ -423,7 +423,7 @@ attach-linux validate --node <name> --overlay <dtso-file> [--linux <path>] [--co
 | `--linux` | No | Path to Linux kernel repository (falls back to `config.toml`) |
 | `--dt-schema` | No | Path to dt-schema repository (uses bundled version by default) |
 | `--context` | No | Path to base `.dts` file (falls back to `config.toml`) |
-| `--node` | Yes | Target node: label, `&label`, path, `&{path}`, or `label/child` (e.g. `imu1`, `&imu1`, `/soc/spi@0/imu@0`, `spi0/adi,ad7124-8`) — a bare name/`name@unit` is NOT matched, since it isn't guaranteed unique across the tree |
+| `--node` | Yes | Target node: label, path, or `label/child` (e.g. `imu1`, `/soc/spi@0/imu@0`, `spi0/adi,ad7124-8`) — a bare name/`name@unit` is NOT matched, since it isn't guaranteed unique across the tree |
 | `--overlay` | Yes | Path to `.dtso` file containing the node |
 
 **Output Format**: Three sections printed to stdout:
@@ -470,7 +470,7 @@ attach-linux get-prop --node <name> --overlay <dtso-file> --property <prop-name>
 **Parameters**:
 | Parameter | Required | Description |
 |-----------|----------|-------------|
-| `--node` | Yes | Target node: label, `&label`, path, `&{path}`, or `label/child` (e.g. `imu1`, `&imu1`, `/soc/spi@0/imu@0`, `spi0/adi,ad7124-8`) — a bare name/`name@unit` is NOT matched, since it isn't guaranteed unique across the tree |
+| `--node` | Yes | Target node: label, path, or `label/child` (e.g. `imu1`, `/soc/spi@0/imu@0`, `spi0/adi,ad7124-8`) — a bare name/`name@unit` is NOT matched, since it isn't guaranteed unique across the tree |
 | `--overlay` | Yes | Path to `.dtso` file containing the node |
 | `--property` | Yes | Name of the property to read |
 
@@ -481,11 +481,11 @@ attach-linux get-prop --node <name> --overlay <dtso-file> --property <prop-name>
 **Examples**:
 ```bash
 # Get the reg property value
-attach-linux get-prop --node &imu1 --overlay overlay.dtso --property reg
+attach-linux get-prop --node imu1 --overlay overlay.dtso --property reg
 # Output: <0x00>
 
 # Get a boolean/flag property (returns "true" if present)
-attach-linux get-prop --node &imu1 --overlay overlay.dtso --property spi-cpha
+attach-linux get-prop --node imu1 --overlay overlay.dtso --property spi-cpha
 # Output: true
 ```
 
@@ -510,7 +510,7 @@ attach-linux set-prop --node <name> --overlay <dtso-file> --property <prop-name>
 | `--linux` | No | Path to Linux kernel repository (falls back to `config.toml`) |
 | `--dt-schema` | No | Path to dt-schema repository (uses bundled version by default) |
 | `--context` | No | Path to base `.dts` file (falls back to `config.toml`) |
-| `--node` | Yes | Target node: label, `&label`, path, `&{path}`, or `label/child` (e.g. `imu1`, `&imu1`, `/soc/spi@0/imu@0`, `spi0/adi,ad7124-8`) — a bare name/`name@unit` is NOT matched, since it isn't guaranteed unique across the tree |
+| `--node` | Yes | Target node: label, path, or `label/child` (e.g. `imu1`, `/soc/spi@0/imu@0`, `spi0/adi,ad7124-8`) — a bare name/`name@unit` is NOT matched, since it isn't guaranteed unique across the tree |
 | `--overlay` | Yes | Path to `.dtso` file to modify (file is updated in place) |
 | `--property` | Yes | Name of the property to set |
 | `--value` | Yes | Value to set (see Value Formats below) |
@@ -532,25 +532,25 @@ Comma is only a row separator; it can't appear in labels, macros, or numbers.
 **Examples**:
 ```bash
 # Set a simple integer property
-attach-linux set-prop --node &imu1 --overlay overlay.dtso --property reg --value 0
+attach-linux set-prop --node imu1 --overlay overlay.dtso --property reg --value 0
 
 # Set SPI frequency
-attach-linux set-prop --node &imu1 --overlay overlay.dtso --property spi-max-frequency --value 5000000
+attach-linux set-prop --node imu1 --overlay overlay.dtso --property spi-max-frequency --value 5000000
 
 # Enable a boolean flag
-attach-linux set-prop --node &imu1 --overlay overlay.dtso --property spi-cpha --value true
+attach-linux set-prop --node imu1 --overlay overlay.dtso --property spi-cpha --value true
 
 # Disable/remove a boolean flag
-attach-linux set-prop --node &imu1 --overlay overlay.dtso --property spi-cpha --value false
+attach-linux set-prop --node imu1 --overlay overlay.dtso --property spi-cpha --value false
 
 # Set an interrupt array
-attach-linux set-prop --node &imu1 --overlay overlay.dtso --property interrupts --value "25 IRQ_TYPE_EDGE_FALLING"
+attach-linux set-prop --node imu1 --overlay overlay.dtso --property interrupts --value "25 IRQ_TYPE_EDGE_FALLING"
 
 # Set a phandle reference for interrupt-parent
-attach-linux set-prop --node &imu1 --overlay overlay.dtso --property interrupt-parent --value gpio
+attach-linux set-prop --node imu1 --overlay overlay.dtso --property interrupt-parent --value gpio
 
 # Set string array (e.g., clock-names)
-attach-linux set-prop --node &imu1 --overlay overlay.dtso --property clock-names --value "spi pclk"
+attach-linux set-prop --node imu1 --overlay overlay.dtso --property clock-names --value "spi pclk"
 ```
 
 **Validation**: The command validates the value against the device binding schema before applying. If the value is invalid, an error message is displayed explaining the valid options.
@@ -579,7 +579,7 @@ attach-linux unset-prop --context <dts-file> --overlay <dtso-file> --node <node>
 **Flags**:
 | Flag | Required | Description |
 |------|----------|-------------|
-| `--node` | Yes | Target node: label, `&label`, path, `&{path}`, or `label/child` |
+| `--node` | Yes | Target node: label, path, or `label/child` |
 | `--property` | Yes | Name of the property to remove |
 | `--overlay` | Yes | The `.dtso` file to edit |
 | `--context` | If no `config.toml` | Base `.dts` file |
@@ -611,7 +611,7 @@ attach-linux disable --context <dts-file> --overlay <dtso-file> --node <node>
 **Flags**:
 | Flag | Required | Description |
 |------|----------|-------------|
-| `--node` | Yes | Target node: label, `&label`, path, `&{path}`, or `label/child` |
+| `--node` | Yes | Target node: label, path, or `label/child` |
 | `--overlay` | Yes | The `.dtso` file to edit |
 | `--context` | If no `config.toml` | Base `.dts` file |
 

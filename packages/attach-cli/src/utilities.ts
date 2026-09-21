@@ -17,11 +17,17 @@ export function resolve_node_identifier(
     identifier: string,
     overlay: DeviceTreeOverlay
 ): DTLabel | DTPath {
-    const clean = identifier.startsWith("&") ? identifier.slice(1) : identifier;
+    const clean = identifier;
 
-    if (clean.startsWith("{/") && clean.endsWith("}")) {
-        return { kind: "path", labels: [], path: clean.slice(1, -1) };
+    // `&label` / `&{/path}` are DTS phandle sigils, not accepted as CLI
+    // navigation input (they are shell metacharacters and redundant with the
+    // bare forms). attach-lib's label lookup would normalize `&spi0` back to
+    // `spi0` and match, so route any sigil identifier to a literal path query
+    // that matches no node — navigation then reports the usual "not found".
+    if (identifier.startsWith("&")) {
+        return { kind: "path", labels: [], path: identifier };
     }
+
     if (identifier.startsWith("/")) {
         return { kind: "path", labels: [], path: identifier };
     }
@@ -58,19 +64,17 @@ export function resolve_node_identifier(
 }
 
 // Split a joined node reference into its node part and an optional trailing
-// property segment. The property is the text after the final '/' that lies
-// outside any sigil-path brace group (`&{/...}`) — a '/' inside the braces is
-// part of the path, not a separator. Returns `property_name === undefined` when
-// there is no separable trailing segment (bare label, absolute or sigil path,
-// or a slash only inside braces); callers try the whole identifier as a node
-// first and fall back to this, so an absolute node path never mis-splits.
+// property segment. The property is the text after the final '/'. Returns
+// `property_name === undefined` when there is no separable trailing segment
+// (bare label, or an absolute path whose only '/' is the leading one); callers
+// try the whole identifier as a node first and fall back to this, so an
+// absolute node path never mis-splits.
 export function split_property_reference(
     identifier: string
 ): { node_identifier: string; property_name: string | undefined } {
-    const brace_close = identifier.lastIndexOf("}");
     const last_slash = identifier.lastIndexOf("/");
 
-    if (last_slash <= 0 || last_slash < brace_close) {
+    if (last_slash <= 0) {
         return { node_identifier: identifier, property_name: undefined };
     }
 
@@ -177,12 +181,16 @@ export async function build_compat_index(linux: string, dtSchema: string): Promi
 export function resolve_positional_path(arguments_: string[]): string | undefined {
     if (arguments_.length === 0) { return undefined; }
     const first = arguments_[0]!;
-    if (first.startsWith("/") || first.startsWith("&")) {
+    if (first.startsWith("/")) {
         return arguments_.length === 1 ? first : `${first}/${arguments_.slice(1).join("/")}`;
     }
     return arguments_.join("/");
 }
 
+// Report a fragment's target as a navigation identifier. The bare label / plain
+// absolute path is returned deliberately (not the DTS phandle forms `&label` /
+// `&{/path}`): this string is surfaced by `suggest`/completion and fed back as
+// CLI input, which no longer accepts the `&` sigil (it is a shell metacharacter).
 export function fragment_target(fragment: DTNode): string | undefined {
     const target = fragment.properties.find(p => p.name === "target");
     if (target !== undefined && !is_dt_flag(target.value)) {
@@ -190,11 +198,10 @@ export function fragment_target(fragment: DTNode): string | undefined {
             if (value.kind !== "array") { continue; }
             for (const element of value.elements) {
                 if (element.kind === "label") {
-                    const name = element.name.startsWith("&") ? element.name.slice(1) : element.name;
-                    return `&${name}`;
+                    return element.name.startsWith("&") ? element.name.slice(1) : element.name;
                 }
                 if (element.kind === "path") {
-                    return `&{${element.path}}`;
+                    return element.path;
                 }
             }
         }
@@ -224,11 +231,11 @@ if (import.meta.vitest) {
         return overlay;
     };
 
-    test("fragment_target reads a label target as &label", () => {
+    test("fragment_target reads a label target as the bare label", () => {
         const overlay = parse_overlay(`/dts-v1/; /plugin/; &spi0 { };`);
         const [fragment] = overlay.get_fragments();
         expect(fragment).toBeDefined();
-        expect(fragment_target(fragment!)).toBe("&spi0");
+        expect(fragment_target(fragment!)).toBe("spi0");
     });
 
     test("fragment_target reads a path target as the absolute path", () => {
@@ -242,32 +249,35 @@ if (import.meta.vitest) {
         expect(split_property_reference("spi0/status")).toEqual({ node_identifier: "spi0", property_name: "status" });
     });
 
-    test("split_property_reference - splits a sigil label/property reference", () => {
-        expect(split_property_reference("&imu1/reg")).toEqual({ node_identifier: "&imu1", property_name: "reg" });
-    });
-
     test("split_property_reference - splits an absolute path/property reference", () => {
         expect(split_property_reference("/soc/spi@7e204000/reg"))
             .toEqual({ node_identifier: "/soc/spi@7e204000", property_name: "reg" });
-    });
-
-    test("split_property_reference - splits a sigil-path/property reference outside the braces", () => {
-        expect(split_property_reference("&{/soc/spi@7e204000}/reg"))
-            .toEqual({ node_identifier: "&{/soc/spi@7e204000}", property_name: "reg" });
     });
 
     test("split_property_reference - no property for a bare label", () => {
         expect(split_property_reference("spi0")).toEqual({ node_identifier: "spi0", property_name: undefined });
     });
 
-    test("split_property_reference - no property for a sigil path (slash only inside braces)", () => {
-        expect(split_property_reference("&{/soc/spi@7e204000}"))
-            .toEqual({ node_identifier: "&{/soc/spi@7e204000}", property_name: undefined });
-    });
-
     test("split_property_reference - deepest slash wins for nested label/child/property", () => {
         expect(split_property_reference("imu1/channel@0/reg"))
             .toEqual({ node_identifier: "imu1/channel@0", property_name: "reg" });
+    });
+
+    test("resolve_node_identifier rejects a `&label` sigil — routed to a non-matching path", () => {
+        const overlay = parse_overlay(`/dts-v1/; /plugin/; &spi0 { };`);
+        // `&spi0` is a DTS phandle sigil, not accepted CLI input. It must NOT be
+        // normalized back to the bare `spi0`: it is returned as a literal path
+        // query that resolves to nothing, so navigation reports "not found".
+        const resolved = resolve_node_identifier("&spi0", overlay);
+        expect(resolved).toEqual({ kind: "path", labels: [], path: "&spi0" });
+        expect(overlay.find_node(resolved)).toBeUndefined();
+    });
+
+    test("resolve_node_identifier rejects a `&{/path}` sigil — routed to a non-matching path", () => {
+        const overlay = parse_overlay(`/dts-v1/; /plugin/; &{/soc/spi@7e204000} { };`);
+        const resolved = resolve_node_identifier("&{/soc/spi@7e204000}", overlay);
+        expect(resolved).toEqual({ kind: "path", labels: [], path: "&{/soc/spi@7e204000}" });
+        expect(overlay.find_node(resolved)).toBeUndefined();
     });
 }
 

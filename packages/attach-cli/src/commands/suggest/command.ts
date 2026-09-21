@@ -16,45 +16,51 @@ export function build_suggest_command(context: LocalContext): Command {
         .description("Provide suggestions for a given intelligence kind")
         .argument("[args...]", "kind followed by kind-specific args")
         .action(async (arguments_: string[]) => {
-            const kind = arguments_[0];
-
-            if (kind === undefined) {
-                if (context.json) { input_error("kind is required"); return; }
-                console.log("Missing: kind (first positional argument)");
-                return;
-            }
-
-            switch (kind) {
-                case "parent": {
-                    await suggest_parent(context, arguments_.slice(1));
-                    return;
-                }
-                case "device-key": {
-                    await suggest_device_key(context, arguments_.slice(1));
-                    return;
-                }
-                case "node-prop": {
-                    await suggest_node_property(context, arguments_.slice(1));
-                    return;
-                }
-                case "navigate": {
-                    await suggest_navigate(context, arguments_.slice(1));
-                    return;
-                }
-                case "type": {
-                    await suggest_type(context, arguments_.slice(1));
-                    return;
-                }
-                default: {
-                    if (context.json) {
-                        respond_fail({ ok: false, message: `Unknown suggestion kind: ${kind}`, severity: "error" });
-                    } else {
-                        console.log(`Unknown suggestion kind: ${kind}`);
-                    }
-                    return;
-                }
-            }
+            await run_suggest(context, arguments_);
         });
+}
+
+// The `suggest` action body, exported so shell-completion (`__complete`) can
+// reuse the exact same intelligence in-process without a second subprocess.
+export async function run_suggest(context: LocalContext, arguments_: string[]): Promise<void> {
+    const kind = arguments_[0];
+
+    if (kind === undefined) {
+        if (context.json) { input_error("kind is required"); return; }
+        console.log("Missing: kind (first positional argument)");
+        return;
+    }
+
+    switch (kind) {
+        case "parent": {
+            await suggest_parent(context, arguments_.slice(1));
+            return;
+        }
+        case "device-key": {
+            await suggest_device_key(context, arguments_.slice(1));
+            return;
+        }
+        case "node-prop": {
+            await suggest_node_property(context, arguments_.slice(1));
+            return;
+        }
+        case "navigate": {
+            await suggest_navigate(context, arguments_.slice(1));
+            return;
+        }
+        case "type": {
+            await suggest_type(context, arguments_.slice(1));
+            return;
+        }
+        default: {
+            if (context.json) {
+                respond_fail({ ok: false, message: `Unknown suggestion kind: ${kind}`, severity: "error" });
+            } else {
+                console.log(`Unknown suggestion kind: ${kind}`);
+            }
+            return;
+        }
+    }
 }
 
 async function suggest_parent(context_: LocalContext, arguments_: string[]): Promise<void> {

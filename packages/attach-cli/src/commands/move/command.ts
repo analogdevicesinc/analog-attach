@@ -11,7 +11,7 @@ import { respond, respond_fail, input_error } from "../../protocol/output";
 export function build_move_command(context_: LocalContext): Command {
     return new Command("move")
         .description("Move an overlay-added node to a different parent in an existing dtso")
-        .requiredOption("--to <value...>", "Destination parent: label, &label, path, &{path}, or label/child")
+        .requiredOption("--to <value...>", "Destination parent: label, path, or label/child (e.g. spi0, /soc/spi@7e204000, spi0/mux)")
         .option("--overlay <value>", "dtso")
         .option("--context <value>", "The target dts")
         .argument("[path...]", "Path to node (ValidIdentifier segments)")
