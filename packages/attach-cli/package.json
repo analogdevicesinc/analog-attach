@@ -9,6 +9,7 @@
     "dist",
     "scripts",
     "bundled",
+    "completions",
     "SKILL.md"
   ],
   "bin": {

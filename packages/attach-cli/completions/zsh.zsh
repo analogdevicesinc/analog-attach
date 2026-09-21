@@ -64,23 +64,24 @@ _attach_linux() {
     case $state in
         commands)
             local -a commands=(
+                'attach-manifest:Write the attach-meta manifest and print its path'
+                'config-get:Get tool configuration fields'
+                'config-set:Set a tool configuration field'
+                'create-workfile:Create a new workfile (DTSO overlay)'
+                'list-devices:List available devices from the compat index'
                 'add:Add a new node to an existing dtso'
                 'read:Read a node subtree or property value'
                 'update:Update a property value on a node'
                 'delete:Delete a node or property from an existing dtso'
                 'validate:Validate a device node against its binding'
+                'validate2:Validate a device node against its binding (alt)'
                 'move:Move an overlay-added node to a different parent'
                 'rename:Rename an overlay-added node'
-                'create-workfile:Create a new workfile (DTSO overlay)'
-                'list-devices:List available devices from the compat index'
+                'list-intelligence:List available suggestion kinds'
                 'suggest:Provide suggestions for a given intelligence kind'
-                'init:Create config.toml and compat-index.json'
-                'create:Create dtso of the node with set compatible'
+                'build:Compile the overlay DTSO into a DTBO using dtc'
+                'deploy:Copy the compiled DTBO to a remote device and reboot it'
                 'get-schema:Get the parsed binding schema for a device'
-                'suggest-parents:Suggest valid parent nodes for a device'
-                'get-prop:Get the value of a property from a DTSO'
-                'set-prop:Set the value of a property in a dtso'
-                'unset-prop:Remove a property set by the overlay'
                 'enable:Enable a node by setting status = okay'
                 'disable:Disable a node by setting status = disabled'
                 'install-skill:Install the Attach skill for Claude Code'
@@ -104,20 +105,7 @@ _attach_linux() {
                     ;;
                 create-workfile)
                     _arguments \
-                        '--compatible[Compatible string]:compatible:_attach_linux_device_keys' \
-                        '--parent[Parent node]:parent:' \
-                        '--label[Label for the new node]:label:' \
-                        '--linux[Path to Linux repo]:linux:_files -/' \
-                        '--dt-schema[Path to dt-schema repo]:dt-schema:_files -/'
-                    ;;
-                create)
-                    _arguments \
-                        '--compatible[Compatible string]:compatible:_attach_linux_device_keys' \
-                        '--parent[Parent node]:parent:' \
-                        '--label[Label for the new node]:label:' \
-                        '--output[Output file]:output:_files' \
-                        '--linux[Path to Linux repo]:linux:_files -/' \
-                        '--dt-schema[Path to dt-schema repo]:dt-schema:_files -/'
+                        '--name[Output filename (default: overlay.dtso)]:name:'
                     ;;
                 validate)
                     _arguments \
@@ -126,29 +114,6 @@ _attach_linux() {
                         '--dt-schema[Path to dt-schema repo]:dt-schema:_files -/' \
                         '--context[The target dts]:context:_files' \
                         '*:args:'
-                    ;;
-                set-prop)
-                    _arguments \
-                        '--node[Target node]:node:' \
-                        '--property[Property name]:property:' \
-                        '--value[Property value]:value:' \
-                        '--overlay[Path to the dtso file]:overlay:_files' \
-                        '--context[The target dts]:context:_files' \
-                        '--linux[Path to Linux repo]:linux:_files -/' \
-                        '--dt-schema[Path to dt-schema repo]:dt-schema:_files -/'
-                    ;;
-                get-prop)
-                    _arguments \
-                        '--node[Target node]:node:' \
-                        '--property[Property name]:property:' \
-                        '--overlay[Path to the dtso file]:overlay:_files'
-                    ;;
-                unset-prop)
-                    _arguments \
-                        '--node[Target node]:node:' \
-                        '--property[Property name]:property:' \
-                        '--overlay[Path to the dtso file]:overlay:_files' \
-                        '--context[The target dts]:context:_files'
                     ;;
                 enable|disable)
                     _arguments \
@@ -192,18 +157,35 @@ _attach_linux() {
                         '--context[The target dts]:context:_files' \
                         '*:args:'
                     ;;
-                get-schema|suggest-parents)
+                get-schema)
                     _arguments \
                         '--compatible[Compatible string]:compatible:_attach_linux_device_keys' \
                         '--context[The target dts]:context:_files' \
                         '--linux[Path to Linux repo]:linux:_files -/' \
                         '--dt-schema[Path to dt-schema repo]:dt-schema:_files -/'
                     ;;
-                init)
+                validate2)
                     _arguments \
+                        '--overlay[Path to the dtso file]:overlay:_files' \
                         '--linux[Path to Linux repo]:linux:_files -/' \
                         '--dt-schema[Path to dt-schema repo]:dt-schema:_files -/' \
-                        '--context[The target dts]:context:_files'
+                        '--context[The target dts]:context:_files' \
+                        '*:args:'
+                    ;;
+                build)
+                    _arguments \
+                        '--overlay[Path to the DTSO overlay to compile]:overlay:_files' \
+                        '--build-command[dtc command template ({input}/{output} substituted)]:build-command:'
+                    ;;
+                deploy)
+                    _arguments \
+                        '--dtbo[Path to the compiled DTBO to deploy]:dtbo:_files' \
+                        '--ip[IP address or hostname of the remote device]:ip:' \
+                        '--user[SSH username on the remote device]:user:' \
+                        '--password[SSH password on the remote device]:password:'
+                    ;;
+                attach-manifest|list-intelligence)
+                    _arguments
                     ;;
                 list-devices)
                     _arguments \
@@ -213,7 +195,7 @@ _attach_linux() {
                     _arguments '*:args:'
                     ;;
                 completion)
-                    _arguments '1:shell:(bash zsh)'
+                    _arguments '1:shell:(zsh)'
                     ;;
                 config-get)
                     _arguments '*:field:(linux dt-schema context overlay)'
