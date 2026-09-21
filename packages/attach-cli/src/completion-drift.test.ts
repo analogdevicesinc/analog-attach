@@ -22,9 +22,15 @@ function bash_commands(script: string): string[] {
     return block[1]!.split(/\s+/).filter(t => /^[a-z][a-z0-9-]*$/.test(t));
 }
 
+// Parse the fish `complete ... -n __fish_use_subcommand -a <name>` directives.
+function fish_commands(script: string): string[] {
+    return [...script.matchAll(/-n __fish_use_subcommand -a (\S+)/g)].map(m => m[1]!);
+}
+
 const cases: [string, string, (script: string) => string[]][] = [
     ["zsh", "../completions/zsh.zsh", zsh_commands],
     ["bash", "../completions/bash.bash", bash_commands],
+    ["fish", "../completions/fish.fish", fish_commands],
 ];
 
 describe("shell completions are in sync with the command registry", () => {

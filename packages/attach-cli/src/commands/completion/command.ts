@@ -12,10 +12,11 @@ function get_completions_directory(): string {
 export function build_completion_command(_context: LocalContext): Command {
     return new Command("completion")
         .description("Generate shell completion script")
-        .argument("<shell>", "Shell to generate completions for (bash, zsh)")
+        .argument("<shell>", "Shell to generate completions for (bash, fish, zsh)")
         .action((shell: string) => {
             const files: Record<string, string> = {
                 bash: "bash.bash",
+                fish: "fish.fish",
                 zsh: "zsh.zsh",
             };
 

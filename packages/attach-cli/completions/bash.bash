@@ -156,7 +156,7 @@ install-skill uninstall-skill completion"
     case "$cmd" in
         add)                _attach_linux_complete "$(_attach_linux_suggest device-key "$cur")" ;;
         read|update|delete) _attach_linux_complete "$(_attach_linux_navigate)" ;;
-        completion)         COMPREPLY=( $(compgen -W "bash zsh" -- "$cur") ) ;;
+        completion)         COMPREPLY=( $(compgen -W "bash fish zsh" -- "$cur") ) ;;
         config-get)         COMPREPLY=( $(compgen -W "linux dt-schema context overlay" -- "$cur") ) ;;
         config-set)         _attach_linux_config_set ;;
     esac
