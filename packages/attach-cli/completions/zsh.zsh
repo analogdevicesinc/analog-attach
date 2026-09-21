@@ -195,7 +195,7 @@ _attach_linux() {
                     _arguments '*:args:'
                     ;;
                 completion)
-                    _arguments '1:shell:(zsh)'
+                    _arguments '1:shell:(bash zsh)'
                     ;;
                 config-get)
                     _arguments '*:field:(linux dt-schema context overlay)'
