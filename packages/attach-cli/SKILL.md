@@ -11,7 +11,7 @@ You are helping a user configure Linux device tree overlays for hardware devices
 
 **When to use selection questions**:
 - Choosing a device from `list-devices` results
-- Selecting a parent bus from `suggest-parents` results
+- Selecting a parent bus from `suggest parent` results
 - Choosing values for enum properties (when schema provides valid options)
 - Selecting which optional properties to configure
 - Asking which channels to set up
@@ -28,51 +28,107 @@ You are helping a user configure Linux device tree overlays for hardware devices
 
 ## Prerequisites
 
-Run `attach-linux init` once per project before anything else. It writes `.attach-linux/config.toml` (storing `--linux`, `--dt-schema`, and optionally `--context`) and builds the `compat-index.json` that `list-devices` reads.
+Set up configuration with `config-set` before using other commands. At minimum, set `linux` and `dt-schema` paths. Run `list-devices` once to build the compat index (it auto-builds on first use).
 
-After `init`, most commands pick up `--linux`, `--dt-schema`, and `--context` from `config.toml` automatically — you only need to pass them explicitly if you want to override.
+**Per-command config requirements** (when not already set via `config-set`):
+- `config-set`: No prerequisites — sets fields one at a time
+- `config-get`: No prerequisites — reads current config
+- `list-devices`: Needs `linux` and `dt-schema` (to build compat index on first run)
+- `create-workfile`: No prerequisites (also saves `overlay` path to config)
+- `get-schema`: Needs `linux`, `dt-schema`, `context`
+- `suggest parent`: Needs `linux`, `dt-schema`, `context`
+- `add`: Needs `linux`, `dt-schema`, `context`, `overlay`
+- `update`: Needs `linux`, `dt-schema`, `context`, `overlay`
+- `read`: Needs `overlay` (optionally `context` for base-tree resolution)
+- `validate`: Needs `linux`, `dt-schema`, `context`, `overlay`
+- `delete`: Needs `context`, `overlay`
+- `rename`: Needs `context`, `overlay`
+- `move`: Needs `context`, `overlay`
+- `enable`/`disable`: Needs `context`, `--overlay` (required flag)
+- `build`: Needs `overlay`
+- `deploy`: Needs `overlay-compiled`, `deploy-ip`, `deploy-user`, `deploy-password`
 
-**Per-command requirements** (when no `config.toml` is present):
-- `init`: Needs `--linux` and `--dt-schema`; `--context` optional
-- `list-devices`: No flags required (reads `compat-index.json` built by `init`)
-- `create`: Needs `--linux` (falls back to `config.toml`)
-- `get-schema`, `suggest-parents`, `validate`, `set-prop`, `add`: Need `--linux` and `--context` (fall back to `config.toml`)
-- `get-prop`: Only needs `--node`, `--property`, `--overlay` — no `--linux`/`--context` required
-- `delete`, `rename`, `move`, `unset-prop`, `enable`, `disable`: Only need `--context` (no `--linux` required)
+**Bundled dt-schema**: The CLI includes a bundled version of dt-schema, so `dt-schema` is optional for most commands. Only specify it if you need to use a different version.
 
-**Bundled dt-schema**: The CLI includes a bundled version of dt-schema, so `--dt-schema` is optional for all commands. Only specify it if you need to use a different version.
+Help users locate appropriate `.dts` files when needed — they're typically in `arch/<arch>/boot/dts/` within the Linux kernel (e.g., Raspberry Pi, BeagleBone).
 
-Help users locate appropriate `.dts` files when needed - they're typically in `arch/<arch>/boot/dts/` within the Linux kernel (e.g., Raspberry Pi, BeagleBone).
+---
+
+## Path-Based Addressing
+
+Almost all commands use **positional path arguments** to identify nodes and properties. Path segments can be provided as:
+
+- **Bare label**: `imu1`
+- **Absolute path**: `/soc/spi@7e204000`
+- **Label/child**: `imu1/channel@0`
+- **Space-separated segments**: `soc spi@7e204000 imu@0` (joined with `/`)
+
+For commands that target a property (`update`, `read`, `delete`, `rename`), the **last path segment** is interpreted as the property name when no node matches the full path.
+
+Examples:
+```bash
+# These are equivalent
+attach-linux read imu1 reg
+attach-linux read imu1/reg
+
+# These target a node
+attach-linux validate imu1
+attach-linux validate /soc/spi@7e204000/adi,ad7124-8@0
+
+# These target a property
+attach-linux update imu1/reg --with 0
+attach-linux update imu1 reg --with 0
+```
+
+A bare `name@unit` is NOT matched — nodes must be referenced by label, absolute path, or `label/child`.
 
 ---
 
 ## Commands Reference
 
-### 0. `init` - Initialize Project Configuration
+### 0. `config-set` / `config-get` - Manage Configuration
 
-**Purpose**: Create `.attach-linux/config.toml` and build `compat-index.json`. Run this once per project before using any other commands. `list-devices` will not work without it.
+**Purpose**: Set or read tool configuration fields stored in `.attach-linux/config.toml`. Replaces the old `init` command — fields are set one at a time.
 
 **Syntax**:
 ```bash
-attach-linux init --linux <path> --dt-schema <path> [--context <dts-file>]
+attach-linux config-set <field> <value>
+attach-linux config-get [fields...]
 ```
 
-**Parameters**:
-| Parameter | Required | Description |
-|-----------|----------|-------------|
-| `--linux` | Yes | Path to Linux kernel repository |
-| `--dt-schema` | Yes | Path to dt-schema repository |
-| `--context` | No | Path to target `.dts` file; stored in `config.toml` so other commands pick it up automatically |
+**Config fields**:
 
-**Output**: Writes `.attach-linux/config.toml` and `.attach-linux/compat-index.json`, printing the path of each written file.
+| Field | Required | Description |
+|-------|----------|-------------|
+| `linux` | Yes | Path to Linux kernel source tree |
+| `dt-schema` | Yes | Path to dt-schema repository |
+| `context` | Yes | Path to target base `.dts` file |
+| `overlay` | No | Path to the working `.dtso` overlay file (auto-set by `create-workfile`) |
+| `build-command` | No | dtc command template (`{input}`/`{output}` substituted); defaults to `dtc -@ -I dts -O dtb -o {output} {input}` |
+| `overlay-compiled` | No | Path to compiled `.dtbo` artifact (auto-set by `build`) |
+| `deploy-ip` | No | IP address or hostname of the remote device |
+| `deploy-user` | No | SSH username on the remote device |
+| `deploy-password` | No | SSH password on the remote device |
 
-**What it stores**: `config.toml` records the `linux`, `dt-schema`, and optionally `context` paths. All subsequent commands that accept those flags will read them from this file if the flags are not explicitly provided.
+**Examples**:
+```bash
+# Set up core paths
+attach-linux config-set linux ~/linux
+attach-linux config-set dt-schema ~/dt-schema
+attach-linux config-set context ~/linux/arch/arm/boot/dts/broadcom/bcm2837-rpi-3-b.dts
+
+# Read all config
+attach-linux config-get
+
+# Read specific fields
+attach-linux config-get linux context
+```
 
 ---
 
 ### 1. `list-devices` - Find Available Devices
 
-**Purpose**: Search the pre-built `compat-index.json` (built by `init`) for device compatible strings.
+**Purpose**: Search the compat index for device compatible strings. The index is auto-built on first use (requires `linux` and `dt-schema` in config) and auto-rebuilt when stale.
 
 **Syntax**:
 ```bash
@@ -82,9 +138,7 @@ attach-linux list-devices [--includes-word <filter>]
 **Parameters**:
 | Parameter | Required | Description |
 |-----------|----------|-------------|
-| `--includes-word` | No | Filter string (e.g., "ad7124", "adi"). Omitting it returns all entries |
-
-**Note**: Requires `compat-index.json` to exist (run `init` first). If the index is stale relative to the paths stored in `config.toml`, it is automatically rebuilt before listing.
+| `--includes-word` | No | Filter string (e.g., "ad7124", "adi"). Omitting returns all entries |
 
 **Output Format**: Plain text, one compatible string per line.
 
@@ -94,9 +148,7 @@ adi,ad7124-8
 adi,ad7173-8
 ```
 
-**How to interpret**: Each line is a "compatible string" - a unique identifier for a device binding. Use these exact strings with other commands.
-
-**Strategy**: Ask the user what board that have or if they do not know for sure, start broad (e.g., `--includes-word adi` for Analog Devices), then narrow down based on user's specific chip.
+**Strategy**: Ask the user what board they have or if they do not know for sure, start broad (e.g., `--includes-word adi` for Analog Devices), then narrow down based on user's specific chip.
 
 ---
 
@@ -106,16 +158,16 @@ adi,ad7173-8
 
 **Syntax**:
 ```bash
-attach-linux get-schema --linux <path> --context <dts-file> --compatible <string>
+attach-linux get-schema --compatible <string> [--context <dts-file>] [--linux <path>] [--dt-schema <path>]
 ```
 
 **Parameters**:
 | Parameter | Required | Description |
 |-----------|----------|-------------|
-| `--linux` | Yes | Path to Linux kernel repository |
-| `--dt-schema` | No | Path to dt-schema repository (uses bundled version by default) |
-| `--context` | Yes | Path to target `.dts` file |
 | `--compatible` | Yes | Device compatible string (from `list-devices`) |
+| `--context` | No | Path to target `.dts` file (falls back to config) |
+| `--linux` | No | Path to Linux kernel repository (falls back to config) |
+| `--dt-schema` | No | Path to dt-schema repository (falls back to config) |
 
 **Output Format**: JSON object with this structure:
 
@@ -162,7 +214,7 @@ attach-linux get-schema --linux <path> --context <dts-file> --compatible <string
 ```
 
 **Interpretation Strategy**:
-1. First check `required_properties` - these MUST be configured
+1. First check `required_properties` — these MUST be configured
 2. Scan `properties` for user-relevant options (ignore internal ones like `compatible`)
 3. If `pattern_properties` exists, the device has configurable child nodes (channels, endpoints, etc.)
 4. Use `description` fields to explain options to the user
@@ -170,22 +222,21 @@ attach-linux get-schema --linux <path> --context <dts-file> --compatible <string
 
 ---
 
-### 3. `suggest-parents` - Find Valid Parent Nodes
+### 3. `suggest parent` - Find Valid Parent Nodes
 
 **Purpose**: Find where in the device tree the device can be attached (which bus controller).
 
 **Syntax**:
 ```bash
-attach-linux suggest-parents --linux <path> --context <dts-file> --compatible <string>
+attach-linux suggest parent <compatible>
 ```
 
 **Parameters**:
 | Parameter | Required | Description |
 |-----------|----------|-------------|
-| `--linux` | Yes | Path to Linux kernel repository |
-| `--dt-schema` | No | Path to dt-schema repository (uses bundled version by default) |
-| `--context` | Yes | Path to target `.dts` file |
-| `--compatible` | Yes | Device compatible string |
+| `<compatible>` | Yes | Device compatible string (positional argument) |
+
+**Note**: Reads `linux`, `dt-schema`, and `context` from config. No flag overrides.
 
 **Output Format**: JSON array of parent node objects.
 
@@ -193,18 +244,18 @@ attach-linux suggest-parents --linux <path> --context <dts-file> --compatible <s
 [
   {
     "label": "spi0",
-    "path": "/soc/spi@7e204000"
+    "path": ["soc", "spi@7e204000"]
   },
   {
-    "label": "i2c1,
-    "path": "/soc/i2c@7e804000"
+    "label": "i2c1",
+    "path": ["soc", "i2c@7e804000"]
   }
 ]
 ```
 
 **How to interpret**:
-- `label`: Short reference name (use as `&spi0` in overlay)
-- `path`: Full device tree path (use as `&{/soc/spi@7e204000}` in overlay)
+- `label`: Short reference name (use as `--to spi0` in `add`)
+- `path`: Full device tree path segments
 
 **Strategy**:
 - SPI devices → look for `spi` in label/compatible
@@ -213,198 +264,197 @@ attach-linux suggest-parents --linux <path> --context <dts-file> --compatible <s
 
 **Parent Selection Guidelines**:
 - When presenting parent options to the user, you may show only the most probable parents in the selection question for simplicity
-- However, **always list ALL possible parents** returned by `suggest-parents` either in the question description or before asking, so users can see every valid option
-- If the user selects "Other" and provides a custom parent value, **validate it against the `suggest-parents` results**
-- If the user's input is NOT in the list of valid parents from `suggest-parents`, warn them: "The parent node you specified was not found in the list of valid parents for this device. Are you sure you want to use this parent?" and ask for confirmation before proceeding
+- However, **always list ALL possible parents** returned by `suggest parent` either in the question description or before asking, so users can see every valid option
+- If the user selects "Other" and provides a custom parent value, **validate it against the `suggest parent` results**
+- If the user's input is NOT in the list of valid parents, warn them: "The parent node you specified was not found in the list of valid parents for this device. Are you sure you want to use this parent?" and ask for confirmation before proceeding
 
 ---
 
-### 4. `create` - Generate Device Tree Overlay
+### 4. `create-workfile` - Create Empty Overlay File
 
-**Purpose**: Create a minimal `.dtso` overlay file for a device.
+**Purpose**: Create a minimal empty `.dtso` overlay file and save its path to config as the working overlay.
 
 **Syntax**:
 ```bash
-attach-linux create --linux <path> --compatible <string> --parent <node> --label <label> --output <file>
+attach-linux create-workfile [--name <filename>]
 ```
-
-**Always pass `--label`** (e.g. `--label imu1`) — later commands (`validate`, `get-prop`, `set-prop`, `add --to`) identify this node by label or path only, never by its bare name.
 
 **Parameters**:
 | Parameter | Required | Description |
 |-----------|----------|-------------|
-| `--linux` | No | Path to Linux kernel repository (falls back to `config.toml`) |
-| `--dt-schema` | No | Path to dt-schema repository (uses bundled version by default) |
-| `--compatible` | Yes | Device compatible string |
-| `--parent` | No | Parent node: label, path, or `label/child` (e.g. `spi0`, `/soc/spi@...`, `spi0/mux`) — a bare name/`name@unit` is NOT matched, since it isn't guaranteed unique across the tree |
-| `--label` | No | Label to attach to the new node (e.g. `imu1`), so it can be referenced later by that label (e.g. as a `--to` for `add`). **Always set this** — without a label, the new node can only be referenced later by its full path, which most other commands cannot compute for you |
-| `--output` | No | Output file path (should end in `.dtso`). If omitted, the overlay is printed to stdout |
+| `--name` | No | Output filename (default: `overlay.dtso`) |
 
-**Output**: If `--output` is given, writes the file and prints confirmation. If omitted, prints the overlay to stdout.
-
-**Generated File Structure**:
+**Output**: Writes an empty overlay file:
 ```dts
 /dts-v1/;
 /plugin/;
 
-&spi0 {
-    adi,ad7124-8 {
-        compatible = "adi,ad7124-8";
-    };
+/ {
 };
 ```
 
 **Next Steps After Create**:
-1. Read the generated file to verify structure
-2. Use `get-schema` to identify required and optional properties
-3. Use `set-prop` to add all required properties
-4. Use `set-prop` to add optional properties based on user needs
-5. If the user needs another device or a subnode (e.g. a channel), use `add`
-6. Validate with `validate` command
-7. Fix any errors using `set-prop`, repeat validation until clean
+1. Use `add` to add a device node to the overlay
+2. Use `update` to configure properties
+3. Validate and iterate
 
 ---
 
 ### 5. `add` - Add a Node to an Existing Overlay
 
-**Purpose**: Add a new node into an already-existing `.dtso` file (created by `create`) — either another top-level device sibling, or a subnode (e.g. a channel) nested under a node already present in the overlay.
+**Purpose**: Add a new node into an already-existing `.dtso` file — either a device node with a compatible string, or a bare subnode (e.g. a channel) without one.
 
-There are two distinct usage patterns depending on whether the node has a `compatible` property:
+There are two distinct usage patterns:
 
-**Pattern A — device node with a compatible string** (e.g. a second ADC on the same bus):
+**Pattern A — device node with a compatible string** (e.g. an ADC on a bus):
 ```bash
-attach-linux add --linux <path> --context <dts-file> --overlay <dtso-file> <compatible-string> [--name <node-name>] [--to <node>] [--label <label>]
+attach-linux add <compatible-string> --to <parent> --label <label> [--overlay <dtso>]
 ```
 
-**Pattern B — bare subnode without compatible** (e.g. a channel, an alias, any structural node):
+**Pattern B — bare subnode without compatible** (e.g. a channel, alias, structural node):
 ```bash
-attach-linux add --linux <path> --context <dts-file> --overlay <dtso-file> --name <node-name> --to <valid-path> [--label <label>]
+attach-linux add --name <node-name> --to <parent> [--label <label>] [--overlay <dtso>]
 ```
 
-> **Rule**: nodes that have no `compatible` property — channels, aliases, bus sub-nodes, etc. — **must not** receive the positional device-key argument. Pass `--name` and `--to` only; omitting `--to` adds the node at root `/`.
+> **Rule**: nodes that have no `compatible` property — channels, aliases, bus sub-nodes, etc. — **must not** receive the positional device-key argument. Pass `--name` and `--to` only.
 
 **Parameters**:
 | Parameter | Required | Description |
-|-----------|----------|--------------|
-| `--linux` | Yes | Path to Linux kernel repository |
-| `--dt-schema` | No | Path to dt-schema repository (uses bundled version by default) |
-| `--context` | Yes | Path to base `.dts` file |
-| `--overlay` | Yes | Path to the existing `.dtso` file to modify (file is updated in place; must already exist — use `create` first) |
-| `<compatible-string>` | Pattern A only | Compatible string of the device binding to add (positional arg). **Do not pass for bare subnodes** (channels, aliases, etc.) |
-| `--name` | Required for Pattern B; optional for Pattern A | Node name (e.g. `channel@0`); for Pattern A defaults to the positional compatible string if omitted |
-| `--to` | No | Where to attach the new node: label, path, or `label/child` of a node already in the base `.dts` or the overlay (e.g. `spi0`, `/soc/spi@...`, `spi0/adi,ad7124-8`). Defaults to root `/` if omitted. A bare name/`name@unit` is NOT matched — a node added via `create`/`add` without `--label` can only be targeted by its full path |
-| `--label` | No | Label to attach to the new node (e.g. `imu1`), so it can be referenced later by that label (e.g. as a `--to` for a subsequent `add`). **Always set this** when the new node might need to be referenced again later |
+|-----------|----------|-------------|
+| `<compatible-string>` | Pattern A only | Compatible string of the device binding (positional arg). **Do not pass for bare subnodes** |
+| `--name` | Required for Pattern B; optional for Pattern A | Node name (e.g. `channel@0`); defaults to the positional key for Pattern A |
+| `--to` | No | Parent node: label, path, or label/child (e.g. `spi0`, `imu1`). Defaults to root `/` if omitted. Variadic — space-separated tokens are joined with `/` |
+| `--label` | No | Label to attach to the new node (e.g. `imu1`). **Always set this** when the node will be referenced later |
+| `--overlay` | No | Path to `.dtso` file (falls back to config) |
+| `--context` | No | The target `.dts` (falls back to config) |
+| `--linux` | No | Path to Linux repo (falls back to config) |
+| `--dt-schema` | No | Path to dt-schema repo (falls back to config) |
 
 **Examples**:
 ```bash
-# Pattern A: add a second sibling device under the same bus
-attach-linux add --linux ~/linux --context ~/ctx.dts --overlay overlay.dtso adi,ad7124-4 --to spi0
+# Pattern A: add a device node under spi0
+attach-linux add adi,ad7124-8 --to spi0 --label imu1
 
 # Pattern B: add a channel subnode (no compatible) under a labeled device
-attach-linux add --linux ~/linux --context ~/ctx.dts --overlay overlay.dtso --name channel@0 --to imu1
+attach-linux add --name channel@0 --to imu1
 
-# Pattern B: add a channel when no label was set — target by full path instead
-attach-linux add --linux ~/linux --context ~/ctx.dts --overlay overlay.dtso --name channel@0 --to /soc/spi@7e204000/adi,ad7124-8
+# Pattern B: add a channel to a node without a label — target by path
+attach-linux add --name channel@0 --to /soc/spi@7e204000/adi,ad7124-8
 ```
 
 **Next Steps After Add**:
 1. Read the overlay to verify the new node's placement
-2. If the new node has a compatible string (Pattern A), use `get-schema` and `set-prop` to configure it, same as after `create`
-3. If the new node is a bare subnode (Pattern B — `--name` only, no compatible string), its properties currently cannot be set with `set-prop` (see Limitations below) — edit the `.dtso` directly for those
-4. `validate` works on bare subnodes too — it checks the node's name against the parent's `pattern_properties` (see `get-schema`) and reports the same error types (`missing_required`, `number_limit`, etc.)
+2. For device nodes (Pattern A), use `get-schema` and `update` to configure properties
+3. For bare subnodes (Pattern B), use `update` with path-based addressing to set properties (e.g. `update imu1/channel@0/reg --with 0`)
+4. `validate` works on both device nodes and bare subnodes
 
 ---
 
-### 5b. `delete` - Remove an Overlay-Added Node
+### 5b. `delete` - Remove a Node or Property
 
-**Purpose**: Remove a node that the current overlay introduced. Only overlay-added nodes can be deleted — base device-tree nodes are refused. If the parent reference block becomes empty after deletion it is also removed from the output.
+**Purpose**: Remove an overlay-added node, or remove a property from a node. Base device-tree nodes themselves cannot be deleted.
 
 **Syntax**:
 ```bash
-attach-linux delete --context <dts-file> --overlay <dtso-file> --node <node>
+attach-linux delete [path...] [--overlay <dtso>] [--context <dts>] [--force]
 ```
 
-**Flags**:
-| Flag | Required | Description |
-|------|----------|-------------|
-| `--node` | Yes | Node to delete: label, path, or `label/child` |
-| `--overlay` | Yes | The `.dtso` file to edit |
-| `--context` | If no `config.toml` | Base `.dts` file — needed to distinguish overlay nodes from base nodes |
+**Parameters**:
+| Parameter | Required | Description |
+|-----------|----------|-------------|
+| `[path...]` | No | Path to node or property (positional segments). Omit for whole-overlay preview/delete |
+| `--overlay` | No | The `.dtso` file to edit (falls back to config) |
+| `--context` | No | Base `.dts` file (falls back to config) |
+| `--force` | No | Force delete of non-leaf nodes (waterfall delete) or clear entire overlay |
 
-**Example**:
+**Behavior**:
+- **Node path**: Deletes the overlay-added node; refuses base-tree nodes
+- **Property path** (e.g. `imu1/reg`): Removes the property from the node (works for overlay-added and base-tree-override properties)
+- **No path**: Preview what would be deleted (node/property counts). Add `--force` to actually clear all overlay content
+- **Non-leaf node without `--force`**: Returns a preview of what would be deleted
+
+**Examples**:
 ```bash
-# Remove a node previously added with `add`
-attach-linux delete --context ~/ctx.dts --overlay overlay.dtso --node imu1
+# Delete a node
+attach-linux delete imu1
+
+# Delete a grandchild via label/child
+attach-linux delete imu1/channel@0
+
+# Remove a property
+attach-linux delete imu1/spi-max-frequency
+
+# Remove an overlay-set property from a base-tree node
+attach-linux delete spi0/status
+
+# Preview what would be deleted
+attach-linux delete
+
+# Clear all overlay content
+attach-linux delete --force
 ```
 
 **Error messages**:
-- `Couldn't find node <node> in <overlay>` — the node is not in the merged tree at all.
-- `<node> is part of the base device tree, not this overlay` — the node came from the `.dts`, not the overlay; delete is refused.
+- `Node <path> not found` — node not in the merged tree
+- `<path> is part of the base device tree, not this overlay` — base-tree node deletion refused
 
 ---
 
-### 5c. `rename` - Rename an Overlay-Added Node
+### 5c. `rename` - Rename a Node or Property
 
-**Purpose**: Change the node key (`name@unit_addr`) of a node that the current overlay introduced. Only overlay-added nodes can be renamed — base device-tree nodes are refused. Labels are left untouched.
+**Purpose**: Change the node key (`name@unit_addr`) or rename a property of an overlay-added node.
 
 **Syntax**:
 ```bash
-attach-linux rename --context <dts-file> --overlay <dtso-file> --node <node> --to <new-key>
+attach-linux rename [path...] --to <new-key> [--overlay <dtso>] [--context <dts>]
 ```
 
-**Flags**:
-| Flag | Required | Description |
-|------|----------|-------------|
-| `--node` | Yes | Node to rename: label, path, or `label/child` |
-| `--to` | Yes | New node key. If `@` is omitted the existing unit address is preserved (e.g. `--to my_adc` on `adi,ad7124-8@0` → `my_adc@0`). Include `@unit` to override (e.g. `--to my_adc@1` → `my_adc@1`) |
-| `--overlay` | Yes | The `.dtso` file to edit |
-| `--context` | If no `config.toml` | Base `.dts` file |
+**Parameters**:
+| Parameter | Required | Description |
+|-----------|----------|-------------|
+| `[path...]` | Yes | Path to node or property (positional segments) |
+| `--to` | Yes | New key. For nodes: if `@` is omitted the existing unit address is preserved; include `@unit` to override. For properties: the new property name |
+| `--overlay` | No | The `.dtso` file to edit (falls back to config) |
+| `--context` | No | Base `.dts` file (falls back to config) |
 
-**Example**:
+**Examples**:
 ```bash
-attach-linux rename --context ~/ctx.dts --overlay overlay.dtso --node imu1 --to my_adc
-# renames adi,ad7124-8@0 → my_adc@0 (unit address preserved)
+# Rename a node (preserves unit address)
+attach-linux rename imu1 --to my_adc
+# adi,ad7124-8@0 → my_adc@0
 
-attach-linux rename --context ~/ctx.dts --overlay overlay.dtso --node imu1 --to my_adc@1
-# renames adi,ad7124-8@0 → my_adc@1 (unit address overridden)
+# Rename with unit address override
+attach-linux rename imu1 --to my_adc@1
+# adi,ad7124-8@0 → my_adc@1
+
+# Rename a property
+attach-linux rename imu1/status --to status-x
 ```
-
-**Error messages**:
-- `Couldn't find node <node>` — node not in the merged tree.
-- `<node> is part of the base device tree` — rename refused; overlay-added only.
-- `<to> already exists under the same parent` — key conflict at destination.
 
 ---
 
-### 5d. `move` - Move an Overlay-Added Node to a Different Parent
+### 5d. `move` - Move a Node to a Different Parent
 
-**Purpose**: Relocate a node introduced by the current overlay under a different parent. The node's key and labels are preserved. Only overlay-added nodes can be moved — base device-tree nodes are refused.
+**Purpose**: Relocate an overlay-added node under a different parent. Labels and the node key are preserved.
 
 **Syntax**:
 ```bash
-attach-linux move --context <dts-file> --overlay <dtso-file> --node <node> --parent <dest>
+attach-linux move [path...] --to <dest> [--overlay <dtso>] [--context <dts>]
 ```
 
-**Flags**:
-| Flag | Required | Description |
-|------|----------|-------------|
-| `--node` | Yes | Node to move: label, path, or `label/child` |
-| `--parent` | Yes | Destination parent: label, path, or `label/child` |
-| `--overlay` | Yes | The `.dtso` file to edit |
-| `--context` | If no `config.toml` | Base `.dts` file |
+**Parameters**:
+| Parameter | Required | Description |
+|-----------|----------|-------------|
+| `[path...]` | Yes | Path to node (positional segments) |
+| `--to` | Yes | Destination parent: label, path, or label/child. Variadic — space-separated tokens joined with `/` |
+| `--overlay` | No | The `.dtso` file to edit (falls back to config) |
+| `--context` | No | Base `.dts` file (falls back to config) |
 
 **Example**:
 ```bash
 # Move imu1 from spi0 to spi1
-attach-linux move --context ~/ctx.dts --overlay overlay.dtso --node imu1 --parent spi1
+attach-linux move imu1 --to spi1
 ```
-
-**Error messages**:
-- `Couldn't find node <node>` — node not in the merged tree.
-- `<node> is part of the base device tree` — move refused; overlay-added only.
-- `Couldn't find parent node <parent>` — destination not found.
-- `Cannot move <node> into itself or one of its descendants` — cycle detected.
-- `<parent> already has a child named <key>` — key conflict at destination.
 
 ---
 
@@ -414,22 +464,22 @@ attach-linux move --context ~/ctx.dts --overlay overlay.dtso --node imu1 --paren
 
 **Syntax**:
 ```bash
-attach-linux validate --node <name> --overlay <dtso-file> [--linux <path>] [--context <dts-file>]
+attach-linux validate [path...] [--overlay <dtso>] [--linux <path>] [--dt-schema <path>] [--context <dts>]
 ```
 
 **Parameters**:
 | Parameter | Required | Description |
 |-----------|----------|-------------|
-| `--linux` | No | Path to Linux kernel repository (falls back to `config.toml`) |
-| `--dt-schema` | No | Path to dt-schema repository (uses bundled version by default) |
-| `--context` | No | Path to base `.dts` file (falls back to `config.toml`) |
-| `--node` | Yes | Target node: label, path, or `label/child` (e.g. `imu1`, `/soc/spi@0/imu@0`, `spi0/adi,ad7124-8`) — a bare name/`name@unit` is NOT matched, since it isn't guaranteed unique across the tree |
-| `--overlay` | Yes | Path to `.dtso` file containing the node |
+| `[path...]` | Yes | Path to the node to validate (positional segments) |
+| `--overlay` | No | Path to `.dtso` file (falls back to config) |
+| `--linux` | No | Path to Linux repo (falls back to config) |
+| `--dt-schema` | No | Path to dt-schema repo (falls back to config) |
+| `--context` | No | Path to base `.dts` file (falls back to config) |
 
-**Output Format**: Three sections printed to stdout:
+**Output**: Three sections in human mode:
 1. JSON object of parsed node values (what was found)
-2. `============= UPDATED BINDING =============` header followed by the full updated binding JSON
-3. `============= VALIDATION ERRORS =============` header followed by the errors array JSON
+2. `============= UPDATED BINDING =============` header followed by binding JSON
+3. `============= VALIDATION ERRORS =============` header followed by errors array
 
 **Error Types**:
 
@@ -440,91 +490,80 @@ attach-linux validate --node <name> --overlay <dtso-file> [--linux <path>] [--co
 | `"failed_dependency"` | Dependent property missing | `dependent_property`, `missing_property` |
 | `"generic"` | Other validation error | `origin`, `msg` |
 
-**Example Error**:
-```json
-[
-  {"_t": "missing_required", "missing_property": "reg", "instance": ["adi,ad7124-8"]},
-  {"_t": "number_limit", "failed_property": ["spi-max-frequency"], "limit": 5000000, "comparison": "<="}
-]
-```
-
 **Interpretation Strategy**:
-1. Empty array `[]` = validation passed
-2. For `missing_required`: add the property to the overlay using `set-prop`
-3. For `number_limit`: adjust value to be within bounds using `set-prop`
-4. For `failed_dependency`: add the missing dependent property using `set-prop`
+1. Empty errors `[]` = validation passed
+2. For `missing_required`: add the property using `update`
+3. For `number_limit`: adjust value to be within bounds using `update`
+4. For `failed_dependency`: add the missing dependent property using `update`
 
-**Bare subnodes (channels, etc.)**: If `--node` has no `compatible` property (e.g. a channel added via `add --name channel@0`), `validate` checks the node's name against its parent's `pattern_properties` (see `get-schema`). If the node name matches one of the parent's patterns (e.g. `^channel@([0-9]|1[0-5])$`), it is validated against that pattern's `properties`/`required` rules, same error types as above. If the node has no `compatible` and its parent has none either, or the node name matches none of the parent's patterns, validation cannot proceed and an explanatory message is printed instead.
+**Bare subnodes (channels, etc.)**: If the node has no `compatible` property (e.g. a channel added via `add --name channel@0`), `validate` checks the node's name against its parent binding's `pattern_properties`. If the node name matches a parent pattern, it is validated against that pattern's rules.
 
 ---
 
-### 7. `get-prop` - Read Property Value
+### 7. `read` - Read Node or Property
 
-**Purpose**: Read the current value of a property from a node in a `.dtso` file.
+**Purpose**: Read a node subtree or property value from the overlay.
 
 **Syntax**:
 ```bash
-attach-linux get-prop --node <name> --overlay <dtso-file> --property <prop-name>
+attach-linux read [path...] [--overlay <dtso>] [--context <dts>]
 ```
 
 **Parameters**:
 | Parameter | Required | Description |
 |-----------|----------|-------------|
-| `--node` | Yes | Target node: label, path, or `label/child` (e.g. `imu1`, `/soc/spi@0/imu@0`, `spi0/adi,ad7124-8`) — a bare name/`name@unit` is NOT matched, since it isn't guaranteed unique across the tree |
-| `--overlay` | Yes | Path to `.dtso` file containing the node |
-| `--property` | Yes | Name of the property to read |
+| `[path...]` | No | Path to node or property. Omit to read entire overlay |
+| `--overlay` | No | Path to `.dtso` file (falls back to config) |
+| `--context` | No | Path to base `.dts` file (falls back to config) |
 
-**Note**: `get-prop` reads directly from the overlay file and does not require `--linux`, `--context`, or `--dt-schema`.
-
-**Output Format**: Plain text value printed to stdout.
+**Note**: `read` does not require `--linux` or `--dt-schema`.
 
 **Examples**:
 ```bash
-# Get the reg property value
-attach-linux get-prop --node imu1 --overlay overlay.dtso --property reg
-# Output: <0x00>
+# Read entire overlay
+attach-linux read
 
-# Get a boolean/flag property (returns "true" if present)
-attach-linux get-prop --node imu1 --overlay overlay.dtso --property spi-cpha
-# Output: true
+# Read a node subtree
+attach-linux read imu1
+
+# Read a property value
+attach-linux read imu1/reg
+
+# Boolean/flag property returns "true" if present
+attach-linux read imu1/spi-cpha
 ```
-
-**Error Cases**:
-- Node not found: `Couldn't find <node> in <input>`
-- Property not found: `Couldn't find <property> in <node> in <input>`
 
 ---
 
-### 8. `set-prop` - Set Property Value
+### 8. `update` - Set Property Value
 
-**Purpose**: Set or update a property value in a node within a `.dtso` file. **This is the required method for configuring device properties.**
+**Purpose**: Set or update a property value on a node. Works on both overlay-added nodes and base-tree nodes (writes into an overlay fragment; the base tree is never modified). **This is the required method for configuring device properties.**
 
 **Syntax**:
 ```bash
-attach-linux set-prop --node <name> --overlay <dtso-file> --property <prop-name> --value <value> [--linux <path>] [--context <dts-file>]
+attach-linux update [path...] --with <value> [--overlay <dtso>] [--context <dts>] [--linux <path>] [--dt-schema <path>]
 ```
 
 **Parameters**:
 | Parameter | Required | Description |
 |-----------|----------|-------------|
-| `--linux` | No | Path to Linux kernel repository (falls back to `config.toml`) |
-| `--dt-schema` | No | Path to dt-schema repository (uses bundled version by default) |
-| `--context` | No | Path to base `.dts` file (falls back to `config.toml`) |
-| `--node` | Yes | Target node: label, path, or `label/child` (e.g. `imu1`, `/soc/spi@0/imu@0`, `spi0/adi,ad7124-8`) — a bare name/`name@unit` is NOT matched, since it isn't guaranteed unique across the tree |
-| `--overlay` | Yes | Path to `.dtso` file to modify (file is updated in place) |
-| `--property` | Yes | Name of the property to set |
-| `--value` | Yes | Value to set (see Value Formats below) |
+| `[path...]` | Yes | Path segments: node followed by property name (e.g. `imu1 reg` or `imu1/reg`) |
+| `--with` | Yes | Value to set (see Value Formats below) |
+| `--overlay` | No | Path to `.dtso` file (falls back to config) |
+| `--context` | No | Path to base `.dts` file (falls back to config) |
+| `--linux` | No | Path to Linux repo (falls back to config) |
+| `--dt-schema` | No | Path to dt-schema repo (falls back to config) |
 
-**Value Formats**:
+**Value Formats** (for `--with`):
 
 | Format | Example | Description |
 |--------|---------|-------------|
 | Single number | `0` | Integer value |
 | Single string | `adi,ad7124-8` | String value |
 | Boolean | `true` or `false` | For flag properties (true = add flag, false = remove flag) |
-| Array | `0 1 2` | Space-separated items |
-| Mixed array | `25 IRQ_FALLING_EDGE` | Numbers and macros, space-separated |
-| Matrix rows | `0 1,2 3` | Comma separates rows, space separates items within a row — produces a true multi-row matrix `<0 1>, <2 3>;` |
+| Array | `"0 1 2"` | Space-separated items |
+| Mixed array | `"25 IRQ_TYPE_EDGE_FALLING"` | Numbers and macros, space-separated |
+| Matrix rows | `"0 1,2 3"` | Comma separates rows, space separates items within a row — produces `<0 1>, <2 3>;` |
 | Phandle ref | `gpio` | Reference to another node (used with `<&gpio>` syntax) |
 
 Comma is only a row separator; it can't appear in labels, macros, or numbers.
@@ -532,100 +571,141 @@ Comma is only a row separator; it can't appear in labels, macros, or numbers.
 **Examples**:
 ```bash
 # Set a simple integer property
-attach-linux set-prop --node imu1 --overlay overlay.dtso --property reg --value 0
+attach-linux update imu1/reg --with 0
 
 # Set SPI frequency
-attach-linux set-prop --node imu1 --overlay overlay.dtso --property spi-max-frequency --value 5000000
+attach-linux update imu1/spi-max-frequency --with 5000000
 
 # Enable a boolean flag
-attach-linux set-prop --node imu1 --overlay overlay.dtso --property spi-cpha --value true
+attach-linux update imu1/spi-cpha --with true
 
 # Disable/remove a boolean flag
-attach-linux set-prop --node imu1 --overlay overlay.dtso --property spi-cpha --value false
+attach-linux update imu1/spi-cpha --with false
 
 # Set an interrupt array
-attach-linux set-prop --node imu1 --overlay overlay.dtso --property interrupts --value "25 IRQ_TYPE_EDGE_FALLING"
+attach-linux update imu1/interrupts --with "25 IRQ_TYPE_EDGE_FALLING"
 
 # Set a phandle reference for interrupt-parent
-attach-linux set-prop --node imu1 --overlay overlay.dtso --property interrupt-parent --value gpio
+attach-linux update imu1/interrupt-parent --with gpio
 
-# Set string array (e.g., clock-names)
-attach-linux set-prop --node imu1 --overlay overlay.dtso --property clock-names --value "spi pclk"
+# Set string array
+attach-linux update imu1/clock-names --with "spi pclk"
+
+# Set a property on a channel subnode
+attach-linux update imu1/channel@0/reg --with 0
+
+# Set a property on a base-tree node (writes overlay fragment)
+attach-linux update spi0/status --with okay
 ```
 
-**Validation**: The command validates the value against the device binding schema before applying. If the value is invalid, an error message is displayed explaining the valid options.
-
-**Error Examples**:
-```
-Property reg in binding demands numbers
-Values for property io-channel-ranges are ["IO_CHANNEL_RANGE_1", "IO_CHANNEL_RANGE_2"]
-Property spi-max-frequency accepts values <= 5000000
-```
-
-**Limitations**:
-- **Channel/subnode properties are NOT supported** - The `set-prop` command currently only works on properties of the main device node. Properties inside child nodes (e.g., `channel@0`, `channel@1`) cannot be set using this command, even after creating the subnode with `add`. For channel configuration, you must manually edit the `.dtso` file.
+**Validation**: The command validates the value against the device binding schema when a binding can be resolved. If the value is invalid, an error message is displayed. When no binding is found, the value is written using best-effort type inference from the syntax.
 
 ---
 
-### 9. `unset-prop` - Remove an Overlay-Set Property
+### 9. `suggest` - Smart Suggestions
 
-**Purpose**: Remove a property that was set by the overlay from a node. Only properties carrying the overlay's `modified_by_user` mark can be removed — properties that exist only in the base device tree are refused. Removing an overlay override of a base property effectively restores the base value.
+**Purpose**: Multi-kind suggestion engine for parent nodes, device keys, properties, navigation, and types.
 
 **Syntax**:
 ```bash
-attach-linux unset-prop --context <dts-file> --overlay <dtso-file> --node <node> --property <prop-name>
+attach-linux suggest <kind> [args...]
 ```
 
-**Flags**:
-| Flag | Required | Description |
-|------|----------|-------------|
-| `--node` | Yes | Target node: label, path, or `label/child` |
-| `--property` | Yes | Name of the property to remove |
-| `--overlay` | Yes | The `.dtso` file to edit |
-| `--context` | If no `config.toml` | Base `.dts` file |
+**Kinds**:
 
-**Example**:
+| Kind | Args | Description |
+|------|------|-------------|
+| `parent` | `<compatible>` | Valid parent nodes for a device |
+| `device-key` | `[filter]` | Compatible strings from compat index |
+| `node-prop` | `<node-ref>` | All binding-declared properties for a node |
+| `navigate` | `[node-ref]` | Children and properties of a node (or overlay entry points if omitted) |
+| `type` | `<prop-ref>` | Expected value type of a property |
+
+**Examples**:
 ```bash
-attach-linux unset-prop --context ~/ctx.dts --overlay overlay.dtso --node imu1 --property spi-max-frequency
+# Find valid parents for a device
+attach-linux suggest parent adi,ad7124-8
+
+# List compatible strings matching a filter
+attach-linux suggest device-key ad7124
+
+# List all properties for a node (marks which are set/required)
+attach-linux suggest node-prop imu1
+
+# Navigate overlay structure
+attach-linux suggest navigate          # list top-level entry points
+attach-linux suggest navigate imu1     # list children and properties of imu1
+
+# Get the type of a property
+attach-linux suggest type imu1/reg
 ```
 
-**Note**: The printer auto-inserts `status = "okay"` whenever a node has overlay-added child nodes and no explicit `status` property. Unsetting `status` on such a node will still produce `status = "okay"` in the output — this is correct printer behaviour.
-
-**Error messages**:
-- `Couldn't find node <node>` — node not found.
-- `Couldn't find property <prop> in <node>` — property not present.
-- `<prop> in <node> is not set by this overlay` — property exists only in the base tree; unset refused.
+Use `list-intelligence` to get full metadata about each suggestion kind.
 
 ---
 
 ### 10. `enable` / `disable` - Set Node Status
 
-**Purpose**: Convenience wrappers that set `status = "okay"` (`enable`) or `status = "disabled"` (`disable`) on a node. Works on both base-tree nodes and overlay-added nodes — setting status on a base-tree node is a common and valid overlay use case.
+**Purpose**: Convenience wrappers that set `status = "okay"` (`enable`) or `status = "disabled"` (`disable`). Works on both base-tree and overlay-added nodes.
 
 **Syntax**:
 ```bash
-attach-linux enable  --context <dts-file> --overlay <dtso-file> --node <node>
-attach-linux disable --context <dts-file> --overlay <dtso-file> --node <node>
+attach-linux enable  --node <node> --overlay <dtso-file> [--context <dts-file>]
+attach-linux disable --node <node> --overlay <dtso-file> [--context <dts-file>]
 ```
 
-**Flags**:
-| Flag | Required | Description |
-|------|----------|-------------|
-| `--node` | Yes | Target node: label, path, or `label/child` |
-| `--overlay` | Yes | The `.dtso` file to edit |
-| `--context` | If no `config.toml` | Base `.dts` file |
+**Parameters**:
+| Parameter | Required | Description |
+|-----------|----------|-------------|
+| `--node` | Yes | Target node: label, path, or label/child |
+| `--overlay` | Yes | Path to `.dtso` file |
+| `--context` | No | Base `.dts` file (falls back to config) |
 
-**Examples**:
+**Note**: These are human-only commands (not protocol commands).
+
+---
+
+### 11. `build` - Compile Overlay
+
+**Purpose**: Compile the `.dtso` overlay into a `.dtbo` binary using `dtc`.
+
+**Syntax**:
 ```bash
-# Enable a peripheral that is disabled in the base tree
-attach-linux enable --context ~/ctx.dts --overlay overlay.dtso --node spi0
-
-# Disable a node
-attach-linux disable --context ~/ctx.dts --overlay overlay.dtso --node spi1
+attach-linux build [--overlay <dtso>] [--build-command <template>]
 ```
 
-**Error messages**:
-- `Couldn't find node <node>` — node not found in the merged tree.
+**Parameters**:
+| Parameter | Required | Description |
+|-----------|----------|-------------|
+| `--overlay` | No | Path to `.dtso` to compile (falls back to config) |
+| `--build-command` | No | dtc command template with `{input}`/`{output}` placeholders (falls back to config, then to default: `dtc -@ -I dts -O dtb -o {output} {input}`) |
+
+**Requirements**: `dtc` must be on PATH.
+
+**Output**: Writes `.dtbo` file (same name as input with `.dtbo` extension) and saves its path to config as `overlay-compiled`.
+
+---
+
+### 12. `deploy` - Deploy to Remote Device
+
+**Purpose**: Copy the compiled `.dtbo` to a remote device via SCP and reboot it.
+
+**Syntax**:
+```bash
+attach-linux deploy [--dtbo <path>] [--ip <host>] [--user <user>] [--password <pass>]
+```
+
+**Parameters**:
+| Parameter | Required | Description |
+|-----------|----------|-------------|
+| `--dtbo` | No | Path to compiled `.dtbo` (falls back to `overlay-compiled` in config) |
+| `--ip` | No | Remote device IP/hostname (falls back to `deploy-ip` in config) |
+| `--user` | No | SSH username (falls back to `deploy-user` in config) |
+| `--password` | No | SSH password (falls back to `deploy-password` in config) |
+
+**Requirements**: `sshpass` must be on PATH. All four fields (dtbo, ip, user, password) must be provided either as flags or via config.
+
+**Behavior**: Copies the `.dtbo` to `/boot/overlays/` on the remote device, then reboots it.
 
 ---
 
@@ -633,77 +713,92 @@ attach-linux disable --context ~/ctx.dts --overlay overlay.dtso --node spi1
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│ 0. INITIALIZE (once per project)                            │
-│    attach-linux init --linux <path> --dt-schema <path>            │
-│               [--context <dts-file>]                        │
-│    → Writes config.toml + compat-index.json                 │
+│ 0. CONFIGURE (once per project)                             │
+│    attach-linux config-set linux <path>                     │
+│    attach-linux config-set dt-schema <path>                 │
+│    attach-linux config-set context <dts-file>               │
 └─────────────────────────────────────────────────────────────┘
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
-│ 1. GATHER INFO                                              │
-│    Ask user for: linux path, dt-schema path, target .dts    │
-│    (if not already stored via init)                         │
-└─────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────┐
-│ 2. FIND DEVICE                                              │
-│    attach-linux list-devices --includes-word <chip-name>          │
+│ 1. FIND DEVICE                                              │
+│    attach-linux list-devices --includes-word <chip-name>    │
 │    → Get compatible string                                  │
 └─────────────────────────────────────────────────────────────┘
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
-│ 3. GET SCHEMA                                               │
-│    attach-linux get-schema --compatible <string>                  │
+│ 2. GET SCHEMA                                               │
+│    attach-linux get-schema --compatible <string>            │
 │    → Understand required/optional properties                │
 └─────────────────────────────────────────────────────────────┘
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
-│ 4. FIND PARENT                                              │
-│    attach-linux suggest-parents --compatible <string>             │
-│    → Determine which bus to attach-linux to                       │
+│ 3. FIND PARENT                                              │
+│    attach-linux suggest parent <compatible>                  │
+│    → Determine which bus to attach to                       │
 └─────────────────────────────────────────────────────────────┘
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
-│ 5. CREATE OVERLAY                                           │
-│    attach-linux create --parent <bus> --output <file.dtso>        │
-│    → Generate skeleton file                                 │
+│ 4. CREATE WORKFILE                                          │
+│    attach-linux create-workfile                              │
+│    → Generate empty overlay file                            │
 └─────────────────────────────────────────────────────────────┘
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
-│ 6. CONFIGURE (using set-prop command)                       │
-│    attach-linux set-prop --property <name> --value <value> ...    │
+│ 5. ADD DEVICE NODE                                          │
+│    attach-linux add <compatible> --to <parent> --label <l>   │
+│    → Place device in overlay                                │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│ 6. CONFIGURE (using update command)                         │
+│    attach-linux update <node>/<property> --with <value>      │
 │    - Set all required_properties                            │
 │    - Set user-requested optional properties                 │
-│    - For channels: manually edit .dtso (set-prop unsupported)│
-│    NOTE: Always use set-prop for main node properties!      │
+│    - For channels: add --name channel@N --to <label>        │
+│      then update <label>/channel@N/<prop> --with <value>    │
 └─────────────────────────────────────────────────────────────┘
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
-│ 7. ADD MORE NODES (optional)                                 │
-│    Device node:  add <compatible> --to <..>                  │
-│    Channel/alias: add --name <..> --to <..>  (no compat key) │
-│    → Repeat step 6 to configure any added device's props    │
+│ 7. ADD MORE NODES (optional)                                │
+│    Device node:   add <compatible> --to <parent> --label <l>│
+│    Channel/alias: add --name <..> --to <label>              │
+│    → Repeat step 6 to configure any added node's properties │
 └─────────────────────────────────────────────────────────────┘
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
 │ 8. VALIDATE                                                 │
-│    attach-linux validate --node <name> --overlay <file.dtso>      │
-│    → Fix any errors with set-prop, repeat until clean       │
+│    attach-linux validate <node>                              │
+│    → Fix any errors with update, repeat until clean         │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│ 9. BUILD (optional)                                         │
+│    attach-linux build                                        │
+│    → Compile .dtso to .dtbo                                 │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│ 10. DEPLOY (optional)                                       │
+│     attach-linux deploy                                      │
+│     → Copy .dtbo to device and reboot                       │
 └─────────────────────────────────────────────────────────────┘
 ```
 
-**IMPORTANT**: When configuring device tree overlays, you MUST use the `set-prop` command to set property values. Do NOT manually edit the `.dtso` file directly. The `set-prop` command:
+**IMPORTANT**: Always use the `update` command to set property values. The `update` command:
 - Validates values against the device binding schema
 - Handles proper formatting of different value types (numbers, strings, arrays, phandles)
 - Ensures correct device tree syntax
+- Works on both main device nodes AND subnodes (channels, etc.) via path-based addressing
 
 ---
 
@@ -728,7 +823,7 @@ node-name {
     // Array of numbers
     interrupts = <0 42 4>;
 
-    // Interrupt with parent specified (required for proper validation)
+    // Interrupt with parent specified
     interrupt-parent = <&gpio>;
     interrupts = <25 2>;
 
@@ -738,10 +833,12 @@ node-name {
     // String array
     clock-names = "spi", "pclk";
 
+    // Multi-row matrix
+    reg = <0 1>, <2 3>;
+
     // Child node (for channels, etc.)
     channel@0 {
         reg = <0>;
-        // channel properties...
     };
 };
 ```
@@ -753,32 +850,34 @@ node-name {
 | Error | Cause | Solution |
 |-------|-------|----------|
 | `Missing: <path>` | File/directory doesn't exist | Verify path with user |
-| `Failed to parse dts` | Invalid device tree syntax | Check for syntax errors in .dts file |
+| `Failed to parse dts` | Invalid device tree syntax | Check for syntax errors in `.dts` file |
 | `Failed to find binding` | Compatible string not found | Use `list-devices` to find valid strings |
-| `missing_required` error | Required property not set | Use `set-prop` to add the property |
-| `number_limit` error | Value outside valid range | Use `set-prop` with a value within schema bounds |
-| `interrupts` size error | Wrong number of cells in interrupts array | Use `set-prop --property interrupt-parent --value gpio` to specify the interrupt controller. The number of cells required depends on the interrupt controller's `#interrupt-cells` property. |
-| `Property in binding demands numbers` | Wrong value type for property | Check `get-schema` output and use correct type with `set-prop` |
-| `Values for property X are [...]` | Invalid enum value | Use one of the listed valid values with `set-prop` |
+| `missing_required` error | Required property not set | Use `update` to add the property |
+| `number_limit` error | Value outside valid range | Use `update` with a value within schema bounds |
+| `interrupts` size error | Wrong number of cells | Set `interrupt-parent` first: `update <node>/interrupt-parent --with gpio` |
+| `Property in binding demands numbers` | Wrong value type | Check `get-schema` output and use correct type with `update` |
+| `Values for property X are [...]` | Invalid enum value | Use one of the listed valid values with `update` |
+| `Node not found` | Invalid node reference | Use `suggest navigate` to explore overlay structure |
 
 ---
 
 ## Tips for Effective Assistance
 
-1. **Use interactive selection questions** - Always prefer form-style questions with selectable options over plain text questions
-2. **Always use `set-prop` for main node properties** - Use `set-prop` for all property changes on the main device node
-3. **Channel properties require manual editing** - `set-prop` does not support child nodes; edit `.dtso` directly for channels
-4. **Always validate before declaring success** - Run `validate` to catch issues
-5. **Use `get-prop` to check current values** - Before modifying, verify current state
-6. **Use schema descriptions** - They explain what each property does
-7. **Check required vs optional** - Only required properties must be set
-8. **Pattern properties = channels** - If present, help user create each channel node with `add`, then configure it manually (property editing is manual-only, see tip 3)
-9. **Phandle references** - When setting phandle properties with `set-prop`, just use the label name (e.g., `--value gpio`)
-10. **Macros need includes** - If schema shows macros, the overlay may need `#include` directives
-11. **Interrupts need interrupt-parent** - When using the `interrupts` property, first set `interrupt-parent` using `set-prop --property interrupt-parent --value <controller>` (e.g., `--value gpio`). The interrupt controller determines how many cells are needed in the `interrupts` array.
-12. **Use `add` for additional nodes** - Once an overlay exists, use `add` to attach another sibling device (pass the compatible string as positional arg) or a bare subnode like a channel/alias (pass `--name <node-name> --to <parent>` only — **no positional arg** for nodes without `compatible`) instead of hand-editing the `.dtso`
-13. **Use `delete` to undo an `add`** - `delete --node <label>` removes an overlay-added node cleanly; it also drops the parent reference block if that block is now empty. It refuses to touch base-tree nodes.
-14. **Use `rename` to change a node's key** - `rename --node <label> --to <new-key>` renames `name@unit_addr`; omitting `@` in `--to` preserves the existing unit address. Only overlay-added nodes.
-15. **Use `move` to reparent a node** - `move --node <label> --parent <dest>` relocates an overlay-added node; labels and the node key are preserved. Refuses base-tree nodes and cycles.
-16. **Use `unset-prop` to remove an overlay-set property** - `unset-prop --node <label> --property <name>` removes a property the overlay added or overrode; restores the base value if one exists. Refuses base-only properties.
-17. **Use `enable`/`disable` for status** - Shorthand for setting `status = "okay"` or `status = "disabled"`. Works on both base-tree and overlay-added nodes — enabling a disabled peripheral is a primary overlay use case.
+1. **Use interactive selection questions** — Always prefer form-style questions with selectable options over plain text questions
+2. **Always use `update` for property changes** — Use `update` for all property changes on any node (device or subnode)
+3. **`update` works on subnodes** — Unlike the old `set-prop`, `update` supports channels and other subnodes via path-based addressing (e.g. `update imu1/channel@0/reg --with 0`)
+4. **Always validate before declaring success** — Run `validate` to catch issues
+5. **Use `read` to check current values** — Before modifying, verify current state
+6. **Use schema descriptions** — They explain what each property does
+7. **Check required vs optional** — Only required properties must be set
+8. **Pattern properties = channels** — If present, help user create each channel node with `add --name channel@N --to <label>`, then configure with `update`
+9. **Phandle references** — When setting phandle properties with `update`, just use the label name (e.g., `--with gpio`)
+10. **Macros need includes** — If schema shows macros, the overlay may need `#include` directives
+11. **Interrupts need interrupt-parent** — When using the `interrupts` property, first set `interrupt-parent` using `update <node>/interrupt-parent --with <controller>` (e.g., `--with gpio`)
+12. **Use `add` for additional nodes** — Use `add` to attach device nodes (pass compatible as positional arg) or bare subnodes like channels (pass `--name <node-name> --to <parent>` only)
+13. **Use `delete` for both nodes and properties** — `delete <node>` removes a node; `delete <node>/<property>` removes a property
+14. **Use `rename` to change a node's key or property name** — Omitting `@` in `--to` preserves the existing unit address
+15. **Use `move` to reparent a node** — `move <node> --to <dest>` relocates an overlay-added node
+16. **Use `suggest` for discovery** — `suggest navigate` to explore the tree, `suggest node-prop` to see available properties, `suggest type` to check a property's expected format
+17. **Config fields fall back to `config.toml`** — Most command flags are optional when the config is set up
+18. **Always pass `--label` when adding nodes** — Without a label, later commands can only target the node by its full path
