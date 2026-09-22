@@ -13,7 +13,7 @@ type AddFlags = {
 };
 
 /**
- * `aa add <schema> [--name <node>]` — create a node.
+ * `attach-noos add <schema> [--name <node>]` — create a node.
  *
  * The schema is the protocol's positional device key, the one aa-meta's base schema marks
  * `x-positional`. `--key` is kept as a second spelling of the same argument because that is
@@ -32,7 +32,7 @@ export const addCommand = buildCommand<AddFlags, [string | undefined]>({
     docs: {
         brief: "Add a node to the workfile",
         fullDescription:
-            "Creates a node from a schema. <schema> is the device key (see 'aa list-devices')\n" +
+            "Creates a node from a schema. <schema> is the device key (see 'attach-noos list-devices')\n" +
             "and may also be given as --key; --name is what the node is called in the workfile,\n" +
             "defaulting to the schema's own name."
     },
@@ -42,7 +42,7 @@ export const addCommand = buildCommand<AddFlags, [string | undefined]>({
             parameters: [
                 {
                     placeholder: "schema",
-                    brief: "Schema to instantiate (see: aa list-devices)",
+                    brief: "Schema to instantiate (see: attach-noos list-devices)",
                     optional: true,
                     parse: String,
                     proposeCompletions(partial: string) {
@@ -103,9 +103,9 @@ export const addCommand = buildCommand<AddFlags, [string | undefined]>({
             output_error(
                 flags,
                 flags.name === undefined
-                    ? "Nothing to add: pass <schema> (see: aa list-devices)"
+                    ? "Nothing to add: pass <schema> (see: attach-noos list-devices)"
                     : `Cannot add '${flags.name}' without a schema: a node is an instance of a schema, ` +
-                      "and there is no default schema. See: aa list-devices"
+                      "and there is no default schema. See: attach-noos list-devices"
             );
             return;
         }
@@ -130,7 +130,7 @@ export const addCommand = buildCommand<AddFlags, [string | undefined]>({
 
         const keys = [...available.value.devices, ...available.value.noos, ...available.value.platform];
         if (!keys.includes(key)) {
-            output_error(flags, `Unknown schema '${key}'. See: aa list-devices`);
+            output_error(flags, `Unknown schema '${key}'. See: attach-noos list-devices`);
             return;
         }
 

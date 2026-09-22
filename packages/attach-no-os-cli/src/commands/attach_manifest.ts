@@ -11,7 +11,7 @@ import {
 } from "../protocol/manifest";
 
 /**
- * `aa attach-manifest` — the one command attach-meta calls by a fixed name.
+ * `attach-noos attach-manifest` — the one command attach-meta calls by a fixed name.
  *
  * The contract is narrow: write the manifest somewhere and print its path, nothing else.
  * attach-meta trims stdout and treats the whole of it as a path, so anything else a human

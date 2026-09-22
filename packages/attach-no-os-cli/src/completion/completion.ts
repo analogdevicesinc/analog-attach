@@ -203,7 +203,7 @@ export function get_platform_names(): string[] {
  * no-OS board presets. Narrowed to the boards belonging to the workfile's platform
  * when there is a workfile to read, since generating for another platform cannot work;
  * the full list otherwise, so `--board` still completes outside a project directory
- * (which is the board-first case: `aa create workfile --board <tab>`).
+ * (which is the board-first case: `attach-noos create workfile --board <tab>`).
  */
 export function get_board_names(): string[] {
     const noos_path = get_setting_value("no_os_path");

@@ -4,7 +4,7 @@ import { common_ok, type Device, type ListDevicesResponse } from "../protocol/re
 import { load_context, output, output_error } from "./shared";
 
 /**
- * `aa list-devices` — every schema a node can be created from.
+ * `attach-noos list-devices` — every schema a node can be created from.
  *
  * "Device" is attach-meta's word for "the thing you add". Ours is a schema, and there are
  * three kinds of them: device drivers, no-OS core types, and platform types. `tag` is what
@@ -18,7 +18,7 @@ export const listDevicesCommand = buildCommand<{ json?: boolean; filter?: string
         brief: "List the schemas a node can be created from",
         fullDescription:
             "Lists every schema available to the current workfile, grouped by kind.\n" +
-            "The key of each entry is what 'aa add --key <key>' takes."
+            "The key of each entry is what 'attach-noos add --key <key>' takes."
     },
     parameters: {
         positional: { kind: "tuple", parameters: [] },
@@ -82,6 +82,6 @@ function format_devices(devices: Device[], platform?: string): string {
         out += "\n";
     }
 
-    out += "Use: aa add --key <key> --name <node name>";
+    out += "Use: attach-noos add --key <key> --name <node name>";
     return out;
 }

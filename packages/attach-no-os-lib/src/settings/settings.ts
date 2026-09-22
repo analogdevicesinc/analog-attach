@@ -181,7 +181,7 @@ export function get_setting_value(key: keyof SettingsFile): Result<string> {
 	}
 
 	if (setting.value.value === undefined) {
-		return error(`Setting "${key}" is not configured. Run: aa tool-config-set ${key} <value>`);
+		return error(`Setting "${key}" is not configured. Run: attach-noos tool-config-set ${key} <value>`);
 	}
 
 	return ok(setting.value.value);

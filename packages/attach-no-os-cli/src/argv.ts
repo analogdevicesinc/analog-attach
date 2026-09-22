@@ -9,7 +9,7 @@
  *
  * stricli accepts flags anywhere after the route words, so that already parses. What it
  * does not accept is a flag *before* the route — which is how a person naturally types it,
- * `aa --json read` — so `--json` is moved to the end and both spellings work.
+ * `attach-noos --json read` — so `--json` is moved to the end and both spellings work.
  *
  * The other shape stricli cannot read is attach-meta's array flags. A protocol flag whose
  * base schema says `"type": "array"` is sent as one flag word followed by all of its
@@ -41,7 +41,7 @@ export function normalize_argv(input: string[]): NormalizedArgv {
     const without_json = input.filter(token => token !== "--json");
 
     // The route is the first word; attach-meta never puts anything before it, and a human
-    // writing `aa --json read` has just had the flag lifted out.
+    // writing `attach-noos --json read` has just had the flag lifted out.
     const argv = expand_array_flags(without_json[0], without_json);
 
     if (wants_json) {

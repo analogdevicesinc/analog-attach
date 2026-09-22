@@ -27,7 +27,7 @@ import { include_target, to_protocol_node, to_protocol_property, to_protocol_roo
 import { read_failure } from "../protocol/responses";
 
 /**
- * `aa read [node] [property]` — the tree, a node, or one property.
+ * `attach-noos read [node] [property]` — the tree, a node, or one property.
  *
  * The path is absolute from the root and the workfile is flat, so it is at most two deep:
  * no positionals is the whole tree, one names a node, two name a property of that node.
@@ -75,7 +75,7 @@ export const readCommand = buildCommand<
 
         const root = root_key(context.value);
 
-        // aa read — the whole tree
+        // attach-noos read — the whole tree
         if (!node) {
             const text = format_workfile(context.value.minimal.platform, context.value.minimal.board)
                 + format_node_list(context.value.minimal, "Nodes:");
@@ -83,7 +83,7 @@ export const readCommand = buildCommand<
             return;
         }
 
-        // aa read <node>
+        // attach-noos read <node>
         if (!property) {
             const found = get_any_node(context.value, node);
             if (!found.ok) {
@@ -95,7 +95,7 @@ export const readCommand = buildCommand<
             return;
         }
 
-        // aa read <node> <property>
+        // attach-noos read <node> <property>
         const lookup = get_node_property(context.value, node, property);
         if (!lookup.ok) {
             output_error(flags, lookup.error.message, { response: read_failure(lookup.error.message) });

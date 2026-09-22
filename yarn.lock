@@ -2906,7 +2906,7 @@ __metadata:
     vitest: "npm:^4.0.18"
     yaml: "npm:^2.7.1"
   bin:
-    aa: ./dist/cli.js
+    attach-noos: ./dist/cli.js
   languageName: unknown
   linkType: soft
 

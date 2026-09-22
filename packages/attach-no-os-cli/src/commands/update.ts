@@ -28,7 +28,7 @@ type UpdateFlags = {
 };
 
 /**
- * `aa update <node> <property> --with <value>` — set one property.
+ * `attach-noos update <node> <property> --with <value>` — set one property.
  *
  * The protocol's `update` is an upsert: an unknown property is inserted. Ours cannot be.
  * A node's properties come from its schema, which is the C struct it generates — a property
@@ -103,7 +103,7 @@ export const updateCommand = buildCommand<
             output_error(
                 flags,
                 "Nothing to update: pass <node> <property> --with <value>. " +
-                "Use 'aa read' to see the nodes and 'aa read <node>' to see their properties."
+                "Use 'attach-noos read' to see the nodes and 'attach-noos read <node>' to see their properties."
             );
             return;
         }
@@ -158,7 +158,7 @@ export const updateCommand = buildCommand<
             output_error(
                 flags,
                 `No value given for '${node}.${property}'. Pass --with <value>; ` +
-                `'aa read ${node} ${property}' lists what it accepts.`
+                `'attach-noos read ${node} ${property}' lists what it accepts.`
             );
             return;
         }

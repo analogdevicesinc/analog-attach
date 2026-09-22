@@ -10,7 +10,7 @@
 #
 #   source "$(dirname "$0")/e2e_common.sh"
 #   PROJECT_NAME="e2e_test_foo"
-#   configure_nodes() { $AA add --name ... --key ...; $AA update ...; }
+#   configure_nodes() { $ATTACH_NOOS add --name ... --key ...; $ATTACH_NOOS update ...; }
 #   run_e2e
 #
 # no-OS builds with CMake and Kconfig, so a project is pinned to a *board*, not to
@@ -44,7 +44,7 @@ NOOS_PATH="${NOOS_PATH:-$HOME/adi/no-OS}"
 
 # Defaults a device script may override before calling run_e2e.
 TARGET_MCU="${TARGET_MCU:-max32690}"
-# Configured rather than left to `aa generate`, so the test asserts on one fixed board
+# Configured rather than left to `attach-noos generate`, so the test asserts on one fixed board
 # instead of whichever one the platform happens to resolve to. max32690 has exactly
 # one board today; max32650 has two, and there generation would refuse to guess.
 BOARD="${BOARD:-ad-apard32690-sl}"
@@ -107,9 +107,9 @@ run_e2e() {
         cd "$CLI_DIR"
         yarn build > /dev/null 2>&1
     fi
-    AA="node $CLI_DIR/dist/cli.js"
+    ATTACH_NOOS="node $CLI_DIR/dist/cli.js"
 
-    # Fail here rather than 8 steps later inside a CMake configure. `aa build` checks
+    # Fail here rather than 8 steps later inside a CMake configure. `attach-noos build` checks
     # the same things, but by then the run has already spent a minute.
     echo -e "${YELLOW}[2/9] Checking build tools...${NC}"
     for tool in cmake ninja; do
@@ -129,7 +129,7 @@ run_e2e() {
 
     # Set up config.
     #
-    # Written as a project-local config in $TEST_DIR rather than with `aa
+    # Written as a project-local config in $TEST_DIR rather than with `attach-noos
     # tool-config-set`, which writes the *global* one: the run then leaves the
     # developer's own configuration alone, and every command below can be invoked with
     # no arguments at all — which is exactly how attach-meta dispatches them.
@@ -151,7 +151,7 @@ EOF
     # way in: the board settles the platform on its own, so this also checks that the
     # derived platform is the one the device nodes below are loaded from.
     echo -e "${YELLOW}[4/9] Creating workfile for $BOARD...${NC}"
-    $AA create-workfile
+    $ATTACH_NOOS create-workfile
 
     if [ ! -f "workfile.json" ]; then
         echo -e "${RED}FAIL: workfile.json not created${NC}"
@@ -177,7 +177,7 @@ EOF
     # A protocol ValidationResponse is `{"errors": [...], "warnings": [...]}` and has no
     # ok/valid field of its own — an empty `errors` is what "valid" means. Warnings are
     # deliberately not fatal here.
-    VALIDATE_OUTPUT=$($AA validate --json 2>&1)
+    VALIDATE_OUTPUT=$($ATTACH_NOOS validate --json 2>&1)
     if echo "$VALIDATE_OUTPUT" | grep -q '"errors": \[\]'; then
         echo -e "${GREEN}OK: Validation passed${NC}"
     else
@@ -190,7 +190,7 @@ EOF
     # Name, output directory and board all come from the config written above, so this
     # is the zero-argument dispatch attach-meta performs.
     echo -e "${YELLOW}[7/9] Generating no-OS project ($E2E_MODE)...${NC}"
-    $AA generate
+    $ATTACH_NOOS generate
 
     if [ ! -d "$PROJECT_DIR" ]; then
         echo -e "${RED}FAIL: Project not generated${NC}"
@@ -234,16 +234,16 @@ EOF
     fi
     echo -e "${GREEN}OK: CMakeLists.txt, CMakePresets.json and project.conf look sane${NC}"
 
-    # Build the project using aa build. Nothing is passed: the project directory comes
+    # Build the project using attach-noos build. Nothing is passed: the project directory comes
     # from the `project_path` setting, the board from the generated preset, and the mode
     # from where the project sits. No PLATFORM/TARGET in the environment either.
-    echo -e "${YELLOW}[9/9] Building project with aa build...${NC}"
+    echo -e "${YELLOW}[9/9] Building project with attach-noos build...${NC}"
 
     BUILD_LOG="/tmp/build_output_${PROJECT_NAME}.log"
     # pipefail is required here: without it the `if` sees tail's exit status (always
-    # 0) instead of aa build's, so a failed build gets reported as a pass.
+    # 0) instead of attach-noos build's, so a failed build gets reported as a pass.
     set -o pipefail
-    if $AA build 2>&1 | tee "$BUILD_LOG" | tail -20; then
+    if $ATTACH_NOOS build 2>&1 | tee "$BUILD_LOG" | tail -20; then
         echo -e "${GREEN}OK: Build successful${NC}"
     else
         echo -e "${RED}FAIL: Build failed${NC}"

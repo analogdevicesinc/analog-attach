@@ -9,7 +9,8 @@ const raw_arguments = process.argv.slice(2);
 
 // --- completions ---
 //
-// `aa complete <route> <partial> [prior tokens...]`, used by completion/aa.bash.
+// `attach-noos complete <route> <partial> [prior tokens...]`, used by
+// completion/attach-noos.bash.
 //
 // attach-meta does not come through here: it drives completion through `list-intelligence`
 // and `suggest` instead (see src/commands/intelligence.ts). This entry point exists for the
@@ -26,8 +27,9 @@ if (raw_arguments[0] === "complete") {
     const context: CompletionContext = { process, completionInputs: words };
     const completions = await proposeCompletions(app, words, context);
 
-    // Values and command names first, flags last, each group sorted. aa.bash registers
-    // with -o nosort so bash preserves this instead of interleaving flags.
+    // Values and command names first, flags last, each group sorted.
+    // attach-noos.bash registers with -o nosort so bash preserves this instead of
+    // interleaving flags.
     const is_flag = (c: (typeof completions)[number]) => c.kind === "argument:flag";
     const by_completion = (a: (typeof completions)[number], b: (typeof completions)[number]) =>
         a.completion.localeCompare(b.completion);

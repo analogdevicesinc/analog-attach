@@ -5,7 +5,7 @@
   "private": true,
   "type": "module",
   "bin": {
-    "aa": "./dist/cli.js"
+    "attach-noos": "./dist/cli.js"
   },
   "scripts": {
     "build": "tsup --silent && cp -r ../attach-no-os-lib/src/codegen/templates dist/ && cp -r completion dist/",

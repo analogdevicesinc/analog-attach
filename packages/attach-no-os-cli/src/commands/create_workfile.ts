@@ -17,7 +17,7 @@ type CreateWorkfileFlags = {
 };
 
 /**
- * `aa create-workfile` — start a new workfile at the configured path.
+ * `attach-noos create-workfile` — start a new workfile at the configured path.
  *
  * The protocol gives this command no arguments at all — its base schema declares no flags
  * and attach-meta dispatches it with an empty argv — so every input is a setting: `workfile`
@@ -32,7 +32,7 @@ export const createWorkfileCommand = buildCommand<CreateWorkfileFlags, []>({
         fullDescription:
             "Creates the workfile named by the 'workfile' setting, for the board named by the\n" +
             "'board' setting (or the 'platform' setting, for platforms that have no boards).\n" +
-            "Set them with 'aa tool-config-set'. Refuses to overwrite a workfile that already exists."
+            "Set them with 'attach-noos tool-config-set'. Refuses to overwrite a workfile that already exists."
     },
     parameters: {
         positional: { kind: "tuple", parameters: [] },
@@ -125,7 +125,7 @@ function resolve_target(specs: PlatformSpecs): ResolvedTarget {
     if (configured_board === undefined && configured_platform === undefined) {
         return {
             ok: false,
-            message: "No board or platform configured. Run: aa tool-config-set board <name>",
+            message: "No board or platform configured. Run: attach-noos tool-config-set board <name>",
             text: format_no_target(specs)
         };
     }
@@ -145,7 +145,7 @@ function resolve_target(specs: PlatformSpecs): ResolvedTarget {
         return { ok: false, message: noos_path.error.message };
     }
     if (noos_path.value === undefined) {
-        return { ok: false, message: "no_os_path is not configured. Run: aa tool-config-set no_os_path <path>" };
+        return { ok: false, message: "no_os_path is not configured. Run: attach-noos tool-config-set no_os_path <path>" };
     }
 
     const resolved = resolve_platform_from_board(noos_path.value, configured_board, specs);
@@ -174,8 +174,8 @@ function setting(key: "board" | "platform"): string | undefined {
 
 function format_no_target(specs: PlatformSpecs): string {
     let out = "No board or platform configured.\n\n";
-    out += "  aa tool-config-set board <name>       a board settles the platform on its own\n";
-    out += "  aa tool-config-set platform <name>    for platforms with no boards\n\n";
+    out += "  attach-noos tool-config-set board <name>       a board settles the platform on its own\n";
+    out += "  attach-noos tool-config-set platform <name>    for platforms with no boards\n\n";
     out += "Available platforms:\n\n";
 
     for (const [name, manifest] of Object.entries(specs)) {
