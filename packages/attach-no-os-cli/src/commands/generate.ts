@@ -27,7 +27,7 @@ type GenerateFlags = {
 };
 
 /**
- * `aa generate` — render the workfile into a no-OS project.
+ * `attach-noos generate` — render the workfile into a no-OS project.
  *
  * Everything it needs is configuration: the project name, where to write it, which board and
  * which template set. The flags stay as human overrides, but nothing is required on the
@@ -38,7 +38,7 @@ export const generateCommand = buildCommand<GenerateFlags, [], AttachContext>({
         brief: "Generate a no-OS project from the workfile",
         fullDescription:
             "Renders the workfile into <output_path>/<project_name>.\n" +
-            "Both come from settings ('aa tool-config-get project_name output_path'); the flags override them."
+            "Both come from settings ('attach-noos tool-config-get project_name output_path'); the flags override them."
     },
     parameters: {
         positional: { kind: "tuple", parameters: [] },
@@ -79,7 +79,7 @@ export const generateCommand = buildCommand<GenerateFlags, [], AttachContext>({
 
         const noos_path = get_setting_value("no_os_path");
         if (!noos_path.ok) {
-            output_error(flags, "no_os_path is not configured. Run: aa tool-config-set no_os_path <path>");
+            output_error(flags, "no_os_path is not configured. Run: attach-noos tool-config-set no_os_path <path>");
             return;
         }
 

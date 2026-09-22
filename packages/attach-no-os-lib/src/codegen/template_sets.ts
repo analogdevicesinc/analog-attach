@@ -32,7 +32,7 @@ export const TEMPLATES_ROOT = path.join(__dirname, "templates");
 export const STRUCTURE_FILENAME = "project_structure.json";
 
 // Names of the bundled template sets, sorted. Used for error messages and for
-// CLI completion of `aa config template_set`.
+// CLI completion of `attach-noos config template_set`.
 export function list_template_sets(): string[] {
 	if (!fs.existsSync(TEMPLATES_ROOT)) {
 		return [];

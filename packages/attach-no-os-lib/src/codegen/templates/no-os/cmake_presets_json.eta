@@ -11,7 +11,7 @@
  *
  * The one preset defined here, `project`, inherits the board this project was
  * generated for. It is what records the board choice inside the project, so
- * `cmake --preset project` needs no arguments and `aa build` can recover the board
+ * `cmake --preset project` needs no arguments and `attach-noos build` can recover the board
  * from a project directory alone. Every other board stays reachable by name.
  *
  * Version 7 is required for the include field and matches the no-OS root.

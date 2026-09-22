@@ -15,37 +15,37 @@ PROJECT_NAME="e2e_test_ad7124"
 TARGET_MCU="max32690"
 
 configure_nodes() {
-    $AA add --name max_spi_ip --key platforms/maxim/max32690/max_spi_init_param.yaml
-    $AA add --name no_os_spi_ip --key no-os/spi/no_os_spi_init_param.yaml
-    $AA add --name ad7124_ip --key devices/ad7124/ad7124_init_param.yaml
-    $AA add --name ad7124_device --key devices/ad7124/ad7124.yaml
+    $ATTACH_NOOS add --name max_spi_ip --key platforms/maxim/max32690/max_spi_init_param.yaml
+    $ATTACH_NOOS add --name no_os_spi_ip --key no-os/spi/no_os_spi_init_param.yaml
+    $ATTACH_NOOS add --name ad7124_ip --key devices/ad7124/ad7124_init_param.yaml
+    $ATTACH_NOOS add --name ad7124_device --key devices/ad7124/ad7124.yaml
     # The driver's power-on register table. Required: ad7124_setup assigns it and then
     # dereferences it (ad7124.c:1491,1512), so a NULL table faults.
-    $AA add --name ad7124_regs --key devices/ad7124/ad7124_regs.yaml
+    $ATTACH_NOOS add --name ad7124_regs --key devices/ad7124/ad7124_regs.yaml
 
     # Configure the Maxim SPI init_param
-    $AA update max_spi_ip vssel MXC_GPIO_VSSEL_VDDIOH
-    $AA update max_spi_ip polarity SPI_SS_POL_LOW
+    $ATTACH_NOOS update max_spi_ip vssel MXC_GPIO_VSSEL_VDDIOH
+    $ATTACH_NOOS update max_spi_ip polarity SPI_SS_POL_LOW
 
     # Configure the no-OS SPI init_param (references the Maxim ops + extra)
-    $AA update no_os_spi_ip device_id 1
-    $AA update no_os_spi_ip max_speed_hz 1000000
-    $AA update no_os_spi_ip chip_select 0
-    $AA update no_os_spi_ip platform_ops max_spi_ops
-    $AA update no_os_spi_ip extra max_spi_ip
+    $ATTACH_NOOS update no_os_spi_ip device_id 1
+    $ATTACH_NOOS update no_os_spi_ip max_speed_hz 1000000
+    $ATTACH_NOOS update no_os_spi_ip chip_select 0
+    $ATTACH_NOOS update no_os_spi_ip platform_ops max_spi_ops
+    $ATTACH_NOOS update no_os_spi_ip extra max_spi_ip
 
     # Configure the AD7124 init_param. spi_init is a pointer include, so this is a
     # plain reference and codegen decides the `&`.
-    $AA update ad7124_ip spi_init no_os_spi_ip
-    $AA update ad7124_ip regs ad7124_regs
-    $AA update ad7124_ip active_device ID_AD7124_4
-    $AA update ad7124_ip mode AD7124_CONTINUOUS
-    $AA update ad7124_ip power_mode AD7124_HIGH_POWER
-    $AA update ad7124_ip ref_en true
-    $AA update ad7124_ip use_crc 0
-    $AA update ad7124_ip check_ready 1
+    $ATTACH_NOOS update ad7124_ip spi_init no_os_spi_ip
+    $ATTACH_NOOS update ad7124_ip regs ad7124_regs
+    $ATTACH_NOOS update ad7124_ip active_device ID_AD7124_4
+    $ATTACH_NOOS update ad7124_ip mode AD7124_CONTINUOUS
+    $ATTACH_NOOS update ad7124_ip power_mode AD7124_HIGH_POWER
+    $ATTACH_NOOS update ad7124_ip ref_en true
+    $ATTACH_NOOS update ad7124_ip use_crc 0
+    $ATTACH_NOOS update ad7124_ip check_ready 1
 
-    $AA update ad7124_device '$init_param' ad7124_ip
+    $ATTACH_NOOS update ad7124_device '$init_param' ad7124_ip
 }
 
 run_e2e

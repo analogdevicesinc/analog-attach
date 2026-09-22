@@ -27,7 +27,7 @@ import { get_settings_file_path } from "attach-no-os-lib";
  */
 export const PROTOCOL_VERSION = "1.0.0";
 
-/** Not part of the manifest (its root is closed) — used for `aa --version` and help. */
+/** Not part of the manifest (its root is closed) — used for `attach-noos --version` and help. */
 export const TOOL_VERSION = "0.1.0";
 export const TOOL_NAME = "attach-no-os";
 export const TOOL_DESCRIPTION = "Analog Attach CLI for no-OS workfiles";
@@ -135,11 +135,11 @@ export function get_manifest_path(): string {
  * does — so `argv[0]` has to be either a name on PATH or an absolute path. Naming the
  * node binary and the script we were actually invoked as works for a global install and
  * for a local `node dist/cli.js` checkout alike; the trade-off is that the manifest pins
- * that interpreter path, so re-run `aa attach-manifest` after moving or upgrading node.
+ * that interpreter path, so re-run `attach-noos attach-manifest` after moving or upgrading node.
  */
 function invocation_prefix(): string[] {
     const script = process.argv[1];
-    return script ? [process.execPath, script] : ["aa"];
+    return script ? [process.execPath, script] : ["attach-noos"];
 }
 
 /**

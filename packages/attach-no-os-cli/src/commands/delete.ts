@@ -36,7 +36,7 @@ type Reference = {
 };
 
 /**
- * `aa delete [node] [property]` — remove a node, or reset one of its properties.
+ * `attach-noos delete [node] [property]` — remove a node, or reset one of its properties.
  *
  * A property is a fixed part of its node's schema, so "deleting" one means clearing its
  * value; that is never destructive beyond the one value and needs no confirmation. A node
@@ -90,7 +90,7 @@ export const deleteCommand = buildCommand<
             return;
         }
 
-        // aa delete — the root, meaning everything in it
+        // attach-noos delete — the root, meaning everything in it
         if (!node) {
             delete_everything(flags, context.value);
             return;
@@ -102,13 +102,13 @@ export const deleteCommand = buildCommand<
             return;
         }
 
-        // aa delete <node> <property> — clear one value
+        // attach-noos delete <node> <property> — clear one value
         if (property) {
             reset_property(flags, context.value, node, property);
             return;
         }
 
-        // aa delete <node> — remove the node, and whatever pointed at it
+        // attach-noos delete <node> — remove the node, and whatever pointed at it
         delete_node(flags, context.value, node);
     }
 });

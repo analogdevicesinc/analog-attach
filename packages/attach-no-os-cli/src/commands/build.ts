@@ -21,7 +21,7 @@ type BuildFlags = {
 };
 
 /**
- * `aa build` — build the generated project.
+ * `attach-noos build` — build the generated project.
  *
  * Which project is a setting, not an argument: `project_path`, or where `generate` would have
  * written it. See `get_project_path`.
@@ -96,7 +96,7 @@ export const buildCommandDefinition = buildCommand<BuildFlags, []>({
 
         const noos_path = get_setting_value("no_os_path");
         if (!noos_path.ok) {
-            output_error(flags, "no_os_path is not configured. Run: aa tool-config-set no_os_path <path>");
+            output_error(flags, "no_os_path is not configured. Run: attach-noos tool-config-set no_os_path <path>");
             return;
         }
 

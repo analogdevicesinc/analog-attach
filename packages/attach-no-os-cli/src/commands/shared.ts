@@ -73,7 +73,7 @@ export function load_context(): Result<WorkfileContext> {
 
     const path = resolved.value;
     if (!fs.existsSync(path)) {
-        return error(`No workfile at '${path}'. Create one with 'aa create-workfile', or point the 'workfile' setting elsewhere.`);
+        return error(`No workfile at '${path}'. Create one with 'attach-noos create-workfile', or point the 'workfile' setting elsewhere.`);
     }
 
     const minimal = load_minimal_workfile(path);
@@ -272,8 +272,9 @@ export function get_node(context: WorkfileContext, node_name: string): Result<Ru
     return ok(node.value);
 }
 
-// For commands that only need the node to exist - `aa delete`, `aa read <node>`. Any kind
-// the user can create counts, including an extern, which is a name with nothing to set.
+// For commands that only need the node to exist - `attach-noos delete`,
+// `attach-noos read <node>`. Any kind the user can create counts, including an
+// extern, which is a name with nothing to set.
 export function get_any_node(context: WorkfileContext, node_name: string): Result<Ruleset> {
     const node = context.workfile.symbols[node_name];
     if (!node) {
@@ -403,7 +404,7 @@ export function format_property_details(property: Property, suggestions: Propert
         case "ArrayProperty": {
             out += `  ${"Max size:".padEnd(15)}${property.size}\n`;
             out += "\n  Format: comma-separated values\n";
-            out += `    aa update <node> ${property.name} value1,value2,value3\n`;
+            out += `    attach-noos update <node> ${property.name} value1,value2,value3\n`;
             break;
         }
 
@@ -412,8 +413,8 @@ export function format_property_details(property: Property, suggestions: Propert
             // user must type the exact C token. String literals need quotes that
             // survive the shell (which strips bare ""), hence the escaping hint.
             out += "\n  Format: written to generated code verbatim (exactly as typed)\n";
-            out += `    aa update <node> ${property.name} &my_handle       -> &my_handle\n`;
-            out += `    aa update <node> ${property.name} '\"some text\"'    -> \"some text\"\n`;
+            out += `    attach-noos update <node> ${property.name} &my_handle       -> &my_handle\n`;
+            out += `    attach-noos update <node> ${property.name} '\"some text\"'    -> \"some text\"\n`;
             out += "  To emit a C string literal, keep the quotes: use '\"...\"' or \\\"...\\\"\n";
             break;
         }

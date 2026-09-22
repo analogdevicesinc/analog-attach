@@ -9,12 +9,12 @@ type MoveFlags = {
 };
 
 /**
- * `aa move` — always refused.
+ * `attach-noos move` — always refused.
  *
  * There is nowhere to move a node to: the workfile is a flat symbol table, so every node
  * already sits at the root and a node's place in it carries no meaning. What a move is
  * usually reaching for is a *reference* — which node points at which — and that is set with
- * `aa update`.
+ * `attach-noos update`.
  *
  * The command exists so it can say so. Leaving it out of the manifest instead makes
  * attach-meta emulate a move with read → add → update → delete `--force`, which rebuilds the
@@ -30,7 +30,7 @@ export const moveCommand = buildCommand<MoveFlags, string[], AttachContext>({
         brief: "Not supported: the workfile is flat",
         fullDescription:
             "Nodes have no parents to move between — every node lives at the root.\n" +
-            "To change which node references another, set the referencing property with 'aa update'."
+            "To change which node references another, set the referencing property with 'attach-noos update'."
     },
     parameters: {
         positional: {
@@ -64,7 +64,7 @@ export const moveCommand = buildCommand<MoveFlags, string[], AttachContext>({
             flags,
             `Cannot move ${target}: this workfile is a flat symbol table, so every node lives at the root `
             + "and has no parent to move between. To change which node references another, set the "
-            + "referencing property: aa update <node> <property> --with <target>"
+            + "referencing property: attach-noos update <node> <property> --with <target>"
         );
     }
 });

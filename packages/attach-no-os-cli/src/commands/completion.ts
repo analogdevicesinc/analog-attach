@@ -6,7 +6,7 @@ import { common_ok } from "../protocol/responses";
 import { output, output_error } from "./shared";
 
 /**
- * `aa completion install|uninstall` — ours alone, not a protocol command.
+ * `attach-noos completion install|uninstall` — ours alone, not a protocol command.
  *
  * attach-meta drives completion through `list-intelligence`/`suggest` and never calls this;
  * it exists so a person can get tab-completion in their own shell. It still speaks the same
@@ -14,14 +14,14 @@ import { output, output_error } from "./shared";
  */
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const COMPLETION_SCRIPT_PATH = path.join(__dirname, "../completion/aa.bash");
+const COMPLETION_SCRIPT_PATH = path.join(__dirname, "../completion/attach-noos.bash");
 const SYSTEM_COMPLETION_DIR = "/etc/bash_completion.d";
 const USER_COMPLETION_DIR = path.join(process.env.HOME ?? "~", ".local/share/bash-completion/completions");
 
 type CompletionFlags = { json?: boolean; user?: boolean };
 
 const installCommand = buildCommand<CompletionFlags, []>({
-    docs: { brief: "Install bash completion for aa" },
+    docs: { brief: "Install bash completion for attach-noos" },
     parameters: {
         positional: { kind: "tuple", parameters: [] },
         flags: {
@@ -31,7 +31,7 @@ const installCommand = buildCommand<CompletionFlags, []>({
     },
     func: async (flags) => {
         const target_directory = flags.user ? USER_COMPLETION_DIR : SYSTEM_COMPLETION_DIR;
-        const target_path = path.join(target_directory, "aa");
+        const target_path = path.join(target_directory, "attach-noos");
 
         if (!fs.existsSync(COMPLETION_SCRIPT_PATH)) {
             output_error(flags, `Completion script not found at '${COMPLETION_SCRIPT_PATH}'. This is a packaging issue.`);
@@ -54,7 +54,7 @@ const installCommand = buildCommand<CompletionFlags, []>({
             if (denied && !flags.user) {
                 const message = "Permission denied. Re-run with sudo, or use --user for a user-local install.";
                 output_error(flags, message, {
-                    text: `${message}\n\n  sudo aa completion install\n  or\n  aa completion install --user`
+                    text: `${message}\n\n  sudo attach-noos completion install\n  or\n  attach-noos completion install --user`
                 });
             } else {
                 output_error(flags, `Failed to install completion script: ${thrown}`);
@@ -68,7 +68,7 @@ const installCommand = buildCommand<CompletionFlags, []>({
 });
 
 const uninstallCommand = buildCommand<CompletionFlags, []>({
-    docs: { brief: "Uninstall bash completion for aa" },
+    docs: { brief: "Uninstall bash completion for attach-noos" },
     parameters: {
         positional: { kind: "tuple", parameters: [] },
         flags: {
@@ -78,7 +78,7 @@ const uninstallCommand = buildCommand<CompletionFlags, []>({
     },
     func: async (flags) => {
         const target_directory = flags.user ? USER_COMPLETION_DIR : SYSTEM_COMPLETION_DIR;
-        const target_path = path.join(target_directory, "aa");
+        const target_path = path.join(target_directory, "attach-noos");
 
         if (!fs.existsSync(target_path)) {
             // Not installed is the state that was asked for, so this is a success.
@@ -93,7 +93,7 @@ const uninstallCommand = buildCommand<CompletionFlags, []>({
             const denied = (thrown as NodeJS.ErrnoException).code === "EACCES";
             if (denied && !flags.user) {
                 const message = "Permission denied. Re-run with sudo.";
-                output_error(flags, message, { text: `${message}\n\n  sudo aa completion uninstall` });
+                output_error(flags, message, { text: `${message}\n\n  sudo attach-noos completion uninstall` });
             } else {
                 output_error(flags, `Failed to uninstall completion script: ${thrown}`);
             }

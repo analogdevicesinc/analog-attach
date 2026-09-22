@@ -85,7 +85,8 @@ export const SETTINGS_DEFAULTS: SettingsFile = {
 	},
 	// no-OS builds with CMake and Kconfig, which needs a configure step and a board
 	// preset rather than one command. So these are escape hatches now: set one to take
-	// over the step entirely, leave it unset to let `aa build`/`aa deploy` drive CMake.
+	// over the step entirely, leave it unset to let `attach-noos build`/`attach-noos deploy`
+	// drive CMake.
 	build_command: {
 		description: "Override the 'build' step with this command, run at the base of the project (unset: drive CMake directly)",
 		required: false,

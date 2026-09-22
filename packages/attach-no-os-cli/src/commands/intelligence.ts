@@ -24,7 +24,7 @@ import { output, output_error } from "./shared";
 /**
  * What each suggestion kind can be given, in order.
  *
- * These are the arguments *after* the kind: `aa suggest path <node>` completes that node's
+ * These are the arguments *after* the kind: `attach-noos suggest path <node>` completes that node's
  * properties. attach-meta walks this list to decide what to complete at each position, and
  * `kind` is what lets it recurse — a `value`'s first argument is itself a `path`, so tabbing
  * through `update <node> <property> --with <tab>` works one segment at a time.
@@ -61,10 +61,10 @@ const INTELLIGENCE: Intelligence[] = [
     { kind: SUGGEST_KINDS.platform, args: [] }
 ];
 
-/** `aa list-intelligence` — the suggestion kinds this tool can answer. */
+/** `attach-noos list-intelligence` — the suggestion kinds this tool can answer. */
 export const listIntelligenceCommand = buildCommand<{ json?: boolean }, []>({
     docs: {
-        brief: "List the suggestion kinds 'aa suggest' answers",
+        brief: "List the suggestion kinds 'attach-noos suggest' answers",
         fullDescription: "Describes each kind and the arguments it takes, for completion drivers."
     },
     parameters: {
@@ -82,7 +82,7 @@ export const listIntelligenceCommand = buildCommand<{ json?: boolean }, []>({
 });
 
 /**
- * `aa suggest <kind> [args...]` — candidate values for one argument.
+ * `attach-noos suggest <kind> [args...]` — candidate values for one argument.
  *
  * The token being typed is deliberately *not* an argument: attach-meta filters what comes
  * back by prefix itself, so this returns the whole candidate list for the position and
@@ -92,7 +92,7 @@ export const suggestCommand = buildCommand<{ json?: boolean }, string[]>({
     docs: {
         brief: "List candidate values for an argument",
         fullDescription:
-            "Answers one suggestion kind (see 'aa list-intelligence'), given the arguments\n" +
+            "Answers one suggestion kind (see 'attach-noos list-intelligence'), given the arguments\n" +
             "before the one being completed. The partial token itself is not passed."
     },
     parameters: {
@@ -197,5 +197,5 @@ function format_intelligence(): string {
         }
     }
 
-    return `${out}\nUse: aa suggest <kind> [args...]`;
+    return `${out}\nUse: attach-noos suggest <kind> [args...]`;
 }

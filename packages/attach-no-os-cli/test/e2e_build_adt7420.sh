@@ -13,29 +13,29 @@ PROJECT_NAME="e2e_test_adt7420"
 TARGET_MCU="max32690"
 
 configure_nodes() {
-    $AA add --name max_i2c_ip --key platforms/maxim/max32690/max_i2c_init_param.yaml
-    $AA add --name no_os_i2c_ip --key no-os/i2c/no_os_i2c_init_param.yaml
-    $AA add --name adt7420_ip --key devices/adt7420/adt7420_init_param.yaml
-    $AA add --name adt7420_device --key devices/adt7420/adt7420.yaml
+    $ATTACH_NOOS add --name max_i2c_ip --key platforms/maxim/max32690/max_i2c_init_param.yaml
+    $ATTACH_NOOS add --name no_os_i2c_ip --key no-os/i2c/no_os_i2c_init_param.yaml
+    $ATTACH_NOOS add --name adt7420_ip --key devices/adt7420/adt7420_init_param.yaml
+    $ATTACH_NOOS add --name adt7420_device --key devices/adt7420/adt7420.yaml
 
     # Configure the Maxim I2C init_param
-    $AA update max_i2c_ip vssel MXC_GPIO_VSSEL_VDDIOH
+    $ATTACH_NOOS update max_i2c_ip vssel MXC_GPIO_VSSEL_VDDIOH
 
     # Configure the no-OS I2C init_param (references the Maxim ops + extra).
     # device_id is capped at 2 by the Maxim $override on the parent.
-    $AA update no_os_i2c_ip device_id 1
-    $AA update no_os_i2c_ip max_speed_hz 100000
-    $AA update no_os_i2c_ip slave_address 72
-    $AA update no_os_i2c_ip platform_ops max_i2c_ops
-    $AA update no_os_i2c_ip extra max_i2c_ip
+    $ATTACH_NOOS update no_os_i2c_ip device_id 1
+    $ATTACH_NOOS update no_os_i2c_ip max_speed_hz 100000
+    $ATTACH_NOOS update no_os_i2c_ip slave_address 72
+    $ATTACH_NOOS update no_os_i2c_ip platform_ops max_i2c_ops
+    $ATTACH_NOOS update no_os_i2c_ip extra max_i2c_ip
 
     # Configure the ADT7420 init_param. active_device drives the $switch that pins
     # interface_init to i2c_init; the union value is still set explicitly.
-    $AA update adt7420_ip active_device ID_ADT7420
-    $AA update adt7420_ip resolution_setting 1
-    $AA update adt7420_ip interface_init i2c_init no_os_i2c_ip
+    $ATTACH_NOOS update adt7420_ip active_device ID_ADT7420
+    $ATTACH_NOOS update adt7420_ip resolution_setting 1
+    $ATTACH_NOOS update adt7420_ip interface_init i2c_init no_os_i2c_ip
 
-    $AA update adt7420_device '$init_param' adt7420_ip
+    $ATTACH_NOOS update adt7420_device '$init_param' adt7420_ip
 }
 
 run_e2e

@@ -23,7 +23,7 @@ type DeployFlags = {
 };
 
 /**
- * `aa deploy` — flash the built project.
+ * `attach-noos deploy` — flash the built project.
  *
  * Same as `build`: the project comes from settings, and so does the probe, since attach-meta
  * passes no arguments.
@@ -116,7 +116,7 @@ export const deployCommand = buildCommand<DeployFlags, []>({
 
         const noos_path = get_setting_value("no_os_path");
         if (!noos_path.ok) {
-            output_error(flags, "no_os_path is not configured. Run: aa tool-config-set no_os_path <path>");
+            output_error(flags, "no_os_path is not configured. Run: attach-noos tool-config-set no_os_path <path>");
             return;
         }
 

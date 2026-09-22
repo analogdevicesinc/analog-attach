@@ -58,7 +58,7 @@ export const listBoardsCommand = buildCommand<{ json?: boolean }, []>({
     func: async (flags) => {
         const noos_path = get_setting_value("no_os_path");
         if (!noos_path.ok) {
-            output_error(flags, "no_os_path is not configured. Run: aa tool-config-set no_os_path <path>");
+            output_error(flags, "no_os_path is not configured. Run: attach-noos tool-config-set no_os_path <path>");
             return;
         }
 
@@ -78,7 +78,7 @@ export const listBoardsCommand = buildCommand<{ json?: boolean }, []>({
 
         // Grouped by platform rather than listed flat: the platform is what a board
         // gives you, and seeing two boards under one platform is also the warning that
-        // `aa generate` will ask which one.
+        // `attach-noos generate` will ask which one.
         const by_platform = new Map<string, ListedBoard[]>();
         for (const board of data.generatable) {
             const key = board.platform ?? "";
@@ -104,7 +104,7 @@ export const listBoardsCommand = buildCommand<{ json?: boolean }, []>({
         }
 
         text += `${data.generatable.length} of ${data.generatable.length + data.unsupported.length} boards can be generated for.\n`;
-        text += "Use: aa tool-config-set board <name>, then aa create-workfile";
+        text += "Use: attach-noos tool-config-set board <name>, then attach-noos create-workfile";
 
         const message = `${data.generatable.length} of ${data.generatable.length + data.unsupported.length} boards can be generated for`;
         output(flags, text, { ...common_ok(message), ...data });

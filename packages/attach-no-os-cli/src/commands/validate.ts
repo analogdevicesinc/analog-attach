@@ -9,7 +9,7 @@ import {
 } from "../protocol/responses";
 
 /**
- * `aa validate` — check the whole workfile.
+ * `attach-noos validate` — check the whole workfile.
  *
  * Always the whole workfile, and never a path: the protocol calls this with no arguments and
  * narrows the findings itself by matching their paths, so scoping here would only hide

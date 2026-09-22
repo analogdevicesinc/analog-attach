@@ -57,7 +57,7 @@ const routes = buildRouteMap({
 });
 
 export const app = buildApplication(routes, {
-	name: "aa",
+	name: "attach-noos",
 	versionInfo: {
 		currentVersion: TOOL_VERSION,
 	},

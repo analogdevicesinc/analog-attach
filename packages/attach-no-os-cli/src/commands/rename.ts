@@ -16,7 +16,7 @@ type RenameFlags = {
 };
 
 /**
- * `aa rename <node> --to <name>` — rename a node.
+ * `attach-noos rename <node> --to <name>` — rename a node.
  *
  * Renaming a node rewrites every reference to it, which is why this is a command of its own
  * rather than a delete-and-re-add: the references are the part that would be lost.
