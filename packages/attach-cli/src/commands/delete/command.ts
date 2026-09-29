@@ -5,7 +5,7 @@ import * as fs from 'node:fs';
 
 import type { LocalContext } from "../../context";
 import { resolve_config } from "../../resolve-config";
-import { resolve_node_identifier } from "../../utilities";
+import { load_trees, resolve_node_identifier, split_property_reference } from "../../utilities";
 import { respond, respond_fail, input_error } from "../../protocol/output";
 import type { DeletePreview } from "../../protocol/types";
 
@@ -19,23 +19,9 @@ export function build_delete_command(context_: LocalContext): Command {
             if (resolved === undefined) { return; }
             const { context, overlay: input } = resolved.values;
 
-            const context_content = fs.readFileSync(context, 'utf8');
-            const base = DeviceTree.new_from_string(context_content);
-
-            if (typeof base === "string") {
-                if (context_.json) { input_error(`failed to parse dts: ${base}`); return; }
-                console.log(`Failed to parse dts ${context}: ${base}`);
-                return;
-            }
-
-            const input_content = fs.readFileSync(input, 'utf8');
-            const overlay = DeviceTreeOverlay.new_from_string(input_content, base);
-
-            if (typeof overlay === "string") {
-                if (context_.json) { input_error(`failed to parse dtso: ${overlay}`); return; }
-                console.log(`Failed to parse dtso ${input}: ${overlay}`);
-                return;
-            }
+            const trees = load_trees(context_, context, input, resolved.parsed.context);
+            if (trees === undefined) { return; }
+            const { base_dt: base, overlay } = trees;
 
             if (path.length === 0) {
                 const preview = count_overlay_root(overlay);
@@ -210,14 +196,10 @@ export function remove_overlay_property(
     overlay: DeviceTreeOverlay,
     identifier: string,
 ): "removed" | "not-found" {
-    const last_slash = identifier.lastIndexOf("/");
-    if (last_slash <= 0) { return "not-found"; }
+    const split = split_property_reference(identifier);
+    if (split.property_name === undefined) { return "not-found"; }
 
-    const property_name = identifier.slice(last_slash + 1);
-    const node_identifier = identifier.slice(0, last_slash);
-    if (property_name.length === 0) { return "not-found"; }
-
-    return overlay.remove_property(resolve_node_identifier(node_identifier, overlay), property_name)
+    return overlay.remove_property(resolve_node_identifier(split.node_identifier, overlay), split.property_name)
         ? "removed"
         : "not-found";
 }

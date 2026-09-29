@@ -361,6 +361,7 @@ describe("overlays (DTOs)", () => {
     if (label_reference.kind !== "label") {
       expect.fail("Expected label reference");
     }
+    expect(label_reference.name).toStrictEqual("label_reference");
 
     const overlay1 = fragment1.children.find(c => c.name === "__overlay__" && c.unit_addr === undefined);
     expect.assert.isDefined(overlay1);

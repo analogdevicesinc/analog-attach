@@ -51,11 +51,19 @@ Commands in `src/app.ts` are annotated with `// protocol commands` (used by AI t
 - `config.toml`: stores `linux`, `dt-schema`, `context`, `overlay` paths; loaded by every command that operates on files.
 - `compat-index.json`: a binding compatibility index keyed by compatible string → YAML file path; rebuilt when stale (mtime-based).
 
+`resolve_config` (`src/resolve-config.ts`) returns `{ values, config, parsed }`. The `parsed: ParsedConfig` object holds the pre-parsed `DeviceTree` and `BoardDescription` when `context` / `board` were among the required fields. Commands pass `parsed.context` to `load_trees` / `load_base` (`src/utilities.ts`) to avoid re-parsing.
+
+`load_trees(ctx, path, overlay_path, base_dt?)` and `load_base(ctx, path, base_dt?)` live in `src/utilities.ts`. `parse_property_reference(args)` is also in `src/utilities.ts` — the canonical split for multi-segment node/property references.
+
 Every command resolves its paths as: `--flag` → `config.toml` value → `undefined` (print diagnostic and return).
 
 ### Dependency on attach-lib
 
 `attach-lib` is a dev dependency resolved from the workspace. `tsup` bundles it into the output via `noExternal: ["attach-lib"]`, so the published `dist/` is self-contained. The `yaml` package is intentionally kept external.
+
+### Board descriptions
+
+The optional `board` config field names an add-on board (HAT, …) description: a path, or a bundled name resolved to `bundled/boards/<name>.yaml` (`src/board.ts`, `getBundledBoardsPath`). All board logic lives in attach-lib's Intelligence module as the third context layer (`board_layer`, see attach-lib's CLAUDE.md); the CLI only loads the file, appends the layer to `IntelligenceStack.default()`, and formats results — `suggest value` / `suggest board-slot`, plus `suggestions` on `suggest type` via `resolve_node_binding`'s `options`. Slot inference is stateless (parent bus + `reg`, via `placement_from_overlay`). Lib suggestions are structured cell rows; `format_value` (`src/commands/update/command.ts`) turns them into `--with` strings and is the inverse of `parse_value`.
 
 ### Bundled dt-schema
 
@@ -63,14 +71,26 @@ A bundled copy of `dt-schema` lives at `bundled/dt-schema/` inside the package. 
 
 ### update --with value format
 
-The `--with` argument for `update` uses a custom mini-syntax parsed in `src/commands/update/command.ts:parse_value`:
-- Single number: `0`
-- Single string: `some_label`
-- Boolean flag: `true` / `false`
-- Array: `a b c` (space-separated items)
-- Matrix rows: `a b,c d` (comma separates rows, space separates items within a row) — emits a true multi-row matrix, `prop = <a b>, <c d>;`
+The `--with` argument for `update` uses a custom mini-syntax parsed in `src/commands/update/command.ts:parse_value`. Each token is resolved by `build_raw_property`:
+- Numbers → `bigint` cell values
+- Known macros (`GPIO_ACTIVE_LOW`, `IRQ_TYPE_EDGE_FALLING`, etc.) → their numeric values
+- Labels that exist in the base tree or overlay (bare or `&label`) → phandle references (`&label`)
+- Unknown words in a cell context → **rejected** with a clear error message
 
-Comma is only a row separator; it can't appear in labels, macros, or numbers. Numbers are parsed as `bigint`. Strings that aren't numbers stay as strings.
+The binding provides only a shape hint (`flag` / `strings` / `cells` / undefined) and never causes a rejection. With the `strings` hint, commas are preserved inside tokens (so `adi,ad7124-8` stays one string), and with no hint, inference picks strings when no token resolves as a cell.
+
+Value formats:
+- Single number: `0`
+- Single string: `okay`
+- Boolean flag: `true` / `false`
+- Array: `"gpio 8 GPIO_ACTIVE_LOW"` (space-separated; macros and labels resolved)
+- Matrix rows: `"gpio 8 1,gpio 7 1"` (comma separates rows) — produces `<&gpio 8 1>, <&gpio 7 1>;`
+
+The old typed `set_property` path (strict binding validation in `update`) has been moved to `src/value-check.ts` as `check_value`, where it serves as a dry-run checker for `suggest value` annotations.
+
+### suggest value binding check
+
+When `linux`/`dt-schema` are configured, `suggest value` (`src/commands/suggest/command.ts`) annotates each suggestion with binding-check notes. For each suggestion it builds a preview node with the candidate value, runs `narrow_and_populate` on it, and calls `check_value` against the resulting definition. Notes appear in the `note` field of the `Suggestion` protocol type and are appended to `display_string`.
 
 ### Skill installation
 

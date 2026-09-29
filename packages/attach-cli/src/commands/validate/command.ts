@@ -11,7 +11,7 @@ import {
 
 import * as fs from 'node:fs';
 
-import { bigIntReplacer, find_binding, resolve_node_identifier, resolve_positional_path } from "../../utilities";
+import { bigIntReplacer, find_binding, load_trees, resolve_node_identifier, resolve_positional_path } from "../../utilities";
 import { resolve_node_binding } from "../../binding-resolution";
 import { resolve_config } from "../../resolve-config";
 import type { LocalContext } from "../../context";
@@ -27,24 +27,9 @@ export function build_validate_command(context_: LocalContext): Command {
             if (resolved === undefined) { return; }
             const { linux, dtSchema, context, overlay: input } = resolved.values;
 
-            const context_content = fs.readFileSync(context, 'utf8');
-            const input_content = fs.readFileSync(input, 'utf8');
-
-            const base_dt = DeviceTree.new_from_string(context_content);
-
-            if (typeof base_dt === 'string') {
-                if (context_.json) { input_error(`Failed to parse dts ${context}: ${base_dt}`); return; }
-                console.log(`Failed to parse dts ${context}: ${base_dt}`);
-                return;
-            }
-
-            const overlay = DeviceTreeOverlay.new_from_string(input_content, base_dt);
-
-            if (typeof overlay === 'string') {
-                if (context_.json) { input_error(`Failed to parse dtso ${input}: ${overlay}`); return; }
-                console.log(`Failed to parse dtso ${input}: ${overlay}`);
-                return;
-            }
+            const trees = load_trees(context_, context, input, resolved.parsed.context);
+            if (trees === undefined) { return; }
+            const { base_dt, overlay } = trees;
 
             const node_identifier = resolve_positional_path(path_arguments);
 

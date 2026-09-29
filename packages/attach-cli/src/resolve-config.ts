@@ -1,18 +1,18 @@
 import type { LocalContext } from "./context";
-import { load_config, check_config, check_failure_message, type AttachConfig, type Checked } from "./config";
+import { load_config, check_config, check_failure_message, type AttachConfig, type Checked, type ParsedConfig } from "./config";
 import { input_error } from "./protocol/output";
 
 /**
  * Load the config and verify the required fields, emitting the standard
  * diagnostics (no config file / missing field / missing path) and returning
- * undefined on any failure. On success returns the narrowed required values
- * plus the full config (for reading optional fields without a second load).
- * NOTE: path to context/overlay validation involves parsing so checks outside are extra, but better still kept until we can return DT/DTO from here
+ * undefined on any failure. On success returns the narrowed required values,
+ * the full config, and the parsed representations of `context` and `board`
+ * (when those fields were among the required set).
  */
 export function resolve_config<K extends keyof AttachConfig>(
     context: LocalContext,
     required: readonly K[],
-): { values: Checked<K>; config: AttachConfig } | undefined {
+): { values: Checked<K>; config: AttachConfig; parsed: ParsedConfig } | undefined {
     const config = load_config();
     if (config === undefined) {
         if (context.json) { input_error("no config.toml (run config-set)"); }
@@ -28,5 +28,5 @@ export function resolve_config<K extends keyof AttachConfig>(
         return undefined;
     }
 
-    return { values: checked.values, config };
+    return { values: checked.values, config, parsed: checked.parsed };
 }

@@ -1,7 +1,9 @@
 import * as fs from "node:fs";
 import path from "node:path";
 import { parse } from "smol-toml";
-import { DeviceTree } from "attach-lib";
+import { DeviceTree, type BoardDescription } from "attach-lib";
+
+import { load_board } from "./board";
 
 export const DEFAULT_BUILD_COMMAND = "dtc -@ -I dts -O dtb -o {output} {input}";
 
@@ -10,6 +12,7 @@ export interface AttachConfig {
     dtSchema?: string;
     context?: string;
     overlay?: string;
+    board?: string;
     validationJson?: string;
     buildCommand?: string;
     overlayCompiled?: string;
@@ -42,6 +45,13 @@ export interface FieldSpec {
      * must be re-checked at read time.
      */
     validate?: (value: string) => string | undefined;
+    /**
+     * Optional parse hook. When present, `check_config` calls it instead of
+     * `validate` and, on success, stores the result in `ParsedConfig` under the
+     * field's key. Returns the parsed value on success, or an error string.
+     * `config-set` uses it only to validate (the parsed value is discarded).
+     */
+    parse?: (value: string) => unknown | string;
 }
 
 export const CONFIG_REGISTRY: readonly FieldSpec[] = [
@@ -73,10 +83,10 @@ export const CONFIG_REGISTRY: readonly FieldSpec[] = [
         type: "path",
         required: true,
         description: "Path to target base DTS file",
-        validate: (value) => {
+        parse: (value) => {
             if (!fs.existsSync(value)) { return `path does not exist: ${value}`; }
             const parsed = DeviceTree.new_from_string(fs.readFileSync(value, "utf8"));
-            return typeof parsed === "string" ? `not a valid device tree: ${parsed}` : undefined;
+            return typeof parsed === "string" ? `not a valid device tree: ${parsed}` : parsed;
         },
     },
     {
@@ -85,6 +95,18 @@ export const CONFIG_REGISTRY: readonly FieldSpec[] = [
         type: "path",
         required: false,
         description: "Path to the working DTSO overlay file (workfile)",
+    },
+    {
+        toml: "board",
+        key: "board",
+        // A bundled board name is not a path, so no existence check; validate resolves both forms.
+        type: "string",
+        required: false,
+        description: "Add-on board description (HAT, …): a path to a board YAML or a bundled board name (e.g. pmd-rpi-intz)",
+        parse: (value) => {
+            const board = load_board(value);
+            return board;
+        },
     },
     {
         toml: "validation-json",
@@ -214,8 +236,13 @@ export function save_config(fields: Partial<AttachConfig>): void {
 /** A config narrowed so every required field is a definite string. */
 export type Checked<K extends keyof AttachConfig> = { [P in K]-?: string };
 
+export type ParsedConfig = {
+    context?: DeviceTree;
+    board?: BoardDescription;
+};
+
 export type ConfigCheck<K extends keyof AttachConfig> =
-    | { ok: true; values: Checked<K> }
+    | { ok: true; values: Checked<K>; parsed: ParsedConfig }
     | { ok: false; kind: "missing-field"; field: K; toml: string }
     | { ok: false; kind: "missing-path"; field: K; toml: string; path: string }
     | { ok: false; kind: "invalid"; field: K; toml: string; path: string; message: string };
@@ -241,6 +268,7 @@ export function check_config<K extends keyof AttachConfig>(
     required: readonly K[],
 ): ConfigCheck<K> {
     const values = {} as Checked<K>;
+    const parsed: ParsedConfig = {};
     for (const field of required) {
         const spec = config_field_spec(field);
         const value = config[field];
@@ -250,13 +278,21 @@ export function check_config<K extends keyof AttachConfig>(
         if (spec.type === "path" && !fs.existsSync(value)) {
             return { ok: false, kind: "missing-path", field, toml: spec.toml, path: value };
         }
-        const invalid = spec.validate?.(value);
-        if (invalid !== undefined) {
-            return { ok: false, kind: "invalid", field, toml: spec.toml, path: value, message: invalid };
+        if (spec.parse !== undefined) {
+            const result = spec.parse(value);
+            if (typeof result === "string") {
+                return { ok: false, kind: "invalid", field, toml: spec.toml, path: value, message: result };
+            }
+            (parsed as Record<string, unknown>)[field] = result;
+        } else {
+            const invalid = spec.validate?.(value);
+            if (invalid !== undefined) {
+                return { ok: false, kind: "invalid", field, toml: spec.toml, path: value, message: invalid };
+            }
         }
         values[field] = value;
     }
-    return { ok: true, values };
+    return { ok: true, values, parsed };
 }
 
 /**
@@ -282,7 +318,7 @@ if (import.meta.vitest) {
 
     test("CONFIG_REGISTRY covers every AttachConfig key exactly once", () => {
         const keys: (keyof AttachConfig)[] = [
-            "linux", "dtSchema", "context", "overlay", "validationJson",
+            "linux", "dtSchema", "context", "overlay", "board", "validationJson",
             "buildCommand", "overlayCompiled", "deployIp", "deployUser", "deployPassword",
         ];
         expect(CONFIG_REGISTRY.length).toBe(keys.length);

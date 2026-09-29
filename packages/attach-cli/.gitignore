@@ -29,3 +29,4 @@ dist
 *.dtso
 .analog-attach.toml
 .attach-linux/
+demo/workspace/

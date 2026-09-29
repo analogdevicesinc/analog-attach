@@ -5,7 +5,7 @@ import * as fs from 'node:fs';
 
 import type { LocalContext } from "../../context";
 import { resolve_config } from "../../resolve-config";
-import { resolve_node_identifier, split_property_reference } from "../../utilities";
+import { load_trees, resolve_node_identifier, split_property_reference } from "../../utilities";
 import { respond, respond_fail, input_error } from "../../protocol/output";
 
 export function build_rename_command(context_: LocalContext): Command {
@@ -26,23 +26,9 @@ export function build_rename_command(context_: LocalContext): Command {
             if (resolved === undefined) { return; }
             const { context, overlay: input } = resolved.values;
 
-            const context_content = fs.readFileSync(context, 'utf8');
-            const base = DeviceTree.new_from_string(context_content);
-
-            if (typeof base === "string") {
-                if (context_.json) { input_error(`failed to parse dts: ${base}`); return; }
-                console.log(`Failed to parse dts ${context}: ${base}`);
-                return;
-            }
-
-            const input_content = fs.readFileSync(input, 'utf8');
-            const overlay = DeviceTreeOverlay.new_from_string(input_content, base);
-
-            if (typeof overlay === "string") {
-                if (context_.json) { input_error(`failed to parse dtso: ${overlay}`); return; }
-                console.log(`Failed to parse dtso ${input}: ${overlay}`);
-                return;
-            }
+            const trees = load_trees(context_, context, input, resolved.parsed.context);
+            if (trees === undefined) { return; }
+            const overlay = trees.overlay;
 
             const identifier = path.join("/");
             const result = rename_overlay_target(overlay, identifier, to);

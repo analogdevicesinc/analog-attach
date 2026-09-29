@@ -1,8 +1,11 @@
 import { AttachType } from "./StructuralTypes.js";
+import type { ValueSuggestion } from "../Intelligence/layers/types.js";
 
 export type ResolvedProperty = {
     key: string,
-    value: AttachType
+    value: AttachType,
+    /** Concrete candidate values contributed by intelligence layers (e.g. a board description). */
+    suggestions?: ValueSuggestion[],
 }
 
 export type PatternPropertyRule = {

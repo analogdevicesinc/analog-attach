@@ -134,13 +134,18 @@ export class DeviceTreeOverlay {
                     return fragment;
                 }
             } else if (target.kind === "path") {
-                const property = fragment.properties.find(p => p.name === "target-path");
-                if (property === undefined || is_dt_flag(property.value)) {
-                    continue;
+                const target_path_prop = fragment.properties.find(p => p.name === "target-path");
+                if (target_path_prop !== undefined && !is_dt_flag(target_path_prop.value)) {
+                    const matches = target_path_prop.value.some(v => v.kind === "string" && v.value === target.path);
+                    if (matches) { return fragment; }
                 }
-                const matches = property.value.some(v => v.kind === "string" && v.value === target.path);
-                if (matches) {
-                    return fragment;
+
+                const target_prop = fragment.properties.find(p => p.name === "target");
+                if (target_prop !== undefined && !is_dt_flag(target_prop.value)) {
+                    const matches = target_prop.value.some(v =>
+                        v.kind === "array" && v.elements.some(element => element.kind === "path" && element.path === target.path)
+                    );
+                    if (matches) { return fragment; }
                 }
             }
         }
@@ -432,7 +437,7 @@ export class DeviceTreeOverlay {
         return this.find_and_remove_by_segments(parent.children[index]!, segments.slice(1));
     }
 
-    private get_fragment_root_path(fragment: DTNode): string | undefined {
+    public get_fragment_root_path(fragment: DTNode): string | undefined {
         // label-targeted: target = <&label>
         const target_property = fragment.properties.find(p => p.name === "target");
 
@@ -441,17 +446,25 @@ export class DeviceTreeOverlay {
                 if (v.kind !== "array") { continue; }
 
                 for (const element of v.elements) {
-                    if (element.kind !== "label") { continue; }
+                    if (element.kind === "label") {
+                        const name = element.name.startsWith("&") ? element.name.slice(1) : element.name;
 
-                    const name = element.name.startsWith("&") ? element.name.slice(1) : element.name;
+                        if (this.base_dts !== undefined) {
+                            const reference = this.base_dts.get_node_by_label({ kind: "label", labels: [], name });
 
-                    if (this.base_dts !== undefined) {
-                        const reference = this.base_dts.get_node_by_label({ kind: "label", labels: [], name });
+                            if (reference !== undefined) { return reference.full_path.path; }
+                        }
 
-                        if (reference !== undefined) { return reference.full_path.path; }
+                        return undefined;
                     }
 
-                    return undefined;
+                    if (element.kind === "path") {
+                        if (this.base_dts !== undefined) {
+                            const reference = this.base_dts.get_node_by_path({ kind: "path", labels: [], path: element.path });
+                            if (reference !== undefined) { return element.path; }
+                        }
+                        return undefined;
+                    }
                 }
             }
         }
@@ -743,5 +756,78 @@ if (import.meta.vitest !== undefined) {
         const overlay = DeviceTreeOverlay.new_from_string(overlay_with_imu, base);
         if (typeof overlay === "string") { throw new TypeError(overlay); }
         expect(overlay.find_node({ kind: "label", labels: [], name: "nonexistent" })).toBeUndefined();
+    });
+
+    test("print/reparse roundtrip - target element name has no & prefix", () => {
+        const base = DeviceTree.new_from_string(base_dts_source);
+        if (typeof base === "string") { throw new TypeError(base); }
+        const overlay = DeviceTreeOverlay.new_from_string(overlay_with_imu, base);
+        if (typeof overlay === "string") { throw new TypeError(overlay); }
+
+        const printed = overlay.print();
+        const reparsed = DeviceTreeOverlay.new_from_string(printed, base);
+        if (typeof reparsed === "string") { throw new TypeError(`reparse failed: ${reparsed}`); }
+
+        const fragment = reparsed.get_fragments()[0];
+        expect(fragment).toBeDefined();
+        const target = fragment!.properties.find(p => p.name === "target");
+        expect(target).toBeDefined();
+        if (target === undefined || is_dt_flag(target.value)) { throw new Error("bad target"); }
+        const element = target.value[0];
+        if (element === undefined || element.kind !== "array") { throw new Error("bad element"); }
+        const ref = element.elements[0];
+        if (ref === undefined || ref.kind !== "label") { throw new Error("bad ref"); }
+        expect(ref.name).toBe("spi0");
+    });
+
+    test("add_fragment reuses existing label fragment", () => {
+        const base = DeviceTree.new_from_string(base_dts_source);
+        if (typeof base === "string") { throw new TypeError(base); }
+        const overlay = DeviceTreeOverlay.new_from_string(overlay_with_imu, base);
+        if (typeof overlay === "string") { throw new TypeError(overlay); }
+
+        const before = overlay.get_fragments().length;
+        overlay.add_fragment({ kind: "label", labels: [], name: "spi0" }, undefined, undefined);
+        expect(overlay.get_fragments().length).toBe(before);
+    });
+
+    const overlay_with_path_target = `/dts-v1/;
+/plugin/;
+
+/ {
+    fragment@0 {
+        target = <&{/soc/spi@7e204000}>;
+        __overlay__ {
+            adc@0 {
+                compatible = "adi,ad7124-8";
+                reg = <0>;
+            };
+        };
+    };
+};`;
+
+    test("target = <&{/path}> normalised to target-path", () => {
+        const base = DeviceTree.new_from_string(base_dts_source);
+        if (typeof base === "string") { throw new TypeError(base); }
+        const overlay = DeviceTreeOverlay.new_from_string(overlay_with_path_target, base);
+        if (typeof overlay === "string") { throw new TypeError(overlay); }
+
+        const fragment = overlay.get_fragments()[0];
+        expect(fragment).toBeDefined();
+        const tp = fragment!.properties.find(p => p.name === "target-path");
+        expect(tp).toBeDefined();
+        if (tp === undefined || is_dt_flag(tp.value)) { throw new Error("bad tp"); }
+        expect(tp.value[0]).toMatchObject({ kind: "string", value: "/soc/spi@7e204000" });
+    });
+
+    test("find_node resolves node under path-targeted fragment", () => {
+        const base = DeviceTree.new_from_string(base_dts_source);
+        if (typeof base === "string") { throw new TypeError(base); }
+        const overlay = DeviceTreeOverlay.new_from_string(overlay_with_path_target, base);
+        if (typeof overlay === "string") { throw new TypeError(overlay); }
+
+        const result = overlay.find_node({ kind: "path", labels: [], path: "/soc/spi@7e204000/adc@0" });
+        expect(result).toBeDefined();
+        expect(result?.node_path).toBe("/soc/spi@7e204000/adc@0");
     });
 }

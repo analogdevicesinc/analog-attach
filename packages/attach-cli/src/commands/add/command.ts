@@ -4,7 +4,7 @@ import { DeviceTree, DeviceTreeOverlay, NodeBuilder, PropertyBuilder, type DTPro
 import * as fs from 'node:fs';
 
 import type { LocalContext } from "../../context";
-import { find_binding, resolve_node_identifier } from "../../utilities";
+import { find_binding, load_trees, resolve_node_identifier } from "../../utilities";
 import { resolve_config } from "../../resolve-config";
 import { respond, respond_fail, input_error } from "../../protocol/output";
 import type { AddResponse } from "../../protocol/types";
@@ -35,23 +35,9 @@ export function build_add_command(context_: LocalContext): Command {
                 return;
             }
 
-            const context_content = fs.readFileSync(context, 'utf8');
-            const base = DeviceTree.new_from_string(context_content);
-
-            if (typeof base === "string") {
-                if (context_.json) { input_error(`Failed to parse dts ${context}: ${base}`); return; }
-                console.log(`Failed to parse dts ${context}: ${base}`);
-                return;
-            }
-
-            const input_content = fs.readFileSync(input, 'utf8');
-            const overlay = DeviceTreeOverlay.new_from_string(input_content, base);
-
-            if (typeof overlay === "string") {
-                if (context_.json) { input_error(`Failed to parse dtso ${input}: ${overlay}`); return; }
-                console.log(`Failed to parse dtso ${input}: ${overlay}`);
-                return;
-            }
+            const trees = load_trees(context_, context, input, resolved.parsed.context);
+            if (trees === undefined) { return; }
+            const { base_dt: base, overlay } = trees;
 
             if (key !== undefined) {
                 const binding_path = await find_binding(linux, dtSchema, key, context_.json);

@@ -8,6 +8,7 @@ import {
   type DTProperty,
   type Memreserve,
   is_bits,
+  is_dt_flag,
   DTCellArray,
   DTMetadata,
   isDTMetadata
@@ -222,7 +223,7 @@ export class Parser {
               elements: [{
                 labels: [],
                 kind: "label",
-                name: `&${current.value}`
+                name: current.value
               }]
             }],
             deleted: false
@@ -380,17 +381,36 @@ export class Parser {
     const r_metadata = this.parse_metadata();
     if (Result.is_err(r_metadata)) { return r_metadata; }
 
+    const root = strip_node({
+      labels: [],
+      name: "/",
+      unit_addr: undefined,
+      properties: [],
+      children: [...children_map.values()],
+      deleted: false
+    });
+
+    // Normalise target = <&{/path}> → target-path = "/path" in explicit fragments,
+    // because dtc can't emit fixups for &{/path} in a plugin.
+    for (const fragment of root.children) {
+      const idx = fragment.properties.findIndex(p => p.name === "target");
+      if (idx === -1) { continue; }
+      const prop = fragment.properties[idx]!;
+      if (is_dt_flag(prop.value)) { continue; }
+      if (prop.value.length !== 1) { continue; }
+      const cell = prop.value[0]!;
+      if (cell.kind !== "array" || cell.elements.length !== 1) { continue; }
+      const el = cell.elements[0]!;
+      if (el.kind !== "path") { continue; }
+      fragment.properties[idx] = {
+        labels: prop.labels,
+        name: "target-path",
+        value: [{ labels: [], kind: "string", value: el.path }]
+      };
+    }
+
     return Result.Ok({
-      dto: {
-        root: strip_node({
-          labels: [],
-          name: "/",
-          unit_addr: undefined,
-          properties: [],
-          children: [...children_map.values()],
-          deleted: false
-        })
-      },
+      dto: { root },
       metadata: r_metadata.value
     });
   }
