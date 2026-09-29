@@ -118,6 +118,24 @@ function get_inherited_property(
     return get_inherited_property(devicetree, new_parent, property_to_search);
 }
 
+export function is_gpio_property(key: string): boolean {
+    return key === "gpios" || key === "gpio" || /(?<!,nr)-gpios?$/.test(key);
+}
+
+function extract_gpio_controller(data: unknown): string | undefined {
+    if (typeof data === "string") { return data; }
+    if (!Array.isArray(data) || data.length === 0) { return; }
+    // ["gpio"] or ["gpio", 21, 1]
+    if (typeof data[0] === "string") { return data[0]; }
+    // [["gpio", 8, 1], …] — use the first row whose first cell is a string (skips <0> holes).
+    if (Array.isArray(data[0])) {
+        for (const row of data) {
+            if (Array.isArray(row) && row.length > 0 && typeof row[0] === "string") { return row[0]; }
+        }
+    }
+    return;
+}
+
 export function query_devicetree(
     devicetree: DeviceTree,
     properties: ResolvedProperty[],
@@ -435,8 +453,8 @@ export function query_devicetree(
                             const new_value: AttachArray = {
                                 _t: 'fixed_index',
                                 prefixItems: [],
-                                minItems: Number(new_length),
-                                maxItems: Number(new_length),
+                                minItems: Number(new_length) + 1,
+                                maxItems: Number(new_length) + 1,
                             };
 
                             new_value.prefixItems.push(
@@ -490,14 +508,15 @@ export function query_devicetree(
             continue;
         }
 
-        if (property.key.endsWith("-gpios") || property.key === "gpios" || property.key === "gpio") {
+        if (is_gpio_property(property.key)) {
 
-            let set_controller = parsed_data[property.key];
+            const raw_controller = parsed_data[property.key];
 
-            if (
-                set_controller === undefined ||
-                (Array.isArray(set_controller) && set_controller.length === 0)
-            ) {
+            // Extract the controller label from any of: "gpio", ["gpio"],
+            // ["gpio", 21, 1], [["gpio", 8, 1], …].
+            const set_controller = extract_gpio_controller(raw_controller);
+
+            if (set_controller === undefined) {
                 const gpio_controllers = find_nodes(devicetree, is_gpio_controller);
 
                 const phandles: string[] = [];
@@ -516,65 +535,60 @@ export function query_devicetree(
                 };
 
                 continue;
-            } else if (
-                Array.isArray(set_controller) &&
-                set_controller.length > 0 &&
-                typeof set_controller[0] === 'string'
-            ) {
-                set_controller = set_controller[0];
+            }
 
-                const gpio_controllers = find_nodes(devicetree, is_gpio_controller);
+            const gpio_controllers = find_nodes(devicetree, is_gpio_controller);
+            const phandles: string[] = [];
+            for (const gpio_controller of gpio_controllers) {
+                phandles.push(gpio_controller.node.labels.at(-1) ?? `&{${gpio_controller.path}}`);
+            }
 
-                const phandles: string[] = [];
+            const controller_node = gpio_controllers.find((value) => value.node.labels.at(-1) === set_controller);
+            if (controller_node === undefined) { continue; }
 
-                for (const gpio_controller of gpio_controllers) {
-                    phandles.push(gpio_controller.node.labels.at(-1) ?? `&{${gpio_controller.path}}`);
-                }
+            const gpio_cells = controller_node.node.properties.find((value) => value.name === "#gpio-cells");
+            if (gpio_cells === undefined) { continue; }
 
-                const node = gpio_controllers.find((value) => value.node.labels.at(-1) === set_controller);
+            const new_length = cell_extract_first_value(gpio_cells);
+            if (new_length === undefined || typeof new_length !== 'bigint') { continue; }
 
-                if (node === undefined) {
-                    continue;
-                }
+            const row_size = Number(new_length) + 1;
 
-                const gpio_cells = node.node.properties.find((value) => value.name === "#gpio-cells");
+            const row_template: AttachArray = {
+                _t: 'fixed_index',
+                prefixItems: [
+                    { _t: "enum", enum: phandles, default: set_controller, enum_type: AttachEnumType.PHANDLE },
+                ],
+                minItems: row_size,
+                maxItems: row_size,
+                description: property.value.description,
+            };
+            for (let index = 0; index < Number(new_length) - 1; index++) {
+                row_template.prefixItems.push({ _t: "number" });
+            }
+            row_template.prefixItems.push({
+                _t: "enum",
+                enum: GPIO_MACROS.map((value) => value.name),
+                enum_type: AttachEnumType.MACRO,
+            });
 
-                if (gpio_cells !== undefined) {
-                    const new_length = cell_extract_first_value(gpio_cells);
+            // Row bounds from the binding; default 1..1 for single-row properties.
+            const min_rows = "minItems" in property.value ? property.value.minItems : 1;
+            const max_rows = "maxItems" in property.value ? property.value.maxItems : 1;
 
-                    if (new_length !== undefined && typeof new_length === 'bigint') {
-                        const new_value: AttachArray = {
-                            _t: 'fixed_index',
-                            prefixItems: [],
-                            minItems: Number(new_length),
-                            maxItems: Number(new_length),
-                            description: property.value.description,
-                        };
-
-                        new_value.prefixItems.push(
-                            {
-                                _t: "enum",
-                                enum: phandles,
-                                default: set_controller,
-                                enum_type: AttachEnumType.PHANDLE
-                            }
-                        );
-
-                        for (let index = 0; index < Number(new_length) - 1; index++) {
-                            new_value.prefixItems.push({ _t: "number" });
-                        }
-
-                        new_value.prefixItems.push(
-                            {
-                                _t: "enum",
-                                enum: GPIO_MACROS.map((value) => value.name),
-                                enum_type: AttachEnumType.MACRO
-                            }
-                        );
-
-                        property.value = new_value;
-                    }
-                }
+            // eslint-disable-next-line unicorn/prefer-ternary
+            if (max_rows <= 1) {
+                // Single-row: keep the flat fixed_index shape so the extension's
+                // forms don't change.
+                property.value = row_template;
+            } else {
+                property.value = {
+                    _t: "matrix",
+                    minItems: min_rows,
+                    maxItems: max_rows,
+                    description: property.value.description,
+                    values: [row_template],
+                };
             }
 
             continue;
@@ -617,6 +631,26 @@ if (import.meta.vitest) {
         }
     });
 
+    test("query_devicetree — *-gpios: item count is the phandle plus #gpio-cells", () => {
+        const dt = dts(`/dts-v1/;
+/ {
+    gpio: gpio@7e200000 {
+        compatible = "brcm,bcm2711-gpio";
+        gpio-controller;
+        #gpio-cells = <2>;
+    };
+};`);
+        const properties = [{ key: "reset-gpios", value: { _t: "generic" as const } }];
+        const result = query_devicetree(dt, properties, JSON.stringify({ "reset-gpios": ["gpio"] }));
+        const reset = result.find(p => p.key === "reset-gpios");
+        expect(reset?.value._t).toBe("fixed_index");
+        if (reset?.value._t === "fixed_index") {
+            expect(reset.value.prefixItems).toHaveLength(3);
+            expect(reset.value.minItems).toBe(3);
+            expect(reset.value.maxItems).toBe(3);
+        }
+    });
+
     test("query_devicetree — clocks: enumerates fixed-clock sources", () => {
         const dt = dts(`/dts-v1/;
 / {
@@ -630,5 +664,100 @@ if (import.meta.vitest) {
         const result = query_devicetree(dt, properties, "{}");
         const clocks_property = result.find(p => p.key === "clocks");
         expect(clocks_property?.value._t).toBe("matrix");
+    });
+
+    const gpio_dt = dts(`/dts-v1/;
+/ {
+    gpio: gpio@7e200000 {
+        compatible = "brcm,bcm2711-gpio";
+        gpio-controller;
+        #gpio-cells = <2>;
+    };
+};`);
+
+    test("query_devicetree — *-gpios: nested data [[\"gpio\", 8, 1], …] is typed as matrix", () => {
+        const properties = [{ key: "cs-gpios", value: { _t: "array" as const, minItems: 1, maxItems: 6 } }];
+        const data = JSON.stringify({ "cs-gpios": [["gpio", 8, 1], ["gpio", 7, 1]] });
+        const result = query_devicetree(gpio_dt, properties, data);
+        const cs = result.find(p => p.key === "cs-gpios");
+        expect(cs?.value._t).toBe("matrix");
+        if (cs?.value._t === "matrix") {
+            expect(cs.value.maxItems).toBe(6);
+            expect(cs.value.values).toHaveLength(1);
+            expect(cs.value.values[0]?._t).toBe("fixed_index");
+        }
+    });
+
+    test("query_devicetree — *-gpios: maxItems 1 stays fixed_index", () => {
+        const properties = [{ key: "reset-gpios", value: { _t: "generic" as const } }];
+        const data = JSON.stringify({ "reset-gpios": ["gpio"] });
+        const result = query_devicetree(gpio_dt, properties, data);
+        const reset = result.find(p => p.key === "reset-gpios");
+        expect(reset?.value._t).toBe("fixed_index");
+    });
+
+    test("query_devicetree — *-gpios: plain string data 'gpio' is typed (not generic)", () => {
+        const properties = [{ key: "reset-gpios", value: { _t: "generic" as const } }];
+        const data = JSON.stringify({ "reset-gpios": "gpio" });
+        const result = query_devicetree(gpio_dt, properties, data);
+        const reset = result.find(p => p.key === "reset-gpios");
+        expect(reset?.value._t).toBe("fixed_index");
+        if (reset?.value._t === "fixed_index") {
+            expect(reset.value.prefixItems).toHaveLength(3);
+        }
+    });
+
+    test("is_gpio_property — matches gpios, gpio, *-gpios, *-gpio; rejects vendor,nr-gpios and gpio-controller", () => {
+        expect(is_gpio_property("gpios")).toBe(true);
+        expect(is_gpio_property("gpio")).toBe(true);
+        expect(is_gpio_property("reset-gpio")).toBe(true);
+        expect(is_gpio_property("cs-gpios")).toBe(true);
+        expect(is_gpio_property("wlf,reset-gpio")).toBe(true);
+        expect(is_gpio_property("enable-gpios")).toBe(true);
+        expect(is_gpio_property("vendor,nr-gpios")).toBe(false);
+        expect(is_gpio_property("gpio-controller")).toBe(false);
+    });
+
+    test("query_devicetree — singular reset-gpio with ['gpio'] data is typed as fixed_index", () => {
+        const properties = [{ key: "reset-gpio", value: { _t: "generic" as const } }];
+        const data = JSON.stringify({ "reset-gpio": ["gpio"] });
+        const result = query_devicetree(gpio_dt, properties, data);
+        const reset = result.find(p => p.key === "reset-gpio");
+        expect(reset?.value._t).toBe("fixed_index");
+        if (reset?.value._t === "fixed_index") {
+            expect(reset.value.prefixItems).toHaveLength(3);
+        }
+    });
+
+    test("extract_gpio_controller — [[0], ['gpio', 7, 1]] skips the <0> hole", () => {
+        const data = [[0], ["gpio", 7, 1]];
+        const properties = [{ key: "cs-gpios", value: { _t: "array" as const, minItems: 1, maxItems: 4 } }];
+        const result = query_devicetree(gpio_dt, properties, JSON.stringify({ "cs-gpios": data }));
+        const cs = result.find(p => p.key === "cs-gpios");
+        expect(cs?.value._t).toBe("matrix");
+    });
+
+    test("query_devicetree — pwms: row length includes the phandle", () => {
+        const dt = dts(`/dts-v1/;
+/ {
+    pwm: pwm@7e20c000 {
+        compatible = "brcm,bcm2835-pwm";
+        #pwm-cells = <2>;
+    };
+};`);
+        const properties = [{ key: "pwms", value: { _t: "matrix" as const, minItems: 1, maxItems: 1, values: [] } }];
+        const data = JSON.stringify({ pwms: [["pwm"]] });
+        const result = query_devicetree(dt, properties, data);
+        const pwms = result.find(p => p.key === "pwms");
+        expect(pwms?.value._t).toBe("matrix");
+        if (pwms?.value._t === "matrix") {
+            const row = pwms.value.values[0];
+            expect(row?._t).toBe("fixed_index");
+            if (row?._t === "fixed_index") {
+                expect(row.prefixItems).toHaveLength(3);
+                expect(row.minItems).toBe(3);
+                expect(row.maxItems).toBe(3);
+            }
+        }
     });
 }

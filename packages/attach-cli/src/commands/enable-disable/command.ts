@@ -5,7 +5,7 @@ import * as fs from 'node:fs';
 
 import type { LocalContext } from "../../context";
 import { load_config, check_config, check_failure_message } from "../../config";
-import { resolve_node_identifier } from "../../utilities";
+import { load_trees, resolve_node_identifier } from "../../utilities";
 
 function make_command(commandName: string, status_value: "okay" | "disabled", verb: string) {
     return (_context: LocalContext): Command => new Command(commandName)
@@ -26,21 +26,9 @@ function make_command(commandName: string, status_value: "okay" | "disabled", ve
             }
             const { overlay: input, context } = checked.values;
 
-            const context_content = fs.readFileSync(context, 'utf8');
-            const base = DeviceTree.new_from_string(context_content);
-
-            if (typeof base === "string") {
-                console.log(`Failed to parse dts ${context}: ${base}`);
-                return;
-            }
-
-            const input_content = fs.readFileSync(input, 'utf8');
-            const overlay = DeviceTreeOverlay.new_from_string(input_content, base);
-
-            if (typeof overlay === "string") {
-                console.log(`Failed to parse dtso ${input}: ${overlay}`);
-                return;
-            }
+            const trees = load_trees(_context, context, input, checked.parsed.context);
+            if (trees === undefined) { return; }
+            const { base_dt: base, overlay } = trees;
 
             const result = set_node_status(base, overlay, node, status_value);
 

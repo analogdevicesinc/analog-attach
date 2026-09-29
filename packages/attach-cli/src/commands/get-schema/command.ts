@@ -1,10 +1,8 @@
 import { Command } from "commander";
-import { Attach, DeviceTree, query_devicetree, insert_known_structures } from "attach-lib";
-
-import * as fs from 'node:fs';
+import { Attach, query_devicetree, insert_known_structures } from "attach-lib";
 
 import type { LocalContext } from "../../context";
-import { bigIntReplacer, find_binding } from "../../utilities";
+import { bigIntReplacer, find_binding, load_base } from "../../utilities";
 import { load_config, check_config, check_failure_message } from "../../config";
 
 export function build_get_schema_command(_context: LocalContext): Command {
@@ -26,14 +24,8 @@ export function build_get_schema_command(_context: LocalContext): Command {
             }
             const { linux, dtSchema, context } = checked.values;
 
-            const context_content = fs.readFileSync(context, 'utf8');
-
-            const dt = DeviceTree.new_from_string(context_content);
-
-            if (typeof dt === 'string') {
-                console.log(`Failed to parse dts ${context}: ${dt}`);
-                return;
-            }
+            const dt = load_base(_context, context, checked.parsed.context);
+            if (dt === undefined) { return; }
 
             const binding_path = await find_binding(linux, dtSchema, compatible);
 

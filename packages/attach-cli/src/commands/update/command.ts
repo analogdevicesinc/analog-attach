@@ -1,13 +1,15 @@
 import { Command } from "commander";
 import {
+    Attach,
     AttachEnumType,
+    IntelligenceStack,
+    board_layer,
+    parse_board_description,
     DeviceTree,
     DeviceTreeOverlay,
     PropertyBuilder,
     INTERRUPT_MACROS,
     GPIO_MACROS,
-    to_attach_array,
-    type AttachArray,
     type CellValue,
     type DTNode,
     type DTProperty,
@@ -15,14 +17,230 @@ import {
     type DTPath,
     type FoundNodeResult,
     type ResolvedProperty,
+    type SuggestedCell,
 } from "attach-lib";
 import * as fs from "node:fs";
 
 import type { LocalContext } from "../../context";
 import { resolve_config } from "../../resolve-config";
-import { resolve_node_identifier } from "../../utilities";
+import { load_trees, parse_property_reference, resolve_write_target } from "../../utilities";
 import { resolve_node_binding } from "../../binding-resolution";
 import { respond, respond_fail, input_error, diagnostic } from "../../protocol/output";
+
+export type ShapeHint = "flag" | "strings" | "cells" | undefined;
+
+const ALL_MACROS = [...INTERRUPT_MACROS, ...GPIO_MACROS];
+
+export function shape_hint(definition: ResolvedProperty | undefined): ShapeHint {
+    if (definition === undefined) { return undefined; }
+    switch (definition.value._t) {
+        case "boolean": { return "flag"; }
+        case "string_array": { return "strings"; }
+        case "enum_array":
+        case "fixed_index": {
+            if (definition.value._t === "enum_array" && definition.value.enum_type === AttachEnumType.STRING) { return "strings"; }
+            if (definition.value._t === "fixed_index" && definition.value.prefixItems.every(index => index._t === "enum" && index.enum_type === AttachEnumType.STRING)) { return "strings"; }
+            return "cells";
+        }
+        case "integer":
+        case "enum_integer":
+        case "const":
+        case "number_array":
+        case "array":
+        case "matrix": { return "cells"; }
+        case "generic":
+        case "object": { return undefined; }
+        default: {
+            const _x: never = definition.value;
+            throw new Error("Exhaustive check failed!");
+        }
+    }
+}
+
+type ResolvedToken = CellValue | { error: string };
+
+function resolve_token(
+    token: bigint | string,
+    is_label: (name: string) => boolean,
+): ResolvedToken {
+    if (typeof token === "bigint") {
+        return PropertyBuilder.tag_number(token);
+    }
+
+    const macro = ALL_MACROS.find(m => m.name === token);
+    if (macro !== undefined) {
+        return PropertyBuilder.tag_number(BigInt(macro.value));
+    }
+
+    const bare = token.startsWith("&") ? token.slice(1) : token;
+    if (is_label(bare)) {
+        return PropertyBuilder.tag_label(bare);
+    }
+
+    return { error: `'${token}' is not a number, a known macro, or a label in the base tree/overlay` };
+}
+
+export function build_raw_property(
+    raw: string,
+    name: string,
+    hint: ShapeHint,
+    is_label: (name: string) => boolean,
+): DTProperty | undefined | { error: string } {
+    const parsed = parse_value(raw);
+
+    if (hint === "flag" || typeof parsed === "boolean") {
+        if (typeof parsed === "boolean") {
+            return parsed
+                ? PropertyBuilder.build_flag().set_flag().with_name(name).build()
+                : undefined;
+        }
+        const lower = raw.trim().toLowerCase();
+        if (lower === "true") {
+            return PropertyBuilder.build_flag().set_flag().with_name(name).build();
+        }
+        if (lower === "false") {
+            return undefined;
+        }
+        return { error: `Property ${name} is a flag; set it with 'true' or remove it with 'false'` };
+    }
+
+    if (hint === "strings") {
+        const tokens = raw.trim().split(/\s+/).filter(t => t.length > 0);
+        if (tokens.length === 0) { return { error: "Value must not be empty" }; }
+        return PropertyBuilder.build_string()
+            .with_value(tokens.length === 1 ? tokens[0]! : tokens)
+            .with_name(name)
+            .build();
+    }
+
+    if (hint === "cells") {
+        return build_cells_from_parsed(parsed, name, is_label);
+    }
+
+    // No hint: infer from the tokens.
+    if (typeof parsed === "bigint") {
+        return PropertyBuilder.build_cell_array()
+            .with_tagged_values(PropertyBuilder.tag_number(parsed))
+            .with_name(name)
+            .build();
+    }
+
+    if (typeof parsed === "string") {
+        const resolved = resolve_token(parsed, is_label);
+        if ("error" in resolved) {
+            // Sole string token with no hint → string value
+            return PropertyBuilder.build_string()
+                .with_value(parsed)
+                .with_name(name)
+                .build();
+        }
+        return PropertyBuilder.build_cell_array()
+            .with_tagged_values(resolved)
+            .with_name(name)
+            .build();
+    }
+
+    // Array or matrix: try to resolve every token as a cell.
+    const flat_tokens = is_matrix_input(parsed)
+        ? parsed.flat()
+        : parsed;
+
+    let has_cell = false;
+    let has_unknown = false;
+    for (const token of flat_tokens) {
+        if (typeof token === "bigint") { has_cell = true; continue; }
+        const resolved = resolve_token(token, is_label);
+        if ("error" in resolved) { has_unknown = true; }
+        else { has_cell = true; }
+    }
+
+    if (has_cell && has_unknown) {
+        // Mix of resolved cell tokens and unknown words
+        for (const token of flat_tokens) {
+            if (typeof token === "string") {
+                const resolved = resolve_token(token, is_label);
+                if ("error" in resolved) {
+                    return resolved;
+                }
+            }
+        }
+    }
+
+    if (!has_cell && has_unknown) {
+        // All tokens are unknown strings → treat as strings
+        if (is_matrix_input(parsed)) {
+            // Matrix of pure strings doesn't make sense for cells, but emit as strings
+            const all_strings = parsed.flat().filter((t): t is string => typeof t === "string");
+            return PropertyBuilder.build_string()
+                .with_value(all_strings.length === 1 ? all_strings[0]! : all_strings)
+                .with_name(name)
+                .build();
+        }
+        const all_strings = parsed.filter((t): t is string => typeof t === "string");
+        return PropertyBuilder.build_string()
+            .with_value(all_strings.length === 1 ? all_strings[0]! : all_strings)
+            .with_name(name)
+            .build();
+    }
+
+    // Every token resolves as a cell → cells
+    return build_cells_from_parsed(parsed, name, is_label);
+}
+
+function build_cells_from_parsed(
+    parsed: ParsedInputValue,
+    name: string,
+    is_label: (name: string) => boolean,
+): DTProperty | { error: string } {
+    if (typeof parsed === "boolean") {
+        return { error: `Cannot write a boolean as cells for ${name}` };
+    }
+
+    if (typeof parsed === "bigint") {
+        return PropertyBuilder.build_cell_array()
+            .with_tagged_values(PropertyBuilder.tag_number(parsed))
+            .with_name(name)
+            .build();
+    }
+
+    if (typeof parsed === "string") {
+        const resolved = resolve_token(parsed, is_label);
+        if ("error" in resolved) { return resolved; }
+        return PropertyBuilder.build_cell_array()
+            .with_tagged_values(resolved)
+            .with_name(name)
+            .build();
+    }
+
+    if (is_matrix_input(parsed)) {
+        const rows: CellValue[][] = [];
+        for (const row of parsed) {
+            const cells: CellValue[] = [];
+            for (const token of row) {
+                const resolved = resolve_token(token, is_label);
+                if ("error" in resolved) { return resolved; }
+                cells.push(resolved);
+            }
+            rows.push(cells);
+        }
+        return PropertyBuilder.build_cell_array()
+            .with_tagged_values(...(rows as [CellValue[], ...CellValue[][]]))
+            .with_name(name)
+            .build();
+    }
+
+    // Flat array
+    const cells: CellValue[] = [];
+    for (const token of parsed) {
+        const resolved = resolve_token(token, is_label);
+        if ("error" in resolved) { return resolved; }
+        cells.push(resolved);
+    }
+    return PropertyBuilder.build_cell_array()
+        .with_tagged_values(cells)
+        .with_name(name)
+        .build();
+}
 
 export function build_update_command(context_: LocalContext): Command {
     return new Command("update")
@@ -32,14 +250,9 @@ export function build_update_command(context_: LocalContext): Command {
         .action(async (path: string[], options) => {
             const withValue: string = options['with'];
 
-            const full_path = path.join("/");
-            const last_slash = full_path.lastIndexOf("/");
-            const property_name = last_slash === -1 ? "" : full_path.slice(last_slash + 1);
-            const node_identifier = last_slash > 0
-                ? full_path.slice(0, last_slash)
-                : (last_slash === 0 ? "/" : "");
+            const reference = parse_property_reference(path);
 
-            if (!property_name || !node_identifier) {
+            if (reference === undefined) {
                 const message = "Path must include at least a node and a property name";
                 if (context_.json) { input_error(message); return; }
                 console.log(message);
@@ -50,33 +263,13 @@ export function build_update_command(context_: LocalContext): Command {
             if (resolved === undefined) { return; }
             const { overlay: input, context, linux, dtSchema } = resolved.values;
 
-            const context_content = fs.readFileSync(context, "utf8");
-            const input_content = fs.readFileSync(input, "utf8");
+            const trees = load_trees(context_, context, input, resolved.parsed.context);
+            if (trees === undefined) { return; }
+            const { base_dt, overlay } = trees;
 
-            const base_dt = DeviceTree.new_from_string(context_content);
-            if (typeof base_dt === "string") {
-                if (context_.json) { input_error(`Failed to parse dts: ${base_dt}`); return; }
-                console.log(`Failed to parse dts ${context}: ${base_dt}`);
-                return;
-            }
-
-            const overlay = DeviceTreeOverlay.new_from_string(input_content, base_dt);
-            if (typeof overlay === "string") {
-                if (context_.json) { input_error(`Failed to parse dtso: ${overlay}`); return; }
-                console.log(`Failed to parse dtso ${input}: ${overlay}`);
-                return;
-            }
-
-            const target_reference = resolve_node_identifier(node_identifier, overlay);
-            const found = overlay.find_node(target_reference);
-
-            const base_reference = target_reference.kind === "path"
-                ? base_dt.get_node_by_path(target_reference)
-                : base_dt.get_node_by_label(target_reference);
-
-            // A base-tree node is edited by writing into an overlay fragment that
-            // targets it; the base tree itself is never modified.
-            const is_base_target = (found?.is_in_base ?? false) || (found === undefined && base_reference !== undefined);
+            const { node_identifier, property_name } = reference;
+            const { target_reference, found, is_base_target, binding_node, binding_parent, parent_name } =
+                resolve_write_target(node_identifier, overlay, base_dt);
 
             if (found === undefined && !is_base_target) {
                 if (context_.json) {
@@ -87,27 +280,6 @@ export function build_update_command(context_: LocalContext): Command {
                 return;
             }
 
-            // The node whose compatible/values drive binding resolution: the base node
-            // for a base target (its compatible lives there, not in the overlay),
-            // otherwise the overlay node we found.
-            let binding_node: DTNode | undefined;
-            let binding_parent: DTNode | undefined;
-            let parent_name = "";
-
-            if (is_base_target && base_reference !== undefined) {
-                binding_node = base_dt.deref_node(base_reference);
-                const parent_reference = base_dt.get_parent(base_reference);
-                binding_parent = parent_reference === undefined ? undefined : base_dt.deref_node(parent_reference);
-                parent_name = base_reference.labels.at(-1)?.name ?? base_reference.full_path.path;
-            } else if (found !== undefined) {
-                binding_node = found.node;
-                binding_parent = found.parent_node;
-                parent_name = found.node.labels.at(-1) ?? found.node_path;
-            }
-
-            // Resolve the binding for type validation. If it can't be resolved, or the
-            // property isn't defined by the binding, fall back to writing the value
-            // as-is (best-effort typing from the value syntax).
             let property_definition: ResolvedProperty | undefined;
 
             if (binding_node !== undefined) {
@@ -131,25 +303,22 @@ export function build_update_command(context_: LocalContext): Command {
                 }
             }
 
-            const parsed = parse_value(withValue);
+            const hint = shape_hint(property_definition);
 
-            // Build the property (undefined means "remove", e.g. a boolean set to false).
-            let built: DTProperty | undefined;
+            const is_label = (name: string): boolean => {
+                if (base_dt.get_node_by_label({ kind: "label", labels: [], name }) !== undefined) { return true; }
+                return overlay.find_node({ kind: "label", labels: [], name }) !== undefined;
+            };
 
-            if (property_definition === undefined) {
-                built = build_untyped_property(parsed, property_name);
-            } else {
-                const scratch: DTNode = { name: "scratch", unit_addr: undefined, labels: [], properties: [], children: [] };
-                const success = set_property(parsed, scratch, property_name, property_definition);
-                if (success !== true) {
-                    if (context_.json) {
-                        respond_fail({ ok: false, message: success, severity: "error" });
-                    } else {
-                        console.log(success);
-                    }
-                    return;
+            const built = build_raw_property(withValue, property_name, hint, is_label);
+
+            if (built !== null && typeof built === "object" && "error" in built) {
+                if (context_.json) {
+                    respond_fail({ ok: false, message: built.error, severity: "error" });
+                } else {
+                    console.log(built.error);
                 }
-                built = scratch.properties.find(p => p.name === property_name);
+                return;
             }
 
             place_property(overlay, target_reference, found, is_base_target, built, property_name);
@@ -185,11 +354,6 @@ function parse_token(token: string): bigint | string {
     return /^-?\d+$/.test(token) ? BigInt(token) : token;
 }
 
-// Value mini-syntax for --with:
-//   <value>                     -> single scalar
-//   <value> <value>             -> flat array (space-separated items)
-//   <value> <value>,<value> ... -> matrix rows (comma between rows, space within a row)
-// Comma is a safe row separator: it can't appear in labels, macros, or numbers.
 export function parse_value(value: string): ParsedInputValue {
     value = value.trim();
 
@@ -208,6 +372,14 @@ export function parse_value(value: string): ParsedInputValue {
     return first;
 }
 
+export function format_value(rows: SuggestedCell[][]): string {
+    return rows
+        .map(row => row
+            .map(cell => typeof cell === "bigint" ? cell.toString() : ("label" in cell ? cell.label : cell.macro))
+            .join(" "))
+        .join(",");
+}
+
 function is_matrix_input(value: ParsedInputValue): value is MatrixInput {
     return Array.isArray(value) && value.length > 0 && value.every(row => Array.isArray(row));
 }
@@ -218,9 +390,6 @@ function upsert_property(found_node: DTNode, property: DTProperty): void {
     existing.value = structuredClone(property.value);
 }
 
-// Write the built property into the overlay. A base-tree target is edited through an
-// overlay fragment (created on demand, reused if present); an overlay node is mutated
-// in place. `built === undefined` means remove the property (e.g. a boolean set false).
 export function place_property(
     overlay: DeviceTreeOverlay,
     target_reference: DTLabel | DTPath,
@@ -247,490 +416,17 @@ export function place_property(
     }
 }
 
-// Best-effort property construction when no binding definition is available:
-// infer the DTS shape from the parsed value syntax alone. Returns undefined when
-// the property should be removed (a boolean set to false).
-export function build_untyped_property(parsed: ParsedInputValue, property: string): DTProperty | undefined {
-    if (typeof parsed === "boolean") {
-        return parsed
-            ? PropertyBuilder.build_flag().set_flag().with_name(property).build()
-            : undefined;
-    }
-
-    if (typeof parsed === "bigint") {
-        return PropertyBuilder.build_cell_array()
-            .with_tagged_values(PropertyBuilder.tag_number(parsed))
-            .with_name(property)
-            .build();
-    }
-
-    if (typeof parsed === "string") {
-        return PropertyBuilder.build_string()
-            .with_value(parsed)
-            .with_name(property)
-            .build();
-    }
-
-    if (is_matrix_input(parsed)) {
-        const rows = parsed.map(row =>
-            row.map(element =>
-                typeof element === "bigint" ? PropertyBuilder.tag_number(element) : PropertyBuilder.tag_expression(element)
-            )
-        ) as [CellValue[], ...CellValue[][]];
-
-        return PropertyBuilder.build_cell_array()
-            .with_tagged_values(...rows)
-            .with_name(property)
-            .build();
-    }
-
-    if (parsed.every((element): element is bigint => typeof element === "bigint")) {
-        return PropertyBuilder.build_cell_array()
-            .with_tagged_values(parsed.map(element => PropertyBuilder.tag_number(element)))
-            .with_name(property)
-            .build();
-    }
-
-    if (parsed.every((element): element is string => typeof element === "string")) {
-        return PropertyBuilder.build_string()
-            .with_value(parsed)
-            .with_name(property)
-            .build();
-    }
-
-    return PropertyBuilder.build_cell_array()
-        .with_tagged_values(
-            parsed.map(element =>
-                typeof element === "bigint" ? PropertyBuilder.tag_number(element) : PropertyBuilder.tag_expression(element)
-            )
-        )
-        .with_name(property)
-        .build();
-}
-
-const ALL_MACROS = [...INTERRUPT_MACROS, ...GPIO_MACROS];
-
-function to_cell_value(entry: bigint | string, enum_type: AttachEnumType): CellValue {
-    if (typeof entry === "bigint") {
-        return PropertyBuilder.tag_number(entry);
-    }
-
-    switch (enum_type) {
-        case AttachEnumType.PHANDLE: {
-            return PropertyBuilder.tag_label(entry);
-        }
-        case AttachEnumType.MACRO: {
-            const resolved = ALL_MACROS.find(m => m.name === entry);
-            if (resolved !== undefined) {
-                return PropertyBuilder.tag_number(BigInt(resolved.value));
-            }
-            return PropertyBuilder.tag_expression(entry);
-        }
-        default: {
-            throw new Error(`Unexpected enum_type for string value: ${enum_type}`);
-        }
-    }
-}
-
-// The numeric values a MACRO enum accepts: each enum name resolved to its macro value.
-// A bare number is a valid MACRO value only if it appears here (e.g. 2 == IRQ_TYPE_EDGE_FALLING).
-function macro_enum_values(enum_names: unknown[]): Set<bigint> {
-    const values = new Set<bigint>();
-    for (const name of enum_names) {
-        const resolved = ALL_MACROS.find(m => m.name === name);
-        if (resolved !== undefined) { values.add(BigInt(resolved.value)); }
-    }
-    return values;
-}
-
-// An enum accepts a value if it names one of its members, or (for MACRO enums) if it is
-// the numeric value one of those macros resolves to.
-function enum_accepts(element: bigint | string, enum_values: unknown[], macro_values: Set<bigint> | undefined): boolean {
-    if (enum_values.includes(element)) { return true; }
-    return typeof element === "bigint" && macro_values !== undefined && macro_values.has(element);
-}
-
-// Validate a single matrix row against its row definition and return the row's cell
-// values, or an error string. Matrix rows are always cell-valued (`<...>`): string
-// shapes (string_array, string-typed enums) are rejected rather than emitted.
-const MATRIX_STRING_ROW_ERROR = (property: string) =>
-    `Property ${property} matrix rows must be numeric or reference values, not strings`;
-
-function build_row_cells(values: ArrayInput, definition: AttachArray, property: string): CellValue[] | string {
-    switch (definition._t) {
-        case "array": {
-            return values.map(element =>
-                typeof element === "bigint" ? PropertyBuilder.tag_number(element) : PropertyBuilder.tag_expression(element)
-            );
-        }
-        case "number_array": {
-            if (!values.every((element): element is bigint => typeof element === "bigint")) {
-                return `Property ${property} in binding demands numbers`;
-            }
-            return values.map(element => PropertyBuilder.tag_number(element));
-        }
-        case "string_array": {
-            return MATRIX_STRING_ROW_ERROR(property);
-        }
-        case "enum_array": {
-            const macro_values = definition.enum_type === AttachEnumType.MACRO
-                ? macro_enum_values(definition.enum) : undefined;
-            if (!values.every(element => enum_accepts(element, definition.enum, macro_values))) {
-                return `Values for property ${property} are ${JSON.stringify(definition.enum)}`;
-            }
-            if (definition.minItems > values.length || definition.maxItems < values.length) {
-                return `Property ${property} accepts between ${definition.minItems} and ${definition.maxItems} items from ${JSON.stringify(definition.enum)}`;
-            }
-            if (definition.enum_type === AttachEnumType.STRING) {
-                return MATRIX_STRING_ROW_ERROR(property);
-            }
-            if (values.some(element => typeof element === "bigint")
-                && definition.enum_type !== AttachEnumType.NUMBER
-                && definition.enum_type !== AttachEnumType.MACRO) {
-                return `Values for property ${property} are ${JSON.stringify(definition.enum)}`;
-            }
-            return values.map(element => to_cell_value(element, definition.enum_type));
-        }
-        case "fixed_index": {
-            if (definition.minItems > values.length || definition.maxItems < values.length) {
-                return `Property ${property} accepts between ${definition.minItems} and ${definition.maxItems} items`;
-            }
-
-            const cell_values: CellValue[] = [];
-
-            for (let index = 0; index < definition.prefixItems.length && index < values.length; index++) {
-                const v = values[index]!;
-                const item_definition = definition.prefixItems[index]!;
-
-                if (typeof v === "bigint") {
-                    if (item_definition._t === "number") {
-                        cell_values.push(PropertyBuilder.tag_number(v));
-                    } else if (item_definition.enum_type === AttachEnumType.MACRO) {
-                        if (!macro_enum_values(item_definition.enum).has(v)) {
-                            return `Property ${property} at index ${index} accepts a macro from ${JSON.stringify(item_definition.enum)} or its numeric value`;
-                        }
-                        cell_values.push(PropertyBuilder.tag_number(v));
-                    } else {
-                        return `Property ${property} doesn't require a number at index ${index}`;
-                    }
-                } else {
-                    if (item_definition._t === "number") {
-                        return `Property ${property} requires a number at index ${index}`;
-                    }
-                    if (!item_definition.enum.includes(v)) {
-                        return `Property ${property} at index ${index} require a value from ${JSON.stringify(item_definition.enum)}`;
-                    }
-                    if (item_definition.enum_type === AttachEnumType.STRING) {
-                        return MATRIX_STRING_ROW_ERROR(property);
-                    }
-                    cell_values.push(to_cell_value(v, item_definition.enum_type));
-                }
-            }
-
-            return cell_values;
-        }
-        default: {
-            const _x: never = definition;
-            throw new Error("Exhaustive check failed!");
-        }
-    }
-}
-
-export function set_property(
-    parsed_value: ParsedInputValue,
-    found_node: DTNode,
-    property: string,
-    definition: ResolvedProperty
-): string | true {
-    switch (definition.value._t) {
-        case "boolean": {
-            if (typeof parsed_value !== 'boolean') {
-                return `Property ${property} is a flag and can be set to appear with 'true' or disappear with 'false'`;
-            }
-
-            const existing = found_node.properties.find(p => p.name === property);
-
-            if (existing !== undefined && parsed_value === false) {
-                found_node.properties = found_node.properties.filter(p => p !== existing);
-            } else if (existing === undefined && parsed_value === true) {
-                found_node.properties.push(
-                    PropertyBuilder.build_flag()
-                        .set_flag()
-                        .with_name(property)
-                        .build()
-                );
-            }
-            return true;
-        }
-        case "integer":
-        case "enum_integer":
-        case "const": {
-            if (Array.isArray(parsed_value)) {
-                return `Definition in binding for property '${property}' requires a singular value`;
-            }
-            if (typeof parsed_value === 'boolean') {
-                return `Property '${property}' isn't a flag => can't have boolean values`;
-            }
-            if (typeof parsed_value === 'string') {
-                return `Property ${property} in binding demands numbers`;
-            }
-            if (definition.value._t === 'enum_integer' && !definition.value.enum.includes(parsed_value)) {
-                return `Values for property ${property} are: ${JSON.stringify(definition.value.enum)}`;
-            }
-            if (definition.value._t === 'const' && BigInt(definition.value.const) !== parsed_value) {
-                return `Value for property ${property} is: ${JSON.stringify(definition.value.const)}`;
-            }
-
-            upsert_property(
-                found_node,
-                PropertyBuilder.build_cell_array()
-                    .with_tagged_values(
-                        PropertyBuilder.tag_number(parsed_value)
-                    )
-                    .with_name(property)
-                    .build()
-            );
-
-            return true;
-        }
-        case "array":
-        case "number_array":
-        case "string_array":
-        case "enum_array":
-        case "fixed_index": {
-            if (typeof parsed_value === 'boolean') {
-                return `Property '${property}' isn't a flag => can't have boolean values`;
-            }
-            if (is_matrix_input(parsed_value)) {
-                return `Property ${property} does not accept comma-separated rows`;
-            }
-
-            const array_definition = to_attach_array(definition);
-
-            if (array_definition === undefined) { throw new Error("Failed cast"); }
-
-            return set_array_property(
-                Array.isArray(parsed_value) ? parsed_value : [parsed_value],
-                found_node,
-                property,
-                array_definition
-            );
-        }
-        case "matrix": {
-            if (typeof parsed_value === 'boolean') {
-                return `Property '${property}' isn't a flag => can't have boolean values`;
-            }
-
-            // Normalize to rows: a matrix input is already rows; a flat array is one row;
-            // a scalar is a single one-cell row.
-            const rows: ArrayInput[] = is_matrix_input(parsed_value)
-                ? parsed_value
-                : [Array.isArray(parsed_value) ? parsed_value : [parsed_value]];
-
-            if (rows.length < definition.value.minItems || rows.length > definition.value.maxItems) {
-                return `Property ${property} accepts between ${definition.value.minItems} and ${definition.value.maxItems} row(s)`;
-            }
-
-            const row_definitions = definition.value.values;
-            const built_rows: CellValue[][] = [];
-
-            for (const [index, row] of rows.entries()) {
-                // Row definitions usually hold a single template broadcast to every row
-                // (e.g. reg, opp-hz); fall back to it when there is no per-index entry.
-                const row_definition = row_definitions[index] ?? row_definitions[0];
-                if (row_definition === undefined) {
-                    return `Property ${property} has no row definition in its binding`;
-                }
-
-                const cells = build_row_cells(row!, row_definition, property);
-                if (typeof cells === "string") { return cells; }
-                built_rows.push(cells);
-            }
-
-            upsert_property(
-                found_node,
-                PropertyBuilder.build_cell_array()
-                    .with_tagged_values(...(built_rows as [CellValue[], ...CellValue[][]]))
-                    .with_name(property)
-                    .build()
-            );
-
-            return true;
-        }
-        case "object": {
-            return `Property '${property}' is defined as an object!`;
-        }
-        case "generic": {
-            return `Property '${property}' couldn't be interpreted!`;
-        }
-        default: {
-            const _x: never = definition.value;
-            throw new Error("Exhaustive check failed!");
-        }
-    }
-}
-
-function set_array_property(
-    values: ArrayInput,
-    found_node: DTNode,
-    property: string,
-    definition: AttachArray
-): string | true {
-    switch (definition._t) {
-        case "array": {
-            const tagged = values.map(element =>
-                typeof element === "bigint" ? PropertyBuilder.tag_number(element) : PropertyBuilder.tag_expression(element)
-            );
-
-            upsert_property(
-                found_node,
-                PropertyBuilder.build_cell_array()
-                    .with_tagged_values(tagged)
-                    .with_name(property)
-                    .build()
-            );
-
-            return true;
-        }
-        case "number_array": {
-            if (!values.every((element): element is bigint => typeof element === "bigint")) {
-                return `Property ${property} in binding demands numbers`;
-            }
-
-            upsert_property(
-                found_node,
-                PropertyBuilder.build_cell_array()
-                    .with_tagged_values(
-                        values.map(element => PropertyBuilder.tag_number(element))
-                    )
-                    .with_name(property).build()
-            );
-
-            return true;
-        }
-        case "string_array": {
-            if (!values.every((element): element is string => typeof element === "string")) {
-                return `Property ${property} in binding demands string`;
-            }
-
-            upsert_property(
-                found_node,
-                PropertyBuilder.build_string()
-                    .with_value(values)
-                    .with_name(property)
-                    .build()
-            );
-
-            return true;
-        }
-        case "enum_array": {
-            const macro_values = definition.enum_type === AttachEnumType.MACRO
-                ? macro_enum_values(definition.enum) : undefined;
-            if (!values.every(element => enum_accepts(element, definition.enum, macro_values))) {
-                return `Values for property ${property} are ${JSON.stringify(definition.enum)}`;
-            }
-            if (definition.minItems > values.length || definition.maxItems < values.length) {
-                return `Property ${property} accepts between ${definition.minItems} and ${definition.maxItems} items from ${JSON.stringify(definition.enum)}`;
-            }
-            if (values.some(element => typeof element === "bigint")
-                && definition.enum_type !== AttachEnumType.NUMBER
-                && definition.enum_type !== AttachEnumType.MACRO) {
-                return `Values for property ${property} are ${JSON.stringify(definition.enum)}`;
-            }
-
-            if (definition.enum_type === AttachEnumType.STRING &&
-                values.every((element): element is string => typeof element === 'string')
-            ) {
-                upsert_property(
-                    found_node,
-                    PropertyBuilder.build_string()
-                        .with_value(values)
-                        .with_name(property)
-                        .build()
-                );
-            } else {
-                upsert_property(
-                    found_node,
-                    PropertyBuilder.build_cell_array()
-                        .with_tagged_values(
-                            values.map(element => to_cell_value(element, definition.enum_type))
-                        )
-                        .with_name(property).build());
-            }
-            return true;
-        }
-        case "fixed_index": {
-            if (definition.minItems > values.length || definition.maxItems < values.length) {
-                return `Property ${property} accepts between ${definition.minItems} and ${definition.maxItems} items`;
-            }
-
-            const cell_values: CellValue[] = [];
-            const string_values: string[] = [];
-
-            for (let index = 0; index < definition.prefixItems.length && index < values.length; index++) {
-
-                const v = values[index]!;
-                const item_definition = definition.prefixItems[index]!;
-
-                if (typeof v === "bigint") {
-                    if (item_definition._t === "number") {
-                        cell_values.push(PropertyBuilder.tag_number(v));
-                    } else if (item_definition.enum_type === AttachEnumType.MACRO) {
-                        if (!macro_enum_values(item_definition.enum).has(v)) {
-                            return `Property ${property} at index ${index} accepts a macro from ${JSON.stringify(item_definition.enum)} or its numeric value`;
-                        }
-                        cell_values.push(PropertyBuilder.tag_number(v));
-                    } else {
-                        return `Property ${property} doesn't require a number at index ${index}`;
-                    }
-                } else {
-                    if (item_definition._t === "number") {
-                        return `Property ${property} requires a number at index ${index}`;
-                    }
-                    if (!item_definition.enum.includes(v)) {
-                        return `Property ${property} at index ${index} require a value from ${JSON.stringify(item_definition.enum)}`;
-                    }
-
-                    if (item_definition.enum_type === AttachEnumType.STRING) {
-                        string_values.push(v);
-                    } else {
-                        cell_values.push(to_cell_value(v, item_definition.enum_type));
-                    }
-                }
-            }
-
-            if (string_values.length > 0 && cell_values.length === 0) {
-                upsert_property(
-                    found_node,
-                    PropertyBuilder.build_string()
-                        .with_value(string_values)
-                        .with_name(property)
-                        .build()
-                );
-            } else if (cell_values.length > 0 && string_values.length === 0) {
-                upsert_property(
-                    found_node,
-                    PropertyBuilder.build_cell_array()
-                        .with_tagged_values(cell_values)
-                        .with_name(property)
-                        .build()
-                );
-            }
-            return true;
-        }
-        default: {
-            const _x: never = definition;
-            throw new Error("Exhaustive check failed!");
-        }
-    }
-}
-
 if (import.meta.vitest) {
     const { test, expect } = import.meta.vitest;
 
     const base_dts = `/dts-v1/;
 / {
     soc {
+        gpio: gpio@7e200000 {
+            compatible = "brcm,bcm2711-gpio";
+            gpio-controller;
+            #gpio-cells = <2>;
+        };
         spi0: spi@7e204000 {
             compatible = "brcm,bcm2835-spi";
         };
@@ -761,24 +457,93 @@ if (import.meta.vitest) {
         return { base, overlay };
     };
 
-    test("build_untyped_property - infers shapes from the value syntax", () => {
-        expect(build_untyped_property(true, "wakeup-source")?.value).toEqual({ kind: "flag" });
-        expect(build_untyped_property(false, "wakeup-source")).toBeUndefined();
+    const base_is_label = (name: string): boolean => {
+        const { base, overlay } = parse(empty_overlay);
+        if (base.get_node_by_label({ kind: "label", labels: [], name }) !== undefined) { return true; }
+        return overlay.find_node({ kind: "label", labels: [], name }) !== undefined;
+    };
 
-        const number_ = build_untyped_property(5_000_000n, "spi-max-frequency");
-        expect(number_?.value).toMatchObject([{ kind: "array" }]);
+    test("build_raw_property — macros become numbers", () => {
+        const result = build_raw_property("gpio 8 GPIO_ACTIVE_LOW", "cs-gpios", "cells", base_is_label);
+        expect(result).toBeDefined();
+        expect(result).not.toBeNull();
+        expect("error" in result!).toBe(false);
+        const property = result as DTProperty;
+        expect(property.value).toMatchObject([{
+            kind: "array",
+            elements: [
+                { kind: "label", name: "gpio" },
+                { kind: "number", value: 8n },
+                { kind: "number", value: 1n },
+            ],
+        }]);
+    });
 
-        const string_ = build_untyped_property("okay", "status");
-        expect(string_?.value).toMatchObject([{ kind: "string", value: "okay" }]);
+    test("build_raw_property — base and overlay labels become &label", () => {
+        const result = build_raw_property("gpio", "interrupt-parent", "cells", base_is_label);
+        expect(result).toBeDefined();
+        expect("error" in result!).toBe(false);
+        const property = result as DTProperty;
+        expect(property.value).toMatchObject([{
+            kind: "array",
+            elements: [{ kind: "label", name: "gpio" }],
+        }]);
+    });
 
-        const nums = build_untyped_property([1n, 2n], "reg");
-        expect(nums?.value).toMatchObject([{ kind: "array" }]);
+    test("build_raw_property — &gpio is accepted", () => {
+        const result = build_raw_property("&gpio", "interrupt-parent", "cells", base_is_label);
+        expect(result).toBeDefined();
+        expect("error" in result!).toBe(false);
+        const property = result as DTProperty;
+        expect(property.value).toMatchObject([{
+            kind: "array",
+            elements: [{ kind: "label", name: "gpio" }],
+        }]);
+    });
 
-        const strs = build_untyped_property(["a", "b"], "clock-names");
-        expect(strs?.value).toMatchObject([{ kind: "string" }, { kind: "string" }]);
+    test("build_raw_property — unknown word gives an error", () => {
+        const result = build_raw_property("bogus 1", "foo", "cells", base_is_label);
+        expect(result).toBeDefined();
+        expect(result).not.toBeNull();
+        expect("error" in result!).toBe(true);
+        expect((result as { error: string }).error).toContain("bogus");
+    });
 
-        const matrix = build_untyped_property([[1n, 2n], [3n, 4n]], "reg");
-        expect(matrix?.value).toMatchObject([{ kind: "array" }, { kind: "array" }]);
+    test("build_raw_property — strings hint keeps 'gpio' as a string and adi,ad7124-8 intact", () => {
+        const result = build_raw_property("adi,ad7124-8", "compatible", "strings", base_is_label);
+        expect(result).toBeDefined();
+        expect("error" in result!).toBe(false);
+        const property = result as DTProperty;
+        expect(property.value).toMatchObject([{ kind: "string", value: "adi,ad7124-8" }]);
+    });
+
+    test("build_raw_property — with no hint, 'okay' becomes a string", () => {
+        const result = build_raw_property("okay", "status", undefined, base_is_label);
+        expect(result).toBeDefined();
+        expect("error" in result!).toBe(false);
+        const property = result as DTProperty;
+        expect(property.value).toMatchObject([{ kind: "string", value: "okay" }]);
+    });
+
+    test("build_raw_property — flags work as before", () => {
+        const result_true = build_raw_property("true", "wakeup-source", "flag", base_is_label);
+        expect(result_true).toBeDefined();
+        expect("error" in result_true!).toBe(false);
+        expect((result_true as DTProperty).value).toEqual({ kind: "flag" });
+
+        const result_false = build_raw_property("false", "wakeup-source", "flag", base_is_label);
+        expect(result_false).toBeUndefined();
+    });
+
+    test("build_raw_property — multi-row cells matrix", () => {
+        const result = build_raw_property("gpio 8 GPIO_ACTIVE_LOW,gpio 7 GPIO_ACTIVE_LOW", "cs-gpios", "cells", base_is_label);
+        expect(result).toBeDefined();
+        expect("error" in result!).toBe(false);
+        const property = result as DTProperty;
+        expect(property.value).toMatchObject([
+            { kind: "array", elements: [{ kind: "label", name: "gpio" }, { kind: "number", value: 8n }, { kind: "number", value: 1n }] },
+            { kind: "array", elements: [{ kind: "label", name: "gpio" }, { kind: "number", value: 7n }, { kind: "number", value: 1n }] },
+        ]);
     });
 
     test("parse_value - scalars, flat arrays, and comma-separated matrices", () => {
@@ -792,59 +557,86 @@ if (import.meta.vitest) {
         expect(parse_value("0,1,2")).toEqual([[0n], [1n], [2n]]);
     });
 
-    test("set_property - builds a multi-row matrix and enforces the row count", () => {
-        const definition: ResolvedProperty = {
-            key: "reg",
-            value: {
-                _t: "matrix",
-                minItems: 1,
-                maxItems: 2,
-                values: [{ _t: "number_array", minItems: 1, maxItems: 2, minimum: 0n, maximum: 0xFF_FF_FF_FFn }],
-            },
-        };
-
-        const scratch: DTNode = { name: "s", unit_addr: undefined, labels: [], properties: [], children: [] };
-        expect(set_property([[1n, 2n], [3n, 4n]], scratch, "reg", definition)).toBe(true);
-        expect(scratch.properties.find(p => p.name === "reg")?.value).toMatchObject([{ kind: "array" }, { kind: "array" }]);
-
-        // Too many rows (maxItems = 2) is rejected with a message.
-        const scratch2: DTNode = { name: "s", unit_addr: undefined, labels: [], properties: [], children: [] };
-        expect(typeof set_property([[1n], [2n], [3n]], scratch2, "reg", definition)).toBe("string");
+    test("format_value - is the inverse of parse_value for suggestion rows", () => {
+        const cases: [SuggestedCell[][], string][] = [
+            [[[0n]], "0"],
+            [[[{ label: "gpio" }]], "gpio"],
+            [[[19n, { macro: "IRQ_TYPE_EDGE_FALLING" }]], "19 IRQ_TYPE_EDGE_FALLING"],
+            [[[{ label: "gpio" }, 8n, { macro: "GPIO_ACTIVE_LOW" }], [{ label: "gpio" }, 7n, { macro: "GPIO_ACTIVE_LOW" }]], "gpio 8 GPIO_ACTIVE_LOW,gpio 7 GPIO_ACTIVE_LOW"],
+        ];
+        for (const [rows, text] of cases) {
+            expect(format_value(rows)).toBe(text);
+            const expected = rows.map(row => row.map(cell => typeof cell === "bigint" ? cell : ("label" in cell ? cell.label : cell.macro)));
+            const parsed = parse_value(text);
+            expect(parsed).toEqual(expected.length > 1 ? expected : (expected[0]!.length > 1 ? expected[0] : expected[0]![0]));
+        }
     });
 
-    test("set_property - accepts a macro's numeric value at a MACRO enum index", () => {
-        const definition: ResolvedProperty = {
-            key: "interrupts",
-            value: {
-                _t: "fixed_index",
-                minItems: 2,
-                maxItems: 2,
-                prefixItems: [
-                    { _t: "number", minimum: 0n, maximum: 0xFF_FF_FF_FFn },
-                    { _t: "enum", enum: INTERRUPT_MACROS.map(m => m.name), enum_type: AttachEnumType.MACRO },
-                ],
-            },
+    test("format_value - board suggestions round-trip through parse_value + build_raw_property into the expected cells", () => {
+        const board = parse_board_description(fs.readFileSync(new URL("../../../bundled/boards/pmd-rpi-intz.yaml", import.meta.url), "utf8"));
+        if (typeof board === "string") { throw new TypeError(board); }
+        const devicetree = DeviceTree.new_from_string(`/dts-v1/;
+/ {
+    soc {
+        gpio: gpio@7e200000 {
+            compatible = "brcm,bcm2711-gpio";
+            gpio-controller;
+            #gpio-cells = <2>;
+            interrupt-controller;
+            #interrupt-cells = <2>;
+        };
+        spi0: spi@7e204000 {
+            compatible = "brcm,bcm2835-spi";
+            #address-cells = <1>;
+            #size-cells = <0>;
+        };
+    };
+};`);
+        if (typeof devicetree === "string") { throw new TypeError(devicetree); }
+
+        const data = JSON.stringify({ "interrupt-parent": "gpio", "reset-gpios": ["gpio"] });
+        const definitions = Attach.populate_properties([
+            { key: "interrupt-parent", value: { _t: "generic" } },
+            { key: "interrupts", value: { _t: "array", minItems: 1, maxItems: 1 } },
+            { key: "reset-gpios", value: { _t: "generic" } },
+        ], devicetree, data);
+
+        const placement = { node_path: "/soc/spi@7e204000/adc@0", parent_path: "/soc/spi@7e204000", reg: 0n, siblings: [] };
+        const stack = IntelligenceStack.default().with(board_layer(board));
+
+        const is_label_rt = (name: string): boolean =>
+            devicetree.get_node_by_label({ kind: "label", labels: [], name }) !== undefined;
+
+        const round_trip = (property: string, display: string) => {
+            const suggestion = stack.suggest_values(property, { devicetree, data, placement }).find(s => s.display === display);
+            expect(suggestion, `${property}: ${display}`).toBeDefined();
+            const definition = definitions.find(d => d.key === property)!;
+            const hint = shape_hint(definition);
+            const result = build_raw_property(format_value(suggestion!.rows), property, hint, is_label_rt);
+            expect(result).toBeDefined();
+            expect("error" in result!).toBe(false);
+            return (result as DTProperty).value;
         };
 
-        // 2 == IRQ_TYPE_EDGE_FALLING, so the bare number is accepted.
-        const scratch: DTNode = { name: "s", unit_addr: undefined, labels: [], properties: [], children: [] };
-        expect(set_property([25n, 2n], scratch, "interrupts", definition)).toBe(true);
-        expect(scratch.properties.find(p => p.name === "interrupts")?.value).toMatchObject([{ kind: "array" }]);
-
-        // The macro name still works.
-        const scratch2: DTNode = { name: "s", unit_addr: undefined, labels: [], properties: [], children: [] };
-        expect(set_property([25n, "IRQ_TYPE_EDGE_FALLING"], scratch2, "interrupts", definition)).toBe(true);
-
-        // A number that is not any IRQ macro value is rejected.
-        const scratch3: DTNode = { name: "s", unit_addr: undefined, labels: [], properties: [], children: [] };
-        expect(typeof set_property([25n, 99n], scratch3, "interrupts", definition)).toBe("string");
+        expect(round_trip("interrupts", "19 IRQ_TYPE_EDGE_FALLING — spi_pmod1.int")).toMatchObject([
+            { kind: "array", elements: [{ kind: "number", value: 19n }, { kind: "number", value: 2n }] },
+        ]);
+        expect(round_trip("reset-gpios", "gpio 21 GPIO_ACTIVE_LOW — spi_pmod1.reset")).toMatchObject([
+            { kind: "array", elements: [{ kind: "label", name: "gpio" }, { kind: "number", value: 21n }, { kind: "number", value: 1n }] },
+        ]);
+        expect(round_trip("interrupt-parent", "gpio — interrupt lines of spi_pmod1")).toMatchObject([
+            { kind: "array", elements: [{ kind: "label", name: "gpio" }] },
+        ]);
     });
 
     test("place_property - writes a true multi-row matrix as separate <...> groups", () => {
         const { overlay } = parse(empty_overlay);
         const target: DTLabel = { kind: "label", labels: [], name: "spi0" };
 
-        place_property(overlay, target, undefined, true, build_untyped_property([[1n, 2n], [3n, 4n]], "reg"), "reg");
+        const built = build_raw_property("1 2,3 4", "reg", "cells", () => false);
+        expect(built).toBeDefined();
+        expect("error" in built!).toBe(false);
+        place_property(overlay, target, undefined, true, built as DTProperty, "reg");
 
         const output = overlay.print();
         expect(output).toMatch(/<[^>]*>,\s*<[^>]*>/);
@@ -855,8 +647,10 @@ if (import.meta.vitest) {
 
         expect(overlay.get_fragments().length).toBe(0);
 
-        const built = build_untyped_property(5_000_000n, "spi-max-frequency");
-        place_property(overlay, { kind: "label", labels: [], name: "spi0" }, undefined, true, built, "spi-max-frequency");
+        const built = build_raw_property("5000000", "spi-max-frequency", "cells", () => false);
+        expect(built).toBeDefined();
+        expect("error" in built!).toBe(false);
+        place_property(overlay, { kind: "label", labels: [], name: "spi0" }, undefined, true, built as DTProperty, "spi-max-frequency");
 
         const output = overlay.print();
         expect(output).toContain("spi0");
@@ -868,8 +662,10 @@ if (import.meta.vitest) {
         const { overlay } = parse(empty_overlay);
         const target: DTLabel = { kind: "label", labels: [], name: "spi0" };
 
-        place_property(overlay, target, undefined, true, build_untyped_property(1n, "spi-max-frequency"), "spi-max-frequency");
-        place_property(overlay, target, undefined, true, build_untyped_property(2n, "spi-max-frequency"), "spi-max-frequency");
+        const b1 = build_raw_property("1", "spi-max-frequency", "cells", () => false) as DTProperty;
+        const b2 = build_raw_property("2", "spi-max-frequency", "cells", () => false) as DTProperty;
+        place_property(overlay, target, undefined, true, b1, "spi-max-frequency");
+        place_property(overlay, target, undefined, true, b2, "spi-max-frequency");
 
         expect(overlay.get_fragments().length).toBe(1);
         expect(overlay.print()).toContain("spi-max-frequency");
@@ -879,10 +675,10 @@ if (import.meta.vitest) {
         const { overlay } = parse(empty_overlay);
         const target: DTLabel = { kind: "label", labels: [], name: "spi0" };
 
-        place_property(overlay, target, undefined, true, build_untyped_property(true, "wakeup-source"), "wakeup-source");
+        const built = build_raw_property("true", "wakeup-source", "flag", () => false) as DTProperty;
+        place_property(overlay, target, undefined, true, built, "wakeup-source");
         expect(overlay.get_fragments().length).toBe(1);
 
-        // built === undefined => remove
         place_property(overlay, target, undefined, true, undefined, "wakeup-source");
         expect(overlay.print()).not.toContain("wakeup-source");
         expect(overlay.get_fragments().length).toBe(0);
@@ -893,10 +689,129 @@ if (import.meta.vitest) {
         const found = overlay.find_node({ kind: "label", labels: [], name: "imu1" });
         expect(found).toBeDefined();
 
-        place_property(overlay, { kind: "label", labels: [], name: "imu1" }, found, false, build_untyped_property(0n, "reg"), "reg");
+        const built = build_raw_property("0", "reg", "cells", () => false) as DTProperty;
+        place_property(overlay, { kind: "label", labels: [], name: "imu1" }, found, false, built, "reg");
 
         const output = overlay.print();
         expect(output).toContain("imu1");
         expect(output).toContain("reg");
+    });
+
+    test("build_raw_property — end-to-end cs-gpios with 6-row board suggestion", () => {
+        const board = parse_board_description(fs.readFileSync(new URL("../../../bundled/boards/pmd-rpi-intz.yaml", import.meta.url), "utf8"));
+        if (typeof board === "string") { throw new TypeError(board); }
+        const devicetree = DeviceTree.new_from_string(`/dts-v1/;
+/ {
+    soc {
+        gpio: gpio@7e200000 {
+            compatible = "brcm,bcm2711-gpio";
+            gpio-controller;
+            #gpio-cells = <2>;
+        };
+        spi0: spi@7e204000 {
+            compatible = "brcm,bcm2835-spi";
+            #address-cells = <1>;
+            #size-cells = <0>;
+            cs-gpios = <&gpio 8 1>, <&gpio 7 1>;
+        };
+    };
+};`);
+        if (typeof devicetree === "string") { throw new TypeError(devicetree); }
+
+        const is_label_cs = (name: string): boolean =>
+            devicetree.get_node_by_label({ kind: "label", labels: [], name }) !== undefined;
+
+        const overlay = DeviceTreeOverlay.new_from_string(`/dts-v1/;\n/plugin/;\n/ { };`, devicetree);
+        if (typeof overlay === "string") { throw new TypeError(overlay); }
+
+        const stack = IntelligenceStack.default().with(board_layer(board));
+        const placement = { node_path: "/soc/spi@7e204000", parent_path: "/soc", siblings: [] };
+        const cs_suggestion = stack.suggest_values("cs-gpios", { devicetree, data: "{}", placement })[0];
+        expect(cs_suggestion).toBeDefined();
+
+        const formatted = format_value(cs_suggestion!.rows);
+        const built = build_raw_property(formatted, "cs-gpios", "cells", is_label_cs);
+        expect(built).toBeDefined();
+        expect("error" in built!).toBe(false);
+        const property = built as DTProperty;
+
+        place_property(overlay, { kind: "label", labels: [], name: "spi0" }, undefined, true, property, "cs-gpios");
+        const printed = overlay.print();
+        const reparsed = DeviceTreeOverlay.new_from_string(printed, devicetree);
+        expect(typeof reparsed).not.toBe("string");
+
+        expect(printed).toContain("&gpio");
+        expect(printed).toMatch(/<&gpio\s+8\s+1>/);
+    });
+
+    test("build_raw_property — <0> placeholder round-trips through format → parse → build → print → reparse", () => {
+        const board = parse_board_description(fs.readFileSync(new URL("../../../bundled/boards/pmd-rpi-intz.yaml", import.meta.url), "utf8"));
+        if (typeof board === "string") { throw new TypeError(board); }
+
+        const gapped_fixture = `
+schema_version: 3
+board: GAPPED-CS
+gpio_controller: "&gpio"
+buses:
+  spi0:
+    node: "&spi0"
+    chip_selects:
+      0: {gpio: 8, user: slot.cs}
+      1: {gpio: 7, user: slot.cs2}
+      3: {gpio: 18, user: slot.cs4}
+slots:
+  slot:
+    bus: "&spi0"
+    reg: 0
+    signals:
+      cs2: {kind: chip-select, gpio: 7, reg: 1}
+      cs4: {kind: chip-select, gpio: 18, reg: 3}`;
+        const gapped_board = parse_board_description(gapped_fixture);
+        if (typeof gapped_board === "string") { throw new TypeError(gapped_board); }
+
+        const devicetree = DeviceTree.new_from_string(`/dts-v1/;
+/ {
+    soc {
+        gpio: gpio@7e200000 {
+            compatible = "brcm,bcm2711-gpio";
+            gpio-controller;
+            #gpio-cells = <2>;
+        };
+        spi0: spi@7e204000 {
+            compatible = "brcm,bcm2835-spi";
+            #address-cells = <1>;
+            #size-cells = <0>;
+        };
+    };
+};`);
+        if (typeof devicetree === "string") { throw new TypeError(devicetree); }
+
+        const is_label = (name: string): boolean =>
+            devicetree.get_node_by_label({ kind: "label", labels: [], name }) !== undefined;
+
+        const overlay = DeviceTreeOverlay.new_from_string(`/dts-v1/;\n/plugin/;\n/ { };`, devicetree);
+        if (typeof overlay === "string") { throw new TypeError(overlay); }
+
+        const stack = IntelligenceStack.default().with(board_layer(gapped_board));
+        const placement = { node_path: "/soc/spi@7e204000", parent_path: "/soc", siblings: [] };
+        const cs_suggestion = stack.suggest_values("cs-gpios", { devicetree, data: "{}", placement })[0];
+        expect(cs_suggestion).toBeDefined();
+        expect(cs_suggestion!.rows).toHaveLength(4);
+        expect(cs_suggestion!.rows[2]).toStrictEqual([0n]);
+
+        const formatted = format_value(cs_suggestion!.rows);
+        const built = build_raw_property(formatted, "cs-gpios", "cells", is_label);
+        expect(built).toBeDefined();
+        expect("error" in built!).toBe(false);
+
+        place_property(overlay, { kind: "label", labels: [], name: "spi0" }, undefined, true, built as DTProperty, "cs-gpios");
+        const printed = overlay.print();
+        const reparsed = DeviceTreeOverlay.new_from_string(printed, devicetree);
+        expect(typeof reparsed).not.toBe("string");
+
+        expect(printed).toMatch(/<&gpio\s+8\s+1>/);
+        expect(printed).toMatch(/<&gpio\s+7\s+1>/);
+        expect(printed).toContain("<0>");
+        expect(printed).toMatch(/<&gpio\s+18\s+1>/);
     });
 }

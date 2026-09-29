@@ -1,0 +1,55 @@
+schema_version: 3
+board: PMD-RPI-INTZ
+host: raspberry-pi-4-model-b
+gpio_controller: "&gpio"
+buses:
+  spi0:
+    node: "&spi0"
+    chip_selects:
+      0: {gpio: 8,  user: [spi_pmod1.cs1, quikeval.cs]}
+      1: {gpio: 7,  user: spi_pmod2.cs1}
+      2: {gpio: 20, user: spi_pmod1.cs2}
+      3: {gpio: 18, user: spi_pmod1.cs3}
+      4: {gpio: 5,  user: spi_pmod2.cs2}
+      5: {gpio: 6,  user: spi_pmod2.cs3}
+  i2c1:
+    node: "&i2c1"
+slots:
+  spi_pmod1:
+    bus: "&spi0"
+    reg: 0
+    signals:
+      cs2:   {kind: chip-select, gpio: 20, reg: 2}
+      cs3:   {kind: chip-select, gpio: 18, reg: 3}
+      int:   {kind: interrupt, gpio: 19}
+      reset: {kind: reset, gpio: 21}
+  spi_pmod2:
+    bus: "&spi0"
+    reg: 1
+    signals:
+      cs2:   {kind: chip-select, gpio: 5, reg: 4}
+      cs3:   {kind: chip-select, gpio: 6, reg: 5}
+      int:   {kind: interrupt, gpio: 25}
+      reset: {kind: reset, gpio: 12}
+  i2c_pmod1:
+    bus: "&i2c1"
+    signals:
+      int:   {kind: interrupt, gpio: 26}
+      reset: {kind: reset, gpio: 13}
+  i2c_pmod2:
+    bus: "&i2c1"
+    signals:
+      int:   {kind: interrupt, gpio: 27}
+      reset: {kind: reset, gpio: 17}
+  quikeval:
+    bus: "&spi0"
+    alt_bus: "&i2c1"
+    selected_by: SW1
+    reg: 0
+    signals:
+      gpio: {kind: gpio, gpio: 22}
+  psm:
+    bus: "&i2c1"
+    signals:
+      alert: {kind: interrupt, gpio: 4, active: low, open_drain: true}
+      gpo1:  {kind: gpio, gpio: 23, connected: false}

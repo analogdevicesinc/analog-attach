@@ -18,7 +18,7 @@ import { CONFIG_REGISTRY } from "../../config";
 export const FILES_DIRECTIVE = "__ATTACH_COMPLETE_FILES__";
 export const DIRS_DIRECTIVE = "__ATTACH_COMPLETE_DIRS__";
 
-export type SuggestKind = "device-key" | "parent" | "navigate";
+export type SuggestKind = "device-key" | "parent" | "navigate" | "value";
 
 export type ValueSource =
     | { kind: "file" }
@@ -57,6 +57,8 @@ export const COMPLETION_SPEC: Readonly<Record<string, CommandSpec>> = {
     },
     update: {
         positional: { mode: "all", source: { kind: "suggest", suggest: "navigate" } },
+        // The positionals are the prop-ref, so `suggest value` sees the property being set.
+        flags: { "--with": { kind: "suggest", suggest: "value" } },
     },
     delete: {
         positional: { mode: "all", source: { kind: "suggest", suggest: "navigate" } },

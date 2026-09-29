@@ -37,6 +37,8 @@ Set up configuration with `config-set` before using other commands. At minimum, 
 - `create-workfile`: No prerequisites (also saves `overlay` path to config)
 - `get-schema`: Needs `linux`, `dt-schema`, `context`
 - `suggest parent`: Needs `linux`, `dt-schema`, `context`
+- `suggest value`: Needs `context`, `overlay` (values come from `board`; without it the result is empty). `linux`/`dt-schema` are optional and enable binding check annotations on each suggestion
+- `suggest board-slot`: Needs `board` (plus `linux`, `dt-schema`, `context` when given a compatible)
 - `add`: Needs `linux`, `dt-schema`, `context`, `overlay`
 - `update`: Needs `linux`, `dt-schema`, `context`, `overlay`
 - `read`: Needs `overlay` (optionally `context` for base-tree resolution)
@@ -104,6 +106,7 @@ attach-linux config-get [fields...]
 | `dt-schema` | Yes | Path to dt-schema repository |
 | `context` | Yes | Path to target base `.dts` file |
 | `overlay` | No | Path to the working `.dtso` overlay file (auto-set by `create-workfile`) |
+| `board` | No | Add-on board description (HAT, …): a path to a board YAML or a bundled board name (e.g. `pmd-rpi-intz`). Enables `suggest board-slot` and board-derived `suggest value` / `suggest type` values |
 | `build-command` | No | dtc command template (`{input}`/`{output}` substituted); defaults to `dtc -@ -I dts -O dtb -o {output} {input}` |
 | `overlay-compiled` | No | Path to compiled `.dtbo` artifact (auto-set by `build`) |
 | `deploy-ip` | No | IP address or hostname of the remote device |
@@ -116,6 +119,9 @@ attach-linux config-get [fields...]
 attach-linux config-set linux ~/linux
 attach-linux config-set dt-schema ~/dt-schema
 attach-linux config-set context ~/linux/arch/arm/boot/dts/broadcom/bcm2837-rpi-3-b.dts
+
+# Optional: describe the add-on board (HAT) the peripherals plug into
+attach-linux config-set board pmd-rpi-intz
 
 # Read all config
 attach-linux config-get
@@ -598,13 +604,13 @@ attach-linux update imu1/channel@0/reg --with 0
 attach-linux update spi0/status --with okay
 ```
 
-**Validation**: The command validates the value against the device binding schema when a binding can be resolved. If the value is invalid, an error message is displayed. When no binding is found, the value is written using best-effort type inference from the syntax.
+**Validation**: The command uses the binding only as a shape hint (flag / strings / cells) and never rejects a value because of the binding alone. Macros (`GPIO_ACTIVE_LOW`, `IRQ_TYPE_EDGE_FALLING`, etc.) are resolved to their numeric values, labels (or `&label`) that exist in the base tree or overlay become phandle references (`&label`), and unknown words in a cell value are rejected with a clear error. Run `validate` afterwards to catch binding-level issues.
 
 ---
 
 ### 9. `suggest` - Smart Suggestions
 
-**Purpose**: Multi-kind suggestion engine for parent nodes, device keys, properties, navigation, and types.
+**Purpose**: Multi-kind suggestion engine for parent nodes, device keys, properties, navigation, types, concrete values and board slots.
 
 **Syntax**:
 ```bash
@@ -619,7 +625,9 @@ attach-linux suggest <kind> [args...]
 | `device-key` | `[filter]` | Compatible strings from compat index |
 | `node-prop` | `<node-ref>` | All binding-declared properties for a node |
 | `navigate` | `[node-ref]` | Children and properties of a node (or overlay entry points if omitted) |
-| `type` | `<prop-ref>` | Expected value type of a property |
+| `type` | `<prop-ref>` | Expected value type of a property (plus board-derived `suggestions` when a board is configured) |
+| `value` | `<prop-ref>` | Ready-to-paste `update --with` values from the configured board (chip selects, interrupt/reset lines, `cs-gpios`). When `linux`/`dt-schema` are configured, each suggestion is checked against the binding and annotated with a `note` if there is a potential issue |
+| `board-slot` | `[compatible]` | Slots of the configured board, optionally only those whose bus can host the device |
 
 **Examples**:
 ```bash
@@ -638,7 +646,32 @@ attach-linux suggest navigate imu1     # list children and properties of imu1
 
 # Get the type of a property
 attach-linux suggest type imu1/reg
+
+# With a board configured (config-set board <name|path>):
+attach-linux suggest board-slot adi,ad7124-8     # slots that can host the device
+attach-linux suggest value ad7124/reg            # chip selects, those in use are marked
+attach-linux suggest value ad7124/interrupts     # e.g. "19 IRQ_TYPE_EDGE_FALLING"
+attach-linux suggest value spi0/cs-gpios         # full cs-gpios list for the bus node
 ```
+
+**Board-aware workflow** — when `config-get board` is set, don't guess wiring:
+1. `suggest board-slot <compatible>` → ask the user (selection question) which slot the device is plugged into. The display names the bus (`--to`) and the chip select (`reg`). A slot listed twice can be switched between buses: ask which position its switch is in.
+2. `add <compatible> --to <slot's bus> --label <l>`, then `update <l>/reg --with <slot's chip select>`.
+3. For `reg`, `interrupt-parent`, `interrupts`, `interrupts-extended`, `reset-gpios` and other `*-gpios`: `suggest value <l>/<prop>` and pick from the result, then `update <l>/<prop> --with "<value>"`.
+4. If a chip select beyond CE0/CE1 is used (reg ≥ 2), set the bus's `cs-gpios` from `suggest value <bus>/cs-gpios`.
+
+How to read `suggest value`:
+- The slot is inferred from the parent bus and `reg`, so set `reg` first. If the message says `ambiguous`, several slots share that bus/chip select (e.g. two ports on CS0): ask the user which slot, then use only the suggestions whose display names that slot.
+- `in use by <node>` on a `reg` value means an enabled sibling already holds that chip select (on a Pi, often `spidev@N`); disable it or pick another.
+- Interrupt-style `*-gpios` (`rdy`, `irq`, `int`, `alert`, …) offer the slot's interrupt line first, then fall back to general-purpose GPIO lines; `nreset-gpios` and similar reset names offer only the reset line.
+- Interrupt trigger types and reset polarity depend on the peripheral, not the board: choose among the offered macros from the device binding/datasheet.
+- The `reg … is not a chip select wired` warning means the chosen `reg` is not on the board's wired chip selects; pick one of the wired values or check the physical wiring.
+- `<0>` rows in `cs-gpios` are intentional placeholders for unwired chip-select slots (the kernel's `of_parse_phandle_with_args` treats phandle 0 as an empty entry).
+- When `linux`/`dt-schema` are configured, suggestions carry a `note` field with binding check results:
+  - `needs interrupt-parent = <&gpio> (currently <&gic>); set it first` — the node inherits an interrupt controller that doesn't match the board; set `interrupt-parent` before `interrupts`.
+  - `not defined by <binding>; validate may reject it` — the property isn't in the binding; the value will still be written but `validate` may flag it.
+  - A cell-count or enum mismatch message — the suggestion doesn't fit the binding's constraints for this property.
+- `*-gpios` and other phandle+cells properties (like `interrupts`, `interrupt-parent`, `reset-gpios`) can be set in one step: `update <l>/<prop> --with "gpio 21 GPIO_ACTIVE_LOW"`. Macros are resolved to numbers and labels to `&label` automatically.
 
 Use `list-intelligence` to get full metadata about each suggestion kind.
 
@@ -738,6 +771,8 @@ attach-linux deploy [--dtbo <path>] [--ip <host>] [--user <user>] [--password <p
 │ 3. FIND PARENT                                              │
 │    attach-linux suggest parent <compatible>                  │
 │    → Determine which bus to attach to                       │
+│    With a board: attach-linux suggest board-slot <compat>   │
+│    → Ask which slot; its bus is the parent                  │
 └─────────────────────────────────────────────────────────────┘
                               │
                               ▼
@@ -758,6 +793,7 @@ attach-linux deploy [--dtbo <path>] [--ip <host>] [--user <user>] [--password <p
 ┌─────────────────────────────────────────────────────────────┐
 │ 6. CONFIGURE (using update command)                         │
 │    attach-linux update <node>/<property> --with <value>      │
+│    - With a board: suggest value <node>/<prop> first        │
 │    - Set all required_properties                            │
 │    - Set user-requested optional properties                 │
 │    - For channels: add --name channel@N --to <label>        │
@@ -855,7 +891,7 @@ node-name {
 | `missing_required` error | Required property not set | Use `update` to add the property |
 | `number_limit` error | Value outside valid range | Use `update` with a value within schema bounds |
 | `interrupts` size error | Wrong number of cells | Set `interrupt-parent` first: `update <node>/interrupt-parent --with gpio` |
-| `Property in binding demands numbers` | Wrong value type | Check `get-schema` output and use correct type with `update` |
+| `'X' is not a number, a known macro, or a label` | Unknown word in cell value | Check spelling of the label/macro, or add the label to the overlay first |
 | `Values for property X are [...]` | Invalid enum value | Use one of the listed valid values with `update` |
 | `Node not found` | Invalid node reference | Use `suggest navigate` to explore overlay structure |
 
@@ -873,7 +909,7 @@ node-name {
 8. **Pattern properties = channels** — If present, help user create each channel node with `add --name channel@N --to <label>`, then configure with `update`
 9. **Phandle references** — When setting phandle properties with `update`, just use the label name (e.g., `--with gpio`)
 10. **Macros need includes** — If schema shows macros, the overlay may need `#include` directives
-11. **Interrupts need interrupt-parent** — When using the `interrupts` property, first set `interrupt-parent` using `update <node>/interrupt-parent --with <controller>` (e.g., `--with gpio`)
+11. **Interrupts need interrupt-parent** — When the board's interrupt controller differs from the inherited one (e.g., `gpio` vs `gic`), set `interrupt-parent` first: `update <node>/interrupt-parent --with gpio`. `suggest value` will annotate `interrupts` suggestions with a `needs interrupt-parent` note when this is the case
 12. **Use `add` for additional nodes** — Use `add` to attach device nodes (pass compatible as positional arg) or bare subnodes like channels (pass `--name <node-name> --to <parent>` only)
 13. **Use `delete` for both nodes and properties** — `delete <node>` removes a node; `delete <node>/<property>` removes a property
 14. **Use `rename` to change a node's key or property name** — Omitting `@` in `--to` preserves the existing unit address

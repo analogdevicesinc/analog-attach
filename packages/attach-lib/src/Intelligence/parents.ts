@@ -6,6 +6,10 @@ export type PathAndLabel = {
     label?: string;
 };
 
+export function parent_path_string(p: PathAndLabel): string {
+    return p.path.length <= 1 ? "/" : `/${p.path.slice(1).join("/")}`;
+}
+
 export enum DTCommDeviceTypes {
     SPI,
     I2C,

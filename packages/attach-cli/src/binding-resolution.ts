@@ -9,6 +9,7 @@ import type {
     DeviceTree,
     ResolvedProperty,
     PatternPropertyRule,
+    PopulateOptions,
 } from "attach-lib";
 
 import { find_binding, bigIntReplacer } from "./utilities";
@@ -42,6 +43,8 @@ export async function resolve_node_binding(
     linux: string,
     dtSchema: string,
     json: boolean,
+    // Extra intelligence layers (e.g. a board) and the node's placement, forwarded to Attach.populate_*.
+    options?: PopulateOptions,
 ): Promise<NodeBinding | { error: string }> {
     const compatible_property = found_node.properties.find(p => p.name === "compatible");
 
@@ -60,7 +63,7 @@ export async function resolve_node_binding(
             return { error: `No binding found for ${compatible_value}` };
         }
 
-        const initial = await Attach.new_populated_binding(binding_path, linux, dtSchema, base_dt, found_node, parent_name);
+        const initial = await Attach.new_populated_binding(binding_path, linux, dtSchema, base_dt, found_node, parent_name, options);
         if (initial === undefined) {
             return { error: `Failed to parse binding ${binding_path}` };
         }
@@ -74,7 +77,7 @@ export async function resolve_node_binding(
                 const input_json = JSON.stringify(input_data, bigIntReplacer);
                 const update = initial.attach.update_binding_by_changes(input_json);
                 if (update === undefined) { return; }
-                const populated = Attach.populate_parsed_binding(update.binding, base_dt, input_json, parent_name);
+                const populated = Attach.populate_parsed_binding(update.binding, base_dt, input_json, parent_name, options);
                 return { properties: populated.properties, errors: update.errors as unknown[] };
             },
         };
@@ -129,14 +132,14 @@ export async function resolve_node_binding(
                 })
             );
 
-            match.rule.properties = Attach.populate_properties(
-                match.rule.properties, base_dt, JSON.stringify(partial_input_data, bigIntReplacer), parent_name
+            const populated = Attach.populate_properties(
+                match.rule.properties, base_dt, JSON.stringify(partial_input_data, bigIntReplacer), parent_name, options
             );
 
             const input_data = Object.fromEntries(
                 dt_to_validator_input(node, {
                     required_properties: match.rule.required,
-                    properties: match.rule.properties,
+                    properties: populated,
                     pattern_properties: undefined,
                     examples: [],
                 })
@@ -147,7 +150,7 @@ export async function resolve_node_binding(
             if (update === undefined) { return; }
 
             const populated_properties = Attach.populate_properties(
-                update.binding.properties, base_dt, input_json, parent_name
+                update.binding.properties, base_dt, input_json, parent_name, options
             );
 
             return { properties: populated_properties, errors: update.errors as unknown[] };

@@ -1,17 +1,21 @@
 import {
     Attach,
+    DeviceTree,
     extract_compatible,
     is_dt_flag,
     type DTLabel,
     type DTNode,
-    type DTPath
+    type DTPath,
+    type FoundNodeResult,
 } from 'attach-lib';
 
 import { DeviceTreeOverlay } from 'attach-lib';
 import * as fs from 'node:fs';
 import path from "node:path";
 
+import type { LocalContext } from "./context";
 import { load_compat_index, save_compat_index, type CompatIndex } from "./config";
+import { input_error } from "./protocol/output";
 
 export function resolve_node_identifier(
     identifier: string,
@@ -69,6 +73,16 @@ export function resolve_node_identifier(
 // (bare label, or an absolute path whose only '/' is the leading one); callers
 // try the whole identifier as a node first and fall back to this, so an
 // absolute node path never mis-splits.
+export function parse_property_reference(arguments_: string[]): { node_identifier: string; property_name: string } | undefined {
+    const full_path = arguments_.join("/");
+    const last_slash = full_path.lastIndexOf("/");
+    const property_name = last_slash === -1 ? "" : full_path.slice(last_slash + 1);
+    const node_identifier = last_slash > 0
+        ? full_path.slice(0, last_slash)
+        : (last_slash === 0 ? "/" : "");
+    return property_name && node_identifier ? { node_identifier, property_name } : undefined;
+}
+
 export function split_property_reference(
     identifier: string
 ): { node_identifier: string; property_name: string | undefined } {
@@ -215,6 +229,84 @@ export function fragment_target(fragment: DTNode): string | undefined {
     }
 
     return undefined;
+}
+
+export interface WriteTarget {
+    target_reference: DTLabel | DTPath;
+    found: FoundNodeResult | undefined;
+    is_base_target: boolean;
+    binding_node: DTNode | undefined;
+    binding_parent: DTNode | undefined;
+    parent_name: string;
+}
+
+export function resolve_write_target(
+    node_identifier: string,
+    overlay: DeviceTreeOverlay,
+    base_dt: DeviceTree,
+): WriteTarget {
+    const target_reference = resolve_node_identifier(node_identifier, overlay);
+    const found = overlay.find_node(target_reference);
+
+    const base_reference = target_reference.kind === "path"
+        ? base_dt.get_node_by_path(target_reference)
+        : base_dt.get_node_by_label(target_reference);
+
+    const is_base_target = (found?.is_in_base ?? false) || (found === undefined && base_reference !== undefined);
+
+    let binding_node: DTNode | undefined;
+    let binding_parent: DTNode | undefined;
+    let parent_name = "";
+
+    if (is_base_target && base_reference !== undefined) {
+        binding_node = base_dt.deref_node(base_reference);
+        const parent_reference = base_dt.get_parent(base_reference);
+        binding_parent = parent_reference === undefined ? undefined : base_dt.deref_node(parent_reference);
+        parent_name = base_reference.labels.at(-1)?.name ?? base_reference.full_path.path;
+    } else if (found !== undefined) {
+        binding_node = found.node;
+        binding_parent = found.parent_node;
+        parent_name = found.node.labels.at(-1) ?? found.node_path;
+    }
+
+    return { target_reference, found, is_base_target, binding_node, binding_parent, parent_name };
+}
+
+export function load_trees(
+    context_: LocalContext,
+    context_path: string,
+    overlay_path: string,
+    base_dt?: DeviceTree,
+): { base_dt: DeviceTree; overlay: DeviceTreeOverlay } | undefined {
+    const dt = base_dt ?? DeviceTree.new_from_string(fs.readFileSync(context_path, "utf8"));
+    if (typeof dt === "string") {
+        if (context_.json) { input_error(`Failed to parse dts: ${dt}`); return; }
+        console.log(`Failed to parse dts ${context_path}: ${dt}`);
+        return;
+    }
+
+    const overlay = DeviceTreeOverlay.new_from_string(fs.readFileSync(overlay_path, "utf8"), dt);
+    if (typeof overlay === "string") {
+        if (context_.json) { input_error(`Failed to parse dtso: ${overlay}`); return; }
+        console.log(`Failed to parse dtso ${overlay_path}: ${overlay}`);
+        return;
+    }
+
+    return { base_dt: dt, overlay };
+}
+
+export function load_base(
+    context_: LocalContext,
+    context_path: string,
+    base_dt?: DeviceTree,
+): DeviceTree | undefined {
+    const dt = base_dt ?? DeviceTree.new_from_string(fs.readFileSync(context_path, "utf8"));
+    if (typeof dt === "string") {
+        if (context_.json) { input_error(`Failed to parse dts: ${dt}`); return; }
+        console.log(`Failed to parse dts ${context_path}: ${dt}`);
+        return;
+    }
+    return dt;
 }
 
 if (import.meta.vitest) {

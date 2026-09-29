@@ -10,7 +10,7 @@ export function build_list_intelligence_command(context: LocalContext): Command 
         .action(async () => {
             const response: ListIntelligenceResponse = {
                 ok: true,
-                message: "5 intelligence kinds available",
+                message: "7 intelligence kinds available",
                 severity: "info",
                 intelligence: [
                     {
@@ -68,6 +68,29 @@ export function build_list_intelligence_command(context: LocalContext): Command 
                                 description: "Property reference (one or more segments, spaces act as path separators): bare label (imu1/reg), absolute path (/soc/spi@7e204000/imu@0/reg), label/child (spi0/imu@0/reg or spi0 imu@0 reg), multi-segment path (soc spi@7e204000 imu@0 reg)",
                                 required: true,
                                 kind: "prop-ref",
+                            },
+                        ],
+                    },
+                    {
+                        kind: "value",
+                        description: "Suggests concrete, ready-to-paste `update --with` values for one property, drawn from the configured context layers — today the add-on board description (`config-get board`), e.g. the chip selects for `reg`, the board's interrupt line for `interrupts`, its reset line for `reset-gpios`, or the full `cs-gpios` list on the bus node itself. The slot is inferred from the node's parent bus and `reg`; set `reg` first to narrow it. Call before `update --with` when a board is configured. If the message says `ambiguous`, ask the user which slot the device is plugged into instead of guessing, and pick the suggestions labelled with that slot. Empty with an info message when no board is configured. Interrupt trigger types and reset polarity come from the peripheral, so choose among the offered macros from the device's datasheet/binding.",
+                        args: [
+                            {
+                                name: "prop",
+                                description: "Property reference (one or more segments, spaces act as path separators): bare label (imu1/reg), absolute path (/soc/spi@7e204000/imu@0/reg), label/child (spi0/imu@0/reg or spi0 imu@0 reg), multi-segment path (soc spi@7e204000 imu@0 reg)",
+                                required: true,
+                                kind: "prop-ref",
+                            },
+                        ],
+                    },
+                    {
+                        kind: "board-slot",
+                        description: "Lists the slots (ports/connectors) of the configured add-on board (`config-get board`), each with its bus, chip select and wired signals. With a compatible string, only the slots whose bus can host that device. Use before `add` when a board is configured: present the slots to the user, ask which one the device is plugged into, then `add --to <bus>` and set `reg` to that slot's chip select. Fails with a missing-config error when no board is configured.",
+                        args: [
+                            {
+                                name: "compatible",
+                                description: "Compatible string of the device, to keep only slots it can attach to",
+                                required: false,
                             },
                         ],
                     },

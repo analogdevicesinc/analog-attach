@@ -5,7 +5,7 @@ import { describe, test, expect, vi, beforeEach, afterEach } from "vitest";
 import { buildApp } from "./app";
 import { buildContext } from "./context";
 import { build_completion_command } from "./commands/completion/command";
-import { run_complete } from "./commands/completion/complete";
+import { run_complete, shell_dequote } from "./commands/completion/complete";
 import { COMPLETION_SPEC, NO_VALUE_COMPLETION, FILES_DIRECTIVE, DIRS_DIRECTIVE } from "./commands/completion/spec";
 import { CONFIG_REGISTRY } from "./config";
 import * as suggest from "./commands/suggest/command";
@@ -133,6 +133,7 @@ describe("__complete delegates dynamic values to suggest in-process", () => {
                 kind === "device-key" ? [{ value: "ad7124" }, { value: "ad5940" }]
                 : kind === "parent" ? [{ value: "spi0", display_string: "/soc/spi@0" }]
                 : kind === "navigate" ? [{ value: "reg", display_string: "reg (required)" }]
+                : kind === "value" ? [{ value: "19 IRQ_TYPE_EDGE_FALLING", display_string: "19 IRQ_TYPE_EDGE_FALLING — spi_pmod1.int" }]
                 : [];
             if (context.json) { console.log(JSON.stringify({ ok: true, message: "", severity: "info", suggestions })); }
         });
@@ -157,6 +158,26 @@ describe("__complete delegates dynamic values to suggest in-process", () => {
         expect(values(lines)).toEqual(["spi0"]);
         expect(vi.mocked(suggest.run_suggest).mock.calls.some(
             ([, arguments_]) => arguments_[0] === "parent" && arguments_[1] === "ad7124",
+        )).toBe(true);
+    });
+});
+
+describe("update --with completion", () => {
+    beforeEach(() => {
+        vi.spyOn(suggest, "run_suggest").mockImplementation(async (context, arguments_) => {
+            const suggestions = arguments_[0] === "value"
+                ? [{ value: "19 IRQ_TYPE_EDGE_FALLING", display_string: "19 IRQ_TYPE_EDGE_FALLING — spi_pmod1.int" }]
+                : [];
+            if (context.json) { console.log(JSON.stringify({ ok: true, message: "", severity: "info", suggestions })); }
+        });
+    });
+    afterEach(() => { vi.restoreAllMocks(); });
+
+    test("update --with completes through suggest value with the prop-ref positionals", async () => {
+        const lines = await complete(["update", "ad7124", "interrupts", "--with", ""]);
+        expect(lines).toEqual(["19 IRQ_TYPE_EDGE_FALLING\t19 IRQ_TYPE_EDGE_FALLING — spi_pmod1.int"]);
+        expect(vi.mocked(suggest.run_suggest).mock.calls.some(
+            ([, arguments_]) => arguments_.join(" ") === "value ad7124 interrupts",
         )).toBe(true);
     });
 });
@@ -189,5 +210,44 @@ describe("completion stubs", () => {
             expect(emit(shell)).toContain(FILES_DIRECTIVE);
             expect(emit(shell)).toContain(DIRS_DIRECTIVE);
         }
+    });
+
+    test("the bash stub does not re-filter with compgen -W", () => {
+        expect(emit("bash")).not.toContain("compgen -W");
+    });
+
+    test("the bash stub does not fork a subshell per candidate", () => {
+        expect(emit("bash")).not.toContain("$(printf");
+    });
+});
+
+describe("shell_dequote", () => {
+    test.each([
+        ["19\\ IRQ_TYPE_", "19 IRQ_TYPE_"],
+        ['"19 IRQ', "19 IRQ"],
+        ["'a b'", "a b"],
+        ["plain", "plain"],
+        ["a\\\\b", "a\\b"],
+        ['"hello \\"world\\""', 'hello "world"'],
+        ["", ""],
+    ])("shell_dequote(%j) → %j", (input, expected) => {
+        expect(shell_dequote(input)).toBe(expected);
+    });
+});
+
+describe("quoted prefix matches in __complete", () => {
+    beforeEach(() => {
+        vi.spyOn(suggest, "run_suggest").mockImplementation(async (context, arguments_) => {
+            const suggestions = arguments_[0] === "value"
+                ? [{ value: "bash" }, { value: "batch" }]
+                : [];
+            if (context.json) { console.log(JSON.stringify({ ok: true, message: "", severity: "info", suggestions })); }
+        });
+    });
+    afterEach(() => { vi.restoreAllMocks(); });
+
+    test("a quoted prefix is dequoted before matching", async () => {
+        const lines = await complete(["update", "ad7124", "interrupts", "--with", '"ba']);
+        expect(values(lines)).toEqual(["bash", "batch"]);
     });
 });

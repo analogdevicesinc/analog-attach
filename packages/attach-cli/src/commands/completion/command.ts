@@ -43,12 +43,20 @@ _attach_linux_complete() {
     esac
 
     # bash has no per-candidate descriptions; drop any "\\tdescription" tail.
+    # Multi-word candidates (update --with values) must be inserted quoted;
+    # zsh and fish quote on insertion by themselves. Skip when the user already
+    # opened a quote — readline closes it and a backslash-space inside would be
+    # literal. printf -v avoids a subshell fork per candidate (bash 3.1+).
     local -a values
-    local line
+    local line value
     for line in "\${lines[@]}"; do
-        values+=( "\${line%%$'\\t'*}" )
+        value="\${line%%$'\\t'*}"
+        if [[ "$cur" != '"'* && "$cur" != "'"* && "$value" == *" "* ]]; then
+            printf -v value '%q' "$value"
+        fi
+        values+=( "$value" )
     done
-    COMPREPLY=( $(compgen -W "\${values[*]}" -- "$cur") )
+    COMPREPLY=( "\${values[@]}" )
 }
 
 complete -F _attach_linux_complete attach-linux
@@ -121,9 +129,7 @@ function __attach_linux_complete
                 return
         end
     end
-    for line in $out
-        printf '%s\\n' $line
-    end
+    printf '%s\\n' $out
 end
 
 complete -c attach-linux -f -a '(__attach_linux_complete)'

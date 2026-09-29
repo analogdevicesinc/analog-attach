@@ -1,0 +1,27 @@
+/dts-v1/;
+/ {
+    soc {
+        gpio: gpio@7e200000 {
+            compatible = "brcm,bcm2711-gpio";
+            gpio-controller;
+            #gpio-cells = <2>;
+            interrupt-controller;
+            #interrupt-cells = <2>;
+        };
+        spi0: spi@7e204000 {
+            compatible = "brcm,bcm2835-spi";
+            #address-cells = <1>;
+            #size-cells = <0>;
+        };
+        i2c1: i2c@7e804000 {
+            compatible = "brcm,bcm2835-i2c";
+            #address-cells = <1>;
+            #size-cells = <0>;
+        };
+        spi1: spi@7e215080 {
+            compatible = "brcm,bcm2835-aux-spi";
+            #address-cells = <1>;
+            #size-cells = <0>;
+        };
+    };
+};

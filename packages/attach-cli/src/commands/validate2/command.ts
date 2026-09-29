@@ -115,8 +115,8 @@ export function build_validate2_command(context_: LocalContext): Command {
 
             const output = fill_template(template, node_blocks);
 
-            const config_dir = path.join(process.cwd(), '.attach-linux');
-            fs.mkdirSync(config_dir, { recursive: true });
+            const config_directory = path.join(process.cwd(), '.attach-linux');
+            fs.mkdirSync(config_directory, { recursive: true });
 
             let validation_json_path = config.validationJson;
 
@@ -129,7 +129,7 @@ export function build_validate2_command(context_: LocalContext): Command {
                 }
 
                 const bindings_path = path.join(linux, 'Documentation', 'devicetree', 'bindings');
-                const generated_path = path.join(config_dir, 'validation.json');
+                const generated_path = path.join(config_directory, 'validation.json');
 
                 if (!context_.json) { console.log("Generating validation.json (this may take a while)..."); }
 
@@ -152,11 +152,11 @@ export function build_validate2_command(context_: LocalContext): Command {
                 console.log(`validation.json not found: ${validation_json_path}`);
                 return;
             }
-            fs.mkdirSync(config_dir, { recursive: true });
+            fs.mkdirSync(config_directory, { recursive: true });
 
-            const temporary_dts = path.join(config_dir, 'temp.dts');
-            const temporary_dtb = path.join(config_dir, 'temp.dtb');
-            const error_json = path.join(config_dir, 'error.json');
+            const temporary_dts = path.join(config_directory, 'temp.dts');
+            const temporary_dtb = path.join(config_directory, 'temp.dtb');
+            const error_json = path.join(config_directory, 'error.json');
             fs.writeFileSync(temporary_dts, output);
 
             let dtc_error: string | undefined;

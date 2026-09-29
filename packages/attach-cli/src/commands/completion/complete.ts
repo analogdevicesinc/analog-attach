@@ -27,9 +27,50 @@ interface Candidate {
     description?: string;
 }
 
+export function shell_dequote(word: string): string {
+    let result = "";
+    let i = 0;
+    while (i < word.length) {
+        const ch = word[i]!;
+        if (ch === "'") {
+            const close = word.indexOf("'", i + 1);
+            if (close === -1) {
+                result += word.slice(i + 1);
+                break;
+            }
+            result += word.slice(i + 1, close);
+            i = close + 1;
+            continue;
+        }
+        if (ch === '"') {
+            i++;
+            while (i < word.length) {
+                const c = word[i]!;
+                if (c === '"') { i++; break; }
+                if (c === '\\' && i + 1 < word.length && '"\\$`'.includes(word[i + 1]!)) {
+                    result += word[i + 1]!;
+                    i += 2;
+                    continue;
+                }
+                result += c;
+                i++;
+            }
+            continue;
+        }
+        if (ch === '\\' && i + 1 < word.length) {
+            result += word[i + 1]!;
+            i += 2;
+            continue;
+        }
+        result += ch;
+        i++;
+    }
+    return result;
+}
+
 export async function run_complete(words: string[]): Promise<void> {
-    const prefix = words.length > 0 ? words.at(-1)! : "";
-    const committed = words.slice(0, -1);
+    const prefix = words.length > 0 ? shell_dequote(words.at(-1)!) : "";
+    const committed = words.slice(0, -1).map(shell_dequote);
 
     const app = buildApp(buildContext(false));
 
@@ -134,7 +175,8 @@ async function suggest_values(kind: SuggestKind, prefix: string, positionals: st
             const key = positionals[0];
             return key === undefined ? [] : capture_suggest(kind, [key]);
         }
-        case "navigate": {
+        case "navigate":
+        case "value": {
             return capture_suggest(kind, positionals);
         }
     }
