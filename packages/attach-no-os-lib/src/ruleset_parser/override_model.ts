@@ -1,6 +1,6 @@
 import type { Effect, EnumValue, OverrideReference, OverridePredicate, Property } from "./types";
 import type { ParseContext} from "./validators";
-import { boolean_, string_, number_, at, stringArray } from "./validators";
+import { boolean_, string_, number_, at, enumValueArray, stringArray } from "./validators";
 import type { Result} from "./result";
 import { error, ok } from "./result";
 
@@ -117,8 +117,10 @@ export function lower_effects(
 	}
 
 	if ("values" in object) {
-		// NOTE: This is an enum
-		const values = stringArray(object.values, at(context, "values"));
+		// An enum value is a name or a number - an I2C address restricted to [0x1D, 0x53] is
+		// as much an enum as a list of symbol names - so this matches `restrictValues`,
+		// which has always been typed for both.
+		const values = enumValueArray(object.values, at(context, "values"));
 		if (!values.ok) {
 			return values;
 		}

@@ -368,6 +368,16 @@ function validate_number(property: NumberProperty, context: ParseContext): Valid
 		});
 	}
 
+	// An override can narrow a numeric field to a set rather than a range; honoring it here
+	// is what makes `values:` mean the same thing on a number as it does on an enum.
+	if (property.values !== undefined && property.values.length > 0 && !property.values.includes(value)) {
+		errors.push({
+			path: context.path,
+			message: `Value ${value.toString()} is not one of: ${property.values.join(", ")}`,
+			severity: "error"
+		});
+	}
+
 	return errors;
 }
 

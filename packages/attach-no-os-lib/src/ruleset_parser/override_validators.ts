@@ -16,7 +16,7 @@ import { asObject, at, required, string_ } from "./validators";
 // a symbol that includes the declaring symbol. The YAML $this/$parent tokens are
 // the authoring surface; once lowered, every reference is a plain {node, property}
 // relative pointer that the engine resolves to concrete symbols exactly once.
-function scope_to_node(scope: OverrideScope): OverrideReference["node"] {
+function scope_to_node(scope: OverrideScope): "self" | "parent" {
 	return scope === "$parent" ? "parent" : "self";
 }
 
@@ -59,6 +59,13 @@ function lower_effects_body(
 			continue;
 		}
 
+		if (key.includes(".")) {
+			const lowered = lower_included_effects(key, value, context, scope);
+			if (!lowered.ok) { return lowered; }
+			effects.push(...lowered.value);
+			continue;
+		}
+
 		const target_property = require_property(context, key, scope);
 		if (!target_property.ok) { return target_property; }
 
@@ -67,6 +74,79 @@ function lower_effects_body(
 
 		const reference: OverrideReference = { node: scope_to_node(scope), property: key };
 		const lowered = lower_effects(override_object.value, reference, at(context, key), target_property.value);
+		if (!lowered.ok) { return lowered; }
+		effects.push(...lowered.value);
+	}
+
+	return ok(effects);
+}
+
+// `comm_init.spi_dev: {...}` — constrain the NODE a union member points at, not the member
+// itself. The fields inside belong to that node's own ruleset, which lives in another file
+// and usually another repo, so they cannot be checked here; the engine resolves the path
+// against the workfile and applies them to whatever is on the other end. That is the same
+// deferral `$parent` already relies on, so `lower_effects` is called without a target
+// property exactly as it is for a parent target.
+//
+// Deliberately limited to `<union property>.<member>`:
+//
+//   - `$parent` scope is refused, because the path is walked from the node declaring the
+//     rule and a parent's properties are not described by this file.
+//   - a plain `include` property has no unambiguous dotted spelling. `controller: {...}`
+//     already means "constrain the reference" (required, allowed, ...), so there is no way
+//     to write "constrain what it points at" without inventing a marker. A union needs the
+//     member name regardless, which is what makes this form unambiguous.
+function lower_included_effects(
+	key: string,
+	value: unknown,
+	context: ParseContext,
+	scope: OverrideScope,
+): Result<Effect[]> {
+	const key_context = at(context, key);
+
+	if (scope === "$parent") {
+		return error(
+			`'${key}' cannot be used under $parent: an included node is reached from the node that declares the rule`,
+			key_context.path
+		);
+	}
+
+	const via = key.split(".");
+	const [property_name, member_name, ...rest] = via;
+	if (property_name === undefined || member_name === undefined || rest.length > 0) {
+		return error(
+			`'${key}' must name a union property and one of its members, e.g. 'comm_init.spi_dev'`,
+			key_context.path
+		);
+	}
+
+	const target_property = require_property(context, property_name, scope);
+	if (!target_property.ok) { return target_property; }
+
+	if (target_property.value._t !== "UnionProperty") {
+		return error(
+			`Property '${property_name}' is a ${target_property.value._t}, not a union, so '${key}' has no member to reach through`,
+			key_context.path
+		);
+	}
+
+	if (!target_property.value.members.some(member => member.name === member_name)) {
+		const known = target_property.value.members.map(member => member.name).join(", ");
+		return error(`Union '${property_name}' has no member '${member_name}'. Known: ${known}`, key_context.path);
+	}
+
+	const body = asObject(value, key_context);
+	if (!body.ok) { return body; }
+
+	const effects: Effect[] = [];
+	for (const [included_property, override_object] of Object.entries(body.value)) {
+		const property_context = at(key_context, included_property);
+
+		const override_body = asObject(override_object, property_context);
+		if (!override_body.ok) { return override_body; }
+
+		const reference: OverrideReference = { node: "include", via, property: included_property };
+		const lowered = lower_effects(override_body.value, reference, property_context);
 		if (!lowered.ok) { return lowered; }
 		effects.push(...lowered.value);
 	}

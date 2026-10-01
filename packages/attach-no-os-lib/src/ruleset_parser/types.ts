@@ -57,7 +57,11 @@ export type NumberProperty<S extends PrimitiveSymbol = PrimitiveSymbol> = Proper
 	type: S,
 	minimum?: number,
 	maximum?: number,
-	default?: number
+	default?: number,
+	// The set this field was narrowed to by an override, e.g. an I2C address restricted to
+	// the two the part actually answers on. Set by override only: a bound that is a handful
+	// of values rather than a range cannot be written as minimum/maximum.
+	values?: number[],
 };
 
 export type BooleanProperty = PropertyBase & {
@@ -177,11 +181,26 @@ export type Property = NumberProperty | BooleanProperty | StringProperty | Inclu
 // self/parent OverrideReference nodes during lowering.
 export type OverrideScope = "$parent" | "$this";
 
-// NOTE: Internal, new override resolution types
-export interface OverrideReference {
-	node: "self" | "parent",
-	property: string
-};
+// Which node a rule's condition reads or whose property it changes.
+//
+//   self    the node declaring the rule
+//   parent  whatever node includes it, known only once a workfile exists
+//   include a node THIS one points at, named by the property and union member reaching it
+//
+// `include` is `parent` with the arrow reversed, and it exists because a constraint
+// sometimes has to travel downward: the ADXL355 fixes the SPI mode and clock ceiling of
+// whatever bus device it is attached to, and a generic capi_spi_device must not mention a
+// driver to receive that. Every kind is resolved to a concrete symbol at collection time,
+// so nothing downstream has to know which kind it was.
+export type OverrideReference =
+	| { node: "self" | "parent", property: string }
+	| {
+		node: "include",
+		/** Property name and the union member through it, e.g. ["comm_init", "spi_dev"]. */
+		via: string[],
+		/** A property of the node on the other end, not of the node declaring the rule. */
+		property: string
+	};
 
 export type OverridePredicate =
 	| { _t: "PredicateAlways" }

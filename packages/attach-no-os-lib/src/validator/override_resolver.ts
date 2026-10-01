@@ -16,15 +16,28 @@ export interface OverrideResult {
 // collection time. This is THE single place scope is decided — both predicate
 // reads and effect targeting go through it, so a "self" target can never again be
 // silently dropped by a branch that assumed "parent".
-function resolve_node(node: OverrideReference["node"], collected: CollectedRule): string | undefined {
-	return node === "self" ? collected.self_symbol : collected.parent_symbol;
+function resolve_node(reference: OverrideReference, collected: CollectedRule): string | undefined {
+	switch (reference.node) {
+		case "self": {
+			return collected.self_symbol;
+		}
+		case "parent": {
+			return collected.parent_symbol;
+		}
+		case "include": {
+			// Resolved when the rule was collected, by walking the declaring node's own
+			// property values. Absent when the path leads nowhere yet - the union member is
+			// unset, so there is no node to constrain and the effect simply does not apply.
+			return collected.include_symbols?.[reference.via.join(".")];
+		}
+	}
 }
 
 // Read the current (explicit) value of a referenced property from the workfile.
 // P3: only a user-set `value` counts — a `default` is a UI hint and is never read
 // here, so equals/hasValue see undefined until the user actually sets the field.
 function read_reference(reference: OverrideReference, collected: CollectedRule, workfile: Workfile): unknown {
-	const symbol_name = resolve_node(reference.node, collected);
+	const symbol_name = resolve_node(reference, collected);
 	if (!symbol_name) {
 		return undefined;
 	}
@@ -83,6 +96,18 @@ function apply_effect(
 			break;
 		}
 		case "setValue": {
+			// The parser refuses `value:` on an enum, but only when it can see the target
+			// type - a $parent or include reference names a property in another ruleset, so
+			// the check lands here instead. Without it the override would quietly replace a
+			// value the user chose, and the contradiction would never be reported.
+			if (effective._t === "EnumProperty") {
+				errors.push({
+					path: `${symbol_name}.${effective.name}`,
+					message: `Cannot force a value on enum '${effective.name}' from another node. Use 'values:' to restrict the selectable set.`,
+					severity: "error",
+				});
+				break;
+			}
 			effective.value = effect.value;
 			break;
 		}
@@ -163,7 +188,7 @@ export function apply_overrides(
 			property._t === "EnumProperty" &&
 			when._t === "PredicateEquals" &&
 			when.reference.property === property.name &&
-			resolve_node(when.reference.node, collected) === symbol_name &&
+			resolve_node(when.reference, collected) === symbol_name &&
 			!property.values.includes(when.value as string | number)
 		) {
 			errors.push({
@@ -178,7 +203,7 @@ export function apply_overrides(
 		}
 
 		for (const effect of collected.rule.effects) {
-			const target_symbol = resolve_node(effect.reference.node, collected);
+			const target_symbol = resolve_node(effect.reference, collected);
 			if (target_symbol !== symbol_name || effect.reference.property !== property.name) {
 				continue;
 			}
