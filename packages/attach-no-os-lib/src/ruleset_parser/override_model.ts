@@ -4,6 +4,15 @@ import { boolean_, string_, number_, at, stringArray } from "./validators";
 import type { Result} from "./result";
 import { error, ok } from "./result";
 
+/**
+ * Operand of `value:` meaning "whatever value, as long as there is one".
+ *
+ * A sentinel operand rather than an operator of its own, so a condition is always the same
+ * shape: one `value:` test per property. `$`-prefixed because every reserved word in the
+ * override vocabulary is, which is also what keeps it from colliding with a real operand.
+ */
+export const ANY_VALUE = "$any";
+
 export function lower_effects(
 	object: Record<string, unknown>,
 	reference: OverrideReference,
@@ -193,6 +202,13 @@ export function lower_condition(
 
 		switch (key) {
 			case "value": {
+				// `value: $any` tests only that the property is set, which is what makes one
+				// field require another without naming what either holds.
+				if (condition_object.value === ANY_VALUE) {
+					predicates.push({ _t: "PredicateHasValue", reference });
+					break;
+				}
+
 				// P3: tests the EXPLICIT value only. Operand is compared strict === by
 				// the engine. We don't coerce it, an enum name, number, or bool is valid.
 				predicates.push({
@@ -202,13 +218,9 @@ export function lower_condition(
 				});
 				break;
 			}
-			case "$any": {
-				predicates.push({ _t: "PredicateHasValue", reference });
-				break;
-			}
 			default: {
 				return error(
-					`Unknown condition operator '${key}'. Expected 'value' or '$any'.`,
+					`Unknown condition operator '${key}'. Expected 'value' (whose operand may be '${ANY_VALUE}').`,
 					operand_context.path
 				);
 			}

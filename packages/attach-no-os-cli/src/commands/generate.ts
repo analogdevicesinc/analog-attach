@@ -11,7 +11,6 @@ import {
 import { filter_completions, get_board_names } from "../completion/completion";
 import type { AttachContext } from "./shared";
 import {
-    get_platform_specs,
     get_project_name,
     load_context,
     output,
@@ -77,9 +76,9 @@ export const generateCommand = buildCommand<GenerateFlags, [], AttachContext>({
             return;
         }
 
-        const noos_path = get_setting_value("no_os_path");
-        if (!noos_path.ok) {
-            output_error(flags, "no_os_path is not configured. Run: attach-noos tool-config-set no_os_path <path>");
+        const capi_path = get_setting_value("capi_path");
+        if (!capi_path.ok) {
+            output_error(flags, "capi_path is not configured. Run: attach-noos tool-config-set capi_path <path>");
             return;
         }
 
@@ -89,19 +88,11 @@ export const generateCommand = buildCommand<GenerateFlags, [], AttachContext>({
             return;
         }
 
-        const specs = get_platform_specs();
-        if (!specs.ok) {
-            output_error(flags, specs.error.message);
-            return;
-        }
-
-        // The generated CMakeLists.txt and project.conf name one board, so it is
-        // settled here rather than left to the templates: the flag wins, then the
-        // workfile, then the platform if exactly one board belongs to it.
+        // The generated project names one board, so it is settled here rather than left
+        // to the templates: the flag wins, then the workfile, then the chip if exactly one
+        // board carries it.
         const board = resolve_board(
-            noos_path.value,
             context.value.minimal.platform,
-            specs.value,
             flags.board ?? context.value.minimal.board,
         );
         if (!board.ok) {
@@ -130,7 +121,7 @@ export const generateCommand = buildCommand<GenerateFlags, [], AttachContext>({
             board: board.value,
             project_name: project_name.value,
             output_path: output_path,
-            noos_path: noos_path.value,
+            capi_path: capi_path.value,
             template_set: flags.templateSet,
         });
 

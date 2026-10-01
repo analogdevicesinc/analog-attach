@@ -183,10 +183,18 @@ function config_type(setting: Setting): ConfigType {
     const options = setting.options ?? (setting.enum_of ? resolve_enum(setting.enum_of) : undefined);
 
     // An enum with nothing in it would be a field no value can satisfy, and the option
-    // sets are scanned (a board list needs no_os_path), so an unscannable one degrades to
+    // sets are scanned (a board list needs capi_path), so an unscannable one degrades to
     // the underlying scalar type rather than to an empty choice.
     if (options && options.length > 0) {
         return { options };
+    }
+
+    // `path_list` is ours, not part of attach-meta's `Config.type` vocabulary, so it is
+    // reported as a path. The delimiter is in the setting's description, which is the only
+    // place a prompt could learn it anyway; claiming a type attach-meta does not define
+    // would make the manifest invalid for the sake of a hint it cannot use.
+    if (setting.type === "path_list") {
+        return "path";
     }
 
     return setting.type;

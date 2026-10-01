@@ -2,10 +2,8 @@ import {
     list_available_structs,
     import_minimal,
     suggest_for_property,
-    scan_platforms,
-    scan_boards,
-    boards_for_platform,
-    get_schemas_path,
+    list_boards,
+    list_socs,
     get_setting_value,
     get_settings,
     get_workfile_path,
@@ -15,7 +13,7 @@ import {
     Workfile,
 } from "attach-no-os-lib";
 import type { AttachContext } from "../commands/shared";
-import { get_platform_specs, resolve_property_name } from "../commands/shared";
+import { resolve_property_name } from "../commands/shared";
 import { RESERVED_PREFIX } from "../protocol/convert";
 import fs from "node:fs";
 import path from "node:path";
@@ -185,42 +183,32 @@ export function get_config_value_suggestions(key: string): string[] {
 }
 
 export function get_platform_names(): string[] {
-    const schemas_path = get_schemas_path();
-    if (!schemas_path.ok) {
+    const socs = list_socs();
+    if (!socs.ok) {
         return [];
     }
 
-    const platforms_path = path.join(schemas_path.value, "platforms");
-    const result = scan_platforms(platforms_path);
-    if (!result.ok) {
-        return [];
-    }
-
-    return Object.keys(result.value);
+    return socs.value.map(entry => entry.soc.name);
 }
 
 /**
- * no-OS board presets. Narrowed to the boards belonging to the workfile's platform
- * when there is a workfile to read, since generating for another platform cannot work;
- * the full list otherwise, so `--board` still completes outside a project directory
- * (which is the board-first case: `attach-noos create workfile --board <tab>`).
+ * Board names. Narrowed to the boards carrying the workfile's chip when there is a
+ * workfile to read, since generating for another chip cannot work; the full list
+ * otherwise, so the board setting still completes outside a project directory (which is
+ * the board-first case).
  */
 export function get_board_names(): string[] {
-    const noos_path = get_setting_value("no_os_path");
-    if (!noos_path.ok) {
+    const boards = list_boards();
+    if (!boards.ok) {
         return [];
     }
 
     const platform = load_workfile_for_completion()?.platform;
-    const specs = get_platform_specs();
-    const result = platform && specs.ok
-        ? boards_for_platform(noos_path.value, platform, specs.value)
-        : scan_boards(noos_path.value);
-    if (!result.ok) {
-        return [];
-    }
+    const matching = platform === undefined
+        ? boards.value
+        : boards.value.filter(board => board.soc === platform);
 
-    return result.value.map(board => board.name);
+    return matching.map(board => board.name);
 }
 
 export function get_schema_paths(): string[] {
@@ -239,9 +227,5 @@ export function get_schema_paths(): string[] {
         return [];
     }
 
-    return [
-        ...available.value.devices,
-        ...available.value.noos,
-        ...available.value.platform,
-    ];
+    return available.value.all;
 }

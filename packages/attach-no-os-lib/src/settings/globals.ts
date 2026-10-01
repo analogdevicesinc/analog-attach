@@ -5,7 +5,13 @@ import type { SettingsFile } from "./types";
 // SETTINGS_DEFAULTS so the defaults can name it; kept in this module (not in
 // codegen/template_sets.ts) so settings never imports codegen, which imports
 // settings back.
-export const DEFAULT_TEMPLATE_SET = "no-os";
+export const DEFAULT_TEMPLATE_SET = "capi";
+
+/**
+ * Separator for a `path_list` setting. The OS path delimiter, so the setting reads and
+ * edits like `PATH` does on the platform it is written on.
+ */
+export const PATH_LIST_DELIMITER = path.delimiter;
 
 /** Debug probe `deploy` drives when `probe` is unset. */
 export const DEFAULT_PROBE = "openocd";
@@ -25,10 +31,21 @@ export const DEFAULT_WORKFILE_NAME = "workfile.json";
  * puts it in the first-run questionnaire.
  */
 export const SETTINGS_DEFAULTS: SettingsFile = {
-	no_os_path: {
-		description: "Path to the root of the no-OS repository",
+	capi_path: {
+		description: "Path to the root of the capi repository",
 		required: true,
 		type: "path",
+		category: "paths",
+	},
+	// Every other module root. Rulesets name each other by bare C symbol, so a reference
+	// reaches across repos without anybody declaring a dependency — which only works if
+	// the repos holding those symbols are listed here. CAPI's own resolver cannot supply
+	// this: it runs at CMake configure time from a project that does not exist yet when
+	// AA is the thing generating it.
+	module_paths: {
+		description: "Module repositories to load rulesets from (platform backends, driver collections), separated like PATH",
+		required: false,
+		type: "path_list",
 		category: "paths",
 	},
 	// attach-meta has no --workfile flag: it forwards nothing but the arguments its own
@@ -43,7 +60,7 @@ export const SETTINGS_DEFAULTS: SettingsFile = {
 		category: "workspace",
 	},
 	board: {
-		description: "no-OS board a new workfile targets; also decides its platform",
+		description: "Board a new workfile targets; also decides its platform",
 		required: true,
 		type: "string",
 		enum_of: "board",
@@ -83,10 +100,10 @@ export const SETTINGS_DEFAULTS: SettingsFile = {
 		enum_of: "template_set",
 		category: "project",
 	},
-	// no-OS builds with CMake and Kconfig, which needs a configure step and a board
-	// preset rather than one command. So these are escape hatches now: set one to take
-	// over the step entirely, leave it unset to let `attach-noos build`/`attach-noos deploy`
-	// drive CMake.
+	// CAPI builds with CMake and Kconfig from inside the project directory
+	// (`cmake --preset <board>`), which needs a configure step rather than one command.
+	// So these are escape hatches: set one to take over the step entirely, leave it unset
+	// to let `attach-noos build`/`attach-noos deploy` drive CMake.
 	build_command: {
 		description: "Override the 'build' step with this command, run at the base of the project (unset: drive CMake directly)",
 		required: false,
@@ -108,8 +125,6 @@ export const SETTINGS_DEFAULTS: SettingsFile = {
 		category: "build",
 	},
 };
-
-export const SCHEMAS_SUBPATH = "schemas";
 
 export const DEFAULT_SYSTEM_CONFIG_PATH = path.join(".config", "analog-attach");
 export const DEFAULT_SYSTEM_CONFIG_FILENAME = "config.json";

@@ -74,12 +74,17 @@ export type StringProperty = PropertyBase & {
 
 // Exactly one of `include` / `include_type` is set; the parser rejects both and neither.
 //
-//   include:      "no-os/spi/no_os_spi_init_param.yaml"  -> match the one ruleset with that $id
-//   include_type: descriptor                             -> match any ruleset of that type
+//   include:      capi_spi_config   -> match the one ruleset with that $symbol
+//   include_type: descriptor        -> match any ruleset of that type
+//
+// `include` names a bare C symbol, not a path: C symbols are already unique across the
+// ecosystem, so a reference resolves the same way within a repo and across repos (a
+// driver's init_param can name a CAPI bus struct). The registry turns that symbol into a
+// file; nothing here knows where a ruleset lives.
 //
 // `include_type` exists for C's polymorphic fields: `iio_app_device.dev` is a `void *`
-// that takes whichever driver descriptor the user picked, so no single $id describes it.
-// It narrows what we suggest, it does not pin down a type — every descriptor matches.
+// that takes whichever driver descriptor the user picked, so no single symbol describes
+// it. It narrows what we suggest, it does not pin down a type — every descriptor matches.
 export type IncludeMatch =
 	| { include: string, include_type?: undefined }
 	| { include?: undefined, include_type: RulesetType };
@@ -120,6 +125,32 @@ export type PlatformExtraProperty = PropertyBase & {
     allowed?: string[], // NOTE: Set by override only
 }
 
+// The two halves of a generic node's link to the concrete driver behind it. Both name only
+// the CAPI interface they are for; which driver supplies the symbol is whatever configured
+// module declares `provides.interfaces` with that interface, so neither the ruleset nor the
+// parser has to know a driver exists.
+//
+//   extra: {type: driver_init_param, interface: accel_sensor}  -> adxl355_init_param
+//   ops:   {type: driver_ops,        interface: accel_sensor}  -> adxl355_capi_accel_ops
+//
+// Deliberately NOT platform_ops/platform_extra: those resolve against the platform backend,
+// and sending a driver's ops table through them makes the validator look for it among the
+// platform's own.
+export type DriverOpsProperty = PropertyBase & {
+    _t: "DriverOpsProperty",
+    type: "driver_ops",
+    /** CAPI interface whose driver supplies the table, e.g. "accel_sensor". */
+    interface: string,
+    allowed?: string[], // NOTE: Set by override only
+}
+
+export type DriverInitParameterProperty = PropertyBase & {
+    _t: "DriverInitParameterProperty",
+    type: "driver_init_param",
+    interface: string,
+    allowed?: string[], // NOTE: Set by override only
+}
+
 // An opaque value emitted to codegen byte-for-byte, with no interpretation.
 // Used for things we can't reason about: callback function pointers, external
 // SDK handles, arbitrary expressions. The author writes the exact C token
@@ -140,7 +171,7 @@ export type ArrayProperty = PropertyBase & {
 	element: ArrayElement,
 }
 
-export type Property = NumberProperty | BooleanProperty | StringProperty | IncludeProperty | EnumProperty | UnionProperty | ArrayProperty | PlatformOpsProperty | PlatformExtraProperty | RawProperty;
+export type Property = NumberProperty | BooleanProperty | StringProperty | IncludeProperty | EnumProperty | UnionProperty | ArrayProperty | PlatformOpsProperty | PlatformExtraProperty | DriverOpsProperty | DriverInitParameterProperty | RawProperty;
 
 // The authoring-surface scope tokens. The parser strips these into concrete
 // self/parent OverrideReference nodes during lowering.
@@ -212,46 +243,24 @@ export function ruleset_type_token(type_: RulesetType): string {
 	}
 }
 
-enum RulesetRank {
-	RR_PRODUCTION = 0, // Deployed in shipping products/apps, hardware validated across all variants
-	RR_VALIDATED = 1, // Developer reviewed, tested on real hardware
-	RR_REVIEWED = 2, // Human reviewed, schema validates, basic tests
-	RR_GENERATED = 3, // Auto/AI generated, validates, but minimally tested
-	RR_DRAFT = 4, // Experimental, may not fully validate
-};
-
-export interface RulesetHeaderSources {
-	headers?: string[],
-	sources?: string[],
-};
-
-export type RulesetSources = RulesetHeaderSources & {
-	noos?: string[],
-	platform?: string[],
-	project?: string[],
-	sdk?: string[],
-	$note?: string
-};
-
 export interface RulesetEnumValue {
 	name: string | number,
 	description?: string,
 };
 
+// A ruleset describes one C symbol and nothing else. `$symbol` is its identity: it is
+// what `include:` and a workfile's `$compatible` name, and what the registry keys on.
+//
+// Build facts are deliberately absent. Which Kconfig symbol turns this code on, which
+// .c files compile it and which directories are on the include path are properties of
+// the module that ships the symbol, not of the symbol, so they are read from that
+// module's own module.yml (`build.kconfig`, `build.sources`, `build.includes`) via the
+// registry entry that located this file. One fact, one source.
 interface RulesetBase {
 	_t: string,
-	$id: string,
 	$type: RulesetType,
 	$symbol: string,
 	$description: string,
-	$ranking: RulesetRank,
-	$sources: RulesetSources,
-	// Kconfig symbols this ruleset owns, without the CONFIG_ prefix (e.g. ["ACCEL",
-	// "ACCEL_ADXL355"]). These become CONFIG_<sym>=y lines in the generated project
-	// defconfig. Only symbols the ruleset owns are listed: a Kconfig `select` closes
-	// the rest, but `depends on` is a constraint that is never auto-satisfied, so a
-	// parent menu symbol has to be named alongside its leaf.
-	$config?: string[],
 }
 
 export type RulesetEnum = RulesetBase & {
@@ -272,11 +281,23 @@ export type RulesetStruct = RulesetBase & {
 	$exposes?: string[],   // List of ops ids that this struct might expose
 };
 
+// Bringing a descriptor up is a function call, so the function names are the data and
+// rendering is the policy:
+//
+//   $init_function:   capi_spi_init     -> capi_spi_init(&handle, &config)
+//   $remove_function:  capi_spi_deinit   -> capi_spi_deinit(handle)
+//
+// Nearly every descriptor is exactly that shape, so the two names are enough for a target
+// to emit the call generically. `$init_template` / `$remove_template` stay as an optional
+// escape hatch for a descriptor whose bring-up does not fit the shape; when absent, the
+// target renders from the function names.
 export type RulesetDescriptor = RulesetBase & {
 	_t: "RulesetDescriptor",
 	$type: RulesetType.RT_DESCRIPTOR,
-	$init_template: string,
-	$remove_template: string,
+	$init_function: string,
+	$remove_function: string,
+	$init_template?: string,
+	$remove_template?: string,
 	// `$init_param` is always first, so `properties[0]` keeps naming it. The rest are the
 	// descriptor's own members, declared so the struct is described 1:1 and so they can be
 	// referenced; a descriptor emits no initializer, so none of them are ever printed.
@@ -296,13 +317,13 @@ export type RulesetPlatformOps = RulesetBase & {
 // Modelling that as a struct would emit a second definition and fail to link. An extern
 // has no properties — there is nothing to configure — so it makes no graph edges and its
 // placement in the emission order is free. `$header` is what makes the declaration
-// visible; `$config` is what gets the defining .c file compiled.
+// visible; getting the defining .c file compiled is the owning module's business.
 export type RulesetExtern = RulesetBase & {
 	_t: "RulesetExtern",
 	$type: RulesetType.RT_EXTERN,
-	// The $id an `include` must name to accept this node, i.e. the C type of the global.
-	// Externs are the one kind whose matching type is not their own $id: the $id names
-	// this schema file, `$provides` names the type the symbol has.
+	// The symbol an `include` must name to accept this node, i.e. the C type of the global.
+	// Externs are the one kind whose matching type is not their own `$symbol`: `$symbol` is
+	// the name of the global itself, `$provides` is the type it has.
 	$provides: string,
 	$header?: string,
 	// The symbol is an array (`extern struct ad7124_st_reg ad7124_regs[AD7124_REG_NO];`).
@@ -314,8 +335,8 @@ export type RulesetExtern = RulesetBase & {
 
 export type Ruleset = RulesetStruct | RulesetEnum | RulesetPlatformOps | RulesetDescriptor | RulesetExtern;
 
-// The $id a node offers for `include` matching. Every kind answers with its own $id
-// except an extern, which answers with the type of the symbol it names.
+// The symbol a node offers for `include` matching. Every kind answers with its own
+// `$symbol` except an extern, which answers with the type of the symbol it names.
 export function provided_id(ruleset: Ruleset): string {
-	return ruleset._t === "RulesetExtern" ? ruleset.$provides : ruleset.$id;
+	return ruleset._t === "RulesetExtern" ? ruleset.$provides : ruleset.$symbol;
 }

@@ -114,19 +114,23 @@ export const deployCommand = buildCommand<DeployFlags, []>({
             return;
         }
 
-        const noos_path = get_setting_value("no_os_path");
-        if (!noos_path.ok) {
-            output_error(flags, "no_os_path is not configured. Run: attach-noos tool-config-set no_os_path <path>");
+        // TODO(capi): this still drives the no-OS build flow - configure from the repo
+        // root against its CMakePresets.json. CAPI builds from inside the generated
+        // project directory (`cmake --preset <board>`), so cmake_build.ts needs reworking
+        // before this command does anything useful; only the setting is renamed here.
+        const capi_path = get_setting_value("capi_path");
+        if (!capi_path.ok) {
+            output_error(flags, "capi_path is not configured. Run: attach-noos tool-config-set capi_path <path>");
             return;
         }
 
-        const checks = preflight(noos_path.value);
+        const checks = preflight(capi_path.value);
         if (!checks.ok) {
             output_error(flags, checks.error.message);
             return;
         }
 
-        const plan = plan_build(target_path, noos_path.value, flags.board);
+        const plan = plan_build(target_path, capi_path.value, flags.board);
         if (!plan.ok) {
             output_error(flags, plan.error.message);
             return;

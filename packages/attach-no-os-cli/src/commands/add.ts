@@ -1,6 +1,6 @@
 import path from "node:path";
 import { buildCommand } from "@stricli/core";
-import { add_symbol, list_available_structs, load_resolved_ruleset } from "attach-no-os-lib";
+import { add_symbol, list_available_structs, load_resolved_ruleset_for_board } from "attach-no-os-lib";
 import { filter_completions, get_node_names, get_schema_paths } from "../completion/completion";
 import { common_ok, type AddResponse } from "../protocol/responses";
 import { load_context, output, output_error, root_key, save_workfile, type WorkfileContext } from "./shared";
@@ -128,7 +128,7 @@ export const addCommand = buildCommand<AddFlags, [string | undefined]>({
             return;
         }
 
-        const keys = [...available.value.devices, ...available.value.noos, ...available.value.platform];
+        const keys = available.value.all;
         if (!keys.includes(key)) {
             output_error(flags, `Unknown schema '${key}'. See: attach-noos list-devices`);
             return;
@@ -140,7 +140,9 @@ export const addCommand = buildCommand<AddFlags, [string | undefined]>({
             return;
         }
 
-        const ruleset = load_resolved_ruleset(key);
+        // The board is passed because `key` may name one of its own peripherals, which are
+        // scoped to the selected board rather than globally unique.
+        const ruleset = load_resolved_ruleset_for_board(key, context.value.workfile.board);
         if (!ruleset.ok) {
             output_error(flags, ruleset.error.message);
             return;

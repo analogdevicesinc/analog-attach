@@ -1,5 +1,4 @@
 import type {
-	RulesetSources,
 	Property,
 	RulesetEnumValue,
 	Ruleset
@@ -13,7 +12,7 @@ import YAML from "yaml";
 import type { Result} from "./result";
 import { ok, error } from "./result";
 import type { ParseContext} from "./validators";
-import { asObject, at, boolean_, number_, optional, optionalWithDefault, required, string_, stringArray } from "./validators";
+import { asObject, at, boolean_, optional, optionalWithDefault, required, string_, stringArray } from "./validators";
 import { RulesetType } from "./types";
 import {
 	parse_array_property,
@@ -21,6 +20,8 @@ import {
 	parse_enum_property,
 	parse_include_property,
 	parse_number_property,
+	parse_driver_init_parameter_property,
+	parse_driver_ops_property,
 	parse_platform_extra_property,
 	parse_platform_ops_property,
 	parse_raw_property,
@@ -53,46 +54,6 @@ function is_ruleset_type(value: unknown, context: ParseContext): Result<RulesetT
 	}
 
 	return ok(type_);
-}
-
-function is_ruleset_sources(value: unknown, context: ParseContext): Result<RulesetSources> {
-	const object = asObject(value, context);
-	if (!object.ok) {
-		return object;
-	}
-
-	const noos = optional(object.value, "noos", context, stringArray);
-	if (!noos.ok) {
-		return noos;
-	}
-
-	const platform = optional(object.value, "platform", context, stringArray);
-	if (!platform.ok) {
-		return platform;
-	}
-
-	const project = optional(object.value, "project", context, stringArray);
-	if (!project.ok) {
-		return project;
-	}
-
-	const sdk = optional(object.value, "sdk", context, stringArray);
-	if (!sdk.ok) {
-		return sdk;
-	}
-
-	const $note = optional(object.value, "$note", context, string_);
-	if (!$note.ok) {
-		return $note;
-	}
-
-	return ok({
-		noos: noos.value,
-		platform: platform.value,
-		project: project.value,
-		sdk: sdk.value,
-		$note: $note.value,
-	});
 }
 
 export function parse_property(name: string, value: unknown, context: ParseContext): Result<Property> {
@@ -137,6 +98,14 @@ export function parse_property(name: string, value: unknown, context: ParseConte
 
 		if (type_ === "platform_extra") {
 			return parse_platform_extra_property(name, object.value, context);
+		}
+
+		if (type_ === "driver_ops") {
+			return parse_driver_ops_property(name, object.value, context);
+		}
+
+		if (type_ === "driver_init_param") {
+			return parse_driver_init_parameter_property(name, object.value, context);
 		}
 
 		if (type_ === "raw") {
@@ -246,11 +215,6 @@ function parse_members(object: Record<string, unknown>, context: ParseContext): 
 }
 
 function parse_ruleset_from_object(object: Record<string, unknown>, context: ParseContext): Result<Ruleset> {
-	const $id = required(object, "$id", context, string_);
-	if (!$id.ok) {
-		return $id;
-	}
-
 	const $type = required(object, "$type", context, is_ruleset_type);
 	if (!$type.ok) {
 		return $type;
@@ -261,34 +225,9 @@ function parse_ruleset_from_object(object: Record<string, unknown>, context: Par
 		return $symbol;
 	}
 
-	const $description = optionalWithDefault(object, "$description", context, "no-OS ruleset", string_);
+	const $description = optionalWithDefault(object, "$description", context, "ruleset", string_);
 	if (!$description.ok) {
 		return $description;
-	}
-
-	// Descriptor rulesets carry no sources (the $init_param they reference does) and an
-	// extern names a symbol the library already compiles, so $sources is optional for both
-	// and defaults to empty; every other type requires it.
-	const $sources = $type.value === RulesetType.RT_DESCRIPTOR || $type.value === RulesetType.RT_EXTERN
-		? optionalWithDefault(object, "$sources", context, {}, is_ruleset_sources)
-		: required(object, "$sources", context, is_ruleset_sources);
-	if (!$sources.ok) {
-		return $sources;
-	}
-
-	// Kconfig symbols owned by this ruleset. Optional while the schemas migrate off
-	// $sources; it becomes required for non-descriptors once every file carries it.
-	const $config = optional(object, "$config", context, stringArray);
-	if (!$config.ok) {
-		return $config;
-	}
-
-	const $ranking = required(object, "$ranking", context, number_);
-	if (!$ranking.ok) {
-		return $ranking;
-	}
-	if ($ranking.value < 0 || $ranking.value > 4) {
-		return error(`Ranking value is invalid (0-4)`, at(context, "$ranking").path);
 	}
 
 	switch ($type.value) {
@@ -333,13 +272,9 @@ function parse_ruleset_from_object(object: Record<string, unknown>, context: Par
 
 			return ok({
 				_t: "RulesetStruct",
-				$id: $id.value,
 				$type: $type.value,
 				$symbol: $symbol.value,
 				$description: $description.value,
-				$ranking: $ranking.value,
-				$sources: $sources.value,
-				$config: $config.value,
 				properties: context.document.properties,
 				rules: rules.value,
 				$requires: $requires,
@@ -368,13 +303,9 @@ function parse_ruleset_from_object(object: Record<string, unknown>, context: Par
 
 			return ok({
 				_t: "RulesetEnum",
-				$id: $id.value,
 				$type: $type.value,
 				$symbol: $symbol.value,
 				$description: $description.value,
-				$ranking: $ranking.value,
-				$sources: $sources.value,
-				$config: $config.value,
 				values: values.value,
 				default: default_.value,
 			});
@@ -387,13 +318,9 @@ function parse_ruleset_from_object(object: Record<string, unknown>, context: Par
 
 			return ok({
 				_t:	"RulesetPlatformOps",
-				$id: $id.value,
 				$type: $type.value,
 				$symbol: $symbol.value,
 				$description: $description.value,
-				$ranking: $ranking.value,
-				$sources: $sources.value,
-				$config: $config.value,
 				$capability: $capability.value,
 			});
 		}
@@ -417,25 +344,36 @@ function parse_ruleset_from_object(object: Record<string, unknown>, context: Par
 
 			return ok({
 				_t: "RulesetExtern",
-				$id: $id.value,
 				$type: $type.value,
 				$symbol: $symbol.value,
 				$description: $description.value,
-				$ranking: $ranking.value,
-				$sources: $sources.value,
-				$config: $config.value,
 				$provides: $provides.value,
 				$header: $header.value,
 				$array: $array.value,
 			});
 		}
 		case RulesetType.RT_DESCRIPTOR: {
-			const $init_template = required(object, "$init_template", context, string_);
+			// The functions that bring this descriptor up and tear it down. These are the
+			// data; how a target prints the call is the target's business, and for the
+			// common `init(&handle, &config)` / `deinit(handle)` shape it needs nothing
+			// else. A descriptor that does not fit that shape overrides the rendering with
+			// $init_template / $remove_template below.
+			const $init_function = required(object, "$init_function", context, string_);
+			if (!$init_function.ok) {
+				return $init_function;
+			}
+
+			const $remove_function = required(object, "$remove_function", context, string_);
+			if (!$remove_function.ok) {
+				return $remove_function;
+			}
+
+			const $init_template = optional(object, "$init_template", context, string_);
 			if (!$init_template.ok) {
 				return $init_template;
 			}
 
-			const $remove_template = required(object, "$remove_template", context, string_);
+			const $remove_template = optional(object, "$remove_template", context, string_);
 			if (!$remove_template.ok) {
 				return $remove_template;
 			}
@@ -469,12 +407,10 @@ function parse_ruleset_from_object(object: Record<string, unknown>, context: Par
 			return ok({
 				_t: "RulesetDescriptor",
 				$type: RulesetType.RT_DESCRIPTOR,
-				$id: $id.value,
-				$ranking: $ranking.value,
-				$sources: $sources.value,
-				$config: $config.value,
 				$description: $description.value,
 				$symbol: $symbol.value,
+				$init_function: $init_function.value,
+				$remove_function: $remove_function.value,
 				$init_template: $init_template.value,
 				$remove_template: $remove_template.value,
 				properties: [init_parameter.value, ...members.value],

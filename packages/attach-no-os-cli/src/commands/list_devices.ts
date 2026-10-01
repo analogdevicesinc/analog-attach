@@ -40,11 +40,9 @@ export const listDevicesCommand = buildCommand<{ json?: boolean; filter?: string
             return;
         }
 
-        const groups: [string, string[]][] = [
-            ["devices", available.value.devices],
-            ["no-os", available.value.noos],
-            ["platform", available.value.platform]
-        ];
+        // One group per module that ships rulesets, so the tag names the repo a symbol
+        // came from (capi, adxl355, ...) instead of a fixed three-way split.
+        const groups: [string, string[]][] = Object.entries(available.value.by_module);
 
         const devices: Device[] = [];
         for (const [tag, keys] of groups) {

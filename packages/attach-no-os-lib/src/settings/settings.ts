@@ -7,7 +7,7 @@ import {
 	DEFAULT_SYSTEM_CONFIG_PATH,
 	DEFAULT_WORKFILE_NAME,
 	LOCAL_CONFIG_FILENAME,
-	SCHEMAS_SUBPATH,
+	PATH_LIST_DELIMITER,
 	SETTINGS_DEFAULTS
 } from "./globals";
 import type { Result} from "../ruleset_parser/result";
@@ -261,12 +261,35 @@ export function reset_setting_value(key: keyof SettingsFile): Result<undefined> 
 	return set_setting_value(key);
 }
 
-export function get_schemas_path(): Result<string> {
-	const result = get_setting_value("no_os_path");
-	if (!result.ok) {
-		return result;
+/** Root of the capi checkout, which every other module's rulesets reference into. */
+export function get_capi_path(): Result<string> {
+	return get_setting_value("capi_path");
+}
+
+/**
+ * Every module root to load rulesets from, capi first.
+ *
+ * `module_paths` is optional: capi alone is a valid (if driver-less) configuration, and
+ * an empty or whitespace-only entry is dropped rather than turned into the current
+ * directory, which is what `"a::b".split(path.delimiter)` would otherwise hand back.
+ */
+export function get_module_roots(): Result<string[]> {
+	const capi = get_capi_path();
+	if (!capi.ok) {
+		return capi;
 	}
-	return ok(path.join(result.value, SCHEMAS_SUBPATH));
+
+	const configured = get_effective_setting_value("module_paths");
+	if (!configured.ok) {
+		return configured;
+	}
+
+	const extra = (configured.value ?? "")
+		.split(PATH_LIST_DELIMITER)
+		.map(entry => entry.trim())
+		.filter(entry => entry.length > 0);
+
+	return ok([capi.value, ...extra]);
 }
 
 /**

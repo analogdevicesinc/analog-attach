@@ -1,5 +1,5 @@
 export { parse_ruleset } from "./ruleset_parser/ruleset_parser";
-export { load_resolved_ruleset } from "./resolver/resolver";
+export { load_resolved_ruleset, load_resolved_ruleset_for_board } from "./resolver/resolver";
 export type {
     Ruleset,
     Property,
@@ -23,7 +23,6 @@ export {
     get_value,
     suggest_for_property,
     list_available_structs,
-    load_platform,
     export_minimal,
     import_minimal,
     load_minimal_workfile,
@@ -32,21 +31,8 @@ export {
     suggest_for_enum,
     suggest_for_include
 } from "./workfile_handler/workfile_handler";
-export { scan_platform, scan_platforms } from "./workfile_handler/platform_scanner";
-export {
-    scan_boards,
-    find_board,
-    platform_for_board,
-    boards_for_platform,
-    resolve_board,
-    resolve_platform_from_board
-} from "./workfile_handler/board_scanner";
-export type { ResolvedBoard } from "./workfile_handler/board_scanner";
 export type {
-    Board,
     MinimalWorkfile,
-    PlatformManifest,
-    PlatformSpecs,
     Workfile,
     AvailableStructs,
     PropertySuggestions
@@ -59,7 +45,8 @@ export {
     get_effective_setting_value,
     set_setting_value,
     reset_setting_value,
-    get_schemas_path,
+    get_capi_path,
+    get_module_roots,
     get_settings_file_path,
     get_settings_sources,
     find_local_config_path,
@@ -72,7 +59,7 @@ export {
     DEFAULT_SYSTEM_CONFIG_PATH,
     DEFAULT_SYSTEM_CONFIG_FILENAME,
     LOCAL_CONFIG_FILENAME,
-    SCHEMAS_SUBPATH,
+    PATH_LIST_DELIMITER,
     DEFAULT_TEMPLATE_SET,
     DEFAULT_PROBE,
     PROBE_OPTIONS,
@@ -80,6 +67,34 @@ export {
 } from "./settings/globals";
 export type { Setting, SettingsFile, SettingType, SettingEnumSource } from "./settings/types";
 export { is_setting, is_settings_file } from "./settings/types";
+export {
+    build_registry,
+    get_registry,
+    reset_registry,
+    resolve_entry,
+    all_symbols,
+    is_platform_symbol
+} from "./registry/registry";
+export type { Registry, RulesetEntry, ModuleInfo, ModuleBuild, SocInfo, BoardInfo } from "./registry/types";
+export {
+    list_platform_modules,
+    list_socs,
+    find_soc,
+    list_boards,
+    find_board,
+    soc_for_board,
+    resolve_board,
+    read_soc_descriptor
+} from "./registry/platforms";
+export { read_module, read_ruleset_index, MODULE_FILENAME } from "./registry/module_yml";
+export { board_externs, find_board_extern, check_bsp_kinds } from "./registry/bsp";
+export {
+    modules_providing,
+    driver_ops_candidates,
+    driver_init_parameter_candidates,
+    provides_interface
+} from "./registry/drivers";
+export type { BoardExterns, SkippedKind, BspKindProblem } from "./registry/bsp";
 export type { ConnectionGraph, SymbolReference, ReferenceKind } from "./validator/types";
 export { get_connected_symbols } from "./validator/connection_graph";
 export { validate_workfile } from "./validator/validator";

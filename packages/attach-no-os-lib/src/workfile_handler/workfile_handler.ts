@@ -1,4 +1,3 @@
-import path from "node:path";
 import fs from "node:fs";
 import type { Result} from "../ruleset_parser/result";
 import { ok, error } from "../ruleset_parser/result";
@@ -11,53 +10,33 @@ import type {
     Ruleset,
     RulesetPlatformOps,
     RulesetStruct,
-    RulesetType,
     UnionProperty
 } from "../ruleset_parser/types";
-import { provided_id } from "../ruleset_parser/types";
-import { scan_platforms } from "./platform_scanner";
-import type { PlatformManifest, PropertySuggestions } from "./types";
-import { load_resolved_ruleset } from "../resolver/resolver";
-import { get_schemas_path } from "../settings/settings";
+import { provided_id, RulesetType } from "../ruleset_parser/types";
+import type { PropertySuggestions } from "./types";
+import { load_resolved_ruleset, load_resolved_ruleset_for_board } from "../resolver/resolver";
+import { all_symbols, is_platform_symbol } from "../registry/registry";
+import { board_externs } from "../registry/bsp";
+import { driver_init_parameter_candidates, driver_ops_candidates } from "../registry/drivers";
 import { collect_child_overrides, create_connections_graph, rename_symbol_references } from "../validator/connection_graph";
 import { apply_overrides } from "../validator/override_resolver";
 import type { AvailableStructs, MinimalWorkfile, Workfile } from "./types";
 import { is_minimal_workfile } from "./types";
-import { parse_ruleset } from "../ruleset_parser/ruleset_parser";
 
 // --- Workfile Creation ---
 
 export function create_workfile(platform?: string): Result<Workfile> {
-    const workfile: Workfile = {
+    // TODO(capi): the platform's vendor and its ops tables. A platform no longer ships a
+    // platform.yaml listing ruleset files; a platform module declares its interfaces in
+    // the `interfaces_file:` its module.yml names, and ops reach a workfile through that
+    // and through each driver's own ops extern. Until that lands a workfile carries the
+    // platform name and no ops.
+    return ok({
         platform: platform,
         platform_ops: {},
         exposed_ops: {},
         symbols: {}
-    };
-
-    if (!platform) {
-        return ok(workfile);
-    }
-
-    const schemas_path = get_schemas_path();
-    if (!schemas_path.ok) {
-        return schemas_path;
-    }
-
-    const platforms_result = scan_platforms(path.join(schemas_path.value, "platforms"));
-    if (!platforms_result.ok) {
-        return platforms_result;
-    }
-
-    const manifest = platforms_result.value[platform];
-    if (!manifest) {
-        return error(`Platform '${platform}' not found`, "platform");
-    }
-
-    workfile.platform_vendor = manifest.vendor;
-
-    const load_result = load_platform(workfile, manifest);
-    return load_result; // Error or not, we return this anyway
+    });
 }
 
 export function all_ops(workfile: Workfile): Record<string, Ruleset> {
@@ -88,13 +67,9 @@ export function recompute_exposed_ops(workfile: Workfile): Result<void> {
                 return error(`Exposed ops '${ops.$symbol}' collides with a platform op with the same name`, ops.$symbol);
             }
 
-            // Same guard between two exposed ops: same file exposed by multiple
-            // structs dedupes silently, but two different files sharing a $symbol
-            // is a real collision.
-            const existing = rebuilt[ops.$symbol];
-            if (existing && existing.$id !== ops.$id) {
-                return error(`Exposed ops '${ops.$symbol}' collides with another exposed op with the same name`, ops.$symbol);
-            }
+            // No guard needed between two exposed ops: `$symbol` is a ruleset's identity
+            // and the registry rejects two files claiming the same one, so the same
+            // `$symbol` here is necessarily the same ruleset and dedupes silently.
 
             rebuilt[ops.$symbol] = ops;
         }
@@ -305,7 +280,7 @@ export function resolve_reference(workfile: Workfile, value: string): ResolvedRe
 
         const runtime = node._t === "RulesetDescriptor";
         return {
-            $id: node.$id,
+            $id: node.$symbol,
             // `struct descriptors` holds descriptors as pointers, so a descriptor node is
             // already a pointer while a plain struct is a value.
             expr: runtime ? `desc.${value}` : value,
@@ -366,7 +341,7 @@ export function suggest_for_include(workfile: Workfile, include: IncludeProperty
 
     // add the already declared symbols
     for (const [name, ruleset] of Object.entries(workfile.platform_ops)) {
-        if (ruleset.$id === include_path) {
+        if (ruleset.$symbol === include_path) {
             values.push(name);
         }
     }
@@ -476,7 +451,7 @@ export function suggest_platform_ops(workfile: Workfile, property: PlatformOpsPr
 
         // When an allowed list is set (from $override), only suggest from that list
         if (property.allowed) {
-            if (property.allowed.includes(ops.$id)) {
+            if (property.allowed.includes(ops.$symbol)) {
                 suggestions.push(name);
             }
         } else if (ops.$capability === parent_struct.$capability) {
@@ -511,29 +486,33 @@ export function suggest_platform_extra(workfile: Workfile, property: PlatformExt
 
         // When an allowed list is set (from $override), only suggest from that list
         if (property.allowed) {
-            if (property.allowed.includes(symbol.$id)) {
+            if (property.allowed.includes(symbol.$symbol)) {
                 values.push(name);
             }
-        } else if (available.value.platform.includes(symbol.$id) && symbol.$capability === parent_struct.$capability) {
+        } else if (is_platform_symbol(symbol.$symbol) && symbol.$capability === parent_struct.$capability) {
             // No override restriction, fall back to capability matching
             values.push(name);
         }
     }
 
-    for (const schema_path of available.value.platform) {
-        const ruleset = load_resolved_ruleset(schema_path);
+    for (const candidate of available.value.all) {
+        if (!is_platform_symbol(candidate)) {
+            continue;
+        }
+
+        const ruleset = load_resolved_ruleset(candidate);
         if (!ruleset.ok || ruleset.value._t !== "RulesetStruct") {
             continue;
         }
 
         // When an allowed list is set (from $override), only suggest from that list
         if (property.allowed) {
-            if (property.allowed.includes(ruleset.value.$id)) {
-                types.push(schema_path);
+            if (property.allowed.includes(ruleset.value.$symbol)) {
+                types.push(candidate);
             }
         } else if (ruleset.value.$capability === parent_struct.$capability) {
             // No override restriction, fall back to capability matching
-            types.push(schema_path);
+            types.push(candidate);
         }
     }
 
@@ -600,6 +579,12 @@ export function suggest_for_property(workfile: Workfile, symbol_name: string, pr
             const { effective } = apply_overrides(property, child_overrides, symbol_name, workfile);
             return suggest_platform_extra(workfile, effective as PlatformExtraProperty, symbol);
         }
+        case "DriverOpsProperty": {
+            return suggest_driver_backed(workfile, property.interface, RulesetType.RT_EXTERN);
+        }
+        case "DriverInitParameterProperty": {
+            return suggest_driver_backed(workfile, property.interface, RulesetType.RT_STRUCT);
+        }
         case "RawProperty": {
             return ok({});
         }
@@ -609,109 +594,82 @@ export function suggest_for_property(workfile: Workfile, symbol_name: string, pr
     }
 }
 
-export function list_available_structs(workfile: Workfile): Result<AvailableStructs> {
-    const schema_path = get_schemas_path();
-    if (!schema_path.ok) {
-        return schema_path;
+/**
+ * Values and types for a driver-backed property.
+ *
+ * `values` are nodes already in the workfile that fit; `types` are the symbols that could be
+ * added to make one. Both come from the modules declaring the interface, so a driver that is
+ * not configured is simply not offered.
+ */
+function suggest_driver_backed(workfile: Workfile, interface_: string, type_: RulesetType): Result<PropertySuggestions> {
+    const candidates = type_ === RulesetType.RT_EXTERN
+        ? driver_ops_candidates(interface_)
+        : driver_init_parameter_candidates(interface_);
+    if (!candidates.ok) {
+        return candidates;
     }
 
-    const devices = scan_yaml_files(path.join(schema_path.value, "devices"));
-    if (!devices.ok) {
-        return error(`Path ${path.join(schema_path.value, "devices")} not found`);
-    }
+    const symbols = new Set(candidates.value.map(entry => entry.$symbol));
 
-    const noos = scan_yaml_files(path.join(schema_path.value, "no-os"));
-    if (!noos.ok) {
-        return error(`Path ${path.join(schema_path.value, "noos")} not found`);
-    }
-
-    // Get platform structs from manifest if platform is set
-    let platform_structs: string[] = [];
-    if (workfile.platform) {
-        const platforms_result = scan_platforms(path.join(schema_path.value, "platforms"));
-        if (platforms_result.ok) {
-            const manifest = platforms_result.value[workfile.platform];
-            if (manifest) {
-                platform_structs = manifest.structs;
-            }
+    const values: string[] = [];
+    for (const [name, ruleset] of Object.entries(workfile.symbols)) {
+        if (symbols.has(ruleset.$symbol)) {
+            values.push(name);
         }
     }
 
-    // Only instantiable rulesets (structs + descriptors) are offered; enums and other
-    // non-instantiable types are filtered out.
+    const types = candidates.value.map(entry => entry.$symbol);
+
     return ok({
-        devices: devices.value.filter(item => is_instantiable(path.join(schema_path.value, item))),
-        noos: noos.value.filter(item => is_instantiable(path.join(schema_path.value, item))),
-        platform: platform_structs.filter(item => is_instantiable(path.join(schema_path.value, item)))
+        values: values.length > 0 ? values : undefined,
+        types: types.length > 0 ? types : undefined,
     });
 }
 
-function is_instantiable(path: string) {
-    if (!fs.existsSync(path)) {
-        return false;
+export function list_available_structs(workfile: Workfile): Result<AvailableStructs> {
+    const entries = all_symbols();
+    if (!entries.ok) {
+        return entries;
     }
-    const contents = fs.readFileSync(path, "utf8");
-    const ruleset = parse_ruleset(contents);
-    if (!ruleset.ok) {
-        return false;
+
+    const by_module: Record<string, string[]> = {};
+    const all: string[] = [];
+
+    for (const entry of entries.value) {
+        if (!is_instantiable(entry.$type)) {
+            continue;
+        }
+        (by_module[entry.module.name] ??= []).push(entry.$symbol);
+        all.push(entry.$symbol);
     }
-    // An extern is instantiable even though it configures nothing: adding it to the
-    // workfile is what makes its symbol referenceable and pulls in its $config.
-    return ruleset.value._t === "RulesetStruct"
-        || ruleset.value._t === "RulesetDescriptor"
-        || ruleset.value._t === "RulesetExtern";
+
+    // The selected board's own peripherals, grouped under the board so it is clear they
+    // come from the hardware rather than from a driver. board.yml is a catalog, not a
+    // selection, so every one is offered and the user picks; adding one is what makes its
+    // symbol referenceable. Without a board there are none to offer: the names are shared
+    // across boards, so they only mean anything once one is chosen.
+    if (workfile.board !== undefined) {
+        const externs = board_externs(workfile.board);
+        if (!externs.ok) {
+            return externs;
+        }
+        for (const extern of externs.value.externs) {
+            (by_module[workfile.board] ??= []).push(extern.$symbol);
+            all.push(extern.$symbol);
+        }
+    }
+
+    return ok({ by_module, all });
+}
+
+// Whether a kind of ruleset describes something a user can add to a workfile as a node.
+// Enums are not instantiable; they only lower into an including property. An extern is,
+// even though it configures nothing: adding it is what makes its symbol referenceable.
+function is_instantiable(type_: RulesetType) {
+    return type_ === RulesetType.RT_STRUCT
+        || type_ === RulesetType.RT_DESCRIPTOR
+        || type_ === RulesetType.RT_EXTERN;
 };
-
-function scan_yaml_files(directory: string): Result<string[]> {
-    const schema_path = get_schemas_path();
-    if (!schema_path.ok) {
-        return schema_path;
-    }
-
-    const results: string[] = [];
-    const scan = (current: string) => {
-        const entries = fs.readdirSync(current, { withFileTypes: true });
-        for (const entry of entries) {
-            const full_path = path.join(current, entry.name);
-            if (entry.isDirectory()) {
-                scan(full_path);
-            } else if (entry.name.endsWith(".yaml")) {
-                results.push(path.relative(schema_path.value, full_path));
-            }
-        }
-    };
-
-    scan(directory);
-    return ok(results);
-}
-
-// --- Platform Loading ---
-
-export function load_platform(workfile: Workfile, manifest: PlatformManifest): Result<Workfile> {
-    clear_platform_ops(workfile);
-
-    for (const ops_path of manifest.ops) {
-        const ruleset_result = load_resolved_ruleset(ops_path);
-        if (!ruleset_result.ok) {
-            return ruleset_result;
-        }
-
-        const ruleset = ruleset_result.value;
-        if (ruleset._t !== "RulesetPlatformOps") {
-            return error(`Expected platform_ops ruleset, got ${ruleset._t}: ${ops_path}`, ops_path);
-        }
-
-        const add_result = add_platform_ops(workfile, ruleset.$symbol, ruleset);
-        if (!add_result.ok) {
-            return add_result;
-        }
-    }
-
-    workfile.platform = manifest.name;
-    workfile.platform_vendor = manifest.vendor;
-
-    return ok(workfile);
-}
 
 // --- Transformations ---
 
@@ -730,7 +688,7 @@ export function export_minimal(workfile: Workfile): Result<MinimalWorkfile> {
         }
 
         const node: MinimalWorkfile["symbols"][string] = {
-            $compatible: ruleset.$id,
+            $compatible: ruleset.$symbol,
         };
 
         // An extern has no properties, so `$compatible` alone round-trips it.
@@ -764,7 +722,7 @@ export function import_minimal(minimal: MinimalWorkfile): Result<Workfile> {
     workfile.board = minimal.board;
 
     for (const [name, node] of Object.entries(minimal.symbols)) {
-        const ruleset_result = load_resolved_ruleset(node.$compatible);
+        const ruleset_result = load_resolved_ruleset_for_board(node.$compatible, minimal.board);
         if (!ruleset_result.ok) {
             return ruleset_result;
         }

@@ -1,4 +1,5 @@
-import type { Board, Workfile } from "../workfile_handler/types";
+import type { BoardInfo } from "../registry/types";
+import type { Workfile } from "../workfile_handler/types";
 
 export interface DeviceInfo {
 	symbol_name: string;       // init param name: "my_accel"
@@ -6,8 +7,14 @@ export interface DeviceInfo {
 	descriptor_type: string;   // descriptor type: "adxl355_dev"
 	init_param_type: string;   // init param type: "adxl355_init_param"
 	header: string;            // "adxl355.h"
-	init_code: string;         // rendered init.eta (full statement block)
-	remove_code: string;       // rendered remove.eta (full statement block)
+	init_function: string;     // $init_function, e.g. "capi_spi_init"
+	remove_function: string;   // $remove_function, e.g. "capi_spi_deinit"
+	// Rendered $init_template / $remove_template (full statement blocks), when the
+	// descriptor carries them. A descriptor whose bring-up is the ordinary
+	// `init(&handle, &config)` / `deinit(handle)` shape declares no templates, and the
+	// target renders the call from the two function names instead.
+	init_code?: string;
+	remove_code?: string;
 	capability?: string;       // $capability, e.g. "uart" / "irq"; used for init ordering
 };
 
@@ -21,14 +28,14 @@ export interface CodegenInput {
 	workfile: Workfile;
 	platform_name: string;
 	platform_vendor: string;
-	// The board the project builds for, resolved from a no-OS CMake preset. Required
-	// here even though `Workfile.board` is optional: resolution (explicit choice, or
-	// the single board matching the chip) happens before codegen, so templates never
-	// have to handle a missing board.
-	board: Board;
+	// The board the project builds for, resolved from a platform module's declared board
+	// list. Required here even though `Workfile.board` is optional: resolution (explicit
+	// choice, or the single board matching the chip) happens before codegen, so templates
+	// never have to handle a missing board.
+	board: BoardInfo;
 	project_name: string;
 	output_path: string;
-	noos_path: string;
+	capi_path: string;
 	// Which template set (folder under codegen/templates, or a path to an
 	// out-of-tree folder) renders the project. Omitted: the `template_set`
 	// setting, falling back to the bundled default.

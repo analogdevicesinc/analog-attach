@@ -131,7 +131,7 @@ function format_workfile(platform?: string, board?: string): string {
 
 function format_node_summary(name: string, ruleset: Ruleset): string {
     let out = `${name}\n`;
-    out += `  ${ruleset.$id}\n`;
+    out += `  ${ruleset.$symbol}\n`;
     if (ruleset.$description) {
         out += `  ${ruleset.$description}\n`;
     }

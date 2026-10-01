@@ -1,55 +1,33 @@
 import type { Ruleset } from "../ruleset_parser/types";
 
-/**
- * Platform manifest - lists ops and structs available for this platform
- */
-export interface PlatformManifest {
-    name: string;         // platform name e.g. "max32690"
-    vendor: string;       // vendor name e.g. "maxim"
-    description?: string; // optional human-readable platform description
-    ops: string[];        // paths to ops yaml files
-    structs: string[];    // paths to struct yaml files (extras)
-};
-
-/**
- * Platform specs indexed by platform ID
- */
-export type PlatformSpecs = Record<string, PlatformManifest>;
-
-/**
- * One buildable board, read from a no-OS CMake preset. See board_scanner.ts for the
- * PLATFORM/TARGET/BOARD vocabulary clash between no-OS presets and the schema tree.
- */
-export interface Board {
-    name: string;               // preset name, also the `cmake --preset` argument
-    board: string;              // BOARD cache variable, e.g. "ad-apard32690-sl"
-    vendor: string;             // PLATFORM cache variable, e.g. "maxim"
-    chip?: string;              // TARGET cache variable, e.g. "max32690"; xilinx presets set none
-    target_num?: string;        // TARGET_NUM cache variable, e.g. "32690"
-    board_config_file?: string; // BOARD_CONFIG_FILE, e.g. "ad-apard32690-sl_defconfig"
-    description?: string;
-};
-
 export interface Workfile {
-    platform?: string;                      // platform name e.g. "max32690"
-    platform_vendor?: string;               // vendor name e.g. "maxim"
-    // Board preset the project builds for, e.g. "ad-apard32690-sl". Optional here
-    // because a chip with exactly one board does not need the user to say so; it is
-    // resolved to a concrete board before codegen runs.
+    // The chip the project targets, e.g. "max32655". A board names its own chip, so this
+    // is inferred from `board` when one is set, and set directly for a chip that has no
+    // board module of its own. NOTE: this is what CAPI's own files call the `soc`; CAPI
+    // reserves "platform" for the backend (maxim), which is `platform_vendor` here.
+    platform?: string;
+    platform_vendor?: string;               // backend vendor, e.g. "maxim"
+    // Board the project builds for, e.g. "max32655fthr", as declared in a platform
+    // module's `boards:` list. Optional because a chip with exactly one board does not
+    // need the user to say so; it is resolved to a concrete board before codegen runs.
     board?: string;
     platform_ops: Record<string, Ruleset>;  // locked, auto-populated from platform, not printed
     exposed_ops: Record<string, Ruleset>;   // same as platform_ops, but runtime updated
     symbols: Record<string, Ruleset>;       // user-created symbols, printed in codegen
 };
 
-export interface LoadPlatformResult {
-    available_structs: string[];
-};
-
+/**
+ * The instantiable symbols a user can add to a workfile.
+ *
+ * Grouped by the module that ships them rather than by the old `devices`/`noos`/`platform`
+ * split: a symbol's provenance is now simply which repo indexed it, and that generalises
+ * to however many driver collections and platform backends are configured.
+ */
 export interface AvailableStructs {
-    devices: string[];
-    noos: string[];
-    platform: string[];
+    /** Module name -> its instantiable symbols. */
+    by_module: Record<string, string[]>;
+    /** Every instantiable symbol, flattened and sorted. */
+    all: string[];
 };
 
 export interface PropertySuggestions {

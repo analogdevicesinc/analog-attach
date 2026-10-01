@@ -5,7 +5,7 @@
  * it without a translation table. `numeric` and `bool` are still stored as strings on
  * disk — the type is a hint for editors and prompts, not a storage format.
  */
-export type SettingType = "path" | "string" | "numeric" | "bool";
+export type SettingType = "path" | "path_list" | "string" | "numeric" | "bool";
 
 /**
  * Names an option set that has to be scanned rather than hardcoded (the schema tree for
@@ -31,8 +31,17 @@ export interface Setting {
 };
 
 export interface SettingsFile {
-	/** Path to the no-OS checkout. Everything else is resolved relative to it. */
-	no_os_path: Setting;
+	/**
+	 * Path to the capi checkout. Special among the module roots: it holds the interface
+	 * catalog and the generic ruleset tree every other module's rulesets reference.
+	 */
+	capi_path: Setting;
+	/**
+	 * The other module roots to load rulesets from — platform backends, driver
+	 * collections, middleware. A `path_list`, so one setting covers however many repos
+	 * are checked out.
+	 */
+	module_paths: Setting;
 	/** Which workfile the commands act on, now that attach-meta has no --workfile flag. */
 	workfile: Setting;
 	/** Board a new workfile is created for; also implies its platform. */
@@ -81,12 +90,13 @@ export function is_settings_file(value: unknown): value is SettingsFile {
 	}
 
 	const object = value as Record<string, unknown>;
-	// Keys a config file must already contain. Settings added after the first
-	// release (e.g. `template_set`, `workfile`) are deliberately absent: an older
-	// config on disk is still valid, and every setting's metadata is taken from
-	// SETTINGS_DEFAULTS on read anyway, so a new setting cannot invalidate a file
-	// that predates it.
-	const required_keys: (keyof SettingsFile)[] = ["no_os_path", "build_command", "deploy_command"];
+	// Keys a config file must already contain. Most settings are deliberately absent:
+	// every setting's metadata is taken from SETTINGS_DEFAULTS on read, so a config
+	// missing a key is still valid and a newly added setting cannot invalidate a file
+	// that predates it. `capi_path` is here because nothing can be loaded without it, so
+	// a config lacking it is a config from before the CAPI move rather than merely an
+	// incomplete one, and saying so beats failing later with an empty registry.
+	const required_keys: (keyof SettingsFile)[] = ["capi_path", "build_command", "deploy_command"];
 
 	for (const key of required_keys) {
 		if (!(key in object) || !is_setting(object[key])) {
