@@ -1,4 +1,5 @@
 import type { NumberProperty, Property } from "../ruleset_parser/types";
+import { format_number_in } from "../ruleset_parser/number_format";
 import { is_float_symbol } from "../ruleset_parser/types";
 import type { Workfile } from "../workfile_handler/types";
 import { resolve_reference } from "../workfile_handler/workfile_handler";
@@ -54,8 +55,9 @@ export function number_literal(value: unknown, property: NumberProperty): string
 		return String(value);
 	}
 
+	// Integers print in the radix the field declares: `.address = 0x1D` rather than 29.
 	if (!is_float_symbol(property.type)) {
-		return String(numeric);
+		return format_number_in(numeric, property.format);
 	}
 
 	let text = String(numeric);

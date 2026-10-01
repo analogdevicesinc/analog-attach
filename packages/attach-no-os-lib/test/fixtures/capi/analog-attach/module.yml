@@ -1,0 +1,32 @@
+schema_version: "1.0"
+
+# Kind of board peripheral -> the C type it has. `mystery` is deliberately absent so the
+# tests can check that an unknown kind is skipped with a warning rather than refused.
+bsp_kinds:
+  spi:       test_spi_config
+  gpio_port: test_gpio_port_config
+  gpio_pin:  test_gpio_pin
+
+# Which fields carry a SPI device's chip-select (see capi/analog-attach/module.yml).
+chip_select:
+  device:      test_spi_device
+  gpio_list:   cs_gpio
+  native_mask: native_cs
+  pin_number:  number
+  pin_port:    port_handle
+
+rulesets:
+  enums:
+    - enums/test_spi_mode.yaml
+  spi:
+    - spi/test_spi_config.yaml
+    - spi/test_spi_controller.yaml
+    - spi/test_spi_device.yaml
+    - spi/test_gpio_pin.yaml
+    - spi/test_gpio_port_config.yaml
+    - spi/test_gpio_port.yaml
+    - spi/test_array_holder.yaml
+    - spi/test_sensor_config.yaml
+    - spi/test_sensor.yaml
+  i2c:
+    - i2c/test_i2c_device.yaml

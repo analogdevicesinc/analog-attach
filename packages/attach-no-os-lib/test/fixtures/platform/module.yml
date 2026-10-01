@@ -1,0 +1,22 @@
+name: platform-test
+type: platform
+version: "1.0.0"
+description: "Platform backend, standing in for capi-maxim"
+
+socs:
+  - {name: testsoc, arch: arm, cpu: cortex-m4, descriptor: sdk/socs/testsoc.yml}
+  - {name: othersoc, arch: arm, cpu: cortex-m4, descriptor: sdk/socs/othersoc.yml}
+  # Declared with no board of its own, which is the case the `platform` setting exists for.
+  - {name: boardless, arch: arm, cpu: cortex-m0}
+
+boards:
+  - testboard
+  - otherboard
+  - twobusboard
+
+# A platform may ship rulesets of its own: the platform-specific `extra` struct a generic
+# config points at. No real CAPI platform does yet, but the code path is live.
+rulesets_file: analog-attach/module.yml
+
+metadata:
+  vendor: testvendor

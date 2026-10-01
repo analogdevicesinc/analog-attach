@@ -134,7 +134,7 @@ export const updateCommand = buildCommand<
             output_error(
                 flags,
                 `'${node}' has no property '${property}', and one cannot be added: its properties are ` +
-                `fixed by its schema (${owner.value.$id}). Available: ` +
+                `fixed by its schema (${owner.value.$symbol}). Available: ` +
                 owner.value.properties.map(candidate => candidate.name).join(", ")
             );
             return;

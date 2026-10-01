@@ -1,7 +1,2 @@
-$id: "test/enum_no_values"
 $type: enum
 $symbol: no_values_enum
-$ranking: 4
-$sources:
-  headers:
-    - "test.h"

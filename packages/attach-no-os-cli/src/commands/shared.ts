@@ -4,10 +4,7 @@ import type { ApplicationContext } from "@stricli/core";
 import {
     export_minimal,
     get_effective_setting_value,
-    get_schemas_path,
     get_workfile_path,
-    scan_platforms,
-    PlatformSpecs,
     import_minimal,
     load_minimal_workfile,
     MinimalWorkfile,
@@ -46,22 +43,6 @@ export type OutputFlags = {
 };
 
 // --- Schema Platforms ---
-
-/**
- * Every platform the schema tree describes, keyed by platform id.
- *
- * Shared because board resolution needs the manifests rather than a flattened list:
- * `platform_for_board` decides whether a board's TARGET or its PLATFORM names a schema
- * directory by looking the id up in here.
- */
-export function get_platform_specs(): Result<PlatformSpecs> {
-    const schemas_path = get_schemas_path();
-    if (!schemas_path.ok) {
-        return schemas_path;
-    }
-
-    return scan_platforms(path.join(schemas_path.value, "platforms"));
-}
 
 // --- Workfile Loading ---
 

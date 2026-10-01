@@ -19,7 +19,13 @@ export interface ValidationResult {
 export interface CollectedRule {
 	rule: Rule,
 	self_symbol: string,
-	parent_symbol?: string
+	parent_symbol?: string,
+	/**
+	 * Symbols the rule's `include` references resolved to, keyed by their dotted path
+	 * ("comm_init.spi_dev"). Resolved when the rule is collected, like self and parent, so
+	 * applying an effect never has to walk the workfile again.
+	 */
+	include_symbols?: Record<string, string>
 }
 
 // How one symbol holds a reference to another, which decides whether the reference

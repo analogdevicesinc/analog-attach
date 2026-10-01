@@ -1,5 +1,5 @@
 import { buildCommand } from "@stricli/core";
-import { list_available_structs } from "attach-no-os-lib";
+import { addable_drivers, list_available_structs } from "attach-no-os-lib";
 import { common_ok, type Device, type ListDevicesResponse } from "../protocol/responses";
 import { load_context, output, output_error } from "./shared";
 
@@ -40,10 +40,13 @@ export const listDevicesCommand = buildCommand<{ json?: boolean; filter?: string
             return;
         }
 
+        // Drivers first: `add <driver>` is the one-command way to bring a part in, and
+        // bootstrap builds the rest. Then one group per module that ships rulesets, so the
+        // tag names the repo a symbol came from (capi, adxl355, ...).
+        const drivers = addable_drivers();
         const groups: [string, string[]][] = [
-            ["devices", available.value.devices],
-            ["no-os", available.value.noos],
-            ["platform", available.value.platform]
+            ...(drivers.ok && drivers.value.length > 0 ? [["drivers", drivers.value] as [string, string[]]] : []),
+            ...Object.entries(available.value.by_module),
         ];
 
         const devices: Device[] = [];
@@ -74,7 +77,10 @@ function format_devices(devices: Device[], platform?: string): string {
 
     let out = "";
     for (const [tag, keys] of by_tag) {
-        const label = tag === "platform" && platform ? `platform (${platform})` : tag;
+        let label = tag === "platform" && platform ? `platform (${platform})` : tag;
+        if (tag === "drivers") {
+            label = "drivers (add by name; bootstrap builds the rest)";
+        }
         out += `  ${label}:\n`;
         for (const key of keys) {
             out += `    ${key}\n`;

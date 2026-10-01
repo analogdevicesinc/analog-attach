@@ -10,22 +10,22 @@ import { Ruleset } from '../src/ruleset_parser/types';
 import { set_settings, set_config_path_override } from '../src/settings/settings';
 import { SETTINGS_DEFAULTS } from '../src/settings/globals';
 import { SettingsFile } from '../src/settings/types';
-import { Board } from '../src/workfile_handler/types';
+import { reset_registry } from '../src/registry/registry';
+import { PATH_LIST_DELIMITER } from '../src/settings/globals';
 
 /*
- * The board every codegen test generates for. Copied from the real
- * `ad-apard32690-sl` preset in no-OS board_configs/maxim/CMakePresets.json so the
- * generated CMakeLists.txt and project.conf are the ones a build would actually see,
- * but frozen here so the tests do not need a no-OS checkout to run.
+ * The miniature CAPI ecosystem under test/fixtures. Checked in rather than read out of a
+ * sibling checkout, so the tests run anywhere and describe only shapes this tool supports.
+ * See test/fixtures/README.md.
  */
-export const TEST_BOARD: Board = {
-	name: 'ad-apard32690-sl',
-	board: 'ad-apard32690-sl',
-	vendor: 'maxim',
-	chip: 'max32690',
-	target_num: '32690',
-	board_config_file: 'ad-apard32690-sl_defconfig',
-};
+export const FIXTURES_ROOT = path.resolve(__dirname, 'fixtures');
+export const FIXTURE_CAPI = path.join(FIXTURES_ROOT, 'capi');
+export const FIXTURE_PLATFORM = path.join(FIXTURES_ROOT, 'platform');
+export const FIXTURE_DRIVERS = path.join(FIXTURES_ROOT, 'driver-collection');
+
+/** The board most tests target, and the chip it carries. */
+export const FIXTURE_BOARD = 'testboard';
+export const FIXTURE_SOC = 'testsoc';
 
 export function expectOk<T>(result: Result<T>): asserts result is { ok: true; value: T } {
 	if (!result.ok) {
@@ -76,28 +76,42 @@ export function loadAndParseRuleset(fixturePath: string): Result<Ruleset> {
 
 const temp_config_paths: string[] = [];
 
-export function setup_test_config(no_os_path: string): void {
+/**
+ * Point the library at a set of module roots, defaulting to the fixture ecosystem.
+ *
+ * The registry is built once per process and memoised, so it is reset here as well as on
+ * teardown: a test that changes the roots must not inherit the previous test's index.
+ */
+export function setup_test_config(roots: { capi?: string; modules?: string[] } = {}): void {
 	const temp_dir = fs.mkdtempSync(path.join(os.tmpdir(), 'attach-no-os-test-'));
 	const temp_config_path = path.join(temp_dir, 'config.json');
 
 	temp_config_paths.push(temp_config_path);
 	set_config_path_override(temp_config_path);
 
+	const modules = roots.modules ?? [FIXTURE_PLATFORM, FIXTURE_DRIVERS];
+
 	const settings: SettingsFile = {
 		...SETTINGS_DEFAULTS,
-		no_os_path: {
-			...SETTINGS_DEFAULTS.no_os_path,
-			value: no_os_path
+		capi_path: {
+			...SETTINGS_DEFAULTS.capi_path,
+			value: roots.capi ?? FIXTURE_CAPI
+		},
+		module_paths: {
+			...SETTINGS_DEFAULTS.module_paths,
+			value: modules.join(PATH_LIST_DELIMITER)
 		}
 	};
 
 	set_settings(settings);
+	reset_registry();
 }
 
 export function teardown_test_config(): void {
 	const temp_config_path = temp_config_paths.pop();
 
 	set_config_path_override(null);
+	reset_registry();
 
 	if (temp_config_path && fs.existsSync(temp_config_path)) {
 		const temp_dir = path.dirname(temp_config_path);
@@ -107,9 +121,11 @@ export function teardown_test_config(): void {
 
 export function setup_no_config(): void {
 	set_config_path_override('/nonexistent/path/to/config.json');
+	reset_registry();
 }
 
 export function teardown_no_config(): void {
 	set_config_path_override(null);
+	reset_registry();
 }
 

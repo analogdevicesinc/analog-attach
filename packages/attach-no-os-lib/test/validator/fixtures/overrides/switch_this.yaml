@@ -1,9 +1,6 @@
 # $switch on the child's own property, writing to the parent's speed.
-$id: "child.yaml"
 $type: struct
 $symbol: child
-$ranking: 4
-$sources: { noos: ["test.h"] }
 child_mode:
   type: enum
   values: [a, b]

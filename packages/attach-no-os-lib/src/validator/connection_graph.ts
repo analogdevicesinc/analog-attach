@@ -1,4 +1,4 @@
-import type { IncludeProperty, Property } from "../ruleset_parser/types";
+import type { IncludeProperty, OverrideReference, OverridePredicate, Property, Rule } from "../ruleset_parser/types";
 import type { Workfile } from "../workfile_handler/types";
 import type { CollectedRule, ConnectionGraph, ReferenceKind, SymbolReference } from "./types";
 import { load_resolved_ruleset } from "../resolver/resolver";
@@ -82,6 +82,15 @@ export function get_symbol_references(property: Property): SymbolReference[] {
 			// order in every existing project's common_data.c for no gain.
 			if (typeof property.value === "string") {
 				return [{ name: property.value, kind: "value" }];
+			}
+			return [];
+		}
+		case "DriverInitParameterProperty":
+		case "DriverOpsProperty": {
+			// The driver's init_param (`void *extra`) and ops table (an extern), by name. A
+			// value edge for the same reason as platform_extra: neither points back.
+			if (typeof property.value === "string") {
+				return [{ name: owner_of(property.value), kind: "value" }];
 			}
 			return [];
 		}
@@ -335,6 +344,73 @@ function find_includer(symbol_name: string, graph: ConnectionGraph): string | un
 	return undefined;
 }
 
+
+// Walk `via` from the node declaring the rule to the node on the other end, as the workfile
+// currently has it: `["comm_init", "spi_dev"]` reads that union property, then the member,
+// and the value there is a symbol name. Undefined when the member is unset - the path leads
+// nowhere yet, so there is nothing to constrain.
+function resolve_include_path(owner_symbol: string, via: string[], workfile: Workfile): string | undefined {
+	const [property_name, member_name] = via;
+	if (property_name === undefined || member_name === undefined) {
+		return undefined;
+	}
+
+	const owner = workfile.symbols[owner_symbol];
+	if (owner?._t !== "RulesetStruct") {
+		return undefined;
+	}
+
+	const value = owner.properties.find(property => property.name === property_name)?.value;
+	if (typeof value !== "object" || value === null) {
+		return undefined;
+	}
+
+	const member = (value as Record<string, unknown>)[member_name];
+	return typeof member === "string" ? member : undefined;
+}
+
+function predicate_references(predicate: OverridePredicate): OverrideReference[] {
+	switch (predicate._t) {
+		case "PredicateAlways": {
+			return [];
+		}
+		case "PredicateAnd": {
+			return predicate.predicates.flatMap(nested => predicate_references(nested));
+		}
+		case "PredicateNot": {
+			// Without this, an include reference inside `$any_of` would never resolve and
+			// the rule could never fire.
+			return predicate_references(predicate.predicate);
+		}
+		default: {
+			return [predicate.reference];
+		}
+	}
+}
+
+// Every `include` reference in a rule, resolved to the symbol it currently points at.
+function resolve_rule_includes(rule: Rule, owner_symbol: string, workfile: Workfile): Record<string, string> {
+	const resolved: Record<string, string> = {};
+
+	for (const reference of [...predicate_references(rule.when), ...rule.effects.map(effect => effect.reference)]) {
+		if (reference.node !== "include") {
+			continue;
+		}
+
+		const key = reference.via.join(".");
+		if (key in resolved) {
+			continue;
+		}
+
+		const symbol = resolve_include_path(owner_symbol, reference.via, workfile);
+		if (symbol !== undefined) {
+			resolved[key] = symbol;
+		}
+	}
+
+	return resolved;
+}
+
 // Collect every rule that can affect `symbol_name`, with its refs pre-resolved to
 // concrete symbol names. A rule declared on symbol D has self = D and parent =
 // D's includer; it affects `symbol_name` when `symbol_name` is D itself (self
@@ -342,8 +418,11 @@ function find_includer(symbol_name: string, graph: ConnectionGraph): string | un
 // sources:
 //   1. `symbol_name`'s own rules   — self = symbol_name, parent = its includer
 //   2. each child's rules          — self = child,       parent = symbol_name
-// resolving both refs once here (decision: resolve at collection time) so
-// apply_overrides never re-decides scope.
+//   3. its includer's rules        — self = includer, when an `include` ref in them
+//                                    resolves to `symbol_name`
+// resolving every ref once here (decision: resolve at collection time) so
+// apply_overrides never re-decides scope. Source 3 is the mirror of source 2: a child
+// reaches up with $parent, a parent reaches down by naming the member that leads here.
 export function collect_child_overrides(symbol_name: string, workfile: Workfile, graph: ConnectionGraph): CollectedRule[] {
 	const collected: CollectedRule[] = [];
 
@@ -363,6 +442,28 @@ export function collect_child_overrides(symbol_name: string, workfile: Workfile,
 
 		for (const rule of child.rules) {
 			collected.push({ rule, self_symbol: child_name, parent_symbol: symbol_name });
+		}
+	}
+
+	const includer = find_includer(symbol_name, graph);
+	const includer_symbol = includer === undefined ? undefined : workfile.symbols[includer];
+	if (includer !== undefined && includer_symbol?._t === "RulesetStruct" && includer_symbol.rules) {
+		for (const rule of includer_symbol.rules) {
+			const include_symbols = resolve_rule_includes(rule, includer, workfile);
+
+			// Only when the rule actually reaches this node. The same rule is collected
+			// again when the includer itself is validated, where its self-scoped effects
+			// apply and these include-scoped ones resolve to a different symbol.
+			if (!Object.values(include_symbols).includes(symbol_name)) {
+				continue;
+			}
+
+			collected.push({
+				rule,
+				self_symbol: includer,
+				parent_symbol: find_includer(includer, graph),
+				include_symbols,
+			});
 		}
 	}
 

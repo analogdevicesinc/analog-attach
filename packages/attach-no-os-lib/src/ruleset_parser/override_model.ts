@@ -1,8 +1,17 @@
 import type { Effect, EnumValue, OverrideReference, OverridePredicate, Property } from "./types";
 import type { ParseContext} from "./validators";
-import { boolean_, string_, number_, at, stringArray } from "./validators";
+import { boolean_, string_, number_, at, enumValueArray, stringArray } from "./validators";
 import type { Result} from "./result";
 import { error, ok } from "./result";
+
+/**
+ * Operand of `value:` meaning "whatever value, as long as there is one".
+ *
+ * A sentinel operand rather than an operator of its own, so a condition is always the same
+ * shape: one `value:` test per property. `$`-prefixed because every reserved word in the
+ * override vocabulary is, which is also what keeps it from colliding with a real operand.
+ */
+export const ANY_VALUE = "$any";
 
 export function lower_effects(
 	object: Record<string, unknown>,
@@ -108,8 +117,10 @@ export function lower_effects(
 	}
 
 	if ("values" in object) {
-		// NOTE: This is an enum
-		const values = stringArray(object.values, at(context, "values"));
+		// An enum value is a name or a number - an I2C address restricted to [0x1D, 0x53] is
+		// as much an enum as a list of symbol names - so this matches `restrictValues`,
+		// which has always been typed for both.
+		const values = enumValueArray(object.values, at(context, "values"));
 		if (!values.ok) {
 			return values;
 		}
@@ -193,6 +204,13 @@ export function lower_condition(
 
 		switch (key) {
 			case "value": {
+				// `value: $any` tests only that the property is set, which is what makes one
+				// field require another without naming what either holds.
+				if (condition_object.value === ANY_VALUE) {
+					predicates.push({ _t: "PredicateHasValue", reference });
+					break;
+				}
+
 				// P3: tests the EXPLICIT value only. Operand is compared strict === by
 				// the engine. We don't coerce it, an enum name, number, or bool is valid.
 				predicates.push({
@@ -202,13 +220,21 @@ export function lower_condition(
 				});
 				break;
 			}
-			case "$any": {
-				predicates.push({ _t: "PredicateHasValue", reference });
+			case "not": {
+				// `not: 0` (or `not: [0, 1]`): the property is set AND is none of these. An
+				// unset property satisfies nothing, the same as `value:` - so a bitmask that is
+				// unset or 0 both fail `not: 0`, which is what "selects something" means.
+				const operand = condition_object.not;
+				predicates.push({
+					_t: "PredicateNoneOf",
+					reference,
+					values: Array.isArray(operand) ? operand : [operand],
+				});
 				break;
 			}
 			default: {
 				return error(
-					`Unknown condition operator '${key}'. Expected 'value' or '$any'.`,
+					`Unknown condition operator '${key}'. Expected 'value' (whose operand may be '${ANY_VALUE}') or 'not'.`,
 					operand_context.path
 				);
 			}

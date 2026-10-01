@@ -1,0 +1,4 @@
+$type: platform_ops
+$symbol: test_gpio_ops
+$description: "Platform GPIO ops table"
+$capability: gpio

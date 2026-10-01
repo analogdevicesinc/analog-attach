@@ -1,11 +1,5 @@
-$id: "test/union_override"
 $type: struct
 $symbol: test_struct
-$ranking: 4
-$sources:
-  headers:
-    - "test.h"
-
 comm:
   type: union
   members:

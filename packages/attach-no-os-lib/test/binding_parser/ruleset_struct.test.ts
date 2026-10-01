@@ -9,7 +9,6 @@ describe('RulesetStruct parsing', () => {
 			expectOk(result);
 			expect(result.value._t).toBe('RulesetStruct');
 			expect(result.value.$type).toBe(RulesetType.RT_STRUCT);
-			expect(result.value.$id).toBe('test/minimal_struct');
 			expect(result.value.$symbol).toBe('minimal_init_param');
 		});
 
@@ -19,7 +18,6 @@ describe('RulesetStruct parsing', () => {
 			const binding = result.value as RulesetStruct;
 			expect(binding.properties).toHaveLength(3);
 			expect(binding.$description).toBe('A struct with properties');
-			expect(binding.$ranking).toBe(2);
 		});
 
 		test('parses struct with override', () => {
@@ -102,11 +100,6 @@ describe('RulesetStruct parsing', () => {
 	});
 
 	describe('error cases', () => {
-		test('rejects missing $id', () => {
-			const result = loadAndParseRuleset('bindings/struct/missing_id.yaml');
-			expectError(result);
-			expectErrorContains(result, "Missing required field '$id'");
-		});
 
 		test('rejects missing $type', () => {
 			const result = loadAndParseRuleset('bindings/struct/missing_type.yaml');
@@ -120,23 +113,7 @@ describe('RulesetStruct parsing', () => {
 			expectErrorContains(result, "Missing required field '$symbol'");
 		});
 
-		test('rejects missing $sources', () => {
-			const result = loadAndParseRuleset('bindings/struct/missing_sources.yaml');
-			expectError(result);
-			expectErrorContains(result, "Missing required field '$sources'");
-		});
 
-		test('rejects missing $ranking', () => {
-			const result = loadAndParseRuleset('bindings/struct/missing_ranking.yaml');
-			expectError(result);
-			expectErrorContains(result, "Missing required field '$ranking'");
-		});
 
-		test('rejects invalid $ranking value', () => {
-			const result = loadAndParseRuleset('bindings/struct/invalid_ranking.yaml');
-			expectError(result);
-			expectErrorPath(result, '$ranking');
-			expectErrorContains(result, 'invalid');
-		});
 	});
 });

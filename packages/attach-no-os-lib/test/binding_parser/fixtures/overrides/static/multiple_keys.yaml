@@ -1,11 +1,5 @@
-$id: "test/static_multi_keys"
 $type: struct
 $symbol: test_struct
-$ranking: 4
-$sources:
-  headers:
-    - "test.h"
-
 prop_a:
   type: uint8_t
 

@@ -4,6 +4,8 @@ import type {
 	ArrayElement,
 	ArrayProperty,
 	BooleanProperty,
+	DriverInitParameterProperty,
+	DriverOpsProperty,
 	EnumProperty,
 	IncludeMatch,
 	IncludeProperty,
@@ -81,6 +83,19 @@ export function parse_number_property(name: string, object: Record<string, unkno
 		return capability;
 	}
 
+	const format = optional(object, "format", context, string_);
+	if (!format.ok) {
+		return format;
+	}
+	if (format.value !== undefined && format.value !== "hex") {
+		return error(`Unknown number format '${format.value}'. Expected 'hex'.`, at(context, "format").path);
+	}
+	// A hex float is not a thing anyone wants to read, and C's hex float literals mean
+	// something else entirely, so the key is integer-only.
+	if (format.value !== undefined && !is_integer_symbol(type_.value)) {
+		return error(`'format: ${format.value}' needs an integer type, but '${name}' is ${type_.value}`, at(context, "format").path);
+	}
+
 	return ok({
 		_t: "NumberProperty",
 		name: name,
@@ -91,6 +106,7 @@ export function parse_number_property(name: string, object: Record<string, unkno
 		minimum: minimum.value,
 		maximum: maximum.value,
 		capability: capability.value,
+		format: format.value,
 	});
 }
 
@@ -223,6 +239,10 @@ export function parse_include_property(name: string, object: Record<string, unkn
 		return error(`'count' names the length of a list, so it needs 'pointer: true'`, at(context, "count").path);
 	}
 
+	// Checked against the enum's values at resolution, the first point the enum is in hand.
+	const default_ = optional(object, "default", context, stringOrNumber_);
+	if (!default_.ok) {return default_;}
+
 	return ok({
 		_t: "IncludeProperty",
 		name,
@@ -231,6 +251,7 @@ export function parse_include_property(name: string, object: Record<string, unkn
 		pointer: pointer.value,
 		count: count.value,
 		capability: capability.value,
+		...(default_.value === undefined ? {} : { default: default_.value }),
 		...match.value,
 	});
 }
@@ -526,4 +547,53 @@ export function parse_readonly(property: Property, object: Record<string, unknow
 	}
 
 	return ok({ ...property, readonly: readonly_.value });
+}
+
+// A driver-backed property: it names only the interface, and which driver answers is
+// decided from each module's declared `provides.interfaces`. `interface` is required
+// because without it there is nothing to look the driver up by.
+function parse_driver_backed(
+    name: string,
+    object: Record<string, unknown>,
+    context: ParseContext
+): Result<{ name: string, description: string, required?: boolean, interface: string }> {
+    const description = optionalWithDefault(object, "description", context, "", string_);
+    if (!description.ok) {
+        return description;
+    }
+
+    const required_ = optionalWithDefault(object, "required", context, false, boolean_);
+    if (!required_.ok) {
+        return required_;
+    }
+
+    const interface_ = required(object, "interface", context, string_);
+    if (!interface_.ok) {
+        return interface_;
+    }
+
+    return ok({
+        name,
+        description: description.value,
+        required: required_.value,
+        interface: interface_.value,
+    });
+}
+
+export function parse_driver_ops_property(name: string, object: Record<string, unknown>, context: ParseContext): Result<DriverOpsProperty> {
+    const base = parse_driver_backed(name, object, context);
+    if (!base.ok) {
+        return base;
+    }
+
+    return ok({ ...base.value, _t: "DriverOpsProperty", type: "driver_ops" });
+}
+
+export function parse_driver_init_parameter_property(name: string, object: Record<string, unknown>, context: ParseContext): Result<DriverInitParameterProperty> {
+    const base = parse_driver_backed(name, object, context);
+    if (!base.ok) {
+        return base;
+    }
+
+    return ok({ ...base.value, _t: "DriverInitParameterProperty", type: "driver_init_param" });
 }

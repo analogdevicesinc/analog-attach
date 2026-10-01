@@ -1,7 +1,2 @@
-$id: "test/platform_ops"
 $type: platform_ops
 $symbol: spi_ops
-$ranking: 4
-$sources:
-  headers:
-    - "spi_ops.h"

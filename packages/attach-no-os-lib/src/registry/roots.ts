@@ -1,0 +1,119 @@
+/**
+ * The node a user adds for a part: its root.
+ *
+ * A CAPI part is reached through a generic interface handle - the ADXL355 through a
+ * `capi_accel_sensor` - whose config names only the interface it is for:
+ *
+ *   capi_accel_sensor_init_config
+ *     extra: {type: driver_init_param, interface: accel_sensor}
+ *     ops:   {type: driver_ops,        interface: accel_sensor}
+ *
+ * and a driver says which interfaces it implements (`provides.interfaces`). So the root for
+ * a driver is a descriptor whose config has a driver-backed field for one of those
+ * interfaces. Everything below the root is then bootstrap's to build.
+ */
+
+import type { Result } from "../ruleset_parser/result";
+import { error, ok } from "../ruleset_parser/result";
+import { RulesetType } from "../ruleset_parser/types";
+import { load_resolved_ruleset } from "../resolver/resolver";
+import { all_symbols, get_registry } from "./registry";
+import type { ModuleInfo } from "./types";
+
+/** `module.yml` `type:` of a single-part driver. */
+const MODULE_TYPE_DRIVER = "driver";
+
+/** The interfaces a descriptor's config takes a driver for, through driver-backed fields. */
+function driver_interfaces_of(descriptor_symbol: string): string[] {
+	const descriptor = load_resolved_ruleset(descriptor_symbol);
+	if (!descriptor.ok || descriptor.value._t !== "RulesetDescriptor") {
+		return [];
+	}
+
+	const config_symbol = descriptor.value.properties[0].include;
+	if (config_symbol === undefined) {
+		return [];
+	}
+
+	const config = load_resolved_ruleset(config_symbol);
+	if (!config.ok || config.value._t !== "RulesetStruct") {
+		return [];
+	}
+
+	return config.value.properties.flatMap(property =>
+		property._t === "DriverInitParameterProperty" || property._t === "DriverOpsProperty" ? [property.interface] : []
+	);
+}
+
+/** Every configured driver module. */
+export function list_drivers(): Result<ModuleInfo[]> {
+	const registry = get_registry();
+	if (!registry.ok) {
+		return registry;
+	}
+	return ok(registry.value.modules.filter(module => module.type === MODULE_TYPE_DRIVER));
+}
+
+/** The root descriptors a driver can be added through, sorted. Usually exactly one. */
+export function driver_roots(driver: string): Result<string[]> {
+	const drivers = list_drivers();
+	if (!drivers.ok) {
+		return drivers;
+	}
+
+	const module = drivers.value.find(candidate => candidate.name === driver);
+	if (module === undefined) {
+		return error(`No configured driver is called '${driver}'`, driver);
+	}
+
+	const provided = new Set(module.provides_interfaces ?? []);
+
+	const entries = all_symbols();
+	if (!entries.ok) {
+		return entries;
+	}
+
+	return ok(entries.value
+		.filter(entry => entry.$type === RulesetType.RT_DESCRIPTOR)
+		.filter(entry => driver_interfaces_of(entry.$symbol).some(interface_ => provided.has(interface_)))
+		.map(entry => entry.$symbol));
+}
+
+/** The one root for a driver, or an error that says why there is not exactly one. */
+export function driver_root(driver: string): Result<string> {
+	const roots = driver_roots(driver);
+	if (!roots.ok) {
+		return roots;
+	}
+
+	const [only, ...more] = roots.value;
+	if (only === undefined) {
+		// Two different situations, and only one has a workaround.
+		const drivers = list_drivers();
+		const module = drivers.ok ? drivers.value.find(candidate => candidate.name === driver) : undefined;
+		if (module?.rulesets_file === undefined) {
+			return error(`Driver '${driver}' has no analog-attach rulesets yet, so it cannot be added`, driver);
+		}
+		return error(`Driver '${driver}' implements no interface that a generic handle is configured through, so there is nothing to add it by. Add its own structs instead (see: attach-noos list-devices)`, driver);
+	}
+	if (more.length > 0) {
+		return error(`Driver '${driver}' can be added through more than one handle: ${roots.value.join(", ")}. Add the one you want by its schema name`, driver);
+	}
+
+	return ok(only);
+}
+
+/**
+ * Drivers `add` accepts by name: those with exactly one root. A driver with none or several
+ * is still addable through its schemas, just not by the shorthand.
+ */
+export function addable_drivers(): Result<string[]> {
+	const drivers = list_drivers();
+	if (!drivers.ok) {
+		return drivers;
+	}
+	return ok(drivers.value
+		.filter(driver => driver_root(driver.name).ok)
+		.map(driver => driver.name)
+		.sort());
+}

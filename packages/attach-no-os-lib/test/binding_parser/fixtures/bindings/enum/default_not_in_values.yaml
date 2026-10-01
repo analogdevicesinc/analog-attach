@@ -1,10 +1,4 @@
-$id: "test/enum_bad_default"
 $type: enum
 $symbol: bad_default_enum
-$ranking: 4
-$sources:
-  headers:
-    - "test.h"
-
 values: [A, B, C]
 default: D

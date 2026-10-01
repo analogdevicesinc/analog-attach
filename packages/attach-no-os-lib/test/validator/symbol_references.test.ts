@@ -1,5 +1,4 @@
 import { describe, test, expect, beforeEach, afterEach } from 'vitest';
-import path from 'node:path';
 import { get_symbol_references, get_connected_symbols } from '../../src/validator/connection_graph';
 import { setup_test_config, teardown_test_config } from '../test_utilities';
 import {
@@ -19,14 +18,17 @@ import {
 // pointer (only an address is stored, so a declaration is enough). Codegen ordering
 // relies on the distinction; the validator and override scoping still want every
 // reference regardless of kind, which is what `get_connected_symbols` returns.
-const NOOS_ROOT = path.join(__dirname, '../bindings');
+//
+// The includes below name fixture symbols rather than arbitrary strings, because telling an
+// enum-backed include from a struct include means resolving it: an include of an enum holds
+// a value, not a symbol name, so it makes no edge and must never be renamed.
 
 function make_include(value?: string, pointer?: boolean): IncludeProperty {
     return {
         _t: "IncludeProperty",
         name: "test_prop",
         description: "",
-        include: "no-os/spi/no_os_spi_init_param.yaml",
+        include: "test_spi_config",
         ...(pointer === undefined ? {} : { pointer }),
         value,
     };
@@ -41,9 +43,9 @@ function make_union(members: IncludeProperty[], value?: Record<string, string>):
 }
 
 describe('get_symbol_references', () => {
-    // Array elements are resolved against the schemas repo to tell an enum-backed
-    // include (values, not references) from a struct include.
-    beforeEach(() => { setup_test_config(NOOS_ROOT); });
+    // Array elements are resolved through the registry to tell an enum-backed include
+    // (values, not references) from a struct include.
+    beforeEach(() => { setup_test_config(); });
     afterEach(() => { teardown_test_config(); });
 
     describe('include', () => {
@@ -77,7 +79,7 @@ describe('get_symbol_references', () => {
         // an address and none of them constrains ordering.
         test('an array of pointer includes yields pointer references', () => {
             const property = make_array(
-                { ...make_include(undefined, true), include: "no-os/i3c/no_os_i3c_init_param.yaml" },
+                { ...make_include(undefined, true), include: "test_spi_config" },
                 ["dev_a", "dev_b"]
             );
             expect(get_symbol_references(property)).toEqual([
@@ -86,11 +88,11 @@ describe('get_symbol_references', () => {
             ]);
         });
 
-        // ad7124's `setups`: a real C array of embedded structs, which genuinely
-        // needs each element fully defined first.
+        // A real C array of embedded structs, which genuinely needs each element fully
+        // defined first.
         test('an array of embedded includes yields value references', () => {
             const property = make_array(
-                { ...make_include(), include: "devices/ad7124/structs/ad7124_channel_setup.yaml" },
+                { ...make_include(), include: "test_gpio_pin" },
                 ["setup_a", "setup_b"]
             );
             expect(get_symbol_references(property)).toEqual([
@@ -102,8 +104,8 @@ describe('get_symbol_references', () => {
         // Enum-backed array entries are enum constants, not symbols.
         test('an array of enum includes references nothing', () => {
             const property = make_array(
-                { ...make_include(), include: "devices/ad5592r/enums/ad5592r_channel_mode.yaml" },
-                ["AD5592R_MODE_ADC", "AD5592R_MODE_DAC"]
+                { ...make_include(), include: "test_spi_mode" },
+                ["TEST_SPI_MODE_0", "TEST_SPI_MODE_3"]
             );
             expect(get_symbol_references(property)).toEqual([]);
         });
@@ -237,7 +239,7 @@ describe('get_symbol_references', () => {
 // override scoping depend on that, and losing pointer references there would silently
 // stop `bus: i3c1_ip` from being checked or scoped.
 describe('get_connected_symbols', () => {
-    beforeEach(() => { setup_test_config(NOOS_ROOT); });
+    beforeEach(() => { setup_test_config(); });
     afterEach(() => { teardown_test_config(); });
 
     test('reports pointer references as connections', () => {
@@ -250,7 +252,7 @@ describe('get_connected_symbols', () => {
 
     test('reports every element of an array of pointer includes', () => {
         const property = make_array(
-            { ...make_include(undefined, true), include: "no-os/i3c/no_os_i3c_init_param.yaml" },
+            { ...make_include(undefined, true), include: "test_spi_config" },
             ["dev_a", "dev_b"]
         );
         expect(get_connected_symbols(property)).toEqual(["dev_a", "dev_b"]);

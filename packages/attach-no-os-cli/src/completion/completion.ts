@@ -1,21 +1,21 @@
 import {
     list_available_structs,
+    addable_drivers,
     import_minimal,
     suggest_for_property,
-    scan_platforms,
-    scan_boards,
-    boards_for_platform,
-    get_schemas_path,
+    list_boards,
+    list_socs,
     get_setting_value,
     get_settings,
     get_workfile_path,
     list_template_sets,
     SettingsFile,
+    Setting,
     MinimalWorkfile,
     Workfile,
 } from "attach-no-os-lib";
 import type { AttachContext } from "../commands/shared";
-import { get_platform_specs, resolve_property_name } from "../commands/shared";
+import { resolve_property_name } from "../commands/shared";
 import { RESERVED_PREFIX } from "../protocol/convert";
 import fs from "node:fs";
 import path from "node:path";
@@ -161,13 +161,35 @@ export function get_config_keys(): string[] {
     return Object.keys(settings.value);
 }
 
-export function get_config_value_suggestions(key: string): string[] {
-    // template_set has a known, enumerable set of valid values — the bundled
-    // template folders — so propose those rather than just the current one.
-    if (key === "template_set") {
-        return list_template_sets();
+/**
+ * Every value a setting can take, when that set is known: a fixed `options` list, or one
+ * scanned from what is configured (`enum_of`: every board, every chip, every template set).
+ * Undefined for a free-form setting.
+ *
+ * The one source for a setting's choices, so tab completion, `tool-config-get` and what
+ * attach-meta is told can never offer different lists.
+ */
+export function setting_options(setting: Setting): string[] | undefined {
+    if (setting.options !== undefined) {
+        return setting.options;
     }
+    switch (setting.enum_of) {
+        case "board": {
+            return get_all_board_names();
+        }
+        case "platform": {
+            return get_platform_names();
+        }
+        case "template_set": {
+            return list_template_sets();
+        }
+        case undefined: {
+            return undefined;
+        }
+    }
+}
 
+export function get_config_value_suggestions(key: string): string[] {
     const settings = get_settings();
     if (!settings.ok) {
         return [];
@@ -178,6 +200,12 @@ export function get_config_value_suggestions(key: string): string[] {
         return [];
     }
 
+    // A setting with a known set of values proposes all of them.
+    const options = setting_options(setting);
+    if (options !== undefined && options.length > 0) {
+        return options;
+    }
+
     // Suggest the current value, falling back to the default, so the user can
     // tab it in and edit rather than retype it from scratch.
     const suggestion = setting.value ?? setting.default;
@@ -185,42 +213,40 @@ export function get_config_value_suggestions(key: string): string[] {
 }
 
 export function get_platform_names(): string[] {
-    const schemas_path = get_schemas_path();
-    if (!schemas_path.ok) {
+    const socs = list_socs();
+    if (!socs.ok) {
         return [];
     }
 
-    const platforms_path = path.join(schemas_path.value, "platforms");
-    const result = scan_platforms(platforms_path);
-    if (!result.ok) {
-        return [];
-    }
-
-    return Object.keys(result.value);
+    return socs.value.map(entry => entry.soc.name);
 }
 
 /**
- * no-OS board presets. Narrowed to the boards belonging to the workfile's platform
- * when there is a workfile to read, since generating for another platform cannot work;
- * the full list otherwise, so `--board` still completes outside a project directory
- * (which is the board-first case: `attach-noos create workfile --board <tab>`).
+ * Every board any configured platform supports. What the `board` SETTING offers: choosing a
+ * board is how a new workfile picks its target, so nothing is filtered out.
+ */
+export function get_all_board_names(): string[] {
+    const boards = list_boards();
+    return boards.ok ? boards.value.map(board => board.name) : [];
+}
+
+/**
+ * Board names for a command acting on an existing workfile (`generate --board`, `build`,
+ * `deploy`). Narrowed to the boards carrying the workfile's chip when there is a workfile
+ * to read, since generating for another chip cannot work; the full list otherwise.
  */
 export function get_board_names(): string[] {
-    const noos_path = get_setting_value("no_os_path");
-    if (!noos_path.ok) {
+    const boards = list_boards();
+    if (!boards.ok) {
         return [];
     }
 
     const platform = load_workfile_for_completion()?.platform;
-    const specs = get_platform_specs();
-    const result = platform && specs.ok
-        ? boards_for_platform(noos_path.value, platform, specs.value)
-        : scan_boards(noos_path.value);
-    if (!result.ok) {
-        return [];
-    }
+    const matching = platform === undefined
+        ? boards.value
+        : boards.value.filter(board => board.soc === platform);
 
-    return result.value.map(board => board.name);
+    return matching.map(board => board.name);
 }
 
 export function get_schema_paths(): string[] {
@@ -239,9 +265,6 @@ export function get_schema_paths(): string[] {
         return [];
     }
 
-    return [
-        ...available.value.devices,
-        ...available.value.noos,
-        ...available.value.platform,
-    ];
+    const drivers = addable_drivers();
+    return [...(drivers.ok ? drivers.value : []), ...available.value.all];
 }

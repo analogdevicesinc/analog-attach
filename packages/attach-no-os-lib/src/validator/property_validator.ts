@@ -1,6 +1,8 @@
 import type {
 	ArrayProperty,
 	BooleanProperty,
+	DriverInitParameterProperty,
+	DriverOpsProperty,
 	EnumProperty,
 	IncludeMatch,
 	NumberProperty,
@@ -9,16 +11,17 @@ import type {
 	Property,
 	RulesetDescriptor,
 	RulesetStruct,
-	RulesetType,
 	StringProperty,
 	UnionProperty
 } from "../ruleset_parser/types";
-import { is_integer_symbol, ruleset_type_token } from "../ruleset_parser/types";
+import { is_integer_symbol, ruleset_type_token, RulesetType } from "../ruleset_parser/types";
 import type { ParseContext } from "../ruleset_parser/validators";
 import { at } from "../ruleset_parser/validators";
 import type { Workfile } from "../workfile_handler/types";
 import { all_ops, resolve_reference, suggest_platform_extra } from "../workfile_handler/workfile_handler";
 import { load_resolved_ruleset } from "../resolver/resolver";
+import { provides_interface } from "../registry/drivers";
+import { format_number_in } from "../ruleset_parser/number_format";
 import { apply_overrides } from "./override_resolver";
 import type { CollectedRule, ValidationError } from "./types";
 
@@ -35,7 +38,7 @@ export function validate_property(
 	// symbol_name is the workfile INSTANCE key (e.g. "my_spi"), not parent_symbol.$symbol
 	// (the schema symbol, e.g. "no_os_spi_init_param"). Refs were resolved to instance
 	// keys at collection time, so the engine must match against the instance key too.
-	const { effective, errors: override_errors } = apply_overrides(
+	const { effective, errors: override_errors, required_reason } = apply_overrides(
 		property, child_overrides, symbol_name, workfile
 	);
 
@@ -90,7 +93,8 @@ export function validate_property(
 
 		return [{
 			path: property_context.path,
-			message: "Required property has no value",
+			// A rule that made this required may say what would satisfy it.
+			message: required_reason ?? "Required property has no value",
 			severity: "error"
 		}];
 	}
@@ -131,6 +135,12 @@ export function validate_property(
 			}
 			return validate_platform_extra(effective, workfile, parent_symbol, property_context);
 		}
+		case "DriverOpsProperty": {
+			return validate_driver_backed(effective, workfile, "ops table", RulesetType.RT_EXTERN, property_context);
+		}
+		case "DriverInitParameterProperty": {
+			return validate_driver_backed(effective, workfile, "init_param", RulesetType.RT_STRUCT, property_context);
+		}
 		case "RawProperty": {
 			return []; // NOTE: Opaque value, emitted verbatim — nothing to validate
 		}
@@ -140,6 +150,63 @@ export function validate_property(
 			return [];
 		}
 	}
+}
+
+/**
+ * Check a driver-backed value: the symbol exists, is the right kind of node, and comes from
+ * a module that declares the interface the property asked for.
+ *
+ * The interface check is what makes this more than a type check. Nothing stops a workfile
+ * naming some other driver's init_param here — it is a struct like any other — and the
+ * mistake would otherwise surface as a compile error in generated C.
+ */
+function validate_driver_backed(
+	property: DriverOpsProperty | DriverInitParameterProperty,
+	workfile: Workfile,
+	label: string,
+	expected: RulesetType,
+	context: ParseContext
+): ValidationError[] {
+	const symbol_name = property.value as string;
+
+	const target = workfile.symbols[symbol_name];
+	if (!target) {
+		return [{
+			path: context.path,
+			message: `Driver ${label} '${symbol_name}' is not a symbol in this workfile`,
+			severity: "error"
+		}];
+	}
+
+	if (target.$type !== expected) {
+		return [{
+			path: context.path,
+			message: `Driver ${label} '${symbol_name}' must be a ${ruleset_type_token(expected)}, got ${ruleset_type_token(target.$type)}`,
+			severity: "error"
+		}];
+	}
+
+	const provides = provides_interface(target.$symbol, property.interface);
+	if (!provides.ok) {
+		return [{ path: context.path, message: provides.error.message, severity: "error" }];
+	}
+	if (!provides.value) {
+		return [{
+			path: context.path,
+			message: `'${symbol_name}' does not come from a driver implementing '${property.interface}'`,
+			severity: "error"
+		}];
+	}
+
+	if (property.allowed && !property.allowed.includes(target.$symbol)) {
+		return [{
+			path: context.path,
+			message: `Driver ${label} '${symbol_name}' ($symbol: ${target.$symbol}) is not in the allowed list: ${property.allowed.join(", ")}`,
+			severity: "error"
+		}];
+	}
+
+	return [];
 }
 
 function validate_platform_ops(
@@ -168,10 +235,10 @@ function validate_platform_ops(
 	}
 
 	if (property.allowed) {
-		if (!property.allowed.includes(ops.$id)) {
+		if (!property.allowed.includes(ops.$symbol)) {
 			return [{
 				path: context.path,
-				message: `Platform ops '${symbol_name}' ($id: ${ops.$id}) is not in the allowed list: ${property.allowed.join(", ")}`,
+				message: `Platform ops '${symbol_name}' ($symbol: ${ops.$symbol}) is not in the allowed list: ${property.allowed.join(", ")}`,
 				severity: "error"
 			}];
 		}
@@ -224,10 +291,10 @@ function validate_platform_extra(
 	}
 
 	if (property.allowed) {
-		if (!property.allowed.includes(extra.$id)) {
+		if (!property.allowed.includes(extra.$symbol)) {
 			return [{
 				path: context.path,
-				message: `Platform extra '${symbol_name}' ($id: ${extra.$id}) is not in the allowed list: ${property.allowed.join(", ")}`,
+				message: `Platform extra '${symbol_name}' ($symbol: ${extra.$symbol}) is not in the allowed list: ${property.allowed.join(", ")}`,
 				severity: "error"
 			}];
 		}
@@ -257,6 +324,9 @@ function validate_platform_extra(
 function validate_number(property: NumberProperty, context: ParseContext): ValidationError[] {
 	const errors: ValidationError[] = [];
 	const value = property.value;
+	// Every number in these messages reads the way the field does, so a hex field is never
+	// reported in decimal the reader then has to convert back.
+	const shown = (shown_value: number) => format_number_in(shown_value, property.format);
 	
 	if (typeof value !== "number") {
 		errors.push({
@@ -290,7 +360,7 @@ function validate_number(property: NumberProperty, context: ParseContext): Valid
 	if (property.minimum !== undefined && value < property.minimum) {
 		errors.push({
 			path: context.path,
-			message: `Value ${value.toString()} is below the minimum ${property.minimum.toString()}`,
+			message: `Value ${shown(value)} is below the minimum ${shown(property.minimum)}`,
 			severity: "error"
 		});
 	}
@@ -298,7 +368,17 @@ function validate_number(property: NumberProperty, context: ParseContext): Valid
 	if (property.maximum !== undefined && value > property.maximum) {
 		errors.push({
 			path: context.path,
-			message: `Value ${value.toString()} is above the maximum ${property.maximum.toString()}`,
+			message: `Value ${shown(value)} is above the maximum ${shown(property.maximum)}`,
+			severity: "error"
+		});
+	}
+
+	// An override can narrow a numeric field to a set rather than a range; honoring it here
+	// is what makes `values:` mean the same thing on a number as it does on an enum.
+	if (property.values !== undefined && property.values.length > 0 && !property.values.includes(value)) {
+		errors.push({
+			path: context.path,
+			message: `Value ${shown(value)} is not one of: ${property.values.map(allowed => shown(allowed)).join(", ")}`,
 			severity: "error"
 		});
 	}

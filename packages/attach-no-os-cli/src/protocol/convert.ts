@@ -318,7 +318,7 @@ function descriptive_property(key: string, value: string | undefined): ProtocolP
  * like `$compatible`.
  */
 export function to_protocol_node(name: string, ruleset: Ruleset): ProtocolNode {
-    const properties: ProtocolProperty[] = [descriptive_property(COMPATIBLE_KEY, ruleset.$id)];
+    const properties: ProtocolProperty[] = [descriptive_property(COMPATIBLE_KEY, ruleset.$symbol)];
 
     if (ruleset._t === "RulesetExtern") {
         properties.push(

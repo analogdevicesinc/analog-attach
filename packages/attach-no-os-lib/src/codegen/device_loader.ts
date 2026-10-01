@@ -5,7 +5,7 @@ import type { RulesetDescriptor, RulesetStruct } from "../ruleset_parser/types";
 import type { Workfile } from "../workfile_handler/types";
 import type { DeviceInfo } from "./types";
 
-import { get_schemas_path } from "../settings/settings";
+import { resolve_entry } from "../registry/registry";
 import { make_string_environment } from "./eta_environment";
 
 // Device init/remove code generation — the one genuinely impure part of codegen.
@@ -26,7 +26,7 @@ function resolve_init_parameter(
 	const init_parameter = descriptor.properties[0];
 	const target_name = init_parameter.value;
 	if (typeof target_name !== "string") {
-		throw new TypeError(`Descriptor '${descriptor.$id}' has no $init_param assigned`);
+		throw new TypeError(`Descriptor '${descriptor.$symbol}' has no $init_param assigned`);
 	}
 	if (!(target_name in workfile.symbols)) {
 		throw new Error(`Descriptor $init_param '${target_name}' not found in workfile`);
@@ -38,20 +38,33 @@ function resolve_init_parameter(
 	return { name: target_name, ruleset: target };
 }
 
-// Read a descriptor's init/remove templates from the external schemas repo.
-function load_device_templates(descriptor: RulesetDescriptor): { init: string; remove: string } {
-	const schemas_path = get_schemas_path();
-	if (!schemas_path.ok) {
-		throw new Error(schemas_path.error.message);
+// Read a descriptor's init/remove templates, if it declares any.
+//
+// Undefined means the descriptor is the ordinary shape and the target renders the call
+// from $init_function / $remove_function. Declaring one template and not the other is a
+// mistake rather than a shape, so it is rejected instead of half-rendered.
+function load_device_templates(descriptor: RulesetDescriptor): { init: string; remove: string } | undefined {
+	if (descriptor.$init_template === undefined && descriptor.$remove_template === undefined) {
+		return undefined;
 	}
-	// Template filenames are declared on the descriptor and resolved relative to its
-	// own schema directory (same dir-adjacency convention as before).
-	const directory = path.dirname(descriptor.$id);
-	const init_path = path.join(schemas_path.value, directory, descriptor.$init_template);
-	const remove_path = path.join(schemas_path.value, directory, descriptor.$remove_template);
+	if (descriptor.$init_template === undefined || descriptor.$remove_template === undefined) {
+		throw new Error(`Descriptor '${descriptor.$symbol}' declares one of $init_template/$remove_template without the other`);
+	}
+
+	// Template filenames are relative to the ruleset file that declared them, which the
+	// registry knows: a ruleset is reached by symbol, so nothing else here can say where
+	// on disk it came from.
+	const entry = resolve_entry(descriptor.$symbol);
+	if (!entry.ok) {
+		throw new Error(entry.error.message);
+	}
+
+	const directory = path.dirname(entry.value.file);
+	const init_path = path.join(directory, descriptor.$init_template);
+	const remove_path = path.join(directory, descriptor.$remove_template);
 
 	if (!fs.existsSync(init_path) || !fs.existsSync(remove_path)) {
-		throw new Error(`Missing templates for descriptor: ${descriptor.$id}`);
+		throw new Error(`Missing templates for descriptor: ${descriptor.$symbol}`);
 	}
 
 	return {
@@ -77,9 +90,7 @@ function extract_device_info(
 	// They emit full statement blocks, rendered with the same Eta options as the
 	// project-level templates.
 	const view = { symbol_name, descriptor_name };
-	const environment = make_string_environment();
-	const init_code = environment.renderString(templates.init, view).trim();
-	const remove_code = environment.renderString(templates.remove, view).trim();
+	const environment = templates === undefined ? undefined : make_string_environment();
 
 	return {
 		symbol_name,
@@ -87,8 +98,10 @@ function extract_device_info(
 		descriptor_type: descriptor.$symbol,
 		init_param_type: init_parameter_ruleset.$symbol,
 		header: init_parameter_ruleset.$header ? path.basename(init_parameter_ruleset.$header) : "",
-		init_code,
-		remove_code,
+		init_function: descriptor.$init_function,
+		remove_function: descriptor.$remove_function,
+		init_code: environment && templates ? environment.renderString(templates.init, view).trim() : undefined,
+		remove_code: environment && templates ? environment.renderString(templates.remove, view).trim() : undefined,
 		capability: init_parameter_ruleset.$capability,
 	};
 }

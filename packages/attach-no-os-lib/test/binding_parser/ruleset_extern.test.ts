@@ -21,7 +21,7 @@ describe('RulesetExtern parsing', () => {
 		});
 
 		// An extern is the one kind whose matching type is not its own $id.
-		test('provided_id answers with $provides, not $id', () => {
+		test('provided_id answers with $provides, not $symbol', () => {
 			const result = loadAndParseRuleset('bindings/extern/valid_minimal.yaml');
 			expectOk(result);
 			expect(provided_id(result.value)).toBe('test/iio_device');
@@ -42,11 +42,6 @@ describe('RulesetExtern parsing', () => {
 		});
 
 		// The symbol is already compiled into the library, so there is nothing to list.
-		test('$sources is optional and defaults to empty', () => {
-			const result = loadAndParseRuleset('bindings/extern/valid_minimal.yaml');
-			expectOk(result);
-			expect(result.value.$sources).toEqual({});
-		});
 	});
 
 	describe('invalid cases', () => {

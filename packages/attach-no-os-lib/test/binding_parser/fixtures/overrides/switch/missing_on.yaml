@@ -1,11 +1,5 @@
-$id: "test/switch_missing_on"
 $type: struct
 $symbol: test_struct
-$ranking: 4
-$sources:
-  headers:
-    - "test.h"
-
 mode:
   type: enum
   values: [A, B]

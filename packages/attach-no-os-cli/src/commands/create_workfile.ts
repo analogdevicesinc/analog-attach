@@ -2,15 +2,16 @@ import fs from "node:fs";
 import path from "node:path";
 import { buildCommand } from "@stricli/core";
 import {
-    PlatformSpecs,
     create_workfile,
     export_minimal,
+    find_soc,
     get_effective_setting_value,
     get_workfile_path,
-    resolve_platform_from_board
+    list_socs,
+    soc_for_board
 } from "attach-no-os-lib";
 import { common_ok, type CreateWorkfileResponse } from "../protocol/responses";
-import { get_platform_specs, output, output_error } from "./shared";
+import { output, output_error } from "./shared";
 
 type CreateWorkfileFlags = {
     json?: boolean;
@@ -58,13 +59,7 @@ export const createWorkfileCommand = buildCommand<CreateWorkfileFlags, []>({
             return;
         }
 
-        const specs = get_platform_specs();
-        if (!specs.ok) {
-            output_error(flags, specs.error.message);
-            return;
-        }
-
-        const resolved = resolve_target(specs.value);
+        const resolved = resolve_target();
         if (!resolved.ok) {
             output_error(flags, resolved.message, { text: resolved.text });
             return;
@@ -118,7 +113,7 @@ type ResolvedTarget =
  * set for the platforms that have no boards at all (linux, mbed) or to start a workfile
  * before the board is decided.
  */
-function resolve_target(specs: PlatformSpecs): ResolvedTarget {
+function resolve_target(): ResolvedTarget {
     const configured_board = setting("board");
     const configured_platform = setting("platform");
 
@@ -126,43 +121,36 @@ function resolve_target(specs: PlatformSpecs): ResolvedTarget {
         return {
             ok: false,
             message: "No board or platform configured. Run: attach-noos tool-config-set board <name>",
-            text: format_no_target(specs)
+            text: format_no_target()
         };
     }
 
+    // No board: the platform setting names the chip directly, which is how a chip with no
+    // board module of its own is targeted.
     if (configured_board === undefined) {
-        if (!(configured_platform! in specs)) {
-            return {
-                ok: false,
-                message: `Unknown platform '${configured_platform}'. Available: ${Object.keys(specs).join(", ")}`
-            };
+        const soc = find_soc(configured_platform!);
+        if (!soc.ok) {
+            return { ok: false, message: soc.error.message };
         }
         return { ok: true, platform: configured_platform! };
     }
 
-    const noos_path = get_effective_setting_value("no_os_path");
-    if (!noos_path.ok) {
-        return { ok: false, message: noos_path.error.message };
-    }
-    if (noos_path.value === undefined) {
-        return { ok: false, message: "no_os_path is not configured. Run: attach-noos tool-config-set no_os_path <path>" };
-    }
-
-    const resolved = resolve_platform_from_board(noos_path.value, configured_board, specs);
+    // A board names its own chip, so it settles the platform on its own.
+    const resolved = soc_for_board(configured_board);
     if (!resolved.ok) {
         return { ok: false, message: resolved.error.message };
     }
 
     // A configured platform that contradicts the board is a mistake worth reporting rather
     // than quietly resolving in the board's favour.
-    if (configured_platform !== undefined && configured_platform !== resolved.value.platform) {
+    if (configured_platform !== undefined && configured_platform !== resolved.value) {
         return {
             ok: false,
-            message: `Board '${configured_board}' belongs to platform ${resolved.value.platform}, not ${configured_platform}`
+            message: `Board '${configured_board}' carries ${resolved.value}, not ${configured_platform}`
         };
     }
 
-    return { ok: true, platform: resolved.value.platform, board: resolved.value.board.name };
+    return { ok: true, platform: resolved.value, board: configured_board };
 }
 
 function setting(key: "board" | "platform"): string | undefined {
@@ -172,15 +160,22 @@ function setting(key: "board" | "platform"): string | undefined {
 
 // --- Formatters ---
 
-function format_no_target(specs: PlatformSpecs): string {
+function format_no_target(): string {
     let out = "No board or platform configured.\n\n";
     out += "  attach-noos tool-config-set board <name>       a board settles the platform on its own\n";
-    out += "  attach-noos tool-config-set platform <name>    for platforms with no boards\n\n";
-    out += "Available platforms:\n\n";
+    out += "  attach-noos tool-config-set platform <name>    for a chip with no board of its own\n\n";
 
-    for (const [name, manifest] of Object.entries(specs)) {
-        out += `  ${name}\n`;
-        for (const line of wrap_text(manifest.description ?? "No description available", 76)) {
+    const socs = list_socs();
+    if (!socs.ok) {
+        out += socs.error.message;
+        return out;
+    }
+
+    out += "Available chips:\n\n";
+    for (const { soc, platform } of socs.value) {
+        out += `  ${soc.name}\n`;
+        const detail = [platform.name, soc.cpu].filter(Boolean).join(", ");
+        for (const line of wrap_text(detail || "No description available", 76)) {
             out += `      ${line}\n`;
         }
         out += "\n";

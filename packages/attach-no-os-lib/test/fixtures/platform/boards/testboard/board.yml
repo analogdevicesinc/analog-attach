@@ -1,0 +1,28 @@
+schema_version: "1.0"
+# The keys ARE the C symbol names the board's BSP defines; the values are inputs to the
+# platform's own BSP generator and are not read by analog-attach, except `pins:` and a
+# GPIO port's `extra.port`, which are read only to join with the pinout.
+peripherals:
+  spi:
+    bsp_test_spi_cfg:
+      interface: spi
+      identifier: 0
+      pins:
+        sck:  {connector: PMOD, pin: 4}
+        mosi: {connector: PMOD, pin: 2}
+        miso: {connector: PMOD, pin: 3}
+        # Two chip-select lines: a native one on the PMOD and a GPIO-driven one on the
+        # header. A part that mates gets the PMOD's by mating; one that does not has two
+        # declared lines to choose from, so the board's declaration cannot decide.
+        cs:
+          - {connector: PMOD, pin: 1, native_cs: 0}
+          - {connector: H1, pin: 1}
+  gpio_port:
+    bsp_test_gpio0_cfg: {interface: gpio, num_pins: 32, extra: {port: TEST_GPIO0}}
+    bsp_test_gpio1_cfg: {interface: gpio, num_pins: 32, extra: {port: TEST_GPIO1}}
+  gpio_pin:
+    bsp_test_led: {interface: gpio, number: 7}
+  # No bsp_kinds row: its symbols are skipped with a warning, because board.schema lets a
+  # board declare kinds this tool has not heard of.
+  mystery:
+    bsp_test_mystery: {interface: mystery}

@@ -1,0 +1,9 @@
+name: drivers-test
+type: driver_collection
+version: "1.0.0"
+description: "Driver bundle, standing in for capi-noos"
+
+# No `categories:` key exists in the ecosystem, so the registry finds categories as the
+# subdirectories of drivers/ that carry a module.yml. Everything below that is declared.
+provides:
+  interfaces: [test_sensor]

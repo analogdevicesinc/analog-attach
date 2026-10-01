@@ -161,7 +161,7 @@ export function generate_project(input: CodegenInput): Result<CodegenResult> {
 		platform_vendor: input.platform_vendor,
 		platform_name: input.platform_name,
 		board: input.board,
-		noos_path: input.noos_path,
+		capi_path: input.capi_path,
 		files: files,
 		h: template_helpers,
 	};

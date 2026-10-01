@@ -1,50 +1,40 @@
 import { buildCommand } from "@stricli/core";
 import {
-    Board,
-    boards_for_platform,
-    get_setting_value,
-    platform_for_board,
-    scan_boards,
-    PlatformSpecs,
+    BoardInfo,
+    list_boards,
+    list_socs,
 } from "attach-no-os-lib";
 import {
-    get_platform_specs,
     output,
     output_error,
 } from "./shared";
 import { common_ok } from "../protocol/responses";
 
 /*
- * Read-only inventory of what the tool can target. It exists because the two halves of
- * that answer live in different repositories - boards come from no-OS's CMake presets
- * and platforms from the schema tree - and neither list is any use on its own: a board
- * with no schemas cannot be generated for, and a platform with no boards cannot be
- * built.
+ * Read-only inventory of what the tool can target.
+ *
+ * Both halves now come from the same place: a platform module declares the chips it
+ * supports and the boards it supports, and each board module names the chip it carries. So
+ * unlike the old no-OS model - boards from CMake presets, platforms from a separate schema
+ * tree - there is no such thing as a board the tool cannot generate for, and no
+ * generatable/unsupported split to report.
  */
 
 type ListedBoard = {
     name: string;
+    /** The chip the board carries, which is what the `platform` setting names. */
     platform?: string;
-    vendor: string;
-    chip?: string;
+    vendor?: string;
     description?: string;
 };
 
-type ListedBoards = { generatable: ListedBoard[], unsupported: ListedBoard[] };
-
-function describe_boards(boards: Board[], specs: PlatformSpecs): ListedBoards {
-    const listed = boards.map(board => ({
+function describe_boards(boards: BoardInfo[]): ListedBoard[] {
+    return boards.map(board => ({
         name: board.name,
-        platform: platform_for_board(board, specs),
+        platform: board.soc,
         vendor: board.vendor,
-        chip: board.chip,
         description: board.description,
     }));
-
-    return {
-        generatable: listed.filter(b => b.platform !== undefined),
-        unsupported: listed.filter(b => b.platform === undefined),
-    };
 }
 
 export const listBoardsCommand = buildCommand<{ json?: boolean }, []>({
@@ -56,58 +46,37 @@ export const listBoardsCommand = buildCommand<{ json?: boolean }, []>({
         }
     },
     func: async (flags) => {
-        const noos_path = get_setting_value("no_os_path");
-        if (!noos_path.ok) {
-            output_error(flags, "no_os_path is not configured. Run: attach-noos tool-config-set no_os_path <path>");
-            return;
-        }
-
-        const specs = get_platform_specs();
-        if (!specs.ok) {
-            output_error(flags, specs.error.message);
-            return;
-        }
-
-        const boards = scan_boards(noos_path.value);
+        const boards = list_boards();
         if (!boards.ok) {
             output_error(flags, boards.error.message);
             return;
         }
 
-        const data = describe_boards(boards.value, specs.value);
+        const listed = describe_boards(boards.value);
 
-        // Grouped by platform rather than listed flat: the platform is what a board
-        // gives you, and seeing two boards under one platform is also the warning that
-        // `attach-noos generate` will ask which one.
+        // Grouped by chip rather than listed flat: the chip is what a board settles, and
+        // seeing two boards under one chip is also the warning that `attach-noos generate`
+        // will ask which one.
         const by_platform = new Map<string, ListedBoard[]>();
-        for (const board of data.generatable) {
-            const key = board.platform ?? "";
+        for (const board of listed) {
+            const key = board.platform ?? "unknown";
             by_platform.set(key, [...by_platform.get(key) ?? [], board]);
         }
 
         let text = "";
         for (const platform of [...by_platform.keys()].sort()) {
-            const group = by_platform.get(platform) ?? [];
             text += `  ${platform}\n`;
-            for (const board of group) {
+            for (const board of by_platform.get(platform) ?? []) {
                 text += `      ${board.name}\n`;
             }
             text += "\n";
         }
 
-        if (data.unsupported.length > 0) {
-            text += "  no schemas - cannot generate\n";
-            for (const board of data.unsupported) {
-                text += `      ${board.name} (${board.chip ?? board.vendor})\n`;
-            }
-            text += "\n";
-        }
-
-        text += `${data.generatable.length} of ${data.generatable.length + data.unsupported.length} boards can be generated for.\n`;
+        text += `${listed.length} board${listed.length === 1 ? "" : "s"} available.\n`;
         text += "Use: attach-noos tool-config-set board <name>, then attach-noos create-workfile";
 
-        const message = `${data.generatable.length} of ${data.generatable.length + data.unsupported.length} boards can be generated for`;
-        output(flags, text, { ...common_ok(message), ...data });
+        const message = `${listed.length} board${listed.length === 1 ? "" : "s"} available`;
+        output(flags, text, { ...common_ok(message), boards: listed });
     }
 });
 
@@ -118,19 +87,23 @@ type ListedPlatform = {
     boards: string[];
 };
 
-function describe_platforms(specs: PlatformSpecs, noos_path?: string): ListedPlatform[] {
-    return Object.entries(specs).map(([name, manifest]) => {
-        // A platform with no boards is not broken: linux and mbed do not build through
-        // a board preset at all, and max32662 has schemas ahead of any board. They are
-        // exactly the platforms --platform exists for, so the count is worth showing.
-        const boards = noos_path === undefined ? undefined : boards_for_platform(noos_path, name, specs);
-        return {
-            name: name,
-            vendor: manifest.vendor,
-            description: manifest.description,
-            boards: boards?.ok === true ? boards.value.map(b => b.name) : [],
-        };
-    });
+function describe_platforms(): ListedPlatform[] {
+    const socs = list_socs();
+    if (!socs.ok) {
+        return [];
+    }
+
+    const boards = list_boards();
+    const all_boards = boards.ok ? boards.value : [];
+
+    return socs.value.map(({ soc, platform }) => ({
+        name: soc.name,
+        vendor: platform.vendor ?? platform.name,
+        description: soc.cpu,
+        // A chip with no board is not broken: it is exactly what the `platform` setting
+        // exists for, so the count is worth showing.
+        boards: all_boards.filter(board => board.soc === soc.name).map(board => board.name),
+    }));
 }
 
 export const listPlatformsCommand = buildCommand<{ json?: boolean }, []>({
@@ -142,31 +115,17 @@ export const listPlatformsCommand = buildCommand<{ json?: boolean }, []>({
         }
     },
     func: async (flags) => {
-        const specs = get_platform_specs();
-        if (!specs.ok) {
-            output_error(flags, specs.error.message);
-            return;
-        }
-
-        // Boards are a nicety here, so a missing no_os_path degrades to platforms only
-        // rather than failing: the platform list comes from the schemas alone.
-        const noos_path = get_setting_value("no_os_path");
-        const platforms = describe_platforms(specs.value, noos_path.ok ? noos_path.value : undefined);
+        const platforms = describe_platforms();
 
         let text = "";
         for (const platform of platforms) {
             text += `  ${platform.name} (${platform.vendor})\n`;
-            if (platform.boards.length > 0) {
-                text += `      boards: ${platform.boards.join(", ")}\n`;
-            } else if (noos_path.ok) {
-                text += "      boards: none - build it with --platform\n";
-            }
+            text += platform.boards.length > 0
+                ? `      boards: ${platform.boards.join(", ")}\n`
+                : "      boards: none - target it with the 'platform' setting\n";
             text += "\n";
         }
-        text += `${platforms.length} platforms`;
-        if (!noos_path.ok) {
-            text += "\n\nno_os_path is not configured, so boards are not shown.";
-        }
+        text += `${platforms.length} chips`;
 
         output(flags, text, { ...common_ok(`${platforms.length} platform${platforms.length === 1 ? "" : "s"}`), platforms });
     }

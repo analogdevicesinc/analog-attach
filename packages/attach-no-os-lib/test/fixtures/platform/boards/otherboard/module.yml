@@ -1,0 +1,21 @@
+name: otherboard
+type: platform_board
+version: "1.0.0"
+description: "A board carrying othersoc"
+
+metadata:
+  mcu: othersoc
+  vendor: testvendor
+
+# No PMOD port, so a PMOD eval board is jumper-wired to this header - the max32655fthr case.
+pinout:
+  connectors:
+    - name: "Header"
+      id: H1
+      type: feather_16
+      pins:
+        - {pin: 1, mnemonic: O0_1, role: [gpio, spi_sck],  gpio: {port: OTHER_GPIO0, number: 1}}
+        - {pin: 2, mnemonic: O0_2, role: [gpio, spi_mosi], gpio: {port: OTHER_GPIO0, number: 2}}
+        - {pin: 3, mnemonic: O0_3, role: [gpio, spi_miso], gpio: {port: OTHER_GPIO0, number: 3}}
+        - {pin: 4, mnemonic: O1_4, role: gpio,             gpio: {port: OTHER_GPIO1, number: 4}}
+        - {pin: 5, mnemonic: O1_5, role: gpio,             gpio: {port: OTHER_GPIO1, number: 5}}

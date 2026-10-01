@@ -1,309 +1,216 @@
 import { describe, test, expect, beforeEach, afterEach } from 'vitest';
-import path from 'node:path';
 import {
     create_workfile,
-    load_platform,
     add_symbol,
     set_value,
-    find_any,
-    list_symbols,
-    list_platform_ops,
-    get_platform_ops
+    export_minimal,
+    import_minimal,
+    list_available_structs,
+    suggest_for_property,
+    materialize_referenced_hidden,
 } from '../../src/workfile_handler/workfile_handler';
-import { Workfile } from '../../src/workfile_handler/types';
-import { scan_platform } from '../../src/workfile_handler/platform_scanner';
 import { validate_workfile } from '../../src/validator/validator';
-import { RulesetStruct } from '../../src/ruleset_parser/types';
-import { expectOk, setup_test_config, teardown_test_config } from '../test_utilities';
-import { load_resolved_ruleset } from '../../src/resolver/resolver';
+import { load_resolved_ruleset_for_board } from '../../src/resolver/resolver';
+import { soc_for_board, resolve_board } from '../../src/registry/platforms';
+import {
+    expectOk,
+    setup_test_config,
+    teardown_test_config,
+    FIXTURE_BOARD,
+    FIXTURE_SOC,
+} from '../test_utilities';
 
-const NOOS_ROOT = path.join(__dirname, '../bindings');
-const SCHEMAS_ROOT = path.join(NOOS_ROOT, 'schemas');
-const PLATFORMS_ROOT = path.join(SCHEMAS_ROOT, 'platforms');
+// Bringing a part up end to end, the way the layers actually compose:
+//
+//   a board peripheral (extern)  ->  a controller descriptor's $init_param
+//   a controller                 ->  the bus device that sits on it
+//   the bus device               ->  the driver's init_param, through a union member
+//   the driver's init_param      ->  constrains the bus device from above ($override)
+//
+// Every reference is a bare symbol, resolved through the registry across three separate
+// module roots, and the whole thing has to survive being written out and read back.
 
-/**
- * Mock for the device suggestion function.
- * In the real app, this would scan device bindings and return available devices.
- * For now, returns a hardcoded list of device binding paths.
- */
-function mock_suggest_devices(): string[] {
-    return [
-        "devices/adxl355/adxl355.yaml",
-        "devices/ad7124/ad7124.yaml",
-        "devices/adt7420/adt7420.yaml",
+const BOARD_CFG = 'bsp_test_spi_cfg';
+
+// How the part is selected. `native` is what the wiring resolver picks on the fixture board
+// (its PMOD port mates, and PMOD pin 1 is native chip-select 0); the rest are what the
+// part's `$any_of` has to tell apart.
+type ChipSelectChoice = 'native' | 'gpio' | 'both' | 'none' | 'native_zero';
+
+function build(chip_select: ChipSelectChoice = 'native') {
+    const workfile = create_workfile(FIXTURE_SOC);
+    expectOk(workfile);
+    workfile.value.board = FIXTURE_BOARD;
+
+    const nodes: [string, string][] = [
+        ['spi_cfg', BOARD_CFG],
+        ['spi_ctrl', 'test_spi_controller'],
+        ['part_spi_dev', 'test_spi_device'],
+        ['part_ip', 'testpart_init_param'],
     ];
+    if (chip_select === 'gpio' || chip_select === 'both') {
+        nodes.push(['part_cs', 'test_gpio_pin']);
+    }
+
+    for (const [name, type] of nodes) {
+        const ruleset = load_resolved_ruleset_for_board(type, FIXTURE_BOARD);
+        expectOk(ruleset);
+        expectOk(add_symbol(workfile.value, name, ruleset.value));
+    }
+
+    const values: [string, string, unknown][] = [
+        ['spi_ctrl', '$init_param', 'spi_cfg'],
+        ['part_spi_dev', 'controller', 'spi_ctrl'],
+        ['part_spi_dev', 'max_speed_hz', 1000000],
+        ['part_ip', 'comm_type', 'TESTPART_SPI'],
+        ['part_ip', 'comm_init', { spi_dev: 'part_spi_dev' }],
+    ];
+    if (chip_select === 'native' || chip_select === 'both') {
+        values.push(['part_spi_dev', 'native_cs', 0x1]);
+    }
+    if (chip_select === 'native_zero') {
+        values.push(['part_spi_dev', 'native_cs', 0]);
+    }
+    if (chip_select === 'gpio' || chip_select === 'both') {
+        values.push(
+            ['part_cs', 'number', 4],
+            // A hidden handle, named by the port config it wraps; materialized below.
+            ['part_cs', 'port_handle', 'bsp_test_gpio0_cfg_handle'],
+            ['part_spi_dev', 'cs_gpio', 'part_cs'],
+            ['part_spi_dev', 'cs_gpio_num', 1],
+        );
+    }
+    for (const [symbol, property, value] of values) {
+        expectOk(set_value(workfile.value, symbol, property, value));
+    }
+    expectOk(materialize_referenced_hidden(workfile.value));
+
+    return workfile.value;
 }
 
-describe('Real System Integration', () => {
-    let workfile: Workfile;
+describe('the part asks to be selectable ($any_of)', () => {
+    beforeEach(() => { setup_test_config(); });
+    afterEach(() => { teardown_test_config(); });
 
-    beforeEach(() => {
-        setup_test_config(NOOS_ROOT);
-        const result = create_workfile();
-        expectOk(result);
-        workfile = result.value;
+    function chip_select_errors(choice: ChipSelectChoice) {
+        return validate_workfile(build(choice)).errors.filter(error => error.path?.startsWith('part_spi_dev'));
+    }
+
+    test('with no chip-select at all, it says what would satisfy it', () => {
+        const errors = chip_select_errors('none');
+        expect(errors.map(error => error.path)).toEqual(['part_spi_dev.native_cs', 'part_spi_dev.cs_gpio']);
+        expect(errors[0]?.message).toBe('needs one of: cs_gpio, native_cs other than 0');
     });
 
-    afterEach(() => {
-        teardown_test_config();
+    test('a native mask of 0 selects nothing, so it is still missing', () => {
+        // 0 has a value, so native_cs passes its own required check and only cs_gpio is
+        // reported - the error lands on the field that still needs something.
+        const errors = chip_select_errors('native_zero');
+        expect(errors.map(error => `${error.path ?? ''}: ${error.message}`)).toEqual([
+            'part_spi_dev.cs_gpio: needs one of: cs_gpio, native_cs other than 0',
+        ]);
     });
 
-    describe('ADXL355 on MAX32690 via SPI', () => {
-        test('full setup flow: platform → device → spi → ops/extra → validate', () => {
-            // Step 1: User selects MAX32690 platform
-            const scan_result = scan_platform(path.join(PLATFORMS_ROOT, 'maxim/max32690'));
-            expectOk(scan_result);
-
-            // Step 2: Load platform into workfile (populates platform_ops)
-            const load_result = load_platform(workfile, scan_result.value);
-            expectOk(load_result);
-
-            // Verify platform ops are available
-            const ops_list = list_platform_ops(workfile);
-            expect(ops_list).toContain('max_spi_ops');
-            expect(ops_list).toContain('max_i2c_ops');
-
-            // Step 3: User sees available devices (mocked suggestion function)
-            const available_devices = mock_suggest_devices();
-            expect(available_devices).toContain("devices/adxl355/adxl355.yaml");
-
-            // Step 4: User selects ADXL355 - load its init_param binding file
-            const adxl355_result = load_resolved_ruleset("devices/adxl355/adxl355_init_param.yaml");
-            expectOk(adxl355_result);
-            const adxl355 = adxl355_result.value as RulesetStruct;
-            expect(adxl355.$symbol).toBe("adxl355_init_param");
-
-            const add_device_result = add_symbol(workfile, "my_adxl355", adxl355);
-            expectOk(add_device_result);
-
-            // Step 5: ADXL355 needs SPI - load the no-os SPI struct
-            const spi_binding_result = load_resolved_ruleset("no-os/spi/no_os_spi_init_param.yaml");
-            expectOk(spi_binding_result);
-            const spi_struct = spi_binding_result.value as RulesetStruct;
-
-            // Add SPI symbol for the ADXL355
-            const add_spi_result = add_symbol(workfile, "adxl355_spi", spi_struct);
-            expectOk(add_spi_result);
-
-            // Step 6: Configure SPI basic properties
-            set_value(workfile, "adxl355_spi", "device_id", 1);
-            set_value(workfile, "adxl355_spi", "chip_select", 0);
-            set_value(workfile, "adxl355_spi", "max_speed_hz", 1_000_000);
-
-            // Step 7: Set platform_ops - user picks from available ops
-            // The suggest function would show matching ops by capability
-            const spi_ops = find_any(workfile, "max_spi_ops");
-            expect(spi_ops).toBeDefined();
-            // NOTE: This is just because the toBeDefined doesn't actually narrow the object
-            if (!spi_ops) {
-                return;
-            }
-            expect(spi_ops?._t).toBe("RulesetPlatformOps");
-            if (spi_ops._t !== "RulesetPlatformOps") {
-                return;
-            }
-            expect(spi_ops?.$capability).toBe("spi");
-
-            set_value(workfile, "adxl355_spi", "platform_ops", "max_spi_ops");
-
-            // Step 8: Create platform extra struct for SPI
-            const extra_binding_result = load_resolved_ruleset("platforms/maxim/max32690/max_spi_init_param.yaml");
-            expectOk(extra_binding_result);
-            const extra_struct = extra_binding_result.value as RulesetStruct;
-
-            const add_extra_result = add_symbol(workfile, "adxl355_spi_extra", extra_struct);
-            expectOk(add_extra_result);
-
-            // Configure extra properties
-            set_value(workfile, "adxl355_spi_extra", "num_slaves", 1);
-
-            // Step 9: Link SPI extra to the extra struct
-            set_value(workfile, "adxl355_spi", "extra", "adxl355_spi_extra");
-
-            // Step 10: Configure ADXL355 - set comm_type and link to SPI
-            set_value(workfile, "my_adxl355", "comm_type", "ADXL355_SPI_COMM");
-            set_value(workfile, "my_adxl355", "dev_type", "ID_ADXL355");
-            // The union member is set via the comm_init property
-            set_value(workfile, "my_adxl355", "comm_init", { spi_init: "adxl355_spi" });
-
-            // Step 11: Validate the complete workfile
-            const validation = validate_workfile(workfile);
-
-            expect(validation.valid).toBe(true);
-            expect(validation.errors).toHaveLength(0);
-
-            // Verify final structure
-            expect(list_symbols(workfile)).toEqual([
-                "my_adxl355",
-                "adxl355_spi",
-                "adxl355_spi_extra"
-            ]);
-            expect(list_platform_ops(workfile)).toContain("max_spi_ops");
-        });
-
-        test('validation fails if platform_ops capability mismatches', () => {
-            // Setup platform
-            const scan_result = scan_platform(path.join(PLATFORMS_ROOT, 'maxim/max32690'));
-            expectOk(scan_result);
-            load_platform(workfile, scan_result.value);
-
-            // Add SPI struct
-            const spi_binding_result = load_resolved_ruleset("no-os/spi/no_os_spi_init_param.yaml");
-            expectOk(spi_binding_result);
-            add_symbol(workfile, "my_spi", spi_binding_result.value as RulesetStruct);
-
-            // Try to use I2C ops for SPI (wrong capability)
-            set_value(workfile, "my_spi", "platform_ops", "max_i2c_ops");
-
-            // Validation should fail
-            const validation = validate_workfile(workfile);
-
-            expect(validation.valid).toBe(false);
-            expect(validation.errors.some(error => error.message.includes("Capability mismatch"))).toBe(true);
-        });
-
-        test('validation fails if extra capability mismatches', () => {
-            // Setup platform
-            const scan_result = scan_platform(path.join(PLATFORMS_ROOT, 'maxim/max32690'));
-            expectOk(scan_result);
-            load_platform(workfile, scan_result.value);
-
-            // Add SPI struct
-            const spi_binding_result = load_resolved_ruleset("no-os/spi/no_os_spi_init_param.yaml");
-            expectOk(spi_binding_result);
-            add_symbol(workfile, "my_spi", spi_binding_result.value as RulesetStruct);
-
-            // Set correct ops
-            set_value(workfile, "my_spi", "platform_ops", "max_spi_ops");
-
-            // Add I2C extra struct (wrong capability for SPI)
-            const index2c_extra_result = load_resolved_ruleset("platforms/maxim/max32690/max_i2c_init_param.yaml");
-            expectOk(index2c_extra_result);
-            add_symbol(workfile, "wrong_extra", index2c_extra_result.value as RulesetStruct);
-
-            // Try to use I2C extra for SPI
-            set_value(workfile, "my_spi", "extra", "wrong_extra");
-
-            // Validation should fail
-            const validation = validate_workfile(workfile);
-
-            expect(validation.valid).toBe(false);
-            expect(validation.errors.some(error => error.message.includes("Capability mismatch"))).toBe(true);
-        });
-
-        test('suggestions show only matching capability ops', () => {
-            // Setup platform
-            const scan_result = scan_platform(path.join(PLATFORMS_ROOT, 'maxim/max32690'));
-            expectOk(scan_result);
-            load_platform(workfile, scan_result.value);
-
-            // Get all platform ops and check capabilities
-            const spi_ops = get_platform_ops(workfile, "max_spi_ops");
-            const index2c_ops = get_platform_ops(workfile, "max_i2c_ops");
-            const gpio_ops = get_platform_ops(workfile, "max_gpio_ops");
-
-            expectOk(spi_ops);
-            expectOk(index2c_ops);
-            expectOk(gpio_ops);
-
-            expect(spi_ops.value.$capability).toBe("spi");
-            expect(index2c_ops.value.$capability).toBe("i2c");
-            expect(gpio_ops.value.$capability).toBe("gpio");
-
-            // A real suggest function would filter by capability
-            const all_ops = list_platform_ops(workfile);
-            const spi_compatible = all_ops.filter(name => {
-                const ops = get_platform_ops(workfile, name);
-                return ops.ok && ops.value.$capability === "spi";
-            });
-
-            expect(spi_compatible).toEqual(["max_spi_ops"]);
-        });
+    test('a native chip-select satisfies it', () => {
+        expect(chip_select_errors('native')).toEqual([]);
     });
 
-    describe('Xilinx SPI with allowed override', () => {
-        test('SPI_ENGINE type restricts ops to spi_engine_ops only', () => {
-            // Setup Xilinx platform
-            const scan_result = scan_platform(path.join(PLATFORMS_ROOT, 'xilinx'));
-            expectOk(scan_result);
-            load_platform(workfile, scan_result.value);
+    test('a GPIO chip-select satisfies it', () => {
+        expect(chip_select_errors('gpio')).toEqual([]);
+    });
 
-            // Verify we have multiple SPI ops
-            expect(list_platform_ops(workfile)).toContain('xil_spi_ops');
-            expect(list_platform_ops(workfile)).toContain('xil_spi_pl_ops');
-            expect(list_platform_ops(workfile)).toContain('spi_eng_platform_ops');
+    test('both is fine: it is a lower bound only', () => {
+        expect(chip_select_errors('both')).toEqual([]);
+    });
+});
 
-            // Add no-os SPI struct (resolved)
-            const spi_result = load_resolved_ruleset("no-os/spi/no_os_spi_init_param.yaml");
-            expectOk(spi_result);
-            add_symbol(workfile, "my_spi", spi_result.value as RulesetStruct);
+describe('a part brought up end to end', () => {
+    beforeEach(() => { setup_test_config(); });
+    afterEach(() => { teardown_test_config(); });
 
-            // Set required SPI fields
-            set_value(workfile, "my_spi", "device_id", 0);
-            set_value(workfile, "my_spi", "chip_select", 0);
+    test('the board settles the chip, and the chip settles the board back', () => {
+        const soc = soc_for_board(FIXTURE_BOARD);
+        expectOk(soc);
+        expect(soc.value).toBe(FIXTURE_SOC);
 
-            // Add Xilinx extra with type = SPI_ENGINE (resolved - type is now EnumProperty)
-            const extra_result = load_resolved_ruleset("platforms/xilinx/xil_spi_init_param.yaml");
-            expectOk(extra_result);
-            add_symbol(workfile, "my_xil_extra", extra_result.value as RulesetStruct);
-            set_value(workfile, "my_xil_extra", "type", "SPI_ENGINE");
+        const board = resolve_board(soc.value);
+        expectOk(board);
+        expect(board.value.name).toBe(FIXTURE_BOARD);
+    });
 
-            // Link extra to parent
-            set_value(workfile, "my_spi", "extra", "my_xil_extra");
+    test('it validates', () => {
+        const result = validate_workfile(build());
+        expect(result.errors).toEqual([]);
+        expect(result.valid).toBe(true);
+    });
 
-            // Try to use xil_spi_ops (should fail - not in allowed list for SPI_ENGINE)
-            set_value(workfile, "my_spi", "platform_ops", "xil_spi_ops");
+    test('a board peripheral is assignable to a descriptor that includes its type', () => {
+        // The extern is synthesized from board.yml and matches on $provides, which is how
+        // bsp_test_spi_cfg lands on a controller whose $init_param includes test_spi_config.
+        const workfile = build();
+        const result = validate_workfile(workfile);
+        expect(result.valid).toBe(true);
+        expect(workfile.symbols['spi_cfg']._t).toBe('RulesetExtern');
+    });
 
-            let validation = validate_workfile(workfile);
-            expect(validation.valid).toBe(false);
-            expect(validation.errors.some(error => error.message.includes("not in the allowed list"))).toBe(true);
+    test('the driver constrains the bus device from above', () => {
+        // testpart_init_param caps max_speed_hz at 10 MHz through its union member, without
+        // test_spi_device knowing a driver exists.
+        const workfile = build();
+        expectOk(set_value(workfile, 'part_spi_dev', 'max_speed_hz', 20000000));
 
-            // Use spi_eng_platform_ops (should pass)
-            set_value(workfile, "my_spi", "platform_ops", "spi_eng_platform_ops");
+        const result = validate_workfile(workfile);
+        expect(result.valid).toBe(false);
+        expect(result.errors.some(error => error.message.includes('above the maximum 10000000'))).toBe(true);
+    });
 
-            validation = validate_workfile(workfile);
-            expect(validation.valid).toBe(true);
-        });
+    test('and locks the mode it needs', () => {
+        const workfile = build();
+        expectOk(set_value(workfile, 'part_spi_dev', 'mode', 'TEST_SPI_MODE_3'));
 
-        test('SPI_PL type allows both spi_ops and spi_pl_ops', () => {
-            // Setup Xilinx platform
-            const scan_result = scan_platform(path.join(PLATFORMS_ROOT, 'xilinx'));
-            expectOk(scan_result);
-            load_platform(workfile, scan_result.value);
+        const result = validate_workfile(workfile);
+        expect(result.valid).toBe(false);
+        expect(result.errors.some(error => error.message.includes('TEST_SPI_MODE_3'))).toBe(true);
+    });
 
-            // Add no-os SPI struct (resolved)
-            const spi_result = load_resolved_ruleset("no-os/spi/no_os_spi_init_param.yaml");
-            expectOk(spi_result);
-            add_symbol(workfile, "my_spi", spi_result.value as RulesetStruct);
+    test('a value within the constraint is accepted', () => {
+        const workfile = build();
+        expectOk(set_value(workfile, 'part_spi_dev', 'mode', 'TEST_SPI_MODE_0'));
+        expect(validate_workfile(workfile).valid).toBe(true);
+    });
 
-            // Set required SPI fields
-            set_value(workfile, "my_spi", "device_id", 0);
-            set_value(workfile, "my_spi", "chip_select", 0);
+    test('the board offers its peripherals, and only its own', () => {
+        const workfile = build();
+        const available = list_available_structs(workfile);
+        expectOk(available);
 
-            // Add Xilinx extra with type = SPI_PL (resolved)
-            const extra_result = load_resolved_ruleset("platforms/xilinx/xil_spi_init_param.yaml");
-            expectOk(extra_result);
-            add_symbol(workfile, "my_xil_extra", extra_result.value as RulesetStruct);
-            set_value(workfile, "my_xil_extra", "type", "SPI_PL");
+        expect(available.value.by_module[FIXTURE_BOARD]).toContain(BOARD_CFG);
+        // The other board declares the same symbol; it is not in play here.
+        expect(available.value.by_module['otherboard']).toBeUndefined();
+    });
 
-            // Link extra to parent
-            set_value(workfile, "my_spi", "extra", "my_xil_extra");
+    test('a union suggests the member that fits', () => {
+        const workfile = build();
+        const suggestions = suggest_for_property(workfile, 'part_ip', 'comm_init', 'spi_dev');
+        expectOk(suggestions);
+        expect(suggestions.value.values).toContain('part_spi_dev');
+    });
 
-            // xil_spi_ops should work
-            set_value(workfile, "my_spi", "platform_ops", "xil_spi_ops");
-            let validation = validate_workfile(workfile);
-            expect(validation.valid).toBe(true);
+    test('it survives being written out and read back', () => {
+        const workfile = build();
 
-            // xil_spi_pl_ops should also work
-            set_value(workfile, "my_spi", "platform_ops", "xil_spi_pl_ops");
-            validation = validate_workfile(workfile);
-            expect(validation.valid).toBe(true);
+        const exported = export_minimal(workfile);
+        expectOk(exported);
+        expect(exported.value.board).toBe(FIXTURE_BOARD);
+        // The board extern round-trips on its $compatible alone, having nothing to configure.
+        expect(exported.value.symbols['spi_cfg']).toEqual({ $compatible: BOARD_CFG });
 
-            // spi_eng_platform_ops should fail
-            set_value(workfile, "my_spi", "platform_ops", "spi_eng_platform_ops");
-            validation = validate_workfile(workfile);
-            expect(validation.valid).toBe(false);
-            expect(validation.errors.some(error => error.message.includes("not in the allowed list"))).toBe(true);
-        });
+        const reimported = import_minimal(exported.value);
+        expectOk(reimported);
+        expect(validate_workfile(reimported.value).valid).toBe(true);
+
+        const again = export_minimal(reimported.value);
+        expectOk(again);
+        expect(again.value).toEqual(exported.value);
     });
 });

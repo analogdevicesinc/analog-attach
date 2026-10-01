@@ -1,11 +1,5 @@
-$id: "test/include_override"
 $type: struct
 $symbol: test_struct
-$ranking: 4
-$sources:
-  headers:
-    - "test.h"
-
 config:
   include: "path/to/config.yaml"
 
