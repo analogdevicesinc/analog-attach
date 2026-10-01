@@ -21,6 +21,7 @@ import type { Workfile } from "../workfile_handler/types";
 import { all_ops, resolve_reference, suggest_platform_extra } from "../workfile_handler/workfile_handler";
 import { load_resolved_ruleset } from "../resolver/resolver";
 import { provides_interface } from "../registry/drivers";
+import { format_number_in } from "../ruleset_parser/number_format";
 import { apply_overrides } from "./override_resolver";
 import type { CollectedRule, ValidationError } from "./types";
 
@@ -322,6 +323,9 @@ function validate_platform_extra(
 function validate_number(property: NumberProperty, context: ParseContext): ValidationError[] {
 	const errors: ValidationError[] = [];
 	const value = property.value;
+	// Every number in these messages reads the way the field does, so a hex field is never
+	// reported in decimal the reader then has to convert back.
+	const shown = (shown_value: number) => format_number_in(shown_value, property.format);
 	
 	if (typeof value !== "number") {
 		errors.push({
@@ -355,7 +359,7 @@ function validate_number(property: NumberProperty, context: ParseContext): Valid
 	if (property.minimum !== undefined && value < property.minimum) {
 		errors.push({
 			path: context.path,
-			message: `Value ${value.toString()} is below the minimum ${property.minimum.toString()}`,
+			message: `Value ${shown(value)} is below the minimum ${shown(property.minimum)}`,
 			severity: "error"
 		});
 	}
@@ -363,7 +367,7 @@ function validate_number(property: NumberProperty, context: ParseContext): Valid
 	if (property.maximum !== undefined && value > property.maximum) {
 		errors.push({
 			path: context.path,
-			message: `Value ${value.toString()} is above the maximum ${property.maximum.toString()}`,
+			message: `Value ${shown(value)} is above the maximum ${shown(property.maximum)}`,
 			severity: "error"
 		});
 	}
@@ -373,7 +377,7 @@ function validate_number(property: NumberProperty, context: ParseContext): Valid
 	if (property.values !== undefined && property.values.length > 0 && !property.values.includes(value)) {
 		errors.push({
 			path: context.path,
-			message: `Value ${value.toString()} is not one of: ${property.values.join(", ")}`,
+			message: `Value ${shown(value)} is not one of: ${property.values.map(allowed => shown(allowed)).join(", ")}`,
 			severity: "error"
 		});
 	}

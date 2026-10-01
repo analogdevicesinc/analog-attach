@@ -83,6 +83,19 @@ export function parse_number_property(name: string, object: Record<string, unkno
 		return capability;
 	}
 
+	const format = optional(object, "format", context, string_);
+	if (!format.ok) {
+		return format;
+	}
+	if (format.value !== undefined && format.value !== "hex") {
+		return error(`Unknown number format '${format.value}'. Expected 'hex'.`, at(context, "format").path);
+	}
+	// A hex float is not a thing anyone wants to read, and C's hex float literals mean
+	// something else entirely, so the key is integer-only.
+	if (format.value !== undefined && !is_integer_symbol(type_.value)) {
+		return error(`'format: ${format.value}' needs an integer type, but '${name}' is ${type_.value}`, at(context, "format").path);
+	}
+
 	return ok({
 		_t: "NumberProperty",
 		name: name,
@@ -93,6 +106,7 @@ export function parse_number_property(name: string, object: Record<string, unkno
 		minimum: minimum.value,
 		maximum: maximum.value,
 		capability: capability.value,
+		format: format.value,
 	});
 }
 

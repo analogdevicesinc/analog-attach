@@ -62,7 +62,19 @@ export type NumberProperty<S extends PrimitiveSymbol = PrimitiveSymbol> = Proper
 	// the two the part actually answers on. Set by override only: a bound that is a handful
 	// of values rather than a range cannot be written as minimum/maximum.
 	values?: number[],
+	// How this field reads as a number. An address, a bitmask or a register value is hex to
+	// anyone working with the datasheet, and `.address = 29` is materially harder to check
+	// against one than `.address = 0x1D`.
+	//
+	// Declared on the FIELD rather than remembered per value, because a workfile is JSON and
+	// JSON has no hex literal: whatever the author typed, the stored value is 29. Putting it
+	// here also means a value entered in decimal still emits as hex, which is what someone
+	// reading the generated C wants.
+	format?: NumberFormat,
 };
+
+/** Radix a numeric field reads in. Absent means decimal. */
+export type NumberFormat = "hex";
 
 export type BooleanProperty = PropertyBase & {
 	_t: "BooleanProperty",
