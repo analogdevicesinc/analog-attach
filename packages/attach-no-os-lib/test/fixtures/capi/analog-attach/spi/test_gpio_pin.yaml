@@ -1,0 +1,7 @@
+$type: struct
+$symbol: test_gpio_pin
+$description: "One GPIO pin"
+number:
+  type: uint8_t
+  required: true
+  description: "Pin number within its port"

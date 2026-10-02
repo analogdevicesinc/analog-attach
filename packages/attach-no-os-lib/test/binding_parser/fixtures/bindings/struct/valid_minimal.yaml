@@ -1,7 +1,2 @@
-$id: "test/minimal_struct"
 $type: struct
 $symbol: minimal_init_param
-$ranking: 4
-$sources:
-  headers:
-    - "test.h"

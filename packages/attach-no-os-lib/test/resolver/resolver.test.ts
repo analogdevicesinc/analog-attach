@@ -1,107 +1,95 @@
 import { describe, test, expect, beforeEach, afterEach } from 'vitest';
-import path from 'node:path';
+import fs from 'node:fs';
 import { resolve_ruleset, load_resolved_ruleset } from '../../src/resolver/resolver';
 import { parse_ruleset } from '../../src/ruleset_parser/ruleset_parser';
+import { resolve_entry } from '../../src/registry/registry';
 import { RulesetStruct } from '../../src/ruleset_parser/types';
-import { expectOk, setup_test_config, teardown_test_config, setup_no_config, teardown_no_config } from '../test_utilities';
-import fs from 'node:fs';
+import {
+    expectErrorContains,
+    expectOk,
+    setup_test_config,
+    teardown_test_config,
+    setup_no_config,
+    teardown_no_config,
+} from '../test_utilities';
 
-const NOOS_ROOT = path.join(__dirname, '../bindings');
-const SCHEMAS_ROOT = path.join(NOOS_ROOT, 'schemas');
+// Resolution follows a ruleset's `include:` references, each of which names a bare symbol.
+// Its one transformation is lowering an include-of-an-enum into an EnumProperty, so a
+// consumer sees a value set rather than a reference to chase.
+
+function fixture(symbol: string) {
+    const entry = resolve_entry(symbol);
+    expectOk(entry);
+    const parsed = parse_ruleset(fs.readFileSync(entry.value.file, 'utf8'));
+    expectOk(parsed);
+    return parsed.value;
+}
 
 describe('resolver', () => {
-    beforeEach(() => {
-        setup_test_config(NOOS_ROOT);
-    });
-
-    afterEach(() => {
-        teardown_test_config();
-    });
+    beforeEach(() => { setup_test_config(); });
+    afterEach(() => { teardown_test_config(); });
 
     describe('resolve_ruleset', () => {
-        test('resolves enum include to EnumProperty', () => {
-            const content = fs.readFileSync(
-                path.join(SCHEMAS_ROOT, 'platforms/xilinx/xil_spi_init_param.yaml'),
-                'utf8'
-            );
-            const parsed = parse_ruleset(content);
-            expectOk(parsed);
-
-            const resolved = resolve_ruleset(parsed.value);
+        test('an include of an enum is lowered to an EnumProperty', () => {
+            const resolved = resolve_ruleset(fixture('test_spi_device'));
             expectOk(resolved);
 
-            const struct = resolved.value as RulesetStruct;
-            const type_property = struct.properties.find(p => p.name === 'type');
-
-            expect(type_property).toBeDefined();
-            expect(type_property!._t).toBe('EnumProperty');
-            expect(type_property!._t === 'EnumProperty' && type_property.values).toContain('SPI_PS');
-            expect(type_property!._t === 'EnumProperty' && type_property.values).toContain('SPI_PL');
-            expect(type_property!._t === 'EnumProperty' && type_property.values).toContain('SPI_ENGINE');
+            const mode = (resolved.value as RulesetStruct).properties.find(p => p.name === 'mode');
+            expect(mode?._t).toBe('EnumProperty');
+            expect(mode?._t === 'EnumProperty' && mode.values).toEqual(['TEST_SPI_MODE_0', 'TEST_SPI_MODE_3']);
+            // The enum's own default comes along, so the including field needs no copy of it.
+            expect(mode?._t === 'EnumProperty' && mode.default).toBe('TEST_SPI_MODE_0');
         });
 
-        test('keeps struct include as IncludeProperty', () => {
-            const content = fs.readFileSync(
-                path.join(SCHEMAS_ROOT, 'no-os/spi/no_os_spi_init_param.yaml'),
-                'utf8'
-            );
-            const parsed = parse_ruleset(content);
-            expectOk(parsed);
-
-            const resolved = resolve_ruleset(parsed.value);
+        test('an include of anything else stays a reference', () => {
+            const resolved = resolve_ruleset(fixture('test_spi_device'));
             expectOk(resolved);
 
-            const struct = resolved.value as RulesetStruct;
-            const mode_property = struct.properties.find(p => p.name === 'mode');
-
-            expect(mode_property).toBeDefined();
-            // mode includes an enum, so should become EnumProperty
-            expect(mode_property!._t).toBe('EnumProperty');
+            const controller = (resolved.value as RulesetStruct).properties.find(p => p.name === 'controller');
+            expect(controller?._t).toBe('IncludeProperty');
+            expect(controller?._t === 'IncludeProperty' && controller.include).toBe('test_spi_controller');
         });
 
-        test('non-struct rulesets pass through unchanged', () => {
-            const content = fs.readFileSync(
-                path.join(SCHEMAS_ROOT, 'no-os/enums/no_os_spi_mode.yaml'),
-                'utf8'
-            );
-            const parsed = parse_ruleset(content);
-            expectOk(parsed);
-
-            const resolved = resolve_ruleset(parsed.value);
+        test('a non-struct passes through unchanged', () => {
+            const resolved = resolve_ruleset(fixture('test_spi_mode'));
             expectOk(resolved);
-
             expect(resolved.value._t).toBe('RulesetEnum');
+        });
+
+        test('a descriptor resolves by checking its $init_param names a struct', () => {
+            const resolved = resolve_ruleset(fixture('test_spi_controller'));
+            expectOk(resolved);
+            expect(resolved.value._t).toBe('RulesetDescriptor');
         });
     });
 
     describe('load_resolved_ruleset', () => {
-        test('loads and resolves in one call', () => {
-            const result = load_resolved_ruleset('platforms/xilinx/xil_spi_init_param.yaml');
+        test('loads and resolves in one call, by symbol', () => {
+            const result = load_resolved_ruleset('test_spi_device');
             expectOk(result);
 
-            const struct = result.value as RulesetStruct;
-            const type_property = struct.properties.find(p => p.name === 'type');
-
-            expect(type_property).toBeDefined();
-            expect(type_property!._t).toBe('EnumProperty');
+            const mode = (result.value as RulesetStruct).properties.find(p => p.name === 'mode');
+            expect(mode?._t).toBe('EnumProperty');
         });
 
-        test('returns error for non-existent file', () => {
-            const result = load_resolved_ruleset('nonexistent.yaml');
-            expect(result.ok).toBe(false);
+        test('reaches across modules, since a symbol names no location', () => {
+            // testpart_init_param is in the driver collection; its union member points at a
+            // struct in the interface module.
+            const result = load_resolved_ruleset('testpart_init_param');
+            expectOk(result);
         });
 
-        test('returns error if schemas_path not set', () => {
+        test('an unknown symbol is an error that names it', () => {
+            expectErrorContains(load_resolved_ruleset('no_such_symbol'), "Unknown ruleset 'no_such_symbol'");
+        });
+
+        test('an unconfigured root is reported as the unset setting it is', () => {
+            // A missing config file is not an error in itself - attach-meta reads the
+            // settings before anything is configured - so the failure is the unset setting.
             setup_no_config();
-            const result = load_resolved_ruleset('no-os/spi/no_os_spi_init_param.yaml');
+            const result = load_resolved_ruleset('test_spi_device');
             teardown_no_config();
-            expect(result.ok).toBe(false);
-            if (!result.ok) {
-                // A missing config file is no longer an error in itself — attach-meta reads
-                // the settings before anything is configured — so the failure comes from
-                // the setting being unset.
-                expect(result.error.message).toContain('"no_os_path" is not configured');
-            }
+            expectErrorContains(result, '"capi_path" is not configured');
         });
     });
 });

@@ -1,12 +1,6 @@
-$id: "test/with_readonly_list"
 $type: struct
 $symbol: app_init_param
 $description: "A struct whose list is filled in by generated code"
-$ranking: 2
-$sources:
-  headers:
-    - "app.h"
-
 name:
   type: string
 

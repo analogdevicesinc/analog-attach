@@ -1,14 +1,6 @@
-$id: "test/with_props"
 $type: struct
 $symbol: config_param
 $description: "A struct with properties"
-$ranking: 2
-$sources:
-  headers:
-    - "config.h"
-  sources:
-    - "config.c"
-
 enabled:
   type: bool
   default: true

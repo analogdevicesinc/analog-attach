@@ -1,0 +1,8 @@
+schema_version: "1.0"
+
+rulesets:
+  structs:
+    - test_spi_extra.yaml
+  platform_ops:
+    - test_spi_ops.yaml
+    - test_gpio_ops.yaml

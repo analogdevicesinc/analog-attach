@@ -1,11 +1,5 @@
-$id: "test/switch_numeric_enum"
 $type: struct
 $symbol: test_struct
-$ranking: 4
-$sources:
-  headers:
-    - "test.h"
-
 mode:
   type: enum
   values: [0, 1]

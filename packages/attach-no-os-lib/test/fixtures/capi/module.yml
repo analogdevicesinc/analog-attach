@@ -1,0 +1,9 @@
+name: capi-test
+type: interface
+version: "1.0.0"
+description: "Generic interface structs, standing in for capi"
+
+build:
+  includes: [inc]
+
+rulesets_file: analog-attach/module.yml

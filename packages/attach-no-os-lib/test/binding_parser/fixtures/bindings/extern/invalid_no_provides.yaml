@@ -1,5 +1,3 @@
-$id: "test/extern"
 $type: extern
 $symbol: iio_test_device
-$ranking: 4
 $header: "drivers/test/iio_test.h"

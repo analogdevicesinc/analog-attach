@@ -1,0 +1,7 @@
+$type: enum
+$symbol: testpart_comm_type
+$description: "Which bus the part is wired to"
+values:
+  TESTPART_SPI: "SPI"
+  TESTPART_NONE: "Not connected"
+default: TESTPART_SPI

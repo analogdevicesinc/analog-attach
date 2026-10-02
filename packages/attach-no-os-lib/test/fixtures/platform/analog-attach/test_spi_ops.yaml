@@ -1,0 +1,4 @@
+$type: platform_ops
+$symbol: test_spi_ops
+$description: "Platform SPI ops table"
+$capability: spi

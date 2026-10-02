@@ -1,0 +1,9 @@
+$type: descriptor
+$symbol: test_spi_controller
+$description: "Controller handle produced by test_spi_init()"
+$init_function: test_spi_init
+$remove_function: test_spi_deinit
+$init_param:
+  include: test_spi_config
+  pointer: true
+  required: true

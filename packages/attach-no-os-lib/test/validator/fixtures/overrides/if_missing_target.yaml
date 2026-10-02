@@ -1,9 +1,6 @@
 # $if condition references a parent property that does not exist — never matches.
-$id: "child.yaml"
 $type: struct
 $symbol: child
-$ranking: 4
-$sources: { noos: ["test.h"] }
 $override:
   $parent:
     - $if:

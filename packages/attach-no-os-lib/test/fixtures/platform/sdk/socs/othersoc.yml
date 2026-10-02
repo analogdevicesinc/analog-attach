@@ -1,0 +1,8 @@
+schema_version: "1.0"
+soc: othersoc
+platform: platform-test
+family: othersoc
+arch: arm
+cpu: cortex-m4
+peripherals:
+  spi: {count: 1, instances: [0]}

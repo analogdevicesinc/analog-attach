@@ -1,0 +1,17 @@
+schema_version: "1.0"
+
+# Kind of board peripheral -> the C type it has. `mystery` is deliberately absent so the
+# tests can check that an unknown kind is skipped with a warning rather than refused.
+bsp_kinds:
+  spi:       test_spi_config
+  gpio_pin:  test_gpio_pin
+
+rulesets:
+  enums:
+    - enums/test_spi_mode.yaml
+  spi:
+    - spi/test_spi_config.yaml
+    - spi/test_spi_controller.yaml
+    - spi/test_spi_device.yaml
+    - spi/test_gpio_pin.yaml
+    - spi/test_array_holder.yaml

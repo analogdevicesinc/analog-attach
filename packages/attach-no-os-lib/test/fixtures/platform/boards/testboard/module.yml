@@ -1,0 +1,8 @@
+name: testboard
+type: platform_board
+version: "1.0.0"
+description: "A board carrying testsoc"
+
+metadata:
+  mcu: testsoc
+  vendor: testvendor

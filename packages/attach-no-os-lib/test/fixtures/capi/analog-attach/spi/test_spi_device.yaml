@@ -1,0 +1,27 @@
+$type: struct
+$symbol: test_spi_device
+$description: "One device on a SPI bus"
+controller:
+  include: test_spi_controller
+  pointer: true
+  required: true
+  description: "Controller this device is connected to"
+max_speed_hz:
+  type: uint32_t
+  required: true
+  description: "Maximum transfer speed the device supports"
+mode:
+  include: test_spi_mode
+  description: "SPI mode the device expects"
+native_cs:
+  type: uint16_t
+  format: hex
+  description: "Native chip-select bitmask"
+cs_gpio:
+  include: test_gpio_pin
+  pointer: true
+  count: cs_gpio_num
+  description: "GPIO chip-selects"
+cs_gpio_num:
+  type: uint8_t
+  description: "Number of entries in cs_gpio"

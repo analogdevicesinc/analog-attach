@@ -1,9 +1,9 @@
-import { describe, test, expect } from 'vitest';
+import { describe, test, expect, beforeEach, afterEach } from 'vitest';
 import path from 'node:path';
 import fs from 'node:fs';
 import { validate_workfile } from '../../src/validator/validator';
 import { parse_ruleset } from '../../src/ruleset_parser/ruleset_parser';
-import { expectOk } from '../test_utilities';
+import { expectOk, setup_test_config, teardown_test_config } from '../test_utilities';
 import {
     RulesetStruct,
     RulesetType,
@@ -19,22 +19,19 @@ import {
     PlatformExtraProperty
 } from '../../src/ruleset_parser/types';
 import { Workfile } from '../../src/workfile_handler/types';
-import { scan_platform } from '../../src/workfile_handler/platform_scanner';
-import { load_platform } from '../../src/workfile_handler/workfile_handler';
 
+// A struct is identified by its $symbol: that is what an `include:` has to name and what
+// the registry keys on. Build facts are not here at all - they belong to the module.yml of
+// whichever module ships the symbol.
 function make_struct(
-    id: string,
     name: string,
     properties: RulesetStruct['properties'] = []
 ): RulesetStruct {
     return {
         _t: "RulesetStruct",
-        $id: id,
         $type: RulesetType.RT_STRUCT,
         $symbol: name,
         $description: "Test struct",
-        $ranking: 4,
-        $sources: { headers: ["test.h"] },
         properties,
     };
 }
@@ -134,15 +131,12 @@ function make_workfile(symbols: Record<string, RulesetStruct>, platform_ops: Rec
     return { platform_ops, exposed_ops: {}, symbols };
 }
 
-function make_platform_ops(id: string, name: string, capability?: string): RulesetPlatformOps {
+function make_platform_ops(name: string, capability?: string): RulesetPlatformOps {
     return {
         _t: "RulesetPlatformOps",
-        $id: id,
         $type: RulesetType.RT_PLATFORM_OPS,
         $symbol: name,
         $description: "Test ops",
-        $ranking: 4,
-        $sources: { headers: ["test.h"] },
         $capability: capability,
     };
 }
@@ -168,29 +162,28 @@ function make_platform_extra_property(name: string, options: Partial<PlatformExt
 }
 
 function make_struct_with_capability(
-    id: string,
     name: string,
     capability: string,
     properties: RulesetStruct['properties'] = []
 ): RulesetStruct {
     return {
         _t: "RulesetStruct",
-        $id: id,
         $type: RulesetType.RT_STRUCT,
         $symbol: name,
         $description: "Test struct",
-        $ranking: 4,
-        $sources: { headers: ["test.h"] },
         $capability: capability,
         properties,
     };
 }
 
 describe('validate_workfile', () => {
+    beforeEach(() => { setup_test_config(); });
+    afterEach(() => { teardown_test_config(); });
+
     describe('number property validation', () => {
         test('valid number passes', () => {
             const workfile = make_workfile({
-                my_struct: make_struct("test.yaml", "test", [
+                my_struct: make_struct("test", [
                     make_number("count", { value: 42, minimum: 0, maximum: 100 })
                 ])
             });
@@ -201,7 +194,7 @@ describe('validate_workfile', () => {
 
         test('number below minimum fails', () => {
             const workfile = make_workfile({
-                my_struct: make_struct("test.yaml", "test", [
+                my_struct: make_struct("test", [
                     make_number("count", { value: -5, minimum: 0 })
                 ])
             });
@@ -214,7 +207,7 @@ describe('validate_workfile', () => {
 
         test('number above maximum fails', () => {
             const workfile = make_workfile({
-                my_struct: make_struct("test.yaml", "test", [
+                my_struct: make_struct("test", [
                     make_number("count", { value: 150, maximum: 100 })
                 ])
             });
@@ -227,7 +220,7 @@ describe('validate_workfile', () => {
 
         test('wrong type fails', () => {
             const workfile = make_workfile({
-                my_struct: make_struct("test.yaml", "test", [
+                my_struct: make_struct("test", [
                     make_number("count", { value: "not a number" as any })
                 ])
             });
@@ -238,7 +231,7 @@ describe('validate_workfile', () => {
 
         test('fractional value on an integer type fails', () => {
             const workfile = make_workfile({
-                my_struct: make_struct("test.yaml", "test", [
+                my_struct: make_struct("test", [
                     make_number("count", { type: "uint32_t", value: 1.5 })
                 ])
             });
@@ -251,7 +244,7 @@ describe('validate_workfile', () => {
 
         test('fractional value on a float passes', () => {
             const workfile = make_workfile({
-                my_struct: make_struct("test.yaml", "test", [
+                my_struct: make_struct("test", [
                     make_number("gain", { type: "float", value: 1.5, minimum: 0, maximum: 2 })
                 ])
             });
@@ -262,7 +255,7 @@ describe('validate_workfile', () => {
 
         test('fractional value on a double passes', () => {
             const workfile = make_workfile({
-                my_struct: make_struct("test.yaml", "test", [
+                my_struct: make_struct("test", [
                     make_number("vref", { type: "double", value: 3.3 })
                 ])
             });
@@ -273,7 +266,7 @@ describe('validate_workfile', () => {
 
         test('float below minimum fails', () => {
             const workfile = make_workfile({
-                my_struct: make_struct("test.yaml", "test", [
+                my_struct: make_struct("test", [
                     make_number("gain", { type: "float", value: 0.05, minimum: 0.1 })
                 ])
             });
@@ -285,7 +278,7 @@ describe('validate_workfile', () => {
 
         test('non-finite value fails', () => {
             const workfile = make_workfile({
-                my_struct: make_struct("test.yaml", "test", [
+                my_struct: make_struct("test", [
                     make_number("gain", { type: "float", value: Number.POSITIVE_INFINITY })
                 ])
             });
@@ -299,7 +292,7 @@ describe('validate_workfile', () => {
     describe('boolean property validation', () => {
         test('valid boolean passes', () => {
             const workfile = make_workfile({
-                my_struct: make_struct("test.yaml", "test", [
+                my_struct: make_struct("test", [
                     make_boolean("flag", { value: true })
                 ])
             });
@@ -309,7 +302,7 @@ describe('validate_workfile', () => {
 
         test('wrong type fails', () => {
             const workfile = make_workfile({
-                my_struct: make_struct("test.yaml", "test", [
+                my_struct: make_struct("test", [
                     make_boolean("flag", { value: "true" as any })
                 ])
             });
@@ -322,7 +315,7 @@ describe('validate_workfile', () => {
     describe('string property validation', () => {
         test('valid string passes', () => {
             const workfile = make_workfile({
-                my_struct: make_struct("test.yaml", "test", [
+                my_struct: make_struct("test", [
                     make_string("name", { value: "hello" })
                 ])
             });
@@ -332,7 +325,7 @@ describe('validate_workfile', () => {
 
         test('wrong type fails', () => {
             const workfile = make_workfile({
-                my_struct: make_struct("test.yaml", "test", [
+                my_struct: make_struct("test", [
                     make_string("name", { value: 123 as any })
                 ])
             });
@@ -345,7 +338,7 @@ describe('validate_workfile', () => {
     describe('enum property validation', () => {
         test('valid enum value passes', () => {
             const workfile = make_workfile({
-                my_struct: make_struct("test.yaml", "test", [
+                my_struct: make_struct("test", [
                     make_enum("mode", ["fast", "slow"], { value: "fast" })
                 ])
             });
@@ -355,7 +348,7 @@ describe('validate_workfile', () => {
 
         test('invalid enum value fails', () => {
             const workfile = make_workfile({
-                my_struct: make_struct("test.yaml", "test", [
+                my_struct: make_struct("test", [
                     make_enum("mode", ["fast", "slow"], { value: "medium" })
                 ])
             });
@@ -369,7 +362,7 @@ describe('validate_workfile', () => {
     describe('required property validation', () => {
         test('required property without value fails', () => {
             const workfile = make_workfile({
-                my_struct: make_struct("test.yaml", "test", [
+                my_struct: make_struct("test", [
                     make_number("count", { required: true })
                 ])
             });
@@ -380,7 +373,7 @@ describe('validate_workfile', () => {
 
         test('optional property without value passes', () => {
             const workfile = make_workfile({
-                my_struct: make_struct("test.yaml", "test", [
+                my_struct: make_struct("test", [
                     make_number("count", { required: false })
                 ])
             });
@@ -392,7 +385,7 @@ describe('validate_workfile', () => {
     describe('disabled property validation', () => {
         test('disabled property is skipped', () => {
             const workfile = make_workfile({
-                my_struct: make_struct("test.yaml", "test", [
+                my_struct: make_struct("test", [
                     make_number("count", { disabled: true, required: true })
                 ])
             });
@@ -406,7 +399,7 @@ describe('validate_workfile', () => {
     describe('readonly property validation', () => {
         test('readonly property is skipped', () => {
             const workfile = make_workfile({
-                my_struct: make_struct("test.yaml", "test", [
+                my_struct: make_struct("test", [
                     make_number("nb_devices", { readonly: true, required: true })
                 ])
             });
@@ -416,8 +409,8 @@ describe('validate_workfile', () => {
 
         test('a readonly include is not required to point anywhere', () => {
             const workfile = make_workfile({
-                my_struct: make_struct("test.yaml", "test", [
-                    make_include("devices", "missing.yaml", { readonly: true, pointer: true, required: true })
+                my_struct: make_struct("test", [
+                    make_include("devices", "no_such_symbol", { readonly: true, pointer: true, required: true })
                 ])
             });
             const result = validate_workfile(workfile);
@@ -428,9 +421,9 @@ describe('validate_workfile', () => {
     describe('include property validation', () => {
         test('valid include passes', () => {
             const workfile = make_workfile({
-                my_spi: make_struct("no-os/spi.yaml", "spi_init_param", []),
-                my_device: make_struct("device.yaml", "device", [
-                    make_include("spi", "no-os/spi.yaml", { value: "my_spi" })
+                my_spi: make_struct("spi_init_param", []),
+                my_device: make_struct("device", [
+                    make_include("spi", "spi_init_param", { value: "my_spi" })
                 ])
             });
             const result = validate_workfile(workfile);
@@ -439,8 +432,8 @@ describe('validate_workfile', () => {
 
         test('include with missing target fails', () => {
             const workfile = make_workfile({
-                my_device: make_struct("device.yaml", "device", [
-                    make_include("spi", "no-os/spi.yaml", { value: "nonexistent" })
+                my_device: make_struct("device", [
+                    make_include("spi", "spi_init_param", { value: "nonexistent" })
                 ])
             });
             const result = validate_workfile(workfile);
@@ -450,9 +443,9 @@ describe('validate_workfile', () => {
 
         test('include with type mismatch fails', () => {
             const workfile = make_workfile({
-                my_i2c: make_struct("no-os/i2c.yaml", "i2c_init_param", []),
-                my_device: make_struct("device.yaml", "device", [
-                    make_include("spi", "no-os/spi.yaml", { value: "my_i2c" })
+                my_i2c: make_struct("i2c_init_param", []),
+                my_device: make_struct("device", [
+                    make_include("spi", "spi_init_param", { value: "my_i2c" })
                 ])
             });
             const result = validate_workfile(workfile);
@@ -464,11 +457,11 @@ describe('validate_workfile', () => {
     describe('union property validation', () => {
         test('valid union passes', () => {
             const workfile = make_workfile({
-                my_spi: make_struct("no-os/spi.yaml", "spi", []),
-                my_device: make_struct("device.yaml", "device", [
+                my_spi: make_struct("spi", []),
+                my_device: make_struct("device", [
                     make_union("comm", [
-                        make_include("spi", "no-os/spi.yaml"),
-                        make_include("i2c", "no-os/i2c.yaml"),
+                        make_include("spi", "spi"),
+                        make_include("i2c", "i2c_init_param"),
                     ], { value: { "spi": "my_spi" } })
                 ])
             });
@@ -478,10 +471,10 @@ describe('validate_workfile', () => {
 
         test('union with unknown member fails', () => {
             const workfile = make_workfile({
-                my_spi: make_struct("no-os/spi.yaml", "spi", []),
-                my_device: make_struct("device.yaml", "device", [
+                my_spi: make_struct("spi", []),
+                my_device: make_struct("device", [
                     make_union("comm", [
-                        make_include("spi", "no-os/spi.yaml"),
+                        make_include("spi", "spi"),
                     ], { value: { "uart": "my_spi" } })
                 ])
             });
@@ -492,12 +485,12 @@ describe('validate_workfile', () => {
 
         test('union with multiple keys fails', () => {
             const workfile = make_workfile({
-                my_spi: make_struct("no-os/spi.yaml", "spi", []),
-                my_i2c: make_struct("no-os/i2c.yaml", "i2c", []),
-                my_device: make_struct("device.yaml", "device", [
+                my_spi: make_struct("spi", []),
+                my_i2c: make_struct("i2c", []),
+                my_device: make_struct("device", [
                     make_union("comm", [
-                        make_include("spi", "no-os/spi.yaml"),
-                        make_include("i2c", "no-os/i2c.yaml"),
+                        make_include("spi", "spi"),
+                        make_include("i2c", "i2c"),
                     ], { value: { "spi": "my_spi", "i2c": "my_i2c" } })
                 ])
             });
@@ -510,10 +503,10 @@ describe('validate_workfile', () => {
     describe('array property validation', () => {
         test('valid array passes', () => {
             const workfile = make_workfile({
-                gpio1: make_struct("no-os/gpio.yaml", "gpio", []),
-                gpio2: make_struct("no-os/gpio.yaml", "gpio", []),
-                my_device: make_struct("device.yaml", "device", [
-                    make_array("gpios", 2, make_include("element", "no-os/gpio.yaml"), { value: ["gpio1", "gpio2"] })
+                gpio1: make_struct("gpio", []),
+                gpio2: make_struct("gpio", []),
+                my_device: make_struct("device", [
+                    make_array("gpios", 2, make_include("element", "gpio"), { value: ["gpio1", "gpio2"] })
                 ])
             });
             const result = validate_workfile(workfile);
@@ -522,11 +515,11 @@ describe('validate_workfile', () => {
 
         test('array exceeding max size fails', () => {
             const workfile = make_workfile({
-                gpio1: make_struct("no-os/gpio.yaml", "gpio", []),
-                gpio2: make_struct("no-os/gpio.yaml", "gpio", []),
-                gpio3: make_struct("no-os/gpio.yaml", "gpio", []),
-                my_device: make_struct("device.yaml", "device", [
-                    make_array("gpios", 2, make_include("element", "no-os/gpio.yaml"), { value: ["gpio1", "gpio2", "gpio3"] })
+                gpio1: make_struct("gpio", []),
+                gpio2: make_struct("gpio", []),
+                gpio3: make_struct("gpio", []),
+                my_device: make_struct("device", [
+                    make_array("gpios", 2, make_include("element", "gpio"), { value: ["gpio1", "gpio2", "gpio3"] })
                 ])
             });
             const result = validate_workfile(workfile);
@@ -536,9 +529,9 @@ describe('validate_workfile', () => {
 
         test('array with fewer elements than max passes', () => {
             const workfile = make_workfile({
-                gpio1: make_struct("no-os/gpio.yaml", "gpio", []),
-                my_device: make_struct("device.yaml", "device", [
-                    make_array("gpios", 2, make_include("element", "no-os/gpio.yaml"), { value: ["gpio1"] })
+                gpio1: make_struct("gpio", []),
+                my_device: make_struct("device", [
+                    make_array("gpios", 2, make_include("element", "gpio"), { value: ["gpio1"] })
                 ])
             });
             const result = validate_workfile(workfile);
@@ -547,9 +540,9 @@ describe('validate_workfile', () => {
 
         test('array with missing element fails', () => {
             const workfile = make_workfile({
-                gpio1: make_struct("no-os/gpio.yaml", "gpio", []),
-                my_device: make_struct("device.yaml", "device", [
-                    make_array("gpios", 2, make_include("element", "no-os/gpio.yaml"), { value: ["gpio1", "nonexistent"] })
+                gpio1: make_struct("gpio", []),
+                my_device: make_struct("device", [
+                    make_array("gpios", 2, make_include("element", "gpio"), { value: ["gpio1", "nonexistent"] })
                 ])
             });
             const result = validate_workfile(workfile);
@@ -560,9 +553,9 @@ describe('validate_workfile', () => {
 
         test('array with valid enum values passes', () => {
             const workfile = make_workfile({
-                my_device: make_struct("device.yaml", "device", [
-                    make_array("modes", 3, make_include("element", "devices/ad5592r/enums/ad5592r_channel_mode.yaml"), {
-                        value: ["CH_MODE_ADC", "CH_MODE_DAC", "CH_MODE_UNUSED"]
+                my_device: make_struct("device", [
+                    make_array("modes", 3, make_include("element", "test_spi_mode"), {
+                        value: ["TEST_SPI_MODE_0", "TEST_SPI_MODE_3", "TEST_SPI_MODE_0"]
                     })
                 ])
             });
@@ -572,9 +565,9 @@ describe('validate_workfile', () => {
 
         test('array with invalid enum value fails', () => {
             const workfile = make_workfile({
-                my_device: make_struct("device.yaml", "device", [
-                    make_array("modes", 3, make_include("element", "devices/ad5592r/enums/ad5592r_channel_mode.yaml"), {
-                        value: ["CH_MODE_ADC", "INVALID_MODE", "CH_MODE_UNUSED"]
+                my_device: make_struct("device", [
+                    make_array("modes", 3, make_include("element", "test_spi_mode"), {
+                        value: ["TEST_SPI_MODE_0", "INVALID_MODE", "TEST_SPI_MODE_3"]
                     })
                 ])
             });
@@ -586,8 +579,8 @@ describe('validate_workfile', () => {
 
         test('array with non-array value fails', () => {
             const workfile = make_workfile({
-                my_device: make_struct("device.yaml", "device", [
-                    make_array("modes", 3, make_include("element", "devices/ad5592r/enums/ad5592r_channel_mode.yaml"), {
+                my_device: make_struct("device", [
+                    make_array("modes", 3, make_include("element", "test_spi_mode"), {
                         value: "not an array" as unknown as string[]
                     })
                 ])
@@ -606,9 +599,9 @@ describe('validate_workfile', () => {
     describe('static override validation', () => {
         test('$parent static override modifies constraints', () => {
             const child = parse_override_fixture("static_parent.yaml");
-            const parent = make_struct("parent.yaml", "parent", [
+            const parent = make_struct("parent", [
                 make_number("device_id", { value: 5, maximum: 10 }),
-                make_include("extra", "child.yaml", { value: "my_child" })
+                make_include("extra", "child", { value: "my_child" })
             ]);
 
             const workfile = make_workfile({
@@ -628,9 +621,9 @@ describe('validate_workfile', () => {
             // The parent's same-named device_id (value 5) must stay unconstrained —
             // if scope leaked, 5 > 4 would fail. Child's own device_id (0) satisfies 4.
             const child = parse_override_fixture("static_this.yaml", { device_id: 0 });
-            const parent = make_struct("parent.yaml", "parent", [
+            const parent = make_struct("parent", [
                 make_number("device_id", { value: 5, maximum: 10 }),
-                make_include("extra", "child.yaml", { value: "my_child" })
+                make_include("extra", "child", { value: "my_child" })
             ]);
 
             const workfile = make_workfile({
@@ -646,10 +639,10 @@ describe('validate_workfile', () => {
     describe('conditional override validation', () => {
         test('$if override applies when condition matches', () => {
             const child = parse_override_fixture("if_parent.yaml");
-            const parent = make_struct("parent.yaml", "parent", [
+            const parent = make_struct("parent", [
                 make_enum("mode", ["fast", "slow"], { value: "fast" }),
                 make_number("speed", { value: 50 }),
-                make_include("extra", "child.yaml", { value: "my_child" })
+                make_include("extra", "child", { value: "my_child" })
             ]);
 
             const workfile = make_workfile({
@@ -665,10 +658,10 @@ describe('validate_workfile', () => {
 
         test('$if override does not apply when condition does not match', () => {
             const child = parse_override_fixture("if_parent.yaml");
-            const parent = make_struct("parent.yaml", "parent", [
+            const parent = make_struct("parent", [
                 make_enum("mode", ["fast", "slow"], { value: "slow" }),
                 make_number("speed", { value: 50 }),
-                make_include("extra", "child.yaml", { value: "my_child" })
+                make_include("extra", "child", { value: "my_child" })
             ]);
 
             const workfile = make_workfile({
@@ -684,10 +677,10 @@ describe('validate_workfile', () => {
     describe('mutex validation', () => {
         test('mutex with one value passes', () => {
             const child = parse_override_fixture("mutex_parent.yaml");
-            const parent = make_struct("parent.yaml", "parent", [
+            const parent = make_struct("parent", [
                 make_number("opt_a", { value: 1 }),
                 make_number("opt_b"),
-                make_include("extra", "child.yaml", { value: "my_child" })
+                make_include("extra", "child", { value: "my_child" })
             ]);
 
             const workfile = make_workfile({
@@ -703,10 +696,10 @@ describe('validate_workfile', () => {
             // Both opt_a and opt_b set: each disables the other, so both are
             // disabled-but-set. The engine reports each with its mutex reason.
             const child = parse_override_fixture("mutex_parent.yaml");
-            const parent = make_struct("parent.yaml", "parent", [
+            const parent = make_struct("parent", [
                 make_number("opt_a", { value: 1 }),
                 make_number("opt_b", { value: 2 }),
-                make_include("extra", "child.yaml", { value: "my_child" })
+                make_include("extra", "child", { value: "my_child" })
             ]);
 
             const workfile = make_workfile({
@@ -727,10 +720,10 @@ describe('validate_workfile', () => {
             // are left unset so the mutex is satisfied. The parent's same-named
             // both-set properties are unaffected (no mutex on the parent).
             const child = parse_override_fixture("mutex_this.yaml");
-            const parent = make_struct("parent.yaml", "parent", [
+            const parent = make_struct("parent", [
                 make_number("opt_a", { value: 1 }),
                 make_number("opt_b", { value: 2 }),
-                make_include("extra", "child.yaml", { value: "my_child" })
+                make_include("extra", "child", { value: "my_child" })
             ]);
 
             const workfile = make_workfile({
@@ -746,10 +739,10 @@ describe('validate_workfile', () => {
     describe('switch override validation', () => {
         test('$switch override applies matching case', () => {
             const child = parse_override_fixture("switch_parent.yaml");
-            const parent = make_struct("parent.yaml", "parent", [
+            const parent = make_struct("parent", [
                 make_enum("mode", ["fast", "slow"], { value: "fast" }),
                 make_number("speed", { value: 50 }),
-                make_include("extra", "child.yaml", { value: "my_child" })
+                make_include("extra", "child", { value: "my_child" })
             ]);
 
             const workfile = make_workfile({
@@ -765,10 +758,10 @@ describe('validate_workfile', () => {
 
         test('$switch override does not apply non-matching case', () => {
             const child = parse_override_fixture("switch_parent_single.yaml");
-            const parent = make_struct("parent.yaml", "parent", [
+            const parent = make_struct("parent", [
                 make_enum("mode", ["fast", "slow"], { value: "slow" }),
                 make_number("speed", { value: 50 }),
-                make_include("extra", "child.yaml", { value: "my_child" })
+                make_include("extra", "child", { value: "my_child" })
             ]);
 
             const workfile = make_workfile({
@@ -782,9 +775,9 @@ describe('validate_workfile', () => {
 
         test('$switch with $this scope checks child property', () => {
             const child = parse_override_fixture("switch_this.yaml", { child_mode: "a" });
-            const parent = make_struct("parent.yaml", "parent", [
+            const parent = make_struct("parent", [
                 make_number("speed", { value: 50 }),
-                make_include("extra", "child.yaml", { value: "my_child" })
+                make_include("extra", "child", { value: "my_child" })
             ]);
 
             const workfile = make_workfile({
@@ -803,10 +796,10 @@ describe('validate_workfile', () => {
         // chip_select tables) were fully inert.
         test('$switch matches a numeric case against a numeric value', () => {
             const child = parse_override_fixture("switch_numeric_parent.yaml");
-            const parent = make_struct("parent.yaml", "parent", [
+            const parent = make_struct("parent", [
                 make_number("device_id", { value: 0 }),
                 make_number("speed", { value: 50 }),
-                make_include("extra", "child.yaml", { value: "my_child" })
+                make_include("extra", "child", { value: "my_child" })
             ]);
 
             const workfile = make_workfile({
@@ -824,10 +817,10 @@ describe('validate_workfile', () => {
             // device_id 1 selects the maximum: 10 case, which speed 50 violates —
             // proving the OTHER numeric case was selected, not merely that one fired.
             const child = parse_override_fixture("switch_numeric_parent.yaml");
-            const parent = make_struct("parent.yaml", "parent", [
+            const parent = make_struct("parent", [
                 make_number("device_id", { value: 1 }),
                 make_number("speed", { value: 50 }),
-                make_include("extra", "child.yaml", { value: "my_child" })
+                make_include("extra", "child", { value: "my_child" })
             ]);
 
             const workfile = make_workfile({
@@ -843,10 +836,10 @@ describe('validate_workfile', () => {
 
         test('$switch `_` case fires when no other case matches', () => {
             const child = parse_override_fixture("switch_default_parent.yaml");
-            const parent = make_struct("parent.yaml", "parent", [
+            const parent = make_struct("parent", [
                 make_number("device_id", { value: 7 }),
                 make_number("speed", { value: 50 }),
-                make_include("extra", "child.yaml", { value: "my_child" })
+                make_include("extra", "child", { value: "my_child" })
             ]);
 
             const workfile = make_workfile({
@@ -864,10 +857,10 @@ describe('validate_workfile', () => {
             // device_id 0 hits the explicit case, so only its minimum applies and the
             // default's maximum: 10 must not also fire.
             const child = parse_override_fixture("switch_default_parent.yaml");
-            const parent = make_struct("parent.yaml", "parent", [
+            const parent = make_struct("parent", [
                 make_number("device_id", { value: 0 }),
                 make_number("speed", { value: 100 }),
-                make_include("extra", "child.yaml", { value: "my_child" })
+                make_include("extra", "child", { value: "my_child" })
             ]);
 
             const workfile = make_workfile({
@@ -881,10 +874,10 @@ describe('validate_workfile', () => {
 
         test('$switch `_` case does not fire when $on is unset', () => {
             const child = parse_override_fixture("switch_default_parent.yaml");
-            const parent = make_struct("parent.yaml", "parent", [
+            const parent = make_struct("parent", [
                 make_number("device_id"),
                 make_number("speed", { value: 50 }),
-                make_include("extra", "child.yaml", { value: "my_child" })
+                make_include("extra", "child", { value: "my_child" })
             ]);
 
             const workfile = make_workfile({
@@ -898,10 +891,10 @@ describe('validate_workfile', () => {
 
         test('$switch reports a case that can never match a $parent enum', () => {
             const child = parse_override_fixture("switch_parent_bad_case.yaml");
-            const parent = make_struct("parent.yaml", "parent", [
+            const parent = make_struct("parent", [
                 make_enum("mode", ["fast", "slow"], { value: "fast" }),
                 make_number("speed", { value: 150 }),
-                make_include("extra", "child.yaml", { value: "my_child" })
+                make_include("extra", "child", { value: "my_child" })
             ]);
 
             const workfile = make_workfile({
@@ -918,9 +911,9 @@ describe('validate_workfile', () => {
 
         test('$switch skips when $on property not found', () => {
             const child = parse_override_fixture("switch_missing_on.yaml");
-            const parent = make_struct("parent.yaml", "parent", [
+            const parent = make_struct("parent", [
                 make_number("speed", { value: 50 }),
-                make_include("extra", "child.yaml", { value: "my_child" })
+                make_include("extra", "child", { value: "my_child" })
             ]);
 
             const workfile = make_workfile({
@@ -936,9 +929,9 @@ describe('validate_workfile', () => {
     describe('conditional override edge cases', () => {
         test('$if skips when condition target not found', () => {
             const child = parse_override_fixture("if_missing_target.yaml");
-            const parent = make_struct("parent.yaml", "parent", [
+            const parent = make_struct("parent", [
                 make_number("speed", { value: 50 }),
-                make_include("extra", "child.yaml", { value: "my_child" })
+                make_include("extra", "child", { value: "my_child" })
             ]);
 
             const workfile = make_workfile({
@@ -954,7 +947,7 @@ describe('validate_workfile', () => {
     describe('multiple errors', () => {
         test('returns all errors, not just first', () => {
             const workfile = make_workfile({
-                my_struct: make_struct("test.yaml", "test", [
+                my_struct: make_struct("test", [
                     make_number("a", { value: -1, minimum: 0 }),
                     make_number("b", { value: 200, maximum: 100 }),
                     make_number("c", { required: true })
@@ -970,12 +963,12 @@ describe('validate_workfile', () => {
         test('valid platform_ops passes', () => {
             const workfile = make_workfile(
                 {
-                    my_spi: make_struct_with_capability("no-os/spi.yaml", "spi_init", "spi", [
+                    my_spi: make_struct_with_capability("spi_init", "spi", [
                         make_platform_ops_property("platform_ops", { value: "spi_ops" })
                     ])
                 },
                 {
-                    spi_ops: make_platform_ops("platform/spi_ops.yaml", "spi_ops", "spi")
+                    spi_ops: make_platform_ops("spi_ops", "spi")
                 }
             );
             const result = validate_workfile(workfile);
@@ -985,7 +978,7 @@ describe('validate_workfile', () => {
         test('missing platform_ops symbol fails', () => {
             const workfile = make_workfile(
                 {
-                    my_spi: make_struct_with_capability("no-os/spi.yaml", "spi_init", "spi", [
+                    my_spi: make_struct_with_capability("spi_init", "spi", [
                         make_platform_ops_property("platform_ops", { value: "nonexistent_ops" })
                     ])
                 },
@@ -999,12 +992,12 @@ describe('validate_workfile', () => {
         test('capability mismatch fails', () => {
             const workfile = make_workfile(
                 {
-                    my_spi: make_struct_with_capability("no-os/spi.yaml", "spi_init", "spi", [
+                    my_spi: make_struct_with_capability("spi_init", "spi", [
                         make_platform_ops_property("platform_ops", { value: "gpio_ops" })
                     ])
                 },
                 {
-                    gpio_ops: make_platform_ops("platform/gpio_ops.yaml", "gpio_ops", "gpio")
+                    gpio_ops: make_platform_ops("gpio_ops", "gpio")
                 }
             );
             const result = validate_workfile(workfile);
@@ -1017,12 +1010,12 @@ describe('validate_workfile', () => {
         test('no capability on parent skips capability check', () => {
             const workfile = make_workfile(
                 {
-                    my_struct: make_struct("test.yaml", "test", [
+                    my_struct: make_struct("test", [
                         make_platform_ops_property("platform_ops", { value: "spi_ops" })
                     ])
                 },
                 {
-                    spi_ops: make_platform_ops("platform/spi_ops.yaml", "spi_ops", "spi")
+                    spi_ops: make_platform_ops("spi_ops", "spi")
                 }
             );
             const result = validate_workfile(workfile);
@@ -1032,7 +1025,7 @@ describe('validate_workfile', () => {
         test('no value skips validation (not required)', () => {
             const workfile = make_workfile(
                 {
-                    my_spi: make_struct_with_capability("no-os/spi.yaml", "spi_init", "spi", [
+                    my_spi: make_struct_with_capability("spi_init", "spi", [
                         make_platform_ops_property("platform_ops")
                     ])
                 },
@@ -1045,7 +1038,7 @@ describe('validate_workfile', () => {
         test('required platform_ops without value fails', () => {
             const workfile = make_workfile(
                 {
-                    my_spi: make_struct_with_capability("no-os/spi.yaml", "spi_init", "spi", [
+                    my_spi: make_struct_with_capability("spi_init", "spi", [
                         make_platform_ops_property("platform_ops", { required: true })
                     ])
                 },
@@ -1061,10 +1054,10 @@ describe('validate_workfile', () => {
         test('valid platform_extra passes', () => {
             const workfile = make_workfile(
                 {
-                    my_spi: make_struct_with_capability("no-os/spi.yaml", "spi_init", "spi", [
+                    my_spi: make_struct_with_capability("spi_init", "spi", [
                         make_platform_extra_property("extra", { value: "my_spi_extra" })
                     ]),
-                    my_spi_extra: make_struct_with_capability("platform/max_spi.yaml", "max_spi", "spi", [])
+                    my_spi_extra: make_struct_with_capability("max_spi", "spi", [])
                 },
                 {}
             );
@@ -1075,7 +1068,7 @@ describe('validate_workfile', () => {
         test('missing platform_extra symbol fails', () => {
             const workfile = make_workfile(
                 {
-                    my_spi: make_struct_with_capability("no-os/spi.yaml", "spi_init", "spi", [
+                    my_spi: make_struct_with_capability("spi_init", "spi", [
                         make_platform_extra_property("extra", { value: "nonexistent" })
                     ])
                 },
@@ -1089,10 +1082,10 @@ describe('validate_workfile', () => {
         test('capability mismatch fails', () => {
             const workfile = make_workfile(
                 {
-                    my_spi: make_struct_with_capability("no-os/spi.yaml", "spi_init", "spi", [
+                    my_spi: make_struct_with_capability("spi_init", "spi", [
                         make_platform_extra_property("extra", { value: "my_gpio_extra" })
                     ]),
-                    my_gpio_extra: make_struct_with_capability("platform/max_gpio.yaml", "max_gpio", "gpio", [])
+                    my_gpio_extra: make_struct_with_capability("max_gpio", "gpio", [])
                 },
                 {}
             );
@@ -1106,10 +1099,10 @@ describe('validate_workfile', () => {
         test('no capability on parent skips capability check', () => {
             const workfile = make_workfile(
                 {
-                    my_struct: make_struct("test.yaml", "test", [
+                    my_struct: make_struct("test", [
                         make_platform_extra_property("extra", { value: "my_extra" })
                     ]),
-                    my_extra: make_struct_with_capability("platform/extra.yaml", "extra", "spi", [])
+                    my_extra: make_struct_with_capability("extra", "spi", [])
                 },
                 {}
             );
@@ -1120,7 +1113,7 @@ describe('validate_workfile', () => {
         test('no value skips validation (not required)', () => {
             const workfile = make_workfile(
                 {
-                    my_spi: make_struct_with_capability("no-os/spi.yaml", "spi_init", "spi", [
+                    my_spi: make_struct_with_capability("spi_init", "spi", [
                         make_platform_extra_property("extra")
                     ])
                 },
@@ -1131,24 +1124,17 @@ describe('validate_workfile', () => {
         });
 
         test('required platform_extra without value fails when platform types exist', () => {
-            // Load a real platform that has spi extra structs
-            const PLATFORM_PATH = path.join(__dirname, '../bindings/schemas/platforms/maxim/max32690');
-            const scan_result = scan_platform(PLATFORM_PATH);
-            if (!scan_result.ok) throw new Error("Failed to scan platform");
-
-            const workfile: Workfile = {
-                platform: "max32690",
-                platform_ops: {},
-                exposed_ops: {},
-                symbols: {
-                    my_spi: {
-                        ...make_struct_with_capability("no-os/spi/no_os_spi_init_param.yaml", "no_os_spi_init_param", "spi", [
-                            make_platform_extra_property("extra", { required: true })
-                        ])
-                    }
-                }
-            };
-            load_platform(workfile, scan_result.value);
+            // A required `extra` is only an error when the platform actually offers one to
+            // put there, so this needs a platform module that ships a matching struct --
+            // test_spi_extra carries $capability: spi in the fixture platform.
+            const workfile = make_workfile(
+                {
+                    my_spi: make_struct_with_capability("test_spi_config", "spi", [
+                        make_platform_extra_property("extra", { required: true })
+                    ])
+                },
+                {}
+            );
 
             const result = validate_workfile(workfile);
             expect(result.valid).toBe(false);
@@ -1156,15 +1142,16 @@ describe('validate_workfile', () => {
         });
 
         test('required platform_extra without value passes if no valid extras exist', () => {
-            // Edge case: platform doesn't have an extra struct for this capability
-            // In this case, required extra should be skipped
+            // A required `extra` with nothing that could fill it is not the user's mistake,
+            // so it is skipped rather than reported. The capability here is one no
+            // configured module provides; the i2c struct is present to show that an extra
+            // with a different capability does not count as a candidate.
             const workfile = make_workfile(
                 {
-                    my_spi: make_struct_with_capability("no-os/spi.yaml", "spi_init", "spi", [
+                    my_uart: make_struct_with_capability("uart_init", "uart", [
                         make_platform_extra_property("extra", { required: true })
                     ]),
-                    // Add an extra with different capability - should not match
-                    unrelated_extra: make_struct_with_capability("platform/i2c_extra.yaml", "i2c_extra", "i2c", [])
+                    unrelated_extra: make_struct_with_capability("i2c_extra", "i2c", [])
                 },
                 {}
             );
@@ -1177,16 +1164,16 @@ describe('validate_workfile', () => {
         test('ops in allowed list passes', () => {
             const workfile = make_workfile(
                 {
-                    my_spi: make_struct_with_capability("no-os/spi.yaml", "spi_init", "spi", [
+                    my_spi: make_struct_with_capability("spi_init", "spi", [
                         make_platform_ops_property("platform_ops", {
                             value: "spi_ops_a",
-                            allowed: ["platform/spi_ops_a.yaml", "platform/spi_ops_b.yaml"]
+                            allowed: ["spi_ops_a", "spi_ops_b"]
                         })
                     ])
                 },
                 {
-                    spi_ops_a: make_platform_ops("platform/spi_ops_a.yaml", "spi_ops_a", "spi"),
-                    spi_ops_b: make_platform_ops("platform/spi_ops_b.yaml", "spi_ops_b", "spi")
+                    spi_ops_a: make_platform_ops("spi_ops_a", "spi"),
+                    spi_ops_b: make_platform_ops("spi_ops_b", "spi")
                 }
             );
             const result = validate_workfile(workfile);
@@ -1196,17 +1183,17 @@ describe('validate_workfile', () => {
         test('ops not in allowed list fails', () => {
             const workfile = make_workfile(
                 {
-                    my_spi: make_struct_with_capability("no-os/spi.yaml", "spi_init", "spi", [
+                    my_spi: make_struct_with_capability("spi_init", "spi", [
                         make_platform_ops_property("platform_ops", {
                             value: "spi_ops_c",
-                            allowed: ["platform/spi_ops_a.yaml", "platform/spi_ops_b.yaml"]
+                            allowed: ["spi_ops_a", "spi_ops_b"]
                         })
                     ])
                 },
                 {
-                    spi_ops_a: make_platform_ops("platform/spi_ops_a.yaml", "spi_ops_a", "spi"),
-                    spi_ops_b: make_platform_ops("platform/spi_ops_b.yaml", "spi_ops_b", "spi"),
-                    spi_ops_c: make_platform_ops("platform/spi_ops_c.yaml", "spi_ops_c", "spi")
+                    spi_ops_a: make_platform_ops("spi_ops_a", "spi"),
+                    spi_ops_b: make_platform_ops("spi_ops_b", "spi"),
+                    spi_ops_c: make_platform_ops("spi_ops_c", "spi")
                 }
             );
             const result = validate_workfile(workfile);
@@ -1217,15 +1204,15 @@ describe('validate_workfile', () => {
         test('allowed overrides capability check - mismatch is warning not error', () => {
             const workfile = make_workfile(
                 {
-                    my_spi: make_struct_with_capability("no-os/spi.yaml", "spi_init", "spi", [
+                    my_spi: make_struct_with_capability("spi_init", "spi", [
                         make_platform_ops_property("platform_ops", {
                             value: "gpio_ops",
-                            allowed: ["platform/gpio_ops.yaml"]  // override allows gpio ops for spi
+                            allowed: ["gpio_ops"]  // override allows gpio ops for spi
                         })
                     ])
                 },
                 {
-                    gpio_ops: make_platform_ops("platform/gpio_ops.yaml", "gpio_ops", "gpio")
+                    gpio_ops: make_platform_ops("gpio_ops", "gpio")
                 }
             );
             const result = validate_workfile(workfile);
@@ -1239,13 +1226,13 @@ describe('validate_workfile', () => {
         test('extra in allowed list passes', () => {
             const workfile = make_workfile(
                 {
-                    my_spi: make_struct_with_capability("no-os/spi.yaml", "spi_init", "spi", [
+                    my_spi: make_struct_with_capability("spi_init", "spi", [
                         make_platform_extra_property("extra", {
                             value: "my_extra",
-                            allowed: ["platform/extra_a.yaml", "platform/extra_b.yaml"]
+                            allowed: ["extra_a", "extra_b"]
                         })
                     ]),
-                    my_extra: make_struct_with_capability("platform/extra_a.yaml", "extra_a", "spi", [])
+                    my_extra: make_struct_with_capability("extra_a", "spi", [])
                 },
                 {}
             );
@@ -1256,13 +1243,13 @@ describe('validate_workfile', () => {
         test('extra not in allowed list fails', () => {
             const workfile = make_workfile(
                 {
-                    my_spi: make_struct_with_capability("no-os/spi.yaml", "spi_init", "spi", [
+                    my_spi: make_struct_with_capability("spi_init", "spi", [
                         make_platform_extra_property("extra", {
                             value: "my_extra",
-                            allowed: ["platform/extra_a.yaml", "platform/extra_b.yaml"]
+                            allowed: ["extra_a", "extra_b"]
                         })
                     ]),
-                    my_extra: make_struct_with_capability("platform/extra_c.yaml", "extra_c", "spi", [])
+                    my_extra: make_struct_with_capability("extra_c", "spi", [])
                 },
                 {}
             );
@@ -1282,11 +1269,11 @@ describe('validate_workfile', () => {
 
         test('a two-symbol value cycle is an error on both symbols', () => {
             const workfile = make_workfile({
-                bus: make_struct("bus.yaml", "bus_t", [
+                bus: make_struct("bus_t", [
                     make_include("dev", "dev.yaml", { value: "dev" })
                 ]),
-                dev: make_struct("dev.yaml", "dev_t", [
-                    make_include("bus", "bus.yaml", { value: "bus" })
+                dev: make_struct("dev_t", [
+                    make_include("bus", "bus_t", { value: "bus" })
                 ])
             });
 
@@ -1300,9 +1287,9 @@ describe('validate_workfile', () => {
         // of just naming a set of suspects.
         test('the error names the chain that closes the loop', () => {
             const workfile = make_workfile({
-                a: make_struct("a.yaml", "a_t", [make_include("to_b", "b.yaml", { value: "b" })]),
-                b: make_struct("b.yaml", "b_t", [make_include("to_c", "c.yaml", { value: "c" })]),
-                c: make_struct("c.yaml", "c_t", [make_include("to_a", "a.yaml", { value: "a" })])
+                a: make_struct("a_t", [make_include("to_b", "b.yaml", { value: "b" })]),
+                b: make_struct("b_t", [make_include("to_c", "c.yaml", { value: "c" })]),
+                c: make_struct("c_t", [make_include("to_a", "a.yaml", { value: "a" })])
             });
 
             const result = validate_workfile(workfile);
@@ -1318,10 +1305,10 @@ describe('validate_workfile', () => {
         // traced rather than taken from the leftover set.
         test('a symbol that only depends on a cycle is not blamed for it', () => {
             const workfile = make_workfile({
-                a: make_struct("a.yaml", "a_t", [make_include("to_b", "b.yaml", { value: "b" })]),
-                b: make_struct("b.yaml", "b_t", [make_include("to_a", "a.yaml", { value: "a" })]),
-                observer: make_struct("obs.yaml", "obs_t", [
-                    make_include("watches", "a.yaml", { value: "a" })
+                a: make_struct("a_t", [make_include("to_b", "b.yaml", { value: "b" })]),
+                b: make_struct("b_t", [make_include("to_a", "a.yaml", { value: "a" })]),
+                observer: make_struct("obs_t", [
+                    make_include("watches", "a_t", { value: "a" })
                 ])
             });
 
@@ -1333,10 +1320,10 @@ describe('validate_workfile', () => {
         // Two unrelated loops are two findings; retiring one walk must not hide the other.
         test('independent cycles are reported separately', () => {
             const workfile = make_workfile({
-                a: make_struct("a.yaml", "a_t", [make_include("to_b", "b.yaml", { value: "b" })]),
-                b: make_struct("b.yaml", "b_t", [make_include("to_a", "a.yaml", { value: "a" })]),
-                x: make_struct("x.yaml", "x_t", [make_include("to_y", "y.yaml", { value: "y" })]),
-                y: make_struct("y.yaml", "y_t", [make_include("to_x", "x.yaml", { value: "x" })])
+                a: make_struct("a_t", [make_include("to_b", "b.yaml", { value: "b" })]),
+                b: make_struct("b_t", [make_include("to_a", "a.yaml", { value: "a" })]),
+                x: make_struct("x_t", [make_include("to_y", "y.yaml", { value: "y" })]),
+                y: make_struct("y_t", [make_include("to_x", "x.yaml", { value: "x" })])
             });
 
             const result = validate_workfile(workfile);
@@ -1348,8 +1335,8 @@ describe('validate_workfile', () => {
         // must not ALSO be reported as a cycle, so one defect stays one error.
         test('a value self-reference is reported once, as a self-reference', () => {
             const workfile = make_workfile({
-                loop: make_struct("loop.yaml", "loop_t", [
-                    make_include("me", "loop.yaml", { value: "loop" })
+                loop: make_struct("loop_t", [
+                    make_include("me", "loop_t", { value: "loop" })
                 ])
             });
 
@@ -1364,8 +1351,8 @@ describe('validate_workfile', () => {
         // the separate self-reference rule looks at ALL edges and still rejects it.
         test('a pointer self-reference is still rejected', () => {
             const workfile = make_workfile({
-                loop: make_struct("loop.yaml", "loop_t", [
-                    make_include("me", "loop.yaml", { value: "loop", pointer: true })
+                loop: make_struct("loop_t", [
+                    make_include("me", "loop_t", { value: "loop", pointer: true })
                 ])
             });
 
@@ -1378,11 +1365,11 @@ describe('validate_workfile', () => {
         // An array of embedded structs is a value edge too, so a loop through one counts.
         test('a cycle through an array of embedded includes is caught', () => {
             const workfile = make_workfile({
-                parent: make_struct("parent.yaml", "parent_t", [
-                    make_array("kids", 2, make_include("kid", "child.yaml"), { value: ["child"] })
+                parent: make_struct("parent_t", [
+                    make_array("kids", 2, make_include("kid", "child"), { value: ["child"] })
                 ]),
-                child: make_struct("child.yaml", "child_t", [
-                    make_include("owner", "parent.yaml", { value: "parent" })
+                child: make_struct("child_t", [
+                    make_include("owner", "parent_t", { value: "parent" })
                 ])
             });
 

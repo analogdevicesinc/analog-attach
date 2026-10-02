@@ -1,11 +1,5 @@
-$id: "test/invalid_min"
 $type: struct
 $symbol: test_struct
-$ranking: 4
-$sources:
-  headers:
-    - "test.h"
-
 value:
   type: uint8_t
   minimum: 10

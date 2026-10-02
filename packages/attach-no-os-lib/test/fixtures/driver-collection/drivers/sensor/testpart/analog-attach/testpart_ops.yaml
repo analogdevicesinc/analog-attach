@@ -1,0 +1,5 @@
+$type: extern
+$symbol: testpart_ops
+$provides: test_sensor_ops
+$header: testpart.h
+$description: "This driver's ops table"

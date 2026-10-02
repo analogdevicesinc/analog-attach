@@ -1,0 +1,13 @@
+$type: struct
+$symbol: test_array_holder
+$description: "Holds a fixed array, for the array handling paths"
+modes:
+  type: array
+  size: 3
+  element:
+    include: test_spi_mode
+  description: "One mode per channel"
+flag:
+  type: bool
+  default: false
+  description: "A boolean, for round-trip coverage"

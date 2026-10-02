@@ -1,0 +1,9 @@
+schema_version: "1.0"
+
+rulesets:
+  enums:
+    - enums/testpart_comm_type.yaml
+  structs:
+    - testpart_init_param.yaml
+  externs:
+    - testpart_ops.yaml

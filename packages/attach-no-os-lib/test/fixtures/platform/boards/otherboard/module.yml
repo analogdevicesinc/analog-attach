@@ -1,0 +1,8 @@
+name: otherboard
+type: platform_board
+version: "1.0.0"
+description: "A board carrying othersoc"
+
+metadata:
+  mcu: othersoc
+  vendor: testvendor

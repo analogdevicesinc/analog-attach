@@ -1,0 +1,14 @@
+schema_version: "1.0"
+# The keys ARE the C symbol names the board's BSP defines; the values are inputs to the
+# platform's own BSP generator and are deliberately not read by analog-attach.
+peripherals:
+  spi:
+    bsp_test_spi_cfg:
+      interface: spi
+      identifier: 0
+  gpio_pin:
+    bsp_test_led: {interface: gpio, number: 7}
+  # No bsp_kinds row: its symbols are skipped with a warning, because board.schema lets a
+  # board declare kinds this tool has not heard of.
+  mystery:
+    bsp_test_mystery: {interface: mystery}

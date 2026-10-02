@@ -17,6 +17,7 @@ import type { PropertySuggestions } from "./types";
 import { load_resolved_ruleset, load_resolved_ruleset_for_board } from "../resolver/resolver";
 import { all_symbols, is_platform_symbol } from "../registry/registry";
 import { board_externs } from "../registry/bsp";
+import { find_soc } from "../registry/platforms";
 import { driver_init_parameter_candidates, driver_ops_candidates } from "../registry/drivers";
 import { collect_child_overrides, create_connections_graph, rename_symbol_references } from "../validator/connection_graph";
 import { apply_overrides } from "../validator/override_resolver";
@@ -26,17 +27,31 @@ import { is_minimal_workfile } from "./types";
 // --- Workfile Creation ---
 
 export function create_workfile(platform?: string): Result<Workfile> {
-    // TODO(capi): the platform's vendor and its ops tables. A platform no longer ships a
-    // platform.yaml listing ruleset files; a platform module declares its interfaces in
-    // the `interfaces_file:` its module.yml names, and ops reach a workfile through that
-    // and through each driver's own ops extern. Until that lands a workfile carries the
-    // platform name and no ops.
-    return ok({
+    const workfile: Workfile = {
         platform: platform,
         platform_ops: {},
         exposed_ops: {},
         symbols: {}
-    });
+    };
+
+    if (platform === undefined) {
+        return ok(workfile);
+    }
+
+    // The chip has to be one a configured platform supports, or the workfile names a target
+    // nothing can build: better to say so here than to fail later with an empty board list.
+    const soc = find_soc(platform);
+    if (!soc.ok) {
+        return soc;
+    }
+
+    workfile.platform_vendor = soc.value.platform.vendor ?? soc.value.platform.name;
+
+    // TODO(capi): the ops tables. A platform no longer ships a platform.yaml listing
+    // ruleset files; it declares its interfaces in the `interfaces_file:` its module.yml
+    // names, and ops reach a workfile through that and through each driver's own ops
+    // extern. Until that lands a workfile carries the target and no ops.
+    return ok(workfile);
 }
 
 export function all_ops(workfile: Workfile): Record<string, Ruleset> {

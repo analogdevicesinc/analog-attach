@@ -1,11 +1,5 @@
-$id: "test/with_override"
 $type: struct
 $symbol: override_param
-$ranking: 3
-$sources:
-  headers:
-    - "test.h"
-
 flag:
   type: bool
 

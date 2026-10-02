@@ -1,0 +1,37 @@
+$type: struct
+$symbol: testpart_init_param
+$description: "This part's configuration"
+comm_type:
+  include: testpart_comm_type
+  required: true
+  default: TESTPART_SPI
+  description: "Which bus the part is wired to"
+# A union whose member points at a bus device, so an $override can reach through it into
+# another ruleset -- the node reference that lets a driver constrain a generic struct.
+comm_init:
+  type: union
+  required: true
+  description: "Bus device this part is attached to"
+  members:
+    - spi_dev:
+        include: test_spi_device
+        pointer: true
+        description: "SPI device"
+dev_ready:
+  type: bool
+  default: true
+  description: "Whether the part is ready to configure"
+$override:
+  - $switch:
+      $on: comm_type
+      $cases:
+        TESTPART_SPI:
+          comm_init:
+            value: spi_dev
+          # Constrains the NODE the member points at, which is a struct in another module.
+          comm_init.spi_dev:
+            max_speed_hz:
+              default: 1000000
+              maximum: 10000000
+            mode:
+              values: [TEST_SPI_MODE_0]

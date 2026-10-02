@@ -1,0 +1,8 @@
+schema_version: "1.0"
+# Declares the SAME symbol name as testboard, on purpose: board BSP names are shared so
+# app code is portable, which is exactly why board externs cannot be pooled globally.
+peripherals:
+  spi:
+    bsp_test_spi_cfg:
+      interface: spi
+      identifier: 0
