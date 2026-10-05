@@ -102,6 +102,7 @@ function boards_of(platform: ModuleInfo): Result<BoardInfo[]> {
 			vendor: module.value.vendor ?? platform.vendor,
 			description: module.value.description,
 			path: board_path,
+			connectors: module.value.connectors ?? [],
 		});
 	}
 

@@ -47,6 +47,10 @@ export interface ModuleInfo {
 	vendor?: string,
 	/** `metadata.mcu` of a `platform_board`: which chip the board carries. */
 	mcu?: string,
+	/** `pinout.connectors`: the physical connectors a board or part exposes. */
+	connectors?: ConnectorInfo[],
+	/** `implements.driver` of an `eval_board`: the part it carries. */
+	implements_driver?: string,
 	/**
 	 * `provides.interfaces` — the CAPI interfaces this module implements, e.g.
 	 * `[accel_sensor]`. This is the declared edge from an interface to the driver behind it,
@@ -54,6 +58,34 @@ export interface ModuleInfo {
 	 * without relying on symbol-name conventions.
 	 */
 	provides_interfaces?: string[],
+}
+
+/** Which MCU GPIO a pin is, in the chip's own port vocabulary (e.g. MXC_GPIO2). */
+export interface GpioIdentity {
+	port: string,
+	number: number,
+}
+
+/** One pin of a connector, as a pinout declares it. */
+export interface PinInfo {
+	/** As written: a position on a header ("11") or a chip pin name ("P0_18"). */
+	pin: string,
+	roles: string[],
+	mnemonic?: string,
+	gpio?: GpioIdentity,
+}
+
+/** One connector in a module's pinout. */
+export interface ConnectorInfo {
+	name: string,
+	/** Stable name a board.yml `pins:` entry or a wire refers to it by. */
+	id?: string,
+	/**
+	 * Physical standard (`pmod_12`, `feather_16`), from capi's `connector_types`. Two
+	 * connectors mate pin-for-pin only when both declare the same one.
+	 */
+	type?: string,
+	pins: PinInfo[],
 }
 
 /**
@@ -82,6 +114,8 @@ export interface BoardInfo {
 	description?: string,
 	/** Absolute path of the board module directory. */
 	path: string,
+	/** The board's own pinout: its headers and on-board pins. */
+	connectors: ConnectorInfo[],
 }
 
 /** One ruleset file, located and attributed but not yet parsed. */

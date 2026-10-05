@@ -1,11 +1,21 @@
 schema_version: "1.0"
 # The keys ARE the C symbol names the board's BSP defines; the values are inputs to the
-# platform's own BSP generator and are deliberately not read by analog-attach.
+# platform's own BSP generator and are not read by analog-attach, except `pins:` and a
+# GPIO port's `extra.port`, which are read only to join with the pinout.
 peripherals:
   spi:
     bsp_test_spi_cfg:
       interface: spi
       identifier: 0
+      pins:
+        sck:  {connector: PMOD, pin: 4}
+        mosi: {connector: PMOD, pin: 2}
+        miso: {connector: PMOD, pin: 3}
+        cs:
+          - {connector: PMOD, pin: 1, native_cs: 0}
+  gpio_port:
+    bsp_test_gpio0_cfg: {interface: gpio, num_pins: 32, extra: {port: TEST_GPIO0}}
+    bsp_test_gpio1_cfg: {interface: gpio, num_pins: 32, extra: {port: TEST_GPIO1}}
   gpio_pin:
     bsp_test_led: {interface: gpio, number: 7}
   # No bsp_kinds row: its symbols are skipped with a warning, because board.schema lets a

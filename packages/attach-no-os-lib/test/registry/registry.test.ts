@@ -26,10 +26,11 @@ describe('registry', () => {
         const registry = get_registry();
         expectOk(registry);
 
-        // capi, the platform and its boards are NOT walked (boards carry no rulesets), the
-        // collection, its one category and its one driver are.
+        // A platform's boards are NOT walked (they carry no rulesets and are read on
+        // demand). The collection's category, driver and eval board are: the eval board
+        // for its pinout, which is what says how the part is wired out.
         const names = registry.value.modules.map(module => module.name).sort();
-        expect(names).toEqual(['capi-test', 'drivers-test', 'platform-test', 'sensor', 'testpart']);
+        expect(names).toEqual(['capi-test', 'drivers-test', 'eval-testpart', 'platform-test', 'sensor', 'testpart']);
     });
 
     test('indexes every symbol its indexes list, and nothing else', () => {
@@ -40,6 +41,7 @@ describe('registry', () => {
             'test_array_holder',
             'test_gpio_ops',
             'test_gpio_pin',
+            'test_gpio_port_config',
             'test_spi_config',
             'test_spi_controller',
             'test_spi_device',

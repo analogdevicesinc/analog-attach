@@ -152,6 +152,20 @@ const MODULE_TYPE_DRIVER_COLLECTION = "driver_collection";
 const MODULE_TYPE_DRIVER_CATEGORY = "driver_category";
 /** Where a driver collection keeps its categories. See `collect_modules`. */
 const DRIVERS_SUBDIR = "drivers";
+/** Where a driver collection keeps its eval boards. See `collect_modules`. */
+const EVAL_BOARDS_SUBDIR = "boards";
+/** `module.yml` `type:` of an eval board, which names its part in `implements.driver`. */
+export const MODULE_TYPE_EVAL_BOARD = "eval_board";
+
+/** Every subdirectory of `directory` that carries a module.yml. */
+function module_directories(directory: string): string[] {
+	if (!fs.existsSync(directory)) {
+		return [];
+	}
+	return fs.readdirSync(directory, { withFileTypes: true })
+		.map(entry => path.join(directory, entry.name))
+		.filter(candidate => fs.existsSync(path.join(candidate, MODULE_FILENAME)));
+}
 
 /**
  * Every module reachable from one configured root, the root included.
@@ -161,17 +175,18 @@ const DRIVERS_SUBDIR = "drivers";
  * root read alone. Each hop follows what a module declares:
  *
  *   driver_collection -> drivers/<category>/        (NOT declared -- see below)
+ *                     -> boards/<eval board>/       (NOT declared -- see below)
  *   driver_category   -> its `drivers:` list, as directories beside it
  *   driver            -> its own `rulesets_file:`
  *
- * One hop is a convention rather than a declaration: a `driver_collection` does not list
- * its categories anywhere, so they are found as the subdirectories of `drivers/` that
- * carry a `module.yml` — the layout the type's own definition describes. Everything below
- * that is declared. If a `categories:` key is ever added upstream, read it here and the
- * convention goes away.
+ * Two hops are conventions rather than declarations: a `driver_collection` lists neither
+ * its categories nor its eval boards, so they are found as the subdirectories of
+ * `drivers/` and `boards/` that carry a `module.yml` — the layout the type's own
+ * definition describes. Everything below that is declared. If `categories:` or
+ * `eval_boards:` keys are ever added upstream, read them here and the conventions go.
  *
- * A module that declares neither children nor rulesets simply contributes nothing; eval
- * boards and projects are not walked, because nothing in them carries rulesets today.
+ * Eval boards carry no rulesets, but they are walked because their pinout is what says
+ * how a part is wired out. Projects are not walked: nothing in them is read.
  */
 function collect_modules(root: string): Result<ModuleInfo[]> {
 	const module = read_module(root);
@@ -183,15 +198,10 @@ function collect_modules(root: string): Result<ModuleInfo[]> {
 
 	const children: string[] = [];
 	if (module.value.type === MODULE_TYPE_DRIVER_COLLECTION) {
-		const drivers_directory = path.join(module.value.path, DRIVERS_SUBDIR);
-		if (fs.existsSync(drivers_directory)) {
-			for (const entry of fs.readdirSync(drivers_directory, { withFileTypes: true })) {
-				const candidate = path.join(drivers_directory, entry.name);
-				if (entry.isDirectory() && fs.existsSync(path.join(candidate, MODULE_FILENAME))) {
-					children.push(candidate);
-				}
-			}
-		}
+		children.push(
+			...module_directories(path.join(module.value.path, DRIVERS_SUBDIR)),
+			...module_directories(path.join(module.value.path, EVAL_BOARDS_SUBDIR)),
+		);
 	} else if (module.value.type === MODULE_TYPE_DRIVER_CATEGORY) {
 		for (const driver of module.value.drivers ?? []) {
 			children.push(path.join(module.value.path, driver));

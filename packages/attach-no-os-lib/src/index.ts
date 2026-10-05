@@ -75,7 +75,7 @@ export {
     all_symbols,
     is_platform_symbol
 } from "./registry/registry";
-export type { Registry, RulesetEntry, ModuleInfo, ModuleBuild, SocInfo, BoardInfo } from "./registry/types";
+export type { Registry, RulesetEntry, ModuleInfo, ModuleBuild, SocInfo, BoardInfo, ConnectorInfo, PinInfo, GpioIdentity } from "./registry/types";
 export {
     list_platform_modules,
     list_socs,
@@ -87,14 +87,16 @@ export {
     read_soc_descriptor
 } from "./registry/platforms";
 export { read_module, read_ruleset_index, MODULE_FILENAME } from "./registry/module_yml";
-export { board_externs, find_board_extern, check_bsp_kinds } from "./registry/bsp";
+export { board_externs, find_board_extern, check_bsp_kinds, board_bus_pins, board_gpio_ports } from "./registry/bsp";
 export {
     modules_providing,
     driver_ops_candidates,
     driver_init_parameter_candidates,
     provides_interface
 } from "./registry/drivers";
-export type { BoardExterns, SkippedKind, BspKindProblem } from "./registry/bsp";
+export type { BoardExterns, SkippedKind, BspKindProblem, PinReference, BusSignal, BusPins } from "./registry/bsp";
+export { find_eval_board, describe_board_pin, land, resolve_bus } from "./registry/wiring";
+export type { Wire, PinSignal, BoardPin, Landing, ChipSelect, BusResolution } from "./registry/wiring";
 export type { ConnectionGraph, SymbolReference, ReferenceKind } from "./validator/types";
 export { get_connected_symbols } from "./validator/connection_graph";
 export { validate_workfile } from "./validator/validator";

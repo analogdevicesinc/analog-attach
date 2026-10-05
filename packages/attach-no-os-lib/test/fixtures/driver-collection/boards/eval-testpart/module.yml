@@ -1,0 +1,20 @@
+name: eval-testpart
+type: eval_board
+version: "1.0.0"
+description: "Eval board for testpart, on a 12-pin PMOD"
+
+implements:
+  driver: testpart
+  category: sensor
+
+pinout:
+  connectors:
+    - name: "P1 (12-pin PMOD)"
+      id: P1
+      type: pmod_12
+      pins:
+        - {pin: 1, mnemonic: CS,   role: spi_cs}
+        - {pin: 2, mnemonic: MOSI, role: spi_mosi}
+        - {pin: 3, mnemonic: MISO, role: spi_miso}
+        - {pin: 4, mnemonic: SCLK, role: spi_sck}
+        - {pin: 5, mnemonic: GND,  role: ground}

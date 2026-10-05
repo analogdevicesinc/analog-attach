@@ -19,6 +19,8 @@ describe('board peripherals as externs', () => {
 
         expect(externs.value.externs.map(extern => `${extern.$symbol}:${extern.$provides}`)).toEqual([
             'bsp_test_spi_cfg:test_spi_config',
+            'bsp_test_gpio0_cfg:test_gpio_port_config',
+            'bsp_test_gpio1_cfg:test_gpio_port_config',
             'bsp_test_led:test_gpio_pin',
         ]);
     });

@@ -1,0 +1,7 @@
+$type: struct
+$symbol: test_gpio_port_config
+$description: "Configuration of one GPIO port, referenced from a board BSP"
+num_pins:
+  type: uint8_t
+  required: true
+  description: "Pins on the port"

@@ -10,10 +10,15 @@
  * be assigned to a matching field and is never emitted. The board.yml key is the C symbol
  * verbatim, and `bsp_kinds` supplies the only missing piece, the type it has.
  *
- * The declared VALUES (`identifier: 0`, `baudrate: 115200`, `extra: {port: MXC_GPIO2}`) are
- * deliberately not read. They are inputs to the platform's own BSP generator, which emits
- * the parameters.c that defines these symbols; analog-attach only needs to know the symbols
- * exist and what type they have. That is what makes this cheap.
+ * The declared VALUES (`identifier: 0`, `baudrate: 115200`) are deliberately not read. They
+ * are inputs to the platform's own BSP generator, which emits the parameters.c that defines
+ * these symbols; analog-attach only needs to know the symbols exist and what type they
+ * have. That is what makes this cheap.
+ *
+ * Two keys ARE read, and only to join with the board's pinout, never to emit anything: a
+ * bus's `pins:` (which header pins carry it) and a GPIO port's `extra.port` (which chip port
+ * it drives). Those are what let a wire to a header pin be turned into "this bus" or "this
+ * GPIO on this port" — see registry/wiring.ts.
  *
  * These are scoped to ONE board, never pooled. Board peripherals share names on purpose, so
  * app code is portable: `bsp_uart_cfg` is declared by every capi-maxim board and means a
@@ -52,8 +57,11 @@ export interface BoardExterns {
 	skipped: SkippedKind[],
 }
 
-/** Read one board's peripheral catalog: kind -> symbol -> (ignored) entry. */
-function read_peripherals(board_path: string): Result<Record<string, string[]>> {
+/** One board.yml peripheral entry, as written. */
+type PeripheralEntry = Record<string, unknown>;
+
+/** Read one board's peripheral catalog: kind -> symbol -> entry. */
+function read_peripherals(board_path: string): Result<Record<string, Record<string, PeripheralEntry>>> {
 	const file = path.join(board_path, BOARD_FILENAME);
 	if (!fs.existsSync(file)) {
 		// A board with no catalog contributes nothing. That is a board whose BSP is entirely
@@ -88,12 +96,18 @@ function read_peripherals(board_path: string): Result<Record<string, string[]>> 
 		return error(`${file}: 'peripherals' must be a mapping of kind to symbols`, file);
 	}
 
-	const by_kind: Record<string, string[]> = {};
+	const by_kind: Record<string, Record<string, PeripheralEntry>> = {};
 	for (const [kind, entries] of Object.entries(peripherals as Record<string, unknown>)) {
 		if (typeof entries !== "object" || entries === null || Array.isArray(entries)) {
 			return error(`${file}: peripheral kind '${kind}' must be a mapping of symbol to entry`, file);
 		}
-		by_kind[kind] = Object.keys(entries);
+		const typed: Record<string, PeripheralEntry> = {};
+		for (const [symbol, entry] of Object.entries(entries as Record<string, unknown>)) {
+			typed[symbol] = typeof entry === "object" && entry !== null && !Array.isArray(entry)
+				? entry as PeripheralEntry
+				: {};
+		}
+		by_kind[kind] = typed;
 	}
 
 	return ok(by_kind);
@@ -126,7 +140,8 @@ export function board_externs(board_name: string): Result<BoardExterns> {
 	const externs: RulesetExtern[] = [];
 	const skipped: SkippedKind[] = [];
 
-	for (const [kind, symbols] of Object.entries(peripherals.value)) {
+	for (const [kind, entries] of Object.entries(peripherals.value)) {
+		const symbols = Object.keys(entries);
 		const provides = registry.value.bsp_kinds.get(kind);
 		if (provides === undefined) {
 			skipped.push({ kind, symbols });
@@ -231,4 +246,119 @@ function list_board_kinds(): Result<Record<string, string[]>> {
 	}
 
 	return ok(kinds);
+}
+
+/** A header pin, named by the `id` of its connector and its `pin` on that connector. */
+export interface PinReference {
+	connector: string,
+	pin: string,
+}
+
+/** One signal of a bus, and the header pin carrying it. */
+export interface BusSignal {
+	/** The `pins:` key: sck, mosi, miso, cs, scl, sda, ... */
+	signal: string,
+	at: PinReference,
+	/** For a chip-select line: the bit a device sets in its native_cs mask to use it. */
+	native_cs?: number,
+}
+
+/** A board bus and the header pins its `pins:` declares. */
+export interface BusPins {
+	/** The board.yml symbol, e.g. bsp_spi1_cfg. */
+	peripheral: string,
+	kind: string,
+	signals: BusSignal[],
+}
+
+function pin_reference(value: unknown): PinReference | undefined {
+	if (typeof value !== "object" || value === null || Array.isArray(value)) {
+		return undefined;
+	}
+	const { connector, pin } = value as Record<string, unknown>;
+	if (typeof connector !== "string" || (typeof pin !== "string" && typeof pin !== "number")) {
+		return undefined;
+	}
+	return { connector, pin: String(pin) };
+}
+
+/**
+ * Every bus on a board that declares which header pins carry it.
+ *
+ * The reference runs from board.yml to the pinout, never the other way: module.yml is
+ * capi's platform-generic format, so it cannot depend on a platform's own board.yml.
+ * Inverting the edge - "this header pin belongs to which bus" - is done here, in memory.
+ *
+ * A signal may carry one pin or a list (a bus can have several chip-selects). An entry
+ * that is not a {connector, pin} pair is skipped rather than refused: board.yml has no
+ * schema for `pins:` yet, so a typo there must not make the board unusable.
+ */
+export function board_bus_pins(board_name: string): Result<BusPins[]> {
+	const board = find_board(board_name);
+	if (!board.ok) {
+		return board;
+	}
+
+	const peripherals = read_peripherals(board.value.path);
+	if (!peripherals.ok) {
+		return peripherals;
+	}
+
+	const buses: BusPins[] = [];
+	for (const [kind, entries] of Object.entries(peripherals.value)) {
+		for (const [peripheral, entry] of Object.entries(entries)) {
+			const declared = entry.pins;
+			if (typeof declared !== "object" || declared === null || Array.isArray(declared)) {
+				continue;
+			}
+
+			const signals: BusSignal[] = [];
+			for (const [signal, value] of Object.entries(declared as Record<string, unknown>)) {
+				for (const item of Array.isArray(value) ? value : [value]) {
+					const at = pin_reference(item);
+					if (at === undefined) {
+						continue;
+					}
+					const native_cs = (item as Record<string, unknown>).native_cs;
+					signals.push({ signal, at, ...(typeof native_cs === "number" ? { native_cs } : {}) });
+				}
+			}
+
+			buses.push({ peripheral, kind, signals });
+		}
+	}
+
+	return ok(buses);
+}
+
+/**
+ * Which board.yml GPIO port symbol drives each chip port, e.g. MXC_GPIO2 -> bsp_gpio2_cfg.
+ *
+ * This is the join from a pinout's `gpio: {port}` (chip vocabulary) to the board's own port
+ * extern. A chip port the board's BSP does not configure simply has no entry: a pin on it
+ * cannot be used without the application configuring that port itself.
+ */
+export function board_gpio_ports(board_name: string): Result<Map<string, string>> {
+	const board = find_board(board_name);
+	if (!board.ok) {
+		return board;
+	}
+
+	const peripherals = read_peripherals(board.value.path);
+	if (!peripherals.ok) {
+		return peripherals;
+	}
+
+	const ports = new Map<string, string>();
+	for (const [symbol, entry] of Object.entries(peripherals.value.gpio_port ?? {})) {
+		const extra = entry.extra;
+		if (typeof extra === "object" && extra !== null) {
+			const port = (extra as Record<string, unknown>).port;
+			if (typeof port === "string") {
+				ports.set(port, symbol);
+			}
+		}
+	}
+
+	return ok(ports);
 }

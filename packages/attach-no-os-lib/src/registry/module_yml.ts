@@ -19,8 +19,8 @@ import YAML from "yaml";
 import type { Result } from "../ruleset_parser/result";
 import { error, ok } from "../ruleset_parser/result";
 import type { ParseContext } from "../ruleset_parser/validators";
-import { asObject, at, optional, required, string_, stringArray } from "../ruleset_parser/validators";
-import type { ModuleBuild, ModuleInfo, SocInfo } from "./types";
+import { asObject, at, integer_, optional, required, string_, stringArray } from "../ruleset_parser/validators";
+import type { ConnectorInfo, GpioIdentity, ModuleBuild, ModuleInfo, PinInfo, SocInfo } from "./types";
 
 export const MODULE_FILENAME = "module.yml";
 
@@ -160,6 +160,26 @@ export function read_module(root: string): Result<ModuleInfo> {
 		return provides_interfaces;
 	}
 
+	const pinout = optional(object.value, "pinout", context, asObject);
+	if (!pinout.ok) {
+		return pinout;
+	}
+
+	const connectors = optional(pinout.value ?? {}, "connectors", at(context, "pinout"), parse_connectors);
+	if (!connectors.ok) {
+		return connectors;
+	}
+
+	const implements_ = optional(object.value, "implements", context, asObject);
+	if (!implements_.ok) {
+		return implements_;
+	}
+
+	const implements_driver = optional(implements_.value ?? {}, "driver", at(context, "implements"), string_);
+	if (!implements_driver.ok) {
+		return implements_driver;
+	}
+
 	const interfaces_file = optional(object.value, "interfaces_file", context, string_);
 	if (!interfaces_file.ok) {
 		return interfaces_file;
@@ -200,8 +220,114 @@ export function read_module(root: string): Result<ModuleInfo> {
 		interfaces_file: interfaces_file.value,
 		vendor: vendor.value,
 		mcu: mcu.value,
+		connectors: connectors.value,
+		implements_driver: implements_driver.value,
 		provides_interfaces: provides_interfaces.value,
 	});
+}
+
+/** `role:` is one role or a list of them; either way it reads as a list. */
+function parse_roles(value: unknown, context: ParseContext): Result<string[]> {
+	if (typeof value === "string") {
+		return ok([value]);
+	}
+	return stringArray(value, context);
+}
+
+function parse_gpio(value: unknown, context: ParseContext): Result<GpioIdentity> {
+	const object = asObject(value, context);
+	if (!object.ok) {
+		return object;
+	}
+
+	const port = required(object.value, "port", context, string_);
+	if (!port.ok) {
+		return port;
+	}
+
+	const number = required(object.value, "number", context, integer_);
+	if (!number.ok) {
+		return number;
+	}
+
+	return ok({ port: port.value, number: number.value });
+}
+
+/**
+ * A pinout's connectors.
+ *
+ * Only the keys analog-attach joins on are typed. `function:` and the rest are prose
+ * for people and are left alone. A pin's `pin:` is kept as text because it is a header
+ * position on one connector ("11") and a chip pin name on another ("P0_18").
+ */
+function parse_connectors(value: unknown, context: ParseContext): Result<ConnectorInfo[]> {
+	if (!Array.isArray(value)) {
+		return error(`Expected array, got ${typeof value}`, context.path);
+	}
+
+	const connectors: ConnectorInfo[] = [];
+	for (const [index, entry] of value.entries()) {
+		const connector_context = at(context, index);
+		const object = asObject(entry, connector_context);
+		if (!object.ok) {
+			return object;
+		}
+
+		const name = required(object.value, "name", connector_context, string_);
+		if (!name.ok) {
+			return name;
+		}
+
+		const id = optional(object.value, "id", connector_context, string_);
+		if (!id.ok) {
+			return id;
+		}
+
+		const type_ = optional(object.value, "type", connector_context, string_);
+		if (!type_.ok) {
+			return type_;
+		}
+
+		const raw_pins = object.value.pins ?? [];
+		if (!Array.isArray(raw_pins)) {
+			return error(`Expected array, got ${typeof raw_pins}`, at(connector_context, "pins").path);
+		}
+
+		const pins: PinInfo[] = [];
+		for (const [pin_index, raw_pin] of raw_pins.entries()) {
+			const pin_context = at(at(connector_context, "pins"), pin_index);
+			const pin_object = asObject(raw_pin, pin_context);
+			if (!pin_object.ok) {
+				return pin_object;
+			}
+
+			const pin = pin_object.value.pin;
+			if (typeof pin !== "string" && typeof pin !== "number") {
+				return error(`Expected a pin number or name, got ${typeof pin}`, at(pin_context, "pin").path);
+			}
+
+			const roles = optional(pin_object.value, "role", pin_context, parse_roles);
+			if (!roles.ok) {
+				return roles;
+			}
+
+			const mnemonic = optional(pin_object.value, "mnemonic", pin_context, string_);
+			if (!mnemonic.ok) {
+				return mnemonic;
+			}
+
+			const gpio = optional(pin_object.value, "gpio", pin_context, parse_gpio);
+			if (!gpio.ok) {
+				return gpio;
+			}
+
+			pins.push({ pin: String(pin), roles: roles.value ?? [], mnemonic: mnemonic.value, gpio: gpio.value });
+		}
+
+		connectors.push({ name: name.value, id: id.value, type: type_.value, pins });
+	}
+
+	return ok(connectors);
 }
 
 function parse_socs(value: unknown, context: ParseContext): Result<SocInfo[]> {

@@ -4,6 +4,7 @@ schema_version: "1.0"
 # tests can check that an unknown kind is skipped with a warning rather than refused.
 bsp_kinds:
   spi:       test_spi_config
+  gpio_port: test_gpio_port_config
   gpio_pin:  test_gpio_pin
 
 rulesets:
@@ -14,4 +15,5 @@ rulesets:
     - spi/test_spi_controller.yaml
     - spi/test_spi_device.yaml
     - spi/test_gpio_pin.yaml
+    - spi/test_gpio_port_config.yaml
     - spi/test_array_holder.yaml
