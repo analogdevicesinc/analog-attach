@@ -67,10 +67,16 @@ describe('pinout and BSP data', () => {
     });
 
     test('a bus that declares no pins: is left out, not listed empty', () => {
-        // otherboard's SPI entry has no `pins:`, so there is nothing about it to join on.
+        // otherboard's second SPI has no `pins:`, so there is nothing about it to join on.
         const buses = board_bus_pins('otherboard');
         expectOk(buses);
-        expect(buses.value).toEqual([]);
+        expect(buses.value.map(bus => bus.peripheral)).toEqual(['bsp_test_spi_cfg']);
+    });
+
+    test('a chip-select line without native_cs is a plain GPIO line', () => {
+        const buses = board_bus_pins('otherboard');
+        expectOk(buses);
+        expect(buses.value[0]?.signals).toContainEqual({ signal: 'cs', at: { connector: 'H1', pin: '4' } });
     });
 
     test('chip ports map to the BSP port that drives them', () => {
@@ -215,13 +221,79 @@ describe('resolving the bus and its chip-select', () => {
         expect(resolved.value.problems.join('\n')).toContain('P1 pin 4 (sck) lands on testboard H1 pin 1, which carries no spi sck');
     });
 
-    test('unwired, it asks, offering the native chip-select first and never on-board pins', () => {
+    test('jumper-wired, nothing stated: the board declaration settles every line', () => {
+        // otherboard has no PMOD port - the max32655fthr case. Its BSP declares one pin per
+        // data signal and one chip-select line, so there is nothing to choose.
         const resolved = resolve_bus(part(), 'otherboard', 'spi');
         expectOk(resolved);
-        expect(resolved.value.peripheral).toBeUndefined();
-        expect(resolved.value.chip_select?.kind).toBe('unwired');
-        // otherboard declares no pinout at all, so there is nothing to offer.
-        expect(resolved.value.chip_select?.kind === 'unwired' && resolved.value.chip_select.options).toEqual([]);
+        expect(resolved.value.problems).toEqual([]);
+        expect(resolved.value.peripheral).toBe('bsp_test_spi_cfg');
+        expect(resolved.value.chip_select).toEqual({
+            kind: 'gpio',
+            gpio: { port: 'OTHER_GPIO1', number: 4 },
+            port_extern: 'bsp_other_gpio1_cfg',
+            at: { connector: 'H1', pin: '4' },
+        });
+    });
+
+    test('the connections are the wiring instructions, each saying how it was decided', () => {
+        const resolved = resolve_bus(part(), 'otherboard', 'spi', [wire('P1.1', 'H1.5')]);
+        expectOk(resolved);
+
+        const instructions = resolved.value.connections.map(
+            connection => `${connection.from.connector}.${connection.from.pin} ${connection.role} -> ${connection.to.connector}.${connection.to.pin} [${connection.via}]`
+        );
+        expect(instructions).toEqual([
+            'P1.2 spi_mosi -> H1.2 [board]',
+            'P1.3 spi_miso -> H1.3 [board]',
+            'P1.4 spi_sck -> H1.1 [board]',
+            // The user's wire wins over the board's convention, and the GPIO follows it.
+            'P1.1 spi_cs -> H1.5 [wire]',
+        ]);
+        expect(resolved.value.chip_select?.kind === 'gpio' && resolved.value.chip_select.gpio).toEqual({ port: 'OTHER_GPIO1', number: 5 });
+    });
+
+    test('mating is reported as mating', () => {
+        const resolved = resolve_bus(part(), FIXTURE_BOARD, 'spi');
+        expectOk(resolved);
+        expect(resolved.value.connections.every(connection => connection.via === 'mating')).toBe(true);
+    });
+
+    test('two declared chip-select lines are a question, not a pick', () => {
+        // The same part with a connector that mates nothing on testboard, whose bus declares
+        // two chip-select lines. Data lines still have one declared pin each.
+        const unmated: ModuleInfo = {
+            ...part(),
+            connectors: (part().connectors ?? []).map(connector => ({ ...connector, type: 'feather_12' })),
+        };
+        const resolved = resolve_bus(unmated, FIXTURE_BOARD, 'spi');
+        expectOk(resolved);
+        expect(resolved.value.peripheral).toBe('bsp_test_spi_cfg');
+
+        const chip_select = resolved.value.chip_select;
+        if (chip_select?.kind !== 'unwired') { throw new Error('expected the chip-select to stay unresolved'); }
+        expect(chip_select.reason).toContain('declares 2 chip-select lines (PMOD pin 1, H1 pin 1); say which');
+        // Both declared lines are offered first.
+        expect(chip_select.options.slice(0, 2).map(option => `${option.at.connector}.${option.at.pin}`)).toEqual(['PMOD.1', 'H1.1']);
+    });
+
+    test('a board declaring no pin for a signal leaves that line to be stated', () => {
+        // The part gains a line the board's bus declares nothing for, so that line - and
+        // only that line - is reported; the rest still resolve.
+        const base = part();
+        const [p1, ...rest] = base.connectors ?? [];
+        if (p1 === undefined) { throw new Error('eval fixture has no connector'); }
+        const with_extra_line: ModuleInfo = {
+            ...base,
+            connectors: [{ ...p1, pins: [...p1.pins, { pin: '7', roles: ['spi_sdio'] }] }, ...rest],
+        };
+
+        const resolved = resolve_bus(with_extra_line, 'otherboard', 'spi');
+        expectOk(resolved);
+        expect(resolved.value.peripheral).toBe('bsp_test_spi_cfg');
+        expect(resolved.value.problems).toEqual([
+            'eval-testpart P1 pin 7 (sdio): otherboard has no pmod_12 connector for eval-testpart P1 to plug into, and otherboard declares no spi sdio pin, so say where it goes',
+        ]);
     });
 
     test('options list the bus native chip-select ahead of plain GPIOs', () => {

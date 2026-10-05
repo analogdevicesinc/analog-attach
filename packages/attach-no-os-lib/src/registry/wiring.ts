@@ -5,13 +5,21 @@
  *
  *   eval board module.yml   P1 (pmod_12): pin 1 is spi_cs, pin 4 is spi_sck, ...
  *   board module.yml        J9 (feather_16): pin 5 is P2_0 = {MXC_GPIO2, 0}, ...
- *   board board.yml         bsp_spi1_cfg: sck on J9 pin 11, cs on J7 pin 8 (native_cs 0)
+ *   board board.yml         bsp_spi1_cfg: sck on J9 pin 11, ..., cs on J9 pin 5
  *
- * A pin on the part LANDS on a pin of the board one of two ways. If the two connectors
- * follow the same standard (both `pmod_12`), pin N mates with pin N and nothing has to be
- * said. Otherwise - a PMOD jumper-wired to a Feather header - the wire has to be stated,
- * and is never guessed: matching by role across different standards picks a pin that
- * merely has the right label, which on max32655fthr is the wrong one.
+ * A pin on the part LANDS on a pin of the board one of three ways, in this order:
+ *
+ *   1. a stated wire                 the user said where it goes
+ *   2. mating                        both connectors follow the same standard (both
+ *                                    `pmod_12`), so pin N goes to pin N
+ *   3. the board's own declaration   the board's BSP declares exactly ONE pin for that
+ *                                    signal: the only SPI clock on any header, or the
+ *                                    chip-select line the board uses by convention
+ *
+ * 3 is what makes a jumper-wired setup work with nothing stated. It never picks: two
+ * declared pins for a signal is a question for the user. And it is never role matching
+ * against the pinout - a header pin LABELLED spi_cs is not the board saying "use this
+ * one", and on max32655fthr the labelled one (J7 pin 8) is not configured at all.
  *
  * Once a pin has landed, the board's own files say what it is: a GPIO on some port, and/or
  * a signal of some bus. From that the bus a part sits on, and how its chip-select is
@@ -50,10 +58,25 @@ export interface BoardPin {
 	signals: PinSignal[],
 }
 
+/** How a landing was decided. See the file header for the order. */
+export type LandingVia = "wire" | "mating" | "board";
+
 /** Where a part's pin ends up: on a board pin, or nowhere that can be known. */
 export type Landing =
-	| { kind: "wired", to: PinReference, via: "wire" | "mating" }
+	| { kind: "wired", to: PinReference, via: LandingVia }
 	| { kind: "unwired", reason: string };
+
+/**
+ * One connection between a part pin and a board pin, as decided. The list of these is the
+ * wiring instruction for a jumper-wired setup: "connect P1 pin 1 to J9 pin 5".
+ */
+export interface Connection {
+	from: PinReference,
+	/** The part pin's role, e.g. spi_cs. */
+	role: string,
+	to: PinReference,
+	via: LandingVia,
+}
 
 /** How a SPI device's chip-select is driven. */
 export type ChipSelect =
@@ -66,6 +89,8 @@ export interface BusResolution {
 	peripheral?: string,
 	/** Set for a SPI bus only. */
 	chip_select?: ChipSelect,
+	/** Every part pin that landed, and how. */
+	connections: Connection[],
 	/**
 	 * Wiring that does not add up: a clock wired to a pin that carries no clock, data lines
 	 * split across two buses. Reported rather than refused, because the wiring is the
@@ -184,7 +209,7 @@ export function land(part: ModuleInfo, board: BoardInfo, from: PinReference, wir
 
 	const connector = (part.connectors ?? []).find(candidate => candidate.id === from.connector);
 	if (connector?.type === undefined) {
-		return { kind: "unwired", reason: `${part.name} ${from.connector} declares no connector type, so its wiring has to be stated` };
+		return { kind: "unwired", reason: `${part.name} ${from.connector} declares no connector type` };
 	}
 
 	const mates = identified(board.connectors).filter(candidate => candidate.type === connector.type);
@@ -192,7 +217,7 @@ export function land(part: ModuleInfo, board: BoardInfo, from: PinReference, wir
 	if (mate === undefined) {
 		return {
 			kind: "unwired",
-			reason: `${board.name} has no ${connector.type} connector for ${part.name} ${from.connector} to plug into, so its wiring has to be stated`,
+			reason: `${board.name} has no ${connector.type} connector for ${part.name} ${from.connector} to plug into`,
 		};
 	}
 	if (others.length > 0) {
@@ -211,15 +236,60 @@ function part_pins_with_role(part: ModuleInfo, role: string): PinReference[] {
 }
 
 /**
- * Header pins a chip-select could go to, for asking: the bus's own native chip-selects
- * first, then every GPIO on a physical header. On-board pins are left out - they are
- * already an LED or a button.
+ * The pins a board's BSP declares for one signal of one kind of bus, deduplicated - limited
+ * to one bus when the part's data lines have already settled which.
+ */
+function declared_pins(buses: BusPins[], kind: string, signal: string, peripheral?: string): PinReference[] {
+	const pins: PinReference[] = [];
+	for (const bus of buses) {
+		if (bus.kind !== kind || (peripheral !== undefined && bus.peripheral !== peripheral)) {
+			continue;
+		}
+		for (const declared of bus.signals) {
+			if (declared.signal === signal && !pins.some(pin => same_reference(pin, declared.at))) {
+				pins.push(declared.at);
+			}
+		}
+	}
+	return pins;
+}
+
+/**
+ * Land a part pin, falling back to the board's own declaration when neither a wire nor
+ * mating placed it. Only an unambiguous declaration counts: exactly one pin.
+ */
+function land_or_declared(
+	part: ModuleInfo,
+	board: BoardInfo,
+	from: PinReference,
+	wires: Wire[],
+	declared: PinReference[],
+	what: string,
+): Landing {
+	const landing = land(part, board, from, wires);
+	if (landing.kind === "wired") {
+		return landing;
+	}
+
+	const [only, ...more] = declared;
+	if (only === undefined) {
+		return { kind: "unwired", reason: `${landing.reason}, and ${board.name} declares no ${what}, so say where it goes` };
+	}
+	if (more.length > 0) {
+		const listed = declared.map(pin => show(pin)).join(", ");
+		return { kind: "unwired", reason: `${board.name} declares ${String(declared.length)} ${what}s (${listed}); say which` };
+	}
+
+	return { kind: "wired", to: only, via: "board" };
+}
+
+/**
+ * Header pins a chip-select could go to, for asking: the chip-select lines the bus
+ * declares first (native or GPIO-driven), then every GPIO on a physical header. On-board
+ * pins are left out - they are already an LED or a button.
  */
 function chip_select_options(board: BoardInfo, buses: BusPins[], peripheral: string | undefined): BoardPin[] {
-	const native = buses
-		.filter(bus => peripheral === undefined || bus.peripheral === peripheral)
-		.flatMap(bus => bus.signals.filter(signal => signal.signal === "cs"))
-		.map(signal => signal.at);
+	const declared = declared_pins(buses, "spi", "cs", peripheral);
 
 	const gpio = identified(board.connectors)
 		.filter(connector => connector.type !== undefined)
@@ -228,7 +298,7 @@ function chip_select_options(board: BoardInfo, buses: BusPins[], peripheral: str
 			.map(pin => ({ connector: connector.id, pin: pin.pin })));
 
 	const options: BoardPin[] = [];
-	for (const at of [...native, ...gpio]) {
+	for (const at of [...declared, ...gpio]) {
 		if (options.some(option => same_reference(option.at, at))) {
 			continue;
 		}
@@ -265,6 +335,7 @@ export function resolve_bus(
 
 	const prefix = `${interface_}_`;
 	const problems: string[] = [];
+	const connections: Connection[] = [];
 	const peripherals = new Set<string>();
 
 	const data_roles = (part.connectors ?? [])
@@ -274,11 +345,13 @@ export function resolve_bus(
 	for (const role of new Set(data_roles)) {
 		const signal = role.slice(prefix.length);
 		for (const from of part_pins_with_role(part, role)) {
-			const landing = land(part, board.value, from, wires);
+			const declared = declared_pins(buses.value, interface_, signal);
+			const landing = land_or_declared(part, board.value, from, wires, declared, `${interface_} ${signal} pin`);
 			if (landing.kind === "unwired") {
 				problems.push(`${part.name} ${show(from)} (${signal}): ${landing.reason}`);
 				continue;
 			}
+			connections.push({ from, role, to: landing.to, via: landing.via });
 
 			const pin = describe_board_pin(board_name, landing.to);
 			if (!pin.ok) {
@@ -302,15 +375,15 @@ export function resolve_bus(
 	const peripheral = peripherals.size === 1 ? [...peripherals][0] : undefined;
 
 	if (interface_ !== "spi") {
-		return ok({ peripheral, problems });
+		return ok({ peripheral, connections, problems });
 	}
 
-	const chip_select = resolve_chip_select(part, board.value, buses.value, peripheral, wires, problems);
+	const chip_select = resolve_chip_select(part, board.value, buses.value, peripheral, wires, connections, problems);
 	if (!chip_select.ok) {
 		return chip_select;
 	}
 
-	return ok({ peripheral, chip_select: chip_select.value, problems });
+	return ok({ peripheral, chip_select: chip_select.value, connections, problems });
 }
 
 function resolve_chip_select(
@@ -319,6 +392,7 @@ function resolve_chip_select(
 	buses: BusPins[],
 	peripheral: string | undefined,
 	wires: Wire[],
+	connections: Connection[],
 	problems: string[],
 ): Result<ChipSelect> {
 	const [from, ...extra_cs] = part_pins_with_role(part, "spi_cs");
@@ -330,10 +404,12 @@ function resolve_chip_select(
 		problems.push(`${part.name} has ${String(extra_cs.length + 1)} spi_cs pins; only ${show(from)} is resolved`);
 	}
 
-	const landing = land(part, board, from, wires);
+	const declared = declared_pins(buses, "spi", "cs", peripheral);
+	const landing = land_or_declared(part, board, from, wires, declared, "chip-select line");
 	if (landing.kind === "unwired") {
 		return ok({ kind: "unwired", reason: landing.reason, options: chip_select_options(board, buses, peripheral) });
 	}
+	connections.push({ from, role: "spi_cs", to: landing.to, via: landing.via });
 
 	const pin = describe_board_pin(board.name, landing.to);
 	if (!pin.ok) {
