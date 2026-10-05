@@ -16,6 +16,11 @@ export interface OverrideResult {
 	 * only that a value is missing.
 	 */
 	required_reason?: string,
+	/**
+	 * The union member a rule pins, when one fired (`comm_init: {value: spi_dev}`). The
+	 * effect itself only checks the stored binding; this is what lets bootstrap follow it.
+	 */
+	selected_member?: string,
 };
 
 // Map a rule-relative ref node to the concrete symbol name it was resolved to at
@@ -187,6 +192,7 @@ export function apply_overrides(
 	let disable_reason: string | undefined;
 	// Same idea for a required effect that carries a reason.
 	let required_reason: string | undefined;
+	let selected_member: string | undefined;
 
 	for (const collected of collected_rules) {
 		const when = collected.rule.when;
@@ -225,6 +231,9 @@ export function apply_overrides(
 			if (effect.op === "setRequired" && effect.value && effect.reason !== undefined) {
 				required_reason = effect.reason;
 			}
+			if (effect.op === "selectMember") {
+				selected_member = effect.member;
+			}
 		}
 	}
 
@@ -240,5 +249,5 @@ export function apply_overrides(
 		});
 	}
 
-	return { effective, errors, required_reason };
+	return { effective, errors, required_reason, selected_member };
 }

@@ -17,3 +17,5 @@ rulesets:
     - spi/test_gpio_pin.yaml
     - spi/test_gpio_port_config.yaml
     - spi/test_array_holder.yaml
+    - spi/test_sensor_config.yaml
+    - spi/test_sensor.yaml

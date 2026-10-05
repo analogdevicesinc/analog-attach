@@ -239,6 +239,10 @@ export function parse_include_property(name: string, object: Record<string, unkn
 		return error(`'count' names the length of a list, so it needs 'pointer: true'`, at(context, "count").path);
 	}
 
+	// Checked against the enum's values at resolution, the first point the enum is in hand.
+	const default_ = optional(object, "default", context, stringOrNumber_);
+	if (!default_.ok) {return default_;}
+
 	return ok({
 		_t: "IncludeProperty",
 		name,
@@ -247,6 +251,7 @@ export function parse_include_property(name: string, object: Record<string, unkn
 		pointer: pointer.value,
 		count: count.value,
 		capability: capability.value,
+		...(default_.value === undefined ? {} : { default: default_.value }),
 		...match.value,
 	});
 }

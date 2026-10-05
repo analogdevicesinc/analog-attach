@@ -89,17 +89,34 @@ function resolve_property(property: Property): Result<Property> {
 	}
 
 	if (included.value._t === "RulesetEnum") {
+		const values = included.value.values.map(v => v.name);
+
+		// The including property's own default wins: it is the part's usual choice, where
+		// the enum's default (if any) is only the type's.
+		const default_ = property.default ?? included.value.default;
+		if (default_ !== undefined && !values.includes(default_)) {
+			return error(
+				`Default '${String(default_)}' of '${property.name}' is not a value of ${property.include}. Valid: ${values.join(", ")}`,
+				property.name
+			);
+		}
+
 		const enum_property: EnumProperty = {
 			_t: "EnumProperty",
 			name: property.name,
 			description: property.description,
 			required: property.required,
-			values: included.value.values.map(v => v.name),
-			default: included.value.default,
+			values,
+			default: default_,
 			value: property.value
 		};
 
 		return ok(enum_property);
+	}
+
+	// A default only makes sense where the include lowers to an enum.
+	if (property.default !== undefined) {
+		return error(`'${property.name}' includes ${property.include}, which is not an enum, so it cannot have a default`, property.name);
 	}
 
 	return ok(property);

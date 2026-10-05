@@ -4,4 +4,5 @@ $description: "Which bus the part is wired to"
 values:
   TESTPART_SPI: "SPI"
   TESTPART_NONE: "Not connected"
-default: TESTPART_SPI
+# The TYPE's default. testpart_init_param's own `default:` (TESTPART_SPI) overrides it.
+default: TESTPART_NONE

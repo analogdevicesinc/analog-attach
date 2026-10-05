@@ -101,6 +101,8 @@ export type { ConnectionGraph, SymbolReference, ReferenceKind } from "./validato
 export { get_connected_symbols } from "./validator/connection_graph";
 export { validate_workfile } from "./validator/validator";
 export type { ValidationResult, ValidationError } from "./validator/types";
+export { bootstrap } from "./bootstrap/bootstrap";
+export type { BootstrapReport, FilledValue, LinkedReference, FillSource } from "./bootstrap/bootstrap";
 export { generate_project } from "./codegen/codegen";
 export type { CodegenInput, CodegenResult } from "./codegen/types";
 export {

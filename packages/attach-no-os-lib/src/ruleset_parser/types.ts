@@ -114,6 +114,10 @@ export type IncludeProperty = PropertyBase & {
 	_t: "IncludeProperty",
 	pointer?: boolean,
 	count?: string,
+	// Only meaningful when the include names an ENUM: resolution lowers the property to an
+	// EnumProperty and this becomes its default, ahead of the enum's own. A part pins its
+	// usual choice this way (`comm_type: {include: adxl355_comm_type, default: ...}`).
+	default?: EnumValue,
 } & IncludeMatch;
 
 export type EnumValue = string | number;
