@@ -368,6 +368,11 @@ function predicate_references(predicate: OverridePredicate): OverrideReference[]
 		case "PredicateAnd": {
 			return predicate.predicates.flatMap(nested => predicate_references(nested));
 		}
+		case "PredicateNot": {
+			// Without this, an include reference inside `$any_of` would never resolve and
+			// the rule could never fire.
+			return predicate_references(predicate.predicate);
+		}
 		default: {
 			return [predicate.reference];
 		}

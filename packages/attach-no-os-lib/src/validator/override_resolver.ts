@@ -10,6 +10,12 @@ import type { CollectedRule, ValidationError } from "./types";
 export interface OverrideResult {
 	effective: Property,
 	errors: ValidationError[],
+	/**
+	 * Why this property is required, when a rule made it so with a reason (`$any_of`'s
+	 * "needs one of ..."). Lets the required check say what would satisfy it instead of
+	 * only that a value is missing.
+	 */
+	required_reason?: string,
 };
 
 // Map a rule-relative ref node to the concrete symbol name it was resolved to at
@@ -66,6 +72,9 @@ function evaluate_predicate(predicate: OverridePredicate, collected: CollectedRu
 		}
 		case "PredicateAnd": {
 			return predicate.predicates.every(p => evaluate_predicate(p, collected, workfile));
+		}
+		case "PredicateNot": {
+			return !evaluate_predicate(predicate.predicate, collected, workfile);
 		}
 	}
 }
@@ -176,6 +185,8 @@ export function apply_overrides(
 	// Why this property ended up disabled, if it did (e.g. "mutually exclusive with
 	// spi_init"). Transient to this fold — used only for the disabled-but-set error.
 	let disable_reason: string | undefined;
+	// Same idea for a required effect that carries a reason.
+	let required_reason: string | undefined;
 
 	for (const collected of collected_rules) {
 		const when = collected.rule.when;
@@ -211,6 +222,9 @@ export function apply_overrides(
 			if (effect.op === "setDisabled") {
 				disable_reason = reason;
 			}
+			if (effect.op === "setRequired" && effect.value && effect.reason !== undefined) {
+				required_reason = effect.reason;
+			}
 		}
 	}
 
@@ -226,5 +240,5 @@ export function apply_overrides(
 		});
 	}
 
-	return { effective, errors };
+	return { effective, errors, required_reason };
 }

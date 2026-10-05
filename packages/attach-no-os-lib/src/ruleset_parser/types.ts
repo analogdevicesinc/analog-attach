@@ -219,7 +219,11 @@ export type OverridePredicate =
 	| { _t: "PredicateEquals", reference: OverrideReference, value: unknown }
 	| { _t: "PredicateNoneOf", reference: OverrideReference, values: unknown[] }
 	| { _t: "PredicateHasValue", reference: OverrideReference }
-	| { _t: "PredicateAnd", predicates: OverridePredicate[] };
+	| { _t: "PredicateAnd", predicates: OverridePredicate[] }
+	// Negation. Every other predicate treats an unset property as matching nothing, so
+	// this is the one that turns "unset" into true - which is exactly what `$any_of`
+	// needs to say "none of these is set".
+	| { _t: "PredicateNot", predicate: OverridePredicate };
 
 export type Effect =
       // merge effects
@@ -227,7 +231,7 @@ export type Effect =
       | { op: "setMin",         reference: OverrideReference, value: number }
       | { op: "setMax",         reference: OverrideReference, value: number }
       | { op: "setValue",       reference: OverrideReference, value: unknown }   // number/scalar only (C1)
-      | { op: "setRequired",    reference: OverrideReference, value: boolean }
+      | { op: "setRequired",    reference: OverrideReference, value: boolean, reason?: string }  // reason drives the error, like setDisabled's
       | { op: "setDescription", reference: OverrideReference, value: string }
       | { op: "setPointer",     reference: OverrideReference, value: boolean }
       | { op: "setDisabled",    reference: OverrideReference, value: boolean, reason?: string }  // reason drives mutex errors (D2)

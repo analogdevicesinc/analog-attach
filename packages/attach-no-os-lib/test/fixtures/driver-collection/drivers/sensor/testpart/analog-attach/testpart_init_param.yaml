@@ -35,3 +35,8 @@ $override:
               maximum: 10000000
             mode:
               values: [TEST_SPI_MODE_0]
+            # The part must be selectable: a GPIO line, or a native line that selects
+            # something.
+            $any_of:
+              - cs_gpio
+              - native_cs: {not: 0}

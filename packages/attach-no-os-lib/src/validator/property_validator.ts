@@ -38,7 +38,7 @@ export function validate_property(
 	// symbol_name is the workfile INSTANCE key (e.g. "my_spi"), not parent_symbol.$symbol
 	// (the schema symbol, e.g. "no_os_spi_init_param"). Refs were resolved to instance
 	// keys at collection time, so the engine must match against the instance key too.
-	const { effective, errors: override_errors } = apply_overrides(
+	const { effective, errors: override_errors, required_reason } = apply_overrides(
 		property, child_overrides, symbol_name, workfile
 	);
 
@@ -93,7 +93,8 @@ export function validate_property(
 
 		return [{
 			path: property_context.path,
-			message: "Required property has no value",
+			// A rule that made this required may say what would satisfy it.
+			message: required_reason ?? "Required property has no value",
 			severity: "error"
 		}];
 	}

@@ -31,7 +31,12 @@ import {
 
 const BOARD_CFG = 'bsp_test_spi_cfg';
 
-function build() {
+// How the part is selected. `native` is what the wiring resolver picks on the fixture board
+// (its PMOD port mates, and PMOD pin 1 is native chip-select 0); the rest are what the
+// part's `$any_of` has to tell apart.
+type ChipSelectChoice = 'native' | 'gpio' | 'both' | 'none' | 'native_zero';
+
+function build(chip_select: ChipSelectChoice = 'native') {
     const workfile = create_workfile(FIXTURE_SOC);
     expectOk(workfile);
     workfile.value.board = FIXTURE_BOARD;
@@ -42,6 +47,9 @@ function build() {
         ['part_spi_dev', 'test_spi_device'],
         ['part_ip', 'testpart_init_param'],
     ];
+    if (chip_select === 'gpio' || chip_select === 'both') {
+        nodes.push(['part_cs', 'test_gpio_pin']);
+    }
 
     for (const [name, type] of nodes) {
         const ruleset = load_resolved_ruleset_for_board(type, FIXTURE_BOARD);
@@ -56,12 +64,57 @@ function build() {
         ['part_ip', 'comm_type', 'TESTPART_SPI'],
         ['part_ip', 'comm_init', { spi_dev: 'part_spi_dev' }],
     ];
+    if (chip_select === 'native' || chip_select === 'both') {
+        values.push(['part_spi_dev', 'native_cs', 0x1]);
+    }
+    if (chip_select === 'native_zero') {
+        values.push(['part_spi_dev', 'native_cs', 0]);
+    }
+    if (chip_select === 'gpio' || chip_select === 'both') {
+        values.push(['part_cs', 'number', 4], ['part_spi_dev', 'cs_gpio', 'part_cs'], ['part_spi_dev', 'cs_gpio_num', 1]);
+    }
     for (const [symbol, property, value] of values) {
         expectOk(set_value(workfile.value, symbol, property, value));
     }
 
     return workfile.value;
 }
+
+describe('the part asks to be selectable ($any_of)', () => {
+    beforeEach(() => { setup_test_config(); });
+    afterEach(() => { teardown_test_config(); });
+
+    function chip_select_errors(choice: ChipSelectChoice) {
+        return validate_workfile(build(choice)).errors.filter(error => error.path?.startsWith('part_spi_dev'));
+    }
+
+    test('with no chip-select at all, it says what would satisfy it', () => {
+        const errors = chip_select_errors('none');
+        expect(errors.map(error => error.path)).toEqual(['part_spi_dev.native_cs', 'part_spi_dev.cs_gpio']);
+        expect(errors[0]?.message).toBe('needs one of: cs_gpio, native_cs other than 0');
+    });
+
+    test('a native mask of 0 selects nothing, so it is still missing', () => {
+        // 0 has a value, so native_cs passes its own required check and only cs_gpio is
+        // reported - the error lands on the field that still needs something.
+        const errors = chip_select_errors('native_zero');
+        expect(errors.map(error => `${error.path ?? ''}: ${error.message}`)).toEqual([
+            'part_spi_dev.cs_gpio: needs one of: cs_gpio, native_cs other than 0',
+        ]);
+    });
+
+    test('a native chip-select satisfies it', () => {
+        expect(chip_select_errors('native')).toEqual([]);
+    });
+
+    test('a GPIO chip-select satisfies it', () => {
+        expect(chip_select_errors('gpio')).toEqual([]);
+    });
+
+    test('both is fine: it is a lower bound only', () => {
+        expect(chip_select_errors('both')).toEqual([]);
+    });
+});
 
 describe('a part brought up end to end', () => {
     beforeEach(() => { setup_test_config(); });

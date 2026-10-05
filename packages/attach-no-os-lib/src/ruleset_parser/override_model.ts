@@ -220,9 +220,21 @@ export function lower_condition(
 				});
 				break;
 			}
+			case "not": {
+				// `not: 0` (or `not: [0, 1]`): the property is set AND is none of these. An
+				// unset property satisfies nothing, the same as `value:` - so a bitmask that is
+				// unset or 0 both fail `not: 0`, which is what "selects something" means.
+				const operand = condition_object.not;
+				predicates.push({
+					_t: "PredicateNoneOf",
+					reference,
+					values: Array.isArray(operand) ? operand : [operand],
+				});
+				break;
+			}
 			default: {
 				return error(
-					`Unknown condition operator '${key}'. Expected 'value' (whose operand may be '${ANY_VALUE}').`,
+					`Unknown condition operator '${key}'. Expected 'value' (whose operand may be '${ANY_VALUE}') or 'not'.`,
 					operand_context.path
 				);
 			}
