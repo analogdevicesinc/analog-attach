@@ -154,13 +154,13 @@ step "Point the interrupt at the GPIO controller" \
 
 step "Choose the trigger type" \
     "The AD7768-1 raises DRDY when a conversion is ready: the binding example and the Linux driver both use a rising edge." \
-    "update adc/interrupts --with '19 IRQ_TYPE_EDGE_RISING'" \
+    "update adc/interrupts --with 19 IRQ_TYPE_EDGE_RISING" \
     "read adc/interrupts"
 
 step "A reset line shared by both Pmods" \
     "GPIO26 is hard-wired to the RESET pin of both Pmods. Both slots stay usable, but asserting the reset resets both devices. The AD7768-1's RESET is active low, as in the binding example." \
     "suggest value adc/reset-gpios" \
-    "update adc/reset-gpios --with 'gpio 26 GPIO_ACTIVE_LOW'"
+    "update adc/reset-gpios --with gpio 26 GPIO_ACTIVE_LOW"
 
 step "Required properties fixed by the binding" \
     "No need to read the binding: suggest value offers what the AD7768-1 binding pins (a const clock-names, required SPI mode flags). Each one is then set exactly as suggested." \

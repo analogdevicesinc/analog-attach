@@ -118,6 +118,28 @@ export function describe_placement(board: BoardDescription, slot: BoardSlot, bus
     return `${slot.id}${onboard_suffix(slot)} — ${bus_with_reg(board, slot, bus_name)}${switch_note}${gpio ? `; gpio ${gpio}` : ""}${exclusion_suffix(board, slot, bus_name)}`;
 }
 
+function same_rows(a: SuggestedCell[][], b: SuggestedCell[][]): boolean {
+    return JSON.stringify(a, (_key, value: unknown) => typeof value === "bigint" ? `${value}n` : value)
+        === JSON.stringify(b, (_key, value: unknown) => typeof value === "bigint" ? `${value}n` : value);
+}
+
+/**
+ * Add the board's own suggestions after the lower layers'. A lower suggestion
+ * with exactly the value of a board one (e.g. the devicetree layer's "reg
+ * matches the unit address" for chip select 0) is folded into it: the board's
+ * row keeps its wiring details and notes, and says it also matches.
+ */
+function merge_board(lower: ValueSuggestion[], own: ValueSuggestion[]): ValueSuggestion[] {
+    const folded = own.map(board_suggestion => {
+        const same = lower.find(l => l.source === "devicetree" && same_rows(l.rows, board_suggestion.rows));
+        if (same === undefined) { return board_suggestion; }
+        const why = same.display.replace(/^\S+ — /, "");
+        return { ...board_suggestion, display: `${board_suggestion.display}; ${why}` };
+    });
+    const rest = lower.filter(l => !(l.source === "devicetree" && own.some(o => same_rows(l.rows, o.rows))));
+    return [...rest, ...folded];
+}
+
 export type BoardLayer = IntelligenceLayer & {
     readonly board: BoardDescription;
     /** Which slot(s) the node at `placement` belongs to. */
@@ -289,11 +311,11 @@ export function board_layer(board: BoardDescription): BoardLayer {
             const bus_paths = resolve_bus_paths(board, context.devicetree);
             const own_bus = bus_at_path(board, bus_paths, placement.node_path);
             if (own_bus !== undefined) {
-                return [...lower, ...bus_node_values(property, own_bus.name)];
+                return merge_board(lower, bus_node_values(property, own_bus.name));
             }
 
             const inference = slots_for_placement(board, bus_paths, placement);
-            return [...lower, ...device_values(property, inference, placement, context)];
+            return merge_board(lower, device_values(property, inference, placement, context));
         },
 
         refine_properties(properties: ResolvedProperty[], context: PropertyContext): ResolvedProperty[] {
@@ -304,8 +326,8 @@ export function board_layer(board: BoardDescription): BoardLayer {
             const inference = own_bus === undefined ? slots_for_placement(board, bus_paths, context.placement) : undefined;
 
             const suggest_one = (property: string, lower: ValueSuggestion[]): ValueSuggestion[] => {
-                if (own_bus !== undefined) { return [...lower, ...bus_node_values(property, own_bus.name)]; }
-                return [...lower, ...device_values(property, inference!, context.placement!, context)];
+                if (own_bus !== undefined) { return merge_board(lower, bus_node_values(property, own_bus.name)); }
+                return merge_board(lower, device_values(property, inference!, context.placement!, context));
             };
 
             return properties.map(property => {
@@ -639,6 +661,15 @@ slots: {}
             const no_reg: PropertyContext = { devicetree, data: "{}", placement: { node_path: `${spi0}/adc@1`, parent_path: spi0, siblings: [] } };
             expect(layer.infer_slots(devicetree, no_reg.placement!).slots.map(s => s.id)).toStrictEqual(["spi_pmod"]);
             expect(layer.infer_slots(devicetree, at(0n).placement!).slots.map(s => s.id)).toStrictEqual(["ad5592r"]);
+        });
+
+        test("adalm — the unit-address reg is folded into the board's matching chip select", () => {
+            const lower = [{ rows: [[1n]], display: "1 — matches the unit address of adc@1", source: "devicetree" }];
+            const result = layer.suggest_values!("reg", at(1n), lower);
+            expect(result.map(s => s.display)).toStrictEqual([
+                "0 — GPIO8 (ad5592r.cs)",
+                "1 — GPIO7 (spi_pmod.cs), or GPIO27 if P11 fitted (spi_pmod.cs_alt); matches the unit address of adc@1",
+            ]);
         });
 
         test("adalm — cs-gpios uses the default routing and notes the P11 remap", () => {
