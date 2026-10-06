@@ -74,6 +74,10 @@ export async function run_suggest(context: LocalContext, arguments_: string[]): 
             await suggest_navigate(context, arguments_.slice(1));
             return;
         }
+        case "children": {
+            await suggest_children(context, arguments_.slice(1));
+            return;
+        }
         case "type": {
             await suggest_type(context, arguments_.slice(1));
             return;
@@ -657,6 +661,53 @@ async function binding_property_suggestions(
             ...(labels ? { display_string: `${p.key} (${labels})` } : {}),
         };
     });
+}
+
+/** Child node names of `node`, from the base tree and the overlay merged, in first-seen order. */
+export function node_children(base_dt: DeviceTree, overlay: DeviceTreeOverlay, identifier: string): string[] | undefined {
+    const in_overlay = overlay.find_node(resolve_node_identifier(identifier, overlay));
+    const base_identifier = base_dt.resolve_identifier(identifier);
+    const base_reference = base_identifier === undefined
+        ? undefined
+        : (base_identifier.kind === "label" ? base_dt.get_node_by_label(base_identifier) : base_dt.get_node_by_path(base_identifier));
+    const in_base = base_reference === undefined ? undefined : base_dt.deref_node(base_reference);
+    if (in_overlay === undefined && in_base === undefined) { return; }
+    return [...new Set([
+        ...(in_base?.children ?? []).map(child => get_full_node_name(child)),
+        ...(in_overlay?.node.children ?? []).map(child => get_full_node_name(child)),
+    ])];
+}
+
+async function suggest_children(context_: LocalContext, arguments_: string[]): Promise<void> {
+    const identifier = resolve_positional_path(arguments_);
+    if (identifier === undefined) {
+        if (context_.json) { input_error("node reference is required for children suggestions"); return; }
+        console.log("Missing: node reference");
+        return;
+    }
+
+    const resolved = resolve_config(context_, ["context", "overlay"]);
+    if (resolved === undefined) { return; }
+    const { context, overlay: overlay_path } = resolved.values;
+
+    const trees = load_trees(context_, context, overlay_path, resolved.parsed.context);
+    if (trees === undefined) { return; }
+
+    const children = node_children(trees.base_dt, trees.overlay, identifier);
+    if (children === undefined) {
+        if (context_.json) {
+            respond_fail({ ok: false, message: `Node ${identifier} not found`, severity: "error" });
+        } else {
+            console.log(`Node not found: ${identifier}`);
+        }
+        return;
+    }
+
+    if (context_.json) {
+        respond({ ok: true, message: `Found ${children.length} child node(s)`, severity: "info", suggestions: children.map(value => ({ value })) });
+    } else {
+        for (const child of children) { console.log(child); }
+    }
 }
 
 async function suggest_navigate(context_: LocalContext, arguments_: string[]): Promise<void> {

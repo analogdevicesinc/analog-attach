@@ -24,7 +24,7 @@ import * as fs from "node:fs";
 
 import type { LocalContext } from "../../context";
 import { resolve_config } from "../../resolve-config";
-import { load_trees, parse_property_reference, resolve_write_target } from "../../utilities";
+import { load_trees, parse_property_reference, resolve_write_target, swallowed_positional_message } from "../../utilities";
 import { resolve_node_binding } from "../../binding-resolution";
 import { respond, respond_fail, input_error, diagnostic } from "../../protocol/output";
 
@@ -246,10 +246,18 @@ function build_cells_from_parsed(
 export function build_update_command(context_: LocalContext): Command {
     return new Command("update")
         .description("Update (upsert) a property value on an overlay-added node or a base-tree node (writes into an overlay fragment; the base tree is never modified)")
-        .requiredOption("--with <value>", "Value to set (raw string, parsed by the tool)")
+        .requiredOption("--with <value...>", "Value to set, parsed by the tool; no quotes needed (e.g. --with 19 IRQ_TYPE_EDGE_FALLING). Takes every token after it, so put the property path first")
         .argument("[path...]", "Path to property: node path segments followed by property name")
         .action(async (path: string[], options) => {
-            const withValue: string = options['with'];
+            const with_tokens = options['with'] as string[];
+            const withValue = with_tokens.join(" ");
+
+            if (path.length === 0 && with_tokens.length > 1) {
+                const message = swallowed_positional_message("property path", "--with", with_tokens, "update adc/interrupts --with 19 IRQ_TYPE_EDGE_FALLING");
+                if (context_.json) { input_error(message); return; }
+                console.log(message);
+                return;
+            }
 
             const reference = parse_property_reference(path);
 

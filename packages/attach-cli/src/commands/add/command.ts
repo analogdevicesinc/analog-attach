@@ -19,14 +19,14 @@ export function build_add_command(context_: LocalContext): Command {
         .option("--name <value>", "Node name (e.g. channel@0); defaults to the positional key")
         .option("--to <value...>", "Parent node: label, path, or label/child (e.g. spi0, /soc/spi@7e204000, spi0/mux)")
         .option("--label <value>", "Label to attach to the new node (e.g. imu1)")
-        .argument("[keys...]", "Device key / compatible string of the device binding to add")
-        .action(async (keys: string[], options) => {
+        .argument("[key]", "Device key / compatible string of the device binding to add")
+        .action(async (key: string | undefined, options) => {
             const resolved = resolve_config(context_, ["linux", "dtSchema", "context", "overlay"]);
             if (resolved === undefined) { return; }
             const { linux, dtSchema, context, overlay: input } = resolved.values;
 
-            const key = keys[0];
             const { name, label } = options;
+            // Segments are joined like a meta path: `--to spi0 my_adc` is `spi0/my_adc`.
             const to: string | undefined = options.to === undefined ? undefined : (options.to as string[]).join("/");
 
             if (key === undefined && name === undefined) {

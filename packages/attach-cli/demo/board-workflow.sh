@@ -147,13 +147,13 @@ step "Point the interrupt at the GPIO controller" \
 
 step "Choose the trigger type" \
     "The AD7124-8 pulls RDY low when a conversion is ready: the binding example and the Linux driver both use a falling edge. Macros resolve to numbers (IRQ_TYPE_EDGE_FALLING is 2)." \
-    "update adc/interrupts --with '19 IRQ_TYPE_EDGE_FALLING'" \
+    "update adc/interrupts --with 19 IRQ_TYPE_EDGE_FALLING" \
     "read adc/interrupts"
 
 step "A recommended GPIO: rdy-gpios" \
     "Not required, but the binding highly recommends it: DOUT/RDY also toggles during SPI transfers, and reading the line is how the driver tells a real interrupt from a spurious one. On spi_pmod1 it is the same GPIO19; quikeval's GPIO22 is listed because it shares CS0. RDY is active low." \
     "suggest value adc/rdy-gpios" \
-    "update adc/rdy-gpios --with 'gpio 19 GPIO_ACTIVE_LOW'"
+    "update adc/rdy-gpios --with gpio 19 GPIO_ACTIVE_LOW"
 
 step "An optional external reference" \
     "refin1-supply is optional: without it the ADC uses its internal 2.5 V reference. The context devicetree offers its regulators, but each is only right if it actually feeds REFIN1, so nothing is set here." \
@@ -182,8 +182,8 @@ step "Channel reg" \
 step "Differential inputs against ground" \
     "diff-channels is a pair of analog inputs, positive then negative. Which pins the signals are wired to is up to the user, so nothing suggests a value. The AD7124 encodes AVSS (ground) as input 17 (datasheet; AD7124_CHANNEL_AINx_AVSS in the driver): channel 0 measures AIN0 against ground, channel 1 AIN1." \
     "suggest type adc/channel@0/diff-channels" \
-    "update adc/channel@0/diff-channels --with '0 17'" \
-    "update adc/channel@1/diff-channels --with '1 17'"
+    "update adc/channel@0/diff-channels --with 0 17" \
+    "update adc/channel@1/diff-channels --with 1 17"
 
 step "Check the required properties" \
     "Every required property is now set, and both channels are present (last line)." \

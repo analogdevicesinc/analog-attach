@@ -100,12 +100,19 @@ export async function run_complete(words: string[]): Promise<void> {
 
     // Walk the words after the subcommand, collecting positional arguments while
     // skipping flags and their values. This replaces the per-shell word walkers.
+    // A variadic flag (`--with <value...>`) takes every word up to the next flag.
     const positionals: string[] = [];
+    let variadic: { flag: string, words: string[] } | undefined;
     for (let index = subIndex + 1; index < committed.length; index++) {
         const w = committed[index]!;
         if (w.startsWith("-")) {
             const opt = find_option(cmd, w);
-            if (opt !== undefined && option_takes_argument(opt)) { index++; }
+            variadic = opt?.variadic === true ? { flag: opt.long ?? w, words: [] } : undefined;
+            if (opt !== undefined && option_takes_argument(opt) && !opt.variadic) { index++; }
+            continue;
+        }
+        if (variadic !== undefined) {
+            variadic.words.push(w);
             continue;
         }
         positionals.push(w);
@@ -123,15 +130,30 @@ export async function run_complete(words: string[]): Promise<void> {
         }
     }
 
+    // Further words of a variadic flag (`--to spi0 <TAB>`): they aren't
+    // positionals. Use the flag's continuation source when it has one (e.g. the
+    // children of the path so far); when that yields nothing, only another flag
+    // can follow, so offer the remaining flags.
+    if (variadic !== undefined && !prefix.startsWith("-")) {
+        const rest = spec?.flag_rest?.[variadic.flag];
+        const candidates = rest === undefined ? [] : await source_candidates(rest, prefix, variadic.words);
+        emit(candidates.length > 0 ? filter_by_prefix(candidates, prefix) : command_flags(cmd, committed, prefix));
+        return;
+    }
+
     // Completing a flag name.
     if (prefix.startsWith("-")) {
         emit(command_flags(cmd, committed, prefix));
         return;
     }
 
-    // Completing a positional argument.
+    // Completing a positional argument; once the command takes no more, offer its flags.
     const source = positional_source(spec, positionals.length);
-    if (source !== undefined) { await emit_value_source(source, prefix, positionals); }
+    if (source === undefined) {
+        emit(command_flags(cmd, committed, prefix));
+        return;
+    }
+    await emit_value_source(source, prefix, positionals);
 }
 
 function positional_source(spec: CommandSpec | undefined, index: number): ValueSource | undefined {
@@ -155,13 +177,22 @@ async function emit_value_source(source: ValueSource, prefix: string, positional
             emit(filter_by_prefix(source.values.map(value => ({ value })), prefix));
             return;
         }
+        case "choices": {
+            emit(filter_by_prefix([...source.choices], prefix));
+            return;
+        }
         case "suggest": {
-            const suggestions = await suggest_values(source.suggest, prefix, positionals);
-            const candidates = suggestions.map(s => ({ value: s.value, description: s.display_string }));
-            emit(filter_by_prefix(candidates, prefix));
+            emit(filter_by_prefix(await source_candidates(source, prefix, positionals), prefix));
             return;
         }
     }
+}
+
+/** Candidates of a dynamic (`suggest`) source; static sources yield none. */
+async function source_candidates(source: ValueSource, prefix: string, positionals: string[]): Promise<Candidate[]> {
+    if (source.kind !== "suggest") { return []; }
+    const suggestions = await suggest_values(source.suggest, prefix, positionals);
+    return suggestions.map(s => ({ value: s.value, description: s.display_string }));
 }
 
 // Build the `suggest` context argv for each dynamic kind, mirroring what the old
@@ -174,6 +205,12 @@ async function suggest_values(kind: SuggestKind, prefix: string, positionals: st
         case "parent": {
             const key = positionals[0];
             return key === undefined ? [] : capture_suggest(kind, [key]);
+        }
+        case "children": {
+            return positionals.length === 0 ? [] : capture_suggest(kind, [positionals.join("/")]);
+        }
+        case "entry-points": {
+            return capture_suggest("navigate", []);
         }
         case "navigate":
         case "value": {

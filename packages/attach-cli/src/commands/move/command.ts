@@ -4,7 +4,7 @@ import { DeviceTree, DeviceTreeOverlay, get_full_node_name, type DTNode } from "
 import * as fs from 'node:fs';
 
 import type { LocalContext } from "../../context";
-import { load_trees, resolve_node_identifier } from "../../utilities";
+import { load_trees, resolve_node_identifier, swallowed_positional_message } from "../../utilities";
 import { resolve_config } from "../../resolve-config";
 import { respond, respond_fail, input_error } from "../../protocol/output";
 
@@ -14,11 +14,17 @@ export function build_move_command(context_: LocalContext): Command {
         .requiredOption("--to <value...>", "Destination parent: label, path, or label/child (e.g. spi0, /soc/spi@7e204000, spi0/mux)")
         .argument("[path...]", "Path to node (ValidIdentifier segments)")
         .action(async (path: string[], options) => {
-            const to: string = (options.to as string[]).join("/");
+            // Segments are joined like a meta path: `--to spi0 mux` is `spi0/mux`.
+            const to_tokens = options.to as string[];
+            const to: string = to_tokens.join("/");
 
             if (path.length === 0) {
-                if (context_.json) { input_error("path is required"); return; }
-                console.log("Missing: path (positional arguments)");
+                // A path given after --to was taken as part of the destination.
+                const message = to_tokens.length > 1
+                    ? swallowed_positional_message("node path", "--to", to_tokens, "move adc --to spi1")
+                    : "Missing: path (positional arguments)";
+                if (context_.json) { input_error(to_tokens.length > 1 ? message : "path is required"); return; }
+                console.log(message);
                 return;
             }
 

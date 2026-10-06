@@ -18,6 +18,16 @@ import type { LocalContext } from "./context";
 import { load_compat_index, save_compat_index, type CompatIndex } from "./config";
 import { input_error } from "./protocol/output";
 
+/**
+ * Message for a required positional that is missing because a variadic flag
+ * given first swallowed it: `update --with 19 IRQ_TYPE_EDGE_FALLING adc/interrupts`
+ * hands every token after `--with` to the flag, path included. `tokens` are
+ * what the flag received.
+ */
+export function swallowed_positional_message(positional: string, flag: string, tokens: string[], example: string): string {
+    return `Missing: ${positional}. ${flag} takes every token after it (here: ${tokens.join(" ")}), so put the ${positional} before it, e.g. ${example}`;
+}
+
 /** Substitute `{name}` placeholders in a command template, quoting each value so spaces are tolerated. */
 export function substitute_command(template: string, values: Record<string, string>): string {
     let command = template;

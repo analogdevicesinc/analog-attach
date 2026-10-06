@@ -455,7 +455,7 @@ attach-linux move [path...] --to <dest> [--overlay <dtso>] [--context <dts>]
 | Parameter | Required | Description |
 |-----------|----------|-------------|
 | `[path...]` | Yes | Path to node (positional segments) |
-| `--to` | Yes | Destination parent: label, path, or label/child. Variadic — space-separated tokens joined with `/` |
+| `--to` | Yes | Destination parent: label, path, or label/child. Variadic — space-separated tokens joined with `/`, so put the node path **before** `--to` (`move --to spi1 adc` is rejected with a hint) |
 | `--overlay` | No | The `.dtso` file to edit (falls back to config) |
 | `--context` | No | Base `.dts` file (falls back to config) |
 
@@ -550,14 +550,14 @@ attach-linux read imu1/spi-cpha
 
 **Syntax**:
 ```bash
-attach-linux update [path...] --with <value> [--overlay <dtso>] [--context <dts>] [--linux <path>] [--dt-schema <path>]
+attach-linux update [path...] --with <value...> [--overlay <dtso>] [--context <dts>] [--linux <path>] [--dt-schema <path>]
 ```
 
 **Parameters**:
 | Parameter | Required | Description |
 |-----------|----------|-------------|
 | `[path...]` | Yes | Path segments: node followed by property name (e.g. `imu1 reg` or `imu1/reg`) |
-| `--with` | Yes | Value to set (see Value Formats below) |
+| `--with` | Yes | Value to set (see Value Formats below). No quotes needed: it takes every token after it, so put the property path **before** `--with` (`update --with 0 imu1/reg` is rejected with a hint) |
 | `--overlay` | No | Path to `.dtso` file (falls back to config) |
 | `--context` | No | Path to base `.dts` file (falls back to config) |
 | `--linux` | No | Path to Linux repo (falls back to config) |
@@ -570,9 +570,9 @@ attach-linux update [path...] --with <value> [--overlay <dtso>] [--context <dts>
 | Single number | `0` | Integer value |
 | Single string | `adi,ad7124-8` | String value |
 | Boolean | `true` or `false` | For flag properties (true = add flag, false = remove flag) |
-| Array | `"0 1 2"` | Space-separated items |
-| Mixed array | `"25 IRQ_TYPE_EDGE_FALLING"` | Numbers and macros, space-separated |
-| Matrix rows | `"0 1,2 3"` | Comma separates rows, space separates items within a row — produces `<0 1>, <2 3>;` |
+| Array | `0 1 2` | Space-separated items |
+| Mixed array | `25 IRQ_TYPE_EDGE_FALLING` | Numbers and macros, space-separated |
+| Matrix rows | `0 1,2 3` | Comma separates rows, space separates items within a row — produces `<0 1>, <2 3>;` |
 | Phandle ref | `gpio` | Reference to another node (used with `<&gpio>` syntax) |
 
 Comma is only a row separator; it can't appear in labels, macros, or numbers.
@@ -592,13 +592,13 @@ attach-linux update imu1/spi-cpha --with true
 attach-linux update imu1/spi-cpha --with false
 
 # Set an interrupt array
-attach-linux update imu1/interrupts --with "25 IRQ_TYPE_EDGE_FALLING"
+attach-linux update imu1/interrupts --with 25 IRQ_TYPE_EDGE_FALLING
 
 # Set a phandle reference for interrupt-parent
 attach-linux update imu1/interrupt-parent --with gpio
 
 # Set string array
-attach-linux update imu1/clock-names --with "spi pclk"
+attach-linux update imu1/clock-names --with spi pclk
 
 # Set a property on a channel subnode
 attach-linux update imu1/channel@0/reg --with 0
@@ -628,6 +628,7 @@ attach-linux suggest <kind> [args...]
 | `device-key` | `[filter]` | Compatible strings from compat index |
 | `node-prop` | `<node-ref>` | All binding-declared properties for a node (marked `set`/`required`), followed by the child nodes the binding allows (e.g. `channel@N`, with their required properties and the ones present) |
 | `navigate` | `[node-ref]` | Children and properties of a node (or overlay entry points if omitted) |
+| `children` | `<node-ref>` | Child nodes of a node, base tree and overlay merged (used to build `--to` paths segment by segment) |
 | `type` | `<prop-ref>` | Expected value type of a property (plus board-derived `suggestions` when a board is configured) |
 | `value` | `<prop-ref>` | Ready-to-paste `update --with` values: `reg` matching the node's unit address (`channel@1` → `1`), those the binding pins (a `const`/single-option value, `true` for a required flag; needs `linux`/`dt-schema`) clock and supply providers from the context devicetree for `clocks` / `*-supply` (only right if actually wired to the device: confirm with the user), and those from the configured board (chip selects, interrupt/reset lines, `cs-gpios`). When `linux`/`dt-schema` are configured, each suggestion is checked against the binding and annotated with a `note` if there is a potential issue |
 | `board-slot` | `[compatible]` | Slots of the configured board, optionally only those whose bus can host the device |
@@ -660,7 +661,7 @@ attach-linux suggest value spi0/cs-gpios         # full cs-gpios list for the bu
 **Board-aware workflow** — when `config-get board` is set, don't guess wiring:
 1. `suggest board-slot <compatible>` → ask the user (selection question) which slot the device is plugged into. The display names the bus (`--to`) and the chip select (`reg`). A slot listed twice can be switched between buses: ask which position its switch is in.
 2. `add <compatible> --to <slot's bus> --label <l>`, then `update <l>/reg --with <slot's chip select>`.
-3. For `reg`, `interrupt-parent`, `interrupts`, `interrupts-extended`, `reset-gpios` and other `*-gpios`: `suggest value <l>/<prop>` and pick from the result, then `update <l>/<prop> --with "<value>"`.
+3. For `reg`, `interrupt-parent`, `interrupts`, `interrupts-extended`, `reset-gpios` and other `*-gpios`: `suggest value <l>/<prop>` and pick from the result, then `update <l>/<prop> --with <value>`.
 4. If a chip select beyond CE0/CE1 is used (reg ≥ 2), set the bus's `cs-gpios` from `suggest value <bus>/cs-gpios`.
 
 How to read `suggest value`:
@@ -674,7 +675,7 @@ How to read `suggest value`:
   - `needs interrupt-parent = <&gpio> (currently <&gic>); set it first` — the node inherits an interrupt controller that doesn't match the board; set `interrupt-parent` before `interrupts`.
   - `not defined by <binding>; validate may reject it` — the property isn't in the binding; the value will still be written but `validate` may flag it.
   - A cell-count or enum mismatch message — the suggestion doesn't fit the binding's constraints for this property.
-- `*-gpios` and other phandle+cells properties (like `interrupts`, `interrupt-parent`, `reset-gpios`) can be set in one step: `update <l>/<prop> --with "gpio 21 GPIO_ACTIVE_LOW"`. Macros are resolved to numbers and labels to `&label` automatically.
+- `*-gpios` and other phandle+cells properties (like `interrupts`, `interrupt-parent`, `reset-gpios`) can be set in one step: `update <l>/<prop> --with gpio 21 GPIO_ACTIVE_LOW`. Macros are resolved to numbers and labels to `&label` automatically.
 
 Use `list-intelligence` to get full metadata about each suggestion kind.
 

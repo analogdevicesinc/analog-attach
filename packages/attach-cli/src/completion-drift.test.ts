@@ -9,6 +9,7 @@ import { run_complete, shell_dequote } from "./commands/completion/complete";
 import { COMPLETION_SPEC, NO_VALUE_COMPLETION, FILES_DIRECTIVE, DIRS_DIRECTIVE } from "./commands/completion/spec";
 import { CONFIG_REGISTRY } from "./config";
 import * as suggest from "./commands/suggest/command";
+import { INTELLIGENCE_KINDS } from "./commands/list-intelligence/command";
 
 // config-set/config-get complete exactly the settable (non-internal) registry
 // fields. Derived from the registry so this test tracks it automatically — if a
@@ -179,6 +180,79 @@ describe("update --with completion", () => {
         expect(vi.mocked(suggest.run_suggest).mock.calls.some(
             ([, arguments_]) => arguments_.join(" ") === "value ad7124 interrupts",
         )).toBe(true);
+    });
+
+    test("update --with is variadic: after its first word only the remaining flags are offered", async () => {
+        const lines = await complete(["update", "ad7124", "interrupts", "--with", "19", ""]);
+        expect(lines.length).toBeGreaterThan(0);
+        expect(lines.every(line => line.startsWith("--"))).toBe(true);
+        expect(lines.some(line => line.startsWith("--with"))).toBe(false);
+    });
+
+    test("add --to is variadic: after a segment the remaining flags are offered, not stuck", async () => {
+        const lines = await complete(["add", "adi,ad7124-8", "--to", "spi0", ""]);
+        expect(lines.some(line => line.startsWith("--label"))).toBe(true);
+        expect(lines.some(line => line.startsWith("--to"))).toBe(false);
+    });
+});
+
+describe("add --to segment completion", () => {
+    beforeEach(() => {
+        vi.spyOn(suggest, "run_suggest").mockImplementation(async (context, arguments_) => {
+            const children: Record<string, string[]> = { "spi0": ["spidev@0", "adc@0"], "spi0/adc@0": [] };
+            const suggestions = arguments_[0] === "children"
+                ? (children[arguments_[1] ?? ""] ?? []).map(value => ({ value }))
+                : [];
+            if (context.json) { console.log(JSON.stringify({ ok: true, message: "", severity: "info", suggestions })); }
+        });
+    });
+    afterEach(() => { vi.restoreAllMocks(); });
+
+    test("each --to segment offers the children of the path so far", async () => {
+        expect(await complete(["add", "adi,ad7124-8", "--to", "spi0", ""])).toStrictEqual(["spidev@0", "adc@0"]);
+        expect(await complete(["add", "adi,ad7124-8", "--to", "spi0", "ad"])).toStrictEqual(["adc@0"]);
+        expect(vi.mocked(suggest.run_suggest).mock.calls.some(([, arguments_]) => arguments_.join(" ") === "children spi0")).toBe(true);
+    });
+
+    test("with no more children, the remaining flags are offered", async () => {
+        const lines = await complete(["add", "adi,ad7124-8", "--to", "spi0", "adc@0", ""]);
+        expect(lines.some(line => line.startsWith("--label"))).toBe(true);
+        expect(lines.some(line => line.startsWith("--to"))).toBe(false);
+    });
+});
+
+describe("move completion", () => {
+    beforeEach(() => {
+        vi.spyOn(suggest, "run_suggest").mockImplementation(async (context, arguments_) => {
+            const by_call: Record<string, string[]> = { "navigate": ["spi0", "i2c1"], "children spi1": ["spidev@0"], "children spi1/spidev@0": [] };
+            const suggestions = (by_call[arguments_.join(" ")] ?? []).map(value => ({ value }));
+            if (context.json) { console.log(JSON.stringify({ ok: true, message: "", severity: "info", suggestions })); }
+        });
+    });
+    afterEach(() => { vi.restoreAllMocks(); });
+
+    test("--to starts at an entry point, then follows children, then the flags", async () => {
+        expect(await complete(["move", "adc", "--to", ""])).toStrictEqual(["spi0", "i2c1"]);
+        expect(await complete(["move", "adc", "--to", "spi1", ""])).toStrictEqual(["spidev@0"]);
+        const flags = await complete(["move", "adc", "--to", "spi1", "spidev@0", ""]);
+        expect(flags.some(line => line.startsWith("--help"))).toBe(true);
+    });
+});
+
+describe("suggest kind completion", () => {
+    test("offers exactly the kinds list-intelligence reports, each with its first sentence", async () => {
+        const lines = await complete(["suggest", ""]);
+        expect(lines.map(line => line.split("\t")[0])).toStrictEqual(INTELLIGENCE_KINDS.map(entry => entry.kind));
+        expect(lines.find(line => line.startsWith("children\t"))).toBe("children\tLists the child nodes of a node, from the base devicetree and the overlay merged (navigate only sees the overlay).");
+    });
+
+    test("an abbreviation like e.g. doesn't end the first sentence", async () => {
+        const parent = (await complete(["suggest", "par"]))[0]!;
+        expect(parent).toContain("(e.g. the SPI/I2C bus or controller matching the binding's bus type).");
+    });
+
+    test("filters by prefix", async () => {
+        expect((await complete(["suggest", "va"])).map(line => line.split("\t")[0])).toStrictEqual(["value"]);
     });
 });
 

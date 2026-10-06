@@ -1,4 +1,5 @@
 import { CONFIG_REGISTRY } from "../../config";
+import { INTELLIGENCE_KINDS } from "../list-intelligence/command";
 
 // Single source of truth for value completion.
 //
@@ -18,12 +19,15 @@ import { CONFIG_REGISTRY } from "../../config";
 export const FILES_DIRECTIVE = "__ATTACH_COMPLETE_FILES__";
 export const DIRS_DIRECTIVE = "__ATTACH_COMPLETE_DIRS__";
 
-export type SuggestKind = "device-key" | "parent" | "navigate" | "value";
+// "entry-points" is completion-only: `suggest navigate` with no node (the overlay's top-level targets).
+export type SuggestKind = "device-key" | "parent" | "navigate" | "entry-points" | "children" | "value";
 
 export type ValueSource =
     | { kind: "file" }
     | { kind: "dir" }
     | { kind: "values"; values: readonly string[] }
+    // Fixed choices with a description each.
+    | { kind: "choices"; choices: readonly { value: string; description: string }[] }
     | { kind: "suggest"; suggest: SuggestKind };
 
 export interface CommandSpec {
@@ -37,6 +41,10 @@ export interface CommandSpec {
         | { mode: "byIndex"; sources: readonly ValueSource[]; rest?: ValueSource };
     // Value completion for specific flags, keyed by the option's long form.
     flags?: Readonly<Record<string, ValueSource>>;
+    // Completion for the further words of a variadic flag (its first word uses
+    // `flags`); the words given so far are passed as context. When it yields
+    // nothing, the remaining flags are offered instead.
+    flag_rest?: Readonly<Record<string, ValueSource>>;
 }
 
 const FILE: ValueSource = { kind: "file" };
@@ -49,8 +57,11 @@ const CONFIG_FIELDS: ValueSource = {
 
 export const COMPLETION_SPEC: Readonly<Record<string, CommandSpec>> = {
     add: {
-        positional: { mode: "all", source: { kind: "suggest", suggest: "device-key" } },
+        // One compatible at most; after it only flags remain.
+        positional: { mode: "byIndex", sources: [{ kind: "suggest", suggest: "device-key" }] },
         flags: { "--to": { kind: "suggest", suggest: "parent" } },
+        // `--to spi0 adc@0` is `spi0/adc@0`: each further segment is a child of the path so far.
+        flag_rest: { "--to": { kind: "suggest", suggest: "children" } },
     },
     read: {
         positional: { mode: "all", source: { kind: "suggest", suggest: "navigate" } },
@@ -62,6 +73,24 @@ export const COMPLETION_SPEC: Readonly<Record<string, CommandSpec>> = {
     },
     delete: {
         positional: { mode: "all", source: { kind: "suggest", suggest: "navigate" } },
+    },
+    move: {
+        positional: { mode: "all", source: { kind: "suggest", suggest: "navigate" } },
+        // The destination starts at an overlay entry point (spi0, i2c1, …); like
+        // `add --to`, each further segment is a child of the path so far.
+        flags: { "--to": { kind: "suggest", suggest: "entry-points" } },
+        flag_rest: { "--to": { kind: "suggest", suggest: "children" } },
+    },
+    suggest: {
+        // The kinds are exactly what list-intelligence reports; the description is
+        // the first sentence of each kind's (a period after "e.g." or "i.e." doesn't end it).
+        positional: {
+            mode: "byIndex",
+            sources: [{
+                kind: "choices",
+                choices: INTELLIGENCE_KINDS.map(entry => ({ value: entry.kind, description: entry.description.split(/(?<=[^.\s]{2}\.)\s/)[0]! })),
+            }],
+        },
     },
     "get-schema": {
         flags: { "--compatible": { kind: "suggest", suggest: "device-key" } },
@@ -80,7 +109,6 @@ export const COMPLETION_SPEC: Readonly<Record<string, CommandSpec>> = {
 // Commands that complete their flag names but have no value completion.
 export const NO_VALUE_COMPLETION: readonly string[] = [
     "validate",
-    "move",
     "rename",
     "enable",
     "disable",
@@ -91,7 +119,6 @@ export const NO_VALUE_COMPLETION: readonly string[] = [
     "list-devices",
     "validate2",
     "list-intelligence",
-    "suggest",
     "install-skill",
     "uninstall-skill",
 ];
