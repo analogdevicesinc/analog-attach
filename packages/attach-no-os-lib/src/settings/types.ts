@@ -59,6 +59,8 @@ export interface SettingsFile {
 	deploy_command: Setting;
 	/** Debug probe `deploy` flashes through. */
 	probe: Setting;
+	/** Whether `add` fills in everything that leaves no room for choice (see bootstrap/). */
+	bootstrap: Setting;
 };
 
 export function is_setting(value: unknown): value is Setting {

@@ -261,6 +261,19 @@ export function reset_setting_value(key: keyof SettingsFile): Result<undefined> 
 	return set_setting_value(key);
 }
 
+/**
+ * Whether bootstrap runs. Settings are stored as strings, so anything but an explicit
+ * "false" (or "0"/"no"/"off") means on - it is the default, and a typo should not silently
+ * turn it off.
+ */
+export function bootstrap_enabled(): boolean {
+	const configured = get_effective_setting_value("bootstrap");
+	if (!configured.ok || configured.value === undefined) {
+		return true;
+	}
+	return !["false", "0", "no", "off"].includes(configured.value.trim().toLowerCase());
+}
+
 /** Root of the capi checkout, which every other module's rulesets reference into. */
 export function get_capi_path(): Result<string> {
 	return get_setting_value("capi_path");

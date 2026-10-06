@@ -1,6 +1,16 @@
 import path from "node:path";
 import { buildCommand } from "@stricli/core";
-import { add_symbol, list_available_structs, load_resolved_ruleset_for_board } from "attach-no-os-lib";
+import {
+    add_symbol,
+    bootstrap,
+    bootstrap_enabled,
+    driver_root,
+    list_available_structs,
+    list_drivers,
+    load_resolved_ruleset_for_board,
+    validate_workfile,
+} from "attach-no-os-lib";
+import type { BootstrapReport, Workfile } from "attach-no-os-lib";
 import { filter_completions, get_node_names, get_schema_paths } from "../completion/completion";
 import { common_ok, type AddResponse } from "../protocol/responses";
 import { load_context, output, output_error, root_key, save_workfile, type WorkfileContext } from "./shared";
@@ -27,6 +37,11 @@ type AddFlags = {
  * `--to` is the protocol's parent path (a variadic array flag). It is accepted and must
  * name the root, because the workfile is a flat symbol table: every node is a root-level
  * node.
+ *
+ * The key may also be a DRIVER name (`add adxl355`). That adds the driver's root - the
+ * generic handle it is reached through (a capi_accel_sensor) - named after the driver, and
+ * the `bootstrap` setting (on by default) then builds everything below it that leaves no
+ * room for choice.
  */
 export const addCommand = buildCommand<AddFlags, [string | undefined]>({
     docs: {
@@ -34,7 +49,10 @@ export const addCommand = buildCommand<AddFlags, [string | undefined]>({
         fullDescription:
             "Creates a node from a schema. <schema> is the device key (see 'attach-noos list-devices')\n" +
             "and may also be given as --key; --name is what the node is called in the workfile,\n" +
-            "defaulting to the schema's own name."
+            "defaulting to the schema's own name. <schema> can also be a driver name (adxl355),\n" +
+            "which adds the handle the part is used through.\n" +
+            "With the 'bootstrap' setting on (the default), everything below the new node that\n" +
+            "leaves no room for choice is then filled in, and what is left is shown."
     },
     parameters: {
         positional: {
@@ -128,13 +146,26 @@ export const addCommand = buildCommand<AddFlags, [string | undefined]>({
             return;
         }
 
-        const keys = available.value.all;
-        if (!keys.includes(key)) {
-            output_error(flags, `Unknown schema '${key}'. See: attach-noos list-devices`);
-            return;
+        // A schema wins over a driver of the same name; a driver is only the shorthand.
+        let schema = key;
+        let default_node_name = default_name(key);
+        if (!available.value.all.includes(key)) {
+            const drivers = list_drivers();
+            const is_driver = drivers.ok && drivers.value.some(driver => driver.name === key);
+            if (!is_driver) {
+                output_error(flags, `Unknown schema '${key}'. See: attach-noos list-devices`);
+                return;
+            }
+            const root = driver_root(key);
+            if (!root.ok) {
+                output_error(flags, root.error.message);
+                return;
+            }
+            schema = root.value;
+            default_node_name = key;
         }
 
-        const name = flags.name ?? unique_name(default_name(key), context.value);
+        const name = flags.name ?? unique_name(default_node_name, context.value);
         if (context.value.workfile.symbols[name]) {
             output_error(flags, `'${name}' already exists. Pass --name to choose another name.`);
             return;
@@ -142,7 +173,7 @@ export const addCommand = buildCommand<AddFlags, [string | undefined]>({
 
         // The board is passed because `key` may name one of its own peripherals, which are
         // scoped to the selected board rather than globally unique.
-        const ruleset = load_resolved_ruleset_for_board(key, context.value.workfile.board);
+        const ruleset = load_resolved_ruleset_for_board(schema, context.value.workfile.board);
         if (!ruleset.ok) {
             output_error(flags, ruleset.error.message);
             return;
@@ -156,20 +187,47 @@ export const addCommand = buildCommand<AddFlags, [string | undefined]>({
 
         context.value.workfile = changed.value;
 
+        let report: BootstrapReport | undefined;
+        if (bootstrap_enabled()) {
+            const ran = bootstrap(context.value.workfile);
+            if (!ran.ok) {
+                output_error(flags, `Added '${name}', but bootstrap failed: ${ran.error.message}`);
+                return;
+            }
+            report = ran.value;
+        }
+
         const saved = save_workfile(context.value);
         if (!saved.ok) {
             output_error(flags, saved.error.message);
             return;
         }
 
-        const message = `Added '${name}' (${key})`;
+        const validation = validate_workfile(context.value.workfile);
+        const errors = validation.errors.filter(entry => entry.severity === "error").length;
+        const left = `${String(errors)} problem${errors === 1 ? "" : "s"} left`;
+
+        const what = schema === key ? key : `${schema}, for driver ${key}`;
+        const created = report === undefined ? 0 : report.linked.filter(link => link.created && !link.hidden).length;
+        const message = report === undefined
+            ? `Added '${name}' (${what})`
+            : `Added '${name}' (${what}) and ${String(created)} node${created === 1 ? "" : "s"} below it; ` +
+              (validation.valid ? "the workfile is valid" : `${left} - run: attach-noos validate`);
+
         const response: AddResponse = {
             ...common_ok(message),
             key,
             path: [name]
         };
 
-        output(flags, `${message}\n  ${context.value.path}`, response);
+        const text = [
+            `Added '${name}' (${what})`,
+            `  ${context.value.path}`,
+            ...(report === undefined ? [] : describe_bootstrap(report, context.value.workfile)),
+            "",
+            validation.valid ? "The workfile is valid." : `${left}. Run: attach-noos validate`,
+        ];
+        output(flags, text.join("\n"), response);
     }
 });
 
@@ -190,3 +248,52 @@ function unique_name(base: string, context: WorkfileContext): string {
         }
     }
 }
+
+/** What bootstrap did, for a person: the nodes it made, the values it chose, and the wiring. */
+function describe_bootstrap(report: BootstrapReport, workfile: Workfile): string[] {
+    const lines: string[] = [];
+    const created = report.linked.filter(link => link.created && !link.hidden);
+    const hidden = report.linked.filter(link => link.hidden);
+
+    if (created.length === 0 && hidden.length === 0 && report.filled.length === 0 && report.chip_selects.length === 0) {
+        return lines;
+    }
+
+    lines.push("", "Bootstrap filled in what leaves no room for choice:");
+    for (const link of created) {
+        const at = `${link.node}.${link.property}${link.member === undefined ? "" : `.${link.member}`}`;
+        lines.push(`  + ${link.target.padEnd(32)} (${link.symbol}) for ${at}`);
+    }
+    // Hidden nodes are named once each: several references can share one.
+    for (const target of new Set(hidden.map(link => link.target))) {
+        lines.push(`  ~ ${target.padEnd(32)} (from the board/driver, not stored)`);
+    }
+    for (const fill of report.filled) {
+        lines.push(`  = ${`${fill.node}.${fill.property}`.padEnd(32)} ${String(fill.value)} (${fill.from})`);
+    }
+
+    for (const decision of report.chip_selects) {
+        const chip_select = decision.chip_select;
+        let how = "unresolved";
+        if (chip_select.kind === "native") {
+            how = `native line ${String(chip_select.native_cs)} of ${chip_select.peripheral}`;
+        } else if (chip_select.kind === "gpio") {
+            how = `GPIO ${chip_select.gpio.port} pin ${String(chip_select.gpio.number)} (${chip_select.at.connector} pin ${chip_select.at.pin})`;
+        }
+        lines.push("", `Chip-select for ${decision.device}: ${how}`);
+        if (decision.connections.length > 0) {
+            lines.push(`Wire ${decision.part} to ${workfile.board ?? "the board"}:`);
+            for (const connection of decision.connections) {
+                const from = `${connection.from.connector} pin ${connection.from.pin} (${connection.role})`;
+                lines.push(`  ${from.padEnd(24)} -> ${connection.to.connector} pin ${connection.to.pin}`);
+            }
+        }
+    }
+
+    for (const problem of report.problems) {
+        lines.push(`  ! ${problem}`);
+    }
+
+    return lines;
+}
+

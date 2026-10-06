@@ -47,6 +47,7 @@ export {
     reset_setting_value,
     get_capi_path,
     get_module_roots,
+    bootstrap_enabled,
     get_settings_file_path,
     get_settings_sources,
     find_local_config_path,
@@ -102,7 +103,8 @@ export { get_connected_symbols } from "./validator/connection_graph";
 export { validate_workfile } from "./validator/validator";
 export type { ValidationResult, ValidationError } from "./validator/types";
 export { bootstrap } from "./bootstrap/bootstrap";
-export type { BootstrapReport, FilledValue, LinkedReference, FillSource } from "./bootstrap/bootstrap";
+export type { BootstrapReport, FilledValue, LinkedReference, FillSource, ChipSelectDecision } from "./bootstrap/bootstrap";
+export { driver_roots, driver_root, list_drivers, addable_drivers } from "./registry/roots";
 export { generate_project } from "./codegen/codegen";
 export type { CodegenInput, CodegenResult } from "./codegen/types";
 export {

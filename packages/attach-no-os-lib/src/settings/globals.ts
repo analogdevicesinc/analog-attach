@@ -124,6 +124,17 @@ export const SETTINGS_DEFAULTS: SettingsFile = {
 		options: PROBE_OPTIONS,
 		category: "build",
 	},
+	// A setting rather than a flag, for the same reason as `workfile`: attach-meta forwards
+	// only the arguments its own schema defines. `required: false` with a default keeps it
+	// out of attach-meta's first-run questions.
+	bootstrap: {
+		description: "After 'add', fill in every value and node that leaves no room for choice (true/false)",
+		required: false,
+		type: "bool",
+		default: "true",
+		options: ["true", "false"],
+		category: "workspace",
+	},
 };
 
 export const DEFAULT_SYSTEM_CONFIG_PATH = path.join(".config", "analog-attach");

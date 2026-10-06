@@ -59,7 +59,7 @@ describe("to_config", () => {
     it("leaves a required setting with no default reported as missing", () => {
         // init's missing_fields is `required && value === null`, so this is the only shape
         // that makes attach-meta prompt for a setting on first run.
-        const config = to_config("no_os_path", SETTINGS_DEFAULTS.no_os_path);
+        const config = to_config("capi_path", SETTINGS_DEFAULTS.capi_path);
 
         expect(config.required).toBe(true);
         // eslint-disable-next-line unicorn/no-null
