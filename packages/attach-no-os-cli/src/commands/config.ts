@@ -2,6 +2,7 @@ import { buildCommand } from "@stricli/core";
 import {
     SETTINGS_DEFAULTS,
     Setting,
+    SettingEnumSource,
     SettingsFile,
     board_peripheral_kinds,
     get_settings,
@@ -140,7 +141,10 @@ export const toolConfigSetCommand = buildCommand<ConfigSetFlags, [string, string
             const options = setting === undefined ? undefined : setting_options(setting);
             const message = `No value given for '${field}'. Pass one, or use --reset to clear it.`;
             if (options === undefined || options.length === 0) {
-                output_error(flags, message);
+                // A scanned set that came up empty is a configuration gap, not a free-form
+                // setting, so say what the scan needs rather than nothing.
+                const why = setting?.enum_of === undefined ? undefined : empty_scan_reason(setting.enum_of);
+                output_error(flags, why === undefined ? message : `${message} No options found: ${why}`);
                 return;
             }
             const listing = key === "board"
@@ -237,6 +241,19 @@ function describe_boards(current?: string): string[] {
         const marker = board.name === current ? "●" : "○";
         return `  ${marker} ${board.name.padEnd(width)}  ${(board.soc ?? "?").padEnd(9)}  ${declared}`;
     });
+}
+
+/** Why a scanned option set is empty: the scan's own error, or where it looked. */
+function empty_scan_reason(source: SettingEnumSource): string {
+    if (source === "board") {
+        const boards = list_boards();
+        if (!boards.ok) {
+            return boards.error.message;
+        }
+    }
+    const what = source === "template_set" ? "template sets" : `${source}s`;
+    return `no ${what} in the configured modules. Set capi_path and module_paths ` +
+        "(attach-noos tool-config-set capi_path <dir>; attach-noos tool-config-set module_paths <dirs>)";
 }
 
 // --- Formatters ---
