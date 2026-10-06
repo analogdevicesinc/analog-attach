@@ -1,5 +1,5 @@
 import { describe, test, expect, beforeEach, afterEach } from 'vitest';
-import { board_bus_pins, board_gpio_ports } from '../../src/registry/bsp';
+import { board_bus_pins, board_gpio_ports, board_peripheral_kinds } from '../../src/registry/bsp';
 import { find_board } from '../../src/registry/platforms';
 import { describe_board_pin, find_eval_board, land, resolve_bus } from '../../src/registry/wiring';
 import type { Wire } from '../../src/registry/wiring';
@@ -100,6 +100,21 @@ describe('pinout and BSP data', () => {
     test('an unknown connector or pin is named in the error', () => {
         expectErrorContains(describe_board_pin(FIXTURE_BOARD, { connector: 'J99', pin: '1' }), "no connector 'J99'");
         expectErrorContains(describe_board_pin(FIXTURE_BOARD, { connector: 'PMOD', pin: '99' }), "has no pin '99'");
+    });
+
+    test('a board lists the peripheral kinds its board.yml declares, in file order', () => {
+        const kinds = board_peripheral_kinds(FIXTURE_BOARD);
+        expectOk(kinds);
+        // Kinds with no bsp_kinds row are listed too: this is what the board declares.
+        expect(kinds.value).toEqual(['spi', 'gpio_port', 'gpio_pin', 'mystery']);
+
+        const other = board_peripheral_kinds('otherboard');
+        expectOk(other);
+        expect(other.value).toEqual(['spi', 'gpio_port']);
+    });
+
+    test('peripheral kinds of an unknown board is an error', () => {
+        expectErrorContains(board_peripheral_kinds('noboard'), 'noboard');
     });
 });
 

@@ -362,3 +362,22 @@ export function board_gpio_ports(board_name: string): Result<Map<string, string>
 
 	return ok(ports);
 }
+
+/**
+ * The kinds of peripheral a board's board.yml declares (uart, spi, gpio_port, ...), in the
+ * file's order. What a person choosing a board wants to know first: whether it has the bus
+ * their part needs. A board with no board.yml declares none.
+ */
+export function board_peripheral_kinds(board_name: string): Result<string[]> {
+	const board = find_board(board_name);
+	if (!board.ok) {
+		return board;
+	}
+
+	const peripherals = read_peripherals(board.value.path);
+	if (!peripherals.ok) {
+		return peripherals;
+	}
+
+	return ok(Object.keys(peripherals.value));
+}

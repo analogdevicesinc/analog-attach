@@ -10,6 +10,7 @@ import {
     get_workfile_path,
     list_template_sets,
     SettingsFile,
+    Setting,
     MinimalWorkfile,
     Workfile,
 } from "attach-no-os-lib";
@@ -160,13 +161,35 @@ export function get_config_keys(): string[] {
     return Object.keys(settings.value);
 }
 
-export function get_config_value_suggestions(key: string): string[] {
-    // template_set has a known, enumerable set of valid values — the bundled
-    // template folders — so propose those rather than just the current one.
-    if (key === "template_set") {
-        return list_template_sets();
+/**
+ * Every value a setting can take, when that set is known: a fixed `options` list, or one
+ * scanned from what is configured (`enum_of`: every board, every chip, every template set).
+ * Undefined for a free-form setting.
+ *
+ * The one source for a setting's choices, so tab completion, `tool-config-get` and what
+ * attach-meta is told can never offer different lists.
+ */
+export function setting_options(setting: Setting): string[] | undefined {
+    if (setting.options !== undefined) {
+        return setting.options;
     }
+    switch (setting.enum_of) {
+        case "board": {
+            return get_all_board_names();
+        }
+        case "platform": {
+            return get_platform_names();
+        }
+        case "template_set": {
+            return list_template_sets();
+        }
+        case undefined: {
+            return undefined;
+        }
+    }
+}
 
+export function get_config_value_suggestions(key: string): string[] {
     const settings = get_settings();
     if (!settings.ok) {
         return [];
@@ -175,6 +198,12 @@ export function get_config_value_suggestions(key: string): string[] {
     const setting = settings.value[key as keyof SettingsFile];
     if (!setting) {
         return [];
+    }
+
+    // A setting with a known set of values proposes all of them.
+    const options = setting_options(setting);
+    if (options !== undefined && options.length > 0) {
+        return options;
     }
 
     // Suggest the current value, falling back to the default, so the user can
@@ -193,10 +222,18 @@ export function get_platform_names(): string[] {
 }
 
 /**
- * Board names. Narrowed to the boards carrying the workfile's chip when there is a
- * workfile to read, since generating for another chip cannot work; the full list
- * otherwise, so the board setting still completes outside a project directory (which is
- * the board-first case).
+ * Every board any configured platform supports. What the `board` SETTING offers: choosing a
+ * board is how a new workfile picks its target, so nothing is filtered out.
+ */
+export function get_all_board_names(): string[] {
+    const boards = list_boards();
+    return boards.ok ? boards.value.map(board => board.name) : [];
+}
+
+/**
+ * Board names for a command acting on an existing workfile (`generate --board`, `build`,
+ * `deploy`). Narrowed to the boards carrying the workfile's chip when there is a workfile
+ * to read, since generating for another chip cannot work; the full list otherwise.
  */
 export function get_board_names(): string[] {
     const boards = list_boards();

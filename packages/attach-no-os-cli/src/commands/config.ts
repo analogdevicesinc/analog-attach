@@ -2,20 +2,19 @@ import { buildCommand } from "@stricli/core";
 import {
     SETTINGS_DEFAULTS,
     Setting,
-    SettingEnumSource,
     SettingsFile,
+    board_peripheral_kinds,
     get_settings,
     get_settings_sources,
-    list_template_sets,
+    list_boards,
     set_setting_value
 } from "attach-no-os-lib";
 import {
     prior_positionals,
     filter_completions,
-    get_board_names,
     get_config_keys,
     get_config_value_suggestions,
-    get_platform_names
+    setting_options
 } from "../completion/completion";
 import { common_ok, type Config, type ConfigType, type ToolConfigResponse } from "../protocol/responses";
 import { output, output_error } from "./shared";
@@ -134,7 +133,28 @@ export const toolConfigSetCommand = buildCommand<ConfigSetFlags, [string, string
         const key = field as keyof SettingsFile;
 
         if (value === undefined && !flags.reset) {
-            output_error(flags, `No value given for '${field}'. Pass one, or use --reset to clear it.`);
+            // Show the choices when there are some: asking for the setting by name is how
+            // someone finds out what it can be set to.
+            const settings = get_settings();
+            const setting = settings.ok ? settings.value[key] : undefined;
+            const options = setting === undefined ? undefined : setting_options(setting);
+            const message = `No value given for '${field}'. Pass one, or use --reset to clear it.`;
+            if (options === undefined || options.length === 0) {
+                output_error(flags, message);
+                return;
+            }
+            const listing = key === "board"
+                ? describe_boards(setting?.value)
+                : options.map(option => `  ${option === setting?.value ? "●" : "○"} ${option}`);
+            output_error(flags, `${message} Options: ${options.join(", ")}`, {
+                text: [
+                    `No value given for '${field}'. Choose one:`,
+                    "",
+                    ...listing,
+                    "",
+                    `Use: attach-noos tool-config-set ${field} <value>`,
+                ].join("\n"),
+            });
             return;
         }
 
@@ -180,7 +200,7 @@ export function to_config(field: keyof SettingsFile, setting: Setting): Config {
 }
 
 function config_type(setting: Setting): ConfigType {
-    const options = setting.options ?? (setting.enum_of ? resolve_enum(setting.enum_of) : undefined);
+    const options = setting_options(setting);
 
     // An enum with nothing in it would be a field no value can satisfy, and the option
     // sets are scanned (a board list needs capi_path), so an unscannable one degrades to
@@ -200,18 +220,23 @@ function config_type(setting: Setting): ConfigType {
     return setting.type;
 }
 
-function resolve_enum(source: SettingEnumSource): string[] {
-    switch (source) {
-        case "board": {
-            return get_board_names();
-        }
-        case "platform": {
-            return get_platform_names();
-        }
-        case "template_set": {
-            return list_template_sets();
-        }
+/**
+ * Every board, with what makes one a fit: the chip it carries, and the peripheral kinds its
+ * board.yml declares - a part on a SPI bus needs a board that declares `spi`.
+ */
+function describe_boards(current?: string): string[] {
+    const boards = list_boards();
+    if (!boards.ok) {
+        return [`  (${boards.error.message})`];
     }
+
+    const width = Math.max(...boards.value.map(board => board.name.length));
+    return boards.value.map(board => {
+        const kinds = board_peripheral_kinds(board.name);
+        const declared = kinds.ok && kinds.value.length > 0 ? kinds.value.join(", ") : "no board.yml peripherals";
+        const marker = board.name === current ? "●" : "○";
+        return `  ${marker} ${board.name.padEnd(width)}  ${(board.soc ?? "?").padEnd(9)}  ${declared}`;
+    });
 }
 
 // --- Formatters ---
@@ -259,10 +284,10 @@ function format_setting(field: string, setting: Setting): string {
     }
     out += `  ${"Description:".padEnd(14)}${setting.description}\n`;
 
-    const options = setting.options ?? (setting.enum_of ? resolve_enum(setting.enum_of) : undefined);
+    const options = setting_options(setting);
     if (options && options.length > 0) {
-        // A scanned option set can be long (there are a few hundred no-OS boards), so the
-        // human listing is truncated. `tool-config-get --json` still carries all of them.
+        // A scanned option set can be long, so the human listing is truncated.
+        // `tool-config-get --json` still carries all of them.
         const shown = options.slice(0, OPTIONS_SHOWN);
         out += "\n  Options:\n";
         for (const option of shown) {

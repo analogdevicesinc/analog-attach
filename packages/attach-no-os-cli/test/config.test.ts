@@ -2,9 +2,17 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import Ajv2020 from "ajv/dist/2020";
-import { SETTINGS_DEFAULTS, type SettingsFile } from "attach-no-os-lib";
-import { describe, expect, it } from "vitest";
+import {
+    PATH_LIST_DELIMITER,
+    SETTINGS_DEFAULTS,
+    reset_registry,
+    set_config_path_override,
+    set_settings,
+    type SettingsFile
+} from "attach-no-os-lib";
+import { afterEach, describe, expect, it } from "vitest";
 import { to_config } from "../src/commands/config";
+import { setting_options } from "../src/completion/completion";
 
 /**
  * attach-meta deserializes each `Config` into a struct with no serde defaults, so a
@@ -81,4 +89,40 @@ describe("to_config", () => {
             }
         },
     );
+});
+
+describe("setting_options", () => {
+    const fixtures = path.resolve(import.meta.dirname, "../../attach-no-os-lib/test/fixtures");
+    let config_directory: string | undefined;
+
+    afterEach(() => {
+        // eslint-disable-next-line unicorn/no-useless-undefined -- clears the override
+        set_config_path_override(undefined);
+        reset_registry();
+        if (config_directory !== undefined) {
+            fs.rmSync(config_directory, { recursive: true, force: true });
+            config_directory = undefined;
+        }
+    });
+
+    it("returns a fixed option set as written", () => {
+        expect(setting_options(SETTINGS_DEFAULTS.bootstrap)).toEqual(["true", "false"]);
+        expect(setting_options(SETTINGS_DEFAULTS.workfile)).toBeUndefined();
+    });
+
+    it("lists every configured board, not only the workfile's chip", () => {
+        config_directory = fs.mkdtempSync(path.join(os.tmpdir(), "attach-no-os-cli-test-"));
+        set_config_path_override(path.join(config_directory, "config.json"));
+        set_settings({
+            ...SETTINGS_DEFAULTS,
+            capi_path: { ...SETTINGS_DEFAULTS.capi_path, value: path.join(fixtures, "capi") },
+            module_paths: {
+                ...SETTINGS_DEFAULTS.module_paths,
+                value: [path.join(fixtures, "platform"), path.join(fixtures, "driver-collection")].join(PATH_LIST_DELIMITER),
+            },
+        });
+        reset_registry();
+
+        expect(setting_options(SETTINGS_DEFAULTS.board)?.sort()).toEqual(["otherboard", "testboard"]);
+    });
 });

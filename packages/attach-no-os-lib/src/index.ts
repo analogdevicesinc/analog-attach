@@ -88,7 +88,7 @@ export {
     read_soc_descriptor
 } from "./registry/platforms";
 export { read_module, read_ruleset_index, MODULE_FILENAME } from "./registry/module_yml";
-export { board_externs, find_board_extern, check_bsp_kinds, board_bus_pins, board_gpio_ports } from "./registry/bsp";
+export { board_externs, find_board_extern, check_bsp_kinds, board_bus_pins, board_gpio_ports, board_peripheral_kinds } from "./registry/bsp";
 export {
     modules_providing,
     driver_ops_candidates,
