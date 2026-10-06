@@ -15,10 +15,19 @@
  * that node's own defaults and references open the next steps.
  *
  * THE RULE: exactly one option, never the best one. An option is a node already in the
- * workfile that fits, a board or driver symbol that provides the type, or a type to create.
- * Bootstrap never links a reference to a node the workfile already holds - that is the
- * user's to decide - except an extern: an extern names one C global, so two nodes for it
- * would be the same thing twice, and binding to it is not a choice.
+ * workfile that fits, a hidden resource that provides the type (a board or driver extern,
+ * or the handle wrapping one - see registry/hidden.ts), or a type to create. Bootstrap never
+ * links a reference to a node the user's workfile holds - that is the user's to decide -
+ * except a hidden one: a hidden node IS one board or driver resource, so binding to it is
+ * not a choice, and is how two devices on one bus share its controller.
+ *
+ * Hidden nodes are created hidden: they are referenced, validated and generated like any
+ * other node, but never written out; the next load rebuilds them from the name.
+ *
+ * Then the chip-select. Once nothing else applies, a SPI device that still has no chip-
+ * select gets the one its part's wiring resolves to (registry/wiring.ts): a native line, or
+ * a GPIO pin node on the right port. The same wiring settles which bus the device is on,
+ * which is what decides the controller on a board with more than one SPI.
  *
  * Termination: every step sets a value that was unset or adds a node, and nothing is ever
  * unset or removed, so the loop only moves forward. The step cap is a bug detector, not the
@@ -27,15 +36,19 @@
 
 import type { Result } from "../ruleset_parser/result";
 import { error, ok } from "../ruleset_parser/result";
-import type { Property, Ruleset } from "../ruleset_parser/types";
+import type { IncludeProperty, Property, Ruleset } from "../ruleset_parser/types";
 import { provided_id, RulesetType } from "../ruleset_parser/types";
 import { load_resolved_ruleset, load_resolved_ruleset_for_board } from "../resolver/resolver";
-import { board_externs } from "../registry/bsp";
+import type { ChipSelectBinding } from "../registry/module_yml";
 import { driver_init_parameter_candidates, driver_ops_candidates } from "../registry/drivers";
-import { all_symbols, resolve_entry } from "../registry/registry";
+import { build_extern_index, hidden_candidates, wrapper_name } from "../registry/hidden";
+import type { ExternIndex, HiddenCandidate } from "../registry/hidden";
+import { get_registry, resolve_entry } from "../registry/registry";
+import { find_eval_board, resolve_bus } from "../registry/wiring";
+import type { ChipSelect, Connection } from "../registry/wiring";
 import { collect_child_overrides, create_connections_graph } from "../validator/connection_graph";
 import { apply_overrides } from "../validator/override_resolver";
-import { add_symbol, set_value } from "../workfile_handler/workfile_handler";
+import { add_symbol, is_hidden, materialize_hidden, materialize_referenced_hidden, set_value } from "../workfile_handler/workfile_handler";
 import type { Workfile } from "../workfile_handler/types";
 
 /** Why a value was filled. */
@@ -58,11 +71,28 @@ export interface LinkedReference {
 	/** The schema or extern symbol of `target`. */
 	symbol: string,
 	created: boolean,
+	/** Whether `target` is hidden: never written out, rebuilt from its name. */
+	hidden: boolean,
+}
+
+/** How a SPI device's chip-select was settled, and the wiring that settled it. */
+export interface ChipSelectDecision {
+	device: string,
+	/** The part whose wiring decided it, by its eval board. */
+	part: string,
+	chip_select: ChipSelect,
+	/** The GPIO pin node created for it, when it is a GPIO. */
+	pin?: string,
+	/** The wiring instructions: connect each part pin to this board pin. */
+	connections: Connection[],
 }
 
 export interface BootstrapReport {
 	filled: FilledValue[],
 	linked: LinkedReference[],
+	chip_selects: ChipSelectDecision[],
+	/** Wiring that does not add up, from the parts' wiring resolution. */
+	problems: string[],
 }
 
 /** A bug detector: well above any real graph, and only reached if a step stops making progress. */
@@ -71,79 +101,48 @@ const STEP_CAP = 1000;
 // --- What can fill a reference -----------------------------------------------------------
 
 /**
- * One option for a reference. `existing` is a node already in the workfile; `extern` and
- * `create` are symbols that are not in it yet.
+ * One option for a reference. `existing` is a node already in the workfile, `bindable`
+ * when it is a hidden resource (so linking to it is not a choice); `hidden` is a resource
+ * not in the workfile yet; `create` is a new stored node of a type.
  */
 type Option =
-	| { kind: "existing", name: string, extern: boolean }
-	| { kind: "extern", symbol: string }
+	| { kind: "existing", name: string, bindable: boolean }
+	| { kind: "hidden", candidate: HiddenCandidate }
 	| { kind: "create", symbol: string };
 
-/** Every extern the configured modules and the selected board offer, by the type it provides. */
-interface ExternIndex {
-	by_type: Map<string, string[]>,
-	board: Set<string>,
-}
-
-function build_extern_index(workfile: Workfile): Result<ExternIndex> {
-	const by_type = new Map<string, string[]>();
-	const board = new Set<string>();
-	const add = (type_: string, symbol: string) => by_type.set(type_, [...by_type.get(type_) ?? [], symbol]);
-
-	const entries = all_symbols();
-	if (!entries.ok) {
-		return entries;
-	}
-	for (const entry of entries.value) {
-		if (entry.$type !== RulesetType.RT_EXTERN) {
-			continue;
-		}
-		const extern = load_resolved_ruleset(entry.$symbol);
-		if (extern.ok && extern.value._t === "RulesetExtern") {
-			add(extern.value.$provides, entry.$symbol);
-		}
-	}
-
-	if (workfile.board !== undefined) {
-		const externs = board_externs(workfile.board);
-		if (!externs.ok) {
-			return externs;
-		}
-		for (const extern of externs.value.externs) {
-			add(extern.$provides, extern.$symbol);
-			board.add(extern.$symbol);
-		}
-	}
-
-	return ok({ by_type, board });
+function existing_option(workfile: Workfile, name: string, node: Ruleset): Option {
+	return { kind: "existing", name, bindable: is_hidden(workfile, name) || node._t === "RulesetExtern" };
 }
 
 /**
  * The options for a reference that must name a node providing `type_`.
  *
- * A board or driver symbol providing the type is THE option, and a fresh struct of the type
- * is only considered when nothing provides one: an application references its board's bus
- * config rather than writing its own, so offering both would make every such reference look
- * like a choice when it is not.
+ * A hidden resource providing the type is THE option, and a fresh node of the type is only
+ * considered when nothing provides one: an application references its board's bus config
+ * and the handle wrapping it rather than writing its own, so offering both would make every
+ * such reference look like a choice when it is not.
  */
 function reference_options(workfile: Workfile, type_: string, self: string, externs: ExternIndex): Option[] {
 	const options: Option[] = [];
-	const extern_symbols = externs.by_type.get(type_) ?? [];
 
 	for (const [name, node] of Object.entries(workfile.symbols)) {
 		if (name !== self && provided_id(node) === type_) {
-			options.push({ kind: "existing", name, extern: node._t === "RulesetExtern" });
+			options.push(existing_option(workfile, name, node));
 		}
 	}
 
-	for (const symbol of extern_symbols) {
-		const present = Object.values(workfile.symbols).some(node => node._t === "RulesetExtern" && node.$symbol === symbol);
-		if (!present) {
-			options.push({ kind: "extern", symbol });
+	const candidates = hidden_candidates(type_, externs);
+	for (const candidate of candidates) {
+		// An extern already in the workfile under ANY name is that resource - one C global -
+		// so it is not a second option.
+		const held = candidate.name in workfile.symbols
+			|| (candidate.kind === "extern" && Object.values(workfile.symbols).some(node => node._t === "RulesetExtern" && node.$symbol === candidate.symbol));
+		if (!held) {
+			options.push({ kind: "hidden", candidate });
 		}
 	}
 
-	if (extern_symbols.length === 0) {
+	if (candidates.length === 0) {
 		const entry = resolve_entry(type_);
 		if (entry.ok && (entry.value.$type === RulesetType.RT_STRUCT || entry.value.$type === RulesetType.RT_DESCRIPTOR)) {
 			options.push({ kind: "create", symbol: type_ });
@@ -159,18 +158,18 @@ function driver_options(workfile: Workfile, candidates: string[], self: string):
 	for (const symbol of candidates) {
 		const present = Object.entries(workfile.symbols).filter(([name, node]) => name !== self && node.$symbol === symbol);
 		for (const [name, node] of present) {
-			options.push({ kind: "existing", name, extern: node._t === "RulesetExtern" });
+			options.push(existing_option(workfile, name, node));
 		}
-		if (present.length === 0) {
-			options.push(node_kind_option(symbol));
+		if (present.length > 0) {
+			continue;
 		}
+		// A driver's ops table is an extern: hidden, named by its own symbol.
+		const entry = resolve_entry(symbol);
+		options.push(entry.ok && entry.value.$type === RulesetType.RT_EXTERN
+			? { kind: "hidden", candidate: { kind: "extern", name: symbol, symbol } }
+			: { kind: "create", symbol });
 	}
 	return options;
-}
-
-function node_kind_option(symbol: string): Option {
-	const entry = resolve_entry(symbol);
-	return entry.ok && entry.value.$type === RulesetType.RT_EXTERN ? { kind: "extern", symbol } : { kind: "create", symbol };
 }
 
 /** The one option to take, or none: anything but exactly one option, or a user-held node, is a choice. */
@@ -179,7 +178,7 @@ function the_only(options: Option[]): Option | undefined {
 	if (only === undefined || more.length > 0) {
 		return undefined;
 	}
-	if (only.kind === "existing" && !only.extern) {
+	if (only.kind === "existing" && !only.bindable) {
 		return undefined;
 	}
 	return only;
@@ -225,7 +224,8 @@ function fill_value(effective: Property): { value: unknown, from: FillSource } |
 
 type Step =
 	| { kind: "fill", node: string, property: string, value: unknown, from: FillSource }
-	| { kind: "link", node: string, property: string, member?: string, option: Option };
+	| { kind: "link", node: string, property: string, member?: string, option: Option }
+	| { kind: "chip_select", device: string, part: string, resolved: ChipSelect, connections: Connection[], problems: string[] };
 
 function next_step(workfile: Workfile, externs: ExternIndex): Step | undefined {
 	const graph = create_connections_graph(workfile);
@@ -255,8 +255,8 @@ function next_step(workfile: Workfile, externs: ExternIndex): Step | undefined {
 			}
 
 			// A requirement that came from `$any_of` has alternatives by construction (the
-			// chip-select can be a GPIO or a native line), so it is never decided here. Lists
-			// (an include with a `count`) are left alone too: they need N nodes, not one.
+			// chip-select can be a GPIO or a native line), so it is never decided here - the
+			// chip-select step below is what settles that one, from the wiring.
 			if (required_reason !== undefined) {
 				continue;
 			}
@@ -268,7 +268,7 @@ function next_step(workfile: Workfile, externs: ExternIndex): Step | undefined {
 		}
 	}
 
-	return undefined;
+	return chip_select_step(workfile, externs);
 }
 
 function link_step(
@@ -284,6 +284,7 @@ function link_step(
 
 	switch (effective._t) {
 		case "IncludeProperty": {
+			// Lists (an include with a `count`) need N nodes, not one; they are left alone.
 			if (effective.required !== true || effective.include === undefined || effective.count !== undefined) {
 				return undefined;
 			}
@@ -324,6 +325,192 @@ function link_step(
 	}
 }
 
+// --- The chip-select ---------------------------------------------------------------------
+
+function value_of(node: Ruleset | undefined, property: string): unknown {
+	return node?._t === "RulesetStruct" || node?._t === "RulesetDescriptor"
+		? node.properties.find(candidate => candidate.name === property)?.value
+		: undefined;
+}
+
+/** Whether a SPI device can already be selected: a GPIO list, or a native mask that selects something. */
+function has_chip_select(node: Ruleset | undefined, binding: ChipSelectBinding): boolean {
+	const native = value_of(node, binding.native_mask);
+	return value_of(node, binding.gpio_list) !== undefined || (typeof native === "number" && native !== 0);
+}
+
+/** Every (driver node, SPI device node) pair: a part's init_param bound to a bus device through a union. */
+function parts_on_spi(workfile: Workfile, binding: ChipSelectBinding): { part_node: string, device: string, driver: string }[] {
+	const pairs: { part_node: string, device: string, driver: string }[] = [];
+	for (const name of Object.keys(workfile.symbols).sort()) {
+		const node = workfile.symbols[name];
+		if (node?._t !== "RulesetStruct") {
+			continue;
+		}
+		const entry = resolve_entry(node.$symbol);
+		if (!entry.ok || entry.value.module.type !== "driver") {
+			continue;
+		}
+		for (const property of node.properties) {
+			if (property._t !== "UnionProperty" || typeof property.value !== "object" || property.value === null) {
+				continue;
+			}
+			for (const target of Object.values(property.value as Record<string, unknown>)) {
+				if (typeof target === "string" && workfile.symbols[target]?.$symbol === binding.device) {
+					pairs.push({ part_node: name, device: target, driver: entry.value.module.name });
+				}
+			}
+		}
+	}
+	return pairs;
+}
+
+/**
+ * The next thing the wiring settles for a SPI device without a chip-select: first its bus,
+ * if the device's controller is still open; then its chip-select.
+ */
+function chip_select_step(workfile: Workfile, externs: ExternIndex): Step | undefined {
+	const binding = get_registry();
+	if (!binding.ok || binding.value.chip_select === undefined || workfile.board === undefined) {
+		return undefined;
+	}
+	const chip_select = binding.value.chip_select;
+
+	for (const { device, driver } of parts_on_spi(workfile, chip_select)) {
+		const device_node = workfile.symbols[device];
+		if (has_chip_select(device_node, chip_select) || device_node?._t !== "RulesetStruct") {
+			continue;
+		}
+
+		// Only a part whose eval board is known can be wired; anything else stays a question.
+		const part = find_eval_board(driver);
+		if (!part.ok) {
+			continue;
+		}
+		const resolved = resolve_bus(part.value, workfile.board, "spi");
+		if (!resolved.ok) {
+			continue;
+		}
+
+		// The bus the part's lines land on decides the controller, where the board alone
+		// could not (two SPI buses means two controller handles to choose from).
+		const peripheral = resolved.value.peripheral;
+		if (peripheral !== undefined) {
+			for (const property of device_node.properties) {
+				if (property._t !== "IncludeProperty" || property.value !== undefined || property.include === undefined) {
+					continue;
+				}
+				const handle = hidden_candidates(property.include, externs).find(candidate => candidate.name === wrapper_name(peripheral));
+				if (handle !== undefined) {
+					return { kind: "link", node: device, property: property.name, option: { kind: "hidden", candidate: handle } };
+				}
+			}
+		}
+
+		const decided = resolved.value.chip_select;
+		if (decided === undefined || decided.kind === "unwired") {
+			continue;
+		}
+		if (decided.kind === "gpio" && decided.port_extern === undefined) {
+			continue; // the board's BSP configures no port for that pin; resolve_bus says so
+		}
+
+		return {
+			kind: "chip_select",
+			device,
+			part: part.value.name,
+			resolved: decided,
+			connections: resolved.value.connections,
+			problems: resolved.value.problems,
+		};
+	}
+
+	return undefined;
+}
+
+/** Give a SPI device its chip-select: a native mask, or a GPIO pin node on the right port. */
+function apply_chip_select(
+	workfile: Workfile,
+	externs: ExternIndex,
+	device: string,
+	resolved: ChipSelect,
+	binding: ChipSelectBinding,
+): Result<{ pin?: string, filled: FilledValue[], linked: LinkedReference[] }> {
+	if (resolved.kind === "native") {
+		const mask = 1 << resolved.native_cs;
+		const set = set_value(workfile, device, binding.native_mask, mask);
+		if (!set.ok) {
+			return set;
+		}
+		return ok({ filled: [{ node: device, property: binding.native_mask, value: mask, from: "only value" }], linked: [] });
+	}
+	if (resolved.kind !== "gpio" || resolved.port_extern === undefined) {
+		return error(`Chip-select for '${device}' is not one that can be applied`, device);
+	}
+
+	const device_node = workfile.symbols[device];
+	const list = device_node?._t === "RulesetStruct"
+		? device_node.properties.find((property): property is IncludeProperty => property.name === binding.gpio_list && property._t === "IncludeProperty")
+		: undefined;
+	if (list?.include === undefined) {
+		return error(`'${device}' has no ${binding.gpio_list} list of pins`, device);
+	}
+
+	// The pin is a stored node: its number is a real field, and the user may change it.
+	const pin_ruleset = load_resolved_ruleset(list.include);
+	if (!pin_ruleset.ok) {
+		return pin_ruleset;
+	}
+	const pin = unique_name(workfile, list.include);
+	const added = add_symbol(workfile, pin, pin_ruleset.value);
+	if (!added.ok) {
+		return added;
+	}
+
+	const port_property = pin_ruleset.value._t === "RulesetStruct"
+		? pin_ruleset.value.properties.find(property => property.name === binding.pin_port)
+		: undefined;
+	if (port_property?._t !== "IncludeProperty" || port_property.include === undefined) {
+		return error(`${list.include} has no ${binding.pin_port} port reference`, list.include);
+	}
+
+	// The port is the handle wrapping the BSP's own port config - hidden, shared by every
+	// pin on that port.
+	const port_handle = hidden_candidates(port_property.include, externs).find(candidate => candidate.name === wrapper_name(resolved.port_extern ?? ""));
+	if (port_handle === undefined) {
+		return error(`No ${port_property.include} handle wraps ${resolved.port_extern}`, resolved.port_extern);
+	}
+	const port = materialize_hidden(workfile, port_handle, externs);
+	if (!port.ok) {
+		return port;
+	}
+
+	const writes: [string, string, unknown][] = [
+		[pin, binding.pin_number, resolved.gpio.number],
+		[pin, binding.pin_port, port.value],
+		[device, binding.gpio_list, pin],
+		...(list.count === undefined ? [] : [[device, list.count, 1] as [string, string, unknown]]),
+	];
+	for (const [node, property, value] of writes) {
+		const set = set_value(workfile, node, property, value);
+		if (!set.ok) {
+			return set;
+		}
+	}
+
+	return ok({
+		pin,
+		filled: [
+			{ node: pin, property: binding.pin_number, value: resolved.gpio.number, from: "only value" },
+			...(list.count === undefined ? [] : [{ node: device, property: list.count, value: 1, from: "only value" as const }]),
+		],
+		linked: [
+			{ node: pin, property: binding.pin_port, target: port.value, symbol: port_property.include, created: true, hidden: true },
+			{ node: device, property: binding.gpio_list, target: pin, symbol: list.include, created: true, hidden: false },
+		],
+	});
+}
+
 // --- Applying a step ---------------------------------------------------------------------
 
 /** A free node name: the symbol itself, then `_1`, `_2`, ... - the same as `add` picks. */
@@ -340,28 +527,29 @@ function unique_name(workfile: Workfile, base: string): string {
 }
 
 /** Put the option's node into the workfile if it is not there yet; its name either way. */
-function realize(workfile: Workfile, option: Option, externs: ExternIndex): Result<{ name: string, symbol: string, created: boolean }> {
-	if (option.kind === "existing") {
-		const node = workfile.symbols[option.name];
-		return ok({ name: option.name, symbol: node?.$symbol ?? option.name, created: false });
+function realize(workfile: Workfile, option: Option, externs: ExternIndex): Result<{ name: string, symbol: string, created: boolean, hidden: boolean }> {
+	switch (option.kind) {
+		case "existing": {
+			const node = workfile.symbols[option.name];
+			return ok({ name: option.name, symbol: node?.$symbol ?? option.name, created: false, hidden: is_hidden(workfile, option.name) });
+		}
+		case "hidden": {
+			const name = materialize_hidden(workfile, option.candidate, externs);
+			return name.ok ? ok({ name: name.value, symbol: option.candidate.symbol, created: true, hidden: true }) : name;
+		}
+		case "create": {
+			// A fresh copy every time: add_symbol stores the ruleset by reference and values
+			// are written onto it, so a shared instance would let one node's values appear on
+			// another.
+			const loaded = load_resolved_ruleset_for_board(option.symbol, workfile.board);
+			if (!loaded.ok) {
+				return loaded;
+			}
+			const name = unique_name(workfile, option.symbol);
+			const added = add_symbol(workfile, name, loaded.value);
+			return added.ok ? ok({ name, symbol: option.symbol, created: true, hidden: false }) : added;
+		}
 	}
-
-	// A fresh copy every time: add_symbol stores the ruleset by reference and values are
-	// written onto it, so a shared instance would let one node's values appear on another.
-	const loaded = externs.board.has(option.symbol)
-		? load_resolved_ruleset_for_board(option.symbol, workfile.board)
-		: load_resolved_ruleset(option.symbol);
-	if (!loaded.ok) {
-		return loaded;
-	}
-
-	const name = unique_name(workfile, option.symbol);
-	const added = add_symbol(workfile, name, loaded.value);
-	if (!added.ok) {
-		return added;
-	}
-
-	return ok({ name, symbol: option.symbol, created: true });
 }
 
 /**
@@ -371,12 +559,20 @@ function realize(workfile: Workfile, option: Option, externs: ExternIndex): Resu
  * every step it could take was already taken.
  */
 export function bootstrap(workfile: Workfile): Result<BootstrapReport> {
-	const externs = build_extern_index(workfile);
+	const externs = build_extern_index(workfile.board);
 	if (!externs.ok) {
 		return externs;
 	}
 
-	const report: BootstrapReport = { filled: [], linked: [] };
+	// A workfile that was just loaded may reference hidden nodes it does not hold yet.
+	const rebuilt = materialize_referenced_hidden(workfile);
+	if (!rebuilt.ok) {
+		return rebuilt;
+	}
+
+	const registry = get_registry();
+	const binding = registry.ok ? registry.value.chip_select : undefined;
+	const report: BootstrapReport = { filled: [], linked: [], chip_selects: [], problems: [] };
 
 	for (let steps = 0; steps < STEP_CAP; steps++) {
 		const step = next_step(workfile, externs.value);
@@ -384,33 +580,57 @@ export function bootstrap(workfile: Workfile): Result<BootstrapReport> {
 			return ok(report);
 		}
 
-		if (step.kind === "fill") {
-			const set = set_value(workfile, step.node, step.property, step.value);
-			if (!set.ok) {
-				return set;
+		switch (step.kind) {
+			case "fill": {
+				const set = set_value(workfile, step.node, step.property, step.value);
+				if (!set.ok) {
+					return set;
+				}
+				report.filled.push({ node: step.node, property: step.property, value: step.value, from: step.from });
+				break;
 			}
-			report.filled.push({ node: step.node, property: step.property, value: step.value, from: step.from });
-			continue;
+			case "link": {
+				const target = realize(workfile, step.option, externs.value);
+				if (!target.ok) {
+					return target;
+				}
+				const value = step.member === undefined ? target.value.name : { [step.member]: target.value.name };
+				const set = set_value(workfile, step.node, step.property, value);
+				if (!set.ok) {
+					return set;
+				}
+				report.linked.push({
+					node: step.node,
+					property: step.property,
+					...(step.member === undefined ? {} : { member: step.member }),
+					target: target.value.name,
+					symbol: target.value.symbol,
+					created: target.value.created,
+					hidden: target.value.hidden,
+				});
+				break;
+			}
+			case "chip_select": {
+				if (binding === undefined) {
+					return error("A chip-select step ran without a chip_select binding. That is a bug.");
+				}
+				const applied = apply_chip_select(workfile, externs.value, step.device, step.resolved, binding);
+				if (!applied.ok) {
+					return applied;
+				}
+				report.filled.push(...applied.value.filled);
+				report.linked.push(...applied.value.linked);
+				report.chip_selects.push({
+					device: step.device,
+					part: step.part,
+					chip_select: step.resolved,
+					...(applied.value.pin === undefined ? {} : { pin: applied.value.pin }),
+					connections: step.connections,
+				});
+				report.problems.push(...step.problems);
+				break;
+			}
 		}
-
-		const target = realize(workfile, step.option, externs.value);
-		if (!target.ok) {
-			return target;
-		}
-
-		const value = step.member === undefined ? target.value.name : { [step.member]: target.value.name };
-		const set = set_value(workfile, step.node, step.property, value);
-		if (!set.ok) {
-			return set;
-		}
-		report.linked.push({
-			node: step.node,
-			property: step.property,
-			...(step.member === undefined ? {} : { member: step.member }),
-			target: target.value.name,
-			symbol: target.value.symbol,
-			created: target.value.created,
-		});
 	}
 
 	return error(

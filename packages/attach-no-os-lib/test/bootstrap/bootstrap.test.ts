@@ -3,7 +3,16 @@ import { bootstrap } from '../../src/bootstrap/bootstrap';
 import { load_resolved_ruleset, load_resolved_ruleset_for_board, resolve_ruleset } from '../../src/resolver/resolver';
 import { parse_ruleset } from '../../src/ruleset_parser/ruleset_parser';
 import { validate_workfile } from '../../src/validator/validator';
-import { add_symbol, create_workfile, export_minimal, set_value } from '../../src/workfile_handler/workfile_handler';
+import {
+    add_symbol,
+    create_workfile,
+    export_minimal,
+    import_minimal,
+    materialize_hidden,
+    set_value,
+    suggest_for_property,
+} from '../../src/workfile_handler/workfile_handler';
+import { build_extern_index } from '../../src/registry/hidden';
 import type { Workfile } from '../../src/workfile_handler/types';
 import type { RulesetStruct } from '../../src/ruleset_parser/types';
 import {
@@ -22,8 +31,8 @@ import {
 // board's own SPI config at the bottom.
 
 // `null` for no board: passing `undefined` would just select the default parameter.
-function workfile_with(root: string, board: string | null = FIXTURE_BOARD): Workfile {
-    const created = create_workfile(FIXTURE_SOC);
+function workfile_with(root: string, board: string | null = FIXTURE_BOARD, soc: string = FIXTURE_SOC): Workfile {
+    const created = create_workfile(soc);
     expectOk(created);
     if (board !== null) {
         created.value.board = board;
@@ -81,14 +90,14 @@ describe('bootstrap from one node', () => {
         const report = bootstrap(workfile);
         expectOk(report);
 
-        expect(report.value.linked.map(link => `${link.node}.${link.property}${link.member === undefined ? '' : `.${link.member}`} -> ${link.target}${link.created ? ' (created)' : ''}`)).toEqual([
-            'test_sensor.$init_param -> test_sensor_config (created)',
-            'test_sensor_config.extra -> testpart_init_param (created)',
-            'test_sensor_config.ops -> testpart_ops (created)',
-            'testpart_init_param.comm_init.spi_dev -> test_spi_device (created)',
-            'test_spi_device.controller -> test_spi_controller (created)',
-            // The board's own config, not a fresh struct: a board extern provides the type.
-            'test_spi_controller.$init_param -> bsp_test_spi_cfg (created)',
+        expect(report.value.linked.map(link => `${link.node}.${link.property}${link.member === undefined ? '' : `.${link.member}`} -> ${link.target}${link.hidden ? ' [hidden]' : ''}`)).toEqual([
+            'test_sensor.$init_param -> test_sensor_config',
+            'test_sensor_config.extra -> testpart_init_param',
+            // The driver's ops table is an extern: hidden, named by its own symbol.
+            'test_sensor_config.ops -> testpart_ops [hidden]',
+            'testpart_init_param.comm_init.spi_dev -> test_spi_device',
+            // The handle wrapping the board's own SPI config, not a fresh controller.
+            'test_spi_device.controller -> bsp_test_spi_cfg_handle [hidden]',
         ]);
     });
 
@@ -106,18 +115,17 @@ describe('bootstrap from one node', () => {
             // The part's override leaves exactly one mode.
             'test_spi_device.mode = TEST_SPI_MODE_0 [only value]',
             'testpart_init_param.dev_ready = true [default]',
+            // Last: the chip-select, once nothing else applies. PMOD pin 1 is native line 0.
+            'test_spi_device.native_cs = 1 [only value]',
         ]);
     });
 
-    test('what is left is exactly what bootstrap must not decide: the chip-select', () => {
+    test('the result is a valid workfile', () => {
         const workfile = workfile_with('test_sensor');
         expectOk(bootstrap(workfile));
-
         const result = validate_workfile(workfile);
-        expect(result.errors.map(error => `${error.path ?? ''}: ${error.message}`)).toEqual([
-            'test_spi_device.native_cs: needs one of: cs_gpio, native_cs other than 0',
-            'test_spi_device.cs_gpio: needs one of: cs_gpio, native_cs other than 0',
-        ]);
+        expect(result.errors).toEqual([]);
+        expect(result.valid).toBe(true);
     });
 
     test('bootstrapped nodes and values are stored', () => {
@@ -127,9 +135,10 @@ describe('bootstrap from one node', () => {
         const symbols = stored(workfile);
         expect(symbols['test_spi_device']).toEqual({
             $compatible: 'test_spi_device',
-            controller: 'test_spi_controller',
+            controller: 'bsp_test_spi_cfg_handle',
             max_speed_hz: 1000000,
             mode: 'TEST_SPI_MODE_0',
+            native_cs: 1,
         });
         expect(symbols['testpart_init_param']?.comm_init).toEqual({ spi_dev: 'test_spi_device' });
     });
@@ -141,7 +150,7 @@ describe('bootstrap from one node', () => {
 
         const again = bootstrap(workfile);
         expectOk(again);
-        expect(again.value).toEqual({ filled: [], linked: [] });
+        expect(again.value).toEqual({ filled: [], linked: [], chip_selects: [], problems: [] });
         expect(stored(workfile)).toEqual(before);
     });
 });
@@ -175,14 +184,16 @@ describe('bootstrap leaves choices alone', () => {
         const report = bootstrap(workfile);
         expectOk(report);
 
+        // The same global under the user's name is the board's config, not a second option.
         expect(report.value.linked).toEqual([{
-            node: 'test_spi_controller', property: '$init_param', target: 'board_spi', symbol: 'bsp_test_spi_cfg', created: false,
+            node: 'test_spi_controller', property: '$init_param', target: 'board_spi', symbol: 'bsp_test_spi_cfg', created: false, hidden: false,
         }]);
     });
 
-    test('a requirement from $any_of is never materialized', () => {
-        // testboard has exactly ONE gpio_pin extern - an LED. Without the guard, bootstrap
-        // would make the LED the chip-select.
+    test('the board LED is never taken as the chip-select', () => {
+        // testboard has exactly ONE gpio_pin extern - an LED - and $any_of makes cs_gpio
+        // required. Without the guard, bootstrap would make the LED the chip-select; the
+        // chip-select comes from the wiring instead (here, the native line).
         const workfile = workfile_with('test_sensor');
         expectOk(bootstrap(workfile));
         expect(stored(workfile)['test_spi_device']?.cs_gpio).toBeUndefined();
@@ -194,7 +205,7 @@ describe('bootstrap leaves choices alone', () => {
         const report = bootstrap(workfile);
         expectOk(report);
         expect(report.value.linked).toEqual([{
-            node: 'test_spi_controller', property: '$init_param', target: 'test_spi_config', symbol: 'test_spi_config', created: true,
+            node: 'test_spi_controller', property: '$init_param', target: 'test_spi_config', symbol: 'test_spi_config', created: true, hidden: false,
         }]);
     });
 
@@ -204,5 +215,134 @@ describe('bootstrap leaves choices alone', () => {
         const report = bootstrap(workfile);
         expectOk(report);
         expect(report.value.linked).toEqual([]);
+    });
+});
+
+describe('hidden nodes', () => {
+    beforeEach(() => { setup_test_config(); });
+    afterEach(() => { teardown_test_config(); });
+
+    test('are never written out - only nodes with fields are', () => {
+        const workfile = workfile_with('test_sensor');
+        expectOk(bootstrap(workfile));
+
+        expect(Object.keys(stored(workfile))).toEqual(['test_sensor', 'test_sensor_config', 'testpart_init_param', 'test_spi_device']);
+        expect([...(workfile.hidden ?? [])].sort()).toEqual(['bsp_test_spi_cfg', 'bsp_test_spi_cfg_handle', 'testpart_ops']);
+    });
+
+    test('a load rebuilds exactly the ones referenced, from the names alone', () => {
+        const workfile = workfile_with('test_sensor');
+        expectOk(bootstrap(workfile));
+        const saved = export_minimal(workfile);
+        expectOk(saved);
+
+        const loaded = import_minimal(saved.value);
+        expectOk(loaded);
+        expect([...(loaded.value.hidden ?? [])].sort()).toEqual(['bsp_test_spi_cfg', 'bsp_test_spi_cfg_handle', 'testpart_ops']);
+        // The board's other peripherals are not dragged in just because they exist.
+        expect(Object.keys(loaded.value.symbols)).not.toContain('bsp_test_gpio0_cfg');
+        expect(validate_workfile(loaded.value).valid).toBe(true);
+
+        const resaved = export_minimal(loaded.value);
+        expectOk(resaved);
+        expect(resaved.value).toEqual(saved.value);
+    });
+
+    test('two devices on one bus share one controller handle', () => {
+        const workfile = workfile_with('test_spi_device');
+        add(workfile, 'second_dev', 'test_spi_device');
+        expectOk(bootstrap(workfile));
+
+        const symbols = stored(workfile);
+        expect(symbols['test_spi_device']?.controller).toBe('bsp_test_spi_cfg_handle');
+        expect(symbols['second_dev']?.controller).toBe('bsp_test_spi_cfg_handle');
+        expect(Object.keys(workfile.symbols).filter(name => name.endsWith('_handle'))).toEqual(['bsp_test_spi_cfg_handle']);
+    });
+
+    test('suggestions offer handles that do not exist yet', () => {
+        // Pointing a pin at another port is the user's override; the handle for it is
+        // offered by the name it would get, before anything creates it.
+        const workfile = workfile_with('test_gpio_pin');
+        const suggestions = suggest_for_property(workfile, 'test_gpio_pin', 'port_handle');
+        expectOk(suggestions);
+        expect(suggestions.value.values).toEqual(['bsp_test_gpio0_cfg_handle', 'bsp_test_gpio1_cfg_handle']);
+    });
+
+    test("a stored node holding a hidden node's name is a conflict, not the resource", () => {
+        const workfile = workfile_with('test_spi_controller');
+        add(workfile, 'bsp_test_spi_cfg', 'test_spi_config');
+        const externs = build_extern_index(workfile.board);
+        expectOk(externs);
+
+        const built = materialize_hidden(workfile, { kind: 'extern', name: 'bsp_test_spi_cfg', symbol: 'bsp_test_spi_cfg' }, externs.value);
+        expectErrorContains(built, 'a node in the workfile already has that name');
+    });
+});
+
+describe('the chip-select', () => {
+    beforeEach(() => { setup_test_config(); });
+    afterEach(() => { teardown_test_config(); });
+
+    test('on a board the part mates with, it is the native line the connector lands on', () => {
+        const workfile = workfile_with('test_sensor');
+        const report = bootstrap(workfile);
+        expectOk(report);
+
+        const [decision] = report.value.chip_selects;
+        expect(decision?.chip_select).toEqual({
+            kind: 'native', peripheral: 'bsp_test_spi_cfg', native_cs: 0, at: { connector: 'PMOD', pin: '1' },
+        });
+        expect(decision?.connections.every(connection => connection.via === 'mating')).toBe(true);
+        expect(decision?.pin).toBeUndefined();
+    });
+
+    test("jumper-wired, it is a GPIO pin on the board's declared line, on the right port", () => {
+        const workfile = workfile_with('test_sensor', 'otherboard', 'othersoc');
+        const report = bootstrap(workfile);
+        expectOk(report);
+        expect(validate_workfile(workfile).valid).toBe(true);
+
+        const symbols = stored(workfile);
+        // The pin is stored - its number is a real field - and its port is a hidden handle.
+        expect(symbols['test_gpio_pin']).toEqual({ $compatible: 'test_gpio_pin', port_handle: 'bsp_other_gpio1_cfg_handle', number: 4 });
+        expect(symbols['test_spi_device']?.cs_gpio).toBe('test_gpio_pin');
+        expect(symbols['test_spi_device']?.cs_gpio_num).toBe(1);
+
+        // And the wiring to make it true on the bench.
+        expect(report.value.chip_selects[0]?.connections.map(connection => `${connection.from.pin}->${connection.to.connector}.${connection.to.pin}`))
+            .toEqual(['2->H1.2', '3->H1.3', '4->H1.1', '1->H1.4']);
+    });
+
+    test('on a board with two SPI buses, the wiring decides which controller', () => {
+        // otherboard has bsp_test_spi_cfg and bsp_test_spi2_cfg: two handles, so the
+        // controller is a choice the board alone cannot make. The part's lines land on the
+        // first bus, and that settles it.
+        const workfile = workfile_with('test_sensor', 'otherboard', 'othersoc');
+        expectOk(bootstrap(workfile));
+
+        expect(stored(workfile)['test_spi_device']?.controller).toBe('bsp_test_spi_cfg_handle');
+        expect(Object.keys(workfile.symbols)).not.toContain('bsp_test_spi2_cfg_handle');
+    });
+
+    test('a device that already has a chip-select is left alone', () => {
+        const workfile = workfile_with('test_sensor');
+        expectOk(bootstrap(workfile));
+        expectOk(set_value(workfile, 'test_spi_device', 'native_cs', 2));
+
+        const again = bootstrap(workfile);
+        expectOk(again);
+        expect(again.value.chip_selects).toEqual([]);
+        expect(stored(workfile)['test_spi_device']?.native_cs).toBe(2);
+    });
+
+    test('running it again on a GPIO chip-select changes nothing', () => {
+        const workfile = workfile_with('test_sensor', 'otherboard', 'othersoc');
+        expectOk(bootstrap(workfile));
+        const before = stored(workfile);
+
+        const again = bootstrap(workfile);
+        expectOk(again);
+        expect(again.value).toEqual({ filled: [], linked: [], chip_selects: [], problems: [] });
+        expect(stored(workfile)).toEqual(before);
     });
 });

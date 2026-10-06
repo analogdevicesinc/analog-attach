@@ -1,6 +1,11 @@
 $type: struct
 $symbol: test_gpio_pin
 $description: "One GPIO pin"
+port_handle:
+  include: test_gpio_port
+  pointer: true
+  required: true
+  description: "Port this pin belongs to"
 number:
   type: uint8_t
   required: true

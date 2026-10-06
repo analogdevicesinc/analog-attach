@@ -7,6 +7,7 @@ import {
     import_minimal,
     list_available_structs,
     suggest_for_property,
+    materialize_referenced_hidden,
 } from '../../src/workfile_handler/workfile_handler';
 import { validate_workfile } from '../../src/validator/validator';
 import { load_resolved_ruleset_for_board } from '../../src/resolver/resolver';
@@ -71,11 +72,18 @@ function build(chip_select: ChipSelectChoice = 'native') {
         values.push(['part_spi_dev', 'native_cs', 0]);
     }
     if (chip_select === 'gpio' || chip_select === 'both') {
-        values.push(['part_cs', 'number', 4], ['part_spi_dev', 'cs_gpio', 'part_cs'], ['part_spi_dev', 'cs_gpio_num', 1]);
+        values.push(
+            ['part_cs', 'number', 4],
+            // A hidden handle, named by the port config it wraps; materialized below.
+            ['part_cs', 'port_handle', 'bsp_test_gpio0_cfg_handle'],
+            ['part_spi_dev', 'cs_gpio', 'part_cs'],
+            ['part_spi_dev', 'cs_gpio_num', 1],
+        );
     }
     for (const [symbol, property, value] of values) {
         expectOk(set_value(workfile.value, symbol, property, value));
     }
+    expectOk(materialize_referenced_hidden(workfile.value));
 
     return workfile.value;
 }

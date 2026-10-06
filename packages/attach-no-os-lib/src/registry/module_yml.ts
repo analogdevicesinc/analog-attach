@@ -31,8 +31,26 @@ export interface RulesetIndexGroup {
 	files: string[],
 }
 
+/**
+ * Which fields carry a SPI device's chip-select, declared by the module owning the generic
+ * SPI structs (capi). Data rather than code so the CAPI names live in one place, next to
+ * `bsp_kinds`, and the mechanism does not assume them.
+ */
+export interface ChipSelectBinding {
+	/** The struct a SPI part is attached through, e.g. capi_spi_device. */
+	device: string,
+	/** Its list of GPIO chip-selects; the list's `count` field comes from the schema. */
+	gpio_list: string,
+	/** Its native chip-select bitmask. */
+	native_mask: string,
+	/** On the pin type the GPIO list includes: the pin number, and the port it is on. */
+	pin_number: string,
+	pin_port: string,
+}
+
 export interface RulesetIndex {
 	groups: RulesetIndexGroup[],
+	chip_select?: ChipSelectBinding,
 	/**
 	 * `bsp_kinds:` — board.yml peripheral kind to the C type it has. Declared by whichever
 	 * module owns the generic structs (capi), not by each platform, so one table covers
@@ -411,7 +429,30 @@ export function read_ruleset_index(index_file: string): Result<RulesetIndex> {
 		return bsp_kinds;
 	}
 
-	return ok({ groups, bsp_kinds: bsp_kinds.value });
+	const chip_select = optional(object.value, "chip_select", context, parse_chip_select);
+	if (!chip_select.ok) {
+		return chip_select;
+	}
+
+	return ok({ groups, bsp_kinds: bsp_kinds.value, chip_select: chip_select.value });
+}
+
+function parse_chip_select(value: unknown, context: ParseContext): Result<ChipSelectBinding> {
+	const object = asObject(value, context);
+	if (!object.ok) {
+		return object;
+	}
+
+	const fields: Record<string, string> = {};
+	for (const key of ["device", "gpio_list", "native_mask", "pin_number", "pin_port"] as const) {
+		const field = required(object.value, key, context, string_);
+		if (!field.ok) {
+			return field;
+		}
+		fields[key] = field.value;
+	}
+
+	return ok(fields as unknown as ChipSelectBinding);
 }
 
 /** A flat mapping of name to name, as `bsp_kinds:` is. */

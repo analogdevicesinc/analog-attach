@@ -1,3 +1,4 @@
+import type { ChipSelectBinding } from "./module_yml";
 import type { RulesetType } from "../ruleset_parser/types";
 
 /**
@@ -151,4 +152,6 @@ export interface Registry {
 	 * `bsp_kinds:`. Used to synthesize a board's externs; see registry/bsp.ts.
 	 */
 	bsp_kinds: Map<string, string>,
+	/** How a SPI device carries its chip-select, when a configured module declares it. */
+	chip_select?: ChipSelectBinding,
 }

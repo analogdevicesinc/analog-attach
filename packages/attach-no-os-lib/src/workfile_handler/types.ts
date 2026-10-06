@@ -14,6 +14,11 @@ export interface Workfile {
     platform_ops: Record<string, Ruleset>;  // locked, auto-populated from platform, not printed
     exposed_ops: Record<string, Ruleset>;   // same as platform_ops, but runtime updated
     symbols: Record<string, Ruleset>;       // user-created symbols, printed in codegen
+    // Names in `symbols` that are hidden: externs, and handles wrapping them. They are
+    // real nodes while the workfile is in memory - validated and generated like any other -
+    // but never written out. A load rebuilds the ones a stored node references, from the
+    // name alone (see registry/hidden.ts).
+    hidden?: string[];
 };
 
 /**

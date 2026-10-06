@@ -7,6 +7,7 @@ import type {
     IncludeProperty,
     PlatformExtraProperty,
     PlatformOpsProperty,
+    Property,
     Ruleset,
     RulesetPlatformOps,
     RulesetStruct,
@@ -18,6 +19,8 @@ import { load_resolved_ruleset, load_resolved_ruleset_for_board } from "../resol
 import { all_symbols, is_platform_symbol } from "../registry/registry";
 import { board_externs } from "../registry/bsp";
 import { find_soc } from "../registry/platforms";
+import { build_extern_index, hidden_candidates } from "../registry/hidden";
+import type { ExternIndex, HiddenCandidate } from "../registry/hidden";
 import { driver_init_parameter_candidates, driver_ops_candidates } from "../registry/drivers";
 import { collect_child_overrides, create_connections_graph, rename_symbol_references } from "../validator/connection_graph";
 import { apply_overrides } from "../validator/override_resolver";
@@ -371,6 +374,18 @@ export function suggest_for_include(workfile: Workfile, include: IncludeProperty
     // those too. This is how a driver's iio wrapper hands over its `iio_dev`.
     values.push(...member_references(workfile, include_path));
 
+    // Hidden nodes that do not exist yet are offered by the name they would get: choosing
+    // one is what brings it into being (on the next load, or bootstrap). That is how a pin
+    // is pointed at another port's handle without anybody creating the handle first.
+    const externs = build_extern_index(workfile.board);
+    if (externs.ok) {
+        for (const candidate of hidden_candidates(include_path, externs.value)) {
+            if (!values.includes(candidate.name)) {
+                values.push(candidate.name);
+            }
+        }
+    }
+
     return ok({
         values: values.length === 0 ? undefined : values,
         types: [include_path],
@@ -695,10 +710,17 @@ export function export_minimal(workfile: Workfile): Result<MinimalWorkfile> {
 
     const symbols: MinimalWorkfile["symbols"] = {};
 
+    const hidden = new Set(workfile.hidden ?? []);
+
     for (const [name, ruleset] of Object.entries(workfile.symbols)) {
         // Every user-created node kind. Platform ops are excluded because the platform
         // manifest reloads them, not the workfile.
         if (ruleset._t !== "RulesetStruct" && ruleset._t !== "RulesetDescriptor" && ruleset._t !== "RulesetExtern") {
+            continue;
+        }
+
+        // A hidden node is rebuilt from the name a stored node references it by.
+        if (hidden.has(name)) {
             continue;
         }
 
@@ -765,6 +787,12 @@ export function import_minimal(minimal: MinimalWorkfile): Result<Workfile> {
         }
     }
 
+    // Hidden nodes are not in the file; the stored nodes name the ones they need.
+    const rebuilt = materialize_referenced_hidden(workfile);
+    if (!rebuilt.ok) {
+        return rebuilt;
+    }
+
     return ok(workfile);
 }
 
@@ -799,3 +827,136 @@ export function load_minimal_workfile(file_path: string): Result<MinimalWorkfile
 export function clone_workfile(workfile: Workfile): Workfile {
     return structuredClone(workfile);
 }
+
+// --- Hidden nodes ---
+
+/** Whether `name` is a hidden node: never written out, rebuilt from its name on load. */
+export function is_hidden(workfile: Workfile, name: string): boolean {
+    return workfile.hidden?.includes(name) === true;
+}
+
+function mark_hidden(workfile: Workfile, name: string): void {
+    workfile.hidden = [...new Set([...(workfile.hidden ?? []), name])];
+}
+
+/**
+ * Put a hidden node into the workfile, along with the extern a handle wraps.
+ *
+ * Idempotent: a hidden node is one resource, so asking for it twice gives the same node. A
+ * STORED node already holding the name is a conflict, not the resource - the name is what
+ * identifies the resource, so reusing the user's node would silently change what it is.
+ */
+export function materialize_hidden(workfile: Workfile, candidate: HiddenCandidate, externs: ExternIndex): Result<string> {
+    if (candidate.name in workfile.symbols) {
+        if (is_hidden(workfile, candidate.name)) {
+            return ok(candidate.name);
+        }
+        return error(`'${candidate.name}' names a ${candidate.symbol} the board provides, but a node in the workfile already has that name`, candidate.name);
+    }
+
+    if (candidate.kind === "wrapper") {
+        const wrapped = materialize_hidden(workfile, { kind: "extern", name: candidate.wraps, symbol: candidate.wraps }, externs);
+        if (!wrapped.ok) {
+            return wrapped;
+        }
+    }
+
+    // A fresh copy every time: add_symbol stores the ruleset by reference.
+    const loaded = externs.board.has(candidate.symbol)
+        ? load_resolved_ruleset_for_board(candidate.symbol, workfile.board)
+        : load_resolved_ruleset(candidate.symbol);
+    if (!loaded.ok) {
+        return loaded;
+    }
+
+    const added = add_symbol(workfile, candidate.name, loaded.value);
+    if (!added.ok) {
+        return added;
+    }
+    mark_hidden(workfile, candidate.name);
+
+    if (candidate.kind === "wrapper") {
+        const linked = set_value(workfile, candidate.name, "$init_param", candidate.wraps);
+        if (!linked.ok) {
+            return linked;
+        }
+    }
+
+    return ok(candidate.name);
+}
+
+/** The type a reference-valued property's value must provide, and that value. */
+function references_of(property: Property): { type_: string, value: string }[] {
+    switch (property._t) {
+        case "IncludeProperty": {
+            return property.include !== undefined && typeof property.value === "string"
+                ? [{ type_: property.include, value: property.value }]
+                : [];
+        }
+        case "UnionProperty": {
+            const binding = property.value as Record<string, unknown> | undefined;
+            if (binding === undefined || typeof binding !== "object") {
+                return [];
+            }
+            return Object.entries(binding).flatMap(([member_name, value]) => {
+                const member = property.members.find(candidate => candidate.name === member_name);
+                return member?.include !== undefined && typeof value === "string" ? [{ type_: member.include, value }] : [];
+            });
+        }
+        default: {
+            return [];
+        }
+    }
+}
+
+/**
+ * Rebuild every hidden node a node in the workfile references but that is not there yet.
+ *
+ * The name says what to build: a reference whose value no node has is matched against the
+ * hidden nodes that could provide the type the property expects. A driver's ops table is
+ * the one reference matched by symbol rather than by type, because the property names an
+ * interface, not a type.
+ */
+export function materialize_referenced_hidden(workfile: Workfile): Result<undefined> {
+    const externs = build_extern_index(workfile.board);
+    if (!externs.ok) {
+        return externs;
+    }
+
+    for (const node of Object.values(workfile.symbols)) {
+        if (node._t !== "RulesetStruct" && node._t !== "RulesetDescriptor") {
+            continue;
+        }
+
+        for (const property of node.properties) {
+            if (property._t === "DriverOpsProperty" && typeof property.value === "string" && !(property.value in workfile.symbols)) {
+                const ops = property.value;
+                const candidates = driver_ops_candidates(property.interface);
+                if (candidates.ok && candidates.value.some(entry => entry.$symbol === ops)) {
+                    const built = materialize_hidden(workfile, { kind: "extern", name: ops, symbol: ops }, externs.value);
+                    if (!built.ok) {
+                        return built;
+                    }
+                }
+                continue;
+            }
+
+            for (const reference of references_of(property)) {
+                if (reference.value in workfile.symbols) {
+                    continue;
+                }
+                const candidate = hidden_candidates(reference.type_, externs.value).find(entry => entry.name === reference.value);
+                if (candidate === undefined) {
+                    continue; // a dangling reference is validation's to report
+                }
+                const built = materialize_hidden(workfile, candidate, externs.value);
+                if (!built.ok) {
+                    return built;
+                }
+            }
+        }
+    }
+
+    return ok();
+}
+

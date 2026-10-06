@@ -26,6 +26,7 @@ import type { Result } from "../ruleset_parser/result";
 import { error, ok } from "../ruleset_parser/result";
 import { get_module_roots } from "../settings/settings";
 import { MODULE_FILENAME, read_module, read_ruleset_index } from "./module_yml";
+import type { ChipSelectBinding } from "./module_yml";
 import { ruleset_type_from_token } from "../ruleset_parser/types";
 import type { RulesetType } from "../ruleset_parser/types";
 import type { ModuleInfo, Registry, RulesetEntry } from "./types";
@@ -77,12 +78,15 @@ function read_header(file: string): Result<{ symbol: string, type: RulesetType }
 	return ok({ symbol, type: type_ });
 }
 
-/** Add one module's indexed rulesets to `symbols`, rejecting a symbol claimed twice. */
+/**
+ * Add one module's indexed rulesets to `symbols`, rejecting a symbol claimed twice. Returns
+ * the chip_select binding the module declares, if any, for the caller to merge.
+ */
 function index_module(
 	module: ModuleInfo,
 	symbols: Map<string, RulesetEntry>,
-	bsp_kinds: Map<string, string>
-): Result<undefined> {
+	bsp_kinds: Map<string, string>,
+): Result<ChipSelectBinding | undefined> {
 	if (module.rulesets_file === undefined) {
 		return ok();
 	}
@@ -105,6 +109,8 @@ function index_module(
 		}
 		bsp_kinds.set(kind, type_);
 	}
+
+
 
 	// Paths in an index are relative to the index file, not to the module root, so the
 	// index can live in a subdirectory alongside the rulesets it lists.
@@ -143,7 +149,7 @@ function index_module(
 		}
 	}
 
-	return ok();
+	return ok(index.value.chip_select);
 }
 
 /** `module.yml` `type:` of a bundle of drivers, e.g. capi-noos. */
@@ -224,6 +230,7 @@ export function build_registry(roots: string[]): Result<Registry> {
 	const modules: ModuleInfo[] = [];
 	const symbols = new Map<string, RulesetEntry>();
 	const bsp_kinds = new Map<string, string>();
+	let chip_select: ChipSelectBinding | undefined;
 
 	for (const root of roots) {
 		const reachable = collect_modules(root);
@@ -236,11 +243,21 @@ export function build_registry(roots: string[]): Result<Registry> {
 			if (!indexed.ok) {
 				return indexed;
 			}
+
+			// One binding for the ecosystem: two modules declaring different ones would make
+			// the answer depend on root order.
+			const declared = indexed.value;
+			if (declared !== undefined) {
+				if (chip_select !== undefined && JSON.stringify(chip_select) !== JSON.stringify(declared)) {
+					return error(`Two modules declare different chip_select bindings (second: ${module.name})`, module.path);
+				}
+				chip_select = declared;
+			}
 			modules.push(module);
 		}
 	}
 
-	return ok({ modules, symbols, bsp_kinds });
+	return ok({ modules, symbols, bsp_kinds, ...(chip_select === undefined ? {} : { chip_select }) });
 }
 
 let cached: Registry | undefined;
