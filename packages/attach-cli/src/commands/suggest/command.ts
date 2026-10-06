@@ -5,6 +5,7 @@ import {
     DeviceTreeOverlay,
     IntelligenceStack,
     board_layer,
+    bus_chip_selects,
     describe_slot,
     describe_placement,
     dt_to_validator_input,
@@ -17,6 +18,7 @@ import {
     type BoardLayer,
     type DTNode,
     type NodePlacement,
+    type PatternPropertyRule,
     type ParsedBinding,
     type ResolvedProperty,
     type ValueSuggestion,
@@ -27,7 +29,7 @@ import type { LocalContext } from "../../context";
 import { load_config, type AttachConfig } from "../../config";
 import { resolve_config } from "../../resolve-config";
 import { load_board } from "../../board";
-import { format_value, build_raw_property, shape_hint, parse_value } from "../update/command";
+import { format_suggestion, build_raw_property, shape_hint, parse_value } from "../update/command";
 import { bigIntReplacer, find_binding, fragment_target, get_or_build_compat_index, load_base, load_trees, parse_property_reference, resolve_node_identifier, resolve_positional_path, resolve_write_target } from "../../utilities";
 import { respond, respond_fail, input_error, diagnostic } from "../../protocol/output";
 import { attach_type_to_protocol_type } from "../../protocol/dt-to-protocol";
@@ -169,12 +171,38 @@ export function no_layer_message(property_name: string, board_error?: string): {
     return { message: `No layer offers values for ${property_name} (no board loaded)`, severity: "info" };
 }
 
+/**
+ * The `suggest value` message: one part per source that offered values, in
+ * layer order (e.g. "1 value(s) pinned by the binding"). The board's part, with
+ * its slot inference, appears only when the board itself offered values; with
+ * no values at all it says no layer offers any.
+ */
+export function value_message(
+    property_name: string,
+    lower_parts: string[],
+    board: { message: string; severity: "info" | "warn" } | undefined,
+    board_loaded: boolean,
+    board_error?: string,
+): { message: string; severity: "info" | "warn" } {
+    if (lower_parts.length === 0 && board === undefined) {
+        return board_loaded
+            ? { message: `No layer offers values for ${property_name}`, severity: "info" }
+            : no_layer_message(property_name, board_error);
+    }
+    const parts = [...lower_parts, ...(board === undefined ? [] : [board.message.replace(/^Found /, "")])];
+    const found = `Found ${parts.join("; ")}`;
+    return {
+        message: board_error === undefined ? found : `${found}; ${board_error}`,
+        severity: board?.severity ?? (board_error === undefined ? "info" : "warn"),
+    };
+}
+
 function to_suggestion(suggestion: ValueSuggestion): Suggestion {
     const display = suggestion.note !== undefined && !suggestion.display.includes(suggestion.note)
         ? `${suggestion.display} (${suggestion.note})`
         : suggestion.display;
     return {
-        value: format_value(suggestion.rows),
+        value: format_suggestion(suggestion),
         display_string: display,
         ...(suggestion.note === undefined ? {} : { note: suggestion.note }),
     };
@@ -187,7 +215,7 @@ export function slot_message(layer: BoardLayer, base_dt: DeviceTree, placement: 
     // 1. The node is itself a board bus.
     const own_bus = layer.bus_of_node(base_dt, placement.node_path);
     if (own_bus !== undefined) {
-        const cs_note = own_bus.chip_selects.length > 0
+        const cs_note = bus_chip_selects(layer.board, own_bus).length > 0
             ? `the board provides cs-gpios for it`
             : `no values for it`;
         return { message: `${found}; ${own_bus.name} is a bus on ${layer.board.board}; ${cs_note}`, severity: "info" };
@@ -203,7 +231,7 @@ export function slot_message(layer: BoardLayer, base_dt: DeviceTree, placement: 
 
     // 3. unwired_reg — reg is valid but not a wired chip select.
     if (inference.unwired_reg !== undefined) {
-        const wired = inference.bus.chip_selects.map(cs => cs.reg).join(", ");
+        const wired = bus_chip_selects(layer.board, inference.bus).map(cs => cs.reg).join(", ");
         return {
             message: `${found}; reg ${inference.unwired_reg} is not a chip select wired on ${inference.bus.name} (board wires ${wired}); use one of those or check the wiring`,
             severity: "warn",
@@ -266,22 +294,27 @@ async function suggest_value(context_: LocalContext, arguments_: string[]): Prom
     // Pass the node's real data so the intelligence stack can resolve phandle
     // references (e.g. interrupt-parent → controller → #interrupt-cells).
     let data = "{}";
-    if (binding_node !== undefined) {
-        const binding = await resolve_binding_for_data(binding_node, binding_parent, parent_name, base_dt, resolved.config);
-        if (binding !== undefined) {
-            const input_data = Object.fromEntries(dt_to_validator_input(binding_node, {
-                required_properties: binding.required_properties,
-                properties: binding.properties,
-                pattern_properties: undefined,
-                examples: [],
-            }));
-            data = JSON.stringify(input_data, bigIntReplacer);
-        }
+    const binding = binding_node === undefined
+        ? undefined
+        : await resolve_binding_for_data(binding_node, binding_parent, parent_name, base_dt, resolved.config);
+    if (binding_node !== undefined && binding !== undefined) {
+        const input_data = Object.fromEntries(dt_to_validator_input(binding_node, {
+            required_properties: binding.required_properties,
+            properties: binding.properties,
+            pattern_properties: undefined,
+            examples: [],
+        }));
+        data = JSON.stringify(input_data, bigIntReplacer);
     }
 
     const { layer, board_error } = optional_board_layer(resolved.config);
     const stack = layer === undefined ? IntelligenceStack.default() : IntelligenceStack.default().with(layer);
-    const values = stack.suggest_values(property_name, { devicetree: base_dt, data, placement });
+    const values = stack.suggest_values(property_name, {
+        devicetree: base_dt,
+        data,
+        placement,
+        ...(binding === undefined ? {} : { binding: { required_properties: binding.required_properties, properties: binding.properties } }),
+    });
 
     // Binding check: annotate suggestions when linux/dt-schema are available.
     const linux = resolved.config.linux;
@@ -307,9 +340,17 @@ async function suggest_value(context_: LocalContext, arguments_: string[]): Prom
 
     const suggestions = values.map((value) => to_suggestion(value));
 
-    let { message, severity } = layer === undefined
-        ? no_layer_message(property_name, board_error)
-        : slot_message(layer, base_dt, placement, suggestions.length);
+    // Values from the binding and the context devicetree come first; the board
+    // message counts only the board's own.
+    const count = (source: string) => values.filter(value => value.source === source).length;
+    const lower_counts = [
+        [count("binding"), "pinned by the binding"],
+        [count("devicetree"), "from the context devicetree"],
+    ] as const;
+    const lower_parts = lower_counts.filter(([n]) => n > 0).map(([n, origin]) => `${n} value(s) ${origin}`);
+    const from_board = values.length - lower_counts.reduce((sum, [n]) => sum + n, 0);
+    const board = layer !== undefined && from_board > 0 ? slot_message(layer, base_dt, placement, from_board) : undefined;
+    let { message, severity } = value_message(property_name, lower_parts, board, layer !== undefined, board_error);
 
     if (binding_check_reason !== undefined) {
         message = `${message}; not checked against a binding (${binding_check_reason})`;
@@ -367,7 +408,7 @@ async function annotate_suggestions(
     };
 
     for (const suggestion of suggestions) {
-        const formatted = format_value(suggestion.rows);
+        const formatted = format_suggestion(suggestion);
         const preview_node = structuredClone(binding_node);
 
         // Build the property from the suggestion value and place it on the preview node
@@ -434,7 +475,10 @@ async function suggest_board_slot(context_: LocalContext, arguments_: string[]):
 
     let suggestions: Suggestion[];
     if (compatible === undefined) {
-        suggestions = board.slots.map(slot => ({ value: slot.id, display_string: describe_slot(board, slot) }));
+        // Onboard slots are occupied by their soldered-on device: nothing can be placed there.
+        suggestions = board.slots
+            .filter(slot => slot.onboard === undefined)
+            .map(slot => ({ value: slot.id, display_string: describe_slot(board, slot) }));
     } else {
         const binding_config = resolve_config(context_, ["linux", "dtSchema", "context"]);
         if (binding_config === undefined) { return; }
@@ -537,19 +581,24 @@ async function suggest_node_property(context_: LocalContext, arguments_: string[
 
     const required = new Set(binding.required_properties);
     const all_properties = binding.properties;
+    const children = binding.child_nodes.map(rule => describe_child_nodes(rule, found_node));
 
     if (context_.json) {
-        const suggestions = all_properties.map(p => {
-            const labels = [
-                ...(existing_keys.has(p.key) ? ["set"] : []),
-                ...(required.has(p.key) ? ["required"] : []),
-            ].join(", ");
-            return {
-                value: p.key,
-                ...(labels ? { display_string: `${p.key} (${labels})` } : {}),
-            };
-        });
-        respond({ ok: true, message: `Found ${suggestions.length} properties`, severity: "info", suggestions });
+        const suggestions = [
+            ...all_properties.map(p => {
+                const labels = [
+                    ...(existing_keys.has(p.key) ? ["set"] : []),
+                    ...(required.has(p.key) ? ["required"] : []),
+                ].join(", ");
+                return {
+                    value: p.key,
+                    ...(labels ? { display_string: `${p.key} (${labels})` } : {}),
+                };
+            }),
+            ...children,
+        ];
+        const child_note = children.length > 0 ? ` and ${children.length} child node pattern(s)` : "";
+        respond({ ok: true, message: `Found ${all_properties.length} properties${child_note}`, severity: "info", suggestions });
     } else {
         for (const p of all_properties) {
             const markers = [
@@ -558,7 +607,29 @@ async function suggest_node_property(context_: LocalContext, arguments_: string[
             ].join(", ");
             console.log(markers ? `${p.key} (${markers})` : p.key);
         }
+        for (const child of children) { console.log(child.display_string); }
     }
+}
+
+/**
+ * A child-node pattern of the binding as a suggestion: its regex as the value,
+ * and a display naming the node, its required properties and the children
+ * already present, e.g. "channel@N (child node ^channel@([0-9]|1[0-5])$;
+ * requires reg, diff-channels; present: channel@0)".
+ */
+export function describe_child_nodes(rule: PatternPropertyRule, node: DTNode): Suggestion {
+    const pattern = new RegExp(rule.pattern);
+    const present = node.children.map(child => get_full_node_name(child)).filter(name => pattern.test(name));
+    // Readable name: the literal prefix of the pattern, then N for the unit address.
+    const literal = rule.pattern.replace(/^\^/, "").replaceAll(/\(([\w@,.-]+)\)/g, "$1");
+    const prefix = /^[\w@,.-]*/.exec(literal)?.[0] ?? "";
+    const name = prefix.endsWith("@") ? `${prefix}N` : (prefix || rule.pattern);
+    const details = [
+        `child node ${rule.pattern}`,
+        ...(rule.required.length > 0 ? [`requires ${rule.required.join(", ")}`] : []),
+        `present: ${present.length > 0 ? present.join(", ") : "none"}`,
+    ];
+    return { value: rule.pattern, display_string: `${name} (${details.join("; ")})` };
 }
 
 async function binding_property_suggestions(
@@ -923,33 +994,27 @@ if (import.meta.vitest) {
 
     describe("slot_message", () => {
         const board_yaml = `
-schema_version: 3
+schema_version: 4
 board: TEST-BOARD
 host: test
 gpio_controller: "&gpio"
 buses:
-  spi0:
-    node: "&spi0"
-    chip_selects:
-      0: {gpio: 8, user: [slot_a.cs, slot_b.cs]}
-      1: {gpio: 7, user: slot_b.cs2}
-      2: {gpio: 20, user: slot_a.cs2}
-  i2c1:
-    node: "&i2c1"
+  spi0: {type: spi}
+  i2c1: {type: i2c}
 slots:
   slot_a:
-    bus: "&spi0"
-    reg: 0
+    bus: spi0
     signals:
+      cs: {kind: chip-select, gpio: 8, reg: 0}
       cs2: {kind: chip-select, gpio: 20, reg: 2}
       int: {kind: interrupt, gpio: 19}
   slot_b:
-    bus: "&spi0"
-    reg: 0
+    bus: spi0
     signals:
+      cs: {kind: chip-select, gpio: 8, reg: 0}
       cs2: {kind: chip-select, gpio: 7, reg: 1}
   slot_c:
-    bus: "&i2c1"
+    bus: i2c1
     signals: {}`;
 
         const base_dts = `/dts-v1/;
@@ -1064,8 +1129,8 @@ slots:
 
         test("slotless bus — warns with reserved addresses", () => {
             const board_with_reserved = board_yaml.replace(
-                "  i2c1:\n    node: \"&i2c1\"",
-                "  i2c1:\n    node: \"&i2c1\"\n  i2c0:\n    node: \"&i2c0\"\n    reserved_addresses: {0x50: \"HAT ID EEPROM\"}"
+                "  i2c1: {type: i2c}",
+                "  i2c1: {type: i2c}\n  i2c0:\n    type: i2c\n    reserved_addresses: {0x50: \"HAT ID EEPROM\"}"
             );
             const base_with_extra_bus = base_dts.replace(
                 "        spi1:",
@@ -1115,6 +1180,65 @@ slots:
             expect(message).toContain("2 slot(s)");
             expect(message).toContain("TEST-BOARD");
             expect(message).toContain("adi,ad7124-8");
+        });
+    });
+
+    // ── describe_child_nodes ────────────────────────────────────────────
+
+    describe("describe_child_nodes", () => {
+        const parent = DeviceTreeOverlay.new_from_string(`/dts-v1/;
+/plugin/;
+&spi0 {
+    adc: adc@0 {
+        channel@0 { reg = <0>; };
+        channel@1 { reg = <1>; };
+        other { };
+    };
+};`);
+        if (typeof parent === "string") { throw new TypeError(parent); }
+        const node = parent.find_node({ kind: "label", labels: [], name: "adc" })!.node;
+        // eslint-disable-next-line unicorn/consistent-function-scoping
+        const rule = (pattern: string, required: string[]): PatternPropertyRule => ({ pattern, description: "", properties: [], required });
+
+        test("names the node, its required properties and the children present", () => {
+            expect(describe_child_nodes(rule("^channel@([0-9]|1[0-5])$", ["reg", "diff-channels"]), node)).toStrictEqual({
+                value: "^channel@([0-9]|1[0-5])$",
+                display_string: "channel@N (child node ^channel@([0-9]|1[0-5])$; requires reg, diff-channels; present: channel@0, channel@1)",
+            });
+        });
+
+        test("a grouped literal prefix still reads as a name; none present", () => {
+            expect(describe_child_nodes(rule("^(channel@)[0-7]$", ["reg"]), { ...node, children: [] }).display_string)
+                .toBe("channel@N (child node ^(channel@)[0-7]$; requires reg; present: none)");
+        });
+    });
+
+    // ── value_message ───────────────────────────────────────────────────
+
+    describe("value_message", () => {
+        test("a board that found nothing adds no slot inference", () => {
+            expect(value_message("clocks", ["4 value(s) from the context devicetree"], undefined, true))
+                .toStrictEqual({ message: "Found 4 value(s) from the context devicetree", severity: "info" });
+        });
+
+        test("a board that found values keeps its slot inference and severity", () => {
+            const board = { message: "Found 2 value(s) from TEST; ambiguous: 2 slots on spi0", severity: "warn" as const };
+            expect(value_message("interrupts", ["1 value(s) pinned by the binding"], board, true)).toStrictEqual({
+                message: "Found 1 value(s) pinned by the binding; 2 value(s) from TEST; ambiguous: 2 slots on spi0",
+                severity: "warn",
+            });
+        });
+
+        test("no values: with a board loaded it doesn't claim there is none", () => {
+            expect(value_message("vref", [], undefined, true)).toStrictEqual({ message: "No layer offers values for vref", severity: "info" });
+            expect(value_message("vref", [], undefined, false)).toStrictEqual(no_layer_message("vref"));
+        });
+
+        test("a board that failed to load is still reported", () => {
+            expect(value_message("clocks", ["4 value(s) from the context devicetree"], undefined, false, "board x ignored: invalid YAML")).toStrictEqual({
+                message: "Found 4 value(s) from the context devicetree; board x ignored: invalid YAML",
+                severity: "warn",
+            });
         });
     });
 

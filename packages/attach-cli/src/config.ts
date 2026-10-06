@@ -6,6 +6,8 @@ import { DeviceTree, type BoardDescription } from "attach-lib";
 import { load_board } from "./board";
 
 export const DEFAULT_BUILD_COMMAND = "dtc -@ -I dts -O dtb -o {output} {input}";
+// Mirrors kbuild's dtc_cpp_flags; {linux} is the configured Linux tree.
+export const DEFAULT_PREPROCESS_COMMAND = "cpp -nostdinc -undef -x assembler-with-cpp -P -I {linux}/include -o {output} {input}";
 
 export interface AttachConfig {
     linux?: string;
@@ -15,6 +17,7 @@ export interface AttachConfig {
     board?: string;
     validationJson?: string;
     buildCommand?: string;
+    preprocessCommand?: string;
     overlayCompiled?: string;
     deployIp?: string;
     deployUser?: string;
@@ -123,6 +126,14 @@ export const CONFIG_REGISTRY: readonly FieldSpec[] = [
         required: false,
         default: DEFAULT_BUILD_COMMAND,
         description: "dtc command used to compile the overlay; {input}/{output} are substituted with the .dtso and .dtbo paths",
+    },
+    {
+        toml: "preprocess-command",
+        key: "preprocessCommand",
+        type: "string",
+        required: false,
+        default: DEFAULT_PREPROCESS_COMMAND,
+        description: "C preprocessor command run on a board's shipped overlay by create-workfile; {input}/{output}/{linux} are substituted",
     },
     {
         toml: "overlay-compiled",
@@ -319,7 +330,7 @@ if (import.meta.vitest) {
     test("CONFIG_REGISTRY covers every AttachConfig key exactly once", () => {
         const keys: (keyof AttachConfig)[] = [
             "linux", "dtSchema", "context", "overlay", "board", "validationJson",
-            "buildCommand", "overlayCompiled", "deployIp", "deployUser", "deployPassword",
+            "buildCommand", "preprocessCommand", "overlayCompiled", "deployIp", "deployUser", "deployPassword",
         ];
         expect(CONFIG_REGISTRY.length).toBe(keys.length);
         expect(SPEC_BY_KEY.size).toBe(keys.length);

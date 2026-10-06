@@ -703,6 +703,14 @@ export class DeviceTreeOverlay {
         this.overlay.root.children = [];
     }
 
+    /** Remove a direct child of the overlay root by full name (e.g. `__overrides__`, `fragment@2`). */
+    public remove_root_node(name: string): boolean {
+        const index = this.overlay.root.children.findIndex(child => get_full_node_name(child) === name);
+        if (index === -1) { return false; }
+        this.overlay.root.children.splice(index, 1);
+        return true;
+    }
+
     public print(): string {
         return print_dto(this.overlay);
     }
@@ -829,5 +837,24 @@ if (import.meta.vitest !== undefined) {
         const result = overlay.find_node({ kind: "path", labels: [], path: "/soc/spi@7e204000/adc@0" });
         expect(result).toBeDefined();
         expect(result?.node_path).toBe("/soc/spi@7e204000/adc@0");
+    });
+
+    test("remove_root_node - drops a root child and keeps root properties and fragments", () => {
+        const overlay = DeviceTreeOverlay.new_from_string(`/dts-v1/;
+/plugin/;
+/ {
+    compatible = "brcm,bcm2711";
+    __overrides__ { cs_pin = <&imu1>, "reg:0"; };
+};
+${overlay_with_imu.replace("/dts-v1/;\n/plugin/;\n", "")}`);
+        if (typeof overlay === "string") { throw new TypeError(overlay); }
+        expect(overlay.remove_root_node("__overrides__")).toBe(true);
+        expect(overlay.remove_root_node("__overrides__")).toBe(false);
+
+        const printed = overlay.print();
+        expect(printed).not.toContain("__overrides__");
+        expect(printed).toContain(`compatible = "brcm,bcm2711";`);
+        expect(printed).toContain("fragment@0");
+        expect(typeof DeviceTreeOverlay.new_from_string(printed)).not.toBe("string");
     });
 }

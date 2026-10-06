@@ -4,6 +4,7 @@ import { execSync } from "node:child_process";
 import type { LocalContext } from "../../context";
 import { save_config, DEFAULT_BUILD_COMMAND } from "../../config";
 import { resolve_config } from "../../resolve-config";
+import { is_tool_available, substitute_command } from "../../utilities";
 import { respond, respond_fail, input_error } from "../../protocol/output";
 import type { BuildResponse } from "../../protocol/types";
 
@@ -14,17 +15,7 @@ export function derive_dtbo_path(overlay: string): string {
 
 /** Substitute {input}/{output} placeholders, quoting paths so spaces are tolerated. */
 export function substitute_build_command(template: string, input: string, output: string): string {
-    return template.replaceAll("{input}", `"${input}"`).replaceAll("{output}", `"${output}"`);
-}
-
-/** Whether the given tool is available on PATH. */
-function is_tool_available(check: string): boolean {
-    try {
-        execSync(check, { stdio: "ignore" });
-        return true;
-    } catch {
-        return false;
-    }
+    return substitute_command(template, { input, output });
 }
 
 export function build_build_command(context_: LocalContext): Command {

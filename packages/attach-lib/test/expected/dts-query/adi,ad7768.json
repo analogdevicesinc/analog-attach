@@ -75,7 +75,9 @@
                 "_t": "enum_array",
                 "minItems": 1,
                 "maxItems": 1,
-                "enum": "mclk",
+                "enum": [
+                    "mclk"
+                ],
                 "default": "mclk",
                 "enum_type": "string"
             }
@@ -111,7 +113,9 @@
                 "_t": "enum_array",
                 "minItems": 1,
                 "maxItems": 1,
-                "enum": "rx",
+                "enum": [
+                    "rx"
+                ],
                 "default": "rx",
                 "enum_type": "string"
             }

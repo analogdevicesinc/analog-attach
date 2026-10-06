@@ -26,6 +26,17 @@ export function resolve_board_reference(reference: string, bundled_directory = g
     return fs.existsSync(bundled) ? bundled : undefined;
 }
 
+/**
+ * Absolute path of the overlay a board ships for its onboard devices (its
+ * `overlay` field is relative to the board file). Undefined when the board
+ * has none or the reference doesn't resolve.
+ */
+export function resolve_board_overlay(reference: string, board: BoardDescription, bundled_directory = getBundledBoardsPath()): string | undefined {
+    if (board.overlay === undefined) { return; }
+    const board_path = resolve_board_reference(reference, bundled_directory);
+    return board_path === undefined ? undefined : path.resolve(path.dirname(board_path), board.overlay);
+}
+
 /** Resolve and parse a board reference, returning the description or an error string. */
 export function load_board(reference: string, bundled_directory = getBundledBoardsPath()): BoardDescription | string {
     let board_path: string | undefined;
@@ -63,6 +74,18 @@ if (import.meta.vitest) {
         expect(board.slots.map(slot => slot.id)).toStrictEqual(["spi_pmod1", "spi_pmod2", "i2c_pmod1", "i2c_pmod2", "quikeval", "psm"]);
     });
 
+    test("resolve_board_overlay — resolves relative to the board file; undefined without an overlay", () => {
+        const board = load_board("adalm-lsmspg", bundled_directory);
+        if (typeof board === "string") { throw new TypeError(board); }
+        const overlay = resolve_board_overlay("adalm-lsmspg", board, bundled_directory);
+        expect(overlay).toBe(path.resolve(bundled_directory, "..", "overlays", "rpi-adalm-lsmspg-overlay.dts"));
+        expect(fs.existsSync(overlay!)).toBe(true);
+
+        const without = load_board("pmd-rpi-intz", bundled_directory);
+        if (typeof without === "string") { throw new TypeError(without); }
+        expect(resolve_board_overlay("pmd-rpi-intz", without, bundled_directory)).toBeUndefined();
+    });
+
     test("load_board — resolves a path", () => {
         const board = load_board(path.join(bundled_directory, "pmd-rpi-intz.yaml"), bundled_directory);
         expect(typeof board).toBe("object");
@@ -74,8 +97,8 @@ if (import.meta.vitest) {
         const directory = fs.mkdtempSync(path.join(os.tmpdir(), "attach-board-"));
         try {
             const broken = path.join(directory, "broken.yaml");
-            fs.writeFileSync(broken, "schema_version: 3\nboard: X\ngpio_controller: \"&gpio\"\nbuses: {}\nslots: {a: {bus: \"&spi0\"}}\n");
-            expect(load_board(broken, bundled_directory)).toBe(`${broken}: slots.a.bus: &spi0 is not the node of any entry in buses`);
+            fs.writeFileSync(broken, "schema_version: 4\nboard: X\ngpio_controller: \"&gpio\"\nbuses: {}\nslots: {a: {bus: spi0}}\n");
+            expect(load_board(broken, bundled_directory)).toBe(`${broken}: slots.a.bus: spi0 is not a key in buses`);
         } finally {
             fs.rmSync(directory, { recursive: true });
         }

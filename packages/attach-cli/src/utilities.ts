@@ -10,12 +10,32 @@ import {
 } from 'attach-lib';
 
 import { DeviceTreeOverlay } from 'attach-lib';
+import { execSync } from "node:child_process";
 import * as fs from 'node:fs';
 import path from "node:path";
 
 import type { LocalContext } from "./context";
 import { load_compat_index, save_compat_index, type CompatIndex } from "./config";
 import { input_error } from "./protocol/output";
+
+/** Substitute `{name}` placeholders in a command template, quoting each value so spaces are tolerated. */
+export function substitute_command(template: string, values: Record<string, string>): string {
+    let command = template;
+    for (const [name, value] of Object.entries(values)) {
+        command = command.replaceAll(`{${name}}`, `"${value}"`);
+    }
+    return command;
+}
+
+/** Whether the given tool is available on PATH (`check` is a cheap invocation, e.g. "dtc --version"). */
+export function is_tool_available(check: string): boolean {
+    try {
+        execSync(check, { stdio: "ignore" });
+        return true;
+    } catch {
+        return false;
+    }
+}
 
 export function resolve_node_identifier(
     identifier: string,

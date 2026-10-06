@@ -489,7 +489,7 @@ function narrow_array_object(object: any): AttachArray {
             _t: 'enum_array',
             minItems: minItems,
             maxItems: maxItems,
-            enum: object.items.const,
+            enum: [object.items.const],
             default: object.items.const,
             description: description,
             enum_type: get_enum_type(object.items.const)

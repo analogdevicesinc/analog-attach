@@ -464,9 +464,9 @@ if (import.meta.vitest) {
                 minItems: 3,
                 maxItems: 3,
                 prefixItems: [
-                    { _t: "enum", enum: ["gpio"], enum_type: AttachEnumType.PHANDLE, description: "" },
-                    { _t: "number", description: "" },
-                    { _t: "enum", enum: ["GPIO_ACTIVE_HIGH", "GPIO_ACTIVE_LOW"], enum_type: AttachEnumType.MACRO, description: "" },
+                    { _t: "enum", enum: ["gpio"], enum_type: AttachEnumType.PHANDLE, },
+                    { _t: "number", },
+                    { _t: "enum", enum: ["GPIO_ACTIVE_HIGH", "GPIO_ACTIVE_LOW"], enum_type: AttachEnumType.MACRO, },
                 ],
                 description: "",
             }],
@@ -479,7 +479,7 @@ if (import.meta.vitest) {
             _t: "matrix",
             minItems: 1,
             maxItems: 4,
-            values: [{ _t: "number_array", minItems: 2, maxItems: 2, description: "" }],
+            values: [{ _t: "number_array", minItems: 2, maxItems: 2, minimum: 0n, maximum: 6n }],
         },
     };
 
