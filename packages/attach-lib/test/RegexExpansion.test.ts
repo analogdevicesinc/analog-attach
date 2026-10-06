@@ -1,4 +1,4 @@
-import { expand_regex } from 'attach-lib';
+import { expand_regex } from '../src/RegexExpansion.js';
 
 import { test, expect } from 'vitest';
 

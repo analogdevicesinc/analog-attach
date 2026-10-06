@@ -34,7 +34,7 @@ Set up configuration with `config-set` before using other commands. At minimum, 
 - `config-set`: No prerequisites — sets fields one at a time
 - `config-get`: No prerequisites — reads current config
 - `list-devices`: Needs `linux` and `dt-schema` (to build compat index on first run)
-- `create-workfile`: No prerequisites (also saves `overlay` path to config)
+- `create-workfile`: No prerequisites (also saves `overlay` path to config). When `board` ships an overlay, needs `linux` for the default `preprocess-command`
 - `get-schema`: Needs `linux`, `dt-schema`, `context`
 - `suggest parent`: Needs `linux`, `dt-schema`, `context`
 - `suggest value`: Needs `context`, `overlay` (values come from `board`; without it the result is empty). `linux`/`dt-schema` are optional and enable binding check annotations on each suggestion
@@ -108,6 +108,7 @@ attach-linux config-get [fields...]
 | `overlay` | No | Path to the working `.dtso` overlay file (auto-set by `create-workfile`) |
 | `board` | No | Add-on board description (HAT, …): a path to a board YAML or a bundled board name (e.g. `pmd-rpi-intz`). Enables `suggest board-slot` and board-derived `suggest value` / `suggest type` values |
 | `build-command` | No | dtc command template (`{input}`/`{output}` substituted); defaults to `dtc -@ -I dts -O dtb -o {output} {input}` |
+| `preprocess-command` | No | Preprocessor run by `create-workfile` on a board's shipped overlay (`{input}`/`{output}`/`{linux}` substituted); defaults to `cpp -nostdinc -undef -x assembler-with-cpp -P -I {linux}/include -o {output} {input}` and is written to config on first use |
 | `overlay-compiled` | No | Path to compiled `.dtbo` artifact (auto-set by `build`) |
 | `deploy-ip` | No | IP address or hostname of the remote device |
 | `deploy-user` | No | SSH username on the remote device |
@@ -298,6 +299,8 @@ attach-linux create-workfile [--name <filename>]
 / {
 };
 ```
+
+**Board overlays**: when the configured `board` ships an overlay for its onboard devices (e.g. `adalm-lsmspg`), the workfile starts from that overlay instead: preprocessed with `preprocess-command`, with `__overrides__` removed. Its onboard devices are already present and enabled; use `disable --node <label>` to turn one off.
 
 **Next Steps After Create**:
 1. Use `add` to add a device node to the overlay
@@ -623,10 +626,10 @@ attach-linux suggest <kind> [args...]
 |------|------|-------------|
 | `parent` | `<compatible>` | Valid parent nodes for a device |
 | `device-key` | `[filter]` | Compatible strings from compat index |
-| `node-prop` | `<node-ref>` | All binding-declared properties for a node |
+| `node-prop` | `<node-ref>` | All binding-declared properties for a node (marked `set`/`required`), followed by the child nodes the binding allows (e.g. `channel@N`, with their required properties and the ones present) |
 | `navigate` | `[node-ref]` | Children and properties of a node (or overlay entry points if omitted) |
 | `type` | `<prop-ref>` | Expected value type of a property (plus board-derived `suggestions` when a board is configured) |
-| `value` | `<prop-ref>` | Ready-to-paste `update --with` values from the configured board (chip selects, interrupt/reset lines, `cs-gpios`). When `linux`/`dt-schema` are configured, each suggestion is checked against the binding and annotated with a `note` if there is a potential issue |
+| `value` | `<prop-ref>` | Ready-to-paste `update --with` values: `reg` matching the node's unit address (`channel@1` → `1`), those the binding pins (a `const`/single-option value, `true` for a required flag; needs `linux`/`dt-schema`) clock and supply providers from the context devicetree for `clocks` / `*-supply` (only right if actually wired to the device: confirm with the user), and those from the configured board (chip selects, interrupt/reset lines, `cs-gpios`). When `linux`/`dt-schema` are configured, each suggestion is checked against the binding and annotated with a `note` if there is a potential issue |
 | `board-slot` | `[compatible]` | Slots of the configured board, optionally only those whose bus can host the device |
 
 **Examples**:

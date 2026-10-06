@@ -434,7 +434,9 @@
                         "_t": "enum_array",
                         "minItems": 1,
                         "maxItems": 1,
-                        "enum": "rx",
+                        "enum": [
+                            "rx"
+                        ],
                         "default": "rx",
                         "enum_type": "string"
                     }

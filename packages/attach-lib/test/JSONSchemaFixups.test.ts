@@ -1,7 +1,7 @@
 import path from 'node:path';
 import * as fs from 'node:fs';
 
-import { resolve_properties, resolve_references, merge_redefinitions, insert_canaries, apply_JSONSchema_fixups, } from 'attach-lib';
+import { resolve_properties, resolve_references, merge_redefinitions, insert_canaries, apply_JSONSchema_fixups, } from '../src/Bindings/index.js';
 import $RefParser from '@apidevtools/json-schema-ref-parser';
 
 import { BindingTestData, write_to_directory } from './testing_utils';

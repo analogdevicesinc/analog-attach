@@ -572,9 +572,7 @@ export function query_devicetree(
                 enum_type: AttachEnumType.MACRO,
             });
 
-            // Row bounds from the binding; default 1..1 for single-row properties.
-            const min_rows = "minItems" in property.value ? property.value.minItems : 1;
-            const max_rows = "maxItems" in property.value ? property.value.maxItems : 1;
+            const { min_rows, max_rows } = gpio_row_bounds(property.value);
 
             // eslint-disable-next-line unicorn/prefer-ternary
             if (max_rows <= 1) {
@@ -596,6 +594,20 @@ export function query_devicetree(
     }
 
     return properties_clone;
+}
+
+/**
+ * Row bounds of a `*-gpios` property, sized the way dt-schema does
+ * (dtschema/fixups.py `_fixup_items_size`, whose `items`-list and typed-array
+ * cases `fixup_mark_array_size` already applies upstream): a lone `minItems`
+ * or `maxItems` fixes the count to it, and with no sizing at all the property
+ * is a bare phandle-array (types.yaml): at least one row, no upper bound.
+ */
+function gpio_row_bounds(value: ResolvedProperty["value"]): { min_rows: number, max_rows: number } {
+    const min = "minItems" in value && typeof value.minItems === "number" ? value.minItems : undefined;
+    const max = "maxItems" in value && typeof value.maxItems === "number" ? value.maxItems : undefined;
+    if (min === undefined && max === undefined) { return { min_rows: 1, max_rows: Number.POSITIVE_INFINITY }; }
+    return { min_rows: min ?? max!, max_rows: max ?? min! };
 }
 
 if (import.meta.vitest) {
@@ -640,7 +652,7 @@ if (import.meta.vitest) {
         #gpio-cells = <2>;
     };
 };`);
-        const properties = [{ key: "reset-gpios", value: { _t: "generic" as const } }];
+        const properties = [{ key: "reset-gpios", value: { _t: "array" as const, minItems: 1, maxItems: 1 } }];
         const result = query_devicetree(dt, properties, JSON.stringify({ "reset-gpios": ["gpio"] }));
         const reset = result.find(p => p.key === "reset-gpios");
         expect(reset?.value._t).toBe("fixed_index");
@@ -689,7 +701,7 @@ if (import.meta.vitest) {
     });
 
     test("query_devicetree — *-gpios: maxItems 1 stays fixed_index", () => {
-        const properties = [{ key: "reset-gpios", value: { _t: "generic" as const } }];
+        const properties = [{ key: "reset-gpios", value: { _t: "array" as const, minItems: 1, maxItems: 1 } }];
         const data = JSON.stringify({ "reset-gpios": ["gpio"] });
         const result = query_devicetree(gpio_dt, properties, data);
         const reset = result.find(p => p.key === "reset-gpios");
@@ -697,7 +709,7 @@ if (import.meta.vitest) {
     });
 
     test("query_devicetree — *-gpios: plain string data 'gpio' is typed (not generic)", () => {
-        const properties = [{ key: "reset-gpios", value: { _t: "generic" as const } }];
+        const properties = [{ key: "reset-gpios", value: { _t: "array" as const, minItems: 1, maxItems: 1 } }];
         const data = JSON.stringify({ "reset-gpios": "gpio" });
         const result = query_devicetree(gpio_dt, properties, data);
         const reset = result.find(p => p.key === "reset-gpios");
@@ -705,6 +717,22 @@ if (import.meta.vitest) {
         if (reset?.value._t === "fixed_index") {
             expect(reset.value.prefixItems).toHaveLength(3);
         }
+    });
+
+    test("query_devicetree — *-gpios: row bounds follow dt-schema's _fixup_items_size", () => {
+        const rows = (value: ResolvedProperty["value"]) => {
+            const result = query_devicetree(gpio_dt, [{ key: "cs-gpios", value }], JSON.stringify({ "cs-gpios": ["gpio"] }));
+            const cs = result.find(p => p.key === "cs-gpios");
+            if (cs?.value._t === "fixed_index") { return "single row"; }
+            return cs?.value._t === "matrix" ? [cs.value.minItems, cs.value.maxItems] : cs?.value._t;
+        };
+        // No sizing (e.g. spi-controller.yaml cs-gpios): a bare phandle-array.
+        expect(rows({ _t: "generic" })).toStrictEqual([1, Number.POSITIVE_INFINITY]);
+        // A lone minItems or maxItems fixes the count.
+        expect(rows({ _t: "array", minItems: 2 } as ResolvedProperty["value"])).toStrictEqual([2, 2]);
+        expect(rows({ _t: "array", maxItems: 3 } as ResolvedProperty["value"])).toStrictEqual([3, 3]);
+        expect(rows({ _t: "array", minItems: 1, maxItems: 6 })).toStrictEqual([1, 6]);
+        expect(rows({ _t: "array", minItems: 1, maxItems: 1 })).toBe("single row");
     });
 
     test("is_gpio_property — matches gpios, gpio, *-gpios, *-gpio; rejects vendor,nr-gpios and gpio-controller", () => {
@@ -719,7 +747,7 @@ if (import.meta.vitest) {
     });
 
     test("query_devicetree — singular reset-gpio with ['gpio'] data is typed as fixed_index", () => {
-        const properties = [{ key: "reset-gpio", value: { _t: "generic" as const } }];
+        const properties = [{ key: "reset-gpio", value: { _t: "array" as const, minItems: 1, maxItems: 1 } }];
         const data = JSON.stringify({ "reset-gpio": ["gpio"] });
         const result = query_devicetree(gpio_dt, properties, data);
         const reset = result.find(p => p.key === "reset-gpio");

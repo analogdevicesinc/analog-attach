@@ -1,55 +1,80 @@
-schema_version: 3
+# PMD-RPI-INTZ (Analog Devices) — devicetree-relevant wiring on a Raspberry Pi 4.
+# gpio = BCM GPIO number = line offset on &gpio. State is as shipped (rev D1).
+# Source: ADI design support package netlist + assembly jumper defaults.
+#
+# Schema (parsed by attach-lib's parse_board_description):
+#   buses.<name>:  type (spi | i2c), node (label ref, default &<name>), pins {name: gpio},
+#                  reserved_addresses {addr: text}
+#   slots.<id>:    bus (bus name, or a list of them + selected_by), signals
+#   signals.<n>:   kind (interrupt | reset | chip-select | gpio), gpio, reg (chip-select only),
+#                  connected (default true), jumper, active (high | low), open_drain (default false)
+#   notes:         free-form advice
+# Chip selects apply on the slot's spi bus; the first one is the slot's default reg. A bus's
+# cs-gpios, the GPIO usage and slots that exclude each other (shared GPIO) are derived.
+
+schema_version: 4
 board: PMD-RPI-INTZ
 host: raspberry-pi-4-model-b
 gpio_controller: "&gpio"
+
 buses:
-  spi0:
-    node: "&spi0"
-    chip_selects:
-      0: {gpio: 8,  user: [spi_pmod1.cs1, quikeval.cs]}
-      1: {gpio: 7,  user: spi_pmod2.cs1}
-      2: {gpio: 20, user: spi_pmod1.cs2}
-      3: {gpio: 18, user: spi_pmod1.cs3}
-      4: {gpio: 5,  user: spi_pmod2.cs2}
-      5: {gpio: 6,  user: spi_pmod2.cs3}
+  spi0: {type: spi, pins: {sclk: 11, mosi: 10, miso: 9}}
   i2c1:
-    node: "&i2c1"
+    type: i2c
+    pins: {sda: 2, scl: 3}
+    reserved_addresses: {0x50: "QuikEval demo-board ID EEPROM (typical, quikeval in I2C mode)"}
+  i2c0:
+    type: i2c
+    pins: {sda: 0, scl: 1}
+    reserved_addresses: {0x50: HAT ID EEPROM}
+
 slots:
   spi_pmod1:
-    bus: "&spi0"
-    reg: 0
+    bus: spi0
     signals:
+      cs1:   {kind: chip-select, gpio: 8, reg: 0}
       cs2:   {kind: chip-select, gpio: 20, reg: 2}
       cs3:   {kind: chip-select, gpio: 18, reg: 3}
       int:   {kind: interrupt, gpio: 19}
       reset: {kind: reset, gpio: 21}
+
   spi_pmod2:
-    bus: "&spi0"
-    reg: 1
+    bus: spi0
     signals:
+      cs1:   {kind: chip-select, gpio: 7, reg: 1}
       cs2:   {kind: chip-select, gpio: 5, reg: 4}
       cs3:   {kind: chip-select, gpio: 6, reg: 5}
       int:   {kind: interrupt, gpio: 25}
       reset: {kind: reset, gpio: 12}
+
   i2c_pmod1:
-    bus: "&i2c1"
+    bus: i2c1
     signals:
       int:   {kind: interrupt, gpio: 26}
       reset: {kind: reset, gpio: 13}
+
   i2c_pmod2:
-    bus: "&i2c1"
+    bus: i2c1
     signals:
       int:   {kind: interrupt, gpio: 27}
       reset: {kind: reset, gpio: 17}
+
   quikeval:
-    bus: "&spi0"
-    alt_bus: "&i2c1"
+    bus: [spi0, i2c1]
     selected_by: SW1
-    reg: 0
     signals:
+      cs:   {kind: chip-select, gpio: 8, reg: 0}   # shared with spi_pmod1.cs1
       gpio: {kind: gpio, gpio: 22}
+
   psm:
-    bus: "&i2c1"
+    bus: i2c1
     signals:
+      # SMBus alert: on &i2c1 as interrupts-extended = <&gpio 4 IRQ_TYPE_LEVEL_LOW>; interrupt-names = "smbus_alert";
       alert: {kind: interrupt, gpio: 4, active: low, open_drain: true}
-      gpo1:  {kind: gpio, gpio: 23, connected: false}
+      gpo1:  {kind: gpio, gpio: 23, connected: false, jumper: JP17}
+      gpo2:  {kind: gpio, gpio: 24, connected: false, jumper: JP18}
+      outen: {kind: gpio, gpio: 16, connected: false, jumper: JP23}
+
+notes:
+  - No pull-ups on any int/reset/alert/gpio line; add bias-pull-up (brcm,pull = <2>) for open-drain interrupts.
+  - Interrupt trigger type and reset polarity come from the peripheral, not the HAT.

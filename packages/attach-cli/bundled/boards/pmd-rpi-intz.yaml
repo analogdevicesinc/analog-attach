@@ -3,131 +3,78 @@
 # Source: ADI design support package netlist + assembly jumper defaults.
 #
 # Schema (parsed by attach-lib's parse_board_description):
-#   buses.<name>:  node (label ref), chip_selects {reg: {gpio, user}}, reserved_addresses {addr: text}
-#   slots.<id>:    bus (label ref of a bus node), alt_bus + selected_by, reg, signals
-#   signals.<n>:   kind (interrupt | reset | chip-select | gpio), gpio, reg (chip-select),
-#                  connected (default true), active (high | low), open_drain (default false)
-# constraints, gpio_usage, free_gpios and conflicting_overlays are informational.
+#   buses.<name>:  type (spi | i2c), node (label ref, default &<name>), pins {name: gpio},
+#                  reserved_addresses {addr: text}
+#   slots.<id>:    bus (bus name, or a list of them + selected_by), signals
+#   signals.<n>:   kind (interrupt | reset | chip-select | gpio), gpio, reg (chip-select only),
+#                  connected (default true), jumper, active (high | low), open_drain (default false)
+#   notes:         free-form advice
+# Chip selects apply on the slot's spi bus; the first one is the slot's default reg. A bus's
+# cs-gpios, the GPIO usage and slots that exclude each other (shared GPIO) are derived.
 
-schema_version: 3
+schema_version: 4
 board: PMD-RPI-INTZ
 host: raspberry-pi-4-model-b
 gpio_controller: "&gpio"
 
 buses:
-  spi0:
-    node: "&spi0"
-    # reg == key; cs-gpios is generated from these in reg order.
-    chip_selects:
-      0: {gpio: 8,  user: [spi_pmod1.cs1, quikeval.cs]}
-      1: {gpio: 7,  user: spi_pmod2.cs1}
-      2: {gpio: 20, user: spi_pmod1.cs2}
-      3: {gpio: 18, user: spi_pmod1.cs3}
-      4: {gpio: 5,  user: spi_pmod2.cs2}
-      5: {gpio: 6,  user: spi_pmod2.cs3}
+  spi0: {type: spi, pins: {sclk: 11, mosi: 10, miso: 9}}
   i2c1:
-    node: "&i2c1"
+    type: i2c
+    pins: {sda: 2, scl: 3}
     reserved_addresses: {0x50: "QuikEval demo-board ID EEPROM (typical, quikeval in I2C mode)"}
   i2c0:
-    node: "&i2c0"
+    type: i2c
+    pins: {sda: 0, scl: 1}
     reserved_addresses: {0x50: HAT ID EEPROM}
 
 slots:
   spi_pmod1:
-    bus: "&spi0"
-    reg: 0
+    bus: spi0
     signals:
+      cs1:   {kind: chip-select, gpio: 8, reg: 0}
       cs2:   {kind: chip-select, gpio: 20, reg: 2}
       cs3:   {kind: chip-select, gpio: 18, reg: 3}
       int:   {kind: interrupt, gpio: 19}
       reset: {kind: reset, gpio: 21}
 
   spi_pmod2:
-    bus: "&spi0"
-    reg: 1
+    bus: spi0
     signals:
+      cs1:   {kind: chip-select, gpio: 7, reg: 1}
       cs2:   {kind: chip-select, gpio: 5, reg: 4}
       cs3:   {kind: chip-select, gpio: 6, reg: 5}
       int:   {kind: interrupt, gpio: 25}
       reset: {kind: reset, gpio: 12}
 
   i2c_pmod1:
-    bus: "&i2c1"
+    bus: i2c1
     signals:
       int:   {kind: interrupt, gpio: 26}
       reset: {kind: reset, gpio: 13}
 
   i2c_pmod2:
-    bus: "&i2c1"
+    bus: i2c1
     signals:
       int:   {kind: interrupt, gpio: 27}
       reset: {kind: reset, gpio: 17}
 
   quikeval:
-    bus: "&spi0"
-    alt_bus: "&i2c1"
+    bus: [spi0, i2c1]
     selected_by: SW1
-    reg: 0
     signals:
+      cs:   {kind: chip-select, gpio: 8, reg: 0}   # shared with spi_pmod1.cs1
       gpio: {kind: gpio, gpio: 22}
 
   psm:
-    bus: "&i2c1"
+    bus: i2c1
     signals:
       # SMBus alert: on &i2c1 as interrupts-extended = <&gpio 4 IRQ_TYPE_LEVEL_LOW>; interrupt-names = "smbus_alert";
       alert: {kind: interrupt, gpio: 4, active: low, open_drain: true}
-      gpo1:  {kind: gpio, gpio: 23, connected: false}   # JP17 open by default
-      gpo2:  {kind: gpio, gpio: 24, connected: false}   # JP18 open by default
-      outen: {kind: gpio, gpio: 16, connected: false}   # JP23 open by default
+      gpo1:  {kind: gpio, gpio: 23, connected: false, jumper: JP17}
+      gpo2:  {kind: gpio, gpio: 24, connected: false, jumper: JP18}
+      outen: {kind: gpio, gpio: 16, connected: false, jumper: JP23}
 
-constraints:
-  - spi_pmod1 and quikeval (SPI mode) share spi0 reg 0 / GPIO8; use only one.
-  - All i2c1 clients (i2c_pmod1, i2c_pmod2, psm, quikeval in I2C mode) share one address space; two identical I2C PMODs will collide.
+notes:
   - No pull-ups on any int/reset/alert/gpio line; add bias-pull-up (brcm,pull = <2>) for open-drain interrupts.
   - Interrupt trigger type and reset polarity come from the peripheral, not the HAT.
-
-# GPIOs claimed by the HAT (default state); anything else in 0-27 is free.
-gpio_usage:
-  0: i2c0.sda
-  1: i2c0.scl
-  2: i2c1.sda
-  3: i2c1.scl
-  4: psm.alert
-  5: spi_pmod2.cs2
-  6: spi_pmod2.cs3
-  7: spi0.ce1
-  8: spi0.ce0
-  9: spi0.miso
-  10: spi0.mosi
-  11: spi0.sclk
-  12: spi_pmod2.reset
-  13: i2c_pmod1.reset
-  17: i2c_pmod2.reset
-  18: spi_pmod1.cs3
-  19: spi_pmod1.int
-  20: spi_pmod1.cs2
-  21: spi_pmod1.reset
-  22: quikeval.gpio
-  25: spi_pmod2.int
-  26: i2c_pmod1.int
-  27: i2c_pmod2.int
-free_gpios: [14, 15, 16, 23, 24]
-
-# Pi 4 overlays that conflict with gpio_usage (pins per /boot/overlays/README).
-conflicting_overlays:
-  spi1: [17, 18, 19, 20, 21]
-  spi3: [0, 1, 2, 3]
-  spi4: [4, 5, 6, 7]
-  spi5: [12, 13]
-  spi6: [18, 19, 20, 21]
-  i2s / pcm: [18, 19, 20, 21]
-  pwm (12/13): [12, 13]
-  pwm (18/19): [18, 19]
-  uart2: [0, 1]
-  uart3: [4, 5]
-  uart4: [8, 9]
-  uart5: [12, 13]
-  i2c3: [4, 5]
-  i2c4: [6, 7]
-  i2c5: [12, 13]
-  i2c6: [22]

@@ -1,0 +1,60 @@
+# ADALM-LSMSPG (Analog Devices Active Learning Module, Low-Speed Mixed Signal Playground) on a Raspberry Pi.
+# gpio = BCM GPIO number = line offset on &gpio. State is as shipped (rev B).
+# Source: ADI design support package schematic + IPC-356 netlist, jumper defaults per schematic.
+#
+# Schema: see pmd-rpi-intz.yaml. Additionally:
+#   overlay:          overlay shipped for the onboard devices, relative to this file; new workfiles start from it
+#   slots.<id>.onboard: label of the soldered-on device in that overlay (the slot is occupied)
+
+schema_version: 4
+board: ADALM-LSMSPG
+host: raspberry-pi
+gpio_controller: "&gpio"
+overlay: ../overlays/rpi-adalm-lsmspg-overlay.dts
+
+buses:
+  spi0: {type: spi, pins: {sclk: 11, mosi: 10, miso: 9}}
+  i2c1:
+    type: i2c
+    pins: {sda: 2, scl: 3}
+    reserved_addresses: {0x11: "AD5593R alternate address (P4)", 0x49: "LM75 alternate address (P9)"}
+  i2c0:
+    type: i2c
+    pins: {sda: 0, scl: 1}
+    reserved_addresses: {0x50: HAT ID EEPROM}
+
+slots:
+  ad5592r:
+    bus: spi0
+    onboard: "&ad5592r"
+    signals:
+      cs: {kind: chip-select, gpio: 8, reg: 0}
+  ad5593r:
+    bus: i2c1
+    onboard: "&ad5593r"
+  lm75:
+    bus: i2c1
+    onboard: "&lm75"
+
+  spi_pmod:   # P10
+    bus: spi0
+    signals:
+      cs:      {kind: chip-select, gpio: 7, reg: 1, jumper: P12}
+      cs_alt:  {kind: chip-select, gpio: 27, reg: 1, connected: false, jumper: P11}   # same CS, routed to GPIO27
+      int:     {kind: interrupt, gpio: 19, jumper: P13}
+      int_alt: {kind: interrupt, gpio: 25, connected: false, jumper: P14}
+      reset:   {kind: reset, gpio: 26}   # hard-wired, shared with i2c_pmod.reset
+
+  i2c_pmod:   # P15
+    bus: i2c1
+    signals:
+      int:   {kind: interrupt, gpio: 19, connected: false, jumper: P37}
+      int2:  {kind: interrupt, gpio: 25, connected: false, jumper: P36}   # pin 7
+      reset: {kind: reset, gpio: 26}     # pins 2 and 8
+
+notes:
+  - The onboard AD5592R, AD5593R, LM75 and one-bit-adc-dac come from the board overlay; the workfile starts from it.
+  - adi,one-bit-adc-dac uses AD5592R/AD5593R GPIO channels 4-7; it has no upstream Linux binding (ADI tree only).
+  - GPIO20 drives heartbeat LED DS1 (active high); GPIO21 has push button S1 to GND (active low, needs a pull-up).
+  - i2c1 has 4.99k pull-ups on board. P32/P34 (open by default) bridge the ID EEPROM onto i2c1.
+  - ADALM2000 header jumpers (P17-P24, P30, P33, P35, shorted by default) tap the SPI/I2C/GPIO19/GPIO25 lines for logic analysis; no devicetree impact.

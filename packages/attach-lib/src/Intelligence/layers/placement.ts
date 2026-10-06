@@ -109,13 +109,13 @@ export function placement_from_overlay(overlay: DeviceTreeOverlay, target: DTLab
             // Fragment targets a sibling directly → __overlay__'s properties patch that child
             const sibling_name = root.slice(root.lastIndexOf("/") + 1);
             const base_child = children.get(sibling_name);
-            if (base_child !== undefined) {
+            if (base_child === undefined) {
+                children.set(sibling_name, overlay_node);
+            } else {
                 children.set(sibling_name, {
                     ...base_child,
                     properties: [...base_child.properties.filter(p => !overlay_node.properties.some(o => o.name === p.name)), ...overlay_node.properties],
                 });
-            } else {
-                children.set(sibling_name, overlay_node);
             }
         }
     }

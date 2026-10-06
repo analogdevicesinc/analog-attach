@@ -295,6 +295,40 @@ describe("bad tokens", () => {
 });
 
 describe("overlays (DTOs)", () => {
+  const parse_inline_dto = (source: string): DTO => {
+    const parse_result = parse_dto(`/dts-v1/;\n/plugin/;\n${source}`);
+    if (Result.is_err(parse_result)) {
+      expect.fail(`Failed to parse overlay because: ${parse_result.error.message}`);
+    }
+    return parse_result.value.dto;
+  };
+  const child_names = (dto: DTO) => dto.root.children.map(c => c.unit_addr === undefined ? c.name : `${c.name}@${c.unit_addr}`);
+
+  test("root properties are kept on the overlay root", () => {
+    const dto = parse_inline_dto(`/ { compatible = "brcm,bcm2711"; __overrides__ { cs_pin = <&spi0>, "reg:0"; }; };`);
+    expect(dto.root.properties.map(p => p.name)).toStrictEqual(["compatible"]);
+    expect(child_names(dto)).toStrictEqual(["__overrides__"]);
+  });
+
+  test("a root block may be followed by reference blocks", () => {
+    const dto = parse_inline_dto(`/ { compatible = "x"; };\n&spidev0 { status = "disabled"; };\n&{/} { n { }; };`);
+    expect(dto.root.properties.map(p => p.name)).toStrictEqual(["compatible"]);
+    expect(child_names(dto)).toStrictEqual(["fragment@0", "fragment@1"]);
+    expect(dto.root.children[1]?.properties[0]).toMatchObject({ name: "target-path", value: [{ kind: "string", value: "/" }] });
+  });
+
+  test("generated fragments are numbered past explicit ones", () => {
+    const dto = parse_inline_dto(`/ { fragment@0 { target = <&spi0>; __overlay__ { }; }; };\n&i2c1 { status = "okay"; };`);
+    expect(child_names(dto)).toStrictEqual(["fragment@0", "fragment@1"]);
+    expect(dto.root.children[1]?.properties[0]).toMatchObject({ name: "target" });
+  });
+
+  test("a later root property definition wins", () => {
+    const dto = parse_inline_dto(`/ { compatible = "a"; };\n/ { compatible = "b"; };`);
+    expect(dto.root.properties).toHaveLength(1);
+    expect(dto.root.properties[0]?.value).toMatchObject([{ kind: "string", value: "b" }]);
+  });
+
   test("label/path references become fragments", () => {
     const dto = parse_dto_from_file("dtso/references.dtso");
 

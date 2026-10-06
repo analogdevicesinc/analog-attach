@@ -8,22 +8,6 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Commands
 
-All of the following should be run from the monorepo root via `yarn workspace attach-cli <script>` or from this package directly with `yarn <script>`.
-
-```bash
-# From monorepo root
-yarn build:attach-cli             # type-check + bundle
-yarn workspace attach-cli test --run          # all unit tests
-yarn workspace attach-cli test --run <file>   # single test file
-
-# From this package directory
-yarn build                        # prebuild (tsc type-check) then tsup bundle
-yarn dev-link                     # build + symlink dist/cli.js to ~/.local/bin/attach-linux
-yarn test                         # vitest (watch mode)
-yarn test --run                   # vitest single-run
-yarn coverage                     # run tests with coverage
-```
-
 The `prebuild` step runs `tsc --noEmit` for type-checking; the actual output is produced by `tsup`. Type errors caught by `tsc` will block the build.
 
 ## Architecture
@@ -63,7 +47,9 @@ Every command resolves its paths as: `--flag` → `config.toml` value → `undef
 
 ### Board descriptions
 
-The optional `board` config field names an add-on board (HAT, …) description: a path, or a bundled name resolved to `bundled/boards/<name>.yaml` (`src/board.ts`, `getBundledBoardsPath`). All board logic lives in attach-lib's Intelligence module as the third context layer (`board_layer`, see attach-lib's CLAUDE.md); the CLI only loads the file, appends the layer to `IntelligenceStack.default()`, and formats results — `suggest value` / `suggest board-slot`, plus `suggestions` on `suggest type` via `resolve_node_binding`'s `options`. Slot inference is stateless (parent bus + `reg`, via `placement_from_overlay`). Lib suggestions are structured cell rows; `format_value` (`src/commands/update/command.ts`) turns them into `--with` strings and is the inverse of `parse_value`.
+The optional `board` config field names an add-on board (HAT, …) description: a path, or a bundled name resolved to `bundled/boards/<name>.yaml` (`src/board.ts`, `getBundledBoardsPath`). All board logic lives in attach-lib's Intelligence module as the third context layer (`board_layer`, see `packages/attach-lib/src/Intelligence/CLAUDE.md`); the CLI only loads the file, appends the layer to `IntelligenceStack.default()`, and formats results — `suggest value` / `suggest board-slot`, plus `suggestions` on `suggest type` via `resolve_node_binding`'s `options`. Slot inference is stateless (parent bus + `reg`, via `placement_from_overlay`). Lib suggestions are structured cell rows; `format_value` (`src/commands/update/command.ts`) turns them into `--with` strings and is the inverse of `parse_value`.
+
+A board may ship an overlay for its onboard devices (`overlay:` in the YAML, relative to the board file, resolved by `resolve_board_overlay`; files live in `bundled/overlays/`). `create-workfile` then writes that overlay instead of the empty skeleton (`prepare_board_workfile`): it runs `preprocess-command` (default mirrors kbuild's `cpp` flags, `{linux}` = the configured tree; persisted to config on first use), parses it, and drops `__overrides__`. Command templates go through `substitute_command` / `is_tool_available` in `src/utilities.ts`.
 
 ### Bundled dt-schema
 

@@ -23,6 +23,8 @@ export type PropertyContext = {
     /** Same semantics as the `parent_name` argument of `query_devicetree`. */
     parent_name?: string;
     placement?: NodePlacement;
+    /** The node's resolved binding, when the consumer has one: lets the binding layer offer values it pins. */
+    binding?: Pick<ParsedBinding, "required_properties" | "properties">;
 };
 
 // One DTS cell element. Kept structured so each consumer can serialise it
@@ -30,8 +32,12 @@ export type PropertyContext = {
 export type SuggestedCell = bigint | { label: string } | { macro: string };
 
 export type ValueSuggestion = {
-    /** Cell rows: `<a b>, <c d>` is `[[a, b], [c, d]]`. */
+    /** Cell rows: `<a b>, <c d>` is `[[a, b], [c, d]]`. Empty when the value is `strings` or a `flag`. */
     rows: SuggestedCell[][];
+    /** A string-list value (`"a", "b"`) instead of cells. */
+    strings?: string[];
+    /** A boolean property: present (true) or absent (false), instead of cells. */
+    flag?: boolean;
     display: string;
     /** Name of the layer that produced the suggestion. */
     source: string;

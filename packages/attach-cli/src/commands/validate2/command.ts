@@ -11,12 +11,14 @@ import {
     type DTPath,
 } from "attach-lib";
 import * as fs from "node:fs";
+import * as os from "node:os";
 import path from "node:path";
 import { execSync } from "node:child_process";
 
 import type { LocalContext } from "../../context";
 import { save_config } from "../../config";
 import { resolve_config } from "../../resolve-config";
+import { is_tool_available } from "../../utilities";
 import { respond, input_error } from "../../protocol/output";
 import type { ValidationResponse, ValidationError } from "../../protocol/types";
 
@@ -71,49 +73,7 @@ export function build_validate2_command(context_: LocalContext): Command {
                 return;
             }
 
-            const template = TEMPLATE;
-            const base_dt = overlay.get_base_dts();
-            const fragments = overlay.get_fragments();
-            const node_blocks: string[] = [];
-
-            for (const [index, fragment_] of fragments.entries()) {
-                const fragment = fragment_!;
-
-                const target_node = base_dt === undefined ? undefined : get_fragment_target_node(fragment, base_dt);
-                const addr_cells = target_node === undefined ? 1n : (get_cell_value(target_node, '#address-cells') ?? 1n);
-                const size_cells = target_node === undefined ? 0n : (get_cell_value(target_node, '#size-cells') ?? 0n);
-
-                const overlay_child = fragment.children.find(c => c.name === '__overlay__');
-                const intc_info = overlay_child === undefined ? { has_interrupts: false, interrupt_parent_label: undefined } : check_interrupt_info(overlay_child);
-
-                const inner_lines: string[] = [];
-
-                if (intc_info.has_interrupts) {
-                    if (intc_info.interrupt_parent_label === undefined) {
-                        const fake_label = `fake_intc_${index}`;
-                        inner_lines.push(`\t\tinterrupt-parent = <&${fake_label}>;`, `\t\t${fake_label}: ${fake_label} {`, `\t\t\t#interrupt-cells = <1>;`, `\t\t\tinterrupt-controller;`, `\t\t};`);
-                    } else {
-                        const intc_node = base_dt === undefined ? undefined : find_node_by_label(base_dt, intc_info.interrupt_parent_label);
-                        if (intc_node !== undefined) {
-                            const interrupt_cells = get_cell_value(intc_node, '#interrupt-cells') ?? 1n;
-                            const label_prefix = intc_node.labels.length > 0 ? `${intc_node.labels.join(': ')}: ` : '';
-                            const key = intc_node.unit_addr === undefined ? intc_node.name : `${intc_node.name}@${intc_node.unit_addr}`;
-                            inner_lines.push(`\t\t${label_prefix}${key} {`, `\t\t\t#interrupt-cells = <${interrupt_cells}>;`, `\t\t\tinterrupt-controller;`, `\t\t};`);
-                        }
-                    }
-                }
-
-                if (overlay_child !== undefined) {
-                    for (const child of overlay_child.children) {
-                        inner_lines.push(print_dtnode(child, '\t\t'));
-                    }
-                }
-
-                const content = inner_lines.length > 0 ? '\n' + inner_lines.join('\n') + '\n' : '';
-                node_blocks.push(`\tnode${index} {\n\t\t#address-cells = <${addr_cells}>;\n\t\t#size-cells = <${size_cells}>;${content}\t};`);
-            }
-
-            const output = fill_template(template, node_blocks);
+            const output = build_validation_dts(overlay);
 
             const config_directory = path.join(process.cwd(), '.attach-linux');
             fs.mkdirSync(config_directory, { recursive: true });
@@ -204,6 +164,93 @@ export function build_validate2_command(context_: LocalContext): Command {
 
             console.log(`Validated. Errors written to: ${error_json}`);
         });
+}
+
+/**
+ * Build the stand-in tree dt-validate checks: one `nodeN` per fragment holding
+ * the fragment's `__overlay__` children, plus a stub for every base-tree node
+ * the overlay references by label (interrupt parents, GPIO controllers, clock
+ * providers, …). Stubs carry the provider's `#*-cells` and `*-controller`
+ * properties so dt-validate can decode specifiers such as `<&gpio 26 1>`.
+ */
+export function build_validation_dts(overlay: DeviceTreeOverlay): string {
+    const base_dt = overlay.get_base_dts();
+    const fragments = overlay.get_fragments();
+    const overlay_roots = fragments.flatMap(fragment => fragment.children.filter(c => c.name === '__overlay__'));
+    // Labels the overlay defines itself need no stub (and must not be defined twice).
+    const defined_labels = new Set(overlay_roots.flatMap(root => collect_defined_labels(root)));
+    const stubbed = new Set<DTNode>();
+    const node_blocks: string[] = [];
+
+    for (const [index, fragment] of fragments.entries()) {
+        const target_node = base_dt === undefined ? undefined : get_fragment_target_node(fragment, base_dt);
+        const addr_cells = target_node === undefined ? 1n : (get_cell_value(target_node, '#address-cells') ?? 1n);
+        const size_cells = target_node === undefined ? 0n : (get_cell_value(target_node, '#size-cells') ?? 0n);
+
+        const overlay_child = fragment.children.find(c => c.name === '__overlay__');
+        const inner_lines: string[] = [];
+
+        if (overlay_child !== undefined) {
+            const intc_info = check_interrupt_info(overlay_child);
+            if (intc_info.has_interrupts && intc_info.interrupt_parent_label === undefined) {
+                const fake_label = `fake_intc_${index}`;
+                inner_lines.push(`\t\tinterrupt-parent = <&${fake_label}>;`, `\t\t${fake_label}: ${fake_label} {`, `\t\t\t#interrupt-cells = <1>;`, `\t\t\tinterrupt-controller;`, `\t\t};`);
+            }
+
+            for (const label of collect_referenced_labels(overlay_child)) {
+                if (defined_labels.has(label) || base_dt === undefined) { continue; }
+                const provider = find_node_by_label(base_dt, label);
+                if (provider === undefined || stubbed.has(provider)) { continue; }
+                stubbed.add(provider);
+                inner_lines.push(print_provider_stub(provider, '\t\t'));
+            }
+
+            for (const child of overlay_child.children) {
+                inner_lines.push(print_dtnode(child, '\t\t'));
+            }
+        }
+
+        const content = inner_lines.length > 0 ? '\n' + inner_lines.join('\n') + '\n' : '';
+        node_blocks.push(`\tnode${index} {\n\t\t#address-cells = <${addr_cells}>;\n\t\t#size-cells = <${size_cells}>;${content}\t};`);
+    }
+
+    return fill_template(TEMPLATE, node_blocks);
+}
+
+/** Labels attached to `node` or any descendant. */
+function collect_defined_labels(node: DTNode): string[] {
+    return [...node.labels, ...node.children.flatMap(child => collect_defined_labels(child))];
+}
+
+/** Labels referenced as phandles (`<&label …>`) by `node` or any descendant, in first-use order. */
+function collect_referenced_labels(node: DTNode): string[] {
+    const labels = new Set<string>();
+    const scan = (n: DTNode): void => {
+        for (const property of n.properties) {
+            if (is_dt_flag(property.value)) { continue; }
+            for (const cell of property.value) {
+                if (cell.kind !== 'array') { continue; }
+                for (const element of cell.elements) {
+                    if (element.kind === 'label') { labels.add((element as DTLabel).name); }
+                }
+            }
+        }
+        for (const child of n.children) { scan(child); }
+    };
+    scan(node);
+    return [...labels];
+}
+
+/** A base-tree provider reduced to what specifier decoding needs: its labels, `#*-cells` and `*-controller` flags. */
+function print_provider_stub(provider: DTNode, indent: string): string {
+    const key = provider.unit_addr === undefined ? provider.name : `${provider.name}@${provider.unit_addr}`;
+    const label_prefix = provider.labels.length > 0 ? `${provider.labels.join(': ')}: ` : '';
+    const properties = provider.properties.filter(p => /^#.+-cells$/.test(p.name) || p.name.endsWith('-controller'));
+    return [
+        `${indent}${label_prefix}${key} {`,
+        ...properties.map(property => print_dtprop(property, indent + '\t')),
+        `${indent}};`,
+    ].join('\n');
 }
 
 function get_fragment_target_node(fragment: DTNode, base_dt: DeviceTree): DTNode | undefined {
@@ -355,4 +402,68 @@ function parse_dt_validate_output(error_json: string): ValidationResponse {
     }
 
     return { errors, warnings };
+}
+
+if (import.meta.vitest) {
+    const { test, expect } = import.meta.vitest;
+
+    const base = DeviceTree.new_from_string(`/dts-v1/;
+/ {
+    soc {
+        gpio: gpio@7e200000 {
+            compatible = "brcm,bcm2711-gpio";
+            gpio-controller;
+            #gpio-cells = <2>;
+            interrupt-controller;
+            #interrupt-cells = <2>;
+        };
+        spi0: spi@7e204000 {
+            #address-cells = <1>;
+            #size-cells = <0>;
+        };
+    };
+};`);
+    if (typeof base === "string") { throw new TypeError(base); }
+
+    const overlay = DeviceTreeOverlay.new_from_string(`/dts-v1/;
+/plugin/;
+&spi0 {
+    expander: dac@0 {
+        reg = <0>;
+        gpio-controller;
+        #gpio-cells = <2>;
+        interrupt-parent = <&gpio>;
+        interrupts = <19 2>;
+        reset-gpios = <&gpio 26 1>;
+    };
+};
+&{/} {
+    ports {
+        in-gpios = <&expander 4 0>;
+    };
+};`, base);
+    if (typeof overlay === "string") { throw new TypeError(overlay); }
+
+    test("build_validation_dts — one stub per referenced provider, with gpio and interrupt cells", () => {
+        const dts = build_validation_dts(overlay);
+        expect(dts.match(/gpio: gpio@7e200000 \{/g)).toHaveLength(1);
+        const stub = dts.slice(dts.indexOf("gpio: gpio@7e200000 {"), dts.indexOf("};", dts.indexOf("gpio: gpio@7e200000 {")));
+        expect(stub).toContain("#gpio-cells = <2>;");
+        expect(stub).toContain("gpio-controller;");
+        expect(stub).toContain("#interrupt-cells = <2>;");
+        expect(stub).not.toContain("compatible");
+        // &expander is defined by the overlay itself: referenced, not stubbed.
+        expect(dts.match(/expander:/g)).toHaveLength(1);
+    });
+
+    test.skipIf(!is_tool_available("dtc --version"))("build_validation_dts — dtc compiles the stand-in tree", () => {
+        const directory = fs.mkdtempSync(path.join(os.tmpdir(), "attach-validate2-"));
+        try {
+            const input = path.join(directory, "t.dts");
+            fs.writeFileSync(input, build_validation_dts(overlay));
+            execSync(`dtc -I dts -O dtb -o "${path.join(directory, "t.dtb")}" "${input}"`, { stdio: "pipe" });
+        } finally {
+            fs.rmSync(directory, { recursive: true });
+        }
+    });
 }

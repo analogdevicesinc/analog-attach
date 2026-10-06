@@ -1,7 +1,8 @@
 import path from 'node:path';
 import * as fs from 'node:fs';
 
-import { Attach, bidirectional_custom_resolve, circular_custom_resolve, DeviceTree, find_in_object } from 'attach-lib';
+import { Attach, DeviceTree } from 'attach-lib';
+import { bidirectional_custom_resolve, circular_custom_resolve, find_in_object } from '../src/Bindings/index.js';
 import { write_to_directory } from './testing_utils';
 import $RefParser from '@apidevtools/json-schema-ref-parser';
 

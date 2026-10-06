@@ -3,6 +3,7 @@ import { execSync } from "node:child_process";
 
 import type { LocalContext } from "../../context";
 import { resolve_config } from "../../resolve-config";
+import { is_tool_available } from "../../utilities";
 import { respond, respond_fail, input_error } from "../../protocol/output";
 import type { DeployResponse } from "../../protocol/types";
 
@@ -20,16 +21,6 @@ export function build_scp_command(dtbo: string, user: string, ip: string): strin
 /** Build the ssh command that reboots the remote device. */
 export function build_reboot_command(user: string, ip: string): string {
     return `sshpass -e ssh ${SSH_OPTS} ${user}@${ip} sudo reboot`;
-}
-
-/** Whether the given tool is available on PATH. */
-function is_tool_available(check: string): boolean {
-    try {
-        execSync(check, { stdio: "ignore" });
-        return true;
-    } catch {
-        return false;
-    }
 }
 
 export function build_deploy_command(context_: LocalContext): Command {

@@ -18,6 +18,7 @@ import {
     type FoundNodeResult,
     type ResolvedProperty,
     type SuggestedCell,
+    type ValueSuggestion,
 } from "attach-lib";
 import * as fs from "node:fs";
 
@@ -380,6 +381,13 @@ export function format_value(rows: SuggestedCell[][]): string {
         .join(",");
 }
 
+/** `--with` text for a suggestion: a flag as true/false, strings space-separated, otherwise its cell rows. */
+export function format_suggestion(suggestion: Pick<ValueSuggestion, "rows" | "strings" | "flag">): string {
+    if (suggestion.flag !== undefined) { return String(suggestion.flag); }
+    if (suggestion.strings !== undefined) { return suggestion.strings.join(" "); }
+    return format_value(suggestion.rows);
+}
+
 function is_matrix_input(value: ParsedInputValue): value is MatrixInput {
     return Array.isArray(value) && value.length > 0 && value.every(row => Array.isArray(row));
 }
@@ -572,6 +580,14 @@ if (import.meta.vitest) {
         }
     });
 
+    test("format_suggestion - string and flag suggestions build the right property", () => {
+        const strings = build_raw_property(format_suggestion({ rows: [], strings: ["mclk"] }), "clock-names", "strings", () => false) as DTProperty;
+        expect(strings.value).toMatchObject([{ kind: "string", value: "mclk" }]);
+        const flag = build_raw_property(format_suggestion({ rows: [], flag: true }), "spi-cpol", "flag", () => false) as DTProperty;
+        expect(flag.value).toStrictEqual({ kind: "flag" });
+        expect(format_suggestion({ rows: [[19n, { macro: "IRQ_TYPE_EDGE_RISING" }]] })).toBe("19 IRQ_TYPE_EDGE_RISING");
+    });
+
     test("format_value - board suggestions round-trip through parse_value + build_raw_property into the expected cells", () => {
         const board = parse_board_description(fs.readFileSync(new URL("../../../bundled/boards/pmd-rpi-intz.yaml", import.meta.url), "utf8"));
         if (typeof board === "string") { throw new TypeError(board); }
@@ -749,21 +765,16 @@ if (import.meta.vitest) {
         if (typeof board === "string") { throw new TypeError(board); }
 
         const gapped_fixture = `
-schema_version: 3
+schema_version: 4
 board: GAPPED-CS
 gpio_controller: "&gpio"
 buses:
-  spi0:
-    node: "&spi0"
-    chip_selects:
-      0: {gpio: 8, user: slot.cs}
-      1: {gpio: 7, user: slot.cs2}
-      3: {gpio: 18, user: slot.cs4}
+  spi0: {type: spi}
 slots:
   slot:
-    bus: "&spi0"
-    reg: 0
+    bus: spi0
     signals:
+      cs: {kind: chip-select, gpio: 8, reg: 0}
       cs2: {kind: chip-select, gpio: 7, reg: 1}
       cs4: {kind: chip-select, gpio: 18, reg: 3}`;
         const gapped_board = parse_board_description(gapped_fixture);

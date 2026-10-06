@@ -8,26 +8,6 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Commands
 
-Run from `packages/attach-lib/`:
-
-```bash
-yarn test                # Run all tests (watch mode)
-yarn test -- run         # Run tests once
-yarn test -- run --reporter=verbose  # Single test with details
-yarn test -- run <filename>          # Run a specific test file
-yarn coverage            # Run tests with v8 coverage report
-yarn build               # Build dist/ (ESM + CJS)
-yarn watch               # Incremental build
-```
-
-Run from the monorepo root (`~/analog-attach/`):
-
-```bash
-yarn build:attach-lib    # Build this package
-yarn test                # Run all tests across packages
-yarn lint                # ESLint over src
-```
-
 There is no top-level test script that isolates just this package — use `cd packages/attach-lib && yarn test`.
 
 Most tests import from the built package (`from 'attach-lib'`, resolved via a workspace symlink at `node_modules/attach-lib` → `dist/`), so `yarn build` before `yarn test` if `dist/` is stale. A few tests (e.g. `test/DTSParser.test.ts`, `test/DTSParserRoundtrip.test.ts`) import directly from `../src` and don't need a build. Some source files also carry inline `import.meta.vitest` doctests (e.g. `src/DTBuilder/DTBuilder.ts`, `src/binding-processor/fixups/*.ts`) picked up via `includeSource` in `vitest.config.ts` — these run alongside the `test/*.test.ts` files.
@@ -67,34 +47,21 @@ Transforms raw YAML binding schemas into a UI-ready representation. Pipeline:
 
 The output is a `ParsedBinding` that can be fed to AJV for validation and fed to the frontend for rendering. See `src/PROCESS.md` for the rationale and worked examples, and `src/BINDINGS.md` for real-world binding quirks encountered in ADI/Linux schemas.
 
-**`Attach` class (`src/Attach.ts`)**
+**`Attach` class (`src/Attach/Attach.ts`)**
 Orchestrates the full binding pipeline. Entry point for the extension: `Attach.new().parse_binding(bindingPath, linuxPath, dtSchemaPath)`. Also owns incremental re-validation: `update_binding_by_changes(data)` re-runs the compiled AJV validator against edited DTS-derived JSON, walks `__canary__` errors to figure out which `if/then` branches now apply, and translates the rest of the AJV errors into typed `BindingErrors` (missing required property, number-limit violation, failed dependency, generic).
 
 **Intelligence (`src/Intelligence/`)**
-Suggestions for configuring a peripheral, organised as **layers of context**, least system-specific first:
-1. *binding* (`layers/binding.ts` → `known_properties.ts:insert_known_structures`) — well-known property shapes;
-2. *devicetree* (`layers/devicetree.ts` → `query.ts:query_devicetree`, `parents.ts:suggest_parents`) — controllers, buses and phandles of the base tree;
-3. *board* (`board/`) — an add-on board description (HAT, cape, …): slots, chip selects, interrupt/reset/gpio lines. `parse_board_description(yaml)` is fs-free; `board_layer(board)` builds the layer. `is_gpio_property(key)` (from `query.ts`) classifies GPIO property names; `gpio_signal_kinds(property)` maps name tokens to `SignalKind[]` for interrupt-before-gpio ordering. `SlotInference.unwired_reg` flags a `reg` that isn't a wired chip select. `bus_node_values` emits `[0n]` placeholder rows for chip-select gaps.
-
-A layer (`layers/types.ts:IntelligenceLayer`) implements any of three optional operations: `refine_properties` (schema-level; the board layer only attaches concrete `ResolvedProperty.suggestions`, never narrows allowed values), `suggest_values` (concrete `ValueSuggestion`s — structured cell rows, serialised by consumers) and `suggest_placement`. `ValueSuggestion.slots` (plural `string[]`) names every owner of a shared chip select; `PlacementSuggestion.slot` stays singular (a placement belongs to exactly one slot). `IntelligenceStack` (`layers/stack.ts`) folds each operation over its layers in order, passing lower layers' results up; `IntelligenceStack.default()` is binding + devicetree and is what `Attach.populate_*` apply (extra layers and a `NodePlacement` go in their optional `options`). Layers that reason about wiring need a `NodePlacement` (`layers/placement.ts:placement_from_overlay`); board slot inference from it is stateless (parent bus + `reg`, `board/slots.ts`). To add a layer, implement `IntelligenceLayer` and append it with `.with(...)` — consumers don't change. `query_devicetree`, `insert_known_structures` and `suggest_parents` remain exported for direct use (the extension calls them).
-
-Board YAML is parsed with `mapAsMap: true`, so integer-like keys keep file order and duplicate integer keys (e.g. `0` and `"0"` both under `chip_selects`) are rejected. `target = <&{/path}>` in explicit fragments is normalised to `target-path` at parse time, because `dtc` can't emit fixups for `&{/path}` in a plugin.
+Suggestions for configuring a peripheral, organised as layers of context (binding → devicetree → board). Details — layer operations, `IntelligenceStack`, board YAML parsing gotchas — are in `src/Intelligence/CLAUDE.md`.
 
 **Utility types (`src/result.ts`, `src/option.ts`)**
 Custom `Result<T, E>` and `Option<T>` types used throughout. Use `Result.Ok`/`Result.Err` and `Option.Some`/`Option.None` constructors; check with `Result.is_ok`/`Result.is_err` and `Option.is_some`/`Option.is_none`.
 
 ### Test Layout
 
-Tests live in `test/` (not `src/test/`). Fixtures are in `test/dts_source/`, `test/expected/`, `test/dt-schema/`, `test/linux/`, and `test/schemas/`. `test/testing_utils.ts` has shared helpers.
-
 `test/legacy/` holds an older copy of the DTS parser tests plus a large `.dtb` fixture cache; `vitest.config.ts` excludes `test/legacy/**` from runs. `test/dt-schema` and `test/linux` are symlinks (see `.gitignore`) into local checkouts of the dt-schema meta-schemas and a Linux kernel tree, used as real-world binding corpora by tests like `BindingParserCompletion.test.ts`.
-
-The `vitest.config.ts` excludes `out/` and ignores `linux/`, `dt-schema/`, and `node_modules/` in watch mode.
-
 ## Key Conventions
 
-- **TypeScript strict mode** throughout. No `any` without justification.
-- Module imports use `.js` extensions (ESM-style, resolved by bundler).
+- No `any` without justification.
 - The DTS AST uses non-enumerable `order` fields on nodes/properties for stable merge/print ordering — do not serialize them directly.
 - The `__canary__` property name is a protocol between `CanaryInserter` and the AJV validation step; do not reuse it for other purposes.
 - Commit messages: short imperative present tense, prefixed with `attach-lib:` (e.g. `attach-lib: handle negative scalars in property values`).

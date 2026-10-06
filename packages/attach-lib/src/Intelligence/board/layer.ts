@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { ParsedBinding, ResolvedProperty } from "../../Attach/AttachTypes.js";
-import { DeviceTree } from "../../Devicetree/index.js";
+import { DeviceTree, DeviceTreeOverlay } from "../../Devicetree/index.js";
 import { parent_path_string } from "../parents.js";
 import { cell_extract_first_value, is_gpio_property, INTERRUPT_MACROS } from "../query.js";
 import {
@@ -11,8 +11,9 @@ import {
     SuggestedCell,
     ValueSuggestion,
 } from "../layers/types.js";
-import { bus_at_path, resolve_bus_paths, slot_chip_selects, SlotInference, slots_for_placement, slots_on_bus } from "./slots.js";
-import { BoardBus, BoardDescription, BoardSignal, BoardSlot, SignalKind } from "./types.js";
+import { bus_chip_selects, exclusions_of, shared_with, slot_chip_selects, slot_primary_reg } from "./derived.js";
+import { bus_at_path, resolve_bus_paths, SlotInference, slots_for_placement, slots_on_bus } from "./slots.js";
+import { BoardBus, BoardChipSelect, BoardDescription, BoardSignal, BoardSlot, SignalKind } from "./types.js";
 import { parse_board_description } from "./parse.js";
 
 function interrupt_macros(signal: BoardSignal): string[] {
@@ -45,38 +46,76 @@ function connected_signals(slots: BoardSlot[], kind: SignalKind): { slot: BoardS
         .map(signal => ({ slot, signal })));
 }
 
-/** One-line human summary of a slot, e.g. "spi_pmod1 — spi0 reg 0; int GPIO19, reset GPIO21". */
-export function describe_slot(board: BoardDescription, slot: BoardSlot): string {
-    const bus = board.buses.find(b => b.name === slot.bus);
-    const primary = slot.reg !== undefined && bus !== undefined && bus.chip_selects.length > 0
-        ? `${slot.bus} reg ${slot.reg}`
-        : slot.bus;
-    const alternative = slot.alt_bus === undefined
-        ? ""
-        : ` or ${slot.alt_bus}${slot.selected_by === undefined ? "" : ` (${slot.selected_by})`}`;
-    const signals = slot.signals.map(signal => {
-        const reg = signal.reg === undefined ? "" : ` (reg ${signal.reg})`;
-        const connected = signal.connected ? "" : " (not connected)";
-        return `${signal.name} GPIO${signal.gpio}${reg}${connected}`;
-    });
-    return `${slot.id} — ${primary}${alternative}${signals.length > 0 ? `; ${signals.join(", ")}` : ""}`;
+/** What sharing a line means for its devices, e.g. one reset resets all of them. */
+function shared_line_effect(kind: SignalKind, devices: number): string {
+    const all = devices === 2 ? "both devices" : `all ${devices} devices`;
+    switch (kind) {
+        case "reset": { return `asserting it resets ${all}`; }
+        case "interrupt": { return `${all} signal on this interrupt line`; }
+        case "chip-select":
+        case "gpio": { return `${all} see this line`; }
+    }
 }
 
+/** Notes for a suggested line: open-drain, and other slots wired to the same GPIO. */
+function line_notes(board: BoardDescription, slot: BoardSlot, signal: BoardSignal): string[] {
+    const shared = shared_with(board, slot.id, signal);
+    const owners = shared.map(line => line.connected ? line.owner : `${line.owner} (if ${line.jumper ?? "connected"} fitted)`);
+    return [
+        ...(signal.open_drain ? ["open-drain line: needs a pull-up"] : []),
+        ...(shared.length > 0 ? [`also wired to ${owners.join(", ")}: ${shared_line_effect(signal.kind, shared.length + 1)}`] : []),
+    ];
+}
+
+/** ", or GPIO27 if P11 fitted (spi_pmod.cs_alt)" for a chip select a jumper can route elsewhere. */
+function alternatives_suffix(cs: BoardChipSelect): string {
+    return (cs.alternatives ?? [])
+        .map(alt => `, or GPIO${alt.gpio} if ${alt.jumper ?? "rewired"} fitted (${alt.user})`)
+        .join("");
+}
+
+/** " (onboard &ad5592r)" for a slot occupied by a soldered-on device. */
+function onboard_suffix(slot: BoardSlot): string {
+    return slot.onboard === undefined ? "" : ` (onboard ${slot.onboard})`;
+}
+
+/** "spi0 reg 0" when `bus` is the slot's SPI bus and it has a chip select, else just the bus name. */
+function bus_with_reg(board: BoardDescription, slot: BoardSlot, bus_name: string): string {
+    const bus = board.buses.find(b => b.name === bus_name);
+    const reg = bus === undefined ? undefined : slot_primary_reg(board, slot, bus);
+    return reg === undefined ? bus_name : `${bus_name} reg ${reg}`;
+}
+
+/** "; excludes quikeval on spi0 (GPIO8)", or "" when the slot shares no GPIO. */
+function exclusion_suffix(board: BoardDescription, slot: BoardSlot, bus_name?: string): string {
+    const exclusions = exclusions_of(board, slot.id, bus_name);
+    if (exclusions.length === 0) { return ""; }
+    return `; excludes ${exclusions.map(exclusion => `${exclusion.slot}${exclusion.bus === undefined ? "" : ` on ${exclusion.bus}`} (GPIO${exclusion.gpio})`).join(", ")}`;
+}
+
+/** One-line human summary of a slot, e.g. "spi_pmod1 — spi0 reg 0; cs1 GPIO8 (reg 0), int GPIO19, …". */
+export function describe_slot(board: BoardDescription, slot: BoardSlot): string {
+    const buses = slot.buses.map(name => bus_with_reg(board, slot, name)).join(" or ");
+    const switch_note = slot.buses.length > 1 && slot.selected_by !== undefined ? ` (${slot.selected_by})` : "";
+    const signals = slot.signals.map(signal => {
+        const reg = signal.reg === undefined ? "" : ` (reg ${signal.reg})`;
+        const connected = signal.connected ? "" : ` (not connected${signal.jumper === undefined ? "" : `, ${signal.jumper}`})`;
+        return `${signal.name} GPIO${signal.gpio}${reg}${connected}`;
+    });
+    return `${slot.id}${onboard_suffix(slot)} — ${buses}${switch_note}${signals.length > 0 ? `; ${signals.join(", ")}` : ""}${exclusion_suffix(board, slot)}`;
+}
+
+/** Summary of a slot placed on `bus_name`, e.g. "quikeval — i2c1 via SW1; gpio GPIO22". */
 export function describe_placement(board: BoardDescription, slot: BoardSlot, bus_name: string): string {
-    if (slot.alt_bus === undefined || bus_name === slot.bus) {
-        const bus = board.buses.find(b => b.name === slot.bus);
-        const bus_part = slot.reg !== undefined && bus !== undefined && bus.chip_selects.length > 0
-            ? `${slot.bus} reg ${slot.reg}`
-            : slot.bus;
-        const switch_note = slot.alt_bus === undefined
-            ? ""
-            : ` (${slot.selected_by ?? "switch"} selects ${slot.alt_bus} instead)`;
-        const gpio = slot.signals.filter(s => s.kind === "gpio" && s.connected).map(s => `GPIO${s.gpio}`).join(", ");
-        return `${slot.id} — ${bus_part}${switch_note}${gpio ? `; gpio ${gpio}` : ""}`;
+    const others = slot.buses.filter(name => name !== bus_name);
+    let switch_note = "";
+    if (others.length > 0 && slot.buses[0] === bus_name) {
+        switch_note = ` (${slot.selected_by ?? "switch"} selects ${others.join(" or ")} instead)`;
+    } else if (others.length > 0 && slot.selected_by !== undefined) {
+        switch_note = ` via ${slot.selected_by}`;
     }
-    const switch_note = slot.selected_by === undefined ? "" : ` via ${slot.selected_by}`;
     const gpio = slot.signals.filter(s => s.kind === "gpio" && s.connected).map(s => `GPIO${s.gpio}`).join(", ");
-    return `${slot.id} — ${bus_name}${switch_note}${gpio ? `; gpio ${gpio}` : ""}`;
+    return `${slot.id}${onboard_suffix(slot)} — ${bus_with_reg(board, slot, bus_name)}${switch_note}${gpio ? `; gpio ${gpio}` : ""}${exclusion_suffix(board, slot, bus_name)}`;
 }
 
 export type BoardLayer = IntelligenceLayer & {
@@ -137,10 +176,12 @@ export function board_layer(board: BoardDescription): BoardLayer {
 
     const bus_node_values = (property: string, bus_name: string): ValueSuggestion[] => {
         const bus = board.buses.find(b => b.name === bus_name);
-        if (bus === undefined || property !== "cs-gpios" || bus.chip_selects.length === 0) { return []; }
+        // Unconnected chip selects (jumper alternatives) aren't claimed by default.
+        const chip_selects = bus === undefined ? [] : bus_chip_selects(board, bus).filter(cs => cs.connected);
+        if (bus === undefined || property !== "cs-gpios" || chip_selects.length === 0) { return []; }
 
-        const cs_map = new Map(bus.chip_selects.map(cs => [cs.reg, cs]));
-        const max_reg = Math.max(...bus.chip_selects.map(cs => cs.reg));
+        const cs_map = new Map(chip_selects.map(cs => [cs.reg, cs]));
+        const max_reg = Math.max(...chip_selects.map(cs => cs.reg));
         const rows: SuggestedCell[][] = [];
         const display_parts: string[] = [];
         const gaps: number[] = [];
@@ -157,10 +198,11 @@ export function board_layer(board: BoardDescription): BoardLayer {
             }
         }
 
-        const note = gaps.length > 0
-            ? gaps.map(g => `CS${g} not wired (<0> placeholder)`).join("; ")
-            : undefined;
-        return [suggestion(rows, `${bus.chip_selects.length} chip selects — ${display_parts.join(", ")}`, undefined, note)];
+        const remaps = chip_selects.flatMap(cs => (cs.alternatives ?? [])
+            .map(alt => `CS${cs.reg} is GPIO${alt.gpio} instead if ${alt.jumper ?? "rewired"} fitted (${alt.user})`));
+        const notes = [...gaps.map(g => `CS${g} not wired (<0> placeholder)`), ...remaps];
+        const note = notes.length > 0 ? notes.join("; ") : undefined;
+        return [suggestion(rows, `${chip_selects.length} chip selects — ${display_parts.join(", ")}`, undefined, note)];
     };
 
     const device_values = (property: string, inference: SlotInference, placement: NodePlacement, context: PropertyContext): ValueSuggestion[] => {
@@ -168,12 +210,12 @@ export function board_layer(board: BoardDescription): BoardLayer {
         if (bus === undefined) { return []; }
 
         if (property === "reg") {
-            return bus.chip_selects.map(cs => {
+            return bus_chip_selects(board, bus).map(cs => {
                 const taken_by = placement.siblings.find(sibling => sibling.reg === BigInt(cs.reg));
-                const owners = board.slots.filter(slot => slot_chip_selects(slot, bus).includes(cs.reg)).map(s => s.id);
+                const owners = board.slots.filter(slot => slot_chip_selects(board, slot, bus).includes(cs.reg)).map(s => s.id);
                 return suggestion(
                     [[BigInt(cs.reg)]],
-                    `${cs.reg} — GPIO${cs.gpio} (${cs.users.join(", ")})${taken_by === undefined ? "" : `, in use by ${taken_by.name}`}`,
+                    `${cs.reg} — GPIO${cs.gpio} (${cs.users.join(", ")})${cs.connected ? "" : ` (jumper ${cs.jumper ?? "?"} open)`}${alternatives_suffix(cs)}${taken_by === undefined ? "" : `, in use by ${taken_by.name}`}`,
                     owners.length > 0 ? owners : undefined,
                     taken_by === undefined ? undefined : `in use by ${taken_by.name}`,
                 );
@@ -195,8 +237,7 @@ export function board_layer(board: BoardDescription): BoardLayer {
 
             return connected_signals(slots, "interrupt").flatMap(({ slot, signal }) =>
                 interrupt_macros(signal).map(macro => {
-                    const base_note = signal.open_drain ? "open-drain line: needs a pull-up" : undefined;
-                    const combined = [int_parent_note, base_note].filter(Boolean).join("; ") || undefined;
+                    const combined = [...(int_parent_note === undefined ? [] : [int_parent_note]), ...line_notes(board, slot, signal)].join("; ") || undefined;
                     return suggestion(
                         [[...prefix, BigInt(signal.gpio), { macro }]],
                         `${property === "interrupts" ? "" : `${controller} `}${signal.gpio} ${macro} — ${slot.id}.${signal.name}`,
@@ -222,7 +263,7 @@ export function board_layer(board: BoardDescription): BoardLayer {
                         [[{ label: controller }, BigInt(signal.gpio), { macro }]],
                         `${controller} ${signal.gpio} ${macro} — ${slot.id}.${signal.name}`,
                         [slot.id],
-                        signal.open_drain ? "open-drain line: needs a pull-up" : undefined,
+                        line_notes(board, slot, signal).join("; ") || undefined,
                     ))));
         }
 
@@ -281,27 +322,17 @@ export function board_layer(board: BoardDescription): BoardLayer {
                 const bus = bus_at_path(board, bus_paths, path);
                 if (bus === undefined) { return [candidate]; }
 
-                const entries: PlacementSuggestion[] = [];
-                for (const slot of slots_on_bus(board, bus)) {
-                    if (slot.bus === bus.name) {
-                        const reg = bus.chip_selects.length > 0 ? slot.reg : undefined;
-                        entries.push({
-                            parent: candidate.parent,
-                            ...(reg === undefined ? {} : { reg: BigInt(reg) }),
-                            slot: slot.id,
-                            display: describe_placement(board, slot, bus.name),
-                            source: name,
-                        });
-                    }
-                    if (slot.alt_bus === bus.name) {
-                        entries.push({
-                            parent: candidate.parent,
-                            slot: slot.id,
-                            display: describe_placement(board, slot, bus.name),
-                            source: name,
-                        });
-                    }
-                }
+                // Onboard slots are occupied by their soldered-on device.
+                const entries = slots_on_bus(board, bus).filter(slot => slot.onboard === undefined).map((slot): PlacementSuggestion => {
+                    const reg = slot_primary_reg(board, slot, bus);
+                    return {
+                        parent: candidate.parent,
+                        ...(reg === undefined ? {} : { reg: BigInt(reg) }),
+                        slot: slot.id,
+                        display: describe_placement(board, slot, bus.name),
+                        source: name,
+                    };
+                });
                 return entries.length > 0 ? entries : [candidate];
             });
         },
@@ -421,7 +452,7 @@ if (import.meta.vitest) {
             ["quikeval", 0n],
             [undefined, undefined],
         ]);
-        expect(result[0]?.display).toBe("spi_pmod1 — spi0 reg 0");
+        expect(result[0]?.display).toBe("spi_pmod1 — spi0 reg 0; excludes quikeval on spi0 (GPIO8)");
     });
 
     test("board_layer — suggest_placement lists dual-bus slot once per bus", () => {
@@ -436,14 +467,15 @@ if (import.meta.vitest) {
         expect(quikeval_entries[0]?.display).toContain("spi0 reg 0");
         expect(quikeval_entries[0]?.display).toContain("SW1 selects i2c1 instead");
         expect(quikeval_entries[1]?.reg).toBeUndefined();
-        expect(quikeval_entries[1]?.display).toContain("i2c1 via SW1");
+        expect(quikeval_entries[1]?.display).toBe("quikeval — i2c1 via SW1; gpio GPIO22");
+        expect(quikeval_entries[0]?.display).toContain("excludes spi_pmod1 (GPIO8)");
     });
 
     test("board_layer — cs-gpios with gaps emits <0> rows and a note", () => {
         const gapped_fixture = PMD_RPI_INTZ_FIXTURE
-            .replace(/      2: \{gpio: 20, user: spi_pmod1\.cs2\}\n/, "")
-            .replace(/      4: \{gpio: 5,  user: spi_pmod2\.cs2\}\n/, "")
-            .replace(/      5: \{gpio: 6,  user: spi_pmod2\.cs3\}\n/, "");
+            .replace(/      cs2: +\{kind: chip-select, gpio: 20, reg: 2\}\n/, "")
+            .replace(/      cs2: +\{kind: chip-select, gpio: 5, reg: 4\}\n/, "")
+            .replace(/      cs3: +\{kind: chip-select, gpio: 6, reg: 5\}\n/, "");
         const gapped_board = parse_board_description(gapped_fixture);
         if (typeof gapped_board === "string") { throw new TypeError(gapped_board); }
         const gapped_layer = board_layer(gapped_board);
@@ -547,21 +579,20 @@ if (import.meta.vitest) {
     });
 
     test("board_layer — refine_properties is idempotent", () => {
-        const ctx = context(spi0, 0n);
-        const props: ResolvedProperty[] = [{ key: "reg", value: { _t: "number" } }];
-        const once = layer.refine_properties!(props, ctx);
-        const twice = layer.refine_properties!(once, ctx);
+        const context_ = context(spi0, 0n);
+        const properties: ResolvedProperty[] = [{ key: "reg", value: { _t: "integer" } }];
+        const once = layer.refine_properties!(properties, context_);
+        const twice = layer.refine_properties!(once, context_);
         expect(twice).toStrictEqual(once);
     });
 
     test("board_layer — suggest_placement keeps a board bus with no slots", () => {
         const slotless_board = parse_board_description(`
-schema_version: 3
+schema_version: 4
 board: SLOTLESS
 gpio_controller: "&gpio"
 buses:
-  i2c1:
-    node: "&i2c1"
+  i2c1: {type: i2c}
 slots: {}
 `);
         if (typeof slotless_board === "string") { throw new TypeError(slotless_board); }
@@ -573,4 +604,64 @@ slots: {}
         expect(result).toHaveLength(1);
         expect(result[0]?.parent.label).toBe("i2c1");
     });
+
+    // ADALM-LSMSPG: onboard devices from the board overlay, a jumper-alternative CS, a shared reset line.
+    {
+        const read_fixture = (name: string) => readFileSync(new URL(`../../../test/fixtures/board/${name}`, import.meta.url), "utf8");
+
+        const board = parse_board_description(read_fixture("adalm-lsmspg.yaml"));
+        if (typeof board === "string") { throw new TypeError(board); }
+        const devicetree = DeviceTree.new_from_string(read_fixture("rpi-base.dts"));
+        if (typeof devicetree === "string") { throw new TypeError(devicetree); }
+        const layer = board_layer(board);
+        const spi0 = "/soc/spi@7e204000";
+        // eslint-disable-next-line unicorn/consistent-function-scoping
+        const at = (reg: bigint): PropertyContext => ({
+            devicetree, data: "{}", placement: { node_path: `${spi0}/dev@${reg}`, parent_path: spi0, reg, siblings: [] },
+        });
+
+        test("adalm — onboard labels name nodes of the shipped overlay", () => {
+            const overlay = DeviceTreeOverlay.new_from_string(read_fixture("adalm-lsmspg-overlay.dtso"));
+            if (typeof overlay === "string") { throw new TypeError(overlay); }
+            for (const slot of board.slots.filter(s => s.onboard !== undefined)) {
+                expect(overlay.find_node({ kind: "label", labels: [], name: slot.onboard!.slice(1) }), slot.id).toBeDefined();
+            }
+        });
+
+        test("adalm — placement on spi0 offers the Pmod, not the onboard AD5592R", () => {
+            const lower: PlacementSuggestion[] = [{ parent: { path: ["/", "soc", "spi@7e204000"], label: "spi0" }, display: "spi0", source: "devicetree" }];
+            const result = layer.suggest_placement!({ required_properties: [], properties: [], examples: [] }, devicetree, lower);
+            expect(result.map(s => [s.slot, s.reg])).toStrictEqual([["spi_pmod", 1n]]);
+            expect(describe_slot(board, board.slots[0]!)).toBe("ad5592r (onboard &ad5592r) — spi0 reg 0; cs GPIO8 (reg 0)");
+        });
+
+        test("adalm — a node without reg narrows to the Pmod; the onboard slot only matches by its reg", () => {
+            const no_reg: PropertyContext = { devicetree, data: "{}", placement: { node_path: `${spi0}/adc@1`, parent_path: spi0, siblings: [] } };
+            expect(layer.infer_slots(devicetree, no_reg.placement!).slots.map(s => s.id)).toStrictEqual(["spi_pmod"]);
+            expect(layer.infer_slots(devicetree, at(0n).placement!).slots.map(s => s.id)).toStrictEqual(["ad5592r"]);
+        });
+
+        test("adalm — cs-gpios uses the default routing and notes the P11 remap", () => {
+            const result = layer.suggest_values!("cs-gpios", { devicetree, data: "{}", placement: { node_path: spi0, parent_path: "/soc", siblings: [] } }, []);
+            expect(result[0]?.rows.map(row => row[1])).toStrictEqual([8n, 7n]);
+            expect(result[0]?.note).toBe("CS1 is GPIO27 instead if P11 fitted (spi_pmod.cs_alt)");
+        });
+
+        test("adalm — the P11 jumper remaps CS1's GPIO, not the reg", () => {
+            expect(layer.suggest_values!("reg", at(1n), []).map(s => s.display)).toStrictEqual([
+                "0 — GPIO8 (ad5592r.cs)",
+                "1 — GPIO7 (spi_pmod.cs), or GPIO27 if P11 fitted (spi_pmod.cs_alt)",
+            ]);
+        });
+
+        test("adalm — the shared reset line doesn't exclude the Pmods but is noted", () => {
+            expect(exclusions_of(board, "spi_pmod")).toStrictEqual([]);
+            const result = layer.suggest_values!("reset-gpios", at(1n), []);
+            expect(result[0]?.rows).toStrictEqual([[{ label: "gpio" }, 26n, { macro: "GPIO_ACTIVE_LOW" }]]);
+            expect(result[0]?.note).toBe("also wired to i2c_pmod.reset: asserting it resets both devices");
+
+            const interrupts = layer.suggest_values!("interrupts", at(1n), []);
+            expect(interrupts[0]?.note).toContain("also wired to i2c_pmod.int (if P37 fitted): both devices signal on this interrupt line");
+        });
+    }
 }

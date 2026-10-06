@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { DeviceTree } from "../../Devicetree/index.js";
 import { NodePlacement } from "../layers/types.js";
+import { bus_chip_selects, slot_chip_selects } from "./derived.js";
 import { BoardBus, BoardDescription, BoardSlot } from "./types.js";
 import { parse_board_description } from "./parse.js";
 
@@ -21,18 +22,9 @@ export function bus_at_path(board: BoardDescription, bus_paths: Map<string, stri
     return board.buses.find(bus => bus_paths.get(bus.name) === path);
 }
 
-/** Slots that can sit on `bus`, either by default or through their alternative bus. */
+/** Slots that can sit on `bus`, by default or through a switch. */
 export function slots_on_bus(board: BoardDescription, bus: BoardBus): BoardSlot[] {
-    return board.slots.filter(slot => slot.bus === bus.name || slot.alt_bus === bus.name);
-}
-
-/** Chip-select indexes a slot owns on `bus`: its primary `reg` plus its chip-select signals. */
-export function slot_chip_selects(slot: BoardSlot, bus: BoardBus): number[] {
-    if (slot.bus !== bus.name) { return []; }
-    return [
-        ...(slot.reg === undefined ? [] : [slot.reg]),
-        ...slot.signals.filter(signal => signal.kind === "chip-select" && signal.reg !== undefined).map(signal => signal.reg!),
-    ];
+    return board.slots.filter(slot => slot.buses.includes(bus.name));
 }
 
 export type SlotInference = {
@@ -42,7 +34,7 @@ export type SlotInference = {
     slots: BoardSlot[];
     /** True when exactly one slot remains. */
     narrowed: boolean;
-    /** Set when the bus has chip selects, `reg` is defined, but no chip_selects entry has that reg. */
+    /** Set when the bus has chip selects, `reg` is defined, but no slot wires that reg. */
     unwired_reg?: bigint;
 };
 
@@ -50,7 +42,8 @@ export type SlotInference = {
  * Infer which slot(s) a node belongs to from its parent bus and `reg`. On a
  * chip-select addressed bus a `reg` narrows to the slots owning that chip
  * select; when `reg` is absent or matches nothing every slot on the bus stays
- * a candidate. Stateless: nothing beyond the tree itself is consulted.
+ * a candidate, except onboard slots (occupied by their soldered-on device).
+ * Stateless: nothing beyond the tree itself is consulted.
  */
 export function slots_for_placement(
     board: BoardDescription,
@@ -63,15 +56,16 @@ export function slots_for_placement(
     }
 
     const on_bus = slots_on_bus(board, bus);
+    const chip_selects = bus_chip_selects(board, bus);
     const reg = placement.reg;
-    const matching = reg === undefined || bus.chip_selects.length === 0
+    const matching = reg === undefined || chip_selects.length === 0
         ? []
-        : on_bus.filter(slot => slot_chip_selects(slot, bus).includes(Number(reg)));
+        : on_bus.filter(slot => slot_chip_selects(board, slot, bus).includes(Number(reg)));
 
-    const slots = matching.length > 0 ? matching : on_bus;
+    // An onboard slot is occupied by its own device: it only matches through its `reg`.
+    const slots = matching.length > 0 ? matching : on_bus.filter(slot => slot.onboard === undefined);
 
-    const unwired_reg = reg !== undefined && bus.chip_selects.length > 0 && matching.length === 0
-        && !bus.chip_selects.some(cs => cs.reg === Number(reg))
+    const unwired_reg = reg !== undefined && chip_selects.length > 0 && matching.length === 0
         ? reg
         : undefined;
 
@@ -117,7 +111,7 @@ if (import.meta.vitest) {
         expect(ids(slots_for_placement(board, bus_paths, at(spi0)))).toStrictEqual(["spi_pmod1", "spi_pmod2", "quikeval"]);
     });
 
-    test("slots_for_placement — i2c1 is ambiguous, quikeval included through alt_bus", () => {
+    test("slots_for_placement — i2c1 is ambiguous, quikeval included through its second bus", () => {
         const inference = slots_for_placement(board, bus_paths, at(i2c1, 0x48n));
         expect(ids(inference)).toStrictEqual(["i2c_pmod1", "i2c_pmod2", "quikeval", "psm"]);
         expect(inference.narrowed).toBe(false);

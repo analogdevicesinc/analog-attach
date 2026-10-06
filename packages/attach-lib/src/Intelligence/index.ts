@@ -48,9 +48,22 @@ export type {
     BoardSlot,
     BoardSignal,
     BoardChipSelect,
+    BusType,
     SignalKind,
 } from "./board/types.js";
-export { SIGNAL_KINDS } from "./board/types.js";
+export { BUS_TYPES, SIGNAL_KINDS } from "./board/types.js";
 export { parse_board_description } from "./board/parse.js";
+export {
+    bus_chip_selects,
+    exclusions_of,
+    exclusive_slots,
+    gpio_usage,
+    shared_with,
+    slot_primary_reg,
+    type ExclusionSide,
+    type GpioUse,
+    type SharedLine,
+    type SlotExclusion,
+} from "./board/derived.js";
 export { resolve_bus_paths, slots_for_placement, type SlotInference } from "./board/slots.js";
 export { board_layer, describe_slot, describe_placement, type BoardLayer } from "./board/layer.js";

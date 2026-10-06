@@ -147,235 +147,37 @@ export class Parser {
     const r_semi2 = this.consume_char_token_then_advance(CharTokenKind.Semicolon);
     if (Result.is_err(r_semi2)) { return r_semi2; }
 
+    // Root blocks (`/ { ... };`) and reference blocks (`&label { ... };`,
+    // `&{/path} { ... };`) may be freely mixed, as dtc allows. Reference blocks
+    // become fragment@N nodes, numbered past any fragment defined explicitly.
     const children_map = new Map<string, DeletableNode>();
+    const root_properties = new Map<string, DeletableProperty>();
 
     if (this.token_stream.done) {
       return Result.Err({ message: "Unexpected end of tokens after /plugin/;" });
     }
-    const current = this.token_stream.current;
 
-    if (current.kind === TokenKind.Char) {
+    let next_fragment = 0;
 
-      // Parsing roots
+    while (!this.token_stream.done) {
+      const current = this.token_stream.current;
 
-      while (!this.token_stream.done) {
-        const r_slash = this.consume_char_token_then_advance(CharTokenKind.Slash);
-        if (Result.is_err(r_slash)) { return r_slash; }
-
-        const r_lbrace = this.consume_char_token_then_advance(CharTokenKind.LBrace);
-        if (Result.is_err(r_lbrace)) { return r_lbrace; }
-
-        // Parsing fragments / new nodes
-
-        while (!this.token_stream.done && this.token_stream.current.kind !== TokenKind.Char) {
-
-          const labels = this.parse_labels();
-
-          const node_identifier_token = this.token_stream.current;
-          if (node_identifier_token.kind !== TokenKind.Identifier) {
-            return Result.Err({
-              message: "Expected node/fragment identifier",
-              found: node_identifier_token
-            });
-          }
-
-          if (children_map.has(node_identifier_token.value)) {
-            return Result.Err({
-              message: "Previously defined node with this identifier might conflict",
-              found: node_identifier_token
-            });
-          }
-
-          const r_node = this.parse_node_statement(labels);
-          if (Result.is_err(r_node)) { return r_node; }
-          children_map.set(node_identifier_token.value, r_node.value);
-        }
-
-        const r_rbrace = this.consume_char_token_then_advance(CharTokenKind.RBrace);
-        if (Result.is_err(r_rbrace)) { return r_rbrace; }
-
-        const r_semi = this.consume_char_token_then_advance(CharTokenKind.Semicolon);
-        if (Result.is_err(r_semi)) { return r_semi; }
+      if (current.kind === TokenKind.Char && current.value === CharTokenKind.Slash) {
+        const r_root = this.parse_dto_root_block(children_map, root_properties);
+        if (Result.is_err(r_root)) { return r_root; }
+        continue;
       }
-    } else {
 
-      // Parsing overlays and transform them into fragments
+      const r_fragment = this.parse_dto_reference_block();
+      if (Result.is_err(r_fragment)) { return r_fragment; }
 
-      let current_number_of_fragments = 0;
-
-      while (!this.token_stream.done) {
-
-        const labels = this.parse_labels();
-
-        const current = this.token_stream.current;
-
-        let target_property: DeletableProperty;
-        if (current.kind === TokenKind.LabelReference) {
-          this.token_stream.advance();
-
-          target_property = {
-            labels: [],
-            name: "target",
-            value: [{
-              labels: [],
-              kind: "array",
-              bit_width: Bits.b32,
-              elements: [{
-                labels: [],
-                kind: "label",
-                name: current.value
-              }]
-            }],
-            deleted: false
-          };
-
-        } else if (current.kind === TokenKind.PathReference) {
-          this.token_stream.advance();
-
-          target_property = {
-            labels: [],
-            name: "target-path",
-            value: [{
-              labels: [],
-              kind: "string",
-              value: current.value
-            }],
-            deleted: false
-          };
-        } else {
-          return Result.Err({
-            message: "Expected reference (path or label)",
-            found: current
-          });
-        }
-
-        const overlay_properties_map = new Map<string, DeletableProperty>();
-        const overlay_children_map = new Map<string, DeletableNode>();
-
-        const r_lbrace = this.consume_char_token_then_advance(CharTokenKind.LBrace);
-        if (Result.is_err(r_lbrace)) { return r_lbrace; }
-
-        while (!this.token_stream.done && this.token_stream.current.kind !== TokenKind.Char) {
-
-          const labels = this.parse_labels();
-
-          const current = this.token_stream.current;
-
-          // Ignoring /delete-*/ identifier;
-
-          if (current.kind === TokenKind.Directive) {
-            if (current.value === DTDirective.DeleteNode || current.value === DTDirective.DeleteProperty) {
-              this.token_stream.advance();
-
-              const r_ident = this.consume_identifier_token_then_advance();
-              if (Result.is_err(r_ident)) { return r_ident; }
-
-              const r_semi = this.consume_char_token_then_advance(CharTokenKind.Semicolon);
-              if (Result.is_err(r_semi)) { return r_semi; }
-              continue;
-            }
-            return Result.Err({
-              message: "Unexpected directive within node",
-              found: current
-            });
-          }
-
-          if (current.kind !== TokenKind.Identifier) {
-            return Result.Err({
-              message: "Looking for identifier that represents property/child name",
-              found: current
-            });
-          }
-
-          const next_opt = this.token_stream.lookahead(1);
-          if (Option.is_none(next_opt)) {
-            return Result.Err({ message: "Unexpected end of tokens after property/child identifier" });
-          }
-          const next = next_opt.value;
-          if (next.kind !== TokenKind.Char) {
-            return Result.Err({
-              message: "Property/Child name must be followed by '=', '{', or ';'",
-              found: next
-            });
-          }
-
-          // Properties
-
-          if (next.value === CharTokenKind.Equals || next.value === CharTokenKind.Semicolon) {
-            if (overlay_children_map.size > 0) {
-              return Result.Err({ message: "Properties must be defined before children" });
-            }
-
-            const property_name = current.value;
-
-            if (overlay_properties_map.has(property_name)) {
-              return Result.Err({
-                message: "Property name will conflict with another previously defined property",
-                found: current
-              });
-            }
-
-            const r_property = this.parse_property_statement(labels);
-            if (Result.is_err(r_property)) { return r_property; }
-            overlay_properties_map.set(r_property.value.name, r_property.value);
-            continue;
-          }
-
-          // Children
-
-          if (next.value === CharTokenKind.LBrace) {
-            const node_identifier = current.value;
-
-            if (overlay_properties_map.has(node_identifier)) {
-              return Result.Err({
-                message: "Node name will conflict with previous defined property name",
-                found: current
-              });
-            }
-
-            if (overlay_children_map.has(node_identifier)) {
-              return Result.Err({
-                message: "Node name will conflict with another previously defined node name",
-                found: current
-              });
-            }
-
-            const r_node = this.parse_node_statement(labels);
-            if (Result.is_err(r_node)) { return r_node; }
-            overlay_children_map.set(node_identifier, r_node.value);
-            continue;
-          }
-
-          return Result.Err({
-            message: "Expected '{','=' or ';' after property/child identifier",
-            found: next
-          });
-        }
-
-        const r_rbrace = this.consume_char_token_then_advance(CharTokenKind.RBrace);
-        if (Result.is_err(r_rbrace)) { return r_rbrace; }
-
-        const r_semi = this.consume_char_token_then_advance(CharTokenKind.Semicolon);
-        if (Result.is_err(r_semi)) { return r_semi; }
-
-        children_map.set(`fragment@${current_number_of_fragments}`, {
-          labels,
-          name: "fragment",
-          unit_addr: current_number_of_fragments.toString(),
-          properties: [target_property],
-          children: [{
-            labels: [],
-            name: "__overlay__",
-            unit_addr: undefined,
-            properties: [...overlay_properties_map.values()],
-            children: [...overlay_children_map.values()],
-            deleted: false
-          }],
-          deleted: false
-        });
-
-        ++current_number_of_fragments;
-      }
+      while (children_map.has(`fragment@${next_fragment}`)) { ++next_fragment; }
+      children_map.set(`fragment@${next_fragment}`, {
+        ...r_fragment.value,
+        name: "fragment",
+        unit_addr: next_fragment.toString(),
+      });
+      ++next_fragment;
     }
 
     const r_metadata = this.parse_metadata();
@@ -385,7 +187,7 @@ export class Parser {
       labels: [],
       name: "/",
       unit_addr: undefined,
-      properties: [],
+      properties: [...root_properties.values()],
       children: [...children_map.values()],
       deleted: false
     });
@@ -412,6 +214,241 @@ export class Parser {
     return Result.Ok({
       dto: { root },
       metadata: r_metadata.value
+    });
+  }
+
+  /**
+   * Parse one `/ { ... };` block of an overlay. Properties land in
+   * `root_properties` (a later definition wins, as in dtc); child nodes
+   * (explicit fragments or new nodes) land in `children_map`.
+   */
+  private parse_dto_root_block(
+    children_map: Map<string, DeletableNode>,
+    root_properties: Map<string, DeletableProperty>,
+  ): Result<void, ParseError> {
+    const r_slash = this.consume_char_token_then_advance(CharTokenKind.Slash);
+    if (Result.is_err(r_slash)) { return r_slash; }
+
+    const r_lbrace = this.consume_char_token_then_advance(CharTokenKind.LBrace);
+    if (Result.is_err(r_lbrace)) { return r_lbrace; }
+
+    while (!this.token_stream.done && this.token_stream.current.kind !== TokenKind.Char) {
+
+      const labels = this.parse_labels();
+
+      const identifier_token = this.token_stream.current;
+      if (identifier_token.kind !== TokenKind.Identifier) {
+        return Result.Err({
+          message: "Expected property, node or fragment identifier",
+          found: identifier_token
+        });
+      }
+
+      const next_opt = this.token_stream.lookahead(1);
+      if (Option.is_none(next_opt)) {
+        return Result.Err({ message: "Unexpected end of tokens after property/child identifier" });
+      }
+      const next = next_opt.value;
+
+      if (next.kind === TokenKind.Char && (next.value === CharTokenKind.Equals || next.value === CharTokenKind.Semicolon)) {
+        const r_property = this.parse_property_statement(labels);
+        if (Result.is_err(r_property)) { return r_property; }
+        root_properties.set(r_property.value.name, r_property.value);
+        continue;
+      }
+
+      if (children_map.has(identifier_token.value)) {
+        return Result.Err({
+          message: "Previously defined node with this identifier might conflict",
+          found: identifier_token
+        });
+      }
+
+      const r_node = this.parse_node_statement(labels);
+      if (Result.is_err(r_node)) { return r_node; }
+      children_map.set(identifier_token.value, r_node.value);
+    }
+
+    const r_rbrace = this.consume_char_token_then_advance(CharTokenKind.RBrace);
+    if (Result.is_err(r_rbrace)) { return r_rbrace; }
+
+    const r_semi = this.consume_char_token_then_advance(CharTokenKind.Semicolon);
+    if (Result.is_err(r_semi)) { return r_semi; }
+
+    // eslint-disable-next-line unicorn/no-useless-undefined
+    return Result.Ok(undefined);
+  }
+
+  /**
+   * Parse one `&label { ... };` / `&{/path} { ... };` block into a fragment
+   * body (target property + `__overlay__`); the caller names and numbers it.
+   */
+  private parse_dto_reference_block(): Result<Omit<DeletableNode, "name" | "unit_addr">, ParseError> {
+    const labels = this.parse_labels();
+
+    const current = this.token_stream.current;
+
+    let target_property: DeletableProperty;
+    if (current.kind === TokenKind.LabelReference) {
+      this.token_stream.advance();
+
+      target_property = {
+        labels: [],
+        name: "target",
+        value: [{
+          labels: [],
+          kind: "array",
+          bit_width: Bits.b32,
+          elements: [{
+            labels: [],
+            kind: "label",
+            name: current.value
+          }]
+        }],
+        deleted: false
+      };
+
+    } else if (current.kind === TokenKind.PathReference) {
+      this.token_stream.advance();
+
+      target_property = {
+        labels: [],
+        name: "target-path",
+        value: [{
+          labels: [],
+          kind: "string",
+          value: current.value
+        }],
+        deleted: false
+      };
+    } else {
+      return Result.Err({
+        message: "Expected reference (path or label)",
+        found: current
+      });
+    }
+
+    const overlay_properties_map = new Map<string, DeletableProperty>();
+    const overlay_children_map = new Map<string, DeletableNode>();
+
+    const r_lbrace = this.consume_char_token_then_advance(CharTokenKind.LBrace);
+    if (Result.is_err(r_lbrace)) { return r_lbrace; }
+
+    while (!this.token_stream.done && this.token_stream.current.kind !== TokenKind.Char) {
+
+      const labels = this.parse_labels();
+
+      const current = this.token_stream.current;
+
+      // Ignoring /delete-*/ identifier;
+
+      if (current.kind === TokenKind.Directive) {
+        if (current.value === DTDirective.DeleteNode || current.value === DTDirective.DeleteProperty) {
+          this.token_stream.advance();
+
+          const r_ident = this.consume_identifier_token_then_advance();
+          if (Result.is_err(r_ident)) { return r_ident; }
+
+          const r_semi = this.consume_char_token_then_advance(CharTokenKind.Semicolon);
+          if (Result.is_err(r_semi)) { return r_semi; }
+          continue;
+        }
+        return Result.Err({
+          message: "Unexpected directive within node",
+          found: current
+        });
+      }
+
+      if (current.kind !== TokenKind.Identifier) {
+        return Result.Err({
+          message: "Looking for identifier that represents property/child name",
+          found: current
+        });
+      }
+
+      const next_opt = this.token_stream.lookahead(1);
+      if (Option.is_none(next_opt)) {
+        return Result.Err({ message: "Unexpected end of tokens after property/child identifier" });
+      }
+      const next = next_opt.value;
+      if (next.kind !== TokenKind.Char) {
+        return Result.Err({
+          message: "Property/Child name must be followed by '=', '{', or ';'",
+          found: next
+        });
+      }
+
+      // Properties
+
+      if (next.value === CharTokenKind.Equals || next.value === CharTokenKind.Semicolon) {
+        if (overlay_children_map.size > 0) {
+          return Result.Err({ message: "Properties must be defined before children" });
+        }
+
+        const property_name = current.value;
+
+        if (overlay_properties_map.has(property_name)) {
+          return Result.Err({
+            message: "Property name will conflict with another previously defined property",
+            found: current
+          });
+        }
+
+        const r_property = this.parse_property_statement(labels);
+        if (Result.is_err(r_property)) { return r_property; }
+        overlay_properties_map.set(r_property.value.name, r_property.value);
+        continue;
+      }
+
+      // Children
+
+      if (next.value === CharTokenKind.LBrace) {
+        const node_identifier = current.value;
+
+        if (overlay_properties_map.has(node_identifier)) {
+          return Result.Err({
+            message: "Node name will conflict with previous defined property name",
+            found: current
+          });
+        }
+
+        if (overlay_children_map.has(node_identifier)) {
+          return Result.Err({
+            message: "Node name will conflict with another previously defined node name",
+            found: current
+          });
+        }
+
+        const r_node = this.parse_node_statement(labels);
+        if (Result.is_err(r_node)) { return r_node; }
+        overlay_children_map.set(node_identifier, r_node.value);
+        continue;
+      }
+
+      return Result.Err({
+        message: "Expected '{','=' or ';' after property/child identifier",
+        found: next
+      });
+    }
+
+    const r_rbrace = this.consume_char_token_then_advance(CharTokenKind.RBrace);
+    if (Result.is_err(r_rbrace)) { return r_rbrace; }
+
+    const r_semi = this.consume_char_token_then_advance(CharTokenKind.Semicolon);
+    if (Result.is_err(r_semi)) { return r_semi; }
+
+    return Result.Ok({
+      labels,
+      properties: [target_property],
+      children: [{
+        labels: [],
+        name: "__overlay__",
+        unit_addr: undefined,
+        properties: [...overlay_properties_map.values()],
+        children: [...overlay_children_map.values()],
+        deleted: false
+      }],
+      deleted: false
     });
   }
 
