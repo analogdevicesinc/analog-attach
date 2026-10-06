@@ -1,7 +1,5 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
-
 ## About This Package
 
 `attach-lib` is the core, UI-free library for Device Tree Source (DTS) parsing, binding processing, and schema validation. It is consumed by the VS Code extension and webviews. Built with Vite (dual ESM/CJS output), tested with Vitest.
@@ -13,11 +11,6 @@ There is no top-level test script that isolates just this package — use `cd pa
 Most tests import from the built package (`from 'attach-lib'`, resolved via a workspace symlink at `node_modules/attach-lib` → `dist/`), so `yarn build` before `yarn test` if `dist/` is stale. A few tests (e.g. `test/DTSParser.test.ts`, `test/DTSParserRoundtrip.test.ts`) import directly from `../src` and don't need a build. Some source files also carry inline `import.meta.vitest` doctests (e.g. `src/DTBuilder/DTBuilder.ts`, `src/binding-processor/fixups/*.ts`) picked up via `includeSource` in `vitest.config.ts` — these run alongside the `test/*.test.ts` files.
 
 ## Architecture
-
-### Entry Points
-
-- `src/index.ts` — Node.js entry (full API, including fs-dependent modules)
-- `src/browser.ts` — Browser/webview entry (only fs-free exports like `BigIntSerializer`)
 
 ### Core Modules
 
@@ -52,9 +45,6 @@ Orchestrates the full binding pipeline. Entry point for the extension: `Attach.n
 
 **Intelligence (`src/Intelligence/`)**
 Suggestions for configuring a peripheral, organised as layers of context (binding → devicetree → board). Details — layer operations, `IntelligenceStack`, board YAML parsing gotchas — are in `src/Intelligence/CLAUDE.md`.
-
-**Utility types (`src/result.ts`, `src/option.ts`)**
-Custom `Result<T, E>` and `Option<T>` types used throughout. Use `Result.Ok`/`Result.Err` and `Option.Some`/`Option.None` constructors; check with `Result.is_ok`/`Result.is_err` and `Option.is_some`/`Option.is_none`.
 
 ### Test Layout
 

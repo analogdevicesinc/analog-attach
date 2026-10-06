@@ -1,7 +1,5 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
-
 ## Overview
 
 `attach-cli` is the standalone `attach-linux` binary — a CLI tool for AI coding assistants to configure Linux device tree overlays. It wraps `attach-lib` (bundled at build time) and exposes all DTS/binding operations as subcommands.
@@ -13,10 +11,6 @@ The `prebuild` step runs `tsc --noEmit` for type-checking; the actual output is 
 ## Architecture
 
 ### Command structure
-
-Commands are registered in `src/app.ts` using `commander`. Each command lives in `src/commands/<name>/command.ts` and exports a `build_<name>_command(ctx)` function. Adding a new command requires:
-1. Creating `src/commands/<name>/command.ts`
-2. Importing and registering it in `src/app.ts`
 
 The entry point is `src/bin/cli.ts`, which strips the `--json` flag from argv before handing off to `commander`, then builds a `LocalContext` with `json: boolean` that every command receives.
 
@@ -77,10 +71,6 @@ The old typed `set_property` path (strict binding validation in `update`) has be
 ### suggest value binding check
 
 When `linux`/`dt-schema` are configured, `suggest value` (`src/commands/suggest/command.ts`) annotates each suggestion with binding-check notes. For each suggestion it builds a preview node with the candidate value, runs `narrow_and_populate` on it, and calls `check_value` against the resulting definition. Notes appear in the `note` field of the `Suggestion` protocol type and are appended to `display_string`.
-
-### Skill installation
-
-`installSkill` / `uninstallSkill` commands copy `SKILL.md` to `~/.claude/skills/attach-linux/SKILL.md`. The same logic runs as a `postinstall` script (`scripts/postinstall.js`) but prompts interactively and skips in CI (`CI` env var).
 
 ## Key Conventions
 
