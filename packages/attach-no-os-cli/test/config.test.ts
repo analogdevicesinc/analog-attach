@@ -123,6 +123,6 @@ describe("setting_options", () => {
         });
         reset_registry();
 
-        expect(setting_options(SETTINGS_DEFAULTS.board)?.sort()).toEqual(["otherboard", "testboard"]);
+        expect(setting_options(SETTINGS_DEFAULTS.board)?.sort()).toEqual(["otherboard", "testboard", "twobusboard"]);
     });
 });

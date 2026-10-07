@@ -150,7 +150,7 @@ describe('bootstrap from one node', () => {
 
         const again = bootstrap(workfile);
         expectOk(again);
-        expect(again.value).toEqual({ filled: [], linked: [], chip_selects: [], problems: [] });
+        expect(again.value).toEqual({ filled: [], linked: [], chip_selects: [], wiring: [], choices: [] });
         expect(stored(workfile)).toEqual(before);
     });
 });
@@ -292,7 +292,7 @@ describe('the chip-select', () => {
         expect(decision?.chip_select).toEqual({
             kind: 'native', peripheral: 'bsp_test_spi_cfg', native_cs: 0, at: { connector: 'PMOD', pin: '1' },
         });
-        expect(decision?.connections.every(connection => connection.via === 'mating')).toBe(true);
+        expect(report.value.wiring[0]?.connections.every(connection => connection.via === 'mating')).toBe(true);
         expect(decision?.pin).toBeUndefined();
     });
 
@@ -309,7 +309,7 @@ describe('the chip-select', () => {
         expect(symbols['test_spi_device']?.cs_gpio_num).toBe(1);
 
         // And the wiring to make it true on the bench.
-        expect(report.value.chip_selects[0]?.connections.map(connection => `${connection.from.pin}->${connection.to.connector}.${connection.to.pin}`))
+        expect(report.value.wiring[0]?.connections.map(connection => `${connection.from.pin}->${connection.to.connector}.${connection.to.pin}`))
             .toEqual(['2->H1.2', '3->H1.3', '4->H1.1', '1->H1.4']);
     });
 
@@ -322,6 +322,68 @@ describe('the chip-select', () => {
 
         expect(stored(workfile)['test_spi_device']?.controller).toBe('bsp_test_spi_cfg_handle');
         expect(Object.keys(workfile.symbols)).not.toContain('bsp_test_spi2_cfg_handle');
+    });
+
+    test('on a board with two wired SPI buses, it stops at the controller and says so', () => {
+        // twobusboard declares pins and a chip-select line for both buses, and the part is
+        // jumper-wired, so it could go on either: that is the user's choice.
+        const workfile = workfile_with('test_sensor', 'twobusboard', 'othersoc');
+        const report = bootstrap(workfile);
+        expectOk(report);
+
+        const symbols = stored(workfile);
+        expect(symbols['test_spi_device']?.controller).toBeUndefined();
+        expect(symbols['test_spi_device']?.cs_gpio).toBeUndefined();
+        expect(report.value.chip_selects).toEqual([]);
+
+        // The stop is reported with the options, by the names `update` takes, in the
+        // board's own order...
+        expect(report.value.choices).toEqual([{
+            node: 'test_spi_device',
+            property: 'controller',
+            options: ['bsp_test_spi_cfg_handle', 'bsp_test_spi2_cfg_handle'],
+        }]);
+        // ...and so is why the wiring could not decide it.
+        const [wiring] = report.value.wiring;
+        expect(wiring?.device).toBe('test_spi_device');
+        expect(wiring?.problems.join('\n')).toContain('2 spi sck pins');
+    });
+
+    test('a workfile with nothing left open reports no choices', () => {
+        const workfile = workfile_with('test_sensor');
+        const report = bootstrap(workfile);
+        expectOk(report);
+        expect(report.value.choices).toEqual([]);
+    });
+
+    test('a filled number carries its format, so it can be shown as the schema writes it', () => {
+        const workfile = workfile_with('test_sensor');
+        const report = bootstrap(workfile);
+        expectOk(report);
+        const mask = report.value.filled.find(fill => fill.property === 'native_cs');
+        expect(mask?.format).toBe('hex');
+    });
+
+    test('a part on a bus its eval board has no pins for is reported, not left silent', () => {
+        // The user picked I2C before bootstrap reached the bus, so the chain is built by hand
+        // down to the part; eval-testpart is a SPI-only board, like the real ADXL355 Pmod.
+        const workfile = workfile_with('test_sensor');
+        add(workfile, 'cfg', 'test_sensor_config');
+        add(workfile, 'part', 'testpart_init_param');
+        expectOk(set_value(workfile, 'test_sensor', '$init_param', 'cfg'));
+        expectOk(set_value(workfile, 'cfg', 'extra', 'part'));
+        expectOk(set_value(workfile, 'part', 'comm_type', 'TESTPART_I2C'));
+
+        const report = bootstrap(workfile);
+        expectOk(report);
+        expect(stored(workfile)['part']?.comm_init).toEqual({ i2c_dev: 'test_i2c_device' });
+        expect(report.value.wiring).toEqual([{
+            device: 'test_i2c_device',
+            part: 'eval-testpart',
+            interface: 'i2c',
+            connections: [],
+            problems: ['eval-testpart declares no i2c pins, so it cannot be wired over i2c'],
+        }]);
     });
 
     test('a device that already has a chip-select is left alone', () => {
@@ -342,7 +404,7 @@ describe('the chip-select', () => {
 
         const again = bootstrap(workfile);
         expectOk(again);
-        expect(again.value).toEqual({ filled: [], linked: [], chip_selects: [], problems: [] });
+        expect(again.value).toEqual({ filled: [], linked: [], chip_selects: [], wiring: [], choices: [] });
         expect(stored(workfile)).toEqual(before);
     });
 });

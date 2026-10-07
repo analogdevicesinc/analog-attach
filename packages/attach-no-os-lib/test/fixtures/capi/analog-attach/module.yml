@@ -28,3 +28,5 @@ rulesets:
     - spi/test_array_holder.yaml
     - spi/test_sensor_config.yaml
     - spi/test_sensor.yaml
+  i2c:
+    - i2c/test_i2c_device.yaml

@@ -17,6 +17,10 @@ comm_init:
         include: test_spi_device
         pointer: true
         description: "SPI device"
+    - i2c_dev:
+        include: test_i2c_device
+        pointer: true
+        description: "I2C device"
 dev_ready:
   type: bool
   default: true
@@ -40,3 +44,6 @@ $override:
             $any_of:
               - cs_gpio
               - native_cs: {not: 0}
+        TESTPART_I2C:
+          comm_init:
+            value: i2c_dev

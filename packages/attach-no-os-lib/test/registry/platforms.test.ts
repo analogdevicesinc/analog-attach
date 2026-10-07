@@ -52,6 +52,7 @@ describe('platforms, chips and boards', () => {
         expect(boards.value.map(board => `${board.name}:${board.soc}`)).toEqual([
             'testboard:testsoc',
             'otherboard:othersoc',
+            'twobusboard:othersoc',
         ]);
         expect(boards.value[0].vendor).toBe('testvendor');
     });

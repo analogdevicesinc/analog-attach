@@ -7,6 +7,7 @@ import {
     driver_root,
     list_available_structs,
     list_drivers,
+    format_number_in,
     load_resolved_ruleset_for_board,
     validate_workfile,
 } from "attach-no-os-lib";
@@ -249,17 +250,15 @@ function unique_name(base: string, context: WorkfileContext): string {
     }
 }
 
-/** What bootstrap did, for a person: the nodes it made, the values it chose, and the wiring. */
+/** What bootstrap did, for a person: the nodes it made, the values it chose, the wiring, and where it stopped. */
 function describe_bootstrap(report: BootstrapReport, workfile: Workfile): string[] {
     const lines: string[] = [];
     const created = report.linked.filter(link => link.created && !link.hidden);
     const hidden = report.linked.filter(link => link.hidden);
 
-    if (created.length === 0 && hidden.length === 0 && report.filled.length === 0 && report.chip_selects.length === 0) {
-        return lines;
+    if (created.length > 0 || hidden.length > 0 || report.filled.length > 0) {
+        lines.push("", "Bootstrap filled in what leaves no room for choice:");
     }
-
-    lines.push("", "Bootstrap filled in what leaves no room for choice:");
     for (const link of created) {
         const at = `${link.node}.${link.property}${link.member === undefined ? "" : `.${link.member}`}`;
         lines.push(`  + ${link.target.padEnd(32)} (${link.symbol}) for ${at}`);
@@ -269,7 +268,8 @@ function describe_bootstrap(report: BootstrapReport, workfile: Workfile): string
         lines.push(`  ~ ${target.padEnd(32)} (from the board/driver, not stored)`);
     }
     for (const fill of report.filled) {
-        lines.push(`  = ${`${fill.node}.${fill.property}`.padEnd(32)} ${String(fill.value)} (${fill.from})`);
+        const value = typeof fill.value === "number" ? format_number_in(fill.value, fill.format) : String(fill.value);
+        lines.push(`  = ${`${fill.node}.${fill.property}`.padEnd(32)} ${value} (${fill.from})`);
     }
 
     for (const decision of report.chip_selects) {
@@ -281,19 +281,37 @@ function describe_bootstrap(report: BootstrapReport, workfile: Workfile): string
             how = `GPIO ${chip_select.gpio.port} pin ${String(chip_select.gpio.number)} (${chip_select.at.connector} pin ${chip_select.at.pin})`;
         }
         lines.push("", `Chip-select for ${decision.device}: ${how}`);
-        if (decision.connections.length > 0) {
-            lines.push(`Wire ${decision.part} to ${workfile.board ?? "the board"}:`);
-            for (const connection of decision.connections) {
+    }
+
+    for (const wiring of report.wiring) {
+        const bus = wiring.peripheral === undefined ? wiring.interface.toUpperCase() : `${wiring.interface.toUpperCase()} (${wiring.peripheral})`;
+        if (wiring.connections.length > 0) {
+            lines.push("", `Wire ${wiring.part} to ${workfile.board ?? "the board"} over ${bus}:`);
+            for (const connection of wiring.connections) {
                 const from = `${connection.from.connector} pin ${connection.from.pin} (${connection.role})`;
                 lines.push(`  ${from.padEnd(24)} -> ${connection.to.connector} pin ${connection.to.pin}`);
             }
+        } else {
+            lines.push("", `Wiring ${wiring.part} over ${bus}:`);
+        }
+        for (const problem of wiring.problems) {
+            lines.push(`  ! ${problem}`);
         }
     }
 
-    for (const problem of report.problems) {
-        lines.push(`  ! ${problem}`);
+    if (report.choices.length > 0) {
+        lines.push("", "Bootstrap stopped at what is a choice - pick one each:");
+        for (const choice of report.choices) {
+            const at = `${choice.node}.${choice.property}${choice.member === undefined ? "" : `.${choice.member}`}`;
+            const options = choice.options.length === 0 ? "nothing configured provides one" : choice.options.join(" | ");
+            lines.push(`  ? ${at.padEnd(32)} ${options}`);
+        }
+        const [first] = report.choices;
+        if (first !== undefined && first.options.length > 0) {
+            const value = first.member === undefined ? first.options[0] : `${first.member} ${first.options[0]}`;
+            lines.push(`  e.g. attach-noos update ${first.node} ${first.property} ${value}`);
+        }
     }
 
     return lines;
 }
-

@@ -1,0 +1,9 @@
+$type: struct
+$symbol: test_i2c_device
+$description: "One device on an I2C bus. No controller: the tests that use it only need a
+  bus device a part can be bound to over I2C."
+address:
+  type: uint8_t
+  format: hex
+  default: 0x1D
+  description: "7-bit device address"

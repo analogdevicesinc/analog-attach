@@ -29,6 +29,10 @@
  * a GPIO pin node on the right port. The same wiring settles which bus the device is on,
  * which is what decides the controller on a board with more than one SPI.
  *
+ * The report says what was done and where it stopped: every bus device this run touched
+ * gets its wiring instructions (or why the wiring does not add up), and every required
+ * reference still open is listed with the options that made it a choice.
+ *
  * Termination: every step sets a value that was unset or adds a node, and nothing is ever
  * unset or removed, so the loop only moves forward. The step cap is a bug detector, not the
  * stopping condition.
@@ -36,7 +40,7 @@
 
 import type { Result } from "../ruleset_parser/result";
 import { error, ok } from "../ruleset_parser/result";
-import type { IncludeProperty, Property, Ruleset } from "../ruleset_parser/types";
+import type { IncludeProperty, NumberFormat, Property, Ruleset } from "../ruleset_parser/types";
 import { provided_id, RulesetType } from "../ruleset_parser/types";
 import { load_resolved_ruleset, load_resolved_ruleset_for_board } from "../resolver/resolver";
 import type { ChipSelectBinding } from "../registry/module_yml";
@@ -59,6 +63,8 @@ export interface FilledValue {
 	property: string,
 	value: unknown,
 	from: FillSource,
+	/** How the field reads, for showing the value the way the schema writes it. */
+	format?: NumberFormat,
 }
 
 /** A reference bootstrap set, and whether it had to create the node it points at. */
@@ -75,7 +81,7 @@ export interface LinkedReference {
 	hidden: boolean,
 }
 
-/** How a SPI device's chip-select was settled, and the wiring that settled it. */
+/** How a SPI device's chip-select was settled. The wiring behind it is in `wiring`. */
 export interface ChipSelectDecision {
 	device: string,
 	/** The part whose wiring decided it, by its eval board. */
@@ -83,16 +89,45 @@ export interface ChipSelectDecision {
 	chip_select: ChipSelect,
 	/** The GPIO pin node created for it, when it is a GPIO. */
 	pin?: string,
+}
+
+/** How one part is wired to the board over one bus device. */
+export interface BusWiring {
+	/** The bus device node: a capi_spi_device, a capi_i2c_device. */
+	device: string,
+	/** The part, by its eval board. */
+	part: string,
+	/** The bus, as the part's pin roles name it: spi, i2c. */
+	interface: string,
+	/** The board bus its lines land on, when they agree on one. */
+	peripheral?: string,
 	/** The wiring instructions: connect each part pin to this board pin. */
 	connections: Connection[],
+	/** Wiring that does not add up, or that the board alone cannot decide. */
+	problems: string[],
+}
+
+/** A required reference bootstrap left open, because it is a choice. */
+export interface OpenChoice {
+	node: string,
+	property: string,
+	/** The union member, when the reference is one. */
+	member?: string,
+	/**
+	 * What could fill it, by the name `update` takes. A type that would be created is
+	 * listed by its symbol. Empty when nothing configured provides it at all.
+	 */
+	options: string[],
 }
 
 export interface BootstrapReport {
 	filled: FilledValue[],
 	linked: LinkedReference[],
 	chip_selects: ChipSelectDecision[],
-	/** Wiring that does not add up, from the parts' wiring resolution. */
-	problems: string[],
+	/** Wiring for every bus device this run created or connected. */
+	wiring: BusWiring[],
+	/** Where bootstrap stopped: the required references still open, with their options. */
+	choices: OpenChoice[],
 }
 
 /** A bug detector: well above any real graph, and only reached if a step stops making progress. */
@@ -225,7 +260,7 @@ function fill_value(effective: Property): { value: unknown, from: FillSource } |
 type Step =
 	| { kind: "fill", node: string, property: string, value: unknown, from: FillSource }
 	| { kind: "link", node: string, property: string, member?: string, option: Option }
-	| { kind: "chip_select", device: string, part: string, resolved: ChipSelect, connections: Connection[], problems: string[] };
+	| { kind: "chip_select", device: string, part: string, resolved: ChipSelect };
 
 function next_step(workfile: Workfile, externs: ExternIndex): Step | undefined {
 	const graph = create_connections_graph(workfile);
@@ -278,17 +313,31 @@ function link_step(
 	effective: Property,
 	selected_member: string | undefined,
 ): Step | undefined {
-	const link = (option: Option | undefined, member?: string): Step | undefined => option === undefined
+	const open = open_reference(workfile, externs, name, effective, selected_member);
+	const option = open === undefined ? undefined : the_only(open.options);
+	return open === undefined || option === undefined
 		? undefined
-		: { kind: "link", node: name, property: effective.name, ...(member === undefined ? {} : { member }), option };
+		: { kind: "link", node: name, property: effective.name, ...(open.member === undefined ? {} : { member: open.member }), option };
+}
 
+/**
+ * The options for an unset reference bootstrap may fill, or undefined for one it never fills
+ * (an optional reference, a list, a union no one has picked a member of).
+ */
+function open_reference(
+	workfile: Workfile,
+	externs: ExternIndex,
+	name: string,
+	effective: Property,
+	selected_member: string | undefined,
+): { member?: string, options: Option[] } | undefined {
 	switch (effective._t) {
 		case "IncludeProperty": {
 			// Lists (an include with a `count`) need N nodes, not one; they are left alone.
 			if (effective.required !== true || effective.include === undefined || effective.count !== undefined) {
 				return undefined;
 			}
-			return link(the_only(reference_options(workfile, effective.include, name, externs)));
+			return { options: reference_options(workfile, effective.include, name, externs) };
 		}
 		case "UnionProperty": {
 			// Only a member something pinned, or the only member there is.
@@ -299,7 +348,7 @@ function link_step(
 			if (member === undefined || member_type === undefined || (selected_member === undefined && effective.required !== true)) {
 				return undefined;
 			}
-			return link(the_only(reference_options(workfile, member_type, name, externs)), member.name);
+			return { member: member.name, options: reference_options(workfile, member_type, name, externs) };
 		}
 		case "DriverInitParameterProperty": {
 			if (effective.required !== true) {
@@ -307,7 +356,7 @@ function link_step(
 			}
 			const candidates = driver_init_parameter_candidates(effective.interface);
 			return candidates.ok
-				? link(the_only(driver_options(workfile, candidates.value.map(entry => entry.$symbol), name)))
+				? { options: driver_options(workfile, candidates.value.map(entry => entry.$symbol), name) }
 				: undefined;
 		}
 		case "DriverOpsProperty": {
@@ -316,7 +365,7 @@ function link_step(
 			}
 			const candidates = driver_ops_candidates(effective.interface);
 			return candidates.ok
-				? link(the_only(driver_options(workfile, candidates.value.map(entry => entry.$symbol), name)))
+				? { options: driver_options(workfile, candidates.value.map(entry => entry.$symbol), name) }
 				: undefined;
 		}
 		default: {
@@ -339,9 +388,18 @@ function has_chip_select(node: Ruleset | undefined, binding: ChipSelectBinding):
 	return value_of(node, binding.gpio_list) !== undefined || (typeof native === "number" && native !== 0);
 }
 
-/** Every (driver node, SPI device node) pair: a part's init_param bound to a bus device through a union. */
-function parts_on_spi(workfile: Workfile, binding: ChipSelectBinding): { part_node: string, device: string, driver: string }[] {
-	const pairs: { part_node: string, device: string, driver: string }[] = [];
+/** A part's init_param bound to a bus device through a union. */
+interface PartOnBus {
+	part_node: string,
+	device: string,
+	driver: string,
+	/** The bus, from the group the device's ruleset is listed under: spi, i2c. */
+	interface: string,
+}
+
+/** Every (driver node, bus device node) pair in the workfile. */
+function parts_on_bus(workfile: Workfile): PartOnBus[] {
+	const pairs: PartOnBus[] = [];
 	for (const name of Object.keys(workfile.symbols).sort()) {
 		const node = workfile.symbols[name];
 		if (node?._t !== "RulesetStruct") {
@@ -356,8 +414,10 @@ function parts_on_spi(workfile: Workfile, binding: ChipSelectBinding): { part_no
 				continue;
 			}
 			for (const target of Object.values(property.value as Record<string, unknown>)) {
-				if (typeof target === "string" && workfile.symbols[target]?.$symbol === binding.device) {
-					pairs.push({ part_node: name, device: target, driver: entry.value.module.name });
+				const device = typeof target === "string" ? workfile.symbols[target] : undefined;
+				const device_entry = device === undefined ? undefined : resolve_entry(device.$symbol);
+				if (typeof target === "string" && device_entry?.ok === true) {
+					pairs.push({ part_node: name, device: target, driver: entry.value.module.name, interface: device_entry.value.group });
 				}
 			}
 		}
@@ -376,8 +436,11 @@ function chip_select_step(workfile: Workfile, externs: ExternIndex): Step | unde
 	}
 	const chip_select = binding.value.chip_select;
 
-	for (const { device, driver } of parts_on_spi(workfile, chip_select)) {
+	for (const { device, driver } of parts_on_bus(workfile)) {
 		const device_node = workfile.symbols[device];
+		if (device_node?.$symbol !== chip_select.device) {
+			continue;
+		}
 		if (has_chip_select(device_node, chip_select) || device_node?._t !== "RulesetStruct") {
 			continue;
 		}
@@ -415,14 +478,7 @@ function chip_select_step(workfile: Workfile, externs: ExternIndex): Step | unde
 			continue; // the board's BSP configures no port for that pin; resolve_bus says so
 		}
 
-		return {
-			kind: "chip_select",
-			device,
-			part: part.value.name,
-			resolved: decided,
-			connections: resolved.value.connections,
-			problems: resolved.value.problems,
-		};
+		return { kind: "chip_select", device, part: part.value.name, resolved: decided };
 	}
 
 	return undefined;
@@ -442,7 +498,7 @@ function apply_chip_select(
 		if (!set.ok) {
 			return set;
 		}
-		return ok({ filled: [{ node: device, property: binding.native_mask, value: mask, from: "only value" }], linked: [] });
+		return ok({ filled: [filled_value(workfile, device, binding.native_mask, mask, "only value")], linked: [] });
 	}
 	if (resolved.kind !== "gpio" || resolved.port_extern === undefined) {
 		return error(`Chip-select for '${device}' is not one that can be applied`, device);
@@ -501,8 +557,8 @@ function apply_chip_select(
 	return ok({
 		pin,
 		filled: [
-			{ node: pin, property: binding.pin_number, value: resolved.gpio.number, from: "only value" },
-			...(list.count === undefined ? [] : [{ node: device, property: list.count, value: 1, from: "only value" as const }]),
+			filled_value(workfile, pin, binding.pin_number, resolved.gpio.number, "only value"),
+			...(list.count === undefined ? [] : [filled_value(workfile, device, list.count, 1, "only value")]),
 		],
 		linked: [
 			{ node: pin, property: binding.pin_port, target: port.value, symbol: port_property.include, created: true, hidden: true },
@@ -511,7 +567,128 @@ function apply_chip_select(
 	});
 }
 
+// --- Where it stopped ---------------------------------------------------------------------
+
+/** Every node this run created, linked from, or gave a chip-select. */
+function touched_nodes(report: BootstrapReport): Set<string> {
+	return new Set([
+		...report.linked.flatMap(link => [link.node, link.target]),
+		...report.chip_selects.map(decision => decision.device),
+	]);
+}
+
+/**
+ * The wiring of every bus device this run touched. Untouched devices are left out, so a run
+ * that changes nothing reports nothing - their wiring was reported when it was settled.
+ */
+function wiring_of(workfile: Workfile, touched: Set<string>): BusWiring[] {
+	if (workfile.board === undefined) {
+		return [];
+	}
+
+	const wiring: BusWiring[] = [];
+	for (const { device, driver, interface: interface_ } of parts_on_bus(workfile)) {
+		if (!touched.has(device)) {
+			continue;
+		}
+		const part = find_eval_board(driver);
+		if (!part.ok) {
+			continue;
+		}
+		const resolved = resolve_bus(part.value, workfile.board, interface_);
+		if (!resolved.ok) {
+			continue;
+		}
+
+		const problems = [...resolved.value.problems];
+		const chip_select = resolved.value.chip_select;
+		if (chip_select?.kind === "unwired") {
+			problems.push(`chip-select: ${chip_select.reason}`);
+		}
+		// Nothing landed and nothing went wrong: the part has no pins for this bus at all,
+		// which is a board that cannot be used this way (a SPI-only Pmod set to I2C).
+		if (resolved.value.connections.length === 0 && problems.length === 0) {
+			problems.push(`${part.value.name} declares no ${interface_} pins, so it cannot be wired over ${interface_}`);
+		}
+
+		wiring.push({
+			device,
+			part: part.value.name,
+			interface: interface_,
+			...(resolved.value.peripheral === undefined ? {} : { peripheral: resolved.value.peripheral }),
+			connections: resolved.value.connections,
+			problems,
+		});
+	}
+	return wiring;
+}
+
+/** An option by the name `update` takes. */
+function option_name(option: Option): string {
+	switch (option.kind) {
+		case "existing": {
+			return option.name;
+		}
+		case "hidden": {
+			return option.candidate.name;
+		}
+		case "create": {
+			return option.symbol;
+		}
+	}
+}
+
+/**
+ * Every required reference left unset because it is a choice: more than one option, a node
+ * the user holds, or nothing at all that provides it. Hidden nodes are skipped - they are
+ * board and driver resources, filled from what they wrap. A requirement from `$any_of` is
+ * left to the chip-select, which the wiring reports on.
+ */
+function open_choices(workfile: Workfile, externs: ExternIndex): OpenChoice[] {
+	const graph = create_connections_graph(workfile);
+	const choices: OpenChoice[] = [];
+
+	for (const name of Object.keys(workfile.symbols).sort()) {
+		const node: Ruleset | undefined = workfile.symbols[name];
+		if ((node?._t !== "RulesetStruct" && node?._t !== "RulesetDescriptor") || is_hidden(workfile, name)) {
+			continue;
+		}
+
+		const collected = collect_child_overrides(name, workfile, graph);
+		for (const property of node.properties) {
+			if (property.value !== undefined || property.readonly === true) {
+				continue;
+			}
+			const { effective, required_reason, selected_member } = apply_overrides(property, collected, name, workfile);
+			if (effective.disabled === true || required_reason !== undefined) {
+				continue;
+			}
+			const open = open_reference(workfile, externs, name, effective, selected_member);
+			if (open === undefined || the_only(open.options) !== undefined) {
+				continue;
+			}
+			choices.push({
+				node: name,
+				property: property.name,
+				...(open.member === undefined ? {} : { member: open.member }),
+				options: open.options.map(option => option_name(option)),
+			});
+		}
+	}
+	return choices;
+}
+
 // --- Applying a step ---------------------------------------------------------------------
+
+/** A filled value, with the field's number format so it can be shown as the schema writes it. */
+function filled_value(workfile: Workfile, node: string, property: string, value: unknown, from: FillSource): FilledValue {
+	const ruleset = workfile.symbols[node];
+	const field = ruleset?._t === "RulesetStruct" || ruleset?._t === "RulesetDescriptor"
+		? ruleset.properties.find(candidate => candidate.name === property)
+		: undefined;
+	const format = field?._t === "NumberProperty" ? field.format : undefined;
+	return { node, property, value, from, ...(format === undefined ? {} : { format }) };
+}
 
 /** A free node name: the symbol itself, then `_1`, `_2`, ... - the same as `add` picks. */
 function unique_name(workfile: Workfile, base: string): string {
@@ -572,11 +749,13 @@ export function bootstrap(workfile: Workfile): Result<BootstrapReport> {
 
 	const registry = get_registry();
 	const binding = registry.ok ? registry.value.chip_select : undefined;
-	const report: BootstrapReport = { filled: [], linked: [], chip_selects: [], problems: [] };
+	const report: BootstrapReport = { filled: [], linked: [], chip_selects: [], wiring: [], choices: [] };
 
 	for (let steps = 0; steps < STEP_CAP; steps++) {
 		const step = next_step(workfile, externs.value);
 		if (step === undefined) {
+			report.wiring = wiring_of(workfile, touched_nodes(report));
+			report.choices = open_choices(workfile, externs.value);
 			return ok(report);
 		}
 
@@ -586,7 +765,7 @@ export function bootstrap(workfile: Workfile): Result<BootstrapReport> {
 				if (!set.ok) {
 					return set;
 				}
-				report.filled.push({ node: step.node, property: step.property, value: step.value, from: step.from });
+				report.filled.push(filled_value(workfile, step.node, step.property, step.value, step.from));
 				break;
 			}
 			case "link": {
@@ -625,9 +804,7 @@ export function bootstrap(workfile: Workfile): Result<BootstrapReport> {
 					part: step.part,
 					chip_select: step.resolved,
 					...(applied.value.pin === undefined ? {} : { pin: applied.value.pin }),
-					connections: step.connections,
 				});
-				report.problems.push(...step.problems);
 				break;
 			}
 		}

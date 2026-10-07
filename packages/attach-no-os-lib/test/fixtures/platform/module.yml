@@ -12,6 +12,7 @@ socs:
 boards:
   - testboard
   - otherboard
+  - twobusboard
 
 # A platform may ship rulesets of its own: the platform-specific `extra` struct a generic
 # config points at. No real CAPI platform does yet, but the code path is live.

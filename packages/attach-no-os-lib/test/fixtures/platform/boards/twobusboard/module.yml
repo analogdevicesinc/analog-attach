@@ -1,0 +1,24 @@
+name: twobusboard
+type: platform_board
+version: "1.0.0"
+description: "A board carrying othersoc, with two SPI buses broken out on one header"
+
+metadata:
+  mcu: othersoc
+  vendor: testvendor
+
+# No PMOD port, so a PMOD eval board is jumper-wired, and both buses are equally reachable.
+pinout:
+  connectors:
+    - name: "Header"
+      id: H1
+      type: feather_16
+      pins:
+        - {pin: 1, mnemonic: O0_1, role: [gpio, spi_sck],  gpio: {port: OTHER_GPIO0, number: 1}}
+        - {pin: 2, mnemonic: O0_2, role: [gpio, spi_mosi], gpio: {port: OTHER_GPIO0, number: 2}}
+        - {pin: 3, mnemonic: O0_3, role: [gpio, spi_miso], gpio: {port: OTHER_GPIO0, number: 3}}
+        - {pin: 4, mnemonic: O1_4, role: gpio,             gpio: {port: OTHER_GPIO1, number: 4}}
+        - {pin: 5, mnemonic: O0_5, role: [gpio, spi_sck],  gpio: {port: OTHER_GPIO0, number: 5}}
+        - {pin: 6, mnemonic: O0_6, role: [gpio, spi_mosi], gpio: {port: OTHER_GPIO0, number: 6}}
+        - {pin: 7, mnemonic: O0_7, role: [gpio, spi_miso], gpio: {port: OTHER_GPIO0, number: 7}}
+        - {pin: 8, mnemonic: O1_8, role: gpio,             gpio: {port: OTHER_GPIO1, number: 8}}
