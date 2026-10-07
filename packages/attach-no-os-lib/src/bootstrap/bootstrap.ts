@@ -441,7 +441,7 @@ function chip_select_step(workfile: Workfile, externs: ExternIndex): Step | unde
 		if (device_node?.$symbol !== chip_select.device) {
 			continue;
 		}
-		if (has_chip_select(device_node, chip_select) || device_node?._t !== "RulesetStruct") {
+		if (has_chip_select(device_node, chip_select) || device_node._t !== "RulesetStruct") {
 			continue;
 		}
 
