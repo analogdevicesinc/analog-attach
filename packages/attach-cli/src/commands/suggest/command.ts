@@ -30,7 +30,7 @@ import { load_config, type AttachConfig } from "../../config";
 import { resolve_config } from "../../resolve-config";
 import { load_board } from "../../board";
 import { format_suggestion, build_raw_property, shape_hint, parse_value } from "../update/command";
-import { bigIntReplacer, find_binding, fragment_target, get_or_build_compat_index, load_base, load_trees, parse_property_reference, resolve_node_identifier, resolve_positional_path, resolve_write_target } from "../../utilities";
+import { bigIntReplacer, effective_parent_compatibles, find_binding, fragment_target, get_or_build_compat_index, load_base, load_trees, parse_property_reference, resolve_node_identifier, resolve_positional_path, resolve_write_target } from "../../utilities";
 import { respond, respond_fail, input_error, diagnostic } from "../../protocol/output";
 import { attach_type_to_protocol_type } from "../../protocol/dt-to-protocol";
 import { resolve_node_binding, type NodeBinding } from "../../binding-resolution";
@@ -282,7 +282,7 @@ async function suggest_value(context_: LocalContext, arguments_: string[]): Prom
     if (trees === undefined) { return; }
     const { base_dt, overlay } = trees;
 
-    const { binding_node, binding_parent, parent_name } = resolve_write_target(node_identifier, overlay, base_dt);
+    const { binding_node, binding_parent, parent_name, parent_compatibles } = resolve_write_target(node_identifier, overlay, base_dt);
 
     const target_reference = resolve_node_identifier(node_identifier, overlay);
     const placement = placement_from_overlay(overlay, target_reference);
@@ -300,7 +300,7 @@ async function suggest_value(context_: LocalContext, arguments_: string[]): Prom
     let data = "{}";
     const binding = binding_node === undefined
         ? undefined
-        : await resolve_binding_for_data(binding_node, binding_parent, parent_name, base_dt, resolved.config);
+        : await resolve_binding_for_data(binding_node, binding_parent, parent_name, base_dt, resolved.config, parent_compatibles);
     if (binding_node !== undefined && binding !== undefined) {
         const input_data = Object.fromEntries(dt_to_validator_input(binding_node, {
             required_properties: binding.required_properties,
@@ -326,7 +326,7 @@ async function suggest_value(context_: LocalContext, arguments_: string[]): Prom
     let binding_check_reason: string | undefined;
 
     if (linux !== undefined && dtSchema !== undefined && fs.existsSync(linux) && fs.existsSync(dtSchema) && binding_node !== undefined) {
-        const annotated = await annotate_suggestions(values, property_name, binding_node, binding_parent, parent_name, base_dt, linux, dtSchema, context_.json, overlay);
+        const annotated = await annotate_suggestions(values, property_name, binding_node, binding_parent, parent_name, base_dt, linux, dtSchema, context_.json, overlay, parent_compatibles);
         if (annotated === undefined) {
             binding_check_reason = "binding could not be resolved";
         } else {
@@ -376,13 +376,14 @@ async function resolve_binding_for_data(
     parent_name: string,
     base_dt: DeviceTree,
     config: AttachConfig,
+    parent_compatibles?: string[],
 ): Promise<NodeBinding | undefined> {
     const linux = config.linux;
     const dtSchema = config.dtSchema;
     if (linux === undefined || dtSchema === undefined) { return; }
     if (!fs.existsSync(linux) || !fs.existsSync(dtSchema)) { return; }
 
-    const binding = await resolve_node_binding(binding_node, binding_parent, parent_name, base_dt, linux, dtSchema, true);
+    const binding = await resolve_node_binding(binding_node, binding_parent, parent_name, base_dt, linux, dtSchema, true, undefined, parent_compatibles);
     if ('error' in binding) { return; }
     return binding;
 }
@@ -398,8 +399,9 @@ async function annotate_suggestions(
     dtSchema: string,
     json: boolean,
     overlay: DeviceTreeOverlay,
+    parent_compatibles?: string[],
 ): Promise<true | undefined> {
-    const binding = await resolve_node_binding(binding_node, binding_parent, parent_name, base_dt, linux, dtSchema, json);
+    const binding = await resolve_node_binding(binding_node, binding_parent, parent_name, base_dt, linux, dtSchema, json, undefined, parent_compatibles);
     if ('error' in binding) { return; }
 
     const origin_desc = binding.origin.kind === "compatible"
@@ -572,8 +574,9 @@ async function suggest_node_property(context_: LocalContext, arguments_: string[
     const { node: found_node, parent_node, node_path } = found;
     const existing_keys = new Set(found_node.properties.map(p => p.name));
     const parent_name = found_node.labels.at(-1) ?? node_path;
+    const parent_compats = effective_parent_compatibles(parent_node, node_path, base_dt);
 
-    const binding = await resolve_node_binding(found_node, parent_node, parent_name, base_dt, linux, dtSchema, context_.json);
+    const binding = await resolve_node_binding(found_node, parent_node, parent_name, base_dt, linux, dtSchema, context_.json, undefined, parent_compats);
     if ('error' in binding) {
         if (context_.json) {
             respond_fail({ ok: false, message: binding.error, severity: "error" });
@@ -644,8 +647,9 @@ async function binding_property_suggestions(
     linux: string,
     dtSchema: string,
     json: boolean,
+    parent_compatibles?: string[],
 ): Promise<Suggestion[] | undefined> {
-    const binding = await resolve_node_binding(found_node, parent_node, parent_name, base_dt, linux, dtSchema, json);
+    const binding = await resolve_node_binding(found_node, parent_node, parent_name, base_dt, linux, dtSchema, json, undefined, parent_compatibles);
     if ('error' in binding) { return undefined; }
 
     const required = new Set(binding.required_properties);
@@ -771,7 +775,8 @@ async function suggest_navigate(context_: LocalContext, arguments_: string[]): P
     let property_suggestions: Suggestion[] | undefined;
     if (linux !== undefined && dtSchema !== undefined && fs.existsSync(linux) && fs.existsSync(dtSchema)) {
         const nav_parent_name = found_node.labels.at(-1) ?? node_path;
-        property_suggestions = await binding_property_suggestions(found_node, parent_node, nav_parent_name, base_dt, linux, dtSchema, context_.json);
+        const nav_parent_compats = effective_parent_compatibles(parent_node, node_path, base_dt);
+        property_suggestions = await binding_property_suggestions(found_node, parent_node, nav_parent_name, base_dt, linux, dtSchema, context_.json, nav_parent_compats);
     }
     property_suggestions ??= found_node.properties.map(p => ({ value: p.name }));
 
@@ -803,7 +808,7 @@ async function suggest_type(context_: LocalContext, arguments_: string[]): Promi
     if (trees === undefined) { return; }
     const { base_dt, overlay } = trees;
 
-    const { target_reference, binding_node, binding_parent, parent_name, is_base_target, found } = resolve_write_target(node_identifier, overlay, base_dt);
+    const { target_reference, binding_node, binding_parent, parent_name, is_base_target, found, parent_compatibles: slot_parent_compats } = resolve_write_target(node_identifier, overlay, base_dt);
     if (binding_node === undefined) {
         if (context_.json) {
             respond_fail({ ok: false, message: `Node ${node_identifier} not found`, severity: "error" });
@@ -818,7 +823,7 @@ async function suggest_type(context_: LocalContext, arguments_: string[]): Promi
     const placement = layer === undefined ? undefined : placement_from_overlay(overlay, target_reference);
     const options = layer === undefined || placement === undefined ? undefined : { layers: [layer], placement };
 
-    const binding = await resolve_node_binding(binding_node, binding_parent, parent_name, base_dt, linux, dtSchema, context_.json, options);
+    const binding = await resolve_node_binding(binding_node, binding_parent, parent_name, base_dt, linux, dtSchema, context_.json, options, slot_parent_compats);
     if ('error' in binding) {
         if (context_.json) {
             respond_fail({ ok: false, message: binding.error, severity: "error" });

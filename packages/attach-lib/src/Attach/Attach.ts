@@ -15,6 +15,11 @@ import { DeviceTree, DTNode } from "../Devicetree/index.js";
 import { IntelligenceStack } from "../Intelligence/layers/stack.js";
 import { IntelligenceLayer, NodePlacement } from "../Intelligence/layers/types.js";
 import { dt_to_validator_input } from "./DTxBinding.js";
+import { filter_vendor_peripheral_props, type ControllerContext } from "../Bindings/VendorPeripheralFilter.js";
+
+export type ParseOptions = {
+    controller?: ControllerContext;
+};
 
 // Extra intelligence for populate_*: layers appended on top of the default
 // binding + devicetree stack, and the node's placement for layers that need it.
@@ -43,7 +48,8 @@ export class Attach {
     public async parse_binding(
         binding_path: string,
         linux_path: string,
-        dt_schema_path: string
+        dt_schema_path: string,
+        parse_options?: ParseOptions,
     ): Promise<{
         parsed_binding: ParsedBinding,
         patterns: string[]
@@ -71,11 +77,13 @@ export class Attach {
 
         const fixuped = apply_JSONSchema_fixups(canary_binding);
 
-        const parsed_binding: ParsedBinding = translate_JSONSchema(fixuped);
+        let parsed_binding: ParsedBinding = translate_JSONSchema(fixuped);
 
         if (parsed_binding === undefined) {
             return undefined;
         }
+
+        parsed_binding = filter_vendor_peripheral_props(parsed_binding, parse_options?.controller);
 
         this.original_binding = fixuped;
         this.current_binding = fixuped;
@@ -199,9 +207,10 @@ export class Attach {
         data: string | DTNode,
         parent_name?: string,
         options?: PopulateOptions,
+        parse_options?: ParseOptions,
     ): Promise<{ attach: Attach, parsed_binding: ParsedBinding, patterns: string[] } | undefined> {
         const attach = Attach.new();
-        const result = await attach.parse_binding(binding_path, linux_path, dt_schema_path);
+        const result = await attach.parse_binding(binding_path, linux_path, dt_schema_path, parse_options);
 
         if (result === undefined) {
             return undefined;

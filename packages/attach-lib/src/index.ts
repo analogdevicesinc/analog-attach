@@ -3,7 +3,8 @@
 // here deliberately rather than via `export *`.
 
 // Binding pipeline, validation and structural types
-export { Attach, type PopulateOptions } from './Attach/Attach.js';
+export { Attach, type PopulateOptions, type ParseOptions } from './Attach/Attach.js';
+export { type ControllerContext, filter_vendor_peripheral_props } from './Bindings/VendorPeripheralFilter.js';
 export type { ResolvedProperty, PatternPropertyRule, ParsedBinding } from './Attach/AttachTypes.js';
 export {
     AttachEnumType,
@@ -72,3 +73,12 @@ export type { BoardDescription } from './Intelligence/board/types.js';
 export { parse_board_description } from './Intelligence/board/parse.js';
 export { bus_chip_selects, exclusions_of, exclusive_slots, gpio_usage, shared_with, type GpioUse, type SharedLine, type SlotExclusion } from './Intelligence/board/derived.js';
 export { board_layer, describe_slot, describe_placement, type BoardLayer } from './Intelligence/board/layer.js';
+
+// Interrupt parent resolution
+export {
+    effective_interrupt_parent,
+    base_lookup,
+    overlay_lookup,
+    type InterruptParentInfo,
+    type NodeLookup,
+} from './Intelligence/interrupt_parent.js';
