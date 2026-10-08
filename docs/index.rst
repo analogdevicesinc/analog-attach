@@ -1,3 +1,5 @@
+Analog Attach
+=============
 
 Analog Attach is a VS Code extension for creating and editing Device Tree
 files (DTS) and Device Tree Overlay (DTSO) files with schema validation,
