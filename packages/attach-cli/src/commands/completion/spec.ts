@@ -18,6 +18,7 @@ import { LIST_KINDS } from "../list/command";
 // path completion, instead of the engine trying to enumerate the filesystem.
 export const FILES_DIRECTIVE = "__ATTACH_COMPLETE_FILES__";
 export const DIRS_DIRECTIVE = "__ATTACH_COMPLETE_DIRS__";
+export const NOSPACE_DIRECTIVE = "__ATTACH_COMPLETE_NOSPACE__";
 
 // "entry-points" is completion-only: `suggest navigate` with no node (the overlay's top-level targets).
 export type SuggestKind = "device-key" | "parent" | "navigate" | "entry-points" | "children" | "value";
@@ -26,9 +27,9 @@ export type ValueSource =
     | { kind: "file" }
     | { kind: "dir" }
     | { kind: "values"; values: readonly string[] }
-    // Fixed choices with a description each.
     | { kind: "choices"; choices: readonly { value: string; description: string }[] }
-    | { kind: "suggest"; suggest: SuggestKind };
+    | { kind: "suggest"; suggest: SuggestKind }
+    | { kind: "path"; roots: SuggestKind; children: SuggestKind };
 
 export interface CommandSpec {
     // How to complete positional arguments.
@@ -57,42 +58,44 @@ const CONFIG_GET_FIELDS: ValueSource = {
     values: CONFIG_REGISTRY.filter(spec => !spec.internal).map(spec => spec.toml),
 };
 
-const NAV: ValueSource = { kind: "suggest", suggest: "navigate" };
+const PATH_OVERLAY: ValueSource = { kind: "path", roots: "navigate", children: "children" };
+const PATH_TREE: ValueSource = { kind: "path", roots: "navigate", children: "children" };
 const VAL: ValueSource = { kind: "suggest", suggest: "value" };
+const PROPS: ValueSource = { kind: "suggest", suggest: "navigate" };
 
 export const COMPLETION_SPEC: Readonly<Record<string, CommandSpec>> = {
     add: {
         positional: { mode: "byIndex", sources: [{ kind: "suggest", suggest: "device-key" }] },
-        flags: { "--parent": { kind: "suggest", suggest: "parent" } },
+        flags: { "--parent": PATH_TREE },
     },
     read: {
-        positional: { mode: "byIndex", sources: [NAV, NAV] },
+        positional: { mode: "byIndex", sources: [PATH_OVERLAY, PROPS] },
     },
     update: {
-        positional: { mode: "byIndex", sources: [NAV, NAV], rest: VAL },
+        positional: { mode: "byIndex", sources: [PATH_TREE, PROPS], rest: VAL },
     },
     delete: {
-        positional: { mode: "byIndex", sources: [NAV, NAV] },
+        positional: { mode: "byIndex", sources: [PATH_OVERLAY, PROPS] },
     },
     move: {
-        positional: { mode: "byIndex", sources: [NAV, { kind: "suggest", suggest: "entry-points" }] },
+        positional: { mode: "byIndex", sources: [PATH_OVERLAY, PATH_TREE] },
     },
     rename: {
-        positional: { mode: "byIndex", sources: [NAV] },
+        positional: { mode: "byIndex", sources: [PATH_OVERLAY] },
     },
     enable: {
-        positional: { mode: "byIndex", sources: [NAV] },
+        positional: { mode: "byIndex", sources: [PATH_OVERLAY] },
     },
     disable: {
-        positional: { mode: "byIndex", sources: [NAV] },
+        positional: { mode: "byIndex", sources: [PATH_OVERLAY] },
     },
     list: {
         positional: {
             mode: "byIndex",
-            sources: [{
-                kind: "choices",
-                choices: LIST_KINDS.map(entry => ({ value: entry.kind, description: entry.summary })),
-            }],
+            sources: [
+                { kind: "choices", choices: LIST_KINDS.map(entry => ({ value: entry.kind, description: entry.summary })) },
+                PATH_TREE,
+            ],
         },
     },
     completion: {

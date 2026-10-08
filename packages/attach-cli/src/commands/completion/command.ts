@@ -1,7 +1,7 @@
 import { Command } from "commander";
 
 import type { LocalContext } from "../../context";
-import { FILES_DIRECTIVE, DIRS_DIRECTIVE } from "./spec";
+import { FILES_DIRECTIVE, DIRS_DIRECTIVE, NOSPACE_DIRECTIVE } from "./spec";
 
 // The completion scripts are thin stubs: on every TAB press they hand the
 // words typed so far to `attach-linux __complete` and render whatever it prints
@@ -30,23 +30,38 @@ _attach_linux_filedir() {
 }
 
 _attach_linux_complete() {
+    # Rebuild words from COMP_LINE so COMP_WORDBREAKS (@:=) doesn't split
+    # path tokens like spi0/adi,ad7124-8@2 into pieces.
+    local line_to_point="\${COMP_LINE:0:COMP_POINT}"
+    local -a words_arr
+    read -ra words_arr <<< "$line_to_point"
+    local n=\${#words_arr[@]}
+    # If the line ends in a space the cursor is on a new empty word.
     local cur
-    cur="\${COMP_WORDS[COMP_CWORD]}"
+    if [[ "$line_to_point" =~ [[:space:]]$ ]]; then
+        cur=""
+    else
+        cur="\${words_arr[$((n-1))]}"
+        n=$((n-1))
+    fi
+    # Drop the program name (words_arr[0]) and pass the rest as committed.
+    local -a committed=( "\${words_arr[@]:1:n-1}" )
 
     local IFS=$'\\n'
     local -a lines
-    lines=( $(attach-linux __complete -- "\${COMP_WORDS[@]:1:COMP_CWORD-1}" "$cur" 2>/dev/null) )
+    lines=( $(attach-linux __complete -- "\${committed[@]}" "$cur" 2>/dev/null) )
 
     case "\${lines[0]}" in
         ${FILES_DIRECTIVE}) _attach_linux_filedir; return ;;
         ${DIRS_DIRECTIVE})  _attach_linux_filedir -d; return ;;
     esac
 
-    # bash has no per-candidate descriptions; drop any "\\tdescription" tail.
-    # Multi-word candidates (update --with values) must be inserted quoted;
-    # zsh and fish quote on insertion by themselves. Skip when the user already
-    # opened a quote — readline closes it and a backslash-space inside would be
-    # literal. printf -v avoids a subshell fork per candidate (bash 3.1+).
+    local nospace=false
+    if [[ "\${lines[0]}" == "${NOSPACE_DIRECTIVE}" ]]; then
+        nospace=true
+        lines=( "\${lines[@]:1}" )
+    fi
+
     local -a values
     local line value
     for line in "\${lines[@]}"; do
@@ -56,7 +71,23 @@ _attach_linux_complete() {
         fi
         values+=( "$value" )
     done
+    # Trim candidates to match bash's COMP_WORDBREAKS-split current word.
+    # Without this, a candidate "spi0/adi,ad7124-8@2" would be inserted as
+    # "spi0/adi,ad7124-8@spi0/adi,ad7124-8@2" because bash thinks the word
+    # starts after the last "@".
+    local bash_cur="\${COMP_WORDS[COMP_CWORD]}"
+    if [[ "$bash_cur" != "$cur" && -n "$bash_cur" ]]; then
+        local prefix="\${cur%"$bash_cur"}"
+        local -a trimmed
+        for v in "\${values[@]}"; do
+            trimmed+=( "\${v#"$prefix"}" )
+        done
+        values=( "\${trimmed[@]}" )
+    fi
     COMPREPLY=( "\${values[@]}" )
+    if $nospace && type compopt &>/dev/null; then
+        compopt -o nospace
+    fi
 }
 
 complete -F _attach_linux_complete attach-linux
@@ -76,24 +107,37 @@ _attach-linux() {
     local cur
     cur="\${words[CURRENT]}"
 
-    # The slice is intentionally unquoted: a quoted empty range would inject a
-    # spurious empty argument (breaking command-name completion), whereas the
-    # words here never contain spaces.
+    # Build committed words as individually quoted arguments so @ and other
+    # glob characters in paths like spi0/adi,ad7124-8@2 are not expanded.
+    local -a committed
+    local i
+    for (( i=2; i < CURRENT; i++ )); do
+        committed+=( "\${words[i]}" )
+    done
     local -a raw
-    raw=( \${(f)"$(attach-linux __complete -- \${words[2,$((CURRENT-1))]} "$cur" 2>/dev/null)"} )
+    raw=( \${(f)"$(attach-linux __complete -- "\${committed[@]}" "$cur" 2>/dev/null)"} )
 
     case "\${raw[1]}" in
         ${FILES_DIRECTIVE}) _files; return ;;
         ${DIRS_DIRECTIVE})  _files -/; return ;;
     esac
 
-    # Each line is "value" or "value<TAB>description"; _describe wants "value:description".
+    local nospace=false
+    if [[ "\${raw[1]}" == "${NOSPACE_DIRECTIVE}" ]]; then
+        nospace=true
+        shift raw
+    fi
+
     local -a described
     local line
     for line in "\${raw[@]}"; do
         described+=( "\${line/$'\\t'/:}" )
     done
-    _describe -t attach-linux 'attach-linux' described
+    if $nospace; then
+        _describe -t attach-linux 'attach-linux' described -S ''
+    else
+        _describe -t attach-linux 'attach-linux' described
+    fi
 }
 
 # Works both ways: when autoloaded from $fpath the function is invoked inside a
@@ -127,6 +171,8 @@ function __attach_linux_complete
             case ${DIRS_DIRECTIVE}
                 __fish_complete_directories "$cur"
                 return
+            case ${NOSPACE_DIRECTIVE}
+                set -e out[1]
         end
     end
     printf '%s\\n' $out
