@@ -179,6 +179,9 @@ export function is_compat_index_stale(index: CompatIndex, linux: string, dtSchem
         return true;
     }
 
+    if (index.linux !== undefined && path.resolve(linux) !== path.resolve(index.linux)) { return true; }
+    if (index.dt_schema !== undefined && path.resolve(dtSchema) !== path.resolve(index.dt_schema)) { return true; }
+
     const bindings_folder = path.resolve(linux, "Documentation", "devicetree", "bindings");
     const latest_mtime = Math.max(get_latest_mtime(bindings_folder), get_latest_mtime(dtSchema));
 
@@ -419,17 +422,17 @@ export async function get_or_build_compat_index(
         if (linux === undefined || dtSchema === undefined) { return undefined; }
         log?.("compat-index.json not found, building...");
         const entries = await build_compat_index(linux, dtSchema);
-        const compat_index_path = save_compat_index(entries);
+        const compat_index_path = save_compat_index(entries, linux, dtSchema);
         log?.(`Written: ${compat_index_path}`);
-        return { generated_at: Date.now(), entries };
+        return { generated_at: Date.now(), linux, dt_schema: dtSchema, entries };
     }
 
     if (linux !== undefined && dtSchema !== undefined && is_compat_index_stale(index, linux, dtSchema)) {
         log?.("compat-index.json is stale, rebuilding...");
         const entries = await build_compat_index(linux, dtSchema);
-        const compat_index_path = save_compat_index(entries);
+        const compat_index_path = save_compat_index(entries, linux, dtSchema);
         log?.(`Written: ${compat_index_path}`);
-        return { generated_at: Date.now(), entries };
+        return { generated_at: Date.now(), linux, dt_schema: dtSchema, entries };
     }
 
     return index;

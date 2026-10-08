@@ -83,8 +83,8 @@ export function build_validate2_command(context_: LocalContext): Command {
             if (validation_json_path === undefined) {
                 const linux = config.linux;
                 if (linux === undefined) {
-                    if (context_.json) { input_error("Missing: linux (required to generate validation.json)"); return; }
-                    console.log("Missing: linux (required to generate validation.json)");
+                    if (context_.json) { input_error("Missing environment variable: ATTACH_LINUX (required to generate validation.json)"); return; }
+                    console.log("Missing environment variable: ATTACH_LINUX (required to generate validation.json)");
                     return;
                 }
 
