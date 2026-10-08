@@ -48,9 +48,11 @@ export interface CommandSpec {
 }
 
 const FILE: ValueSource = { kind: "file" };
-// Complete exactly the fields config-set accepts and config-get returns — the
-// settable (non-internal) registry fields, so this list never drifts from it.
-const CONFIG_FIELDS: ValueSource = {
+const CONFIG_SET_FIELDS: ValueSource = {
+    kind: "values",
+    values: CONFIG_REGISTRY.filter(spec => !spec.internal && spec.env === undefined).map(spec => spec.toml),
+};
+const CONFIG_GET_FIELDS: ValueSource = {
     kind: "values",
     values: CONFIG_REGISTRY.filter(spec => !spec.internal).map(spec => spec.toml),
 };
@@ -99,10 +101,10 @@ export const COMPLETION_SPEC: Readonly<Record<string, CommandSpec>> = {
         positional: { mode: "byIndex", sources: [{ kind: "values", values: ["bash", "fish", "zsh"] }] },
     },
     "config-get": {
-        positional: { mode: "all", source: CONFIG_FIELDS },
+        positional: { mode: "all", source: CONFIG_GET_FIELDS },
     },
     "config-set": {
-        positional: { mode: "byIndex", sources: [CONFIG_FIELDS, FILE] },
+        positional: { mode: "byIndex", sources: [CONFIG_SET_FIELDS, FILE] },
     },
 };
 

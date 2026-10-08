@@ -33,7 +33,7 @@ export function prepare_board_workfile(
     linux?: string,
 ): { text: string, warnings: string[] } | { error: string } {
     if (template.includes("{linux}") && linux === undefined) {
-        return { error: `preprocess-command uses {linux} but linux is not set (config-set linux <path>)` };
+        return { error: `preprocess-command uses {linux} but linux is not set (export ATTACH_LINUX=<path>)` };
     }
     const tool = template.trim().split(/\s+/)[0] ?? "";
     if (!is_tool_available(`${tool} --version`)) {
@@ -176,7 +176,7 @@ if (import.meta.vitest) {
 
     test("prepare_board_workfile — reports a missing linux tree and missing tool", () => {
         expect(prepare_board_workfile(board, overlay_path, DEFAULT_PREPROCESS_COMMAND))
-            .toStrictEqual({ error: "preprocess-command uses {linux} but linux is not set (config-set linux <path>)" });
+            .toStrictEqual({ error: "preprocess-command uses {linux} but linux is not set (export ATTACH_LINUX=<path>)" });
         expect(prepare_board_workfile(board, overlay_path, "no-such-preprocessor -o {output} {input}"))
             .toStrictEqual({ error: `no-such-preprocessor not found on PATH (needed to preprocess ${overlay_path})` });
     });

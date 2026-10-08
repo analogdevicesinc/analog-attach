@@ -4,6 +4,7 @@ import { parse } from "smol-toml";
 import { DeviceTree, type BoardDescription } from "attach-lib";
 
 import { load_board } from "./board";
+import { getBundledDtSchemaPath } from "./commands/skill/utilities";
 
 export const DEFAULT_BUILD_COMMAND = "dtc -@ -I dts -O dtb -o {output} {input}";
 // Mirrors kbuild's dtc_cpp_flags; {linux} is the configured Linux tree.
@@ -40,20 +41,13 @@ export interface FieldSpec {
     default?: string;
     /** Internal fields are load/save-able but not exposed by config-set or config-get. */
     internal?: boolean;
-    /**
-     * Optional structural validation, returning an error message or undefined.
-     * Run both when the field is set (config-set) and when it is read
-     * (check_config): config.toml is a plain file that can be edited or grow
-     * stale out from under the tool, so a value that was valid at write time
-     * must be re-checked at read time.
-     */
+    /** Environment variable name. When set, the value comes from `process.env` and config.toml is ignored. */
+    env?: string;
+    /** Fallback function called when `env` is unset (e.g. bundled dt-schema). */
+    fallback?: () => string | undefined;
+    /** Allowed values — config-set validates against these. */
+    options?: readonly string[];
     validate?: (value: string) => string | undefined;
-    /**
-     * Optional parse hook. When present, `check_config` calls it instead of
-     * `validate` and, on success, stores the result in `ParsedConfig` under the
-     * field's key. Returns the parsed value on success, or an error string.
-     * `config-set` uses it only to validate (the parsed value is discarded).
-     */
     parse?: (value: string) => unknown | string;
 }
 
@@ -63,6 +57,7 @@ export const CONFIG_REGISTRY: readonly FieldSpec[] = [
         key: "linux",
         type: "path",
         required: true,
+        env: "ATTACH_LINUX",
         description: "Path to Linux kernel source tree",
         validate: (value) =>
             fs.existsSync(path.join(value, "Documentation", "devicetree", "bindings"))
@@ -74,6 +69,11 @@ export const CONFIG_REGISTRY: readonly FieldSpec[] = [
         key: "dtSchema",
         type: "path",
         required: true,
+        env: "ATTACH_DT_SCHEMA",
+        fallback: () => {
+            const bundled = getBundledDtSchemaPath();
+            return fs.existsSync(path.join(bundled, "dtschema", "schemas")) ? bundled : undefined;
+        },
         description: "Path to dt-schema repository",
         validate: (value) =>
             fs.existsSync(path.join(value, "dtschema", "schemas"))
@@ -85,6 +85,7 @@ export const CONFIG_REGISTRY: readonly FieldSpec[] = [
         key: "context",
         type: "path",
         required: true,
+        env: "ATTACH_CONTEXT",
         description: "Path to target base DTS file",
         parse: (value) => {
             if (!fs.existsSync(value)) { return `path does not exist: ${value}`; }
@@ -180,6 +181,8 @@ export function config_field_spec(key: keyof AttachConfig): FieldSpec {
 
 export interface CompatIndex {
     generated_at: number;
+    linux?: string;
+    dt_schema?: string;
     entries: Record<string, string>;
 }
 
@@ -194,18 +197,19 @@ export function load_compat_index(): CompatIndex | undefined {
     return JSON.parse(raw) as CompatIndex;
 }
 
-export function save_compat_index(entries: Record<string, string>): string {
+export function save_compat_index(entries: Record<string, string>, linux?: string, dt_schema?: string): string {
     const directory = path.join(process.cwd(), ".attach-linux");
     fs.mkdirSync(directory, { recursive: true });
 
     const index_path = path.join(directory, "compat-index.json");
-    const index: CompatIndex = { generated_at: Date.now(), entries };
+    const index: CompatIndex = { generated_at: Date.now(), linux, dt_schema, entries };
     fs.writeFileSync(index_path, JSON.stringify(index, undefined, 2));
 
     return index_path;
 }
 
-export function load_config(): AttachConfig | undefined {
+/** Load only the config.toml file, without env var overlay. Used by save_config. */
+export function load_config_file(): AttachConfig | undefined {
     const config_path = path.join(process.cwd(), ".attach-linux", "config.toml");
 
     if (!fs.existsSync(config_path)) {
@@ -225,16 +229,81 @@ export function load_config(): AttachConfig | undefined {
     return config;
 }
 
+export interface ConfigFromSources {
+    config: AttachConfig;
+    ignored: { toml: string; value: string; env: string }[];
+}
+
+/** Build the effective config from a TOML record and the process environment. */
+export function config_from_sources(
+    toml: Record<string, unknown>,
+    environment: Record<string, string | undefined>,
+): ConfigFromSources {
+    const config: AttachConfig = {};
+    const ignored: ConfigFromSources["ignored"] = [];
+
+    for (const spec of CONFIG_REGISTRY) {
+        if (spec.env === undefined) {
+            const value = toml[spec.toml];
+            if (typeof value === "string") {
+                config[spec.key] = value;
+            }
+            continue;
+        }
+        const env_value = environment[spec.env];
+        if (env_value !== undefined && env_value !== "") {
+            config[spec.key] = path.resolve(env_value);
+            const toml_value = toml[spec.toml];
+            if (typeof toml_value === "string") {
+                ignored.push({ toml: spec.toml, value: toml_value, env: spec.env });
+            }
+            continue;
+        }
+        const fallback_value = spec.fallback?.();
+        if (fallback_value !== undefined) {
+            config[spec.key] = fallback_value;
+        }
+    }
+    return { config, ignored };
+}
+
+let legacy_warned = false;
+
+/** Load config from file + env vars. The main entry point for commands. */
+export function load_config(): AttachConfig | undefined {
+    const config_path = path.join(process.cwd(), ".attach-linux", "config.toml");
+
+    let toml_record: Record<string, unknown> = {};
+    if (fs.existsSync(config_path)) {
+        toml_record = parse(fs.readFileSync(config_path, "utf8")) as Record<string, unknown>;
+    }
+
+    const { config, ignored } = config_from_sources(toml_record, process.env);
+
+    if (!legacy_warned && ignored.length > 0) {
+        legacy_warned = true;
+        for (const { toml, value, env } of ignored) {
+            console.error(`config.toml: ignoring ${toml} = ${JSON.stringify(value)}; it is read from $${env} (export ${env}=${JSON.stringify(value)})`);
+        }
+    }
+
+    const has_any = Object.values(config).some(v => v !== undefined);
+    if (!has_any && !fs.existsSync(config_path)) { return undefined; }
+    return config;
+}
+
+/** Save config fields, skipping env-sourced fields (they disappear from config.toml). */
 export function save_config(fields: Partial<AttachConfig>): void {
     const directory = path.join(process.cwd(), ".attach-linux");
     fs.mkdirSync(directory, { recursive: true });
 
     const config_path = path.join(directory, "config.toml");
-    const existing = load_config() ?? {};
+    const existing = load_config_file() ?? {};
     const merged = { ...existing, ...fields };
 
     let content = "";
     for (const spec of CONFIG_REGISTRY) {
+        if (spec.env !== undefined) { continue; }
         const value = merged[spec.key];
         if (value !== undefined) {
             content += `${spec.toml} = ${JSON.stringify(value)}\n`;
@@ -311,14 +380,34 @@ export function check_config<K extends keyof AttachConfig>(
  * resolve_config and the human-only commands all report identically.
  */
 export function check_failure_message(failure: CheckFailure): { human: string; json: string } {
+    const spec = CONFIG_REGISTRY.find(s => s.toml === failure.toml);
+    const env_name = spec?.env;
     switch (failure.kind) {
         case "missing-field": {
+            if (env_name !== undefined) {
+                return {
+                    human: `Missing environment variable: ${env_name}`,
+                    json: `Missing environment variable: ${env_name}`,
+                };
+            }
             return { human: `Missing config: ${failure.toml}`, json: `missing config: ${failure.toml}` };
         }
         case "missing-path": {
+            if (env_name !== undefined) {
+                return {
+                    human: `Invalid ${env_name}: ${failure.path} (path does not exist)`,
+                    json: `Invalid ${env_name}: ${failure.path} (path does not exist)`,
+                };
+            }
             return { human: `Missing: ${failure.path}`, json: `Missing: ${failure.path}` };
         }
         case "invalid": {
+            if (env_name !== undefined) {
+                return {
+                    human: `Invalid ${env_name}: ${failure.message}`,
+                    json: `Invalid ${env_name}: ${failure.message}`,
+                };
+            }
             return { human: `Invalid ${failure.toml}: ${failure.message}`, json: `invalid config: ${failure.toml}: ${failure.message}` };
         }
     }
@@ -363,12 +452,67 @@ if (import.meta.vitest) {
     });
 
     test("check_config - runs the field validator at read time", () => {
-        // cwd exists but is not a kernel tree, so linux's validator rejects it —
-        // the same check config-set runs, now applied when the value is read.
         const result = check_config({ linux: process.cwd() }, ["linux"]);
         expect(result.ok).toBe(false);
         if (result.ok || result.kind !== "invalid") { throw new Error("expected invalid"); }
         expect(result.field).toBe("linux");
         expect(result.message).toContain("Documentation/devicetree/bindings");
+    });
+
+    test("config_from_sources - env wins over TOML", () => {
+        const toml = { linux: "/old" };
+        const env = { ATTACH_LINUX: "/new" };
+        const { config, ignored } = config_from_sources(toml, env);
+        expect(config.linux).toBe("/new");
+        expect(ignored).toHaveLength(1);
+        expect(ignored[0]!.toml).toBe("linux");
+    });
+
+    test("config_from_sources - empty env counts as unset", () => {
+        const { config } = config_from_sources({}, { ATTACH_LINUX: "" });
+        expect(config.linux).toBeUndefined();
+    });
+
+    test("config_from_sources - TOML values are ignored and reported for env fields", () => {
+        const { config, ignored } = config_from_sources(
+            { linux: "/old", overlay: "/my.dtso" },
+            { ATTACH_LINUX: "/new" },
+        );
+        expect(config.linux).toBe("/new");
+        expect(config.overlay).toBe("/my.dtso");
+        expect(ignored).toHaveLength(1);
+        expect(ignored[0]!.env).toBe("ATTACH_LINUX");
+    });
+
+    test("config_from_sources - relative env paths are resolved", () => {
+        const { config } = config_from_sources({}, { ATTACH_CONTEXT: "../x.dts" });
+        expect(config.context).toBe(path.resolve("../x.dts"));
+    });
+
+    test("save_config never writes env keys", () => {
+        const original_cwd = process.cwd();
+        const tmpdir = fs.mkdtempSync(path.join(require("node:os").tmpdir(), "attach-cfg-"));
+        try {
+            process.chdir(tmpdir);
+            fs.mkdirSync(".attach-linux", { recursive: true });
+            save_config({ linux: "/ignored", overlay: "/my.dtso" });
+            const content = fs.readFileSync(path.join(tmpdir, ".attach-linux", "config.toml"), "utf8");
+            expect(content).not.toContain("linux");
+            expect(content).toContain("overlay");
+        } finally {
+            process.chdir(original_cwd);
+            fs.rmSync(tmpdir, { recursive: true });
+        }
+    });
+
+    test("check_failure_message - env fields use env var name", () => {
+        const message = check_failure_message({ kind: "missing-field", toml: "linux" });
+        expect(message.human).toBe("Missing environment variable: ATTACH_LINUX");
+        expect(message.json).toBe("Missing environment variable: ATTACH_LINUX");
+    });
+
+    test("check_failure_message - non-env fields use toml name", () => {
+        const message = check_failure_message({ kind: "missing-field", toml: "overlay" });
+        expect(message.human).toBe("Missing config: overlay");
     });
 }

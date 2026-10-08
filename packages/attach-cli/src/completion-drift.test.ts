@@ -11,10 +11,12 @@ import { CONFIG_REGISTRY } from "./config";
 import * as suggest from "./commands/suggest/command";
 import { INTELLIGENCE_KINDS } from "./commands/list-intelligence/command";
 
-// config-set/config-get complete exactly the settable (non-internal) registry
-// fields. Derived from the registry so this test tracks it automatically — if a
-// field is added, both the completion spec and this expectation move together.
-const SETTABLE_FIELD_NAMES = CONFIG_REGISTRY
+const CONFIG_SET_FIELD_NAMES = CONFIG_REGISTRY
+    .filter(spec => !spec.internal && spec.env === undefined)
+    .map(spec => spec.toml)
+    .sort();
+
+const CONFIG_GET_FIELD_NAMES = CONFIG_REGISTRY
     .filter(spec => !spec.internal)
     .map(spec => spec.toml)
     .sort();
@@ -112,12 +114,12 @@ describe("__complete engine", () => {
     });
 
     test("config-set completes every settable field then a file path", async () => {
-        expect(values(await complete(["config-set", ""])).sort()).toEqual(SETTABLE_FIELD_NAMES);
-        expect(await complete(["config-set", "linux", ""])).toEqual([FILES_DIRECTIVE]);
+        expect(values(await complete(["config-set", ""])).sort()).toEqual(CONFIG_SET_FIELD_NAMES);
+        expect(await complete(["config-set", "overlay", ""])).toEqual([FILES_DIRECTIVE]);
     });
 
-    test("config-get completes every settable field", async () => {
-        expect(values(await complete(["config-get", ""])).sort()).toEqual(SETTABLE_FIELD_NAMES);
+    test("config-get completes every visible field", async () => {
+        expect(values(await complete(["config-get", ""])).sort()).toEqual(CONFIG_GET_FIELD_NAMES);
     });
 
     test("a free-value flag (no spec entry) yields no candidates", async () => {

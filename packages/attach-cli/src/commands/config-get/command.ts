@@ -6,19 +6,10 @@ import { load_config, CONFIG_REGISTRY, type AttachConfig } from "../../config";
 import { respond } from "../../protocol/output";
 import type { Config, ToolConfigResponse } from "../../protocol/types";
 
-const SETTABLE_SPECS = CONFIG_REGISTRY.filter((spec) => !spec.internal);
-
-const CONFIG_FIELDS: Config[] = SETTABLE_SPECS.map((spec) => ({
-    field_name: spec.toml,
-    description: spec.description,
-    type: spec.type,
-    required: spec.required,
-    default: spec.default ?? null,
-    value: null,
-}));
+const VISIBLE_SPECS = CONFIG_REGISTRY.filter((spec) => !spec.internal);
 
 const FIELD_TO_CONFIG_KEY: Record<string, keyof AttachConfig> = Object.fromEntries(
-    SETTABLE_SPECS.map((spec) => [spec.toml, spec.key]),
+    VISIBLE_SPECS.map((spec) => [spec.toml, spec.key]),
 );
 
 export function build_config_get_command(context: LocalContext): Command {
@@ -28,15 +19,24 @@ export function build_config_get_command(context: LocalContext): Command {
         .action(async (fields: string[]) => {
             const current = load_config() ?? {};
 
-            let configs = CONFIG_FIELDS;
+            let specs = VISIBLE_SPECS;
             if (fields.length > 0) {
-                configs = configs.filter(c => fields.includes(c.field_name));
+                specs = specs.filter(s => fields.includes(s.toml));
             }
 
-            const result: Config[] = configs.map(c => {
-                const key = FIELD_TO_CONFIG_KEY[c.field_name];
-                const value = key === undefined ? undefined : current[key];
-                return { ...c, value: value ?? null };
+            const result: Config[] = specs.map(spec => {
+                const key = FIELD_TO_CONFIG_KEY[spec.toml];
+                const value = key !== undefined ? current[key] : undefined;
+                const category = spec.env === undefined ? undefined : "environment";
+                return {
+                    field_name: spec.toml,
+                    category,
+                    description: spec.description,
+                    type: spec.options !== undefined ? { options: [...spec.options] } : spec.type,
+                    required: spec.required,
+                    default: spec.default ?? null,
+                    value: value ?? null,
+                };
             });
 
             const response: ToolConfigResponse = {
@@ -52,7 +52,9 @@ export function build_config_get_command(context: LocalContext): Command {
                 for (const c of result) {
                     const display = c.value === null ? "(not set)" : c.value;
                     const request = c.required ? " [required]" : "";
-                    console.log(`${c.field_name}${request}: ${display}`);
+                    const spec = VISIBLE_SPECS.find(s => s.toml === c.field_name);
+                    const env_suffix = spec?.env !== undefined ? ` ($${spec.env})` : "";
+                    console.log(`${c.field_name}${request}${env_suffix}: ${display}`);
                 }
             }
         });

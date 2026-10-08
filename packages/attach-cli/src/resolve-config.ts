@@ -4,7 +4,7 @@ import { input_error } from "./protocol/output";
 
 /**
  * Load the config and verify the required fields, emitting the standard
- * diagnostics (no config file / missing field / missing path) and returning
+ * diagnostics (missing env var / missing field / missing path) and returning
  * undefined on any failure. On success returns the narrowed required values,
  * the full config, and the parsed representations of `context` and `board`
  * (when those fields were among the required set).
@@ -13,12 +13,7 @@ export function resolve_config<K extends keyof AttachConfig>(
     context: LocalContext,
     required: readonly K[],
 ): { values: Checked<K>; config: AttachConfig; parsed: ParsedConfig } | undefined {
-    const config = load_config();
-    if (config === undefined) {
-        if (context.json) { input_error("no config.toml (run config-set)"); }
-        else { console.log("No config.toml (run config-set)"); }
-        return undefined;
-    }
+    const config = load_config() ?? {};
 
     const checked = check_config(config, required);
     if (!checked.ok) {
