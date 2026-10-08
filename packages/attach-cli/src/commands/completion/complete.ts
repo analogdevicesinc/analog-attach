@@ -14,7 +14,8 @@ import { buildApp } from "../../app";
 import { buildContext } from "../../context";
 import { run_internal_list } from "../list/internal";
 import type { Suggestion } from "../../protocol/types";
-import { COMPLETION_SPEC, FILES_DIRECTIVE, DIRS_DIRECTIVE, NOSPACE_DIRECTIVE, type CommandSpec, type ValueSource, type SuggestKind } from "./spec";
+import { COMPLETION_SPEC, LIST_SUBKIND_SPECS, FILES_DIRECTIVE, DIRS_DIRECTIVE, NOSPACE_DIRECTIVE, type CommandSpec, type ValueSource, type SuggestKind } from "./spec";
+import { LIST_KINDS } from "../list/command";
 
 const GLOBAL_FLAGS: readonly Candidate[] = [
     { value: "--json", description: "Output as JSON" },
@@ -96,7 +97,27 @@ export async function run_complete(words: string[]): Promise<void> {
 
     const cmd = app.commands.find(c => c.name() === sub);
     if (cmd === undefined) { return; }
-    const spec = COMPLETION_SPEC[sub];
+    const raw_spec = COMPLETION_SPEC[sub];
+
+    // For "list", resolve the spec dynamically based on the subkind.
+    let spec: CommandSpec | undefined;
+    if (raw_spec === "dynamic") {
+        const after_sub = committed.slice(subIndex + 1).filter(w => !w.startsWith("-"));
+        const subkind = after_sub[0];
+        if (subkind === undefined || prefix === subkind) {
+            // Still completing the subkind itself.
+            const choices = LIST_KINDS.map(entry => ({ value: entry.kind, description: entry.summary }));
+            emit(filter_by_prefix(choices, prefix));
+            return;
+        }
+        const subkind_spec = LIST_SUBKIND_SPECS[subkind];
+        if (subkind_spec === undefined) { return; }
+        spec = subkind_spec;
+        // Shift positionals: the subkind word doesn't count as a positional for the subkind spec.
+        subIndex += 1;
+    } else {
+        spec = raw_spec;
+    }
 
     // Walk the words after the subcommand, collecting positional arguments while
     // skipping flags and their values. This replaces the per-shell word walkers.

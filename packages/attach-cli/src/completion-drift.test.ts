@@ -64,7 +64,7 @@ describe("completion spec stays in sync with the command registry", () => {
     test("every flag named in the spec exists on its command", () => {
         const app = buildApp(buildContext(false));
         for (const [name, spec] of Object.entries(COMPLETION_SPEC)) {
-            if (spec.flags === undefined) { continue; }
+            if (typeof spec === "string" || spec.flags === undefined) { continue; }
             const cmd = app.commands.find(c => c.name() === name)!;
             const longs = new Set(cmd.options.map(o => o.long));
             for (const flag of Object.keys(spec.flags)) {
