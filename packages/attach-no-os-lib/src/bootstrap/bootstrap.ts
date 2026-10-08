@@ -506,6 +506,13 @@ function next_step(workfile: Workfile, externs: ExternIndex): Step | undefined {
 				continue;
 			}
 
+			// A list's count has exactly one value once the list is set: its length.
+			const list = node.properties.find(candidate => candidate._t === "IncludeProperty" && candidate.count === property.name);
+			const length = list === undefined ? undefined : list_length(list.value);
+			if (length !== undefined) {
+				return { kind: "fill", node: name, property: property.name, value: length, from: "only value" };
+			}
+
 			const filled = fill_value(effective);
 			if (filled !== undefined) {
 				return { kind: "fill", node: name, property: property.name, ...filled };

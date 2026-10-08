@@ -634,6 +634,18 @@ describe('the chip-select', () => {
         expect(report.value.deleted).toEqual(['test_gpio_pin']);
     });
 
+    test('a list the user set gets its count filled in', () => {
+        const workfile = workfile_with('test_sensor', 'otherboard', 'othersoc');
+        expectOk(bootstrap(workfile));
+        add(workfile, 'second', 'test_sensor');
+        expectOk(bootstrap(workfile));
+        add(workfile, 'my_pin', 'test_gpio_pin');
+        expectOk(set_value(workfile, 'test_spi_device_1', 'cs_gpio', 'my_pin'));
+
+        expectOk(bootstrap(workfile));
+        expect(stored(workfile)['test_spi_device_1']?.cs_gpio_num).toBe(1);
+    });
+
     test('a device that already has a chip-select is left alone', () => {
         const workfile = workfile_with('test_sensor');
         expectOk(bootstrap(workfile));
