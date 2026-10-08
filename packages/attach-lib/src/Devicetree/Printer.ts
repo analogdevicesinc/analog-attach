@@ -43,11 +43,57 @@ export function print_dts(document: DTS, metadata?: DTMetadata): string {
   return out.join("");
 }
 
-export function print_dto(document: DTO, metadata?: DTMetadata): string {
+export type OverlaySyntax = "fragment" | "label";
+
+export interface DtoPrintOptions {
+  syntax?: OverlaySyntax;
+}
+
+export function print_dto(document: DTO, metadata?: DTMetadata, options?: DtoPrintOptions): string {
   const indent = "\t";
+  const syntax = options?.syntax ?? "fragment";
   const out: string[] = [];
 
-  out.push("/dts-v1/;\n", "/plugin/;\n", print_node(document.root, indent, 0, '/'));
+  out.push("/dts-v1/;\n", "/plugin/;\n");
+
+  if (syntax === "label") {
+    const root = document.root;
+    const root_props = root.properties;
+    const root_labels = root.labels;
+    const non_fragment_children: DTNode[] = [];
+    const label_bodies: string[] = [];
+
+    for (const child of root.children) {
+      const sugar = sugar_fragment(child);
+      if (sugar === undefined) {
+        non_fragment_children.push(child);
+      } else {
+        label_bodies.push(print_label_fragment(sugar.target, sugar.overlay_children, sugar.overlay_props, indent));
+      }
+    }
+
+    if (root_props.length > 0 || root_labels.length > 0 || non_fragment_children.length > 0) {
+      let root_block = "/ {\n";
+      for (const property of root_props) {
+        root_block += print_property(property, indent, 1);
+      }
+      for (const child of non_fragment_children) {
+        root_block += print_node(child, indent, 1, '/');
+      }
+      root_block += "};\n";
+      out.push(root_block);
+    }
+
+    for (const body of label_bodies) {
+      out.push(body);
+    }
+
+    if (label_bodies.length === 0 && root_props.length === 0 && non_fragment_children.length === 0) {
+      out.push("/ {\n};\n");
+    }
+  } else {
+    out.push(print_node(document.root, indent, 0, '/'));
+  }
 
   if (metadata !== undefined) {
     const serialized_metadata = serialize_metadata(metadata);
@@ -55,6 +101,67 @@ export function print_dto(document: DTO, metadata?: DTMetadata): string {
   }
 
   return out.join("");
+}
+
+interface SugarableFragment {
+  target: string;
+  target_kind: "label" | "path";
+  overlay_children: DTNode[];
+  overlay_props: DTProperty[];
+}
+
+function sugar_fragment(child: DTNode): SugarableFragment | undefined {
+  if (!child.name.startsWith("fragment")) { return undefined; }
+  if (child.labels.length > 0) { return undefined; }
+
+  const overlay_child = child.children.find(c => c.name === "__overlay__");
+  if (overlay_child === undefined) { return undefined; }
+  if (overlay_child.labels.length > 0) { return undefined; }
+  if (child.children.length !== 1) { return undefined; }
+
+  const target_prop = child.properties.find(p => p.name === "target");
+  if (target_prop !== undefined && child.properties.length === 1 && !is_dt_flag(target_prop.value)) {
+    const first = target_prop.value[0];
+    if (first?.kind === "array" && first.elements.length === 1) {
+      const element = first.elements[0];
+      if (element !== undefined && element.kind === "label") {
+        return {
+          target: (element as DTLabel).name,
+          target_kind: "label",
+          overlay_children: overlay_child.children,
+          overlay_props: overlay_child.properties,
+        };
+      }
+    }
+  }
+
+  const target_path_prop = child.properties.find(p => p.name === "target-path");
+  if (target_path_prop !== undefined && child.properties.length === 1 && !is_dt_flag(target_path_prop.value)) {
+    const first = target_path_prop.value[0];
+    if (first?.kind === "string") {
+      return {
+        target: first.value,
+        target_kind: "path",
+        overlay_children: overlay_child.children,
+        overlay_props: overlay_child.properties,
+      };
+    }
+  }
+
+  return undefined;
+}
+
+function print_label_fragment(target: string, children: DTNode[], props: DTProperty[], indent: string): string {
+  const ref = target.startsWith("/") ? `&{${target}}` : `&${target}`;
+  let out = `${ref} {\n`;
+  for (const property of props) {
+    out += print_property(property, indent, 1);
+  }
+  for (const child of children) {
+    out += print_node(child, indent, 1, target);
+  }
+  out += "};\n";
+  return out;
 }
 
 function serialize_metadata(metadata: DTMetadata): string {

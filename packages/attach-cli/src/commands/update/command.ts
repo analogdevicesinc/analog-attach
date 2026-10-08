@@ -24,7 +24,7 @@ import * as fs from "node:fs";
 
 import type { LocalContext } from "../../context";
 import { resolve_config } from "../../resolve-config";
-import { load_trees, parse_property_reference, resolve_write_target, swallowed_positional_message } from "../../utilities";
+import { load_trees, parse_property_reference, resolve_write_target, swallowed_positional_message, overlay_print_options } from "../../utilities";
 import { resolve_node_binding } from "../../binding-resolution";
 import { respond, respond_fail, input_error, diagnostic } from "../../protocol/output";
 
@@ -332,7 +332,7 @@ export function build_update_command(context_: LocalContext): Command {
 
             place_property(overlay, target_reference, found, is_base_target, built, property_name);
 
-            const printed = overlay.print();
+            const printed = overlay.print(overlay_print_options(resolved.config));
             const test_parse = DeviceTreeOverlay.new_from_string(printed, base_dt);
 
             if (typeof test_parse === "string") {

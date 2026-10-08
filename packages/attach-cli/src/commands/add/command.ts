@@ -1,11 +1,9 @@
 import { Command } from "commander";
 import { DeviceTree, DeviceTreeOverlay, NodeBuilder, PropertyBuilder, type DTProperty } from "attach-lib";
 
-import * as fs from 'node:fs';
-
 import type { LocalContext } from "../../context";
 import { load_config, check_config, check_failure_message } from "../../config";
-import { find_binding, load_trees, resolve_node_identifier } from "../../utilities";
+import { find_binding, load_trees, resolve_node_identifier, write_overlay } from "../../utilities";
 import { resolve_config } from "../../resolve-config";
 import { respond, respond_fail, input_error, diagnostic } from "../../protocol/output";
 import type { AddResponse } from "../../protocol/types";
@@ -41,8 +39,8 @@ export function build_add_command(context_: LocalContext): Command {
                     return;
                 }
                 created_message = workfile.message;
-                if (!context_.json) { console.log(created_message); }
-                else { diagnostic(created_message); }
+                if (context_.json) { diagnostic(created_message); }
+                else { console.log(created_message); }
             }
 
             const resolved = resolve_config(context_, ["linux", "dtSchema", "context", "overlay"]);
@@ -89,7 +87,7 @@ export function build_add_command(context_: LocalContext): Command {
                     return;
                 }
                 case "added": {
-                    fs.writeFileSync(input, overlay.print());
+                    write_overlay(input, overlay, resolved.config);
                     const added_message = `Added ${node_name}`;
                     const full_message = created_message !== undefined
                         ? `${created_message}; ${added_message}`

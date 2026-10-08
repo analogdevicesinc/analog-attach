@@ -711,8 +711,8 @@ export class DeviceTreeOverlay {
         return true;
     }
 
-    public print(): string {
-        return print_dto(this.overlay);
+    public print(options?: import("./Printer.js").DtoPrintOptions): string {
+        return print_dto(this.overlay, undefined, options);
     }
 }
 
@@ -856,5 +856,49 @@ ${overlay_with_imu.replace("/dts-v1/;\n/plugin/;\n", "")}`);
         expect(printed).toContain(`compatible = "brcm,bcm2711";`);
         expect(printed).toContain("fragment@0");
         expect(typeof DeviceTreeOverlay.new_from_string(printed)).not.toBe("string");
+    });
+
+    test("print label mode — label target becomes &spi0 {}", () => {
+        const base = DeviceTree.new_from_string(`/dts-v1/;\n/ {\n\tsoc {\n\t\tspi0: spi@7e204000 {\n\t\t};\n\t};\n};`);
+        if (typeof base === "string") { throw new TypeError(base); }
+        const overlay = DeviceTreeOverlay.new_from_string(`/dts-v1/;\n/plugin/;\n\n&spi0 {\n\tadc@0 {\n\t\treg = <0>;\n\t};\n};`, base);
+        if (typeof overlay === "string") { throw new TypeError(overlay); }
+        const printed = overlay.print({ syntax: "label" });
+        expect(printed).toContain("&spi0 {");
+        expect(printed).not.toContain("fragment@0");
+        expect(printed).not.toContain("__overlay__");
+        expect(printed).toContain("adc@0");
+    });
+
+    test("print label mode — target-path becomes &{/path}", () => {
+        const overlay = DeviceTreeOverlay.new_from_string(`/dts-v1/;\n/plugin/;\n\n&{/} {\n\tmy-node {\n\t};\n};`);
+        if (typeof overlay === "string") { throw new TypeError(overlay); }
+        const printed = overlay.print({ syntax: "label" });
+        expect(printed).toContain("&{/} {");
+        expect(printed).not.toContain("fragment");
+    });
+
+    test("print label mode — round trip: parse(print(label)) ≡ parse(print(fragment))", () => {
+        const base = DeviceTree.new_from_string(`/dts-v1/;\n/ {\n\tsoc {\n\t\tspi0: spi@7e204000 {\n\t\t};\n\t};\n};`);
+        if (typeof base === "string") { throw new TypeError(base); }
+        const overlay = DeviceTreeOverlay.new_from_string(`/dts-v1/;\n/plugin/;\n\n&spi0 {\n\tadc@0 {\n\t\treg = <0>;\n\t\tcompatible = "adi,ad7124-8";\n\t};\n};`, base);
+        if (typeof overlay === "string") { throw new TypeError(overlay); }
+
+        const fragment_text = overlay.print({ syntax: "fragment" });
+        const label_text = overlay.print({ syntax: "label" });
+
+        const re_fragment = DeviceTreeOverlay.new_from_string(fragment_text, base);
+        const re_label = DeviceTreeOverlay.new_from_string(label_text, base);
+        if (typeof re_fragment === "string") { throw new TypeError(re_fragment); }
+        if (typeof re_label === "string") { throw new TypeError(re_label); }
+
+        expect(re_label.print({ syntax: "fragment" })).toBe(re_fragment.print({ syntax: "fragment" }));
+    });
+
+    test("print label mode — empty overlay prints / {};", () => {
+        const overlay = DeviceTreeOverlay.new_from_string(`/dts-v1/;\n/plugin/;\n\n/ {\n};`);
+        if (typeof overlay === "string") { throw new TypeError(overlay); }
+        const printed = overlay.print({ syntax: "label" });
+        expect(printed).toContain("/ {\n};");
     });
 }

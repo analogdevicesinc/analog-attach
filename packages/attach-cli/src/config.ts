@@ -16,6 +16,7 @@ export interface AttachConfig {
     context?: string;
     overlay?: string;
     board?: string;
+    overlaySyntax?: string;
     validationJson?: string;
     buildCommand?: string;
     preprocessCommand?: string;
@@ -111,6 +112,14 @@ export const CONFIG_REGISTRY: readonly FieldSpec[] = [
             const board = load_board(value);
             return board;
         },
+    },
+    {
+        toml: "overlay-syntax",
+        key: "overlaySyntax",
+        type: "string",
+        required: false,
+        options: ["fragment", "label"],
+        description: "Output syntax for the overlay file: fragment (default) or label (&spi0 { … })",
     },
     {
         toml: "validation-json",
@@ -250,9 +259,9 @@ export function config_from_sources(
             }
             continue;
         }
-        const env_value = environment[spec.env];
-        if (env_value !== undefined && env_value !== "") {
-            config[spec.key] = path.resolve(env_value);
+        const environment_value = environment[spec.env];
+        if (environment_value !== undefined && environment_value !== "") {
+            config[spec.key] = path.resolve(environment_value);
             const toml_value = toml[spec.toml];
             if (typeof toml_value === "string") {
                 ignored.push({ toml: spec.toml, value: toml_value, env: spec.env });
@@ -418,7 +427,7 @@ if (import.meta.vitest) {
 
     test("CONFIG_REGISTRY covers every AttachConfig key exactly once", () => {
         const keys: (keyof AttachConfig)[] = [
-            "linux", "dtSchema", "context", "overlay", "board", "validationJson",
+            "linux", "dtSchema", "context", "overlay", "board", "overlaySyntax", "validationJson",
             "buildCommand", "preprocessCommand", "overlayCompiled", "deployIp", "deployUser", "deployPassword",
         ];
         expect(CONFIG_REGISTRY.length).toBe(keys.length);

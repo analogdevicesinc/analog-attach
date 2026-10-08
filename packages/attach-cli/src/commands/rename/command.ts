@@ -5,7 +5,7 @@ import * as fs from 'node:fs';
 
 import type { LocalContext } from "../../context";
 import { resolve_config } from "../../resolve-config";
-import { load_trees, resolve_node_identifier, split_property_reference } from "../../utilities";
+import { load_trees, resolve_node_identifier, split_property_reference, write_overlay } from "../../utilities";
 import { respond, respond_fail, input_error } from "../../protocol/output";
 
 export function build_rename_command(context_: LocalContext): Command {
@@ -36,7 +36,7 @@ export function build_rename_command(context_: LocalContext): Command {
             if (context_.json) {
                 switch (result) {
                     case "renamed": {
-                        fs.writeFileSync(input, overlay.print());
+                        write_overlay(input, overlay, resolved.config);
                         respond({ ok: true, message: `Renamed ${identifier} to ${to}`, severity: "info" });
                         return;
                     }
@@ -76,7 +76,7 @@ export function build_rename_command(context_: LocalContext): Command {
                         return;
                     }
                     case "renamed": {
-                        fs.writeFileSync(input, overlay.print());
+                        write_overlay(input, overlay, resolved.config);
                         console.log(`Renamed ${identifier} to ${to} in ${input}`);
                         return;
                     }

@@ -5,7 +5,7 @@ import * as fs from 'node:fs';
 
 import type { LocalContext } from "../../context";
 import { load_config, check_config, check_failure_message } from "../../config";
-import { load_trees, resolve_node_identifier } from "../../utilities";
+import { load_trees, resolve_node_identifier, write_overlay } from "../../utilities";
 
 function make_command(commandName: string, status_value: "okay" | "disabled", verb: string) {
     return (_context: LocalContext): Command => new Command(commandName)
@@ -38,7 +38,7 @@ function make_command(commandName: string, status_value: "okay" | "disabled", ve
                     return;
                 }
                 case "done": {
-                    fs.writeFileSync(input, overlay.print());
+                    write_overlay(input, overlay, config);
                     console.log(`${verb}d ${node} in ${input}`);
                     return;
                 }

@@ -4,7 +4,7 @@ import { DeviceTree, DeviceTreeOverlay, get_full_node_name, type DTNode } from "
 import * as fs from 'node:fs';
 
 import type { LocalContext } from "../../context";
-import { load_trees, resolve_node_identifier, swallowed_positional_message } from "../../utilities";
+import { load_trees, resolve_node_identifier, swallowed_positional_message, write_overlay } from "../../utilities";
 import { resolve_config } from "../../resolve-config";
 import { respond, respond_fail, input_error } from "../../protocol/output";
 
@@ -42,7 +42,7 @@ export function build_move_command(context_: LocalContext): Command {
             if (context_.json) {
                 switch (result) {
                     case "moved": {
-                        fs.writeFileSync(input, overlay.print());
+                        write_overlay(input, overlay, resolved.config);
                         respond({ ok: true, message: `Moved ${identifier} to ${to}`, severity: "info" });
                         return;
                     }
@@ -102,7 +102,7 @@ export function build_move_command(context_: LocalContext): Command {
                         return;
                     }
                     case "moved": {
-                        fs.writeFileSync(input, overlay.print());
+                        write_overlay(input, overlay, resolved.config);
                         console.log(`Moved ${identifier} to ${to} in ${input}`);
                         return;
                     }
