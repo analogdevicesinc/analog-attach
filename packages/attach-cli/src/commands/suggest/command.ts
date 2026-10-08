@@ -879,7 +879,17 @@ async function suggest_type(context_: LocalContext, arguments_: string[]): Promi
         respond(response);
     } else {
         if (board_error !== undefined) { console.log(`warning: ${board_error}`); }
-        console.log(format_type(type));
+        const is_required = binding.required_properties.includes(property_name);
+        const required = is_required ? " (required)" : "";
+        console.log(`${property_name}${required}: ${format_type(type)}`);
+        if (property_definition.value.description !== undefined) {
+            console.log(`  ${property_definition.value.description}`);
+        }
+        const v = property_definition.value as Record<string, unknown>;
+        if (v["const"] !== undefined) { console.log(`  const: ${JSON.stringify(v["const"], bigIntReplacer)}`); }
+        if (v["default"] !== undefined) { console.log(`  default: ${JSON.stringify(v["default"], bigIntReplacer)}`); }
+        if (v["minimum"] !== undefined) { console.log(`  min: ${v["minimum"]}`); }
+        if (v["maximum"] !== undefined) { console.log(`  max: ${v["maximum"]}`); }
         for (const suggestion of suggestions) {
             console.log(`  ${suggestion.value}\t${suggestion.display_string}`);
         }
