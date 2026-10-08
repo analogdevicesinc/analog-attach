@@ -170,16 +170,61 @@ describe('bootstrap leaves choices alone', () => {
         expect(stored(workfile)['test_spi_device']?.max_speed_hz).toBe(2000000);
     });
 
-    test('a node the user already holds is never linked to - that is a choice', () => {
-        // A second device's chain: a bus device already exists, so "use it" and "create
-        // one" are two options and the union member stays unset.
+    test('an unused struct is reused, whoever left it there', () => {
         const workfile = workfile_with('testpart_init_param');
-        add(workfile, 'existing_dev', 'test_spi_device');
+        add(workfile, 'spare_dev', 'test_spi_device');
+        expectOk(bootstrap(workfile));
+
+        expect(stored(workfile)['testpart_init_param']?.comm_init).toEqual({ spi_dev: 'spare_dev' });
+        expect(Object.keys(workfile.symbols)).not.toContain('test_spi_device');
+    });
+
+    test('a struct already in use is someone else\'s, so a new one is made', () => {
+        const workfile = workfile_with('testpart_init_param');
+        add(workfile, 'other_part', 'testpart_init_param');
+        add(workfile, 'used_dev', 'test_spi_device');
+        expectOk(set_value(workfile, 'other_part', 'comm_init', { spi_dev: 'used_dev' }));
+        expectOk(bootstrap(workfile));
+
+        expect(stored(workfile)['testpart_init_param']?.comm_init).toEqual({ spi_dev: 'test_spi_device' });
+    });
+
+    test('two unused structs that fit are a choice, and are listed', () => {
+        const workfile = workfile_with('testpart_init_param');
+        add(workfile, 'spare_a', 'test_spi_device');
+        add(workfile, 'spare_b', 'test_spi_device');
         const report = bootstrap(workfile);
         expectOk(report);
 
         expect(stored(workfile)['testpart_init_param']?.comm_init).toBeUndefined();
-        expect(report.value.linked.some(link => link.node === 'testpart_init_param')).toBe(false);
+        expect(report.value.choices).toContainEqual({
+            node: 'testpart_init_param', property: 'comm_init', member: 'spi_dev', options: ['spare_a', 'spare_b'],
+        });
+    });
+
+    test('a stored handle is shared: a second device on the bus uses the same controller', () => {
+        // With no board the controller is a stored node, not a hidden one - still one bus.
+        const workfile = workfile_with('test_sensor', null);
+        expectOk(bootstrap(workfile));
+        add(workfile, 'second', 'test_sensor');
+        expectOk(bootstrap(workfile));
+
+        const symbols = stored(workfile);
+        expect(symbols['test_spi_device_1']?.controller).toBe(symbols['test_spi_device']?.controller);
+    });
+
+    test('a second device builds a chain of its own', () => {
+        const workfile = workfile_with('test_sensor');
+        expectOk(bootstrap(workfile));
+        add(workfile, 'second', 'test_sensor');
+        expectOk(bootstrap(workfile));
+
+        const symbols = stored(workfile);
+        expect(symbols['second']?.$init_param).toBe('test_sensor_config_1');
+        expect(symbols['test_sensor_config_1']?.extra).toBe('testpart_init_param_1');
+        expect(symbols['testpart_init_param_1']?.comm_init).toEqual({ spi_dev: 'test_spi_device_1' });
+        // The bus controller is one board resource, shared by both.
+        expect(symbols['test_spi_device_1']?.controller).toBe('bsp_test_spi_cfg_handle');
     });
 
     test('an extern already in the workfile is linked to - it is one C global, not a choice', () => {

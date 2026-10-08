@@ -55,7 +55,8 @@ import type { ExternIndex, HiddenCandidate } from "../registry/hidden";
 import { get_registry, resolve_entry } from "../registry/registry";
 import { find_eval_board, resolve_bus } from "../registry/wiring";
 import type { ChipSelect, Connection } from "../registry/wiring";
-import { collect_child_overrides, create_connections_graph } from "../validator/connection_graph";
+import { collect_child_overrides, create_connections_graph, is_referenced_by_others } from "../validator/connection_graph";
+import type { ConnectionGraph } from "../validator/types";
 import { apply_overrides } from "../validator/override_resolver";
 import { add_symbol, is_hidden, mark_auto, materialize_hidden, materialize_referenced_hidden, set_value } from "../workfile_handler/workfile_handler";
 import type { Workfile } from "../workfile_handler/types";
@@ -158,12 +159,20 @@ const STEP_CAP = 1000;
  * not in the workfile yet; `create` is a new stored node of a type.
  */
 type Option =
-	| { kind: "existing", name: string, bindable: boolean }
+	| { kind: "existing", name: string }
 	| { kind: "hidden", candidate: HiddenCandidate }
 	| { kind: "create", symbol: string };
 
-function existing_option(workfile: Workfile, name: string, node: Ruleset): Option {
-	return { kind: "existing", name, bindable: is_hidden(workfile, name) || node._t === "RulesetExtern" };
+/**
+ * A node already in the workfile, as an option - or not one at all. A hidden resource, an
+ * extern or a handle (a descriptor: a runtime object many can point at, like a bus
+ * controller) is shared, so it is an option even when something already uses it. A plain
+ * struct belongs to whatever points at it: it is an option only while nothing does - a
+ * dangling node, left by the user or by an earlier run, is there to be reused.
+ */
+function existing_option(workfile: Workfile, name: string, node: Ruleset, graph: ConnectionGraph): Option | undefined {
+	const shared = is_hidden(workfile, name) || node._t === "RulesetExtern" || node._t === "RulesetDescriptor";
+	return shared || !is_referenced_by_others(name, graph) ? { kind: "existing", name } : undefined;
 }
 
 /**
@@ -176,10 +185,12 @@ function existing_option(workfile: Workfile, name: string, node: Ruleset): Optio
  */
 function reference_options(workfile: Workfile, type_: string, self: string, externs: ExternIndex): Option[] {
 	const options: Option[] = [];
+	const graph = create_connections_graph(workfile);
 
 	for (const [name, node] of Object.entries(workfile.symbols)) {
-		if (name !== self && provided_id(node) === type_) {
-			options.push(existing_option(workfile, name, node));
+		const option = name === self || provided_id(node) !== type_ ? undefined : existing_option(workfile, name, node, graph);
+		if (option !== undefined) {
+			options.push(option);
 		}
 	}
 
@@ -194,7 +205,8 @@ function reference_options(workfile: Workfile, type_: string, self: string, exte
 		}
 	}
 
-	if (candidates.length === 0) {
+	// Reusing a node beats making one, so a new node is only an option when none fits.
+	if (candidates.length === 0 && options.length === 0) {
 		const entry = resolve_entry(type_);
 		if (entry.ok && (entry.value.$type === RulesetType.RT_STRUCT || entry.value.$type === RulesetType.RT_DESCRIPTOR)) {
 			options.push({ kind: "create", symbol: type_ });
@@ -207,11 +219,13 @@ function reference_options(workfile: Workfile, type_: string, self: string, exte
 /** Options for a driver-backed reference: the providing modules' own symbols of one kind. */
 function driver_options(workfile: Workfile, candidates: string[], self: string): Option[] {
 	const options: Option[] = [];
+	const graph = create_connections_graph(workfile);
 	for (const symbol of candidates) {
-		const present = Object.entries(workfile.symbols).filter(([name, node]) => name !== self && node.$symbol === symbol);
-		for (const [name, node] of present) {
-			options.push(existing_option(workfile, name, node));
-		}
+		const present = Object.entries(workfile.symbols)
+			.filter(([name, node]) => name !== self && node.$symbol === symbol)
+			.map(([name, node]) => existing_option(workfile, name, node, graph))
+			.filter((option): option is Option => option !== undefined);
+		options.push(...present);
 		if (present.length > 0) {
 			continue;
 		}
@@ -224,16 +238,10 @@ function driver_options(workfile: Workfile, candidates: string[], self: string):
 	return options;
 }
 
-/** The one option to take, or none: anything but exactly one option, or a user-held node, is a choice. */
+/** The one option to take, or none: anything but exactly one option is a choice. */
 function the_only(options: Option[]): Option | undefined {
 	const [only, ...more] = options;
-	if (only === undefined || more.length > 0) {
-		return undefined;
-	}
-	if (only.kind === "existing" && !only.bindable) {
-		return undefined;
-	}
-	return only;
+	return more.length === 0 ? only : undefined;
 }
 
 // --- What can fill a value ---------------------------------------------------------------

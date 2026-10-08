@@ -85,6 +85,15 @@ export function get_symbol_references(property: Property): SymbolReference[] {
 			}
 			return [];
 		}
+		case "DriverInitParameterProperty":
+		case "DriverOpsProperty": {
+			// The driver's init_param (`void *extra`) and ops table (an extern), by name. A
+			// value edge for the same reason as platform_extra: neither points back.
+			if (typeof property.value === "string") {
+				return [{ name: owner_of(property.value), kind: "value" }];
+			}
+			return [];
+		}
 		default: {
 			return [];
 		}
