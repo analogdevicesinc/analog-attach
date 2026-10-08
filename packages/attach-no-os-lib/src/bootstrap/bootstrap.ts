@@ -53,6 +53,8 @@ import { driver_init_parameter_candidates, driver_ops_candidates } from "../regi
 import { build_extern_index, hidden_candidates, wrapper_name } from "../registry/hidden";
 import type { ExternIndex, HiddenCandidate } from "../registry/hidden";
 import { board_gpio_ports } from "../registry/bsp";
+import type { PinReference } from "../registry/bsp";
+import type { GpioIdentity } from "../registry/types";
 import { get_registry, resolve_entry } from "../registry/registry";
 import { find_eval_board, resolve_bus } from "../registry/wiring";
 import type { ChipSelect, Connection, TakenChipSelects } from "../registry/wiring";
@@ -122,6 +124,12 @@ export interface BusWiring {
 	connections: Connection[],
 	/** Wiring that does not add up, or that the board alone cannot decide. */
 	problems: string[],
+	/**
+	 * When the chip-select could not be settled: header pins that could carry it, free of
+	 * other devices and other bus signals - the board's declared lines first. A hint, not a
+	 * choice made.
+	 */
+	chip_select_options?: { at: PinReference, gpio?: GpioIdentity }[],
 }
 
 /** A required reference bootstrap left open, because it is a choice. */
@@ -855,6 +863,9 @@ function wiring_of(workfile: Workfile, touched: Set<string>): BusWiring[] {
 
 		const problems = [...resolved.value.problems];
 		const chip_select = resolved.value.chip_select;
+		const options = chip_select?.kind === "unwired"
+			? chip_select.options.map(pin => ({ at: pin.at, ...(pin.gpio === undefined ? {} : { gpio: pin.gpio }) }))
+			: [];
 		if (chip_select?.kind === "unwired") {
 			problems.push(`chip-select: ${chip_select.reason}`);
 		}
@@ -871,6 +882,7 @@ function wiring_of(workfile: Workfile, touched: Set<string>): BusWiring[] {
 			...(resolved.value.peripheral === undefined ? {} : { peripheral: resolved.value.peripheral }),
 			connections: resolved.value.connections,
 			problems,
+			...(options.length === 0 ? {} : { chip_select_options: options }),
 		});
 	}
 	return wiring;
