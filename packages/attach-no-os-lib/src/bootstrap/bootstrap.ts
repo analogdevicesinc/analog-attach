@@ -685,6 +685,8 @@ interface PartOnBus {
 /** Every (driver node, bus device node) pair in the workfile. */
 function parts_on_bus(workfile: Workfile): PartOnBus[] {
 	const pairs: PartOnBus[] = [];
+	const registry = get_registry();
+	const bus_kinds = new Set(registry.ok ? registry.value.bsp_kinds.keys() : []);
 	for (const name of Object.keys(workfile.symbols).sort()) {
 		const node = workfile.symbols[name];
 		if (node?._t !== "RulesetStruct") {
@@ -695,13 +697,16 @@ function parts_on_bus(workfile: Workfile): PartOnBus[] {
 			continue;
 		}
 		for (const property of node.properties) {
-			if (property._t !== "UnionProperty" || typeof property.value !== "object" || property.value === null) {
-				continue;
-			}
-			for (const target of Object.values(property.value as Record<string, unknown>)) {
+			// A bus device is reached through a union member (adxl355's comm_init) or a plain
+			// include (ad74413r's spi_dev).
+			const targets = property._t === "UnionProperty" && typeof property.value === "object" && property.value !== null
+				? Object.values(property.value as Record<string, unknown>)
+				: (property._t === "IncludeProperty" ? [property.value] : []);
+			for (const target of targets) {
 				const device = typeof target === "string" ? workfile.symbols[target] : undefined;
 				const device_entry = device === undefined ? undefined : resolve_entry(device.$symbol);
-				if (typeof target === "string" && device_entry?.ok === true) {
+				// Only a device on a board bus kind (spi, i2c, ...): a reset GPIO pin is not one.
+				if (typeof target === "string" && device_entry?.ok === true && bus_kinds.has(device_entry.value.group)) {
 					pairs.push({ part_node: name, device: target, driver: entry.value.module.name, interface: device_entry.value.group });
 				}
 			}

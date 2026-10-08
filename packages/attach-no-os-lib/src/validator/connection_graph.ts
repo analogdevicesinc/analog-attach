@@ -351,7 +351,7 @@ function find_includer(symbol_name: string, graph: ConnectionGraph): string | un
 // nowhere yet, so there is nothing to constrain.
 function resolve_include_path(owner_symbol: string, via: string[], workfile: Workfile): string | undefined {
 	const [property_name, member_name] = via;
-	if (property_name === undefined || member_name === undefined) {
+	if (property_name === undefined) {
 		return undefined;
 	}
 
@@ -361,6 +361,10 @@ function resolve_include_path(owner_symbol: string, via: string[], workfile: Wor
 	}
 
 	const value = owner.properties.find(property => property.name === property_name)?.value;
+	// One step is a plain include (`spi_dev: {$node: ...}`): its value is the node's name.
+	if (member_name === undefined) {
+		return typeof value === "string" ? owner_of(value) : undefined;
+	}
 	if (typeof value !== "object" || value === null) {
 		return undefined;
 	}
