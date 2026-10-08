@@ -10,6 +10,7 @@ import {
     import_minimal,
     materialize_hidden,
     clear_value,
+    mark_auto,
     set_value,
     suggest_for_property,
 } from '../../src/workfile_handler/workfile_handler';
@@ -153,7 +154,7 @@ describe('bootstrap from one node', () => {
 
         const again = bootstrap(workfile);
         expectOk(again);
-        expect(again.value).toEqual({ filled: [], linked: [], chip_selects: [], wiring: [], choices: [] });
+        expect(again.value).toEqual({ revised: [], filled: [], linked: [], chip_selects: [], wiring: [], choices: [] });
         expect(stored(workfile)).toEqual(before);
     });
 });
@@ -255,6 +256,53 @@ describe('who owns a value', () => {
         expectOk(again);
         expect(again.value.filled).toEqual([]);
         expect(stored(workfile)['test_spi_device']?.max_speed_hz).toBeNull();
+    });
+
+    test('switching the bus: owned values follow the rules, the new bus is built', () => {
+        const workfile = workfile_with('test_sensor');
+        expectOk(bootstrap(workfile));
+        expectOk(set_value(workfile, 'testpart_init_param', 'comm_type', 'TESTPART_I2C'));
+
+        const report = bootstrap(workfile);
+        expectOk(report);
+        const symbols = stored(workfile);
+
+        // The SPI member no longer fits the I2C case, so it went, and the I2C one was built.
+        expect(symbols['testpart_init_param']?.comm_init).toEqual({ i2c_dev: 'test_i2c_device' });
+        expect(symbols['test_i2c_device']).toEqual({ $compatible: 'test_i2c_device', $auto: ['address'], address: 0x1D });
+        expect(report.value.revised).toContainEqual({
+            node: 'testpart_init_param', property: 'comm_init', previous: { spi_dev: 'test_spi_device' },
+        });
+
+        // The SPI device lost the part's overrides with it: its speed came only from them, so
+        // nothing fills it now. Its mode is still the enum's own default, and its controller
+        // still fits, so those stay.
+        expect(symbols['test_spi_device']?.max_speed_hz).toBeUndefined();
+        expect(symbols['test_spi_device']?.mode).toBe('TEST_SPI_MODE_0');
+        expect(symbols['test_spi_device']?.controller).toBe('bsp_test_spi_cfg_handle');
+    });
+
+    test('a value the user wrote is never revised, whatever the rules say now', () => {
+        const workfile = workfile_with('test_sensor');
+        expectOk(bootstrap(workfile));
+        expectOk(set_value(workfile, 'test_spi_device', 'max_speed_hz', 2000000));
+        expectOk(set_value(workfile, 'testpart_init_param', 'comm_type', 'TESTPART_I2C'));
+
+        expectOk(bootstrap(workfile));
+        expect(stored(workfile)['test_spi_device']?.max_speed_hz).toBe(2000000);
+    });
+
+    test('a revised value is reported with what it was and what it is now', () => {
+        // An owned value that differs from what the rule gives now is set to the rule's value.
+        const workfile = workfile_with('test_sensor');
+        expectOk(bootstrap(workfile));
+        expectOk(set_value(workfile, 'test_spi_device', 'max_speed_hz', 5000000));
+        expectOk(mark_auto(workfile, 'test_spi_device', 'max_speed_hz'));
+
+        const report = bootstrap(workfile);
+        expectOk(report);
+        expect(report.value.revised).toEqual([{ node: 'test_spi_device', property: 'max_speed_hz', previous: 5000000, value: 1000000 }]);
+        expect(stored(workfile)['test_spi_device']?.$auto).toContain('max_speed_hz');
     });
 
     test('a chip-select the user cleared is not settled from the wiring', () => {
@@ -460,7 +508,7 @@ describe('the chip-select', () => {
 
         const again = bootstrap(workfile);
         expectOk(again);
-        expect(again.value).toEqual({ filled: [], linked: [], chip_selects: [], wiring: [], choices: [] });
+        expect(again.value).toEqual({ revised: [], filled: [], linked: [], chip_selects: [], wiring: [], choices: [] });
         expect(stored(workfile)).toEqual(before);
     });
 });

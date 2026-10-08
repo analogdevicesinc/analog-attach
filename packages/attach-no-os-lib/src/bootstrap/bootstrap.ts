@@ -33,9 +33,14 @@
  * gets its wiring instructions (or why the wiring does not add up), and every required
  * reference still open is listed with the options that made it a choice.
  *
- * Termination: every step sets a value that was unset or adds a node, and nothing is ever
- * unset or removed, so the loop only moves forward. The step cap is a bug detector, not the
- * stopping condition.
+ * Before any of that, the values bootstrap already owns ("$auto") follow the current rules:
+ * a plain value is set to what its fill rule gives now, or removed when it gives nothing; a
+ * reference is removed when the node it names no longer fits there. Values the user wrote are
+ * never touched. The chip-select fields follow the wiring instead, and are left as they are.
+ *
+ * Termination: a revision only ever writes what the fill rule gives, which the fill and link
+ * steps then leave alone, and they only fill unset values or add nodes - so nothing flips back
+ * and forth. The step cap is a bug detector, not the stopping condition.
  */
 
 import type { Result } from "../ruleset_parser/result";
@@ -64,6 +69,16 @@ export interface FilledValue {
 	value: unknown,
 	from: FillSource,
 	/** How the field reads, for showing the value the way the schema writes it. */
+	format?: NumberFormat,
+}
+
+/** A value bootstrap owned and had to change, because the rules no longer give it. */
+export interface RevisedValue {
+	node: string,
+	property: string,
+	previous: unknown,
+	/** The new value, or undefined when nothing fills it any more and it was removed. */
+	value?: unknown,
 	format?: NumberFormat,
 }
 
@@ -121,6 +136,8 @@ export interface OpenChoice {
 }
 
 export interface BootstrapReport {
+	/** Owned values changed or removed to follow the current rules. */
+	revised: RevisedValue[],
 	filled: FilledValue[],
 	linked: LinkedReference[],
 	chip_selects: ChipSelectDecision[],
@@ -255,9 +272,129 @@ function fill_value(effective: Property): { value: unknown, from: FillSource } |
 	}
 }
 
+// --- Following the rules -----------------------------------------------------------------
+
+/**
+ * The fields a chip-select decision writes, by schema: the device's mask, pin list and its
+ * count, and the pin's number and port. They come from the wiring, not the fill rule, so the
+ * rule cannot revise them.
+ */
+function wiring_fields(binding: ChipSelectBinding | undefined): Map<string, Set<string>> {
+	const fields = new Map<string, Set<string>>();
+	if (binding === undefined) {
+		return fields;
+	}
+	const device = load_resolved_ruleset(binding.device);
+	const list = device.ok && device.value._t === "RulesetStruct"
+		? device.value.properties.find(property => property.name === binding.gpio_list)
+		: undefined;
+	const count = list?._t === "IncludeProperty" ? list.count : undefined;
+	fields.set(binding.device, new Set([binding.native_mask, binding.gpio_list, ...(count === undefined ? [] : [count])]));
+	if (list?._t === "IncludeProperty" && list.include !== undefined) {
+		fields.set(list.include, new Set([binding.pin_number, binding.pin_port]));
+	}
+	return fields;
+}
+
+/** Whether a reference bootstrap set still names a node that fits where it is. */
+function still_fits(workfile: Workfile, effective: Property, value: unknown, selected_member: string | undefined): boolean {
+	const provides = (target: unknown, type_: string | undefined): boolean => {
+		const node = typeof target === "string" ? workfile.symbols[target] : undefined;
+		return node !== undefined && type_ !== undefined && provided_id(node) === type_;
+	};
+
+	switch (effective._t) {
+		case "IncludeProperty": {
+			// A list is never bootstrap's except as a chip-select, which the wiring owns.
+			return effective.count !== undefined || provides(value, effective.include);
+		}
+		case "UnionProperty": {
+			const [entry, ...more] = typeof value === "object" && value !== null ? Object.entries(value as Record<string, unknown>) : [];
+			if (entry === undefined || more.length > 0) {
+				return false;
+			}
+			const [member_name, target] = entry;
+			const member = effective.members.find(candidate => candidate.name === member_name);
+			return member !== undefined
+				&& (selected_member === undefined || selected_member === member_name)
+				&& provides(target, member.include);
+		}
+		case "DriverInitParameterProperty":
+		case "DriverOpsProperty": {
+			const candidates = effective._t === "DriverOpsProperty"
+				? driver_ops_candidates(effective.interface)
+				: driver_init_parameter_candidates(effective.interface);
+			const node = typeof value === "string" ? workfile.symbols[value] : undefined;
+			return candidates.ok && node !== undefined && candidates.value.some(entry => entry.$symbol === node.$symbol);
+		}
+		default: {
+			return true;
+		}
+	}
+}
+
+/**
+ * The first value bootstrap owns that the rules no longer give: a plain value whose fill
+ * rule now says something else (or nothing), or a reference that no longer fits. One at a
+ * time, because removing one can change the overrides that apply to the next.
+ */
+function revise_step(workfile: Workfile, wiring: Map<string, Set<string>>): Step | undefined {
+	const graph = create_connections_graph(workfile);
+
+	for (const name of Object.keys(workfile.symbols).sort()) {
+		const node: Ruleset | undefined = workfile.symbols[name];
+		if ((node?._t !== "RulesetStruct" && node?._t !== "RulesetDescriptor") || is_hidden(workfile, name)) {
+			continue;
+		}
+
+		const collected = collect_child_overrides(name, workfile, graph);
+		const fixed = wiring.get(node.$symbol);
+
+		for (const property of node.properties) {
+			const previous = property.value;
+			if (property.auto !== true || previous === undefined || fixed?.has(property.name) === true) {
+				continue;
+			}
+
+			// Judged as if unset: what would bootstrap write here now?
+			const unset = { ...property, value: undefined };
+			const { effective, selected_member } = apply_overrides(unset, collected, name, workfile);
+			const remove: Step = { kind: "revise", node: name, property: property.name, previous };
+
+			if (effective.disabled === true) {
+				return remove;
+			}
+
+			switch (effective._t) {
+				case "IncludeProperty":
+				case "UnionProperty":
+				case "DriverInitParameterProperty":
+				case "DriverOpsProperty": {
+					if (!still_fits(workfile, effective, previous, selected_member)) {
+						return remove;
+					}
+					break;
+				}
+				default: {
+					const filled = fill_value(effective);
+					if (filled === undefined) {
+						return remove;
+					}
+					if (JSON.stringify(filled.value) !== JSON.stringify(previous)) {
+						return { ...remove, value: filled.value };
+					}
+				}
+			}
+		}
+	}
+
+	return undefined;
+}
+
 // --- One step ----------------------------------------------------------------------------
 
 type Step =
+	| { kind: "revise", node: string, property: string, previous: unknown, value?: unknown }
 	| { kind: "fill", node: string, property: string, value: unknown, from: FillSource }
 	| { kind: "link", node: string, property: string, member?: string, option: Option }
 	| { kind: "chip_select", device: string, part: string, resolved: ChipSelect };
@@ -761,10 +898,14 @@ export function bootstrap(workfile: Workfile): Result<BootstrapReport> {
 
 	const registry = get_registry();
 	const binding = registry.ok ? registry.value.chip_select : undefined;
-	const report: BootstrapReport = { filled: [], linked: [], chip_selects: [], wiring: [], choices: [] };
+	const report: BootstrapReport = { revised: [], filled: [], linked: [], chip_selects: [], wiring: [], choices: [] };
+
+	const wiring = wiring_fields(binding);
 
 	for (let steps = 0; steps < STEP_CAP; steps++) {
-		const step = next_step(workfile, externs.value);
+		// What bootstrap already owns is brought in line first, so every fill and link after
+		// is judged against values the current rules give.
+		const step = revise_step(workfile, wiring) ?? next_step(workfile, externs.value);
 		if (step === undefined) {
 			report.wiring = wiring_of(workfile, touched_nodes(report));
 			report.choices = open_choices(workfile, externs.value);
@@ -772,6 +913,24 @@ export function bootstrap(workfile: Workfile): Result<BootstrapReport> {
 		}
 
 		switch (step.kind) {
+			case "revise": {
+				// No value means nothing fills it now: it goes, and is no longer bootstrap's.
+				const set = step.value === undefined
+					? set_value(workfile, step.node, step.property)
+					: set_owned(workfile, step.node, step.property, step.value);
+				if (!set.ok) {
+					return set;
+				}
+				const { format } = filled_value(workfile, step.node, step.property, step.value, "default");
+				report.revised.push({
+					node: step.node,
+					property: step.property,
+					previous: step.previous,
+					...(step.value === undefined ? {} : { value: step.value }),
+					...(format === undefined ? {} : { format }),
+				});
+				break;
+			}
 			case "fill": {
 				const set = set_owned(workfile, step.node, step.property, step.value);
 				if (!set.ok) {

@@ -11,7 +11,7 @@ import {
     load_resolved_ruleset_for_board,
     validate_workfile,
 } from "attach-no-os-lib";
-import type { BootstrapReport, Workfile } from "attach-no-os-lib";
+import type { BootstrapReport, FilledValue, Workfile } from "attach-no-os-lib";
 import { filter_completions, get_node_names, get_schema_paths } from "../completion/completion";
 import { common_ok, type AddResponse } from "../protocol/responses";
 import { load_context, output, output_error, root_key, save_workfile, type WorkfileContext } from "./shared";
@@ -250,9 +250,24 @@ function unique_name(base: string, context: WorkfileContext): string {
     }
 }
 
+/** A value as the schema writes it: a number in its format, anything else as JSON. */
+function show(value: unknown, format: FilledValue["format"]): string {
+    return typeof value === "number" ? format_number_in(value, format) : JSON.stringify(value);
+}
+
 /** What bootstrap did, for a person: the nodes it made, the values it chose, the wiring, and where it stopped. */
 function describe_bootstrap(report: BootstrapReport, workfile: Workfile): string[] {
     const lines: string[] = [];
+    if (report.revised.length > 0) {
+        lines.push("", "Bootstrap brought its own values in line with the current rules:");
+        for (const revision of report.revised) {
+            const at = `${revision.node}.${revision.property}`.padEnd(32);
+            lines.push(revision.value === undefined
+                ? `  - ${at} ${show(revision.previous, revision.format)} (no longer applies, removed)`
+                : `  * ${at} ${show(revision.previous, revision.format)} -> ${show(revision.value, revision.format)}`);
+        }
+    }
+
     const created = report.linked.filter(link => link.created && !link.hidden);
     const hidden = report.linked.filter(link => link.hidden);
 
