@@ -1,6 +1,7 @@
 import type { Workfile } from "../workfile_handler/types";
 import type { ValidationError, ValidationResult } from "./types";
 import type { ParseContext } from "../ruleset_parser/validators";
+import { validate_chip_selects } from "./chip_select";
 import { validate_property } from "./property_validator";
 import { child_names, collect_child_overrides, create_connections_graph, describe_cycle, topo_sorted_symbols } from "./connection_graph";
 
@@ -67,6 +68,8 @@ export function validate_workfile(workfile: Workfile): ValidationResult {
 			errors.push(...property_errors);
 		}
 	}
+
+	errors.push(...validate_chip_selects(workfile));
 
 	return {
 		valid: errors.filter(error => error.severity === "error").length === 0,
