@@ -251,11 +251,12 @@ export function set_value(workfile: Workfile, symbol_name: string, property_name
         return property;
     }
 
+    // A written value is its writer's: the user's, unless bootstrap marks it its own right
+    // after (mark_auto). That is what takes a value out of bootstrap's hands when the user
+    // edits it. A value also replaces "set to nothing".
     property.value.value = value;
-    // A value replaces "set to nothing"; no value leaves nothing for bootstrap to own.
-    if (value === undefined) {
-        delete property.value.auto;
-    } else {
+    delete property.value.auto;
+    if (value !== undefined) {
         delete property.value.cleared;
     }
     return ok();

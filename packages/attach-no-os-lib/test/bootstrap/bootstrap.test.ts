@@ -9,6 +9,7 @@ import {
     export_minimal,
     import_minimal,
     materialize_hidden,
+    clear_value,
     set_value,
     suggest_for_property,
 } from '../../src/workfile_handler/workfile_handler';
@@ -133,8 +134,10 @@ describe('bootstrap from one node', () => {
         expectOk(bootstrap(workfile));
 
         const symbols = stored(workfile);
+        // Every value bootstrap wrote is listed as its own.
         expect(symbols['test_spi_device']).toEqual({
             $compatible: 'test_spi_device',
+            $auto: ['controller', 'max_speed_hz', 'mode', 'native_cs'],
             controller: 'bsp_test_spi_cfg_handle',
             max_speed_hz: 1000000,
             mode: 'TEST_SPI_MODE_0',
@@ -215,6 +218,59 @@ describe('bootstrap leaves choices alone', () => {
         const report = bootstrap(workfile);
         expectOk(report);
         expect(report.value.linked).toEqual([]);
+    });
+});
+
+describe('who owns a value', () => {
+    beforeEach(() => { setup_test_config(); });
+    afterEach(() => { teardown_test_config(); });
+
+    test('the user editing a value takes it out of bootstrap\'s hands', () => {
+        const workfile = workfile_with('test_sensor');
+        expectOk(bootstrap(workfile));
+        expect(stored(workfile)['test_spi_device']?.$auto).toContain('max_speed_hz');
+
+        expectOk(set_value(workfile, 'test_spi_device', 'max_speed_hz', 2000000));
+        expect(stored(workfile)['test_spi_device']?.$auto).not.toContain('max_speed_hz');
+    });
+
+    test('ownership survives a save and load', () => {
+        const workfile = workfile_with('test_sensor');
+        expectOk(bootstrap(workfile));
+        const before = stored(workfile);
+
+        const exported = export_minimal(workfile);
+        expectOk(exported);
+        const reloaded = import_minimal(JSON.parse(JSON.stringify(exported.value)));
+        expectOk(reloaded);
+        expect(stored(reloaded.value)).toEqual(before);
+    });
+
+    test('a value the user cleared is not filled back in', () => {
+        const workfile = workfile_with('test_sensor');
+        expectOk(bootstrap(workfile));
+        expectOk(clear_value(workfile, 'test_spi_device', 'max_speed_hz'));
+
+        const again = bootstrap(workfile);
+        expectOk(again);
+        expect(again.value.filled).toEqual([]);
+        expect(stored(workfile)['test_spi_device']?.max_speed_hz).toBeNull();
+    });
+
+    test('a chip-select the user cleared is not settled from the wiring', () => {
+        const workfile = workfile_with('test_sensor', 'otherboard', 'othersoc');
+        add(workfile, 'cfg', 'test_sensor_config');
+        add(workfile, 'part', 'testpart_init_param');
+        add(workfile, 'dev', 'test_spi_device');
+        expectOk(set_value(workfile, 'test_sensor', '$init_param', 'cfg'));
+        expectOk(set_value(workfile, 'cfg', 'extra', 'part'));
+        expectOk(set_value(workfile, 'part', 'comm_init', { spi_dev: 'dev' }));
+        expectOk(clear_value(workfile, 'dev', 'cs_gpio'));
+
+        const report = bootstrap(workfile);
+        expectOk(report);
+        expect(report.value.chip_selects).toEqual([]);
+        expect(stored(workfile)['dev']?.cs_gpio).toBeNull();
     });
 });
 
@@ -304,7 +360,7 @@ describe('the chip-select', () => {
 
         const symbols = stored(workfile);
         // The pin is stored - its number is a real field - and its port is a hidden handle.
-        expect(symbols['test_gpio_pin']).toEqual({ $compatible: 'test_gpio_pin', port_handle: 'bsp_other_gpio1_cfg_handle', number: 4 });
+        expect(symbols['test_gpio_pin']).toEqual({ $compatible: 'test_gpio_pin', $auto: ['port_handle', 'number'], port_handle: 'bsp_other_gpio1_cfg_handle', number: 4 });
         expect(symbols['test_spi_device']?.cs_gpio).toBe('test_gpio_pin');
         expect(symbols['test_spi_device']?.cs_gpio_num).toBe(1);
 

@@ -52,7 +52,7 @@ import { find_eval_board, resolve_bus } from "../registry/wiring";
 import type { ChipSelect, Connection } from "../registry/wiring";
 import { collect_child_overrides, create_connections_graph } from "../validator/connection_graph";
 import { apply_overrides } from "../validator/override_resolver";
-import { add_symbol, is_hidden, materialize_hidden, materialize_referenced_hidden, set_value } from "../workfile_handler/workfile_handler";
+import { add_symbol, is_hidden, mark_auto, materialize_hidden, materialize_referenced_hidden, set_value } from "../workfile_handler/workfile_handler";
 import type { Workfile } from "../workfile_handler/types";
 
 /** Why a value was filled. */
@@ -275,7 +275,7 @@ function next_step(workfile: Workfile, externs: ExternIndex): Step | undefined {
 		const collected = collect_child_overrides(name, workfile, graph);
 
 		for (const property of node.properties) {
-			if (property.value !== undefined || property.readonly === true) {
+			if (property.value !== undefined || property.cleared === true || property.readonly === true) {
 				continue;
 			}
 
@@ -388,6 +388,12 @@ function has_chip_select(node: Ruleset | undefined, binding: ChipSelectBinding):
 	return value_of(node, binding.gpio_list) !== undefined || (typeof native === "number" && native !== 0);
 }
 
+/** Whether the user set either chip-select field to nothing: their call, not the wiring's. */
+function chip_select_cleared(node: Ruleset | undefined, binding: ChipSelectBinding): boolean {
+	return node?._t === "RulesetStruct" && node.properties.some(property =>
+		(property.name === binding.gpio_list || property.name === binding.native_mask) && property.cleared === true);
+}
+
 /** A part's init_param bound to a bus device through a union. */
 interface PartOnBus {
 	part_node: string,
@@ -441,7 +447,7 @@ function chip_select_step(workfile: Workfile, externs: ExternIndex): Step | unde
 		if (device_node?.$symbol !== chip_select.device) {
 			continue;
 		}
-		if (has_chip_select(device_node, chip_select) || device_node._t !== "RulesetStruct") {
+		if (has_chip_select(device_node, chip_select) || chip_select_cleared(device_node, chip_select) || device_node._t !== "RulesetStruct") {
 			continue;
 		}
 
@@ -460,7 +466,7 @@ function chip_select_step(workfile: Workfile, externs: ExternIndex): Step | unde
 		const peripheral = resolved.value.peripheral;
 		if (peripheral !== undefined) {
 			for (const property of device_node.properties) {
-				if (property._t !== "IncludeProperty" || property.value !== undefined || property.include === undefined) {
+				if (property._t !== "IncludeProperty" || property.value !== undefined || property.cleared === true || property.include === undefined) {
 					continue;
 				}
 				const handle = hidden_candidates(property.include, externs).find(candidate => candidate.name === wrapper_name(peripheral));
@@ -494,7 +500,7 @@ function apply_chip_select(
 ): Result<{ pin?: string, filled: FilledValue[], linked: LinkedReference[] }> {
 	if (resolved.kind === "native") {
 		const mask = 1 << resolved.native_cs;
-		const set = set_value(workfile, device, binding.native_mask, mask);
+		const set = set_owned(workfile, device, binding.native_mask, mask);
 		if (!set.ok) {
 			return set;
 		}
@@ -548,7 +554,7 @@ function apply_chip_select(
 		...(list.count === undefined ? [] : [[device, list.count, 1] as [string, string, unknown]]),
 	];
 	for (const [node, property, value] of writes) {
-		const set = set_value(workfile, node, property, value);
+		const set = set_owned(workfile, node, property, value);
 		if (!set.ok) {
 			return set;
 		}
@@ -656,7 +662,7 @@ function open_choices(workfile: Workfile, externs: ExternIndex): OpenChoice[] {
 
 		const collected = collect_child_overrides(name, workfile, graph);
 		for (const property of node.properties) {
-			if (property.value !== undefined || property.readonly === true) {
+			if (property.value !== undefined || property.cleared === true || property.readonly === true) {
 				continue;
 			}
 			const { effective, required_reason, selected_member } = apply_overrides(property, collected, name, workfile);
@@ -679,6 +685,12 @@ function open_choices(workfile: Workfile, externs: ExternIndex): OpenChoice[] {
 }
 
 // --- Applying a step ---------------------------------------------------------------------
+
+/** Write a value as bootstrap's own: it is listed in the node's "$auto" until the user edits it. */
+function set_owned(workfile: Workfile, node: string, property: string, value: unknown): Result<void> {
+	const set = set_value(workfile, node, property, value);
+	return set.ok ? mark_auto(workfile, node, property) : set;
+}
 
 /** A filled value, with the field's number format so it can be shown as the schema writes it. */
 function filled_value(workfile: Workfile, node: string, property: string, value: unknown, from: FillSource): FilledValue {
@@ -761,7 +773,7 @@ export function bootstrap(workfile: Workfile): Result<BootstrapReport> {
 
 		switch (step.kind) {
 			case "fill": {
-				const set = set_value(workfile, step.node, step.property, step.value);
+				const set = set_owned(workfile, step.node, step.property, step.value);
 				if (!set.ok) {
 					return set;
 				}
@@ -774,7 +786,7 @@ export function bootstrap(workfile: Workfile): Result<BootstrapReport> {
 					return target;
 				}
 				const value = step.member === undefined ? target.value.name : { [step.member]: target.value.name };
-				const set = set_value(workfile, step.node, step.property, value);
+				const set = set_owned(workfile, step.node, step.property, value);
 				if (!set.ok) {
 					return set;
 				}
