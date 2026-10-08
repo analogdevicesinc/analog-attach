@@ -4,6 +4,7 @@ schema_version: "1.0"
 # tests can check that an unknown kind is skipped with a warning rather than refused.
 bsp_kinds:
   spi:       test_spi_config
+  i2c:       test_i2c_config
   gpio_port: test_gpio_port_config
   gpio_pin:  test_gpio_pin
 
@@ -29,4 +30,5 @@ rulesets:
     - spi/test_sensor_config.yaml
     - spi/test_sensor.yaml
   i2c:
+    - i2c/test_i2c_config.yaml
     - i2c/test_i2c_device.yaml

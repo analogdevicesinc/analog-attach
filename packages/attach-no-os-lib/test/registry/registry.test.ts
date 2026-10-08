@@ -43,6 +43,7 @@ describe('registry', () => {
             'test_gpio_pin',
             'test_gpio_port',
             'test_gpio_port_config',
+            'test_i2c_config',
             'test_i2c_device',
             'test_sensor',
             'test_sensor_config',

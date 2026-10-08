@@ -196,13 +196,49 @@ function lower_effects_body(
 		const override_object = asObject(value, at(context, key));
 		if (!override_object.ok) { return override_object; }
 
+		// `$node` constrains what the reference points at; the other keys, the reference.
+		const { [NODE_KEY]: node_body, ...own } = override_object.value;
+		if (node_body !== undefined) {
+			const included = lower_node_effects(key, node_body, target_property.value, context, scope);
+			if (!included.ok) { return included; }
+			effects.push(...included.value.effects);
+			nested.push(...included.value.nested);
+		}
+		if (node_body !== undefined && Object.keys(own).length === 0) {
+			continue;
+		}
+
 		const reference: OverrideReference = { node: scope_to_node(scope), property: key };
-		const lowered = lower_effects(override_object.value, reference, at(context, key), target_property.value);
+		const lowered = lower_effects(own, reference, at(context, key), target_property.value);
 		if (!lowered.ok) { return lowered; }
 		effects.push(...lowered.value);
 	}
 
 	return ok({ effects, nested });
+}
+
+/** The override key under a plain include that constrains the node it points at. */
+const NODE_KEY = "$node";
+
+// `spi_dev: {$node: {...}}` — constrain the NODE a plain include points at. The plain key
+// alone already means "constrain the reference" (required, allowed, ...), so the node's own
+// fields go under a marker; being a `$` key, it can never be mistaken for one of them. The
+// fields are checked by the engine against that node, exactly as for a union member.
+function lower_node_effects(
+	key: string,
+	value: unknown,
+	property: Property,
+	context: ParseContext,
+	scope: OverrideScope,
+): Result<LoweredBody> {
+	const key_context = at(at(context, key), NODE_KEY);
+	if (scope === "$parent") {
+		return error(`'${key}.${NODE_KEY}' cannot be used under $parent: an included node is reached from the node that declares the rule`, key_context.path);
+	}
+	if (property._t !== "IncludeProperty" || property.count !== undefined) {
+		return error(`'${NODE_KEY}' needs '${key}' to be a single include, the node it points at; it is a ${property._t}${property._t === "IncludeProperty" ? " list" : ""}`, key_context.path);
+	}
+	return lower_included_body([key], value, key_context);
 }
 
 // `comm_init.spi_dev: {...}` — constrain the NODE a union member points at, not the member
@@ -217,9 +253,9 @@ function lower_effects_body(
 //   - `$parent` scope is refused, because the path is walked from the node declaring the
 //     rule and a parent's properties are not described by this file.
 //   - a plain `include` property has no unambiguous dotted spelling. `controller: {...}`
-//     already means "constrain the reference" (required, allowed, ...), so there is no way
-//     to write "constrain what it points at" without inventing a marker. A union needs the
-//     member name regardless, which is what makes this form unambiguous.
+//     already means "constrain the reference" (required, allowed, ...), so what it points at
+//     is reached with a marker instead: `controller: {$node: {...}}` (lower_node_effects).
+//     A union needs the member name regardless, which is what makes this form unambiguous.
 function lower_included_effects(
 	key: string,
 	value: unknown,
@@ -259,6 +295,11 @@ function lower_included_effects(
 		return error(`Union '${property_name}' has no member '${member_name}'. Known: ${known}`, key_context.path);
 	}
 
+	return lower_included_body(via, value, key_context);
+}
+
+/** The constraints on an included node, reached from this one through `via`. */
+function lower_included_body(via: string[], value: unknown, key_context: ParseContext): Result<LoweredBody> {
 	const body = asObject(value, key_context);
 	if (!body.ok) { return body; }
 
