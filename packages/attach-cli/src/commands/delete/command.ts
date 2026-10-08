@@ -1,20 +1,19 @@
 import { Command } from "commander";
 import { DeviceTree, DeviceTreeOverlay, type DTNode } from "attach-lib";
 
-import * as fs from 'node:fs';
-
 import type { LocalContext } from "../../context";
 import { resolve_config } from "../../resolve-config";
-import { load_trees, resolve_node_identifier, split_property_reference, write_overlay } from "../../utilities";
+import { load_trees, resolve_node_identifier, not_found_message, write_overlay } from "../../utilities";
 import { respond, respond_fail, input_error } from "../../protocol/output";
 import type { DeletePreview } from "../../protocol/types";
 
 export function build_delete_command(context_: LocalContext): Command {
     return new Command("delete")
-        .description("Delete an overlay-added node, or remove a property from an overlay node or a base-tree node (base-tree nodes themselves cannot be deleted)")
+        .description("Delete an overlay-added node, or remove a property from an overlay node or a base-tree node")
         .option("--force", "Force delete of non-leaf nodes (waterfall delete)")
-        .argument("[path...]", "Path to node or property (ValidIdentifier segments)")
-        .action(async (path: string[], options) => {
+        .argument("[path]", "Path to node or property")
+        .argument("[property]", "Property name")
+        .action(async (path_argumentument: string | undefined, property_argument: string | undefined, options) => {
             const resolved = resolve_config(context_, ["context", "overlay"]);
             if (resolved === undefined) { return; }
             const { context, overlay: input } = resolved.values;
@@ -23,7 +22,7 @@ export function build_delete_command(context_: LocalContext): Command {
             if (trees === undefined) { return; }
             const { base_dt: base, overlay } = trees;
 
-            if (path.length === 0) {
+            if (path_argumentument === undefined) {
                 const preview = count_overlay_root(overlay);
 
                 if (!options.force) {
@@ -54,7 +53,36 @@ export function build_delete_command(context_: LocalContext): Command {
                 return;
             }
 
-            const identifier = path.join("/");
+            if (path_argumentument === "/" && property_argument === undefined) {
+                if (context_.json) {
+                    respond_fail({ ok: false, message: "Cannot delete the root node", severity: "error" });
+                } else {
+                    console.log("Refusing to delete the root node");
+                }
+                return;
+            }
+
+            if (property_argument !== undefined) {
+                const result = remove_overlay_property(overlay, path_argumentument, property_argument);
+                if (result === "removed") {
+                    write_overlay(input, overlay, resolved.config);
+                    if (context_.json) {
+                        respond({ ok: true, message: `Removed ${property_argument} from ${path_argumentument}`, severity: "info" });
+                    } else {
+                        console.log(`Removed ${property_argument} from ${path_argumentument} in ${input}`);
+                    }
+                } else {
+                    const message = `Not found: ${property_argument} on ${path_argumentument}`;
+                    if (context_.json) {
+                        respond_fail({ ok: false, message, severity: "error" });
+                    } else {
+                        console.log(message);
+                    }
+                }
+                return;
+            }
+
+            const identifier = path_argumentument;
 
             if (context_.json) {
                 const found = overlay.find_node(resolve_node_identifier(identifier, overlay));
@@ -83,12 +111,8 @@ export function build_delete_command(context_: LocalContext): Command {
                         return;
                     }
                     case "not-found": {
-                        if (remove_overlay_property(overlay, identifier) === "removed") {
-                            write_overlay(input, overlay, resolved.config);
-                            respond({ ok: true, message: `Removed ${identifier}`, severity: "info" });
-                            return;
-                        }
-                        respond_fail({ ok: false, message: `Node ${identifier} not found`, severity: "error" });
+                        const message = not_found_message(identifier, overlay, base);
+                        respond_fail({ ok: false, message, severity: "error" });
                         return;
                     }
                     case "in-base": {
@@ -105,12 +129,7 @@ export function build_delete_command(context_: LocalContext): Command {
 
                 switch (result) {
                     case "not-found": {
-                        if (remove_overlay_property(overlay, identifier) === "removed") {
-                            write_overlay(input, overlay, resolved.config);
-                            console.log(`Removed ${identifier} from ${input}`);
-                            return;
-                        }
-                        console.log(`Couldn't find node ${identifier} in ${input}`);
+                        console.log(not_found_message(identifier, overlay, base));
                         return;
                     }
                     case "in-base": {
@@ -189,17 +208,12 @@ export function delete_overlay_node(
     return "deleted";
 }
 
-// Remove an overlay property when the identifier's last slash-delimited segment is a
-// property name. Works for properties added onto base-tree nodes (the fragment root)
-// and properties on overlay-added nodes; the fragment is pruned if it becomes empty.
 export function remove_overlay_property(
     overlay: DeviceTreeOverlay,
-    identifier: string,
+    node_identifier: string,
+    property_name: string,
 ): "removed" | "not-found" {
-    const split = split_property_reference(identifier);
-    if (split.property_name === undefined) { return "not-found"; }
-
-    return overlay.remove_property(resolve_node_identifier(split.node_identifier, overlay), split.property_name)
+    return overlay.remove_property(resolve_node_identifier(node_identifier, overlay), property_name)
         ? "removed"
         : "not-found";
 }
@@ -344,7 +358,7 @@ if (import.meta.vitest) {
         const overlay = DeviceTreeOverlay.new_from_string(overlay_spi_with_status, base);
         if (typeof overlay === "string") { throw new TypeError(overlay); }
 
-        const result = remove_overlay_property(overlay, "spi0/status");
+        const result = remove_overlay_property(overlay, "spi0", "status");
 
         expect(result).toBe("removed");
 
@@ -368,7 +382,7 @@ if (import.meta.vitest) {
         const overlay = DeviceTreeOverlay.new_from_string(overlay_only_status, base);
         if (typeof overlay === "string") { throw new TypeError(overlay); }
 
-        expect(remove_overlay_property(overlay, "spi0/status")).toBe("removed");
+        expect(remove_overlay_property(overlay, "spi0", "status")).toBe("removed");
 
         const output = overlay.print();
 
@@ -383,7 +397,7 @@ if (import.meta.vitest) {
         const overlay = DeviceTreeOverlay.new_from_string(overlay_with_imu, base);
         if (typeof overlay === "string") { throw new TypeError(overlay); }
 
-        expect(remove_overlay_property(overlay, "imu1/compatible")).toBe("removed");
+        expect(remove_overlay_property(overlay, "imu1", "compatible")).toBe("removed");
 
         const output = overlay.print();
 
@@ -398,16 +412,6 @@ if (import.meta.vitest) {
         const overlay = DeviceTreeOverlay.new_from_string(overlay_with_imu, base);
         if (typeof overlay === "string") { throw new TypeError(overlay); }
 
-        expect(remove_overlay_property(overlay, "imu1/nonexistent")).toBe("not-found");
-    });
-
-    test("remove_overlay_property - not-found when identifier has no property segment", () => {
-        const base = DeviceTree.new_from_string(base_dts);
-        if (typeof base === "string") { throw new TypeError(base); }
-
-        const overlay = DeviceTreeOverlay.new_from_string(overlay_with_imu, base);
-        if (typeof overlay === "string") { throw new TypeError(overlay); }
-
-        expect(remove_overlay_property(overlay, "imu1")).toBe("not-found");
+        expect(remove_overlay_property(overlay, "imu1", "nonexistent")).toBe("not-found");
     });
 }

@@ -57,35 +57,40 @@ const CONFIG_GET_FIELDS: ValueSource = {
     values: CONFIG_REGISTRY.filter(spec => !spec.internal).map(spec => spec.toml),
 };
 
+const NAV: ValueSource = { kind: "suggest", suggest: "navigate" };
+const VAL: ValueSource = { kind: "suggest", suggest: "value" };
+
 export const COMPLETION_SPEC: Readonly<Record<string, CommandSpec>> = {
     add: {
-        // One compatible at most; after it only flags remain.
         positional: { mode: "byIndex", sources: [{ kind: "suggest", suggest: "device-key" }] },
-        flags: { "--to": { kind: "suggest", suggest: "parent" } },
-        // `--to spi0 adc@0` is `spi0/adc@0`: each further segment is a child of the path so far.
-        flag_rest: { "--to": { kind: "suggest", suggest: "children" } },
+        flags: { "--parent": { kind: "suggest", suggest: "parent" } },
     },
     read: {
-        positional: { mode: "all", source: { kind: "suggest", suggest: "navigate" } },
+        positional: { mode: "byIndex", sources: [NAV, NAV] },
     },
     update: {
-        positional: { mode: "all", source: { kind: "suggest", suggest: "navigate" } },
-        // The positionals are the prop-ref, so `suggest value` sees the property being set.
-        flags: { "--with": { kind: "suggest", suggest: "value" } },
+        positional: { mode: "byIndex", sources: [NAV, NAV], rest: VAL },
     },
     delete: {
-        positional: { mode: "all", source: { kind: "suggest", suggest: "navigate" } },
+        positional: { mode: "byIndex", sources: [NAV, NAV] },
     },
     move: {
-        positional: { mode: "all", source: { kind: "suggest", suggest: "navigate" } },
-        // The destination starts at an overlay entry point (spi0, i2c1, …); like
-        // `add --to`, each further segment is a child of the path so far.
-        flags: { "--to": { kind: "suggest", suggest: "entry-points" } },
-        flag_rest: { "--to": { kind: "suggest", suggest: "children" } },
+        positional: { mode: "byIndex", sources: [NAV] },
+        flags: { "--parent": { kind: "suggest", suggest: "entry-points" } },
+    },
+    rename: {
+        positional: { mode: "byIndex", sources: [NAV] },
+    },
+    enable: {
+        positional: { mode: "byIndex", sources: [NAV] },
+    },
+    disable: {
+        positional: { mode: "byIndex", sources: [NAV] },
+    },
+    validate: {
+        positional: { mode: "byIndex", sources: [NAV] },
     },
     suggest: {
-        // The kinds are exactly what list-intelligence reports; the description is
-        // the first sentence of each kind's (a period after "e.g." or "i.e." doesn't end it).
         positional: {
             mode: "byIndex",
             sources: [{
@@ -108,12 +113,7 @@ export const COMPLETION_SPEC: Readonly<Record<string, CommandSpec>> = {
     },
 };
 
-// Commands that complete their flag names but have no value completion.
 export const NO_VALUE_COMPLETION: readonly string[] = [
-    "validate",
-    "rename",
-    "enable",
-    "disable",
     "build",
     "deploy",
     "attach-manifest",

@@ -89,7 +89,7 @@ describe("__complete engine", () => {
     test("a subcommand's flags come from commander, filtered by prefix", async () => {
         const flags = values(await complete(["add", "--"]));
         expect(flags).toContain("--name");
-        expect(flags).toContain("--to");
+        expect(flags).toContain("--parent");
         expect(flags).toContain("--help");
         expect(flags).not.toContain("--overlay");
         expect(flags).not.toContain("--linux");
@@ -98,7 +98,7 @@ describe("__complete engine", () => {
     test("already-used flags are excluded", async () => {
         const flags = values(await complete(["add", "--name", "foo", "--"]));
         expect(flags).not.toContain("--name");
-        expect(flags).toContain("--to");
+        expect(flags).toContain("--parent");
     });
 
     test("validate2 offers no bogus flags (only --help)", async () => {
@@ -156,8 +156,8 @@ describe("__complete delegates dynamic values to suggest in-process", () => {
         expect(lines).toEqual(["reg\treg (required)"]);
     });
 
-    test("add --to passes the device key as parent context", async () => {
-        const lines = await complete(["add", "ad7124", "--to", ""]);
+    test("add --parent passes the device key as parent context", async () => {
+        const lines = await complete(["add", "ad7124", "--parent", ""]);
         expect(values(lines)).toEqual(["spi0"]);
         expect(vi.mocked(suggest.run_suggest).mock.calls.some(
             ([, arguments_]) => arguments_[0] === "parent" && arguments_[1] === "ad7124",
@@ -165,7 +165,7 @@ describe("__complete delegates dynamic values to suggest in-process", () => {
     });
 });
 
-describe("update --with completion", () => {
+describe("update value completion", () => {
     beforeEach(() => {
         vi.spyOn(suggest, "run_suggest").mockImplementation(async (context, arguments_) => {
             const suggestions = arguments_[0] === "value"
@@ -176,68 +176,27 @@ describe("update --with completion", () => {
     });
     afterEach(() => { vi.restoreAllMocks(); });
 
-    test("update --with completes through suggest value with the prop-ref positionals", async () => {
-        const lines = await complete(["update", "ad7124", "interrupts", "--with", ""]);
+    test("update value positional completes through suggest value", async () => {
+        const lines = await complete(["update", "ad7124", "interrupts", ""]);
         expect(lines).toEqual(["19 IRQ_TYPE_EDGE_FALLING\t19 IRQ_TYPE_EDGE_FALLING — spi_pmod1.int"]);
         expect(vi.mocked(suggest.run_suggest).mock.calls.some(
             ([, arguments_]) => arguments_.join(" ") === "value ad7124 interrupts",
         )).toBe(true);
-    });
-
-    test("update --with is variadic: after its first word only the remaining flags are offered", async () => {
-        const lines = await complete(["update", "ad7124", "interrupts", "--with", "19", ""]);
-        expect(lines.length).toBeGreaterThan(0);
-        expect(lines.every(line => line.startsWith("--"))).toBe(true);
-        expect(lines.some(line => line.startsWith("--with"))).toBe(false);
-    });
-
-    test("add --to is variadic: after a segment the remaining flags are offered, not stuck", async () => {
-        const lines = await complete(["add", "adi,ad7124-8", "--to", "spi0", ""]);
-        expect(lines.some(line => line.startsWith("--label"))).toBe(true);
-        expect(lines.some(line => line.startsWith("--to"))).toBe(false);
-    });
-});
-
-describe("add --to segment completion", () => {
-    beforeEach(() => {
-        vi.spyOn(suggest, "run_suggest").mockImplementation(async (context, arguments_) => {
-            const children: Record<string, string[]> = { "spi0": ["spidev@0", "adc@0"], "spi0/adc@0": [] };
-            const suggestions = arguments_[0] === "children"
-                ? (children[arguments_[1] ?? ""] ?? []).map(value => ({ value }))
-                : [];
-            if (context.json) { console.log(JSON.stringify({ ok: true, message: "", severity: "info", suggestions })); }
-        });
-    });
-    afterEach(() => { vi.restoreAllMocks(); });
-
-    test("each --to segment offers the children of the path so far", async () => {
-        expect(await complete(["add", "adi,ad7124-8", "--to", "spi0", ""])).toStrictEqual(["spidev@0", "adc@0"]);
-        expect(await complete(["add", "adi,ad7124-8", "--to", "spi0", "ad"])).toStrictEqual(["adc@0"]);
-        expect(vi.mocked(suggest.run_suggest).mock.calls.some(([, arguments_]) => arguments_.join(" ") === "children spi0")).toBe(true);
-    });
-
-    test("with no more children, the remaining flags are offered", async () => {
-        const lines = await complete(["add", "adi,ad7124-8", "--to", "spi0", "adc@0", ""]);
-        expect(lines.some(line => line.startsWith("--label"))).toBe(true);
-        expect(lines.some(line => line.startsWith("--to"))).toBe(false);
     });
 });
 
 describe("move completion", () => {
     beforeEach(() => {
         vi.spyOn(suggest, "run_suggest").mockImplementation(async (context, arguments_) => {
-            const by_call: Record<string, string[]> = { "navigate": ["spi0", "i2c1"], "children spi1": ["spidev@0"], "children spi1/spidev@0": [] };
+            const by_call: Record<string, string[]> = { "navigate": ["spi0", "i2c1"], "entry-points": ["spi0", "i2c1"] };
             const suggestions = (by_call[arguments_.join(" ")] ?? []).map(value => ({ value }));
             if (context.json) { console.log(JSON.stringify({ ok: true, message: "", severity: "info", suggestions })); }
         });
     });
     afterEach(() => { vi.restoreAllMocks(); });
 
-    test("--to starts at an entry point, then follows children, then the flags", async () => {
-        expect(await complete(["move", "adc", "--to", ""])).toStrictEqual(["spi0", "i2c1"]);
-        expect(await complete(["move", "adc", "--to", "spi1", ""])).toStrictEqual(["spidev@0"]);
-        const flags = await complete(["move", "adc", "--to", "spi1", "spidev@0", ""]);
-        expect(flags.some(line => line.startsWith("--help"))).toBe(true);
+    test("--parent completes entry points", async () => {
+        expect(values(await complete(["move", "adc", "--parent", ""]))).toStrictEqual(["spi0", "i2c1"]);
     });
 });
 

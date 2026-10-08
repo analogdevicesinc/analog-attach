@@ -10,6 +10,8 @@ import {
     PropertyBuilder,
     INTERRUPT_MACROS,
     GPIO_MACROS,
+    is_dt_flag,
+    print_property,
     type CellValue,
     type DTNode,
     type DTProperty,
@@ -24,9 +26,10 @@ import * as fs from "node:fs";
 
 import type { LocalContext } from "../../context";
 import { resolve_config } from "../../resolve-config";
-import { load_trees, parse_property_reference, resolve_write_target, swallowed_positional_message, overlay_print_options } from "../../utilities";
+import { load_trees, resolve_write_target, overlay_print_options, parse_node_path, not_found_message } from "../../utilities";
 import { resolve_node_binding } from "../../binding-resolution";
 import { respond, respond_fail, input_error, diagnostic } from "../../protocol/output";
+import { convert_property } from "../../protocol/dt-to-protocol";
 
 export type ShapeHint = "flag" | "strings" | "cells" | undefined;
 
@@ -89,20 +92,8 @@ export function build_raw_property(
 ): DTProperty | undefined | { error: string } {
     const parsed = parse_value(raw);
 
-    if (hint === "flag" || typeof parsed === "boolean") {
-        if (typeof parsed === "boolean") {
-            return parsed
-                ? PropertyBuilder.build_flag().set_flag().with_name(name).build()
-                : undefined;
-        }
-        const lower = raw.trim().toLowerCase();
-        if (lower === "true") {
-            return PropertyBuilder.build_flag().set_flag().with_name(name).build();
-        }
-        if (lower === "false") {
-            return undefined;
-        }
-        return { error: `Property ${name} is a flag; set it with 'true' or remove it with 'false'` };
+    if (hint === "flag") {
+        return { error: `${name} is a flag: \`update <path> ${name}\` sets it, \`delete <path> ${name}\` clears it` };
     }
 
     if (hint === "strings") {
@@ -193,10 +184,6 @@ function build_cells_from_parsed(
     name: string,
     is_label: (name: string) => boolean,
 ): DTProperty | { error: string } {
-    if (typeof parsed === "boolean") {
-        return { error: `Cannot write a boolean as cells for ${name}` };
-    }
-
     if (typeof parsed === "bigint") {
         return PropertyBuilder.build_cell_array()
             .with_tagged_values(PropertyBuilder.tag_number(parsed))
@@ -243,30 +230,103 @@ function build_cells_from_parsed(
         .build();
 }
 
+export function resolve_property_definition(
+    binding_node: DTNode | undefined,
+    binding_parent: DTNode | undefined,
+    parent_name: string,
+    base_dt: DeviceTree,
+    linux: string,
+    dtSchema: string,
+    property_name: string,
+    json: boolean,
+    quiet = false,
+): Promise<{ definition: ResolvedProperty | undefined }> {
+    return (async () => {
+        if (binding_node === undefined) { return { definition: undefined }; }
+        const binding = await resolve_node_binding(binding_node, binding_parent, parent_name, base_dt, linux, dtSchema, json);
+        if ('error' in binding) {
+            if (!quiet) { diagnostic(`Property ${property_name} written without schema validation: ${binding.error}`); }
+            return { definition: undefined };
+        }
+        const result = binding.narrow_and_populate(binding_node);
+        if (result === undefined) {
+            if (!quiet) { diagnostic(`Property ${property_name} written without schema validation: failed to narrow binding`); }
+            return { definition: undefined };
+        }
+        const definition = result.properties.find(entry => entry.key === property_name);
+        if (definition === undefined && !quiet) {
+            const origin_desc = binding.origin.kind === "compatible"
+                ? `${binding.origin.compatible} binding`
+                : `pattern "${binding.origin.pattern}" of ${binding.origin.parent_compatible}`;
+            diagnostic(`Property ${property_name} not defined by ${origin_desc}; written without schema validation`);
+        }
+        return { definition };
+    })();
+}
+
+export type UpdateDecision = "set-flag" | "read" | "value" | { error: string };
+
+export function decide_update(hint: ShapeHint, value_tokens: string[], existing_has_value: boolean): UpdateDecision {
+    if (value_tokens.length === 0) {
+        if (hint === "flag") { return "set-flag"; }
+        if (hint === undefined) {
+            return existing_has_value ? "read" : "set-flag";
+        }
+        return "read";
+    }
+    if (hint === "flag") {
+        return { error: `is a flag: \`update <path> ${""}\` sets it, \`delete <path> ${""}\` clears it` };
+    }
+    return "value";
+}
+
+function read_property(context_: LocalContext, found: FoundNodeResult | undefined, property_name: string, node_identifier: string): void {
+    if (found === undefined) {
+        if (context_.json) { respond_fail({ ok: false, message: `Not found: ${node_identifier}`, severity: "error" }); }
+        else { console.log(`Not found: ${node_identifier}`); }
+        return;
+    }
+    const property = found.node.properties.find(p => p.name === property_name);
+    if (property === undefined) {
+        if (context_.json) { respond_fail({ ok: false, message: `Not found: ${property_name} on ${node_identifier}`, severity: "error" }); }
+        else { console.log(`Property ${property_name} not set on ${node_identifier}`); }
+        return;
+    }
+    if (context_.json) {
+        respond(convert_property(property));
+    } else {
+        if (is_dt_flag(property.value)) {
+            console.log("true");
+        } else {
+            console.log(print_property(property, "", 0).trim());
+        }
+    }
+}
+
 export function build_update_command(context_: LocalContext): Command {
     return new Command("update")
-        .description("Update (upsert) a property value on an overlay-added node or a base-tree node (writes into an overlay fragment; the base tree is never modified)")
-        .requiredOption("--with <value...>", "Value to set, parsed by the tool; no quotes needed (e.g. --with 19 IRQ_TYPE_EDGE_FALLING). Takes every token after it, so put the property path first")
-        .argument("[path...]", "Path to property: node path segments followed by property name")
-        .action(async (path: string[], options) => {
-            const with_tokens = options['with'] as string[];
-            const withValue = with_tokens.join(" ");
-
-            if (path.length === 0 && with_tokens.length > 1) {
-                const message = swallowed_positional_message("property path", "--with", with_tokens, "update adc/interrupts --with 19 IRQ_TYPE_EDGE_FALLING");
-                if (context_.json) { input_error(message); return; }
-                console.log(message);
+        .description("Set a property value, or read it when no value is given. Flags are set with no value and cleared with delete.")
+        .argument("[path]", "Path to node (e.g. spi0/adi,ad7124-8@0)")
+        .argument("[property]", "Property name")
+        .argument("[value...]", "Value tokens (omit to read or set a flag)")
+        .action(async (path_argument: string | undefined, property_argument: string | undefined, value_arguments: string[]) => {
+            if (path_argument === undefined) {
+                const message = "Missing: path";
+                if (context_.json) { input_error(message); } else { console.log(message); }
+                return;
+            }
+            if (property_argument === undefined) {
+                const message = "Missing: property name";
+                if (context_.json) { input_error(message); } else { console.log(message); }
                 return;
             }
 
-            const reference = parse_property_reference(path);
-
-            if (reference === undefined) {
-                const message = "Path must include at least a node and a property name";
-                if (context_.json) { input_error(message); return; }
-                console.log(message);
+            const parsed_path = parse_node_path(path_argument);
+            if (!parsed_path.ok) {
+                if (context_.json) { input_error(parsed_path.error); } else { console.log(parsed_path.error); }
                 return;
             }
+            const node_identifier = parsed_path.value;
 
             const resolved = resolve_config(context_, ["overlay", "context", "linux", "dtSchema"]);
             if (resolved === undefined) { return; }
@@ -276,50 +336,68 @@ export function build_update_command(context_: LocalContext): Command {
             if (trees === undefined) { return; }
             const { base_dt, overlay } = trees;
 
-            const { node_identifier, property_name } = reference;
             const { target_reference, found, is_base_target, binding_node, binding_parent, parent_name } =
                 resolve_write_target(node_identifier, overlay, base_dt);
 
             if (found === undefined && !is_base_target) {
+                const message = not_found_message(node_identifier, overlay, base_dt);
                 if (context_.json) {
-                    respond_fail({ ok: false, message: `Node ${node_identifier} not found`, severity: "error" });
+                    respond_fail({ ok: false, message, severity: "error" });
                 } else {
-                    console.log(`Couldn't find ${node_identifier} in ${input}`);
+                    console.log(message);
                 }
                 return;
             }
 
-            let property_definition: ResolvedProperty | undefined;
-
-            if (binding_node !== undefined) {
-                const binding = await resolve_node_binding(binding_node, binding_parent, parent_name, base_dt, linux, dtSchema, context_.json);
-
-                if ('error' in binding) {
-                    diagnostic(`Property ${property_name} written without schema validation: ${binding.error}`);
-                } else {
-                    const result = binding.narrow_and_populate(binding_node);
-                    if (result === undefined) {
-                        diagnostic(`Property ${property_name} written without schema validation: failed to narrow binding`);
-                    } else {
-                        property_definition = result.properties.find(entry => entry.key === property_name);
-                        if (property_definition === undefined) {
-                            const origin_desc = binding.origin.kind === "compatible"
-                                ? `${binding.origin.compatible} binding`
-                                : `pattern "${binding.origin.pattern}" of ${binding.origin.parent_compatible}`;
-                            diagnostic(`Property ${property_name} not defined by ${origin_desc}; written without schema validation`);
-                        }
-                    }
-                }
-            }
+            const property_name = property_argument;
+            const { definition: property_definition } = await resolve_property_definition(
+                binding_node, binding_parent, parent_name, base_dt, linux, dtSchema,
+                property_name, context_.json, value_arguments.length === 0,
+            );
 
             const hint = shape_hint(property_definition);
 
+            const existing_property = found?.node.properties.find(p => p.name === property_name);
+            const existing_has_value = existing_property !== undefined && !is_dt_flag(existing_property.value);
+
+            const decision = decide_update(hint, value_arguments, existing_has_value);
+
+            if (typeof decision === "object" && "error" in decision) {
+                const message = `${property_name} ${decision.error}`;
+                if (context_.json) { respond_fail({ ok: false, message, severity: "error" }); }
+                else { console.log(message); }
+                return;
+            }
+
+            if (decision === "read") {
+                read_property(context_, found, property_name, node_identifier);
+                return;
+            }
+
+            if (decision === "set-flag") {
+                const built = PropertyBuilder.build_flag().set_flag().with_name(property_name).build();
+                place_property(overlay, target_reference, found, is_base_target, built, property_name);
+                const printed = overlay.print(overlay_print_options(resolved.config));
+                const test_parse = DeviceTreeOverlay.new_from_string(printed, base_dt);
+                if (typeof test_parse === "string") {
+                    if (context_.json) { respond_fail({ ok: false, message: `Update would produce an unreadable overlay: ${test_parse}`, severity: "error" }); }
+                    else { console.log(`Update would produce an unreadable overlay: ${test_parse}`); }
+                    return;
+                }
+                fs.writeFileSync(input, printed);
+                if (context_.json) { respond({ ok: true, message: `Set flag ${property_name} on ${node_identifier}`, severity: "info" }); }
+                else { console.log(`Set flag ${property_name} on ${node_identifier}`); }
+                return;
+            }
+
+            // decision === "value"
+            const with_value = value_arguments.join(" ");
             const is_label = (name: string): boolean => {
                 if (base_dt.get_node_by_label({ kind: "label", labels: [], name }) !== undefined) { return true; }
                 return overlay.find_node({ kind: "label", labels: [], name }) !== undefined;
             };
 
-            const built = build_raw_property(withValue, property_name, hint, is_label);
+            const built = build_raw_property(with_value, property_name, hint, is_label);
 
             if (built !== null && typeof built === "object" && "error" in built) {
                 if (context_.json) {
@@ -347,7 +425,7 @@ export function build_update_command(context_: LocalContext): Command {
             fs.writeFileSync(input, printed);
 
             if (context_.json) {
-                respond({ ok: true, message: `Updated ${property_name}`, severity: "info" });
+                respond({ ok: true, message: `Set ${property_name} on ${node_identifier}`, severity: "info" });
             } else {
                 console.log(`Set ${property_name} on ${node_identifier}`);
             }
@@ -355,7 +433,7 @@ export function build_update_command(context_: LocalContext): Command {
 }
 
 type ParsedInputValue = SingleInput | ArrayInput | MatrixInput;
-type SingleInput = boolean | bigint | string;
+type SingleInput = bigint | string;
 type ArrayInput = (bigint | string)[];
 type MatrixInput = ArrayInput[];
 
@@ -365,10 +443,6 @@ function parse_token(token: string): bigint | string {
 
 export function parse_value(value: string): ParsedInputValue {
     value = value.trim();
-
-    const lowerValue = value.toLowerCase();
-    if (lowerValue === 'true') { return true; }
-    if (lowerValue === 'false') { return false; }
 
     const rows: MatrixInput = value
         .split(',')
@@ -389,9 +463,8 @@ export function format_value(rows: SuggestedCell[][]): string {
         .join(",");
 }
 
-/** `--with` text for a suggestion: a flag as true/false, strings space-separated, otherwise its cell rows. */
 export function format_suggestion(suggestion: Pick<ValueSuggestion, "rows" | "strings" | "flag">): string {
-    if (suggestion.flag !== undefined) { return String(suggestion.flag); }
+    if (suggestion.flag !== undefined) { return ""; }
     if (suggestion.strings !== undefined) { return suggestion.strings.join(" "); }
     return format_value(suggestion.rows);
 }
@@ -541,14 +614,23 @@ if (import.meta.vitest) {
         expect(property.value).toMatchObject([{ kind: "string", value: "okay" }]);
     });
 
-    test("build_raw_property — flags work as before", () => {
-        const result_true = build_raw_property("true", "wakeup-source", "flag", base_is_label);
+    test("build_raw_property — flag hint rejects any value", () => {
+        const result = build_raw_property("true", "wakeup-source", "flag", base_is_label);
+        expect(result).toBeDefined();
+        expect("error" in result!).toBe(true);
+        expect((result as { error: string }).error).toContain("is a flag");
+    });
+
+    test("build_raw_property — with no hint, true and false are strings", () => {
+        const result_true = build_raw_property("true", "my-prop", undefined, base_is_label);
         expect(result_true).toBeDefined();
         expect("error" in result_true!).toBe(false);
-        expect((result_true as DTProperty).value).toEqual({ kind: "flag" });
+        expect((result_true as DTProperty).value).toMatchObject([{ kind: "string", value: "true" }]);
 
-        const result_false = build_raw_property("false", "wakeup-source", "flag", base_is_label);
-        expect(result_false).toBeUndefined();
+        const result_false = build_raw_property("false", "my-prop", undefined, base_is_label);
+        expect(result_false).toBeDefined();
+        expect("error" in result_false!).toBe(false);
+        expect((result_false as DTProperty).value).toMatchObject([{ kind: "string", value: "false" }]);
     });
 
     test("build_raw_property — multi-row cells matrix", () => {
@@ -565,8 +647,8 @@ if (import.meta.vitest) {
     test("parse_value - scalars, flat arrays, and comma-separated matrices", () => {
         expect(parse_value("0")).toBe(0n);
         expect(parse_value("some_label")).toBe("some_label");
-        expect(parse_value("true")).toBe(true);
-        expect(parse_value("false")).toBe(false);
+        expect(parse_value("true")).toBe("true");
+        expect(parse_value("false")).toBe("false");
         expect(parse_value("a b c")).toEqual(["a", "b", "c"]);
         expect(parse_value("1 2")).toEqual([1n, 2n]);
         expect(parse_value("1 2,3 4")).toEqual([[1n, 2n], [3n, 4n]]);
@@ -588,11 +670,10 @@ if (import.meta.vitest) {
         }
     });
 
-    test("format_suggestion - string and flag suggestions build the right property", () => {
+    test("format_suggestion - string and flag suggestions build the right value text", () => {
         const strings = build_raw_property(format_suggestion({ rows: [], strings: ["mclk"] }), "clock-names", "strings", () => false) as DTProperty;
         expect(strings.value).toMatchObject([{ kind: "string", value: "mclk" }]);
-        const flag = build_raw_property(format_suggestion({ rows: [], flag: true }), "spi-cpol", "flag", () => false) as DTProperty;
-        expect(flag.value).toStrictEqual({ kind: "flag" });
+        expect(format_suggestion({ rows: [], flag: true })).toBe("");
         expect(format_suggestion({ rows: [[19n, { macro: "IRQ_TYPE_EDGE_RISING" }]] })).toBe("19 IRQ_TYPE_EDGE_RISING");
     });
 
@@ -653,6 +734,34 @@ if (import.meta.vitest) {
         ]);
     });
 
+    test("decide_update — known flag, no value → set-flag", () => {
+        expect(decide_update("flag", [], false)).toBe("set-flag");
+    });
+
+    test("decide_update — known non-flag, no value → read", () => {
+        expect(decide_update("cells", [], false)).toBe("read");
+        expect(decide_update("strings", [], false)).toBe("read");
+    });
+
+    test("decide_update — unknown and absent, no value → set-flag", () => {
+        expect(decide_update(undefined, [], false)).toBe("set-flag");
+    });
+
+    test("decide_update — unknown and present with value, no value → read", () => {
+        expect(decide_update(undefined, [], true)).toBe("read");
+    });
+
+    test("decide_update — value under flag hint → error", () => {
+        const result = decide_update("flag", ["true"], false);
+        expect(typeof result).toBe("object");
+        expect((result as { error: string }).error).toContain("is a flag");
+    });
+
+    test("decide_update — value with any other hint → value", () => {
+        expect(decide_update("cells", ["19", "2"], false)).toBe("value");
+        expect(decide_update(undefined, ["okay"], false)).toBe("value");
+    });
+
     test("place_property - writes a true multi-row matrix as separate <...> groups", () => {
         const { overlay } = parse(empty_overlay);
         const target: DTLabel = { kind: "label", labels: [], name: "spi0" };
@@ -699,7 +808,7 @@ if (import.meta.vitest) {
         const { overlay } = parse(empty_overlay);
         const target: DTLabel = { kind: "label", labels: [], name: "spi0" };
 
-        const built = build_raw_property("true", "wakeup-source", "flag", () => false) as DTProperty;
+        const built = PropertyBuilder.build_flag().set_flag().with_name("wakeup-source").build();
         place_property(overlay, target, undefined, true, built, "wakeup-source");
         expect(overlay.get_fragments().length).toBe(1);
 

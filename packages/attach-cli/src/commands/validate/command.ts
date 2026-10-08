@@ -11,7 +11,7 @@ import {
 
 import * as fs from 'node:fs';
 
-import { bigIntReplacer, find_binding, load_trees, resolve_node_identifier, resolve_positional_path } from "../../utilities";
+import { bigIntReplacer, find_binding, load_trees, resolve_node_identifier } from "../../utilities";
 import { resolve_node_binding } from "../../binding-resolution";
 import { resolve_config } from "../../resolve-config";
 import type { LocalContext } from "../../context";
@@ -21,8 +21,8 @@ import { respond, input_error } from "../../protocol/output";
 export function build_validate_command(context_: LocalContext): Command {
     return new Command("validate")
         .description("Validate a device node in a DTSO against its binding")
-        .argument("[path...]", "Path segments to the node to validate (e.g. spi0 imu1, or /soc/spi@7e204000/imu1)")
-        .action(async (path_arguments: string[], options) => {
+        .argument("[path]", "Path to node (e.g. spi0/imu1, /soc/spi@7e204000/imu1)")
+        .action(async (path_argument: string | undefined) => {
             const resolved = resolve_config(context_, ["linux", "dtSchema", "context", "overlay"]);
             if (resolved === undefined) { return; }
             const { linux, dtSchema, context, overlay: input } = resolved.values;
@@ -31,7 +31,7 @@ export function build_validate_command(context_: LocalContext): Command {
             if (trees === undefined) { return; }
             const { base_dt, overlay } = trees;
 
-            const node_identifier = resolve_positional_path(path_arguments);
+            const node_identifier = path_argument;
 
             if (node_identifier === undefined) {
                 if (context_.json) {
@@ -71,14 +71,14 @@ export function build_validate_command(context_: LocalContext): Command {
                 const result = binding.narrow_and_populate(found_node);
 
                 if (result === undefined) {
-                    const msg = binding.origin.kind === "pattern"
+                    const message = binding.origin.kind === "pattern"
                         ? `Failed to validate against pattern "${binding.origin.pattern}" of ${binding.origin.parent_compatible}`
                         : `Failed to validate binding`;
                     if (context_.json) {
-                        respond({ errors: [{ kind: "generic", path: path_segs, message: msg }], warnings: [] } satisfies ValidationResponse);
+                        respond({ errors: [{ kind: "generic", path: path_segs, message: message }], warnings: [] } satisfies ValidationResponse);
                         return;
                     }
-                    console.log(msg);
+                    console.log(message);
                     return;
                 }
 
@@ -191,7 +191,7 @@ function map_validation_errors(errors: any[], node_path: string[]): ValidationEr
                 return { kind: "generic" as const, path: node_path, message: `Property ${error.dependent_property} requires ${error.missing_property}` };
             }
             case "generic": {
-                return { kind: "generic" as const, path: node_path, message: error.msg ?? String(error.origin) };
+                return { kind: "generic" as const, path: node_path, message: error.message ?? String(error.origin) };
             }
             default: {
                 return { kind: "generic" as const, path: node_path, message: JSON.stringify(error) };

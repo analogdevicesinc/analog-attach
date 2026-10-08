@@ -19,14 +19,104 @@ import type { LocalContext } from "./context";
 import { load_compat_index, save_compat_index, type AttachConfig, type CompatIndex } from "./config";
 import { input_error } from "./protocol/output";
 
-/**
- * Message for a required positional that is missing because a variadic flag
- * given first swallowed it: `update --with 19 IRQ_TYPE_EDGE_FALLING adc/interrupts`
- * hands every token after `--with` to the flag, path included. `tokens` are
- * what the flag received.
- */
-export function swallowed_positional_message(positional: string, flag: string, tokens: string[], example: string): string {
-    return `Missing: ${positional}. ${flag} takes every token after it (here: ${tokens.join(" ")}), so put the ${positional} before it, e.g. ${example}`;
+// --- New shared path helpers (Group A) ---
+
+export type Parsed<T> = { ok: true; value: T } | { ok: false; error: string };
+
+export function parse_node_path(raw: string): Parsed<string> {
+    if (raw === "") { return { ok: false, error: "Missing: path" }; }
+    if (raw.startsWith("&")) {
+        const bare = raw.startsWith("&{") && raw.endsWith("}") ? raw.slice(2, -1) : raw.slice(1);
+        return { ok: false, error: `Use the bare form: ${bare}` };
+    }
+    if (/\s/.test(raw)) { return { ok: false, error: "a path is one token (join segments with /)" }; }
+    if (raw.includes("//")) { return { ok: false, error: `empty segment in path: ${raw}` }; }
+    const normalized = raw === "/" ? "/" : raw.replace(/\/$/, "");
+    return { ok: true, value: normalized };
+}
+
+export function parse_property_name(raw: string): Parsed<string> {
+    if (raw === "") { return { ok: false, error: "Missing: property name" }; }
+    if (raw.includes("/")) { return { ok: false, error: "pass node and property separately" }; }
+    return { ok: true, value: raw };
+}
+
+export interface ResolvedPath {
+    reference: DTLabel | DTPath;
+    in_overlay: FoundNodeResult | undefined;
+    in_base: { node_name: string; full_path: DTPath; labels: DTLabel[] } | undefined;
+}
+
+export function resolve_path(path_string: string, overlay: DeviceTreeOverlay, base?: DeviceTree): ResolvedPath {
+    const reference = resolve_node_identifier(path_string, overlay);
+    const in_overlay = overlay.find_node(reference);
+    let in_base: ResolvedPath["in_base"];
+    if (base !== undefined) {
+        const found = reference.kind === "path"
+            ? base.get_node_by_path(reference)
+            : base.get_node_by_label(reference);
+        in_base = found ?? undefined;
+    }
+    return { reference, in_overlay, in_base };
+}
+
+export function base_target(resolved: ResolvedPath): DTLabel | DTPath | undefined {
+    if (resolved.in_base === undefined) { return undefined; }
+    if (resolved.in_base.labels.length > 0) {
+        return { kind: "label", labels: [], name: resolved.in_base.labels[0]!.name };
+    }
+    return resolved.in_base.full_path;
+}
+
+export function not_found_message(path_string: string, overlay: DeviceTreeOverlay, base?: DeviceTree): string {
+    const split = split_property_reference(path_string);
+    if (split.property_name !== undefined) {
+        const parent = resolve_path(split.node_identifier, overlay, base);
+        if (parent.in_overlay !== undefined || parent.in_base !== undefined) {
+            return `Not found: ${path_string} (the property is a separate argument: <path> <property>)`;
+        }
+    }
+    if (!path_string.startsWith("/") && path_string.includes("/")) {
+        return `Not found: ${path_string}`;
+    }
+    return `Not found: ${path_string}`;
+}
+
+import type { LocalContext as LocalContextType } from "./context";
+
+export function parse_target(
+    context_: LocalContextType,
+    path_raw: string | undefined,
+    property_raw: string | undefined,
+    need: { path: "required" | "optional"; property: "required" | "optional" | "none" },
+): { path: string | undefined; property: string | undefined } | undefined {
+    if (need.path === "required" && path_raw === undefined) {
+        const message = "Missing: path";
+        if (context_.json) { input_error(message); } else { console.log(message); }
+        return undefined;
+    }
+    if (path_raw !== undefined) {
+        const parsed = parse_node_path(path_raw);
+        if (!parsed.ok) {
+            if (context_.json) { input_error(parsed.error); } else { console.log(parsed.error); }
+            return undefined;
+        }
+        path_raw = parsed.value;
+    }
+    if (need.property === "required" && property_raw === undefined) {
+        const message = "Missing: property name";
+        if (context_.json) { input_error(message); } else { console.log(message); }
+        return undefined;
+    }
+    if (property_raw !== undefined) {
+        const parsed = parse_property_name(property_raw);
+        if (!parsed.ok) {
+            if (context_.json) { input_error(parsed.error); } else { console.log(parsed.error); }
+            return undefined;
+        }
+        property_raw = parsed.value;
+    }
+    return { path: path_raw, property: property_raw };
 }
 
 /** Substitute `{name}` placeholders in a command template, quoting each value so spaces are tolerated. */
@@ -226,6 +316,7 @@ export async function build_compat_index(linux: string, dtSchema: string): Promi
     return index;
 }
 
+/** @deprecated Use parse_node_path instead. Kept only for suggest callers pending Group B. */
 export function resolve_positional_path(arguments_: string[]): string | undefined {
     if (arguments_.length === 0) { return undefined; }
     const first = arguments_[0]!;
@@ -404,6 +495,59 @@ if (import.meta.vitest) {
         const resolved = resolve_node_identifier("&{/soc/spi@7e204000}", overlay);
         expect(resolved).toEqual({ kind: "path", labels: [], path: "&{/soc/spi@7e204000}" });
         expect(overlay.find_node(resolved)).toBeUndefined();
+    });
+
+    test("parse_node_path — valid forms", () => {
+        expect(parse_node_path("spi0")).toEqual({ ok: true, value: "spi0" });
+        expect(parse_node_path("spi0/adc@0")).toEqual({ ok: true, value: "spi0/adc@0" });
+        expect(parse_node_path("/soc/spi@7e204000")).toEqual({ ok: true, value: "/soc/spi@7e204000" });
+        expect(parse_node_path("/")).toEqual({ ok: true, value: "/" });
+    });
+
+    test("parse_node_path — trailing slash stripped", () => {
+        expect(parse_node_path("spi0/")).toEqual({ ok: true, value: "spi0" });
+    });
+
+    test("parse_node_path — errors", () => {
+        expect(parse_node_path("")).toEqual({ ok: false, error: "Missing: path" });
+        expect(parse_node_path("&spi0").ok).toBe(false);
+        expect(parse_node_path("&{/x}").ok).toBe(false);
+        expect(parse_node_path("spi0//x").ok).toBe(false);
+    });
+
+    test("parse_property_name — valid and invalid", () => {
+        expect(parse_property_name("reg")).toEqual({ ok: true, value: "reg" });
+        expect(parse_property_name("#address-cells")).toEqual({ ok: true, value: "#address-cells" });
+        expect(parse_property_name("")).toEqual({ ok: false, error: "Missing: property name" });
+        expect(parse_property_name("adc@0/reg").ok).toBe(false);
+    });
+
+    test("resolve_path — a base child via label", () => {
+        const base = DT.new_from_string(base_dts);
+        if (typeof base === "string") { throw new TypeError(base); }
+        const overlay = DTO.new_from_string(`/dts-v1/; /plugin/; &spi0 {};`, base);
+        if (typeof overlay === "string") { throw new TypeError(overlay); }
+        const resolved = resolve_path("spi0", overlay, base);
+        expect(resolved.in_overlay).toBeDefined();
+        expect(resolved.in_base).toBeDefined();
+    });
+
+    test("resolve_path — overlay label/child", () => {
+        const base = DT.new_from_string(base_dts);
+        if (typeof base === "string") { throw new TypeError(base); }
+        const overlay = DTO.new_from_string(`/dts-v1/; /plugin/; &spi0 { adc: adc@0 { reg = <0>; }; };`, base);
+        if (typeof overlay === "string") { throw new TypeError(overlay); }
+        const resolved = resolve_path("spi0/adc@0", overlay, base);
+        expect(resolved.in_overlay).toBeDefined();
+    });
+
+    test("not_found_message — hint for old syntax", () => {
+        const base = DT.new_from_string(base_dts);
+        if (typeof base === "string") { throw new TypeError(base); }
+        const overlay = DTO.new_from_string(`/dts-v1/; /plugin/; &spi0 { adc: adc@0 { reg = <0>; }; };`, base);
+        if (typeof overlay === "string") { throw new TypeError(overlay); }
+        const message = not_found_message("spi0/adc@0/reg", overlay, base);
+        expect(message).toContain("the property is a separate argument");
     });
 }
 

@@ -3,7 +3,7 @@ import { DeviceTree, DeviceTreeOverlay, NodeBuilder, PropertyBuilder, type DTPro
 
 import type { LocalContext } from "../../context";
 import { load_config, check_config, check_failure_message } from "../../config";
-import { find_binding, load_trees, resolve_node_identifier, write_overlay } from "../../utilities";
+import { find_binding, load_trees, resolve_node_identifier, resolve_path, base_target, write_overlay } from "../../utilities";
 import { resolve_config } from "../../resolve-config";
 import { respond, respond_fail, input_error, diagnostic } from "../../protocol/output";
 import type { AddResponse } from "../../protocol/types";
@@ -15,12 +15,12 @@ export type AddResult =
 
 export function build_add_command(context_: LocalContext): Command {
     return new Command("add")
-        .description("Add a new node to an existing dtso. Two patterns: (A) device node with a compatible string — pass the compatible string as a positional arg (e.g. `add adi,ad7124-8 --to spi0`); (B) bare structural subnode without a compatible (channel, alias, bus sub-node) — pass `--name <node-name> --to <parent>` only, no positional arg.")
-        .option("--name <value>", "Node name (e.g. channel@0); defaults to the positional key")
-        .option("--to <value...>", "Parent node: label, path, or label/child (e.g. spi0, /soc/spi@7e204000, spi0/mux)")
+        .description("Add a device node to an overlay (e.g. `add adi,ad7124-8 --parent spi0`). Use `update <path> <child>` for child nodes like channels.")
+        .option("--name <value>", "Node name override (e.g. adc@0); defaults to the compatible string")
+        .option("--parent <value>", "Parent node: label or path (e.g. spi0, /soc/spi@7e204000)")
         .option("--label <value>", "Label to attach to the new node (e.g. imu1)")
-        .argument("[key]", "Device key / compatible string of the device binding to add")
-        .action(async (key: string | undefined, options) => {
+        .argument("<key>", "Compatible string of the device binding to add")
+        .action(async (key: string, options) => {
             const pre_config = load_config() ?? {};
             const pre_check = check_config(pre_config, ["linux", "dtSchema", "context"]);
             if (!pre_check.ok) {
@@ -48,14 +48,7 @@ export function build_add_command(context_: LocalContext): Command {
             const { linux, dtSchema, context, overlay: input } = resolved.values;
 
             const { name, label } = options;
-            // Segments are joined like a meta path: `--to spi0 my_adc` is `spi0/my_adc`.
-            const to: string | undefined = options.to === undefined ? undefined : (options.to as string[]).join("/");
-
-            if (key === undefined && name === undefined) {
-                if (context_.json) { input_error("key or --name required"); return; }
-                console.log("Missing: key (positional) or --name (at least one is required)");
-                return;
-            }
+            const to: string | undefined = options.parent;
 
             const trees = load_trees(context_, context, input, resolved.parsed.context);
             if (trees === undefined) { return; }
@@ -74,7 +67,7 @@ export function build_add_command(context_: LocalContext): Command {
                 }
             }
 
-            const node_name = name ?? key!;
+            const node_name = name ?? key;
             const result = add_overlay_node(base, overlay, node_name, to, label, key);
 
             switch (result.status) {
@@ -89,9 +82,9 @@ export function build_add_command(context_: LocalContext): Command {
                 case "added": {
                     write_overlay(input, overlay, resolved.config);
                     const added_message = `Added ${node_name}`;
-                    const full_message = created_message !== undefined
-                        ? `${created_message}; ${added_message}`
-                        : added_message;
+                    const full_message = created_message === undefined
+                        ? added_message
+                        : `${created_message}; ${added_message}`;
                     if (context_.json) {
                         const response: AddResponse = {
                             ok: true,
@@ -157,13 +150,13 @@ export function add_overlay_node(
         return { status: "added", key: node_key, path: path_segments };
     }
 
-    const in_overlay = overlay.find_node(resolve_node_identifier(parent_identifier, overlay));
-    if (in_overlay !== undefined) {
-        in_overlay.node.children.push(new_node.build());
+    const resolved = resolve_path(parent_identifier, overlay, base);
+    if (resolved.in_overlay !== undefined) {
+        resolved.in_overlay.node.children.push(new_node.build());
 
         const found = overlay.find_node(
             label === undefined
-                ? { kind: "path", labels: [], path: `${in_overlay.node_path}/${node_key}` }
+                ? { kind: "path", labels: [], path: `${resolved.in_overlay.node_path}/${node_key}` }
                 : { kind: "label", labels: [], name: label }
         );
         const path_segments = found === undefined ? [node_key] : found.node_path.split("/").filter(Boolean);
@@ -171,13 +164,13 @@ export function add_overlay_node(
         return { status: "added", key: node_key, path: path_segments };
     }
 
-    const in_base = base.resolve_identifier(parent_identifier);
-    if (in_base === undefined) {
+    const base_reference = base_target(resolved);
+    if (base_reference === undefined) {
         return { status: "parent-not-found" };
     }
 
     // eslint-disable-next-line unicorn/no-useless-undefined
-    overlay.add_fragment(in_base, new_node, undefined);
+    overlay.add_fragment(base_reference, new_node, undefined);
 
     const found = overlay.find_node(
         label === undefined
