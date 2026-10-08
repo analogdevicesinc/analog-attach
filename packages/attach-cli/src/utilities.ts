@@ -6,6 +6,7 @@ import {
     type DTLabel,
     type DTNode,
     type DTPath,
+    type DtoPrintOptions,
     type FoundNodeResult,
 } from 'attach-lib';
 
@@ -15,7 +16,7 @@ import * as fs from 'node:fs';
 import path from "node:path";
 
 import type { LocalContext } from "./context";
-import { load_compat_index, save_compat_index, type CompatIndex } from "./config";
+import { load_compat_index, save_compat_index, type AttachConfig, type CompatIndex } from "./config";
 import { input_error } from "./protocol/output";
 
 /**
@@ -451,4 +452,19 @@ export async function find_binding(linux: string, dtSchema: string, compatible_t
     }
 
     return;
+}
+
+export function overlay_print_options(config: AttachConfig): DtoPrintOptions {
+    const syntax = config.overlaySyntax;
+    if (syntax === "fragment" || syntax === "label") {
+        return { syntax };
+    }
+    if (syntax !== undefined) {
+        console.error(`Unknown overlay-syntax "${syntax}", using fragment`);
+    }
+    return { syntax: "fragment" };
+}
+
+export function write_overlay(file: string, overlay: DeviceTreeOverlay, config: AttachConfig): void {
+    fs.writeFileSync(file, overlay.print(overlay_print_options(config)));
 }

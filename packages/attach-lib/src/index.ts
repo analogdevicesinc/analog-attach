@@ -24,7 +24,7 @@ export {
     type DTPath,
     type CellArrayElement,
 } from './Devicetree/Parser/AST.js';
-export { print_property } from './Devicetree/Printer.js';
+export { print_property, type OverlaySyntax, type DtoPrintOptions } from './Devicetree/Printer.js';
 export type { CellValue, FoundNodeResult } from './Devicetree/Types.js';
 export { NodeBuilder } from './Devicetree/NodeBuilder.js';
 export { PropertyBuilder } from './Devicetree/PropertyBuilder.js';

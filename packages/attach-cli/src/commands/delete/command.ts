@@ -5,7 +5,7 @@ import * as fs from 'node:fs';
 
 import type { LocalContext } from "../../context";
 import { resolve_config } from "../../resolve-config";
-import { load_trees, resolve_node_identifier, split_property_reference } from "../../utilities";
+import { load_trees, resolve_node_identifier, split_property_reference, write_overlay } from "../../utilities";
 import { respond, respond_fail, input_error } from "../../protocol/output";
 import type { DeletePreview } from "../../protocol/types";
 
@@ -45,7 +45,7 @@ export function build_delete_command(context_: LocalContext): Command {
                 }
 
                 overlay.delete_all();
-                fs.writeFileSync(input, overlay.print());
+                write_overlay(input, overlay, resolved.config);
                 if (context_.json) {
                     respond({ ok: true, message: "Deleted all overlay content", severity: "info" });
                 } else {
@@ -78,13 +78,13 @@ export function build_delete_command(context_: LocalContext): Command {
 
                 switch (result) {
                     case "deleted": {
-                        fs.writeFileSync(input, overlay.print());
+                        write_overlay(input, overlay, resolved.config);
                         respond({ ok: true, message: `Deleted ${identifier}`, severity: "info" });
                         return;
                     }
                     case "not-found": {
                         if (remove_overlay_property(overlay, identifier) === "removed") {
-                            fs.writeFileSync(input, overlay.print());
+                            write_overlay(input, overlay, resolved.config);
                             respond({ ok: true, message: `Removed ${identifier}`, severity: "info" });
                             return;
                         }
@@ -106,7 +106,7 @@ export function build_delete_command(context_: LocalContext): Command {
                 switch (result) {
                     case "not-found": {
                         if (remove_overlay_property(overlay, identifier) === "removed") {
-                            fs.writeFileSync(input, overlay.print());
+                            write_overlay(input, overlay, resolved.config);
                             console.log(`Removed ${identifier} from ${input}`);
                             return;
                         }
@@ -122,7 +122,7 @@ export function build_delete_command(context_: LocalContext): Command {
                         return;
                     }
                     case "deleted": {
-                        fs.writeFileSync(input, overlay.print());
+                        write_overlay(input, overlay, resolved.config);
                         console.log(`Deleted ${identifier} from ${input}`);
                         return;
                     }
