@@ -10,6 +10,8 @@ import type {
     ResolvedProperty,
     PatternPropertyRule,
     PopulateOptions,
+    ControllerContext,
+    ParseOptions,
 } from "attach-lib";
 
 import { find_binding, bigIntReplacer } from "./utilities";
@@ -45,8 +47,8 @@ export async function resolve_node_binding(
     linux: string,
     dtSchema: string,
     json: boolean,
-    // Extra intelligence layers (e.g. a board) and the node's placement, forwarded to Attach.populate_*.
     options?: PopulateOptions,
+    parent_compatibles?: string[],
 ): Promise<NodeBinding | { error: string }> {
     const compatible_property = found_node.properties.find(p => p.name === "compatible");
 
@@ -65,7 +67,17 @@ export async function resolve_node_binding(
             return { error: `No binding found for ${compatible_value}` };
         }
 
-        const initial = await Attach.new_populated_binding(binding_path, linux, dtSchema, base_dt, found_node, parent_name, options);
+        let controller_context: ControllerContext | undefined;
+        if (parent_compatibles !== undefined && parent_compatibles.length > 0) {
+            let controller_binding_path: string | undefined;
+            for (const compat of parent_compatibles) {
+                controller_binding_path = await find_binding(linux, dtSchema, compat, true);
+                if (controller_binding_path !== undefined) { break; }
+            }
+            controller_context = { compatibles: parent_compatibles, binding_path: controller_binding_path };
+        }
+        const parse_options: ParseOptions | undefined = controller_context !== undefined ? { controller: controller_context } : undefined;
+        const initial = await Attach.new_populated_binding(binding_path, linux, dtSchema, base_dt, found_node, parent_name, options, parse_options);
         if (initial === undefined) {
             return { error: `Failed to parse binding ${binding_path}` };
         }

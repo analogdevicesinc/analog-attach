@@ -363,6 +363,7 @@ export interface WriteTarget {
     binding_node: DTNode | undefined;
     binding_parent: DTNode | undefined;
     parent_name: string;
+    parent_compatibles: string[];
 }
 
 export function resolve_write_target(
@@ -394,7 +395,9 @@ export function resolve_write_target(
         parent_name = found.node.labels.at(-1) ?? found.node_path;
     }
 
-    return { target_reference, found, is_base_target, binding_node, binding_parent, parent_name };
+    const node_path = found?.node_path ?? (base_reference !== undefined ? base_reference.full_path.path : "");
+    const parent_compats = effective_parent_compatibles(binding_parent, node_path, base_dt);
+    return { target_reference, found, is_base_target, binding_node, binding_parent, parent_name, parent_compatibles: parent_compats };
 }
 
 export function load_trees(
@@ -549,6 +552,23 @@ if (import.meta.vitest) {
         const message = not_found_message("spi0/adc@0/reg", overlay, base);
         expect(message).toContain("the property is a separate argument");
     });
+
+    test("effective_parent_compatibles — overlay __overlay__ parent resolves via base tree", () => {
+        const base_with_compat = DT.new_from_string(`/dts-v1/; / { soc { spi0: spi@7e204000 { compatible = "brcm,bcm2835-spi"; }; }; };`);
+        if (typeof base_with_compat === "string") { throw new TypeError(base_with_compat); }
+        const overlay = DTO.new_from_string(`/dts-v1/; /plugin/; &spi0 { adc@0 { reg = <0>; }; };`, base_with_compat);
+        if (typeof overlay === "string") { throw new TypeError(overlay); }
+        const found = overlay.find_node({ kind: "path", labels: [], path: "/soc/spi@7e204000/adc@0" });
+        expect(found).toBeDefined();
+        const parent_compats = effective_parent_compatibles(found!.parent_node, found!.node_path, base_with_compat);
+        expect(parent_compats).toEqual(["brcm,bcm2835-spi"]);
+    });
+
+    test("effective_parent_compatibles — missing parent → empty", () => {
+        const base = DT.new_from_string(base_dts);
+        if (typeof base === "string") { throw new TypeError(base); }
+        expect(effective_parent_compatibles(undefined, "unknown", base)).toEqual([]);
+    });
 }
 
 /**
@@ -596,6 +616,34 @@ export async function find_binding(linux: string, dtSchema: string, compatible_t
     }
 
     return;
+}
+
+export function node_compatibles(node: DTNode): string[] {
+    const compatible = node.properties.find(p => p.name === "compatible");
+    if (compatible === undefined || is_dt_flag(compatible.value)) { return []; }
+    return compatible.value
+        .filter(v => v.kind === "string")
+        .map(v => (v as { kind: "string"; value: string }).value);
+}
+
+export function effective_parent_compatibles(
+    parent_node: DTNode | undefined,
+    node_path: string,
+    base_dt: DeviceTree,
+): string[] {
+    if (parent_node !== undefined) {
+        const compatibles = node_compatibles(parent_node);
+        if (compatibles.length > 0) { return compatibles; }
+    }
+    const parent_path = node_path.includes("/")
+        ? node_path.slice(0, node_path.lastIndexOf("/")) || "/"
+        : undefined;
+    if (parent_path === undefined) { return []; }
+    const base_reference = base_dt.get_node_by_path({ kind: "path", labels: [], path: parent_path });
+    if (base_reference === undefined) { return []; }
+    const base_node = base_dt.deref_node(base_reference);
+    if (base_node === undefined) { return []; }
+    return node_compatibles(base_node);
 }
 
 export function overlay_print_options(config: AttachConfig): DtoPrintOptions {
