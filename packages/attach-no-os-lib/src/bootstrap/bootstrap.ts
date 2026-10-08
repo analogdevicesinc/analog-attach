@@ -305,8 +305,8 @@ function fill_value(effective: Property): { value: unknown, from: FillSource } |
 // --- Following the rules -----------------------------------------------------------------
 
 /**
- * The fields a chip-select decision writes, by schema: the device's mask, pin list and its
- * count, and the pin's number and port. They come from the wiring, not the fill rule, so the
+ * The fields a chip-select decision writes, by schema: the device's mask and pin list, and
+ * the pin's number and port. They come from the wiring, not the fill rule, so the
  * rule cannot revise them.
  */
 function wiring_fields(binding: ChipSelectBinding | undefined): Map<string, Set<string>> {
@@ -318,12 +318,20 @@ function wiring_fields(binding: ChipSelectBinding | undefined): Map<string, Set<
 	const list = device.ok && device.value._t === "RulesetStruct"
 		? device.value.properties.find(property => property.name === binding.gpio_list)
 		: undefined;
-	const count = list?._t === "IncludeProperty" ? list.count : undefined;
-	fields.set(binding.device, new Set([binding.native_mask, binding.gpio_list, ...(count === undefined ? [] : [count])]));
+	// The list's count is not one of them: it follows its list, like every count does.
+	fields.set(binding.device, new Set([binding.native_mask, binding.gpio_list]));
 	if (list?._t === "IncludeProperty" && list.include !== undefined) {
 		fields.set(list.include, new Set([binding.pin_number, binding.pin_port]));
 	}
 	return fields;
+}
+
+/** How many entries a list value holds: one name, or an array of them. Undefined when unset. */
+function list_length(value: unknown): number | undefined {
+	if (Array.isArray(value)) {
+		return value.length === 0 ? undefined : value.length;
+	}
+	return value === undefined ? undefined : 1;
 }
 
 /** Whether a reference bootstrap set still names a node that fits where it is. */
@@ -383,6 +391,19 @@ function revise_step(workfile: Workfile, wiring: Map<string, Set<string>>): Step
 		for (const property of node.properties) {
 			const previous = property.value;
 			if (property.auto !== true || previous === undefined || fixed?.has(property.name) === true) {
+				continue;
+			}
+
+			// A list's count is the length of its list: gone with it, and right for it.
+			const list = node.properties.find(candidate => candidate._t === "IncludeProperty" && candidate.count === property.name);
+			if (list !== undefined) {
+				const length = list_length(list.value);
+				if (length === undefined) {
+					return { kind: "revise", node: name, property: property.name, previous };
+				}
+				if (length !== previous) {
+					return { kind: "revise", node: name, property: property.name, previous, value: length };
+				}
 				continue;
 			}
 
