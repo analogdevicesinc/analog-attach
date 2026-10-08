@@ -12,6 +12,8 @@ import {
     list_symbols,
     find_any,
     set_value,
+    clear_value,
+    mark_auto,
     get_value,
     suggest_for_include,
     suggest_for_union,
@@ -812,6 +814,101 @@ describe('workfile_handler', () => {
             const result = list_available_structs(workfile);
             teardown_no_config();
             expectError(result);
+        });
+    });
+
+    describe('value ownership', () => {
+        // "$auto" names the values bootstrap owns; null is a value the user set to nothing.
+        function spi_node(): RulesetStruct {
+            const ruleset = load_resolved_ruleset('test_spi_config');
+            expectOk(ruleset);
+            expectOk(add_symbol(workfile, 'my_spi', ruleset.value));
+            expectOk(set_value(workfile, 'my_spi', 'identifier', 1));
+            expectOk(set_value(workfile, 'my_spi', 'dma_handle', 2));
+            return workfile.symbols['my_spi'] as RulesetStruct;
+        }
+
+        function property(node: RulesetStruct, name: string) {
+            const found = node.properties.find(candidate => candidate.name === name);
+            expect(found).toBeDefined();
+            return found!;
+        }
+
+        function reloaded(): Workfile {
+            const exported = export_minimal(workfile);
+            expectOk(exported);
+            const imported = import_minimal(JSON.parse(JSON.stringify(exported.value)));
+            expectOk(imported);
+            return imported.value;
+        }
+
+        test('owned values are written as one "$auto" list, and only those', () => {
+            spi_node();
+            expectOk(mark_auto(workfile, 'my_spi', 'identifier'));
+
+            const exported = export_minimal(workfile);
+            expectOk(exported);
+            expect(exported.value.symbols['my_spi']).toEqual({ $compatible: 'test_spi_config', $auto: ['identifier'], identifier: 1, dma_handle: 2 });
+        });
+
+        test('a node with no owned values has no "$auto" key', () => {
+            spi_node();
+            const exported = export_minimal(workfile);
+            expectOk(exported);
+            expect(exported.value.symbols['my_spi']).not.toHaveProperty('$auto');
+        });
+
+        test('ownership and cleared values survive a save and load', () => {
+            spi_node();
+            expectOk(mark_auto(workfile, 'my_spi', 'identifier'));
+            expectOk(clear_value(workfile, 'my_spi', 'dma_handle'));
+
+            const node = reloaded().symbols['my_spi'] as RulesetStruct;
+            expect(property(node, 'identifier')).toMatchObject({ value: 1, auto: true });
+            expect(property(node, 'dma_handle').value).toBeUndefined();
+            expect(property(node, 'dma_handle').cleared).toBe(true);
+        });
+
+        test('a cleared value is written as null and reads as unset', () => {
+            const node = spi_node();
+            expectOk(mark_auto(workfile, 'my_spi', 'dma_handle'));
+            expectOk(clear_value(workfile, 'my_spi', 'dma_handle'));
+
+            // Cleared is the user's: no longer bootstrap's, and no value for anything to read.
+            expect(property(node, 'dma_handle')).toMatchObject({ cleared: true });
+            expect(property(node, 'dma_handle').auto).toBeUndefined();
+            const exported = export_minimal(workfile);
+            expectOk(exported);
+            expect(exported.value.symbols['my_spi']?.dma_handle).toBeNull();
+            expect(exported.value.symbols['my_spi']).not.toHaveProperty('$auto');
+        });
+
+        test('writing a value replaces a cleared one', () => {
+            const node = spi_node();
+            expectOk(clear_value(workfile, 'my_spi', 'dma_handle'));
+            expectOk(set_value(workfile, 'my_spi', 'dma_handle', 3));
+            expect(property(node, 'dma_handle').cleared).toBeUndefined();
+            expect(property(node, 'dma_handle').value).toBe(3);
+        });
+
+        test('ownership needs a value to own', () => {
+            spi_node();
+            expectOk(clear_value(workfile, 'my_spi', 'dma_handle'));
+            expectErrorContains(mark_auto(workfile, 'my_spi', 'dma_handle'), 'no value');
+        });
+
+        test('rename keeps ownership with the node', () => {
+            spi_node();
+            expectOk(mark_auto(workfile, 'my_spi', 'identifier'));
+            expectOk(rename_symbol(workfile, 'my_spi', 'renamed_spi'));
+            const exported = export_minimal(workfile);
+            expectOk(exported);
+            expect(exported.value.symbols['renamed_spi']?.$auto).toEqual(['identifier']);
+        });
+
+        test('"$auto" naming a value the node does not have is refused on load', () => {
+            const minimal = { platform: FIXTURE_SOC, symbols: { my_spi: { $compatible: 'test_spi_config', $auto: ['identifier'] } } };
+            expectErrorContains(import_minimal(minimal), 'no value for bootstrap to own');
         });
     });
 

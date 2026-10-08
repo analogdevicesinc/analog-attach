@@ -20,6 +20,8 @@ export {
     list_symbols,
     find_any,
     set_value,
+    clear_value,
+    mark_auto,
     get_value,
     suggest_for_property,
     list_available_structs,

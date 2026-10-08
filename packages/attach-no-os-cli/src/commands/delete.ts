@@ -2,6 +2,7 @@ import { buildCommand } from "@stricli/core";
 import {
     get_connected_symbols,
     remove_symbol,
+    clear_value,
     set_value,
     type Result,
     type Workfile
@@ -126,8 +127,8 @@ function reset_property(flags: DeleteFlags, context: WorkfileContext, node: stri
     // `$init_param`, and the lib only knows the workfile's spelling.
     const resolved = lookup.value.property.name;
 
-    // No value argument: set_value clears the property.
-    const cleared = set_value(context.workfile, node, resolved);
+    // The user's "nothing": unset, and not bootstrap's to fill back in.
+    const cleared = clear_value(context.workfile, node, resolved);
     if (!cleared.ok) {
         output_error(flags, cleared.error.message);
         return;

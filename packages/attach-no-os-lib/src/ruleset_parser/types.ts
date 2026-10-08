@@ -16,6 +16,11 @@ export interface PropertyBase {
 	// a descriptor member an init function writes, and a struct field the target template
 	// derives (an iio_app_init_param device list, whose value is a local in main).
 	readonly?: boolean,
+	// Who holds `value`, past what the schema says. `auto`: bootstrap set it and owns it, so
+	// it may change or remove it (written as the node's "$auto" list). `cleared`: the user set
+	// it to nothing (written as null) - unset to everything else, but not bootstrap's to fill.
+	auto?: boolean,
+	cleared?: boolean,
 }
 
 export type PrimitiveSymbol = PrimitiveCType["symbol"];

@@ -127,6 +127,9 @@ export function clear_platform_ops(workfile: Workfile): void {
 
 const C_NAME_REGEX = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
 
+/** The workfile node key listing the values bootstrap owns. */
+const AUTO_KEY = "$auto";
+
 /**
  * Validate that a name is a valid C identifier.
  * `label` is used in the error message (e.g. "Symbol", "Descriptor name").
@@ -215,7 +218,8 @@ export function find_any(workfile: Workfile, name: string): Ruleset | undefined 
 
 // --- Property Values ---
 
-export function set_value(workfile: Workfile, symbol_name: string, property_name: string, value?: unknown): Result<void> {
+/** The property a value can be written to, or why it cannot be. */
+function settable_property(workfile: Workfile, symbol_name: string, property_name: string): Result<Property> {
     const ruleset = workfile.symbols[symbol_name];
     if (!ruleset) {
         return error(`Symbol '${symbol_name}' not found`, "symbol_name");
@@ -238,7 +242,52 @@ export function set_value(workfile: Workfile, symbol_name: string, property_name
         return error(`Property '${property_name}' of '${symbol_name}' is filled in by generated code and cannot be assigned`, "property_name");
     }
 
-    property.value = value;
+    return ok(property);
+}
+
+export function set_value(workfile: Workfile, symbol_name: string, property_name: string, value?: unknown): Result<void> {
+    const property = settable_property(workfile, symbol_name, property_name);
+    if (!property.ok) {
+        return property;
+    }
+
+    property.value.value = value;
+    // A value replaces "set to nothing"; no value leaves nothing for bootstrap to own.
+    if (value === undefined) {
+        delete property.value.auto;
+    } else {
+        delete property.value.cleared;
+    }
+    return ok();
+}
+
+/**
+ * Set a property to nothing on the user's behalf. It reads as unset everywhere, but it is the
+ * user's - bootstrap does not fill it back in - until a value is written again.
+ */
+export function clear_value(workfile: Workfile, symbol_name: string, property_name: string): Result<void> {
+    const property = settable_property(workfile, symbol_name, property_name);
+    if (!property.ok) {
+        return property;
+    }
+
+    delete property.value.value;
+    delete property.value.auto;
+    property.value.cleared = true;
+    return ok();
+}
+
+/** Mark a set value as bootstrap's own. */
+export function mark_auto(workfile: Workfile, symbol_name: string, property_name: string): Result<void> {
+    const property = settable_property(workfile, symbol_name, property_name);
+    if (!property.ok) {
+        return property;
+    }
+    if (property.value.value === undefined) {
+        return error(`'${symbol_name}.${property_name}' has no value for bootstrap to own`, property_name);
+    }
+
+    property.value.auto = true;
     return ok();
 }
 
@@ -724,16 +773,21 @@ export function export_minimal(workfile: Workfile): Result<MinimalWorkfile> {
             continue;
         }
 
+        // An extern has no properties, so `$compatible` alone round-trips it.
+        const properties = ruleset._t === "RulesetExtern" ? [] : ruleset.properties;
+        const auto = properties.filter(property => property.auto === true && property.value !== undefined);
+
         const node: MinimalWorkfile["symbols"][string] = {
             $compatible: ruleset.$symbol,
+            ...(auto.length === 0 ? {} : { [AUTO_KEY]: auto.map(property => property.name) }),
         };
 
-        // An extern has no properties, so `$compatible` alone round-trips it.
-        if (ruleset._t !== "RulesetExtern") {
-            for (const property of ruleset.properties) {
-                if (property.value !== undefined) {
-                    node[property.name] = property.value;
-                }
+        for (const property of properties) {
+            if (property.value !== undefined) {
+                node[property.name] = property.value;
+            } else if (property.cleared === true) {
+                // eslint-disable-next-line unicorn/no-null -- null is how the file says "set to nothing"
+                node[property.name] = null;
             }
         }
 
@@ -772,10 +826,12 @@ export function import_minimal(minimal: MinimalWorkfile): Result<Workfile> {
         }
 
         for (const [property_name, value] of Object.entries(node)) {
-            if (property_name === "$compatible") {
+            if (property_name === "$compatible" || property_name === AUTO_KEY) {
                 continue;
             }
-            const set_result = set_value(workfile, name, property_name, value);
+            const set_result = value === null
+                ? clear_value(workfile, name, property_name)
+                : set_value(workfile, name, property_name, value);
             if (!set_result.ok) {
                 // A stored value the current schemas reject is a stale workfile, not a bad
                 // command, so say which key to remove rather than only why it was refused.
@@ -783,6 +839,20 @@ export function import_minimal(minimal: MinimalWorkfile): Result<Workfile> {
                     `Workfile symbol '${name}' cannot be loaded: ${set_result.error.message}. Remove '${property_name}' from it.`,
                     set_result.error.path
                 );
+            }
+        }
+
+        // Ownership is applied once every value is in place: it names values, not properties.
+        const auto = node[AUTO_KEY];
+        if (auto !== undefined) {
+            if (!Array.isArray(auto) || !auto.every(entry => typeof entry === "string")) {
+                return error(`Workfile symbol '${name}' cannot be loaded: '${AUTO_KEY}' must be a list of property names`, name);
+            }
+            for (const property_name of auto) {
+                const marked = mark_auto(workfile, name, property_name);
+                if (!marked.ok) {
+                    return error(`Workfile symbol '${name}' cannot be loaded: ${marked.error.message}`, marked.error.path);
+                }
             }
         }
     }
