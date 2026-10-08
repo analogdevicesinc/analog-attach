@@ -75,14 +75,16 @@ rm -rf "$SANDBOX"
 mkdir -p "$SANDBOX/.attach-linux"
 cp "$WORKSPACE/compat-index.json" "$SANDBOX/.attach-linux/"
 cp "$WORKSPACE/validation.json"   "$SANDBOX/.attach-linux/"
+
+export ATTACH_LINUX=~/linux
+export ATTACH_DT_SCHEMA=~/dt-schema
+export ATTACH_CONTEXT=~/rpi-4.dts
+
 cd "$SANDBOX"
 
-node "$CLI" config-set linux ~/linux           >/dev/null
-node "$CLI" config-set dt-schema ~/dt-schema   >/dev/null
-node "$CLI" config-set context ~/rpi-4.dts     >/dev/null
 # validation-json is internal (not settable with config-set): point it at the
-# copied bundle so validate2 doesn't regenerate it with dt-mk-schema.
-echo "validation-json = \"$SANDBOX/.attach-linux/validation.json\"" >> "$SANDBOX/.attach-linux/config.toml"
+# copied bundle so validate doesn't regenerate it with dt-mk-schema.
+echo "validation-json = \"$SANDBOX/.attach-linux/validation.json\"" > "$SANDBOX/.attach-linux/config.toml"
 
 banner "Board with onboard devices: start from the board's overlay"
 echo ""
@@ -108,7 +110,7 @@ step "Configure the board" \
 
 step "Discover the board's slots" \
     "Only the free slots are listed; the onboard devices occupy theirs. Each Pmod lists every line, including jumper alternatives open by default (P11, P14, P36, P37)." \
-    "suggest board-slot"
+    "list slot"
 
 step "Start from the board's overlay" \
     "create-workfile writes the board's overlay instead of an empty one: run through the C preprocessor against the Linux tree (#include + CH_MODE_* macros), with the Pi firmware's __overrides__ dropped. The preprocess command is saved to the config." \
@@ -122,95 +124,95 @@ step "The onboard devices are already there" \
 
 step "Which slot can host the ADC?" \
     "Only the SPI Pmod: the onboard AD5592R occupies spi0 reg 0." \
-    "suggest board-slot adi,ad7768-1"
+    "list slot adi,ad7768-1"
 
 step "Add the device" \
     "The node has no reg yet, but the onboard slot is out of the running, so the board layer already narrows to spi_pmod." \
-    "add adi,ad7768-1 --to spi0 --label adc --name adc@1"
+    "add adi,ad7768-1 --parent spi0 --label adc --name adc@1"
 
 step "What does the binding expect?" \
     "Every property the AD7768-1 binding declares, required ones first, marked when already set. Only compatible is set so far; the rest of the required list (reg, clocks, clock-names, vref-supply, spi-cpol, spi-cpha) is what the next steps fill in. The last line lists the child nodes the binding allows: channel@N." \
-    "suggest node-prop adc"
+    "list property adc"
 
 step "Suggest chip-select (reg) values" \
     "reg 0 is taken by the onboard AD5592R (from the board overlay), reg 1 by the base tree's spidev@1. Jumper P11 would route the Pmod's CS to GPIO27 instead of GPIO7: the reg stays 1." \
-    "suggest value adc/reg"
+    "list value adc reg"
 
 step "Free CS1 and set reg = 1" \
     "The board overlay only disables spidev0; CE1 still has a spidev. Disable it and take the Pmod's chip select." \
-    "disable --node spidev1" \
-    "update adc/reg --with 1" \
-    "suggest value adc/reg"
+    "disable spidev1" \
+    "update adc reg 1" \
+    "list value adc reg"
 
 step "Suggest interrupts" \
     "The board offers GPIO19, the Pmod's interrupt pin (P13 fitted), with every trigger type: the trigger depends on the device, not the board. The notes flag two things: the node inherits the Pi's GIC as interrupt controller, but GPIO19 belongs to the GPIO block; and with P37 fitted the same GPIO would also reach the I2C Pmod." \
-    "suggest value adc/interrupts"
+    "list value adc interrupts"
 
 step "Point the interrupt at the GPIO controller" \
     "As the note asks, set interrupt-parent first. The board knows which controller its interrupt lines are on." \
-    "suggest value adc/interrupt-parent" \
-    "update adc/interrupt-parent --with gpio" \
-    "suggest value adc/interrupts"
+    "list value adc interrupt-parent" \
+    "update adc interrupt-parent gpio" \
+    "list value adc interrupts"
 
 step "Choose the trigger type" \
     "The AD7768-1 raises DRDY when a conversion is ready: the binding example and the Linux driver both use a rising edge." \
-    "update adc/interrupts --with 19 IRQ_TYPE_EDGE_RISING" \
-    "read adc/interrupts"
+    "update adc interrupts 19 IRQ_TYPE_EDGE_RISING" \
+    "read adc interrupts"
 
 step "A reset line shared by both Pmods" \
     "GPIO26 is hard-wired to the RESET pin of both Pmods. Both slots stay usable, but asserting the reset resets both devices. The AD7768-1's RESET is active low, as in the binding example." \
-    "suggest value adc/reset-gpios" \
-    "update adc/reset-gpios --with gpio 26 GPIO_ACTIVE_LOW"
+    "list value adc reset-gpios" \
+    "update adc reset-gpios gpio 26 GPIO_ACTIVE_LOW"
 
 step "Required properties fixed by the binding" \
-    "No need to read the binding: suggest value offers what the AD7768-1 binding pins (a const clock-names, required SPI mode flags). Each one is then set exactly as suggested." \
-    "suggest value adc/clock-names" \
-    "update adc/clock-names --with mclk" \
-    "suggest value adc/spi-cpol" \
-    "update adc/spi-cpol --with true" \
-    "suggest value adc/spi-cpha" \
-    "update adc/spi-cpha --with true"
+    "No need to read the binding: list value offers what the AD7768-1 binding pins (a const clock-names, required SPI mode flags). Each one is then set exactly as suggested." \
+    "list value adc clock-names" \
+    "update adc clock-names mclk" \
+    "list value adc spi-cpol" \
+    "update adc spi-cpol" \
+    "list value adc spi-cpha" \
+    "update adc spi-cpha"
 
 step "Required properties that describe external hardware" \
     "The binding also requires a master clock and a reference supply. The board says nothing about them, but the context devicetree has fixed clocks and regulators, offered with their frequency and voltage. Each is only right if it is actually wired to the ADC; the demo picks clk_osc and vdd_3v3_reg just to complete the tree. A real setup describes the clock and reference physically hooked up (e.g. a fixed-clock and a fixed-regulator node) and references those." \
-    "suggest value adc/clocks" \
-    "update adc/clocks --with clk_osc" \
-    "suggest value adc/vref-supply" \
-    "update adc/vref-supply --with vdd_3v3_reg"
+    "list value adc clocks" \
+    "update adc clocks clk_osc" \
+    "list value adc vref-supply" \
+    "update adc vref-supply vdd_3v3_reg"
 
 step "Child nodes need address cells" \
-    "The last line of node-prop showed that the binding allows channel@N child nodes. Their unit addresses need #address-cells and #size-cells on the ADC, and the binding pins both." \
-    "suggest value adc/#address-cells" \
-    "update adc/#address-cells --with 1" \
-    "suggest value adc/#size-cells" \
-    "update adc/#size-cells --with 0"
+    "The last line of list property showed that the binding allows channel@N child nodes. Their unit addresses need #address-cells and #size-cells on the ADC, and the binding pins both." \
+    "list value adc '#address-cells'" \
+    "update adc '#address-cells' 1" \
+    "list value adc '#size-cells'" \
+    "update adc '#size-cells' 0"
 
 step "Add two channels" \
-    "Each channel node is a bare subnode (no compatible); its pattern only requires reg. The AD7768-1 has a single analog input: a second channel validates, but the driver only uses channel 0." \
-    "add --name channel@0 --to adc" \
-    "add --name channel@1 --to adc" \
-    "suggest node-prop adc/channel@0"
+    "Each channel node is created through update; its pattern only requires reg. The AD7768-1 has a single analog input: a second channel validates, but the driver only uses channel 0." \
+    "update adc channel@0" \
+    "update adc channel@1" \
+    "list property adc/channel@0"
 
 step "Channel reg" \
     "By devicetree convention reg matches the unit address, so the tool suggests it from the node name." \
-    "suggest value adc/channel@0/reg" \
-    "update adc/channel@0/reg --with 0" \
-    "suggest value adc/channel@1/reg" \
-    "update adc/channel@1/reg --with 1"
+    "list value adc/channel@0 reg" \
+    "update adc/channel@0 reg 0" \
+    "list value adc/channel@1 reg" \
+    "update adc/channel@1 reg 1"
 
 step "Check the required properties" \
     "Every required property is now set, and both channels are present (last line)." \
-    "suggest node-prop adc"
+    "list property adc"
 
 step "Validate against dt-schema" \
     "The ADC is clean. dt-validate also checks the onboard devices from the vendor overlay, and catches a 'label' property their bindings don't allow." \
-    "--json validate2 2>/dev/null | python3 -m json.tool"
+    "--json validate 2>/dev/null | python3 -m json.tool"
 
 step "Fix the vendor overlay and re-validate" \
     "The workfile is a normal overlay: edit the onboard nodes like any other. Note: the label isn't pointless. The IIO core reads it as the device's sysfs label (industrialio-core.c), and the vendor overlay sets names like my_lsmspg_ad5592r on purpose. The real gap is upstream: adi,ad5592r.yaml (which also covers the AD5593R) never declares label, so its additionalProperties: false rejects it. A one-line 'label: true' there would make the overlay valid; deleting it here gets a clean tree but loses those names." \
-    "delete ad5592r/label" \
-    "delete ad5593r/label" \
-    "--json validate2 2>/dev/null | python3 -m json.tool"
+    "delete ad5592r label" \
+    "delete ad5593r label" \
+    "--json validate 2>/dev/null | python3 -m json.tool"
 
 step "Build" \
     "dtc compiles the workfile, onboard devices and the new ADC together." \
