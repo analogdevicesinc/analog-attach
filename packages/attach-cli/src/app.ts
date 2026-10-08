@@ -10,15 +10,13 @@ import { build_add_command } from "./commands/add/command";
 import { build_read_command } from "./commands/read/command";
 import { build_update_command } from "./commands/update/command";
 import { build_delete_command } from "./commands/delete/command";
-import { build_validate_command } from "./commands/validate/command";
-import { build_validate2_command } from "./commands/validate2/command";
+import { build_validate_command } from "./commands/validate2/command";
 import { build_move_command } from "./commands/move/command";
 import { build_rename_command } from "./commands/rename/command";
 import { build_list_command } from "./commands/list/command";
 import { build_internal_list_command } from "./commands/list/internal";
 import { build_build_command } from "./commands/build/command";
 import { build_deploy_command } from "./commands/deploy/command";
-import { build_get_schema_command } from "./commands/get-schema/command";
 import { build_enable_command, build_disable_command } from "./commands/enable-disable/command";
 import { build_install_skill_command } from "./commands/skill/install-skill";
 import { build_uninstall_skill_command } from "./commands/skill/uninstall-skill";
@@ -42,16 +40,14 @@ export function buildApp(context: LocalContext): Command {
     program.addCommand(build_update_command(context));
     program.addCommand(build_delete_command(context));
     program.addCommand(build_validate_command(context));
-    program.addCommand(build_validate2_command(context));
     program.addCommand(build_move_command(context));
     program.addCommand(build_rename_command(context));
     program.addCommand(build_list_command(context));
-    program.addCommand(build_internal_list_command(context));
+    program.addCommand(build_internal_list_command(context), { hidden: true });
     program.addCommand(build_build_command(context));
     program.addCommand(build_deploy_command(context));
 
     // human-only commands
-    program.addCommand(build_get_schema_command(context));
     program.addCommand(build_enable_command(context));
     program.addCommand(build_disable_command(context));
 

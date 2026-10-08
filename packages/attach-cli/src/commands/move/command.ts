@@ -9,16 +9,10 @@ import { respond, respond_fail, input_error } from "../../protocol/output";
 export function build_move_command(context_: LocalContext): Command {
     return new Command("move")
         .description("Move an overlay-added node to a different parent")
-        .option("--parent <value>", "Destination parent: label or path (e.g. spi1, /soc/spi@7e205000)")
         .argument("<path>", "Path to node")
-        .action(async (path_argumentument: string, options) => {
-            const parent_identifier: string | undefined = options.parent;
-
-            if (parent_identifier === undefined) {
-                if (context_.json) { input_error("--parent is required"); return; }
-                console.log("Missing: --parent (destination parent node)");
-                return;
-            }
+        .argument("<destination>", "Destination parent: label or path (e.g. spi1, /soc/spi@7e205000)")
+        .action(async (path_argumentument: string, destination: string) => {
+            const parent_identifier = destination;
 
             const resolved = resolve_config(context_, ["context", "overlay"]);
             if (resolved === undefined) { return; }

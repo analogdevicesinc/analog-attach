@@ -37,10 +37,10 @@ export type AddResult =
 export function build_add_command(context_: LocalContext): Command {
     return new Command("add")
         .description("Add a device node to an overlay (e.g. `add adi,ad7124-8 --parent spi0`). Use `update <path> <child>` for child nodes like channels.")
-        .option("--name <value>", "Node name override (e.g. adc@0); defaults to the compatible string")
-        .option("--parent <value>", "Parent node: label or path (e.g. spi0, /soc/spi@7e204000)")
-        .option("--label <value>", "Label to attach to the new node (e.g. imu1)")
         .argument("<key>", "Compatible string of the device binding to add")
+        .option("--parent <value>", "Parent node: label or path (e.g. spi0, /soc/spi@7e204000)")
+        .option("--name <value>", "Node name override (e.g. adc@0); defaults to the compatible string")
+        .option("--label <value>", "Label to attach to the new node (e.g. imu1)")
         .action(async (key: string, options) => {
             const pre_config = load_config() ?? {};
             const pre_check = check_config(pre_config, ["linux", "dtSchema", "context"]);

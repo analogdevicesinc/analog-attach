@@ -75,8 +75,7 @@ export const COMPLETION_SPEC: Readonly<Record<string, CommandSpec>> = {
         positional: { mode: "byIndex", sources: [NAV, NAV] },
     },
     move: {
-        positional: { mode: "byIndex", sources: [NAV] },
-        flags: { "--parent": { kind: "suggest", suggest: "entry-points" } },
+        positional: { mode: "byIndex", sources: [NAV, { kind: "suggest", suggest: "entry-points" }] },
     },
     rename: {
         positional: { mode: "byIndex", sources: [NAV] },
@@ -87,9 +86,6 @@ export const COMPLETION_SPEC: Readonly<Record<string, CommandSpec>> = {
     disable: {
         positional: { mode: "byIndex", sources: [NAV] },
     },
-    validate: {
-        positional: { mode: "byIndex", sources: [NAV] },
-    },
     list: {
         positional: {
             mode: "byIndex",
@@ -98,9 +94,6 @@ export const COMPLETION_SPEC: Readonly<Record<string, CommandSpec>> = {
                 choices: LIST_KINDS.map(entry => ({ value: entry.kind, description: entry.summary })),
             }],
         },
-    },
-    "get-schema": {
-        flags: { "--compatible": { kind: "suggest", suggest: "device-key" } },
     },
     completion: {
         positional: { mode: "byIndex", sources: [{ kind: "values", values: ["bash", "fish", "zsh"] }] },
@@ -114,12 +107,11 @@ export const COMPLETION_SPEC: Readonly<Record<string, CommandSpec>> = {
 };
 
 export const NO_VALUE_COMPLETION: readonly string[] = [
-    "__list",
     "build",
     "deploy",
     "attach-manifest",
     "create-workfile",
-    "validate2",
+    "validate",
     "install-skill",
     "uninstall-skill",
 ];

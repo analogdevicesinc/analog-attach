@@ -5,7 +5,7 @@ set -euo pipefail
 # Walks through everything delivered in the CLI findings work:
 # env config (24), implicit workfile (2), naming (7-9,11,12), grammar (1,3,10,13,14,20),
 # reg↔unit address (7,17), child nodes (R12), list (15,16), SPI filtering (21),
-# interrupts (0,19), overlay syntax (6), validate2 (4,5), build.
+# interrupts (0,19), overlay syntax (6), validate (4,5), build.
 
 BOLD='\033[1m'
 DIM='\033[2m'
@@ -288,13 +288,13 @@ step "Switch back to fragment" \
     "config-set overlay-syntax fragment"
 
 # ============================================================
-# 11. validate2 (notes 4, 5)
+# 11. validate (notes 4, 5)
 # ============================================================
 banner "11. Validation (notes 4, 5)"
 
-step "validate2 — human-readable errors" \
+step "validate — human-readable errors" \
     "Errors are grouped by fragment target, not nodeN." \
-    "validate2"
+    "validate"
 
 step "Fix the errors" \
     "Set the missing required properties. Correct interrupt-parent to gpio (2 cells, matching our interrupts)." \
@@ -306,9 +306,9 @@ step "Fix the errors" \
     "update spi0/adc@7 interrupts 19 2" \
     "update regulator-fixed regulator-name vdd-supply"
 
-step "validate2 — No errors!" \
+step "validate — No errors!" \
     "All required properties are set; validation passes." \
-    "validate2"
+    "validate"
 
 # ============================================================
 # 12. Build
