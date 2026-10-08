@@ -21,8 +21,6 @@ jobs:
     steps:
       - name: Check out
         uses: actions/checkout@v7
-        with:
-          token: ${{ secrets.GH_TOKEN }}
 
       - name: Install dtc (Device Tree Compiler)
         run: |
