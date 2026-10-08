@@ -23,7 +23,7 @@ const CONFIG_GET_FIELD_NAMES = CONFIG_REGISTRY
     .sort();
 
 function registered_commands(): string[] {
-    return buildApp(buildContext(false)).commands.map(c => c.name());
+    return buildApp(buildContext(false)).commands.map(c => c.name()).filter(n => !n.startsWith("__"));
 }
 
 // Capture the lines `run_complete` prints for a given set of shell words.
@@ -81,7 +81,7 @@ describe("__complete engine", () => {
     });
 
     test("partial command name is prefix-filtered", async () => {
-        expect(values(await complete(["val"]))).toEqual(["validate", "validate2"]);
+        expect(values(await complete(["val"]))).toEqual(["validate"]);
     });
 
     test("leading dash lists global flags", async () => {
@@ -103,8 +103,8 @@ describe("__complete engine", () => {
         expect(flags).toContain("--parent");
     });
 
-    test("validate2 offers no bogus flags (only --help)", async () => {
-        expect(values(await complete(["validate2", "--"]))).toEqual(["--help"]);
+    test("validate offers no bogus flags (only --help)", async () => {
+        expect(values(await complete(["validate", "--"]))).toEqual(["--help"]);
     });
 
     test("a file-valued positional emits the file directive", async () => {
@@ -197,8 +197,8 @@ describe("move completion", () => {
     });
     afterEach(() => { vi.restoreAllMocks(); });
 
-    test("--parent completes entry points", async () => {
-        expect(values(await complete(["move", "adc", "--parent", ""]))).toStrictEqual(["spi0", "i2c1"]);
+    test("second positional completes entry points (destination)", async () => {
+        expect(values(await complete(["move", "adc", ""]))).toStrictEqual(["spi0", "i2c1"]);
     });
 });
 

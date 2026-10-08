@@ -10,9 +10,9 @@ import type { DeletePreview } from "../../protocol/types";
 export function build_delete_command(context_: LocalContext): Command {
     return new Command("delete")
         .description("Delete an overlay-added node, or remove a property from an overlay node or a base-tree node")
-        .option("--force", "Force delete of non-leaf nodes (waterfall delete)")
         .argument("[path]", "Path to node or property")
         .argument("[property]", "Property name")
+        .option("--force", "Force delete of non-leaf nodes (waterfall delete)")
         .action(async (path_argumentument: string | undefined, property_argument: string | undefined, options) => {
             const resolved = resolve_config(context_, ["context", "overlay"]);
             if (resolved === undefined) { return; }

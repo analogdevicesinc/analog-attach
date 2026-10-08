@@ -64,10 +64,10 @@ export function build_attach_manifest_command(_context: LocalContext): Command {
                     },
                     "validate": {
                         description: "Validate the overlay against Linux dt-schema binding rules using dt-validate. Requires linux and overlay config fields. On first run generates .attach-linux/validation.json by running dt-mk-schema over the Linux bindings — this can take a minute; subsequent runs reuse the cached file. Empty errors array means validation passed; warnings may still be present.",
-                        argv: ["attach-linux", "--json", "validate2"],
+                        argv: ["attach-linux", "--json", "validate"],
                     },
                     "move": {
-                        description: "Move an overlay-added node to a different parent. Positional args identify the node to move; accepted forms: node label (imu1), absolute path (/soc/spi@7e204000), slash-separated label/child (imu1/channel@0), or space-separated tokens from root (soc spi@7e204000). --to <parent> (required) accepts the same forms: bare label (spi1), absolute path (/soc/spi@7e205000), slash-separated label/child (spi1/mux), or space-separated tokens (soc spi@7e205000). Only overlay-added nodes can be moved — base-tree nodes return in-base. Also detects: parent-not-found, conflict (destination already has a child with the same key), into-self (destination is a descendant of the node).",
+                        description: "Move an overlay-added node to a different parent: `move <path> <destination>`. Both arguments are label-first or absolute paths. Only overlay-added nodes can be moved — base-tree nodes return in-base.",
                         argv: ["attach-linux", "--json", "move"],
                     },
                     "rename": {
