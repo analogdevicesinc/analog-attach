@@ -436,6 +436,7 @@ export function display_node(node: string, targets: Map<number, string>): string
     const rest = match[2] ?? '';
     const target = targets.get(index);
     if (target === undefined) { return node; }
+    if (target === "/" && rest.startsWith("/")) { return rest; }
     return target + rest;
 }
 
@@ -626,7 +627,7 @@ if (import.meta.vitest) {
         const targets = new Map<number, string>([[0, "spi0"], [1, "/"]]);
         expect(display_node("/node0/dac@0", targets)).toBe("spi0/dac@0");
         expect(display_node("/node1", targets)).toBe("/");
-        expect(display_node("/node1/ports", targets)).toBe("//ports");
+        expect(display_node("/node1/ports", targets)).toBe("/ports");
         expect(display_node("/node5/x", targets)).toBe("/node5/x");
         expect(display_node("/other", targets)).toBe("/other");
     });

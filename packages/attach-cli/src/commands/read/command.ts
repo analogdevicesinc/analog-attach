@@ -4,7 +4,7 @@ import * as fs from "node:fs";
 
 import type { LocalContext } from "../../context";
 import { resolve_config } from "../../resolve-config";
-import { resolve_node_identifier, not_found_message, parse_node_path, parse_property_name } from "../../utilities";
+import { resolve_node_identifier, not_found_message, parse_node_path, parse_property_name, overlay_print_options } from "../../utilities";
 import { respond, respond_fail, input_error } from "../../protocol/output";
 import { convert_node, convert_property } from "../../protocol/dt-to-protocol";
 import type { Node } from "../../protocol/types";
@@ -111,7 +111,7 @@ export function build_read_command(context_: LocalContext): Command {
                 if (context_.json) {
                     respond(root);
                 } else {
-                    console.log(overlay.print());
+                    console.log(overlay.print(overlay_print_options(resolved.config)));
                 }
                 return;
             }
@@ -136,9 +136,10 @@ export function build_read_command(context_: LocalContext): Command {
         });
 }
 
-function print_node_human(node: { name: string; unit_addr?: string; properties: any[]; children: any[] }, indent: string = ""): void {
+function print_node_human(node: { name: string; unit_addr?: string; labels?: string[]; properties: any[]; children: any[] }, indent: string = ""): void {
     const key = node.unit_addr ? `${node.name}@${node.unit_addr}` : node.name;
-    console.log(`${indent}${key} {`);
+    const label_prefix = node.labels !== undefined && node.labels.length > 0 ? `${node.labels.join(": ")}: ` : "";
+    console.log(`${indent}${label_prefix}${key} {`);
     for (const property of node.properties) {
         if (is_dt_flag(property.value)) {
             console.log(`${indent}    ${property.name};`);
