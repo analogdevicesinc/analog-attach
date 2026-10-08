@@ -156,13 +156,18 @@ function format_node_summary(name: string, ruleset: Ruleset): string {
     for (const property of ruleset.properties) {
         const required = property.required ? "* " : "  ";
         const type = format_property_type(property._t);
-        const value = property._t === "IncludeProperty" && property.value === undefined
+        let value = property._t === "IncludeProperty" && property.value === undefined
             ? `(${include_target(property)})`
             : format_property_value(property);
+        if (property.cleared === true) {
+            value = "- (cleared)";
+        } else if (property.auto === true) {
+            value = `${value} (auto)`;
+        }
 
         out += `${required}${property.name.padEnd(20)}${type.padEnd(18)}${value}\n`;
     }
 
-    out += "\n* = required";
+    out += "\n* = required   (auto) = set by bootstrap   (cleared) = you set it to nothing";
     return out;
 }

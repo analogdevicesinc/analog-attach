@@ -306,8 +306,12 @@ export function format_node_list(minimal: MinimalWorkfile, header?: string): str
     }
 
     let out = header ? `${header}\n\n` : "";
+    const width = Math.max(...entries.map(([name]) => name.length)) + 2;
+    const type_width = Math.max(...entries.map(([, node]) => node.$compatible.length)) + 2;
     for (const [name, node] of entries) {
-        out += `  ${name.padEnd(18)}${node.$compatible}\n`;
+        const auto = Array.isArray(node.$auto) ? node.$auto.length : 0;
+        const from_bootstrap = auto === 0 ? "" : `${String(auto)} value${auto === 1 ? "" : "s"} from bootstrap`;
+        out += `  ${name.padEnd(width)}${node.$compatible.padEnd(type_width)}${from_bootstrap}`.trimEnd() + "\n";
     }
 
     return out;
@@ -327,12 +331,29 @@ export function format_property_list(node_name: string, properties: Property[]):
     return out;
 }
 
+/** Who holds a property's value, for a person: bootstrap, the user, or the user's "nothing". */
+export function property_owner(property: Property): string | undefined {
+    if (property.cleared === true) {
+        return "you (cleared: left empty, bootstrap will not fill it)";
+    }
+    if (property.value === undefined) {
+        return undefined;
+    }
+    return property.auto === true
+        ? "bootstrap (follows the rules until you change it)"
+        : "you";
+}
+
 export function format_property_details(property: Property, suggestions: PropertySuggestions): string {
     let out = `${property.name}\n\n`;
 
     out += `  ${"Type:".padEnd(15)}${format_property_type(property._t)}\n`;
     out += `  ${"Required:".padEnd(15)}${property.required ? "yes" : "no"}\n`;
     out += `  ${"Value:".padEnd(15)}${format_property_value(property) || "(not set)"}\n`;
+    const owner = property_owner(property);
+    if (owner !== undefined) {
+        out += `  ${"Set by:".padEnd(15)}${owner}\n`;
+    }
 
     if ("default" in property && property.default !== undefined) {
         out += `  ${"Default:".padEnd(15)}${property.default}\n`;
