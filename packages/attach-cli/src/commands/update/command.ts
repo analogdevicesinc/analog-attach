@@ -37,7 +37,7 @@ import { resolve_config } from "../../resolve-config";
 import { load_trees, resolve_write_target, overlay_print_options, parse_node_path, not_found_message } from "../../utilities";
 import { resolve_node_binding } from "../../binding-resolution";
 import { respond, respond_fail, input_error, diagnostic } from "../../protocol/output";
-import { convert_property } from "../../protocol/dt-to-protocol";
+import { convert_node, convert_property } from "../../protocol/dt-to-protocol";
 
 export type ShapeHint = "flag" | "strings" | "cells" | undefined;
 
@@ -365,9 +365,24 @@ export function build_update_command(context_: LocalContext): Command {
                 const effective = overlay.effective_children(found?.node_path ?? node_identifier);
                 const existing_child = effective.get(property_name);
                 if (existing_child !== undefined) {
-                    // Existing child → act as read
-                    const child_found = overlay.find_node({ kind: "path", labels: [], path: `${found?.node_path ?? node_identifier}/${property_name}` });
-                    read_property(context_, child_found, property_name, `${node_identifier}/${property_name}`);
+                    const child_path = `${found?.node_path ?? node_identifier}/${property_name}`;
+                    const child_found = overlay.find_node({ kind: "path", labels: [], path: child_path });
+                    if (child_found !== undefined) {
+                        if (context_.json) {
+                            respond(convert_node(child_found.node));
+                        } else {
+                            const ck = existing_child.unit_addr ? `${existing_child.name}@${existing_child.unit_addr}` : existing_child.name;
+                            console.log(`${ck} {`);
+                            for (const p of existing_child.properties) {
+                                if (is_dt_flag(p.value)) { console.log(`    ${p.name};`); }
+                                else { console.log(`    ${print_property(p, "    ", 0).trim()}`); }
+                            }
+                            console.log("};");
+                        }
+                    } else {
+                        if (context_.json) { respond_fail({ ok: false, message: `Not found: ${child_path}`, severity: "error" }); }
+                        else { console.log(`Not found: ${child_path}`); }
+                    }
                     return;
                 }
 

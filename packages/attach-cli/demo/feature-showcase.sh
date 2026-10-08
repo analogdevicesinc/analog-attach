@@ -127,7 +127,7 @@ step "Overlay content" \
 banner "3. Naming, unit addresses and labels (notes 7-9, 11, 12)"
 
 step "Auto unit address and label" \
-    "The first add got @0 with reg = <0> and label ad7124_8. A second add gets @1." \
+    "The first add got @2 (spidev@0/1 occupy 0/1) with label ad7124_8. A second add picks the next free address." \
     "add adi,ad7124-8 --parent spi0"
 
 step "Read both nodes" \
@@ -197,6 +197,14 @@ step "Read the renamed node" \
     "" \
     "read spi0/adc@5 reg"
 
+step "update reg renames the node" \
+    "update spi0/adc@5 reg 7 → the node is renamed to adc@7." \
+    "update spi0/adc@5 reg 7"
+
+step "Read confirms the rename" \
+    "The node is now at spi0/adc@7 with reg = <7>." \
+    "read spi0/adc@7 reg"
+
 # ============================================================
 # 6. Child nodes via update (R12)
 # ============================================================
@@ -249,12 +257,12 @@ step "No vendor props on RPi spi0" \
 # ============================================================
 banner "9. Interrupts (notes 0, 19)"
 
-step "Set interrupts — implicit interrupt-parent" \
-    "Setting interrupts writes the inherited interrupt-parent = <&gicv2> automatically." \
+step "Set interrupts — implicit interrupt-parent surfaced" \
+    "Setting interrupts without an explicit interrupt-parent writes the inherited one (<&gicv2>) and warns about the cell count mismatch (gicv2 wants 3 cells, we gave 2)." \
     "update spi0/adi,ad7124-8@2 interrupts 19 2"
 
 step "Read the node" \
-    "interrupt-parent and interrupts are both present." \
+    "interrupt-parent = <&gicv2> was written automatically. The value is wrong for this device — we will fix it later." \
     "read spi0/adi,ad7124-8@2"
 
 # ============================================================
@@ -286,6 +294,20 @@ banner "11. Validation (notes 4, 5)"
 
 step "validate2 — human-readable errors" \
     "Errors are grouped by fragment target, not nodeN." \
+    "validate2"
+
+step "Fix the errors" \
+    "Set the missing required properties. Correct interrupt-parent to gpio (2 cells, matching our interrupts)." \
+    "update spi0/adi,ad7124-8@2 interrupt-parent gpio" \
+    "update spi0/adi,ad7124-8@2/channel@0 diff-channels 0 1" \
+    "update spi0/adi,ad7124-8@2/channel@1 diff-channels 2 3" \
+    "update spi0/adc@7 spi-max-frequency 5000000" \
+    "update spi0/adc@7 interrupt-parent gpio" \
+    "update spi0/adc@7 interrupts 19 2" \
+    "update regulator-fixed regulator-name vdd-supply"
+
+step "validate2 — No errors!" \
+    "All required properties are set; validation passes." \
     "validate2"
 
 # ============================================================

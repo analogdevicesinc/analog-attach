@@ -121,14 +121,16 @@ async function suggest_parent(context_: LocalContext, arguments_: string[]): Pro
 
     const parents = suggest_parents(dt, binding);
 
+    const suggestions = parents.map(p => ({
+        value: p.label ?? parent_path_string(p),
+        display_string: parent_path_string(p),
+    }));
     if (context_.json) {
-        const suggestions = parents.map(p => ({
-            value: p.label ?? parent_path_string(p),
-            display_string: parent_path_string(p),
-        }));
         respond({ ok: true, message: `Found ${suggestions.length} valid parents`, severity: "info", suggestions });
     } else {
-        console.log(JSON.stringify(parents));
+        for (const s of suggestions) {
+            console.log(`${s.value}  ${s.display_string}`);
+        }
     }
 }
 
@@ -633,7 +635,6 @@ export function describe_child_nodes(rule: PatternPropertyRule, node: DTNode): S
     const name = prefix.endsWith("@") ? `${prefix}N` : (prefix || rule.pattern);
     const details = [
         `child node ${rule.pattern}`,
-        ...(rule.required.length > 0 ? [`requires ${rule.required.join(", ")}`] : []),
         `present: ${present.length > 0 ? present.join(", ") : "none"}`,
     ];
     return { value: rule.pattern, display_string: `${name} (${details.join("; ")})` };
@@ -1256,16 +1257,16 @@ slots:
         // eslint-disable-next-line unicorn/consistent-function-scoping
         const rule = (pattern: string, required: string[]): PatternPropertyRule => ({ pattern, description: "", properties: [], required });
 
-        test("names the node, its required properties and the children present", () => {
+        test("names the node and the children present", () => {
             expect(describe_child_nodes(rule("^channel@([0-9]|1[0-5])$", ["reg", "diff-channels"]), node)).toStrictEqual({
                 value: "^channel@([0-9]|1[0-5])$",
-                display_string: "channel@N (child node ^channel@([0-9]|1[0-5])$; requires reg, diff-channels; present: channel@0, channel@1)",
+                display_string: "channel@N (child node ^channel@([0-9]|1[0-5])$; present: channel@0, channel@1)",
             });
         });
 
         test("a grouped literal prefix still reads as a name; none present", () => {
             expect(describe_child_nodes(rule("^(channel@)[0-7]$", ["reg"]), { ...node, children: [] }).display_string)
-                .toBe("channel@N (child node ^(channel@)[0-7]$; requires reg; present: none)");
+                .toBe("channel@N (child node ^(channel@)[0-7]$; present: none)");
         });
     });
 
