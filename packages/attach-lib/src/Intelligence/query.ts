@@ -1,6 +1,6 @@
 import { ResolvedProperty } from "../Attach/AttachTypes.js";
 import { AttachArray, AttachEnumType, FixedIndex } from "../Attach/StructuralTypes.js";
-import { DeviceTree, DTNode, DTProperty, get_full_node_name, is_dt_flag } from "../Devicetree/index.js";
+import { DeviceTree, DTNode, DTProperty, is_dt_flag } from "../Devicetree/index.js";
 import {
     is_clock,
     is_dma_controller,
@@ -90,34 +90,6 @@ function find_nodes(
         .map(([node, path]) => ({ node, path: path.path }));
 }
 
-function get_inherited_property(
-    devicetree: DeviceTree,
-    parent_name: string,
-    property_to_search: string,
-): DTProperty | undefined {
-    const matches = devicetree.as_stream()
-        .filter((node) => get_full_node_name(node) === parent_name)
-        .toArray();
-
-    if (matches.length !== 1) { return; }
-    const first = matches[0];
-
-    if (first === undefined) { return; }
-    const [node, path] = first;
-
-    const property = node.properties.find(p => p.name === property_to_search);
-
-    if (property !== undefined) { return property; }
-    if (path.path === '/') { return; }
-
-    let new_parent = path.path.split('/').at(-2);
-
-    if (new_parent === undefined) { return; }
-    if (new_parent === '') { new_parent = '/'; }
-
-    return get_inherited_property(devicetree, new_parent, property_to_search);
-}
-
 export function is_gpio_property(key: string): boolean {
     return key === "gpios" || key === "gpio" || /(?<!,nr)-gpios?$/.test(key);
 }
@@ -141,6 +113,7 @@ export function query_devicetree(
     properties: ResolvedProperty[],
     data: string,
     parent_name?: string,
+    inherited_interrupt_parent?: string,
 ): ResolvedProperty[] {
 
     const properties_clone = structuredClone(properties);
@@ -152,12 +125,8 @@ export function query_devicetree(
 
                 let is_set = parsed_data["interrupt-parent"];
 
-                if (is_set === undefined && parent_name !== undefined) {
-                    const inherited = get_inherited_property(devicetree, parent_name, "interrupt-parent");
-
-                    if (inherited !== undefined) {
-                        is_set = cell_extract_first_value(inherited);
-                    }
+                if (is_set === undefined && inherited_interrupt_parent !== undefined) {
+                    is_set = inherited_interrupt_parent;
                 } else if (
                     is_set !== undefined &&
                     Array.isArray(is_set) &&
@@ -641,6 +610,23 @@ if (import.meta.vitest) {
         if (ip?.value._t === "enum_array") {
             expect(ip.value.enum).toContain("gic");
         }
+    });
+
+    test("query_devicetree — interrupt-parent: inherited label refines interrupts to matrix", () => {
+        const dt = dts(`/dts-v1/;
+/ {
+    gic: interrupt-controller@ff841000 {
+        interrupt-controller;
+        #interrupt-cells = <3>;
+    };
+};`);
+        const properties = [
+            { key: "interrupt-parent", value: { _t: "generic" as const } },
+            { key: "interrupts", value: { _t: "array" as const, minItems: 1, maxItems: 1 } },
+        ];
+        const result = query_devicetree(dt, properties, "{}", undefined, "gic");
+        const interrupts = result.find(p => p.key === "interrupts");
+        expect(interrupts?.value._t).toBe("matrix");
     });
 
     test("query_devicetree — *-gpios: item count is the phandle plus #gpio-cells", () => {

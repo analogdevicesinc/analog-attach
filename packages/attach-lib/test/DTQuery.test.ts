@@ -212,7 +212,8 @@ async function test_impl(data: BindingTestData) {
         dt,
         binding.parsed_binding.properties,
         JSON.stringify(input_data),
-        "spi@7e204000"
+        "spi@7e204000",
+        "gicv2",
     );
 
     if (data.debug === true) {

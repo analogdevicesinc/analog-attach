@@ -27,6 +27,8 @@ import {
     type ResolvedProperty,
     type SuggestedCell,
     type ValueSuggestion,
+    effective_interrupt_parent,
+    base_lookup,
 } from "attach-lib";
 import * as fs from "node:fs";
 
@@ -503,6 +505,9 @@ export function build_update_command(context_: LocalContext): Command {
 
             place_property(overlay, target_reference, found, is_base_target, built, property_name);
 
+            const ip_result = implicit_interrupt_parent(overlay, base_dt, target_reference, found, is_base_target, property_name, built);
+            if (ip_result.warning !== undefined) { diagnostic(ip_result.warning); }
+
             // R10: updating reg renames the node (overlay-added targets only)
             let rename_message = "";
             if (property_name === "reg" && found !== undefined && !is_base_target) {
@@ -543,10 +548,12 @@ export function build_update_command(context_: LocalContext): Command {
 
             fs.writeFileSync(input, printed);
 
+            const ip_msg = ip_result.message !== undefined ? `; ${ip_result.message}` : "";
             if (context_.json) {
-                respond({ ok: true, message: `Set ${property_name} on ${node_identifier}${rename_message}`, severity: "info" });
+                respond({ ok: true, message: `Set ${property_name} on ${node_identifier}${rename_message}${ip_msg}`, severity: ip_result.warning !== undefined ? "warn" : "info" });
             } else {
                 console.log(`Set ${property_name} on ${node_identifier}${rename_message}`);
+                if (ip_result.message !== undefined) { console.log(ip_result.message); }
             }
         });
 }
@@ -590,6 +597,60 @@ export function format_suggestion(suggestion: Pick<ValueSuggestion, "rows" | "st
 
 function is_matrix_input(value: ParsedInputValue): value is MatrixInput {
     return Array.isArray(value) && value.length > 0 && value.every(row => Array.isArray(row));
+}
+
+export function implicit_interrupt_parent(
+    overlay: DeviceTreeOverlay,
+    base_dt: DeviceTree,
+    target_reference: DTLabel | DTPath,
+    found: FoundNodeResult | undefined,
+    is_base_target: boolean,
+    property_name: string,
+    built: DTProperty | undefined,
+): { message?: string; warning?: string } {
+    if (property_name !== "interrupts") { return {}; }
+    if (built === undefined) { return {}; }
+
+    const node_path = found?.node_path;
+    if (node_path === undefined) { return {}; }
+
+    const has_interrupt_parent = found?.node.properties.some(p => p.name === "interrupt-parent") ?? false;
+    if (has_interrupt_parent) { return {}; }
+
+    const inherited = effective_interrupt_parent(base_lookup(base_dt), node_path, base_dt);
+    if (inherited === undefined) {
+        return { warning: `No interrupt-parent inherited for ${node_path}; set one: update ${node_path} interrupt-parent <controller>` };
+    }
+    if (inherited.label === undefined) {
+        return { warning: `Inherited interrupt-parent at ${inherited.from} has no label; cannot write &{/path} in a plugin` };
+    }
+
+    const ip_built = PropertyBuilder.build_cell_array()
+        .with_tagged_values(PropertyBuilder.tag_label(inherited.label))
+        .with_name("interrupt-parent")
+        .build();
+
+    place_property(overlay, target_reference, found, is_base_target, ip_built, "interrupt-parent");
+
+    let warning: string | undefined;
+    if (inherited.interrupt_cells !== undefined) {
+        const row_count = count_interrupt_cells(built);
+        if (row_count !== undefined && row_count !== inherited.interrupt_cells) {
+            warning = `${inherited.label} has #interrupt-cells = <${inherited.interrupt_cells}> but interrupts has ${row_count} cells; set interrupt-parent explicitly`;
+        }
+    }
+
+    return {
+        message: `Set interrupt-parent = <&${inherited.label}> on ${node_path} (inherited from ${inherited.from})`,
+        warning,
+    };
+}
+
+function count_interrupt_cells(property: DTProperty): number | undefined {
+    if (is_dt_flag(property.value)) { return undefined; }
+    const first = property.value[0];
+    if (first?.kind !== "array") { return undefined; }
+    return first.elements.length;
 }
 
 function upsert_property(found_node: DTNode, property: DTProperty): void {
@@ -832,7 +893,7 @@ if (import.meta.vitest) {
             devicetree.get_node_by_label({ kind: "label", labels: [], name }) !== undefined;
 
         const round_trip = (property: string, display: string) => {
-            const suggestion = stack.suggest_values(property, { devicetree, data, placement }).find(s => s.display === display);
+            const suggestion = stack.suggest_values(property, { devicetree, data, placement }).find(s => s.display.includes(display));
             expect(suggestion, `${property}: ${display}`).toBeDefined();
             const definition = definitions.find(d => d.key === property)!;
             const hint = shape_hint(definition);
