@@ -590,8 +590,10 @@ describe('the chip-select', () => {
         const symbols = stored(workfile);
         expect(symbols['test_spi_device_1']?.cs_gpio).toBeUndefined();
         expect(report.value.chip_selects).toEqual([]);
-        const problems = report.value.wiring.find(wiring => wiring.device === 'test_spi_device_1')?.problems ?? [];
-        expect(problems.join('\n')).toContain('already used by another device');
+        const wiring = report.value.wiring.find(entry => entry.device === 'test_spi_device_1');
+        expect(wiring?.problems.join('\n')).toContain('already used by another device');
+        // The free pins it could use instead: not H1.4 (taken), not H1.1-3 (they carry SPI).
+        expect(wiring?.chip_select_options).toEqual([{ at: { connector: 'H1', pin: '5' }, gpio: { port: 'OTHER_GPIO1', number: 5 } }]);
     });
 
     test('a second device does not get a native chip-select line the first already uses', () => {

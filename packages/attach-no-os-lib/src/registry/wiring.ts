@@ -323,9 +323,12 @@ function chip_select_options(board: BoardInfo, buses: BusPins[], peripheral: str
 			continue;
 		}
 		const described = describe_board_pin(board.name, at);
-		// Not a line already selecting another device, nor one carrying another bus signal.
+		// Not a line already selecting another device, nor one carrying another bus signal,
+		// and one that can actually drive it: a native line, or a GPIO on a port the BSP sets up.
+		const native = described.ok && described.value.signals.some(signal => signal.native_cs !== undefined);
 		if (described.ok && !is_taken(described.value, taken)
-			&& described.value.signals.every(signal => signal.signal === "cs")) {
+			&& described.value.signals.every(signal => signal.signal === "cs")
+			&& (native || described.value.port_extern !== undefined)) {
 			options.push(described.value);
 		}
 	}

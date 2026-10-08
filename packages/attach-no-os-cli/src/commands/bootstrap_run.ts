@@ -13,6 +13,9 @@ export function run_bootstrap(workfile: Workfile, referenced_before?: Iterable<s
     return bootstrap(workfile, referenced_before === undefined ? {} : { referenced_before });
 }
 
+/** Free chip-select pins listed before the hint is cut short. */
+const CHIP_SELECT_OPTIONS_SHOWN = 6;
+
 /** A value as the schema writes it: a number in its format, anything else as JSON. */
 function show(value: unknown, format: FilledValue["format"]): string {
     return typeof value === "number" ? format_number_in(value, format) : JSON.stringify(value);
@@ -85,6 +88,16 @@ export function describe_bootstrap(report: BootstrapReport, workfile: Workfile):
         }
         for (const problem of wiring.problems) {
             lines.push(`  ! ${problem}`);
+        }
+        const options = wiring.chip_select_options ?? [];
+        if (options.length > 0) {
+            const shown = options.slice(0, CHIP_SELECT_OPTIONS_SHOWN).map(option =>
+                `${option.at.connector} pin ${option.at.pin}${option.gpio === undefined ? "" : ` (${option.gpio.port} ${String(option.gpio.number)})`}`);
+            const more = options.length > shown.length ? `, and ${String(options.length - shown.length)} more` : "";
+            lines.push(
+                `  Free pins for its chip-select: ${shown.join(", ")}${more}`,
+                `  To use one: add a pin node, set its port_handle and number, and point ${wiring.device}.cs_gpio at it.`,
+            );
         }
     }
 
