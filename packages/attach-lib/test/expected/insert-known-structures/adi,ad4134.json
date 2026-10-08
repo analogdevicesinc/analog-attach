@@ -1,4 +1,6 @@
 {
+    "title": "Analog Devices AD4134 ADC",
+    "description": "The AD4134 is a quad channel, low noise, simultaneous sampling,\nprecision analog-to-digital converter (ADC) that delivers on\nfunctionality, performance, and ease of use.\n\n  https://www.analog.com/en/products/ad4134.html\n",
     "required_properties": [
         "compatible",
         "reg",

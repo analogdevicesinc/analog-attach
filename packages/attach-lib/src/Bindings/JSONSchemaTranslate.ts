@@ -98,6 +98,8 @@ export function translate_JSONSchema(fixuped: DtBindingSchema): ParsedBinding {
     }
 
     return {
+        title: fixuped.title,
+        description: fixuped.description,
         required_properties: fixuped.required === undefined ? [] : fixuped.required,
         properties: resolved_properties,
         pattern_properties: pattern_properties.length === 0 ? undefined : pattern_properties,

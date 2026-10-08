@@ -9,7 +9,8 @@ import { run_complete, shell_dequote } from "./commands/completion/complete";
 import { COMPLETION_SPEC, NO_VALUE_COMPLETION, FILES_DIRECTIVE, DIRS_DIRECTIVE } from "./commands/completion/spec";
 import { CONFIG_REGISTRY } from "./config";
 import * as suggest from "./commands/suggest/command";
-import { INTELLIGENCE_KINDS } from "./commands/list-intelligence/command";
+import * as internal from "./commands/list/internal";
+import { LIST_KINDS } from "./commands/list/command";
 
 const CONFIG_SET_FIELD_NAMES = CONFIG_REGISTRY
     .filter(spec => !spec.internal && spec.env === undefined)
@@ -74,8 +75,9 @@ describe("completion spec stays in sync with the command registry", () => {
 });
 
 describe("__complete engine", () => {
-    test("no subcommand lists exactly the registered commands", async () => {
-        expect(values(await complete([""])).sort()).toEqual(registered_commands().sort());
+    test("no subcommand lists exactly the registered commands (excluding hidden __* commands)", async () => {
+        const visible = registered_commands().filter(name => !name.startsWith("__"));
+        expect(values(await complete([""])).sort()).toEqual(visible.sort());
     });
 
     test("partial command name is prefix-filtered", async () => {
@@ -200,20 +202,14 @@ describe("move completion", () => {
     });
 });
 
-describe("suggest kind completion", () => {
-    test("offers exactly the kinds list-intelligence reports, each with its first sentence", async () => {
-        const lines = await complete(["suggest", ""]);
-        expect(lines.map(line => line.split("\t")[0])).toStrictEqual(INTELLIGENCE_KINDS.map(entry => entry.kind));
-        expect(lines.find(line => line.startsWith("children\t"))).toBe("children\tLists the child nodes of a node, from the base devicetree and the overlay merged (navigate only sees the overlay).");
-    });
-
-    test("an abbreviation like e.g. doesn't end the first sentence", async () => {
-        const parent = (await complete(["suggest", "par"]))[0]!;
-        expect(parent).toContain("(e.g. the SPI/I2C bus or controller matching the binding's bus type).");
+describe("list kind completion", () => {
+    test("offers exactly the list kinds with their summaries", async () => {
+        const lines = await complete(["list", ""]);
+        expect(lines.map(line => line.split("\t")[0])).toStrictEqual(LIST_KINDS.map(entry => entry.kind));
     });
 
     test("filters by prefix", async () => {
-        expect((await complete(["suggest", "va"])).map(line => line.split("\t")[0])).toStrictEqual(["value"]);
+        expect((await complete(["list", "va"])).map(line => line.split("\t")[0])).toStrictEqual(["value"]);
     });
 });
 

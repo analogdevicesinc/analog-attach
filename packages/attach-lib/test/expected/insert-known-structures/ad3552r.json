@@ -1,4 +1,6 @@
 {
+    "title": "Analog Devices AD2552R DAC device driver",
+    "description": "Bindings for the Analog Devices AD3552R DAC device and similar.\nDatasheet can be found here:\n  https://www.analog.com/media/en/technical-documentation/data-sheets/ad3541r.pdf\n  https://www.analog.com/media/en/technical-documentation/data-sheets/ad3542r.pdf\n  https://www.analog.com/media/en/technical-documentation/data-sheets/ad3551r.pdf\n  https://www.analog.com/media/en/technical-documentation/data-sheets/ad3552r.pdf\n",
     "required_properties": [
         "compatible",
         "reg",
