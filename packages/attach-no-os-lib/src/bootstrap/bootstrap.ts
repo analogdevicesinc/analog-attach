@@ -52,9 +52,10 @@ import type { ChipSelectBinding } from "../registry/module_yml";
 import { driver_init_parameter_candidates, driver_ops_candidates } from "../registry/drivers";
 import { build_extern_index, hidden_candidates, wrapper_name } from "../registry/hidden";
 import type { ExternIndex, HiddenCandidate } from "../registry/hidden";
+import { board_gpio_ports } from "../registry/bsp";
 import { get_registry, resolve_entry } from "../registry/registry";
 import { find_eval_board, resolve_bus } from "../registry/wiring";
-import type { ChipSelect, Connection } from "../registry/wiring";
+import type { ChipSelect, Connection, TakenChipSelects } from "../registry/wiring";
 import { collect_child_overrides, create_connections_graph, is_referenced_by_others } from "../validator/connection_graph";
 import type { ConnectionGraph } from "../validator/types";
 import { apply_overrides } from "../validator/override_resolver";
@@ -580,6 +581,56 @@ function has_chip_select(node: Ruleset | undefined, binding: ChipSelectBinding):
 	return value_of(node, binding.gpio_list) !== undefined || (typeof native === "number" && native !== 0);
 }
 
+/** The board extern a handle node wraps (bsp_gpio2_cfg_handle -> bsp_gpio2_cfg), when it is one. */
+function wrapped_extern(workfile: Workfile, handle: unknown): string | undefined {
+	const node = typeof handle === "string" ? workfile.symbols[handle] : undefined;
+	const wrapped = value_of(node, "$init_param");
+	return typeof wrapped === "string" && workfile.symbols[wrapped]?._t === "RulesetExtern" ? wrapped : undefined;
+}
+
+/**
+ * The chip-select lines every SPI device but `device` already uses: each GPIO pin by its chip
+ * port and number, each native line by its controller and bit.
+ */
+function taken_chip_selects(workfile: Workfile, device: string, binding: ChipSelectBinding): TakenChipSelects {
+	const taken: TakenChipSelects = { gpio: [], native: [] };
+	if (workfile.board === undefined) {
+		return taken;
+	}
+	const ports = board_gpio_ports(workfile.board);
+	const port_of = new Map([...(ports.ok ? ports.value : new Map<string, string>())].map(([port, extern]) => [extern, port]));
+
+	for (const [name, node] of Object.entries(workfile.symbols)) {
+		if (name === device || node.$symbol !== binding.device) {
+			continue;
+		}
+
+		const pins = value_of(node, binding.gpio_list);
+		for (const pin of Array.isArray(pins) ? pins : [pins]) {
+			const pin_node = typeof pin === "string" ? workfile.symbols[pin] : undefined;
+			const port = port_of.get(wrapped_extern(workfile, value_of(pin_node, binding.pin_port)) ?? "");
+			const number = value_of(pin_node, binding.pin_number);
+			if (port !== undefined && typeof number === "number") {
+				taken.gpio.push({ port, number });
+			}
+		}
+
+		const mask = value_of(node, binding.native_mask);
+		// The bus it is on: the one reference that names a board handle (its controller).
+		const peripheral = node._t === "RulesetStruct"
+			? node.properties.map(property => wrapped_extern(workfile, property.value)).find(extern => extern !== undefined)
+			: undefined;
+		if (typeof mask === "number" && peripheral !== undefined) {
+			for (let bit = 0; bit < 32; bit++) {
+				if ((mask & (1 << bit)) !== 0) {
+					taken.native.push({ peripheral, native_cs: bit });
+				}
+			}
+		}
+	}
+	return taken;
+}
+
 /** Whether the user set either chip-select field to nothing: their call, not the wiring's. */
 function chip_select_cleared(node: Ruleset | undefined, binding: ChipSelectBinding): boolean {
 	return node?._t === "RulesetStruct" && node.properties.some(property =>
@@ -648,7 +699,7 @@ function chip_select_step(workfile: Workfile, externs: ExternIndex): Step | unde
 		if (!part.ok) {
 			continue;
 		}
-		const resolved = resolve_bus(part.value, workfile.board, "spi");
+		const resolved = resolve_bus(part.value, workfile.board, "spi", [], taken_chip_selects(workfile, device, chip_select));
 		if (!resolved.ok) {
 			continue;
 		}
@@ -793,7 +844,11 @@ function wiring_of(workfile: Workfile, touched: Set<string>): BusWiring[] {
 		if (!part.ok) {
 			continue;
 		}
-		const resolved = resolve_bus(part.value, workfile.board, interface_);
+		const binding = get_registry();
+		const taken = binding.ok && binding.value.chip_select !== undefined
+			? taken_chip_selects(workfile, device, binding.value.chip_select)
+			: undefined;
+		const resolved = resolve_bus(part.value, workfile.board, interface_, [], taken);
 		if (!resolved.ok) {
 			continue;
 		}
