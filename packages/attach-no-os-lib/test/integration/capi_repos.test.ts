@@ -40,14 +40,18 @@ function stored(workfile: Workfile): Record<string, Record<string, unknown>> {
     return exported.value.symbols as Record<string, Record<string, unknown>>;
 }
 
-/** What `attach-noos add adxl355` does: the driver's root, named after the driver, then bootstrap. */
-function add_adxl355(workfile: Workfile, name: string): void {
-    const root = driver_root('adxl355');
+/** What `attach-noos add <driver>` does: the driver's root, named after the driver, then bootstrap. */
+function add_driver(workfile: Workfile, driver: string, name: string): void {
+    const root = driver_root(driver);
     expectOk(root);
     const ruleset = load_resolved_ruleset_for_board(root.value, BOARD);
     expectOk(ruleset);
     expectOk(add_symbol(workfile, name, ruleset.value));
     expectOk(bootstrap(workfile));
+}
+
+function add_adxl355(workfile: Workfile, name: string): void {
+    add_driver(workfile, 'adxl355', name);
 }
 
 function board_workfile(): Workfile {
@@ -119,5 +123,37 @@ describe.skipIf(REPOS === undefined)('adxl355 on max32655fthr, from the real rep
 
         expect(stored(reloaded.value)).toEqual(stored(workfile));
         expect(validate_workfile(reloaded.value).valid).toBe(true);
+    });
+});
+
+describe.skipIf(REPOS === undefined)('ad74413r on max32655fthr, from the real repos', () => {
+    beforeEach(() => { setup_test_config(REPOS); });
+    afterEach(() => { teardown_test_config(); });
+
+    test('one node becomes a valid workfile, set up like the eval board\'s own project', () => {
+        const workfile = board_workfile();
+        add_driver(workfile, 'ad74413r', 'ad74413r');
+
+        expect(validate_workfile(workfile).valid).toBe(true);
+        const symbols = stored(workfile);
+        expect(symbols['capi_adc_config']).toMatchObject({ adc_ops: 'ad74413r_capi_adc_ops', extra: 'ad74413r_init_param' });
+        // Through $node: SPI mode 1 and 1 MHz, from the part, on the generic SPI device.
+        expect(symbols['capi_spi_device']).toMatchObject({ controller: 'bsp_spi1_cfg_handle', mode: 'CAPI_SPI_MODE_1', max_speed_hz: 1_000_000 });
+        expect(symbols['capi_gpio_pin']).toMatchObject({ port_handle: 'bsp_gpio2_cfg_handle', number: 0 });
+        // The reset line is optional: the driver falls back to a software reset.
+        expect(symbols['ad74413r_init_param']?.reset_gpio).toBeUndefined();
+    });
+
+    test('next to an adxl355 it shares the bus, not the chip-select', () => {
+        const workfile = board_workfile();
+        add_adxl355(workfile, 'adxl355');
+        add_driver(workfile, 'ad74413r', 'ad74413r');
+
+        const symbols = stored(workfile);
+        expect(symbols['capi_spi_device_1']?.controller).toBe('bsp_spi1_cfg_handle');
+        expect(symbols['capi_spi_device_1']?.cs_gpio).toBeUndefined();
+        // Each part's mode stays its own, though both devices are the same schema.
+        expect(symbols['capi_spi_device']?.mode).toBe('CAPI_SPI_MODE_0');
+        expect(symbols['capi_spi_device_1']?.mode).toBe('CAPI_SPI_MODE_1');
     });
 });
