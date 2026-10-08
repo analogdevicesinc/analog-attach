@@ -7,25 +7,13 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import type { LocalContext } from "../../context";
-import { load_config, save_config, DEFAULT_PREPROCESS_COMMAND, type AttachConfig } from "../../config";
-import { load_board, resolve_board_overlay } from "../../board";
+import { load_config, DEFAULT_PREPROCESS_COMMAND } from "../../config";
+import { load_board } from "../../board";
 import { respond, respond_fail } from "../../protocol/output";
 import type { CreateWorkfileResponse } from "../../protocol/types";
 import { is_tool_available, substitute_command } from "../../utilities";
+import { create_workfile } from "../../workfile";
 
-const EMPTY_DTSO = String.raw`/dts-v1/;
-/plugin/;
-
-/ {
-};
-`;
-
-/**
- * Turn a board's shipped overlay into a workfile: run the preprocess command
- * (includes and macros), parse, and drop `__overrides__` (Raspberry Pi
- * firmware dtparam glue whose references break once nodes are edited).
- * Warns about `onboard` slot labels the overlay doesn't define.
- */
 export function prepare_board_workfile(
     board: BoardDescription,
     overlay_path: string,
@@ -65,27 +53,6 @@ export function prepare_board_workfile(
     return { text: overlay.print(), warnings };
 }
 
-/** The workfile to start from: the configured board's overlay when it ships one, otherwise an empty overlay. */
-function initial_workfile(config: AttachConfig): { text: string, source?: string, warnings: string[], persist: Partial<AttachConfig> } | { error: string } {
-    if (config.board === undefined) { return { text: EMPTY_DTSO, warnings: [], persist: {} }; }
-
-    const board = load_board(config.board);
-    if (typeof board === "string") { return { error: `board ${config.board}: ${board}` }; }
-    const overlay_path = resolve_board_overlay(config.board, board);
-    if (overlay_path === undefined) { return { text: EMPTY_DTSO, warnings: [], persist: {} }; }
-
-    const template = config.preprocessCommand ?? DEFAULT_PREPROCESS_COMMAND;
-    const prepared = prepare_board_workfile(board, overlay_path, template, config.linux);
-    if ("error" in prepared) { return prepared; }
-    return {
-        text: prepared.text,
-        source: overlay_path,
-        warnings: prepared.warnings,
-        // Write the command used to the config so it is visible and editable.
-        persist: config.preprocessCommand === undefined ? { preprocessCommand: template } : {},
-    };
-}
-
 export function build_create_workfile_command(context: LocalContext): Command {
     return new Command("create-workfile")
         .description("Create a new workfile (DTSO overlay); starts from the board's overlay when the configured board ships one")
@@ -93,33 +60,27 @@ export function build_create_workfile_command(context: LocalContext): Command {
         .action(async (options) => {
             const filename: string = options.name ?? "overlay.dtso";
 
-            const initial = initial_workfile(load_config() ?? {});
-            if ("error" in initial) {
+            const result = create_workfile(load_config() ?? {}, filename);
+            if ("error" in result) {
                 if (context.json) {
-                    respond_fail({ ok: false, message: initial.error, severity: "error" });
+                    respond_fail({ ok: false, message: result.error, severity: "error" });
                 } else {
-                    console.log(initial.error);
+                    console.log(result.error);
                 }
                 return;
             }
 
-            const output_path = path.resolve(process.cwd(), filename);
-            fs.writeFileSync(output_path, initial.text);
-
-            save_config({ overlay: output_path, ...initial.persist });
-
-            const from = initial.source === undefined ? "" : ` from ${initial.source}`;
-            const message = [`Created workfile${from}`, ...initial.warnings].join("; ");
+            const message = [result.message, ...result.warnings].join("; ");
             if (context.json) {
                 respond({
                     ok: true,
-                    message,
-                    severity: initial.warnings.length > 0 ? "warn" : "info",
-                    path: output_path,
+                    message: message.replace(/^Wrote /, "Created workfile "),
+                    severity: result.warnings.length > 0 ? "warn" : "info",
+                    path: result.path,
                 } satisfies CreateWorkfileResponse);
             } else {
-                console.log(`Wrote ${output_path}${from}`);
-                for (const warning of initial.warnings) { console.log(warning); }
+                console.log(result.message);
+                for (const warning of result.warnings) { console.log(warning); }
             }
         });
 }

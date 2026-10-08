@@ -4,10 +4,12 @@ import { DeviceTree, DeviceTreeOverlay, NodeBuilder, PropertyBuilder, type DTPro
 import * as fs from 'node:fs';
 
 import type { LocalContext } from "../../context";
+import { load_config, check_config, check_failure_message } from "../../config";
 import { find_binding, load_trees, resolve_node_identifier } from "../../utilities";
 import { resolve_config } from "../../resolve-config";
-import { respond, respond_fail, input_error } from "../../protocol/output";
+import { respond, respond_fail, input_error, diagnostic } from "../../protocol/output";
 import type { AddResponse } from "../../protocol/types";
+import { create_workfile } from "../../workfile";
 
 export type AddResult =
     | { status: "added"; key: string; path: string[] }
@@ -21,6 +23,28 @@ export function build_add_command(context_: LocalContext): Command {
         .option("--label <value>", "Label to attach to the new node (e.g. imu1)")
         .argument("[key]", "Device key / compatible string of the device binding to add")
         .action(async (key: string | undefined, options) => {
+            const pre_config = load_config() ?? {};
+            const pre_check = check_config(pre_config, ["linux", "dtSchema", "context"]);
+            if (!pre_check.ok) {
+                const message = check_failure_message(pre_check);
+                if (context_.json) { input_error(message.json); }
+                else { console.log(message.human); }
+                return;
+            }
+
+            let created_message: string | undefined;
+            if (pre_config.overlay === undefined) {
+                const workfile = create_workfile(pre_config);
+                if ("error" in workfile) {
+                    if (context_.json) { respond_fail({ ok: false, message: workfile.error, severity: "error" }); }
+                    else { console.log(workfile.error); }
+                    return;
+                }
+                created_message = workfile.message;
+                if (!context_.json) { console.log(created_message); }
+                else { diagnostic(created_message); }
+            }
+
             const resolved = resolve_config(context_, ["linux", "dtSchema", "context", "overlay"]);
             if (resolved === undefined) { return; }
             const { linux, dtSchema, context, overlay: input } = resolved.values;
@@ -66,10 +90,14 @@ export function build_add_command(context_: LocalContext): Command {
                 }
                 case "added": {
                     fs.writeFileSync(input, overlay.print());
+                    const added_message = `Added ${node_name}`;
+                    const full_message = created_message !== undefined
+                        ? `${created_message}; ${added_message}`
+                        : added_message;
                     if (context_.json) {
                         const response: AddResponse = {
                             ok: true,
-                            message: `Added ${node_name}`,
+                            message: full_message,
                             severity: "info",
                             key: result.key,
                             path: result.path,
@@ -77,7 +105,7 @@ export function build_add_command(context_: LocalContext): Command {
                         respond(response);
                         return;
                     }
-                    console.log(`Added ${node_name} to ${input}`);
+                    console.log(`${added_message} to ${input}`);
                     return;
                 }
             }
