@@ -7,11 +7,17 @@ import {
     parse_board_description,
     DeviceTree,
     DeviceTreeOverlay,
+    NodeBuilder,
     PropertyBuilder,
     INTERRUPT_MACROS,
     GPIO_MACROS,
     is_dt_flag,
     print_property,
+    get_full_node_name,
+    address_cells_of,
+    encode_reg_address,
+    parse_unit_address,
+    sync_unit_address_from_reg,
     type CellValue,
     type DTNode,
     type DTProperty,
@@ -350,6 +356,93 @@ export function build_update_command(context_: LocalContext): Command {
             }
 
             const property_name = property_argument;
+
+            // R12: child nodes via update
+            if (property_name.includes("@")) {
+                // A name with @ is always a child node, never a property
+                const effective = overlay.effective_children(found?.node_path ?? node_identifier);
+                const existing_child = effective.get(property_name);
+                if (existing_child !== undefined) {
+                    // Existing child → act as read
+                    const child_found = overlay.find_node({ kind: "path", labels: [], path: `${found?.node_path ?? node_identifier}/${property_name}` });
+                    read_property(context_, child_found, property_name, `${node_identifier}/${property_name}`);
+                    return;
+                }
+
+                // Check if it matches a pattern_properties regex
+                const { definition: def } = await resolve_property_definition(
+                    binding_node, binding_parent, parent_name, base_dt, linux, dtSchema,
+                    property_name, context_.json, true,
+                );
+                // Try to find the binding's child_nodes (pattern_properties)
+                let matched_pattern = false;
+                if (binding_node !== undefined) {
+                    const binding = await resolve_node_binding(binding_node, binding_parent, parent_name, base_dt, linux, dtSchema, context_.json);
+                    if (!("error" in binding) && binding.child_nodes.length > 0) {
+                        const patterns = binding.child_nodes.map(c => c.pattern);
+                        for (const pattern of patterns) {
+                            if (new RegExp(pattern).test(property_name)) {
+                                matched_pattern = true;
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                if (matched_pattern) {
+                    if (value_arguments.length > 0) {
+                        const message = `${property_name} is a child node; set its properties with \`update ${node_identifier}/${property_name} <prop> <value>\``;
+                        if (context_.json) { respond_fail({ ok: false, message, severity: "error" }); }
+                        else { console.log(message); }
+                        return;
+                    }
+
+                    // Create the child node
+                    const at = property_name.indexOf("@");
+                    const child_name = property_name.slice(0, at);
+                    const child_unit = property_name.slice(at + 1);
+                    const child_props: DTProperty[] = [];
+
+                    const parsed_addr = parse_unit_address(child_unit);
+                    if (parsed_addr !== undefined) {
+                        const cells = address_cells_of(overlay, found?.node_path ?? node_identifier);
+                        child_props.push(encode_reg_address(parsed_addr, cells.address, cells.size));
+
+                        // C3: write #address-cells/#size-cells on parent if missing
+                        if (found !== undefined && !is_base_target) {
+                            const has_addr = found.node.properties.some(p => p.name === "#address-cells");
+                            if (!has_addr) {
+                                found.node.properties.push(
+                                    PropertyBuilder.build_cell_array().with_tagged_values(PropertyBuilder.tag_number(1n)).with_name("#address-cells").build(),
+                                    PropertyBuilder.build_cell_array().with_tagged_values(PropertyBuilder.tag_number(0n)).with_name("#size-cells").build(),
+                                );
+                            }
+                        }
+                    }
+
+                    const child_node = NodeBuilder.new()
+                        .with_name(child_name)
+                        .with_unit_address(child_unit)
+                        .with_label([])
+                        .with_properties(child_props.length > 0 ? child_props : undefined)
+                        .build();
+
+                    if (found !== undefined) {
+                        found.node.children.push(child_node);
+                    } else if (is_base_target) {
+                        overlay.add_fragment(target_reference, NodeBuilder.new().with_name(child_name).with_unit_address(child_unit).with_label([]).with_properties(child_props.length > 0 ? child_props : undefined), undefined);
+                    }
+
+                    const printed = overlay.print(overlay_print_options(resolved.config));
+                    fs.writeFileSync(input, printed);
+                    const message = `Added ${property_name} to ${node_identifier}`;
+                    if (context_.json) { respond({ ok: true, message, severity: "info" }); }
+                    else { console.log(message); }
+                    return;
+                }
+                // Fall through to property handling (creates a flag for unknown names)
+            }
+
             const { definition: property_definition } = await resolve_property_definition(
                 binding_node, binding_parent, parent_name, base_dt, linux, dtSchema,
                 property_name, context_.json, value_arguments.length === 0,
@@ -410,6 +503,32 @@ export function build_update_command(context_: LocalContext): Command {
 
             place_property(overlay, target_reference, found, is_base_target, built, property_name);
 
+            // R10: updating reg renames the node (overlay-added targets only)
+            let rename_message = "";
+            if (property_name === "reg" && found !== undefined && !is_base_target) {
+                const parent_path = found.node_path.split("/").slice(0, -1).join("/") || "/";
+                const cells = address_cells_of(overlay, parent_path);
+                const effective = overlay.effective_children(parent_path);
+                const sync = sync_unit_address_from_reg(found.node, cells.address, effective);
+                switch (sync) {
+                    case "conflict": {
+                        if (context_.json) { respond_fail({ ok: false, message: `reg update would create a naming conflict`, severity: "error" }); }
+                        else { console.log("reg update would create a naming conflict; not written"); }
+                        return;
+                    }
+                    case "renamed": {
+                        rename_message = `; renamed to ${get_full_node_name(found.node)}`;
+                        break;
+                    }
+                    case "not-numeric": {
+                        diagnostic("reg contains non-numeric cells; node not renamed");
+                        break;
+                    }
+                }
+            } else if (property_name === "reg" && is_base_target) {
+                diagnostic("an overlay can't rename a base node; reg written but name unchanged");
+            }
+
             const printed = overlay.print(overlay_print_options(resolved.config));
             const test_parse = DeviceTreeOverlay.new_from_string(printed, base_dt);
 
@@ -425,9 +544,9 @@ export function build_update_command(context_: LocalContext): Command {
             fs.writeFileSync(input, printed);
 
             if (context_.json) {
-                respond({ ok: true, message: `Set ${property_name} on ${node_identifier}`, severity: "info" });
+                respond({ ok: true, message: `Set ${property_name} on ${node_identifier}${rename_message}`, severity: "info" });
             } else {
-                console.log(`Set ${property_name} on ${node_identifier}`);
+                console.log(`Set ${property_name} on ${node_identifier}${rename_message}`);
             }
         });
 }

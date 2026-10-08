@@ -137,11 +137,13 @@ export function move_overlay_node(
     if (is_self_or_descendant(node, destination_node)) { return "into-self"; }
 
     const key = get_full_node_name(node);
-    const collision = destination_node.children.some(
-        (c) => c !== node && get_full_node_name(c) === key
-    );
 
-    if (collision) { return "conflict"; }
+    // R2: check effective_children at destination for duplicates
+    const dest_path = destination_in_overlay !== undefined
+        ? destination_in_overlay.node_path
+        : parent_identifier;
+    const effective = overlay.effective_children(dest_path);
+    if (effective.has(key)) { return "conflict"; }
 
     if (!overlay.remove_node({ kind: "path", labels: [], path: found.node_path })) {
         return "not-found";
