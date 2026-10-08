@@ -1,4 +1,6 @@
 {
+    "title": "Analog Devices ADXL345/ADXL375 3-Axis Digital Accelerometers",
+    "description": "Analog Devices ADXL345/ADXL375 3-Axis Digital Accelerometers that supports\nboth I2C & SPI interfaces.\n  https://www.analog.com/en/products/mems/accelerometers/adxl345.html\n  https://www.analog.com/en/products/sensors-mems/accelerometers/adxl375.html\n",
     "required_properties": [
         "compatible",
         "reg",

@@ -27,17 +27,12 @@ export function build_attach_manifest_command(_context: LocalContext): Command {
                             },
                         },
                     },
-                    "list-devices": {
-                        description: "List all known Linux device compatible strings from the compat-index (built from the Linux bindings directory). Use --includes-word <fragment> to filter; e.g. --includes-word spi returns only SPI-related entries. The index is built automatically on first call and rebuilt when stale — first call can be slow. Use the returned key values as the positional argument to add.",
-                        argv: ["attach-linux", "--json", "list-devices"],
-                        args: {
-                            properties: {
-                                "includes-word": { type: "string" },
-                            },
-                        },
+                    "list": {
+                        description: "List device bindings, properties, values, parents or slots. Subkinds: device [compatible], property <path> [property], value <path> <property>, parent <compatible>, slot [compatible]. Bare `list` shows available kinds.",
+                        argv: ["attach-linux", "--json", "list"],
                     },
                     "add": {
-                        description: "Add a new node to the overlay. Two patterns — choose based on whether the node has a compatible property. Pattern A (device node with compatible): pass the compatible string as the positional arg (e.g. adi,ad7124-8); --name <name[@unit]> overrides the node name; use suggest(device-key) to discover the right compatible string and suggest(parent) to find the right bus. Pattern B (bare structural subnode — channel, alias, bus sub-node, any node without compatible): pass --name <node-name> and --to <parent> only; do NOT pass a positional compatible string. --label <label> assigns a DTS label to the new node (both patterns; recommended so the node can be targeted by label in later commands). --to <parent> accepted forms: bare label (spi0), absolute path (/soc/spi@7e204000), slash-separated label/child (spi0/ad7124@0/channel@0), or multiple space-separated tokens resolved from root (soc spi@7e204000 ad7124@0 → /soc/spi@7e204000/ad7124@0). Fails with parent-not-found if the parent does not exist in either the base DTS or the overlay. After adding a node to a base-tree parent (e.g. a bus like spi0 or i2c1), the parent may need status = \"okay\" set in the overlay — use update(<parent-label>/status, \"okay\") after add if the parent is a base-tree node.",
+                        description: "Add a device node to the overlay. The compatible string is required as the positional arg (e.g. `add adi,ad7124-8 --parent spi0`). --parent <path> sets the parent node (label-first or absolute). --name <name[@unit]> overrides the node name. --label <label> assigns a DTS label. Use `list device` to discover compatible strings and `list parent` to find the right bus. Child nodes (channels, ports) are created through `update <path> <child-name>` instead.",
                         argv: ["attach-linux", "--json", "add"],
                         args: {
                             properties: {
@@ -50,7 +45,7 @@ export function build_attach_manifest_command(_context: LocalContext): Command {
                                 kind: "device-key"
                             },
                             {
-                                arg: "to",
+                                arg: "parent",
                                 kind: "parent"
                             }
                         ]
@@ -79,13 +74,9 @@ export function build_attach_manifest_command(_context: LocalContext): Command {
                         description: "Rename an overlay-added node or property. Positional args identify the target; accepted forms: node label (imu1), absolute path (/soc/spi@7e204000), slash-separated label/child (imu1/channel@0), or space-separated tokens from root (soc spi@7e204000) — the same forms work for properties, where the last segment is the property name. --to <new-name> (required): for nodes, bare name preserves the existing unit address (my_adc), name@unit overrides it (my_adc@1), name@ removes the unit address; for properties, pass the new property name. Only overlay-added nodes can be renamed — base-tree nodes return in-base. Detects sibling key conflicts.",
                         argv: ["attach-linux", "--json", "rename"],
                     },
-                    "list-intelligence": {
-                        description: "Returns metadata about the suggestion kinds supported by suggest. Use this to discover what kinds are available and what arguments each kind requires before calling suggest.",
-                        argv: ["attach-linux", "--json", "list-intelligence"],
-                    },
                     "suggest": {
-                        description: "Return completion candidates for a suggestion kind. First positional arg is the kind; remaining args depend on the kind — call list-intelligence to discover available kinds and their arguments.",
-                        argv: ["attach-linux", "--json", "suggest"],
+                        description: "Internal: return completion candidates for a suggestion kind (hidden __list command). First positional arg is the kind; remaining args depend on the kind.",
+                        argv: ["attach-linux", "--json", "__list"],
                     },
                     "build": {
                         description: "Compile the overlay DTSO into a DTBO using dtc. Reads the overlay config field for the source path (--overlay overrides) and writes the compiled .dtbo next to it, saving that path to the overlay-compiled config field for deploy to pick up. The compile command comes from the build-command config field (default: dtc -@ -I dts -O dtb -o {output} {input}); {input}/{output} are substituted with the source and artifact paths. --build-command overrides the template for one run. Fails with an input-error if overlay is unset, the source is missing, or dtc is not installed; returns the artifact path on success.",

@@ -1,4 +1,6 @@
 {
+    "title": "Analog Devices AD2S90 Resolver-to-Digital Converter",
+    "description": "Datasheet: https://www.analog.com/en/products/ad2s90.html\n",
     "required_properties": [
         "compatible",
         "reg"

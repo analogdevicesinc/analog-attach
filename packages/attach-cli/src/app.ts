@@ -6,7 +6,6 @@ import { build_attach_manifest_command } from "./commands/attach-manifest/comman
 import { build_config_get_command } from "./commands/config-get/command";
 import { build_config_set_command } from "./commands/config-set/command";
 import { build_create_workfile_command } from "./commands/create-workfile/command";
-import { build_list_devices_command } from "./commands/list-devices/command";
 import { build_add_command } from "./commands/add/command";
 import { build_read_command } from "./commands/read/command";
 import { build_update_command } from "./commands/update/command";
@@ -15,8 +14,8 @@ import { build_validate_command } from "./commands/validate/command";
 import { build_validate2_command } from "./commands/validate2/command";
 import { build_move_command } from "./commands/move/command";
 import { build_rename_command } from "./commands/rename/command";
-import { build_list_intelligence_command } from "./commands/list-intelligence/command";
-import { build_suggest_command } from "./commands/suggest/command";
+import { build_list_command } from "./commands/list/command";
+import { build_internal_list_command } from "./commands/list/internal";
 import { build_build_command } from "./commands/build/command";
 import { build_deploy_command } from "./commands/deploy/command";
 import { build_get_schema_command } from "./commands/get-schema/command";
@@ -38,7 +37,6 @@ export function buildApp(context: LocalContext): Command {
     program.addCommand(build_config_get_command(context));
     program.addCommand(build_config_set_command(context));
     program.addCommand(build_create_workfile_command(context));
-    program.addCommand(build_list_devices_command(context));
     program.addCommand(build_add_command(context));
     program.addCommand(build_read_command(context));
     program.addCommand(build_update_command(context));
@@ -47,8 +45,8 @@ export function buildApp(context: LocalContext): Command {
     program.addCommand(build_validate2_command(context));
     program.addCommand(build_move_command(context));
     program.addCommand(build_rename_command(context));
-    program.addCommand(build_list_intelligence_command(context));
-    program.addCommand(build_suggest_command(context));
+    program.addCommand(build_list_command(context));
+    program.addCommand(build_internal_list_command(context));
     program.addCommand(build_build_command(context));
     program.addCommand(build_deploy_command(context));
 

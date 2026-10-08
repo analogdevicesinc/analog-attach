@@ -1,4 +1,6 @@
 {
+    "title": "Analog Devices ADIS16475 and similar IMUs",
+    "description": "Analog Devices ADIS16475 and similar IMUs\nhttps://www.analog.com/media/en/technical-documentation/data-sheets/ADIS16475.pdf\n",
     "required_properties": [
         "compatible",
         "reg",

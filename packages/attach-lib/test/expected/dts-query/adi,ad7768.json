@@ -1,4 +1,6 @@
 {
+    "title": "Analog Devices AD7768 ADC family device driver",
+    "description": "Analog Devices AD7768 8-/4-Channel, 24-Bit, Simultaneous Sampling ADCs\n\nhttps://www.analog.com/media/en/technical-documentation/data-sheets/ad7768-7768-4.pdf\n",
     "required_properties": [
         "compatible",
         "reg",

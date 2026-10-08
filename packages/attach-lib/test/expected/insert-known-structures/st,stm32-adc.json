@@ -1,4 +1,6 @@
 {
+    "title": "STMicroelectronics STM32 ADC",
+    "description": "STM32 ADC is a successive approximation analog-to-digital converter.\nIt has several multiplexed input channels. Conversions can be performed\nin single, continuous, scan or discontinuous mode. Result of the ADC is\nstored in a left-aligned or right-aligned 32-bit data register.\nConversions can be launched in software or using hardware triggers.\n\nThe analog watchdog feature allows the application to detect if the input\nvoltage goes beyond the user-defined, higher or lower thresholds.\n\nEach STM32 ADC block can have up to 3 ADC instances.\n",
     "required_properties": [
         "compatible",
         "reg",

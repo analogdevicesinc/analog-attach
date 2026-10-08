@@ -1,4 +1,6 @@
 {
+    "title": "Analog Devices AD7292 10-Bit Monitor and Control System",
+    "description": "Analog Devices AD7292 10-Bit Monitor and Control System with ADC, DACs,\nTemperature Sensor, and GPIOs\n\nSpecifications about the part can be found at:\n  https://www.analog.com/media/en/technical-documentation/data-sheets/ad7292.pdf\n",
     "required_properties": [
         "compatible",
         "reg",

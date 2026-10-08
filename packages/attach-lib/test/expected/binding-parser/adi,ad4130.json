@@ -1,4 +1,6 @@
 {
+    "title": "Analog Devices AD4130 ADC device driver",
+    "description": "Bindings for the Analog Devices AD4130 ADC. Datasheet can be found here:\n  https://www.analog.com/media/en/technical-documentation/data-sheets/AD4130-8.pdf\n",
     "required_properties": [
         "compatible",
         "reg",

@@ -16,6 +16,8 @@ export type PatternPropertyRule = {
 };
 
 export type ParsedBinding = {
+    title?: string,
+    description?: string,
     required_properties: string[],
     properties: ResolvedProperty[],
     pattern_properties?: PatternPropertyRule[],

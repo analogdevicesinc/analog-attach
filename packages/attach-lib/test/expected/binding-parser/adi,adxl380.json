@@ -1,4 +1,6 @@
 {
+    "title": "Analog Devices ADXL380/382 3-Axis Digital Accelerometer",
+    "description": "The ADXL380/ADXL382 is a low noise density, low power, 3-axis\naccelerometer with selectable measurement ranges. The ADXL380\nsupports the ±4 g, ±8 g, and ±16 g ranges, and the ADXL382 supports\n±15 g, ±30 g, and ±60 g ranges.\n\nhttps://www.analog.com/en/products/adxl380.html\n",
     "required_properties": [
         "compatible",
         "reg",

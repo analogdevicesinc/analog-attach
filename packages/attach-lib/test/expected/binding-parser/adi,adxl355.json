@@ -1,4 +1,6 @@
 {
+    "title": "Analog Devices ADXL355 and ADXL359 3-Axis, Low noise MEMS Accelerometers",
+    "description": "Analog Devices ADXL355 and ADXL359 3-Axis, Low noise MEMS Accelerometers that\nsupport both I2C & SPI interfaces\n  https://www.analog.com/en/products/adxl355.html\n  https://www.analog.com/en/products/adxl359.html\n",
     "required_properties": [
         "compatible",
         "reg"

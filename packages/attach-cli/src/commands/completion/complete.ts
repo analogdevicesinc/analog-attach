@@ -12,7 +12,7 @@ import type { Command, Option } from "commander";
 
 import { buildApp } from "../../app";
 import { buildContext } from "../../context";
-import { run_suggest } from "../suggest/command";
+import { run_internal_list } from "../list/internal";
 import type { Suggestion } from "../../protocol/types";
 import { COMPLETION_SPEC, FILES_DIRECTIVE, DIRS_DIRECTIVE, type CommandSpec, type ValueSource, type SuggestKind } from "./spec";
 
@@ -89,7 +89,7 @@ export async function run_complete(words: string[]): Promise<void> {
         if (prefix.startsWith("-")) {
             emit(filter_by_prefix(GLOBAL_FLAGS, prefix));
         } else {
-            emit(filter_by_prefix(app.commands.map(c => ({ value: c.name(), description: c.description() })), prefix));
+            emit(filter_by_prefix(app.commands.filter(c => !c.name().startsWith("__")).map(c => ({ value: c.name(), description: c.description() })), prefix));
         }
         return;
     }
@@ -227,7 +227,7 @@ async function capture_suggest(kind: SuggestKind, arguments_: string[]): Promise
     const lines: string[] = [];
     console.log = (...parts: unknown[]) => { lines.push(parts.map(p => (typeof p === "string" ? p : String(p))).join(" ")); };
     try {
-        await run_suggest(buildContext(true), [kind, ...arguments_]);
+        await run_internal_list(buildContext(true), [kind, ...arguments_]);
     } catch {
         // ignore — no candidates
     } finally {

@@ -1,5 +1,5 @@
 import { CONFIG_REGISTRY } from "../../config";
-import { INTELLIGENCE_KINDS } from "../list-intelligence/command";
+import { LIST_KINDS } from "../list/command";
 
 // Single source of truth for value completion.
 //
@@ -90,12 +90,12 @@ export const COMPLETION_SPEC: Readonly<Record<string, CommandSpec>> = {
     validate: {
         positional: { mode: "byIndex", sources: [NAV] },
     },
-    suggest: {
+    list: {
         positional: {
             mode: "byIndex",
             sources: [{
                 kind: "choices",
-                choices: INTELLIGENCE_KINDS.map(entry => ({ value: entry.kind, description: entry.description.split(/(?<=[^.\s]{2}\.)\s/)[0]! })),
+                choices: LIST_KINDS.map(entry => ({ value: entry.kind, description: entry.summary })),
             }],
         },
     },
@@ -114,13 +114,12 @@ export const COMPLETION_SPEC: Readonly<Record<string, CommandSpec>> = {
 };
 
 export const NO_VALUE_COMPLETION: readonly string[] = [
+    "__list",
     "build",
     "deploy",
     "attach-manifest",
     "create-workfile",
-    "list-devices",
     "validate2",
-    "list-intelligence",
     "install-skill",
     "uninstall-skill",
 ];

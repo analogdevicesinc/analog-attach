@@ -1,4 +1,6 @@
 {
+    "title": "Analog Devices AD7124 ADC device driver",
+    "description": "Bindings for the Analog Devices AD7124 ADC device. Datasheet can be\nfound here:\n  https://www.analog.com/media/en/technical-documentation/data-sheets/AD7124-8.pdf\n",
     "required_properties": [
         "compatible",
         "reg",

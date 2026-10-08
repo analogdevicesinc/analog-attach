@@ -1,4 +1,6 @@
 {
+    "title": "Analog Devices AD7923 and similars with 4 and 8 Channel ADCs.",
+    "description": "Analog Devices AD7904, AD7914, AD7923, AD7924 4 Channel ADCs, and AD7908,\n AD7918, AD7927, AD7928 8 Channels ADCs.\n\nSpecifications about the part can be found at:\n  https://www.analog.com/media/en/technical-documentation/data-sheets/AD7923.pdf\n  https://www.analog.com/media/en/technical-documentation/data-sheets/AD7904_7914_7924.pdf\n  https://www.analog.com/media/en/technical-documentation/data-sheets/AD7908_7918_7928.pdf\n",
     "required_properties": [
         "compatible",
         "reg"
