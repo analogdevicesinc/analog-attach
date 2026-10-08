@@ -1,27 +1,17 @@
 import { Command } from "commander";
 import { DeviceTree, DeviceTreeOverlay } from "attach-lib";
 
-import * as fs from 'node:fs';
-
 import type { LocalContext } from "../../context";
 import { resolve_config } from "../../resolve-config";
-import { load_trees, resolve_node_identifier, split_property_reference, write_overlay } from "../../utilities";
+import { load_trees, resolve_node_identifier, not_found_message, write_overlay } from "../../utilities";
 import { respond, respond_fail, input_error } from "../../protocol/output";
 
 export function build_rename_command(context_: LocalContext): Command {
     return new Command("rename")
-        .description("Rename an overlay-added node in an existing dtso")
-        .requiredOption("--to <value>", "New node key: 'name' preserves unit addr, 'name@unit' overrides it")
-        .argument("[path...]", "Path to node (ValidIdentifier segments)")
-        .action(async (path: string[], options) => {
-            const { to } = options;
-
-            if (path.length === 0) {
-                if (context_.json) { input_error("path is required"); return; }
-                console.log("Missing: path (positional arguments)");
-                return;
-            }
-
+        .description("Rename an overlay-added node")
+        .argument("<path>", "Path to node")
+        .argument("<new-name>", "New name for the node (e.g. adc@1)")
+        .action(async (path_argumentument: string, new_name: string) => {
             const resolved = resolve_config(context_, ["context", "overlay"]);
             if (resolved === undefined) { return; }
             const { context, overlay: input } = resolved.values;
@@ -30,22 +20,21 @@ export function build_rename_command(context_: LocalContext): Command {
             if (trees === undefined) { return; }
             const overlay = trees.overlay;
 
-            const identifier = path.join("/");
-            const result = rename_overlay_target(overlay, identifier, to);
+            const result = rename_overlay_node(overlay, path_argumentument, new_name);
 
             if (context_.json) {
                 switch (result) {
                     case "renamed": {
                         write_overlay(input, overlay, resolved.config);
-                        respond({ ok: true, message: `Renamed ${identifier} to ${to}`, severity: "info" });
+                        respond({ ok: true, message: `Renamed ${path_argumentument} to ${new_name}`, severity: "info" });
                         return;
                     }
                     case "not-found": {
-                        respond_fail({ ok: false, message: `${identifier} not found`, severity: "error" });
+                        respond_fail({ ok: false, message: not_found_message(path_argumentument, overlay, trees.base_dt), severity: "error" });
                         return;
                     }
                     case "in-base": {
-                        respond_fail({ ok: false, message: `${identifier} is part of the base device tree, not this overlay`, severity: "error" });
+                        respond_fail({ ok: false, message: `${path_argumentument} is part of the base device tree, not this overlay`, severity: "error" });
                         return;
                     }
                     case "is-root": {
@@ -53,18 +42,18 @@ export function build_rename_command(context_: LocalContext): Command {
                         return;
                     }
                     case "conflict": {
-                        respond_fail({ ok: false, message: `${to} already exists under the same parent`, severity: "error" });
+                        respond_fail({ ok: false, message: `${new_name} already exists under the same parent`, severity: "error" });
                         return;
                     }
                 }
             } else {
                 switch (result) {
                     case "not-found": {
-                        console.log(`Couldn't find ${identifier} in ${input}`);
+                        console.log(not_found_message(path_argumentument, overlay, trees.base_dt));
                         return;
                     }
                     case "in-base": {
-                        console.log(`${identifier} is part of the base device tree (${context}), not this overlay; rename only applies to overlay-added nodes`);
+                        console.log(`${path_argumentument} is part of the base device tree (${context}), not this overlay; rename only applies to overlay-added nodes`);
                         return;
                     }
                     case "is-root": {
@@ -72,55 +61,17 @@ export function build_rename_command(context_: LocalContext): Command {
                         return;
                     }
                     case "conflict": {
-                        console.log(`${to} already exists under the same parent`);
+                        console.log(`${new_name} already exists under the same parent`);
                         return;
                     }
                     case "renamed": {
                         write_overlay(input, overlay, resolved.config);
-                        console.log(`Renamed ${identifier} to ${to} in ${input}`);
+                        console.log(`Renamed ${path_argumentument} to ${new_name} in ${input}`);
                         return;
                     }
                 }
             }
         });
-}
-
-type RenameResult = "renamed" | "not-found" | "in-base" | "is-root" | "conflict";
-
-function rename_overlay_target(
-    overlay: DeviceTreeOverlay,
-    identifier: string,
-    to: string,
-): RenameResult {
-    const node_result = rename_overlay_node(overlay, identifier, to);
-    if (node_result !== "not-found") { return node_result; }
-
-    // Not a node: reinterpret the trailing segment as a property name, splitting
-    // the joined identifier so every reference form works whether written as one
-    // slash-joined token (imu1/status) or as separate tokens (imu1 status).
-    const { node_identifier, property_name } = split_property_reference(identifier);
-    if (property_name === undefined) { return "not-found"; }
-
-    return rename_overlay_property(overlay, node_identifier, property_name, to);
-}
-
-function rename_overlay_property(
-    overlay: DeviceTreeOverlay,
-    parent_identifier: string,
-    property_name: string,
-    new_name: string,
-): RenameResult {
-    const found = overlay.find_node(resolve_node_identifier(parent_identifier, overlay));
-    if (found === undefined) { return "not-found"; }
-
-    const property = found.node.properties.find(p => p.name === property_name);
-    if (property === undefined) { return "not-found"; }
-
-    const conflict = found.node.properties.some(p => p.name === new_name);
-    if (conflict) { return "conflict"; }
-
-    property.name = new_name;
-    return "renamed";
 }
 
 export function rename_overlay_node(
@@ -202,7 +153,7 @@ if (import.meta.vitest) {
         expect(output).not.toContain("adi,ad7124-8@0");
     });
 
-    test("rename_overlay_node - --to without @ preserves existing unit addr", () => {
+    test("rename_overlay_node - new-name without @ preserves existing unit addr", () => {
         const base = DeviceTree.new_from_string(base_dts);
         if (typeof base === "string") { throw new TypeError(base); }
 
@@ -219,7 +170,7 @@ if (import.meta.vitest) {
         expect(output).not.toContain("adi,ad7124-8@0");
     });
 
-    test("rename_overlay_node - --to with @ overrides unit addr", () => {
+    test("rename_overlay_node - new-name with @ overrides unit addr", () => {
         const base = DeviceTree.new_from_string(base_dts);
         if (typeof base === "string") { throw new TypeError(base); }
 
@@ -270,32 +221,6 @@ if (import.meta.vitest) {
         const result = rename_overlay_node(overlay, "imu1", "adi,ad7124-8@1");
 
         expect(result).toBe("conflict");
-    });
-
-    test("rename_overlay_target - renames a property via single-token slash form", () => {
-        const overlay_with_property = `/dts-v1/;
-/plugin/;
-
-&spi0 {
-    imu1: adi,ad7124-8@0 {
-        compatible = "adi,ad7124-8";
-        status = "okay";
-    };
-};`;
-        const base = DeviceTree.new_from_string(base_dts);
-        if (typeof base === "string") { throw new TypeError(base); }
-
-        const overlay = DeviceTreeOverlay.new_from_string(overlay_with_property, base);
-        if (typeof overlay === "string") { throw new TypeError(overlay); }
-
-        const result = rename_overlay_target(overlay, "imu1/status", "status-x");
-
-        expect(result).toBe("renamed");
-
-        const output = overlay.print();
-
-        expect(output).toContain("status-x");
-        expect(output).not.toMatch(/\bstatus =/);
     });
 
     test("rename_overlay_node - renames grandchild via label/child syntax", () => {

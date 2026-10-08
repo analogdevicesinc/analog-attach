@@ -4,16 +4,72 @@ import * as fs from "node:fs";
 
 import type { LocalContext } from "../../context";
 import { resolve_config } from "../../resolve-config";
-import { resolve_node_identifier, split_property_reference } from "../../utilities";
+import { resolve_node_identifier, not_found_message, parse_node_path, parse_property_name } from "../../utilities";
 import { respond, respond_fail, input_error } from "../../protocol/output";
 import { convert_node, convert_property } from "../../protocol/dt-to-protocol";
 import type { Node } from "../../protocol/types";
 
+/**
+ * Find a node and optionally a property on it, printing JSON or human output.
+ * Exported so `update` can delegate the "no value → read" path here.
+ */
+export function read_target(
+    context_: LocalContext,
+    overlay: DeviceTreeOverlay,
+    input: string,
+    path_string: string,
+    property_name: string | undefined,
+): void {
+    const found = overlay.find_node(resolve_node_identifier(path_string, overlay));
+
+    if (found === undefined) {
+        const base = overlay.get_base_dts();
+        const message = not_found_message(path_string, overlay, base ?? undefined);
+        if (context_.json) {
+            respond_fail({ ok: false, message, severity: "error" });
+        } else {
+            console.log(message);
+        }
+        return;
+    }
+
+    if (property_name === undefined) {
+        if (context_.json) {
+            respond(convert_node(found.node));
+        } else {
+            print_node_human(found.node);
+        }
+        return;
+    }
+
+    const property = found.node.properties.find(p => p.name === property_name);
+    if (property === undefined) {
+        const message = `Not found: ${property_name} on ${path_string}`;
+        if (context_.json) {
+            respond_fail({ ok: false, message, severity: "error" });
+        } else {
+            console.log(message);
+        }
+        return;
+    }
+
+    if (context_.json) {
+        respond(convert_property(property));
+    } else {
+        if (is_dt_flag(property.value)) {
+            console.log("true");
+        } else {
+            console.log(print_property(property, "", 0).trim());
+        }
+    }
+}
+
 export function build_read_command(context_: LocalContext): Command {
     return new Command("read")
         .description("Read a node subtree or property value from the overlay")
-        .argument("[path...]", "Path to node or property (ValidIdentifier segments)")
-        .action(async (path: string[], options) => {
+        .argument("[path]", "Path to node (label-first or absolute)")
+        .argument("[property]", "Property name")
+        .action(async (path_argument: string | undefined, property_argument: string | undefined) => {
             const resolved = resolve_config(context_, ["overlay"]);
             if (resolved === undefined) { return; }
             const input = resolved.values.overlay;
@@ -38,7 +94,7 @@ export function build_read_command(context_: LocalContext): Command {
                 return;
             }
 
-            if (path.length === 0) {
+            if (path_argument === undefined) {
                 const fragments = overlay.get_fragments();
                 const children = fragments.flatMap(f => {
                     const overlay_child = f.children.find(c => c.name === "__overlay__");
@@ -60,64 +116,23 @@ export function build_read_command(context_: LocalContext): Command {
                 return;
             }
 
-            const identifier = path.join("/");
-
-            const found = overlay.find_node(resolve_node_identifier(identifier, overlay));
-
-            if (found !== undefined) {
-                if (context_.json) {
-                    respond(convert_node(found.node));
-                } else {
-                    print_node_human(found.node);
-                }
+            const parsed_path = parse_node_path(path_argument);
+            if (!parsed_path.ok) {
+                if (context_.json) { input_error(parsed_path.error); }
+                else { console.log(parsed_path.error); }
                 return;
             }
 
-            // Not a node: reinterpret the trailing segment as a property name.
-            // Splitting the joined identifier (not the argv tokens) means every
-            // reference form works whether written as one slash-joined token
-            // (spi0/status) or as separate tokens (spi0 status).
-            const { node_identifier, property_name } = split_property_reference(identifier);
-
-            if (property_name === undefined) {
-                if (context_.json) {
-                    respond_fail({ ok: false, message: `Not found: ${identifier}`, severity: "error" });
-                } else {
-                    console.log(`Couldn't find ${identifier} in ${input}`);
-                }
-                return;
-            }
-
-            const parent_found = overlay.find_node(resolve_node_identifier(node_identifier, overlay));
-
-            if (parent_found === undefined) {
-                if (context_.json) {
-                    respond_fail({ ok: false, message: `Not found: ${identifier}`, severity: "error" });
-                } else {
-                    console.log(`Couldn't find ${node_identifier} in ${input}`);
-                }
-                return;
-            }
-
-            const property = parent_found.node.properties.find(p => p.name === property_name);
-            if (property === undefined) {
-                if (context_.json) {
-                    respond_fail({ ok: false, message: `Not found: ${identifier}`, severity: "error" });
-                } else {
-                    console.log(`Couldn't find ${property_name} in ${node_identifier} in ${input}`);
-                }
-                return;
-            }
-
-            if (context_.json) {
-                respond(convert_property(property));
-            } else {
-                if (is_dt_flag(property.value)) {
-                    console.log("true");
-                } else {
-                    console.log(print_property(property, "", 0).trim());
+            if (property_argument !== undefined) {
+                const parsed_property = parse_property_name(property_argument);
+                if (!parsed_property.ok) {
+                    if (context_.json) { input_error(parsed_property.error); }
+                    else { console.log(parsed_property.error); }
+                    return;
                 }
             }
+
+            read_target(context_, overlay, input, parsed_path.value, property_argument);
         });
 }
 

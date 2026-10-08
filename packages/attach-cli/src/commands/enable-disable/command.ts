@@ -5,19 +5,23 @@ import * as fs from 'node:fs';
 
 import type { LocalContext } from "../../context";
 import { load_config, check_config, check_failure_message } from "../../config";
-import { load_trees, resolve_node_identifier, write_overlay } from "../../utilities";
+import { load_trees, resolve_node_identifier, resolve_path, base_target, write_overlay } from "../../utilities";
 
 function make_command(commandName: string, status_value: "okay" | "disabled", verb: string) {
     return (_context: LocalContext): Command => new Command(commandName)
-        .description(`${verb} a node in a dtso by setting status = "${status_value}"`)
-        .requiredOption("--node <value>", "Target node: label, path, or label/child (e.g. spi0, /soc/spi@7e204000, spi0/mux)")
-        .action(async (options) => {
+        .description(`${verb} a node by setting status = "${status_value}"`)
+        .argument("[path]", "Path to node (e.g. spi0, /soc/spi@7e204000, spi0/spidev@0)")
+        .action(async (path_argumentument: string | undefined) => {
+            if (path_argumentument === undefined) {
+                console.log("Missing: path");
+                return;
+            }
+
             const config = load_config();
             if (config === undefined) {
                 console.log("No config.toml (run config-set)");
                 return;
             }
-            const { node } = options;
 
             const checked = check_config(config, ["overlay", "context"]);
             if (!checked.ok) {
@@ -30,16 +34,16 @@ function make_command(commandName: string, status_value: "okay" | "disabled", ve
             if (trees === undefined) { return; }
             const { base_dt: base, overlay } = trees;
 
-            const result = set_node_status(base, overlay, node, status_value);
+            const result = set_node_status(base, overlay, path_argumentument, status_value);
 
             switch (result) {
                 case "not-found": {
-                    console.log(`Couldn't find node ${node} in ${context} or ${input}`);
+                    console.log(`Couldn't find node ${path_argumentument} in ${context} or ${input}`);
                     return;
                 }
                 case "done": {
                     write_overlay(input, overlay, config);
-                    console.log(`${verb}d ${node} in ${input}`);
+                    console.log(`${verb}d ${path_argumentument} in ${input}`);
                     return;
                 }
             }
@@ -61,26 +65,24 @@ export function set_node_status(
         .with_name("status")
         .build();
 
-    // Check if there's already an overlay fragment touching this node
-    const found = overlay.find_node(resolve_node_identifier(identifier, overlay));
-    if (found !== undefined) {
-        const index = found.node.properties.findIndex(p => p.name === "status");
+    const resolved = resolve_path(identifier, overlay, base);
+    if (resolved.in_overlay !== undefined) {
+        const index = resolved.in_overlay.node.properties.findIndex(p => p.name === "status");
 
         if (index === -1) {
-            found.node.properties.push(status_property);
+            resolved.in_overlay.node.properties.push(status_property);
         } else {
-            found.node.properties[index] = status_property;
+            resolved.in_overlay.node.properties[index] = status_property;
         }
         return "done";
     }
 
-    // Not in any fragment — check if it exists in base and create a new fragment
-    const in_base = base.resolve_identifier(identifier);
-    if (in_base === undefined) {
+    const base_referenceerence = base_target(resolved);
+    if (base_referenceerence === undefined) {
         return "not-found";
     }
 
-    overlay.add_fragment(in_base, undefined, status_property);
+    overlay.add_fragment(base_referenceerence, undefined, status_property);
 
     return "done";
 }
