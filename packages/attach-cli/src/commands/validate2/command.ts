@@ -135,6 +135,9 @@ export function build_validate2_command(context_: LocalContext): Command {
                 return;
             }
 
+            // Delete stale error.json so a dt-validate crash isn't hidden by an old file.
+            if (fs.existsSync(error_json)) { fs.unlinkSync(error_json); }
+
             // dt-validate exits non-zero when there are validation errors — that is not a tool failure.
             // We always read error.json; only fall back to stderr if the file wasn't written.
             let tool_error: string | undefined;
@@ -156,13 +159,24 @@ export function build_validate2_command(context_: LocalContext): Command {
                 return;
             }
 
-            if (context_.json) {
-                const response = parse_dt_validate_output(error_json);
-                respond(response);
+            const diagnostics = read_dt_validate_diagnostics(error_json);
+            if ('error' in diagnostics) {
+                if (context_.json) {
+                    respond({ errors: [{ kind: "generic", path: [], message: diagnostics.error }], warnings: [] } satisfies ValidationResponse);
+                } else {
+                    console.log(diagnostics.error);
+                }
                 return;
             }
 
-            console.log(`Validated. Errors written to: ${error_json}`);
+            if (context_.json) {
+                respond(parse_dt_validate_output(diagnostics));
+                return;
+            }
+
+            const targets = fragment_display_targets(overlay);
+            const report = format_validation_report(diagnostics, targets);
+            for (const line of report) { console.log(line); }
         });
 }
 
@@ -358,15 +372,133 @@ function fill_template(template: string, node_blocks: string[]): string {
     );
 }
 
-// dt-validate --json-output writes an array of diagnostic objects.
-// Each has: level ("error"|"warning"), node (DT path), property_path (string[]),
-// formatted (human string, preferred) or message.
 interface DtValidateDiagnostic {
+    type?: string;
     level?: string;
     node?: string;
     property_path?: unknown[];
     formatted?: string;
     message?: string;
+    note?: string;
+    context?: unknown[];
+}
+
+export function read_dt_validate_diagnostics(error_json: string): DtValidateDiagnostic[] | { error: string } {
+    let content: string;
+    try {
+        content = fs.readFileSync(error_json, 'utf8');
+    } catch (error: any) {
+        return { error: `dt-validate output unreadable: ${error.message ?? String(error)}` };
+    }
+    let raw: unknown;
+    try {
+        raw = JSON.parse(content);
+    } catch {
+        return { error: `dt-validate output unreadable: not valid JSON` };
+    }
+    if (!Array.isArray(raw)) { return { error: `dt-validate output unreadable: not an array` }; }
+    return raw as DtValidateDiagnostic[];
+}
+
+export function fragment_display_targets(overlay: DeviceTreeOverlay): Map<number, string> {
+    const targets = new Map<number, string>();
+    const fragments = overlay.get_fragments();
+    for (const [index, fragment] of fragments.entries()) {
+        const target_property = fragment.properties.find(p => p.name === "target");
+        if (target_property !== undefined && !is_dt_flag(target_property.value)) {
+            const first = target_property.value[0];
+            if (first?.kind === 'array') {
+                for (const element of first.elements) {
+                    if (element.kind === 'label') {
+                        targets.set(index, (element as DTLabel).name);
+                        break;
+                    }
+                }
+            }
+        }
+        if (!targets.has(index)) {
+            const target_path_property = fragment.properties.find(p => p.name === "target-path");
+            if (target_path_property !== undefined && !is_dt_flag(target_path_property.value)) {
+                const first = target_path_property.value[0];
+                if (first?.kind === 'string') {
+                    targets.set(index, first.value);
+                }
+            }
+        }
+    }
+    return targets;
+}
+
+export function display_node(node: string, targets: Map<number, string>): string {
+    const match = /^\/node(\d+)(.*)$/.exec(node);
+    if (match === null) { return node; }
+    const index = Number(match[1]);
+    const rest = match[2] ?? '';
+    const target = targets.get(index);
+    if (target === undefined) { return node; }
+    return target + rest;
+}
+
+export function format_validation_report(diagnostics: DtValidateDiagnostic[], targets: Map<number, string>): string[] {
+    const errors: DtValidateDiagnostic[] = [];
+    const warnings: DtValidateDiagnostic[] = [];
+    const nodeless: DtValidateDiagnostic[] = [];
+
+    for (const d of diagnostics) {
+        if (d.node === undefined || d.node === '') {
+            nodeless.push(d);
+        } else if (d.level === 'warning') {
+            warnings.push(d);
+        } else {
+            errors.push(d);
+        }
+    }
+
+    const lines: string[] = [];
+
+    for (const d of nodeless) {
+        const level = d.level === 'warning' ? 'warning' : 'error';
+        lines.push(`${level}: ${d.message ?? 'Unknown error'}`);
+    }
+
+    const grouped = new Map<string, DtValidateDiagnostic[]>();
+    for (const d of [...errors, ...warnings]) {
+        const key = display_node(d.node!, targets);
+        const group = grouped.get(key);
+        if (group === undefined) { grouped.set(key, [d]); }
+        else { group.push(d); }
+    }
+
+    for (const [node, group] of grouped) {
+        lines.push(`${node}:`);
+        for (const d of group) {
+            const level = d.level === 'warning' ? 'warning' : 'error';
+            const property_path = Array.isArray(d.property_path) && d.property_path.length > 0
+                ? d.property_path.map(String).join('/')
+                : '(node)';
+            lines.push(`  ${level}: ${property_path}: ${d.message ?? 'Unknown error'}`);
+            if (d.note !== undefined) { lines.push(`    note: ${d.note}`); }
+            if (d.context !== undefined) {
+                for (const line of d.context) {
+                    const text = typeof line === 'string' ? line : JSON.stringify(line);
+                    lines.push(`    context: ${text}`);
+                }
+            }
+        }
+    }
+
+    const error_count = errors.length + nodeless.filter(d => d.level !== 'warning').length;
+    const warning_count = warnings.length + nodeless.filter(d => d.level === 'warning').length;
+
+    if (error_count === 0) {
+        if (warning_count > 0) {
+            lines.push(`No errors! (${warning_count} warning(s))`);
+        } else {
+            lines.push('No errors!');
+        }
+    }
+
+    return lines;
 }
 
 function map_diagnostic(d: DtValidateDiagnostic): ValidationError {
@@ -379,20 +511,11 @@ function map_diagnostic(d: DtValidateDiagnostic): ValidationError {
     };
 }
 
-function parse_dt_validate_output(error_json: string): ValidationResponse {
-    let raw: unknown;
-    try {
-        raw = JSON.parse(fs.readFileSync(error_json, 'utf8'));
-    } catch {
-        return { errors: [], warnings: [] };
-    }
-
-    if (!Array.isArray(raw)) { return { errors: [], warnings: [] }; }
-
+function parse_dt_validate_output(diagnostics: DtValidateDiagnostic[]): ValidationResponse {
     const errors: ValidationError[] = [];
     const warnings: ValidationError[] = [];
 
-    for (const entry of raw as DtValidateDiagnostic[]) {
+    for (const entry of diagnostics) {
         const mapped = map_diagnostic(entry);
         if (entry.level === 'warning') {
             warnings.push(mapped);
@@ -465,5 +588,90 @@ if (import.meta.vitest) {
         } finally {
             fs.rmSync(directory, { recursive: true });
         }
+    });
+
+    test("read_dt_validate_diagnostics — non-JSON input", () => {
+        const directory = fs.mkdtempSync(path.join(os.tmpdir(), "attach-diag-"));
+        const file = path.join(directory, "bad.json");
+        try {
+            fs.writeFileSync(file, "not json");
+            const result = read_dt_validate_diagnostics(file);
+            expect(result).toHaveProperty("error");
+            expect((result as { error: string }).error).toContain("not valid JSON");
+        } finally {
+            fs.rmSync(directory, { recursive: true });
+        }
+    });
+
+    test("read_dt_validate_diagnostics — empty array", () => {
+        const directory = fs.mkdtempSync(path.join(os.tmpdir(), "attach-diag-"));
+        const file = path.join(directory, "empty.json");
+        try {
+            fs.writeFileSync(file, "[]");
+            const result = read_dt_validate_diagnostics(file);
+            expect(Array.isArray(result)).toBe(true);
+            expect(result).toHaveLength(0);
+        } finally {
+            fs.rmSync(directory, { recursive: true });
+        }
+    });
+
+    test("read_dt_validate_diagnostics — missing file", () => {
+        const result = read_dt_validate_diagnostics("/nonexistent/path.json");
+        expect(result).toHaveProperty("error");
+        expect((result as { error: string }).error).toContain("unreadable");
+    });
+
+    test("display_node — maps nodeN to fragment target", () => {
+        const targets = new Map<number, string>([[0, "spi0"], [1, "/"]]);
+        expect(display_node("/node0/dac@0", targets)).toBe("spi0/dac@0");
+        expect(display_node("/node1", targets)).toBe("/");
+        expect(display_node("/node1/ports", targets)).toBe("//ports");
+        expect(display_node("/node5/x", targets)).toBe("/node5/x");
+        expect(display_node("/other", targets)).toBe("/other");
+    });
+
+    test("fragment_display_targets — extracts label and path targets", () => {
+        const targets = fragment_display_targets(overlay);
+        expect(targets.get(0)).toBe("spi0");
+        expect(targets.get(1)).toBe("/");
+    });
+
+    test("format_validation_report — empty input", () => {
+        const report = format_validation_report([], new Map());
+        expect(report).toEqual(["No errors!"]);
+    });
+
+    test("format_validation_report — one error and one warning", () => {
+        const diagnostics: DtValidateDiagnostic[] = [
+            { level: "error", node: "/node0/dac@0", property_path: ["reg"], message: "reg is required" },
+            { level: "warning", node: "/node0/dac@0", property_path: ["spi-max-frequency"], message: "missing recommended property" },
+        ];
+        const targets = new Map<number, string>([[0, "spi0"]]);
+        const report = format_validation_report(diagnostics, targets);
+        expect(report[0]).toBe("spi0/dac@0:");
+        expect(report[1]).toContain("error: reg: reg is required");
+        expect(report[2]).toContain("warning: spi-max-frequency: missing recommended property");
+        expect(report).not.toContain(expect.stringContaining("No errors!"));
+    });
+
+    test("format_validation_report — warnings only", () => {
+        const diagnostics: DtValidateDiagnostic[] = [
+            { level: "warning", node: "/node0/dac@0", property_path: ["spi-max-frequency"], message: "missing" },
+        ];
+        const targets = new Map<number, string>([[0, "spi0"]]);
+        const report = format_validation_report(diagnostics, targets);
+        expect(report.some(l => l.includes("warning"))).toBe(true);
+        expect(report.at(-1)).toBe("No errors! (1 warning(s))");
+    });
+
+    test("format_validation_report — note and context are printed", () => {
+        const diagnostics: DtValidateDiagnostic[] = [
+            { level: "error", node: "/node0/x", property_path: ["p"], message: "bad", note: "see spec", context: ["line 1", "line 2"] },
+        ];
+        const report = format_validation_report(diagnostics, new Map([[0, "spi0"]]));
+        expect(report.some(l => l.includes("note: see spec"))).toBe(true);
+        expect(report.some(l => l.includes("context: line 1"))).toBe(true);
+        expect(report.some(l => l.includes("context: line 2"))).toBe(true);
     });
 }
