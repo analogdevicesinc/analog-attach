@@ -48,6 +48,26 @@ export interface PinSignal {
 	native_cs?: number,
 }
 
+/**
+ * Chip-select lines other devices already use, so one is never given to two: GPIO pins by
+ * their chip identity (one physical pin, whatever bus it selects for), native lines by the
+ * controller they belong to and their bit.
+ */
+export interface TakenChipSelects {
+	gpio: GpioIdentity[],
+	native: { peripheral: string, native_cs: number }[],
+}
+
+const NOTHING_TAKEN: TakenChipSelects = { gpio: [], native: [] };
+
+/** Whether a board pin is a chip-select line another device already uses. */
+function is_taken(pin: BoardPin, taken: TakenChipSelects): boolean {
+	const gpio = pin.gpio;
+	return (gpio !== undefined && taken.gpio.some(used => used.port === gpio.port && used.number === gpio.number))
+		|| pin.signals.some(signal => signal.signal === "cs" && signal.native_cs !== undefined
+			&& taken.native.some(used => used.peripheral === signal.peripheral && used.native_cs === signal.native_cs));
+}
+
 /** Everything the board's own files say about one of its pins. */
 export interface BoardPin {
 	at: PinReference,
@@ -288,7 +308,7 @@ function land_or_declared(
  * declares first (native or GPIO-driven), then every GPIO on a physical header. On-board
  * pins are left out - they are already an LED or a button.
  */
-function chip_select_options(board: BoardInfo, buses: BusPins[], peripheral: string | undefined): BoardPin[] {
+function chip_select_options(board: BoardInfo, buses: BusPins[], peripheral: string | undefined, taken: TakenChipSelects): BoardPin[] {
 	const declared = declared_pins(buses, "spi", "cs", peripheral);
 
 	const gpio = identified(board.connectors)
@@ -303,7 +323,9 @@ function chip_select_options(board: BoardInfo, buses: BusPins[], peripheral: str
 			continue;
 		}
 		const described = describe_board_pin(board.name, at);
-		if (described.ok) {
+		// Not a line already selecting another device, nor one carrying another bus signal.
+		if (described.ok && !is_taken(described.value, taken)
+			&& described.value.signals.every(signal => signal.signal === "cs")) {
 			options.push(described.value);
 		}
 	}
@@ -322,6 +344,7 @@ export function resolve_bus(
 	board_name: string,
 	interface_: string,
 	wires: Wire[] = [],
+	taken: TakenChipSelects = NOTHING_TAKEN,
 ): Result<BusResolution> {
 	const board = find_board(board_name);
 	if (!board.ok) {
@@ -378,7 +401,7 @@ export function resolve_bus(
 		return ok({ peripheral, connections, problems });
 	}
 
-	const chip_select = resolve_chip_select(part, board.value, buses.value, peripheral, wires, connections, problems);
+	const chip_select = resolve_chip_select(part, board.value, buses.value, peripheral, wires, connections, problems, taken);
 	if (!chip_select.ok) {
 		return chip_select;
 	}
@@ -394,6 +417,7 @@ function resolve_chip_select(
 	wires: Wire[],
 	connections: Connection[],
 	problems: string[],
+	taken: TakenChipSelects,
 ): Result<ChipSelect> {
 	const [from, ...extra_cs] = part_pins_with_role(part, "spi_cs");
 	if (from === undefined) {
@@ -404,17 +428,32 @@ function resolve_chip_select(
 		problems.push(`${part.name} has ${String(extra_cs.length + 1)} spi_cs pins; only ${show(from)} is resolved`);
 	}
 
-	const declared = declared_pins(buses, "spi", "cs", peripheral);
+	const options = (): BoardPin[] => chip_select_options(board, buses, peripheral, taken);
+
+	// A declared line another device already uses is not one to offer.
+	const declared_all = declared_pins(buses, "spi", "cs", peripheral);
+	const declared = declared_all.filter(at => {
+		const described = describe_board_pin(board.name, at);
+		return !described.ok || !is_taken(described.value, taken);
+	});
 	const landing = land_or_declared(part, board, from, wires, declared, "chip-select line");
 	if (landing.kind === "unwired") {
-		return ok({ kind: "unwired", reason: landing.reason, options: chip_select_options(board, buses, peripheral) });
+		const reason = declared.length === 0 && declared_all.length > 0 && land(part, board, from, wires).kind === "unwired"
+			? `every chip-select line ${board.name} declares (${declared_all.map(at => show(at)).join(", ")}) is already used by another device`
+			: landing.reason;
+		return ok({ kind: "unwired", reason, options: options() });
 	}
-	connections.push({ from, role: "spi_cs", to: landing.to, via: landing.via });
 
 	const pin = describe_board_pin(board.name, landing.to);
 	if (!pin.ok) {
 		return pin;
 	}
+	// Mating or a stated wire put it on one fixed pin; if that pin already selects another
+	// device, the two would answer together.
+	if (is_taken(pin.value, taken)) {
+		return ok({ kind: "unwired", reason: `${part.name} ${show(from)} (cs) lands on ${board.name} ${show(landing.to)}, which is already used by another device`, options: options() });
+	}
+	connections.push({ from, role: "spi_cs", to: landing.to, via: landing.via });
 
 	// A native chip-select of the very bus the data lines landed on needs no GPIO at all.
 	const native = pin.value.signals.find(signal => signal.signal === "cs"
@@ -432,5 +471,5 @@ function resolve_chip_select(
 	}
 
 	problems.push(`${part.name} ${show(from)} (cs) lands on ${board.name} ${show(landing.to)}, which is neither a native chip-select nor a GPIO`);
-	return ok({ kind: "unwired", reason: "the chip-select is wired to a pin that cannot drive it", options: chip_select_options(board, buses, peripheral) });
+	return ok({ kind: "unwired", reason: "the chip-select is wired to a pin that cannot drive it", options: options() });
 }

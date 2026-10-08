@@ -579,6 +579,43 @@ describe('the chip-select', () => {
         }]);
     });
 
+    test('a second device does not get a GPIO chip-select line the first already uses', () => {
+        // otherboard declares one chip-select line, H1 pin 4; the first device takes it.
+        const workfile = workfile_with('test_sensor', 'otherboard', 'othersoc');
+        expectOk(bootstrap(workfile));
+        add(workfile, 'second', 'test_sensor');
+        const report = bootstrap(workfile);
+        expectOk(report);
+
+        const symbols = stored(workfile);
+        expect(symbols['test_spi_device_1']?.cs_gpio).toBeUndefined();
+        expect(report.value.chip_selects).toEqual([]);
+        const problems = report.value.wiring.find(wiring => wiring.device === 'test_spi_device_1')?.problems ?? [];
+        expect(problems.join('\n')).toContain('already used by another device');
+    });
+
+    test('a second device does not get a native chip-select line the first already uses', () => {
+        // On testboard the part plugs into the PMOD, whose CS pin is native line 0 - fixed by
+        // mating, so the second device would land on the very same line.
+        const workfile = workfile_with('test_sensor');
+        expectOk(bootstrap(workfile));
+        add(workfile, 'second', 'test_sensor');
+        const report = bootstrap(workfile);
+        expectOk(report);
+
+        expect(stored(workfile)['test_spi_device_1']?.native_cs).toBeUndefined();
+        const problems = report.value.wiring.find(wiring => wiring.device === 'test_spi_device_1')?.problems ?? [];
+        expect(problems.join('\n')).toContain('already used by another device');
+    });
+
+    test('the first device still keeps its own chip-select on a rerun', () => {
+        const workfile = workfile_with('test_sensor', 'otherboard', 'othersoc');
+        expectOk(bootstrap(workfile));
+        add(workfile, 'second', 'test_sensor');
+        expectOk(bootstrap(workfile));
+        expect(stored(workfile)['test_spi_device']?.cs_gpio).toBe('test_gpio_pin');
+    });
+
     test('a device that already has a chip-select is left alone', () => {
         const workfile = workfile_with('test_sensor');
         expectOk(bootstrap(workfile));
