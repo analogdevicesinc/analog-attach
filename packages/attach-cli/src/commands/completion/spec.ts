@@ -63,7 +63,20 @@ const PATH_TREE: ValueSource = { kind: "path", roots: "navigate", children: "chi
 const VAL: ValueSource = { kind: "suggest", suggest: "value" };
 const PROPS: ValueSource = { kind: "suggest", suggest: "navigate" };
 
-export const COMPLETION_SPEC: Readonly<Record<string, CommandSpec>> = {
+const LIST_KIND_CHOICES: ValueSource = {
+    kind: "choices",
+    choices: LIST_KINDS.map(entry => ({ value: entry.kind, description: entry.summary })),
+};
+
+export const LIST_SUBKIND_SPECS: Readonly<Record<string, CommandSpec>> = {
+    device: { positional: { mode: "byIndex", sources: [{ kind: "suggest", suggest: "device-key" }] } },
+    property: { positional: { mode: "byIndex", sources: [PATH_TREE, PROPS] } },
+    value: { positional: { mode: "byIndex", sources: [PATH_TREE, PROPS] } },
+    parent: { positional: { mode: "byIndex", sources: [{ kind: "suggest", suggest: "device-key" }] } },
+    slot: { positional: { mode: "byIndex", sources: [{ kind: "suggest", suggest: "device-key" }] } },
+};
+
+export const COMPLETION_SPEC: Readonly<Record<string, CommandSpec | "dynamic">> = {
     add: {
         positional: { mode: "byIndex", sources: [{ kind: "suggest", suggest: "device-key" }] },
         flags: { "--parent": PATH_TREE },
@@ -89,15 +102,7 @@ export const COMPLETION_SPEC: Readonly<Record<string, CommandSpec>> = {
     disable: {
         positional: { mode: "byIndex", sources: [PATH_OVERLAY] },
     },
-    list: {
-        positional: {
-            mode: "byIndex",
-            sources: [
-                { kind: "choices", choices: LIST_KINDS.map(entry => ({ value: entry.kind, description: entry.summary })) },
-                PATH_TREE,
-            ],
-        },
-    },
+    list: "dynamic",
     completion: {
         positional: { mode: "byIndex", sources: [{ kind: "values", values: ["bash", "fish", "zsh"] }] },
     },
