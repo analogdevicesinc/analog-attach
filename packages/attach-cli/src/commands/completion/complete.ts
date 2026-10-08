@@ -14,7 +14,7 @@ import { buildApp } from "../../app";
 import { buildContext } from "../../context";
 import { run_internal_list } from "../list/internal";
 import type { Suggestion } from "../../protocol/types";
-import { COMPLETION_SPEC, FILES_DIRECTIVE, DIRS_DIRECTIVE, type CommandSpec, type ValueSource, type SuggestKind } from "./spec";
+import { COMPLETION_SPEC, FILES_DIRECTIVE, DIRS_DIRECTIVE, NOSPACE_DIRECTIVE, type CommandSpec, type ValueSource, type SuggestKind } from "./spec";
 
 const GLOBAL_FLAGS: readonly Candidate[] = [
     { value: "--json", description: "Output as JSON" },
@@ -185,7 +185,32 @@ async function emit_value_source(source: ValueSource, prefix: string, positional
             emit(filter_by_prefix(await source_candidates(source, prefix, positionals), prefix));
             return;
         }
+        case "path": {
+            emit(await path_candidates(source.roots, source.children, prefix));
+            return;
+        }
     }
+}
+
+async function path_candidates(roots_kind: SuggestKind, children_kind: SuggestKind, prefix: string): Promise<Candidate[]> {
+    const slash = prefix.lastIndexOf("/");
+    if (slash === -1) {
+        const roots = await capture_suggest(roots_kind, []);
+        return filter_by_prefix(
+            roots.map(s => ({ value: `${s.value}/`, description: s.display_string })),
+            prefix,
+        );
+    }
+    if (prefix === "/") {
+        return [{ value: "/" }];
+    }
+    const parent = prefix.slice(0, slash);
+    const child_prefix = prefix.slice(slash + 1);
+    const children = await capture_suggest(children_kind, [parent]);
+    return filter_by_prefix(
+        children.map(s => ({ value: `${parent}/${s.value}`, description: s.display_string })),
+        prefix,
+    );
 }
 
 /** Candidates of a dynamic (`suggest`) source; static sources yield none. */
@@ -264,6 +289,9 @@ function filter_by_prefix(candidates: readonly Candidate[], prefix: string): Can
 }
 
 function emit(candidates: Candidate[]): void {
+    if (candidates.length > 0 && candidates.every(c => c.value.endsWith("/"))) {
+        console.log(NOSPACE_DIRECTIVE);
+    }
     for (const c of candidates) {
         console.log(c.description ? `${c.value}\t${c.description}` : c.value);
     }

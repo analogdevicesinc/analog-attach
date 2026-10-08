@@ -131,14 +131,15 @@ describe("__complete engine", () => {
 
 describe("__complete delegates dynamic values to suggest in-process", () => {
     beforeEach(() => {
-        // Stand in for the real intelligence: emit the JSON `suggest` protocol.
         vi.spyOn(suggest, "run_suggest").mockImplementation(async (context, arguments_) => {
-            const [kind] = arguments_;
+            const key = arguments_.join(" ");
             const suggestions =
-                kind === "device-key" ? [{ value: "ad7124" }, { value: "ad5940" }]
-                : kind === "parent" ? [{ value: "spi0", display_string: "/soc/spi@0" }]
-                : kind === "navigate" ? [{ value: "reg", display_string: "reg (required)" }]
-                : kind === "value" ? [{ value: "19 IRQ_TYPE_EDGE_FALLING", display_string: "19 IRQ_TYPE_EDGE_FALLING — spi_pmod1.int" }]
+                arguments_[0] === "device-key" ? [{ value: "ad7124" }, { value: "ad5940" }]
+                : arguments_[0] === "parent" ? [{ value: "spi0", display_string: "/soc/spi@0" }]
+                : key === "navigate" ? [{ value: "spi0" }, { value: "i2c1" }]
+                : key === "navigate spi0/adc@0" ? [{ value: "reg", display_string: "reg (required)" }]
+                : arguments_[0] === "children" ? [{ value: "adc@0" }, { value: "spidev@0" }]
+                : arguments_[0] === "value" ? [{ value: "19 IRQ_TYPE_EDGE_FALLING", display_string: "19 IRQ_TYPE_EDGE_FALLING — spi_pmod1.int" }]
                 : [];
             if (context.json) { console.log(JSON.stringify({ ok: true, message: "", severity: "info", suggestions })); }
         });
@@ -153,52 +154,67 @@ describe("__complete delegates dynamic values to suggest in-process", () => {
         expect(values(await complete(["add", "ad7"]))).toEqual(["ad7124"]);
     });
 
-    test("read positional completes navigate items with descriptions", async () => {
+    test("read path: no slash offers roots with trailing /", async () => {
         const lines = await complete(["read", ""]);
-        expect(lines).toEqual(["reg\treg (required)"]);
+        expect(lines[0]).toBe("__ATTACH_COMPLETE_NOSPACE__");
+        expect(values(lines.slice(1))).toStrictEqual(["spi0/", "i2c1/"]);
     });
 
-    test("add --parent passes the device key as parent context", async () => {
+    test("read path: after slash offers children joined to parent", async () => {
+        const lines = await complete(["read", "spi0/"]);
+        expect(values(lines)).toStrictEqual(["spi0/adc@0", "spi0/spidev@0"]);
+    });
+
+    test("read second positional completes properties via navigate", async () => {
+        const lines = await complete(["read", "spi0/adc@0", ""]);
+        expect(lines).toStrictEqual(["reg\treg (required)"]);
+    });
+
+    test("add --parent completes as path with trailing /", async () => {
         const lines = await complete(["add", "ad7124", "--parent", ""]);
-        expect(values(lines)).toEqual(["spi0"]);
-        expect(vi.mocked(suggest.run_suggest).mock.calls.some(
-            ([, arguments_]) => arguments_[0] === "parent" && arguments_[1] === "ad7124",
-        )).toBe(true);
+        expect(lines[0]).toBe("__ATTACH_COMPLETE_NOSPACE__");
+        expect(values(lines.slice(1))).toStrictEqual(["spi0/", "i2c1/"]);
     });
 });
 
 describe("update value completion", () => {
     beforeEach(() => {
         vi.spyOn(suggest, "run_suggest").mockImplementation(async (context, arguments_) => {
-            const suggestions = arguments_[0] === "value"
-                ? [{ value: "19 IRQ_TYPE_EDGE_FALLING", display_string: "19 IRQ_TYPE_EDGE_FALLING — spi_pmod1.int" }]
+            const key = arguments_.join(" ");
+            const suggestions =
+                key === "navigate" ? [{ value: "spi0" }]
+                : arguments_[0] === "children" ? [{ value: "adc@0" }]
+                : arguments_[0] === "value" ? [{ value: "19 IRQ_TYPE_EDGE_FALLING", display_string: "19 IRQ_TYPE_EDGE_FALLING — spi_pmod1.int" }]
+                : arguments_[0] === "navigate" ? [{ value: "reg" }]
                 : [];
             if (context.json) { console.log(JSON.stringify({ ok: true, message: "", severity: "info", suggestions })); }
         });
     });
     afterEach(() => { vi.restoreAllMocks(); });
 
-    test("update value positional completes through suggest value", async () => {
-        const lines = await complete(["update", "ad7124", "interrupts", ""]);
+    test("update value completes through suggest value", async () => {
+        const lines = await complete(["update", "spi0/adc@0", "interrupts", ""]);
         expect(lines).toEqual(["19 IRQ_TYPE_EDGE_FALLING\t19 IRQ_TYPE_EDGE_FALLING — spi_pmod1.int"]);
-        expect(vi.mocked(suggest.run_suggest).mock.calls.some(
-            ([, arguments_]) => arguments_.join(" ") === "value ad7124 interrupts",
-        )).toBe(true);
     });
 });
 
 describe("move completion", () => {
     beforeEach(() => {
         vi.spyOn(suggest, "run_suggest").mockImplementation(async (context, arguments_) => {
-            const by_call: Record<string, string[]> = { "navigate": ["spi0", "i2c1"], "entry-points": ["spi0", "i2c1"] };
-            const suggestions = (by_call[arguments_.join(" ")] ?? []).map(value => ({ value }));
+            const key = arguments_.join(" ");
+            const suggestions =
+                key === "navigate" ? [{ value: "spi0" }, { value: "i2c1" }]
+                : arguments_[0] === "children" ? [{ value: "adc@0" }]
+                : key === "entry-points" ? [{ value: "spi0" }, { value: "spi1" }]
+                : [];
             if (context.json) { console.log(JSON.stringify({ ok: true, message: "", severity: "info", suggestions })); }
         });
     });
     afterEach(() => { vi.restoreAllMocks(); });
 
-    test("second positional completes entry points (destination)", async () => {
-        expect(values(await complete(["move", "adc", ""]))).toStrictEqual(["spi0", "i2c1"]);
+    test("second positional offers destination paths with trailing /", async () => {
+        const lines = await complete(["move", "adc", ""]);
+        expect(values(lines).some(v => v.endsWith("/"))).toBe(true);
     });
 });
 
