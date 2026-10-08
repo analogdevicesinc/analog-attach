@@ -1,7 +1,8 @@
 import { DeviceTree, DTNode, is_dt_flag } from "../../Devicetree/index.js";
-import { is_clock, is_regulator } from "../predicates.js";
+import { is_clock, is_interrupt_controller, is_regulator } from "../predicates.js";
 import { cell_extract_first_value, query_devicetree } from "../query.js";
 import { parent_path_string, suggest_parents } from "../parents.js";
+import { effective_interrupt_parent, base_lookup } from "../interrupt_parent.js";
 import { IntelligenceLayer, ValueSuggestion } from "./types.js";
 
 function string_property(node: DTNode, name: string): string | undefined {
@@ -58,6 +59,48 @@ function describe_regulator(node: DTNode): string {
     ].join(", ");
 }
 
+function suggest_interrupt_parents(
+    property: string,
+    devicetree: DeviceTree,
+    node_path: string | undefined,
+): ValueSuggestion[] {
+    if (property !== "interrupt-parent") { return []; }
+
+    const controllers = providers(devicetree, is_interrupt_controller);
+    if (controllers.length === 0) { return []; }
+
+    const inherited = node_path !== undefined
+        ? effective_interrupt_parent(base_lookup(devicetree), node_path, devicetree)
+        : undefined;
+
+    const suggestions: ValueSuggestion[] = [];
+
+    if (inherited !== undefined && inherited.label !== undefined) {
+        const matching = controllers.find(c => c.label === inherited.label);
+        if (matching !== undefined) {
+            const cells = number_property(matching.node, "#interrupt-cells");
+            suggestions.push({
+                rows: [[{ label: inherited.label }]],
+                display: `${inherited.label} — interrupt controller, #interrupt-cells = <${cells ?? "?"}>${inherited.from === "/" ? "" : ` at ${inherited.from}`}; inherited from ${inherited.from}`,
+                source: "devicetree",
+            });
+        }
+    }
+
+    for (const { label, node } of controllers) {
+        if (inherited !== undefined && label === inherited.label) { continue; }
+        const cells = number_property(node, "#interrupt-cells");
+        suggestions.push({
+            rows: [[{ label }]],
+            display: `${label} — interrupt controller, #interrupt-cells = <${cells ?? "?"}>`,
+            source: "devicetree",
+            note: "only right if the device's interrupt line is wired to this controller",
+        });
+    }
+
+    return suggestions;
+}
+
 /**
  * Clock and supply providers the base tree already has. The board can't say
  * which one feeds the device (it is external hardware), so each candidate is
@@ -105,13 +148,28 @@ function suggest_unit_address_reg(property: string, node_path: string | undefine
 export const devicetree_layer: IntelligenceLayer = {
     name: "devicetree",
     refine_properties(properties, context) {
-        return query_devicetree(context.devicetree, properties, context.data, context.parent_name);
+        let inherited_label: string | undefined;
+        if (context.placement?.node_path !== undefined) {
+            inherited_label = effective_interrupt_parent(base_lookup(context.devicetree), context.placement.node_path, context.devicetree)?.label;
+        } else if (context.parent_name !== undefined) {
+            const path_from_name = context.devicetree.as_stream()
+                .filter(node => {
+                    const full = node.unit_addr !== undefined ? `${node.name}@${node.unit_addr}` : node.name;
+                    return full === context.parent_name;
+                })
+                .toArray()[0]?.[1]?.path;
+            if (path_from_name !== undefined) {
+                inherited_label = effective_interrupt_parent(base_lookup(context.devicetree), `${path_from_name}/child`, context.devicetree)?.label;
+            }
+        }
+        return query_devicetree(context.devicetree, properties, context.data, context.parent_name, inherited_label);
     },
     suggest_values(property, context, lower) {
         return [
             ...lower,
             ...suggest_unit_address_reg(property, context.placement?.node_path),
             ...suggest_providers(property, context.devicetree),
+            ...suggest_interrupt_parents(property, context.devicetree, context.placement?.node_path),
         ];
     },
     suggest_placement(binding, devicetree, lower) {
@@ -189,5 +247,56 @@ if (import.meta.vitest) {
     test("devicetree_layer — other properties get no provider suggestions", () => {
         expect(values("reg")).toStrictEqual([]);
         expect(values("clock-names")).toStrictEqual([]);
+    });
+
+    const int_dt = DeviceTree.new_from_string(`/dts-v1/;
+/ {
+    interrupt-parent = <&gicv2>;
+    gicv2: interrupt-controller@ff841000 {
+        interrupt-controller;
+        #interrupt-cells = <3>;
+    };
+    soc {
+        gpio: gpio@7e200000 {
+            interrupt-controller;
+            #interrupt-cells = <2>;
+        };
+        spi0: spi@7e204000 {
+            #address-cells = <1>;
+            #size-cells = <0>;
+        };
+    };
+    no_label_intc {
+        interrupt-controller;
+        #interrupt-cells = <1>;
+    };
+    disabled_intc: disabled_intc {
+        interrupt-controller;
+        #interrupt-cells = <1>;
+        status = "disabled";
+    };
+};`);
+    if (typeof int_dt === "string") { throw new TypeError(int_dt); }
+
+    test("devicetree_layer — interrupt-parent: lists enabled labelled controllers, inherited first", () => {
+        const result = devicetree_layer.suggest_values!("interrupt-parent", {
+            devicetree: int_dt, data: "{}",
+            placement: { node_path: "/soc/spi@7e204000/adc@0", parent_path: "/soc/spi@7e204000", siblings: [] },
+        }, []);
+        expect(result.length).toBeGreaterThanOrEqual(2);
+        expect(result[0]!.display).toContain("gicv2");
+        expect(result[0]!.display).toContain("inherited");
+        expect(result[1]!.display).toContain("gpio");
+        expect(result[1]!.note).toContain("only right if");
+        expect(result.every(s => !s.display.includes("no_label_intc"))).toBe(true);
+        expect(result.every(s => !s.display.includes("disabled_intc"))).toBe(true);
+    });
+
+    test("devicetree_layer — interrupt-parent: no suggestions for other properties", () => {
+        const result = devicetree_layer.suggest_values!("interrupts", {
+            devicetree: int_dt, data: "{}",
+            placement: { node_path: "/soc/spi@7e204000/adc@0", parent_path: "/soc/spi@7e204000", siblings: [] },
+        }, []);
+        expect(result).toStrictEqual([]);
     });
 }

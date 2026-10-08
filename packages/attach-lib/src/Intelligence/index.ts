@@ -67,3 +67,12 @@ export {
 } from "./board/derived.js";
 export { resolve_bus_paths, slots_for_placement, type SlotInference } from "./board/slots.js";
 export { board_layer, describe_slot, describe_placement, type BoardLayer } from "./board/layer.js";
+
+// Interrupt parent resolution
+export {
+    effective_interrupt_parent,
+    base_lookup,
+    overlay_lookup,
+    type InterruptParentInfo,
+    type NodeLookup,
+} from "./interrupt_parent.js";

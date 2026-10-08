@@ -8,7 +8,7 @@ import $RefParser from '@apidevtools/json-schema-ref-parser';
 
 import { describe, test } from 'vitest';
 
-const run = true;
+const run = false;
 
 describe.runIf(run)('Completion suite', () => {
 

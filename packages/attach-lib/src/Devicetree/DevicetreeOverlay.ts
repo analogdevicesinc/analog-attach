@@ -815,7 +815,7 @@ export class DeviceTreeOverlay {
         if (this.base_dts !== undefined) {
             const collect = (node: DTNode, path: string): void => {
                 for (const label of node.labels) {
-                    labels.set(typeof label === "string" ? label : label.name, path);
+                    labels.set(label, path);
                 }
                 for (const child of node.children) {
                     const child_name = get_full_node_name(child);
@@ -837,7 +837,7 @@ export class DeviceTreeOverlay {
             const root = this.get_fragment_root_path(fragment) ?? "";
             const collect_overlay = (node: DTNode, path: string): void => {
                 for (const label of node.labels) {
-                    labels.set(typeof label === "string" ? label : label.name, path);
+                    labels.set(label, path);
                 }
                 for (const child of node.children) {
                     const child_name = get_full_node_name(child);
