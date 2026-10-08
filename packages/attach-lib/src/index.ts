@@ -31,6 +31,25 @@ export { PropertyBuilder } from './Devicetree/PropertyBuilder.js';
 export { DeviceTree } from './Devicetree/Devicetree.js';
 export { DeviceTreeOverlay } from './Devicetree/DevicetreeOverlay.js';
 
+// Unit address and label utilities (Group C)
+export {
+    parse_unit_address,
+    format_unit_address,
+    address_cells_of,
+    encode_reg_address,
+    decode_reg_address,
+    next_free_unit_address,
+    sync_unit_address_from_reg,
+    is_enabled,
+    type AddressCells,
+    type SyncResult,
+} from './Devicetree/UnitAddress.js';
+export {
+    is_valid_label,
+    label_from_compatible,
+    unique_label,
+} from './Devicetree/Labels.js';
+
 // Intelligence: queries, parent suggestions and layers
 export {
     query_devicetree,

@@ -6,3 +6,5 @@ export * from './NodeBuilder.js';
 export * from './PropertyBuilder.js';
 export { DeviceTree } from './Devicetree.js';
 export { DeviceTreeOverlay } from './DevicetreeOverlay.js';
+export * from './UnitAddress.js';
+export * from './Labels.js';

@@ -711,6 +711,150 @@ export class DeviceTreeOverlay {
         return true;
     }
 
+    /**
+     * Merge base and overlay children of the node at `parent_path`.
+     * An overlay child with the same full name as a base child patches it.
+     */
+    public effective_children(parent_path: string): Map<string, DTNode> {
+        const base = this.base_dts;
+        const children = new Map<string, DTNode>();
+
+        const base_node = (() => {
+            if (base === undefined) { return; }
+            const reference = base.get_node_by_path({ kind: "path", labels: [], path: parent_path });
+            return reference === undefined ? undefined : base.deref_node(reference);
+        })();
+        for (const child of base_node?.children ?? []) {
+            children.set(get_full_node_name(child), child);
+        }
+
+        for (const fragment of this.get_fragments()) {
+            const overlay_node = fragment.children.find(c => c.name === "__overlay__");
+            if (overlay_node === undefined) { continue; }
+            const root = this.get_fragment_root_path(fragment);
+            if (root === undefined) { continue; }
+
+            let cursor: DTNode | undefined;
+            if (root === parent_path) {
+                cursor = overlay_node;
+            } else if (parent_path.startsWith(root + "/") || (root === "/" && parent_path.startsWith("/"))) {
+                const relative = root === "/" ? parent_path.slice(1) : parent_path.slice(root.length + 1);
+                let node: DTNode | undefined = overlay_node;
+                for (const segment of relative.split("/")) {
+                    if (node === undefined) { break; }
+                    node = node.children.find(c => get_full_node_name(c) === segment);
+                }
+                cursor = node;
+            }
+            if (cursor === undefined) { continue; }
+
+            for (const child of cursor.children) {
+                const child_name = get_full_node_name(child);
+                const existing = children.get(child_name);
+                if (existing === undefined) {
+                    children.set(child_name, child);
+                } else {
+                    children.set(child_name, {
+                        ...existing,
+                        properties: [
+                            ...existing.properties.filter(p => !child.properties.some(o => o.name === p.name)),
+                            ...child.properties,
+                        ],
+                        children: [
+                            ...existing.children.filter(c => !child.children.some(o => get_full_node_name(o) === get_full_node_name(c))),
+                            ...child.children,
+                        ],
+                    });
+                }
+            }
+        }
+
+        return children;
+    }
+
+    /**
+     * Build the effective node at `path`: for `/`, the root with properties from
+     * all fragments targeting `/`; for other paths, the base node patched by overlay props.
+     */
+    public effective_node(path: string): DTNode | undefined {
+        const base = this.base_dts;
+        let base_node: DTNode | undefined;
+        if (base !== undefined) {
+            const reference = base.get_node_by_path({ kind: "path", labels: [], path });
+            base_node = reference === undefined ? undefined : base.deref_node(reference);
+        }
+
+        const found = this.find_node({ kind: "path", labels: [], path });
+        if (found === undefined && base_node === undefined) { return undefined; }
+
+        const properties = [...(base_node?.properties ?? [])];
+        if (found !== undefined) {
+            for (const property of found.node.properties) {
+                const index = properties.findIndex(p => p.name === property.name);
+                if (index === -1) { properties.push(property); }
+                else { properties[index] = property; }
+            }
+        }
+
+        return {
+            name: base_node?.name ?? found?.node.name ?? path.split("/").at(-1) ?? "",
+            unit_addr: base_node?.unit_addr ?? found?.node.unit_addr,
+            labels: [...(base_node?.labels ?? []), ...(found?.node.labels ?? [])],
+            properties,
+            children: [...this.effective_children(path).values()],
+        };
+    }
+
+    /**
+     * Collect every label in the base tree and the overlay, returning a map from
+     * label name to absolute path. Overlay labels override base labels.
+     */
+    public all_labels(): Map<string, string> {
+        const labels = new Map<string, string>();
+
+        if (this.base_dts !== undefined) {
+            const collect = (node: DTNode, path: string): void => {
+                for (const label of node.labels) {
+                    labels.set(typeof label === "string" ? label : label.name, path);
+                }
+                for (const child of node.children) {
+                    const child_name = get_full_node_name(child);
+                    const child_path = path === "/" ? `/${child_name}` : `${path}/${child_name}`;
+                    collect(child, child_path);
+                }
+            };
+            const root = this.base_dts.deref_node({
+                node_name: "/",
+                full_path: { kind: "path", labels: [], path: "/" },
+                labels: [],
+            });
+            if (root !== undefined) { collect(root, "/"); }
+        }
+
+        for (const fragment of this.get_fragments()) {
+            const overlay_node = fragment.children.find(c => c.name === "__overlay__");
+            if (overlay_node === undefined) { continue; }
+            const root = this.get_fragment_root_path(fragment) ?? "";
+            const collect_overlay = (node: DTNode, path: string): void => {
+                for (const label of node.labels) {
+                    labels.set(typeof label === "string" ? label : label.name, path);
+                }
+                for (const child of node.children) {
+                    const child_name = get_full_node_name(child);
+                    const child_path = path === "/" ? `/${child_name}` : `${path}/${child_name}`;
+                    collect_overlay(child, child_path);
+                }
+            };
+            for (const child of overlay_node.children) {
+                const child_name = get_full_node_name(child);
+                const child_path = root === "/" ? `/${child_name}` : `${root}/${child_name}`;
+                collect_overlay(child, child_path);
+            }
+        }
+
+        return labels;
+    }
+
     public print(options?: import("./Printer.js").DtoPrintOptions): string {
         return print_dto(this.overlay, undefined, options);
     }
@@ -900,5 +1044,49 @@ ${overlay_with_imu.replace("/dts-v1/;\n/plugin/;\n", "")}`);
         if (typeof overlay === "string") { throw new TypeError(overlay); }
         const printed = overlay.print({ syntax: "label" });
         expect(printed).toContain("/ {\n};");
+    });
+
+    test("effective_children merges base and overlay children", () => {
+        const base = DeviceTree.new_from_string(`/dts-v1/;\n/ {\n\tsoc {\n\t\tspi0: spi@7e204000 {\n\t\t\t#address-cells = <1>;\n\t\t\t#size-cells = <0>;\n\t\t\tspidev@0 { reg = <0>; };\n\t\t\tspidev@1 { reg = <1>; };\n\t\t};\n\t};\n};`);
+        if (typeof base === "string") { throw new TypeError(base); }
+        const overlay = DeviceTreeOverlay.new_from_string(`/dts-v1/;\n/plugin/;\n\n&spi0 {\n\tspidev@0 { status = "disabled"; };\n\tadc@2 { reg = <2>; };\n};`, base);
+        if (typeof overlay === "string") { throw new TypeError(overlay); }
+
+        const children = overlay.effective_children("/soc/spi@7e204000");
+        expect(children.has("spidev@0")).toBe(true);
+        expect(children.has("spidev@1")).toBe(true);
+        expect(children.has("adc@2")).toBe(true);
+        const patched = children.get("spidev@0");
+        expect(patched?.properties.some(p => p.name === "status")).toBe(true);
+        expect(patched?.properties.some(p => p.name === "reg")).toBe(true);
+    });
+
+    test("effective_children — overlay-only parent", () => {
+        const base = DeviceTree.new_from_string(`/dts-v1/;\n/ {\n\tsoc {\n\t\tspi0: spi@7e204000 {\n\t\t};\n\t};\n};`);
+        if (typeof base === "string") { throw new TypeError(base); }
+        const overlay = DeviceTreeOverlay.new_from_string(`/dts-v1/;\n/plugin/;\n\n&spi0 {\n\tadc@0 {\n\t\tchannel@0 { reg = <0>; };\n\t};\n};`, base);
+        if (typeof overlay === "string") { throw new TypeError(overlay); }
+        const children = overlay.effective_children("/soc/spi@7e204000/adc@0");
+        expect(children.has("channel@0")).toBe(true);
+    });
+
+    test("all_labels collects from base and overlay", () => {
+        const base = DeviceTree.new_from_string(`/dts-v1/;\n/ {\n\tsoc {\n\t\tspi0: spi@7e204000 {\n\t\t};\n\t};\n};`);
+        if (typeof base === "string") { throw new TypeError(base); }
+        const overlay = DeviceTreeOverlay.new_from_string(`/dts-v1/;\n/plugin/;\n\n&spi0 {\n\tadc: adc@0 { reg = <0>; };\n};`, base);
+        if (typeof overlay === "string") { throw new TypeError(overlay); }
+        const labels = overlay.all_labels();
+        expect(labels.get("spi0")).toBe("/soc/spi@7e204000");
+        expect(labels.get("adc")).toBe("/soc/spi@7e204000/adc@0");
+    });
+
+    test("all_labels — overlay label in second fragment", () => {
+        const base = DeviceTree.new_from_string(`/dts-v1/;\n/ {\n\tsoc {\n\t\tspi0: spi@7e204000 {};\n\t\tspi1: spi@7e205000 {};\n\t};\n};`);
+        if (typeof base === "string") { throw new TypeError(base); }
+        const overlay = DeviceTreeOverlay.new_from_string(`/dts-v1/;\n/plugin/;\n\n&spi0 {\n\tadc: adc@0 { reg = <0>; };\n};\n&spi1 {\n\tdac: dac@0 { reg = <0>; };\n};`, base);
+        if (typeof overlay === "string") { throw new TypeError(overlay); }
+        const labels = overlay.all_labels();
+        expect(labels.get("adc")).toBe("/soc/spi@7e204000/adc@0");
+        expect(labels.get("dac")).toBe("/soc/spi@7e205000/dac@0");
     });
 }
