@@ -173,6 +173,9 @@ export function remove_symbol(workfile: Workfile, name: string): Result<void> {
         return error(`Symbol '${name}' not found`, "name");
     }
     delete workfile.symbols[name];
+    if (workfile.hidden !== undefined) {
+        workfile.hidden = workfile.hidden.filter(hidden => hidden !== name);
+    }
     return recompute_exposed_ops(workfile);
 }
 

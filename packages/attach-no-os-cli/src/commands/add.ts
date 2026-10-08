@@ -268,6 +268,17 @@ function describe_bootstrap(report: BootstrapReport, workfile: Workfile): string
         }
     }
 
+    if (report.deleted.length > 0) {
+        lines.push("", "Bootstrap deleted what nothing uses any more:");
+        for (const name of report.deleted) {
+            lines.push(`  x ${name}`);
+        }
+    }
+    for (const name of report.dangling) {
+        lines.push("", `'${name}' is no longer used, but holds values you set, so it was kept.`,
+            `  Delete it with: attach-noos delete ${name}`);
+    }
+
     const created = report.linked.filter(link => link.created && !link.hidden);
     const hidden = report.linked.filter(link => link.hidden);
 

@@ -58,7 +58,7 @@ import type { ChipSelect, Connection } from "../registry/wiring";
 import { collect_child_overrides, create_connections_graph, is_referenced_by_others } from "../validator/connection_graph";
 import type { ConnectionGraph } from "../validator/types";
 import { apply_overrides } from "../validator/override_resolver";
-import { add_symbol, is_hidden, mark_auto, materialize_hidden, materialize_referenced_hidden, set_value } from "../workfile_handler/workfile_handler";
+import { add_symbol, is_hidden, mark_auto, remove_symbol, materialize_hidden, materialize_referenced_hidden, set_value } from "../workfile_handler/workfile_handler";
 import type { Workfile } from "../workfile_handler/types";
 
 /** Why a value was filled. */
@@ -146,6 +146,19 @@ export interface BootstrapReport {
 	wiring: BusWiring[],
 	/** Where bootstrap stopped: the required references still open, with their options. */
 	choices: OpenChoice[],
+	/** Stored nodes deleted: they lost their last reference, and every value was bootstrap's. */
+	deleted: string[],
+	/** Stored nodes that lost their last reference but hold values the user wrote, so stay. */
+	dangling: string[],
+}
+
+export interface BootstrapOptions {
+	/**
+	 * The nodes something referenced before the command that led to this run. A node one
+	 * of them lost its last reference to - by the user's edit or by bootstrap - may be
+	 * deleted. Defaults to what is referenced when the run starts.
+	 */
+	referenced_before?: Iterable<string>,
 }
 
 /** A bug detector: well above any real graph, and only reached if a step stops making progress. */
@@ -399,9 +412,43 @@ function revise_step(workfile: Workfile, wiring: Map<string, Set<string>>): Step
 	return undefined;
 }
 
+// --- Dropping what is no longer used --------------------------------------------------------
+
+/** Every node something in the workfile references. */
+export function referenced_nodes(workfile: Workfile): Set<string> {
+	const graph = create_connections_graph(workfile);
+	return new Set([...graph.values()].flatMap(children => children.map(child => child.name)));
+}
+
+/** Whether every value a node holds is bootstrap's: nothing the user wrote, or cleared, is lost by deleting it. */
+function owned_entirely(node: Ruleset): boolean {
+	return (node._t === "RulesetStruct" || node._t === "RulesetDescriptor")
+		&& node.properties.every(property => property.cleared !== true && (property.value === undefined || property.auto === true));
+}
+
+/**
+ * The first node that lost its last reference and can go: a hidden one (a board or driver
+ * resource, rebuilt whenever it is named again), or a stored one bootstrap owns entirely.
+ * Roots were never referenced, so they are never dropped.
+ */
+function drop_step(workfile: Workfile, watched: Set<string>): Step | undefined {
+	const referenced = referenced_nodes(workfile);
+	for (const name of Object.keys(workfile.symbols).sort()) {
+		const node = workfile.symbols[name];
+		if (!watched.has(name) || referenced.has(name) || node === undefined) {
+			continue;
+		}
+		if (is_hidden(workfile, name) || owned_entirely(node)) {
+			return { kind: "drop", node: name };
+		}
+	}
+	return undefined;
+}
+
 // --- One step ----------------------------------------------------------------------------
 
 type Step =
+	| { kind: "drop", node: string }
 	| { kind: "revise", node: string, property: string, previous: unknown, value?: unknown }
 	| { kind: "fill", node: string, property: string, value: unknown, from: FillSource }
 	| { kind: "link", node: string, property: string, member?: string, option: Option }
@@ -892,7 +939,7 @@ function realize(workfile: Workfile, option: Option, externs: ExternIndex): Resu
  * Safe to run any number of times: a second run on the result changes nothing, because
  * every step it could take was already taken.
  */
-export function bootstrap(workfile: Workfile): Result<BootstrapReport> {
+export function bootstrap(workfile: Workfile, options: BootstrapOptions = {}): Result<BootstrapReport> {
 	const externs = build_extern_index(workfile.board);
 	if (!externs.ok) {
 		return externs;
@@ -906,21 +953,41 @@ export function bootstrap(workfile: Workfile): Result<BootstrapReport> {
 
 	const registry = get_registry();
 	const binding = registry.ok ? registry.value.chip_select : undefined;
-	const report: BootstrapReport = { revised: [], filled: [], linked: [], chip_selects: [], wiring: [], choices: [] };
+	const report: BootstrapReport = { revised: [], filled: [], linked: [], chip_selects: [], wiring: [], choices: [], deleted: [], dangling: [] };
 
 	const wiring = wiring_fields(binding);
+	// Every node referenced at some point in this command: the ones that can lose their last
+	// reference. A node never referenced (a root, a node the user just added) is never dropped.
+	const watched = new Set([...options.referenced_before ?? [], ...referenced_nodes(workfile)]);
 
 	for (let steps = 0; steps < STEP_CAP; steps++) {
-		// What bootstrap already owns is brought in line first, so every fill and link after
-		// is judged against values the current rules give.
-		const step = revise_step(workfile, wiring) ?? next_step(workfile, externs.value);
+		// What bootstrap already owns is brought in line first, then what is no longer used
+		// goes, so every fill and link after is judged against the workfile that remains.
+		const step = revise_step(workfile, wiring) ?? drop_step(workfile, watched) ?? next_step(workfile, externs.value);
 		if (step === undefined) {
+			// A node that went is reported once, as deleted, not also value by value.
+			report.revised = report.revised.filter(revision => !report.deleted.includes(revision.node));
+			report.dangling = [...watched]
+				.filter(name => name in workfile.symbols && !is_hidden(workfile, name) && !referenced_nodes(workfile).has(name))
+				.sort();
 			report.wiring = wiring_of(workfile, touched_nodes(report));
 			report.choices = open_choices(workfile, externs.value);
 			return ok(report);
 		}
 
 		switch (step.kind) {
+			case "drop": {
+				const hidden = is_hidden(workfile, step.node);
+				const removed = remove_symbol(workfile, step.node);
+				if (!removed.ok) {
+					return removed;
+				}
+				// A hidden node is not the user's to hear about: it was never stored.
+				if (!hidden) {
+					report.deleted.push(step.node);
+				}
+				break;
+			}
 			case "revise": {
 				// No value means nothing fills it now: it goes, and is no longer bootstrap's.
 				const set = step.value === undefined
@@ -986,6 +1053,10 @@ export function bootstrap(workfile: Workfile): Result<BootstrapReport> {
 				});
 				break;
 			}
+		}
+
+		for (const name of referenced_nodes(workfile)) {
+			watched.add(name);
 		}
 	}
 

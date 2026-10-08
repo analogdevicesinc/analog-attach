@@ -1,5 +1,5 @@
 import { describe, test, expect, beforeEach, afterEach } from 'vitest';
-import { bootstrap } from '../../src/bootstrap/bootstrap';
+import { bootstrap, referenced_nodes } from '../../src/bootstrap/bootstrap';
 import { load_resolved_ruleset, load_resolved_ruleset_for_board, resolve_ruleset } from '../../src/resolver/resolver';
 import { parse_ruleset } from '../../src/ruleset_parser/ruleset_parser';
 import { validate_workfile } from '../../src/validator/validator';
@@ -154,7 +154,7 @@ describe('bootstrap from one node', () => {
 
         const again = bootstrap(workfile);
         expectOk(again);
-        expect(again.value).toEqual({ revised: [], filled: [], linked: [], chip_selects: [], wiring: [], choices: [] });
+        expect(again.value).toEqual({ revised: [], filled: [], linked: [], chip_selects: [], wiring: [], choices: [], deleted: [], dangling: [] });
         expect(stored(workfile)).toEqual(before);
     });
 });
@@ -319,12 +319,56 @@ describe('who owns a value', () => {
             node: 'testpart_init_param', property: 'comm_init', previous: { spi_dev: 'test_spi_device' },
         });
 
-        // The SPI device lost the part's overrides with it: its speed came only from them, so
-        // nothing fills it now. Its mode is still the enum's own default, and its controller
-        // still fits, so those stay.
-        expect(symbols['test_spi_device']?.max_speed_hz).toBeUndefined();
-        expect(symbols['test_spi_device']?.mode).toBe('TEST_SPI_MODE_0');
-        expect(symbols['test_spi_device']?.controller).toBe('bsp_test_spi_cfg_handle');
+        // The SPI device lost its last reference, and every value on it was bootstrap's, so
+        // it went - and the controller handle it alone used went with it.
+        expect(symbols['test_spi_device']).toBeUndefined();
+        expect(Object.keys(workfile.symbols)).not.toContain('bsp_test_spi_cfg_handle');
+        expect(report.value.deleted).toEqual(['test_spi_device']);
+        expect(report.value.dangling).toEqual([]);
+    });
+
+    test('switching the bus on a jumper-wired board drops the chip-select pin too', () => {
+        const workfile = workfile_with('test_sensor', 'otherboard', 'othersoc');
+        expectOk(bootstrap(workfile));
+        expect(stored(workfile)['test_gpio_pin']).toBeDefined();
+        expectOk(set_value(workfile, 'testpart_init_param', 'comm_type', 'TESTPART_I2C'));
+
+        const report = bootstrap(workfile);
+        expectOk(report);
+        expect(report.value.deleted).toEqual(['test_spi_device', 'test_gpio_pin']);
+    });
+
+    test('a node the user edited is left dangling, and reported, not deleted', () => {
+        const workfile = workfile_with('test_sensor');
+        expectOk(bootstrap(workfile));
+        expectOk(set_value(workfile, 'test_spi_device', 'max_speed_hz', 2000000));
+        expectOk(set_value(workfile, 'testpart_init_param', 'comm_type', 'TESTPART_I2C'));
+
+        const report = bootstrap(workfile);
+        expectOk(report);
+        expect(stored(workfile)['test_spi_device']?.max_speed_hz).toBe(2000000);
+        expect(report.value.deleted).toEqual([]);
+        expect(report.value.dangling).toEqual(['test_spi_device']);
+    });
+
+    test('a reference the user removed counts too, given what was referenced before', () => {
+        const workfile = workfile_with('test_sensor');
+        expectOk(bootstrap(workfile));
+        const before = referenced_nodes(workfile);
+        add(workfile, 'my_dev', 'test_spi_device');
+        expectOk(set_value(workfile, 'testpart_init_param', 'comm_init', { spi_dev: 'my_dev' }));
+
+        const report = bootstrap(workfile, { referenced_before: before });
+        expectOk(report);
+        expect(report.value.deleted).toEqual(['test_spi_device']);
+    });
+
+    test('a root, never referenced, is never deleted', () => {
+        const workfile = workfile_with('test_sensor');
+        const report = bootstrap(workfile);
+        expectOk(report);
+        expect(Object.keys(workfile.symbols)).toContain('test_sensor');
+        expect(report.value.deleted).toEqual([]);
     });
 
     test('a value the user wrote is never revised, whatever the rules say now', () => {
@@ -553,7 +597,7 @@ describe('the chip-select', () => {
 
         const again = bootstrap(workfile);
         expectOk(again);
-        expect(again.value).toEqual({ revised: [], filled: [], linked: [], chip_selects: [], wiring: [], choices: [] });
+        expect(again.value).toEqual({ revised: [], filled: [], linked: [], chip_selects: [], wiring: [], choices: [], deleted: [], dangling: [] });
         expect(stored(workfile)).toEqual(before);
     });
 });
