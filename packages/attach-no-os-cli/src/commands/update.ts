@@ -1,5 +1,6 @@
 import { buildCommand } from "@stricli/core";
-import { set_value } from "attach-no-os-lib";
+import { referenced_nodes, set_value } from "attach-no-os-lib";
+import { describe_bootstrap, run_bootstrap } from "./bootstrap_run";
 import type { AttachContext } from "./shared";
 import {
     load_context,
@@ -169,9 +170,18 @@ export const updateCommand = buildCommand<
             return;
         }
 
+        const referenced_before = referenced_nodes(context.value.workfile);
         const updated = set_value(context.value.workfile, node, resolved, parsed.value);
         if (!updated.ok) {
             output_error(flags, updated.error.message);
+            return;
+        }
+        const message = `Set ${node}.${resolved} = ${format_property_value(lookup.value.property)}`;
+
+        // The edit may leave what bootstrap built out of line with the rules, or unused.
+        const ran = run_bootstrap(context.value.workfile, referenced_before);
+        if (!ran.ok) {
+            output_error(flags, `${message}, but bootstrap failed: ${ran.error.message}`);
             return;
         }
 
@@ -181,7 +191,7 @@ export const updateCommand = buildCommand<
             return;
         }
 
-        const message = `Set ${node}.${resolved} = ${format_property_value(lookup.value.property)}`;
-        output(flags, message, common_ok(message));
+        const text = [message, ...(ran.value === undefined ? [] : describe_bootstrap(ran.value, context.value.workfile))];
+        output(flags, text.join("\n"), common_ok(message));
     }
 });

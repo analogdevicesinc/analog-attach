@@ -1,12 +1,14 @@
 import { buildCommand } from "@stricli/core";
 import {
     get_connected_symbols,
+    referenced_nodes,
     remove_symbol,
     clear_value,
     set_value,
     type Result,
     type Workfile
 } from "attach-no-os-lib";
+import { describe_bootstrap, run_bootstrap } from "./bootstrap_run";
 import type { AttachContext, WorkfileContext } from "./shared";
 import {
     load_context,
@@ -128,18 +130,19 @@ function reset_property(flags: DeleteFlags, context: WorkfileContext, node: stri
     const resolved = lookup.value.property.name;
 
     // The user's "nothing": unset, and not bootstrap's to fill back in.
+    const referenced_before = referenced_nodes(context.workfile);
     const cleared = clear_value(context.workfile, node, resolved);
     if (!cleared.ok) {
         output_error(flags, cleared.error.message);
         return;
     }
 
-    if (!write(flags, context)) {
+    const message = `Reset ${node}.${resolved}`;
+    const bootstrapped = write(flags, context, message, referenced_before);
+    if (bootstrapped === undefined) {
         return;
     }
-
-    const message = `Reset ${node}.${resolved}`;
-    output(flags, message, common_ok(message));
+    output(flags, [message, ...bootstrapped].join("\n"), common_ok(message));
 }
 
 function delete_node(flags: DeleteFlags, context: WorkfileContext, node: string): void {
@@ -161,6 +164,7 @@ function delete_node(flags: DeleteFlags, context: WorkfileContext, node: string)
         return;
     }
 
+    const referenced_before = referenced_nodes(context.workfile);
     for (const reference of references) {
         const cleared = clear_reference(context.workfile, reference, node);
         if (!cleared.ok) {
@@ -179,14 +183,14 @@ function delete_node(flags: DeleteFlags, context: WorkfileContext, node: string)
         return;
     }
 
-    if (!write(flags, context)) {
-        return;
-    }
-
     const message = references.length > 0
         ? `Deleted '${node}' and cleared ${count(references.length, "reference")} to it`
         : `Deleted '${node}'`;
-    output(flags, message, common_ok(message));
+    const bootstrapped = write(flags, context, message, referenced_before);
+    if (bootstrapped === undefined) {
+        return;
+    }
+    output(flags, [message, ...bootstrapped].join("\n"), common_ok(message));
 }
 
 function delete_everything(flags: DeleteFlags, context: WorkfileContext): void {
@@ -222,7 +226,8 @@ function delete_everything(flags: DeleteFlags, context: WorkfileContext): void {
         }
     }
 
-    if (!write(flags, context)) {
+    // Nothing is left for bootstrap to build on.
+    if (write(flags, context, "Deleted everything") === undefined) {
         return;
     }
 
@@ -232,15 +237,25 @@ function delete_everything(flags: DeleteFlags, context: WorkfileContext): void {
 
 // ------- HELPERS --------
 
-/** Save, reporting the failure the same way every other step does. False means it failed. */
-function write(flags: DeleteFlags, context: WorkfileContext): boolean {
+/**
+ * Bootstrap (when given what was referenced before the change) and save, reporting a failure
+ * the same way every other step does. The lines describing what bootstrap did, or undefined
+ * when it failed.
+ */
+function write(flags: DeleteFlags, context: WorkfileContext, message: string, referenced_before?: Set<string>): string[] | undefined {
+    const ran = referenced_before === undefined ? undefined : run_bootstrap(context.workfile, referenced_before);
+    if (ran?.ok === false) {
+        output_error(flags, `${message}, but bootstrap failed: ${ran.error.message}`);
+        return undefined;
+    }
+
     const saved = save_workfile(context);
     if (!saved.ok) {
         output_error(flags, saved.error.message);
-        return false;
+        return undefined;
     }
 
-    return true;
+    return ran?.value === undefined ? [] : describe_bootstrap(ran.value, context.workfile);
 }
 
 /**
@@ -296,7 +311,9 @@ function clear_reference(workfile: Workfile, reference: Reference, target: strin
         return set_value(workfile, reference.owner, reference.property, kept.length > 0 ? kept : undefined);
     }
 
-    return set_value(workfile, reference.owner, reference.property);
+    // Cleared, not merely unset: the user deleted what it named, so bootstrap must not build
+    // it straight back.
+    return clear_value(workfile, reference.owner, reference.property);
 }
 
 function property_count(workfile: Workfile): number {
