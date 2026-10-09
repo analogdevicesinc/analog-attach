@@ -59,6 +59,8 @@ export interface ModuleInfo {
 	 * without relying on symbol-name conventions.
 	 */
 	provides_interfaces?: string[],
+	/** `depends.packages` names: the libraries a driver builds against, e.g. capi-util. */
+	packages?: string[],
 }
 
 /** Which MCU GPIO a pin is, in the chip's own port vocabulary (e.g. MXC_GPIO2). */

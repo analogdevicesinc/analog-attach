@@ -8,11 +8,14 @@ import { get_connected_symbols, reorder_symbols_topologically } from "../validat
 import { effective_value, is_descriptor_reference, is_null_pointer, number_literal, property_default, reference_expression } from "./codegen_helpers";
 import { STRUCTURE_FILENAME, resolve_template_set } from "./template_sets";
 import { schedule_patches } from "./patch_schedule";
+import { capi_project } from "./capi_project";
+import type { CapiProject } from "./capi_project";
 
 import type { Eta } from "eta";
 import type { CodegenInput, CodegenResult } from "./types";
 import type { Result } from "../ruleset_parser/result";
 import type { FileSpec } from "./types";
+import type { Workfile } from "../workfile_handler/types";
 
 // Helpers injected into every template under `it.h` — the Eta replacement for the
 // custom nunjucks filters that used to live on the environment. Templates call them
@@ -48,6 +51,17 @@ const template_helpers = {
 	reference_expression,
 	number_literal,
 	connected_symbols: get_connected_symbols,
+
+	// The build facts of a CAPI application: platform, board, drivers, Kconfig, headers
+	// and the board peripherals to declare (see capi_project.ts). Throws on a workfile
+	// that cannot be one, which surfaces as a Result error like any template failure.
+	capi_project: (workfile: Workfile): CapiProject => {
+		const project = capi_project(workfile);
+		if (!project.ok) {
+			throw new Error(project.error.message);
+		}
+		return project.value;
+	},
 
 	// Where each runtime patch goes relative to the init calls (see patch_schedule.ts).
 	// A template decides WHAT to patch; this decides WHEN, which is ordering logic worth
