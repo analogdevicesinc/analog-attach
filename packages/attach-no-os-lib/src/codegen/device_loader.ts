@@ -1,7 +1,9 @@
 import path from "node:path";
 import fs from "node:fs";
 
-import type { RulesetDescriptor, RulesetStruct } from "../ruleset_parser/types";
+import type { RulesetDescriptor } from "../ruleset_parser/types";
+import type { ConnectionGraph } from "../validator/types";
+import { child_names, create_connections_graph } from "../validator/connection_graph";
 import type { Workfile } from "../workfile_handler/types";
 import type { DeviceInfo } from "./types";
 
@@ -19,30 +21,37 @@ import { make_string_environment } from "./eta_environment";
 
 // The init_param node a descriptor references via its $init_param include.
 // Throws (templates have no Result type) on a mis-linked descriptor.
+/**
+ * The node a descriptor is brought up from: a config struct in the workfile, or - for a
+ * board peripheral's handle - the board extern itself (`capi_spi_init(&ctrl, &bsp_spi1_cfg)`).
+ * `type` is the C type either way: the struct's own symbol, or what the extern provides.
+ */
 function resolve_init_parameter(
 	descriptor: RulesetDescriptor,
 	workfile: Workfile,
-): { name: string; ruleset: RulesetStruct } {
+): { name: string; type: string; header?: string } {
 	const init_parameter = descriptor.properties[0];
 	const target_name = init_parameter.value;
 	if (typeof target_name !== "string") {
 		throw new TypeError(`Descriptor '${descriptor.$symbol}' has no $init_param assigned`);
 	}
-	if (!(target_name in workfile.symbols)) {
+	const target = workfile.symbols[target_name];
+	if (target === undefined) {
 		throw new Error(`Descriptor $init_param '${target_name}' not found in workfile`);
 	}
-	const target = workfile.symbols[target_name];
-	if (target?._t !== "RulesetStruct") {
-		throw new Error(`Descriptor $init_param '${target_name}' is not a struct`);
+	switch (target._t) {
+		case "RulesetStruct": {
+			return { name: target_name, type: target.$symbol, ...(target.$header === undefined ? {} : { header: target.$header }) };
+		}
+		case "RulesetExtern": {
+			return { name: target_name, type: target.$provides, ...(target.$header === undefined ? {} : { header: target.$header }) };
+		}
+		default: {
+			throw new Error(`Descriptor $init_param '${target_name}' is neither a struct nor a board/driver extern`);
+		}
 	}
-	return { name: target_name, ruleset: target };
 }
 
-// Read a descriptor's init/remove templates, if it declares any.
-//
-// Undefined means the descriptor is the ordinary shape and the target renders the call
-// from $init_function / $remove_function. Declaring one template and not the other is a
-// mistake rather than a shape, so it is rejected instead of half-rendered.
 function load_device_templates(descriptor: RulesetDescriptor): { init: string; remove: string } | undefined {
 	if (descriptor.$init_template === undefined && descriptor.$remove_template === undefined) {
 		return undefined;
@@ -83,7 +92,6 @@ function extract_device_info(
 	const templates = load_device_templates(descriptor);
 	const init_parameter = resolve_init_parameter(descriptor, workfile);
 	const symbol_name = init_parameter.name;
-	const init_parameter_ruleset = init_parameter.ruleset;
 
 	// Device templates receive the descriptor instance name and the init_param
 	// instance name (reached in-template as `it.descriptor_name` / `it.symbol_name`).
@@ -96,13 +104,12 @@ function extract_device_info(
 		symbol_name,
 		descriptor_name,
 		descriptor_type: descriptor.$symbol,
-		init_param_type: init_parameter_ruleset.$symbol,
-		header: init_parameter_ruleset.$header ? path.basename(init_parameter_ruleset.$header) : "",
+		init_param_type: init_parameter.type,
+		header: init_parameter.header === undefined ? "" : path.basename(init_parameter.header),
 		init_function: descriptor.$init_function,
 		remove_function: descriptor.$remove_function,
 		init_code: environment && templates ? environment.renderString(templates.init, view).trim() : undefined,
 		remove_code: environment && templates ? environment.renderString(templates.remove, view).trim() : undefined,
-		capability: init_parameter_ruleset.$capability,
 	};
 }
 
@@ -110,25 +117,52 @@ function extract_device_info(
 // IRQ controller first: any driver registering an interrupt handler (async UART, timers,
 // data-ready lines) needs it up. UART next: so logging works during the rest of init.
 // Devices without a listed capability keep their original relative order.
-const INIT_PRIORITY: string[] = ["irq", "uart"];
-
-function prioritize_devices(devices: DeviceInfo[]): DeviceInfo[] {
-	const priority_of = (device: DeviceInfo): number => {
-		const index = device.capability ? INIT_PRIORITY.indexOf(device.capability) : -1;
-		return index === -1 ? INIT_PRIORITY.length : index;
-	};
-
-	// Stable sort: prioritized capabilities float to the front in INIT_PRIORITY order,
-	// everything else stays in its existing (workfile) order.
-	return devices
-		.map((device, index) => ({ device, index }))
-		.sort((a, b) => priority_of(a.device) - priority_of(b.device) || a.index - b.index)
-		.map(entry => entry.device);
+/** Every descriptor `name` reaches through its references, of any kind, in any number of steps. */
+function reached_descriptors(name: string, graph: ConnectionGraph, workfile: Workfile): Set<string> {
+	const reached = new Set<string>();
+	const seen = new Set<string>([name]);
+	const pending = [...child_names(graph, name)];
+	for (let next = pending.pop(); next !== undefined; next = pending.pop()) {
+		if (seen.has(next)) {
+			continue;
+		}
+		seen.add(next);
+		if (workfile.symbols[next]?._t === "RulesetDescriptor") {
+			reached.add(next);
+		}
+		pending.push(...child_names(graph, next));
+	}
+	return reached;
 }
 
-// Every descriptor node is a device that is initialized at top level. Returns them
-// in init order (prioritized capabilities first). Throws on a half-configured device
-// (e.g. an init template with no matching remove template) so it surfaces loudly.
+/**
+ * Init order: a device after every handle it reaches. The ADXL355's handle reaches, through
+ * its config, init_param and SPI device, the SPI controller and the chip-select's GPIO port,
+ * so those come first. Otherwise workfile order is kept, so the order is stable.
+ */
+function order_devices(devices: DeviceInfo[], workfile: Workfile): DeviceInfo[] {
+	const graph = create_connections_graph(workfile);
+	const names = new Set(devices.map(device => device.descriptor_name));
+	const needs = new Map(devices.map(device => [
+		device.descriptor_name,
+		[...reached_descriptors(device.descriptor_name, graph, workfile)].filter(name => names.has(name)),
+	]));
+
+	const ordered: DeviceInfo[] = [];
+	const placed = new Set<string>();
+	while (ordered.length < devices.length) {
+		const next = devices.find(device => !placed.has(device.descriptor_name)
+			&& (needs.get(device.descriptor_name) ?? []).every(name => placed.has(name)));
+		if (next === undefined) {
+			const stuck = devices.filter(device => !placed.has(device.descriptor_name)).map(device => device.descriptor_name);
+			throw new Error(`Devices reach each other in a loop, so none can be brought up first: ${stuck.join(", ")}`);
+		}
+		ordered.push(next);
+		placed.add(next.descriptor_name);
+	}
+	return ordered;
+}
+
 export function load_devices(workfile: Workfile): DeviceInfo[] {
 	const result: DeviceInfo[] = [];
 	for (const [name, symbol] of Object.entries(workfile.symbols)) {
@@ -137,5 +171,5 @@ export function load_devices(workfile: Workfile): DeviceInfo[] {
 		}
 		result.push(extract_device_info(name, symbol, workfile));
 	}
-	return prioritize_devices(result);
+	return order_devices(result, workfile);
 }

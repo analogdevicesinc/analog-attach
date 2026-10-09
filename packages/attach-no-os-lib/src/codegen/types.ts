@@ -15,7 +15,6 @@ export interface DeviceInfo {
 	// target renders the call from the two function names instead.
 	init_code?: string;
 	remove_code?: string;
-	capability?: string;       // $capability, e.g. "uart" / "irq"; used for init ordering
 };
 
 export interface DescriptorInfo {
