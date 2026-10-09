@@ -78,7 +78,7 @@ const template_helpers = {
 // error) rather than producing a half-written project.
 //
 // A set may declare `"extends": "<set>"`. Templates it does not carry itself are
-// then taken from that base set, so a variant target (no-os-iio) ships only the
+// then taken from that base set, so a variant target (an IIO app) ships only the
 // templates that genuinely differ instead of a copy of the whole folder. One level
 // only: a base set that itself extends is not followed, which keeps resolution
 // obvious and cannot loop.
