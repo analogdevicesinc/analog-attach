@@ -26,7 +26,7 @@ extern struct capi_uart_handle *console_uart;
 <% } -%>
 /* Handles, filled in by their init functions in main.c. */
 <% for (const d of devices) { -%>
-extern struct <%= H.handle_type(d.descriptor_type) %> *<%= d.descriptor_name %>;
+extern struct <%= d.handle_type %> *<%= d.descriptor_name %>;
 <% } -%>
 
 <% for (const s of structs) { -%>

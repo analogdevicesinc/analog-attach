@@ -104,6 +104,7 @@ function extract_device_info(
 		symbol_name,
 		descriptor_name,
 		descriptor_type: descriptor.$symbol,
+		handle_type: descriptor.$handle ?? `${descriptor.$symbol}_handle`,
 		init_param_type: init_parameter.type,
 		header: init_parameter.header === undefined ? "" : path.basename(init_parameter.header),
 		init_function: descriptor.$init_function,

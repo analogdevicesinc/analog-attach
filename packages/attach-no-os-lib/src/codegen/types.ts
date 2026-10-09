@@ -4,7 +4,8 @@ import type { Workfile } from "../workfile_handler/types";
 export interface DeviceInfo {
 	symbol_name: string;       // init param name: "my_accel"
 	descriptor_name: string;   // descriptor name: "my_accel_device"
-	descriptor_type: string;   // descriptor type: "adxl355_dev"
+	descriptor_type: string;   // descriptor ruleset symbol: "capi_spi_controller"
+	handle_type: string;       // C struct of the handle: "capi_spi_controller_handle"
 	init_param_type: string;   // init param type: "adxl355_init_param"
 	header: string;            // "adxl355.h"
 	init_function: string;     // $init_function, e.g. "capi_spi_init"

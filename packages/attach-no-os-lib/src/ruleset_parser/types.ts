@@ -346,6 +346,10 @@ export type RulesetDescriptor = RulesetBase & {
 	$remove_function: string,
 	$init_template?: string,
 	$remove_template?: string,
+	// The C struct the init function fills in. Optional: CAPI's generic handles follow
+	// `<symbol>_handle` (capi_spi_controller -> capi_spi_controller_handle), and only a
+	// handle named otherwise says so (capi_iio_adxl355 -> capi_iio_adxl355_dev).
+	$handle?: string,
 	// `$init_param` is always first, so `properties[0]` keeps naming it. The rest are the
 	// descriptor's own members, declared so the struct is described 1:1 and so they can be
 	// referenced; a descriptor emits no initializer, so none of them are ever printed.
