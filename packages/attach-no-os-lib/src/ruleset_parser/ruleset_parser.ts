@@ -383,6 +383,11 @@ function parse_ruleset_from_object(object: Record<string, unknown>, context: Par
 				return $remove_template;
 			}
 
+			const $handle = optional(object, "$handle", context, string_);
+			if (!$handle.ok) {
+				return $handle;
+			}
+
 			// `$`-prefixed, like the rest of a descriptor's metadata: it says which struct
 			// configures this device, not what the C struct contains. That also keeps it out
 			// of the member loop below for free.
@@ -418,6 +423,7 @@ function parse_ruleset_from_object(object: Record<string, unknown>, context: Par
 				$remove_function: $remove_function.value,
 				$init_template: $init_template.value,
 				$remove_template: $remove_template.value,
+				...($handle.value === undefined ? {} : { $handle: $handle.value }),
 				properties: [init_parameter.value, ...members.value],
 			});
 		}

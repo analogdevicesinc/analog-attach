@@ -78,13 +78,7 @@ function struct_views(wf) {
 	return views;
 }
 
-/* The C handle type of a descriptor: capi_spi_controller -> capi_spi_controller_handle. */
-function handle_type(descriptor_type) {
-	return `${descriptor_type}_handle`;
-}
-
 return {
 	struct_views: struct_views,
-	handle_type: handle_type,
 };
 %>
