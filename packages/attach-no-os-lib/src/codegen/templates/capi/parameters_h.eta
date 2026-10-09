@@ -1,0 +1,23 @@
+<%
+/*
+ * parameters.h: the board peripherals this app uses, declared extern. They are defined by
+ * the platform board BSP (compiled into the app, see CMakeLists.txt); declaring only the
+ * ones used, here, keeps the app from depending on the BSP header itself.
+ *
+ * NOTE: apostrophes break the Eta parser even inside comments.
+ */
+const project = it.h.capi_project(it.workfile);
+-%>
+#ifndef PARAMETERS_H
+#define PARAMETERS_H
+
+<% for (const header of project.headers.filter(h => h.startsWith("capi_"))) { -%>
+#include "<%= header %>"
+<% } -%>
+
+/* Board <%= project.board.name %>: defined by the <%= project.platform.name %> board BSP. */
+<% for (const e of project.externs) { -%>
+extern struct <%= e.type %> <%= e.symbol %>;
+<% } -%>
+
+#endif /* PARAMETERS_H */
