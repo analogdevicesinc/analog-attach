@@ -54,6 +54,7 @@ describe('registry', () => {
             'test_spi_mode',
             'test_spi_ops',
             'testpart_comm_type',
+            'testpart_iio_init_param',
             'testpart_init_param',
             'testpart_ops',
         ]);

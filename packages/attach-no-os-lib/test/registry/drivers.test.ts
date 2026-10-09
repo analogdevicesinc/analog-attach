@@ -37,7 +37,8 @@ describe('interface to driver', () => {
 
     test('init_param candidates are the structs they ship', () => {
         // Every struct, not one matched by an `_init_param` suffix: a driver's rulesets are
-        // its own, so what it indexes is what an application may have to fill in.
+        // its own, so what it indexes is what an application may have to fill in. Except its
+        // `iio` group (testpart_iio_init_param), which is its IIO side, not this handle's.
         const candidates = driver_init_parameter_candidates('test_sensor');
         expectOk(candidates);
         expect(candidates.value.map(entry => entry.$symbol)).toEqual(['testpart_init_param']);
