@@ -19,6 +19,7 @@ import { RulesetType } from "../ruleset_parser/types";
 import { load_resolved_ruleset } from "../resolver/resolver";
 import { all_symbols, get_registry } from "./registry";
 import type { ModuleInfo } from "./types";
+import { IIO_GROUP } from "./drivers";
 
 /** `module.yml` `type:` of a single-part driver. */
 const MODULE_TYPE_DRIVER = "driver";
@@ -101,6 +102,36 @@ export function driver_root(driver: string): Result<string> {
 	}
 
 	return ok(only);
+}
+
+/**
+ * The root a driver is added through when the app serves it over IIO: the descriptor in its
+ * `iio` group (capi_iio_adxl355). That handle inits the part itself from the driver's own
+ * init_param, so it replaces the generic root rather than sitting next to it.
+ */
+export function driver_iio_root(driver: string): Result<string> {
+	const drivers = list_drivers();
+	if (!drivers.ok) {
+		return drivers;
+	}
+	const module = drivers.value.find(candidate => candidate.name === driver);
+	if (module === undefined) {
+		return error(`No configured driver is called '${driver}'`, driver);
+	}
+
+	const entries = all_symbols();
+	if (!entries.ok) {
+		return entries;
+	}
+	const [only, ...more] = entries.value.filter(entry => entry.$type === RulesetType.RT_DESCRIPTOR
+		&& entry.group === IIO_GROUP && entry.module.path === module.path);
+	if (only === undefined) {
+		return error(`Driver '${driver}' has no IIO device in its rulesets, so it cannot be served over IIO`, driver);
+	}
+	if (more.length > 0) {
+		return error(`Driver '${driver}' lists more than one IIO device: ${[only, ...more].map(entry => entry.$symbol).join(", ")}`, driver);
+	}
+	return ok(only.$symbol);
 }
 
 /**

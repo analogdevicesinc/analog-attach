@@ -19,6 +19,7 @@ import type { Result } from "../ruleset_parser/result";
 import { error, ok } from "../ruleset_parser/result";
 import { board_externs } from "../registry/bsp";
 import { find_board } from "../registry/platforms";
+import { IIO_GROUP } from "../registry/drivers";
 import { get_registry, resolve_entry } from "../registry/registry";
 import type { ModuleInfo } from "../registry/types";
 import type { Workfile } from "../workfile_handler/types";
@@ -57,6 +58,8 @@ export interface CapiProject {
 	dependencies: CapiDependency[],
 	/** The driver collections among them (capi-noos): built as subdirectories, with their Kconfig. */
 	collections: CapiDependency[],
+	/** Middleware among them (capi-iio): built as subdirectories too. */
+	middleware: CapiDependency[],
 	kconfig: string[],
 	headers: string[],
 	externs: CapiExtern[],
@@ -131,6 +134,20 @@ export function capi_project(workfile: Workfile): Result<CapiProject> {
 	const package_names = [...new Set(driver_modules.flatMap(module => module.packages ?? []))].sort();
 	const package_modules = package_names.flatMap(name => modules.filter(module => module.name === name));
 
+	// Served over IIO: a node from a driver's `iio` group brings in capi-iio, the middleware
+	// that provides the iio interface, and each such driver's own <KCONFIG>_IIO symbol.
+	const iio_drivers = driver_modules.filter(module => used.some(entry => entry.module.path === module.path && entry.group === IIO_GROUP));
+	const iio = iio_drivers.length === 0
+		? []
+		: modules.filter(module => module.type === "middleware" && module.provides_interfaces?.includes("iio") === true);
+	if (iio_drivers.length > 0 && iio.length === 0) {
+		return error(`${iio_drivers.map(module => module.name).join(", ")} is served over IIO, which needs capi-iio: add it to module_paths`);
+	}
+	const iio_kconfig = iio_drivers.flatMap(module => {
+		const symbol = module.build?.kconfig === undefined ? undefined : `${module.build.kconfig}_IIO`;
+		return symbol !== undefined && kconfig_symbols(module).has(symbol) ? [symbol] : [];
+	});
+
 	// project.conf: the platform interfaces the nodes use (a capi group named like one of the
 	// platform's own Kconfig symbols), the console's, and each driver's own symbol.
 	const platform_symbols = kconfig_symbols(platform);
@@ -142,6 +159,7 @@ export function capi_project(workfile: Workfile): Result<CapiProject> {
 		...CONSOLE_KCONFIG.filter(symbol => platform_symbols.has(symbol)),
 		...interfaces,
 		...drivers.flatMap(driver => (driver.kconfig === undefined ? [] : [driver.kconfig])),
+		...iio_kconfig,
 	])].sort();
 
 	// Headers: capi's generic header per group (capi_spi.h), each driver's own header and
@@ -159,9 +177,13 @@ export function capi_project(workfile: Workfile): Result<CapiProject> {
 		}
 	}
 	for (const node of Object.values(workfile.symbols)) {
-		if (node._t === "RulesetExtern" && node.$header !== undefined) {
+		if ((node._t === "RulesetExtern" || node._t === "RulesetStruct") && node.$header !== undefined) {
 			headers.add(path.basename(node.$header));
 		}
+	}
+	if (iio.length > 0) {
+		headers.add("capi_iio_app.h");
+		headers.add("capi_util.h");
 	}
 
 	// The board peripherals the workfile references, to declare `extern` in parameters.h.
@@ -190,9 +212,13 @@ export function capi_project(workfile: Workfile): Result<CapiProject> {
 		platform: { name: platform.name, id: short_name(platform.name) },
 		board: { name: board.value.name, target },
 		drivers,
-		packages: package_names.map(name => `capi::${short_name(name)}`),
-		dependencies: [platform, ...collections, ...package_modules].map(module => dependency(module)),
+		packages: [
+			...package_names.map(name => `capi::${short_name(name)}`),
+			...iio.map(module => `capi::middleware::${short_name(module.name)}`),
+		],
+		dependencies: [platform, ...collections, ...iio, ...package_modules].map(module => dependency(module)),
 		collections: collections.map(module => dependency(module)),
+		middleware: iio.map(module => dependency(module)),
 		kconfig,
 		headers: [...headers].sort(),
 		externs,

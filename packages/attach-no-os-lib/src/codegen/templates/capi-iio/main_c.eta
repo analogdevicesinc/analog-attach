@@ -1,0 +1,92 @@
+<%
+/*
+ * main.c for an IIO app: the capi set main.c, then the IIO app serving every IIO device in
+ * the workfile over the console UART, stepped forever. The app is a fact of this target,
+ * not a node: the only choice is which devices are IIO ones (see codegen_helpers.ts).
+ *
+ * Bring-up, from the capi set: the platform, then every handle, in an order where each one comes
+ * after the handles it reaches. A struct field that names a handle only has a value once
+ * that handle is inited, so it is patched right after it (see patch_schedule.ts). A
+ * field that declares `$post_init` gets its block once the node bound there is ready.
+ *
+ * NOTE: apostrophes break the Eta parser even inside comments, so this file uses only
+ * block comments and apostrophe-free prose.
+ */
+const H = include("./_helpers", { h: it.h });
+const project = it.h.capi_project(it.workfile);
+const runtime_assignments = H.struct_views(it.workfile).flatMap(view => view.runtime_assignments);
+const devices = it.h.devices(it.workfile);
+const iio_devices = it.h.iio_devices(it.workfile);
+if (iio_devices.length === 0) {
+	throw new Error("The capi-iio template set serves IIO devices, and the workfile has none. Add a part with: attach-noos add <driver>");
+}
+if (!project.console) {
+	throw new Error("The IIO app is served over the console UART, and the board declares no single UART for it");
+}
+const patches = it.h.schedule_patches(runtime_assignments, devices.map(d => d.descriptor_name), it.h.post_init_blocks(it.workfile));
+-%>
+#include "common_data.h"
+
+int main(void)
+{
+	int ret;
+
+	capi_platform_init();
+<% if (project.console) { -%>
+
+	ret = capi_uart_init(&console_uart, &<%= project.console.symbol %>);
+	if (ret)
+		return ret;
+	capi_stdio_init(console_uart);
+<% } -%>
+<% for (const a of patches.before) { -%>
+	<%= a.struct_name %>.<%= a.field_path %> = <%= a.value %>;
+<% } -%>
+<% for (const b of patches.post_init_before) { -%>
+<%= it.h.tab_indent(b.code) %>
+<% } -%>
+<% for (const d of devices) { -%>
+
+<% if (d.init_code) { -%>
+<%= it.h.tab_indent(d.init_code) %>
+<% } else { -%>
+	ret = <%= d.init_function %>(&<%= d.descriptor_name %>, &<%= d.symbol_name %>);
+	if (ret)
+		return ret;
+<% } -%>
+<% for (const a of patches.after.get(d.descriptor_name) ?? []) { -%>
+	<%= a.struct_name %>.<%= a.field_path %> = <%= a.value %>;
+<% } -%>
+<% for (const b of patches.post_init_after.get(d.descriptor_name) ?? []) { -%>
+<%= it.h.tab_indent(b.code) %>
+<% } -%>
+<% } -%>
+
+	struct capi_iio_device_init iio_devices[] = {
+<% for (const d of iio_devices) { -%>
+		{
+			.name = "<%= d.name %>",
+			.dev = <%= d.name %>,
+			.dev_descriptor = <%= d.name %>-><%= d.table %>,
+		},
+<% } -%>
+	};
+	struct capi_iio_app_init_param app_init_param = {
+		.iio_init_param = {
+			.phy_type = CAPI_IIO_USE_UART,
+			.uart_handle = console_uart,
+			.devs = iio_devices,
+			.nb_devs = CAPI_ARRAY_SIZE(iio_devices),
+		},
+	};
+	struct capi_iio_app_desc *app;
+
+	ret = capi_iio_app_init(&app, app_init_param);
+	if (ret)
+		return ret;
+
+	while (1)
+		capi_iio_app_step(app);
+
+	return 0;
+}

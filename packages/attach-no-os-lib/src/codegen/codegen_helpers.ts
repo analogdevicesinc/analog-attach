@@ -3,6 +3,8 @@ import { format_number_in } from "../ruleset_parser/number_format";
 import { is_float_symbol } from "../ruleset_parser/types";
 import type { Workfile } from "../workfile_handler/types";
 import type { PostInitBlock } from "./types";
+import { IIO_GROUP } from "../registry/drivers";
+import { resolve_entry } from "../registry/registry";
 import { make_string_environment } from "./eta_environment";
 import { resolve_reference } from "../workfile_handler/workfile_handler";
 
@@ -137,4 +139,34 @@ export function post_init_blocks(workfile: Workfile): PostInitBlock[] {
 	}
 
 	return blocks;
+}
+
+/** An IIO device the app serves: its handle, and the handle member holding its device table. */
+export interface IioDevice {
+	/** The handle node; also the name the device is served under. */
+	name: string,
+	/** The readonly member that points at a capi_iio_device (`iio_dev`). */
+	table: string,
+}
+
+/** The C type every IIO handle points its device table at. */
+const IIO_DEVICE_TABLE = "capi_iio_device";
+
+/**
+ * Every handle from a driver's `iio` group, in workfile order. The device table member is
+ * found by what it points at, so no member name is assumed.
+ */
+export function iio_devices(workfile: Workfile): IioDevice[] {
+	return Object.entries(workfile.symbols).flatMap(([name, node]) => {
+		if (node._t !== "RulesetDescriptor") {
+			return [];
+		}
+		const entry = resolve_entry(node.$symbol);
+		if (!entry.ok || entry.value.group !== IIO_GROUP) {
+			return [];
+		}
+		const table = node.properties.find(property => property._t === "IncludeProperty"
+			&& property.readonly === true && property.include === IIO_DEVICE_TABLE);
+		return table === undefined ? [] : [{ name, table: table.name }];
+	});
 }

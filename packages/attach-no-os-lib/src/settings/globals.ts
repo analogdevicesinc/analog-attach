@@ -7,6 +7,9 @@ import type { SettingsFile } from "./types";
 // settings back.
 export const DEFAULT_TEMPLATE_SET = "capi";
 
+/** The template set of an app that serves its devices over IIO: `add <driver>` picks IIO roots for it. */
+export const IIO_TEMPLATE_SET = "capi-iio";
+
 /**
  * Separator for a `path_list` setting. The OS path delimiter, so the setting reads and
  * edits like `PATH` does on the platform it is written on.
