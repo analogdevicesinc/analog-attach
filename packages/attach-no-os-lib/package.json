@@ -21,6 +21,7 @@
     "lint": "eslint src",
     "test": "vitest",
     "test:watch": "vitest --watch",
+    "test:build": "AA_BUILD_TESTS=1 vitest run test/integration/capi_build.test.ts",
     "coverage": "vitest run --coverage"
   },
   "devDependencies": {

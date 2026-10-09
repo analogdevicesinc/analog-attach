@@ -8,7 +8,11 @@
  * NOTE: apostrophes break the Eta parser even inside comments.
  */
 const project = it.h.capi_project(it.workfile);
-const target = it.project_name.replace(/[^A-Za-z0-9_]/g, "_");
+/*
+ * The app target is suffixed so it can never clash with a library target: a project named
+ * after its part (adxl355) would otherwise collide with capi-noos own adxl355 driver target.
+ */
+const target = `${it.project_name.replace(/[^A-Za-z0-9_]/g, "_")}_app`;
 /* capi-noos -> CAPI_NOOS_DIR: the variable the SDK resolves a dependency into. */
 const dir_of = name => `CAPI_${name.replace(/^capi-/, "").toUpperCase().replace(/-/g, "_")}_DIR`;
 const collections = project.collections;
