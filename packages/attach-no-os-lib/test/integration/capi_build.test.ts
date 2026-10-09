@@ -137,6 +137,13 @@ describe.skipIf(!ENABLED)('generated CAPI apps build on max32655fthr', () => {
         expect(generated_warnings(generate_and_build(workfile, 'ad74413r'))).toEqual([]);
     }, BUILD_TIMEOUT);
 
+    test('adt7420 over I2C', () => {
+        const workfile = board_workfile();
+        add_driver(workfile, 'adt7420', 'adt7420');
+        expect(Object.keys(workfile.symbols)).toContain('capi_i2c_device');
+        expect(generated_warnings(generate_and_build(workfile, 'adt7420'))).toEqual([]);
+    }, BUILD_TIMEOUT);
+
     test('adxl355 and ad74413r on one bus, the second chip-select set by hand', () => {
         const workfile = board_workfile();
         add_driver(workfile, 'adxl355', 'adxl355');

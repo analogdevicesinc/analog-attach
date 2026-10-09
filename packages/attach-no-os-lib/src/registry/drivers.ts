@@ -34,6 +34,9 @@ export function modules_providing(interface_: string): Result<ModuleInfo[]> {
 }
 
 /** Rulesets of one kind, shipped by the modules implementing `interface_`. */
+/** The `rulesets:` group a driver lists its IIO device under. */
+export const IIO_GROUP = "iio";
+
 function candidates_of(interface_: string, type_: RulesetType): Result<RulesetEntry[]> {
 	const registry = get_registry();
 	if (!registry.ok) {
@@ -49,8 +52,10 @@ function candidates_of(interface_: string, type_: RulesetType): Result<RulesetEn
 	// path is what the registry keyed the module on.
 	const paths = new Set(providers.value.map(module => module.path));
 
+	// A driver's `iio` group is its IIO side - the IIO device and what only it uses - so
+	// none of it is what a generic interface's init_param or ops field takes.
 	return ok([...registry.value.symbols.values()].filter(
-		entry => entry.$type === type_ && paths.has(entry.module.path)
+		entry => entry.$type === type_ && paths.has(entry.module.path) && entry.group !== IIO_GROUP
 	));
 }
 

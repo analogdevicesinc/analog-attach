@@ -7,3 +7,5 @@ rulesets:
     - testpart_init_param.yaml
   externs:
     - testpart_ops.yaml
+  iio:
+    - iio/testpart_iio_init_param.yaml
