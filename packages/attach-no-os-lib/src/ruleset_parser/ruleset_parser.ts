@@ -27,6 +27,7 @@ import {
 	parse_raw_property,
 	parse_string_property,
 	parse_union_property,
+	parse_post_init,
 	parse_readonly,
 	reject_include_type
 } from "./property_parser";
@@ -182,7 +183,11 @@ function parse_members(object: Record<string, unknown>, context: ParseContext): 
 			return member_object;
 		}
 
-		const member = parse_readonly(property.value, member_object.value, at(context, key));
+		const readonly_member = parse_readonly(property.value, member_object.value, at(context, key));
+		if (!readonly_member.ok) {
+			return readonly_member;
+		}
+		const member = parse_post_init(readonly_member.value, member_object.value, at(context, key));
 		if (!member.ok) {
 			return member;
 		}

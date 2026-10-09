@@ -21,6 +21,10 @@ export interface PropertyBase {
 	// it to nothing (written as null) - unset to everything else, but not bootstrap's to fill.
 	auto?: boolean,
 	cleared?: boolean,
+	// `$post_init` on an include: an Eta template main.c renders once per node bound to the
+	// field, once that node is ready. It belongs to the role the field gives the node (a pin
+	// in `cs_gpio` is a chip-select), not to the node's type.
+	post_init?: string,
 }
 
 export type PrimitiveSymbol = PrimitiveCType["symbol"];

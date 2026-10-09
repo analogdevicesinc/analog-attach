@@ -22,6 +22,8 @@ cs_gpio:
   pointer: true
   count: cs_gpio_num
   description: "GPIO chip-selects"
+  $post_init: |
+    test_gpio_pin_set_output(<%= it.target %>, <%= it.owner %>.<%= it.field %>_num);
 cs_gpio_num:
   type: uint8_t
   description: "Number of entries in cs_gpio"

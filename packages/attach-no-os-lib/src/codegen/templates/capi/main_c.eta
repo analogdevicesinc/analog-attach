@@ -2,7 +2,8 @@
 /*
  * main.c: bring the platform up, then every handle, in an order where each one comes
  * after the handles it reaches. A struct field that names a handle only has a value once
- * that handle is inited, so it is patched right after it (see patch_schedule.ts).
+ * that handle is inited, so it is patched right after it (see patch_schedule.ts). A
+ * field that declares `$post_init` gets its block once the node bound there is ready.
  *
  * The app only brings the hardware up; what it then does is the user code at the end.
  *
@@ -13,7 +14,7 @@ const H = include("./_helpers", { h: it.h });
 const project = it.h.capi_project(it.workfile);
 const runtime_assignments = H.struct_views(it.workfile).flatMap(view => view.runtime_assignments);
 const devices = it.h.devices(it.workfile);
-const patches = it.h.schedule_patches(runtime_assignments, devices.map(d => d.descriptor_name));
+const patches = it.h.schedule_patches(runtime_assignments, devices.map(d => d.descriptor_name), it.h.post_init_blocks(it.workfile));
 -%>
 #include "common_data.h"
 
@@ -32,6 +33,9 @@ int main(void)
 <% for (const a of patches.before) { -%>
 	<%= a.struct_name %>.<%= a.field_path %> = <%= a.value %>;
 <% } -%>
+<% for (const b of patches.post_init_before) { -%>
+<%= it.h.tab_indent(b.code) %>
+<% } -%>
 <% for (const d of devices) { -%>
 
 <% if (d.init_code) { -%>
@@ -43,6 +47,9 @@ int main(void)
 <% } -%>
 <% for (const a of patches.after.get(d.descriptor_name) ?? []) { -%>
 	<%= a.struct_name %>.<%= a.field_path %> = <%= a.value %>;
+<% } -%>
+<% for (const b of patches.post_init_after.get(d.descriptor_name) ?? []) { -%>
+<%= it.h.tab_indent(b.code) %>
 <% } -%>
 <% } -%>
 
