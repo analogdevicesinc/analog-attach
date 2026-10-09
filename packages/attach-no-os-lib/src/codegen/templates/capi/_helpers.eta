@@ -1,0 +1,90 @@
+<%
+/*
+ * Shared CAPI assembly helpers for the project templates.
+ *
+ * This whole file is one JS block that ends in `return { ... }`. Eta include() hands
+ * back whatever a template produces, so returning an object gives callers the
+ * functions. A partial does NOT inherit the parent `it`, so consumers pass it in:
+ * `<% const H = include("./_helpers", { h: it.h }) %>`.
+ *
+ * Only cross-template logic lives here: which struct fields are static and which are
+ * patched at runtime (a reference to a handle only exists once that handle is inited),
+ * agreed on by common_data.c/.h and main.c. The build facts come from it.h.capi_project.
+ *
+ * NOTE: apostrophes break the Eta parser even inside comments, so this file uses only
+ * block comments and apostrophe-free prose.
+ */
+
+/*
+ * The symbol a patch READS, which is what decides where the patch may be emitted (see
+ * patch_schedule.ts). A reference value is either `node` or `node.member`, and either way
+ * the value is only live once `node` has been initialized.
+ */
+function patch_source(value) {
+	return String(value).split(".")[0];
+}
+
+/*
+ * One struct: split its properties into handle references (patched at runtime, once the
+ * handle is inited) and static fields (emitted in the initializer).
+ */
+function build_struct_view(name, ruleset, wf) {
+	const runtime_assignments = [];
+	const fields = [];
+
+	for (const property of ruleset.properties) {
+		/*
+		 * A readonly field is filled in by generated code, so it is neither a static field
+		 * nor a patch. Skipped before the checks below because an unset readonly pointer
+		 * would otherwise print as `.field = NULL` and then be assigned anyway.
+		 */
+		if (property.readonly === true) {
+			continue;
+		}
+
+		if (it.h.is_descriptor_reference(property, wf) && it.h.effective_value(property) !== undefined) {
+			runtime_assignments.push({
+				struct_name: name,
+				field_path: property.name,
+				value: it.h.reference_expression(property, wf),
+				source: patch_source(it.h.effective_value(property)),
+			});
+		} else if (it.h.effective_value(property) !== undefined || it.h.is_null_pointer(property)) {
+			fields.push(property);
+		}
+	}
+
+	return {
+		type: ruleset.$symbol,
+		name: name,
+		is_const: runtime_assignments.length === 0,
+		fields: fields,
+		runtime_assignments: runtime_assignments,
+	};
+}
+
+/*
+ * Every struct node. None is const: CAPI init functions take their config non-const, and a
+ * driver init_param goes in through `void *extra`, so a const one would not even compile
+ * there without a cast.
+ */
+function struct_views(wf) {
+	const views = [];
+	for (const [name, ruleset] of Object.entries(wf.symbols)) {
+		if (ruleset._t === "RulesetStruct") {
+			views.push({ ...build_struct_view(name, ruleset, wf), is_const: false });
+		}
+	}
+	return views;
+}
+
+/* The C handle type of a descriptor: capi_spi_controller -> capi_spi_controller_handle. */
+function handle_type(descriptor_type) {
+	return `${descriptor_type}_handle`;
+}
+
+return {
+	struct_views: struct_views,
+	handle_type: handle_type,
+};
+%>

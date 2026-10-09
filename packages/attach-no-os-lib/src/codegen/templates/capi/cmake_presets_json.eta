@@ -1,0 +1,21 @@
+<%
+/* One preset for the board, as capi/sdk/tools/generate_presets.py writes it. */
+const project = it.h.capi_project(it.workfile);
+-%>
+{
+    "version": 7,
+    "cmakeMinimumRequired": {"major": 3, "minor": 27, "patch": 0},
+    "configurePresets": [
+        {
+            "name": "<%= project.board.name %>",
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/build",
+            "cacheVariables": {
+                "USE_VENDOR_TOOLCHAIN": "ON",
+                "PLATFORM": "<%= project.platform.id %>",
+                "BOARD": "<%= project.board.name %>",
+                "TARGET": "<%= project.board.target %>"
+            }
+        }
+    ]
+}

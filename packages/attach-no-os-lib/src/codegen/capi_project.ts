@@ -55,6 +55,8 @@ export interface CapiProject {
 	/** Link targets of the packages the drivers build against (capi::util). */
 	packages: string[],
 	dependencies: CapiDependency[],
+	/** The driver collections among them (capi-noos): built as subdirectories, with their Kconfig. */
+	collections: CapiDependency[],
 	kconfig: string[],
 	headers: string[],
 	externs: CapiExtern[],
@@ -190,6 +192,7 @@ export function capi_project(workfile: Workfile): Result<CapiProject> {
 		drivers,
 		packages: package_names.map(name => `capi::${short_name(name)}`),
 		dependencies: [platform, ...collections, ...package_modules].map(module => dependency(module)),
+		collections: collections.map(module => dependency(module)),
 		kconfig,
 		headers: [...headers].sort(),
 		externs,
