@@ -5,7 +5,7 @@ import { error, ok } from "../ruleset_parser/result";
 import { make_environment } from "./eta_environment";
 import { load_devices } from "./device_loader";
 import { get_connected_symbols, reorder_symbols_topologically } from "../validator/connection_graph";
-import { effective_value, is_descriptor_reference, is_null_pointer, number_literal, post_init_blocks, property_default, reference_expression } from "./codegen_helpers";
+import { effective_value, is_descriptor_reference, is_null_pointer, iio_devices, number_literal, post_init_blocks, property_default, reference_expression } from "./codegen_helpers";
 import { STRUCTURE_FILENAME, resolve_template_set } from "./template_sets";
 import { schedule_patches } from "./patch_schedule";
 import { capi_project } from "./capi_project";
@@ -65,6 +65,9 @@ const template_helpers = {
 
 	// The rendered `$post_init` blocks, one per node bound to a field that declares one.
 	post_init_blocks,
+
+	// The IIO devices an IIO app serves, with each one's device table member.
+	iio_devices,
 
 	// Where each runtime patch goes relative to the init calls (see patch_schedule.ts).
 	// A template decides WHAT to patch; this decides WHEN, which is ordering logic worth
@@ -137,7 +140,8 @@ function load_file_specs(templates_directory: string): Result<FileSpec[]> {
 			directory = base_directory;
 		}
 
-		specs.push({ template, output, protect, directory });
+		const fallback = directory === templates_directory ? base_directory : undefined;
+		specs.push({ template, output, protect, directory, ...(fallback === undefined ? {} : { fallback }) });
 	}
 
 	return ok(specs);
@@ -190,10 +194,10 @@ export function generate_project(input: CodegenInput): Result<CodegenResult> {
 	// `include("./_helpers")` would reach the borrowing set's helpers instead of the
 	// ones it was written against. Cached because a set typically owns several files.
 	const environments = new Map<string, Eta>();
-	const environment_for = (directory: string): Eta => {
+	const environment_for = (directory: string, fallback?: string): Eta => {
 		let environment = environments.get(directory);
 		if (!environment) {
-			environment = make_environment(directory);
+			environment = make_environment(directory, fallback);
 			environments.set(directory, environment);
 		}
 		return environment;
@@ -220,7 +224,7 @@ export function generate_project(input: CodegenInput): Result<CodegenResult> {
 
 			fs.mkdirSync(path.dirname(file_path), { recursive: true });
 
-			const content = environment_for(file.directory).render(file.template, context);
+			const content = environment_for(file.directory, file.fallback).render(file.template, context);
 			fs.writeFileSync(file_path, content);
 			files_created.push(file_path);
 		}

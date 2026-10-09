@@ -64,6 +64,7 @@ export {
     LOCAL_CONFIG_FILENAME,
     PATH_LIST_DELIMITER,
     DEFAULT_TEMPLATE_SET,
+    IIO_TEMPLATE_SET,
     DEFAULT_PROBE,
     PROBE_OPTIONS,
     DEFAULT_WORKFILE_NAME
@@ -107,7 +108,7 @@ export type { ValidationResult, ValidationError } from "./validator/types";
 export { bootstrap, referenced_nodes } from "./bootstrap/bootstrap";
 export type { BootstrapOptions, BootstrapReport, BusWiring, ChipSelectDecision, FilledValue, FillSource, LinkedReference, OpenChoice } from "./bootstrap/bootstrap";
 export { format_number_in } from "./ruleset_parser/number_format";
-export { driver_roots, driver_root, list_drivers, addable_drivers } from "./registry/roots";
+export { driver_roots, driver_root, driver_iio_root, list_drivers, addable_drivers } from "./registry/roots";
 export { generate_project } from "./codegen/codegen";
 export type { CodegenInput, CodegenResult } from "./codegen/types";
 export {

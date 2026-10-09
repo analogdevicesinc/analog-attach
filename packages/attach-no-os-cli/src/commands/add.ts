@@ -1,8 +1,11 @@
 import path from "node:path";
 import { buildCommand } from "@stricli/core";
 import {
+    IIO_TEMPLATE_SET,
     add_symbol,
+    driver_iio_root,
     driver_root,
+    get_effective_setting_value,
     list_available_structs,
     list_drivers,
     load_resolved_ruleset_for_board,
@@ -154,7 +157,11 @@ export const addCommand = buildCommand<AddFlags, [string | undefined]>({
                 output_error(flags, `Unknown schema '${key}'. See: attach-noos list-devices`);
                 return;
             }
-            const root = driver_root(key);
+            // Served over IIO (template_set capi-iio): the driver's IIO device is the root,
+            // and it inits the part itself, so the generic handle is not added at all.
+            const template_set = get_effective_setting_value("template_set");
+            const iio = template_set.ok && template_set.value === IIO_TEMPLATE_SET;
+            const root = iio ? driver_iio_root(key) : driver_root(key);
             if (!root.ok) {
                 output_error(flags, root.error.message);
                 return;

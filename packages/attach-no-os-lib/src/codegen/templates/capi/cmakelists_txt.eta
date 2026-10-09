@@ -60,7 +60,7 @@ target_include_directories(<%= target %> PRIVATE
 target_sources(<%= target %> PRIVATE
     ${CAPI_${_capi_app_platform_upper}_BOARD_BSP_SRC})
 
-<% for (const c of collections) { -%>
+<% for (const c of [...collections, ...project.middleware]) { -%>
 add_subdirectory("${<%= dir_of(c.name) %>}" "${CMAKE_BINARY_DIR}/<%= c.name %>")
 <% } -%>
 target_link_libraries(<%= target %> PUBLIC

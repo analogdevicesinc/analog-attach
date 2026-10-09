@@ -60,6 +60,9 @@ export interface FileSpec {
 	output: string;
 	protect: boolean;
 	directory: string;
+	// The base set, for a template the set carries itself: what its partials fall back to
+	// (`include("./_helpers")` from a variant main.c reaches the base set's helpers).
+	fallback?: string;
 }
 
 // One `<struct_name>.<field_path> = <value>;` line main() emits, because the value is

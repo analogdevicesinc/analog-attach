@@ -1,3 +1,5 @@
+import fs from "node:fs";
+import path from "node:path";
 import { Eta } from "eta";
 
 // One configured Eta engine for all project-level (.eta) templates.
@@ -16,8 +18,8 @@ import { Eta } from "eta";
 // NOTE: unlike nunjucks' throwOnUndefined, Eta renders a missing variable as the
 // literal string "undefined" rather than erroring. The codegen tests (exact-content
 // assertions) are the safety net against that for now; a dedicated guard is deferred.
-export function make_environment(templates_directory: string): Eta {
-	return new Eta({
+export function make_environment(templates_directory: string, fallback?: string): Eta {
+	const environment = new Eta({
 		views: templates_directory,
 		autoEscape: false,
 		rmWhitespace: false,
@@ -28,6 +30,19 @@ export function make_environment(templates_directory: string): Eta {
 		// newlines explicitly with `-%>` in the templates (mirrors trimBlocks 1:1).
 		autoTrim: false,
 	});
+
+	// A variant set extends its base: a partial it does not carry itself is the base set's
+	// (`include("./_helpers")` from capi-iio's main.c reaches capi's helpers).
+	if (fallback !== undefined) {
+		const resolve = environment.resolvePath.bind(environment);
+		environment.resolvePath = (template, options) => {
+			const own = resolve(template, options);
+			const borrowed = path.join(fallback, path.relative(templates_directory, own));
+			return fs.existsSync(own) || !fs.existsSync(borrowed) ? own : borrowed;
+		};
+	}
+
+	return environment;
 }
 
 // A minimal engine for rendering template strings that don't live on disk —
