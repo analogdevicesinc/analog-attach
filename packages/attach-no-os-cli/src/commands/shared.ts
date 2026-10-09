@@ -123,8 +123,15 @@ export function get_project_path(): Result<string> {
         return name;
     }
 
-    if (!name.value) {
-        return ok(process.cwd());
+    // The same default `generate` uses (get_project_name): named after the folder the
+    // workfile is in, so `build` finds what `generate` wrote without any setting.
+    let project_name = name.value;
+    if (!project_name) {
+        const workfile = get_effective_setting_value("workfile");
+        if (!workfile.ok) {
+            return workfile;
+        }
+        project_name = path.basename(path.dirname(path.resolve(process.cwd(), workfile.value ?? "workfile.json")));
     }
 
     const output_path = get_effective_setting_value("output_path");
@@ -132,7 +139,7 @@ export function get_project_path(): Result<string> {
         return output_path;
     }
 
-    return ok(path.resolve(process.cwd(), output_path.value ?? ".", name.value));
+    return ok(path.resolve(process.cwd(), output_path.value ?? ".", project_name));
 }
 
 // --- Workfile Saving ---

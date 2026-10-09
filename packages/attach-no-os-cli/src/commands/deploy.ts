@@ -13,7 +13,7 @@ import { filter_completions, get_board_names } from "../completion/completion";
 import { common_ok } from "../protocol/responses";
 import { get_project_path, output, output_error } from "./shared";
 
-// no-OS names the flash target `flash`, not after the project.
+// The platform SDK names the flash target `flash` (capi-maxim sdk/flash.cmake), not after the project.
 const FLASH_TARGET = "flash";
 
 type DeployFlags = {
@@ -30,7 +30,7 @@ type DeployFlags = {
  */
 export const deployCommand = buildCommand<DeployFlags, []>({
     docs: {
-        brief: "Deploy a no-OS project",
+        brief: "Flash the generated CAPI project to the board",
         fullDescription:
             "Flashes the project named by the 'project_path' setting, or the one 'generate' would\n" +
             "have written ('<output_path>/<project_name>'), or the current directory."
@@ -114,19 +114,9 @@ export const deployCommand = buildCommand<DeployFlags, []>({
             return;
         }
 
-        // TODO(capi): this still drives the no-OS build flow - configure from the repo
-        // root against its CMakePresets.json. CAPI builds from inside the generated
-        // project directory (`cmake --preset <board>`), so cmake_build.ts needs reworking
-        // before this command does anything useful; only the setting is renamed here.
         const capi_path = get_setting_value("capi_path");
         if (!capi_path.ok) {
             output_error(flags, "capi_path is not configured. Run: attach-noos tool-config-set capi_path <path>");
-            return;
-        }
-
-        const checks = preflight(capi_path.value);
-        if (!checks.ok) {
-            output_error(flags, checks.error.message);
             return;
         }
 
@@ -136,38 +126,32 @@ export const deployCommand = buildCommand<DeployFlags, []>({
             return;
         }
 
-        if (!flags.json) {
-            console.log(`Flashing ${plan.value.project_name} to ${plan.value.board} via ${probe} (${plan.value.mode})`);
-            for (const note of checks.value) {
-                console.log(`  ${note}`);
-            }
-            console.log();
+        const checks = preflight(plan.value, capi_path.value);
+        if (!checks.ok) {
+            output_error(flags, checks.error.message);
+            return;
         }
 
-        // PROBE is a configure-time cache variable: the `flash` target only exists if
-        // it was set when the build directory was configured, so configure runs here
-        // even if the project was already built.
-        const configure = await run(
-            "cmake",
-            configure_arguments(plan.value, [`-DPROBE=${probe}`]),
-            plan.value.source_directory,
-        );
+        if (!flags.json) {
+            console.log(`Flashing ${plan.value.target} to ${plan.value.board} via ${probe}\n`);
+        }
+
+        // PROBE is read when the build directory is configured, so configure runs here even
+        // if the project was already built. The `flash` target builds what it needs first.
+        const { project_directory, environment } = plan.value;
+        const configure = await run("cmake", configure_arguments(plan.value, [`-DPROBE=${probe}`]), project_directory, environment);
         if (configure.exit_code !== 0) {
             output_error(flags, `CMake configure failed with exit code ${configure.exit_code}`);
             return;
         }
 
-        const flash = await run(
-            "cmake",
-            build_arguments(plan.value, FLASH_TARGET),
-            plan.value.source_directory,
-        );
+        const flash = await run("cmake", build_arguments(plan.value, FLASH_TARGET), project_directory, environment);
         if (flash.exit_code !== 0) {
             output_error(flags, `Deploy failed with exit code ${flash.exit_code}`);
             return;
         }
 
-        const message = `Flashed ${plan.value.project_name} to ${plan.value.board} via ${probe} (${plan.value.mode})`;
+        const message = `Flashed ${plan.value.target} to ${plan.value.board} via ${probe}`;
         output(flags, "Deploy completed successfully", common_ok(message));
     }
 });

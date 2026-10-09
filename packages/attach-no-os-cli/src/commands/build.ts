@@ -1,10 +1,9 @@
 import fs from "node:fs";
 import { buildCommand } from "@stricli/core";
-import { find_board, get_effective_setting_value, get_setting_value } from "attach-no-os-lib";
+import { get_effective_setting_value, get_setting_value } from "attach-no-os-lib";
 import {
     build_arguments,
     configure_arguments,
-    missing_prerequisite_hint,
     plan_build,
     preflight,
     run,
@@ -29,7 +28,7 @@ type BuildFlags = {
 // definition because otherwise it clashes with the stricli function
 export const buildCommandDefinition = buildCommand<BuildFlags, []>({
     docs: {
-        brief: "Build a no-OS project",
+        brief: "Build the generated CAPI project",
         fullDescription:
             "Builds the project named by the 'project_path' setting, or the one 'generate' would\n" +
             "have written ('<output_path>/<project_name>'), or the current directory."
@@ -70,7 +69,7 @@ export const buildCommandDefinition = buildCommand<BuildFlags, []>({
         }
 
         // An explicit build_command takes the step over completely, for a project that
-        // is not a generated no-OS project or a build CMake cannot express.
+        // is not a generated CAPI project or a build CMake cannot express.
         const override = get_effective_setting_value("build_command");
         if (!override.ok) {
             output_error(flags, override.error.message);
@@ -94,19 +93,9 @@ export const buildCommandDefinition = buildCommand<BuildFlags, []>({
             return;
         }
 
-        // TODO(capi): this still drives the no-OS build flow - configure from the repo
-        // root against its CMakePresets.json. CAPI builds from inside the generated
-        // project directory (`cmake --preset <board>`), so cmake_build.ts needs reworking
-        // before this command does anything useful; only the setting is renamed here.
         const capi_path = get_setting_value("capi_path");
         if (!capi_path.ok) {
             output_error(flags, "capi_path is not configured. Run: attach-noos tool-config-set capi_path <path>");
-            return;
-        }
-
-        const checks = preflight(capi_path.value);
-        if (!checks.ok) {
-            output_error(flags, checks.error.message);
             return;
         }
 
@@ -116,37 +105,31 @@ export const buildCommandDefinition = buildCommand<BuildFlags, []>({
             return;
         }
 
+        const checks = preflight(plan.value, capi_path.value);
+        if (!checks.ok) {
+            output_error(flags, checks.error.message);
+            return;
+        }
+
         if (flags.clean) {
             fs.rmSync(plan.value.binary_directory, { recursive: true, force: true });
         }
 
         if (!flags.json) {
-            console.log(`Building ${plan.value.project_name} for ${plan.value.board} (${plan.value.mode})`);
-            for (const note of checks.value) {
-                console.log(`  ${note}`);
-            }
-            console.log();
+            console.log(`Building ${plan.value.target} for ${plan.value.board}\n`);
         }
 
-        // Configure every time. CMake re-configures in milliseconds when nothing
-        // changed, and skipping it would miss an edited project.conf - which is the
-        // one file a user is most likely to touch by hand.
-        const configure = await run("cmake", configure_arguments(plan.value), plan.value.source_directory);
+        // Configure every time. CMake re-configures in moments when nothing changed, and
+        // skipping it would miss an edited project.conf, the file a user is most likely to
+        // touch by hand.
+        const { project_directory, environment } = plan.value;
+        const configure = await run("cmake", configure_arguments(plan.value), project_directory, environment);
         if (configure.exit_code !== 0) {
-            // Only maxim boards build from a bare checkout; the other vendors need a
-            // file from their own tooling that neither codegen nor Kconfig can supply.
-            // Naming it here is the whole reason generation does not refuse those
-            // boards up front.
-            const board = find_board(plan.value.board);
-            const hint = board.ok && board.value.vendor !== undefined
-                ? missing_prerequisite_hint(board.value.vendor)
-                : undefined;
-            const message = `CMake configure failed with exit code ${configure.exit_code}`;
-            output_error(flags, message, hint === undefined ? {} : { text: `${message}\n\n${hint}` });
+            output_error(flags, `CMake configure failed with exit code ${configure.exit_code}`);
             return;
         }
 
-        const compile = await run("cmake", build_arguments(plan.value, plan.value.project_name), plan.value.source_directory);
+        const compile = await run("cmake", build_arguments(plan.value), project_directory, environment);
         if (compile.exit_code !== 0) {
             output_error(flags, `Build failed with exit code ${compile.exit_code}`);
             return;
@@ -156,10 +139,9 @@ export const buildCommandDefinition = buildCommand<BuildFlags, []>({
         const text = elf_exists
             ? `Build completed successfully\n\n  ${plan.value.elf_path}`
             : `Build reported success but no ELF was found at ${plan.value.elf_path}`;
-
         const message = elf_exists
-            ? `Built ${plan.value.project_name} for ${plan.value.board} (${plan.value.mode}): ${plan.value.elf_path}`
-            : `Built ${plan.value.project_name} for ${plan.value.board} (${plan.value.mode}), but no ELF was found at ${plan.value.elf_path}`;
+            ? `Built ${plan.value.target} for ${plan.value.board}: ${plan.value.elf_path}`
+            : `Built ${plan.value.target} for ${plan.value.board}, but no ELF was found at ${plan.value.elf_path}`;
 
         output(flags, text, common_ok(message, elf_exists ? "info" : "warn"));
     }
