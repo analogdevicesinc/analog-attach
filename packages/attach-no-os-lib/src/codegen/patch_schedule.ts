@@ -4,9 +4,9 @@ import type { PatchSchedule, PostInitBlock, RuntimeAssignment } from "./types";
 //
 // A patch copies something that only exists at runtime into a file-scope struct:
 //
-//     child_spi_ip.parent = desc.parent_spi;
+//     capi_spi_device.controller = bsp_spi1_cfg_handle;
 //
-// `desc.parent_spi` is NULL until `no_os_spi_init(&desc.parent_spi, ...)` has run, so
+// `bsp_spi1_cfg_handle` is NULL until `capi_spi_init(&bsp_spi1_cfg_handle, ...)` has run, so
 // emitting every patch in one block before every init — which is what codegen used to do —
 // copies NULL. The value has to be read after its source exists, and written before the
 // struct it lands in is consumed.
@@ -27,11 +27,8 @@ import type { PatchSchedule, PostInitBlock, RuntimeAssignment } from "./types";
 // The result is a `before` block (patches whose sources need no init at all) plus one
 // bucket per descriptor, emitted right after that descriptor's init.
 //
-// KNOWN LIMIT, pre-existing and orthogonal: `prioritize_devices` floats irq and uart
-// capabilities to the front of the init order, which can put a consumer before its source
-// if a uart init_param ever references another descriptor. That reorders the inits
-// themselves, so it is broken with or without this scheduling; the throw below is what
-// surfaces it instead of emitting a NULL copy.
+// The init order itself comes from load_devices: each device after the handles it reaches,
+// so a consumer is never inited before its source.
 export function schedule_patches(
 	assignments: RuntimeAssignment[],
 	init_order: string[],

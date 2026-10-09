@@ -1,6 +1,6 @@
 // A "template set" is one folder of project templates plus the
 // `project_structure.json` that declares which files it generates. Sets live
-// side by side under `templates/` (`templates/no-os/`, and any other set added
+// side by side under `templates/` (`templates/capi/`, and any other set added
 // later), so a second target is a new folder rather than a change to codegen.
 //
 // Which set to use is a setting (`template_set`, see settings/globals.ts),
