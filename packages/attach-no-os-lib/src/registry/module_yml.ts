@@ -178,6 +178,17 @@ export function read_module(root: string): Result<ModuleInfo> {
 		return provides_interfaces;
 	}
 
+	// A driver's `depends.packages`: the libraries it builds against (capi-util). Read leniently,
+	// by name only - the version and source fields are the build's business, and an
+	// application's `depends:` is a list of a different shape.
+	const depends = object.value.depends;
+	const packages = typeof depends === "object" && depends !== null && !Array.isArray(depends)
+		&& Array.isArray((depends as Record<string, unknown>).packages)
+		? ((depends as Record<string, unknown>).packages as unknown[])
+			.map(entry => (typeof entry === "object" && entry !== null ? (entry as Record<string, unknown>).name : undefined))
+			.filter((name): name is string => typeof name === "string")
+		: undefined;
+
 	const pinout = optional(object.value, "pinout", context, asObject);
 	if (!pinout.ok) {
 		return pinout;
@@ -241,6 +252,7 @@ export function read_module(root: string): Result<ModuleInfo> {
 		connectors: connectors.value,
 		implements_driver: implements_driver.value,
 		provides_interfaces: provides_interfaces.value,
+		...(packages === undefined ? {} : { packages }),
 	});
 }
 

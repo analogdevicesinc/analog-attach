@@ -352,9 +352,10 @@ export function resolve_reference(workfile: Workfile, value: string): ResolvedRe
         const runtime = node._t === "RulesetDescriptor";
         return {
             $id: node.$symbol,
-            // `struct descriptors` holds descriptors as pointers, so a descriptor node is
-            // already a pointer while a plain struct is a value.
-            expr: runtime ? `desc.${value}` : value,
+            // A descriptor node is a handle: a pointer global its init function fills in
+            // (`capi_spi_init(&ctrl, ...)`), so it is already a pointer while a plain struct
+            // is a value.
+            expr: value,
             runtime: runtime,
             pointer: runtime,
         };
@@ -387,7 +388,7 @@ export function resolve_reference(workfile: Workfile, value: string): ResolvedRe
     const owner_is_descriptor = owner._t === "RulesetDescriptor";
     return {
         $id: member.include,
-        expr: owner_is_descriptor ? `desc.${owner_name}->${member_name}` : `${owner_name}.${member_name}`,
+        expr: owner_is_descriptor ? `${owner_name}->${member_name}` : `${owner_name}.${member_name}`,
         runtime: owner_is_descriptor,
         pointer: member.pointer === true,
     };
