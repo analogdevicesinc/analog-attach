@@ -2,6 +2,8 @@ import type { NumberProperty, Property } from "../ruleset_parser/types";
 import { format_number_in } from "../ruleset_parser/number_format";
 import { is_float_symbol } from "../ruleset_parser/types";
 import type { Workfile } from "../workfile_handler/types";
+import type { PostInitBlock } from "./types";
+import { make_string_environment } from "./eta_environment";
 import { resolve_reference } from "../workfile_handler/workfile_handler";
 
 // Typed, reusable property primitives injected into every template under `it.h`.
@@ -101,4 +103,38 @@ export function reference_expression(property: Property, workfile: Workfile): st
 	}
 
 	return property.pointer === true && !target.pointer ? `&${target.expr}` : target.expr;
+}
+
+/**
+ * Every `$post_init` block to emit: for each field that declares one, rendered once per node
+ * bound to it, with `it.target` (the node as an argument: `&pin`, or a handle as it is),
+ * `it.node`, `it.owner` and `it.field`. The same block on the same node twice is one block.
+ */
+export function post_init_blocks(workfile: Workfile): PostInitBlock[] {
+	const environment = make_string_environment();
+	const blocks: PostInitBlock[] = [];
+
+	for (const [owner, node] of Object.entries(workfile.symbols)) {
+		if (node._t !== "RulesetStruct" && node._t !== "RulesetDescriptor") {
+			continue;
+		}
+		for (const property of node.properties) {
+			if (property.post_init === undefined || property._t !== "IncludeProperty") {
+				continue;
+			}
+			const bound = Array.isArray(property.value) ? property.value : [property.value];
+			for (const target of bound) {
+				if (typeof target !== "string") {
+					continue;
+				}
+				const expression = reference_expression({ ...property, value: target }, workfile) ?? `&${target}`;
+				const code = environment.renderString(property.post_init, { target: expression, node: target, owner, field: property.name }).trim();
+				if (!blocks.some(block => block.node === target && block.code === code)) {
+					blocks.push({ node: target, code });
+				}
+			}
+		}
+	}
+
+	return blocks;
 }

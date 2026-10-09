@@ -540,6 +540,23 @@ export function parse_raw_property(name: string, object: Record<string, unknown>
 // `readonly` marks a member the init function fills in: referenceable, never settable, and
 // never emitted. Read here as a decoration rather than in each parse_*_property, because
 // only a descriptor's members can be readonly and every property kind can be one.
+// `$post_init`: what main.c does with each node bound to this field once it is ready, as an
+// Eta template (`it.target`, `it.node`, `it.owner`, `it.field`). Only an include binds a
+// node, so only an include can carry one.
+export function parse_post_init(property: Property, object: Record<string, unknown>, context: ParseContext): Result<Property> {
+	const template = optional(object, "$post_init", context, string_);
+	if (!template.ok) {
+		return template;
+	}
+	if (template.value === undefined) {
+		return ok(property);
+	}
+	if (property._t !== "IncludeProperty") {
+		return error(`'$post_init' needs '${property.name}' to bind a node (an include); it is a ${property._t}`, at(context, "$post_init").path);
+	}
+	return ok({ ...property, post_init: template.value });
+}
+
 export function parse_readonly(property: Property, object: Record<string, unknown>, context: ParseContext): Result<Property> {
 	const readonly_ = optionalWithDefault(object, "readonly", context, false, boolean_);
 	if (!readonly_.ok) {

@@ -5,7 +5,7 @@ import { error, ok } from "../ruleset_parser/result";
 import { make_environment } from "./eta_environment";
 import { load_devices } from "./device_loader";
 import { get_connected_symbols, reorder_symbols_topologically } from "../validator/connection_graph";
-import { effective_value, is_descriptor_reference, is_null_pointer, number_literal, property_default, reference_expression } from "./codegen_helpers";
+import { effective_value, is_descriptor_reference, is_null_pointer, number_literal, post_init_blocks, property_default, reference_expression } from "./codegen_helpers";
 import { STRUCTURE_FILENAME, resolve_template_set } from "./template_sets";
 import { schedule_patches } from "./patch_schedule";
 import { capi_project } from "./capi_project";
@@ -62,6 +62,9 @@ const template_helpers = {
 		}
 		return project.value;
 	},
+
+	// The rendered `$post_init` blocks, one per node bound to a field that declares one.
+	post_init_blocks,
 
 	// Where each runtime patch goes relative to the init calls (see patch_schedule.ts).
 	// A template decides WHAT to patch; this decides WHEN, which is ordering logic worth

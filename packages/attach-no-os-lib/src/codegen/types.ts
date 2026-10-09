@@ -76,7 +76,18 @@ export interface RuntimeAssignment {
 
 // Where each patch goes: `before` runs ahead of every init, and `after` maps a
 // descriptor name to the patches that must follow that descriptor's init.
+/** A rendered `$post_init` block, for one node bound to the field that declares it. */
+export interface PostInitBlock {
+	/** The bound node: the block runs once it is ready. */
+	node: string;
+	/** Complete C statements. */
+	code: string;
+}
+
 export interface PatchSchedule {
 	before: RuntimeAssignment[];
 	after: Map<string, RuntimeAssignment[]>;
+	/** Post-init blocks, by the same slots: after that slot's patches. */
+	post_init_before: PostInitBlock[];
+	post_init_after: Map<string, PostInitBlock[]>;
 }

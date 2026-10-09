@@ -1,4 +1,4 @@
-import type { PatchSchedule, RuntimeAssignment } from "./types";
+import type { PatchSchedule, PostInitBlock, RuntimeAssignment } from "./types";
 
 // WHERE a runtime patch goes in main().
 //
@@ -35,6 +35,7 @@ import type { PatchSchedule, RuntimeAssignment } from "./types";
 export function schedule_patches(
 	assignments: RuntimeAssignment[],
 	init_order: string[],
+	post_init: PostInitBlock[] = [],
 ): PatchSchedule {
 	const descriptors = new Set(init_order);
 
@@ -82,8 +83,21 @@ export function schedule_patches(
 		return placed;
 	};
 
+	// A post-init block acts on its node, so it waits for the same thing a patch reading
+	// that node waits for: the node being complete. It writes into no struct, so it never
+	// holds anything else back. Placed after the patches of its slot, which may be what
+	// completes the node.
+	let pending_blocks = [...post_init];
+	const drain_blocks = (): PostInitBlock[] => {
+		const ready = pending_blocks.filter(block => is_ready({ struct_name: "", field_path: "", value: "", source: block.node }));
+		pending_blocks = pending_blocks.filter(block => !ready.includes(block));
+		return ready;
+	};
+
 	const before = drain();
+	const post_init_before = drain_blocks();
 	const after = new Map<string, RuntimeAssignment[]>();
+	const post_init_after = new Map<string, PostInitBlock[]>();
 
 	for (const descriptor of init_order) {
 		initialized.add(descriptor);
@@ -91,6 +105,14 @@ export function schedule_patches(
 		if (placed.length > 0) {
 			after.set(descriptor, placed);
 		}
+		const blocks = drain_blocks();
+		if (blocks.length > 0) {
+			post_init_after.set(descriptor, blocks);
+		}
+	}
+
+	if (pending_blocks.length > 0) {
+		throw new Error(`Cannot place the post-init of ${pending_blocks.map(block => block.node).join(", ")}: it never becomes ready.`);
 	}
 
 	// Nothing may be dropped: a patch left over reads something that never becomes
@@ -102,5 +124,5 @@ export function schedule_patches(
 		);
 	}
 
-	return { before, after };
+	return { before, after, post_init_before, post_init_after };
 }
