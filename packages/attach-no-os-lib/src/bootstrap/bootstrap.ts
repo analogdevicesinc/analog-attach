@@ -244,7 +244,10 @@ function reference_options(workfile: Workfile, type_: string, self: string, exte
  * ones (from parts already in the workfile) when there are any, else all that are left.
  */
 function preferred(workfile: Workfile, candidates: RulesetEntry[], self: string): string[] {
-	const owner = workfile.symbols[self]?.$symbol ?? "";
+	const owner = workfile.symbols[self];
+	if (owner === undefined) {
+		return candidates.map(entry => entry.$symbol);
+	}
 	const { strong, weak } = rank_driver_candidates(workfile, candidates, owner);
 	return (strong.length > 0 ? strong : weak).map(entry => entry.$symbol);
 }
@@ -1051,8 +1054,10 @@ function realize(workfile: Workfile, option: Option, externs: ExternIndex): Resu
  * where that fact enters, so nothing below it has to be guessed.
  *
  * A driver with no `<driver>_init_param` is left unpinned: bootstrap then lists its options.
+ * `chip` names an existing init_param to link instead of creating one: the second side of one
+ * chip (`add ad74413r --as adc,dac` gives capi_adc and capi_dac the same ad74413r_init_param).
  */
-export function pin_driver(workfile: Workfile, root: string, driver: string): Result<void> {
+export function pin_driver(workfile: Workfile, root: string, driver: string, chip?: string): Result<void> {
 	const node = workfile.symbols[root];
 	if (node?._t !== "RulesetDescriptor") {
 		return error(`'${root}' is not a handle to pin a driver to`, root);
@@ -1100,14 +1105,19 @@ export function pin_driver(workfile: Workfile, root: string, driver: string): Re
 			|| module.provides_interfaces?.includes(property.interface) !== true) {
 			continue;
 		}
-		const loaded = load_resolved_ruleset_for_board(own_config, workfile.board);
-		if (!loaded.ok) {
-			return loaded;
-		}
-		const name = unique_name(workfile, own_config);
-		const added = add_symbol(workfile, name, loaded.value);
-		if (!added.ok) {
-			return added;
+		let name = chip;
+		if (name === undefined) {
+			const loaded = load_resolved_ruleset_for_board(own_config, workfile.board);
+			if (!loaded.ok) {
+				return loaded;
+			}
+			name = unique_name(workfile, own_config);
+			const added = add_symbol(workfile, name, loaded.value);
+			if (!added.ok) {
+				return added;
+			}
+		} else if (workfile.symbols[name]?.$symbol !== own_config) {
+			return error(`'${name}' is not a ${own_config} to share`, name);
 		}
 		const linked = set_owned(workfile, config, property.name, name);
 		if (!linked.ok) {

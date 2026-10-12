@@ -664,10 +664,10 @@ export function suggest_for_property(workfile: Workfile, symbol_name: string, pr
             return suggest_platform_extra(workfile, effective as PlatformExtraProperty, symbol);
         }
         case "DriverOpsProperty": {
-            return suggest_driver_backed(workfile, property.interface, RulesetType.RT_EXTERN, symbol.$symbol);
+            return suggest_driver_backed(workfile, property.interface, RulesetType.RT_EXTERN, symbol);
         }
         case "DriverInitParameterProperty": {
-            return suggest_driver_backed(workfile, property.interface, RulesetType.RT_STRUCT, symbol.$symbol);
+            return suggest_driver_backed(workfile, property.interface, RulesetType.RT_STRUCT, symbol);
         }
         case "RawProperty": {
             return ok({});
@@ -685,7 +685,7 @@ export function suggest_for_property(workfile: Workfile, symbol_name: string, pr
  * added to make one. Both come from the modules declaring the interface, so a driver that is
  * not configured is simply not offered.
  */
-function suggest_driver_backed(workfile: Workfile, interface_: string, type_: RulesetType, owner: string): Result<PropertySuggestions> {
+function suggest_driver_backed(workfile: Workfile, interface_: string, type_: RulesetType, owner: Ruleset): Result<PropertySuggestions> {
     const candidates = type_ === RulesetType.RT_EXTERN
         ? driver_ops_candidates(interface_)
         : driver_init_parameter_candidates(interface_);

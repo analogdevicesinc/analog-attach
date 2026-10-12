@@ -112,9 +112,29 @@ export function driver_root(driver: string): Result<string> {
 		return error(`Driver '${driver}' implements no interface that a generic handle is configured through, so there is nothing to add it by. Add its own structs instead (see: attach-noos list-devices)`, driver);
 	}
 	if (more.length > 0) {
-		return error(`Driver '${driver}' can be added through more than one handle: ${roots.value.join(", ")}. Add the one you want by its schema name`, driver);
+		const interfaces = roots.value.flatMap(root => driver_interfaces_of(root)).filter((interface_, index, all) => all.indexOf(interface_) === index);
+		const one_each = interfaces.map(interface_ => `--as ${interface_}`).join(" or ");
+		return error(`Driver '${driver}' can be added as ${interfaces.join(" or ")} (${roots.value.join(", ")}). Pass ${one_each}, or --as ${interfaces.join(",")} for all of them on one chip`, driver);
 	}
 
+	return ok(only);
+}
+
+/** The root a driver is added through for one of the interfaces it provides: `add ad74413r --as dac`. */
+export function driver_root_for(driver: string, interface_: string): Result<string> {
+	const roots = driver_roots(driver);
+	if (!roots.ok) {
+		return roots;
+	}
+	const matching = roots.value.filter(root => driver_interfaces_of(root).includes(interface_));
+	const [only, ...more] = matching;
+	if (only === undefined) {
+		const offered = roots.value.flatMap(root => driver_interfaces_of(root));
+		return error(`Driver '${driver}' cannot be added as '${interface_}'. It can be: ${[...new Set(offered)].join(", ") || "nothing"}`, interface_);
+	}
+	if (more.length > 0) {
+		return error(`Driver '${driver}' has more than one handle for '${interface_}': ${matching.join(", ")}`, interface_);
+	}
 	return ok(only);
 }
 

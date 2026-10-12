@@ -3,7 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { describe, test, expect, beforeEach, afterEach } from 'vitest';
 import { bootstrap, pin_driver, referenced_nodes } from '../../src/bootstrap/bootstrap';
-import { driver_root } from '../../src/registry/roots';
+import { driver_root, driver_root_for } from '../../src/registry/roots';
 import { load_resolved_ruleset_for_board } from '../../src/resolver/resolver';
 import { validate_workfile } from '../../src/validator/validator';
 import {
@@ -41,8 +41,8 @@ function stored(workfile: Workfile): Record<string, Record<string, unknown>> {
 }
 
 /** What `attach-noos add <driver>` does: the driver's root, named after the driver, then bootstrap. */
-function add_driver(workfile: Workfile, driver: string, name: string): void {
-    const root = driver_root(driver);
+function add_driver(workfile: Workfile, driver: string, name: string, interface_?: string): void {
+    const root = interface_ === undefined ? driver_root(driver) : driver_root_for(driver, interface_);
     expectOk(root);
     const ruleset = load_resolved_ruleset_for_board(root.value, BOARD);
     expectOk(ruleset);
@@ -133,7 +133,7 @@ describe.skipIf(REPOS === undefined)('ad74413r on max32655fthr, from the real re
 
     test('one node becomes a valid workfile, set up like the eval board\'s own project', () => {
         const workfile = board_workfile();
-        add_driver(workfile, 'ad74413r', 'ad74413r');
+        add_driver(workfile, 'ad74413r', 'ad74413r', 'adc');
 
         expect(validate_workfile(workfile).valid).toBe(true);
         const symbols = stored(workfile);
@@ -147,7 +147,7 @@ describe.skipIf(REPOS === undefined)('ad74413r on max32655fthr, from the real re
 
     test('an ADC channel finds its ADC and the driver\'s channel struct, with nothing declared', () => {
         const workfile = board_workfile();
-        add_driver(workfile, 'ad74413r', 'ad74413r');
+        add_driver(workfile, 'ad74413r', 'ad74413r', 'adc');
         for (const name of ['ch0', 'ch1']) {
             const channel = load_resolved_ruleset_for_board('capi_adc_chan', BOARD);
             expectOk(channel);
@@ -166,7 +166,7 @@ describe.skipIf(REPOS === undefined)('ad74413r on max32655fthr, from the real re
     test('next to an adxl355 it shares the bus, not the chip-select', () => {
         const workfile = board_workfile();
         add_adxl355(workfile, 'adxl355');
-        add_driver(workfile, 'ad74413r', 'ad74413r');
+        add_driver(workfile, 'ad74413r', 'ad74413r', 'adc');
 
         const symbols = stored(workfile);
         expect(symbols['capi_spi_device_1']?.controller).toBe('bsp_spi1_cfg_handle');
