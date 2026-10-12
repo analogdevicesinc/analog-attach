@@ -22,7 +22,7 @@ export function phandle_names(
     dt: DeviceTree,
     predicate: (node: DTNode) => boolean,
 ): string[] {
-    return find_nodes(dt, predicate).map(located => phandle_name(located));
+    return find_nodes(dt, node => predicate(node) && is_enabled(node)).map(located => phandle_name(located));
 }
 
 export function labelled_providers(

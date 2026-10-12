@@ -143,9 +143,10 @@
                 "_t": "number_array",
                 "minItems": 1,
                 "maxItems": 1,
-                "minimum": 0,
+                "minimum": 16000,
                 "maximum": 4294967295,
-                "description": "Delay in nanoseconds to be introduced by the controller after CS is de-asserted."
+                "description": "Delay in nanoseconds to be introduced by the controller after CS is de-asserted.",
+                "default": 16000
             }
         },
         {
@@ -166,9 +167,7 @@
                                     "clk_osc",
                                     "clk_usb",
                                     "clk_27MHz",
-                                    "clk_108MHz",
-                                    "cam1_clk",
-                                    "cam0_clk"
+                                    "clk_108MHz"
                                 ],
                                 "enum_type": "phandle"
                             }

@@ -111,7 +111,6 @@
                 "maxItems": 1,
                 "enum": [
                     "cam1_reg",
-                    "cam0_regulator",
                     "cam_dummy_reg",
                     "sd_vcc_reg",
                     "vdd_3v3_reg",
@@ -129,7 +128,6 @@
                 "maxItems": 1,
                 "enum": [
                     "cam1_reg",
-                    "cam0_regulator",
                     "cam_dummy_reg",
                     "sd_vcc_reg",
                     "vdd_3v3_reg",

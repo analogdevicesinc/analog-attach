@@ -76,9 +76,7 @@
                                     "clk_osc",
                                     "clk_usb",
                                     "clk_27MHz",
-                                    "clk_108MHz",
-                                    "cam1_clk",
-                                    "cam0_clk"
+                                    "clk_108MHz"
                                 ],
                                 "enum_type": "phandle"
                             }
@@ -149,7 +147,6 @@
                 "maxItems": 1,
                 "enum": [
                     "cam1_reg",
-                    "cam0_regulator",
                     "cam_dummy_reg",
                     "sd_vcc_reg",
                     "vdd_3v3_reg",
