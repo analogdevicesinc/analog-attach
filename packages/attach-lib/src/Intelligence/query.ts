@@ -1,5 +1,5 @@
 import { ResolvedProperty } from "../Attach/AttachTypes.js";
-import { AttachArray, AttachEnumType } from "../Attach/StructuralTypes.js";
+import { AttachArray, AttachEnumType, FixedIndex } from "../Attach/StructuralTypes.js";
 import { DeviceTree, number_property } from "../Devicetree/index.js";
 import {
     is_clock,
@@ -11,7 +11,9 @@ import {
 } from "./predicates.js";
 import { find_nodes, phandle_name, phandle_names } from "./providers.js";
 
-export const INTERRUPT_MACROS: { name: string, value: number }[] = [
+export type MacroDefinition = { name: string; value: number };
+
+export const INTERRUPT_MACROS: MacroDefinition[] = [
     { name: "IRQ_TYPE_NONE", value: 0 },
     { name: "IRQ_TYPE_EDGE_RISING", value: 1 },
     { name: "IRQ_TYPE_EDGE_FALLING", value: 2 },
@@ -20,7 +22,7 @@ export const INTERRUPT_MACROS: { name: string, value: number }[] = [
     { name: "IRQ_TYPE_LEVEL_LOW", value: 8 },
 ];
 
-export const GPIO_MACROS: { name: string, value: number }[] = [
+export const GPIO_MACROS: MacroDefinition[] = [
     { name: "GPIO_ACTIVE_HIGH", value: 0 },
     { name: "GPIO_ACTIVE_LOW", value: 1 },
     { name: "GPIO_PUSH_PULL", value: 0 },
@@ -73,6 +75,259 @@ function extract_gpio_controller(data: unknown): string | undefined {
     return;
 }
 
+// --- Row builders ---
+
+function specifier_row(options: {
+    phandle?: { enum: string[]; default?: string };
+    numbers: number;
+    number_item: { _t: "number"; minimum?: bigint; maximum?: bigint } | { _t: "number" };
+    trailing_macros?: string[];
+    description?: string;
+}): AttachArray {
+    const { phandle, numbers, number_item, trailing_macros, description } = options;
+    const prefixItems: FixedIndex[] = [];
+    if (phandle !== undefined) {
+        prefixItems.push({ _t: "enum", enum: phandle.enum, ...(phandle.default === undefined ? {} : { default: phandle.default }), enum_type: AttachEnumType.PHANDLE });
+    }
+    for (let index = 0; index < numbers; index++) {
+        prefixItems.push(number_item);
+    }
+    if (trailing_macros !== undefined) {
+        prefixItems.push({ _t: "enum", enum: trailing_macros, enum_type: AttachEnumType.MACRO });
+    }
+    const size = prefixItems.length;
+    return { _t: "fixed_index", prefixItems, minItems: size, maxItems: size, ...(description === undefined ? {} : { description }) };
+}
+
+function phandle_enum_array(phandles: string[], description?: string, default_value?: string): ResolvedProperty["value"] {
+    return {
+        _t: "enum_array",
+        minItems: 1,
+        maxItems: 1,
+        enum: phandles,
+        ...(default_value === undefined ? {} : { default: default_value }),
+        enum_type: AttachEnumType.PHANDLE,
+        description,
+    };
+}
+
+function phandle_matrix(phandles: string[], bounds: { minItems: number; maxItems: number }, description?: string): ResolvedProperty["value"] {
+    return {
+        _t: "matrix",
+        minItems: bounds.minItems,
+        maxItems: bounds.maxItems,
+        description,
+        values: [{
+            _t: "fixed_index",
+            minItems: 1,
+            maxItems: 1,
+            prefixItems: [{ _t: "enum", enum: phandles, enum_type: AttachEnumType.PHANDLE }],
+        }],
+    };
+}
+
+// --- Refiners ---
+
+function refine_interrupt_parent(
+    property: ResolvedProperty,
+    properties_clone: ResolvedProperty[],
+    devicetree: DeviceTree,
+    parsed_data: Record<string, unknown>,
+    inherited_interrupt_parent: string | undefined,
+): boolean {
+    if (property.key !== "interrupt-parent") { return false; }
+
+    const is_set = (() => {
+        const raw = parsed_data["interrupt-parent"];
+        if (raw === undefined) { return inherited_interrupt_parent; }
+        if (Array.isArray(raw) && raw.length === 1 && typeof raw[0] === "string") { return raw[0]; }
+        return raw;
+    })();
+
+    const interrupt_controllers = find_nodes(devicetree, is_interrupt_controller);
+    const phandles = interrupt_controllers.map(located => phandle_name(located));
+
+    if (is_set !== undefined) {
+        const parent = interrupt_controllers.find(value => phandle_name(value) === is_set);
+        if (parent !== undefined) {
+            const cell_count = number_property(parent.node, "#interrupt-cells");
+            if (cell_count !== undefined) {
+                const new_interrupt = properties_clone.find(value => value.key === "interrupts");
+                if (new_interrupt !== undefined && new_interrupt.value._t === "array") {
+                    const row = specifier_row({
+                        numbers: Number(cell_count) - 1,
+                        number_item: { _t: "number" },
+                        trailing_macros: INTERRUPT_MACROS.map(m => m.name),
+                    });
+                    new_interrupt.value = {
+                        _t: "matrix",
+                        minItems: new_interrupt.value.minItems,
+                        maxItems: new_interrupt.value.maxItems,
+                        description: new_interrupt.value.description,
+                        values: [row],
+                    };
+                }
+            }
+        }
+    }
+
+    property.value = phandle_enum_array(phandles, property.value.description, is_set as string | undefined);
+    return true;
+}
+
+function refine_clocks(property: ResolvedProperty, devicetree: DeviceTree): boolean {
+    if (property.key !== "clocks") { return false; }
+    property.value = phandle_matrix(phandle_names(devicetree, is_clock), { minItems: 1, maxItems: 1 }, property.value.description);
+    return true;
+}
+
+function refine_dmas(
+    property: ResolvedProperty,
+    devicetree: DeviceTree,
+    parsed_data: Record<string, unknown>,
+): boolean {
+    if (property.key !== "dmas") { return false; }
+
+    let set_dma = parsed_data[property.key];
+
+    if (set_dma === undefined || (Array.isArray(set_dma) && set_dma.length === 0)) {
+        if (property.value._t !== "array") { return true; }
+        property.value = phandle_matrix(phandle_names(devicetree, is_dma_controller), { minItems: property.value.minItems, maxItems: property.value.maxItems }, property.value.description);
+        return true;
+    }
+
+    if (Array.isArray(set_dma) && set_dma.length > 0) {
+        set_dma = set_dma.every((entry: unknown) => Array.isArray(entry)) ? set_dma[0][0] : set_dma[0];
+        const dmas = find_nodes(devicetree, is_dma_controller);
+        const phandles = dmas.map(located => phandle_name(located));
+        const node = dmas.find(value => phandle_name(value) === set_dma);
+        if (node === undefined) { return true; }
+
+        const cell_count = number_property(node.node, "#dma-cells");
+        if (cell_count !== undefined) {
+            const row = specifier_row({
+                phandle: { enum: phandles, default: set_dma as string },
+                numbers: Number(cell_count),
+                number_item: { _t: "number", minimum: 0n, maximum: 0xFF_FF_FF_FFn },
+            });
+            property.value = {
+                _t: "matrix",
+                minItems: "minItems" in property.value ? property.value.minItems : 1,
+                maxItems: "maxItems" in property.value ? property.value.maxItems : 1,
+                description: property.value.description,
+                values: [row],
+            };
+        }
+        return true;
+    }
+
+    return false;
+}
+
+function refine_pwms(
+    property: ResolvedProperty,
+    devicetree: DeviceTree,
+    parsed_data: Record<string, unknown>,
+): boolean {
+    if (property.key !== "pwms") { return false; }
+
+    let set_pwm = parsed_data[property.key];
+
+    if (set_pwm === undefined || (Array.isArray(set_pwm) && set_pwm.length === 0)) {
+        if (property.value._t !== "array") { return true; }
+        property.value = phandle_matrix(phandle_names(devicetree, is_pwm_controller), { minItems: property.value.minItems, maxItems: property.value.maxItems }, property.value.description);
+        return true;
+    }
+
+    if (
+        property.value._t === "matrix" &&
+        Array.isArray(set_pwm) &&
+        set_pwm.length > 0 &&
+        set_pwm.every((entry: unknown) => Array.isArray(entry))
+    ) {
+        set_pwm = set_pwm[0][0];
+        const pwms = find_nodes(devicetree, is_pwm_controller);
+        const phandles = pwms.map(located => phandle_name(located));
+        const node = pwms.find(value => phandle_name(value) === set_pwm);
+        if (node === undefined) { return true; }
+
+        const cell_count = number_property(node.node, "#pwm-cells");
+        if (cell_count !== undefined) {
+            const row = specifier_row({
+                phandle: { enum: phandles, default: set_pwm as string },
+                numbers: Number(cell_count),
+                number_item: { _t: "number" },
+            });
+            property.value = {
+                _t: "matrix",
+                minItems: property.value.minItems,
+                maxItems: property.value.maxItems,
+                description: property.value.description,
+                values: [row],
+            };
+        }
+        return true;
+    }
+
+    return false;
+}
+
+function refine_supply(property: ResolvedProperty, devicetree: DeviceTree): boolean {
+    if (!property.key.endsWith("-supply")) { return false; }
+    property.value = phandle_enum_array(phandle_names(devicetree, is_regulator), property.value.description);
+    return true;
+}
+
+function refine_gpio(
+    property: ResolvedProperty,
+    devicetree: DeviceTree,
+    parsed_data: Record<string, unknown>,
+): boolean {
+    if (!is_gpio_property(property.key)) { return false; }
+
+    const set_controller = extract_gpio_controller(parsed_data[property.key]);
+
+    if (set_controller === undefined) {
+        property.value = phandle_enum_array(phandle_names(devicetree, is_gpio_controller), property.value.description);
+        return true;
+    }
+
+    const gpio_controllers = find_nodes(devicetree, is_gpio_controller);
+    const phandles = gpio_controllers.map(located => phandle_name(located));
+    const controller_node = gpio_controllers.find(value => phandle_name(value) === set_controller);
+    if (controller_node === undefined) { return true; }
+
+    const cell_count = number_property(controller_node.node, "#gpio-cells");
+    if (cell_count === undefined) { return true; }
+
+    const row = specifier_row({
+        phandle: { enum: phandles, default: set_controller },
+        numbers: Number(cell_count) - 1,
+        number_item: { _t: "number" },
+        trailing_macros: GPIO_MACROS.map(m => m.name),
+        description: property.value.description,
+    });
+
+    const { min_rows, max_rows } = gpio_row_bounds(property.value);
+
+    // eslint-disable-next-line unicorn/prefer-ternary
+    if (max_rows <= 1) {
+        property.value = row;
+    } else {
+        property.value = {
+            _t: "matrix",
+            minItems: min_rows,
+            maxItems: max_rows,
+            description: property.value.description,
+            values: [row],
+        };
+    }
+
+    return true;
+}
+
+// --- Main entry ---
+
 export function query_devicetree(
     devicetree: DeviceTree,
     properties: ResolvedProperty[],
@@ -84,369 +339,12 @@ export function query_devicetree(
     const parsed_data = JSON.parse(data);
 
     for (const property of properties_clone) {
-        switch (property.key) {
-            case "interrupt-parent": {
-
-                let is_set = parsed_data["interrupt-parent"];
-
-                if (is_set === undefined && inherited_interrupt_parent !== undefined) {
-                    is_set = inherited_interrupt_parent;
-                } else if (
-                    is_set !== undefined &&
-                    Array.isArray(is_set) &&
-                    is_set.length === 1 &&
-                    typeof is_set[0] === 'string'
-                ) {
-                    is_set = is_set[0];
-                }
-
-                const interrupt_controllers = find_nodes(devicetree, is_interrupt_controller);
-                const phandles = interrupt_controllers.map(located => phandle_name(located));
-
-                if (is_set !== undefined) {
-
-                    const parent = interrupt_controllers.find(
-                        (value) => phandle_name(value) === is_set
-                    );
-
-                    if (parent !== undefined) {
-
-                        const new_length = number_property(parent.node, "#interrupt-cells");
-
-                        if (new_length !== undefined) {
-
-                            const new_interrupt = properties_clone.find((value) => value.key === "interrupts");
-
-                            if (new_interrupt !== undefined &&
-                                new_interrupt.value._t === 'array'
-                            ) {
-
-                                const new_value: AttachArray = {
-                                    _t: 'fixed_index',
-                                    prefixItems: [],
-                                    minItems: Number(new_length),
-                                    maxItems: Number(new_length)
-                                };
-
-                                for (let index = 0; index < Number(new_length) - 1; index++) {
-                                    new_value.prefixItems.push({ _t: "number" });
-                                }
-
-                                new_value.prefixItems.push(
-                                    {
-                                        _t: "enum",
-                                        enum: INTERRUPT_MACROS.map((value) => value.name),
-                                        enum_type: AttachEnumType.MACRO
-                                    });
-
-                                new_interrupt.value = {
-                                    _t: "matrix",
-                                    minItems: new_interrupt.value.minItems,
-                                    maxItems: new_interrupt.value.maxItems,
-                                    description: new_interrupt.value.description,
-                                    values: [new_value]
-                                };
-                            }
-
-                        }
-
-                    }
-
-                }
-
-                property.value = {
-                    _t: "enum_array",
-                    minItems: 1,
-                    maxItems: 1,
-                    enum: phandles,
-                    default: is_set,
-                    enum_type: AttachEnumType.PHANDLE,
-                    description: property.value.description,
-                };
-
-                continue;
-            }
-            case "clocks": {
-                const phandles = phandle_names(devicetree, is_clock);
-
-                property.value = {
-                    _t: "matrix",
-                    minItems: 1,
-                    maxItems: 1,
-                    description: property.value.description,
-                    values: [
-                        {
-                            _t: "fixed_index",
-                            minItems: 1,
-                            maxItems: 1,
-                            prefixItems: [
-                                {
-                                    _t: "enum",
-                                    enum: phandles,
-                                    enum_type: AttachEnumType.PHANDLE,
-                                }
-                            ]
-                        }
-                    ]
-                };
-
-                continue;
-            }
-            case "dmas": {
-
-                let set_dma = parsed_data[property.key];
-
-                if (set_dma === undefined ||
-                    (Array.isArray(set_dma) && set_dma.length === 0)
-                ) {
-
-                    if (property.value._t !== 'array') {
-                        continue;
-                    }
-
-                    const phandles = phandle_names(devicetree, is_dma_controller);
-
-                    property.value = {
-                        _t: 'matrix',
-                        minItems: property.value.minItems,
-                        maxItems: property.value.maxItems,
-                        description: property.value.description,
-                        values: [
-                            {
-                                _t: "fixed_index",
-                                minItems: 1,
-                                maxItems: 1,
-                                prefixItems: [{ _t: "enum", enum: phandles, enum_type: AttachEnumType.PHANDLE }]
-                            }
-                        ]
-                    };
-
-                    continue;
-                } else if (
-                    Array.isArray(set_dma) &&
-                    set_dma.length > 0
-                ) {
-                    set_dma = set_dma.every((entry) => Array.isArray(entry)) ? set_dma[0][0] : set_dma[0];
-
-                    const dmas = find_nodes(devicetree, is_dma_controller);
-                    const phandles = dmas.map(located => phandle_name(located));
-                    const node = dmas.find((value) => phandle_name(value) === set_dma);
-
-                    if (node === undefined) {
-                        continue;
-                    }
-
-                    const new_length = number_property(node.node, "#dma-cells");
-
-                    if (new_length !== undefined) {
-                        const new_value: AttachArray = {
-                            _t: 'fixed_index',
-                            prefixItems: [],
-                            minItems: Number(new_length) + 1,
-                            maxItems: Number(new_length) + 1,
-                        };
-
-                        new_value.prefixItems.push(
-                            {
-                                _t: "enum",
-                                enum: phandles,
-                                default: set_dma,
-                                enum_type: AttachEnumType.PHANDLE
-                            }
-                        );
-
-                        for (let index = 0; index < Number(new_length); index++) {
-                            new_value.prefixItems.push(
-                                {
-                                    _t: "number",
-                                    minimum: 0n,
-                                    maximum: 0xFF_FF_FF_FFn,
-                                }
-                            );
-                        }
-
-                        property.value = {
-                            _t: 'matrix',
-                            minItems: "minItems" in property.value ? property.value.minItems : 1,
-                            maxItems: "maxItems" in property.value ? property.value.maxItems : 1,
-                            description: property.value.description,
-                            values: [
-                                new_value
-                            ]
-                        };
-                    }
-
-                    continue;
-                }
-            }
-            case "pwms": {
-
-                let set_pwm = parsed_data[property.key];
-
-                if (set_pwm === undefined ||
-                    (Array.isArray(set_pwm) && set_pwm.length === 0)
-                ) {
-
-                    if (property.value._t !== 'array') {
-                        continue;
-                    }
-
-                    const phandles = phandle_names(devicetree, is_pwm_controller);
-
-                    property.value = {
-                        _t: 'matrix',
-                        minItems: property.value.minItems,
-                        maxItems: property.value.maxItems,
-                        description: property.value.description,
-                        values: [
-                            {
-                                _t: "fixed_index",
-                                minItems: 1,
-                                maxItems: 1,
-                                prefixItems: [{ _t: "enum", enum: phandles, enum_type: AttachEnumType.PHANDLE }]
-                            }
-                        ]
-                    };
-
-                    continue;
-                } else if (
-                    property.value._t === 'matrix' &&
-                    Array.isArray(set_pwm) &&
-                    set_pwm.length > 0 &&
-                    set_pwm.every((entry) => Array.isArray(entry))
-                ) {
-                    set_pwm = set_pwm[0][0];
-
-                    const pwms = find_nodes(devicetree, is_pwm_controller);
-                    const phandles = pwms.map(located => phandle_name(located));
-                    const node = pwms.find((value) => phandle_name(value) === set_pwm);
-
-                    if (node === undefined) {
-                        continue;
-                    }
-
-                    const new_length = number_property(node.node, "#pwm-cells");
-
-                    if (new_length !== undefined) {
-                        const new_value: AttachArray = {
-                            _t: 'fixed_index',
-                            prefixItems: [],
-                            minItems: Number(new_length) + 1,
-                            maxItems: Number(new_length) + 1,
-                        };
-
-                        new_value.prefixItems.push(
-                            {
-                                _t: "enum",
-                                enum: phandles,
-                                default: set_pwm,
-                                enum_type: AttachEnumType.PHANDLE
-                            }
-                        );
-
-                        for (let index = 0; index < Number(new_length); index++) {
-                            new_value.prefixItems.push({ _t: "number" });
-                        }
-
-                        property.value = {
-                            _t: 'matrix',
-                            minItems: property.value.minItems,
-                            maxItems: property.value.maxItems,
-                            description: property.value.description,
-                            values: [
-                                new_value
-                            ]
-                        };
-                    }
-
-                    continue;
-                }
-            }
-        }
-
-        if (property.key.endsWith("-supply")) {
-            const phandles = phandle_names(devicetree, is_regulator);
-
-            property.value = {
-                _t: "enum_array",
-                minItems: 1,
-                maxItems: 1,
-                enum: phandles,
-                enum_type: AttachEnumType.PHANDLE,
-                description: property.value.description,
-            };
-
-            continue;
-        }
-
-        if (is_gpio_property(property.key)) {
-
-            const raw_controller = parsed_data[property.key];
-
-            // Extract the controller label from any of: "gpio", ["gpio"],
-            // ["gpio", 21, 1], [["gpio", 8, 1], …].
-            const set_controller = extract_gpio_controller(raw_controller);
-
-            if (set_controller === undefined) {
-                property.value = {
-                    _t: "enum_array",
-                    minItems: 1,
-                    maxItems: 1,
-                    enum: phandle_names(devicetree, is_gpio_controller),
-                    enum_type: AttachEnumType.PHANDLE,
-                    description: property.value.description,
-                };
-
-                continue;
-            }
-
-            const gpio_controllers = find_nodes(devicetree, is_gpio_controller);
-            const phandles = gpio_controllers.map(located => phandle_name(located));
-            const controller_node = gpio_controllers.find((value) => phandle_name(value) === set_controller);
-            if (controller_node === undefined) { continue; }
-
-            const new_length = number_property(controller_node.node, "#gpio-cells");
-            if (new_length === undefined) { continue; }
-
-            const row_size = Number(new_length) + 1;
-
-            const row_template: AttachArray = {
-                _t: 'fixed_index',
-                prefixItems: [
-                    { _t: "enum", enum: phandles, default: set_controller, enum_type: AttachEnumType.PHANDLE },
-                ],
-                minItems: row_size,
-                maxItems: row_size,
-                description: property.value.description,
-            };
-            for (let index = 0; index < Number(new_length) - 1; index++) {
-                row_template.prefixItems.push({ _t: "number" });
-            }
-            row_template.prefixItems.push({
-                _t: "enum",
-                enum: GPIO_MACROS.map((value) => value.name),
-                enum_type: AttachEnumType.MACRO,
-            });
-
-            const { min_rows, max_rows } = gpio_row_bounds(property.value);
-
-            // eslint-disable-next-line unicorn/prefer-ternary
-            if (max_rows <= 1) {
-                // Single-row: keep the flat fixed_index shape so the extension's
-                // forms don't change.
-                property.value = row_template;
-            } else {
-                property.value = {
-                    _t: "matrix",
-                    minItems: min_rows,
-                    maxItems: max_rows,
-                    description: property.value.description,
-                    values: [row_template],
-                };
-            }
-
-            continue;
-        }
+        if (refine_interrupt_parent(property, properties_clone, devicetree, parsed_data, inherited_interrupt_parent)) { continue; }
+        if (refine_clocks(property, devicetree)) { continue; }
+        if (refine_dmas(property, devicetree, parsed_data)) { continue; }
+        if (refine_pwms(property, devicetree, parsed_data)) { continue; }
+        if (refine_supply(property, devicetree)) { continue; }
+        if (refine_gpio(property, devicetree, parsed_data)) { continue; }
     }
 
     return properties_clone;
