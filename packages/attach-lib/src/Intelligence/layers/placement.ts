@@ -3,11 +3,9 @@ import {
     DeviceTreeOverlay,
     DTLabel,
     DTPath,
-    get_full_node_name,
     extract_first_number,
     is_enabled,
     parent_path as access_parent_path,
-    patch_node,
 } from "../../Devicetree/index.js";
 import type { DTNode } from "../../Devicetree/index.js";
 import { NodePlacement } from "./types.js";
@@ -16,16 +14,6 @@ function first_reg(node: DTNode): bigint | undefined {
     return extract_first_number(node, "reg");
 }
 
-/**
- * Locate `target` in the overlay (falling back to the base tree) and describe
- * its position: parent path, own `reg`, and the enabled siblings that occupy
- * the parent's address space. Overlay children override base children of the
- * same name, and `status = "disabled"` nodes are not counted as siblings.
- *
- * All overlay fragments are walked so that sibling patches in separate
- * fragments (e.g. a `target = <&spidev0>` that disables a base sibling, or a
- * second `&spi0` fragment that adds a device) are accounted for.
- */
 export function placement_from_overlay(overlay: DeviceTreeOverlay, target: DTLabel | DTPath): NodePlacement | undefined {
     const base = overlay.get_base_dts();
 
@@ -39,44 +27,7 @@ export function placement_from_overlay(overlay: DeviceTreeOverlay, target: DTLab
     const parent_path = access_parent_path(node_path) ?? "/";
     const own_name = node_path.slice(node_path.lastIndexOf("/") + 1);
 
-    const children = new Map<string, DTNode>();
-    for (const child of base?.node_at(parent_path)?.children ?? []) {
-        children.set(get_full_node_name(child), child);
-    }
-
-    const merge_children = (cursor: DTNode) => {
-        for (const child of cursor.children) {
-            const child_name = get_full_node_name(child);
-            const existing = children.get(child_name);
-            children.set(child_name, existing === undefined ? child : patch_node(existing, child));
-        }
-    };
-
-    for (const fragment of overlay.get_fragments()) {
-        const overlay_node = fragment.children.find(c => c.name === "__overlay__");
-        if (overlay_node === undefined) { continue; }
-
-        const root = overlay.get_fragment_root_path(fragment);
-        if (root === undefined) { continue; }
-
-        if (root === parent_path) {
-            merge_children(overlay_node);
-        } else if (parent_path.startsWith(root + "/") || root === "/" && parent_path.startsWith("/")) {
-            const relative = root === "/" ? parent_path.slice(1) : parent_path.slice(root.length + 1);
-            let cursor: DTNode | undefined = overlay_node;
-            for (const segment of relative.split("/")) {
-                if (cursor === undefined) { break; }
-                cursor = cursor.children.find(c => get_full_node_name(c) === segment);
-            }
-            if (cursor !== undefined) { merge_children(cursor); }
-        } else if ((access_parent_path(root) ?? "/") === parent_path) {
-            const sibling_name = root.slice(root.lastIndexOf("/") + 1);
-            const existing = children.get(sibling_name);
-            children.set(sibling_name, existing === undefined
-                ? overlay_node
-                : patch_node(existing, overlay_node));
-        }
-    }
+    const children = overlay.effective_children(parent_path);
 
     const siblings = [...children.entries()]
         .filter(([name, child]) => name !== own_name && is_enabled(child))
@@ -85,10 +36,8 @@ export function placement_from_overlay(overlay: DeviceTreeOverlay, target: DTLab
             return reg === undefined ? { name } : { name, reg };
         });
 
-    const reg = first_reg(located.node) ?? (found === undefined ? undefined : (() => {
-        const node = base?.node_at(node_path);
-        return node === undefined ? undefined : first_reg(node);
-    })());
+    const effective = overlay.effective_node(node_path);
+    const reg = first_reg(located.node) ?? (effective === undefined ? undefined : first_reg(effective));
     return reg === undefined
         ? { node_path, parent_path, siblings }
         : { node_path, parent_path, reg, siblings };

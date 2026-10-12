@@ -18,7 +18,7 @@ import { Result } from "../result";
 import { DeviceTree } from "./Devicetree";
 import { DTReference, FoundNodeResult, TraversalOrder } from "./Types";
 import { Stream } from "./Stream";
-import { patch_node } from "./Access";
+import { patch_node, parent_path as access_parent_path } from "./Access";
 
 export class DeviceTreeOverlay {
 
@@ -740,6 +740,13 @@ export class DeviceTreeOverlay {
                     node = node.children.find(c => get_full_node_name(c) === segment);
                 }
                 cursor = node;
+            } else if ((access_parent_path(root) ?? "/") === parent_path) {
+                const sibling_name = root.slice(root.lastIndexOf("/") + 1);
+                const existing = children.get(sibling_name);
+                children.set(sibling_name, existing === undefined
+                    ? overlay_node
+                    : patch_node(existing, overlay_node));
+                continue;
             }
             if (cursor === undefined) { continue; }
 
