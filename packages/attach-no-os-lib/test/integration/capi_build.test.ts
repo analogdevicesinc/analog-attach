@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { describe, test, expect, beforeEach, afterEach } from 'vitest';
-import { bootstrap, referenced_nodes } from '../../src/bootstrap/bootstrap';
+import { bootstrap, pin_driver, referenced_nodes } from '../../src/bootstrap/bootstrap';
 import { generate_project } from '../../src/codegen/codegen';
 import { find_board } from '../../src/registry/platforms';
 import { driver_root } from '../../src/registry/roots';
@@ -60,6 +60,7 @@ function add_driver(workfile: Workfile, driver: string, name: string): void {
     const ruleset = load_resolved_ruleset_for_board(root.value, BOARD);
     expectOk(ruleset);
     expectOk(add_symbol(workfile, name, ruleset.value));
+    expectOk(pin_driver(workfile, name, driver));
     expectOk(bootstrap(workfile));
 }
 
@@ -135,6 +136,19 @@ describe.skipIf(!ENABLED)('generated CAPI apps build on max32655fthr', () => {
         const workfile = board_workfile();
         add_driver(workfile, 'ad74413r', 'ad74413r');
         expect(generated_warnings(generate_and_build(workfile, 'ad74413r'))).toEqual([]);
+    }, BUILD_TIMEOUT);
+
+    test('ad74413r with an ADC channel', () => {
+        const workfile = board_workfile();
+        add_driver(workfile, 'ad74413r', 'ad74413r');
+        const channel = load_resolved_ruleset_for_board('capi_adc_chan', BOARD);
+        expectOk(channel);
+        expectOk(add_symbol(workfile, 'ch0', channel.value));
+        expectOk(bootstrap(workfile));
+        update(workfile, 'capi_adc_chan_config', 'chan_id', 0);
+        update(workfile, 'ad74413r_channel_config', 'function', 'AD74413R_VOLTAGE_IN');
+        update(workfile, 'ad74413r_channel_config', 'enabled', true);
+        expect(generated_warnings(generate_and_build(workfile, 'ad74413r-channel'))).toEqual([]);
     }, BUILD_TIMEOUT);
 
     test('adt7420 over I2C', () => {

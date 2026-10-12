@@ -49,7 +49,8 @@ import type { IncludeProperty, NumberFormat, Property, Ruleset } from "../rulese
 import { provided_id, RulesetType } from "../ruleset_parser/types";
 import { load_resolved_ruleset, load_resolved_ruleset_for_board } from "../resolver/resolver";
 import type { ChipSelectBinding } from "../registry/module_yml";
-import { driver_init_parameter_candidates, driver_ops_candidates } from "../registry/drivers";
+import type { RulesetEntry } from "../registry/types";
+import { driver_init_parameter_candidates, driver_ops_candidates, rank_driver_candidates } from "../registry/drivers";
 import { build_extern_index, hidden_candidates, wrapper_name } from "../registry/hidden";
 import type { ExternIndex, HiddenCandidate } from "../registry/hidden";
 import { board_gpio_ports } from "../registry/bsp";
@@ -236,6 +237,16 @@ function reference_options(workfile: Workfile, type_: string, self: string, exte
 	}
 
 	return options;
+}
+
+/**
+ * The driver symbols bootstrap considers for a driver-backed field of node `self`: the strong
+ * ones (from parts already in the workfile) when there are any, else all that are left.
+ */
+function preferred(workfile: Workfile, candidates: RulesetEntry[], self: string): string[] {
+	const owner = workfile.symbols[self]?.$symbol ?? "";
+	const { strong, weak } = rank_driver_candidates(workfile, candidates, owner);
+	return (strong.length > 0 ? strong : weak).map(entry => entry.$symbol);
 }
 
 /** Options for a driver-backed reference: the providing modules' own symbols of one kind. */
@@ -585,7 +596,7 @@ function open_reference(
 			}
 			const candidates = driver_init_parameter_candidates(effective.interface);
 			return candidates.ok
-				? { options: driver_options(workfile, candidates.value.map(entry => entry.$symbol), name) }
+				? { options: driver_options(workfile, preferred(workfile, candidates.value, name), name) }
 				: undefined;
 		}
 		case "DriverOpsProperty": {
@@ -594,7 +605,7 @@ function open_reference(
 			}
 			const candidates = driver_ops_candidates(effective.interface);
 			return candidates.ok
-				? { options: driver_options(workfile, candidates.value.map(entry => entry.$symbol), name) }
+				? { options: driver_options(workfile, preferred(workfile, candidates.value, name), name) }
 				: undefined;
 		}
 		default: {
@@ -1031,6 +1042,79 @@ function realize(workfile: Workfile, option: Option, externs: ExternIndex): Resu
 			return added.ok ? ok({ name, symbol: option.symbol, created: true, hidden: false }) : added;
 		}
 	}
+}
+
+/**
+ * Pin a driver root to the driver the user named (`add ad74413r`): create the root's config
+ * and the driver's own init_param - by name, `<driver>_init_param` - and link them, both as
+ * bootstrap's. The generic handle (capi_adc) says nothing about which part it is; this is
+ * where that fact enters, so nothing below it has to be guessed.
+ *
+ * A driver with no `<driver>_init_param` is left unpinned: bootstrap then lists its options.
+ */
+export function pin_driver(workfile: Workfile, root: string, driver: string): Result<void> {
+	const node = workfile.symbols[root];
+	if (node?._t !== "RulesetDescriptor") {
+		return error(`'${root}' is not a handle to pin a driver to`, root);
+	}
+	const registry = get_registry();
+	if (!registry.ok) {
+		return registry;
+	}
+	const module = registry.value.modules.find(candidate => candidate.type === "driver" && candidate.name === driver);
+	if (module === undefined) {
+		return error(`No configured driver is called '${driver}'`, driver);
+	}
+
+	// The root's config: the struct its $init_param takes.
+	const config_type = node.properties[0].include;
+	if (config_type === undefined) {
+		return ok();
+	}
+	let config = typeof node.properties[0].value === "string" ? node.properties[0].value : undefined;
+	if (config === undefined) {
+		const loaded = load_resolved_ruleset_for_board(config_type, workfile.board);
+		if (!loaded.ok) {
+			return loaded;
+		}
+		config = unique_name(workfile, config_type);
+		const added = add_symbol(workfile, config, loaded.value);
+		if (!added.ok) {
+			return added;
+		}
+		const linked = set_owned(workfile, root, "$init_param", config);
+		if (!linked.ok) {
+			return linked;
+		}
+	}
+
+	// The driver's own init_param, for each driver-backed init_param field it provides for.
+	const config_node = workfile.symbols[config];
+	const own_config = `${driver}_init_param`;
+	const entry = resolve_entry(own_config);
+	if (config_node?._t !== "RulesetStruct" || !entry.ok || entry.value.module.path !== module.path || entry.value.$type !== RulesetType.RT_STRUCT) {
+		return ok();
+	}
+	for (const property of config_node.properties) {
+		if (property._t !== "DriverInitParameterProperty" || property.value !== undefined
+			|| module.provides_interfaces?.includes(property.interface) !== true) {
+			continue;
+		}
+		const loaded = load_resolved_ruleset_for_board(own_config, workfile.board);
+		if (!loaded.ok) {
+			return loaded;
+		}
+		const name = unique_name(workfile, own_config);
+		const added = add_symbol(workfile, name, loaded.value);
+		if (!added.ok) {
+			return added;
+		}
+		const linked = set_owned(workfile, config, property.name, name);
+		if (!linked.ok) {
+			return linked;
+		}
+	}
+	return ok();
 }
 
 /**

@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { describe, test, expect, beforeEach, afterEach } from 'vitest';
-import { bootstrap, referenced_nodes } from '../../src/bootstrap/bootstrap';
+import { bootstrap, pin_driver, referenced_nodes } from '../../src/bootstrap/bootstrap';
 import { driver_root } from '../../src/registry/roots';
 import { load_resolved_ruleset_for_board } from '../../src/resolver/resolver';
 import { validate_workfile } from '../../src/validator/validator';
@@ -47,6 +47,7 @@ function add_driver(workfile: Workfile, driver: string, name: string): void {
     const ruleset = load_resolved_ruleset_for_board(root.value, BOARD);
     expectOk(ruleset);
     expectOk(add_symbol(workfile, name, ruleset.value));
+    expectOk(pin_driver(workfile, name, driver));
     expectOk(bootstrap(workfile));
 }
 
@@ -142,6 +143,24 @@ describe.skipIf(REPOS === undefined)('ad74413r on max32655fthr, from the real re
         expect(symbols['capi_gpio_pin']).toMatchObject({ port_handle: 'bsp_gpio2_cfg_handle', number: 0 });
         // The reset line is optional: the driver falls back to a software reset.
         expect(symbols['ad74413r_init_param']?.reset_gpio).toBeUndefined();
+    });
+
+    test('an ADC channel finds its ADC and the driver\'s channel struct, with nothing declared', () => {
+        const workfile = board_workfile();
+        add_driver(workfile, 'ad74413r', 'ad74413r');
+        for (const name of ['ch0', 'ch1']) {
+            const channel = load_resolved_ruleset_for_board('capi_adc_chan', BOARD);
+            expectOk(channel);
+            expectOk(add_symbol(workfile, name, channel.value));
+            expectOk(bootstrap(workfile));
+        }
+
+        const symbols = stored(workfile);
+        // Both on the one ADC handle, each with a channel config of its own. Its extra is
+        // the ad74413r struct left once the device's own (ad74413r_init_param) is taken.
+        expect(symbols['capi_adc_chan_config']).toMatchObject({ adc_handle: 'ad74413r', extra: 'ad74413r_channel_config' });
+        expect(symbols['capi_adc_chan_config_1']).toMatchObject({ adc_handle: 'ad74413r', extra: 'ad74413r_channel_config_1' });
+        expect(symbols['capi_adc_config']?.extra).toBe('ad74413r_init_param');
     });
 
     test('next to an adxl355 it shares the bus, not the chip-select', () => {

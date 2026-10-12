@@ -74,10 +74,24 @@ export function driver_roots(driver: string): Result<string[]> {
 		return entries;
 	}
 
-	return ok(entries.value
+	const candidates = entries.value
 		.filter(entry => entry.$type === RulesetType.RT_DESCRIPTOR)
 		.filter(entry => driver_interfaces_of(entry.$symbol).some(interface_ => provided.has(interface_)))
-		.map(entry => entry.$symbol));
+		.map(entry => entry.$symbol);
+
+	// A handle whose config takes another candidate hangs off it - an ADC channel's config
+	// names the ADC it is on (capi_adc_chan_config.adc_handle) - so it is not a root.
+	return ok(candidates.filter(candidate => !config_includes(candidate).some(include => candidates.includes(include))));
+}
+
+/** The types a descriptor's config includes. */
+function config_includes(descriptor_symbol: string): string[] {
+	const descriptor = load_resolved_ruleset(descriptor_symbol);
+	const config_symbol = descriptor.ok && descriptor.value._t === "RulesetDescriptor" ? descriptor.value.properties[0].include : undefined;
+	const config = config_symbol === undefined ? undefined : load_resolved_ruleset(config_symbol);
+	return config?.ok === true && config.value._t === "RulesetStruct"
+		? config.value.properties.flatMap(property => (property._t === "IncludeProperty" && property.include !== undefined ? [property.include] : []))
+		: [];
 }
 
 /** The one root for a driver, or an error that says why there is not exactly one. */
