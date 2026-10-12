@@ -1,5 +1,4 @@
-import { DeviceTree, DeviceTreeOverlay, type DTNode, is_dt_flag } from "../Devicetree/index.js";
-import { cell_extract_first_value } from "./query.js";
+import { DeviceTree, DeviceTreeOverlay, type DTNode, number_property, reference_property, has_property, parent_path } from "../Devicetree/index.js";
 
 export interface InterruptParentInfo {
     label?: string;
@@ -11,10 +10,7 @@ export interface InterruptParentInfo {
 export type NodeLookup = (path: string) => DTNode | undefined;
 
 export function base_lookup(dt: DeviceTree): NodeLookup {
-    return (path: string) => {
-        const reference = dt.get_node_by_path({ kind: "path", labels: [], path });
-        return reference === undefined ? undefined : dt.deref_node(reference);
-    };
+    return (path: string) => dt.node_at(path);
 }
 
 export function overlay_lookup(overlay: DeviceTreeOverlay): NodeLookup {
@@ -22,24 +18,8 @@ export function overlay_lookup(overlay: DeviceTreeOverlay): NodeLookup {
     return (path: string) => {
         const found = overlay.find_node({ kind: "path", labels: [], path });
         if (found !== undefined) { return found.node; }
-        if (base_dt === undefined) { return undefined; }
-        const reference = base_dt.get_node_by_path({ kind: "path", labels: [], path });
-        return reference === undefined ? undefined : base_dt.deref_node(reference);
+        return base_dt?.node_at(path);
     };
-}
-
-function get_number_property(node: DTNode, name: string): bigint | undefined {
-    const property = node.properties.find(p => p.name === name);
-    if (property === undefined || is_dt_flag(property.value)) { return undefined; }
-    const value = cell_extract_first_value(property);
-    return typeof value === "bigint" ? value : undefined;
-}
-
-function get_label_property(node: DTNode, name: string): string | undefined {
-    const property = node.properties.find(p => p.name === name);
-    if (property === undefined || is_dt_flag(property.value)) { return undefined; }
-    const value = cell_extract_first_value(property);
-    return typeof value === "string" ? value : undefined;
 }
 
 /**
@@ -58,59 +38,53 @@ export function effective_interrupt_parent(
 ): InterruptParentInfo | undefined {
     const visited = new Set<string>();
 
-    let path = parent_of(node_path);
-    if (path === undefined) { return undefined; }
+    let current = parent_path(node_path);
+    if (current === undefined) { return undefined; }
 
-    while (!visited.has(path)) {
-        visited.add(path);
+    while (!visited.has(current)) {
+        visited.add(current);
 
-        const node = lookup(path);
+        const node = lookup(current);
         if (node === undefined) {
-            path = parent_of(path) ?? "";
-            if (path === "") { break; }
+            current = parent_path(current) ?? "";
+            if (current === "") { break; }
             continue;
         }
 
-        if (node.properties.some(p => p.name === "#interrupt-cells")) {
-            const cells = get_number_property(node, "#interrupt-cells");
+        if (has_property(node, "#interrupt-cells")) {
+            const cells = number_property(node, "#interrupt-cells");
             const label = node.labels.at(-1);
             return {
                 label,
-                path,
-                from: path,
-                interrupt_cells: cells !== undefined ? Number(cells) : undefined,
+                path: current,
+                from: current,
+                interrupt_cells: cells === undefined ? undefined : Number(cells),
             };
         }
 
-        const parent_label = get_label_property(node, "interrupt-parent");
+        const parent_label = reference_property(node, "interrupt-parent");
         if (parent_label !== undefined && base_dt !== undefined) {
             const reference = base_dt.get_node_by_label({ kind: "label", labels: [], name: parent_label });
             if (reference !== undefined) {
                 const parent_node = base_dt.deref_node(reference);
                 if (parent_node !== undefined) {
-                    const cells = get_number_property(parent_node, "#interrupt-cells");
+                    const cells = number_property(parent_node, "#interrupt-cells");
                     const resolved_label = parent_node.labels.at(-1);
                     return {
                         label: resolved_label,
                         path: reference.full_path.path,
-                        from: path,
-                        interrupt_cells: cells !== undefined ? Number(cells) : undefined,
+                        from: current,
+                        interrupt_cells: cells === undefined ? undefined : Number(cells),
                     };
                 }
             }
         }
 
-        path = parent_of(path) ?? "";
-        if (path === "") { break; }
+        current = parent_path(current) ?? "";
+        if (current === "") { break; }
     }
 
     return undefined;
-}
-
-function parent_of(path: string): string | undefined {
-    if (path === "/" || path === "") { return undefined; }
-    const last = path.lastIndexOf("/");
-    return last <= 0 ? "/" : path.slice(0, last);
 }
 
 if (import.meta.vitest) {
@@ -188,6 +162,7 @@ if (import.meta.vitest) {
     });
 
     test("effective_interrupt_parent — loop terminates", () => {
+        // eslint-disable-next-line unicorn/consistent-function-scoping
         const looped_lookup: NodeLookup = (path) => {
             if (path === "/a") {
                 return {

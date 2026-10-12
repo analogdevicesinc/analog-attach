@@ -25,6 +25,7 @@ export {
     type DTPath,
     type CellArrayElement,
 } from './Devicetree/Parser/AST.js';
+export { is_enabled, cell_extract_first_value } from './Devicetree/Access.js';
 export { print_property, type OverlaySyntax, type DtoPrintOptions } from './Devicetree/Printer.js';
 export type { CellValue, FoundNodeResult } from './Devicetree/Types.js';
 export { NodeBuilder } from './Devicetree/NodeBuilder.js';
@@ -41,7 +42,6 @@ export {
     decode_reg_address,
     next_free_unit_address,
     sync_unit_address_from_reg,
-    is_enabled,
     type AddressCells,
     type SyncResult,
 } from './Devicetree/UnitAddress.js';
@@ -54,7 +54,6 @@ export {
 // Intelligence: queries, parent suggestions and layers
 export {
     query_devicetree,
-    cell_extract_first_value,
     INTERRUPT_MACROS,
     GPIO_MACROS,
 } from './Intelligence/query.js';

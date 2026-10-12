@@ -9,7 +9,6 @@ export {
 
 export {
     query_devicetree,
-    cell_extract_first_value,
     value_to_macro,
     is_gpio_property,
     INTERRUPT_MACROS,

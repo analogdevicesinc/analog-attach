@@ -1,6 +1,6 @@
 import { ResolvedProperty } from "../Attach/AttachTypes.js";
 import { AttachArray, AttachEnumType, FixedIndex } from "../Attach/StructuralTypes.js";
-import { DeviceTree, DTNode, DTProperty, is_dt_flag } from "../Devicetree/index.js";
+import { DeviceTree, DTNode, number_property } from "../Devicetree/index.js";
 import {
     is_clock,
     is_dma_controller,
@@ -54,32 +54,6 @@ export function value_to_macro(value: number, names: string[]): string | undefin
     return;
 }
 
-export function cell_extract_first_value(property: DTProperty): bigint | string | undefined {
-    if (is_dt_flag(property.value)) { return; }
-    const first = property.value[0];
-    if (first === undefined || first.kind !== 'array') { return; }
-    const element = first.elements[0];
-    if (element === undefined) { return; }
-    switch (element.kind) {
-        case "number": {
-            return element.value;
-        }
-        case "expression": {
-            return element.value;
-        }
-        case "label": {
-            return element.name;
-        }
-        case "path": {
-            return element.path;
-        }
-        default: {
-            const _x: never = element;
-            throw new Error("Failed exhaustive check!");
-        }
-    }
-}
-
 function find_nodes(
     dt: DeviceTree,
     pred: (node: DTNode) => boolean,
@@ -112,7 +86,6 @@ export function query_devicetree(
     devicetree: DeviceTree,
     properties: ResolvedProperty[],
     data: string,
-    parent_name?: string,
     inherited_interrupt_parent?: string,
 ): ResolvedProperty[] {
 
@@ -157,45 +130,41 @@ export function query_devicetree(
 
                     if (parent !== undefined) {
 
-                        const interrupt_cells = parent.node.properties.find((value) => value.name === '#interrupt-cells');
-                        if (interrupt_cells !== undefined) {
-                            const new_length = cell_extract_first_value(interrupt_cells);
+                        const new_length = number_property(parent.node, "#interrupt-cells");
 
-                            if (new_length !== undefined && typeof new_length === 'bigint') {
+                        if (new_length !== undefined) {
 
-                                const new_interrupt = properties_clone.find((value) => value.key === "interrupts");
+                            const new_interrupt = properties_clone.find((value) => value.key === "interrupts");
 
-                                if (new_interrupt !== undefined &&
-                                    new_interrupt.value._t === 'array'
-                                ) {
+                            if (new_interrupt !== undefined &&
+                                new_interrupt.value._t === 'array'
+                            ) {
 
-                                    const new_value: AttachArray = {
-                                        _t: 'fixed_index',
-                                        prefixItems: [],
-                                        minItems: Number(new_length),
-                                        maxItems: Number(new_length)
-                                    };
+                                const new_value: AttachArray = {
+                                    _t: 'fixed_index',
+                                    prefixItems: [],
+                                    minItems: Number(new_length),
+                                    maxItems: Number(new_length)
+                                };
 
-                                    for (let index = 0; index < Number(new_length) - 1; index++) {
-                                        new_value.prefixItems.push({ _t: "number" });
-                                    }
-
-                                    new_value.prefixItems.push(
-                                        {
-                                            _t: "enum",
-                                            enum: INTERRUPT_MACROS.map((value) => value.name),
-                                            enum_type: AttachEnumType.MACRO
-                                        });
-
-                                    new_interrupt.value = {
-                                        _t: "matrix",
-                                        minItems: new_interrupt.value.minItems,
-                                        maxItems: new_interrupt.value.maxItems,
-                                        description: new_interrupt.value.description,
-                                        values: [new_value]
-                                    };
+                                for (let index = 0; index < Number(new_length) - 1; index++) {
+                                    new_value.prefixItems.push({ _t: "number" });
                                 }
 
+                                new_value.prefixItems.push(
+                                    {
+                                        _t: "enum",
+                                        enum: INTERRUPT_MACROS.map((value) => value.name),
+                                        enum_type: AttachEnumType.MACRO
+                                    });
+
+                                new_interrupt.value = {
+                                    _t: "matrix",
+                                    minItems: new_interrupt.value.minItems,
+                                    maxItems: new_interrupt.value.maxItems,
+                                    description: new_interrupt.value.description,
+                                    values: [new_value]
+                                };
                             }
 
                         }
@@ -306,48 +275,44 @@ export function query_devicetree(
                         continue;
                     }
 
-                    const dma_cells = node.node.properties.find((value) => value.name === "#dma-cells");
+                    const new_length = number_property(node.node, "#dma-cells");
 
-                    if (dma_cells !== undefined) {
-                        const new_length = cell_extract_first_value(dma_cells);
+                    if (new_length !== undefined) {
+                        const new_value: AttachArray = {
+                            _t: 'fixed_index',
+                            prefixItems: [],
+                            minItems: Number(new_length) + 1,
+                            maxItems: Number(new_length) + 1,
+                        };
 
-                        if (new_length !== undefined && typeof new_length === 'bigint') {
-                            const new_value: AttachArray = {
-                                _t: 'fixed_index',
-                                prefixItems: [],
-                                minItems: Number(new_length) + 1,
-                                maxItems: Number(new_length) + 1,
-                            };
+                        new_value.prefixItems.push(
+                            {
+                                _t: "enum",
+                                enum: phandles,
+                                default: set_dma,
+                                enum_type: AttachEnumType.PHANDLE
+                            }
+                        );
 
+                        for (let index = 0; index < Number(new_length); index++) {
                             new_value.prefixItems.push(
                                 {
-                                    _t: "enum",
-                                    enum: phandles,
-                                    default: set_dma,
-                                    enum_type: AttachEnumType.PHANDLE
+                                    _t: "number",
+                                    minimum: 0n,
+                                    maximum: 0xFF_FF_FF_FFn,
                                 }
                             );
-
-                            for (let index = 0; index < Number(new_length); index++) {
-                                new_value.prefixItems.push(
-                                    {
-                                        _t: "number",
-                                        minimum: 0n,
-                                        maximum: 0xFF_FF_FF_FFn,
-                                    }
-                                );
-                            }
-
-                            property.value = {
-                                _t: 'matrix',
-                                minItems: "minItems" in property.value ? property.value.minItems : 1,
-                                maxItems: "maxItems" in property.value ? property.value.maxItems : 1,
-                                description: property.value.description,
-                                values: [
-                                    new_value
-                                ]
-                            };
                         }
+
+                        property.value = {
+                            _t: 'matrix',
+                            minItems: "minItems" in property.value ? property.value.minItems : 1,
+                            maxItems: "maxItems" in property.value ? property.value.maxItems : 1,
+                            description: property.value.description,
+                            values: [
+                                new_value
+                            ]
+                        };
                     }
 
                     continue;
@@ -413,42 +378,38 @@ export function query_devicetree(
                         continue;
                     }
 
-                    const pwm_cells = node.node.properties.find((value) => value.name === "#pwm-cells");
+                    const new_length = number_property(node.node, "#pwm-cells");
 
-                    if (pwm_cells !== undefined) {
-                        const new_length = cell_extract_first_value(pwm_cells);
+                    if (new_length !== undefined) {
+                        const new_value: AttachArray = {
+                            _t: 'fixed_index',
+                            prefixItems: [],
+                            minItems: Number(new_length) + 1,
+                            maxItems: Number(new_length) + 1,
+                        };
 
-                        if (new_length !== undefined && typeof new_length === 'bigint') {
-                            const new_value: AttachArray = {
-                                _t: 'fixed_index',
-                                prefixItems: [],
-                                minItems: Number(new_length) + 1,
-                                maxItems: Number(new_length) + 1,
-                            };
-
-                            new_value.prefixItems.push(
-                                {
-                                    _t: "enum",
-                                    enum: phandles,
-                                    default: set_pwm,
-                                    enum_type: AttachEnumType.PHANDLE
-                                }
-                            );
-
-                            for (let index = 0; index < Number(new_length); index++) {
-                                new_value.prefixItems.push({ _t: "number" });
+                        new_value.prefixItems.push(
+                            {
+                                _t: "enum",
+                                enum: phandles,
+                                default: set_pwm,
+                                enum_type: AttachEnumType.PHANDLE
                             }
+                        );
 
-                            property.value = {
-                                _t: 'matrix',
-                                minItems: property.value.minItems,
-                                maxItems: property.value.maxItems,
-                                description: property.value.description,
-                                values: [
-                                    new_value
-                                ]
-                            };
+                        for (let index = 0; index < Number(new_length); index++) {
+                            new_value.prefixItems.push({ _t: "number" });
                         }
+
+                        property.value = {
+                            _t: 'matrix',
+                            minItems: property.value.minItems,
+                            maxItems: property.value.maxItems,
+                            description: property.value.description,
+                            values: [
+                                new_value
+                            ]
+                        };
                     }
 
                     continue;
@@ -515,11 +476,8 @@ export function query_devicetree(
             const controller_node = gpio_controllers.find((value) => value.node.labels.at(-1) === set_controller);
             if (controller_node === undefined) { continue; }
 
-            const gpio_cells = controller_node.node.properties.find((value) => value.name === "#gpio-cells");
-            if (gpio_cells === undefined) { continue; }
-
-            const new_length = cell_extract_first_value(gpio_cells);
-            if (new_length === undefined || typeof new_length !== 'bigint') { continue; }
+            const new_length = number_property(controller_node.node, "#gpio-cells");
+            if (new_length === undefined) { continue; }
 
             const row_size = Number(new_length) + 1;
 
@@ -624,7 +582,7 @@ if (import.meta.vitest) {
             { key: "interrupt-parent", value: { _t: "generic" as const } },
             { key: "interrupts", value: { _t: "array" as const, minItems: 1, maxItems: 1 } },
         ];
-        const result = query_devicetree(dt, properties, "{}", undefined, "gic");
+        const result = query_devicetree(dt, properties, "{}", "gic");
         const interrupts = result.find(p => p.key === "interrupts");
         expect(interrupts?.value._t).toBe("matrix");
     });

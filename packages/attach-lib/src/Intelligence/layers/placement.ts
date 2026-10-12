@@ -2,45 +2,18 @@ import {
     DeviceTree,
     DeviceTreeOverlay,
     DTLabel,
-    DTNode,
     DTPath,
     get_full_node_name,
-    is_dt_flag,
+    extract_first_number,
+    is_enabled,
+    parent_path as access_parent_path,
+    patch_node,
 } from "../../Devicetree/index.js";
-import { cell_extract_first_value } from "../query.js";
+import type { DTNode } from "../../Devicetree/index.js";
 import { NodePlacement } from "./types.js";
 
 function first_reg(node: DTNode): bigint | undefined {
-    const reg = node.properties.find(p => p.name === "reg");
-    if (reg === undefined) { return; }
-    const value = cell_extract_first_value(reg);
-    return typeof value === "bigint" ? value : undefined;
-}
-
-function status_of(node: DTNode): string | undefined {
-    const status = node.properties.find(p => p.name === "status");
-    if (status === undefined || is_dt_flag(status.value)) { return; }
-    const first = status.value[0];
-    return first?.kind === "string" ? first.value : undefined;
-}
-
-function parent_path_of(node_path: string): string {
-    const last_slash = node_path.lastIndexOf("/");
-    return last_slash <= 0 ? "/" : node_path.slice(0, last_slash);
-}
-
-function base_node_at(base: DeviceTree | undefined, path: string): DTNode | undefined {
-    if (base === undefined) { return; }
-    const reference = base.get_node_by_path({ kind: "path", labels: [], path });
-    return reference === undefined ? undefined : base.deref_node(reference);
-}
-
-function resolve_in_base(base: DeviceTree | undefined, target: DTLabel | DTPath): { node: DTNode, path: string } | undefined {
-    if (base === undefined) { return; }
-    const reference = target.kind === "path" ? base.get_node_by_path(target) : base.get_node_by_label(target);
-    if (reference === undefined) { return; }
-    const node = base.deref_node(reference);
-    return node === undefined ? undefined : { node, path: reference.full_path.path };
+    return extract_first_number(node, "reg");
 }
 
 /**
@@ -58,18 +31,26 @@ export function placement_from_overlay(overlay: DeviceTreeOverlay, target: DTLab
 
     const found = overlay.find_node(target);
     const located = found === undefined
-        ? resolve_in_base(base, target)
+        ? base?.locate(target)
         : { node: found.node, path: found.node_path };
     if (located === undefined) { return; }
 
     const node_path = located.path;
-    const parent_path = parent_path_of(node_path);
+    const parent_path = access_parent_path(node_path) ?? "/";
     const own_name = node_path.slice(node_path.lastIndexOf("/") + 1);
 
     const children = new Map<string, DTNode>();
-    for (const child of base_node_at(base, parent_path)?.children ?? []) {
+    for (const child of base?.node_at(parent_path)?.children ?? []) {
         children.set(get_full_node_name(child), child);
     }
+
+    const merge_children = (cursor: DTNode) => {
+        for (const child of cursor.children) {
+            const child_name = get_full_node_name(child);
+            const existing = children.get(child_name);
+            children.set(child_name, existing === undefined ? child : patch_node(existing, child));
+        }
+    };
 
     for (const fragment of overlay.get_fragments()) {
         const overlay_node = fragment.children.find(c => c.name === "__overlay__");
@@ -79,63 +60,38 @@ export function placement_from_overlay(overlay: DeviceTreeOverlay, target: DTLab
         if (root === undefined) { continue; }
 
         if (root === parent_path) {
-            // Fragment targets the parent → every child of __overlay__ is a child patch
-            for (const child of overlay_node.children) {
-                const child_name = get_full_node_name(child);
-                const base_child = children.get(child_name);
-                children.set(child_name, base_child === undefined
-                    ? child
-                    : { ...base_child, properties: [...base_child.properties.filter(p => !child.properties.some(o => o.name === p.name)), ...child.properties] });
-            }
+            merge_children(overlay_node);
         } else if (parent_path.startsWith(root + "/") || root === "/" && parent_path.startsWith("/")) {
-            // Fragment targets an ancestor → descend __overlay__ along the relative segments
             const relative = root === "/" ? parent_path.slice(1) : parent_path.slice(root.length + 1);
-            const segments = relative.split("/");
             let cursor: DTNode | undefined = overlay_node;
-            for (const segment of segments) {
+            for (const segment of relative.split("/")) {
                 if (cursor === undefined) { break; }
                 cursor = cursor.children.find(c => get_full_node_name(c) === segment);
             }
-            if (cursor !== undefined) {
-                for (const child of cursor.children) {
-                    const child_name = get_full_node_name(child);
-                    const base_child = children.get(child_name);
-                    children.set(child_name, base_child === undefined
-                        ? child
-                        : { ...base_child, properties: [...base_child.properties.filter(p => !child.properties.some(o => o.name === p.name)), ...child.properties] });
-                }
-            }
-        } else if (parent_path_of(root) === parent_path) {
-            // Fragment targets a sibling directly → __overlay__'s properties patch that child
+            if (cursor !== undefined) { merge_children(cursor); }
+        } else if ((access_parent_path(root) ?? "/") === parent_path) {
             const sibling_name = root.slice(root.lastIndexOf("/") + 1);
-            const base_child = children.get(sibling_name);
-            if (base_child === undefined) {
-                children.set(sibling_name, overlay_node);
-            } else {
-                children.set(sibling_name, {
-                    ...base_child,
-                    properties: [...base_child.properties.filter(p => !overlay_node.properties.some(o => o.name === p.name)), ...overlay_node.properties],
-                });
-            }
+            const existing = children.get(sibling_name);
+            children.set(sibling_name, existing === undefined
+                ? overlay_node
+                : patch_node(existing, overlay_node));
         }
     }
 
     const siblings = [...children.entries()]
-        .filter(([name, child]) => name !== own_name && status_of(child) !== "disabled")
+        .filter(([name, child]) => name !== own_name && is_enabled(child))
         .map(([name, child]) => {
             const reg = first_reg(child);
             return reg === undefined ? { name } : { name, reg };
         });
 
-    const reg = first_reg(located.node) ?? (found === undefined ? undefined : first_reg_from_base(base, node_path));
+    const reg = first_reg(located.node) ?? (found === undefined ? undefined : (() => {
+        const node = base?.node_at(node_path);
+        return node === undefined ? undefined : first_reg(node);
+    })());
     return reg === undefined
         ? { node_path, parent_path, siblings }
         : { node_path, parent_path, reg, siblings };
-}
-
-function first_reg_from_base(base: DeviceTree | undefined, path: string): bigint | undefined {
-    const node = base_node_at(base, path);
-    return node === undefined ? undefined : first_reg(node);
 }
 
 if (import.meta.vitest) {

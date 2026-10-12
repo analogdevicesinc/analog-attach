@@ -18,6 +18,7 @@ import { Result } from "../result";
 import { DeviceTree } from "./Devicetree";
 import { DTReference, FoundNodeResult, TraversalOrder } from "./Types";
 import { Stream } from "./Stream";
+import { patch_node } from "./Access";
 
 export class DeviceTreeOverlay {
 
@@ -716,15 +717,9 @@ export class DeviceTreeOverlay {
      * An overlay child with the same full name as a base child patches it.
      */
     public effective_children(parent_path: string): Map<string, DTNode> {
-        const base = this.base_dts;
         const children = new Map<string, DTNode>();
 
-        const base_node = (() => {
-            if (base === undefined) { return; }
-            const reference = base.get_node_by_path({ kind: "path", labels: [], path: parent_path });
-            return reference === undefined ? undefined : base.deref_node(reference);
-        })();
-        for (const child of base_node?.children ?? []) {
+        for (const child of this.base_dts?.node_at(parent_path)?.children ?? []) {
             children.set(get_full_node_name(child), child);
         }
 
@@ -751,21 +746,7 @@ export class DeviceTreeOverlay {
             for (const child of cursor.children) {
                 const child_name = get_full_node_name(child);
                 const existing = children.get(child_name);
-                if (existing === undefined) {
-                    children.set(child_name, child);
-                } else {
-                    children.set(child_name, {
-                        ...existing,
-                        properties: [
-                            ...existing.properties.filter(p => !child.properties.some(o => o.name === p.name)),
-                            ...child.properties,
-                        ],
-                        children: [
-                            ...existing.children.filter(c => !child.children.some(o => get_full_node_name(o) === get_full_node_name(c))),
-                            ...child.children,
-                        ],
-                    });
-                }
+                children.set(child_name, existing === undefined ? child : patch_node(existing, child));
             }
         }
 
@@ -777,12 +758,7 @@ export class DeviceTreeOverlay {
      * all fragments targeting `/`; for other paths, the base node patched by overlay props.
      */
     public effective_node(path: string): DTNode | undefined {
-        const base = this.base_dts;
-        let base_node: DTNode | undefined;
-        if (base !== undefined) {
-            const reference = base.get_node_by_path({ kind: "path", labels: [], path });
-            base_node = reference === undefined ? undefined : base.deref_node(reference);
-        }
+        const base_node = this.base_dts?.node_at(path);
 
         const found = this.find_node({ kind: "path", labels: [], path });
         if (found === undefined && base_node === undefined) { return undefined; }
