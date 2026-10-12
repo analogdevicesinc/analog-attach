@@ -1,5 +1,5 @@
 import { ParsedBinding } from "../Attach/AttachTypes.js";
-import { DeviceTree, DTNode } from "../Devicetree/index.js";
+import { DeviceTree, DTNode, has_property, type LocatedNode } from "../Devicetree/index.js";
 import { find_nodes, node_label } from "./providers.js";
 
 export type PathAndLabel = {
@@ -18,24 +18,23 @@ export enum DTCommDeviceTypes {
     REGULATOR_FIXED,
 }
 
-// eslint-disable-next-line unicorn/prevent-abbreviations
-function is_i2c_parent(node: DTNode): boolean {
-    if (node.name !== 'i2c') { return false; }
-    return node.properties.some(p => p.name === 'compatible') &&
-        node.properties.some(p => p.name === '#address-cells') &&
-        node.properties.some(p => p.name === '#size-cells');
-}
-
-function is_spi_parent(node: DTNode): boolean {
-    if (node.name !== 'spi') { return false; }
-    return node.properties.some(p => p.name === 'compatible') &&
-        node.properties.some(p => p.name === '#address-cells') &&
-        node.properties.some(p => p.name === '#size-cells');
+function is_bus_parent(name: string): (node: DTNode) => boolean {
+    return (node: DTNode) =>
+        node.name === name &&
+        has_property(node, "compatible") &&
+        has_property(node, "#address-cells") &&
+        has_property(node, "#size-cells");
 }
 
 function is_fixed_clock_parent(node: DTNode): boolean {
-    return node.name === 'clocks' &&
-        !node.properties.some(p => p.name === '#clock-cells');
+    return node.name === 'clocks' && !has_property(node, '#clock-cells');
+}
+
+function to_path_and_label(located: LocatedNode): PathAndLabel {
+    return {
+        path: ['/', ...located.path.split('/').slice(1)],
+        label: node_label(located.node),
+    };
 }
 
 export function suggest_parents(devicetree: DeviceTree, node: ParsedBinding): PathAndLabel[] {
@@ -74,31 +73,18 @@ export function suggest_parents_impl(devicetree: DeviceTree, parent_types: DTCom
     for (const parent_type of parent_types) {
         switch (parent_type) {
             case DTCommDeviceTypes.I2C: {
-                // eslint-disable-next-line unicorn/prevent-abbreviations
-                const i2c_devices = find_nodes(devicetree, is_i2c_parent);
-                const paths: PathAndLabel[] = i2c_devices.map((device) => ({
-                    path: ['/', ...device.path.split('/').slice(1)],
-                    label: node_label(device.node),
-                }));
-                suggestions = [...suggestions, ...paths];
+                suggestions = [...suggestions, ...find_nodes(devicetree, is_bus_parent("i2c")).map(located => to_path_and_label(located))];
                 break;
             }
             case DTCommDeviceTypes.SPI: {
-                const spi_devices = find_nodes(devicetree, is_spi_parent);
-                const paths: PathAndLabel[] = spi_devices.map((device) => ({
-                    path: ['/', ...device.path.split('/').slice(1)],
-                    label: node_label(device.node),
-                }));
-                suggestions = [...suggestions, ...paths];
+                suggestions = [...suggestions, ...find_nodes(devicetree, is_bus_parent("spi")).map(located => to_path_and_label(located))];
                 break;
             }
             case DTCommDeviceTypes.FIXED_CLOCK: {
-                const clock_definitions = find_nodes(devicetree, is_fixed_clock_parent);
-                const paths: PathAndLabel[] = clock_definitions.map((device) => ({
-                    path: ['/', ...device.path.split('/').slice(1)],
-                    label: node_label(device.node) ?? device.node.name,
-                }));
-                suggestions = [...suggestions, ...paths];
+                suggestions = [...suggestions, ...find_nodes(devicetree, is_fixed_clock_parent).map(located => ({
+                    ...to_path_and_label(located),
+                    label: node_label(located.node) ?? located.node.name,
+                }))];
                 break;
             }
             case DTCommDeviceTypes.REGULATOR_FIXED: {
