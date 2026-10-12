@@ -103,7 +103,7 @@ if (import.meta.vitest) {
         expect(result.map(s => s.source)).toStrictEqual(["low", "high"]);
     });
 
-    test("IntelligenceStack — layers without an operation are skipped", () => {
+    test("IntelligenceStack — properties with no matching providers get empty suggestions", () => {
         const result = IntelligenceStack.default().suggest_values("reg", { devicetree, data: "{}" });
         expect(result).toStrictEqual([]);
     });
