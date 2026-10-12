@@ -89,6 +89,10 @@ Setting `interrupts` without an explicit `interrupt-parent` writes the inherited
 
 `VendorPeripheralFilter.ts` in the lib removes vendor-specific SPI peripheral properties (pl022, cdns, fsl, nvidia, st) unless they match the parent controller's compatible. Applied at binding parse time.
 
+### Plans and backlog
+
+`plans/` (gitignored) contains working plans and progress notes for Claude sessions. `plans/completed.md` summarises the delivered groups (F through E) and their key decisions. `plans/PROGRESS.md` has per-group commit hashes, test counts and deviations. `notes.txt` (gitignored) is the feature backlog.
+
 ## Key Conventions
 
 - All commands follow the pattern: validate paths → parse files → call `attach-lib` → `console.log` or `respond()` output. Commands never throw to the user; they print a diagnostic and return early.
