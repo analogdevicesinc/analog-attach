@@ -1,12 +1,9 @@
 import { parse_board_description } from "./parse.js";
+import { spi_bus_of, signal_reference } from "./lookup.js";
 import { BoardBus, BoardChipSelect, BoardDescription, BoardSignal, BoardSlot } from "./types.js";
 
-// Facts computed from a BoardDescription instead of being stored in the
-// board file, so they can't drift from the slots' signals.
-
-/** The SPI bus a slot's chip-select signals apply on, if the slot can sit on one. */
 export function slot_spi_bus(board: BoardDescription, slot: BoardSlot): BoardBus | undefined {
-    return board.buses.find(bus => bus.type === "spi" && slot.buses.includes(bus.name));
+    return spi_bus_of(board.buses, slot);
 }
 
 /** A slot's chip-select signals, in file order (the first is its primary `reg`). */
@@ -43,7 +40,7 @@ export function bus_chip_selects(board: BoardDescription, bus: BoardBus): BoardC
         const on_primary = entries.filter(entry => entry.signal.gpio === primary.signal.gpio);
         const alternatives = entries.filter(entry => entry.signal.gpio !== primary.signal.gpio).map(entry => ({
             gpio: entry.signal.gpio,
-            user: `${entry.slot.id}.${entry.signal.name}`,
+            user: signal_reference(entry.slot, entry.signal),
             ...(entry.signal.jumper === undefined ? {} : { jumper: entry.signal.jumper }),
         }));
         const connected = on_primary.some(entry => entry.signal.connected);
@@ -51,7 +48,7 @@ export function bus_chip_selects(board: BoardDescription, bus: BoardBus): BoardC
         return {
             reg,
             gpio: primary.signal.gpio,
-            users: on_primary.map(entry => `${entry.slot.id}.${entry.signal.name}`),
+            users: on_primary.map(entry => signal_reference(entry.slot, entry.signal)),
             connected,
             ...(jumper === undefined ? {} : { jumper }),
             ...(alternatives.length > 0 ? { alternatives } : {}),
@@ -71,7 +68,7 @@ export type GpioUse = {
 export function gpio_usage(board: BoardDescription): GpioUse[] {
     const uses: GpioUse[] = [
         ...board.buses.flatMap(bus => bus.pins.map(pin => ({ gpio: pin.gpio, owner: `${bus.name}.${pin.name}`, connected: true }))),
-        ...board.slots.flatMap(slot => slot.signals.map(signal => ({ gpio: signal.gpio, owner: `${slot.id}.${signal.name}`, connected: signal.connected }))),
+        ...board.slots.flatMap(slot => slot.signals.map(signal => ({ gpio: signal.gpio, owner: signal_reference(slot, signal), connected: signal.connected }))),
     ];
     return uses.sort((a, b) => a.gpio - b.gpio);
 }
@@ -98,7 +95,7 @@ export type SlotExclusion = {
 export function exclusive_slots(board: BoardDescription): SlotExclusion[] {
     const side = (slot: BoardSlot, signal: BoardSignal): ExclusionSide => {
         const bus = signal.kind === "chip-select" && slot.buses.length > 1 ? slot_spi_bus(board, slot)?.name : undefined;
-        return { slot: slot.id, signal: `${slot.id}.${signal.name}`, ...(bus === undefined ? {} : { bus }) };
+        return { slot: slot.id, signal: signal_reference(slot, signal), ...(bus === undefined ? {} : { bus }) };
     };
     const exclusions: SlotExclusion[] = [];
     for (const [index, a] of board.slots.entries()) {
@@ -142,7 +139,7 @@ export function shared_with(board: BoardDescription, slot_id: string, signal: Bo
         .flatMap(slot => slot.signals
             .filter(other => other.gpio === signal.gpio)
             .map(other => ({
-                owner: `${slot.id}.${other.name}`,
+                owner: signal_reference(slot, other),
                 connected: other.connected,
                 ...(other.jumper === undefined ? {} : { jumper: other.jumper }),
             })));

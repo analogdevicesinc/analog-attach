@@ -4,6 +4,7 @@ import { DeviceTree, DeviceTreeOverlay } from "../../Devicetree/index.js";
 import { parent_path_string } from "../parents.js";
 import { effective_interrupt_parent, base_lookup } from "../interrupt_parent.js";
 import { is_gpio_property, INTERRUPT_MACROS } from "../query.js";
+import { bus_named, signal_reference, label_name } from "./lookup.js";
 import {
     IntelligenceLayer,
     NodePlacement,
@@ -82,7 +83,7 @@ function onboard_suffix(slot: BoardSlot): string {
 
 /** "spi0 reg 0" when `bus` is the slot's SPI bus and it has a chip select, else just the bus name. */
 function bus_with_reg(board: BoardDescription, slot: BoardSlot, bus_name: string): string {
-    const bus = board.buses.find(b => b.name === bus_name);
+    const bus = bus_named(board.buses, bus_name);
     const reg = bus === undefined ? undefined : slot_primary_reg(board, slot, bus);
     return reg === undefined ? bus_name : `${bus_name} reg ${reg}`;
 }
@@ -168,7 +169,7 @@ function current_interrupt_parent(context: PropertyContext, placement: NodePlace
  */
 export function board_layer(board: BoardDescription): BoardLayer {
     const name = `board:${board.board}`;
-    const controller = board.gpio_controller.slice(1);
+    const controller = label_name(board.gpio_controller);
 
     const suggestion = (rows: SuggestedCell[][], display: string, slots?: string[], note?: string): ValueSuggestion => ({
         rows,
@@ -179,7 +180,7 @@ export function board_layer(board: BoardDescription): BoardLayer {
     });
 
     const bus_node_values = (property: string, bus_name: string): ValueSuggestion[] => {
-        const bus = board.buses.find(b => b.name === bus_name);
+        const bus = bus_named(board.buses, bus_name);
         // Unconnected chip selects (jumper alternatives) aren't claimed by default.
         const chip_selects = bus === undefined ? [] : bus_chip_selects(board, bus).filter(cs => cs.connected);
         if (bus === undefined || property !== "cs-gpios" || chip_selects.length === 0) { return []; }
@@ -244,7 +245,7 @@ export function board_layer(board: BoardDescription): BoardLayer {
                     const combined = [...(int_parent_note === undefined ? [] : [int_parent_note]), ...line_notes(board, slot, signal)].join("; ") || undefined;
                     return suggestion(
                         [[...prefix, BigInt(signal.gpio), { macro }]],
-                        `${property === "interrupts" ? "" : `${controller} `}${signal.gpio} ${macro} — ${slot.id}.${signal.name}`,
+                        `${property === "interrupts" ? "" : `${controller} `}${signal.gpio} ${macro} — ${signal_reference(slot, signal)}`,
                         [slot.id],
                         combined,
                     );
@@ -265,7 +266,7 @@ export function board_layer(board: BoardDescription): BoardLayer {
                 connected_signals(slots, kind).flatMap(({ slot, signal }) =>
                     gpio_flag_macros(signal, unknown_order).map(macro => suggestion(
                         [[{ label: controller }, BigInt(signal.gpio), { macro }]],
-                        `${controller} ${signal.gpio} ${macro} — ${slot.id}.${signal.name}`,
+                        `${controller} ${signal.gpio} ${macro} — ${signal_reference(slot, signal)}`,
                         [slot.id],
                         line_notes(board, slot, signal).join("; ") || undefined,
                     ))));
