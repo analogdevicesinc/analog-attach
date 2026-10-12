@@ -8,6 +8,7 @@ import {
     type DTPath,
     type DtoPrintOptions,
     type FoundNodeResult,
+    type LocatedNode,
 } from 'attach-lib';
 
 import { DeviceTreeOverlay } from 'attach-lib';
@@ -44,28 +45,22 @@ export function parse_property_name(raw: string): Parsed<string> {
 export interface ResolvedPath {
     reference: DTLabel | DTPath;
     in_overlay: FoundNodeResult | undefined;
-    in_base: { node_name: string; full_path: DTPath; labels: DTLabel[] } | undefined;
+    in_base: LocatedNode | undefined;
 }
 
 export function resolve_path(path_string: string, overlay: DeviceTreeOverlay, base?: DeviceTree): ResolvedPath {
     const reference = resolve_node_identifier(path_string, overlay);
     const in_overlay = overlay.find_node(reference);
-    let in_base: ResolvedPath["in_base"];
-    if (base !== undefined) {
-        const found = reference.kind === "path"
-            ? base.get_node_by_path(reference)
-            : base.get_node_by_label(reference);
-        in_base = found ?? undefined;
-    }
+    const in_base = base?.locate(reference);
     return { reference, in_overlay, in_base };
 }
 
 export function base_target(resolved: ResolvedPath): DTLabel | DTPath | undefined {
     if (resolved.in_base === undefined) { return undefined; }
-    if (resolved.in_base.labels.length > 0) {
-        return { kind: "label", labels: [], name: resolved.in_base.labels[0]!.name };
+    if (resolved.in_base.node.labels.length > 0) {
+        return { kind: "label", labels: [], name: resolved.in_base.node.labels[0]! };
     }
-    return resolved.in_base.full_path;
+    return { kind: "path", labels: [], path: resolved.in_base.path };
 }
 
 export function not_found_message(path_string: string, overlay: DeviceTreeOverlay, base?: DeviceTree): string {
@@ -170,16 +165,14 @@ export function resolve_node_identifier(
     if (base !== undefined) {
         const found = base.resolve_identifier(label_part);
         if (found !== undefined) {
-            const reference = found.kind === "path"
-                ? base.get_node_by_path(found)
-                : base.get_node_by_label(found);
-            if (reference !== undefined) {
-                return { kind: "path", labels: [], path: `${reference.full_path.path}/${child_part}` };
+            const located = base.locate(found);
+            if (located !== undefined) {
+                return { kind: "path", labels: [], path: `${located.path}/${child_part}` };
             }
         }
     }
 
-    const in_overlay = overlay.find_node({ kind: "label", labels: [], name: label_part });
+    const in_overlay = overlay.find_node(label_part);
 
     if (in_overlay !== undefined) {
         return { kind: "path", labels: [], path: `${in_overlay.node_path}/${child_part}` };
@@ -374,28 +367,25 @@ export function resolve_write_target(
     const target_reference = resolve_node_identifier(node_identifier, overlay);
     const found = overlay.find_node(target_reference);
 
-    const base_reference = target_reference.kind === "path"
-        ? base_dt.get_node_by_path(target_reference)
-        : base_dt.get_node_by_label(target_reference);
+    const base_located = base_dt.locate(target_reference);
 
-    const is_base_target = (found?.is_in_base ?? false) || (found === undefined && base_reference !== undefined);
+    const is_base_target = (found?.is_in_base ?? false) || (found === undefined && base_located !== undefined);
 
     let binding_node: DTNode | undefined;
     let binding_parent: DTNode | undefined;
     let parent_name = "";
 
-    if (is_base_target && base_reference !== undefined) {
-        binding_node = base_dt.deref_node(base_reference);
-        const parent_reference = base_dt.get_parent(base_reference);
-        binding_parent = parent_reference === undefined ? undefined : base_dt.deref_node(parent_reference);
-        parent_name = base_reference.labels.at(-1)?.name ?? base_reference.full_path.path;
+    if (is_base_target && base_located !== undefined) {
+        binding_node = base_located.node;
+        binding_parent = base_dt.get_parent(base_located.path)?.node;
+        parent_name = base_located.node.labels.at(-1) ?? base_located.path;
     } else if (found !== undefined) {
         binding_node = found.node;
         binding_parent = found.parent_node;
         parent_name = found.node.labels.at(-1) ?? found.node_path;
     }
 
-    const node_path = found?.node_path ?? (base_reference !== undefined ? base_reference.full_path.path : "");
+    const node_path = found?.node_path ?? (base_located === undefined ? "" : base_located.path);
     const parent_compats = effective_parent_compatibles(binding_parent, node_path, base_dt);
     return { target_reference, found, is_base_target, binding_node, binding_parent, parent_name, parent_compatibles: parent_compats };
 }
@@ -558,7 +548,7 @@ if (import.meta.vitest) {
         if (typeof base_with_compat === "string") { throw new TypeError(base_with_compat); }
         const overlay = DTO.new_from_string(`/dts-v1/; /plugin/; &spi0 { adc@0 { reg = <0>; }; };`, base_with_compat);
         if (typeof overlay === "string") { throw new TypeError(overlay); }
-        const found = overlay.find_node({ kind: "path", labels: [], path: "/soc/spi@7e204000/adc@0" });
+        const found = overlay.find_node("/soc/spi@7e204000/adc@0");
         expect(found).toBeDefined();
         const parent_compats = effective_parent_compatibles(found!.parent_node, found!.node_path, base_with_compat);
         expect(parent_compats).toEqual(["brcm,bcm2835-spi"]);
@@ -639,9 +629,7 @@ export function effective_parent_compatibles(
         ? node_path.slice(0, node_path.lastIndexOf("/")) || "/"
         : undefined;
     if (parent_path === undefined) { return []; }
-    const base_reference = base_dt.get_node_by_path({ kind: "path", labels: [], path: parent_path });
-    if (base_reference === undefined) { return []; }
-    const base_node = base_dt.deref_node(base_reference);
+    const base_node = base_dt.node_at(parent_path);
     if (base_node === undefined) { return []; }
     return node_compatibles(base_node);
 }

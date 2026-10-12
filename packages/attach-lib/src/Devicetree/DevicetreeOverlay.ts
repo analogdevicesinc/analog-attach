@@ -3,8 +3,6 @@ import { PropertyBuilder } from "./PropertyBuilder";
 
 import {
     DTNode,
-    DTLabel,
-    DTPath,
     get_full_node_name,
     DTProperty,
     is_dt_flag,
@@ -16,9 +14,9 @@ import {
 import * as fs from 'node:fs';
 import { Result } from "../result";
 import { DeviceTree } from "./Devicetree";
-import { DTReference, FoundNodeResult, TraversalOrder } from "./Types";
+import { FoundNodeResult, TraversalOrder } from "./Types";
 import { Stream } from "./Stream";
-import { patch_node, parent_path as access_parent_path } from "./Access";
+import { type LocatedNode, type NodeTarget, normalize_target, patch_node, parent_path as access_parent_path } from "./Access";
 
 export class DeviceTreeOverlay {
 
@@ -73,16 +71,16 @@ export class DeviceTreeOverlay {
     }
 
     public add_fragment(
-        target: DTLabel | DTPath,
+        target: NodeTarget,
         nodes: INodeBuilderBase | undefined,
         properties: DTProperty | DTProperty[] | undefined
-    ): DTReference | undefined {
+    ): boolean {
         const existing = this.find_fragment(target);
 
         if (existing !== undefined) {
             const overlay_node = existing.children.find(c => c.name === "__overlay__");
             if (overlay_node === undefined) {
-                return undefined;
+                return false;
             }
 
             if (nodes !== undefined) {
@@ -101,50 +99,43 @@ export class DeviceTreeOverlay {
                 }
             }
 
-            return this.fragment_to_ref(existing);
+            return true;
         }
 
-        if (this.base_dts !== undefined) {
-            if (target.kind === "label") {
-                if (this.base_dts.get_node_by_label(target) === undefined) {
-                    return undefined;
-                }
-            } else if (target.kind === "path" && this.base_dts.get_node_by_path(target) === undefined) {
-                return undefined;
-            }
+        if (this.base_dts !== undefined && !this.base_dts.node_exists(target)) {
+            return false;
         }
 
-        const fragment = target.kind === "label"
-            ? this.create_label_fragment(target, nodes, properties)
-            : this.create_path_fragment(target, nodes, properties);
+        this.create_fragment(target, nodes, properties);
 
-        return this.fragment_to_ref(fragment);
+        return true;
     }
 
-    private find_fragment(target: DTLabel | DTPath): DTNode | undefined {
+    private find_fragment(target: NodeTarget): DTNode | undefined {
+        const normalized = normalize_target(target);
         for (const fragment of this.get_fragments()) {
-            if (target.kind === "label") {
+            if (normalized.kind === "label") {
                 const property = fragment.properties.find(p => p.name === "target");
                 if (property === undefined || is_dt_flag(property.value)) {
                     continue;
                 }
                 const matches = property.value.some(v =>
-                    v.kind === "array" && v.elements.some(element => element.kind === "label" && element.name === target.name)
+                    v.kind === "array" && v.elements.some(element => element.kind === "label" && element.name === normalized.name)
                 );
                 if (matches) {
                     return fragment;
                 }
-            } else if (target.kind === "path") {
-                const target_path_prop = fragment.properties.find(p => p.name === "target-path");
-                if (target_path_prop !== undefined && !is_dt_flag(target_path_prop.value)) {
-                    const matches = target_path_prop.value.some(v => v.kind === "string" && v.value === target.path);
+            } else if (normalized.kind === "path") {
+                const target_path_property = fragment.properties.find(p => p.name === "target-path");
+                if (target_path_property !== undefined && !is_dt_flag(target_path_property.value)) {
+                    const matches = target_path_property.value.some(v => v.kind === "string" && v.value === normalized.path);
                     if (matches) { return fragment; }
                 }
 
-                const target_prop = fragment.properties.find(p => p.name === "target");
-                if (target_prop !== undefined && !is_dt_flag(target_prop.value)) {
-                    const matches = target_prop.value.some(v =>
-                        v.kind === "array" && v.elements.some(element => element.kind === "path" && element.path === target.path)
+                const target_property = fragment.properties.find(p => p.name === "target");
+                if (target_property !== undefined && !is_dt_flag(target_property.value)) {
+                    const matches = target_property.value.some(v =>
+                        v.kind === "array" && v.elements.some(element => element.kind === "path" && element.path === normalized.path)
                     );
                     if (matches) { return fragment; }
                 }
@@ -152,14 +143,6 @@ export class DeviceTreeOverlay {
         }
 
         return undefined;
-    }
-
-    private fragment_to_ref(fragment: DTNode): DTReference {
-        return {
-            node_name: get_full_node_name(fragment),
-            full_path: { kind: "path", labels: [], path: `/${get_full_node_name(fragment)}` },
-            labels: fragment.labels.map(entry => ({ kind: "label", labels: [], name: entry }))
-        };
     }
 
     private next_fragment_unit_addr(): number {
@@ -172,15 +155,22 @@ export class DeviceTreeOverlay {
         return max + 1;
     }
 
-    private create_label_fragment(
-        target_label: DTLabel,
+    private create_fragment(
+        target: NodeTarget,
         node: INodeBuilderBase | undefined,
         properties: DTProperty | DTProperty[] | undefined
     ): DTNode {
-        const targetProperty = PropertyBuilder.build_cell_array()
-            .with_tagged_values(PropertyBuilder.tag_label(target_label.name))
-            .with_name("target")
-            .build();
+        const normalized = normalize_target(target);
+
+        const targetProperty = normalized.kind === "label"
+            ? PropertyBuilder.build_cell_array()
+                .with_tagged_values(PropertyBuilder.tag_label(normalized.name))
+                .with_name("target")
+                .build()
+            : PropertyBuilder.build_string()
+                .with_value(normalized.path)
+                .with_name("target-path")
+                .build();
 
         const overlayNode = NodeBuilder.new()
             .with_name("__overlay__")
@@ -198,244 +188,38 @@ export class DeviceTreeOverlay {
         return fragment;
     }
 
-    private create_path_fragment(
-        target_path: DTPath,
-        node: INodeBuilderBase | undefined,
-        properties: DTProperty | DTProperty[] | undefined
-    ): DTNode {
-        const targetProperty = PropertyBuilder.build_string()
-            .with_value(target_path.path)
-            .with_name("target-path")
-            .build();
+    public remove_node(target: NodeTarget): boolean {
+        const found = this.find_node(target);
+        if (found === undefined || found.parent_node === undefined) { return false; }
 
-        const overlayNode = NodeBuilder.new()
-            .with_name("__overlay__")
-            .with_children(node)
-            .with_properties(properties);
+        const node_name = get_full_node_name(found.node);
+        found.parent_node.children = found.parent_node.children.filter(c => get_full_node_name(c) !== node_name);
 
-        const fragment = NodeBuilder.new()
-            .with_name("fragment")
-            .with_unit_address(this.next_fragment_unit_addr().toString())
-            .with_properties(targetProperty)
-            .with_children(overlayNode)
-            .build();
-
-        this.overlay.root.children.push(fragment);
-        return fragment;
-    }
-
-    public remove_node(reference: DTReference | DTLabel | DTPath): boolean {
-        // DTReference has no kind discriminant — detect by its unique property
-        if ("node_name" in reference) {
-            if (reference.labels.length > 0) {
-                return this.remove_by_label(reference.labels[0]!.name);
-            }
-            return this.remove_by_base_path(reference.full_path.path);
-        }
-        if (reference.kind === "label") {
-            return this.remove_by_label(reference.name);
-        }
-        return this.remove_by_base_path(reference.path);
-    }
-
-    public remove_property(target: DTReference | DTLabel | DTPath, property: string): boolean {
-        if ("node_name" in target) {
-            if (target.labels.length > 0) {
-                return this.remove_property_by_label(target.labels[0]!.name, property);
-            }
-            return this.remove_property_by_path(target.full_path.path, property);
-        }
-        if (target.kind === "label") {
-            return this.remove_property_by_label(target.name, property);
-        }
-        return this.remove_property_by_path(target.path, property);
-    }
-
-    private remove_property_by_label(label_name: string, property: string): boolean {
-        for (const fragment of this.get_fragments()) {
-            const overlay_node = fragment.children.find(c => c.name === "__overlay__");
-            if (overlay_node === undefined) { continue; }
-
-            const root_path = this.get_fragment_root_path(fragment);
-
-            if (root_path !== undefined && this.base_dts !== undefined) {
-                const reference = this.base_dts.resolve_identifier(label_name);
-
-                if (reference !== undefined) {
-                    const dt_node = reference.kind === "path"
-                        ? this.base_dts.get_node_by_path(reference)
-                        : this.base_dts.get_node_by_label(reference);
-
-                    if (dt_node?.full_path.path === root_path) {
-                        return this.remove_property_from_overlay_node(fragment, overlay_node, property);
-                    }
-                }
-            }
-
-            const child = this.find_labeled_in_overlay(overlay_node, label_name);
-
-            if (child !== undefined) {
-                const property_index = child.properties.findIndex(p => p.name === property);
-                if (property_index === -1) { continue; }
-
-                child.properties.splice(property_index, 1);
-
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private remove_property_by_path(path: string, property: string): boolean {
-        for (const fragment of this.get_fragments()) {
-            const root_path = this.get_fragment_root_path(fragment);
-            if (root_path === undefined) { continue; }
-
-            const overlay_node = fragment.children.find(c => c.name === "__overlay__");
-            if (overlay_node === undefined) { continue; }
-
-            if (path === root_path) {
-                return this.remove_property_from_overlay_node(fragment, overlay_node, property);
-            }
-
-            const normalized_root = root_path === "/" ? "" : root_path;
-            if (!path.startsWith(normalized_root + "/")) { continue; }
-
-            const relative_path = path.slice(normalized_root.length + 1);
-            const segments = relative_path.split("/").filter(s => s.length > 0);
-            if (segments.length === 0) { continue; }
-
-            const child = this.find_in_overlay_by_segments(overlay_node, segments);
-            if (child === undefined) { continue; }
-
-            const property_index = child.properties.findIndex(p => p.name === property);
-            if (property_index === -1) { continue; }
-
-            child.properties.splice(property_index, 1);
-
-            return true;
-        }
-        return false;
-    }
-
-    private remove_property_from_overlay_node(fragment: DTNode, overlay_node: DTNode, property: string): boolean {
-        const property_index = overlay_node.properties.findIndex(p => p.name === property);
-        if (property_index === -1) { return false; }
-
-        overlay_node.properties.splice(property_index, 1);
-
-        if (overlay_node.children.length === 0 && overlay_node.properties.length === 0) {
-            const index = this.overlay.root.children.indexOf(fragment);
-            if (index !== -1) { this.overlay.root.children.splice(index, 1); }
-            this.renumber_fragments();
-        }
-
+        this.cleanup_empty_fragments();
         return true;
     }
 
-    private find_labeled_in_overlay(parent: DTNode, label_name: string): DTNode | undefined {
-        for (const child of parent.children) {
-            if (child.labels.includes(label_name)) { return child; }
+    public remove_property(target: NodeTarget, property: string): boolean {
+        const found = this.find_node(target);
+        if (found === undefined) { return false; }
 
-            const found = this.find_labeled_in_overlay(child, label_name);
-
-            if (found !== undefined) { return found; }
-        }
-
-        return undefined;
-    }
-
-    private find_in_overlay_by_segments(parent: DTNode, segments: string[]): DTNode | undefined {
-        const [head, ...rest] = segments;
-        if (head === undefined) { return undefined; }
-
-        const child = parent.children.find(c => get_full_node_name(c) === head);
-        if (child === undefined) { return undefined; }
-
-        return rest.length === 0 ? child : this.find_in_overlay_by_segments(child, rest);
-    }
-
-    private remove_by_label(label_name: string): boolean {
-        for (const fragment of this.get_fragments()) {
-            const overlay_node = fragment.children.find(c => c.name === "__overlay__");
-
-            if (overlay_node === undefined) { continue; }
-
-            if (!this.find_and_remove_labeled(overlay_node, label_name)) { continue; }
-
-            if (overlay_node.children.length === 0 && overlay_node.properties.length === 0) {
-                const index = this.overlay.root.children.indexOf(fragment);
-                if (index !== -1) { this.overlay.root.children.splice(index, 1); }
-            }
-
-            this.renumber_fragments();
-
-            return true;
-        }
-        return false;
-    }
-
-    private find_and_remove_labeled(parent: DTNode, label_name: string): boolean {
-        for (let index = 0; index < parent.children.length; index++) {
-            const child = parent.children[index]!;
-
-            if (child.labels.includes(label_name)) {
-                parent.children.splice(index, 1);
-                return true;
-            }
-
-            if (this.find_and_remove_labeled(child, label_name)) { return true; }
-        }
-
-        return false;
-    }
-
-    private remove_by_base_path(path: string): boolean {
-        for (const fragment of this.get_fragments()) {
-            const root_path = this.get_fragment_root_path(fragment);
-
-            if (root_path === undefined) { continue; }
-
-            const normalized_root = root_path === "/" ? "" : root_path;
-
-            if (!path.startsWith(normalized_root + "/")) { continue; }
-
-            const relative_path = path.slice(normalized_root.length + 1);
-            const relative_segments = relative_path.split("/").filter(s => s.length > 0);
-
-            if (relative_segments.length === 0) { continue; }
-
-            const overlay_node = fragment.children.find(c => c.name === "__overlay__");
-
-            if (overlay_node === undefined) { continue; }
-            if (!this.find_and_remove_by_segments(overlay_node, relative_segments)) { continue; }
-
-            if (overlay_node.children.length === 0 && overlay_node.properties.length === 0) {
-                const index = this.overlay.root.children.indexOf(fragment);
-                if (index !== -1) { this.overlay.root.children.splice(index, 1); }
-            }
-
-            this.renumber_fragments();
-
-            return true;
-        }
-        return false;
-    }
-
-    private find_and_remove_by_segments(parent: DTNode, segments: string[]): boolean {
-        if (segments.length === 0) { return false; }
-
-        const head = segments[0]!;
-        const index = parent.children.findIndex(c => get_full_node_name(c) === head);
-
+        const index = found.node.properties.findIndex(p => p.name === property);
         if (index === -1) { return false; }
 
-        if (segments.length === 1) {
-            parent.children.splice(index, 1);
-            return true;
-        }
+        found.node.properties.splice(index, 1);
 
-        return this.find_and_remove_by_segments(parent.children[index]!, segments.slice(1));
+        this.cleanup_empty_fragments();
+        return true;
+    }
+
+    private cleanup_empty_fragments(): void {
+        this.overlay.root.children = this.overlay.root.children.filter(child => {
+            if (child.name !== "fragment") { return true; }
+            const overlay_node = child.children.find(c => c.name === "__overlay__");
+            if (overlay_node === undefined) { return true; }
+            return overlay_node.children.length > 0 || overlay_node.properties.length > 0;
+        });
+        this.renumber_fragments();
     }
 
     public get_fragment_root_path(fragment: DTNode): string | undefined {
@@ -451,18 +235,17 @@ export class DeviceTreeOverlay {
                         const name = element.name.startsWith("&") ? element.name.slice(1) : element.name;
 
                         if (this.base_dts !== undefined) {
-                            const reference = this.base_dts.get_node_by_label({ kind: "label", labels: [], name });
+                            const located = this.base_dts.locate(name);
 
-                            if (reference !== undefined) { return reference.full_path.path; }
+                            if (located !== undefined) { return located.path; }
                         }
 
                         return undefined;
                     }
 
                     if (element.kind === "path") {
-                        if (this.base_dts !== undefined) {
-                            const reference = this.base_dts.get_node_by_path({ kind: "path", labels: [], path: element.path });
-                            if (reference !== undefined) { return element.path; }
+                        if (this.base_dts !== undefined && this.base_dts.node_exists(element.path)) {
+                            return element.path;
                         }
                         return undefined;
                     }
@@ -491,39 +274,13 @@ export class DeviceTreeOverlay {
         }
     }
 
-    public deref_node(reference: DTReference): DTNode | undefined {
-        const path = reference.full_path.path;
-
-        if (path === "/") {
-            return this.overlay.root;
-        }
-
-        const segments = path.split("/").filter(s => s.length > 0);
-
-        let current: DTNode = this.overlay.root;
-
-        for (const segment of segments) {
-            const child = current.children.find(c => get_full_node_name(c) === segment);
-
-            if (child === undefined) {
-                return undefined;
-            }
-
-            current = child;
-        }
-
-        return current;
-    }
-
-    public as_stream(order: TraversalOrder = "DFS"): Stream<DTNode, DTPath> {
+    public as_stream(order: TraversalOrder = "DFS"): Stream<LocatedNode> {
         return new Stream(this.as_generator(this.overlay.root, "/", order));
     }
 
-    private *as_generator(root: DTNode, currentPath: string, order: TraversalOrder): Generator<[DTNode, DTPath]> {
-        const make_path = (p: string): DTPath => ({ kind: "path", labels: [], path: p });
-
+    private *as_generator(root: DTNode, currentPath: string, order: TraversalOrder): Generator<LocatedNode> {
         if (order === "DFS") {
-            yield [root, make_path(currentPath)];
+            yield { node: root, path: currentPath };
 
             for (const child of root.children) {
                 const childPath = currentPath === "/"
@@ -538,7 +295,7 @@ export class DeviceTreeOverlay {
             while (queue.length > 0) {
                 const [node, nodePath] = queue.shift()!;
 
-                yield [node, make_path(nodePath)];
+                yield { node, path: nodePath };
 
                 for (const child of node.children) {
                     const childPath = nodePath === "/"
@@ -553,18 +310,15 @@ export class DeviceTreeOverlay {
 
     public get_fragments(): DTNode[] {
         return this.as_stream()
-            .filter((node) => node.name === "fragment")
+            .filter(({ node }) => node.name === "fragment")
             .toArray()
-            .map(([node]) => node);
+            .map(({ node }) => node);
     }
 
-    public find_node(target: DTReference | DTPath | DTLabel): FoundNodeResult | undefined {
-        if ("node_name" in target) {
-            return this.find_node(target.full_path);
-        }
-
-        if (target.kind === "path") {
-            const path = target.path;
+    public find_node(target: NodeTarget): FoundNodeResult | undefined {
+        const t = normalize_target(target);
+        if (t.kind === "path") {
+            const path = t.path;
 
             for (const fragment of this.get_fragments()) {
                 const overlay_node = fragment.children.find(c => c.name === "__overlay__");
@@ -573,7 +327,7 @@ export class DeviceTreeOverlay {
                 const root_path = this.get_fragment_root_path(fragment) ?? "";
 
                 if (path === root_path) {
-                    const is_in_base = this.base_dts?.get_node_by_path(target) !== undefined;
+                    const is_in_base = this.base_dts?.node_exists(t) ?? false;
 
                     return {
                         node: overlay_node,
@@ -595,7 +349,7 @@ export class DeviceTreeOverlay {
                 const result = this.find_node_in_fragment(fragment, segments);
                 if (result === undefined) { continue; }
 
-                const is_in_base = this.base_dts?.get_node_by_path(target) !== undefined;
+                const is_in_base = this.base_dts?.node_exists(t) ?? false;
                 const abs_node_path = `${normalized_root}/${result.actual_segments.join("/")}`;
 
                 return {
@@ -612,7 +366,7 @@ export class DeviceTreeOverlay {
         }
 
         // DTLabel search
-        const label_name = target.name;
+        const label_name = t.name;
 
         for (const fragment of this.get_fragments()) {
             const result = this.find_node_in_fragment(fragment, [label_name]);
@@ -642,12 +396,10 @@ export class DeviceTreeOverlay {
             const in_base = this.base_dts.resolve_identifier(label_name);
 
             if (in_base !== undefined) {
-                const reference = in_base.kind === "path"
-                    ? this.base_dts.get_node_by_path(in_base)
-                    : this.base_dts.get_node_by_label(in_base);
+                const located = this.base_dts.locate(in_base);
 
-                if (reference !== undefined) {
-                    const target_path = reference.full_path.path;
+                if (located !== undefined) {
+                    const target_path = located.path;
 
                     for (const fragment of this.get_fragments()) {
                         if (this.get_fragment_root_path(fragment) === target_path) {
@@ -767,7 +519,7 @@ export class DeviceTreeOverlay {
     public effective_node(path: string): DTNode | undefined {
         const base_node = this.base_dts?.node_at(path);
 
-        const found = this.find_node({ kind: "path", labels: [], path });
+        const found = this.find_node(path);
         if (found === undefined && base_node === undefined) { return undefined; }
 
         const properties = [...(base_node?.properties ?? [])];
@@ -806,11 +558,7 @@ export class DeviceTreeOverlay {
                     collect(child, child_path);
                 }
             };
-            const root = this.base_dts.deref_node({
-                node_name: "/",
-                full_path: { kind: "path", labels: [], path: "/" },
-                labels: [],
-            });
+            const root = this.base_dts.node_at("/");
             if (root !== undefined) { collect(root, "/"); }
         }
 
@@ -870,7 +618,7 @@ if (import.meta.vitest !== undefined) {
         if (typeof base === "string") { throw new TypeError(base); }
         const overlay = DeviceTreeOverlay.new_from_string(overlay_with_imu, base);
         if (typeof overlay === "string") { throw new TypeError(overlay); }
-        const result = overlay.find_node({ kind: "label", labels: [], name: "imu1" });
+        const result = overlay.find_node("imu1");
         expect(result).toBeDefined();
         expect(result?.is_in_base).toBe(false);
     });
@@ -880,7 +628,7 @@ if (import.meta.vitest !== undefined) {
         if (typeof base === "string") { throw new TypeError(base); }
         const overlay = DeviceTreeOverlay.new_from_string(overlay_with_imu, base);
         if (typeof overlay === "string") { throw new TypeError(overlay); }
-        const result = overlay.find_node({ kind: "label", labels: [], name: "imu1" });
+        const result = overlay.find_node("imu1");
         expect(result).toBeDefined();
         expect(result?.is_in_base).toBe(false);
     });
@@ -890,7 +638,7 @@ if (import.meta.vitest !== undefined) {
         if (typeof base === "string") { throw new TypeError(base); }
         const overlay = DeviceTreeOverlay.new_from_string(overlay_with_imu, base);
         if (typeof overlay === "string") { throw new TypeError(overlay); }
-        expect(overlay.find_node({ kind: "label", labels: [], name: "nonexistent" })).toBeUndefined();
+        expect(overlay.find_node("nonexistent")).toBeUndefined();
     });
 
     test("print/reparse roundtrip - target element name has no & prefix", () => {
@@ -910,9 +658,9 @@ if (import.meta.vitest !== undefined) {
         if (target === undefined || is_dt_flag(target.value)) { throw new Error("bad target"); }
         const element = target.value[0];
         if (element === undefined || element.kind !== "array") { throw new Error("bad element"); }
-        const ref = element.elements[0];
-        if (ref === undefined || ref.kind !== "label") { throw new Error("bad ref"); }
-        expect(ref.name).toBe("spi0");
+        const reference = element.elements[0];
+        if (reference === undefined || reference.kind !== "label") { throw new Error("bad ref"); }
+        expect(reference.name).toBe("spi0");
     });
 
     test("add_fragment reuses existing label fragment", () => {
@@ -922,7 +670,7 @@ if (import.meta.vitest !== undefined) {
         if (typeof overlay === "string") { throw new TypeError(overlay); }
 
         const before = overlay.get_fragments().length;
-        overlay.add_fragment({ kind: "label", labels: [], name: "spi0" }, undefined, undefined);
+        overlay.add_fragment("spi0", undefined, undefined);
         expect(overlay.get_fragments().length).toBe(before);
     });
 
@@ -961,7 +709,7 @@ if (import.meta.vitest !== undefined) {
         const overlay = DeviceTreeOverlay.new_from_string(overlay_with_path_target, base);
         if (typeof overlay === "string") { throw new TypeError(overlay); }
 
-        const result = overlay.find_node({ kind: "path", labels: [], path: "/soc/spi@7e204000/adc@0" });
+        const result = overlay.find_node("/soc/spi@7e204000/adc@0");
         expect(result).toBeDefined();
         expect(result?.node_path).toBe("/soc/spi@7e204000/adc@0");
     });

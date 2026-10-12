@@ -1,11 +1,10 @@
 import {
     DeviceTree,
     DeviceTreeOverlay,
-    DTLabel,
-    DTPath,
     extract_first_number,
     is_enabled,
     parent_path as access_parent_path,
+    type NodeTarget,
 } from "../../Devicetree/index.js";
 import type { DTNode } from "../../Devicetree/index.js";
 import { NodePlacement } from "./types.js";
@@ -14,7 +13,7 @@ function first_reg(node: DTNode): bigint | undefined {
     return extract_first_number(node, "reg");
 }
 
-export function placement_from_overlay(overlay: DeviceTreeOverlay, target: DTLabel | DTPath): NodePlacement | undefined {
+export function placement_from_overlay(overlay: DeviceTreeOverlay, target: NodeTarget): NodePlacement | undefined {
     const base = overlay.get_base_dts();
 
     const found = overlay.find_node(target);
@@ -84,7 +83,7 @@ if (import.meta.vitest) {
         reg = <3>;
     };
 };`);
-        const placement = placement_from_overlay(overlay, { kind: "label", labels: [], name: "adc" });
+        const placement = placement_from_overlay(overlay, "adc");
         expect(placement?.node_path).toBe("/soc/spi@7e204000/adc@2");
         expect(placement?.parent_path).toBe("/soc/spi@7e204000");
         expect(placement?.reg).toBe(2n);
@@ -106,7 +105,7 @@ if (import.meta.vitest) {
         reg = <0>;
     };
 };`);
-        const placement = placement_from_overlay(overlay, { kind: "label", labels: [], name: "adc" });
+        const placement = placement_from_overlay(overlay, "adc");
         expect(placement?.siblings).toStrictEqual([{ name: "spidev@1", reg: 1n }]);
     });
 
@@ -114,7 +113,7 @@ if (import.meta.vitest) {
         const overlay = overlay_of(`/dts-v1/;
 /plugin/;
 / { };`);
-        const placement = placement_from_overlay(overlay, { kind: "label", labels: [], name: "spi0" });
+        const placement = placement_from_overlay(overlay, "spi0");
         expect(placement?.node_path).toBe("/soc/spi@7e204000");
         expect(placement?.parent_path).toBe("/soc");
         expect(placement?.reg).toBeUndefined();
@@ -124,7 +123,7 @@ if (import.meta.vitest) {
         const overlay = overlay_of(`/dts-v1/;
 /plugin/;
 / { };`);
-        expect(placement_from_overlay(overlay, { kind: "label", labels: [], name: "nope" })).toBeUndefined();
+        expect(placement_from_overlay(overlay, "nope")).toBeUndefined();
     });
 
     test("placement_from_overlay — sibling disabled via a separate target=<&spidev0> fragment is excluded", () => {
@@ -148,7 +147,7 @@ if (import.meta.vitest) {
         };
     };
 };`);
-        const placement = placement_from_overlay(overlay, { kind: "label", labels: [], name: "adc" });
+        const placement = placement_from_overlay(overlay, "adc");
         expect(placement?.siblings.map(s => s.name)).not.toContain("spidev@0");
         expect(placement?.siblings.map(s => s.name)).toContain("spidev@1");
     });
@@ -176,7 +175,7 @@ if (import.meta.vitest) {
         };
     };
 };`);
-        const placement = placement_from_overlay(overlay, { kind: "label", labels: [], name: "adc" });
+        const placement = placement_from_overlay(overlay, "adc");
         expect(placement?.siblings.map(s => s.name)).toContain("dac@2");
     });
 
@@ -218,7 +217,7 @@ if (import.meta.vitest) {
 };`, base_with_ancestor);
         if (typeof overlay === "string") { throw new TypeError(overlay); }
 
-        const placement = placement_from_overlay(overlay, { kind: "label", labels: [], name: "adc" });
+        const placement = placement_from_overlay(overlay, "adc");
         expect(placement?.siblings.map(s => s.name)).toContain("dac@1");
     });
 
@@ -237,7 +236,7 @@ if (import.meta.vitest) {
         };
     };
 };`);
-        const placement = placement_from_overlay(overlay, { kind: "label", labels: [], name: "adc" });
+        const placement = placement_from_overlay(overlay, "adc");
         expect(placement?.node_path).toBe("/soc/spi@7e204000/adc@2");
         expect(placement?.parent_path).toBe("/soc/spi@7e204000");
         expect(placement?.siblings).toStrictEqual([

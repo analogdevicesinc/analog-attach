@@ -1,6 +1,17 @@
-import { type DTNode, type DTProperty, is_dt_flag, get_full_node_name } from "./Parser/AST.js";
+import { type DTLabel, type DTNode, type DTPath, type DTProperty, is_dt_flag, get_full_node_name } from "./Parser/AST.js";
 
 export type LocatedNode = { node: DTNode; path: string };
+
+export type NodeTarget = DTLabel | DTPath | string;
+
+export function normalize_target(target: NodeTarget): DTLabel | DTPath {
+    if (typeof target === "string") {
+        return target.startsWith("/")
+            ? { kind: "path", labels: [], path: target }
+            : { kind: "label", labels: [], name: target };
+    }
+    return target;
+}
 
 export function cell_extract_first_value(property: DTProperty): bigint | string | undefined {
     if (is_dt_flag(property.value)) { return; }
@@ -137,7 +148,7 @@ if (import.meta.vitest) {
         reg = <0x48 0x400>;
     };
 };`);
-        const node = dt.as_stream().toArray().find(([n]) => n.name === "node")![0];
+        const node = dt.as_stream().toArray().find(({ node }) => node.name === "node")!.node;
         expect(number_property(node, "#interrupt-cells")).toBe(3n);
         expect(number_property(node, "reg")).toBeUndefined();
         expect(number_property(node, "missing")).toBeUndefined();
@@ -151,7 +162,7 @@ if (import.meta.vitest) {
         reg = <0x48 0x400>;
     };
 };`);
-        const node = dt.as_stream().toArray().find(([n]) => n.name === "node")![0];
+        const node = dt.as_stream().toArray().find(({ node }) => node.name === "node")!.node;
         expect(extract_first_number(node, "#interrupt-cells")).toBe(3n);
         expect(extract_first_number(node, "reg")).toBe(0x48n);
     });
@@ -166,7 +177,7 @@ if (import.meta.vitest) {
         clocks = <&osc 0>;
     };
 };`);
-        const node = dt.as_stream().toArray().find(([n]) => n.name === "node")![0];
+        const node = dt.as_stream().toArray().find(({ node }) => node.name === "node")!.node;
         expect(reference_property(node, "interrupt-parent")).toBe("gic");
         expect(reference_property(node, "clocks")).toBeUndefined();
     });
@@ -181,7 +192,7 @@ if (import.meta.vitest) {
         clocks = <&osc 0>;
     };
 };`);
-        const node = dt.as_stream().toArray().find(([n]) => n.name === "node")![0];
+        const node = dt.as_stream().toArray().find(({ node }) => node.name === "node")!.node;
         expect(extract_first_reference(node, "interrupt-parent")).toBe("gic");
         expect(extract_first_reference(node, "clocks")).toBe("osc");
     });
@@ -193,7 +204,7 @@ if (import.meta.vitest) {
         status = "okay";
     };
 };`);
-        const node = dt.as_stream().toArray().find(([n]) => n.name === "node")![0];
+        const node = dt.as_stream().toArray().find(({ node }) => node.name === "node")!.node;
         expect(string_property(node, "status")).toBe("okay");
     });
 
@@ -205,7 +216,7 @@ if (import.meta.vitest) {
         interrupt-parent = <&gic>;
     };
 };`);
-        const node = dt.as_stream().toArray().find(([n]) => n.name === "node")![0];
+        const node = dt.as_stream().toArray().find(({ node }) => node.name === "node")!.node;
         expect(reference_property(node, "interrupt-parent")).toBe("gic");
     });
 
@@ -218,7 +229,7 @@ if (import.meta.vitest) {
         #interrupt-cells = <3>;
     };
 };`);
-        const node = dt.as_stream().toArray().find(([n]) => n.name === "node")![0];
+        const node = dt.as_stream().toArray().find(({ node }) => node.name === "node")!.node;
         expect(has_flag(node, "interrupt-controller")).toBe(true);
         expect(has_flag(node, "#interrupt-cells")).toBe(false);
         expect(has_property(node, "#interrupt-cells")).toBe(true);
@@ -235,9 +246,9 @@ if (import.meta.vitest) {
     c { status = "disabled"; };
 };`);
         const nodes = dt.as_stream().toArray();
-        const a = nodes.find(([n]) => n.name === "a")![0];
-        const b = nodes.find(([n]) => n.name === "b")![0];
-        const c = nodes.find(([n]) => n.name === "c")![0];
+        const a = nodes.find(({ node }) => node.name === "a")!.node;
+        const b = nodes.find(({ node }) => node.name === "b")!.node;
+        const c = nodes.find(({ node }) => node.name === "c")!.node;
         expect(is_enabled(a)).toBe(true);
         expect(is_enabled(b)).toBe(true);
         expect(is_enabled(c)).toBe(false);

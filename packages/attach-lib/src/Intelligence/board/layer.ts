@@ -151,7 +151,7 @@ export type BoardLayer = IntelligenceLayer & {
 };
 
 function controller_cells(devicetree: DeviceTree, label: string, property: string): bigint | undefined {
-    const located = devicetree.locate({ kind: "label", name: label, labels: [] });
+    const located = devicetree.locate(label);
     return located === undefined ? undefined : number_property(located.node, property);
 }
 
@@ -659,7 +659,7 @@ slots: {}
             const overlay = DeviceTreeOverlay.new_from_string(read_fixture("adalm-lsmspg-overlay.dtso"));
             if (typeof overlay === "string") { throw new TypeError(overlay); }
             for (const slot of board.slots.filter(s => s.onboard !== undefined)) {
-                expect(overlay.find_node({ kind: "label", labels: [], name: slot.onboard!.slice(1) }), slot.id).toBeDefined();
+                expect(overlay.find_node(slot.onboard!.slice(1)), slot.id).toBeDefined();
             }
         });
 

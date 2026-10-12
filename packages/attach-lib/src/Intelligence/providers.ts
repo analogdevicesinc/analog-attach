@@ -5,9 +5,8 @@ export function find_nodes(
     predicate: (node: DTNode) => boolean,
 ): LocatedNode[] {
     return dt.as_stream()
-        .filter((element) => predicate(element))
-        .toArray()
-        .map(([node, path]) => ({ node, path: path.path }));
+        .filter((located) => predicate(located.node))
+        .toArray();
 }
 
 export function node_label(node: DTNode): string | undefined {

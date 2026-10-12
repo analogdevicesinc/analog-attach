@@ -128,8 +128,8 @@ function inherited_interrupt_label(context: PropertyContext): string | undefined
     }
     if (context.parent_name !== undefined) {
         const path_from_name = dt.as_stream()
-            .filter(node => get_full_node_name(node) === context.parent_name)
-            .toArray()[0]?.[1]?.path;
+            .filter(({ node }) => get_full_node_name(node) === context.parent_name)
+            .toArray()[0]?.path;
         if (path_from_name !== undefined) {
             return effective_interrupt_parent(lookup, `${path_from_name}/child`, dt)?.label;
         }

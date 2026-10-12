@@ -213,7 +213,7 @@ export function build_validation_dts(overlay: DeviceTreeOverlay): string {
 
             for (const label of collect_referenced_labels(overlay_child)) {
                 if (defined_labels.has(label) || base_dt === undefined) { continue; }
-                const provider = find_node_by_label(base_dt, label);
+                const provider = base_dt.locate(label)?.node;
                 if (provider === undefined || stubbed.has(provider)) { continue; }
                 stubbed.add(provider);
                 inner_lines.push(print_provider_stub(provider, '\t\t'));
@@ -273,13 +273,9 @@ function get_fragment_target_node(fragment: DTNode, base_dt: DeviceTree): DTNode
         const first = target_property.value[0];
         if (first?.kind === 'array') {
             for (const element of first.elements) {
-                if (element.kind === 'label') {
-                    const reference = base_dt.get_node_by_label(element as DTLabel);
-                    if (reference !== undefined) { return base_dt.deref_node(reference); }
-                }
-                if (element.kind === 'path') {
-                    const reference = base_dt.get_node_by_path(element as DTPath);
-                    if (reference !== undefined) { return base_dt.deref_node(reference); }
+                if (element.kind === 'label' || element.kind === 'path') {
+                    const located = base_dt.locate(element);
+                    if (located !== undefined) { return located.node; }
                 }
             }
         }
@@ -289,8 +285,7 @@ function get_fragment_target_node(fragment: DTNode, base_dt: DeviceTree): DTNode
     if (target_path_property !== undefined && !is_dt_flag(target_path_property.value)) {
         const first = target_path_property.value[0];
         if (first?.kind === 'string') {
-            const reference = base_dt.get_node_by_path({ kind: 'path', path: first.value, labels: [] });
-            if (reference !== undefined) { return base_dt.deref_node(reference); }
+            return base_dt.node_at(first.value);
         }
     }
 
@@ -332,12 +327,6 @@ function check_interrupt_info(node: DTNode): InterruptInfo {
 
     scan(node);
     return { has_interrupts, interrupt_parent_label };
-}
-
-function find_node_by_label(base_dt: DeviceTree, label: string): DTNode | undefined {
-    const reference = base_dt.get_node_by_label({ kind: 'label', name: label, labels: [] });
-    if (reference === undefined) { return undefined; }
-    return base_dt.deref_node(reference);
 }
 
 function print_dtnode(node: DTNode, indent: string): string {

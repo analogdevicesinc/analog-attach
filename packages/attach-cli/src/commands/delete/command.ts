@@ -201,7 +201,7 @@ export function delete_overlay_node(
     if (found.is_in_base) { return "in-base"; }
     if (found.parent_node === undefined) { return "is-root"; }
 
-    if (!overlay.remove_node({ kind: "path", labels: [], path: found.node_path })) {
+    if (!overlay.remove_node(found.node_path)) {
         return "not-found";
     }
 

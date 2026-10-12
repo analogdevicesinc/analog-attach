@@ -1,11 +1,5 @@
-import { Bits, CellArrayElement, DTCellArray, DTLabel, DTNode, DTPath } from "./Parser";
+import { Bits, CellArrayElement, DTCellArray, DTNode } from "./Parser";
 import { Labeled, MakeArray, is_array, is_labeled, make_array, make_labeled } from "./TypeUtilities";
-
-export type DTReference = {
-    node_name: string,
-    full_path: DTPath,
-    labels: DTLabel[],
-};
 
 export type TraversalOrder = "DFS" | "BFS";
 

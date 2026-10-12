@@ -11,7 +11,7 @@ export function build_move_command(context_: LocalContext): Command {
         .description("Move an overlay-added node to a different parent")
         .argument("<path>", "Path to node")
         .argument("<destination>", "Destination parent: label or path (e.g. spi1, /soc/spi@7e205000)")
-        .action(async (path_argumentument: string, destination: string) => {
+        .action(async (path_argument: string, destination: string) => {
             const parent_identifier = destination;
 
             const resolved = resolve_config(context_, ["context", "overlay"]);
@@ -22,21 +22,21 @@ export function build_move_command(context_: LocalContext): Command {
             if (trees === undefined) { return; }
             const { base_dt: base, overlay } = trees;
 
-            const result = move_overlay_node(base, overlay, path_argumentument, parent_identifier);
+            const result = move_overlay_node(base, overlay, path_argument, parent_identifier);
 
             if (context_.json) {
                 switch (result) {
                     case "moved": {
                         write_overlay(input, overlay, resolved.config);
-                        respond({ ok: true, message: `Moved ${path_argumentument} to ${parent_identifier}`, severity: "info" });
+                        respond({ ok: true, message: `Moved ${path_argument} to ${parent_identifier}`, severity: "info" });
                         return;
                     }
                     case "not-found": {
-                        respond_fail({ ok: false, message: not_found_message(path_argumentument, overlay, base), severity: "error" });
+                        respond_fail({ ok: false, message: not_found_message(path_argument, overlay, base), severity: "error" });
                         return;
                     }
                     case "in-base": {
-                        respond_fail({ ok: false, message: `${path_argumentument} is part of the base device tree, not this overlay`, severity: "error" });
+                        respond_fail({ ok: false, message: `${path_argument} is part of the base device tree, not this overlay`, severity: "error" });
                         return;
                     }
                     case "is-root": {
@@ -48,12 +48,12 @@ export function build_move_command(context_: LocalContext): Command {
                         return;
                     }
                     case "into-self": {
-                        respond_fail({ ok: false, message: `Cannot move ${path_argumentument} into itself or one of its descendants`, severity: "error" });
+                        respond_fail({ ok: false, message: `Cannot move ${path_argument} into itself or one of its descendants`, severity: "error" });
                         return;
                     }
                     case "conflict": {
-                        const found = overlay.find_node(resolve_node_identifier(path_argumentument, overlay));
-                        const node_key = found === undefined ? path_argumentument : get_full_node_name(found.node);
+                        const found = overlay.find_node(resolve_node_identifier(path_argument, overlay));
+                        const node_key = found === undefined ? path_argument : get_full_node_name(found.node);
                         respond_fail({ ok: false, message: `${parent_identifier} already has a child named ${node_key}`, severity: "error" });
                         return;
                     }
@@ -61,11 +61,11 @@ export function build_move_command(context_: LocalContext): Command {
             } else {
                 switch (result) {
                     case "not-found": {
-                        console.log(not_found_message(path_argumentument, overlay, base));
+                        console.log(not_found_message(path_argument, overlay, base));
                         return;
                     }
                     case "in-base": {
-                        console.log(`${path_argumentument} is part of the base device tree (${context}), not this overlay; move only applies to overlay-added nodes`);
+                        console.log(`${path_argument} is part of the base device tree (${context}), not this overlay; move only applies to overlay-added nodes`);
                         return;
                     }
                     case "is-root": {
@@ -77,18 +77,18 @@ export function build_move_command(context_: LocalContext): Command {
                         return;
                     }
                     case "into-self": {
-                        console.log(`Cannot move ${path_argumentument} into itself or one of its descendants`);
+                        console.log(`Cannot move ${path_argument} into itself or one of its descendants`);
                         return;
                     }
                     case "conflict": {
-                        const found = overlay.find_node(resolve_node_identifier(path_argumentument, overlay));
-                        const node_key = found === undefined ? path_argumentument : get_full_node_name(found.node);
+                        const found = overlay.find_node(resolve_node_identifier(path_argument, overlay));
+                        const node_key = found === undefined ? path_argument : get_full_node_name(found.node);
                         console.log(`${parent_identifier} already has a child named ${node_key}`);
                         return;
                     }
                     case "moved": {
                         write_overlay(input, overlay, resolved.config);
-                        console.log(`Moved ${path_argumentument} to ${parent_identifier} in ${input}`);
+                        console.log(`Moved ${path_argument} to ${parent_identifier} in ${input}`);
                         return;
                     }
                 }
@@ -116,12 +116,12 @@ export function move_overlay_node(
 
     const destination_node: DTNode | "parent-not-found" = (() => {
         if (destination_in_overlay === undefined) {
-            const base_referenceerence = base_target(resolved_parent);
-            if (base_referenceerence === undefined) { return "parent-not-found"; }
+            const base_reference = base_target(resolved_parent);
+            if (base_reference === undefined) { return "parent-not-found"; }
             // eslint-disable-next-line unicorn/no-useless-undefined
-            const reference = overlay.add_fragment(base_referenceerence, undefined, undefined)!;
+            overlay.add_fragment(base_reference, undefined, undefined);
 
-            return overlay.deref_node(reference)!.children.find(c => c.name === "__overlay__")!;
+            return overlay.find_node(base_reference)!.node;
         } else {
             return destination_in_overlay.node;
         }
@@ -133,17 +133,18 @@ export function move_overlay_node(
     const key = get_full_node_name(node);
 
     // R2: check effective_children at destination for duplicates
-    const dest_path = destination_in_overlay !== undefined
-        ? destination_in_overlay.node_path
-        : parent_identifier;
-    const effective = overlay.effective_children(dest_path);
+    const destination_path = destination_in_overlay === undefined
+        ? parent_identifier
+        : destination_in_overlay.node_path;
+    const effective = overlay.effective_children(destination_path);
     if (effective.has(key)) { return "conflict"; }
 
-    if (!overlay.remove_node({ kind: "path", labels: [], path: found.node_path })) {
+    destination_node.children.push(node);
+
+    if (!overlay.remove_node(found.node_path)) {
+        destination_node.children.pop();
         return "not-found";
     }
-
-    destination_node.children.push(node);
 
     return "moved";
 }

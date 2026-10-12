@@ -21,7 +21,7 @@ export interface AddressCells {
 }
 
 export function address_cells_of(overlay: DeviceTreeOverlay, parent_path: string): AddressCells {
-    const node = overlay.find_node({ kind: "path", labels: [], path: parent_path })?.node;
+    const node = overlay.find_node(parent_path)?.node;
     const base_node = overlay.get_base_dts()?.node_at(parent_path);
 
     const overlay_addr = node === undefined ? undefined : number_property(node, "#address-cells");
