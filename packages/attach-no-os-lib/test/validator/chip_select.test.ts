@@ -1,5 +1,5 @@
 import { describe, test, expect, beforeEach, afterEach } from 'vitest';
-import { bootstrap } from '../../src/bootstrap/bootstrap';
+import { attach_eval_board, bootstrap } from '../../src/bootstrap/bootstrap';
 import { load_resolved_ruleset } from '../../src/resolver/resolver';
 import { validate_workfile } from '../../src/validator/validator';
 import { add_symbol, create_workfile, set_value } from '../../src/workfile_handler/workfile_handler';
@@ -18,6 +18,7 @@ function two_sensors(board: string, soc: string): Workfile {
         const ruleset = load_resolved_ruleset('test_sensor');
         expectOk(ruleset);
         expectOk(add_symbol(workfile, name, ruleset.value));
+        expectOk(attach_eval_board(workfile, 'eval-testpart', name));
     }
     expectOk(bootstrap(workfile));
     return workfile;

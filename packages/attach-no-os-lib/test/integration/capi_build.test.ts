@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { describe, test, expect, beforeEach, afterEach } from 'vitest';
-import { bootstrap, pin_driver, referenced_nodes } from '../../src/bootstrap/bootstrap';
+import { attach_eval_board, bootstrap, pin_driver, referenced_nodes } from '../../src/bootstrap/bootstrap';
 import { generate_project } from '../../src/codegen/codegen';
 import { find_board } from '../../src/registry/platforms';
 import { driver_root, driver_root_for } from '../../src/registry/roots';
@@ -46,6 +46,13 @@ const ENABLED = process.env.AA_BUILD_TESTS === '1'
     && process.env.MAXIM_SDK_PATH !== undefined
     && has_tool('cmake') && has_tool('ninja');
 
+/** The eval board each part sits on in these tests. */
+const EVAL_BOARDS: Record<string, string> = {
+    adxl355: 'eval-adxl355-pmdz',
+    ad74413r: 'eval-ad-swio-2-click',
+    adt7420: 'eval-adt7420-pmdz',
+};
+
 function board_workfile(): Workfile {
     const created = create_workfile('max32655');
     expectOk(created);
@@ -61,6 +68,8 @@ function add_driver(workfile: Workfile, driver: string, name: string, interface_
     expectOk(ruleset);
     expectOk(add_symbol(workfile, name, ruleset.value));
     expectOk(pin_driver(workfile, name, driver));
+    // On its eval board, as `attach-noos add <eval board>` puts it, so its pinout wires it.
+    expectOk(attach_eval_board(workfile, EVAL_BOARDS[driver] ?? '', name));
     expectOk(bootstrap(workfile));
 }
 

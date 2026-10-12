@@ -105,7 +105,8 @@ export type { ConnectionGraph, SymbolReference, ReferenceKind } from "./validato
 export { get_connected_symbols } from "./validator/connection_graph";
 export { validate_workfile } from "./validator/validator";
 export type { ValidationResult, ValidationError } from "./validator/types";
-export { bootstrap, pin_driver, referenced_nodes } from "./bootstrap/bootstrap";
+export { attach_eval_board, bootstrap, pin_driver, referenced_nodes } from "./bootstrap/bootstrap";
+export { find_eval_board_module, list_eval_boards } from "./registry/eval_boards";
 export type { BootstrapOptions, BootstrapReport, BusWiring, ChipSelectDecision, FilledValue, FillSource, LinkedReference, OpenChoice } from "./bootstrap/bootstrap";
 export { format_number_in } from "./ruleset_parser/number_format";
 export { driver_roots, driver_root, driver_root_for, driver_iio_root, list_drivers, addable_drivers } from "./registry/roots";

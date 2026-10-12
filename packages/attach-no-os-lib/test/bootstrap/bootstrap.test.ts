@@ -1,5 +1,5 @@
 import { describe, test, expect, beforeEach, afterEach } from 'vitest';
-import { bootstrap, referenced_nodes } from '../../src/bootstrap/bootstrap';
+import { attach_eval_board, bootstrap, referenced_nodes } from '../../src/bootstrap/bootstrap';
 import { load_resolved_ruleset, load_resolved_ruleset_for_board, resolve_ruleset } from '../../src/resolver/resolver';
 import { parse_ruleset } from '../../src/ruleset_parser/ruleset_parser';
 import { validate_workfile } from '../../src/validator/validator';
@@ -42,6 +42,10 @@ function workfile_with(root: string, board: string | null = FIXTURE_BOARD, soc: 
     const ruleset = load_resolved_ruleset(root);
     expectOk(ruleset);
     expectOk(add_symbol(created.value, root, ruleset.value));
+    // The part sits on its eval board, so its pinout wires it (a bare part would not be).
+    if (root === 'test_sensor') {
+        expectOk(attach_eval_board(created.value, 'eval-testpart', root));
+    }
     return created.value;
 }
 
@@ -419,7 +423,7 @@ describe('hidden nodes', () => {
         const workfile = workfile_with('test_sensor');
         expectOk(bootstrap(workfile));
 
-        expect(Object.keys(stored(workfile))).toEqual(['test_sensor', 'test_sensor_config', 'testpart_init_param', 'test_spi_device']);
+        expect(Object.keys(stored(workfile))).toEqual(['test_sensor', 'eval_testpart', 'test_sensor_config', 'testpart_init_param', 'test_spi_device']);
         expect([...(workfile.hidden ?? [])].sort()).toEqual(['bsp_test_spi_cfg', 'bsp_test_spi_cfg_handle', 'testpart_ops']);
     });
 
@@ -584,6 +588,7 @@ describe('the chip-select', () => {
         const workfile = workfile_with('test_sensor', 'otherboard', 'othersoc');
         expectOk(bootstrap(workfile));
         add(workfile, 'second', 'test_sensor');
+        expectOk(attach_eval_board(workfile, 'eval-testpart', 'second'));
         const report = bootstrap(workfile);
         expectOk(report);
 
@@ -602,6 +607,7 @@ describe('the chip-select', () => {
         const workfile = workfile_with('test_sensor');
         expectOk(bootstrap(workfile));
         add(workfile, 'second', 'test_sensor');
+        expectOk(attach_eval_board(workfile, 'eval-testpart', 'second'));
         const report = bootstrap(workfile);
         expectOk(report);
 
@@ -614,6 +620,7 @@ describe('the chip-select', () => {
         const workfile = workfile_with('test_sensor', 'otherboard', 'othersoc');
         expectOk(bootstrap(workfile));
         add(workfile, 'second', 'test_sensor');
+        expectOk(attach_eval_board(workfile, 'eval-testpart', 'second'));
         expectOk(bootstrap(workfile));
         expect(stored(workfile)['test_spi_device']?.cs_gpio).toBe('test_gpio_pin');
     });
@@ -638,6 +645,7 @@ describe('the chip-select', () => {
         const workfile = workfile_with('test_sensor', 'otherboard', 'othersoc');
         expectOk(bootstrap(workfile));
         add(workfile, 'second', 'test_sensor');
+        expectOk(attach_eval_board(workfile, 'eval-testpart', 'second'));
         expectOk(bootstrap(workfile));
         add(workfile, 'my_pin', 'test_gpio_pin');
         expectOk(set_value(workfile, 'test_spi_device_1', 'cs_gpio', 'my_pin'));

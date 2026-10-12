@@ -57,9 +57,11 @@ import { board_gpio_ports } from "../registry/bsp";
 import type { PinReference } from "../registry/bsp";
 import type { GpioIdentity } from "../registry/types";
 import { get_registry, resolve_entry } from "../registry/registry";
-import { find_eval_board, resolve_bus } from "../registry/wiring";
+import { free_chip_select_pins, resolve_bus } from "../registry/wiring";
+import { EVAL_BOARD_PART, find_eval_board_module } from "../registry/eval_boards";
+import type { ModuleInfo } from "../registry/types";
 import type { ChipSelect, Connection, TakenChipSelects } from "../registry/wiring";
-import { collect_child_overrides, create_connections_graph, is_referenced_by_others } from "../validator/connection_graph";
+import { child_names, collect_child_overrides, create_connections_graph, is_referenced_by_others } from "../validator/connection_graph";
 import type { ConnectionGraph } from "../validator/types";
 import { apply_overrides } from "../validator/override_resolver";
 import { add_symbol, is_hidden, mark_auto, remove_symbol, materialize_hidden, materialize_referenced_hidden, set_value } from "../workfile_handler/workfile_handler";
@@ -358,7 +360,14 @@ function still_fits(workfile: Workfile, effective: Property, value: unknown, sel
 	switch (effective._t) {
 		case "IncludeProperty": {
 			// A list is never bootstrap's except as a chip-select, which the wiring owns.
-			return effective.count !== undefined || provides(value, effective.include);
+			if (effective.count !== undefined) {
+				return true;
+			}
+			// `include_type` takes any node of a kind (an eval board's part: any handle).
+			if (effective.include_type !== undefined) {
+				return typeof value === "string" && workfile.symbols[value]?.$type === effective.include_type;
+			}
+			return provides(value, effective.include);
 		}
 		case "UnionProperty": {
 			const [entry, ...more] = typeof value === "object" && value !== null ? Object.entries(value as Record<string, unknown>) : [];
@@ -696,6 +705,55 @@ interface PartOnBus {
 	interface: string,
 }
 
+/**
+ * The eval board carrying a part: the eval-board node whose `part` reaches the part's node
+ * (adxl355_init_param, through capi_accel_sensor and its config). None for a bare part.
+ */
+function eval_board_for(workfile: Workfile, part_node: string): ModuleInfo | undefined {
+	const graph = create_connections_graph(workfile);
+	for (const node of Object.values(workfile.symbols)) {
+		const root = node._t === "RulesetStruct" && node.$eval_board === true ? value_of(node, EVAL_BOARD_PART) : undefined;
+		if (typeof root !== "string") {
+			continue;
+		}
+		const seen = new Set<string>();
+		const pending = [root];
+		for (let next = pending.pop(); next !== undefined; next = pending.pop()) {
+			if (next === part_node) {
+				return find_eval_board_module(node.$symbol);
+			}
+			if (!seen.has(next)) {
+				seen.add(next);
+				pending.push(...child_names(graph, next));
+			}
+		}
+	}
+	return undefined;
+}
+
+/** The wiring report of a bare part: nothing is known about how it is wired, so say so. */
+function bare_part_wiring(workfile: Workfile, device: string, driver: string, interface_: string): BusWiring {
+	const binding = get_registry();
+	const chip_select = binding.ok ? binding.value.chip_select : undefined;
+	const is_spi = chip_select?.device === workfile.symbols[device]?.$symbol;
+	const free = is_spi && workfile.board !== undefined && chip_select !== undefined
+		? free_chip_select_pins(workfile.board, taken_chip_selects(workfile, device, chip_select))
+		: undefined;
+	const options = free?.ok === true
+		? free.value.map(pin => ({ at: pin.at, ...(pin.gpio === undefined ? {} : { gpio: pin.gpio }) }))
+		: [];
+	return {
+		device,
+		part: driver,
+		interface: interface_,
+		connections: [],
+		problems: [is_spi
+			? `no eval board carries this ${driver}, so its wiring is yours: set ${device}.${chip_select?.gpio_list ?? "cs_gpio"} (or add the eval board instead: attach-noos add <eval board>)`
+			: `no eval board carries this ${driver}, so its wiring is yours (or add the eval board instead: attach-noos add <eval board>)`],
+		...(options.length === 0 ? {} : { chip_select_options: options }),
+	};
+}
+
 /** Every (driver node, bus device node) pair in the workfile. */
 function parts_on_bus(workfile: Workfile): PartOnBus[] {
 	const pairs: PartOnBus[] = [];
@@ -740,7 +798,7 @@ function chip_select_step(workfile: Workfile, externs: ExternIndex): Step | unde
 	}
 	const chip_select = binding.value.chip_select;
 
-	for (const { device, driver } of parts_on_bus(workfile)) {
+	for (const { device, part_node } of parts_on_bus(workfile)) {
 		const device_node = workfile.symbols[device];
 		if (device_node?.$symbol !== chip_select.device) {
 			continue;
@@ -749,12 +807,12 @@ function chip_select_step(workfile: Workfile, externs: ExternIndex): Step | unde
 			continue;
 		}
 
-		// Only a part whose eval board is known can be wired; anything else stays a question.
-		const part = find_eval_board(driver);
-		if (!part.ok) {
+		// Only a part on an eval board in the workfile can be wired; a bare part is the user's.
+		const part = eval_board_for(workfile, part_node);
+		if (part === undefined) {
 			continue;
 		}
-		const resolved = resolve_bus(part.value, workfile.board, "spi", [], taken_chip_selects(workfile, device, chip_select));
+		const resolved = resolve_bus(part, workfile.board, "spi", [], taken_chip_selects(workfile, device, chip_select));
 		if (!resolved.ok) {
 			continue;
 		}
@@ -782,7 +840,7 @@ function chip_select_step(workfile: Workfile, externs: ExternIndex): Step | unde
 			continue; // the board's BSP configures no port for that pin; resolve_bus says so
 		}
 
-		return { kind: "chip_select", device, part: part.value.name, resolved: decided };
+		return { kind: "chip_select", device, part: part.name, resolved: decided };
 	}
 
 	return undefined;
@@ -891,19 +949,20 @@ function wiring_of(workfile: Workfile, touched: Set<string>): BusWiring[] {
 	}
 
 	const wiring: BusWiring[] = [];
-	for (const { device, driver, interface: interface_ } of parts_on_bus(workfile)) {
+	for (const { device, driver, part_node, interface: interface_ } of parts_on_bus(workfile)) {
 		if (!touched.has(device)) {
 			continue;
 		}
-		const part = find_eval_board(driver);
-		if (!part.ok) {
+		const part = eval_board_for(workfile, part_node);
+		if (part === undefined) {
+			wiring.push(bare_part_wiring(workfile, device, driver, interface_));
 			continue;
 		}
 		const binding = get_registry();
 		const taken = binding.ok && binding.value.chip_select !== undefined
 			? taken_chip_selects(workfile, device, binding.value.chip_select)
 			: undefined;
-		const resolved = resolve_bus(part.value, workfile.board, interface_, [], taken);
+		const resolved = resolve_bus(part, workfile.board, interface_, [], taken);
 		if (!resolved.ok) {
 			continue;
 		}
@@ -919,12 +978,12 @@ function wiring_of(workfile: Workfile, touched: Set<string>): BusWiring[] {
 		// Nothing landed and nothing went wrong: the part has no pins for this bus at all,
 		// which is a board that cannot be used this way (a SPI-only Pmod set to I2C).
 		if (resolved.value.connections.length === 0 && problems.length === 0) {
-			problems.push(`${part.value.name} declares no ${interface_} pins, so it cannot be wired over ${interface_}`);
+			problems.push(`${part.name} declares no ${interface_} pins, so it cannot be wired over ${interface_}`);
 		}
 
 		wiring.push({
 			device,
-			part: part.value.name,
+			part: part.name,
 			interface: interface_,
 			...(resolved.value.peripheral === undefined ? {} : { peripheral: resolved.value.peripheral }),
 			connections: resolved.value.connections,
@@ -1045,6 +1104,25 @@ function realize(workfile: Workfile, option: Option, externs: ExternIndex): Resu
 			return added.ok ? ok({ name, symbol: option.symbol, created: true, hidden: false }) : added;
 		}
 	}
+}
+
+/**
+ * Put an eval board on the bench: its node, carrying the part whose root is `root`
+ * (`add eval-adxl355-pmdz` adds the adxl355 root, then this). The node is named after the
+ * board, as a C identifier (eval_adxl355_pmdz), and its `part` link is bootstrap's own.
+ */
+export function attach_eval_board(workfile: Workfile, eval_board: string, root: string): Result<string> {
+	const ruleset = load_resolved_ruleset_for_board(eval_board, workfile.board);
+	if (!ruleset.ok) {
+		return ruleset;
+	}
+	const name = unique_name(workfile, eval_board.replaceAll(/[^A-Za-z0-9_]/g, "_"));
+	const added = add_symbol(workfile, name, ruleset.value);
+	if (!added.ok) {
+		return added;
+	}
+	const linked = set_owned(workfile, name, EVAL_BOARD_PART, root);
+	return linked.ok ? ok(name) : linked;
 }
 
 /**

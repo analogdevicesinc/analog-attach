@@ -1,5 +1,5 @@
 import { buildCommand } from "@stricli/core";
-import { addable_drivers, list_available_structs } from "attach-no-os-lib";
+import { addable_drivers, list_available_structs, list_eval_boards } from "attach-no-os-lib";
 import { common_ok, type Device, type ListDevicesResponse } from "../protocol/responses";
 import { load_context, output, output_error } from "./shared";
 
@@ -45,6 +45,7 @@ export const listDevicesCommand = buildCommand<{ json?: boolean; filter?: string
         // tag names the repo a symbol came from (capi, adxl355, ...).
         const drivers = addable_drivers();
         const groups: [string, string[]][] = [
+            ...(list_eval_boards().length > 0 ? [["eval boards", list_eval_boards()] as [string, string[]]] : []),
             ...(drivers.ok && drivers.value.length > 0 ? [["drivers", drivers.value] as [string, string[]]] : []),
             ...Object.entries(available.value.by_module),
         ];
@@ -78,8 +79,10 @@ function format_devices(devices: Device[], platform?: string): string {
     let out = "";
     for (const [tag, keys] of by_tag) {
         let label = tag === "platform" && platform ? `platform (${platform})` : tag;
-        if (tag === "drivers") {
-            label = "drivers (add by name; bootstrap builds the rest)";
+        if (tag === "eval boards") {
+            label = "eval boards (the part on it, wired: add by name)";
+        } else if (tag === "drivers") {
+            label = "drivers (a bare part, wired by hand: add by name)";
         }
         out += `  ${label}:\n`;
         for (const key of keys) {

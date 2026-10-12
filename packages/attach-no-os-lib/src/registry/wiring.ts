@@ -336,6 +336,22 @@ function chip_select_options(board: BoardInfo, buses: BusPins[], peripheral: str
 }
 
 /**
+ * Header pins a chip-select could go to on a board, for a part with no known eval board: free
+ * of other devices and other bus signals, and able to drive it.
+ */
+export function free_chip_select_pins(board_name: string, taken: TakenChipSelects = NOTHING_TAKEN): Result<BoardPin[]> {
+	const board = find_board(board_name);
+	if (!board.ok) {
+		return board;
+	}
+	const buses = board_bus_pins(board_name);
+	if (!buses.ok) {
+		return buses;
+	}
+	return ok(chip_select_options(board.value, buses.value, undefined, taken));
+}
+
+/**
  * Which board bus a part's bus lines land on, and - for SPI - how its chip-select is driven.
  *
  * `interface_` is the role prefix: `spi` reads the part's spi_sck/spi_mosi/spi_miso/spi_cs

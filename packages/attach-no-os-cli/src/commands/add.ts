@@ -3,9 +3,11 @@ import { buildCommand } from "@stricli/core";
 import {
     IIO_TEMPLATE_SET,
     add_symbol,
+    attach_eval_board,
     driver_iio_root,
     driver_root,
     driver_root_for,
+    find_eval_board_module,
     get_effective_setting_value,
     list_available_structs,
     list_drivers,
@@ -160,6 +162,9 @@ export const addCommand = buildCommand<AddFlags, [string | undefined]>({
         // A schema wins over a driver of the same name; a driver is only the shorthand.
         let schema = key;
         let default_node_name = default_name(key);
+        // What `add` was given a name of: a driver, or an eval board carrying one.
+        let driver = key;
+        let eval_board: string | undefined;
         const interfaces = (flags.as ?? "").split(",").map(entry => entry.trim()).filter(entry => entry !== "");
         if (interfaces.length > 0 && available.value.all.includes(key)) {
             output_error(flags, `--as picks a driver's interface, and '${key}' is a schema, not a driver`);
@@ -167,7 +172,13 @@ export const addCommand = buildCommand<AddFlags, [string | undefined]>({
         }
         if (!available.value.all.includes(key)) {
             const drivers = list_drivers();
-            const is_driver = drivers.ok && drivers.value.some(driver => driver.name === key);
+            // An eval board is added through the driver it carries, then attached to it.
+            const eval_module = find_eval_board_module(key);
+            if (eval_module?.implements_driver !== undefined) {
+                eval_board = key;
+                driver = eval_module.implements_driver;
+            }
+            const is_driver = drivers.ok && drivers.value.some(candidate => candidate.name === driver);
             if (!is_driver) {
                 output_error(flags, `Unknown schema '${key}'. See: attach-noos list-devices`);
                 return;
@@ -178,15 +189,15 @@ export const addCommand = buildCommand<AddFlags, [string | undefined]>({
             const iio = template_set.ok && template_set.value === IIO_TEMPLATE_SET;
             const [first_interface] = interfaces;
             const root = iio
-                ? driver_iio_root(key)
-                : (first_interface === undefined ? driver_root(key) : driver_root_for(key, first_interface));
+                ? driver_iio_root(driver)
+                : (first_interface === undefined ? driver_root(driver) : driver_root_for(driver, first_interface));
             if (!root.ok) {
                 output_error(flags, root.error.message);
                 return;
             }
             schema = root.value;
             // Named after the side too when one is picked, so ADC and DAC never collide.
-            default_node_name = first_interface === undefined ? key : `${key}_${first_interface}`;
+            default_node_name = first_interface === undefined ? driver : `${driver}_${first_interface}`;
         }
 
         const name = flags.name ?? unique_name(default_node_name, context.value);
@@ -214,7 +225,7 @@ export const addCommand = buildCommand<AddFlags, [string | undefined]>({
         // Named by its driver: say which part it is now, so nothing below it is guessed.
         const pinned_links: LinkedReference[] = [];
         if (schema !== key) {
-            const pinned = pin_driver(context.value.workfile, name, key);
+            const pinned = pin_driver(context.value.workfile, name, driver);
             if (!pinned.ok) {
                 output_error(flags, pinned.error.message);
                 return;
@@ -227,12 +238,12 @@ export const addCommand = buildCommand<AddFlags, [string | undefined]>({
         const chip = chip_of(context.value.workfile, name);
         const sides: string[] = [];
         for (const interface_ of interfaces.slice(1)) {
-            const side = driver_root_for(key, interface_);
+            const side = driver_root_for(driver, interface_);
             if (!side.ok) {
                 output_error(flags, side.error.message);
                 return;
             }
-            const side_name = unique_name(`${key}_${interface_}`, context.value);
+            const side_name = unique_name(`${driver}_${interface_}`, context.value);
             const side_ruleset = load_resolved_ruleset_for_board(side.value, context.value.workfile.board);
             if (!side_ruleset.ok) {
                 output_error(flags, side_ruleset.error.message);
@@ -243,13 +254,24 @@ export const addCommand = buildCommand<AddFlags, [string | undefined]>({
                 output_error(flags, side_added.error.message);
                 return;
             }
-            const side_pinned = pin_driver(context.value.workfile, side_name, key, chip);
+            const side_pinned = pin_driver(context.value.workfile, side_name, driver, chip);
             if (!side_pinned.ok) {
                 output_error(flags, side_pinned.error.message);
                 return;
             }
             pinned_links.push(...side_pinned.value);
             sides.push(side_name);
+        }
+
+        // On an eval board: its node carries the part, and its pinout is what wires it.
+        let eval_node: string | undefined;
+        if (eval_board !== undefined) {
+            const attached = attach_eval_board(context.value.workfile, eval_board, name);
+            if (!attached.ok) {
+                output_error(flags, attached.error.message);
+                return;
+            }
+            eval_node = attached.value;
         }
 
         const ran = run_bootstrap(context.value.workfile);
@@ -270,7 +292,7 @@ export const addCommand = buildCommand<AddFlags, [string | undefined]>({
         const errors = validation.errors.filter(entry => entry.severity === "error").length;
         const left = `${String(errors)} problem${errors === 1 ? "" : "s"} left`;
 
-        const what = schema === key ? key : `${schema}, for driver ${key}`;
+        const what = schema === key ? key : `${schema}, for driver ${driver}`;
         const created = report === undefined ? 0 : report.linked.filter(link => link.created && !link.hidden).length;
         const message = report === undefined
             ? `Added '${name}' (${what})`
@@ -286,6 +308,7 @@ export const addCommand = buildCommand<AddFlags, [string | undefined]>({
         const text = [
             `Added '${name}' (${what})`,
             ...sides.map(side => `Added '${side}' on the same chip`),
+            ...(eval_node === undefined ? [] : [`On eval board '${eval_node}' (${eval_board ?? ""})`]),
             `  ${context.value.path}`,
             ...(report === undefined ? [] : describe_bootstrap(report, context.value.workfile)),
             "",

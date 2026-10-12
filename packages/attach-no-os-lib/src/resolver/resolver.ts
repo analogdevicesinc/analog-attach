@@ -5,6 +5,7 @@ import { parse_ruleset } from "../ruleset_parser/ruleset_parser";
 import type { EnumProperty, Property, Ruleset, RulesetDescriptor } from "../ruleset_parser/types";
 import { resolve_entry } from "../registry/registry";
 import { find_board_extern } from "../registry/bsp";
+import { eval_board_ruleset, find_eval_board_module } from "../registry/eval_boards";
 
 /**
  * Load the ruleset a bare `$symbol` names.
@@ -147,7 +148,14 @@ export function load_resolved_ruleset_for_board(symbol: string, board?: string):
 	// Whether the global index HAS the symbol, not whether loading it succeeded. A ruleset
 	// that exists but fails to parse must report why: falling through to the board on any
 	// failure would turn every parse error in a shared ruleset into "no module defines it".
-	if (resolve_entry(symbol).ok || board === undefined) {
+	if (resolve_entry(symbol).ok) {
+		return load_resolved_ruleset(symbol);
+	}
+	// An eval board is a node too (`add eval-adxl355-pmdz`), synthesized from its module.yml.
+	if (find_eval_board_module(symbol) !== undefined) {
+		return eval_board_ruleset(symbol);
+	}
+	if (board === undefined) {
 		return load_resolved_ruleset(symbol);
 	}
 
