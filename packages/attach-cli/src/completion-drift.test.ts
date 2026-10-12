@@ -8,8 +8,7 @@ import { build_completion_command } from "./commands/completion/command";
 import { run_complete, shell_dequote } from "./commands/completion/complete";
 import { COMPLETION_SPEC, NO_VALUE_COMPLETION, FILES_DIRECTIVE, DIRS_DIRECTIVE } from "./commands/completion/spec";
 import { CONFIG_REGISTRY } from "./config";
-import * as suggest from "./commands/suggest/command";
-import * as internal from "./commands/list/internal";
+import * as suggest from "./commands/list/suggest";
 import { LIST_KINDS } from "./commands/list/command";
 
 const CONFIG_SET_FIELD_NAMES = CONFIG_REGISTRY

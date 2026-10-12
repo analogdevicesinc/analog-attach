@@ -10,7 +10,7 @@ import { build_add_command } from "./commands/add/command";
 import { build_read_command } from "./commands/read/command";
 import { build_update_command } from "./commands/update/command";
 import { build_delete_command } from "./commands/delete/command";
-import { build_validate_command } from "./commands/validate2/command";
+import { build_validate_command } from "./commands/validate/command";
 import { build_move_command } from "./commands/move/command";
 import { build_rename_command } from "./commands/rename/command";
 import { build_list_command } from "./commands/list/command";

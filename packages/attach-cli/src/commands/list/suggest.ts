@@ -1,4 +1,3 @@
-import { Command } from "commander";
 import {
     Attach,
     DeviceTree,
@@ -7,20 +6,17 @@ import {
     board_layer,
     bus_chip_selects,
     describe_slot,
-    describe_placement,
     dt_to_validator_input,
     get_full_node_name,
     parent_path_string,
     parse_board_description,
     placement_from_overlay,
-    PropertyBuilder,
     suggest_parents,
     type BoardLayer,
     type DTNode,
     type NodePlacement,
     type PatternPropertyRule,
     type ParsedBinding,
-    type ResolvedProperty,
     type ValueSuggestion,
 } from "attach-lib";
 import * as fs from "node:fs";
@@ -31,23 +27,12 @@ import { resolve_config } from "../../resolve-config";
 import { load_board } from "../../board";
 import { format_suggestion, build_raw_property, shape_hint, parse_value } from "../update/command";
 import { bigIntReplacer, effective_parent_compatibles, find_binding, fragment_target, get_or_build_compat_index, load_base, load_trees, parse_property_reference, resolve_node_identifier, resolve_positional_path, resolve_write_target } from "../../utilities";
-import { respond, respond_fail, input_error, diagnostic } from "../../protocol/output";
+import { respond, respond_fail, input_error } from "../../protocol/output";
 import { attach_type_to_protocol_type } from "../../protocol/dt-to-protocol";
 import { resolve_node_binding, type NodeBinding } from "../../binding-resolution";
 import { check_value } from "../../value-check";
 import type { TypeResponse, Suggestion } from "../../protocol/types";
 
-export function build_suggest_command(context: LocalContext): Command {
-    return new Command("suggest")
-        .description("Provide suggestions for a given intelligence kind")
-        .argument("[args...]", "kind followed by kind-specific args")
-        .action(async (arguments_: string[]) => {
-            await run_suggest(context, arguments_);
-        });
-}
-
-// The `suggest` action body, exported so shell-completion (`__complete`) can
-// reuse the exact same intelligence in-process without a second subprocess.
 export async function run_suggest(context: LocalContext, arguments_: string[]): Promise<void> {
     const kind = arguments_[0];
 
@@ -134,7 +119,6 @@ async function suggest_parent(context_: LocalContext, arguments_: string[]): Pro
     }
 }
 
-// Parse and emit the standard diagnostics for a binding looked up by compatible.
 async function load_binding(context_: LocalContext, linux: string, dtSchema: string, compatible: string): Promise<ParsedBinding | undefined> {
     const binding_path = await find_binding(linux, dtSchema, compatible, context_.json);
     if (binding_path === undefined) {
@@ -159,8 +143,6 @@ async function load_binding(context_: LocalContext, linux: string, dtSchema: str
     return binding.parsed_binding;
 }
 
-// The configured board as an intelligence layer. The board is optional for the
-// kinds that use this, so a broken board is reported and ignored, not fatal.
 function optional_board_layer(config: AttachConfig): { layer?: BoardLayer; board_error?: string } {
     if (config.board === undefined) { return {}; }
     const board = load_board(config.board);
@@ -214,7 +196,6 @@ function to_suggestion(suggestion: ValueSuggestion): Suggestion {
     };
 }
 
-// How the board layer read the node's position, for the response message.
 export function slot_message(layer: BoardLayer, base_dt: DeviceTree, placement: NodePlacement, count: number): { message: string; severity: "info" | "warn" } {
     const found = `Found ${count} value(s) from ${layer.board.board}`;
 

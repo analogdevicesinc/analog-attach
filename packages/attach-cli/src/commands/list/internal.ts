@@ -1,6 +1,8 @@
 import { Command } from "commander";
 import type { LocalContext } from "../../context";
-import { run_suggest } from "../suggest/command";
+import { run_suggest } from "./suggest";
+
+export { run_suggest } from "./suggest";
 
 export async function run_internal_list(context: LocalContext, arguments_: string[]): Promise<void> {
     await run_suggest(context, arguments_);
