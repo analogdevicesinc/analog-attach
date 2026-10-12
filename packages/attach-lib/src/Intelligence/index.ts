@@ -21,6 +21,7 @@ export {
     is_gpio_property,
     INTERRUPT_MACROS,
     GPIO_MACROS,
+    type MacroDefinition,
 } from "./query.js";
 
 export {

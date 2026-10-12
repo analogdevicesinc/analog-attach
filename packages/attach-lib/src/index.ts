@@ -51,33 +51,5 @@ export {
     unique_label,
 } from './Devicetree/Labels.js';
 
-// Intelligence: queries, parent suggestions and layers
-export {
-    query_devicetree,
-    INTERRUPT_MACROS,
-    GPIO_MACROS,
-} from './Intelligence/query.js';
-export { parent_path_string, suggest_parents, extract_compatible } from './Intelligence/parents.js';
-export { insert_known_structures } from './Intelligence/known_properties.js';
-export type {
-    NodePlacement,
-    SuggestedCell,
-    ValueSuggestion,
-} from './Intelligence/layers/types.js';
-export { IntelligenceStack } from './Intelligence/layers/stack.js';
-export { placement_from_overlay } from './Intelligence/layers/placement.js';
-
-// Board descriptions
-export type { BoardDescription } from './Intelligence/board/types.js';
-export { parse_board_description } from './Intelligence/board/parse.js';
-export { bus_chip_selects, exclusions_of, exclusive_slots, gpio_usage, shared_with, type GpioUse, type SharedLine, type SlotExclusion } from './Intelligence/board/derived.js';
-export { board_layer, describe_slot, describe_placement, type BoardLayer } from './Intelligence/board/layer.js';
-
-// Interrupt parent resolution
-export {
-    effective_interrupt_parent,
-    base_lookup,
-    overlay_lookup,
-    type InterruptParentInfo,
-    type NodeLookup,
-} from './Intelligence/interrupt_parent.js';
+// Intelligence: queries, parent suggestions, layers, board, interrupt parent
+export * from './Intelligence/index.js';
