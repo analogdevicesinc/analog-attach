@@ -337,15 +337,16 @@ export function board_layer(board: BoardDescription): BoardLayer {
             const own_bus = bus_at_path(board, bus_paths, context.placement.node_path);
             const inference = own_bus === undefined ? slots_for_placement(board, bus_paths, context.placement) : undefined;
 
-            const suggest_one = (property: string, lower: ValueSuggestion[]): ValueSuggestion[] => {
-                if (own_bus !== undefined) { return merge_board(lower, bus_node_values(property, own_bus.name)); }
-                return merge_board(lower, device_values(property, inference!, context.placement!, context));
+            const own_values = (property: string): ValueSuggestion[] => {
+                if (own_bus !== undefined) { return bus_node_values(property, own_bus.name); }
+                return device_values(property, inference!, context.placement!, context);
             };
 
             return properties.map(property => {
+                const own = own_values(property.key);
+                if (own.length === 0) { return property; }
                 const lower = (property.suggestions ?? []).filter(s => s.source !== name);
-                const suggestions = suggest_one(property.key, lower);
-                return suggestions.length === lower.length ? property : { ...property, suggestions };
+                return { ...property, suggestions: merge_board(lower, own) };
             });
         },
 
