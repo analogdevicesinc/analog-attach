@@ -128,50 +128,60 @@ function phandle_matrix(phandles: string[], bounds: { minItems: number; maxItems
 
 // --- Refiners ---
 
+function effective_interrupt_controller(
+    parsed_data: Record<string, unknown>,
+    inherited_interrupt_parent: string | undefined,
+): string | undefined {
+    const raw = parsed_data["interrupt-parent"];
+    if (raw === undefined) { return inherited_interrupt_parent; }
+    if (Array.isArray(raw) && raw.length === 1 && typeof raw[0] === "string") { return raw[0]; }
+    return raw as string | undefined;
+}
+
 function refine_interrupt_parent(
     property: ResolvedProperty,
-    properties_clone: ResolvedProperty[],
     devicetree: DeviceTree,
     parsed_data: Record<string, unknown>,
     inherited_interrupt_parent: string | undefined,
 ): boolean {
     if (property.key !== "interrupt-parent") { return false; }
 
-    const is_set = (() => {
-        const raw = parsed_data["interrupt-parent"];
-        if (raw === undefined) { return inherited_interrupt_parent; }
-        if (Array.isArray(raw) && raw.length === 1 && typeof raw[0] === "string") { return raw[0]; }
-        return raw;
-    })();
+    const is_set = effective_interrupt_controller(parsed_data, inherited_interrupt_parent);
+    const phandles = find_nodes(devicetree, is_interrupt_controller).map(located => phandle_name(located));
 
-    const interrupt_controllers = find_nodes(devicetree, is_interrupt_controller);
-    const phandles = interrupt_controllers.map(located => phandle_name(located));
+    property.value = phandle_enum_array(phandles, property.value.description, is_set);
+    return true;
+}
 
-    if (is_set !== undefined) {
-        const parent = interrupt_controllers.find(value => phandle_name(value) === is_set);
-        if (parent !== undefined) {
-            const cell_count = number_property(parent.node, "#interrupt-cells");
-            if (cell_count !== undefined) {
-                const new_interrupt = properties_clone.find(value => value.key === "interrupts");
-                if (new_interrupt !== undefined && new_interrupt.value._t === "array") {
-                    const row = specifier_row({
-                        numbers: Number(cell_count) - 1,
-                        number_item: { _t: "number" },
-                        trailing_macros: INTERRUPT_MACROS.map(m => m.name),
-                    });
-                    new_interrupt.value = {
-                        _t: "matrix",
-                        minItems: new_interrupt.value.minItems,
-                        maxItems: new_interrupt.value.maxItems,
-                        description: new_interrupt.value.description,
-                        values: [row],
-                    };
-                }
-            }
-        }
-    }
+function refine_interrupts(
+    property: ResolvedProperty,
+    devicetree: DeviceTree,
+    parsed_data: Record<string, unknown>,
+    inherited_interrupt_parent: string | undefined,
+): boolean {
+    if (property.key !== "interrupts" || property.value._t !== "array") { return false; }
 
-    property.value = phandle_enum_array(phandles, property.value.description, is_set as string | undefined);
+    const is_set = effective_interrupt_controller(parsed_data, inherited_interrupt_parent);
+    if (is_set === undefined) { return false; }
+
+    const parent = find_nodes(devicetree, is_interrupt_controller).find(value => phandle_name(value) === is_set);
+    if (parent === undefined) { return false; }
+
+    const cell_count = number_property(parent.node, "#interrupt-cells");
+    if (cell_count === undefined) { return false; }
+
+    const row = specifier_row({
+        numbers: Number(cell_count) - 1,
+        number_item: { _t: "number" },
+        trailing_macros: cell_count > 1n ? INTERRUPT_MACROS.map(m => m.name) : undefined,
+    });
+    property.value = {
+        _t: "matrix",
+        minItems: property.value.minItems,
+        maxItems: property.value.maxItems,
+        description: property.value.description,
+        values: [row],
+    };
     return true;
 }
 
@@ -304,20 +314,20 @@ function refine_gpio(
         phandle: { enum: phandles, default: set_controller },
         numbers: Number(cell_count) - 1,
         number_item: { _t: "number" },
-        trailing_macros: GPIO_MACROS.map(m => m.name),
+        trailing_macros: cell_count > 1n ? GPIO_MACROS.map(m => m.name) : undefined,
         description: property.value.description,
     });
 
     const { min_rows, max_rows } = gpio_row_bounds(property.value);
 
     // eslint-disable-next-line unicorn/prefer-ternary
-    if (max_rows <= 1) {
+    if (max_rows !== undefined && max_rows <= 1) {
         property.value = row;
     } else {
         property.value = {
             _t: "matrix",
             minItems: min_rows,
-            maxItems: max_rows,
+            ...(max_rows === undefined ? {} : { maxItems: max_rows }),
             description: property.value.description,
             values: [row],
         };
@@ -339,7 +349,8 @@ export function query_devicetree(
     const parsed_data = JSON.parse(data);
 
     for (const property of properties_clone) {
-        if (refine_interrupt_parent(property, properties_clone, devicetree, parsed_data, inherited_interrupt_parent)) { continue; }
+        if (refine_interrupt_parent(property, devicetree, parsed_data, inherited_interrupt_parent)) { continue; }
+        if (refine_interrupts(property, devicetree, parsed_data, inherited_interrupt_parent)) { continue; }
         if (refine_clocks(property, devicetree)) { continue; }
         if (refine_dmas(property, devicetree, parsed_data)) { continue; }
         if (refine_pwms(property, devicetree, parsed_data)) { continue; }
@@ -357,10 +368,10 @@ export function query_devicetree(
  * or `maxItems` fixes the count to it, and with no sizing at all the property
  * is a bare phandle-array (types.yaml): at least one row, no upper bound.
  */
-function gpio_row_bounds(value: ResolvedProperty["value"]): { min_rows: number, max_rows: number } {
+function gpio_row_bounds(value: ResolvedProperty["value"]): { min_rows: number, max_rows: number | undefined } {
     const min = "minItems" in value && typeof value.minItems === "number" ? value.minItems : undefined;
     const max = "maxItems" in value && typeof value.maxItems === "number" ? value.maxItems : undefined;
-    if (min === undefined && max === undefined) { return { min_rows: 1, max_rows: Number.POSITIVE_INFINITY }; }
+    if (min === undefined && max === undefined) { return { min_rows: 1, max_rows: undefined }; }
     return { min_rows: min ?? max!, max_rows: max ?? min! };
 }
 
@@ -412,6 +423,70 @@ if (import.meta.vitest) {
         const result = query_devicetree(dt, properties, "{}", "gic");
         const interrupts = result.find(p => p.key === "interrupts");
         expect(interrupts?.value._t).toBe("matrix");
+    });
+
+    test("query_devicetree — interrupts reshaped even without interrupt-parent in binding", () => {
+        const dt = dts(`/dts-v1/;
+/ {
+    gic: interrupt-controller@ff841000 {
+        interrupt-controller;
+        #interrupt-cells = <2>;
+    };
+};`);
+        const properties = [
+            { key: "interrupts", value: { _t: "array" as const, minItems: 1, maxItems: 4 } },
+        ];
+        const result = query_devicetree(dt, properties, "{}", "gic");
+        const interrupts = result.find(p => p.key === "interrupts");
+        expect(interrupts?.value._t).toBe("matrix");
+        if (interrupts?.value._t === "matrix") {
+            expect(interrupts.value.minItems).toBe(1);
+            expect(interrupts.value.maxItems).toBe(4);
+        }
+    });
+
+    test("query_devicetree — #interrupt-cells = <1>: row is [number], no macro", () => {
+        const dt = dts(`/dts-v1/;
+/ {
+    intc: interrupt-controller {
+        interrupt-controller;
+        #interrupt-cells = <1>;
+    };
+};`);
+        const properties = [
+            { key: "interrupt-parent", value: { _t: "generic" as const } },
+            { key: "interrupts", value: { _t: "array" as const, minItems: 1, maxItems: 1 } },
+        ];
+        const result = query_devicetree(dt, properties, "{}", "intc");
+        const interrupts = result.find(p => p.key === "interrupts");
+        expect(interrupts?.value._t).toBe("matrix");
+        if (interrupts?.value._t === "matrix") {
+            const row = interrupts.value.values[0];
+            expect(row?._t).toBe("fixed_index");
+            if (row?._t === "fixed_index") {
+                expect(row.prefixItems).toHaveLength(0);
+                expect(row.minItems).toBe(0);
+            }
+        }
+    });
+
+    test("query_devicetree — #gpio-cells = <1>: row is [phandle, number], no macro", () => {
+        const dt = dts(`/dts-v1/;
+/ {
+    gpio: gpio@7e200000 {
+        compatible = "brcm,bcm2711-gpio";
+        gpio-controller;
+        #gpio-cells = <1>;
+    };
+};`);
+        const properties = [{ key: "reset-gpios", value: { _t: "array" as const, minItems: 1, maxItems: 1 } }];
+        const result = query_devicetree(dt, properties, JSON.stringify({ "reset-gpios": ["gpio"] }));
+        const reset = result.find(p => p.key === "reset-gpios");
+        expect(reset?.value._t).toBe("fixed_index");
+        if (reset?.value._t === "fixed_index") {
+            expect(reset.value.prefixItems).toHaveLength(1);
+            expect(reset.value.prefixItems[0]?._t).toBe("enum");
+        }
     });
 
     test("query_devicetree — *-gpios: item count is the phandle plus #gpio-cells", () => {
@@ -498,7 +573,7 @@ if (import.meta.vitest) {
             return cs?.value._t === "matrix" ? [cs.value.minItems, cs.value.maxItems] : cs?.value._t;
         };
         // No sizing (e.g. spi-controller.yaml cs-gpios): a bare phandle-array.
-        expect(rows({ _t: "generic" })).toStrictEqual([1, Number.POSITIVE_INFINITY]);
+        expect(rows({ _t: "generic" })).toStrictEqual([1, undefined]);
         // A lone minItems or maxItems fixes the count.
         expect(rows({ _t: "array", minItems: 2 } as ResolvedProperty["value"])).toStrictEqual([2, 2]);
         expect(rows({ _t: "array", maxItems: 3 } as ResolvedProperty["value"])).toStrictEqual([3, 3]);
