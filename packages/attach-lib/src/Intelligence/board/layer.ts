@@ -1,8 +1,8 @@
 import { readFileSync } from "node:fs";
 import { ParsedBinding, ResolvedProperty } from "../../Attach/AttachTypes.js";
-import { DeviceTree, DeviceTreeOverlay } from "../../Devicetree/index.js";
+import { cell_extract_first_value, DeviceTree, DeviceTreeOverlay } from "../../Devicetree/index.js";
 import { parent_path_string } from "../parents.js";
-import { cell_extract_first_value, is_gpio_property, INTERRUPT_MACROS } from "../query.js";
+import { is_gpio_property, INTERRUPT_MACROS } from "../query.js";
 import {
     IntelligenceLayer,
     NodePlacement,

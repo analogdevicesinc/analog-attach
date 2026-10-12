@@ -1,41 +1,31 @@
-import { DeviceTree, DTNode, is_dt_flag } from "../Devicetree/index.js";
+import { DeviceTree, DTNode, has_flag, has_property, has_compatible } from "../Devicetree/index.js";
 
 export function is_interrupt_controller(node: DTNode): boolean {
-    return node.properties.some(
-        p => p.name === "interrupt-controller" && is_dt_flag(p.value)
-    );
+    return has_flag(node, "interrupt-controller");
 }
 
 export function is_clock(node: DTNode): boolean {
-    return node.properties.some(
-        p => p.name === "compatible" &&
-            !is_dt_flag(p.value) &&
-            p.value.some(v => v.kind === "string" && v.value === "fixed-clock")
-    );
+    return has_compatible(node, "fixed-clock");
 }
 
 export function is_regulator(node: DTNode): boolean {
-    return node.properties.some(
-        p => p.name === "compatible" &&
-            !is_dt_flag(p.value) &&
-            p.value.some(v => v.kind === "string" && v.value === "regulator-fixed")
-    );
+    return has_compatible(node, "regulator-fixed");
 }
 
 export function is_gpio_controller(node: DTNode): boolean {
-    return node.properties.some(p => p.name === "compatible") &&
-        node.properties.some(p => p.name === "gpio-controller" && is_dt_flag(p.value)) &&
-        node.properties.some(p => p.name === "#gpio-cells");
+    return has_property(node, "compatible") &&
+        has_flag(node, "gpio-controller") &&
+        has_property(node, "#gpio-cells");
 }
 
 export function is_dma_controller(node: DTNode): boolean {
-    return node.properties.some(p => p.name === "compatible") &&
-        node.properties.some(p => p.name === "#dma-cells");
+    return has_property(node, "compatible") &&
+        has_property(node, "#dma-cells");
 }
 
 export function is_pwm_controller(node: DTNode): boolean {
-    return node.properties.some(p => p.name === "compatible") &&
-        node.properties.some(p => p.name === "#pwm-cells");
+    return has_property(node, "compatible") &&
+        has_property(node, "#pwm-cells");
 }
 
 if (import.meta.vitest) {

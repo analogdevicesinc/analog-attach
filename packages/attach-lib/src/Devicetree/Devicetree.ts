@@ -10,7 +10,6 @@ import {
     DTPath,
     get_full_node_name,
     DTProperty,
-    is_dt_flag
 } from "./Parser";
 
 import path from 'node:path';
@@ -18,6 +17,7 @@ import * as fs from 'node:fs';
 import { Result } from "../result";
 import { DTReference, TraversalOrder, UnitAddr } from "./Types";
 import { Stream } from "./Stream";
+import { type LocatedNode, parent_path as access_parent_path, has_compatible } from "./Access.js";
 
 function format_unit_addr_part(addr: UnitAddr): string {
     return addr.repr === "hex"
@@ -195,27 +195,13 @@ export class DeviceTree {
     }
 
     public get_parent(target: DTReference): DTReference | undefined {
-        // eslint-disable-next-line unicorn/consistent-function-scoping
-        const make_path = (p: string): DTPath => ({ kind: "path", labels: [], path: p });
+        const pp = access_parent_path(target.full_path.path);
+        if (pp === undefined) { return undefined; }
 
-        const path = target.full_path.path;
+        const parent_node = this.node_at(pp);
+        if (parent_node === undefined) { return undefined; }
 
-        if (path === "/") {
-            return undefined;
-        }
-
-        const segments = path.split("/").filter(s => s.length > 0);
-        segments.pop();
-
-        const parent_path = segments.length === 0 ? "/" : "/" + segments.join("/");
-
-        const parent_node = this.deref_node_by_path(parent_path);
-
-        if (parent_node === undefined) {
-            return undefined;
-        }
-
-        return DeviceTree.node_to_ref(parent_node, make_path(parent_path));
+        return DeviceTree.node_to_ref(parent_node, { kind: "path", labels: [], path: pp });
     }
 
     public get_node_by_label(label: DTLabel): DTReference | undefined {
@@ -229,7 +215,7 @@ export class DeviceTree {
     }
 
     public get_node_by_path(path: DTPath): DTReference | undefined {
-        const node = this.deref_node_by_path(path.path);
+        const node = this.node_at(path.path);
         if (node === undefined) {
             return undefined;
         }
@@ -261,21 +247,10 @@ export class DeviceTree {
     }
 
     public get_nodes_with_compatible(compatible: string): DTReference[] {
-        const results: DTReference[] = [];
-
-        for (const [node, path] of this.as_stream()) {
-            const compat_property = node.properties.find(p => p.name === "compatible");
-            if (compat_property === undefined || is_dt_flag(compat_property.value)) {
-                continue;
-            }
-
-            const has_match = compat_property.value.some(v => v.kind === "string" && v.value === compatible);
-            if (has_match) {
-                results.push(DeviceTree.node_to_ref(node, path));
-            }
-        }
-
-        return results;
+        return this.as_stream()
+            .filter(node => has_compatible(node, compatible))
+            .toArray()
+            .map(([node, path]) => DeviceTree.node_to_ref(node, path));
     }
 
     static node_to_ref(node: DTNode, path: DTPath): DTReference {
@@ -323,11 +298,18 @@ export class DeviceTree {
         return node.properties.length < original_length;
     }
 
-    public deref_node(reference: DTReference): DTNode | undefined {
-        return this.deref_node_by_path(reference.full_path.path);
+    public locate(target: DTLabel | DTPath): LocatedNode | undefined {
+        const reference = target.kind === "path" ? this.get_node_by_path(target) : this.get_node_by_label(target);
+        if (reference === undefined) { return undefined; }
+        const node = this.node_at(reference.full_path.path);
+        return node === undefined ? undefined : { node, path: reference.full_path.path };
     }
 
-    private deref_node_by_path(path: string): DTNode | undefined {
+    public deref_node(reference: DTReference): DTNode | undefined {
+        return this.node_at(reference.full_path.path);
+    }
+
+    public node_at(path: string): DTNode | undefined {
         if (path === "/") {
             return this.devicetree.root;
         }

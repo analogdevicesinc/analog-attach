@@ -1,23 +1,9 @@
-import { DeviceTree, DTNode, is_dt_flag } from "../../Devicetree/index.js";
+import { DeviceTree, DTNode, string_property, number_property, is_enabled } from "../../Devicetree/index.js";
 import { is_clock, is_interrupt_controller, is_regulator } from "../predicates.js";
-import { cell_extract_first_value, query_devicetree } from "../query.js";
+import { query_devicetree } from "../query.js";
 import { parent_path_string, suggest_parents } from "../parents.js";
 import { effective_interrupt_parent, base_lookup } from "../interrupt_parent.js";
 import { IntelligenceLayer, ValueSuggestion } from "./types.js";
-
-function string_property(node: DTNode, name: string): string | undefined {
-    const property = node.properties.find(p => p.name === name);
-    if (property === undefined || is_dt_flag(property.value)) { return; }
-    const first = property.value[0];
-    return first?.kind === "string" ? first.value : undefined;
-}
-
-function number_property(node: DTNode, name: string): bigint | undefined {
-    const property = node.properties.find(p => p.name === name);
-    if (property === undefined || is_dt_flag(property.value)) { return; }
-    const value = cell_extract_first_value(property);
-    return typeof value === "bigint" ? value : undefined;
-}
 
 function format_frequency(hz: bigint): string {
     if (hz % 1_000_000n === 0n) { return `${hz / 1_000_000n} MHz`; }
@@ -36,7 +22,7 @@ function providers(devicetree: DeviceTree, predicate: (node: DTNode) => boolean)
         .toArray()
         .flatMap(([node]) => {
             const label = node.labels.at(-1);
-            return label === undefined || string_property(node, "status") === "disabled" ? [] : [{ label, node }];
+            return label === undefined || !is_enabled(node) ? [] : [{ label, node }];
         });
 }
 
@@ -162,7 +148,7 @@ export const devicetree_layer: IntelligenceLayer = {
                 inherited_label = effective_interrupt_parent(base_lookup(context.devicetree), `${path_from_name}/child`, context.devicetree)?.label;
             }
         }
-        return query_devicetree(context.devicetree, properties, context.data, context.parent_name, inherited_label);
+        return query_devicetree(context.devicetree, properties, context.data, inherited_label);
     },
     suggest_values(property, context, lower) {
         return [

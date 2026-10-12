@@ -1,6 +1,6 @@
-import { type DTNode, type DTProperty, is_dt_flag, get_full_node_name } from "./Parser/AST.js";
+import { type DTNode, type DTProperty, is_dt_flag } from "./Parser/AST.js";
 import { PropertyBuilder } from "./PropertyBuilder.js";
-import { cell_extract_first_value } from "../Intelligence/query.js";
+import { is_enabled, number_property } from "./Access.js";
 import type { DeviceTreeOverlay } from "./DevicetreeOverlay.js";
 
 export function parse_unit_address(unit: string): bigint | undefined {
@@ -15,44 +15,30 @@ export function format_unit_address(value: bigint): string {
     return value.toString(16);
 }
 
-function get_cells_property(node: DTNode, name: string): number | undefined {
-    const property = node.properties.find(p => p.name === name);
-    if (property === undefined || is_dt_flag(property.value)) { return undefined; }
-    const value = cell_extract_first_value(property);
-    return typeof value === "bigint" ? Number(value) : undefined;
-}
-
 export interface AddressCells {
     address: number;
     size: number;
 }
 
 export function address_cells_of(overlay: DeviceTreeOverlay, parent_path: string): AddressCells {
-    const found = overlay.find_node({ kind: "path", labels: [], path: parent_path });
-    const node = found?.node;
+    const node = overlay.find_node({ kind: "path", labels: [], path: parent_path })?.node;
+    const base_node = overlay.get_base_dts()?.node_at(parent_path);
 
-    const base = overlay.get_base_dts();
-    let base_node: DTNode | undefined;
-    if (base !== undefined) {
-        const reference = base.get_node_by_path({ kind: "path", labels: [], path: parent_path });
-        if (reference !== undefined) { base_node = base.deref_node(reference); }
-    }
-
-    const overlay_addr = node !== undefined ? get_cells_property(node, "#address-cells") : undefined;
-    const overlay_size = node !== undefined ? get_cells_property(node, "#size-cells") : undefined;
-    const base_addr = base_node !== undefined ? get_cells_property(base_node, "#address-cells") : undefined;
-    const base_size = base_node !== undefined ? get_cells_property(base_node, "#size-cells") : undefined;
+    const overlay_addr = node === undefined ? undefined : number_property(node, "#address-cells");
+    const overlay_size = node === undefined ? undefined : number_property(node, "#size-cells");
+    const base_addr = base_node === undefined ? undefined : number_property(base_node, "#address-cells");
+    const base_size = base_node === undefined ? undefined : number_property(base_node, "#size-cells");
 
     return {
-        address: overlay_addr ?? base_addr ?? 1,
-        size: overlay_size ?? base_size ?? 0,
+        address: Number(overlay_addr ?? base_addr ?? 1n),
+        size: Number(overlay_size ?? base_size ?? 0n),
     };
 }
 
 export function encode_reg_address(value: bigint, address_cells: number, size_cells: number): DTProperty {
     const tags = [];
     for (let index = address_cells - 1; index >= 0; index--) {
-        tags.push(PropertyBuilder.tag_number((value >> BigInt(index * 32)) & 0xFFFF_FFFFn));
+        tags.push(PropertyBuilder.tag_number((value >> BigInt(index * 32)) & 0xFF_FF_FF_FFn));
     }
     for (let index = 0; index < size_cells; index++) {
         tags.push(PropertyBuilder.tag_number(0n));
@@ -72,16 +58,9 @@ export function decode_reg_address(reg: DTProperty, address_cells: number): bigi
     for (let index = 0; index < address_cells; index++) {
         const element = first.elements[index];
         if (element === undefined || element.kind !== "number") { return undefined; }
-        result = (result << 32n) | (element.value & 0xFFFF_FFFFn);
+        result = (result << 32n) | (element.value & 0xFF_FF_FF_FFn);
     }
     return result;
-}
-
-export function is_enabled(node: DTNode): boolean {
-    const status = node.properties.find(p => p.name === "status");
-    if (status === undefined || is_dt_flag(status.value)) { return true; }
-    const first = status.value[0];
-    return !(first?.kind === "string" && first.value === "disabled");
 }
 
 export function next_free_unit_address(
@@ -129,7 +108,7 @@ export function sync_unit_address_from_reg(
     if (new_address === undefined) { return "not-numeric"; }
 
     const current_unit = node.unit_addr;
-    const current_address = current_unit !== undefined ? parse_unit_address(current_unit) : undefined;
+    const current_address = current_unit === undefined ? undefined : parse_unit_address(current_unit);
 
     if (current_address !== undefined && current_address === new_address) { return "unchanged"; }
 
@@ -147,9 +126,9 @@ if (import.meta.vitest) {
 
     test("parse_unit_address", () => {
         expect(parse_unit_address("0")).toBe(0n);
-        expect(parse_unit_address("a")).toBe(0xan);
+        expect(parse_unit_address("a")).toBe(0xAn);
         expect(parse_unit_address("10")).toBe(0x10n);
-        expect(parse_unit_address("7e204000")).toBe(0x7e20_4000n);
+        expect(parse_unit_address("7e204000")).toBe(0x7E_20_40_00n);
         expect(parse_unit_address("bar")).toBeUndefined();
         expect(parse_unit_address("")).toBeUndefined();
         expect(parse_unit_address("0x10")).toBeUndefined();
@@ -157,7 +136,7 @@ if (import.meta.vitest) {
 
     test("format_unit_address", () => {
         expect(format_unit_address(0n)).toBe("0");
-        expect(format_unit_address(0xan)).toBe("a");
+        expect(format_unit_address(0xAn)).toBe("a");
         expect(format_unit_address(0x10n)).toBe("10");
     });
 
@@ -168,13 +147,13 @@ if (import.meta.vitest) {
     });
 
     test("decode_reg_address — round trip", () => {
-        const reg = encode_reg_address(0xan, 1, 0);
-        expect(decode_reg_address(reg, 1)).toBe(0xan);
+        const reg = encode_reg_address(0xAn, 1, 0);
+        expect(decode_reg_address(reg, 1)).toBe(0xAn);
     });
 
     test("decode_reg_address — two address cells", () => {
-        const reg = encode_reg_address(0x1_0000_0000n, 2, 1);
-        expect(decode_reg_address(reg, 2)).toBe(0x1_0000_0000n);
+        const reg = encode_reg_address(0x1_00_00_00_00n, 2, 1);
+        expect(decode_reg_address(reg, 2)).toBe(0x1_00_00_00_00n);
     });
 
     test("is_enabled", () => {
