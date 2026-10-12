@@ -262,7 +262,7 @@ if (import.meta.vitest) {
             devicetree: int_dt, data: "{}",
             placement: { node_path: "/soc/spi@7e204000/adc@0", parent_path: "/soc/spi@7e204000", siblings: [] },
         }, []);
-        expect(result.length).toBeGreaterThanOrEqual(2);
+        expect(result).toHaveLength(2);
         expect(result[0]!.display).toContain("gicv2");
         expect(result[0]!.display).toContain("inherited");
         expect(result[1]!.display).toContain("gpio");
