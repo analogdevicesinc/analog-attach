@@ -1,4 +1,65 @@
 import { ResolvedProperty } from "../Attach/AttachTypes.js";
+import { AttachType } from "../Attach/StructuralTypes.js";
+
+function array_bounds(value: AttachType): { minItems: number; maxItems: number } {
+    if (value._t === "array") {
+        return { minItems: value.minItems ?? 1, maxItems: value.maxItems ?? 1 };
+    }
+    return { minItems: 1, maxItems: 1 };
+}
+
+type SuffixRule = {
+    test: RegExp;
+    make(bounds: { minItems: number; maxItems: number }, description: string | undefined): AttachType;
+};
+
+const uint32_array = (bounds: { minItems: number; maxItems: number }, description: string | undefined): AttachType => ({
+    _t: "number_array", ...bounds, minimum: 0n, maximum: 0xFF_FF_FF_FFn, description,
+});
+
+const int32_array = (bounds: { minItems: number; maxItems: number }, description: string | undefined): AttachType => ({
+    _t: "number_array", ...bounds, minimum: -2_147_483_648n, maximum: 2_147_483_647n, description,
+});
+
+const uint32_matrix = (bounds: { minItems: number; maxItems: number }, description: string | undefined): AttachType => ({
+    _t: "matrix", minItems: 1, maxItems: 1,
+    values: [{ _t: "number_array", minimum: 0n, maximum: 0xFF_FF_FF_FFn, ...bounds }],
+    description,
+});
+
+const suffix_rules: SuffixRule[] = [
+    { test: /-bits$/, make: uint32_array },
+    { test: /-kBps$/, make: uint32_array },
+    { test: /-mhz$/, make: uint32_array },
+    { test: /-sec$/, make: uint32_array },
+    { test: /(?<!(rvell,wakeup-gap|refresh-interval))-ms$/, make: uint32_array },
+    { test: /-us$/, make: uint32_array },
+    { test: /-ns$/, make: uint32_array },
+    { test: /-ps$/, make: uint32_array },
+    { test: /-mm$/, make: uint32_array },
+    { test: /-microamp$/, make: uint32_array },
+    { test: /-nanoamp$/, make: uint32_array },
+    { test: /-picoamp$/, make: uint32_array },
+    { test: /-microamp-hours$/, make: uint32_array },
+    { test: /(?<!ti,[xy]-plate)-ohms$/, make: uint32_array },
+    { test: /-micro-ohms$/, make: uint32_array },
+    { test: /-microwatts$/, make: uint32_array },
+    { test: /-milliwatts$/, make: uint32_array },
+    { test: /-microwatt-hours$/, make: uint32_array },
+    { test: /-picofarads$/, make: uint32_array },
+    { test: /-femtofarads$/, make: uint32_array },
+    { test: /-kelvin$/, make: uint32_array },
+    { test: /-percent$/, make: int32_array },
+    { test: /-bp$/, make: int32_array },
+    { test: /-db$/, make: int32_array },
+    { test: /-microvolt$/, make: int32_array },
+    { test: /-millicelsius$/, make: int32_array },
+    { test: /-pascal$/, make: int32_array },
+    { test: /-kpascal$/, make: int32_array },
+    { test: /-celsius$/, make: int32_array },
+    { test: /-bps$/, make: (_bounds, description) => ({ _t: "integer", minimum: 0n, maximum: 0xFF_FF_FF_FFn, description }) },
+    { test: /(?<!^opp)-hz$/, make: uint32_matrix },
+];
 
 export function insert_known_structures(properties: ResolvedProperty[]): ResolvedProperty[] {
 
@@ -12,25 +73,10 @@ export function insert_known_structures(properties: ResolvedProperty[]): Resolve
         }
 
         switch (property.key) {
-            case "spi-3wire": {
-                property.value = {
-                    _t: "boolean",
-                    description: property.value.description,
-                };
-                break;
-            }
-            case "spi-cpol": {
-                property.value = {
-                    _t: "boolean",
-                    description: property.value.description,
-                };
-                break;
-            }
+            case "spi-3wire":
+            case "spi-cpol":
             case "spi-cpha": {
-                property.value = {
-                    _t: "boolean",
-                    description: property.value.description,
-                };
+                property.value = { _t: "boolean", description: property.value.description };
                 break;
             }
             case "clock-frequency": {
@@ -42,186 +88,45 @@ export function insert_known_structures(properties: ResolvedProperty[]): Resolve
                 };
                 break;
             }
-            // uint64-matrix
             case "opp-hz": {
-                const minItems = property.value._t === "array" ? (property.value.minItems === undefined ? 1 : property.value.minItems) : 1;
-                const maxItems = property.value._t === "array" ? (property.value.maxItems === undefined ? 1 : property.value.maxItems) : 1;
-                const description = property.value.description === undefined ? undefined : property.value.description;
-
-                // TODO: not sure
+                const bounds = array_bounds(property.value);
                 property.value = {
-                    _t: "matrix",
-                    minItems: 1,
-                    maxItems: 1,
-                    values: [
-                        {
-                            _t: "number_array",
-                            minimum: 0n,
-                            maximum: 0xFF_FF_FF_FF_FF_FF_FF_FFn,
-                            //typeSize: 64,
-                            minItems: minItems,
-                            maxItems: maxItems,
-                        }
-                    ],
-                    description: description
+                    _t: "matrix", minItems: 1, maxItems: 1, description: property.value.description,
+                    values: [{ _t: "number_array", minimum: 0n, maximum: 0xFF_FF_FF_FF_FF_FF_FF_FFn, ...bounds }],
                 };
                 break;
             }
             case "mount-matrix": {
                 property.value = {
-                    _t: "string_array",
-                    minItems: 9,
-                    maxItems: 9,
-                    unique_items: false,
+                    _t: "string_array", minItems: 9, maxItems: 9, unique_items: false,
                     description: property.value.description,
                 };
                 break;
             }
-            case "gpio-controller": {
-                if (property.value._t === "generic") {
-                    const description = property.value.description === undefined ? undefined : property.value.description;
-                    property.value = {
-                        _t: "boolean",
-                        description: description,
-                    };
-                }
-                break;
-            }
+            case "gpio-controller":
             case "interrupt-controller": {
                 if (property.value._t === "generic") {
-                    const description = property.value.description === undefined ? undefined : property.value.description;
-                    property.value = {
-                        _t: "boolean",
-                        description: description
-                    };
+                    property.value = { _t: "boolean", description: property.value.description };
                 }
                 break;
             }
             case "reg": {
-
-                if (property.value._t !== 'array') {
-                    break;
-                }
-
+                if (property.value._t !== 'array') { break; }
                 property.value = {
-                    _t: "matrix",
-                    minItems: property.value.minItems,
-                    maxItems: property.value.maxItems,
+                    _t: "matrix", minItems: property.value.minItems, maxItems: property.value.maxItems,
                     description: property.value.description,
-                    values: [
-                        {
-                            _t: "number_array",
-                            minItems: 1,
-                            maxItems: 1,
-                            minimum: 0n,
-                            maximum: 0xFF_FF_FF_FFn,
-                        }
-                    ]
+                    values: [{ _t: "number_array", minItems: 1, maxItems: 1, minimum: 0n, maximum: 0xFF_FF_FF_FFn }],
                 };
-
                 break;
             }
         }
 
-        // uint32-array
-        if (
-            property.key.endsWith("-bits") ||
-            property.key.endsWith("-kBps") ||
-            property.key.endsWith("-mhz") ||
-            property.key.endsWith("-sec") ||
-            new RegExp('(?<!(rvell,wakeup-gap|refresh-interval))-ms$').test(property.key) ||
-            property.key.endsWith("-us") ||
-            property.key.endsWith("-ns") ||
-            property.key.endsWith("-ps") ||
-            property.key.endsWith("-mm") ||
-            property.key.endsWith("-microamp") ||
-            property.key.endsWith("-nanoamp") ||
-            property.key.endsWith("-picoamp") ||
-            property.key.endsWith("-microamp-hours") ||
-            new RegExp('(?<!ti,[xy]-plate)-ohms$').test(property.key) ||
-            property.key.endsWith("-micro-ohms") ||
-            property.key.endsWith("-microwatts") ||
-            property.key.endsWith("-milliwatts") ||
-            property.key.endsWith("-microwatt-hours") ||
-            property.key.endsWith("-picofarads") ||
-            property.key.endsWith("-femtofarads") ||
-            property.key.endsWith("-kelvin")
-        ) {
-            const minItems = property.value._t === "array" ? (property.value.minItems === undefined ? 1 : property.value.minItems) : 1;
-            const maxItems = property.value._t === "array" ? (property.value.maxItems === undefined ? 1 : property.value.maxItems) : 1;
-            const description = property.value.description === undefined ? undefined : property.value.description;
-
-            property.value = {
-                _t: "number_array",
-                minItems: minItems,
-                maxItems: maxItems,
-                minimum: 0n,
-                maximum: 0xFF_FF_FF_FFn,
-                description: description
-            };
+        for (const rule of suffix_rules) {
+            if (rule.test.test(property.key)) {
+                property.value = rule.make(array_bounds(property.value), property.value.description);
+                break;
+            }
         }
-
-        // int32-array
-        if (
-            property.key.endsWith("-percent") ||
-            property.key.endsWith("-bp") ||
-            property.key.endsWith("-db") ||
-            property.key.endsWith("-microvolt") ||
-            property.key.endsWith("-millicelsius") ||
-            property.key.endsWith("-pascal") ||
-            property.key.endsWith("-kpascal") ||
-            property.key.endsWith("-celsius")
-        ) {
-            const minItems = property.value._t === "array" ? (property.value.minItems === undefined ? 1 : property.value.minItems) : 1;
-            const maxItems = property.value._t === "array" ? (property.value.maxItems === undefined ? 1 : property.value.maxItems) : 1;
-            const description = property.value.description === undefined ? undefined : property.value.description;
-
-            property.value = {
-                _t: "number_array",
-                minItems: minItems,
-                maxItems: maxItems,
-                minimum: -2_147_483_648n,
-                maximum: 2_147_483_647n,
-                description: description
-            };
-        }
-
-        // uint32
-        if (property.key.endsWith("-bps")) {
-            const description = property.value.description === undefined ? undefined : property.value.description;
-
-            property.value = {
-                _t: "integer",
-                minimum: 0n,
-                maximum: 0xFF_FF_FF_FFn,
-                description: description
-            };
-        }
-
-        // uint32-matrix
-        if (new RegExp("(^(?!opp)).*-hz$").test(property.key)) {
-            const minItems = property.value._t === "array" ? (property.value.minItems === undefined ? 1 : property.value.minItems) : 1;
-            const maxItems = property.value._t === "array" ? (property.value.maxItems === undefined ? 1 : property.value.maxItems) : 1;
-            const description = property.value.description === undefined ? undefined : property.value.description;
-
-            // TODO: not sure
-            property.value = {
-                _t: "matrix",
-                minItems: 1,
-                maxItems: 1,
-                values: [
-                    {
-                        _t: "number_array",
-                        minimum: 0n,
-                        maximum: 0xFF_FF_FF_FFn,
-                        minItems: minItems,
-                        maxItems: maxItems,
-                    }
-                ],
-                description: description
-            };
-        }
-
     }
 
     return properties_clone;
