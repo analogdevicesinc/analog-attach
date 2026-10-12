@@ -1,5 +1,6 @@
 import { ParsedBinding } from "../Attach/AttachTypes.js";
 import { DeviceTree, DTNode } from "../Devicetree/index.js";
+import { find_nodes, node_label } from "./providers.js";
 
 export type PathAndLabel = {
     path: string[];
@@ -15,16 +16,6 @@ export enum DTCommDeviceTypes {
     I2C,
     FIXED_CLOCK,
     REGULATOR_FIXED,
-}
-
-function find_nodes(
-    dt: DeviceTree,
-    pred: (node: DTNode) => boolean,
-): { node: DTNode; path: string }[] {
-    return dt.as_stream()
-        .filter((element) => pred(element))
-        .toArray()
-        .map(([node, path]) => ({ node, path: path.path }));
 }
 
 // eslint-disable-next-line unicorn/prevent-abbreviations
@@ -87,7 +78,7 @@ export function suggest_parents_impl(devicetree: DeviceTree, parent_types: DTCom
                 const i2c_devices = find_nodes(devicetree, is_i2c_parent);
                 const paths: PathAndLabel[] = i2c_devices.map((device) => ({
                     path: ['/', ...device.path.split('/').slice(1)],
-                    label: device.node.labels.at(0),
+                    label: node_label(device.node),
                 }));
                 suggestions = [...suggestions, ...paths];
                 break;
@@ -96,7 +87,7 @@ export function suggest_parents_impl(devicetree: DeviceTree, parent_types: DTCom
                 const spi_devices = find_nodes(devicetree, is_spi_parent);
                 const paths: PathAndLabel[] = spi_devices.map((device) => ({
                     path: ['/', ...device.path.split('/').slice(1)],
-                    label: device.node.labels.at(0),
+                    label: node_label(device.node),
                 }));
                 suggestions = [...suggestions, ...paths];
                 break;
@@ -105,7 +96,7 @@ export function suggest_parents_impl(devicetree: DeviceTree, parent_types: DTCom
                 const clock_definitions = find_nodes(devicetree, is_fixed_clock_parent);
                 const paths: PathAndLabel[] = clock_definitions.map((device) => ({
                     path: ['/', ...device.path.split('/').slice(1)],
-                    label: device.node.labels.at(0) ?? device.node.name,
+                    label: node_label(device.node) ?? device.node.name,
                 }));
                 suggestions = [...suggestions, ...paths];
                 break;

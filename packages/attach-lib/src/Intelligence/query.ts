@@ -1,6 +1,6 @@
 import { ResolvedProperty } from "../Attach/AttachTypes.js";
-import { AttachArray, AttachEnumType, FixedIndex } from "../Attach/StructuralTypes.js";
-import { DeviceTree, DTNode, number_property } from "../Devicetree/index.js";
+import { AttachArray, AttachEnumType } from "../Attach/StructuralTypes.js";
+import { DeviceTree, number_property } from "../Devicetree/index.js";
 import {
     is_clock,
     is_dma_controller,
@@ -9,6 +9,7 @@ import {
     is_pwm_controller,
     is_regulator,
 } from "./predicates.js";
+import { find_nodes, phandle_name, phandle_names } from "./providers.js";
 
 export const INTERRUPT_MACROS: { name: string, value: number }[] = [
     { name: "IRQ_TYPE_NONE", value: 0 },
@@ -52,16 +53,6 @@ export function value_to_macro(value: number, names: string[]): string | undefin
     }
 
     return;
-}
-
-function find_nodes(
-    dt: DeviceTree,
-    pred: (node: DTNode) => boolean,
-): { node: DTNode; path: string }[] {
-    return dt.as_stream()
-        .filter((element) => pred(element))
-        .toArray()
-        .map(([node, path]) => ({ node, path: path.path }));
 }
 
 export function is_gpio_property(key: string): boolean {
@@ -110,22 +101,12 @@ export function query_devicetree(
                 }
 
                 const interrupt_controllers = find_nodes(devicetree, is_interrupt_controller);
-
-                const phandles: string[] = [];
-
-                for (const interrupt_controller of interrupt_controllers) {
-                    phandles.push(interrupt_controller.node.labels.at(-1) ?? `&{${interrupt_controller.path}}`);
-                }
+                const phandles = interrupt_controllers.map(located => phandle_name(located));
 
                 if (is_set !== undefined) {
 
-                    const set_interrupt_parent = is_set;
-
                     const parent = interrupt_controllers.find(
-                        (value) => {
-                            const name = value.node.labels.at(-1) ?? `&{${value.path}}`;
-                            return name === set_interrupt_parent;
-                        }
+                        (value) => phandle_name(value) === is_set
                     );
 
                     if (parent !== undefined) {
@@ -186,13 +167,7 @@ export function query_devicetree(
                 continue;
             }
             case "clocks": {
-                const clocks = find_nodes(devicetree, is_clock);
-
-                const phandles: string[] = [];
-
-                for (const clock of clocks) {
-                    phandles.push(clock.node.labels.at(-1) ?? `&{${clock.path}}`);
-                }
+                const phandles = phandle_names(devicetree, is_clock);
 
                 property.value = {
                     _t: "matrix",
@@ -229,15 +204,7 @@ export function query_devicetree(
                         continue;
                     }
 
-                    const dmas = find_nodes(devicetree, is_dma_controller);
-
-                    const phandles: string[] = [];
-
-                    for (const dma of dmas) {
-                        phandles.push(dma.node.labels.at(-1) ?? `&{${dma.path}}`);
-                    }
-
-                    const prefix_items: FixedIndex[] = [{ _t: "enum", enum: phandles, enum_type: AttachEnumType.PHANDLE }];
+                    const phandles = phandle_names(devicetree, is_dma_controller);
 
                     property.value = {
                         _t: 'matrix',
@@ -249,7 +216,7 @@ export function query_devicetree(
                                 _t: "fixed_index",
                                 minItems: 1,
                                 maxItems: 1,
-                                prefixItems: prefix_items
+                                prefixItems: [{ _t: "enum", enum: phandles, enum_type: AttachEnumType.PHANDLE }]
                             }
                         ]
                     };
@@ -262,14 +229,8 @@ export function query_devicetree(
                     set_dma = set_dma.every((entry) => Array.isArray(entry)) ? set_dma[0][0] : set_dma[0];
 
                     const dmas = find_nodes(devicetree, is_dma_controller);
-
-                    const phandles: string[] = [];
-
-                    for (const dma of dmas) {
-                        phandles.push(dma.node.labels.at(-1) ?? `&{${dma.path}}`);
-                    }
-
-                    const node = dmas.find((value) => value.node.labels.at(-1) === set_dma);
+                    const phandles = dmas.map(located => phandle_name(located));
+                    const node = dmas.find((value) => phandle_name(value) === set_dma);
 
                     if (node === undefined) {
                         continue;
@@ -330,15 +291,7 @@ export function query_devicetree(
                         continue;
                     }
 
-                    const pwms = find_nodes(devicetree, is_pwm_controller);
-
-                    const phandles: string[] = [];
-
-                    for (const pwm of pwms) {
-                        phandles.push(pwm.node.labels.at(-1) ?? `&{${pwm.path}}`);
-                    }
-
-                    const prefix_items: FixedIndex[] = [{ _t: "enum", enum: phandles, enum_type: AttachEnumType.PHANDLE }];
+                    const phandles = phandle_names(devicetree, is_pwm_controller);
 
                     property.value = {
                         _t: 'matrix',
@@ -350,7 +303,7 @@ export function query_devicetree(
                                 _t: "fixed_index",
                                 minItems: 1,
                                 maxItems: 1,
-                                prefixItems: prefix_items
+                                prefixItems: [{ _t: "enum", enum: phandles, enum_type: AttachEnumType.PHANDLE }]
                             }
                         ]
                     };
@@ -365,14 +318,8 @@ export function query_devicetree(
                     set_pwm = set_pwm[0][0];
 
                     const pwms = find_nodes(devicetree, is_pwm_controller);
-
-                    const phandles: string[] = [];
-
-                    for (const pwm of pwms) {
-                        phandles.push(pwm.node.labels.at(-1) ?? `&{${pwm.path}}`);
-                    }
-
-                    const node = pwms.find((value) => value.node.labels.at(-1) === set_pwm);
+                    const phandles = pwms.map(located => phandle_name(located));
+                    const node = pwms.find((value) => phandle_name(value) === set_pwm);
 
                     if (node === undefined) {
                         continue;
@@ -418,13 +365,7 @@ export function query_devicetree(
         }
 
         if (property.key.endsWith("-supply")) {
-            const regulators = find_nodes(devicetree, is_regulator);
-
-            const phandles: string[] = [];
-
-            for (const regulator of regulators) {
-                phandles.push(regulator.node.labels.at(-1) ?? `&{${regulator.path}}`);
-            }
+            const phandles = phandle_names(devicetree, is_regulator);
 
             property.value = {
                 _t: "enum_array",
@@ -447,19 +388,11 @@ export function query_devicetree(
             const set_controller = extract_gpio_controller(raw_controller);
 
             if (set_controller === undefined) {
-                const gpio_controllers = find_nodes(devicetree, is_gpio_controller);
-
-                const phandles: string[] = [];
-
-                for (const gpio_controller of gpio_controllers) {
-                    phandles.push(gpio_controller.node.labels.at(-1) ?? `&{${gpio_controller.path}}`);
-                }
-
                 property.value = {
                     _t: "enum_array",
                     minItems: 1,
                     maxItems: 1,
-                    enum: phandles,
+                    enum: phandle_names(devicetree, is_gpio_controller),
                     enum_type: AttachEnumType.PHANDLE,
                     description: property.value.description,
                 };
@@ -468,12 +401,8 @@ export function query_devicetree(
             }
 
             const gpio_controllers = find_nodes(devicetree, is_gpio_controller);
-            const phandles: string[] = [];
-            for (const gpio_controller of gpio_controllers) {
-                phandles.push(gpio_controller.node.labels.at(-1) ?? `&{${gpio_controller.path}}`);
-            }
-
-            const controller_node = gpio_controllers.find((value) => value.node.labels.at(-1) === set_controller);
+            const phandles = gpio_controllers.map(located => phandle_name(located));
+            const controller_node = gpio_controllers.find((value) => phandle_name(value) === set_controller);
             if (controller_node === undefined) { continue; }
 
             const new_length = number_property(controller_node.node, "#gpio-cells");

@@ -5,7 +5,7 @@
             "soc",
             "spi@7e204000"
         ],
-        "label": "spi0"
+        "label": "spi"
     },
     {
         "path": [
@@ -69,7 +69,7 @@
             "soc",
             "i2c@7e804000"
         ],
-        "label": "i2c_arm"
+        "label": "i2c1"
     },
     {
         "path": [

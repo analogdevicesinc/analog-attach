@@ -1,8 +1,9 @@
-import { DeviceTree, DTNode, string_property, number_property, is_enabled } from "../../Devicetree/index.js";
+import { DeviceTree, DTNode, string_property, number_property } from "../../Devicetree/index.js";
 import { is_clock, is_interrupt_controller, is_regulator } from "../predicates.js";
 import { query_devicetree } from "../query.js";
 import { parent_path_string, suggest_parents } from "../parents.js";
 import { effective_interrupt_parent, base_lookup } from "../interrupt_parent.js";
+import { labelled_providers } from "../providers.js";
 import { IntelligenceLayer, ValueSuggestion } from "./types.js";
 
 function format_frequency(hz: bigint): string {
@@ -13,17 +14,6 @@ function format_frequency(hz: bigint): string {
 
 function format_voltage(microvolt: bigint): string {
     return `${Number(microvolt) / 1_000_000} V`;
-}
-
-/** Labelled, enabled nodes of the base tree matching `predicate`, in tree order. */
-function providers(devicetree: DeviceTree, predicate: (node: DTNode) => boolean): { label: string, node: DTNode }[] {
-    return devicetree.as_stream()
-        .filter(node => predicate(node))
-        .toArray()
-        .flatMap(([node]) => {
-            const label = node.labels.at(-1);
-            return label === undefined || !is_enabled(node) ? [] : [{ label, node }];
-        });
 }
 
 /** "fixed-clock "osc", 54 MHz" */
@@ -52,7 +42,7 @@ function suggest_interrupt_parents(
 ): ValueSuggestion[] {
     if (property !== "interrupt-parent") { return []; }
 
-    const controllers = providers(devicetree, is_interrupt_controller);
+    const controllers = labelled_providers(devicetree, is_interrupt_controller);
     if (controllers.length === 0) { return []; }
 
     const inherited = node_path !== undefined
@@ -92,9 +82,9 @@ function suggest_interrupt_parents(
  * which one feeds the device (it is external hardware), so each candidate is
  * only valid if it is actually wired to the device.
  */
-function suggest_providers(property: string, devicetree: DeviceTree): ValueSuggestion[] {
+function suggest_labelled_providers(property: string, devicetree: DeviceTree): ValueSuggestion[] {
     if (property === "clocks") {
-        return providers(devicetree, is_clock).map(({ label, node }) => ({
+        return labelled_providers(devicetree, is_clock).map(({ label, node }) => ({
             rows: [[{ label }]],
             display: `${label} — ${describe_clock(node)}`,
             source: "devicetree",
@@ -102,7 +92,7 @@ function suggest_providers(property: string, devicetree: DeviceTree): ValueSugge
         }));
     }
     if (property.endsWith("-supply")) {
-        return providers(devicetree, is_regulator).map(({ label, node }) => ({
+        return labelled_providers(devicetree, is_regulator).map(({ label, node }) => ({
             rows: [[{ label }]],
             display: `${label} — ${describe_regulator(node)}`,
             source: "devicetree",
@@ -154,7 +144,7 @@ export const devicetree_layer: IntelligenceLayer = {
         return [
             ...lower,
             ...suggest_unit_address_reg(property, context.placement?.node_path),
-            ...suggest_providers(property, context.devicetree),
+            ...suggest_labelled_providers(property, context.devicetree),
             ...suggest_interrupt_parents(property, context.devicetree, context.placement?.node_path),
         ];
     },
