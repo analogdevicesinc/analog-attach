@@ -47,7 +47,7 @@ export function prepare_board_workfile(
 
     const warnings = board.slots
         .filter(slot => slot.onboard !== undefined
-            && overlay.find_node({ kind: "label", labels: [], name: slot.onboard.slice(1) }) === undefined)
+            && overlay.find_node(slot.onboard.slice(1)) === undefined)
         .map(slot => `slot ${slot.id}: onboard ${slot.onboard} is not defined in ${path.basename(overlay_path)}`);
 
     return { text: overlay.print(), warnings };

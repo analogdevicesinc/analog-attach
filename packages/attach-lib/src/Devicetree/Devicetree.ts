@@ -15,9 +15,9 @@ import {
 import path from 'node:path';
 import * as fs from 'node:fs';
 import { Result } from "../result";
-import { DTReference, TraversalOrder, UnitAddr } from "./Types";
+import { TraversalOrder, UnitAddr } from "./Types";
 import { Stream } from "./Stream";
-import { type LocatedNode, parent_path as access_parent_path, has_compatible } from "./Access.js";
+import { type LocatedNode, type NodeTarget, normalize_target, parent_path as access_parent_path, has_compatible } from "./Access.js";
 
 function format_unit_addr_part(addr: UnitAddr): string {
     return addr.repr === "hex"
@@ -71,15 +71,13 @@ export class DeviceTree {
         );
     }
 
-    public as_stream(order: TraversalOrder = "DFS"): Stream<DTNode, DTPath> {
+    public as_stream(order: TraversalOrder = "DFS"): Stream<LocatedNode> {
         return new Stream(this.as_generator(this.devicetree.root, "/", order));
     }
 
-    private *as_generator(root: DTNode, currentPath: string, order: TraversalOrder): Generator<[DTNode, DTPath]> {
-        const make_path = (p: string): DTPath => ({ kind: "path", labels: [], path: p });
-
+    private *as_generator(root: DTNode, currentPath: string, order: TraversalOrder): Generator<LocatedNode> {
         if (order === "DFS") {
-            yield [root, make_path(currentPath)];
+            yield { node: root, path: currentPath };
 
             for (const child of root.children) {
                 const childPath = currentPath === "/"
@@ -94,7 +92,7 @@ export class DeviceTree {
             while (queue.length > 0) {
                 const [node, nodePath] = queue.shift()!;
 
-                yield [node, make_path(nodePath)];
+                yield { node, path: nodePath };
 
                 for (const child of node.children) {
                     const childPath = nodePath === "/"
@@ -107,85 +105,69 @@ export class DeviceTree {
         }
     }
 
-    public add_node(node: INodeBuilderBase, parent: DTReference): DTNode | undefined {
-        const target = this.deref_node(parent);
+    public add_node(node: INodeBuilderBase, parent: NodeTarget): DTNode | undefined {
+        const located = this.locate(parent);
+        if (located === undefined) { return undefined; }
 
-        if (target === undefined) {
-            return undefined;
-        }
-
-        target.children.push(node.build());
+        located.node.children.push(node.build());
 
         return;
     }
 
-    public remove_node(target: DTReference): DTNode | undefined {
-        const target_parent = this.get_parent(target);
+    public remove_node(target: NodeTarget): DTNode | undefined {
+        const located = this.locate(target);
+        if (located === undefined) { return undefined; }
 
-        if (target_parent === undefined) {
-            return undefined;
-        }
+        const parent = this.get_parent(located.path);
+        if (parent === undefined) { return undefined; }
 
-        const deref_parent = this.deref_node(target_parent);
-
-        if (deref_parent === undefined) {
-            return undefined;
-        }
-
-        deref_parent.children = deref_parent.children.filter((entry) => get_full_node_name(entry) !== target.node_name);
+        const node_name = located.path.slice(located.path.lastIndexOf("/") + 1);
+        parent.node.children = parent.node.children.filter((entry) => get_full_node_name(entry) !== node_name);
 
         return;
     }
 
-    public move_node(target: DTReference, new_parent: DTReference): DTReference | undefined {
-        const node = this.deref_node(target);
-        if (node === undefined) {
-            return undefined;
-        }
+    public move_node(target: NodeTarget, new_parent: NodeTarget): LocatedNode | undefined {
+        const located = this.locate(target);
+        if (located === undefined) { return undefined; }
 
-        this.remove_node(target);
+        this.remove_node(located.path);
 
-        const new_parent_node = this.deref_node(new_parent);
-        if (new_parent_node === undefined) {
-            return undefined;
-        }
+        const new_parent_located = this.locate(new_parent);
+        if (new_parent_located === undefined) { return undefined; }
 
-        new_parent_node.children.push(node);
+        new_parent_located.node.children.push(located.node);
 
-        const new_path = new_parent.full_path.path === "/"
-            ? `/${get_full_node_name(node)}`
-            : `${new_parent.full_path.path}/${get_full_node_name(node)}`;
+        const new_path = new_parent_located.path === "/"
+            ? `/${get_full_node_name(located.node)}`
+            : `${new_parent_located.path}/${get_full_node_name(located.node)}`;
 
-        return DeviceTree.node_to_ref(node, { kind: "path", labels: [], path: new_path });
+        return { node: located.node, path: new_path };
     }
 
-    public rename_node(target: DTReference, new_name: string): boolean {
-        const node = this.deref_node(target);
-        if (node === undefined) {
-            return false;
-        }
+    public rename_node(target: NodeTarget, new_name: string): boolean {
+        const located = this.locate(target);
+        if (located === undefined) { return false; }
 
-        node.name = new_name;
+        located.node.name = new_name;
         return true;
     }
 
-    public set_unit_addr(target: DTReference, addr: UnitAddr | UnitAddr[] | undefined): boolean {
-        const node = this.deref_node(target);
-        if (node === undefined) {
-            return false;
-        }
+    public set_unit_addr(target: NodeTarget, addr: UnitAddr | UnitAddr[] | undefined): boolean {
+        const located = this.locate(target);
+        if (located === undefined) { return false; }
 
         if (addr === undefined) {
-            node.unit_addr = undefined;
+            located.node.unit_addr = undefined;
             return true;
         }
 
         const parts = Array.isArray(addr) ? addr : [addr];
-        node.unit_addr = parts.map((element) => format_unit_addr_part(element)).join(",");
+        located.node.unit_addr = parts.map((element) => format_unit_addr_part(element)).join(",");
         return true;
     }
 
-    public set_status(target: DTReference, status: "okay" | "disabled" | "reserved" | "fail" | "fail-sss"): boolean {
+    public set_status(target: NodeTarget, status: "okay" | "disabled" | "reserved" | "fail" | "fail-sss"): boolean {
         const property = PropertyBuilder.build_string()
             .with_value(status)
             .with_name("status")
@@ -194,119 +176,95 @@ export class DeviceTree {
         return this.set_property(target, property);
     }
 
-    public get_parent(target: DTReference): DTReference | undefined {
-        const pp = access_parent_path(target.full_path.path);
+    public get_parent(target: NodeTarget): LocatedNode | undefined {
+        const located = this.locate(target);
+        if (located === undefined) { return undefined; }
+
+        const pp = access_parent_path(located.path);
         if (pp === undefined) { return undefined; }
 
         const parent_node = this.node_at(pp);
         if (parent_node === undefined) { return undefined; }
 
-        return DeviceTree.node_to_ref(parent_node, { kind: "path", labels: [], path: pp });
+        return { node: parent_node, path: pp };
     }
 
-    public get_node_by_label(label: DTLabel): DTReference | undefined {
-        for (const [node, path] of this.as_stream()) {
-            if (node.labels.includes(label.name)) {
-                return DeviceTree.node_to_ref(node, path);
+    public locate(target: NodeTarget): LocatedNode | undefined {
+        const t = normalize_target(target);
+        if (t.kind === "path") {
+            const node = this.node_at(t.path);
+            return node === undefined ? undefined : { node, path: t.path };
+        }
+        for (const located of this.as_stream()) {
+            if (located.node.labels.includes(t.name)) {
+                return located;
             }
         }
-
         return undefined;
     }
 
-    public get_node_by_path(path: DTPath): DTReference | undefined {
-        const node = this.node_at(path.path);
-        if (node === undefined) {
-            return undefined;
+    public node_exists(target: NodeTarget): boolean {
+        const t = normalize_target(target);
+        if (t.kind === "path") { return this.node_at(t.path) !== undefined; }
+        for (const located of this.as_stream()) {
+            if (located.node.labels.includes(t.name)) { return true; }
         }
-
-        return DeviceTree.node_to_ref(node, path);
+        return false;
     }
 
-    /**
-     * Accept any of the four CLI identifier forms and return the corresponding
-     * DTLabel or DTPath if the node exists, or undefined if not found.
-     * Accepted forms: &label  |  bare-label  |  /abs/path  |  &{/abs/path}
-     */
     public resolve_identifier(identifier: string): DTLabel | DTPath | undefined {
         const stripped = identifier.startsWith("&") ? identifier.slice(1) : identifier;
 
         if (stripped.startsWith("{/") && stripped.endsWith("}")) {
             const abs = stripped.slice(1, -1);
-            const dt_path: DTPath = { kind: "path", labels: [], path: abs };
-            return this.get_node_by_path(dt_path) === undefined ? undefined : dt_path;
+            if (this.node_at(abs) === undefined) { return undefined; }
+            return { kind: "path", labels: [], path: abs };
         }
 
         if (identifier.startsWith("/")) {
-            const dt_path: DTPath = { kind: "path", labels: [], path: identifier };
-            return this.get_node_by_path(dt_path) === undefined ? undefined : dt_path;
+            if (this.node_at(identifier) === undefined) { return undefined; }
+            return { kind: "path", labels: [], path: identifier };
         }
 
         const dt_label: DTLabel = { kind: "label", labels: [], name: stripped };
-        return this.get_node_by_label(dt_label) === undefined ? undefined : dt_label;
+        return this.node_exists(dt_label) ? dt_label : undefined;
     }
 
-    public get_nodes_with_compatible(compatible: string): DTReference[] {
+    public get_nodes_with_compatible(compatible: string): LocatedNode[] {
         return this.as_stream()
-            .filter(node => has_compatible(node, compatible))
-            .toArray()
-            .map(([node, path]) => DeviceTree.node_to_ref(node, path));
+            .filter(located => has_compatible(located.node, compatible))
+            .toArray();
     }
 
-    static node_to_ref(node: DTNode, path: DTPath): DTReference {
-        return {
-            node_name: get_full_node_name(node),
-            full_path: path,
-            labels: node.labels.map(entry => ({ kind: "label", labels: [], name: entry }))
-        };
+    public get_property(target: NodeTarget, property: string): DTProperty | undefined {
+        const located = this.locate(target);
+        if (located === undefined) { return undefined; }
+
+        return located.node.properties.find(p => p.name === property);
     }
 
-    public get_property(target_node: DTReference, property: string): DTProperty | undefined {
-        const node = this.deref_node(target_node);
-        if (node === undefined) {
-            return undefined;
-        }
+    public set_property(target: NodeTarget, property: DTProperty): boolean {
+        const located = this.locate(target);
+        if (located === undefined) { return false; }
 
-        return node.properties.find(p => p.name === property);
-    }
-
-    public set_property(target_node: DTReference, property: DTProperty): boolean {
-        const node = this.deref_node(target_node);
-        if (node === undefined) {
-            return false;
-        }
-
-        const existing_index = node.properties.findIndex(p => p.name === property.name);
+        const existing_index = located.node.properties.findIndex(p => p.name === property.name);
         if (existing_index === -1) {
-            node.properties.push(property);
+            located.node.properties.push(property);
         } else {
-            node.properties[existing_index] = property;
+            located.node.properties[existing_index] = property;
         }
 
         return true;
     }
 
-    public remove_property(target_node: DTReference, property: string): boolean {
-        const node = this.deref_node(target_node);
-        if (node === undefined) {
-            return false;
-        }
+    public remove_property(target: NodeTarget, property: string): boolean {
+        const located = this.locate(target);
+        if (located === undefined) { return false; }
 
-        const original_length = node.properties.length;
-        node.properties = node.properties.filter(p => p.name !== property);
+        const original_length = located.node.properties.length;
+        located.node.properties = located.node.properties.filter(p => p.name !== property);
 
-        return node.properties.length < original_length;
-    }
-
-    public locate(target: DTLabel | DTPath): LocatedNode | undefined {
-        const reference = target.kind === "path" ? this.get_node_by_path(target) : this.get_node_by_label(target);
-        if (reference === undefined) { return undefined; }
-        const node = this.node_at(reference.full_path.path);
-        return node === undefined ? undefined : { node, path: reference.full_path.path };
-    }
-
-    public deref_node(reference: DTReference): DTNode | undefined {
-        return this.node_at(reference.full_path.path);
+        return located.node.properties.length < original_length;
     }
 
     public node_at(path: string): DTNode | undefined {
@@ -360,8 +318,8 @@ if (import.meta.vitest !== undefined) {
         }
 
         console.log("TREE:");
-        for (const [node, path] of dt.as_stream().filter((node) => node.name === 'spi')) {
-            console.log(DeviceTree.node_to_ref(node, path));
+        for (const { node, path } of dt.as_stream().filter(({ node }) => node.name === 'spi')) {
+            console.log({ node: node.name, path });
         }
         console.log("==================================");
 

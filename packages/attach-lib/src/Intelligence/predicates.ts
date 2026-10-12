@@ -46,9 +46,9 @@ if (import.meta.vitest) {
     };
 };`);
         const results = dt.as_stream()
-            .filter((element) => is_interrupt_controller(element))
+            .filter(({ node }) => is_interrupt_controller(node))
             .toArray()
-            .map(([n]) => n.name);
+            .map(({ node }) => node.name);
         expect(results).toContain("interrupt-controller");
     });
 
@@ -60,7 +60,7 @@ if (import.meta.vitest) {
         };
     };
 };`);
-        const results = dt.as_stream().filter((element) => is_interrupt_controller(element)).toArray();
+        const results = dt.as_stream().filter(({ node }) => is_interrupt_controller(node)).toArray();
         expect(results).toHaveLength(0);
     });
 
@@ -73,7 +73,7 @@ if (import.meta.vitest) {
         clock-frequency = <19200000>;
     };
 };`);
-        const results = dt.as_stream().filter((element) => is_clock(element)).toArray();
+        const results = dt.as_stream().filter(({ node }) => is_clock(node)).toArray();
         expect(results).toHaveLength(1);
     });
 
@@ -86,7 +86,7 @@ if (import.meta.vitest) {
         #gpio-cells = <2>;
     };
 };`);
-        const results = dt.as_stream().filter((element) => is_gpio_controller(element)).toArray();
+        const results = dt.as_stream().filter(({ node }) => is_gpio_controller(node)).toArray();
         expect(results).toHaveLength(1);
     });
 
@@ -98,7 +98,7 @@ if (import.meta.vitest) {
         #gpio-cells = <2>;
     };
 };`);
-        const results = dt.as_stream().filter((element) => is_gpio_controller(element)).toArray();
+        const results = dt.as_stream().filter(({ node }) => is_gpio_controller(node)).toArray();
         expect(results).toHaveLength(0);
     });
 }

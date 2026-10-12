@@ -1,3 +1,4 @@
+/* eslint-disable unicorn/no-useless-undefined */
 import { Command } from "commander";
 import {
     Attach,
@@ -24,6 +25,7 @@ import {
     type DTLabel,
     type DTPath,
     type FoundNodeResult,
+    type NodeTarget,
     type ResolvedProperty,
     type SuggestedCell,
     type ValueSuggestion,
@@ -366,8 +368,11 @@ export function build_update_command(context_: LocalContext): Command {
                 const existing_child = effective.get(property_name);
                 if (existing_child !== undefined) {
                     const child_path = `${found?.node_path ?? node_identifier}/${property_name}`;
-                    const child_found = overlay.find_node({ kind: "path", labels: [], path: child_path });
-                    if (child_found !== undefined) {
+                    const child_found = overlay.find_node(child_path);
+                    if (child_found === undefined) {
+                        if (context_.json) { respond_fail({ ok: false, message: `Not found: ${child_path}`, severity: "error" }); }
+                        else { console.log(`Not found: ${child_path}`); }
+                    } else {
                         if (context_.json) {
                             respond(convert_node(child_found.node));
                         } else {
@@ -379,18 +384,11 @@ export function build_update_command(context_: LocalContext): Command {
                             }
                             console.log("};");
                         }
-                    } else {
-                        if (context_.json) { respond_fail({ ok: false, message: `Not found: ${child_path}`, severity: "error" }); }
-                        else { console.log(`Not found: ${child_path}`); }
                     }
                     return;
                 }
 
                 // Check if it matches a pattern_properties regex
-                const { definition: def } = await resolve_property_definition(
-                    binding_node, binding_parent, parent_name, base_dt, linux, dtSchema,
-                    property_name, context_.json, true,
-                );
                 // Try to find the binding's child_nodes (pattern_properties)
                 let matched_pattern = false;
                 if (binding_node !== undefined) {
@@ -418,12 +416,12 @@ export function build_update_command(context_: LocalContext): Command {
                     const at = property_name.indexOf("@");
                     const child_name = property_name.slice(0, at);
                     const child_unit = property_name.slice(at + 1);
-                    const child_props: DTProperty[] = [];
+                    const child_properties: DTProperty[] = [];
 
                     const parsed_addr = parse_unit_address(child_unit);
                     if (parsed_addr !== undefined) {
                         const cells = address_cells_of(overlay, found?.node_path ?? node_identifier);
-                        child_props.push(encode_reg_address(parsed_addr, cells.address, cells.size));
+                        child_properties.push(encode_reg_address(parsed_addr, cells.address, cells.size));
 
                         // C3: write #address-cells/#size-cells on parent if missing
                         if (found !== undefined && !is_base_target) {
@@ -441,13 +439,13 @@ export function build_update_command(context_: LocalContext): Command {
                         .with_name(child_name)
                         .with_unit_address(child_unit)
                         .with_label([])
-                        .with_properties(child_props.length > 0 ? child_props : undefined)
+                        .with_properties(child_properties.length > 0 ? child_properties : undefined)
                         .build();
 
                     if (found !== undefined) {
                         found.node.children.push(child_node);
                     } else if (is_base_target) {
-                        overlay.add_fragment(target_reference, NodeBuilder.new().with_name(child_name).with_unit_address(child_unit).with_label([]).with_properties(child_props.length > 0 ? child_props : undefined), undefined);
+                        overlay.add_fragment(target_reference, NodeBuilder.new().with_name(child_name).with_unit_address(child_unit).with_properties(child_properties.length > 0 ? child_properties : undefined), undefined);
                     }
 
                     const printed = overlay.print(overlay_print_options(resolved.config));
@@ -503,8 +501,8 @@ export function build_update_command(context_: LocalContext): Command {
             // decision === "value"
             const with_value = value_arguments.join(" ");
             const is_label = (name: string): boolean => {
-                if (base_dt.get_node_by_label({ kind: "label", labels: [], name }) !== undefined) { return true; }
-                return overlay.find_node({ kind: "label", labels: [], name }) !== undefined;
+                if (base_dt.node_exists(name)) { return true; }
+                return overlay.find_node(name) !== undefined;
             };
 
             const built = build_raw_property(with_value, property_name, hint, is_label);
@@ -563,9 +561,9 @@ export function build_update_command(context_: LocalContext): Command {
 
             fs.writeFileSync(input, printed);
 
-            const ip_msg = ip_result.message !== undefined ? `; ${ip_result.message}` : "";
+            const ip_message = ip_result.message === undefined ? "" : `; ${ip_result.message}`;
             if (context_.json) {
-                respond({ ok: true, message: `Set ${property_name} on ${node_identifier}${rename_message}${ip_msg}`, severity: ip_result.warning !== undefined ? "warn" : "info" });
+                respond({ ok: true, message: `Set ${property_name} on ${node_identifier}${rename_message}${ip_message}`, severity: ip_result.warning === undefined ? "info" : "warn" });
             } else {
                 console.log(`Set ${property_name} on ${node_identifier}${rename_message}`);
                 if (ip_result.message !== undefined) { console.log(ip_result.message); }
@@ -676,7 +674,7 @@ function upsert_property(found_node: DTNode, property: DTProperty): void {
 
 export function place_property(
     overlay: DeviceTreeOverlay,
-    target_reference: DTLabel | DTPath,
+    target: NodeTarget,
     found: FoundNodeResult | undefined,
     is_base_target: boolean,
     built: DTProperty | undefined,
@@ -684,9 +682,9 @@ export function place_property(
 ): void {
     if (is_base_target) {
         if (built === undefined) {
-            overlay.remove_property(target_reference, property_name);
+            overlay.remove_property(target, property_name);
         } else {
-            overlay.add_fragment(target_reference, undefined, built);
+            overlay.add_fragment(target, undefined, built);
         }
         return;
     }
@@ -743,8 +741,8 @@ if (import.meta.vitest) {
 
     const base_is_label = (name: string): boolean => {
         const { base, overlay } = parse(empty_overlay);
-        if (base.get_node_by_label({ kind: "label", labels: [], name }) !== undefined) { return true; }
-        return overlay.find_node({ kind: "label", labels: [], name }) !== undefined;
+        if (base.node_exists(name)) { return true; }
+        return overlay.find_node(name) !== undefined;
     };
 
     test("build_raw_property — macros become numbers", () => {
@@ -905,7 +903,7 @@ if (import.meta.vitest) {
         const stack = IntelligenceStack.default().with(board_layer(board));
 
         const is_label_rt = (name: string): boolean =>
-            devicetree.get_node_by_label({ kind: "label", labels: [], name }) !== undefined;
+            devicetree.node_exists(name);
 
         const round_trip = (property: string, display: string) => {
             const suggestion = stack.suggest_values(property, { devicetree, data, placement }).find(s => s.display.includes(display));
@@ -959,12 +957,10 @@ if (import.meta.vitest) {
 
     test("place_property - writes a true multi-row matrix as separate <...> groups", () => {
         const { overlay } = parse(empty_overlay);
-        const target: DTLabel = { kind: "label", labels: [], name: "spi0" };
-
         const built = build_raw_property("1 2,3 4", "reg", "cells", () => false);
         expect(built).toBeDefined();
         expect("error" in built!).toBe(false);
-        place_property(overlay, target, undefined, true, built as DTProperty, "reg");
+        place_property(overlay, "spi0", undefined, true, built as DTProperty, "reg");
 
         const output = overlay.print();
         expect(output).toMatch(/<[^>]*>,\s*<[^>]*>/);
@@ -978,7 +974,7 @@ if (import.meta.vitest) {
         const built = build_raw_property("5000000", "spi-max-frequency", "cells", () => false);
         expect(built).toBeDefined();
         expect("error" in built!).toBe(false);
-        place_property(overlay, { kind: "label", labels: [], name: "spi0" }, undefined, true, built as DTProperty, "spi-max-frequency");
+        place_property(overlay, "spi0", undefined, true, built as DTProperty, "spi-max-frequency");
 
         const output = overlay.print();
         expect(output).toContain("spi0");
@@ -988,12 +984,11 @@ if (import.meta.vitest) {
 
     test("place_property - updating a base-node property reuses the fragment", () => {
         const { overlay } = parse(empty_overlay);
-        const target: DTLabel = { kind: "label", labels: [], name: "spi0" };
 
         const b1 = build_raw_property("1", "spi-max-frequency", "cells", () => false) as DTProperty;
         const b2 = build_raw_property("2", "spi-max-frequency", "cells", () => false) as DTProperty;
-        place_property(overlay, target, undefined, true, b1, "spi-max-frequency");
-        place_property(overlay, target, undefined, true, b2, "spi-max-frequency");
+        place_property(overlay, "spi0", undefined, true, b1, "spi-max-frequency");
+        place_property(overlay, "spi0", undefined, true, b2, "spi-max-frequency");
 
         expect(overlay.get_fragments().length).toBe(1);
         expect(overlay.print()).toContain("spi-max-frequency");
@@ -1001,24 +996,23 @@ if (import.meta.vitest) {
 
     test("place_property - removing a base-node boolean prunes the emptied fragment", () => {
         const { overlay } = parse(empty_overlay);
-        const target: DTLabel = { kind: "label", labels: [], name: "spi0" };
 
         const built = PropertyBuilder.build_flag().set_flag().with_name("wakeup-source").build();
-        place_property(overlay, target, undefined, true, built, "wakeup-source");
+        place_property(overlay, "spi0", undefined, true, built, "wakeup-source");
         expect(overlay.get_fragments().length).toBe(1);
 
-        place_property(overlay, target, undefined, true, undefined, "wakeup-source");
+        place_property(overlay, "spi0", undefined, true, undefined, "wakeup-source");
         expect(overlay.print()).not.toContain("wakeup-source");
         expect(overlay.get_fragments().length).toBe(0);
     });
 
     test("place_property - mutates an overlay-added node in place", () => {
         const { overlay } = parse(overlay_with_imu);
-        const found = overlay.find_node({ kind: "label", labels: [], name: "imu1" });
+        const found = overlay.find_node("imu1");
         expect(found).toBeDefined();
 
         const built = build_raw_property("0", "reg", "cells", () => false) as DTProperty;
-        place_property(overlay, { kind: "label", labels: [], name: "imu1" }, found, false, built, "reg");
+        place_property(overlay, "imu1", found, false, built, "reg");
 
         const output = overlay.print();
         expect(output).toContain("imu1");
@@ -1047,7 +1041,7 @@ if (import.meta.vitest) {
         if (typeof devicetree === "string") { throw new TypeError(devicetree); }
 
         const is_label_cs = (name: string): boolean =>
-            devicetree.get_node_by_label({ kind: "label", labels: [], name }) !== undefined;
+            devicetree.node_exists(name);
 
         const overlay = DeviceTreeOverlay.new_from_string(`/dts-v1/;\n/plugin/;\n/ { };`, devicetree);
         if (typeof overlay === "string") { throw new TypeError(overlay); }
@@ -1063,7 +1057,7 @@ if (import.meta.vitest) {
         expect("error" in built!).toBe(false);
         const property = built as DTProperty;
 
-        place_property(overlay, { kind: "label", labels: [], name: "spi0" }, undefined, true, property, "cs-gpios");
+        place_property(overlay, "spi0", undefined, true, property, "cs-gpios");
         const printed = overlay.print();
         const reparsed = DeviceTreeOverlay.new_from_string(printed, devicetree);
         expect(typeof reparsed).not.toBe("string");
@@ -1110,7 +1104,7 @@ slots:
         if (typeof devicetree === "string") { throw new TypeError(devicetree); }
 
         const is_label = (name: string): boolean =>
-            devicetree.get_node_by_label({ kind: "label", labels: [], name }) !== undefined;
+            devicetree.node_exists(name);
 
         const overlay = DeviceTreeOverlay.new_from_string(`/dts-v1/;\n/plugin/;\n/ { };`, devicetree);
         if (typeof overlay === "string") { throw new TypeError(overlay); }
@@ -1127,7 +1121,7 @@ slots:
         expect(built).toBeDefined();
         expect("error" in built!).toBe(false);
 
-        place_property(overlay, { kind: "label", labels: [], name: "spi0" }, undefined, true, built as DTProperty, "cs-gpios");
+        place_property(overlay, "spi0", undefined, true, built as DTProperty, "cs-gpios");
         const printed = overlay.print();
         const reparsed = DeviceTreeOverlay.new_from_string(printed, devicetree);
         expect(typeof reparsed).not.toBe("string");

@@ -9,9 +9,9 @@ import { parse_board_description } from "./parse.js";
 export function resolve_bus_paths(board: BoardDescription, devicetree: DeviceTree): Map<string, string> {
     const paths = new Map<string, string>();
     for (const bus of board.buses) {
-        const reference = devicetree.get_node_by_label({ kind: "label", labels: [], name: bus.node.slice(1) });
-        if (reference !== undefined) {
-            paths.set(bus.name, reference.full_path.path);
+        const located = devicetree.locate(bus.node.slice(1));
+        if (located !== undefined) {
+            paths.set(bus.name, located.path);
         }
     }
     return paths;

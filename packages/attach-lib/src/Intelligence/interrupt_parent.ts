@@ -16,7 +16,7 @@ export function base_lookup(dt: DeviceTree): NodeLookup {
 export function overlay_lookup(overlay: DeviceTreeOverlay): NodeLookup {
     const base_dt = overlay.get_base_dts();
     return (path: string) => {
-        const found = overlay.find_node({ kind: "path", labels: [], path });
+        const found = overlay.find_node(path);
         if (found !== undefined) { return found.node; }
         return base_dt?.node_at(path);
     };
@@ -64,19 +64,16 @@ export function effective_interrupt_parent(
 
         const parent_label = reference_property(node, "interrupt-parent");
         if (parent_label !== undefined && base_dt !== undefined) {
-            const reference = base_dt.get_node_by_label({ kind: "label", labels: [], name: parent_label });
-            if (reference !== undefined) {
-                const parent_node = base_dt.deref_node(reference);
-                if (parent_node !== undefined) {
-                    const cells = number_property(parent_node, "#interrupt-cells");
-                    const resolved_label = parent_node.labels.at(-1);
-                    return {
-                        label: resolved_label,
-                        path: reference.full_path.path,
-                        from: current,
-                        interrupt_cells: cells === undefined ? undefined : Number(cells),
-                    };
-                }
+            const located = base_dt.locate(parent_label);
+            if (located !== undefined) {
+                const cells = number_property(located.node, "#interrupt-cells");
+                const resolved_label = located.node.labels.at(-1);
+                return {
+                    label: resolved_label,
+                    path: located.path,
+                    from: current,
+                    interrupt_cells: cells === undefined ? undefined : Number(cells),
+                };
             }
         }
 

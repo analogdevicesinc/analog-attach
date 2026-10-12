@@ -392,8 +392,8 @@ async function annotate_suggestions(
         : `pattern "${binding.origin.pattern}" of ${binding.origin.parent_compatible}`;
 
     const is_label = (name: string): boolean => {
-        if (base_dt.get_node_by_label({ kind: "label", labels: [], name }) !== undefined) { return true; }
-        return overlay.find_node({ kind: "label", labels: [], name }) !== undefined;
+        if (base_dt.node_exists(name)) { return true; }
+        return overlay.find_node(name) !== undefined;
     };
 
     for (const suggestion of suggestions) {
@@ -653,10 +653,7 @@ async function binding_property_suggestions(
 export function node_children(base_dt: DeviceTree, overlay: DeviceTreeOverlay, identifier: string): string[] | undefined {
     const in_overlay = overlay.find_node(resolve_node_identifier(identifier, overlay));
     const base_identifier = base_dt.resolve_identifier(identifier);
-    const base_reference = base_identifier === undefined
-        ? undefined
-        : (base_identifier.kind === "label" ? base_dt.get_node_by_label(base_identifier) : base_dt.get_node_by_path(base_identifier));
-    const in_base = base_reference === undefined ? undefined : base_dt.deref_node(base_reference);
+    const in_base = base_identifier === undefined ? undefined : base_dt.locate(base_identifier)?.node;
     if (in_overlay === undefined && in_base === undefined) { return; }
     return [...new Set([
         ...(in_base?.children ?? []).map(child => get_full_node_name(child)),
@@ -1244,7 +1241,7 @@ slots:
     };
 };`);
         if (typeof parent === "string") { throw new TypeError(parent); }
-        const node = parent.find_node({ kind: "label", labels: [], name: "adc" })!.node;
+        const node = parent.find_node("adc")!.node;
         // eslint-disable-next-line unicorn/consistent-function-scoping
         const rule = (pattern: string, required: string[]): PatternPropertyRule => ({ pattern, description: "", properties: [], required });
 

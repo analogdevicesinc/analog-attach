@@ -179,10 +179,10 @@ export function add_overlay_node(
         if (resolved.in_overlay !== undefined) {
             parent_path = resolved.in_overlay.node_path;
             parent_overlay_node = resolved.in_overlay.node;
-        } else if (resolved.in_base !== undefined) {
-            parent_path = resolved.in_base.full_path.path;
-        } else {
+        } else if (resolved.in_base === undefined) {
             return { status: "parent-not-found" };
+        } else {
+            parent_path = resolved.in_base.path;
         }
     }
 
@@ -256,12 +256,9 @@ export function add_overlay_node(
             const base_dt = overlay.get_base_dts();
             let base_has_cells = false;
             if (base_dt !== undefined) {
-                const base_ref = base_dt.get_node_by_path({ kind: "path", labels: [], path: parent_path });
-                if (base_ref !== undefined) {
-                    const base_node = base_dt.deref_node(base_ref);
-                    if (base_node !== undefined) {
-                        base_has_cells = base_node.properties.some(p => p.name === "#address-cells");
-                    }
+                const base_node = base_dt.node_at(parent_path);
+                if (base_node !== undefined) {
+                    base_has_cells = base_node.properties.some(p => p.name === "#address-cells");
                 }
             }
             if (!base_has_cells) {
@@ -276,14 +273,14 @@ export function add_overlay_node(
     // Insert the node
     if (parent_identifier === undefined) {
         // eslint-disable-next-line unicorn/no-useless-undefined
-        overlay.add_fragment({ kind: "path", labels: [], path: "/" }, new_node, undefined);
-    } else if (parent_overlay_node !== undefined) {
-        parent_overlay_node.children.push(new_node.build());
-    } else {
+        overlay.add_fragment("/", new_node, undefined);
+    } else if (parent_overlay_node === undefined) {
         const base_reference = base_target(resolve_path(parent_identifier, overlay, base));
         if (base_reference === undefined) { return { status: "parent-not-found" }; }
         // eslint-disable-next-line unicorn/no-useless-undefined
         overlay.add_fragment(base_reference, new_node, undefined);
+    } else {
+        parent_overlay_node.children.push(new_node.build());
     }
 
     // Resolve the final path
