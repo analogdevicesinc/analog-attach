@@ -8,6 +8,14 @@ export {
 } from "./predicates.js";
 
 export {
+    find_nodes,
+    node_label,
+    phandle_name,
+    phandle_names,
+    labelled_providers,
+} from "./providers.js";
+
+export {
     query_devicetree,
     value_to_macro,
     is_gpio_property,

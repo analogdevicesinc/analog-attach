@@ -5,7 +5,7 @@
             "soc",
             "spi@7e204000"
         ],
-        "label": "spi0"
+        "label": "spi"
     },
     {
         "path": [
