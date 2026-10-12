@@ -106,7 +106,7 @@ export function to_attach_array(resolved_property: ResolvedProperty): AttachArra
 type AttachMatrix = {
     _t: "matrix",
     minItems: number,
-    maxItems: number,
+    maxItems?: number,
     description?: string,
     values: AttachArray[],
 }

@@ -164,9 +164,7 @@
                                     "clk_osc",
                                     "clk_usb",
                                     "clk_27MHz",
-                                    "clk_108MHz",
-                                    "cam1_clk",
-                                    "cam0_clk"
+                                    "clk_108MHz"
                                 ],
                                 "enum_type": "phandle"
                             }
