@@ -6,3 +6,5 @@ test/legacy/expected/cache/*
 #SYMLINKS
 test/dt-schema
 test/linux
+
+plans/
