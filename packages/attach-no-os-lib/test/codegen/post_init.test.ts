@@ -1,5 +1,5 @@
 import { describe, test, expect, beforeEach, afterEach } from 'vitest';
-import { bootstrap } from '../../src/bootstrap/bootstrap';
+import { attach_eval_board, bootstrap } from '../../src/bootstrap/bootstrap';
 import { post_init_blocks } from '../../src/codegen/codegen_helpers';
 import { load_devices } from '../../src/codegen/device_loader';
 import { schedule_patches } from '../../src/codegen/patch_schedule';
@@ -20,6 +20,7 @@ function sensor_on_otherboard(): Workfile {
     const ruleset = load_resolved_ruleset('test_sensor');
     expectOk(ruleset);
     expectOk(add_symbol(created.value, 'sensor', ruleset.value));
+    expectOk(attach_eval_board(created.value, 'eval-testpart', 'sensor'));
     expectOk(bootstrap(created.value));
     return created.value;
 }

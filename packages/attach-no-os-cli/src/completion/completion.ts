@@ -1,6 +1,7 @@
 import {
     list_available_structs,
     addable_drivers,
+    list_eval_boards,
     import_minimal,
     suggest_for_property,
     list_boards,
@@ -266,5 +267,5 @@ export function get_schema_paths(): string[] {
     }
 
     const drivers = addable_drivers();
-    return [...(drivers.ok ? drivers.value : []), ...available.value.all];
+    return [...list_eval_boards(), ...(drivers.ok ? drivers.value : []), ...available.value.all];
 }

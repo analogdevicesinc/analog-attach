@@ -169,8 +169,8 @@ export function driver_iio_root(driver: string): Result<string> {
 }
 
 /**
- * Drivers `add` accepts by name: those with exactly one root. A driver with none or several
- * is still addable through its schemas, just not by the shorthand.
+ * Drivers `add` accepts by name: those with at least one root. One with several (ad74413r:
+ * an ADC and a DAC handle) takes `--as` to pick; one with none is added through its schemas.
  */
 export function addable_drivers(): Result<string[]> {
 	const drivers = list_drivers();
@@ -178,7 +178,10 @@ export function addable_drivers(): Result<string[]> {
 		return drivers;
 	}
 	return ok(drivers.value
-		.filter(driver => driver_root(driver.name).ok)
+		.filter(driver => {
+			const roots = driver_roots(driver.name);
+			return roots.ok && roots.value.length > 0;
+		})
 		.map(driver => driver.name)
 		.sort());
 }

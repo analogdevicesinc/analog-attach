@@ -71,7 +71,8 @@ function build_struct_view(name, ruleset, wf) {
 function struct_views(wf) {
 	const views = [];
 	for (const [name, ruleset] of Object.entries(wf.symbols)) {
-		if (ruleset._t === "RulesetStruct") {
+		/* An eval board is hardware on the bench, not a C struct. */
+		if (ruleset._t === "RulesetStruct" && ruleset.$eval_board !== true) {
 			views.push({ ...build_struct_view(name, ruleset, wf), is_const: false });
 		}
 	}

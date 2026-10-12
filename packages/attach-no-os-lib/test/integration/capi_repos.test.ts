@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { describe, test, expect, beforeEach, afterEach } from 'vitest';
-import { bootstrap, pin_driver, referenced_nodes } from '../../src/bootstrap/bootstrap';
+import { attach_eval_board, bootstrap, pin_driver, referenced_nodes } from '../../src/bootstrap/bootstrap';
 import { driver_root, driver_root_for } from '../../src/registry/roots';
 import { load_resolved_ruleset_for_board } from '../../src/resolver/resolver';
 import { validate_workfile } from '../../src/validator/validator';
@@ -48,12 +48,21 @@ function add_driver(workfile: Workfile, driver: string, name: string, interface_
     expectOk(ruleset);
     expectOk(add_symbol(workfile, name, ruleset.value));
     expectOk(pin_driver(workfile, name, driver));
+    // On its eval board, as `attach-noos add <eval board>` puts it, so its pinout wires it.
+    expectOk(attach_eval_board(workfile, EVAL_BOARDS[driver] ?? '', name));
     expectOk(bootstrap(workfile));
 }
 
 function add_adxl355(workfile: Workfile, name: string): void {
     add_driver(workfile, 'adxl355', name);
 }
+
+/** The eval board each part sits on in these tests. */
+const EVAL_BOARDS: Record<string, string> = {
+    adxl355: 'eval-adxl355-pmdz',
+    ad74413r: 'eval-ad-swio-2-click',
+    adt7420: 'eval-adt7420-pmdz',
+};
 
 function board_workfile(): Workfile {
     const created = create_workfile('max32655');
@@ -104,11 +113,11 @@ describe.skipIf(REPOS === undefined)('adxl355 on max32655fthr, from the real rep
         expect(report.value.deleted.sort()).toEqual(['capi_gpio_pin', 'capi_spi_device']);
     });
 
-    test('deleting the root takes the whole chain with it', () => {
+    test('deleting the eval board takes the whole chain with it', () => {
         const workfile = board_workfile();
         add_adxl355(workfile, 'adxl355');
         const before = referenced_nodes(workfile);
-        expectOk(remove_symbol(workfile, 'adxl355'));
+        expectOk(remove_symbol(workfile, 'eval_adxl355_pmdz'));
         expectOk(bootstrap(workfile, { referenced_before: before }));
 
         expect(stored(workfile)).toEqual({});

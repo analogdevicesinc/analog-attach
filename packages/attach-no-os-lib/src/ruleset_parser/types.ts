@@ -327,6 +327,9 @@ export type RulesetStruct = RulesetBase & {
 	$capability?: string,
 	$header?: string,      // Device header path, e.g. "drivers/accel/adxl355/adxl355.h"
 	$exposes?: string[],   // List of ops ids that this struct might expose
+	// An eval board on the bench, not a C struct: stored in the workfile, never generated.
+	// Its `part` field names the part's root, and its pinout is what wires that part.
+	$eval_board?: boolean,
 };
 
 // Bringing a descriptor up is a function call, so the function names are the data and
