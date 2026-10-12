@@ -61,6 +61,28 @@ const suffix_rules: SuffixRule[] = [
     { test: /(?<!^opp)-hz$/, make: uint32_matrix },
 ];
 
+function patch_from_binding(base: AttachType, binding: AttachType): AttachType {
+    if (binding._t === "generic" || binding._t === "array") { return base; }
+
+    const patch: Record<string, unknown> = {};
+    if ("minimum" in binding && binding.minimum !== undefined) { patch.minimum = binding.minimum; }
+    if ("maximum" in binding && binding.maximum !== undefined) { patch.maximum = binding.maximum; }
+    if ("default" in binding && binding.default !== undefined) { patch.default = binding.default; }
+    if ("typeSize" in binding && binding.typeSize !== undefined) { patch.typeSize = binding.typeSize; }
+
+    if (base._t === "number_array" && "minimum" in base) {
+        return { ...base, ...patch } as AttachType;
+    }
+    if (base._t === "integer") {
+        return { ...base, ...patch } as AttachType;
+    }
+    if (base._t === "matrix" && base.values.length === 1 && "minimum" in base.values[0]!) {
+        return { ...base, values: [{ ...base.values[0]!, ...patch }] } as AttachType;
+    }
+
+    return { ...base, ...patch } as AttachType;
+}
+
 export function insert_known_structures(properties: ResolvedProperty[]): ResolvedProperty[] {
 
     const properties_clone = structuredClone(properties);
@@ -123,7 +145,8 @@ export function insert_known_structures(properties: ResolvedProperty[]): Resolve
 
         for (const rule of suffix_rules) {
             if (rule.test.test(property.key)) {
-                property.value = rule.make(array_bounds(property.value), property.value.description);
+                const base = rule.make(array_bounds(property.value), property.value.description);
+                property.value = patch_from_binding(base, property.value);
                 break;
             }
         }
@@ -308,6 +331,34 @@ if (import.meta.vitest) {
         );
         expect(a!.value._t).toBe("number_array");
         expect(b!.value._t).toBe("generic");
+    });
+
+    test("suffix rule patches binding constraints onto the base type", () => {
+        const [result] = run(property("adi,vref-microvolt", {
+            _t: "integer", minimum: 1_000_000n, maximum: 2_500_000n, default: 2_500_000n, description: "ref voltage",
+        }));
+        expect(result!.value).toStrictEqual({
+            _t: "number_array", minItems: 1, maxItems: 1,
+            minimum: 1_000_000n, maximum: 2_500_000n, default: 2_500_000n, description: "ref voltage",
+        });
+    });
+
+    test("suffix rule patches binding constraints onto matrix base", () => {
+        const [result] = run(property("spi-cs-inactive-delay-ns", {
+            _t: "integer", minimum: 16_000n, description: "CS delay",
+        }));
+        expect(result!.value).toStrictEqual({
+            _t: "number_array", minItems: 1, maxItems: 1,
+            minimum: 16_000n, maximum: 0xFF_FF_FF_FFn, description: "CS delay",
+        });
+    });
+
+    test("suffix rule applies base type when binding is generic", () => {
+        const [result] = run(property("timeout-ns", { _t: "generic", description: "d" }));
+        expect(result!.value).toStrictEqual({
+            _t: "number_array", minItems: 1, maxItems: 1,
+            minimum: 0n, maximum: 0xFF_FF_FF_FFn, description: "d",
+        });
     });
 
     test("object properties are recursed", () => {
