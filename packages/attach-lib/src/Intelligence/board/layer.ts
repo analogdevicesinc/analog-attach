@@ -1,7 +1,8 @@
 import { readFileSync } from "node:fs";
 import { ParsedBinding, ResolvedProperty } from "../../Attach/AttachTypes.js";
-import { cell_extract_first_value, DeviceTree, DeviceTreeOverlay } from "../../Devicetree/index.js";
+import { DeviceTree, DeviceTreeOverlay } from "../../Devicetree/index.js";
 import { parent_path_string } from "../parents.js";
+import { effective_interrupt_parent, base_lookup } from "../interrupt_parent.js";
 import { is_gpio_property, INTERRUPT_MACROS } from "../query.js";
 import {
     IntelligenceLayer,
@@ -148,8 +149,7 @@ export type BoardLayer = IntelligenceLayer & {
     bus_of_node(devicetree: DeviceTree, node_path: string): BoardBus | undefined;
 };
 
-function effective_interrupt_parent(context: PropertyContext, placement: NodePlacement, devicetree: DeviceTree): string | undefined {
-    // First check data (set by the overlay)
+function current_interrupt_parent(context: PropertyContext, placement: NodePlacement): string | undefined {
     let parsed: Record<string, unknown> = {};
     try { parsed = JSON.parse(context.data); } catch { /* empty */ }
 
@@ -157,25 +157,7 @@ function effective_interrupt_parent(context: PropertyContext, placement: NodePla
     if (typeof from_data === "string") { return from_data; }
     if (Array.isArray(from_data) && from_data.length > 0 && typeof from_data[0] === "string") { return from_data[0]; }
 
-    // Walk base-tree ancestors for an inherited interrupt-parent
-    let path = placement.parent_path;
-    while (path.length > 0) {
-        const reference = devicetree.get_node_by_path({ kind: "path", labels: [], path });
-        if (reference !== undefined) {
-            const node = devicetree.deref_node(reference);
-            if (node !== undefined) {
-                const property = node.properties.find(p => p.name === "interrupt-parent");
-                if (property !== undefined) {
-                    const value = cell_extract_first_value(property);
-                    return typeof value === "string" ? value : undefined;
-                }
-            }
-        }
-        if (path === "/") { break; }
-        const last = path.lastIndexOf("/");
-        path = last <= 0 ? "/" : path.slice(0, last);
-    }
-    return;
+    return effective_interrupt_parent(base_lookup(context.devicetree), placement.node_path, context.devicetree)?.label;
 }
 
 /**
@@ -251,7 +233,7 @@ export function board_layer(board: BoardDescription): BoardLayer {
             // interrupt-parent is the board controller. If not, warn the user.
             let int_parent_note: string | undefined;
             if (property === "interrupts") {
-                const effective = effective_interrupt_parent(context, placement, context.devicetree);
+                const effective = current_interrupt_parent(context, placement);
                 if (effective !== undefined && effective !== controller) {
                     int_parent_note = `needs interrupt-parent = <&${controller}> (currently <&${effective}>); set it first`;
                 }
