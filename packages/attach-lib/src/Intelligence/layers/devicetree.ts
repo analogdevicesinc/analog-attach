@@ -1,10 +1,10 @@
-import { DeviceTree, DTNode, string_property, number_property } from "../../Devicetree/index.js";
+import { DeviceTree, DTNode, string_property, number_property, get_full_node_name } from "../../Devicetree/index.js";
 import { is_clock, is_interrupt_controller, is_regulator } from "../predicates.js";
 import { query_devicetree } from "../query.js";
 import { parent_path_string, suggest_parents } from "../parents.js";
 import { effective_interrupt_parent, base_lookup } from "../interrupt_parent.js";
 import { labelled_providers } from "../providers.js";
-import { IntelligenceLayer, ValueSuggestion } from "./types.js";
+import { IntelligenceLayer, PropertyContext, ValueSuggestion } from "./types.js";
 
 function format_frequency(hz: bigint): string {
     if (hz % 1_000_000n === 0n) { return `${hz / 1_000_000n} MHz`; }
@@ -120,25 +120,28 @@ function suggest_unit_address_reg(property: string, node_path: string | undefine
     }];
 }
 
+function inherited_interrupt_label(context: PropertyContext): string | undefined {
+    const dt = context.devicetree;
+    const lookup = base_lookup(dt);
+    if (context.placement?.node_path !== undefined) {
+        return effective_interrupt_parent(lookup, context.placement.node_path, dt)?.label;
+    }
+    if (context.parent_name !== undefined) {
+        const path_from_name = dt.as_stream()
+            .filter(node => get_full_node_name(node) === context.parent_name)
+            .toArray()[0]?.[1]?.path;
+        if (path_from_name !== undefined) {
+            return effective_interrupt_parent(lookup, `${path_from_name}/child`, dt)?.label;
+        }
+    }
+    return undefined;
+}
+
 // Layer 2: knowledge derived from the base device tree (controllers, buses, phandles).
 export const devicetree_layer: IntelligenceLayer = {
     name: "devicetree",
     refine_properties(properties, context) {
-        let inherited_label: string | undefined;
-        if (context.placement?.node_path !== undefined) {
-            inherited_label = effective_interrupt_parent(base_lookup(context.devicetree), context.placement.node_path, context.devicetree)?.label;
-        } else if (context.parent_name !== undefined) {
-            const path_from_name = context.devicetree.as_stream()
-                .filter(node => {
-                    const full = node.unit_addr !== undefined ? `${node.name}@${node.unit_addr}` : node.name;
-                    return full === context.parent_name;
-                })
-                .toArray()[0]?.[1]?.path;
-            if (path_from_name !== undefined) {
-                inherited_label = effective_interrupt_parent(base_lookup(context.devicetree), `${path_from_name}/child`, context.devicetree)?.label;
-            }
-        }
-        return query_devicetree(context.devicetree, properties, context.data, inherited_label);
+        return query_devicetree(context.devicetree, properties, context.data, inherited_interrupt_label(context));
     },
     suggest_values(property, context, lower) {
         return [
