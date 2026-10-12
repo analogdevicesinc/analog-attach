@@ -1057,7 +1057,8 @@ function realize(workfile: Workfile, option: Option, externs: ExternIndex): Resu
  * `chip` names an existing init_param to link instead of creating one: the second side of one
  * chip (`add ad74413r --as adc,dac` gives capi_adc and capi_dac the same ad74413r_init_param).
  */
-export function pin_driver(workfile: Workfile, root: string, driver: string, chip?: string): Result<void> {
+export function pin_driver(workfile: Workfile, root: string, driver: string, chip?: string): Result<LinkedReference[]> {
+	const linked: LinkedReference[] = [];
 	const node = workfile.symbols[root];
 	if (node?._t !== "RulesetDescriptor") {
 		return error(`'${root}' is not a handle to pin a driver to`, root);
@@ -1074,7 +1075,7 @@ export function pin_driver(workfile: Workfile, root: string, driver: string, chi
 	// The root's config: the struct its $init_param takes.
 	const config_type = node.properties[0].include;
 	if (config_type === undefined) {
-		return ok();
+		return ok(linked);
 	}
 	let config = typeof node.properties[0].value === "string" ? node.properties[0].value : undefined;
 	if (config === undefined) {
@@ -1087,10 +1088,11 @@ export function pin_driver(workfile: Workfile, root: string, driver: string, chi
 		if (!added.ok) {
 			return added;
 		}
-		const linked = set_owned(workfile, root, "$init_param", config);
-		if (!linked.ok) {
-			return linked;
+		const set = set_owned(workfile, root, "$init_param", config);
+		if (!set.ok) {
+			return set;
 		}
+		linked.push({ node: root, property: "$init_param", target: config, symbol: config_type, created: true, hidden: false });
 	}
 
 	// The driver's own init_param, for each driver-backed init_param field it provides for.
@@ -1098,7 +1100,7 @@ export function pin_driver(workfile: Workfile, root: string, driver: string, chi
 	const own_config = `${driver}_init_param`;
 	const entry = resolve_entry(own_config);
 	if (config_node?._t !== "RulesetStruct" || !entry.ok || entry.value.module.path !== module.path || entry.value.$type !== RulesetType.RT_STRUCT) {
-		return ok();
+		return ok(linked);
 	}
 	for (const property of config_node.properties) {
 		if (property._t !== "DriverInitParameterProperty" || property.value !== undefined
@@ -1119,12 +1121,13 @@ export function pin_driver(workfile: Workfile, root: string, driver: string, chi
 		} else if (workfile.symbols[name]?.$symbol !== own_config) {
 			return error(`'${name}' is not a ${own_config} to share`, name);
 		}
-		const linked = set_owned(workfile, config, property.name, name);
-		if (!linked.ok) {
-			return linked;
+		const set = set_owned(workfile, config, property.name, name);
+		if (!set.ok) {
+			return set;
 		}
+		linked.push({ node: config, property: property.name, target: name, symbol: own_config, created: chip === undefined, hidden: false });
 	}
-	return ok();
+	return ok(linked);
 }
 
 /**

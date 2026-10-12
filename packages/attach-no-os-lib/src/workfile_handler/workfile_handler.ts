@@ -5,6 +5,7 @@ import type {
     ArrayProperty,
     EnumProperty,
     IncludeProperty,
+    NumberProperty,
     PlatformExtraProperty,
     PlatformOpsProperty,
     Property,
@@ -14,6 +15,7 @@ import type {
     UnionProperty
 } from "../ruleset_parser/types";
 import { provided_id, RulesetType } from "../ruleset_parser/types";
+import { format_number } from "../ruleset_parser/number_format";
 import type { PropertySuggestions } from "./types";
 import { load_resolved_ruleset, load_resolved_ruleset_for_board } from "../resolver/resolver";
 import { all_symbols, is_platform_symbol } from "../registry/registry";
@@ -621,9 +623,15 @@ export function suggest_for_property(workfile: Workfile, symbol_name: string, pr
         return error(`Could not find property "${property_name}" in [${symbol.properties.map(p => p.name).join(", ")}]`, symbol_name);
     }
 
+    // What the part's overrides leave (adxl355 allows only CAPI_SPI_MODE_0), not the schema
+    // alone: a suggestion the validator would then refuse is no suggestion.
+    const graph = create_connections_graph(workfile);
+    const overridden = apply_overrides(property, collect_child_overrides(symbol_name, workfile, graph), symbol_name, workfile).effective;
+
     switch (property._t) {
         case "NumberProperty": {
-            return ok({});
+            const values = overridden._t === "NumberProperty" ? overridden.values : undefined;
+            return ok(values === undefined ? {} : { values: values.map(value => format_number(value, overridden as NumberProperty)) });
         }
         case "BooleanProperty": {
             return ok({ values: ["true", "false"]});
@@ -635,7 +643,7 @@ export function suggest_for_property(workfile: Workfile, symbol_name: string, pr
             return suggest_for_include(workfile, property);
         }
         case "EnumProperty": {
-            return suggest_for_enum(property);
+            return suggest_for_enum(overridden as EnumProperty);
         }
         case "UnionProperty": {
             return suggest_for_union(workfile, property, union_member);

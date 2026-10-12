@@ -13,7 +13,7 @@ import {
     pin_driver,
     validate_workfile,
 } from "attach-no-os-lib";
-import type { Workfile } from "attach-no-os-lib";
+import type { LinkedReference, Workfile } from "attach-no-os-lib";
 import { filter_completions, get_node_names, get_schema_paths } from "../completion/completion";
 import { common_ok, type AddResponse } from "../protocol/responses";
 import { describe_bootstrap, run_bootstrap } from "./bootstrap_run";
@@ -212,12 +212,14 @@ export const addCommand = buildCommand<AddFlags, [string | undefined]>({
         context.value.workfile = changed.value;
 
         // Named by its driver: say which part it is now, so nothing below it is guessed.
+        const pinned_links: LinkedReference[] = [];
         if (schema !== key) {
             const pinned = pin_driver(context.value.workfile, name, key);
             if (!pinned.ok) {
                 output_error(flags, pinned.error.message);
                 return;
             }
+            pinned_links.push(...pinned.value);
         }
 
         // The other sides asked for (`--as adc,dac`): more handles on the same chip, sharing
@@ -246,6 +248,7 @@ export const addCommand = buildCommand<AddFlags, [string | undefined]>({
                 output_error(flags, side_pinned.error.message);
                 return;
             }
+            pinned_links.push(...side_pinned.value);
             sides.push(side_name);
         }
 
@@ -254,7 +257,8 @@ export const addCommand = buildCommand<AddFlags, [string | undefined]>({
             output_error(flags, `Added '${name}', but bootstrap failed: ${ran.error.message}`);
             return;
         }
-        const report = ran.value;
+        // What add itself linked comes first: it is what the rest was built on.
+        const report = ran.value === undefined ? undefined : { ...ran.value, linked: [...pinned_links, ...ran.value.linked] };
 
         const saved = save_workfile(context.value);
         if (!saved.ok) {

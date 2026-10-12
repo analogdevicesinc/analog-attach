@@ -275,8 +275,10 @@ function format_configs(settings: SettingsFile, selected: (keyof SettingsFile)[]
         return out + format_setting(selected[0], settings[selected[0]]);
     }
 
-    out += `  ${"Setting".padEnd(16)}${"Value".padEnd(24)}Source\n`;
-    out += `  ${"─".repeat(58)}\n`;
+    // As wide as the longest value: paths are long, and a fixed width ran them into Source.
+    const width = Math.max(22, ...selected.map(field => (settings[field].value ?? settings[field].default ?? "-").length)) + 2;
+    out += `  ${"Setting".padEnd(16)}${"Value".padEnd(width)}Source\n`;
+    out += `  ${"─".repeat(16 + width + 18)}\n`;
 
     for (const field of selected) {
         const setting = settings[field];
@@ -284,7 +286,7 @@ function format_configs(settings: SettingsFile, selected: (keyof SettingsFile)[]
         const source = setting.value === undefined
             ? (setting.default === undefined ? (setting.required ? "unset (required)" : "unset") : "default")
             : "configured";
-        out += `  ${field.padEnd(16)}${value.padEnd(24)}${source}\n`;
+        out += `  ${field.padEnd(16)}${value.padEnd(width)}${source}\n`;
     }
 
     return out;
