@@ -1,4 +1,5 @@
 import { parse as parse_yaml_string } from "yaml";
+import { bus_named, signal_reference, spi_bus_of } from "./lookup.js";
 import {
     BoardBus,
     BoardDescription,
@@ -140,7 +141,7 @@ function parse_slot(id: string, value: unknown, where: string, buses: BoardBus[]
         signals.push(parse_signal(n, signal, `${where}.signals.${n}`));
     }
 
-    const spi_buses = bus_names.filter(name => buses.find(b => b.name === name)?.type === "spi");
+    const spi_buses = bus_names.filter(name => bus_named(buses, name)?.type === "spi");
     const chip_select = signals.find(signal => signal.kind === "chip-select");
     if (chip_select !== undefined && spi_buses.length !== 1) {
         fail(`${where}.signals.${chip_select.name}`, spi_buses.length === 0
@@ -163,7 +164,7 @@ function check_wiring(buses: BoardBus[], slots: BoardSlot[]): void {
     // "<spi bus> <reg>" → the chip-select signals seen with it so far.
     const chip_selects = new Map<string, { gpio: number; owner: string; connected: boolean }[]>();
     for (const slot of slots) {
-        const spi_bus = slot.buses.find(name => buses.find(b => b.name === name)?.type === "spi");
+        const spi_bus = spi_bus_of(buses, slot)?.name;
         for (const signal of slot.signals) {
             const where = `slots.${slot.id}.signals.${signal.name}`;
             const pin = bus_pins.get(signal.gpio);
@@ -175,9 +176,10 @@ function check_wiring(buses: BoardBus[], slots: BoardSlot[]): void {
             // connected lines for one reg must agree.
             const clash = signal.connected ? seen.find(s => s.connected && s.gpio !== signal.gpio) : undefined;
             if (clash !== undefined) { fail(`${where}.gpio`, `${spi_bus} reg ${signal.reg} is GPIO${clash.gpio} in ${clash.owner}`); }
+            const reference = signal_reference(slot, signal);
             const twice = seen.find(s => s.gpio === signal.gpio && s.owner.startsWith(`${slot.id}.`));
             if (twice !== undefined) { fail(`${where}.reg`, `reg ${signal.reg} is already ${twice.owner}`); }
-            chip_selects.set(key, [...seen, { gpio: signal.gpio, owner: `${slot.id}.${signal.name}`, connected: signal.connected }]);
+            chip_selects.set(key, [...seen, { gpio: signal.gpio, owner: reference, connected: signal.connected }]);
         }
     }
 }
