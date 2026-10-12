@@ -20,6 +20,7 @@ import { ok } from "../ruleset_parser/result";
 import { RulesetType } from "../ruleset_parser/types";
 import { get_registry } from "./registry";
 import type { ModuleInfo, RulesetEntry } from "./types";
+import type { Workfile } from "../workfile_handler/types";
 
 /** Every configured module declaring that it implements `interface_`. */
 export function modules_providing(interface_: string): Result<ModuleInfo[]> {
@@ -93,4 +94,55 @@ export function provides_interface(symbol: string, interface_: string): Result<b
 	}
 
 	return ok(entry.module.provides_interfaces?.includes(interface_) === true);
+}
+
+/** A driver-backed field's options, ranked by what the workfile already says. */
+export interface RankedCandidates {
+	/** From drivers that already have nodes in the workfile: the part the user added. */
+	strong: RulesetEntry[],
+	/** From every other configured driver providing the interface. */
+	weak: RulesetEntry[],
+}
+
+/**
+ * The options for a driver-backed field (`extra`, `ops`) of a node of type `owner`, deduced
+ * from the workfile rather than declared:
+ *
+ *   - a symbol that already fills a driver-backed field of a node of ANOTHER type is that
+ *     node's - `ad74413r_init_param` filling capi_adc_config.extra is the device's, so it is
+ *     not offered for capi_adc_chan_config.extra, which leaves ad74413r_channel_config;
+ *   - what is left is strong when its driver already has a node in the workfile, weak when
+ *     not. With one ADC part in the workfile, its own structs are the strong options.
+ */
+export function rank_driver_candidates(workfile: Workfile, candidates: RulesetEntry[], owner: string): RankedCandidates {
+	const taken = new Set<string>();
+	const present = new Set<string>();
+	for (const node of Object.values(workfile.symbols)) {
+		const entry = lookup(node.$symbol);
+		if (entry?.module.type === "driver") {
+			present.add(entry.module.path);
+		}
+		if (node.$symbol === owner || (node._t !== "RulesetStruct" && node._t !== "RulesetDescriptor")) {
+			continue;
+		}
+		for (const property of node.properties) {
+			if ((property._t === "DriverInitParameterProperty" || property._t === "DriverOpsProperty") && typeof property.value === "string") {
+				const target = workfile.symbols[property.value];
+				if (target !== undefined) {
+					taken.add(target.$symbol);
+				}
+			}
+		}
+	}
+
+	const open = candidates.filter(candidate => !taken.has(candidate.$symbol));
+	return {
+		strong: open.filter(candidate => present.has(candidate.module.path)),
+		weak: open.filter(candidate => !present.has(candidate.module.path)),
+	};
+}
+
+function lookup(symbol: string): RulesetEntry | undefined {
+	const registry = get_registry();
+	return registry.ok ? registry.value.symbols.get(symbol) : undefined;
 }

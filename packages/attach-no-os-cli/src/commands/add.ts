@@ -9,6 +9,7 @@ import {
     list_available_structs,
     list_drivers,
     load_resolved_ruleset_for_board,
+    pin_driver,
     validate_workfile,
 } from "attach-no-os-lib";
 import { filter_completions, get_node_names, get_schema_paths } from "../completion/completion";
@@ -191,6 +192,15 @@ export const addCommand = buildCommand<AddFlags, [string | undefined]>({
         }
 
         context.value.workfile = changed.value;
+
+        // Named by its driver: say which part it is now, so nothing below it is guessed.
+        if (schema !== key) {
+            const pinned = pin_driver(context.value.workfile, name, key);
+            if (!pinned.ok) {
+                output_error(flags, pinned.error.message);
+                return;
+            }
+        }
 
         const ran = run_bootstrap(context.value.workfile);
         if (!ran.ok) {

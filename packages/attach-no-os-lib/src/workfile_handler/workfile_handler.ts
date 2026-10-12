@@ -21,7 +21,7 @@ import { board_externs } from "../registry/bsp";
 import { find_soc } from "../registry/platforms";
 import { build_extern_index, hidden_candidates } from "../registry/hidden";
 import type { ExternIndex, HiddenCandidate } from "../registry/hidden";
-import { driver_init_parameter_candidates, driver_ops_candidates } from "../registry/drivers";
+import { driver_init_parameter_candidates, driver_ops_candidates, rank_driver_candidates } from "../registry/drivers";
 import { collect_child_overrides, create_connections_graph, rename_symbol_references } from "../validator/connection_graph";
 import { apply_overrides } from "../validator/override_resolver";
 import type { AvailableStructs, MinimalWorkfile, Workfile } from "./types";
@@ -664,10 +664,10 @@ export function suggest_for_property(workfile: Workfile, symbol_name: string, pr
             return suggest_platform_extra(workfile, effective as PlatformExtraProperty, symbol);
         }
         case "DriverOpsProperty": {
-            return suggest_driver_backed(workfile, property.interface, RulesetType.RT_EXTERN);
+            return suggest_driver_backed(workfile, property.interface, RulesetType.RT_EXTERN, symbol.$symbol);
         }
         case "DriverInitParameterProperty": {
-            return suggest_driver_backed(workfile, property.interface, RulesetType.RT_STRUCT);
+            return suggest_driver_backed(workfile, property.interface, RulesetType.RT_STRUCT, symbol.$symbol);
         }
         case "RawProperty": {
             return ok({});
@@ -685,7 +685,7 @@ export function suggest_for_property(workfile: Workfile, symbol_name: string, pr
  * added to make one. Both come from the modules declaring the interface, so a driver that is
  * not configured is simply not offered.
  */
-function suggest_driver_backed(workfile: Workfile, interface_: string, type_: RulesetType): Result<PropertySuggestions> {
+function suggest_driver_backed(workfile: Workfile, interface_: string, type_: RulesetType, owner: string): Result<PropertySuggestions> {
     const candidates = type_ === RulesetType.RT_EXTERN
         ? driver_ops_candidates(interface_)
         : driver_init_parameter_candidates(interface_);
@@ -693,16 +693,19 @@ function suggest_driver_backed(workfile: Workfile, interface_: string, type_: Ru
         return candidates;
     }
 
-    const symbols = new Set(candidates.value.map(entry => entry.$symbol));
+    // Strong first: what the parts already in the workfile ship, then everything else that
+    // provides the interface. A type already filling another config's field is left out.
+    const { strong, weak } = rank_driver_candidates(workfile, candidates.value, owner);
+    const types = [...strong, ...weak].map(entry => entry.$symbol);
 
     const values: string[] = [];
-    for (const [name, ruleset] of Object.entries(workfile.symbols)) {
-        if (symbols.has(ruleset.$symbol)) {
-            values.push(name);
+    for (const symbol of types) {
+        for (const [name, ruleset] of Object.entries(workfile.symbols)) {
+            if (ruleset.$symbol === symbol) {
+                values.push(name);
+            }
         }
     }
-
-    const types = candidates.value.map(entry => entry.$symbol);
 
     return ok({
         values: values.length > 0 ? values : undefined,
