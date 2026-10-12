@@ -28,15 +28,6 @@ export interface CreateWorkfileResponse extends CommonResponse {
     path: string;
 }
 
-export interface Device {
-    tag: string;
-    key: string;
-}
-
-export interface ListDevicesResponse extends CommonResponse {
-    devices: Device[];
-}
-
 export interface AddResponse extends CommonResponse {
     key: string;
     path: string[];
