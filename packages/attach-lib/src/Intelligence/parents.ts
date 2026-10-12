@@ -52,7 +52,7 @@ export function suggest_parents(devicetree: DeviceTree, node: ParsedBinding): Pa
 
     const spi_max_frequency = node.properties.some((value) => value.key === "spi-max-frequency");
     // eslint-disable-next-line unicorn/prevent-abbreviations
-    const i2c_example = node.examples.some((example) => { return example.includes("i2c {"); });
+    const i2c_example = node.examples.some((example) => /\bi2c[\d@&]?\S*\s*\{/.test(example));
 
     let suggestions: PathAndLabel[] = [];
 
@@ -81,10 +81,11 @@ export function suggest_parents_impl(devicetree: DeviceTree, parent_types: DTCom
                 break;
             }
             case DTCommDeviceTypes.FIXED_CLOCK: {
-                suggestions = [...suggestions, ...find_nodes(devicetree, is_fixed_clock_parent).map(located => ({
+                const parents = find_nodes(devicetree, is_fixed_clock_parent).map(located => ({
                     ...to_path_and_label(located),
                     label: node_label(located.node) ?? located.node.name,
-                }))];
+                }));
+                suggestions = [...suggestions, ...(parents.length > 0 ? parents : [{ path: ['/'], label: '/' }])];
                 break;
             }
             case DTCommDeviceTypes.REGULATOR_FIXED: {
@@ -193,5 +194,32 @@ if (import.meta.vitest) {
         const dt = dts(rpi_like);
         const result = suggest_parents_impl(dt, [DTCommDeviceTypes.SPI]);
         expect(result[0]?.path).toStrictEqual(['/', 'soc', 'spi@7e204000']);
+    });
+
+    test("suggest_parents_impl — FIXED_CLOCK: falls back to root when no /clocks container", () => {
+        const dt = dts(`/dts-v1/;
+/ {
+    osc: oscillator {
+        compatible = "fixed-clock";
+        #clock-cells = <0>;
+    };
+};`);
+        const result = suggest_parents_impl(dt, [DTCommDeviceTypes.FIXED_CLOCK]);
+        expect(result).toHaveLength(1);
+        expect(result[0]?.path).toStrictEqual(['/']);
+    });
+
+    test("suggest_parents — I2C example with i2c0 or i2c@addr pattern", () => {
+        const dt = dts(rpi_like);
+        // eslint-disable-next-line unicorn/consistent-function-scoping
+        const binding = (example: string) => ({
+            properties: [],
+            required_properties: [],
+            examples: [example],
+        }) as unknown as ParsedBinding;
+
+        expect(suggest_parents(dt, binding("i2c0 {\n  dev@48 {};\n};"))).toHaveLength(1);
+        expect(suggest_parents(dt, binding("&i2c1 {\n  dev@48 {};\n};"))).toHaveLength(1);
+        expect(suggest_parents(dt, binding("i2c@7e205000 {\n  dev@48 {};\n};"))).toHaveLength(1);
     });
 }
