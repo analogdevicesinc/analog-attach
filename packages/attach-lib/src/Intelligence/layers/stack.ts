@@ -18,7 +18,6 @@ export class IntelligenceStack {
         return new IntelligenceStack(layers);
     }
 
-    /** The binding and devicetree layers — what attach-lib has always applied. */
     public static default(): IntelligenceStack {
         return new IntelligenceStack([binding_layer, devicetree_layer]);
     }
@@ -27,34 +26,25 @@ export class IntelligenceStack {
         return new IntelligenceStack([...this.layers, ...layers]);
     }
 
-    public refine_properties(properties: ResolvedProperty[], context: PropertyContext): ResolvedProperty[] {
-        let refined = properties;
+    private fold<T>(initial: T, pick: (layer: IntelligenceLayer) => ((value: T) => T) | undefined): T {
+        let result = initial;
         for (const layer of this.layers) {
-            if (layer.refine_properties !== undefined) {
-                refined = layer.refine_properties(refined, context);
-            }
+            const step = pick(layer);
+            if (step !== undefined) { result = step(result); }
         }
-        return refined;
+        return result;
+    }
+
+    public refine_properties(properties: ResolvedProperty[], context: PropertyContext): ResolvedProperty[] {
+        return this.fold(properties, layer => layer.refine_properties && (refined => layer.refine_properties!(refined, context)));
     }
 
     public suggest_values(property: string, context: PropertyContext): ValueSuggestion[] {
-        let suggestions: ValueSuggestion[] = [];
-        for (const layer of this.layers) {
-            if (layer.suggest_values !== undefined) {
-                suggestions = layer.suggest_values(property, context, suggestions);
-            }
-        }
-        return suggestions;
+        return this.fold([] as ValueSuggestion[], layer => layer.suggest_values && (lower => layer.suggest_values!(property, context, lower)));
     }
 
     public suggest_placement(binding: ParsedBinding, devicetree: DeviceTree): PlacementSuggestion[] {
-        let suggestions: PlacementSuggestion[] = [];
-        for (const layer of this.layers) {
-            if (layer.suggest_placement !== undefined) {
-                suggestions = layer.suggest_placement(binding, devicetree, suggestions);
-            }
-        }
-        return suggestions;
+        return this.fold([] as PlacementSuggestion[], layer => layer.suggest_placement && (lower => layer.suggest_placement!(binding, devicetree, lower)));
     }
 }
 
