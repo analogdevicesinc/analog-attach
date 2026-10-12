@@ -6,7 +6,7 @@ import { describe, test, expect, beforeEach, afterEach } from 'vitest';
 import { bootstrap, pin_driver, referenced_nodes } from '../../src/bootstrap/bootstrap';
 import { generate_project } from '../../src/codegen/codegen';
 import { find_board } from '../../src/registry/platforms';
-import { driver_root } from '../../src/registry/roots';
+import { driver_root, driver_root_for } from '../../src/registry/roots';
 import { load_resolved_ruleset_for_board } from '../../src/resolver/resolver';
 import { validate_workfile } from '../../src/validator/validator';
 import { add_symbol, create_workfile, set_value } from '../../src/workfile_handler/workfile_handler';
@@ -54,8 +54,8 @@ function board_workfile(): Workfile {
 }
 
 /** What `attach-noos add <driver>` does. */
-function add_driver(workfile: Workfile, driver: string, name: string): void {
-    const root = driver_root(driver);
+function add_driver(workfile: Workfile, driver: string, name: string, interface_?: string): void {
+    const root = interface_ === undefined ? driver_root(driver) : driver_root_for(driver, interface_);
     expectOk(root);
     const ruleset = load_resolved_ruleset_for_board(root.value, BOARD);
     expectOk(ruleset);
@@ -134,13 +134,13 @@ describe.skipIf(!ENABLED)('generated CAPI apps build on max32655fthr', () => {
 
     test('ad74413r', () => {
         const workfile = board_workfile();
-        add_driver(workfile, 'ad74413r', 'ad74413r');
+        add_driver(workfile, 'ad74413r', 'ad74413r', 'adc');
         expect(generated_warnings(generate_and_build(workfile, 'ad74413r'))).toEqual([]);
     }, BUILD_TIMEOUT);
 
     test('ad74413r with an ADC channel', () => {
         const workfile = board_workfile();
-        add_driver(workfile, 'ad74413r', 'ad74413r');
+        add_driver(workfile, 'ad74413r', 'ad74413r', 'adc');
         const channel = load_resolved_ruleset_for_board('capi_adc_chan', BOARD);
         expectOk(channel);
         expectOk(add_symbol(workfile, 'ch0', channel.value));
@@ -149,6 +149,32 @@ describe.skipIf(!ENABLED)('generated CAPI apps build on max32655fthr', () => {
         update(workfile, 'ad74413r_channel_config', 'function', 'AD74413R_VOLTAGE_IN');
         update(workfile, 'ad74413r_channel_config', 'enabled', true);
         expect(generated_warnings(generate_and_build(workfile, 'ad74413r-channel'))).toEqual([]);
+    }, BUILD_TIMEOUT);
+
+    test('ad74413r ADC and DAC on one chip, a channel on each', () => {
+        const workfile = board_workfile();
+        add_driver(workfile, 'ad74413r', 'ad74413r_adc', 'adc');
+        // `add ad74413r --as adc,dac`: the DAC side shares the chip's init_param.
+        const dac = driver_root_for('ad74413r', 'dac');
+        expectOk(dac);
+        const dac_ruleset = load_resolved_ruleset_for_board(dac.value, BOARD);
+        expectOk(dac_ruleset);
+        expectOk(add_symbol(workfile, 'ad74413r_dac', dac_ruleset.value));
+        expectOk(pin_driver(workfile, 'ad74413r_dac', 'ad74413r', 'ad74413r_init_param'));
+        expectOk(bootstrap(workfile));
+        for (const [schema, name] of [['capi_adc_chan', 'adc_ch0'], ['capi_dac_chan', 'dac_ch1']] as const) {
+            const channel = load_resolved_ruleset_for_board(schema, BOARD);
+            expectOk(channel);
+            expectOk(add_symbol(workfile, name, channel.value));
+            expectOk(bootstrap(workfile));
+        }
+        update(workfile, 'capi_adc_chan_config', 'chan_id', 0);
+        update(workfile, 'capi_dac_chan_config', 'chan_id', 1);
+        update(workfile, 'ad74413r_channel_config', 'function', 'AD74413R_VOLTAGE_IN');
+        update(workfile, 'ad74413r_channel_config_1', 'function', 'AD74413R_VOLTAGE_OUT');
+
+        expect(Object.keys(workfile.symbols).filter(name => workfile.symbols[name]?.$symbol === 'ad74413r_init_param')).toEqual(['ad74413r_init_param']);
+        expect(generated_warnings(generate_and_build(workfile, 'ad74413r-adc-dac'))).toEqual([]);
     }, BUILD_TIMEOUT);
 
     test('adt7420 over I2C', () => {
@@ -161,7 +187,7 @@ describe.skipIf(!ENABLED)('generated CAPI apps build on max32655fthr', () => {
     test('adxl355 and ad74413r on one bus, the second chip-select set by hand', () => {
         const workfile = board_workfile();
         add_driver(workfile, 'adxl355', 'adxl355');
-        add_driver(workfile, 'ad74413r', 'ad74413r');
+        add_driver(workfile, 'ad74413r', 'ad74413r', 'adc');
 
         // The board's one declared chip-select line is taken, so the second device is left
         // without one. Set it the way a user would: a pin node on P2_1 (J9 pin 6).

@@ -18,7 +18,9 @@
 import type { Result } from "../ruleset_parser/result";
 import { ok } from "../ruleset_parser/result";
 import { RulesetType } from "../ruleset_parser/types";
+import type { Ruleset } from "../ruleset_parser/types";
 import { get_registry } from "./registry";
+import { load_resolved_ruleset } from "../resolver/resolver";
 import type { ModuleInfo, RulesetEntry } from "./types";
 import type { Workfile } from "../workfile_handler/types";
 
@@ -67,7 +69,22 @@ function candidates_of(interface_: string, type_: RulesetType): Result<RulesetEn
  * never emitted.
  */
 export function driver_ops_candidates(interface_: string): Result<RulesetEntry[]> {
-	return candidates_of(interface_, RulesetType.RT_EXTERN);
+	const candidates = candidates_of(interface_, RulesetType.RT_EXTERN);
+	if (!candidates.ok) {
+		return candidates;
+	}
+	// A driver providing several interfaces ships an ops table per interface (ad74413r: adc
+	// and dac). Each says what it is, and an interface's table is named <interface>_ops, with
+	// the framework's prefix in front (capi_adc_ops).
+	const ops_type = `${interface_}_ops`;
+	return ok(candidates.value.filter(entry => {
+		const ruleset = load_resolved_ruleset(entry.$symbol);
+		if (!ruleset.ok || ruleset.value._t !== "RulesetExtern") {
+			return false;
+		}
+		const provides = ruleset.value.$provides;
+		return provides === ops_type || provides.endsWith(`_${ops_type}`);
+	}));
 }
 
 /**
@@ -108,21 +125,27 @@ export interface RankedCandidates {
  * The options for a driver-backed field (`extra`, `ops`) of a node of type `owner`, deduced
  * from the workfile rather than declared:
  *
- *   - a symbol that already fills a driver-backed field of a node of ANOTHER type is that
- *     node's - `ad74413r_init_param` filling capi_adc_config.extra is the device's, so it is
- *     not offered for capi_adc_chan_config.extra, which leaves ad74413r_channel_config;
+ *   - a symbol that already fills a driver-backed field at the OTHER level - a device config
+ *     versus a channel config - belongs to that level: `ad74413r_init_param` filling
+ *     capi_adc_config.extra is a device's, so it is not offered for capi_adc_chan_config.extra,
+ *     which leaves ad74413r_channel_config. Between two device configs (ADC and DAC on one
+ *     chip) the same init_param stays an option;
  *   - what is left is strong when its driver already has a node in the workfile, weak when
  *     not. With one ADC part in the workfile, its own structs are the strong options.
  */
-export function rank_driver_candidates(workfile: Workfile, candidates: RulesetEntry[], owner: string): RankedCandidates {
+export function rank_driver_candidates(workfile: Workfile, candidates: RulesetEntry[], owner: Ruleset): RankedCandidates {
 	const taken = new Set<string>();
 	const present = new Set<string>();
+	const owner_level = hangs_off_handle(owner);
 	for (const node of Object.values(workfile.symbols)) {
 		const entry = lookup(node.$symbol);
 		if (entry?.module.type === "driver") {
 			present.add(entry.module.path);
 		}
-		if (node.$symbol === owner || (node._t !== "RulesetStruct" && node._t !== "RulesetDescriptor")) {
+		// Only across levels: the chip's init_param fills both the ADC and the DAC device
+		// config, but never a channel's.
+		if (node.$symbol === owner.$symbol || hangs_off_handle(node) === owner_level
+			|| (node._t !== "RulesetStruct" && node._t !== "RulesetDescriptor")) {
 			continue;
 		}
 		for (const property of node.properties) {
@@ -140,6 +163,15 @@ export function rank_driver_candidates(workfile: Workfile, candidates: RulesetEn
 		strong: open.filter(candidate => present.has(candidate.module.path)),
 		weak: open.filter(candidate => !present.has(candidate.module.path)),
 	};
+}
+
+/**
+ * Whether a config hangs off a handle - a channel config names the ADC or DAC it is on
+ * (`adc_handle`) - as opposed to configuring a device of its own.
+ */
+function hangs_off_handle(node: Ruleset): boolean {
+	return node._t === "RulesetStruct" && node.properties.some(property => property._t === "IncludeProperty"
+		&& property.include !== undefined && lookup(property.include)?.$type === RulesetType.RT_DESCRIPTOR);
 }
 
 function lookup(symbol: string): RulesetEntry | undefined {

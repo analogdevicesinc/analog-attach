@@ -5,6 +5,7 @@ import {
     add_symbol,
     driver_iio_root,
     driver_root,
+    driver_root_for,
     get_effective_setting_value,
     list_available_structs,
     list_drivers,
@@ -12,12 +13,14 @@ import {
     pin_driver,
     validate_workfile,
 } from "attach-no-os-lib";
+import type { Workfile } from "attach-no-os-lib";
 import { filter_completions, get_node_names, get_schema_paths } from "../completion/completion";
 import { common_ok, type AddResponse } from "../protocol/responses";
 import { describe_bootstrap, run_bootstrap } from "./bootstrap_run";
 import { load_context, output, output_error, root_key, save_workfile, type WorkfileContext } from "./shared";
 
 type AddFlags = {
+    as?: string;
     json?: boolean;
     key?: string;
     name?: string;
@@ -97,6 +100,12 @@ export const addCommand = buildCommand<AddFlags, [string | undefined]>({
                     return filter_completions(get_node_names(), partial);
                 }
             },
+            as: {
+                kind: "parsed",
+                brief: "For a driver with several interfaces (ad74413r: adc, dac): which to add, comma-separated for several on one chip",
+                optional: true,
+                parse: String
+            },
             json: { kind: "boolean", brief: "Output as JSON", optional: true }
         }
     },
@@ -151,6 +160,11 @@ export const addCommand = buildCommand<AddFlags, [string | undefined]>({
         // A schema wins over a driver of the same name; a driver is only the shorthand.
         let schema = key;
         let default_node_name = default_name(key);
+        const interfaces = (flags.as ?? "").split(",").map(entry => entry.trim()).filter(entry => entry !== "");
+        if (interfaces.length > 0 && available.value.all.includes(key)) {
+            output_error(flags, `--as picks a driver's interface, and '${key}' is a schema, not a driver`);
+            return;
+        }
         if (!available.value.all.includes(key)) {
             const drivers = list_drivers();
             const is_driver = drivers.ok && drivers.value.some(driver => driver.name === key);
@@ -162,13 +176,17 @@ export const addCommand = buildCommand<AddFlags, [string | undefined]>({
             // and it inits the part itself, so the generic handle is not added at all.
             const template_set = get_effective_setting_value("template_set");
             const iio = template_set.ok && template_set.value === IIO_TEMPLATE_SET;
-            const root = iio ? driver_iio_root(key) : driver_root(key);
+            const [first_interface] = interfaces;
+            const root = iio
+                ? driver_iio_root(key)
+                : (first_interface === undefined ? driver_root(key) : driver_root_for(key, first_interface));
             if (!root.ok) {
                 output_error(flags, root.error.message);
                 return;
             }
             schema = root.value;
-            default_node_name = key;
+            // Named after the side too when one is picked, so ADC and DAC never collide.
+            default_node_name = first_interface === undefined ? key : `${key}_${first_interface}`;
         }
 
         const name = flags.name ?? unique_name(default_node_name, context.value);
@@ -200,6 +218,35 @@ export const addCommand = buildCommand<AddFlags, [string | undefined]>({
                 output_error(flags, pinned.error.message);
                 return;
             }
+        }
+
+        // The other sides asked for (`--as adc,dac`): more handles on the same chip, sharing
+        // its init_param rather than describing a second part.
+        const chip = chip_of(context.value.workfile, name);
+        const sides: string[] = [];
+        for (const interface_ of interfaces.slice(1)) {
+            const side = driver_root_for(key, interface_);
+            if (!side.ok) {
+                output_error(flags, side.error.message);
+                return;
+            }
+            const side_name = unique_name(`${key}_${interface_}`, context.value);
+            const side_ruleset = load_resolved_ruleset_for_board(side.value, context.value.workfile.board);
+            if (!side_ruleset.ok) {
+                output_error(flags, side_ruleset.error.message);
+                return;
+            }
+            const side_added = add_symbol(context.value.workfile, side_name, side_ruleset.value);
+            if (!side_added.ok) {
+                output_error(flags, side_added.error.message);
+                return;
+            }
+            const side_pinned = pin_driver(context.value.workfile, side_name, key, chip);
+            if (!side_pinned.ok) {
+                output_error(flags, side_pinned.error.message);
+                return;
+            }
+            sides.push(side_name);
         }
 
         const ran = run_bootstrap(context.value.workfile);
@@ -234,6 +281,7 @@ export const addCommand = buildCommand<AddFlags, [string | undefined]>({
 
         const text = [
             `Added '${name}' (${what})`,
+            ...sides.map(side => `Added '${side}' on the same chip`),
             `  ${context.value.path}`,
             ...(report === undefined ? [] : describe_bootstrap(report, context.value.workfile)),
             "",
@@ -242,6 +290,17 @@ export const addCommand = buildCommand<AddFlags, [string | undefined]>({
         output(flags, text.join("\n"), response);
     }
 });
+
+/** The driver init_param a root's config points at: the chip it describes. */
+function chip_of(workfile: Workfile, root: string): string | undefined {
+    const node = workfile.symbols[root];
+    const config_name = node?._t === "RulesetDescriptor" ? node.properties[0].value : undefined;
+    const config = typeof config_name === "string" ? workfile.symbols[config_name] : undefined;
+    const field = config?._t === "RulesetStruct"
+        ? config.properties.find(property => property._t === "DriverInitParameterProperty" && typeof property.value === "string")
+        : undefined;
+    return typeof field?.value === "string" ? field.value : undefined;
+}
 
 /** `devices/ad7124/ad7124_init_param.yaml` → `ad7124_init_param`. */
 function default_name(key: string): string {
