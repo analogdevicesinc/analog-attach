@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { ParsedBinding, ResolvedProperty } from "../../Attach/AttachTypes.js";
-import { DeviceTree, DeviceTreeOverlay } from "../../Devicetree/index.js";
+import { DeviceTree, DeviceTreeOverlay, number_property } from "../../Devicetree/index.js";
 import { parent_path_string } from "../parents.js";
 import { effective_interrupt_parent, base_lookup } from "../interrupt_parent.js";
 import { is_gpio_property, INTERRUPT_MACROS } from "../query.js";
@@ -150,6 +150,11 @@ export type BoardLayer = IntelligenceLayer & {
     bus_of_node(devicetree: DeviceTree, node_path: string): BoardBus | undefined;
 };
 
+function controller_cells(devicetree: DeviceTree, label: string, property: string): bigint | undefined {
+    const located = devicetree.locate({ kind: "label", name: label, labels: [] });
+    return located === undefined ? undefined : number_property(located.node, property);
+}
+
 function current_interrupt_parent(context: PropertyContext, placement: NodePlacement): string | undefined {
     let parsed: Record<string, unknown> = {};
     try { parsed = JSON.parse(context.data); } catch { /* empty */ }
@@ -240,8 +245,19 @@ export function board_layer(board: BoardDescription): BoardLayer {
                 }
             }
 
-            return connected_signals(slots, "interrupt").flatMap(({ slot, signal }) =>
-                interrupt_macros(signal).map(macro => {
+            const int_cells = controller_cells(context.devicetree, controller, "#interrupt-cells");
+
+            return connected_signals(slots, "interrupt").flatMap(({ slot, signal }) => {
+                if (int_cells !== undefined && int_cells <= 1n) {
+                    const combined = [...(int_parent_note === undefined ? [] : [int_parent_note]), ...line_notes(board, slot, signal)].join("; ") || undefined;
+                    return [suggestion(
+                        [[...prefix, BigInt(signal.gpio)]],
+                        `${property === "interrupts" ? "" : `${controller} `}${signal.gpio} — ${signal_reference(slot, signal)}`,
+                        [slot.id],
+                        combined,
+                    )];
+                }
+                return interrupt_macros(signal).map(macro => {
                     const combined = [...(int_parent_note === undefined ? [] : [int_parent_note]), ...line_notes(board, slot, signal)].join("; ") || undefined;
                     return suggestion(
                         [[...prefix, BigInt(signal.gpio), { macro }]],
@@ -249,7 +265,8 @@ export function board_layer(board: BoardDescription): BoardLayer {
                         [slot.id],
                         combined,
                     );
-                }));
+                });
+            });
         }
 
         if (property === "interrupt-parent") {
@@ -259,9 +276,21 @@ export function board_layer(board: BoardDescription): BoardLayer {
         }
 
         if (is_gpio_property(property)) {
+            const gpio_cells = controller_cells(context.devicetree, controller, "#gpio-cells");
             const kinds = gpio_signal_kinds(property);
             const low_first = kinds[0] === "reset" || kinds[0] === "interrupt";
             const unknown_order = low_first ? ["GPIO_ACTIVE_LOW", "GPIO_ACTIVE_HIGH"] : ["GPIO_ACTIVE_HIGH", "GPIO_ACTIVE_LOW"];
+
+            if (gpio_cells !== undefined && gpio_cells <= 1n) {
+                return kinds.flatMap(kind =>
+                    connected_signals(slots, kind).map(({ slot, signal }) => suggestion(
+                        [[{ label: controller }, BigInt(signal.gpio)]],
+                        `${controller} ${signal.gpio} — ${signal_reference(slot, signal)}`,
+                        [slot.id],
+                        line_notes(board, slot, signal).join("; ") || undefined,
+                    )));
+            }
+
             return kinds.flatMap(kind =>
                 connected_signals(slots, kind).flatMap(({ slot, signal }) =>
                     gpio_flag_macros(signal, unknown_order).map(macro => suggestion(
