@@ -4,6 +4,8 @@
 
 `attach-lib` is the core, UI-free library for Device Tree Source (DTS) parsing, binding processing, and schema validation. It is consumed by the VS Code extension and webviews. Built with Vite (dual ESM/CJS output), tested with Vitest.
 
+`plans/` (gitignored) contains working plans for Claude sessions — currently the Intelligence module structural dedup and behaviour findings.
+
 ## Commands
 
 There is no top-level test script that isolates just this package — use `cd packages/attach-lib && yarn test`.

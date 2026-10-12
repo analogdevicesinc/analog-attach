@@ -774,4 +774,131 @@ if (import.meta.vitest) {
             }
         }
     });
+
+    test("query_devicetree — dmas: unset becomes phandle-only matrix", () => {
+        const dt = dts(`/dts-v1/;
+/ {
+    dma: dma@48000000 {
+        compatible = "st,stm32-dma";
+        dma-controller;
+        #dma-cells = <4>;
+    };
+};`);
+        const properties = [{ key: "dmas", value: { _t: "array" as const, minItems: 1, maxItems: 2 } }];
+        const result = query_devicetree(dt, properties, "{}");
+        const dmas = result.find(p => p.key === "dmas");
+        expect(dmas?.value._t).toBe("matrix");
+        if (dmas?.value._t === "matrix") {
+            expect(dmas.value.minItems).toBe(1);
+            expect(dmas.value.maxItems).toBe(2);
+            const row = dmas.value.values[0];
+            expect(row?._t).toBe("fixed_index");
+            if (row?._t === "fixed_index") {
+                expect(row.prefixItems).toHaveLength(1);
+                expect(row.prefixItems[0]).toMatchObject({ _t: "enum", enum: ["dma"] });
+                expect(row.minItems).toBe(1);
+                expect(row.maxItems).toBe(1);
+            }
+        }
+    });
+
+    test("query_devicetree — dmas: set controller expands to phandle + #dma-cells numbers", () => {
+        const dt = dts(`/dts-v1/;
+/ {
+    dma: dma@48000000 {
+        compatible = "st,stm32-dma";
+        dma-controller;
+        #dma-cells = <4>;
+    };
+};`);
+        const properties = [{ key: "dmas", value: { _t: "array" as const, minItems: 1, maxItems: 2 } }];
+        const data = JSON.stringify({ dmas: [["dma", 0, 1, 2, 3]] });
+        const result = query_devicetree(dt, properties, data);
+        const dmas = result.find(p => p.key === "dmas");
+        expect(dmas?.value._t).toBe("matrix");
+        if (dmas?.value._t === "matrix") {
+            expect(dmas.value.minItems).toBe(1);
+            expect(dmas.value.maxItems).toBe(2);
+            const row = dmas.value.values[0];
+            expect(row?._t).toBe("fixed_index");
+            if (row?._t === "fixed_index") {
+                expect(row.prefixItems).toHaveLength(5);
+                expect(row.minItems).toBe(5);
+                expect(row.maxItems).toBe(5);
+                expect(row.prefixItems[0]).toMatchObject({ _t: "enum", default: "dma" });
+                expect(row.prefixItems[1]).toMatchObject({ _t: "number", minimum: 0n, maximum: 0xFF_FF_FF_FFn });
+            }
+        }
+    });
+
+    test("query_devicetree — *-supply: enumerates regulators as phandle enum", () => {
+        const dt = dts(`/dts-v1/;
+/ {
+    reg_3v3: regulator-3v3 {
+        compatible = "regulator-fixed";
+        regulator-min-microvolt = <3300000>;
+        regulator-max-microvolt = <3300000>;
+    };
+};`);
+        const properties = [{ key: "vdd-supply", value: { _t: "generic" as const } }];
+        const result = query_devicetree(dt, properties, "{}");
+        const supply = result.find(p => p.key === "vdd-supply");
+        expect(supply?.value._t).toBe("enum_array");
+        if (supply?.value._t === "enum_array") {
+            expect(supply.value.enum).toContain("reg_3v3");
+            expect(supply.value.minItems).toBe(1);
+            expect(supply.value.maxItems).toBe(1);
+        }
+    });
+
+    test("query_devicetree — pwms: unset becomes phandle-only matrix", () => {
+        const dt = dts(`/dts-v1/;
+/ {
+    pwm: pwm@7e20c000 {
+        compatible = "brcm,bcm2835-pwm";
+        #pwm-cells = <2>;
+    };
+};`);
+        const properties = [{ key: "pwms", value: { _t: "array" as const, minItems: 1, maxItems: 1 } }];
+        const result = query_devicetree(dt, properties, "{}");
+        const pwms = result.find(p => p.key === "pwms");
+        expect(pwms?.value._t).toBe("matrix");
+        if (pwms?.value._t === "matrix") {
+            expect(pwms.value.minItems).toBe(1);
+            expect(pwms.value.maxItems).toBe(1);
+            const row = pwms.value.values[0];
+            expect(row?._t).toBe("fixed_index");
+            if (row?._t === "fixed_index") {
+                expect(row.prefixItems).toHaveLength(1);
+                expect(row.prefixItems[0]).toMatchObject({ _t: "enum", enum: ["pwm"] });
+                expect(row.minItems).toBe(1);
+                expect(row.maxItems).toBe(1);
+            }
+        }
+    });
+
+    test("query_devicetree — clocks: bounds are always 1/1 regardless of input", () => {
+        const dt = dts(`/dts-v1/;
+/ {
+    osc: oscillator {
+        compatible = "fixed-clock";
+        #clock-cells = <0>;
+        clock-frequency = <24000000>;
+    };
+};`);
+        const properties = [{ key: "clocks", value: { _t: "array" as const, minItems: 2, maxItems: 4 } }];
+        const result = query_devicetree(dt, properties, "{}");
+        const clocks = result.find(p => p.key === "clocks");
+        expect(clocks?.value._t).toBe("matrix");
+        if (clocks?.value._t === "matrix") {
+            expect(clocks.value.minItems).toBe(1);
+            expect(clocks.value.maxItems).toBe(1);
+            const row = clocks.value.values[0];
+            expect(row?._t).toBe("fixed_index");
+            if (row?._t === "fixed_index") {
+                expect(row.minItems).toBe(1);
+                expect(row.maxItems).toBe(1);
+            }
+        }
+    });
 }
