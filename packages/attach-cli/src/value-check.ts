@@ -240,8 +240,9 @@ function set_property(
                 ? parsed_value
                 : [Array.isArray(parsed_value) ? parsed_value : [parsed_value]];
 
-            if (rows.length < definition.value.minItems || rows.length > definition.value.maxItems) {
-                return `Property ${property} accepts between ${definition.value.minItems} and ${definition.value.maxItems} row(s)`;
+            if (rows.length < definition.value.minItems || (definition.value.maxItems !== undefined && rows.length > definition.value.maxItems)) {
+                const upper = definition.value.maxItems === undefined ? "∞" : definition.value.maxItems;
+                return `Property ${property} accepts between ${definition.value.minItems} and ${upper} row(s)`;
             }
 
             const row_definitions = definition.value.values;
