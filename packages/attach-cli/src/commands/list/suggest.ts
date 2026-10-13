@@ -94,11 +94,11 @@ async function suggest_parent(context_: LocalContext, arguments_: string[]): Pro
         return;
     }
 
-    const resolved = resolve_config(context_, ["linux", "dtSchema", "context"]);
+    const resolved = resolve_config(context_, ["linux", "dtSchema", "devicetree"]);
     if (resolved === undefined) { return; }
-    const { linux, dtSchema, context } = resolved.values;
+    const { linux, dtSchema, devicetree } = resolved.values;
 
-    const dt = load_base(context_, context, resolved.parsed.context);
+    const dt = load_base(context_, devicetree, resolved.parsed.devicetree);
     if (dt === undefined) { return; }
 
     const binding = await load_binding(context_, linux, dtSchema, compatible);
@@ -257,11 +257,11 @@ async function suggest_value(context_: LocalContext, arguments_: string[]): Prom
     }
     const { node_identifier, property_name } = reference;
 
-    const resolved = resolve_config(context_, ["context", "overlay"]);
+    const resolved = resolve_config(context_, ["devicetree", "overlay"]);
     if (resolved === undefined) { return; }
-    const { context, overlay: overlay_path } = resolved.values;
+    const { devicetree, overlay: overlay_path } = resolved.values;
 
-    const trees = load_trees(context_, context, overlay_path, resolved.parsed.context);
+    const trees = load_trees(context_, devicetree, overlay_path, resolved.parsed.devicetree);
     if (trees === undefined) { return; }
     const { base_dt, overlay } = trees;
 
@@ -469,11 +469,11 @@ async function suggest_board_slot(context_: LocalContext, arguments_: string[]):
             .filter(slot => slot.onboard === undefined)
             .map(slot => ({ value: slot.id, display_string: describe_slot(board, slot) }));
     } else {
-        const binding_config = resolve_config(context_, ["linux", "dtSchema", "context"]);
+        const binding_config = resolve_config(context_, ["linux", "dtSchema", "devicetree"]);
         if (binding_config === undefined) { return; }
-        const { linux, dtSchema, context } = binding_config.values;
+        const { linux, dtSchema, devicetree } = binding_config.values;
 
-        const base_dt = load_base(context_, context, binding_config.parsed.context);
+        const base_dt = load_base(context_, devicetree, binding_config.parsed.devicetree);
         if (base_dt === undefined) { return; }
 
         const binding = await load_binding(context_, linux, dtSchema, compatible);
@@ -536,11 +536,11 @@ async function suggest_node_property(context_: LocalContext, arguments_: string[
         return;
     }
 
-    const resolved = resolve_config(context_, ["linux", "dtSchema", "context", "overlay"]);
+    const resolved = resolve_config(context_, ["linux", "dtSchema", "devicetree", "overlay"]);
     if (resolved === undefined) { return; }
-    const { linux, dtSchema, context, overlay: overlay_path } = resolved.values;
+    const { linux, dtSchema, devicetree, overlay: overlay_path } = resolved.values;
 
-    const trees = load_trees(context_, context, overlay_path, resolved.parsed.context);
+    const trees = load_trees(context_, devicetree, overlay_path, resolved.parsed.devicetree);
     if (trees === undefined) { return; }
     const { base_dt, overlay } = trees;
 
@@ -669,11 +669,11 @@ async function suggest_children(context_: LocalContext, arguments_: string[]): P
         return;
     }
 
-    const resolved = resolve_config(context_, ["context", "overlay"]);
+    const resolved = resolve_config(context_, ["devicetree", "overlay"]);
     if (resolved === undefined) { return; }
-    const { context, overlay: overlay_path } = resolved.values;
+    const { devicetree, overlay: overlay_path } = resolved.values;
 
-    const trees = load_trees(context_, context, overlay_path, resolved.parsed.context);
+    const trees = load_trees(context_, devicetree, overlay_path, resolved.parsed.devicetree);
     if (trees === undefined) { return; }
 
     const children = node_children(trees.base_dt, trees.overlay, identifier);
@@ -694,13 +694,13 @@ async function suggest_children(context_: LocalContext, arguments_: string[]): P
 }
 
 async function suggest_navigate(context_: LocalContext, arguments_: string[]): Promise<void> {
-    const resolved = resolve_config(context_, ["context", "overlay"]);
+    const resolved = resolve_config(context_, ["devicetree", "overlay"]);
     if (resolved === undefined) { return; }
-    const { context, overlay: overlay_path } = resolved.values;
+    const { devicetree, overlay: overlay_path } = resolved.values;
     const linux = resolved.config.linux;
     const dtSchema = resolved.config.dtSchema;
 
-    const trees = load_trees(context_, context, overlay_path, resolved.parsed.context);
+    const trees = load_trees(context_, devicetree, overlay_path, resolved.parsed.devicetree);
     if (trees === undefined) { return; }
     const { base_dt, overlay } = trees;
 
@@ -779,11 +779,11 @@ async function suggest_type(context_: LocalContext, arguments_: string[]): Promi
     }
     const { node_identifier, property_name } = reference;
 
-    const resolved = resolve_config(context_, ["linux", "dtSchema", "context", "overlay"]);
+    const resolved = resolve_config(context_, ["linux", "dtSchema", "devicetree", "overlay"]);
     if (resolved === undefined) { return; }
-    const { linux, dtSchema, context, overlay: overlay_path } = resolved.values;
+    const { linux, dtSchema, devicetree, overlay: overlay_path } = resolved.values;
 
-    const trees = load_trees(context_, context, overlay_path, resolved.parsed.context);
+    const trees = load_trees(context_, devicetree, overlay_path, resolved.parsed.devicetree);
     if (trees === undefined) { return; }
     const { base_dt, overlay } = trees;
 

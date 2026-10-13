@@ -30,48 +30,48 @@ interface Candidate {
 
 export function shell_dequote(word: string): string {
     let result = "";
-    let i = 0;
-    while (i < word.length) {
-        const ch = word[i]!;
+    let index = 0;
+    while (index < word.length) {
+        const ch = word[index]!;
         if (ch === "'") {
-            const close = word.indexOf("'", i + 1);
+            const close = word.indexOf("'", index + 1);
             if (close === -1) {
-                result += word.slice(i + 1);
+                result += word.slice(index + 1);
                 break;
             }
-            result += word.slice(i + 1, close);
-            i = close + 1;
+            result += word.slice(index + 1, close);
+            index = close + 1;
             continue;
         }
         if (ch === '"') {
-            i++;
-            while (i < word.length) {
-                const c = word[i]!;
-                if (c === '"') { i++; break; }
-                if (c === '\\' && i + 1 < word.length && '"\\$`'.includes(word[i + 1]!)) {
-                    result += word[i + 1]!;
-                    i += 2;
+            index++;
+            while (index < word.length) {
+                const c = word[index]!;
+                if (c === '"') { index++; break; }
+                if (c === '\\' && index + 1 < word.length && '"\\$`'.includes(word[index + 1]!)) {
+                    result += word[index + 1]!;
+                    index += 2;
                     continue;
                 }
                 result += c;
-                i++;
+                index++;
             }
             continue;
         }
-        if (ch === '\\' && i + 1 < word.length) {
-            result += word[i + 1]!;
-            i += 2;
+        if (ch === '\\' && index + 1 < word.length) {
+            result += word[index + 1]!;
+            index += 2;
             continue;
         }
         result += ch;
-        i++;
+        index++;
     }
     return result;
 }
 
 export async function run_complete(words: string[]): Promise<void> {
     const prefix = words.length > 0 ? shell_dequote(words.at(-1)!) : "";
-    const committed = words.slice(0, -1).map(shell_dequote);
+    const committed = words.slice(0, -1).map((element) => shell_dequote(element));
 
     const app = buildApp(buildContext(false));
 
@@ -102,8 +102,8 @@ export async function run_complete(words: string[]): Promise<void> {
     // For "list", resolve the spec dynamically based on the subkind.
     let spec: CommandSpec | undefined;
     if (raw_spec === "dynamic") {
-        const after_sub = committed.slice(subIndex + 1).filter(w => !w.startsWith("-"));
-        const subkind = after_sub[0];
+        const after_sub = committed.slice(subIndex + 1).find(w => !w.startsWith("-"));
+        const subkind = after_sub;
         if (subkind === undefined || prefix === subkind) {
             // Still completing the subkind itself.
             const choices = LIST_KINDS.map(entry => ({ value: entry.kind, description: entry.summary }));

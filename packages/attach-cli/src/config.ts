@@ -13,13 +13,14 @@ export const DEFAULT_PREPROCESS_COMMAND = "cpp -nostdinc -undef -x assembler-wit
 export interface AttachConfig {
     linux?: string;
     dtSchema?: string;
-    context?: string;
+    devicetree?: string;
     overlay?: string;
     board?: string;
     overlaySyntax?: string;
     validationJson?: string;
     buildCommand?: string;
     preprocessCommand?: string;
+    preprocessedDevicetree?: string;
     overlayCompiled?: string;
     deployIp?: string;
     deployUser?: string;
@@ -75,11 +76,11 @@ export const CONFIG_REGISTRY: readonly FieldSpec[] = [
         description: "Path to bundled dt-schema (not user-configurable)",
     },
     {
-        toml: "context",
-        key: "context",
+        toml: "devicetree",
+        key: "devicetree",
         type: "path",
         required: true,
-        env: "ATTACH_CONTEXT",
+        env: "ATTACH_DEVICETREE",
         description: "Path to target base DTS file",
         parse: (value) => {
             if (!fs.existsSync(value)) { return `path does not exist: ${value}`; }
@@ -138,6 +139,14 @@ export const CONFIG_REGISTRY: readonly FieldSpec[] = [
         required: false,
         default: DEFAULT_PREPROCESS_COMMAND,
         description: "C preprocessor command run on a board's shipped overlay by create-workfile; {input}/{output}/{linux} are substituted",
+    },
+    {
+        toml: "preprocessed-devicetree",
+        key: "preprocessedDevicetree",
+        type: "path",
+        required: false,
+        internal: true,
+        description: "Auto-generated preprocessed base DTS (regenerated on each use)",
     },
     {
         toml: "overlay-compiled",
@@ -325,7 +334,7 @@ export function save_config(fields: Partial<AttachConfig>): void {
 export type Checked<K extends keyof AttachConfig> = { [P in K]-?: string };
 
 export type ParsedConfig = {
-    context?: DeviceTree;
+    devicetree?: DeviceTree;
     board?: BoardDescription;
 };
 
@@ -366,17 +375,17 @@ export function check_config<K extends keyof AttachConfig>(
         if (spec.type === "path" && !fs.existsSync(value)) {
             return { ok: false, kind: "missing-path", field, toml: spec.toml, path: value };
         }
-        if (spec.parse !== undefined) {
+        if (spec.parse === undefined) {
+            const invalid = spec.validate?.(value);
+            if (invalid !== undefined) {
+                return { ok: false, kind: "invalid", field, toml: spec.toml, path: value, message: invalid };
+            }
+        } else {
             const result = spec.parse(value);
             if (typeof result === "string") {
                 return { ok: false, kind: "invalid", field, toml: spec.toml, path: value, message: result };
             }
             (parsed as Record<string, unknown>)[field] = result;
-        } else {
-            const invalid = spec.validate?.(value);
-            if (invalid !== undefined) {
-                return { ok: false, kind: "invalid", field, toml: spec.toml, path: value, message: invalid };
-            }
         }
         values[field] = value;
     }
@@ -389,31 +398,31 @@ export function check_config<K extends keyof AttachConfig>(
  */
 export function check_failure_message(failure: CheckFailure): { human: string; json: string } {
     const spec = CONFIG_REGISTRY.find(s => s.toml === failure.toml);
-    const env_name = spec?.env;
+    const environment_name = spec?.env;
     switch (failure.kind) {
         case "missing-field": {
-            if (env_name !== undefined) {
+            if (environment_name !== undefined) {
                 return {
-                    human: `Missing environment variable: ${env_name}`,
-                    json: `Missing environment variable: ${env_name}`,
+                    human: `Missing environment variable: ${environment_name}`,
+                    json: `Missing environment variable: ${environment_name}`,
                 };
             }
             return { human: `Missing config: ${failure.toml}`, json: `missing config: ${failure.toml}` };
         }
         case "missing-path": {
-            if (env_name !== undefined) {
+            if (environment_name !== undefined) {
                 return {
-                    human: `Invalid ${env_name}: ${failure.path} (path does not exist)`,
-                    json: `Invalid ${env_name}: ${failure.path} (path does not exist)`,
+                    human: `Invalid ${environment_name}: ${failure.path} (path does not exist)`,
+                    json: `Invalid ${environment_name}: ${failure.path} (path does not exist)`,
                 };
             }
             return { human: `Missing: ${failure.path}`, json: `Missing: ${failure.path}` };
         }
         case "invalid": {
-            if (env_name !== undefined) {
+            if (environment_name !== undefined) {
                 return {
-                    human: `Invalid ${env_name}: ${failure.message}`,
-                    json: `Invalid ${env_name}: ${failure.message}`,
+                    human: `Invalid ${environment_name}: ${failure.message}`,
+                    json: `Invalid ${environment_name}: ${failure.message}`,
                 };
             }
             return { human: `Invalid ${failure.toml}: ${failure.message}`, json: `invalid config: ${failure.toml}: ${failure.message}` };
@@ -426,8 +435,8 @@ if (import.meta.vitest) {
 
     test("CONFIG_REGISTRY covers every AttachConfig key exactly once", () => {
         const keys: (keyof AttachConfig)[] = [
-            "linux", "dtSchema", "context", "overlay", "board", "overlaySyntax", "validationJson",
-            "buildCommand", "preprocessCommand", "overlayCompiled", "deployIp", "deployUser", "deployPassword",
+            "linux", "dtSchema", "devicetree", "overlay", "board", "overlaySyntax", "validationJson",
+            "buildCommand", "preprocessCommand", "preprocessedDevicetree", "overlayCompiled", "deployIp", "deployUser", "deployPassword",
         ];
         expect(CONFIG_REGISTRY.length).toBe(keys.length);
         expect(SPEC_BY_KEY.size).toBe(keys.length);
@@ -469,8 +478,8 @@ if (import.meta.vitest) {
 
     test("config_from_sources - env wins over TOML", () => {
         const toml = { linux: "/old" };
-        const env = { ATTACH_LINUX: "/new" };
-        const { config, ignored } = config_from_sources(toml, env);
+        const environment = { ATTACH_LINUX: "/new" };
+        const { config, ignored } = config_from_sources(toml, environment);
         expect(config.linux).toBe("/new");
         expect(ignored).toHaveLength(1);
         expect(ignored[0]!.toml).toBe("linux");
@@ -493,8 +502,8 @@ if (import.meta.vitest) {
     });
 
     test("config_from_sources - relative env paths are resolved", () => {
-        const { config } = config_from_sources({}, { ATTACH_CONTEXT: "../x.dts" });
-        expect(config.context).toBe(path.resolve("../x.dts"));
+        const { config } = config_from_sources({}, { ATTACH_DEVICETREE: "../x.dts" });
+        expect(config.devicetree).toBe(path.resolve("../x.dts"));
     });
 
     test("save_config never writes env keys", () => {

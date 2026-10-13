@@ -224,7 +224,8 @@ describe("list kind completion", () => {
     });
 
     test("filters by prefix", async () => {
-        expect((await complete(["list", "va"])).map(line => line.split("\t")[0])).toStrictEqual(["value"]);
+        const result = await complete(["list", "va"]);
+        expect(result.map(line => line.split("\t")[0])).toStrictEqual(["value"]);
     });
 });
 
@@ -269,12 +270,12 @@ describe("completion stubs", () => {
 
 describe("shell_dequote", () => {
     test.each([
-        ["19\\ IRQ_TYPE_", "19 IRQ_TYPE_"],
+        [String.raw`19\ IRQ_TYPE_`, "19 IRQ_TYPE_"],
         ['"19 IRQ', "19 IRQ"],
         ["'a b'", "a b"],
         ["plain", "plain"],
-        ["a\\\\b", "a\\b"],
-        ['"hello \\"world\\""', 'hello "world"'],
+        [String.raw`a\\b`, String.raw`a\b`],
+        [String.raw`"hello \"world\""`, 'hello "world"'],
         ["", ""],
     ])("shell_dequote(%j) → %j", (input, expected) => {
         expect(shell_dequote(input)).toBe(expected);

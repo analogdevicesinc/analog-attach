@@ -433,10 +433,10 @@ if (import.meta.vitest) {
 
     const base_dts = `/dts-v1/; / { soc { spi0: spi@7e204000 {}; }; };`;
 
-    const parse_overlay = (overlay_src: string): DeviceTreeOverlay => {
+    const parse_overlay = (overlay_source: string): DeviceTreeOverlay => {
         const base = DT.new_from_string(base_dts);
         if (typeof base === "string") { throw new TypeError(base); }
-        const overlay = DTO.new_from_string(overlay_src, base);
+        const overlay = DTO.new_from_string(overlay_source, base);
         if (typeof overlay === "string") { throw new TypeError(overlay); }
         return overlay;
     };

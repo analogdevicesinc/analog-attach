@@ -17,7 +17,7 @@ import { execSync } from "node:child_process";
 
 import type { LocalContext } from "../../context";
 import { save_config } from "../../config";
-import { resolve_config } from "../../resolve-config";
+import { resolve_config, preprocess_context } from "../../resolve-config";
 import { is_tool_available } from "../../utilities";
 import { getBundledToolsPath } from "../skill/utilities";
 import { respond, input_error } from "../../protocol/output";
@@ -50,15 +50,15 @@ export function build_validate_command(context_: LocalContext): Command {
             if (resolved === undefined) { return; }
             const config = resolved.config;
             const input = resolved.values.overlay;
-            const context = config.context;
+            const context = config.devicetree;
 
             const input_content = fs.readFileSync(input, "utf8");
 
             const base = (() => {
-                if (context !== undefined && fs.existsSync(context)) {
-                    return DeviceTree.new_from_string(fs.readFileSync(context, "utf8"));
-                }
-                return;
+                if (context === undefined || !fs.existsSync(context)) { return; }
+                const preprocessed = preprocess_context(context, config.linux, config.preprocessCommand);
+                const source = typeof preprocessed === "string" ? preprocessed : context;
+                return DeviceTree.new_from_string(fs.readFileSync(source, "utf8"));
             })();
 
             const overlay = typeof base === "string" || base === undefined

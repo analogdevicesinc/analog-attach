@@ -14,11 +14,11 @@ export function build_move_command(context_: LocalContext): Command {
         .action(async (path_argument: string, destination: string) => {
             const parent_identifier = destination;
 
-            const resolved = resolve_config(context_, ["context", "overlay"]);
+            const resolved = resolve_config(context_, ["devicetree", "overlay"]);
             if (resolved === undefined) { return; }
-            const { context, overlay: input } = resolved.values;
+            const { devicetree, overlay: input } = resolved.values;
 
-            const trees = load_trees(context_, context, input, resolved.parsed.context);
+            const trees = load_trees(context_, devicetree, input, resolved.parsed.devicetree);
             if (trees === undefined) { return; }
             const { base_dt: base, overlay } = trees;
 
@@ -65,7 +65,7 @@ export function build_move_command(context_: LocalContext): Command {
                         return;
                     }
                     case "in-base": {
-                        console.log(`${path_argument} is part of the base device tree (${context}), not this overlay; move only applies to overlay-added nodes`);
+                        console.log(`${path_argument} is part of the base device tree (${devicetree}), not this overlay; move only applies to overlay-added nodes`);
                         return;
                     }
                     case "is-root": {
@@ -73,7 +73,7 @@ export function build_move_command(context_: LocalContext): Command {
                         return;
                     }
                     case "parent-not-found": {
-                        console.log(`Couldn't find parent node ${parent_identifier} in ${context} or ${input}`);
+                        console.log(`Couldn't find parent node ${parent_identifier} in ${devicetree} or ${input}`);
                         return;
                     }
                     case "into-self": {

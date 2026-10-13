@@ -17,6 +17,12 @@ const jsonIndex = argv.indexOf("--json");
 const json = jsonIndex !== -1;
 if (json) { argv.splice(jsonIndex, 1); }
 
+if (argv.length === 0 && !json && process.stdin.isTTY) {
+    const { run_setup } = await import("../setup");
+    await run_setup();
+    process.exit(0);
+}
+
 const context = buildContext(json);
 const app = buildApp(context);
 

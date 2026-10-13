@@ -338,11 +338,11 @@ export function build_update_command(context_: LocalContext): Command {
             }
             const node_identifier = parsed_path.value;
 
-            const resolved = resolve_config(context_, ["overlay", "context", "linux", "dtSchema"]);
+            const resolved = resolve_config(context_, ["overlay", "devicetree", "linux", "dtSchema"]);
             if (resolved === undefined) { return; }
-            const { overlay: input, context, linux, dtSchema } = resolved.values;
+            const { overlay: input, devicetree, linux, dtSchema } = resolved.values;
 
-            const trees = load_trees(context_, context, input, resolved.parsed.context);
+            const trees = load_trees(context_, devicetree, input, resolved.parsed.devicetree);
             if (trees === undefined) { return; }
             const { base_dt, overlay } = trees;
 
