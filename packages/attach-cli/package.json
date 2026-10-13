@@ -1,7 +1,7 @@
 {
   "name": "attach-linux",
   "author": "AnalogDevices",
-  "description": "CLI tool for configuring Linux device tree overlays",
+  "description": "Configure Linux device tree overlays for peripherals",
   "license": "Apache-2.0",
   "type": "module",
   "version": "0.1.0",

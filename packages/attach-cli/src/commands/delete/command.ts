@@ -9,10 +9,20 @@ import type { DeletePreview } from "../../protocol/types";
 
 export function build_delete_command(context_: LocalContext): Command {
     return new Command("delete")
-        .description("Delete an overlay-added node, or remove a property from an overlay node or a base-tree node")
-        .argument("[path]", "Path to node or property")
+        .description("Delete a node or remove a property from the overlay")
+        .argument("[path]", "Path to node (label, label-first, or absolute)")
         .argument("[property]", "Property name")
         .option("--force", "Force delete of non-leaf nodes (waterfall delete)")
+        .addHelpText("after", `
+Paths:
+  Label:        spi0                       (a label in the base tree)
+  Label-first:  spi0/adi,ad7124-8@0       (label then child segments)
+  Absolute:     /soc/spi@7e204000          (full device tree path)
+
+Examples:
+  $ attach-linux delete spi0/adi,ad7124-8@0              Delete a node
+  $ attach-linux delete spi0/adi,ad7124-8@0 spi-cpha     Remove a property
+  $ attach-linux delete spi0 --force                      Delete all overlay children and properties`)
         .action(async (path_argumentument: string | undefined, property_argument: string | undefined, options) => {
             const resolved = resolve_config(context_, ["devicetree", "overlay"]);
             if (resolved === undefined) { return; }

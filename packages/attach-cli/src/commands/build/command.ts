@@ -24,7 +24,10 @@ export function substitute_build_command(template: string, input: string, output
 
 export function build_build_command(context_: LocalContext): Command {
     return new Command("build")
-        .description("Compile the overlay DTSO into a DTBO using dtc")
+        .description("Compile the overlay into a .dtbo")
+        .addHelpText("after", `
+Compiles the configured overlay file into a binary .dtbo.
+Output path is derived from the overlay (e.g. overlay.dtso -> overlay.dtbo).`)
         .action(async () => {
             const resolved = resolve_config(context_, ["overlay"]);
             if (resolved === undefined) { return; }

@@ -44,7 +44,9 @@ const TEMPLATE = `/dts-v1/;
 
 export function build_validate_command(context_: LocalContext): Command {
     return new Command("validate")
-        .description("Validate the overlay against device bindings using dt-validate")
+        .description("Validate the overlay against its bindings")
+        .addHelpText("after", `
+Runs dt-validate on the overlay merged with the base device tree.`)
         .action(async () => {
             const resolved = resolve_config(context_, ["overlay"]);
             if (resolved === undefined) { return; }

@@ -35,11 +35,18 @@ export type AddResult =
 
 export function build_add_command(context_: LocalContext): Command {
     return new Command("add")
-        .description("Add a device node to an overlay (e.g. `add adi,ad7124-8 --parent spi0`). Use `update <path> <child>` for child nodes like channels.")
-        .argument("<key>", "Compatible string of the device binding to add")
-        .option("--parent <value>", "Parent node: label or path (e.g. spi0, /soc/spi@7e204000)")
+        .description("Add a device node to the overlay")
+        .argument("<compatible>", "Compatible string of the device to add")
+        .option("--parent <value>", "Parent node: label, path, or hybrid (e.g. spi0, /soc/spi@7e204000, spi0/adc@2)")
         .option("--name <value>", "Node name override (e.g. adc@0); defaults to the compatible string")
-        .option("--label <value>", "Label to attach to the new node (e.g. imu1)")
+        .option("--label <value>", "Label override (a label is generated automatically)")
+        .addHelpText("after", `
+Examples:
+  $ attach-linux add adi,ad7124-8 --parent spi0
+  $ attach-linux add invensense,icm42688 --parent spi0 --label imu1
+  $ attach-linux add adi,ad7124-8 --parent spi0 --name adc@1
+
+Use 'list device' to find compatible strings, 'list parent' to find valid buses.`)
         .action(async (key: string, options) => {
             const pre_config = load_config() ?? {};
             const pre_check = check_config(pre_config, ["linux", "dtSchema", "devicetree"]);

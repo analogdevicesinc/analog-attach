@@ -55,10 +55,19 @@ export function prepare_board_workfile(
 
 export function build_create_workfile_command(context: LocalContext): Command {
     return new Command("create-workfile")
-        .description("Create a new workfile (DTSO overlay); starts from the board's overlay when the configured board ships one")
-        .argument("[name]", "Output filename (default: overlay.dtso; auto-indexes to overlay-1.dtso etc. when it exists)")
+        .description("Create an overlay workfile")
+        .argument("[name]", "Base name for the overlay file (default: overlay)")
+        .addHelpText("after", `
+The .dtso extension is added automatically. When the name is omitted, uses
+overlay.dtso (or overlay-1.dtso, overlay-2.dtso, etc. if it already exists).
+
+Examples:
+  $ attach-linux create-workfile
+  $ attach-linux create-workfile my-overlay`)
         .action(async (name) => {
-            const filename: string = name ?? next_workfile_name();
+            const filename: string = name === undefined
+                ? next_workfile_name()
+                : (name.endsWith(".dtso") ? name : `${name}.dtso`);
 
             const result = create_workfile(load_config() ?? {}, filename);
 

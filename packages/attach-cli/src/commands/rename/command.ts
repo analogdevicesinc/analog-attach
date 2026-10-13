@@ -16,9 +16,21 @@ import { respond, respond_fail, diagnostic } from "../../protocol/output";
 
 export function build_rename_command(context_: LocalContext): Command {
     return new Command("rename")
-        .description("Rename an overlay-added node")
-        .argument("<path>", "Path to node")
-        .argument("<new-name>", "New name for the node (e.g. adc@1)")
+        .description("Rename a node")
+        .argument("<path>", "Path to node (label, label-first, or absolute)")
+        .argument("<new-name>", "New node name, optionally with @unit-address")
+        .addHelpText("after", `
+A bare name (no @) keeps the existing unit address: adc@0 renamed to
+my_adc becomes my_adc@0. Include @ to change it; reg is updated to match.
+
+Paths:
+  Label:        spi0                       (a label in the base tree)
+  Label-first:  spi0/adi,ad7124-8@0       (label then child segments)
+  Absolute:     /soc/spi@7e204000          (full device tree path)
+
+Examples:
+  $ attach-linux rename spi0/adi,ad7124-8@0 adc        Rename, keep unit address
+  $ attach-linux rename spi0/adi,ad7124-8@0 adc@1      Rename and change unit address`)
         .action(async (path_argument: string, new_name: string) => {
             const resolved = resolve_config(context_, ["devicetree", "overlay"]);
             if (resolved === undefined) { return; }

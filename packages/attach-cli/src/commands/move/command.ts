@@ -8,9 +8,17 @@ import { respond, respond_fail, input_error } from "../../protocol/output";
 
 export function build_move_command(context_: LocalContext): Command {
     return new Command("move")
-        .description("Move an overlay-added node to a different parent")
-        .argument("<path>", "Path to node")
-        .argument("<destination>", "Destination parent: label or path (e.g. spi1, /soc/spi@7e205000)")
+        .description("Move a node to a different parent")
+        .argument("<path>", "Path to node (label, label-first, or absolute)")
+        .argument("<destination>", "Destination parent (label, label-first, or absolute)")
+        .addHelpText("after", `
+Paths:
+  Label:        spi0                       (a label in the base tree)
+  Label-first:  spi0/adi,ad7124-8@0       (label then child segments)
+  Absolute:     /soc/spi@7e204000          (full device tree path)
+
+Example:
+  $ attach-linux move spi0/adi,ad7124-8@0 spi1`)
         .action(async (path_argument: string, destination: string) => {
             const parent_identifier = destination;
 

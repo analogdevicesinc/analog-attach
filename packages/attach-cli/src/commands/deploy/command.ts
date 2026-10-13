@@ -25,15 +25,26 @@ export function build_reboot_command(user: string, ip: string): string {
 
 export function build_deploy_command(context_: LocalContext): Command {
     return new Command("deploy")
-        .description("Copy the compiled DTBO to a remote device and reboot it")
+        .description("Deploy the compiled overlay to a remote device")
+        .addHelpText("after", `
+Copies the compiled overlay to /boot/overlays/ on the remote device via scp,
+then reboots it. Requires scp and sshpass on PATH.
+
+Required config fields (set with config-set):
+  overlay-compiled    Path to the .dtbo file (written by build)
+  deploy-ip           IP address or hostname of the device
+  deploy-user         SSH username
+  deploy-password     SSH password`)
         .action(async () => {
             const resolved = resolve_config(context_, ["overlayCompiled", "deployIp", "deployUser", "deployPassword"]);
             if (resolved === undefined) { return; }
             const { overlayCompiled: dtbo, deployIp: ip, deployUser: user, deployPassword: password } = resolved.values;
 
-            if (!is_tool_available("sshpass -V")) {
-                if (context_.json) { input_error("sshpass not found on PATH"); return; }
-                console.log("sshpass not found on PATH");
+            const missing = ["scp", "sshpass"].filter(tool => !is_tool_available(`which ${tool}`));
+            if (missing.length > 0) {
+                const message = `${missing.join(", ")} not found on PATH`;
+                if (context_.json) { input_error(message); return; }
+                console.log(message);
                 return;
             }
 
