@@ -1,5 +1,5 @@
 {
-  "name": "attach-cli",
+  "name": "attach-linux",
   "author": "AnalogDevices",
   "description": "CLI tool for configuring Linux device tree overlays",
   "license": "Apache-2.0",
@@ -11,9 +11,7 @@
     "bundled",
     "SKILL.md"
   ],
-  "bin": {
-    "attach-linux": "dist/cli.js"
-  },
+  "bin": "dist/cli.js",
   "engines": {
     "node": ">=20"
   },
