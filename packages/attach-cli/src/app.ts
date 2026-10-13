@@ -31,7 +31,7 @@ export function buildApp(context: LocalContext): Command {
         .allowUnknownOption(false);
 
     // protocol commands
-    program.addCommand(build_attach_manifest_command(context));
+    program.addCommand(build_attach_manifest_command(context), { hidden: true });
     program.addCommand(build_config_get_command(context));
     program.addCommand(build_config_set_command(context));
     program.addCommand(build_create_workfile_command(context));
