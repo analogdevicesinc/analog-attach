@@ -1,10 +1,13 @@
 import { Command } from "commander";
+import * as fs from "node:fs";
+import path from "node:path";
 import { execSync } from "node:child_process";
 
 import type { LocalContext } from "../../context";
 import { save_config, DEFAULT_BUILD_COMMAND } from "../../config";
 import { resolve_config } from "../../resolve-config";
-import { is_tool_available, substitute_command } from "../../utilities";
+import { substitute_command } from "../../utilities";
+import { getBundledToolsPath } from "../skill/utilities";
 import { respond, respond_fail, input_error } from "../../protocol/output";
 import type { BuildResponse } from "../../protocol/types";
 
@@ -13,9 +16,10 @@ export function derive_dtbo_path(overlay: string): string {
     return overlay.endsWith(".dtso") ? `${overlay.slice(0, -".dtso".length)}.dtbo` : `${overlay}.dtbo`;
 }
 
-/** Substitute {input}/{output} placeholders, quoting paths so spaces are tolerated. */
+/** Substitute {dtc}/{input}/{output} placeholders, quoting paths so spaces are tolerated. */
 export function substitute_build_command(template: string, input: string, output: string): string {
-    return substitute_command(template, { input, output });
+    const dtc = path.join(getBundledToolsPath(), "dtc");
+    return substitute_command(template, { dtc, input, output });
 }
 
 export function build_build_command(context_: LocalContext): Command {
@@ -26,15 +30,17 @@ export function build_build_command(context_: LocalContext): Command {
             if (resolved === undefined) { return; }
             const input = resolved.values.overlay;
 
+            const dtc = path.join(getBundledToolsPath(), "dtc");
+            if (!fs.existsSync(dtc)) {
+                const message = "Bundled dtc not found — run scripts/bundle-dt-schema.sh";
+                if (context_.json) { input_error(message); return; }
+                console.log(message);
+                return;
+            }
+
             const output = derive_dtbo_path(input);
             const template = resolved.config.buildCommand ?? DEFAULT_BUILD_COMMAND;
             const command = substitute_build_command(template, input, output);
-
-            if (!is_tool_available("dtc --version")) {
-                if (context_.json) { input_error("dtc not found on PATH"); return; }
-                console.log("dtc not found on PATH");
-                return;
-            }
 
             try {
                 execSync(command, { stdio: "pipe" });

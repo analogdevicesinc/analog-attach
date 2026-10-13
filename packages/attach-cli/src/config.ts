@@ -6,7 +6,7 @@ import { DeviceTree, type BoardDescription } from "attach-lib";
 import { load_board } from "./board";
 import { getBundledDtSchemaPath } from "./commands/skill/utilities";
 
-export const DEFAULT_BUILD_COMMAND = "dtc -@ -I dts -O dtb -o {output} {input}";
+export const DEFAULT_BUILD_COMMAND = "{dtc} -@ -I dts -O dtb -o {output} {input}";
 // Mirrors kbuild's dtc_cpp_flags; {linux} is the configured Linux tree.
 export const DEFAULT_PREPROCESS_COMMAND = "cpp -nostdinc -undef -x assembler-with-cpp -P -I {linux}/include -o {output} {input}";
 
@@ -69,17 +69,10 @@ export const CONFIG_REGISTRY: readonly FieldSpec[] = [
         toml: "dt-schema",
         key: "dtSchema",
         type: "path",
-        required: true,
-        env: "ATTACH_DT_SCHEMA",
-        fallback: () => {
-            const bundled = getBundledDtSchemaPath();
-            return fs.existsSync(path.join(bundled, "dtschema", "schemas")) ? bundled : undefined;
-        },
-        description: "Path to dt-schema repository",
-        validate: (value) =>
-            fs.existsSync(path.join(value, "dtschema", "schemas"))
-                ? undefined
-                : `no dtschema/schemas under ${value}`,
+        required: false,
+        internal: true,
+        fallback: () => getBundledDtSchemaPath(),
+        description: "Path to bundled dt-schema (not user-configurable)",
     },
     {
         toml: "context",
@@ -134,8 +127,9 @@ export const CONFIG_REGISTRY: readonly FieldSpec[] = [
         key: "buildCommand",
         type: "string",
         required: false,
+        internal: true,
         default: DEFAULT_BUILD_COMMAND,
-        description: "dtc command used to compile the overlay; {input}/{output} are substituted with the .dtso and .dtbo paths",
+        description: "dtc command used to compile the overlay; {dtc}/{input}/{output} are substituted",
     },
     {
         toml: "preprocess-command",
@@ -256,6 +250,11 @@ export function config_from_sources(
             const value = toml[spec.toml];
             if (typeof value === "string") {
                 config[spec.key] = value;
+            } else {
+                const fallback_value = spec.fallback?.();
+                if (fallback_value !== undefined) {
+                    config[spec.key] = fallback_value;
+                }
             }
             continue;
         }

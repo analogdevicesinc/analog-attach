@@ -37,7 +37,7 @@ Commands in `src/app.ts` are annotated with `// protocol commands` (used by AI t
 ### Configuration and workspace state
 
 `src/config.ts` manages `.attach-linux/config.toml` (relative to CWD) and environment variables:
-- **Environment variables**: `ATTACH_LINUX`, `ATTACH_DT_SCHEMA`, `ATTACH_CONTEXT` replace config.toml for these three fields. `config-set` rejects them with an export hint; legacy TOML values are ignored with a warning.
+- **Environment variables**: `ATTACH_LINUX`, `ATTACH_CONTEXT` replace config.toml for these two fields. `config-set` rejects them with an export hint; legacy TOML values are ignored with a warning.
 - **config.toml**: stores `overlay`, `board`, `overlay-syntax`, `build-command`, `preprocess-command`, and other fields.
 - `compat-index.json`: a binding compatibility index keyed by compatible string → YAML file path; rebuilt when stale (mtime-based or when the linux/dt-schema paths differ).
 
@@ -55,9 +55,9 @@ The optional `board` config field names an add-on board (HAT, …) description: 
 
 A board may ship an overlay for its onboard devices (`overlay:` in the YAML, relative to the board file, resolved by `resolve_board_overlay`; files live in `bundled/overlays/`). `create-workfile` then writes that overlay instead of the empty skeleton (`prepare_board_workfile`): it runs `preprocess-command` (default mirrors kbuild's `cpp` flags, `{linux}` = the configured tree; persisted to config on first use), parses it, and drops `__overrides__`. Command templates go through `substitute_command` / `is_tool_available` in `src/utilities.ts`.
 
-### Bundled dt-schema
+### Bundled dt-schema and tools
 
-A bundled copy of `dt-schema` lives at `bundled/dt-schema/` inside the package. The environment variable `ATTACH_DT_SCHEMA` overrides this path; the bundled version is the fallback. The path is resolved at runtime relative to the dist directory in `src/commands/skill/utilities.ts:getBundledDtSchemaPath`.
+`bundled/dt-schema/` contains the dt-schema YAML schemas used by the binding parser. `bundled/tools/` contains PyInstaller-built binaries of `dt-mk-schema` and `dt-validate`, plus a statically-linked `dtc` (v1.8.1, built without libyaml), all used by the validate command. These are built on demand by `scripts/bundle-dt-schema.sh` (which clones dt-schema at a pinned commit into `dt-schema/` and dtc into `dtc/`, both gitignored). The build script runs automatically as part of `yarn build`. The path helpers `getBundledDtSchemaPath` and `getBundledToolsPath` in `src/commands/skill/utilities.ts` resolve these at runtime relative to the dist directory.
 
 ### Overlay syntax
 

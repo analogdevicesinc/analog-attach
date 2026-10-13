@@ -28,25 +28,24 @@ You are helping a user configure Linux device tree overlays for hardware devices
 
 ## Prerequisites
 
-Set up configuration before using other commands. `linux`, `dt-schema` and `context` are read from environment variables:
+Set up configuration before using other commands. `linux` and `context` are read from environment variables:
 
 ```bash
 export ATTACH_LINUX=~/linux
-export ATTACH_DT_SCHEMA=~/dt-schema
 export ATTACH_CONTEXT=~/rpi-4.dts
 ```
 
-Other fields (overlay, board, build-command, etc.) are stored in `.attach-linux/config.toml` via `config-set`.
+Other fields (overlay, board, etc.) are stored in `.attach-linux/config.toml` via `config-set`. The dt-schema bindings, dtc and validation tools are bundled with the CLI.
 
 **Per-command config requirements**:
 - `config-set` / `config-get`: No prerequisites
-- `list device`: Needs `ATTACH_LINUX` and `ATTACH_DT_SCHEMA` (to build compat index on first run)
+- `list device`: Needs `ATTACH_LINUX` (to build compat index on first run)
 - `create-workfile`: No prerequisites (also saves `overlay` path to config). When `board` ships an overlay, needs `ATTACH_LINUX` for the default `preprocess-command`
-- `list parent`: Needs `ATTACH_LINUX`, `ATTACH_DT_SCHEMA`, `ATTACH_CONTEXT`
-- `list value`: Needs `ATTACH_CONTEXT`, `overlay` (values come from `board`; without it the result is empty). `ATTACH_LINUX`/`ATTACH_DT_SCHEMA` are optional and enable binding check annotations
-- `list slot`: Needs `board` (plus `ATTACH_LINUX`, `ATTACH_DT_SCHEMA`, `ATTACH_CONTEXT` when given a compatible)
-- `add`: Needs `ATTACH_LINUX`, `ATTACH_DT_SCHEMA`, `ATTACH_CONTEXT`, `overlay` (auto-created if missing)
-- `update`: Needs `ATTACH_LINUX`, `ATTACH_DT_SCHEMA`, `ATTACH_CONTEXT`, `overlay`
+- `list parent`: Needs `ATTACH_LINUX`, `ATTACH_CONTEXT`
+- `list value`: Needs `ATTACH_CONTEXT`, `overlay` (values come from `board`; without it the result is empty). `ATTACH_LINUX` is optional and enables binding check annotations
+- `list slot`: Needs `board` (plus `ATTACH_LINUX`, `ATTACH_CONTEXT` when given a compatible)
+- `add`: Needs `ATTACH_LINUX`, `ATTACH_CONTEXT`, `overlay` (auto-created if missing)
+- `update`: Needs `ATTACH_LINUX`, `ATTACH_CONTEXT`, `overlay`
 - `read`: Needs `overlay` (optionally `ATTACH_CONTEXT` for base-tree resolution)
 - `validate`: Needs `overlay` (optionally `ATTACH_LINUX` to generate validation.json)
 - `delete`: Needs `ATTACH_CONTEXT`, `overlay`
@@ -55,8 +54,6 @@ Other fields (overlay, board, build-command, etc.) are stored in `.attach-linux/
 - `enable`/`disable`: Needs `ATTACH_CONTEXT`, `overlay`
 - `build`: Needs `overlay`
 - `deploy`: Needs `overlay-compiled`, `deploy-ip`, `deploy-user`, `deploy-password`
-
-**Bundled dt-schema**: The CLI includes a bundled version of dt-schema, so `ATTACH_DT_SCHEMA` is optional for most commands. Only set it if you need to use a different version.
 
 Help users locate appropriate `.dts` files when needed — they're typically in `arch/<arch>/boot/dts/` within the Linux kernel (e.g., Raspberry Pi, BeagleBone).
 
@@ -107,7 +104,6 @@ attach-linux config-get [fields...]
 | Variable | Description |
 |----------|-------------|
 | `ATTACH_LINUX` | Path to Linux kernel source tree |
-| `ATTACH_DT_SCHEMA` | Path to dt-schema repository (optional if bundled version suffices) |
 | `ATTACH_CONTEXT` | Path to target base `.dts` file |
 
 **Config fields** (stored in `.attach-linux/config.toml`):
@@ -117,7 +113,6 @@ attach-linux config-get [fields...]
 | `overlay` | No | Path to the working `.dtso` overlay file (auto-set by `create-workfile` or `add`) |
 | `board` | No | Add-on board description (HAT, …): a path to a board YAML or a bundled board name (e.g. `pmd-rpi-intz`). Enables `list slot` and board-derived `list value` values |
 | `overlay-syntax` | No | Output syntax: `fragment` (default) or `label` (`&spi0 { }` style) |
-| `build-command` | No | dtc command template (`{input}`/`{output}` substituted); defaults to `dtc -@ -I dts -O dtb -o {output} {input}` |
 | `preprocess-command` | No | Preprocessor run by `create-workfile` on a board's shipped overlay |
 | `overlay-compiled` | No | Path to compiled `.dtbo` artifact (auto-set by `build`) |
 | `deploy-ip` | No | IP address or hostname of the remote device |
@@ -128,7 +123,6 @@ attach-linux config-get [fields...]
 ```bash
 # Set up core paths (environment variables)
 export ATTACH_LINUX=~/linux
-export ATTACH_DT_SCHEMA=~/dt-schema
 export ATTACH_CONTEXT=~/rpi-4.dts
 
 # Optional: describe the add-on board (HAT) the peripherals plug into
@@ -351,7 +345,7 @@ attach-linux move imu1 spi1
 
 **Syntax**:
 ```bash
-attach-linux validate [path...] [--overlay <dtso>] [--linux <path>] [--dt-schema <path>] [--context <dts>]
+attach-linux validate [path...] [--overlay <dtso>] [--linux <path>] [--context <dts>]
 ```
 
 Validates the overlay against device bindings using `dt-validate`. Errors and warnings are grouped by fragment target in human mode. An empty result prints `No errors!`.
@@ -472,16 +466,15 @@ Sets `status = "okay"` or `status = "disabled"`. Works on both base-tree and ove
 
 **Syntax**:
 ```bash
-attach-linux build [--overlay <dtso>] [--build-command <template>]
+attach-linux build [--overlay <dtso>]
 ```
 
 **Parameters**:
 | Parameter | Required | Description |
 |-----------|----------|-------------|
 | `--overlay` | No | Path to `.dtso` to compile (falls back to config) |
-| `--build-command` | No | dtc command template with `{input}`/`{output}` placeholders (falls back to config, then to default: `dtc -@ -I dts -O dtb -o {output} {input}`) |
 
-**Requirements**: `dtc` must be on PATH.
+Uses the bundled `dtc` to compile.
 
 **Output**: Writes `.dtbo` file (same name as input with `.dtbo` extension) and saves its path to config as `overlay-compiled`.
 
@@ -513,7 +506,7 @@ attach-linux deploy [--dtbo <path>] [--ip <host>] [--user <user>] [--password <p
 ## Recommended Workflow
 
 ```
-0. CONFIGURE    export ATTACH_LINUX=... ATTACH_DT_SCHEMA=... ATTACH_CONTEXT=...
+0. CONFIGURE    export ATTACH_LINUX=... ATTACH_CONTEXT=...
 1. FIND DEVICE  list device <chip-name>
 2. FIND PARENT  list parent <compatible>  (with board: list slot <compatible>)
 3. ADD DEVICE   add <compatible> --parent <bus>  (auto-creates workfile)
