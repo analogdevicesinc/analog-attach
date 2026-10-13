@@ -97,12 +97,12 @@ function read_values(file_path: string): Result<Record<string, string>> {
 	return ok(values);
 }
 
-export type SettingsSources = {
+export interface SettingsSources {
 	/** Always defined, whether or not the file exists yet. */
 	global: string;
 	/** The project-local config that shadowed it, if one was found. */
 	local?: string;
-};
+}
 
 export function get_settings_sources(): SettingsSources {
 	const local = find_local_config_path();
@@ -202,7 +202,7 @@ export function get_effective_setting_value(key: keyof SettingsFile): Result<str
 	return ok(setting.value.value ?? setting.value.default);
 }
 
-export type SetSettingOptions = {
+export interface SetSettingOptions {
 	/**
 	 * Write to a project-local config, creating `.analog-attach.json` in the current
 	 * directory if none was found above it. Without this, a local config is still
@@ -210,7 +210,7 @@ export type SetSettingOptions = {
 	 * write to the global config and be shadowed by the local one immediately.
 	 */
 	local?: boolean;
-};
+}
 
 export function set_setting_value(
 	key: keyof SettingsFile,
@@ -237,13 +237,11 @@ export function set_setting_value(
 		Object.assign(existing, read.value);
 	}
 
-	if (value === undefined) {
-		delete existing[key];
-	} else {
-		existing[key] = value;
-	}
+	const updated = value === undefined
+		? Object.fromEntries(Object.entries(existing).filter(([name]) => name !== key))
+		: { ...existing, [key]: value };
 
-	return write_config(target, existing);
+	return write_config(target, updated);
 }
 
 function set_global_setting_value(key: keyof SettingsFile, value?: string): Result<undefined> {

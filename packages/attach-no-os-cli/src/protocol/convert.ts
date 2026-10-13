@@ -276,7 +276,7 @@ function split_elements(raw: string): string[] {
         try {
             const parsed: unknown = JSON.parse(trimmed);
             if (Array.isArray(parsed)) {
-                return parsed.map(element => String(element));
+                return parsed.map(String);
             }
         } catch {
             // Not JSON after all — fall through and treat it as a plain comma list.
