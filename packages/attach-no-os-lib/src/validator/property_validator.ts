@@ -18,10 +18,10 @@ import { is_integer_symbol, ruleset_type_token, RulesetType } from "../ruleset_p
 import type { ParseContext } from "../ruleset_parser/validators";
 import { at } from "../ruleset_parser/validators";
 import type { Workfile } from "../workfile_handler/types";
-import { all_ops, resolve_reference, suggest_platform_extra } from "../workfile_handler/workfile_handler";
+import { resolve_reference, suggest_platform_extra } from "../workfile_handler/workfile_handler";
 import { load_resolved_ruleset } from "../resolver/resolver";
 import { provides_interface } from "../registry/drivers";
-import { ops_capability_fits } from "../workfile_handler/workfile_handler";
+import { capability_fits } from "../workfile_handler/workfile_handler";
 import { format_number_in } from "../ruleset_parser/number_format";
 import { apply_overrides } from "./override_resolver";
 import type { CollectedRule, ValidationError } from "./types";
@@ -37,7 +37,7 @@ export function validate_property(
 	const property_context = at(context, property.name);
 
 	// symbol_name is the workfile INSTANCE key (e.g. "my_spi"), not parent_symbol.$symbol
-	// (the schema symbol, e.g. "no_os_spi_init_param"). Refs were resolved to instance
+	// (the schema symbol, e.g. "capi_spi_device"). Refs were resolved to instance
 	// keys at collection time, so the engine must match against the instance key too.
 	const { effective, errors: override_errors, required_reason } = apply_overrides(
 		property, child_overrides, symbol_name, workfile
@@ -218,19 +218,11 @@ function validate_platform_ops(
 ): ValidationError[] {
 	const symbol_name = property.value as string;
 
-	const ops = all_ops(workfile)[symbol_name];
+	const ops = workfile.platform_ops[symbol_name];
 	if (!ops) {
 		return [{
 			path: context.path,
 			message: `Platform ops '${symbol_name}' not found`,
-			severity: "error"
-		}];
-	}
-
-	if (ops._t !== "RulesetPlatformOps") {
-		return [{
-			path: context.path,
-			message: `Expected type platform_ops, got ${ops._t}`,
 			severity: "error"
 		}];
 	}
@@ -244,10 +236,10 @@ function validate_platform_ops(
 			}];
 		}
 
-		if (parent_struct.$capability && ops.$capability && ops.$capability !== parent_struct.$capability) {
+		if (!capability_fits(property, ops)) {
 			return [{
 				path: context.path,
-				message: `Capability mismatch: ops is '${ops.$capability}', expected ${parent_struct.$capability} (allowed by override)`,
+				message: `Capability mismatch: ops is '${ops.$capability ?? "none"}', expected '${property.capability?.join(", ") ?? ""}' (allowed by override)`,
 				severity: "warning"
 			}];
 		}
@@ -255,11 +247,10 @@ function validate_platform_ops(
 		return [];
 	}
 
-	if (!ops_capability_fits(ops, property, parent_struct)) {
-		const expected = property.capability?.join(", ") ?? parent_struct.$capability ?? "none";
+	if (!capability_fits(property, ops)) {
 		return [{
 			path: context.path,
-			message: `Capability mismatch: ops is '${ops.$capability ?? "none"}', expected '${expected}'`,
+			message: `Capability mismatch: ops is '${ops.$capability ?? "none"}', expected '${property.capability?.join(", ") ?? ""}'`,
 			severity: "error"
 		}];
 	}
@@ -301,21 +292,21 @@ function validate_platform_extra(
 			}];
 		}
 
-		if (parent_struct.$capability && extra.$capability && extra.$capability !== parent_struct.$capability) {
+		if (!capability_fits(property, extra)) {
 			return [{
 				path: context.path,
-				message: `Capability mismatch: extra is '${extra.$capability}', expected ${parent_struct.$capability} (allowed by override)`,
+				message: `Capability mismatch: extra is '${extra.$capability ?? "none"}', expected '${property.capability?.join(", ") ?? ""}' (allowed by override)`,
 				severity: "warning"
 			}];
 		}
 
 		return [];
 	}
-	
-	if (parent_struct.$capability && extra.$capability && extra.$capability !== parent_struct.$capability) {
+
+	if (!capability_fits(property, extra)) {
 		return [{
 			path: context.path,
-			message: `Capability mismatch: extra is '${extra.$capability}', expected '${parent_struct.$capability}'`,
+			message: `Capability mismatch: extra is '${extra.$capability ?? "none"}', expected '${property.capability?.join(", ") ?? ""}'`,
 			severity: "error"
 		}];
 	}

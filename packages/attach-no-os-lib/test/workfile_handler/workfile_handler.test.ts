@@ -2,10 +2,6 @@ import { describe, test, expect, beforeEach, afterEach } from 'vitest';
 import path from 'node:path';
 import {
     create_workfile,
-    add_platform_ops,
-    get_platform_ops,
-    list_platform_ops,
-    clear_platform_ops,
     add_symbol,
     get_symbol,
     remove_symbol,
@@ -25,7 +21,6 @@ import {
     export_minimal,
     import_minimal,
     clone_workfile,
-    all_ops,
     rename_symbol,
     resolve_reference
 } from '../../src/workfile_handler/workfile_handler';
@@ -182,7 +177,7 @@ describe('workfile_handler', () => {
         });
 
         test('add_symbol rejects name that conflicts with platform_ops', () => {
-            add_platform_ops(workfile, "spi_ops", make_platform_ops("spi_ops", "spi"));
+            workfile.platform_ops["spi_ops"] = make_platform_ops("spi_ops", "spi");
             const result = add_symbol(workfile, "spi_ops", make_struct("test"));
             expectError(result);
             expectErrorContains(result, "conflicts with platform ops");
@@ -279,46 +274,9 @@ describe('workfile_handler', () => {
         });
     });
 
-    describe('Platform Ops', () => {
-        test('add_platform_ops adds ops', () => {
-            const ops = make_platform_ops("spi_ops", "spi");
-            const result = add_platform_ops(workfile, "spi_ops", ops);
-            expectOk(result);
-            expect(list_platform_ops(workfile)).toContain("spi_ops");
-        });
-
-        test('add_platform_ops rejects duplicate names', () => {
-            const ops = make_platform_ops("spi_ops", "spi");
-            add_platform_ops(workfile, "spi_ops", ops);
-            const result = add_platform_ops(workfile, "spi_ops", ops);
-            expectError(result);
-            expectErrorContains(result, "already exists");
-        });
-
-        test('get_platform_ops returns existing ops', () => {
-            const ops = make_platform_ops("spi_ops", "spi");
-            add_platform_ops(workfile, "spi_ops", ops);
-            const result = get_platform_ops(workfile, "spi_ops");
-            expectOk(result);
-            expect(result.value.$symbol).toBe("spi_ops");
-            expect(result.value.$capability).toBe("spi");
-        });
-
-        test('get_platform_ops returns error for unknown ops', () => {
-            const result = get_platform_ops(workfile, "unknown");
-            expectError(result);
-            expectErrorContains(result, "not found");
-        });
-
-        test('clear_platform_ops removes all ops', () => {
-            add_platform_ops(workfile, "spi_ops", make_platform_ops("spi_ops", "spi"));
-            add_platform_ops(workfile, "i2c_ops", make_platform_ops("i2c_ops", "i2c"));
-            clear_platform_ops(workfile);
-            expect(list_platform_ops(workfile)).toEqual([]);
-        });
-
+    describe('find_any', () => {
         test('find_any finds platform_ops', () => {
-            add_platform_ops(workfile, "spi_ops", make_platform_ops("spi_ops", "spi"));
+            workfile.platform_ops["spi_ops"] = make_platform_ops("spi_ops", "spi");
             const result = find_any(workfile, "spi_ops");
             expect(result).toBeDefined();
             expect(result?.$symbol).toBe("spi_ops");
@@ -334,145 +292,6 @@ describe('workfile_handler', () => {
         test('find_any returns undefined for unknown', () => {
             const result = find_any(workfile, "unknown");
             expect(result).toBeUndefined();
-        });
-    });
-
-    describe('Exposed Ops ($exposes)', () => {
-        // $exposes names ops rulesets by symbol, like every other reference, and they are
-        // keyed in exposed_ops by that same symbol. These two come from the fixture
-        // platform; nothing about them is specific to a platform beyond who ships them.
-        const SPI_OPS = "test_spi_ops";
-        const GPIO_OPS = "test_gpio_ops";
-
-        function make_extender(name: string, exposes: string[]): RulesetStruct {
-            return { ...make_struct(name), $exposes: exposes };
-        }
-
-        test('adding a struct with $exposes registers its ops', () => {
-            const result = add_symbol(workfile, "mux", make_extender("mux", [SPI_OPS]));
-            expectOk(result);
-            expect(Object.keys(workfile.exposed_ops)).toEqual([SPI_OPS]);
-            // Surfaced through the merged view used by suggestions/validation/codegen.
-            expect(list_platform_ops(workfile)).toContain(SPI_OPS);
-            expect(find_any(workfile, SPI_OPS)?._t).toBe("RulesetPlatformOps");
-        });
-
-        test('a struct without $exposes registers nothing', () => {
-            add_symbol(workfile, "plain", make_struct("plain"));
-            expect(workfile.exposed_ops).toEqual({});
-        });
-
-        test('two extenders exposing the same ops collapse to one entry', () => {
-            expectOk(add_symbol(workfile, "mux_a", make_extender("mux", [SPI_OPS])));
-            expectOk(add_symbol(workfile, "mux_b", make_extender("mux", [SPI_OPS])));
-            expect(Object.keys(workfile.exposed_ops)).toEqual([SPI_OPS]);
-        });
-
-        test('removing one of two exposers keeps the shared ops', () => {
-            add_symbol(workfile, "mux_a", make_extender("mux", [SPI_OPS]));
-            add_symbol(workfile, "mux_b", make_extender("mux", [SPI_OPS]));
-
-            expectOk(remove_symbol(workfile, "mux_a"));
-            expect(workfile.exposed_ops[SPI_OPS]).toBeDefined();
-
-            expectOk(remove_symbol(workfile, "mux_b"));
-            expect(workfile.exposed_ops[SPI_OPS]).toBeUndefined();
-        });
-
-        test('recompute reflects the exact set of present exposers', () => {
-            add_symbol(workfile, "mux", make_extender("mux", [SPI_OPS]));
-            add_symbol(workfile, "expander", make_extender("exp", [GPIO_OPS]));
-            expect(Object.keys(workfile.exposed_ops).sort()).toEqual([GPIO_OPS, SPI_OPS].sort());
-
-            remove_symbol(workfile, "mux");
-            expect(Object.keys(workfile.exposed_ops)).toEqual([GPIO_OPS]);
-        });
-
-        test('one struct exposing multiple ops registers all of them', () => {
-            add_symbol(workfile, "combo", make_extender("combo", [SPI_OPS, GPIO_OPS]));
-            expect(Object.keys(workfile.exposed_ops).sort()).toEqual([GPIO_OPS, SPI_OPS].sort());
-        });
-
-        test('rename keeps exposed ops intact', () => {
-            add_symbol(workfile, "mux", make_extender("mux", [SPI_OPS]));
-            expectOk(rename_symbol(workfile, "mux", "mux_renamed"));
-            expect(Object.keys(workfile.exposed_ops)).toEqual([SPI_OPS]);
-        });
-
-        test('add rolls back when $exposes target is missing', () => {
-            const result = add_symbol(workfile, "bad", make_extender("bad", ["does/not/exist.yaml"]));
-            expectError(result);
-            expect(list_symbols(workfile)).not.toContain("bad");
-            expect(workfile.exposed_ops).toEqual({});
-        });
-
-        test('exposing ops that collide with a platform op is rejected', () => {
-            // Two different C globals cannot share one identifier, so a struct exposing ops
-            // already registered for the platform is a name clash rather than a duplicate.
-            add_platform_ops(workfile, SPI_OPS, make_platform_ops(SPI_OPS, 'spi'));
-            expect(workfile.platform_ops[SPI_OPS]).toBeDefined();
-
-            const result = add_symbol(workfile, "mux", make_extender("mux", [SPI_OPS]));
-            expectError(result);
-            expectErrorContains(result, "collides with a platform op");
-            // The add is rolled back, so a rejected expose leaves nothing behind.
-            expect(list_symbols(workfile)).not.toContain("mux");
-        });
-
-        test('a struct without $exposes registers nothing', () => {
-            add_symbol(workfile, "plain", make_struct("plain"));
-            expect(workfile.exposed_ops).toEqual({});
-        });
-
-        test('two extenders exposing the same ops collapse to one entry', () => {
-            expectOk(add_symbol(workfile, "mux_a", make_extender("mux", [SPI_OPS])));
-            expectOk(add_symbol(workfile, "mux_b", make_extender("mux", [SPI_OPS])));
-            expect(Object.keys(workfile.exposed_ops)).toEqual([SPI_OPS]);
-        });
-
-        test('removing one of two exposers keeps the shared ops', () => {
-            add_symbol(workfile, "mux_a", make_extender("mux", [SPI_OPS]));
-            add_symbol(workfile, "mux_b", make_extender("mux", [SPI_OPS]));
-
-            expectOk(remove_symbol(workfile, "mux_a"));
-            expect(workfile.exposed_ops[SPI_OPS]).toBeDefined();
-
-            expectOk(remove_symbol(workfile, "mux_b"));
-            expect(workfile.exposed_ops[SPI_OPS]).toBeUndefined();
-        });
-
-        test('recompute reflects the exact set of present exposers', () => {
-            add_symbol(workfile, "mux", make_extender("mux", [SPI_OPS]));
-            add_symbol(workfile, "expander", make_extender("exp", [GPIO_OPS]));
-            expect(Object.keys(workfile.exposed_ops).sort()).toEqual([GPIO_OPS, SPI_OPS].sort());
-
-            remove_symbol(workfile, "mux");
-            expect(Object.keys(workfile.exposed_ops)).toEqual([GPIO_OPS]);
-        });
-
-        test('one struct exposing multiple ops registers all of them', () => {
-            add_symbol(workfile, "combo", make_extender("combo", [SPI_OPS, GPIO_OPS]));
-            expect(Object.keys(workfile.exposed_ops).sort()).toEqual([GPIO_OPS, SPI_OPS].sort());
-        });
-
-        test('rename keeps exposed ops intact', () => {
-            add_symbol(workfile, "mux", make_extender("mux", [SPI_OPS]));
-            expectOk(rename_symbol(workfile, "mux", "mux_renamed"));
-            expect(Object.keys(workfile.exposed_ops)).toEqual([SPI_OPS]);
-        });
-
-        test('add rolls back when $exposes target is missing', () => {
-            const result = add_symbol(workfile, "bad", make_extender("bad", ["does/not/exist.yaml"]));
-            expectError(result);
-            expect(list_symbols(workfile)).not.toContain("bad");
-            expect(workfile.exposed_ops).toEqual({});
-        });
-
-
-        test('all_ops merges platform and exposed ops', () => {
-            add_platform_ops(workfile, "spi_ops", make_platform_ops("spi_ops", "spi"));
-            add_symbol(workfile, "mux", make_extender("mux", [SPI_OPS]));
-            expect(Object.keys(all_ops(workfile)).sort()).toEqual(["spi_ops", SPI_OPS].sort());
         });
     });
 
@@ -707,34 +526,25 @@ describe('workfile_handler', () => {
     describe('suggest_platform_ops', () => {
 
         test('suggests ops matching capability', () => {
-            add_platform_ops(workfile, 'test_spi_ops', make_platform_ops('test_spi_ops', 'spi'));
-            add_platform_ops(workfile, 'test_gpio_ops', make_platform_ops('test_gpio_ops', 'gpio'));
-
-            const spi_struct: RulesetStruct = {
-                ...make_struct("spi"),
-                $capability: "spi"
-            };
+            workfile.platform_ops['test_spi_ops'] = make_platform_ops('test_spi_ops', 'spi');
+            workfile.platform_ops['test_gpio_ops'] = make_platform_ops('test_gpio_ops', 'gpio');
 
             const property: PlatformOpsProperty = {
                 _t: "PlatformOpsProperty",
                 name: "platform_ops",
                 description: "",
-                type: "platform_ops"
+                type: "platform_ops",
+                capability: ["spi"]
             };
 
-            const result = suggest_platform_ops(workfile, property, spi_struct);
+            const result = suggest_platform_ops(workfile, property);
             expectOk(result);
             expect(result.value.values).toContain("test_spi_ops");
             expect(result.value.values).not.toContain("test_gpio_ops");
         });
 
         test('suggests ops from allowed list when override present', () => {
-            add_platform_ops(workfile, 'test_spi_ops', make_platform_ops('test_spi_ops', 'spi'));
-
-            const spi_struct: RulesetStruct = {
-                ...make_struct("spi"),
-                $capability: "spi"
-            };
+            workfile.platform_ops['test_spi_ops'] = make_platform_ops('test_spi_ops', 'spi');
 
             const property: PlatformOpsProperty = {
                 _t: "PlatformOpsProperty",
@@ -744,7 +554,7 @@ describe('workfile_handler', () => {
                 allowed: ["test_spi_ops"]
             };
 
-            const result = suggest_platform_ops(workfile, property, spi_struct);
+            const result = suggest_platform_ops(workfile, property);
             expectOk(result);
             expect(result.value).toEqual({ values: ["test_spi_ops"] });
         });
@@ -766,16 +576,14 @@ describe('workfile_handler', () => {
             };
             add_symbol(workfile, "my_local_extra", local);
 
-            const parent: RulesetStruct = {
-                ...make_struct("spi"),
-                $capability: "spi"
-            };
+            const parent = make_struct("spi");
 
             const property: PlatformExtraProperty = {
                 _t: "PlatformExtraProperty",
                 name: "extra",
                 description: "",
-                type: "platform_extra"
+                type: "platform_extra",
+                capability: ["spi"]
             };
 
             const result = suggest_platform_extra(workfile, property, parent);
@@ -787,9 +595,8 @@ describe('workfile_handler', () => {
 
     describe('list_available_structs', () => {
         test('groups instantiable symbols by the module that ships them', () => {
-            // The old devices/no-os/platform split described one build system's directory
-            // layout. Provenance is now simply which module indexed a symbol, which
-            // generalises to however many drivers and platforms are configured.
+            // Provenance is which module indexed a symbol, which generalises to however many
+            // drivers and platforms are configured.
             const result = list_available_structs(workfile);
             expectOk(result);
 
@@ -915,7 +722,7 @@ describe('workfile_handler', () => {
     describe('export_minimal', () => {
 
         test('exports platform name and symbol values', () => {
-            add_platform_ops(workfile, 'test_spi_ops', make_platform_ops('test_spi_ops', 'spi'));
+            workfile.platform_ops['test_spi_ops'] = make_platform_ops('test_spi_ops', 'spi');
 
             const spi_result = load_resolved_ruleset("test_spi_config");
             expectOk(spi_result);
@@ -980,7 +787,7 @@ describe('workfile_handler', () => {
         });
 
         test('round-trip: export then import produces same state', () => {
-            add_platform_ops(workfile, 'test_spi_ops', make_platform_ops('test_spi_ops', 'spi'));
+            workfile.platform_ops['test_spi_ops'] = make_platform_ops('test_spi_ops', 'spi');
 
             const spi_result = load_resolved_ruleset("test_spi_config");
             expectOk(spi_result);

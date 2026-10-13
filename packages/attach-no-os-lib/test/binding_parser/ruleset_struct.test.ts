@@ -28,23 +28,6 @@ describe('RulesetStruct parsing', () => {
 			expect(binding.rules!.length).toBeGreaterThanOrEqual(1);
 		});
 
-		test('auto-computes $requires from property capabilities', () => {
-			const result = loadAndParseRuleset('bindings/struct/valid_with_capabilities.yaml');
-			expectOk(result);
-			const binding = result.value as RulesetStruct;
-			expect(binding.$requires).toBeDefined();
-			expect(binding.$requires).toContain('spi');
-			expect(binding.$requires).toContain('irq');
-			expect(binding.$requires).toHaveLength(2);
-		});
-
-		test('$requires is undefined when no properties have capabilities', () => {
-			const result = loadAndParseRuleset('bindings/struct/valid_with_properties.yaml');
-			expectOk(result);
-			const binding = result.value as RulesetStruct;
-			expect(binding.$requires).toBeUndefined();
-		});
-
 		test('parses $capability field', () => {
 			const result = loadAndParseRuleset('bindings/struct/valid_with_capability.yaml');
 			expectOk(result);

@@ -12,7 +12,7 @@ import YAML from "yaml";
 import type { Result} from "./result";
 import { ok, error } from "./result";
 import type { ParseContext} from "./validators";
-import { asObject, at, boolean_, optional, optionalWithDefault, required, string_, stringArray } from "./validators";
+import { asObject, at, boolean_, optional, optionalWithDefault, required, string_ } from "./validators";
 import { RulesetType } from "./types";
 import {
 	parse_array_property,
@@ -259,21 +259,6 @@ function parse_ruleset_from_object(object: Record<string, unknown>, context: Par
 				return $header;
 			}
 
-			const $exposes = optional(object, "$exposes", context, stringArray);
-			if (!$exposes.ok) {
-				return $exposes;
-			}
-
-			// Collect all capabilities from properties into $requires
-			const capabilities = new Set<string>();
-			for (const property of context.document.properties) {
-				if (property.capability) {
-					for (const cap of property.capability) {
-						capabilities.add(cap);
-					}
-				}
-			}
-			const $requires = capabilities.size > 0 ? [...capabilities] : undefined;
 
 			return ok({
 				_t: "RulesetStruct",
@@ -282,10 +267,8 @@ function parse_ruleset_from_object(object: Record<string, unknown>, context: Par
 				$description: $description.value,
 				properties: context.document.properties,
 				rules: rules.value,
-				$requires: $requires,
 				$capability: $capability.value,
 				$header: $header.value,
-				$exposes: $exposes.value,
 			});
 		}
 		case RulesetType.RT_ENUM: {

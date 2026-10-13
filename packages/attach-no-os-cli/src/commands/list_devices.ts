@@ -6,9 +6,9 @@ import { load_context, output, output_error } from "./shared";
 /**
  * `attach-noos list-devices` — every schema a node can be created from.
  *
- * "Device" is attach-meta's word for "the thing you add". Ours is a schema, and there are
- * three kinds of them: device drivers, no-OS core types, and platform types. `tag` is what
- * carries that distinction, since `key` has to be the exact string `add --key` takes.
+ * "Device" is attach-meta's word for "the thing you add". Ours is an eval board, a driver,
+ * or a schema, grouped by the module that ships it. `tag` is what carries that distinction,
+ * since `key` has to be the exact string `add --key` takes.
  *
  * The list depends on the workfile: which platform's schemas are available follows from
  * the platform the workfile was created for.

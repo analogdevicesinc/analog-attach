@@ -35,7 +35,6 @@ export function create_workfile(platform?: string): Result<Workfile> {
     const workfile: Workfile = {
         platform: platform,
         platform_ops: {},
-        exposed_ops: {},
         symbols: {}
     };
 
@@ -68,72 +67,6 @@ export function create_workfile(platform?: string): Result<Workfile> {
     return ok(workfile);
 }
 
-export function all_ops(workfile: Workfile): Record<string, Ruleset> {
-    return { ...workfile.platform_ops, ...workfile.exposed_ops };
-}
-
-export function recompute_exposed_ops(workfile: Workfile): Result<void> {
-    const rebuilt: Record<string, Ruleset> = {};
-
-    for (const symbol of Object.values(workfile.symbols)) {
-        if (symbol._t !== "RulesetStruct" || !symbol.$exposes) {
-            continue;
-        }
-
-        for (const ops_path of symbol.$exposes) {
-            const loaded = load_resolved_ruleset(ops_path);
-            if (!loaded.ok) {
-                return loaded;
-            }
-
-            const ops = loaded.value;
-            if (ops._t !== "RulesetPlatformOps") {
-                return error(`$exposes target is not platform_ops: ${ops_path}`, ops_path);
-            }
-
-            // Naming collision. 2 different C globals sharing the same identifier
-            if (ops.$symbol in workfile.platform_ops) {
-                return error(`Exposed ops '${ops.$symbol}' collides with a platform op with the same name`, ops.$symbol);
-            }
-
-            // No guard needed between two exposed ops: `$symbol` is a ruleset's identity
-            // and the registry rejects two files claiming the same one, so the same
-            // `$symbol` here is necessarily the same ruleset and dedupes silently.
-
-            rebuilt[ops.$symbol] = ops;
-        }
-    }
-
-    workfile.exposed_ops = rebuilt;
-    return ok();
-}
-
-// --- Platform Ops (locked, from manifest) ---
-
-export function add_platform_ops(workfile: Workfile, name: string, ruleset: RulesetPlatformOps): Result<void> {
-    if (name in workfile.platform_ops) {
-        return error(`Platform ops '${name}' already exists`, "name");
-    }
-    workfile.platform_ops[name] = ruleset;
-    return ok();
-}
-
-export function get_platform_ops(workfile: Workfile, name: string): Result<RulesetPlatformOps> {
-    const ops = workfile.platform_ops[name];
-    if (!ops) {
-        return error(`Platform ops '${name}' not found`, "name");
-    }
-    return ok(ops as RulesetPlatformOps);
-}
-
-export function list_platform_ops(workfile: Workfile): string[] {
-    return Object.keys(all_ops(workfile));
-}
-
-export function clear_platform_ops(workfile: Workfile): void {
-    workfile.platform_ops = {};
-}
-
 // --- Symbol CRUD (user-created) ---
 
 const C_NAME_REGEX = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
@@ -164,11 +97,6 @@ export function add_symbol(workfile: Workfile, name: string, ruleset: Ruleset): 
         return error(`Symbol '${name}' conflicts with platform ops`, "name");
     }
     workfile.symbols[name] = ruleset;
-    const recompute = recompute_exposed_ops(workfile);
-    if (!recompute.ok) {
-        delete workfile.symbols[name]; // roll back the add on failure
-        return recompute;
-    }
     return ok(workfile);
 }
 
@@ -187,7 +115,7 @@ export function remove_symbol(workfile: Workfile, name: string): Result<void> {
     if (workfile.hidden !== undefined) {
         workfile.hidden = workfile.hidden.filter(hidden => hidden !== name);
     }
-    return recompute_exposed_ops(workfile);
+    return ok();
 }
 
 export function rename_symbol(workfile: Workfile, old_name: string, new_name: string): Result<Workfile> {
@@ -211,12 +139,6 @@ export function rename_symbol(workfile: Workfile, old_name: string, new_name: st
     // Rewrite references to the old name held in other symbols' property values.
     rename_symbol_references(workfile, old_name, new_name);
 
-    // recompute might not be needed here, but more uniform
-    const recompute = recompute_exposed_ops(workfile);
-    if (!recompute.ok) {
-        return recompute;
-    }
-
     return ok(workfile);
 }
 
@@ -227,7 +149,7 @@ export function list_symbols(workfile: Workfile): string[] {
 // --- Lookup (checks both platform_ops and symbols) ---
 
 export function find_any(workfile: Workfile, name: string): Ruleset | undefined {
-    return all_ops(workfile)[name] ?? workfile.symbols[name];
+    return workfile.platform_ops[name] ?? workfile.symbols[name];
 }
 
 // --- Property Values ---
@@ -537,29 +459,25 @@ export function suggest_for_enum(property: EnumProperty): Result<PropertySuggest
 }
 
 /**
- * Whether a platform ops table fits a field: its capability is the field's own (capi:
- * `ops: {type: platform_ops, capability: spi}`), or the struct's when the field names none.
+ * Whether a platform ruleset fits a platform field: the field says which capability it takes
+ * (`ops: {type: platform_ops, capability: spi}`), the ops table or extra struct says which it
+ * is. A field that names none takes any.
  */
-export function ops_capability_fits(ops: RulesetPlatformOps, property: PlatformOpsProperty, parent_struct: RulesetStruct): boolean {
-    const wanted = property.capability ?? (parent_struct.$capability === undefined ? [] : [parent_struct.$capability]);
-    // Nothing declared on either: no constraint to check.
-    return wanted.length === 0 || (ops.$capability !== undefined && wanted.includes(ops.$capability));
+export function capability_fits(property: PlatformOpsProperty | PlatformExtraProperty, ruleset: RulesetPlatformOps | RulesetStruct): boolean {
+    const wanted = property.capability ?? [];
+    return wanted.length === 0 || (ruleset.$capability !== undefined && wanted.includes(ruleset.$capability));
 }
 
-export function suggest_platform_ops(workfile: Workfile, property: PlatformOpsProperty, parent_struct: RulesetStruct): Result<PropertySuggestions> {
+export function suggest_platform_ops(workfile: Workfile, property: PlatformOpsProperty): Result<PropertySuggestions> {
     const suggestions: string[] = [];
 
-    for (const [name, ops] of Object.entries(all_ops(workfile))) {
-        if (ops._t !== "RulesetPlatformOps") {
-            continue;
-        }
-
+    for (const [name, ops] of Object.entries(workfile.platform_ops)) {
         // When an allowed list is set (from $override), only suggest from that list
         if (property.allowed) {
             if (property.allowed.includes(ops.$symbol)) {
                 suggestions.push(name);
             }
-        } else if (ops_capability_fits(ops, property, parent_struct)) {
+        } else if (capability_fits(property, ops)) {
             // No override restriction, fall back to capability matching
             suggestions.push(name);
         }
@@ -594,7 +512,7 @@ export function suggest_platform_extra(workfile: Workfile, property: PlatformExt
             if (property.allowed.includes(symbol.$symbol)) {
                 values.push(name);
             }
-        } else if (is_platform_symbol(symbol.$symbol) && symbol.$capability === parent_struct.$capability) {
+        } else if (is_platform_symbol(symbol.$symbol) && capability_fits(property, symbol)) {
             // No override restriction, fall back to capability matching
             values.push(name);
         }
@@ -615,7 +533,7 @@ export function suggest_platform_extra(workfile: Workfile, property: PlatformExt
             if (property.allowed.includes(ruleset.value.$symbol)) {
                 types.push(candidate);
             }
-        } else if (ruleset.value.$capability === parent_struct.$capability) {
+        } else if (capability_fits(property, ruleset.value)) {
             // No override restriction, fall back to capability matching
             types.push(candidate);
         }
@@ -675,7 +593,7 @@ export function suggest_for_property(workfile: Workfile, symbol_name: string, pr
             if (symbol._t !== "RulesetStruct") {
                 return error(`Property '${property_name}' is not valid on a descriptor node`, symbol_name);
             }
-            return suggest_platform_ops(workfile, overridden, symbol);
+            return suggest_platform_ops(workfile, overridden);
         }
         case "PlatformExtraProperty": {
             // Only structs carry platform_extra; a descriptor node never reaches here.

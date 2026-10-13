@@ -15,8 +15,7 @@ import { common_ok } from "../protocol/responses";
  *
  * Both halves now come from the same place: a platform module declares the chips it
  * supports and the boards it supports, and each board module names the chip it carries. So
- * unlike the old no-OS model - boards from CMake presets, platforms from a separate schema
- * tree - there is no such thing as a board the tool cannot generate for, and no
+ * there is no such thing as a board the tool cannot generate for, and no
  * generatable/unsupported split to report.
  */
 
@@ -38,7 +37,7 @@ function describe_boards(boards: BoardInfo[]): ListedBoard[] {
 }
 
 export const listBoardsCommand = buildCommand<{ json?: boolean }, []>({
-    docs: { brief: "List the no-OS boards that can be generated for" },
+    docs: { brief: "List the boards that can be generated for" },
     parameters: {
         positional: { kind: "tuple", parameters: [] },
         flags: {

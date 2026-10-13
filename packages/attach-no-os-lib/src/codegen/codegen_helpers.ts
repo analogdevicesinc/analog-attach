@@ -9,10 +9,10 @@ import { make_string_environment } from "./eta_environment";
 import { resolve_reference } from "../workfile_handler/workfile_handler";
 
 // Typed, reusable property primitives injected into every template under `it.h`.
-// These read a single Property with no target-specific (no-OS) knowledge, so they are
-// the general vocabulary a template author reaches for. The no-OS-specific assembly
-// (struct const-ness, source collection) stays in `_helpers.eta`, which calls these
-// via the injected `it.h`.
+// These read a single Property with no target-specific knowledge, so they are the general
+// vocabulary a template author reaches for. The target-specific assembly (struct views,
+// source collection) stays in the template set's `_helpers.eta`, which calls these via
+// the injected `it.h`.
 
 // A scalar property's declared default, or undefined for shapes that have none.
 export function property_default(property: Property): unknown {
