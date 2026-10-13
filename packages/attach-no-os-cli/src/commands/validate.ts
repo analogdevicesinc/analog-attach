@@ -39,8 +39,8 @@ export const validateCommand = buildCommand<{ json?: boolean }, [], AttachContex
         const warnings = result.errors.filter(finding => finding.severity === "warning");
 
         const response: ValidationResponse = {
-            errors: errors.map(to_protocol_error),
-            warnings: warnings.map(to_protocol_error)
+            errors: errors.map(finding => to_protocol_error(finding)),
+            warnings: warnings.map(finding => to_protocol_error(finding))
         };
 
         // A workfile with errors is a valid answer to "is it valid", not a failed run, so

@@ -283,13 +283,22 @@ function format_configs(settings: SettingsFile, selected: (keyof SettingsFile)[]
     for (const field of selected) {
         const setting = settings[field];
         const value = setting.value ?? setting.default ?? "-";
-        const source = setting.value === undefined
-            ? (setting.default === undefined ? (setting.required ? "unset (required)" : "unset") : "default")
-            : "configured";
+        const source = setting_source(setting);
         out += `  ${field.padEnd(16)}${value.padEnd(width)}${source}\n`;
     }
 
     return out;
+}
+
+/** Where a setting's value comes from, for the Source column. */
+function setting_source(setting: Setting): string {
+    if (setting.value !== undefined) {
+        return "configured";
+    }
+    if (setting.default !== undefined) {
+        return "default";
+    }
+    return setting.required ? "unset (required)" : "unset";
 }
 
 function format_setting(field: string, setting: Setting): string {

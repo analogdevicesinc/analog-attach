@@ -112,14 +112,14 @@ export const suggestCommand = buildCommand<{ json?: boolean }, string[]>({
         }
     },
     func: async (flags, ...input: string[]) => {
-        const [kind, ...args] = input;
+        const [kind, ...arguments_] = input;
 
         if (!kind) {
             output_error(flags, `No kind given. Available: ${INTELLIGENCE.map(entry => entry.kind).join(", ")}`);
             return;
         }
 
-        const values = suggest(kind, args);
+        const values = suggest(kind, arguments_);
         if (values === undefined) {
             output_error(flags, `Unknown suggestion kind '${kind}'. Available: ${INTELLIGENCE.map(entry => entry.kind).join(", ")}`);
             return;
@@ -142,15 +142,15 @@ export const suggestCommand = buildCommand<{ json?: boolean }, string[]>({
  * which list to return, because attach-meta looks up a single kind per command and uses it
  * for every positional slot.
  */
-function suggest(kind: string, args: string[]): string[] | undefined {
+function suggest(kind: string, arguments_: string[]): string[] | undefined {
     switch (kind) {
         case SUGGEST_KINDS.path: {
-            const [node] = args;
+            const [node] = arguments_;
             return node === undefined ? get_node_names() : get_property_names(node);
         }
 
         case SUGGEST_KINDS.value: {
-            const [node, property, member] = args;
+            const [node, property, member] = arguments_;
             if (node === undefined || property === undefined) {
                 return [];
             }
@@ -167,7 +167,7 @@ function suggest(kind: string, args: string[]): string[] | undefined {
         }
 
         case SUGGEST_KINDS.config_field: {
-            const [field] = args;
+            const [field] = arguments_;
             return field === undefined ? get_config_keys() : get_config_value_suggestions(field);
         }
 
@@ -192,8 +192,8 @@ function format_intelligence(): string {
 
     for (const entry of INTELLIGENCE) {
         out += `  ${entry.kind}\n`;
-        for (const arg of entry.args) {
-            out += `      ${arg.name.padEnd(12)}${arg.description}\n`;
+        for (const argument of entry.args) {
+            out += `      ${argument.name.padEnd(12)}${argument.description}\n`;
         }
     }
 

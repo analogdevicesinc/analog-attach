@@ -41,23 +41,23 @@ const installCommand = buildCommand<CompletionFlags, []>({
         if (flags.user && !fs.existsSync(target_directory)) {
             try {
                 fs.mkdirSync(target_directory, { recursive: true });
-            } catch (thrown) {
-                output_error(flags, `Failed to create directory '${target_directory}': ${thrown}`);
+            } catch (error) {
+                output_error(flags, `Failed to create directory '${target_directory}': ${String(error)}`);
                 return;
             }
         }
 
         try {
             fs.writeFileSync(target_path, fs.readFileSync(COMPLETION_SCRIPT_PATH, "utf8"));
-        } catch (thrown) {
-            const denied = (thrown as NodeJS.ErrnoException).code === "EACCES";
+        } catch (error) {
+            const denied = (error as NodeJS.ErrnoException).code === "EACCES";
             if (denied && !flags.user) {
                 const message = "Permission denied. Re-run with sudo, or use --user for a user-local install.";
                 output_error(flags, message, {
                     text: `${message}\n\n  sudo attach-noos completion install\n  or\n  attach-noos completion install --user`
                 });
             } else {
-                output_error(flags, `Failed to install completion script: ${thrown}`);
+                output_error(flags, `Failed to install completion script: ${String(error)}`);
             }
             return;
         }
@@ -89,13 +89,13 @@ const uninstallCommand = buildCommand<CompletionFlags, []>({
 
         try {
             fs.unlinkSync(target_path);
-        } catch (thrown) {
-            const denied = (thrown as NodeJS.ErrnoException).code === "EACCES";
+        } catch (error) {
+            const denied = (error as NodeJS.ErrnoException).code === "EACCES";
             if (denied && !flags.user) {
                 const message = "Permission denied. Re-run with sudo.";
                 output_error(flags, message, { text: `${message}\n\n  sudo attach-noos completion uninstall` });
             } else {
-                output_error(flags, `Failed to uninstall completion script: ${thrown}`);
+                output_error(flags, `Failed to uninstall completion script: ${String(error)}`);
             }
             return;
         }

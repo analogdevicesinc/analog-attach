@@ -317,6 +317,7 @@ export function reorder_symbols_topologically(workfile: Workfile): void {
 			reordered[name] = symbol;
 		}
 	}
+	// eslint-disable-next-line no-param-reassign -- reordering the workfile in place is this function's job
 	workfile.symbols = reordered;
 }
 

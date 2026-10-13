@@ -177,7 +177,7 @@ export interface ValidationResponse {
     warnings: ValidationError[];
 }
 
-export interface IntelligenceArg {
+export interface IntelligenceArgument {
     name: string;
     description: string;
     required: boolean;
@@ -187,7 +187,7 @@ export interface IntelligenceArg {
 
 export interface Intelligence {
     kind: string;
-    args: IntelligenceArg[];
+    args: IntelligenceArgument[];
 }
 
 export interface ListIntelligenceResponse extends CommonResponse {
