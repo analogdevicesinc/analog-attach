@@ -2,6 +2,8 @@ schema_version: "1.0"
 
 rulesets:
   structs:
+    - otheradc_capi_init_param.yaml
     - otheradc_init_param.yaml
+    - otheradc_channel.yaml
   externs:
     - otheradc_adc_ops.yaml

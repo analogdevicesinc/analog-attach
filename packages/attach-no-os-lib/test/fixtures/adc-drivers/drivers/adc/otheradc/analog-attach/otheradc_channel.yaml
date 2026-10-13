@@ -1,0 +1,7 @@
+$type: struct
+$symbol: otheradc_channel
+$description: "One channel's settings, embedded in otheradc_capi_init_param.channels"
+gain:
+  type: uint8_t
+  default: 1
+  description: "Channel gain"

@@ -67,15 +67,17 @@ provides it. Either way the reference stays unset and is listed in the report's 
 | `add <schema>` | that one node, nothing pinned |
 
 The part is its driver's root handle (`registry/roots.ts`). `pin_driver()` then names the
-driver once, so nothing below has to be guessed. It creates the root's config and puts
-`<driver>_init_param` in its driver-backed `extra`. Each further `--as` side gets its own
+driver once, so nothing below has to be guessed. It creates the root's config and puts the
+driver's init_param in its driver-backed `extra`: its only candidate, or `<driver>_init_param`
+when it has several. Each further `--as` side gets its own
 handle and config, but the same init_param: one chip, several interfaces.
 
 ## Driver-backed fields
 
 A config's `extra` and `ops` name only an interface (`type: driver_init_param, interface:
-adc`). The candidates are what every driver providing it ships, outside its `iio` group;
-ops tables are matched by `<interface>_ops`. They are ranked by what the workfile already
+adc`). The candidates are what every driver providing it ships, outside its `iio` group, and
+not a struct another of its candidates includes (ad7156_init_param is embedded in the
+adapter's ad7156_capi_init_param); ops tables are matched by `<interface>_ops`. They are ranked by what the workfile already
 holds (`rank_driver_candidates()`):
 
 - **Elimination across levels.** A struct already filling a driver-backed field of a device

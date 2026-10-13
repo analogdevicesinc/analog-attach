@@ -126,7 +126,7 @@ describe('ranking the drivers behind a field', () => {
         add(workfile, 'adc_config', 'test_adc_config');
         expect(ranked(workfile, 'adc_config')).toEqual({
             strong: [],
-            weak: ['dualpart_channel_config', 'dualpart_init_param', 'otheradc_init_param'],
+            weak: ['dualpart_channel_config', 'dualpart_init_param', 'otheradc_capi_init_param'],
         });
     });
 
@@ -138,7 +138,7 @@ describe('ranking the drivers behind a field', () => {
         // left of dualpart for a channel is its channel struct.
         expect(ranked(workfile, 'chan_config')).toEqual({
             strong: ['dualpart_channel_config'],
-            weak: ['otheradc_init_param'],
+            weak: ['otheradc_capi_init_param'],
         });
     });
 
@@ -155,7 +155,7 @@ describe('ranking the drivers behind a field', () => {
         add(workfile, 'chan_config', 'test_adc_chan_config');
         const suggestions = suggest_for_property(workfile, 'chan_config', 'extra');
         expectOk(suggestions);
-        expect(suggestions.value.types).toEqual(['dualpart_channel_config', 'otheradc_init_param']);
+        expect(suggestions.value.types).toEqual(['dualpart_channel_config', 'otheradc_capi_init_param']);
     });
 });
 
@@ -212,7 +212,7 @@ describe('bootstrap follows the ranking', () => {
         expectOk(report);
         expect(config_field(workfile, 'adc', 'extra')).toBeUndefined();
         const open = report.value.choices.find(choice => choice.property === 'extra');
-        expect(open?.options.sort()).toEqual(['dualpart_channel_config', 'dualpart_init_param', 'otheradc_init_param']);
+        expect(open?.options.sort()).toEqual(['dualpart_channel_config', 'dualpart_init_param', 'otheradc_capi_init_param']);
     });
 
     test('a channel finds its ADC and the part\'s channel struct, though a rival ADC is configured', () => {

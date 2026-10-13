@@ -1,7 +1,12 @@
 $type: struct
 $symbol: otheradc_init_param
-$description: "The other part's configuration"
+$description: "The part's own configuration, embedded in otheradc_capi_init_param"
 rate:
   type: uint32_t
   default: 1000
   description: "Sample rate, in Hz"
+bus:
+  include: test_spi_controller
+  pointer: true
+  required: true
+  description: "A handle: only set once it is inited, so patched in main.c"

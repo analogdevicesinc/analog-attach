@@ -20,7 +20,8 @@ import { at } from "../ruleset_parser/validators";
 import type { Workfile } from "../workfile_handler/types";
 import { resolve_reference, suggest_platform_extra } from "../workfile_handler/workfile_handler";
 import { load_resolved_ruleset } from "../resolver/resolver";
-import { provides_interface } from "../registry/drivers";
+import { driver_init_parameter_candidates, provides_interface } from "../registry/drivers";
+import { resolve_entry } from "../registry/registry";
 import { capability_fits } from "../workfile_handler/workfile_handler";
 import { format_number_in } from "../ruleset_parser/number_format";
 import { apply_overrides } from "./override_resolver";
@@ -197,6 +198,22 @@ function validate_driver_backed(
 			message: `'${symbol_name}' does not come from a driver implementing '${property.interface}'`,
 			severity: "error"
 		}];
+	}
+
+	// A struct another of the driver's structs includes is a part of that one, not what the
+	// handle takes: the driver would read it as the wrong type.
+	if (expected === RulesetType.RT_STRUCT) {
+		const candidates = driver_init_parameter_candidates(property.interface);
+		if (candidates.ok && !candidates.value.some(candidate => candidate.$symbol === target.$symbol)) {
+			const entry = resolve_entry(target.$symbol);
+			const module_path = entry.ok ? entry.value.module.path : undefined;
+			const offered = candidates.value.filter(candidate => candidate.module.path === module_path);
+			return [{
+				path: context.path,
+				message: `'${symbol_name}' (${target.$symbol}) is not a ${property.interface} init_param: its driver takes ${offered.map(candidate => candidate.$symbol).join(" or ") || "another struct"}`,
+				severity: "error"
+			}];
+		}
 	}
 
 	if (property.allowed && !property.allowed.includes(target.$symbol)) {

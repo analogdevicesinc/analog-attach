@@ -51,6 +51,7 @@ const EVAL_BOARDS: Record<string, string> = {
     adxl355: 'eval-adxl355-pmdz',
     ad74413r: 'eval-ad-swio-2-click',
     adt7420: 'eval-adt7420-pmdz',
+    ad7156: 'eval-pmodcdc1',
 };
 
 function board_workfile(): Workfile {
@@ -206,6 +207,13 @@ describe.skipIf(!ENABLED)('generated CAPI apps build on max32655fthr', () => {
         add_driver(workfile, 'adt7420', 'adt7420');
         expect(Object.keys(workfile.symbols)).toContain('capi_i2c_device');
         expect(generated_warnings(generate_and_build(workfile, 'adt7420'))).toEqual([]);
+    }, BUILD_TIMEOUT);
+
+    test('ad7156 over I2C, its native config embedded in the adapter\'s', () => {
+        const workfile = board_workfile();
+        add_driver(workfile, 'ad7156', 'ad7156');
+        expect(Object.keys(workfile.symbols)).toEqual(expect.arrayContaining(['ad7156_capi_init_param', 'ad7156_init_param', 'capi_i2c_device']));
+        expect(generated_warnings(generate_and_build(workfile, 'ad7156'))).toEqual([]);
     }, BUILD_TIMEOUT);
 
     test('adxl355 and ad74413r on one bus, the second chip-select set by hand', () => {

@@ -2,7 +2,34 @@
 const H = include("./_helpers", { h: it.h });
 const wf = it.workfile;
 const structs = H.struct_views(wf);
+const embedded = H.embedded_nodes(wf);
 const devices = it.h.devices(wf);
+
+/*
+ * An embedded struct node, written inline: its own fields in braces, as the member of its
+ * owner that it is (see embedded_nodes in _helpers.eta). Recursive, so a struct embedded
+ * in an embedded one is written inline too.
+ */
+function inline_initializer(name) {
+	const view = H.embedded_view(name, wf);
+	const fields = view.fields.map(f => `.${f.name} = ${cval(f, name)}`);
+	return fields.length === 0 ? "{ 0 }" : `{ ${fields.join(", ")} }`;
+}
+
+/* The embedded nodes inside one global, at any depth: their hoisted arrays go above it. */
+function embedded_in(root) {
+	const found = [];
+	for (const [name, at] of embedded) {
+		let owner = at.owner;
+		while (embedded.has(owner)) {
+			owner = embedded.get(owner).owner;
+		}
+		if (owner === root) {
+			found.push(name);
+		}
+	}
+	return found;
+}
 
 /*
  * A member declared as an array of POINTER includes is a pointer-to-pointer in C, not
@@ -17,7 +44,7 @@ const devices = it.h.devices(wf);
  * the member at it by name.
  *
  * Arrays of EMBEDDED includes (ad7124 `setups`) are genuine C arrays and keep their
- * inline braces; only `pointer: true` elements need this.
+ * inline braces, each element written inline; only `pointer: true` elements need this.
  */
 function is_pointer_include_array(property) {
 	return property._t === "ArrayProperty"
@@ -112,6 +139,9 @@ function cval(property, struct_name) {
 			if (property.pointer === true && value === undefined) {
 				return "NULL";
 			}
+			if (property.pointer !== true && embedded.has(String(value))) {
+				return inline_initializer(String(value));
+			}
 			/*
 			 * A reference names a node or one readonly member of one, and knows on its
 			 * own whether an `&` is needed. Enum-backed includes hold a value rather
@@ -142,8 +172,11 @@ function cval(property, struct_name) {
 			const [member_name, reference] = first_entry;
 			const member = property.members.find(m => m.name === member_name);
 			const is_pointer = member?.pointer ?? false;
-			return is_pointer
-				? `{ .${member_name} = &${reference} }`
+			if (is_pointer) {
+				return `{ .${member_name} = &${reference} }`;
+			}
+			return embedded.has(String(reference))
+				? `{ .${member_name} = ${inline_initializer(String(reference))} }`
 				: `{ .${member_name} = ${reference} }`;
 		}
 		case "ArrayProperty": {
@@ -168,7 +201,10 @@ function cval(property, struct_name) {
 						return String(v);
 					}
 					case "IncludeProperty": {
-						return property.element.pointer ? `&${String(v)}` : String(v);
+						if (property.element.pointer) {
+							return `&${String(v)}`;
+						}
+						return embedded.has(String(v)) ? inline_initializer(String(v)) : String(v);
 					}
 					default: {
 						return String(v);
@@ -198,7 +234,7 @@ struct <%= d.handle_type %> *<%= d.descriptor_name %>;
 <% } -%>
 
 <% for (const s of structs) { -%>
-<% for (const a of hoisted_arrays(s)) { -%>
+<% for (const a of [...embedded_in(s.name).map(name => hoisted_arrays(H.embedded_view(name, wf))), hoisted_arrays(s)].flat()) { -%>
 const struct <%= a.element_type %> *<%= a.name %>[] = { <%= a.elements.join(", ") %> };
 <% } -%>
 <%= s.is_const ? "const " : "" %>struct <%= s.type %> <%= s.name %> = {

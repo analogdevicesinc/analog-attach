@@ -248,6 +248,17 @@ export function land(part: ModuleInfo, board: BoardInfo, from: PinReference, wir
 	return { kind: "wired", to: { connector: mate.id, pin: from.pin }, via: "mating" };
 }
 
+/**
+ * The part's connectors with pins for this bus but no `id`: wiring names a pin by its
+ * connector's id, so those pins can never land.
+ */
+export function unidentified_bus_connectors(part: ModuleInfo, interface_: string): string[] {
+	return (part.connectors ?? [])
+		.filter(connector => connector.id === undefined
+			&& connector.pins.some(pin => pin.roles.some(role => role.startsWith(`${interface_}_`))))
+		.map(connector => connector.name);
+}
+
 /** The part's pins with a given role, each named by its connector id. */
 function part_pins_with_role(part: ModuleInfo, role: string): PinReference[] {
 	return identified(part.connectors ?? []).flatMap(connector => connector.pins

@@ -92,10 +92,58 @@ export function driver_ops_candidates(interface_: string): Result<RulesetEntry[]
  *
  * Every struct the driver ships is a candidate rather than only one matched by name: a
  * driver's rulesets are its own, so the structs it indexes are exactly the ones an
- * application may have to fill in.
+ * application may have to fill in. Except a struct another of the driver's candidates
+ * includes: that one is a part of it, not what a handle takes. ad7156_capi_init_param
+ * embeds ad7156_init_param as `device`, so only the adapter's struct is the extra.
  */
 export function driver_init_parameter_candidates(interface_: string): Result<RulesetEntry[]> {
-	return candidates_of(interface_, RulesetType.RT_STRUCT);
+	const candidates = candidates_of(interface_, RulesetType.RT_STRUCT);
+	if (!candidates.ok) {
+		return candidates;
+	}
+	const parts = new Set<string>();
+	for (const candidate of candidates.value) {
+		for (const included of included_symbols(candidate.$symbol)) {
+			if (candidates.value.some(other => other.$symbol === included && other.module.path === candidate.module.path)) {
+				parts.add(included);
+			}
+		}
+	}
+	return ok(candidates.value.filter(candidate => !parts.has(candidate.$symbol)));
+}
+
+/** The symbols a struct names through its includes: plain, union members and array elements. */
+function included_symbols(symbol: string): string[] {
+	const ruleset = load_resolved_ruleset(symbol);
+	if (!ruleset.ok || ruleset.value._t !== "RulesetStruct") {
+		return [];
+	}
+	return ruleset.value.properties.flatMap(property => {
+		switch (property._t) {
+			case "IncludeProperty": { return property.include === undefined ? [] : [property.include]; }
+			case "UnionProperty": { return property.members.flatMap(member => (member.include === undefined ? [] : [member.include])); }
+			case "ArrayProperty": { return property.element._t === "IncludeProperty" && property.element.include !== undefined ? [property.element.include] : []; }
+			default: { return []; }
+		}
+	});
+}
+
+/**
+ * The init_param `add <driver>` pins for one of its interfaces: the driver's only candidate,
+ * or, when it has several (ad74413r: the chip's, and a channel's), `<driver>_init_param`.
+ * None when neither settles it, which leaves the field to bootstrap's ranking.
+ */
+export function pinned_init_parameter(driver: ModuleInfo, interface_: string): Result<RulesetEntry | undefined> {
+	const candidates = driver_init_parameter_candidates(interface_);
+	if (!candidates.ok) {
+		return candidates;
+	}
+	const own = candidates.value.filter(candidate => candidate.module.path === driver.path);
+	const [only, ...more] = own;
+	if (more.length === 0) {
+		return ok(only);
+	}
+	return ok(own.find(candidate => candidate.$symbol === `${driver.name}_init_param`));
 }
 
 /** Whether `symbol` is shipped by a module implementing `interface_`. */

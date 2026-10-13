@@ -64,22 +64,98 @@ function build_struct_view(name, ruleset, wf) {
 }
 
 /*
- * Every struct node. None is const: CAPI init functions take their config non-const, and a
- * driver init_param goes in through `void *extra`, so a const one would not even compile
- * there without a cast.
+ * Struct nodes embedded in another: named by a non-pointer include (a plain one, a union
+ * member, an array element), so the C member IS that struct, not a pointer to it. Such a
+ * node has no global of its own. Its fields are written inside the owner initializer, as
+ * in `.device = { .i2c_dev = &capi_i2c_device }`, because a static initializer cannot copy
+ * another object. Maps each embedded node to its owner and the C path from the owner to it.
  */
-function struct_views(wf) {
-	const views = [];
-	for (const [name, ruleset] of Object.entries(wf.symbols)) {
-		/* An eval board is hardware on the bench, not a C struct. */
-		if (ruleset._t === "RulesetStruct" && ruleset.$eval_board !== true) {
-			views.push({ ...build_struct_view(name, ruleset, wf), is_const: false });
+function embedded_nodes(wf) {
+	const embedded = new Map();
+	const is_struct_node = value => typeof value === "string" && wf.symbols[value]?._t === "RulesetStruct";
+	for (const [owner, ruleset] of Object.entries(wf.symbols)) {
+		if (ruleset._t !== "RulesetStruct") {
+			continue;
+		}
+		for (const property of ruleset.properties) {
+			const value = it.h.effective_value(property);
+			if (property._t === "IncludeProperty" && property.pointer !== true && is_struct_node(value)) {
+				embedded.set(value, { owner, path: property.name });
+			} else if (property._t === "UnionProperty" && value !== undefined && value !== null) {
+				for (const [member_name, target] of Object.entries(value)) {
+					const member = property.members.find(candidate => candidate.name === member_name);
+					if (member !== undefined && member.pointer !== true && is_struct_node(target)) {
+						embedded.set(target, { owner, path: `${property.name}.${member_name}` });
+					}
+				}
+			} else if (property._t === "ArrayProperty" && property.element._t === "IncludeProperty"
+				&& property.element.pointer !== true && Array.isArray(value)) {
+				value.forEach((element, index) => {
+					if (is_struct_node(element)) {
+						embedded.set(element, { owner, path: `${property.name}[${index}]` });
+					}
+				});
+			}
 		}
 	}
-	return views;
+	return embedded;
+}
+
+/* The global an embedded node lives in, and the C path to it: ad7156_init_param is ad7156_capi_init_param.device. */
+function embedding_root(name, embedded) {
+	let root = name;
+	let path = "";
+	const seen = new Set();
+	for (let at = embedded.get(root); at !== undefined; at = embedded.get(root)) {
+		if (seen.has(root)) {
+			throw new Error(`Struct ${name} is embedded in itself, through ${[...seen].join(", ")}`);
+		}
+		seen.add(root);
+		path = path === "" ? at.path : `${at.path}.${path}`;
+		root = at.owner;
+	}
+	return { root, path };
+}
+
+/*
+ * Every struct node with a global of its own. None is const: CAPI init functions take their
+ * config non-const, and a driver init_param goes in through `void *extra`, so a const one
+ * would not even compile there without a cast. An embedded node is not one of them, but its
+ * runtime assignments are, written through the global it lives in.
+ */
+function struct_views(wf) {
+	const embedded = embedded_nodes(wf);
+	const views = new Map();
+	const nested_assignments = [];
+	for (const [name, ruleset] of Object.entries(wf.symbols)) {
+		/* An eval board is hardware on the bench, not a C struct. */
+		if (ruleset._t !== "RulesetStruct" || ruleset.$eval_board === true) {
+			continue;
+		}
+		const view = build_struct_view(name, ruleset, wf);
+		if (!embedded.has(name)) {
+			views.set(name, { ...view, is_const: false });
+			continue;
+		}
+		const { root, path } = embedding_root(name, embedded);
+		for (const assignment of view.runtime_assignments) {
+			nested_assignments.push({ root, assignment: { ...assignment, struct_name: root, field_path: `${path}.${assignment.field_path}` } });
+		}
+	}
+	for (const { root, assignment } of nested_assignments) {
+		views.get(root)?.runtime_assignments.push(assignment);
+	}
+	return [...views.values()];
+}
+
+/* The view of one embedded node, for its owner initializer to write inline. */
+function embedded_view(name, wf) {
+	return build_struct_view(name, wf.symbols[name], wf);
 }
 
 return {
 	struct_views: struct_views,
+	embedded_nodes: embedded_nodes,
+	embedded_view: embedded_view,
 };
 %>
