@@ -7,3 +7,10 @@ $init_param:
   include: test_adc_chan_config
   pointer: true
   required: true
+# Filled by test_adc_chan_init() from its own config, like capi_adc_chan.adc_handle: never an
+# option for that config's adc_handle, which it is copied from.
+adc_handle:
+  include: test_adc
+  pointer: true
+  readonly: true
+  description: "The ADC this channel belongs to"

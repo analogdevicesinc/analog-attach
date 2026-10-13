@@ -47,13 +47,19 @@ export function describe_bootstrap(report: BootstrapReport, workfile: Workfile):
 
     const created = report.linked.filter(link => link.created && !link.hidden);
     const hidden = report.linked.filter(link => link.hidden);
+    // A node already in the workfile, now named somewhere new: the connection is the news.
+    const connected = report.linked.filter(link => !link.created && !link.hidden);
 
-    if (created.length > 0 || hidden.length > 0 || report.filled.length > 0) {
+    if (created.length > 0 || hidden.length > 0 || connected.length > 0 || report.filled.length > 0) {
         lines.push("", "Bootstrap filled in what leaves no room for choice:");
     }
     for (const link of created) {
         const at = `${link.node}.${link.property}${link.member === undefined ? "" : `.${link.member}`}`;
         lines.push(`  + ${link.target.padEnd(32)} (${link.symbol}) for ${at}`);
+    }
+    for (const link of connected) {
+        const at = `${link.node}.${link.property}${link.member === undefined ? "" : `.${link.member}`}`;
+        lines.push(`  > ${at.padEnd(32)} ${link.target} (already in the workfile)`);
     }
     // Hidden nodes are named once each: several references can share one.
     for (const target of new Set(hidden.map(link => link.target))) {
