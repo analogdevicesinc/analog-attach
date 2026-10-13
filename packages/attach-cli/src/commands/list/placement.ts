@@ -13,7 +13,3 @@ export async function list_parent(context_: LocalContext, arguments_: string[]):
     }
     await run_internal_list(context_, ["parent", arguments_[0]!]);
 }
-
-export async function list_slot(context_: LocalContext, arguments_: string[]): Promise<void> {
-    await run_internal_list(context_, ["board-slot", ...(arguments_.length > 0 ? [arguments_[0]!] : [])]);
-}

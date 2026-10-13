@@ -73,7 +73,6 @@ export const LIST_SUBKIND_SPECS: Readonly<Record<string, CommandSpec>> = {
     property: { positional: { mode: "byIndex", sources: [PATH_TREE, PROPS] } },
     value: { positional: { mode: "byIndex", sources: [PATH_TREE, PROPS] } },
     parent: { positional: { mode: "byIndex", sources: [{ kind: "suggest", suggest: "device-key" }] } },
-    slot: { positional: { mode: "byIndex", sources: [{ kind: "suggest", suggest: "device-key" }] } },
 };
 
 export const COMPLETION_SPEC: Readonly<Record<string, CommandSpec | "dynamic">> = {

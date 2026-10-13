@@ -109,7 +109,7 @@ export interface SuggestResponse extends CommonResponse {
 export interface TypeResponse extends CommonResponse {
     type: Types;
     description?: string;
-    /** Concrete values offered by intelligence layers (e.g. a configured board), ready for `update --with`. */
+    /** Concrete values offered by intelligence layers, ready for `update`. */
     suggestions?: Suggestion[];
 }
 

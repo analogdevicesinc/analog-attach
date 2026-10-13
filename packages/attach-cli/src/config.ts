@@ -1,9 +1,8 @@
 import * as fs from "node:fs";
 import path from "node:path";
 import { parse } from "smol-toml";
-import { DeviceTree, type BoardDescription } from "attach-lib";
+import { DeviceTree } from "attach-lib";
 
-import { load_board } from "./board";
 import { getBundledDtSchemaPath } from "./commands/skill/utilities";
 
 export const DEFAULT_BUILD_COMMAND = "{dtc} -@ -I dts -O dtb -o {output} {input}";
@@ -15,7 +14,6 @@ export interface AttachConfig {
     dtSchema?: string;
     devicetree?: string;
     overlay?: string;
-    board?: string;
     overlaySyntax?: string;
     validationJson?: string;
     buildCommand?: string;
@@ -101,18 +99,6 @@ export const CONFIG_REGISTRY: readonly FieldSpec[] = [
         required: false,
         description: "Path to the working DTSO overlay file (workfile)",
         hint: "Run 'create-workfile' to create one, or 'config-set overlay <path>'.",
-    },
-    {
-        toml: "board",
-        key: "board",
-        // A bundled board name is not a path, so no existence check; validate resolves both forms.
-        type: "string",
-        required: false,
-        description: "Add-on board description (HAT, …): a path to a board YAML or a bundled board name (e.g. pmd-rpi-intz)",
-        parse: (value) => {
-            const board = load_board(value);
-            return board;
-        },
     },
     {
         toml: "overlay-syntax",
@@ -342,7 +328,6 @@ export type Checked<K extends keyof AttachConfig> = { [P in K]-?: string };
 
 export type ParsedConfig = {
     devicetree?: DeviceTree;
-    board?: BoardDescription;
 };
 
 export type ConfigCheck<K extends keyof AttachConfig> =
@@ -464,7 +449,7 @@ if (import.meta.vitest) {
 
     test("CONFIG_REGISTRY covers every AttachConfig key exactly once", () => {
         const keys: (keyof AttachConfig)[] = [
-            "linux", "dtSchema", "devicetree", "overlay", "board", "overlaySyntax", "validationJson",
+            "linux", "dtSchema", "devicetree", "overlay", "overlaySyntax", "validationJson",
             "buildCommand", "preprocessCommand", "preprocessedDevicetree", "overlayCompiled", "deployIp", "deployUser", "deployPassword",
         ];
         expect(CONFIG_REGISTRY.length).toBe(keys.length);

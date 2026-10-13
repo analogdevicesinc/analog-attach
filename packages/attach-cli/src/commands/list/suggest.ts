@@ -3,18 +3,12 @@ import {
     DeviceTree,
     DeviceTreeOverlay,
     IntelligenceStack,
-    board_layer,
-    bus_chip_selects,
-    describe_slot,
     dt_to_validator_input,
     get_full_node_name,
     parent_path_string,
-    parse_board_description,
     placement_from_overlay,
     suggest_parents,
-    type BoardLayer,
     type DTNode,
-    type NodePlacement,
     type PatternPropertyRule,
     type ParsedBinding,
     type ValueSuggestion,
@@ -24,7 +18,6 @@ import * as fs from "node:fs";
 import type { LocalContext } from "../../context";
 import { load_config, type AttachConfig } from "../../config";
 import { resolve_config } from "../../resolve-config";
-import { load_board } from "../../board";
 import { format_suggestion, build_raw_property, shape_hint, parse_value } from "../update/command";
 import { bigIntReplacer, effective_parent_compatibles, find_binding, fragment_target, get_or_build_compat_index, load_base, load_trees, parse_property_reference, resolve_node_identifier, resolve_positional_path, resolve_write_target } from "../../utilities";
 import { respond, respond_fail, input_error } from "../../protocol/output";
@@ -69,10 +62,6 @@ export async function run_suggest(context: LocalContext, arguments_: string[]): 
         }
         case "value": {
             await suggest_value(context, arguments_.slice(1));
-            return;
-        }
-        case "board-slot": {
-            await suggest_board_slot(context, arguments_.slice(1));
             return;
         }
         default: {
@@ -143,48 +132,6 @@ async function load_binding(context_: LocalContext, linux: string, dtSchema: str
     return binding.parsed_binding;
 }
 
-function optional_board_layer(config: AttachConfig): { layer?: BoardLayer; board_error?: string } {
-    if (config.board === undefined) { return {}; }
-    const board = load_board(config.board);
-    if (typeof board === "string") {
-        return { board_error: `board ${config.board} ignored: ${board}` };
-    }
-    return { layer: board_layer(board) };
-}
-
-export function no_layer_message(property_name: string, board_error?: string): { message: string; severity: "info" | "warn" } {
-    if (board_error !== undefined) {
-        return { message: `No layer offers values for ${property_name}; ${board_error}`, severity: "warn" };
-    }
-    return { message: `No layer offers values for ${property_name} (no board loaded)`, severity: "info" };
-}
-
-/**
- * The `suggest value` message: one part per source that offered values, in
- * layer order (e.g. "1 value(s) pinned by the binding"). The board's part, with
- * its slot inference, appears only when the board itself offered values; with
- * no values at all it says no layer offers any.
- */
-export function value_message(
-    property_name: string,
-    lower_parts: string[],
-    board: { message: string; severity: "info" | "warn" } | undefined,
-    board_loaded: boolean,
-    board_error?: string,
-): { message: string; severity: "info" | "warn" } {
-    if (lower_parts.length === 0 && board === undefined) {
-        return board_loaded
-            ? { message: `No layer offers values for ${property_name}`, severity: "info" }
-            : no_layer_message(property_name, board_error);
-    }
-    const parts = [...lower_parts, ...(board === undefined ? [] : [board.message.replace(/^Found /, "")])];
-    const found = `Found ${parts.join("; ")}`;
-    return {
-        message: board_error === undefined ? found : `${found}; ${board_error}`,
-        severity: board?.severity ?? (board_error === undefined ? "info" : "warn"),
-    };
-}
-
 function to_suggestion(suggestion: ValueSuggestion): Suggestion {
     const display = suggestion.note !== undefined && !suggestion.display.includes(suggestion.note)
         ? `${suggestion.display} (${suggestion.note})`
@@ -193,58 +140,6 @@ function to_suggestion(suggestion: ValueSuggestion): Suggestion {
         value: format_suggestion(suggestion),
         display_string: display,
         ...(suggestion.note === undefined ? {} : { note: suggestion.note }),
-    };
-}
-
-export function slot_message(layer: BoardLayer, base_dt: DeviceTree, placement: NodePlacement, count: number): { message: string; severity: "info" | "warn" } {
-    const found = `Found ${count} value(s) from ${layer.board.board}`;
-
-    // 1. The node is itself a board bus.
-    const own_bus = layer.bus_of_node(base_dt, placement.node_path);
-    if (own_bus !== undefined) {
-        const cs_note = bus_chip_selects(layer.board, own_bus).length > 0
-            ? `the board provides cs-gpios for it`
-            : `no values for it`;
-        return { message: `${found}; ${own_bus.name} is a bus on ${layer.board.board}; ${cs_note}`, severity: "info" };
-    }
-
-    // 2. The parent is not a board bus.
-    const inference = layer.infer_slots(base_dt, placement);
-    if (inference.bus === undefined) {
-        return count > 0
-            ? { message: found, severity: "info" }
-            : { message: `${found}: parent of ${placement.node_path} is not a bus on ${layer.board.board}`, severity: "warn" };
-    }
-
-    // 3. unwired_reg — reg is valid but not a wired chip select.
-    if (inference.unwired_reg !== undefined) {
-        const wired = bus_chip_selects(layer.board, inference.bus).map(cs => cs.reg).join(", ");
-        return {
-            message: `${found}; reg ${inference.unwired_reg} is not a chip select wired on ${inference.bus.name} (board wires ${wired}); use one of those or check the wiring`,
-            severity: "warn",
-        };
-    }
-
-    // 4. No slots on the bus.
-    if (inference.slots.length === 0) {
-        const reserved = inference.bus.reserved_addresses;
-        const reserved_note = reserved.length > 0
-            ? ` (reserved: ${reserved.map(r => `0x${r.address.toString(16)} ${r.description}`).join(", ")})`
-            : "";
-        return {
-            message: `${found}; ${inference.bus.name} has no slots on ${layer.board.board}${reserved_note}`,
-            severity: "warn",
-        };
-    }
-
-    // 5. Narrowed or ambiguous.
-    if (inference.narrowed) {
-        return { message: `${found}; narrowed to ${inference.slots[0]!.id}`, severity: "info" };
-    }
-    const ids = inference.slots.map(slot => slot.id).join(", ");
-    return {
-        message: `${found}; ambiguous: ${inference.slots.length} slots on ${inference.bus.name} (${ids}), ask the user which slot the device is plugged into`,
-        severity: "warn",
     };
 }
 
@@ -294,8 +189,7 @@ async function suggest_value(context_: LocalContext, arguments_: string[]): Prom
         data = JSON.stringify(input_data, bigIntReplacer);
     }
 
-    const { layer, board_error } = optional_board_layer(resolved.config);
-    const stack = layer === undefined ? IntelligenceStack.default() : IntelligenceStack.default().with(layer);
+    const stack = IntelligenceStack.default();
     const values = stack.suggest_values(property_name, {
         devicetree: base_dt,
         data,
@@ -327,26 +221,21 @@ async function suggest_value(context_: LocalContext, arguments_: string[]): Prom
 
     const suggestions = values.map((value) => to_suggestion(value));
 
-    // Values from the binding and the context devicetree come first; the board
-    // message counts only the board's own.
     const count = (source: string) => values.filter(value => value.source === source).length;
-    const lower_counts = [
+    const parts = [
         [count("binding"), "pinned by the binding"],
         [count("devicetree"), "from the context devicetree"],
-    ] as const;
-    const lower_parts = lower_counts.filter(([n]) => n > 0).map(([n, origin]) => `${n} value(s) ${origin}`);
-    const from_board = values.length - lower_counts.reduce((sum, [n]) => sum + n, 0);
-    const board = layer !== undefined && from_board > 0 ? slot_message(layer, base_dt, placement, from_board) : undefined;
-    let { message, severity } = value_message(property_name, lower_parts, board, layer !== undefined, board_error);
+    ].filter(([n]) => (n as number) > 0).map(([n, origin]) => `${n} value(s) ${origin}`);
+    let message = parts.length > 0 ? `Found ${parts.join("; ")}` : `No values for ${property_name}`;
 
     if (binding_check_reason !== undefined) {
         message = `${message}; not checked against a binding (${binding_check_reason})`;
     }
 
     if (context_.json) {
-        respond({ ok: true, message, severity, suggestions });
+        respond({ ok: true, message, severity: "info", suggestions });
     } else {
-        if (severity === "warn" || suggestions.length === 0) { console.log(message); }
+        if (suggestions.length === 0) { console.log(message); }
         for (const suggestion of suggestions) {
             console.log(`${suggestion.value}\t${suggestion.display_string}`);
         }
@@ -438,65 +327,6 @@ async function annotate_suggestions(
 function combine_notes(existing: string | undefined, addition: string): string {
     if (existing === undefined) { return addition; }
     return `${existing}; ${addition}`;
-}
-
-export function placement_message(board_name: string, compatible: string, suggestions: Suggestion[]): string {
-    const distinct_slots = new Set(suggestions.map(s => s.value)).size;
-    return `${suggestions.length} placement(s) in ${distinct_slots} slot(s) on ${board_name} can host ${compatible}`;
-}
-
-async function suggest_board_slot(context_: LocalContext, arguments_: string[]): Promise<void> {
-    const compatible = arguments_[0];
-
-    const resolved = resolve_config(context_, ["board"]);
-    if (resolved === undefined) { return; }
-
-    const board = load_board(resolved.values.board);
-    if (typeof board === "string") {
-        const error = `board ${resolved.values.board} ignored: ${board}`;
-        if (context_.json) {
-            respond_fail({ ok: false, message: error, severity: "error" });
-        } else {
-            console.log(error);
-        }
-        return;
-    }
-
-    let suggestions: Suggestion[];
-    if (compatible === undefined) {
-        // Onboard slots are occupied by their soldered-on device: nothing can be placed there.
-        suggestions = board.slots
-            .filter(slot => slot.onboard === undefined)
-            .map(slot => ({ value: slot.id, display_string: describe_slot(board, slot) }));
-    } else {
-        const binding_config = resolve_config(context_, ["linux", "dtSchema", "devicetree"]);
-        if (binding_config === undefined) { return; }
-        const { linux, dtSchema, devicetree } = binding_config.values;
-
-        const base_dt = load_base(context_, devicetree, binding_config.parsed.devicetree);
-        if (base_dt === undefined) { return; }
-
-        const binding = await load_binding(context_, linux, dtSchema, compatible);
-        if (binding === undefined) { return; }
-
-        suggestions = IntelligenceStack.default().with(board_layer(board))
-            .suggest_placement(binding, base_dt)
-            .filter(placement => placement.slot !== undefined)
-            .map(placement => ({ value: placement.slot!, display_string: placement.display }));
-    }
-
-    const message = compatible === undefined
-        ? `${board.board} has ${suggestions.length} slot(s)`
-        : placement_message(board.board, compatible, suggestions);
-
-    if (context_.json) {
-        respond({ ok: true, message, severity: suggestions.length === 0 ? "warn" : "info", suggestions });
-    } else {
-        if (suggestions.length === 0) { console.log(message); }
-        for (const suggestion of suggestions) {
-            console.log(suggestion.display_string ?? suggestion.value);
-        }
-    }
 }
 
 async function suggest_device_key(context: LocalContext, arguments_: string[]): Promise<void> {
@@ -787,7 +617,7 @@ async function suggest_type(context_: LocalContext, arguments_: string[]): Promi
     if (trees === undefined) { return; }
     const { base_dt, overlay } = trees;
 
-    const { target_reference, binding_node, binding_parent, parent_name, is_base_target, found, parent_compatibles: slot_parent_compats } = resolve_write_target(node_identifier, overlay, base_dt);
+    const { binding_node, binding_parent, parent_name, parent_compatibles: slot_parent_compats } = resolve_write_target(node_identifier, overlay, base_dt);
     if (binding_node === undefined) {
         if (context_.json) {
             respond_fail({ ok: false, message: `Node ${node_identifier} not found`, severity: "error" });
@@ -797,12 +627,7 @@ async function suggest_type(context_: LocalContext, arguments_: string[]): Promi
         return;
     }
 
-    // With a board configured, its layer attaches concrete values to the properties it knows about.
-    const { layer, board_error } = optional_board_layer(resolved.config);
-    const placement = layer === undefined ? undefined : placement_from_overlay(overlay, target_reference);
-    const options = layer === undefined || placement === undefined ? undefined : { layers: [layer], placement };
-
-    const binding = await resolve_node_binding(binding_node, binding_parent, parent_name, base_dt, linux, dtSchema, context_.json, options, slot_parent_compats);
+    const binding = await resolve_node_binding(binding_node, binding_parent, parent_name, base_dt, linux, dtSchema, context_.json, undefined, slot_parent_compats);
     if ('error' in binding) {
         if (context_.json) {
             respond_fail({ ok: false, message: binding.error, severity: "error" });
@@ -842,21 +667,17 @@ async function suggest_type(context_: LocalContext, arguments_: string[]): Promi
     const type = attach_type_to_protocol_type(property_definition.value);
     const suggestions = (property_definition.suggestions ?? []).map((suggestion) => to_suggestion(suggestion));
 
-    const type_message = board_error === undefined ? `Type of ${property_name}` : `Type of ${property_name}; ${board_error}`;
-    const type_severity = board_error === undefined ? "info" as const : "warn" as const;
-
     if (context_.json) {
         const response: TypeResponse = {
             ok: true,
-            message: type_message,
-            severity: type_severity,
+            message: `Type of ${property_name}`,
+            severity: "info",
             type,
             description: property_definition.value.description,
             ...(suggestions.length > 0 ? { suggestions } : {}),
         };
         respond(response);
     } else {
-        if (board_error !== undefined) { console.log(`warning: ${board_error}`); }
         const is_required = binding.required_properties.includes(property_name);
         const required = is_required ? " (required)" : "";
         console.log(`${property_name}${required}: ${format_type(type)}`);
@@ -1032,285 +853,6 @@ if (import.meta.vitest) {
                 kind: "array",
                 items: { kind: "enum", options: [{ value: 0 }, { value: 1 }] },
             })).toBe("enum(0 | 1)[]");
-        });
-    });
-
-    // ── slot_message ───────────────────────────────────────────────────
-
-    describe("slot_message", () => {
-        const board_yaml = `
-schema_version: 4
-board: TEST-BOARD
-host: test
-gpio_controller: "&gpio"
-buses:
-  spi0: {type: spi}
-  i2c1: {type: i2c}
-slots:
-  slot_a:
-    bus: spi0
-    signals:
-      cs: {kind: chip-select, gpio: 8, reg: 0}
-      cs2: {kind: chip-select, gpio: 20, reg: 2}
-      int: {kind: interrupt, gpio: 19}
-  slot_b:
-    bus: spi0
-    signals:
-      cs: {kind: chip-select, gpio: 8, reg: 0}
-      cs2: {kind: chip-select, gpio: 7, reg: 1}
-  slot_c:
-    bus: i2c1
-    signals: {}`;
-
-        const base_dts = `/dts-v1/;
-/ {
-    soc {
-        gpio: gpio@7e200000 {
-            compatible = "brcm,bcm2711-gpio";
-            gpio-controller;
-            #gpio-cells = <2>;
-            interrupt-controller;
-            #interrupt-cells = <2>;
-        };
-        spi0: spi@7e204000 {
-            compatible = "brcm,bcm2835-spi";
-            #address-cells = <1>;
-            #size-cells = <0>;
-        };
-        i2c1: i2c@7e804000 {
-            compatible = "brcm,bcm2835-i2c";
-            #address-cells = <1>;
-            #size-cells = <0>;
-        };
-        spi1: spi@7e215080 {
-            compatible = "brcm,bcm2835-aux-spi";
-            #address-cells = <1>;
-            #size-cells = <0>;
-        };
-    };
-};`;
-
-        const board_desc = parse_board_description(board_yaml);
-        if (typeof board_desc === "string") { throw new TypeError(board_desc); }
-        const dt = DeviceTree.new_from_string(base_dts);
-        if (typeof dt === "string") { throw new TypeError(dt); }
-        const layer = board_layer(board_desc);
-
-        test("narrowed slot — reports the single slot", () => {
-            const placement: NodePlacement = {
-                node_path: "/soc/spi@7e204000/dev@2",
-                parent_path: "/soc/spi@7e204000",
-                reg: 2n,
-                siblings: [],
-            };
-            const { message, severity } = slot_message(layer, dt, placement, 3);
-            expect(severity).toBe("info");
-            expect(message).toContain("narrowed to slot_a");
-            expect(message).toContain("Found 3 value(s)");
-        });
-
-        test("ambiguous slots — warns and lists slot ids", () => {
-            const placement: NodePlacement = {
-                node_path: "/soc/spi@7e204000/dev@0",
-                parent_path: "/soc/spi@7e204000",
-                reg: 0n,
-                siblings: [],
-            };
-            const { message, severity } = slot_message(layer, dt, placement, 2);
-            expect(severity).toBe("warn");
-            expect(message).toContain("ambiguous");
-            expect(message).toContain("slot_a");
-            expect(message).toContain("slot_b");
-        });
-
-        test("off-board bus — zero results warns about parent", () => {
-            const placement: NodePlacement = {
-                node_path: "/soc/spi@7e215080/dev@0",
-                parent_path: "/soc/spi@7e215080",
-                reg: 0n,
-                siblings: [],
-            };
-            const { message, severity } = slot_message(layer, dt, placement, 0);
-            expect(severity).toBe("warn");
-            expect(message).toContain("not a bus");
-        });
-
-        test("off-board bus — nonzero results returns info", () => {
-            const placement: NodePlacement = {
-                node_path: "/soc/spi@7e215080/dev@0",
-                parent_path: "/soc/spi@7e215080",
-                reg: 0n,
-                siblings: [],
-            };
-            const { message, severity } = slot_message(layer, dt, placement, 1);
-            expect(severity).toBe("info");
-            expect(message).toContain("Found 1 value(s)");
-        });
-
-        test("bus node — reports bus info with cs-gpios", () => {
-            const placement: NodePlacement = {
-                node_path: "/soc/spi@7e204000",
-                parent_path: "/soc",
-                siblings: [],
-            };
-            const { message, severity } = slot_message(layer, dt, placement, 1);
-            expect(severity).toBe("info");
-            expect(message).toContain("spi0 is a bus");
-            expect(message).toContain("provides cs-gpios");
-        });
-
-        test("unwired reg — warns about chip select not on board", () => {
-            const placement: NodePlacement = {
-                node_path: "/soc/spi@7e204000/dev@7",
-                parent_path: "/soc/spi@7e204000",
-                reg: 7n,
-                siblings: [],
-            };
-            const { message, severity } = slot_message(layer, dt, placement, 3);
-            expect(severity).toBe("warn");
-            expect(message).toContain("reg 7 is not a chip select wired");
-            expect(message).toContain("board wires 0, 1, 2");
-        });
-
-        test("slotless bus — warns with reserved addresses", () => {
-            const board_with_reserved = board_yaml.replace(
-                "  i2c1: {type: i2c}",
-                "  i2c1: {type: i2c}\n  i2c0:\n    type: i2c\n    reserved_addresses: {0x50: \"HAT ID EEPROM\"}"
-            );
-            const base_with_extra_bus = base_dts.replace(
-                "        spi1:",
-                "        i2c0: i2c@7e205000 {\n            compatible = \"brcm,bcm2835-i2c\";\n            #address-cells = <1>;\n            #size-cells = <0>;\n        };\n        spi1:"
-            );
-            const board2 = parse_board_description(board_with_reserved);
-            if (typeof board2 === "string") { throw new TypeError(board2); }
-            const dt2 = DeviceTree.new_from_string(base_with_extra_bus);
-            if (typeof dt2 === "string") { throw new TypeError(dt2); }
-            const layer2 = board_layer(board2);
-
-            const placement: NodePlacement = {
-                node_path: "/soc/i2c@7e205000/dev@48",
-                parent_path: "/soc/i2c@7e205000",
-                reg: 0x48n,
-                siblings: [],
-            };
-            const { message, severity } = slot_message(layer2, dt2, placement, 0);
-            expect(severity).toBe("warn");
-            expect(message).toContain("has no slots");
-            expect(message).toContain("HAT ID EEPROM");
-        });
-
-        test("bus node without chip selects — reports no values", () => {
-            const placement: NodePlacement = {
-                node_path: "/soc/i2c@7e804000",
-                parent_path: "/soc",
-                siblings: [],
-            };
-            const { message, severity } = slot_message(layer, dt, placement, 0);
-            expect(severity).toBe("info");
-            expect(message).toContain("no values for it");
-        });
-    });
-
-    // ── placement_message ──────────────────────────────────────────────
-
-    describe("placement_message", () => {
-        test("counts distinct slots separately from total placements", () => {
-            const suggestions: Suggestion[] = [
-                { value: "quikeval", display_string: "quikeval — spi0" },
-                { value: "quikeval", display_string: "quikeval — i2c1" },
-                { value: "slot_a", display_string: "slot_a — spi0" },
-            ];
-            const message = placement_message("TEST-BOARD", "adi,ad7124-8", suggestions);
-            expect(message).toContain("3 placement(s)");
-            expect(message).toContain("2 slot(s)");
-            expect(message).toContain("TEST-BOARD");
-            expect(message).toContain("adi,ad7124-8");
-        });
-    });
-
-    // ── describe_child_nodes ────────────────────────────────────────────
-
-    describe("describe_child_nodes", () => {
-        const parent = DeviceTreeOverlay.new_from_string(`/dts-v1/;
-/plugin/;
-&spi0 {
-    adc: adc@0 {
-        channel@0 { reg = <0>; };
-        channel@1 { reg = <1>; };
-        other { };
-    };
-};`);
-        if (typeof parent === "string") { throw new TypeError(parent); }
-        const node = parent.find_node("adc")!.node;
-        // eslint-disable-next-line unicorn/consistent-function-scoping
-        const rule = (pattern: string, required: string[]): PatternPropertyRule => ({ pattern, description: "", properties: [], required });
-
-        test("names the node and the children present", () => {
-            expect(describe_child_nodes(rule("^channel@([0-9]|1[0-5])$", ["reg", "diff-channels"]), node)).toStrictEqual({
-                value: "^channel@([0-9]|1[0-5])$",
-                display_string: "channel@N (child node ^channel@([0-9]|1[0-5])$; present: channel@0, channel@1)",
-            });
-        });
-
-        test("a grouped literal prefix still reads as a name; none present", () => {
-            expect(describe_child_nodes(rule("^(channel@)[0-7]$", ["reg"]), { ...node, children: [] }).display_string)
-                .toBe("channel@N (child node ^(channel@)[0-7]$; present: none)");
-        });
-    });
-
-    // ── value_message ───────────────────────────────────────────────────
-
-    describe("value_message", () => {
-        test("a board that found nothing adds no slot inference", () => {
-            expect(value_message("clocks", ["4 value(s) from the context devicetree"], undefined, true))
-                .toStrictEqual({ message: "Found 4 value(s) from the context devicetree", severity: "info" });
-        });
-
-        test("a board that found values keeps its slot inference and severity", () => {
-            const board = { message: "Found 2 value(s) from TEST; ambiguous: 2 slots on spi0", severity: "warn" as const };
-            expect(value_message("interrupts", ["1 value(s) pinned by the binding"], board, true)).toStrictEqual({
-                message: "Found 1 value(s) pinned by the binding; 2 value(s) from TEST; ambiguous: 2 slots on spi0",
-                severity: "warn",
-            });
-        });
-
-        test("no values: with a board loaded it doesn't claim there is none", () => {
-            expect(value_message("vref", [], undefined, true)).toStrictEqual({ message: "No layer offers values for vref", severity: "info" });
-            expect(value_message("vref", [], undefined, false)).toStrictEqual(no_layer_message("vref"));
-        });
-
-        test("a board that failed to load is still reported", () => {
-            expect(value_message("clocks", ["4 value(s) from the context devicetree"], undefined, false, "board x ignored: invalid YAML")).toStrictEqual({
-                message: "Found 4 value(s) from the context devicetree; board x ignored: invalid YAML",
-                severity: "warn",
-            });
-        });
-    });
-
-    // ── no_layer_message ────────────────────────────────────────────────
-
-    describe("no_layer_message", () => {
-        test("no board — info severity", () => {
-            const { message, severity } = no_layer_message("interrupts");
-            expect(severity).toBe("info");
-            expect(message).toBe("No layer offers values for interrupts (no board loaded)");
-        });
-
-        test("broken board — warn severity and contains the error", () => {
-            const { message, severity } = no_layer_message("reg", "board foo.yaml ignored: invalid YAML");
-            expect(severity).toBe("warn");
-            expect(message).toContain("No layer offers values for reg");
-            expect(message).toContain("board foo.yaml ignored: invalid YAML");
-        });
-    });
-
-    // ── optional_board_layer ──────────────────────────────────────────
-
-    describe("optional_board_layer", () => {
-        test("nonexistent board returns board_error naming the reference", () => {
-            const { layer, board_error } = optional_board_layer({ board: "/nonexistent.yaml" });
-            expect(layer).toBeUndefined();
-            expect(board_error).toMatch(/^board \/nonexistent\.yaml ignored: /);
         });
     });
 

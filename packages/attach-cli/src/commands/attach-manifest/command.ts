@@ -23,7 +23,7 @@ export function build_attach_manifest_command(_context: LocalContext): Command {
                         argv: ["attach-linux", "--json", "create-workfile"],
                     },
                     "list": {
-                        description: "List device bindings, properties, values, parents or slots. Subkinds: device [compatible], property <path> [property], value <path> <property>, parent <compatible>, slot [compatible]. Bare `list` shows available kinds.",
+                        description: "List device bindings, properties, values or parents. Subkinds: device [compatible], property <path> [property], value <path> <property>, parent <compatible>. Bare `list` shows available kinds.",
                         argv: ["attach-linux", "--json", "list"],
                     },
                     "add": {
