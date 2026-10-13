@@ -32,11 +32,17 @@ export function make_environment(templates_directory: string, fallback?: string)
 	});
 
 	// A variant set extends its base: a partial it does not carry itself is the base set's
-	// (`include("./_helpers")` from capi-iio's main.c reaches capi's helpers).
+	// (`include("./_helpers")` from capi-iio's main.c reaches capi's helpers). A borrowed
+	// partial resolves its own includes as if it sat in the variant set, so it stays inside
+	// the views directory and a partial the variant does carry wins there too.
 	if (fallback !== undefined) {
 		const resolve = environment.resolvePath.bind(environment);
 		environment.resolvePath = (template, options) => {
-			const own = resolve(template, options);
+			const from = options?.filepath;
+			const borrowed_from = from !== undefined && path.relative(fallback, from).split(path.sep)[0] !== "..";
+			const own = resolve(template, borrowed_from
+				? { ...options, filepath: path.join(templates_directory, path.relative(fallback, from)) }
+				: options);
 			const borrowed = path.join(fallback, path.relative(templates_directory, own));
 			return fs.existsSync(own) || !fs.existsSync(borrowed) ? own : borrowed;
 		};
