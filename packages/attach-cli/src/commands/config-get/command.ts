@@ -49,12 +49,37 @@ export function build_config_get_command(context: LocalContext): Command {
             if (context.json) {
                 respond(response);
             } else {
+                const hints: string[] = [];
                 for (const c of result) {
-                    const display = c.value === null ? "(not set)" : c.value;
-                    const request = c.required ? " [required]" : "";
                     const spec = VISIBLE_SPECS.find(s => s.toml === c.field_name);
+                    const required_tag = c.required ? " [required]" : "";
                     const environment_suffix = spec?.env === undefined ? "" : ` ($${spec.env})`;
-                    console.log(`${c.field_name}${request}${environment_suffix}: ${display}`);
+                    let display: string;
+                    if (c.value === null && c.default === null) {
+                        display = "(not set)";
+                    } else if (c.value === null) {
+                        display = `(not set, default: ${c.default})`;
+                    } else {
+                        display = String(c.value);
+                    }
+                    console.log(`${c.field_name}${required_tag}${environment_suffix}: ${display}`);
+                    let desc = spec?.description ?? "";
+                    if (spec?.options !== undefined && spec.options.length > 0) {
+                        desc += ` [${spec.options.join(" | ")}]`;
+                    }
+                    if (desc !== "") {
+                        console.log(`  ${desc}`);
+                    }
+                    console.log("");
+                    if (c.value === null && c.required && spec?.hint !== undefined && !hints.includes(spec.hint)) {
+                        hints.push(spec.hint);
+                    }
+                }
+                if (hints.length > 0) {
+                    console.log("");
+                    for (const hint of hints) {
+                        console.log(hint);
+                    }
                 }
             }
         });

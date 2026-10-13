@@ -49,9 +49,13 @@ export interface FieldSpec {
     fallback?: () => string | undefined;
     /** Allowed values — config-set validates against these. */
     options?: readonly string[];
+    /** User-facing hint printed when this field is missing (e.g. how to set it up). */
+    hint?: string;
     validate?: (value: string) => string | undefined;
     parse?: (value: string) => unknown | string;
 }
+
+const SETUP_HINT = "Run 'attach-linux' to set up a workspace interactively.";
 
 export const CONFIG_REGISTRY: readonly FieldSpec[] = [
     {
@@ -60,7 +64,8 @@ export const CONFIG_REGISTRY: readonly FieldSpec[] = [
         type: "path",
         required: true,
         env: "ATTACH_LINUX",
-        description: "Path to Linux kernel source tree",
+        description: "Path to Linux kernel source tree (set via $ATTACH_LINUX)",
+        hint: SETUP_HINT,
         validate: (value) =>
             fs.existsSync(path.join(value, "Documentation", "devicetree", "bindings"))
                 ? undefined
@@ -81,7 +86,8 @@ export const CONFIG_REGISTRY: readonly FieldSpec[] = [
         type: "path",
         required: true,
         env: "ATTACH_DEVICETREE",
-        description: "Path to target base DTS file",
+        description: "Path to target base DTS file (set via $ATTACH_DEVICETREE)",
+        hint: SETUP_HINT,
         parse: (value) => {
             if (!fs.existsSync(value)) { return `path does not exist: ${value}`; }
             const parsed = DeviceTree.new_from_string(fs.readFileSync(value, "utf8"));
@@ -94,6 +100,7 @@ export const CONFIG_REGISTRY: readonly FieldSpec[] = [
         type: "path",
         required: false,
         description: "Path to the working DTSO overlay file (workfile)",
+        hint: "Run 'create-workfile' to create one, or 'config-set overlay <path>'.",
     },
     {
         toml: "board",
@@ -138,7 +145,7 @@ export const CONFIG_REGISTRY: readonly FieldSpec[] = [
         type: "string",
         required: false,
         default: DEFAULT_PREPROCESS_COMMAND,
-        description: "C preprocessor command run on a board's shipped overlay by create-workfile; {input}/{output}/{linux} are substituted",
+        description: "C preprocessor command to resolve macros in the base devicetree; {input}/{output}/{linux} are substituted",
     },
     {
         toml: "preprocessed-devicetree",
@@ -340,13 +347,11 @@ export type ParsedConfig = {
 
 export type ConfigCheck<K extends keyof AttachConfig> =
     | { ok: true; values: Checked<K>; parsed: ParsedConfig }
-    | { ok: false; kind: "missing-field"; field: K; toml: string }
-    | { ok: false; kind: "missing-path"; field: K; toml: string; path: string }
-    | { ok: false; kind: "invalid"; field: K; toml: string; path: string; message: string };
+    | { ok: false; failures: CheckFailure[] };
 
-/** The failure shape shared by every ConfigCheck error, for message formatting. */
 export type CheckFailure = {
     kind: "missing-field" | "missing-path" | "invalid";
+    field: string;
     toml: string;
     path?: string;
     message?: string;
@@ -366,68 +371,92 @@ export function check_config<K extends keyof AttachConfig>(
 ): ConfigCheck<K> {
     const values = {} as Checked<K>;
     const parsed: ParsedConfig = {};
+    const failures: CheckFailure[] = [];
     for (const field of required) {
         const spec = config_field_spec(field);
         const value = config[field];
         if (value === undefined) {
-            return { ok: false, kind: "missing-field", field, toml: spec.toml };
+            failures.push({ kind: "missing-field", field, toml: spec.toml });
+            continue;
         }
         if (spec.type === "path" && !fs.existsSync(value)) {
-            return { ok: false, kind: "missing-path", field, toml: spec.toml, path: value };
+            failures.push({ kind: "missing-path", field, toml: spec.toml, path: value });
+            continue;
         }
         if (spec.parse === undefined) {
             const invalid = spec.validate?.(value);
             if (invalid !== undefined) {
-                return { ok: false, kind: "invalid", field, toml: spec.toml, path: value, message: invalid };
+                failures.push({ kind: "invalid", field, toml: spec.toml, path: value, message: invalid });
+                continue;
             }
         } else {
             const result = spec.parse(value);
             if (typeof result === "string") {
-                return { ok: false, kind: "invalid", field, toml: spec.toml, path: value, message: result };
+                failures.push({ kind: "invalid", field, toml: spec.toml, path: value, message: result });
+                continue;
             }
             (parsed as Record<string, unknown>)[field] = result;
         }
         values[field] = value;
     }
+    if (failures.length > 0) { return { ok: false, failures }; }
     return { ok: true, values, parsed };
 }
 
-/**
- * The normalized human and JSON strings for a check failure, so config-set,
- * resolve_config and the human-only commands all report identically.
- */
-export function check_failure_message(failure: CheckFailure): { human: string; json: string } {
+function format_one_failure(failure: CheckFailure): { label: string; description: string } {
     const spec = CONFIG_REGISTRY.find(s => s.toml === failure.toml);
     const environment_name = spec?.env;
+    const description = spec?.description ?? failure.toml;
     switch (failure.kind) {
         case "missing-field": {
-            if (environment_name !== undefined) {
-                return {
-                    human: `Missing environment variable: ${environment_name}`,
-                    json: `Missing environment variable: ${environment_name}`,
-                };
-            }
-            return { human: `Missing config: ${failure.toml}`, json: `missing config: ${failure.toml}` };
+            const label = environment_name === undefined ? failure.toml : environment_name;
+            return { label, description };
         }
         case "missing-path": {
-            if (environment_name !== undefined) {
-                return {
-                    human: `Invalid ${environment_name}: ${failure.path} (path does not exist)`,
-                    json: `Invalid ${environment_name}: ${failure.path} (path does not exist)`,
-                };
-            }
-            return { human: `Missing: ${failure.path}`, json: `Missing: ${failure.path}` };
+            const name = environment_name === undefined ? failure.toml : environment_name;
+            return { label: `${name}: ${failure.path} (path does not exist)`, description };
         }
         case "invalid": {
-            if (environment_name !== undefined) {
-                return {
-                    human: `Invalid ${environment_name}: ${failure.message}`,
-                    json: `Invalid ${environment_name}: ${failure.message}`,
-                };
-            }
-            return { human: `Invalid ${failure.toml}: ${failure.message}`, json: `invalid config: ${failure.toml}: ${failure.message}` };
+            const name = environment_name === undefined ? failure.toml : environment_name;
+            return { label: `${name}: ${failure.message}`, description };
         }
     }
+}
+
+export function check_failure_message(failures: CheckFailure[]): { human: string; json: string } {
+    const hints: string[] = [];
+    for (const f of failures) {
+        const spec = CONFIG_REGISTRY.find(s => s.toml === f.toml);
+        if (spec?.hint !== undefined && !hints.includes(spec.hint)) {
+            hints.push(spec.hint);
+        }
+    }
+    const hint_block = hints.length > 0 ? "\n\n" + hints.join("\n") : "";
+
+    if (failures.length === 1) {
+        const f = failures[0]!;
+        const { label, description } = format_one_failure(f);
+        const spec = CONFIG_REGISTRY.find(s => s.toml === f.toml);
+        const prefix = f.kind === "missing-field"
+            ? (spec?.env === undefined ? "Missing config" : "Missing environment variable")
+            : "Invalid";
+        const human = `${prefix}: ${label} — ${description}${hint_block}`;
+        const json = JSON.stringify({ errors: [{ field: f.toml, kind: f.kind, message: label, description }], hints });
+        return { human, json };
+    }
+
+    const lines: string[] = ["Missing configuration:\n"];
+    const json_errors: { field: string; kind: string; message: string; description: string }[] = [];
+    for (const f of failures) {
+        const { label, description } = format_one_failure(f);
+        const environment_name = CONFIG_REGISTRY.find(s => s.toml === f.toml)?.env;
+        const environment_tag = environment_name === undefined ? "" : " (environment variable)";
+        lines.push(`  ${label}${environment_tag} — ${description}`);
+        json_errors.push({ field: f.toml, kind: f.kind, message: label, description });
+    }
+    const human = lines.join("\n") + hint_block;
+    const json = JSON.stringify({ errors: json_errors, hints });
+    return { human, json };
 }
 
 if (import.meta.vitest) {
@@ -445,13 +474,13 @@ if (import.meta.vitest) {
         }
     });
 
-    test("check_config - reports the first missing field", () => {
-        const result = check_config({ linux: "/x" }, ["dtSchema", "linux"]);
+    test("check_config - collects all missing fields", () => {
+        const result = check_config({}, ["linux", "devicetree"]);
         expect(result.ok).toBe(false);
         if (result.ok) { return; }
-        expect(result.kind).toBe("missing-field");
-        expect(result.field).toBe("dtSchema");
-        expect(result.toml).toBe("dt-schema");
+        expect(result.failures).toHaveLength(2);
+        expect(result.failures[0]!.field).toBe("linux");
+        expect(result.failures[1]!.field).toBe("devicetree");
     });
 
     test("check_config - string fields are presence-only (no existsSync)", () => {
@@ -464,16 +493,20 @@ if (import.meta.vitest) {
     test("check_config - path fields must exist on disk", () => {
         const result = check_config({ overlay: "/does/not/exist.dtso" }, ["overlay"]);
         expect(result.ok).toBe(false);
-        if (result.ok || result.kind !== "missing-path") { throw new Error("expected missing-path"); }
-        expect(result.path).toBe("/does/not/exist.dtso");
+        if (result.ok) { return; }
+        expect(result.failures).toHaveLength(1);
+        expect(result.failures[0]!.kind).toBe("missing-path");
+        expect(result.failures[0]!.path).toBe("/does/not/exist.dtso");
     });
 
     test("check_config - runs the field validator at read time", () => {
         const result = check_config({ linux: process.cwd() }, ["linux"]);
         expect(result.ok).toBe(false);
-        if (result.ok || result.kind !== "invalid") { throw new Error("expected invalid"); }
-        expect(result.field).toBe("linux");
-        expect(result.message).toContain("Documentation/devicetree/bindings");
+        if (result.ok) { return; }
+        expect(result.failures).toHaveLength(1);
+        expect(result.failures[0]!.kind).toBe("invalid");
+        expect(result.failures[0]!.field).toBe("linux");
+        expect(result.failures[0]!.message).toContain("Documentation/devicetree/bindings");
     });
 
     test("config_from_sources - env wins over TOML", () => {
@@ -522,14 +555,28 @@ if (import.meta.vitest) {
         }
     });
 
-    test("check_failure_message - env fields use env var name", () => {
-        const message = check_failure_message({ kind: "missing-field", toml: "linux" });
-        expect(message.human).toBe("Missing environment variable: ATTACH_LINUX");
-        expect(message.json).toBe("Missing environment variable: ATTACH_LINUX");
+    test("check_failure_message - single env field includes description and hint", () => {
+        const message = check_failure_message([{ kind: "missing-field", field: "linux", toml: "linux" }]);
+        expect(message.human).toContain("ATTACH_LINUX");
+        expect(message.human).toContain("Linux kernel source tree");
+        expect(message.human).toContain("attach-linux");
     });
 
-    test("check_failure_message - non-env fields use toml name", () => {
-        const message = check_failure_message({ kind: "missing-field", toml: "overlay" });
-        expect(message.human).toBe("Missing config: overlay");
+    test("check_failure_message - single non-env field includes description", () => {
+        const message = check_failure_message([{ kind: "missing-field", field: "overlay", toml: "overlay" }]);
+        expect(message.human).toContain("overlay");
+        expect(message.human).toContain("DTSO overlay file");
+        expect(message.human).toContain("create-workfile");
+    });
+
+    test("check_failure_message - multiple env fields deduplicate hint", () => {
+        const message = check_failure_message([
+            { kind: "missing-field", field: "linux", toml: "linux" },
+            { kind: "missing-field", field: "devicetree", toml: "devicetree" },
+        ]);
+        expect(message.human).toContain("ATTACH_LINUX");
+        expect(message.human).toContain("ATTACH_DEVICETREE");
+        const hint_count = message.human.split("attach-linux").length - 1;
+        expect(hint_count).toBe(1);
     });
 }

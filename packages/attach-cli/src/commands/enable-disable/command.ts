@@ -19,13 +19,13 @@ function make_command(commandName: string, status_value: "okay" | "disabled", ve
 
             const config = load_config();
             if (config === undefined) {
-                console.log("No config.toml (run config-set)");
+                console.log("No configuration found. Run 'attach-linux' to get started.");
                 return;
             }
 
             const checked = check_config(config, ["overlay", "devicetree"]);
             if (!checked.ok) {
-                console.log(check_failure_message(checked).human);
+                console.log(check_failure_message(checked.failures).human);
                 return;
             }
             const { overlay: input, devicetree } = checked.values;
