@@ -1,0 +1,9 @@
+$type: descriptor
+$symbol: test_adc
+$description: "Generic ADC handle - a root, like capi_adc"
+$init_function: test_adc_init
+$remove_function: test_adc_deinit
+$init_param:
+  include: test_adc_config
+  pointer: true
+  required: true

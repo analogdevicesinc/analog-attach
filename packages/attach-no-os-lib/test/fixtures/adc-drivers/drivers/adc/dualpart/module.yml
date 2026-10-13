@@ -1,0 +1,15 @@
+name: dualpart
+type: driver
+category: adc
+version: "1.0.0"
+description: "One chip with an ADC and a DAC side, like ad74413r"
+
+build:
+  kconfig: DUALPART
+  sources: [dualpart.c]
+  includes: [.]
+
+provides:
+  interfaces: [test_adc, test_dac]
+
+rulesets_file: analog-attach/module.yml

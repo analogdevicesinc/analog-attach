@@ -38,7 +38,13 @@ describe('registry', () => {
         expectOk(symbols);
 
         expect(symbols.value.map(entry => entry.$symbol)).toEqual([
+            'test_adc',
+            'test_adc_chan',
+            'test_adc_chan_config',
+            'test_adc_config',
             'test_array_holder',
+            'test_dac',
+            'test_dac_config',
             'test_gpio_ops',
             'test_gpio_pin',
             'test_gpio_port',

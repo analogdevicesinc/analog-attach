@@ -1,0 +1,9 @@
+$type: descriptor
+$symbol: test_dac
+$description: "Generic DAC handle - a root, like capi_dac"
+$init_function: test_dac_init
+$remove_function: test_dac_deinit
+$init_param:
+  include: test_dac_config
+  pointer: true
+  required: true

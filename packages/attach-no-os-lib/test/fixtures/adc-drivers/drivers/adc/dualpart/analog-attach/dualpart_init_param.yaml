@@ -1,0 +1,7 @@
+$type: struct
+$symbol: dualpart_init_param
+$description: "The chip's configuration: one per chip, whichever sides are used"
+gain:
+  type: uint8_t
+  default: 1
+  description: "Front-end gain"

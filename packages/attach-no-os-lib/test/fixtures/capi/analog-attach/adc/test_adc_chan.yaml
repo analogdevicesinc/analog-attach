@@ -1,0 +1,9 @@
+$type: descriptor
+$symbol: test_adc_chan
+$description: "ADC channel handle: hangs off an ADC, so it is never a driver's root"
+$init_function: test_adc_chan_init
+$remove_function: test_adc_chan_deinit
+$init_param:
+  include: test_adc_chan_config
+  pointer: true
+  required: true
