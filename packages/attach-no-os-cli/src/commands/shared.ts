@@ -127,11 +127,13 @@ export function get_project_path(): Result<string> {
     // workfile is in, so `build` finds what `generate` wrote without any setting.
     let project_name = name.value;
     if (!project_name) {
-        const workfile = get_effective_setting_value("workfile");
+        // Resolved the way every command resolves it, so a `workfile` set to a folder names
+        // the workfile inside it here too.
+        const workfile = get_workfile_path();
         if (!workfile.ok) {
             return workfile;
         }
-        project_name = path.basename(path.dirname(path.resolve(process.cwd(), workfile.value ?? "workfile.json")));
+        project_name = path.basename(path.dirname(workfile.value));
     }
 
     const output_path = get_effective_setting_value("output_path");

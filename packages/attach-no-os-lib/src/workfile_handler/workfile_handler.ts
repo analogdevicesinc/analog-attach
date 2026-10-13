@@ -5,7 +5,6 @@ import type {
     ArrayProperty,
     EnumProperty,
     IncludeProperty,
-    NumberProperty,
     PlatformExtraProperty,
     PlatformOpsProperty,
     Property,
@@ -55,9 +54,12 @@ export function create_workfile(platform?: string): Result<Workfile> {
 
     // The platform's ops tables (maxim_capi_spi_ops, ...), from the interfaces_file its
     // module.yml names. A driver's own ops table is an extern of the driver, not one of these.
+    // Without them the workfile still works, only the ops fields are left for the user to fill,
+    // so a missing or broken interfaces_file is a warning, not a reason to refuse the workfile.
     const tables = platform_ops_tables(soc.value.platform);
     if (!tables.ok) {
-        return tables;
+        console.warn(`Warning: no platform ops tables: ${tables.error.message}`);
+        return ok(workfile);
     }
     for (const table of tables.value) {
         workfile.platform_ops[table.$symbol] = table;
@@ -645,10 +647,10 @@ export function suggest_for_property(workfile: Workfile, symbol_name: string, pr
     const graph = create_connections_graph(workfile);
     const overridden = apply_overrides(property, collect_child_overrides(symbol_name, workfile, graph), symbol_name, workfile).effective;
 
-    switch (property._t) {
+    switch (overridden._t) {
         case "NumberProperty": {
-            const values = overridden._t === "NumberProperty" ? overridden.values : undefined;
-            return ok(values === undefined ? {} : { values: values.map(value => format_number(value, overridden as NumberProperty)) });
+            const values = overridden.values;
+            return ok(values === undefined ? {} : { values: values.map(value => format_number(value, overridden)) });
         }
         case "BooleanProperty": {
             return ok({ values: ["true", "false"]});
@@ -657,42 +659,36 @@ export function suggest_for_property(workfile: Workfile, symbol_name: string, pr
             return ok({});
         }
         case "IncludeProperty": {
-            return suggest_for_include(workfile, property);
+            return suggest_for_include(workfile, overridden);
         }
         case "EnumProperty": {
-            return suggest_for_enum(overridden as EnumProperty);
+            return suggest_for_enum(overridden);
         }
         case "UnionProperty": {
-            return suggest_for_union(workfile, property, union_member);
+            return suggest_for_union(workfile, overridden, union_member);
         }
         case "ArrayProperty": {
-            return suggest_for_array(workfile, property);
+            return suggest_for_array(workfile, overridden);
         }
         case "PlatformOpsProperty": {
             // Only structs carry platform_ops; a descriptor node never reaches here.
             if (symbol._t !== "RulesetStruct") {
                 return error(`Property '${property_name}' is not valid on a descriptor node`, symbol_name);
             }
-            const graph = create_connections_graph(workfile);
-            const child_overrides = collect_child_overrides(symbol_name, workfile, graph);
-            const { effective } = apply_overrides(property, child_overrides, symbol_name, workfile);
-            return suggest_platform_ops(workfile, effective as PlatformOpsProperty, symbol);
+            return suggest_platform_ops(workfile, overridden, symbol);
         }
         case "PlatformExtraProperty": {
             // Only structs carry platform_extra; a descriptor node never reaches here.
             if (symbol._t !== "RulesetStruct") {
                 return error(`Property '${property_name}' is not valid on a descriptor node`, symbol_name);
             }
-            const graph = create_connections_graph(workfile);
-            const child_overrides = collect_child_overrides(symbol_name, workfile, graph);
-            const { effective } = apply_overrides(property, child_overrides, symbol_name, workfile);
-            return suggest_platform_extra(workfile, effective as PlatformExtraProperty, symbol);
+            return suggest_platform_extra(workfile, overridden, symbol);
         }
         case "DriverOpsProperty": {
-            return suggest_driver_backed(workfile, property.interface, RulesetType.RT_EXTERN, symbol);
+            return suggest_driver_backed(workfile, overridden.interface, RulesetType.RT_EXTERN, symbol);
         }
         case "DriverInitParameterProperty": {
-            return suggest_driver_backed(workfile, property.interface, RulesetType.RT_STRUCT, symbol);
+            return suggest_driver_backed(workfile, overridden.interface, RulesetType.RT_STRUCT, symbol);
         }
         case "RawProperty": {
             return ok({});
