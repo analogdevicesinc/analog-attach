@@ -128,7 +128,7 @@ function make_array(name: string, size: number, element: ArrayProperty['element'
 }
 
 function make_workfile(symbols: Record<string, RulesetStruct>, platform_ops: Record<string, RulesetPlatformOps> = {}): Workfile {
-    return { platform_ops, exposed_ops: {}, symbols };
+    return { platform_ops, symbols };
 }
 
 function make_platform_ops(name: string, capability?: string): RulesetPlatformOps {
@@ -963,8 +963,8 @@ describe('validate_workfile', () => {
         test('valid platform_ops passes', () => {
             const workfile = make_workfile(
                 {
-                    my_spi: make_struct_with_capability("spi_init", "spi", [
-                        make_platform_ops_property("platform_ops", { value: "spi_ops" })
+                    my_spi: make_struct("spi_init", [
+                        make_platform_ops_property("platform_ops", { capability: ["spi"], value: "spi_ops" })
                     ])
                 },
                 {
@@ -978,8 +978,8 @@ describe('validate_workfile', () => {
         test('missing platform_ops symbol fails', () => {
             const workfile = make_workfile(
                 {
-                    my_spi: make_struct_with_capability("spi_init", "spi", [
-                        make_platform_ops_property("platform_ops", { value: "nonexistent_ops" })
+                    my_spi: make_struct("spi_init", [
+                        make_platform_ops_property("platform_ops", { capability: ["spi"], value: "nonexistent_ops" })
                     ])
                 },
                 {}
@@ -992,8 +992,8 @@ describe('validate_workfile', () => {
         test('capability mismatch fails', () => {
             const workfile = make_workfile(
                 {
-                    my_spi: make_struct_with_capability("spi_init", "spi", [
-                        make_platform_ops_property("platform_ops", { value: "gpio_ops" })
+                    my_spi: make_struct("spi_init", [
+                        make_platform_ops_property("platform_ops", { capability: ["spi"], value: "gpio_ops" })
                     ])
                 },
                 {
@@ -1007,7 +1007,7 @@ describe('validate_workfile', () => {
             expect(result.errors[0].message).toContain("spi");
         });
 
-        test('no capability on parent skips capability check', () => {
+        test('a field that names no capability takes any ops', () => {
             const workfile = make_workfile(
                 {
                     my_struct: make_struct("test", [
@@ -1025,8 +1025,8 @@ describe('validate_workfile', () => {
         test('no value skips validation (not required)', () => {
             const workfile = make_workfile(
                 {
-                    my_spi: make_struct_with_capability("spi_init", "spi", [
-                        make_platform_ops_property("platform_ops")
+                    my_spi: make_struct("spi_init", [
+                        make_platform_ops_property("platform_ops", { capability: ["spi"] })
                     ])
                 },
                 {}
@@ -1038,8 +1038,8 @@ describe('validate_workfile', () => {
         test('required platform_ops without value fails', () => {
             const workfile = make_workfile(
                 {
-                    my_spi: make_struct_with_capability("spi_init", "spi", [
-                        make_platform_ops_property("platform_ops", { required: true })
+                    my_spi: make_struct("spi_init", [
+                        make_platform_ops_property("platform_ops", { capability: ["spi"], required: true })
                     ])
                 },
                 {}
@@ -1054,8 +1054,8 @@ describe('validate_workfile', () => {
         test('valid platform_extra passes', () => {
             const workfile = make_workfile(
                 {
-                    my_spi: make_struct_with_capability("spi_init", "spi", [
-                        make_platform_extra_property("extra", { value: "my_spi_extra" })
+                    my_spi: make_struct("spi_init", [
+                        make_platform_extra_property("extra", { capability: ["spi"], value: "my_spi_extra" })
                     ]),
                     my_spi_extra: make_struct_with_capability("max_spi", "spi", [])
                 },
@@ -1068,8 +1068,8 @@ describe('validate_workfile', () => {
         test('missing platform_extra symbol fails', () => {
             const workfile = make_workfile(
                 {
-                    my_spi: make_struct_with_capability("spi_init", "spi", [
-                        make_platform_extra_property("extra", { value: "nonexistent" })
+                    my_spi: make_struct("spi_init", [
+                        make_platform_extra_property("extra", { capability: ["spi"], value: "nonexistent" })
                     ])
                 },
                 {}
@@ -1082,8 +1082,8 @@ describe('validate_workfile', () => {
         test('capability mismatch fails', () => {
             const workfile = make_workfile(
                 {
-                    my_spi: make_struct_with_capability("spi_init", "spi", [
-                        make_platform_extra_property("extra", { value: "my_gpio_extra" })
+                    my_spi: make_struct("spi_init", [
+                        make_platform_extra_property("extra", { capability: ["spi"], value: "my_gpio_extra" })
                     ]),
                     my_gpio_extra: make_struct_with_capability("max_gpio", "gpio", [])
                 },
@@ -1096,7 +1096,7 @@ describe('validate_workfile', () => {
             expect(result.errors[0].message).toContain("spi");
         });
 
-        test('no capability on parent skips capability check', () => {
+        test('a field that names no capability takes any ops', () => {
             const workfile = make_workfile(
                 {
                     my_struct: make_struct("test", [
@@ -1113,8 +1113,8 @@ describe('validate_workfile', () => {
         test('no value skips validation (not required)', () => {
             const workfile = make_workfile(
                 {
-                    my_spi: make_struct_with_capability("spi_init", "spi", [
-                        make_platform_extra_property("extra")
+                    my_spi: make_struct("spi_init", [
+                        make_platform_extra_property("extra", { capability: ["spi"] })
                     ])
                 },
                 {}
@@ -1129,8 +1129,8 @@ describe('validate_workfile', () => {
             // test_spi_extra carries $capability: spi in the fixture platform.
             const workfile = make_workfile(
                 {
-                    my_spi: make_struct_with_capability("test_spi_config", "spi", [
-                        make_platform_extra_property("extra", { required: true })
+                    my_spi: make_struct("test_spi_config", [
+                        make_platform_extra_property("extra", { capability: ["spi"], required: true })
                     ])
                 },
                 {}
@@ -1148,8 +1148,8 @@ describe('validate_workfile', () => {
             // with a different capability does not count as a candidate.
             const workfile = make_workfile(
                 {
-                    my_uart: make_struct_with_capability("uart_init", "uart", [
-                        make_platform_extra_property("extra", { required: true })
+                    my_uart: make_struct("uart_init", [
+                        make_platform_extra_property("extra", { capability: ["uart"], required: true })
                     ]),
                     unrelated_extra: make_struct_with_capability("i2c_extra", "i2c", [])
                 },
@@ -1164,8 +1164,8 @@ describe('validate_workfile', () => {
         test('ops in allowed list passes', () => {
             const workfile = make_workfile(
                 {
-                    my_spi: make_struct_with_capability("spi_init", "spi", [
-                        make_platform_ops_property("platform_ops", {
+                    my_spi: make_struct("spi_init", [
+                        make_platform_ops_property("platform_ops", { capability: ["spi"],
                             value: "spi_ops_a",
                             allowed: ["spi_ops_a", "spi_ops_b"]
                         })
@@ -1183,8 +1183,8 @@ describe('validate_workfile', () => {
         test('ops not in allowed list fails', () => {
             const workfile = make_workfile(
                 {
-                    my_spi: make_struct_with_capability("spi_init", "spi", [
-                        make_platform_ops_property("platform_ops", {
+                    my_spi: make_struct("spi_init", [
+                        make_platform_ops_property("platform_ops", { capability: ["spi"],
                             value: "spi_ops_c",
                             allowed: ["spi_ops_a", "spi_ops_b"]
                         })
@@ -1204,8 +1204,8 @@ describe('validate_workfile', () => {
         test('allowed overrides capability check - mismatch is warning not error', () => {
             const workfile = make_workfile(
                 {
-                    my_spi: make_struct_with_capability("spi_init", "spi", [
-                        make_platform_ops_property("platform_ops", {
+                    my_spi: make_struct("spi_init", [
+                        make_platform_ops_property("platform_ops", { capability: ["spi"],
                             value: "gpio_ops",
                             allowed: ["gpio_ops"]  // override allows gpio ops for spi
                         })
@@ -1226,8 +1226,8 @@ describe('validate_workfile', () => {
         test('extra in allowed list passes', () => {
             const workfile = make_workfile(
                 {
-                    my_spi: make_struct_with_capability("spi_init", "spi", [
-                        make_platform_extra_property("extra", {
+                    my_spi: make_struct("spi_init", [
+                        make_platform_extra_property("extra", { capability: ["spi"],
                             value: "my_extra",
                             allowed: ["extra_a", "extra_b"]
                         })
@@ -1243,8 +1243,8 @@ describe('validate_workfile', () => {
         test('extra not in allowed list fails', () => {
             const workfile = make_workfile(
                 {
-                    my_spi: make_struct_with_capability("spi_init", "spi", [
-                        make_platform_extra_property("extra", {
+                    my_spi: make_struct("spi_init", [
+                        make_platform_extra_property("extra", { capability: ["spi"],
                             value: "my_extra",
                             allowed: ["extra_a", "extra_b"]
                         })

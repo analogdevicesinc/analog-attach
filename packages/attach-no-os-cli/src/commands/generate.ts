@@ -26,7 +26,7 @@ type GenerateFlags = {
 };
 
 /**
- * `attach-noos generate` — render the workfile into a no-OS project.
+ * `attach-noos generate` — render the workfile into a CAPI project.
  *
  * Everything it needs is configuration: the project name, where to write it, which board and
  * which template set. The flags stay as human overrides, but nothing is required on the
@@ -34,7 +34,7 @@ type GenerateFlags = {
  */
 export const generateCommand = buildCommand<GenerateFlags, [], AttachContext>({
     docs: {
-        brief: "Generate a no-OS project from the workfile",
+        brief: "Generate a CAPI project from the workfile",
         fullDescription:
             "Renders the workfile into <output_path>/<project_name>.\n" +
             "Both come from settings ('attach-noos tool-config-get project_name output_path'); the flags override them."
@@ -60,7 +60,7 @@ export const generateCommand = buildCommand<GenerateFlags, [], AttachContext>({
             },
             board: {
                 kind: "parsed",
-                brief: "no-OS board preset to build for (default: the workfile board, else the only board for its platform)",
+                brief: "Board preset to build for (default: the workfile board, else the only board for its platform)",
                 optional: true,
                 parse: String,
                 proposeCompletions(partial: string) {

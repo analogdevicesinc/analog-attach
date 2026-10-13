@@ -1,4 +1,4 @@
-import type { Ruleset } from "../ruleset_parser/types";
+import type { Ruleset, RulesetPlatformOps } from "../ruleset_parser/types";
 
 export interface Workfile {
     // The chip the project targets, e.g. "max32655". A board names its own chip, so this
@@ -11,8 +11,7 @@ export interface Workfile {
     // module's `boards:` list. Optional because a chip with exactly one board does not
     // need the user to say so; it is resolved to a concrete board before codegen runs.
     board?: string;
-    platform_ops: Record<string, Ruleset>;  // locked, auto-populated from platform, not printed
-    exposed_ops: Record<string, Ruleset>;   // same as platform_ops, but runtime updated
+    platform_ops: Record<string, RulesetPlatformOps>;  // the platform's ops tables, from its interfaces_file; not printed
     symbols: Record<string, Ruleset>;       // user-created symbols, printed in codegen
     // Names in `symbols` that are hidden: externs, and handles wrapping them. They are
     // real nodes while the workfile is in memory - validated and generated like any other -
@@ -24,9 +23,8 @@ export interface Workfile {
 /**
  * The instantiable symbols a user can add to a workfile.
  *
- * Grouped by the module that ships them rather than by the old `devices`/`noos`/`platform`
- * split: a symbol's provenance is now simply which repo indexed it, and that generalises
- * to however many driver collections and platform backends are configured.
+ * Grouped by the module that ships them: a symbol's provenance is which repo indexed it,
+ * which generalises to however many driver collections and platform backends are configured.
  */
 export interface AvailableStructs {
     /** Module name -> its instantiable symbols. */

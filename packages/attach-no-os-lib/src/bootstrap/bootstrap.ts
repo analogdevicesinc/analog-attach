@@ -65,7 +65,7 @@ import type { ChipSelect, Connection, TakenChipSelects } from "../registry/wirin
 import { child_names, collect_child_overrides, create_connections_graph, is_referenced_by_others } from "../validator/connection_graph";
 import type { ConnectionGraph } from "../validator/types";
 import { apply_overrides } from "../validator/override_resolver";
-import { add_symbol, all_ops, is_hidden, mark_auto, ops_capability_fits, remove_symbol, materialize_hidden, materialize_referenced_hidden, set_value } from "../workfile_handler/workfile_handler";
+import { add_symbol, capability_fits, is_hidden, mark_auto, remove_symbol, materialize_hidden, materialize_referenced_hidden, set_value } from "../workfile_handler/workfile_handler";
 import type { Workfile } from "../workfile_handler/types";
 
 /** Why a value was filled. */
@@ -390,7 +390,7 @@ function still_fits(workfile: Workfile, effective: Property, value: unknown, sel
 			return candidates.ok && node !== undefined && candidates.value.some(entry => entry.$symbol === node.$symbol);
 		}
 		case "PlatformOpsProperty": {
-			return typeof value === "string" && all_ops(workfile)[value]?._t === "RulesetPlatformOps";
+			return typeof value === "string" && value in workfile.platform_ops;
 		}
 		default: {
 			return true;
@@ -618,12 +618,11 @@ function open_reference(
 		}
 		case "PlatformOpsProperty": {
 			// The platform's table for the field's capability: maxim_capi_spi_ops for spi.
-			const owner = workfile.symbols[name];
-			if (effective.required !== true || owner?._t !== "RulesetStruct") {
+			if (effective.required !== true || workfile.symbols[name]?._t !== "RulesetStruct") {
 				return undefined;
 			}
-			const fits = Object.entries(all_ops(workfile)).filter(([, ops]) => ops._t === "RulesetPlatformOps"
-				&& (effective.allowed === undefined ? ops_capability_fits(ops, effective, owner) : effective.allowed.includes(ops.$symbol)));
+			const fits = Object.entries(workfile.platform_ops).filter(([, ops]) =>
+				effective.allowed === undefined ? capability_fits(effective, ops) : effective.allowed.includes(ops.$symbol));
 			return { options: fits.map(([table]) => ({ kind: "existing" as const, name: table })) };
 		}
 		case "DriverInitParameterProperty": {

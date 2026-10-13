@@ -323,10 +323,10 @@ export type RulesetStruct = RulesetBase & {
 	$type: RulesetType.RT_STRUCT,
 	properties: Property[],
 	rules?: Rule[],
-	$requires?: string[], // Auto-computed: all capabilities required by properties
+	// On a platform's extra struct only: the capability it extends (maxim_spi_extra: spi),
+	// matched against the `capability:` of a `platform_extra` field.
 	$capability?: string,
 	$header?: string,      // Device header path, e.g. "drivers/accel/adxl355/adxl355.h"
-	$exposes?: string[],   // List of ops ids that this struct might expose
 	// An eval board on the bench, not a C struct: stored in the workfile, never generated.
 	// Its `part` field names the part's root, and its pinout is what wires that part.
 	$eval_board?: boolean,

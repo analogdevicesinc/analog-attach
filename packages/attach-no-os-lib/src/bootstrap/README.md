@@ -134,7 +134,7 @@ then the pin node), leaving exactly the bare part `add <driver>` gives.
 | `deleted`      | stored nodes deleted                                                 |
 | `dangling`     | nodes left unused that hold user values                              |
 
-The CLI prints it after each command (`attach-noos-cli/src/commands/bootstrap_run.ts`).
+The CLI prints it after each command (`attach-no-os-cli/src/commands/bootstrap_run.ts`).
 
 ## Files
 

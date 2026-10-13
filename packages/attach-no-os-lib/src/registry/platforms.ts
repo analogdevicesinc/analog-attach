@@ -1,10 +1,9 @@
 /**
  * Platforms, chips and boards, read from the platform modules among the configured roots.
  *
- * This replaces reading no-OS's `CMakePresets.json`. Nothing here needs a file that does
- * not already exist: a platform module declares its own boards and chips, and each board
- * module says which chip it carries, so the whole chain is read-only and asks nothing of
- * the repos that own those files.
+ * Nothing here needs a file that does not already exist: a platform module declares its own
+ * boards and chips, and each board module says which chip it carries, so the whole chain is
+ * read-only and asks nothing of the repos that own those files.
  *
  *   <platform>/module.yml      boards: [max32655fthr, ...]   socs: [{name, descriptor}]
  *                             metadata.vendor: maxim

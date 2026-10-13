@@ -1,7 +1,7 @@
 {
   "name": "attach-no-os-lib",
   "version": "0.0.1",
-  "description": "No-OS device tree generation library for Analog Attach",
+  "description": "CAPI workfile, bootstrap and code generation library for Analog Attach",
   "private": true,
   "type": "module",
   "main": "./dist/index.cjs",

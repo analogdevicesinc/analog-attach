@@ -30,7 +30,7 @@ export const PROTOCOL_VERSION = "1.0.0";
 /** Not part of the manifest (its root is closed) — used for `attach-noos --version` and help. */
 export const TOOL_VERSION = "0.1.0";
 export const TOOL_NAME = "attach-no-os";
-export const TOOL_DESCRIPTION = "Analog Attach CLI for no-OS workfiles";
+export const TOOL_DESCRIPTION = "Analog Attach CLI for CAPI workfiles";
 
 /**
  * The commands attach-meta knows. Absence from a manifest *is* how a tool says it does
@@ -178,7 +178,7 @@ export function build_manifest(): Manifest {
         commands: {
             "tool-config-get": map(
                 "tool-config-get",
-                "Read the CLI's settings: where the workfile and no-OS tree are, which board and template set to use.",
+                "Read the CLI's settings: where the workfile and CAPI repos are, which board and template set to use.",
                 { completions: [{ arg: "tool-config-get", kind: SUGGEST_KINDS.config_field }] },
             ),
             "tool-config-set": map(
@@ -192,7 +192,7 @@ export function build_manifest(): Manifest {
             ),
             "list-devices": map(
                 "list-devices",
-                "List the schemas a node can be an instance of: no-OS drivers, platform peripherals and core types.",
+                "List the schemas a node can be an instance of: eval boards, drivers, board peripherals and CAPI types.",
             ),
             add: map(
                 "add",
@@ -245,12 +245,12 @@ export function build_manifest(): Manifest {
             ),
             generate: map(
                 "generate",
-                "Render the workfile into a buildable no-OS project: sources, headers, CMake and Kconfig.",
+                "Render the workfile into a buildable CAPI project: sources, headers, CMake and Kconfig.",
                 { timeout_ms: undefined },
             ),
             build: map(
                 "build",
-                "Build the generated project with no-OS's CMake flow, producing a flashable binary.",
+                "Build the generated project with the platform's CMake presets, producing a flashable binary.",
                 { timeout_ms: undefined },
             ),
             deploy: map(

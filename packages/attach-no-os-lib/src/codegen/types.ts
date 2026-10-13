@@ -18,12 +18,6 @@ export interface DeviceInfo {
 	remove_code?: string;
 };
 
-export interface DescriptorInfo {
-	symbol_name: string;       // init param name: "my_spi_ip"
-	descriptor_name: string;   // descriptor name: "my_spi"
-	descriptor_type: string;   // descriptor type: "no_os_spi_desc"
-};
-
 export interface CodegenInput {
 	workfile: Workfile;
 	platform_name: string;
