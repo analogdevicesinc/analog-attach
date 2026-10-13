@@ -18,8 +18,7 @@
     "node": ">=20"
   },
   "scripts": {
-    "prebuild": "tsc -p src/tsconfig.json",
-    "build": "tsup --silent --dts",
+    "build": "scripts/bundle-dt-schema.sh && tsc -p src/tsconfig.json && tsup --silent --dts",
     "postinstall": "node scripts/postinstall.js",
     "prepublishOnly": "npm run build",
     "dev-link": "yarn build && mkdir -p $HOME/.local/bin && ln -sf \"$(pwd)/dist/cli.js\" $HOME/.local/bin/attach-linux && chmod +x dist/cli.js && echo 'attach-linux linked to $HOME/.local/bin/attach-linux'",

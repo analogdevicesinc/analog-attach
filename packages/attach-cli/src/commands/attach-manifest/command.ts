@@ -74,7 +74,7 @@ export function build_attach_manifest_command(_context: LocalContext): Command {
                         argv: ["attach-linux", "--json", "__list"],
                     },
                     "build": {
-                        description: "Compile the overlay DTSO into a DTBO using dtc. Reads the overlay config field for the source path (--overlay overrides) and writes the compiled .dtbo next to it, saving that path to the overlay-compiled config field for deploy to pick up. The compile command comes from the build-command config field (default: dtc -@ -I dts -O dtb -o {output} {input}); {input}/{output} are substituted with the source and artifact paths. --build-command overrides the template for one run. Fails with an input-error if overlay is unset, the source is missing, or dtc is not installed; returns the artifact path on success.",
+                        description: "Compile the overlay DTSO into a DTBO using the bundled dtc. Reads the overlay config field for the source path (--overlay overrides) and writes the compiled .dtbo next to it, saving that path to the overlay-compiled config field for deploy to pick up. Fails with an input-error if overlay is unset or the source is missing; returns the artifact path on success.",
                         argv: ["attach-linux", "--json", "build"],
                     },
                     "deploy": {

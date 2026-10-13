@@ -26,6 +26,11 @@ jspm_packages/
 *.tsbuildinfo
 dist
 
+dt-schema/
+dtc/
+bundled/tools/
+bundled/dt-schema/
+
 *.dtso
 .analog-attach.toml
 .attach-linux/

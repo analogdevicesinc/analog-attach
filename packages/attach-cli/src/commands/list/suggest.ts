@@ -842,8 +842,8 @@ async function suggest_type(context_: LocalContext, arguments_: string[]): Promi
     const type = attach_type_to_protocol_type(property_definition.value);
     const suggestions = (property_definition.suggestions ?? []).map((suggestion) => to_suggestion(suggestion));
 
-    const type_message = board_error !== undefined ? `Type of ${property_name}; ${board_error}` : `Type of ${property_name}`;
-    const type_severity = board_error !== undefined ? "warn" as const : "info" as const;
+    const type_message = board_error === undefined ? `Type of ${property_name}` : `Type of ${property_name}; ${board_error}`;
+    const type_severity = board_error === undefined ? "info" as const : "warn" as const;
 
     if (context_.json) {
         const response: TypeResponse = {
@@ -942,14 +942,14 @@ if (import.meta.vitest) {
             rows: [[{ label: "gpio" }, 19n, { macro: "IRQ_TYPE_EDGE_FALLING" }]],
             display: "gpio 19 IRQ_TYPE_EDGE_FALLING — spi_pmod1.int",
             source: "board:PMD-RPI-INTZ",
-            slot: "spi_pmod1",
+            slots: ["spi_pmod1"],
         };
         const result = to_suggestion(suggestion);
         expect(result.value).toBe("gpio 19 IRQ_TYPE_EDGE_FALLING");
     });
 
     test("to_suggestion — single-cell reg", () => {
-        const suggestion: VS = { rows: [[2n]], display: "2 — GPIO20 (spi_pmod1.cs2)", source: "board:PMD-RPI-INTZ", slot: "spi_pmod1" };
+        const suggestion: VS = { rows: [[2n]], display: "2 — GPIO20 (spi_pmod1.cs2)", source: "board:PMD-RPI-INTZ", slots: ["spi_pmod1"] };
         const result = to_suggestion(suggestion);
         expect(result.value).toBe("2");
     });

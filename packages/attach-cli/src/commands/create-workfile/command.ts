@@ -124,12 +124,14 @@ if (import.meta.vitest) {
             expect(prepared.text).not.toContain("CH_MODE");
             expect(typeof DeviceTreeOverlay.new_from_string(prepared.text)).not.toBe("string");
 
-            if (is_tool_available("dtc --version")) {
+            const bundledDtc = path.join(bundled, "tools", "dtc");
+            if (fs.existsSync(bundledDtc) || is_tool_available("dtc --version")) {
+                const dtc = fs.existsSync(bundledDtc) ? bundledDtc : "dtc";
                 const directory = fs.mkdtempSync(path.join(os.tmpdir(), "attach-dtc-"));
                 try {
                     const input = path.join(directory, "w.dtso");
                     fs.writeFileSync(input, prepared.text);
-                    execSync(`dtc -@ -I dts -O dtb -o "${path.join(directory, "w.dtbo")}" "${input}"`, { stdio: "pipe" });
+                    execSync(`${dtc} -@ -I dts -O dtb -o "${path.join(directory, "w.dtbo")}" "${input}"`, { stdio: "pipe" });
                 } finally {
                     fs.rmSync(directory, { recursive: true });
                 }

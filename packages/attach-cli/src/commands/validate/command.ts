@@ -19,6 +19,7 @@ import type { LocalContext } from "../../context";
 import { save_config } from "../../config";
 import { resolve_config } from "../../resolve-config";
 import { is_tool_available } from "../../utilities";
+import { getBundledToolsPath } from "../skill/utilities";
 import { respond, input_error } from "../../protocol/output";
 import type { ValidationResponse, ValidationError } from "../../protocol/types";
 
@@ -80,6 +81,18 @@ export function build_validate_command(context_: LocalContext): Command {
 
             let validation_json_path = config.validationJson;
 
+            const toolsPath = getBundledToolsPath();
+            const dtMkSchema = path.join(toolsPath, 'dt-mk-schema');
+            const dtValidate = path.join(toolsPath, 'dt-validate');
+            const dtc = path.join(toolsPath, 'dtc');
+
+            if (!fs.existsSync(dtMkSchema) || !fs.existsSync(dtValidate) || !fs.existsSync(dtc)) {
+                const message = "Bundled tools not found — run scripts/bundle-dt-schema.sh";
+                if (context_.json) { input_error(message); return; }
+                console.log(message);
+                return;
+            }
+
             if (validation_json_path === undefined) {
                 const linux = config.linux;
                 if (linux === undefined) {
@@ -94,7 +107,7 @@ export function build_validate_command(context_: LocalContext): Command {
                 if (!context_.json) { console.log("Generating validation.json (this may take a while)..."); }
 
                 try {
-                    const schema_output = execSync(`dt-mk-schema -j ${bindings_path}`, { stdio: 'pipe', maxBuffer: 256 * 1024 * 1024 });
+                    const schema_output = execSync(`${dtMkSchema} -j ${bindings_path}`, { stdio: 'pipe', maxBuffer: 256 * 1024 * 1024 });
                     fs.writeFileSync(generated_path, schema_output);
                 } catch (error: any) {
                     const stderr: string = (error.stderr as Buffer | undefined)?.toString() ?? String(error);
@@ -121,7 +134,7 @@ export function build_validate_command(context_: LocalContext): Command {
 
             let dtc_error: string | undefined;
             try {
-                execSync(`dtc -I dts -O dtb -o ${temporary_dtb} ${temporary_dts}`, { stdio: 'pipe' });
+                execSync(`${dtc} -I dts -O dtb -o ${temporary_dtb} ${temporary_dts}`, { stdio: 'pipe' });
             } catch (error: any) {
                 dtc_error = (error.stderr as Buffer | undefined)?.toString() ?? String(error);
             }
@@ -142,7 +155,7 @@ export function build_validate_command(context_: LocalContext): Command {
             // We always read error.json; only fall back to stderr if the file wasn't written.
             let tool_error: string | undefined;
             try {
-                execSync(`dt-validate -s ${validation_json_path} ${temporary_dtb} --json-output ${error_json}`, { stdio: 'pipe' });
+                execSync(`${dtValidate} -s ${validation_json_path} ${temporary_dtb} --json-output ${error_json}`, { stdio: 'pipe' });
             } catch (error: any) {
                 const stderr: string = (error.stderr as Buffer | undefined)?.toString() ?? String(error);
                 if (!fs.existsSync(error_json)) {

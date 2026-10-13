@@ -1,0 +1,12 @@
+src/
+dt-schema/
+dtc/
+plans/
+notes.txt
+*.tsbuildinfo
+*.dtso
+.attach-linux/
+.analog-attach.toml
+demo/
+coverage/
+.nyc_output/
