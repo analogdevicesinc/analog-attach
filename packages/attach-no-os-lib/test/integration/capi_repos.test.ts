@@ -3,6 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { describe, test, expect, beforeEach, afterEach } from 'vitest';
 import { attach_eval_board, bootstrap, pin_driver, referenced_nodes } from '../../src/bootstrap/bootstrap';
+import { load_devices } from '../../src/codegen/device_loader';
 import { driver_root, driver_root_for } from '../../src/registry/roots';
 import { load_resolved_ruleset_for_board } from '../../src/resolver/resolver';
 import { validate_workfile } from '../../src/validator/validator';
@@ -195,6 +196,27 @@ describe.skipIf(REPOS === undefined)('ad74413r on max32655fthr, from the real re
         expect(symbols['capi_adc_chan_config']).toMatchObject({ adc_handle: 'ad74413r', extra: 'ad74413r_channel_config' });
         expect(symbols['capi_adc_chan_config_1']).toMatchObject({ adc_handle: 'ad74413r', extra: 'ad74413r_channel_config_1' });
         expect(symbols['capi_adc_config']?.extra).toBe('ad74413r_init_param');
+    });
+
+    test('the DAC side is brought up before an ADC channel added ahead of it', () => {
+        const workfile = board_workfile();
+        add_driver(workfile, 'ad74413r', 'ad74413r_adc', 'adc');
+        const channel = load_resolved_ruleset_for_board('capi_adc_chan', BOARD);
+        expectOk(channel);
+        expectOk(add_symbol(workfile, 'adc_ch0', channel.value));
+        expectOk(bootstrap(workfile));
+        // `add ad74413r --as dac` afterwards, on the same chip.
+        const dac = driver_root_for('ad74413r', 'dac');
+        expectOk(dac);
+        const dac_ruleset = load_resolved_ruleset_for_board(dac.value, BOARD);
+        expectOk(dac_ruleset);
+        expectOk(add_symbol(workfile, 'ad74413r_dac', dac_ruleset.value));
+        expectOk(pin_driver(workfile, 'ad74413r_dac', 'ad74413r', 'ad74413r_init_param'));
+        expectOk(bootstrap(workfile));
+
+        const names = load_devices(workfile).map(device => device.descriptor_name);
+        expect(names.indexOf('ad74413r_dac')).toBeLessThan(names.indexOf('adc_ch0'));
+        expect(names.indexOf('ad74413r_adc')).toBeLessThan(names.indexOf('adc_ch0'));
     });
 
     test('next to an adxl355 it shares the bus, not the chip-select', () => {
