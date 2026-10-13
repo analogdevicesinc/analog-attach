@@ -11,6 +11,7 @@ import {
     output_error,
     get_any_node,
     get_node_property,
+    column_width,
     format_property_type,
     format_property_value,
     format_node_list,
@@ -150,8 +151,10 @@ function format_node_summary(name: string, ruleset: Ruleset): string {
 
     out += "\n";
 
-    out += `  ${"Property".padEnd(20)}${"Type".padEnd(18)}${"Value".padEnd(18)}\n`;
-    out += `  ${"─".repeat(56)}\n`;
+    const name_width = column_width("Property", ruleset.properties.map(property => property.name));
+    const type_width = column_width("Type", ruleset.properties.map(property => format_property_type(property._t)));
+    out += `  ${"Property".padEnd(name_width)}${"Type".padEnd(type_width)}Value\n`;
+    out += `  ${"─".repeat(name_width + type_width + 18)}\n`;
 
     for (const property of ruleset.properties) {
         const required = property.required ? "* " : "  ";
@@ -165,7 +168,7 @@ function format_node_summary(name: string, ruleset: Ruleset): string {
             value = `${value} (auto)`;
         }
 
-        out += `${required}${property.name.padEnd(20)}${type.padEnd(18)}${value}\n`;
+        out += `${required}${property.name.padEnd(name_width)}${type.padEnd(type_width)}${value}\n`;
     }
 
     out += "\n* = required   (auto) = set by bootstrap   (cleared) = you set it to nothing";

@@ -159,6 +159,38 @@ describe('ranking the drivers behind a field', () => {
     });
 });
 
+describe('a channel\'s ADC', () => {
+    beforeEach(() => { setup_test_config(WITH_ADC_DRIVERS); });
+    afterEach(() => { teardown_test_config(); });
+
+    test('is offered by the ADC handle, not by the channel\'s own copy of it', () => {
+        const workfile = board_workfile();
+        const adc = add_driver(workfile, 'dualpart', 'test_adc');
+        add(workfile, 'ch0', 'test_adc_chan');
+        expectOk(bootstrap(workfile));
+        const config = stored(workfile)['ch0']?.$init_param as string;
+
+        const suggestions = suggest_for_property(workfile, config, 'adc_handle');
+        expectOk(suggestions);
+        // ch0.adc_handle is set by ch0's init, from this very config: offering it is a loop.
+        expect(suggestions.value.values).toEqual([adc]);
+    });
+
+    test('another channel\'s copy is still offered: it does not depend on this config', () => {
+        const workfile = board_workfile();
+        add_driver(workfile, 'dualpart', 'test_adc');
+        add(workfile, 'ch0', 'test_adc_chan');
+        add(workfile, 'ch1', 'test_adc_chan');
+        expectOk(bootstrap(workfile));
+        const config = stored(workfile)['ch1']?.$init_param as string;
+
+        const suggestions = suggest_for_property(workfile, config, 'adc_handle');
+        expectOk(suggestions);
+        expect(suggestions.value.values).toContain('ch0.adc_handle');
+        expect(suggestions.value.values).not.toContain('ch1.adc_handle');
+    });
+});
+
 describe('bootstrap follows the ranking', () => {
     beforeEach(() => { setup_test_config(WITH_ADC_DRIVERS); });
     afterEach(() => { teardown_test_config(); });

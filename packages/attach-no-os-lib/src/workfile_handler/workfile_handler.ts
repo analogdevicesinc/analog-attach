@@ -24,8 +24,9 @@ import { find_soc } from "../registry/platforms";
 import { build_extern_index, hidden_candidates } from "../registry/hidden";
 import type { ExternIndex, HiddenCandidate } from "../registry/hidden";
 import { driver_init_parameter_candidates, driver_ops_candidates, rank_driver_candidates } from "../registry/drivers";
-import { collect_child_overrides, create_connections_graph, rename_symbol_references } from "../validator/connection_graph";
+import { child_names, collect_child_overrides, create_connections_graph, rename_symbol_references } from "../validator/connection_graph";
 import { apply_overrides } from "../validator/override_resolver";
+import type { ConnectionGraph } from "../validator/types";
 import type { AvailableStructs, MinimalWorkfile, Workfile } from "./types";
 import { is_minimal_workfile } from "./types";
 
@@ -329,7 +330,8 @@ export function resolve_reference(workfile: Workfile, value: string): ResolvedRe
 
 // --- Suggestions ---
 
-export function suggest_for_include(workfile: Workfile, include: IncludeProperty): Result<PropertySuggestions> {
+/** `owner` is the node whose field this is: a member that only exists once it is used is left out. */
+export function suggest_for_include(workfile: Workfile, include: IncludeProperty, owner?: string): Result<PropertySuggestions> {
     if (include.include === undefined) {
         return suggest_for_include_type(workfile, include.include_type);
     }
@@ -359,7 +361,7 @@ export function suggest_for_include(workfile: Workfile, include: IncludeProperty
 
     // A readonly member of another node is just as referenceable as a whole node, so offer
     // those too. This is how a driver's iio wrapper hands over its `iio_dev`.
-    values.push(...member_references(workfile, include_path));
+    values.push(...member_references(workfile, include_path, owner));
 
     // Hidden nodes that do not exist yet are offered by the name they would get: choosing
     // one is what brings it into being (on the next load, or bootstrap). That is how a pin
@@ -379,12 +381,20 @@ export function suggest_for_include(workfile: Workfile, include: IncludeProperty
     });
 }
 
-// Every `node.member` in the workfile whose member names `include_path`.
-function member_references(workfile: Workfile, include_path: string): string[] {
+/**
+ * Every `node.member` in the workfile whose member names `include_path`, except the members
+ * of a node that reaches `owner`: those only have a value once `owner` is used (capi_adc_chan
+ * is brought up from capi_adc_chan_config, so its adc_handle cannot fill the config's).
+ */
+function member_references(workfile: Workfile, include_path: string, owner?: string): string[] {
     const values: string[] = [];
+    const graph = create_connections_graph(workfile);
 
     for (const [name, ruleset] of Object.entries(workfile.symbols)) {
         if (ruleset._t !== "RulesetStruct" && ruleset._t !== "RulesetDescriptor") {
+            continue;
+        }
+        if (owner !== undefined && (name === owner || reaches(graph, name, owner))) {
             continue;
         }
 
@@ -399,6 +409,22 @@ function member_references(workfile: Workfile, include_path: string): string[] {
     }
 
     return values;
+}
+
+/** Whether `from` reaches `to` through its references, in any number of steps. */
+function reaches(graph: ConnectionGraph, from: string, to: string): boolean {
+    const seen = new Set<string>();
+    const pending = [...child_names(graph, from)];
+    for (let next = pending.pop(); next !== undefined; next = pending.pop()) {
+        if (next === to) {
+            return true;
+        }
+        if (!seen.has(next)) {
+            seen.add(next);
+            pending.push(...child_names(graph, next));
+        }
+    }
+    return false;
 }
 
 // Same shape as above, matching on the target's kind instead of its $id. No `types`:
@@ -423,7 +449,7 @@ function suggest_for_include_type(workfile: Workfile, include_type: RulesetType)
     });
 }
 
-export function suggest_for_union(workfile: Workfile, union: UnionProperty, member_name?: string): Result<PropertySuggestions> {
+export function suggest_for_union(workfile: Workfile, union: UnionProperty, member_name?: string, owner?: string): Result<PropertySuggestions> {
     if (member_name === undefined) {
         // Suggest the member names (one must be selected for further suggestions)
         return ok({ values: union.members.map(p => p.name)});
@@ -433,13 +459,13 @@ export function suggest_for_union(workfile: Workfile, union: UnionProperty, memb
     if (!member) {
         return error(`Unknown union member '${member_name}'`, member_name);
     }
-    return suggest_for_include(workfile, member);
+    return suggest_for_include(workfile, member, owner);
 }
 
-export function suggest_for_array(workfile: Workfile, array: ArrayProperty): Result<PropertySuggestions> {
+export function suggest_for_array(workfile: Workfile, array: ArrayProperty, owner?: string): Result<PropertySuggestions> {
     switch (array.element._t) {
         case "IncludeProperty": {
-            return suggest_for_include(workfile, array.element);
+            return suggest_for_include(workfile, array.element, owner);
         }
         case "EnumProperty": {
             return suggest_for_enum(array.element);
@@ -577,16 +603,16 @@ export function suggest_for_property(workfile: Workfile, symbol_name: string, pr
             return ok({});
         }
         case "IncludeProperty": {
-            return suggest_for_include(workfile, overridden);
+            return suggest_for_include(workfile, overridden, symbol_name);
         }
         case "EnumProperty": {
             return suggest_for_enum(overridden);
         }
         case "UnionProperty": {
-            return suggest_for_union(workfile, overridden, union_member);
+            return suggest_for_union(workfile, overridden, union_member, symbol_name);
         }
         case "ArrayProperty": {
-            return suggest_for_array(workfile, overridden);
+            return suggest_for_array(workfile, overridden, symbol_name);
         }
         case "PlatformOpsProperty": {
             // Only structs carry platform_ops; a descriptor node never reaches here.

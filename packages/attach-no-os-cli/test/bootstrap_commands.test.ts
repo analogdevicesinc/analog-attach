@@ -130,6 +130,22 @@ describe("bootstrap after each command", () => {
         expect(stored()).toEqual(bare);
     });
 
+    it("a link to a node already in the workfile is reported, not only what was created", async () => {
+        await cli("create-workfile");
+        await cli("add", "test_spi_device");
+        const text = await cli("add", "testpart");
+        // The unused SPI device is reused: the connection is the only trace of it.
+        expect(text).toMatch(/> testpart_init_param\.comm_init\.spi_dev\s+test_spi_device \(already in the workfile\)/);
+    });
+
+    it("read names each field's type as the schema writes it, in its own column", async () => {
+        await sensor();
+        const text = await cli("read", "test_sensor_config");
+        expect(text).toMatch(/extra\s+driver_init_param\s+testpart_init_param/);
+        expect(text).toMatch(/ops\s+driver_ops\s+testpart_ops/);
+        expect(text).not.toContain("DriverInitParameterProperty");
+    });
+
     it("a bare part, with no eval board, is not wired and says why", async () => {
         await cli("create-workfile");
         const text = await cli("add", "testpart");

@@ -276,8 +276,9 @@ export function get_any_node(context: WorkfileContext, node_name: string): Resul
 
 // --- Formatters ---
 
-export function format_property_type(t: string): string {
-    const map: Record<string, string> = {
+export function format_property_type(t: Property["_t"]): string {
+    // Every kind, by the `type:` a schema writes for it: a new kind fails to compile here.
+    const map: Record<Property["_t"], string> = {
         "NumberProperty": "number",
         "StringProperty": "string",
         "BooleanProperty": "boolean",
@@ -287,9 +288,16 @@ export function format_property_type(t: string): string {
         "ArrayProperty": "array",
         "PlatformOpsProperty": "platform_ops",
         "PlatformExtraProperty": "platform_extra",
+        "DriverInitParameterProperty": "driver_init_param",
+        "DriverOpsProperty": "driver_ops",
         "RawProperty": "raw",
     };
-    return map[t] ?? t;
+    return map[t];
+}
+
+/** A column as wide as its widest entry (or its heading), plus a gap. */
+export function column_width(heading: string, entries: string[]): number {
+    return Math.max(heading.length, ...entries.map(entry => entry.length)) + 2;
 }
 
 export function format_property_value(property: Property): string {
@@ -328,13 +336,15 @@ export function format_node_list(minimal: MinimalWorkfile, header?: string): str
 
 export function format_property_list(node_name: string, properties: Property[]): string {
     let out = `${node_name} properties:\n\n`;
-    out += `  ${"Property".padEnd(20)}${"Type".padEnd(14)}${"Value"}\n`;
-    out += `  ${"─".repeat(50)}\n`;
+    const name_width = column_width("Property", properties.map(p => p.name));
+    const type_width = column_width("Type", properties.map(p => format_property_type(p._t)));
+    out += `  ${"Property".padEnd(name_width)}${"Type".padEnd(type_width)}${"Value"}\n`;
+    out += `  ${"─".repeat(name_width + type_width + 18)}\n`;
 
     for (const p of properties) {
         const type = format_property_type(p._t);
         const value = format_property_value(p);
-        out += `  ${p.name.padEnd(20)}${type.padEnd(14)}${value}\n`;
+        out += `  ${p.name.padEnd(name_width)}${type.padEnd(type_width)}${value}\n`;
     }
 
     return out;
