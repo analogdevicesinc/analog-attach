@@ -114,10 +114,6 @@ function extract_device_info(
 	};
 }
 
-// Capabilities that must (or should) be initialized before everything else, in order.
-// IRQ controller first: any driver registering an interrupt handler (async UART, timers,
-// data-ready lines) needs it up. UART next: so logging works during the rest of init.
-// Devices without a listed capability keep their original relative order.
 /** Every descriptor `name` reaches through its references, of any kind, in any number of steps. */
 function reached_descriptors(name: string, graph: ConnectionGraph, workfile: Workfile): Set<string> {
 	const reached = new Set<string>();
@@ -136,10 +132,24 @@ function reached_descriptors(name: string, graph: ConnectionGraph, workfile: Wor
 	return reached;
 }
 
+/** Whether a handle is configured through a driver: its config has a driver-backed field. */
+function is_driver_backed(name: string, workfile: Workfile): boolean {
+	const descriptor = workfile.symbols[name];
+	const config_name = descriptor?._t === "RulesetDescriptor" ? descriptor.properties[0].value : undefined;
+	const config = typeof config_name === "string" ? workfile.symbols[config_name] : undefined;
+	return config?._t === "RulesetStruct" && config.properties.some(property =>
+		property._t === "DriverInitParameterProperty" || property._t === "DriverOpsProperty");
+}
+
 /**
  * Init order: a device after every handle it reaches. The ADXL355's handle reaches, through
  * its config, init_param and SPI device, the SPI controller and the chip-select's GPIO port,
- * so those come first. Otherwise workfile order is kept, so the order is stable.
+ * so those come first.
+ *
+ * Then every part before any channel: a channel is a driver-backed handle that reaches another
+ * one (an ADC channel names its ADC). Two sides of one chip each init the chip, and an init
+ * may reset it, so a DAC brought up after an ADC channel would wipe what the channel set.
+ * Otherwise workfile order is kept, so the order is stable.
  */
 function order_devices(devices: DeviceInfo[], workfile: Workfile): DeviceInfo[] {
 	const graph = create_connections_graph(workfile);
@@ -148,11 +158,15 @@ function order_devices(devices: DeviceInfo[], workfile: Workfile): DeviceInfo[] 
 		device.descriptor_name,
 		[...reached_descriptors(device.descriptor_name, graph, workfile)].filter(name => names.has(name)),
 	]));
+	const is_channel = (device: DeviceInfo): boolean => is_driver_backed(device.descriptor_name, workfile)
+		&& (needs.get(device.descriptor_name) ?? []).some(name => is_driver_backed(name, workfile));
+	// Stable: parts keep their workfile order, and so do channels.
+	const candidates = [...devices.filter(device => !is_channel(device)), ...devices.filter(device => is_channel(device))];
 
 	const ordered: DeviceInfo[] = [];
 	const placed = new Set<string>();
 	while (ordered.length < devices.length) {
-		const next = devices.find(device => !placed.has(device.descriptor_name)
+		const next = candidates.find(device => !placed.has(device.descriptor_name)
 			&& (needs.get(device.descriptor_name) ?? []).every(name => placed.has(name)));
 		if (next === undefined) {
 			const stuck = devices.filter(device => !placed.has(device.descriptor_name)).map(device => device.descriptor_name);
