@@ -113,14 +113,24 @@ describe.skipIf(REPOS === undefined)('adxl355 on max32655fthr, from the real rep
         expect(report.value.deleted.sort()).toEqual(['capi_gpio_pin', 'capi_spi_device']);
     });
 
-    test('deleting the eval board takes the whole chain with it', () => {
+    test('deleting the eval board leaves the part as a bare one', () => {
         const workfile = board_workfile();
         add_adxl355(workfile, 'adxl355');
         const before = referenced_nodes(workfile);
         expectOk(remove_symbol(workfile, 'eval_adxl355_pmdz'));
         expectOk(bootstrap(workfile, { referenced_before: before }));
 
-        expect(stored(workfile)).toEqual({});
+        // Exactly what `add adxl355` on its own gives: the chain, without the eval board wiring.
+        const bare = board_workfile();
+        const root = driver_root('adxl355');
+        expectOk(root);
+        const ruleset = load_resolved_ruleset_for_board(root.value, BOARD);
+        expectOk(ruleset);
+        expectOk(add_symbol(bare, 'adxl355', ruleset.value));
+        expectOk(pin_driver(bare, 'adxl355', 'adxl355'));
+        expectOk(bootstrap(bare));
+        expect(stored(workfile)).toEqual(stored(bare));
+        expect(stored(workfile)['capi_spi_device']?.cs_gpio).toBeUndefined();
     });
 
     test('the platform\'s ops tables come from its interfaces_file', () => {
