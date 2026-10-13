@@ -19,13 +19,8 @@ export function build_attach_manifest_command(_context: LocalContext): Command {
                         argv: ["attach-linux", "--json", "config-set"],
                     },
                     "create-workfile": {
-                        description: "Create a minimal DTSO overlay file in CWD and save its path as the overlay config field. --name <filename> overrides the default filename (overlay.dtso). Run this once before any overlay-editing command (add, update, delete, etc.).",
+                        description: "Create a minimal DTSO overlay file in CWD and save its path as the overlay config field. An optional positional <name> overrides the default filename; without it, uses overlay.dtso (or overlay-1.dtso, overlay-2.dtso, … when it already exists). Run this once before any overlay-editing command (add, update, delete, etc.).",
                         argv: ["attach-linux", "--json", "create-workfile"],
-                        args: {
-                            properties: {
-                                name: { type: "string" },
-                            },
-                        },
                     },
                     "list": {
                         description: "List device bindings, properties, values, parents or slots. Subkinds: device [compatible], property <path> [property], value <path> <property>, parent <compatible>, slot [compatible]. Bare `list` shows available kinds.",
