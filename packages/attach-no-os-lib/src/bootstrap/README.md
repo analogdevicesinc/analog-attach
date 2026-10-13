@@ -1,8 +1,8 @@
 # Bootstrap
 
 Fills in a workfile wherever there is no room for choice, and keeps what it filled in
-line with the rules. With it, `attach-noos add adxl355` on a max32655fthr workfile gives a
-valid workfile, the wiring to make it true on the bench, and nothing left to decide.
+line with the rules. With it, `attach-noos add eval-adxl355-pmdz` on a max32655fthr workfile
+gives a valid workfile, the wiring to make it true on the bench, and nothing left to decide.
 
 The law: **bootstrap supplies values, the engine enforces rules.** Bootstrap never decides
 anything that is a choice. When there is exactly one sensible answer it writes it. When
@@ -54,6 +54,41 @@ An option for a reference is one of:
 
 Exactly one option means it is taken. Two or more is a choice, and none means nothing
 provides it. Either way the reference stays unset and is listed in the report's `choices`.
+
+## Adding a part
+
+`attach-noos add` puts one node in the workfile, and bootstrap builds everything below it:
+
+| Command | Adds |
+|---|---|
+| `add <eval board>` | the eval-board node (stored, never generated) and the part it carries, which its pinout then wires |
+| `add <driver>` | the part alone: a bare part, whose chip-select is the user's |
+| `add <driver> --as adc,dac` | one handle per side, all on one chip |
+| `add <schema>` | that one node, nothing pinned |
+
+The part is its driver's root handle (`registry/roots.ts`). `pin_driver()` then names the
+driver once, so nothing below has to be guessed. It creates the root's config and puts
+`<driver>_init_param` in its driver-backed `extra`. Each further `--as` side gets its own
+handle and config, but the same init_param: one chip, several interfaces.
+
+## Driver-backed fields
+
+A config's `extra` and `ops` name only an interface (`type: driver_init_param, interface:
+adc`). The candidates are what every driver providing it ships, outside its `iio` group;
+ops tables are matched by `<interface>_ops`. They are ranked by what the workfile already
+holds (`rank_driver_candidates()`):
+
+- **Elimination across levels.** A struct already filling a driver-backed field of a device
+  config is that device's, so it is never offered to a channel config, and the other way
+  round. A channel config is one that names a handle (`capi_adc_chan_config.adc_handle`).
+  Between two device configs, as with the ADC and DAC sides of one chip, nothing is taken.
+- **Strong and weak.** Of what is left, the structs of a driver that already has a node in
+  the workfile are strong; the rest are weak.
+
+Bootstrap takes the strong options when there are any, else the weak ones, and links only
+when that leaves exactly one. So a channel added next to an ad74413r gets
+`ad74413r_channel_config`, even with another ADC driver configured. Suggestions list strong
+before weak.
 
 ## Hidden nodes
 
@@ -136,10 +171,14 @@ then the pin node), leaving exactly the bare part `add <driver>` gives.
 
 The CLI prints it after each command (`attach-no-os-cli/src/commands/bootstrap_run.ts`).
 
+The keys all of this reads are listed in [docs/vocabulary.md](../../docs/vocabulary.md).
+
 ## Files
 
 - `bootstrap.ts`: the steps, the options and the report.
 - `../registry/hidden.ts`: hidden candidates and handle names.
 - `../registry/wiring.ts`: where pins land, and the chip-select.
 - `../registry/roots.ts`: the root a driver is added through (`add adxl355`).
+- `../registry/drivers.ts`: driver-backed candidates, and their ranking.
+- `../registry/eval_boards.ts`: the eval-board node.
 - `../validator/chip_select.ts`: the shared chip-select check.
