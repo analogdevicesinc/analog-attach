@@ -119,10 +119,15 @@ describe("bootstrap after each command", () => {
         expect(symbols["test_spi_device"]?.cs_gpio_num).toBeUndefined();
     });
 
-    it("deleting the eval board takes the chain bootstrap built with it", async () => {
+    it("deleting the eval board leaves the part as a bare one", async () => {
+        await cli("create-workfile");
+        await cli("add", "testpart");
+        const bare = stored();
+        fs.rmSync(path.join(directory, "workfile.json"));
+
         await sensor();
         await cli("delete", "eval_testpart");
-        expect(stored()).toEqual({});
+        expect(stored()).toEqual(bare);
     });
 
     it("a bare part, with no eval board, is not wired and says why", async () => {

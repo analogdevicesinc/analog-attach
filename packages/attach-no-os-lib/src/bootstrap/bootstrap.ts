@@ -36,7 +36,8 @@
  * Before any of that, the values bootstrap already owns ("$auto") follow the current rules:
  * a plain value is set to what its fill rule gives now, or removed when it gives nothing; a
  * reference is removed when the node it names no longer fits there. Values the user wrote are
- * never touched. The chip-select fields follow the wiring instead, and are left as they are.
+ * never touched. The chip-select fields follow the wiring instead: they stay as long as an
+ * eval board carries the part, and go once none does (deleting the eval board leaves a bare part).
  *
  * Termination: a revision only ever writes what the fill rule gives, which the fill and link
  * steps then leave alone, and they only fill unset values or add nodes - so nothing flips back
@@ -471,10 +472,19 @@ function revise_step(workfile: Workfile, wiring: Map<string, Set<string>>): Step
 
 // --- Dropping what is no longer used --------------------------------------------------------
 
-/** Every node something in the workfile references. */
+/**
+ * Every node something in the workfile references. An eval board naming its part does not
+ * count: the part is a root either way, so deleting the eval board leaves it as a bare part.
+ */
 export function referenced_nodes(workfile: Workfile): Set<string> {
 	const graph = create_connections_graph(workfile);
-	return new Set([...graph.values()].flatMap(children => children.map(child => child.name)));
+	return new Set([...graph.entries()]
+		.filter(([parent]) => !is_eval_board(workfile.symbols[parent]))
+		.flatMap(([, children]) => children.map(child => child.name)));
+}
+
+function is_eval_board(node: Ruleset | undefined): boolean {
+	return node?._t === "RulesetStruct" && node.$eval_board === true;
 }
 
 /** Whether every value a node holds is bootstrap's: nothing the user wrote, or cleared, is lost by deleting it. */
@@ -857,6 +867,39 @@ function chip_select_step(workfile: Workfile, externs: ExternIndex): Step | unde
 		return { kind: "chip_select", device, part: part.name, resolved: decided };
 	}
 
+	return undefined;
+}
+
+/**
+ * The first value bootstrap wired from an eval board that no longer carries the part (the
+ * eval board was deleted): it goes, so the part is left bare, as `add <driver>` leaves it.
+ * The controller goes first, while the chip-select still says the device was wired, since the
+ * wiring may be what picked it among several buses; the fill rule puts it back if the board
+ * has only one. Then the chip-select, whose pin node is dropped once nothing names it.
+ */
+function unwire_step(workfile: Workfile): Step | undefined {
+	const binding = get_registry();
+	if (!binding.ok || binding.value.chip_select === undefined) {
+		return undefined;
+	}
+	const chip_select = binding.value.chip_select;
+
+	for (const { device, part_node } of parts_on_bus(workfile)) {
+		const device_node = workfile.symbols[device];
+		if (device_node?._t !== "RulesetStruct" || device_node.$symbol !== chip_select.device) {
+			continue;
+		}
+		const wired = device_node.properties.find(property =>
+			(property.name === chip_select.gpio_list || property.name === chip_select.native_mask)
+			&& property.auto === true && property.value !== undefined);
+		if (wired === undefined || eval_board_for(workfile, part_node) !== undefined) {
+			continue;
+		}
+		const controller = device_node.properties.find(property =>
+			property.auto === true && wrapped_extern(workfile, property.value) !== undefined);
+		const unwired = controller ?? wired;
+		return { kind: "revise", node: device, property: unwired.name, previous: unwired.value };
+	}
 	return undefined;
 }
 
@@ -1252,7 +1295,7 @@ export function bootstrap(workfile: Workfile, options: BootstrapOptions = {}): R
 	for (let steps = 0; steps < STEP_CAP; steps++) {
 		// What bootstrap already owns is brought in line first, then what is no longer used
 		// goes, so every fill and link after is judged against the workfile that remains.
-		const step = revise_step(workfile, wiring) ?? drop_step(workfile, watched) ?? next_step(workfile, externs.value);
+		const step = revise_step(workfile, wiring) ?? unwire_step(workfile) ?? drop_step(workfile, watched) ?? next_step(workfile, externs.value);
 		if (step === undefined) {
 			// A node that went is reported once, as deleted, not also value by value.
 			report.revised = report.revised.filter(revision => !report.deleted.includes(revision.node));

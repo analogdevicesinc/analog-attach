@@ -115,6 +115,9 @@ its own controller. When no free line is left, bootstrap stops and lists free he
 as hints. `validate` flags two devices that share a chip-select, however they got there.
 
 The chip-select fields follow the wiring, not the fill rule, so step 1 leaves them alone.
+Only an eval-board node in the workfile wires a part, and its `part` link is not a
+reference: deleting the eval board removes the chip-select bootstrap wired from it (and
+then the pin node), leaving exactly the bare part `add <driver>` gives.
 
 ## The report
 
