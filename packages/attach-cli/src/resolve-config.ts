@@ -70,7 +70,7 @@ export function resolve_config<K extends keyof AttachConfig>(
 
     const checked = check_config(config, required);
     if (!checked.ok) {
-        const message = check_failure_message(checked);
+        const message = check_failure_message(checked.failures);
         if (context.json) { input_error(message.json); }
         else { console.log(message.human); }
         return undefined;

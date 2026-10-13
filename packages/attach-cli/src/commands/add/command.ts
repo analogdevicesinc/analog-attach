@@ -44,7 +44,7 @@ export function build_add_command(context_: LocalContext): Command {
             const pre_config = load_config() ?? {};
             const pre_check = check_config(pre_config, ["linux", "dtSchema", "devicetree"]);
             if (!pre_check.ok) {
-                const message = check_failure_message(pre_check);
+                const message = check_failure_message(pre_check.failures);
                 if (context_.json) { input_error(message.json); }
                 else { console.log(message.human); }
                 return;
