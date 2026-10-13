@@ -1,0 +1,15 @@
+name: otheradc
+type: driver
+category: adc
+version: "1.0.0"
+description: "A second ADC part: the other candidate for every ADC field"
+
+build:
+  kconfig: OTHERADC
+  sources: [otheradc.c]
+  includes: [.]
+
+provides:
+  interfaces: [test_adc]
+
+rulesets_file: analog-attach/module.yml

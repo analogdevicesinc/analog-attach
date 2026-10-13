@@ -1,0 +1,11 @@
+name: adc
+type: driver_category
+version: "1.0.0"
+description: "ADC and DAC drivers"
+
+drivers:
+  - dualpart
+  - otheradc
+
+provides:
+  interfaces: [test_adc, test_dac]

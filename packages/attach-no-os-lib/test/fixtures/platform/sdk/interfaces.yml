@@ -1,0 +1,7 @@
+# The platform's ops tables, in capi-maxim's sdk/interfaces.yml shape. `time` has no ops
+# table (function-based), so it yields none.
+schema_version: "1.0"
+interfaces:
+  - {name: spi, header: [testvendor_spi.h], ops_symbol: testvendor_spi_ops, capi_header: [test_spi.h]}
+  - {name: gpio, header: [testvendor_gpio.h], ops_symbol: testvendor_gpio_ops, capi_header: [test_gpio.h]}
+  - {name: time, header: [], ops_symbol: null, capi_header: [test_time.h]}

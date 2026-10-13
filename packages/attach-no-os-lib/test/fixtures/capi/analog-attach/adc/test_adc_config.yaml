@@ -1,0 +1,13 @@
+$type: struct
+$symbol: test_adc_config
+$description: "Generic ADC configuration: the device level"
+extra:
+  type: driver_init_param
+  interface: test_adc
+  required: true
+  description: "The selected driver's own init_param"
+adc_ops:
+  type: driver_ops
+  interface: test_adc
+  required: true
+  description: "The selected driver's ADC ops table"

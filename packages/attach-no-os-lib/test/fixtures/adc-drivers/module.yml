@@ -1,0 +1,7 @@
+name: adc-drivers-test
+type: driver_collection
+version: "1.0.0"
+description: "A second driver bundle: two ADC parts, standing in for ad74413r and a rival"
+
+provides:
+  interfaces: [test_adc, test_dac]

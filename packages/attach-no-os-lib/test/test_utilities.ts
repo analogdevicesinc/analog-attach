@@ -22,6 +22,8 @@ export const FIXTURES_ROOT = path.resolve(__dirname, 'fixtures');
 export const FIXTURE_CAPI = path.join(FIXTURES_ROOT, 'capi');
 export const FIXTURE_PLATFORM = path.join(FIXTURES_ROOT, 'platform');
 export const FIXTURE_DRIVERS = path.join(FIXTURES_ROOT, 'driver-collection');
+/** A second driver collection, opted into by the tests that need two ADC parts. */
+export const FIXTURE_ADC_DRIVERS = path.join(FIXTURES_ROOT, 'adc-drivers');
 
 /** The board most tests target, and the chip it carries. */
 export const FIXTURE_BOARD = 'testboard';

@@ -32,3 +32,11 @@ rulesets:
   i2c:
     - i2c/test_i2c_config.yaml
     - i2c/test_i2c_device.yaml
+  adc:
+    - adc/test_adc.yaml
+    - adc/test_adc_config.yaml
+    - adc/test_adc_chan.yaml
+    - adc/test_adc_chan_config.yaml
+  dac:
+    - dac/test_dac.yaml
+    - dac/test_dac_config.yaml

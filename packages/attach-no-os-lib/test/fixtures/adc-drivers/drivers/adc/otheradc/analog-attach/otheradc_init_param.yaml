@@ -1,0 +1,7 @@
+$type: struct
+$symbol: otheradc_init_param
+$description: "The other part's configuration"
+rate:
+  type: uint32_t
+  default: 1000
+  description: "Sample rate, in Hz"

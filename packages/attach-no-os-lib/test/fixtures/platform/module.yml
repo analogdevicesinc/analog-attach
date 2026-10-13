@@ -18,5 +18,8 @@ boards:
 # config points at. No real CAPI platform does yet, but the code path is live.
 rulesets_file: analog-attach/module.yml
 
+# The platform's ops tables (testvendor_spi_ops, ...), loaded into every workfile.
+interfaces_file: sdk/interfaces.yml
+
 metadata:
   vendor: testvendor

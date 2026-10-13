@@ -1,0 +1,5 @@
+$type: extern
+$symbol: otheradc_adc_ops
+$provides: test_adc_ops
+$header: otheradc.h
+$description: "The other part's ADC ops table"

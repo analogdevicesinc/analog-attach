@@ -1,0 +1,9 @@
+schema_version: "1.0"
+
+rulesets:
+  structs:
+    - dualpart_init_param.yaml
+    - dualpart_channel_config.yaml
+  externs:
+    - dualpart_adc_ops.yaml
+    - dualpart_dac_ops.yaml

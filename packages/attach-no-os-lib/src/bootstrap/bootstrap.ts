@@ -713,6 +713,15 @@ function taken_chip_selects(workfile: Workfile, device: string, binding: ChipSel
 	return taken;
 }
 
+/** Whether a SPI device still has no chip-select, and the user did not clear it on purpose. */
+function chip_select_unsettled(workfile: Workfile, device: string): boolean {
+	const binding = get_registry();
+	const chip_select = binding.ok ? binding.value.chip_select : undefined;
+	const node = workfile.symbols[device];
+	return chip_select !== undefined && node?.$symbol === chip_select.device
+		&& !has_chip_select(node, chip_select) && !chip_select_cleared(node, chip_select);
+}
+
 /** Whether the user set either chip-select field to nothing: their call, not the wiring's. */
 function chip_select_cleared(node: Ruleset | undefined, binding: ChipSelectBinding): boolean {
 	return node?._t === "RulesetStruct" && node.properties.some(property =>
@@ -996,8 +1005,11 @@ function touched_nodes(report: BootstrapReport): Set<string> {
 }
 
 /**
- * The wiring of every bus device this run touched. Untouched devices are left out, so a run
- * that changes nothing reports nothing - their wiring was reported when it was settled.
+ * The wiring of every bus device this run touched, and of every device on an eval board whose
+ * chip-select is still unsettled. Settled, untouched devices are left out, so a run that
+ * changes nothing reports nothing - their wiring was reported when it was settled. An
+ * unsettled one is an open problem, like an open choice, so it is reported until it is not
+ * (an eval board attached to a part that already had its chain).
  */
 function wiring_of(workfile: Workfile, touched: Set<string>): BusWiring[] {
 	if (workfile.board === undefined) {
@@ -1006,10 +1018,10 @@ function wiring_of(workfile: Workfile, touched: Set<string>): BusWiring[] {
 
 	const wiring: BusWiring[] = [];
 	for (const { device, driver, part_node, interface: interface_ } of parts_on_bus(workfile)) {
-		if (!touched.has(device)) {
+		const part = eval_board_for(workfile, part_node);
+		if (!touched.has(device) && !(part !== undefined && chip_select_unsettled(workfile, device))) {
 			continue;
 		}
-		const part = eval_board_for(workfile, part_node);
 		if (part === undefined) {
 			wiring.push(bare_part_wiring(workfile, device, driver, interface_));
 			continue;
