@@ -51,14 +51,14 @@ import { provided_id, RulesetType } from "../ruleset_parser/types";
 import { load_resolved_ruleset, load_resolved_ruleset_for_board } from "../resolver/resolver";
 import type { ChipSelectBinding } from "../registry/module_yml";
 import type { RulesetEntry } from "../registry/types";
-import { driver_init_parameter_candidates, driver_ops_candidates, rank_driver_candidates } from "../registry/drivers";
+import { driver_init_parameter_candidates, driver_ops_candidates, pinned_init_parameter, rank_driver_candidates } from "../registry/drivers";
 import { build_extern_index, hidden_candidates, wrapper_name } from "../registry/hidden";
 import type { ExternIndex, HiddenCandidate } from "../registry/hidden";
 import { board_gpio_ports } from "../registry/bsp";
 import type { PinReference } from "../registry/bsp";
 import type { GpioIdentity } from "../registry/types";
 import { get_registry, resolve_entry } from "../registry/registry";
-import { free_chip_select_pins, resolve_bus } from "../registry/wiring";
+import { free_chip_select_pins, resolve_bus, unidentified_bus_connectors } from "../registry/wiring";
 import { EVAL_BOARD_PART, find_eval_board_module } from "../registry/eval_boards";
 import type { ModuleInfo } from "../registry/types";
 import type { ChipSelect, Connection, TakenChipSelects } from "../registry/wiring";
@@ -1046,7 +1046,10 @@ function wiring_of(workfile: Workfile, touched: Set<string>): BusWiring[] {
 		// Nothing landed and nothing went wrong: the part has no pins for this bus at all,
 		// which is a board that cannot be used this way (a SPI-only Pmod set to I2C).
 		if (resolved.value.connections.length === 0 && problems.length === 0) {
-			problems.push(`${part.name} declares no ${interface_} pins, so it cannot be wired over ${interface_}`);
+			const unnamed = unidentified_bus_connectors(part, interface_);
+			problems.push(unnamed.length > 0
+				? `${part.name}'s ${unnamed.map(name => `'${name}'`).join(", ")} has ${interface_} pins but no id in its module.yml pinout, so they cannot be wired`
+				: `${part.name} declares no ${interface_} pins, so it cannot be wired over ${interface_}`);
 		}
 
 		wiring.push({
@@ -1243,9 +1246,7 @@ export function pin_driver(workfile: Workfile, root: string, driver: string, chi
 
 	// The driver's own init_param, for each driver-backed init_param field it provides for.
 	const config_node = workfile.symbols[config];
-	const own_config = `${driver}_init_param`;
-	const entry = resolve_entry(own_config);
-	if (config_node?._t !== "RulesetStruct" || !entry.ok || entry.value.module.path !== module.path || entry.value.$type !== RulesetType.RT_STRUCT) {
+	if (config_node?._t !== "RulesetStruct") {
 		return ok(linked);
 	}
 	for (const property of config_node.properties) {
@@ -1253,6 +1254,14 @@ export function pin_driver(workfile: Workfile, root: string, driver: string, chi
 			|| module.provides_interfaces?.includes(property.interface) !== true) {
 			continue;
 		}
+		const pinned = pinned_init_parameter(module, property.interface);
+		if (!pinned.ok) {
+			return pinned;
+		}
+		if (pinned.value === undefined) {
+			continue;
+		}
+		const own_config = pinned.value.$symbol;
 		let name = chip;
 		if (name === undefined) {
 			const loaded = load_resolved_ruleset_for_board(own_config, workfile.board);

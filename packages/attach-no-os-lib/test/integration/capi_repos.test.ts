@@ -63,6 +63,7 @@ const EVAL_BOARDS: Record<string, string> = {
     adxl355: 'eval-adxl355-pmdz',
     ad74413r: 'eval-ad-swio-2-click',
     adt7420: 'eval-adt7420-pmdz',
+    ad7156: 'eval-pmodcdc1',
 };
 
 function board_workfile(): Workfile {
@@ -230,5 +231,43 @@ describe.skipIf(REPOS === undefined)('ad74413r on max32655fthr, from the real re
         // Each part's mode stays its own, though both devices are the same schema.
         expect(symbols['capi_spi_device']?.mode).toBe('CAPI_SPI_MODE_0');
         expect(symbols['capi_spi_device_1']?.mode).toBe('CAPI_SPI_MODE_1');
+    });
+});
+
+describe.skipIf(REPOS === undefined)('ad7156 on max32655fthr, from the real repos', () => {
+    beforeEach(() => { setup_test_config(REPOS); });
+    afterEach(() => { teardown_test_config(); });
+
+    test('one node becomes a valid workfile, set up like the eval board\'s own project', () => {
+        const workfile = board_workfile();
+        add_driver(workfile, 'ad7156', 'ad7156');
+
+        expect(validate_workfile(workfile).valid).toBe(true);
+        const symbols = stored(workfile);
+        // The adapter's struct is the extra; the part's own is embedded in it as `device`.
+        expect(symbols['capi_proximity_sensor_init_config']).toMatchObject({ extra: 'ad7156_capi_init_param', ops: 'ad7156_capi_proximity_ops' });
+        expect(symbols['ad7156_capi_init_param']?.device).toBe('ad7156_init_param');
+        expect(symbols['ad7156_init_param']).toMatchObject({ i2c_dev: 'capi_i2c_device', channel1_range: 2, channel2_range: 2 });
+        // Fixed in silicon, and on the board's only I2C bus.
+        expect(symbols['capi_i2c_device']).toMatchObject({ address: 0x48, speed: 'CAPI_I2C_SPEED_FAST', controller: 'bsp_i2c2_cfg_handle' });
+    });
+
+    test('its eval board wires it to the board\'s I2C pins', () => {
+        const workfile = board_workfile();
+        const root = driver_root('ad7156');
+        expectOk(root);
+        const ruleset = load_resolved_ruleset_for_board(root.value, BOARD);
+        expectOk(ruleset);
+        expectOk(add_symbol(workfile, 'ad7156', ruleset.value));
+        expectOk(pin_driver(workfile, 'ad7156', 'ad7156'));
+        expectOk(attach_eval_board(workfile, 'eval-pmodcdc1', 'ad7156'));
+        const report = bootstrap(workfile);
+        expectOk(report);
+
+        const wiring = report.value.wiring.find(entry => entry.interface === 'i2c');
+        expect(wiring?.problems).toEqual([]);
+        expect(wiring?.peripheral).toBe('bsp_i2c2_cfg');
+        expect(wiring?.connections.map(connection => `${connection.role} -> ${connection.to.connector} ${connection.to.pin}`))
+            .toEqual(expect.arrayContaining(['i2c_scl -> J7 11', 'i2c_sda -> J7 12']));
     });
 });

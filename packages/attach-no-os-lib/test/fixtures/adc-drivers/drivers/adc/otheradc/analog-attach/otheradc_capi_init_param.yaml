@@ -1,0 +1,14 @@
+$type: struct
+$symbol: otheradc_capi_init_param
+$description: "The adapter's configuration, like ad7156_capi_init_param: it embeds the part's
+  own struct, so only this one is what the handle takes"
+device:
+  include: otheradc_init_param
+  required: true
+  description: "The part's own configuration, embedded"
+channels:
+  type: array
+  size: 2
+  element:
+    include: otheradc_channel
+  description: "Per-channel settings, embedded"

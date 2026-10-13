@@ -261,7 +261,7 @@ And what each one can say about itself:
 | `default` | the value it starts with. On an include of an enum, the field's own default wins over the enum's. |
 | `minimum`, `maximum`, `values` | the values it accepts |
 | `format: hex` | an integer field shown and generated in hex (`0x1D`). Integer types only. |
-| `pointer` | the field is a pointer to what it includes |
+| `pointer` | the field is a pointer to what it includes. Without it, an include of a struct embeds that struct: the node is written inside its owner (`.device = { ... }`) and has no global of its own |
 | `count: <field>` | an include is a list, and that field holds its length |
 | `readonly` | a member the init function fills in: referenceable, never set |
 | `disabled` | the field is not used: an `$override` case sets it, and an array can say so itself |
@@ -359,15 +359,18 @@ because each looks like it would need one.
   another candidate root hangs off it, so it is not one. An ADC channel names its ADC. A
   driver with two roots (ad74413r: an ADC and a DAC) asks for `--as`.
 - **Which driver fills a field.** The candidates are the structs (or, for ops, the externs)
-  of every driver providing the field's `interface`, outside its `iio` group. Those from a
+  of every driver providing the field's `interface`, outside its `iio` group, except a struct
+  another of the driver's candidates includes: that one is a part of it. ad7156's handle takes
+  the adapter's `ad7156_capi_init_param`, which embeds `ad7156_init_param` as `device`. Those from a
   part already in the workfile are *strong*, the rest *weak*. Bootstrap takes the only
   strong one. Suggestions list strong ones first. A struct already filling a driver-backed
   field at the other level (device config versus channel config) belongs to that level. So
   once `ad74413r_init_param` fills the ADC's config, a channel gets `ad74413r_channel_config`.
 - **Which ops table.** A driver providing several interfaces ships one table per interface,
   and each is the one whose `$provides` ends in `<interface>_ops` (`capi_adc_ops`).
-- **Pinning a driver.** `add <driver>` puts the driver's own `<driver>_init_param` in its
-  root's config by name. With `--as adc,dac`, every side shares that one chip.
+- **Pinning a driver.** `add <driver>` puts the driver's init_param in its root's config:
+  its only candidate, or `<driver>_init_param` when it has several (ad74413r's chip and
+  channel structs). With `--as adc,dac`, every side shares that one chip.
 - **Eval boards.** `add <eval board>` adds a node for the board (stored, never generated) and
   the part its `implements.driver` names. Only a part an eval-board node reaches is wired. `add
   <driver>` alone is a bare part whose wiring is the user's. Deleting the eval board leaves a
