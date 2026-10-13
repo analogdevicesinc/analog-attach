@@ -181,6 +181,20 @@ export function capi_project(workfile: Workfile): Result<CapiProject> {
 			headers.add(path.basename(node.$header));
 		}
 	}
+	// A platform ops table a node points at (`ops = maxim_capi_spi_ops`): the headers declaring it.
+	for (const node of Object.values(workfile.symbols)) {
+		if (node._t !== "RulesetStruct") {
+			continue;
+		}
+		for (const property of node.properties) {
+			const table = property._t === "PlatformOpsProperty" && typeof property.value === "string"
+				? workfile.platform_ops[property.value]
+				: undefined;
+			for (const header of table?._t === "RulesetPlatformOps" ? table.$headers ?? [] : []) {
+				headers.add(path.basename(header));
+			}
+		}
+	}
 	if (iio.length > 0) {
 		headers.add("capi_iio_app.h");
 		headers.add("capi_util.h");

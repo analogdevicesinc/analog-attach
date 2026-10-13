@@ -20,6 +20,7 @@ import type { PropertySuggestions } from "./types";
 import { load_resolved_ruleset, load_resolved_ruleset_for_board } from "../resolver/resolver";
 import { all_symbols, is_platform_symbol } from "../registry/registry";
 import { board_externs } from "../registry/bsp";
+import { platform_ops_tables } from "../registry/interfaces";
 import { find_soc } from "../registry/platforms";
 import { build_extern_index, hidden_candidates } from "../registry/hidden";
 import type { ExternIndex, HiddenCandidate } from "../registry/hidden";
@@ -52,10 +53,16 @@ export function create_workfile(platform?: string): Result<Workfile> {
 
     workfile.platform_vendor = soc.value.platform.vendor ?? soc.value.platform.name;
 
-    // TODO(capi): the ops tables. A platform no longer ships a platform.yaml listing
-    // ruleset files; it declares its interfaces in the `interfaces_file:` its module.yml
-    // names, and ops reach a workfile through that and through each driver's own ops
-    // extern. Until that lands a workfile carries the target and no ops.
+    // The platform's ops tables (maxim_capi_spi_ops, ...), from the interfaces_file its
+    // module.yml names. A driver's own ops table is an extern of the driver, not one of these.
+    const tables = platform_ops_tables(soc.value.platform);
+    if (!tables.ok) {
+        return tables;
+    }
+    for (const table of tables.value) {
+        workfile.platform_ops[table.$symbol] = table;
+    }
+
     return ok(workfile);
 }
 
@@ -527,6 +534,16 @@ export function suggest_for_enum(property: EnumProperty): Result<PropertySuggest
     return ok({ values: property.values.map(p => typeof p === "number" ? p.toString() : p)});
 }
 
+/**
+ * Whether a platform ops table fits a field: its capability is the field's own (capi:
+ * `ops: {type: platform_ops, capability: spi}`), or the struct's when the field names none.
+ */
+export function ops_capability_fits(ops: RulesetPlatformOps, property: PlatformOpsProperty, parent_struct: RulesetStruct): boolean {
+    const wanted = property.capability ?? (parent_struct.$capability === undefined ? [] : [parent_struct.$capability]);
+    // Nothing declared on either: no constraint to check.
+    return wanted.length === 0 || (ops.$capability !== undefined && wanted.includes(ops.$capability));
+}
+
 export function suggest_platform_ops(workfile: Workfile, property: PlatformOpsProperty, parent_struct: RulesetStruct): Result<PropertySuggestions> {
     const suggestions: string[] = [];
 
@@ -540,7 +557,7 @@ export function suggest_platform_ops(workfile: Workfile, property: PlatformOpsPr
             if (property.allowed.includes(ops.$symbol)) {
                 suggestions.push(name);
             }
-        } else if (ops.$capability === parent_struct.$capability) {
+        } else if (ops_capability_fits(ops, property, parent_struct)) {
             // No override restriction, fall back to capability matching
             suggestions.push(name);
         }

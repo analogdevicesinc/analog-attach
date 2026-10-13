@@ -363,6 +363,9 @@ export type RulesetPlatformOps = RulesetBase & {
 	_t: "RulesetPlatformOps",
 	$type: RulesetType.RT_PLATFORM_OPS,
 	$capability?: string,
+	// The headers declaring the table (maxim_capi_spi.h) and its type (capi_spi.h), from the
+	// platform's interfaces_file: what generated code must include to reference it.
+	$headers?: string[],
 };
 
 // A symbol the library already defines, so we reference it and never emit it:

@@ -186,6 +186,21 @@ describe.skipIf(!ENABLED)('generated CAPI apps build on max32655fthr', () => {
         expect(generated_warnings(generate_and_build(workfile, 'ad74413r-adc-dac'))).toEqual([]);
     }, BUILD_TIMEOUT);
 
+    test('a SPI controller the user configures by hand', () => {
+        const workfile = board_workfile();
+        const config = load_resolved_ruleset_for_board('capi_spi_config', BOARD);
+        expectOk(config);
+        expectOk(add_symbol(workfile, 'my_spi', config.value));
+        expectOk(bootstrap(workfile));
+        update(workfile, 'my_spi', 'identifier', 0);
+        const controller = load_resolved_ruleset_for_board('capi_spi_controller', BOARD);
+        expectOk(controller);
+        expectOk(add_symbol(workfile, 'my_ctrl', controller.value));
+        expectOk(bootstrap(workfile));
+        update(workfile, 'my_ctrl', '$init_param', 'my_spi');
+        expect(generated_warnings(generate_and_build(workfile, 'hand-made-spi'))).toEqual([]);
+    }, BUILD_TIMEOUT);
+
     test('adt7420 over I2C', () => {
         const workfile = board_workfile();
         add_driver(workfile, 'adt7420', 'adt7420');
