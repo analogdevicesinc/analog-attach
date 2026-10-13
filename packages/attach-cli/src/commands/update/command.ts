@@ -1,11 +1,7 @@
 /* eslint-disable unicorn/no-useless-undefined */
 import { Command } from "commander";
 import {
-    Attach,
     AttachEnumType,
-    IntelligenceStack,
-    board_layer,
-    parse_board_description,
     DeviceTree,
     DeviceTreeOverlay,
     NodeBuilder,
@@ -895,63 +891,6 @@ if (import.meta.vitest) {
         expect(format_suggestion({ rows: [[19n, { macro: "IRQ_TYPE_EDGE_RISING" }]] })).toBe("19 IRQ_TYPE_EDGE_RISING");
     });
 
-    test("format_value - board suggestions round-trip through parse_value + build_raw_property into the expected cells", () => {
-        const board = parse_board_description(fs.readFileSync(new URL("../../../bundled/boards/pmd-rpi-intz.yaml", import.meta.url), "utf8"));
-        if (typeof board === "string") { throw new TypeError(board); }
-        const devicetree = DeviceTree.new_from_string(`/dts-v1/;
-/ {
-    soc {
-        gpio: gpio@7e200000 {
-            compatible = "brcm,bcm2711-gpio";
-            gpio-controller;
-            #gpio-cells = <2>;
-            interrupt-controller;
-            #interrupt-cells = <2>;
-        };
-        spi0: spi@7e204000 {
-            compatible = "brcm,bcm2835-spi";
-            #address-cells = <1>;
-            #size-cells = <0>;
-        };
-    };
-};`);
-        if (typeof devicetree === "string") { throw new TypeError(devicetree); }
-
-        const data = JSON.stringify({ "interrupt-parent": "gpio", "reset-gpios": ["gpio"] });
-        const definitions = Attach.populate_properties([
-            { key: "interrupt-parent", value: { _t: "generic" } },
-            { key: "interrupts", value: { _t: "array", minItems: 1, maxItems: 1 } },
-            { key: "reset-gpios", value: { _t: "generic" } },
-        ], devicetree, data);
-
-        const placement = { node_path: "/soc/spi@7e204000/adc@0", parent_path: "/soc/spi@7e204000", reg: 0n, siblings: [] };
-        const stack = IntelligenceStack.default().with(board_layer(board));
-
-        const is_label_rt = (name: string): boolean =>
-            devicetree.node_exists(name);
-
-        const round_trip = (property: string, display: string) => {
-            const suggestion = stack.suggest_values(property, { devicetree, data, placement }).find(s => s.display.includes(display));
-            expect(suggestion, `${property}: ${display}`).toBeDefined();
-            const definition = definitions.find(d => d.key === property)!;
-            const hint = shape_hint(definition);
-            const result = build_raw_property(format_value(suggestion!.rows), property, hint, is_label_rt);
-            expect(result).toBeDefined();
-            expect("error" in result!).toBe(false);
-            return (result as DTProperty).value;
-        };
-
-        expect(round_trip("interrupts", "19 IRQ_TYPE_EDGE_FALLING — spi_pmod1.int")).toMatchObject([
-            { kind: "array", elements: [{ kind: "number", value: 19n }, { kind: "number", value: 2n }] },
-        ]);
-        expect(round_trip("reset-gpios", "gpio 21 GPIO_ACTIVE_LOW — spi_pmod1.reset")).toMatchObject([
-            { kind: "array", elements: [{ kind: "label", name: "gpio" }, { kind: "number", value: 21n }, { kind: "number", value: 1n }] },
-        ]);
-        expect(round_trip("interrupt-parent", "gpio — interrupt lines of spi_pmod1")).toMatchObject([
-            { kind: "array", elements: [{ kind: "label", name: "gpio" }] },
-        ]);
-    });
-
     test("decide_update — known flag, no value → set-flag", () => {
         expect(decide_update("flag", [], false)).toBe("set-flag");
     });
@@ -1044,116 +983,4 @@ if (import.meta.vitest) {
         expect(output).toContain("reg");
     });
 
-    test("build_raw_property — end-to-end cs-gpios with 6-row board suggestion", () => {
-        const board = parse_board_description(fs.readFileSync(new URL("../../../bundled/boards/pmd-rpi-intz.yaml", import.meta.url), "utf8"));
-        if (typeof board === "string") { throw new TypeError(board); }
-        const devicetree = DeviceTree.new_from_string(`/dts-v1/;
-/ {
-    soc {
-        gpio: gpio@7e200000 {
-            compatible = "brcm,bcm2711-gpio";
-            gpio-controller;
-            #gpio-cells = <2>;
-        };
-        spi0: spi@7e204000 {
-            compatible = "brcm,bcm2835-spi";
-            #address-cells = <1>;
-            #size-cells = <0>;
-            cs-gpios = <&gpio 8 1>, <&gpio 7 1>;
-        };
-    };
-};`);
-        if (typeof devicetree === "string") { throw new TypeError(devicetree); }
-
-        const is_label_cs = (name: string): boolean =>
-            devicetree.node_exists(name);
-
-        const overlay = DeviceTreeOverlay.new_from_string(`/dts-v1/;\n/plugin/;\n/ { };`, devicetree);
-        if (typeof overlay === "string") { throw new TypeError(overlay); }
-
-        const stack = IntelligenceStack.default().with(board_layer(board));
-        const placement = { node_path: "/soc/spi@7e204000", parent_path: "/soc", siblings: [] };
-        const cs_suggestion = stack.suggest_values("cs-gpios", { devicetree, data: "{}", placement })[0];
-        expect(cs_suggestion).toBeDefined();
-
-        const formatted = format_value(cs_suggestion!.rows);
-        const built = build_raw_property(formatted, "cs-gpios", "cells", is_label_cs);
-        expect(built).toBeDefined();
-        expect("error" in built!).toBe(false);
-        const property = built as DTProperty;
-
-        place_property(overlay, "spi0", undefined, true, property, "cs-gpios");
-        const printed = overlay.print();
-        const reparsed = DeviceTreeOverlay.new_from_string(printed, devicetree);
-        expect(typeof reparsed).not.toBe("string");
-
-        expect(printed).toContain("&gpio");
-        expect(printed).toMatch(/<&gpio\s+8\s+1>/);
-    });
-
-    test("build_raw_property — <0> placeholder round-trips through format → parse → build → print → reparse", () => {
-        const board = parse_board_description(fs.readFileSync(new URL("../../../bundled/boards/pmd-rpi-intz.yaml", import.meta.url), "utf8"));
-        if (typeof board === "string") { throw new TypeError(board); }
-
-        const gapped_fixture = `
-schema_version: 4
-board: GAPPED-CS
-gpio_controller: "&gpio"
-buses:
-  spi0: {type: spi}
-slots:
-  slot:
-    bus: spi0
-    signals:
-      cs: {kind: chip-select, gpio: 8, reg: 0}
-      cs2: {kind: chip-select, gpio: 7, reg: 1}
-      cs4: {kind: chip-select, gpio: 18, reg: 3}`;
-        const gapped_board = parse_board_description(gapped_fixture);
-        if (typeof gapped_board === "string") { throw new TypeError(gapped_board); }
-
-        const devicetree = DeviceTree.new_from_string(`/dts-v1/;
-/ {
-    soc {
-        gpio: gpio@7e200000 {
-            compatible = "brcm,bcm2711-gpio";
-            gpio-controller;
-            #gpio-cells = <2>;
-        };
-        spi0: spi@7e204000 {
-            compatible = "brcm,bcm2835-spi";
-            #address-cells = <1>;
-            #size-cells = <0>;
-        };
-    };
-};`);
-        if (typeof devicetree === "string") { throw new TypeError(devicetree); }
-
-        const is_label = (name: string): boolean =>
-            devicetree.node_exists(name);
-
-        const overlay = DeviceTreeOverlay.new_from_string(`/dts-v1/;\n/plugin/;\n/ { };`, devicetree);
-        if (typeof overlay === "string") { throw new TypeError(overlay); }
-
-        const stack = IntelligenceStack.default().with(board_layer(gapped_board));
-        const placement = { node_path: "/soc/spi@7e204000", parent_path: "/soc", siblings: [] };
-        const cs_suggestion = stack.suggest_values("cs-gpios", { devicetree, data: "{}", placement })[0];
-        expect(cs_suggestion).toBeDefined();
-        expect(cs_suggestion!.rows).toHaveLength(4);
-        expect(cs_suggestion!.rows[2]).toStrictEqual([0n]);
-
-        const formatted = format_value(cs_suggestion!.rows);
-        const built = build_raw_property(formatted, "cs-gpios", "cells", is_label);
-        expect(built).toBeDefined();
-        expect("error" in built!).toBe(false);
-
-        place_property(overlay, "spi0", undefined, true, built as DTProperty, "cs-gpios");
-        const printed = overlay.print();
-        const reparsed = DeviceTreeOverlay.new_from_string(printed, devicetree);
-        expect(typeof reparsed).not.toBe("string");
-
-        expect(printed).toMatch(/<&gpio\s+8\s+1>/);
-        expect(printed).toMatch(/<&gpio\s+7\s+1>/);
-        expect(printed).toContain("<0>");
-        expect(printed).toMatch(/<&gpio\s+18\s+1>/);
-    });
 }

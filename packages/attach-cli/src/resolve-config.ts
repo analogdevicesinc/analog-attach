@@ -55,8 +55,8 @@ export function preprocess_context(
  * Load the config and verify the required fields, emitting the standard
  * diagnostics (missing env var / missing field / missing path) and returning
  * undefined on any failure. On success returns the narrowed required values,
- * the full config, and the parsed representations of `devicetree` and `board`
- * (when those fields were among the required set).
+ * the full config, and the parsed representations of `devicetree`
+ * (when that field was among the required set).
  *
  * When `"devicetree"` is among the required fields the base DTS is
  * automatically preprocessed (via cpp) and the returned `values.devicetree`

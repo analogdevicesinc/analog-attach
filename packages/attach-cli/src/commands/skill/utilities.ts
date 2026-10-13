@@ -28,12 +28,6 @@ export function getBundledToolsPath(): string {
     return path.join(packageRoot, 'bundled', 'tools');
 }
 
-export function getBundledBoardsPath(): string {
-    // tsup bundles everything into dist/, so only go up one level to package root
-    const packageRoot = path.resolve(__dirname, '..');
-    return path.join(packageRoot, 'bundled', 'boards');
-}
-
 export function getPackageRoot(): string {
     return path.resolve(__dirname, '..');
 }

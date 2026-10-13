@@ -1,9 +1,7 @@
 import * as fs from "node:fs";
 import path from "node:path";
 
-import { save_config, DEFAULT_PREPROCESS_COMMAND, type AttachConfig } from "./config";
-import { load_board, resolve_board_overlay } from "./board";
-import { prepare_board_workfile } from "./commands/create-workfile/command";
+import { save_config, type AttachConfig } from "./config";
 
 const EMPTY_DTSO = String.raw`/dts-v1/;
 /plugin/;
@@ -23,24 +21,9 @@ export function next_workfile_name(cwd?: string): string {
     return `overlay-${n}.dtso`;
 }
 
-/** The workfile to start from: the configured board's overlay when it ships one, otherwise an empty overlay. */
-export function initial_workfile(config: AttachConfig): { text: string; source?: string; warnings: string[]; persist: Partial<AttachConfig> } | { error: string } {
-    if (config.board === undefined) { return { text: EMPTY_DTSO, warnings: [], persist: {} }; }
-
-    const board = load_board(config.board);
-    if (typeof board === "string") { return { error: `board ${config.board}: ${board}` }; }
-    const overlay_path = resolve_board_overlay(config.board, board);
-    if (overlay_path === undefined) { return { text: EMPTY_DTSO, warnings: [], persist: {} }; }
-
-    const template = config.preprocessCommand ?? DEFAULT_PREPROCESS_COMMAND;
-    const prepared = prepare_board_workfile(board, overlay_path, template, config.linux);
-    if ("error" in prepared) { return prepared; }
-    return {
-        text: prepared.text,
-        source: overlay_path,
-        warnings: prepared.warnings,
-        persist: config.preprocessCommand === undefined ? { preprocessCommand: template } : {},
-    };
+/** The workfile to start from: an empty overlay. */
+export function initial_workfile(_config: AttachConfig): { text: string; source?: string; warnings: string[]; persist: Partial<AttachConfig> } | { error: string } {
+    return { text: EMPTY_DTSO, warnings: [], persist: {} };
 }
 
 export interface CreateWorkfileResult {

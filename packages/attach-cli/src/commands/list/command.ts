@@ -5,14 +5,13 @@ import type { ListIntelligenceResponse } from "../../protocol/types";
 import { list_device } from "./device";
 import { list_property } from "./property";
 import { list_value } from "./value";
-import { list_parent, list_slot } from "./placement";
+import { list_parent } from "./placement";
 
 export const LIST_KINDS = [
     { kind: "device", summary: "Device bindings by compatible string", args: "[compatible]" },
     { kind: "property", summary: "Properties of a node from its binding", args: "<path> [property]" },
     { kind: "value", summary: "Concrete values for a property", args: "<path> <property>" },
     { kind: "parent", summary: "Valid parent buses for a device", args: "<compatible>" },
-    { kind: "slot", summary: "Board slots (requires board config)", args: "[compatible]" },
 ] as const;
 
 export function build_list_command(context: LocalContext): Command {
@@ -76,10 +75,6 @@ Examples:
                 }
                 case "parent": {
                     await list_parent(context, arguments_);
-                    return;
-                }
-                case "slot": {
-                    await list_slot(context, arguments_);
                     return;
                 }
                 default: {
