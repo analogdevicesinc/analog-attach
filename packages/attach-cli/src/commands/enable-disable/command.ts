@@ -9,8 +9,17 @@ import { load_trees, resolve_node_identifier, resolve_path, base_target, write_o
 
 function make_command(commandName: string, status_value: "okay" | "disabled", verb: string) {
     return (_context: LocalContext): Command => new Command(commandName)
-        .description(`${verb} a node by setting status = "${status_value}"`)
-        .argument("[path]", "Path to node (e.g. spi0, /soc/spi@7e204000, spi0/spidev@0)")
+        .description(`${verb} a node (status = "${status_value}")`)
+        .argument("[path]", "Path to node (label, label-first, or absolute)")
+        .addHelpText("after", `
+Paths:
+  Label:        spi0                       (a label in the base tree)
+  Label-first:  spi0/adi,ad7124-8@0       (label then child segments)
+  Absolute:     /soc/spi@7e204000          (full device tree path)
+
+Example:
+  $ attach-linux ${commandName} spi0
+  $ attach-linux ${commandName} spi0/spidev@0`)
         .action(async (path_argumentument: string | undefined) => {
             if (path_argumentument === undefined) {
                 console.log("Missing: path");

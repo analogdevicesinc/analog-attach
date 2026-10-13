@@ -10,9 +10,22 @@ export const SETTABLE_FIELDS: Map<string, FieldSpec> = new Map(
 
 export function build_config_set_command(context: LocalContext): Command {
     return new Command("config-set")
-        .description("Set a tool configuration field")
+        .description("Set a configuration field")
         .argument("<field>", "Config field name")
         .argument("<value>", "Value to set")
+        .addHelpText("after", `
+Settable fields:
+  overlay, overlay-syntax, overlay-compiled,
+  preprocess-command, deploy-ip, deploy-user, deploy-password
+
+  linux and devicetree are set via environment variables:
+    export ATTACH_LINUX=/path/to/linux
+    export ATTACH_DEVICETREE=/path/to/base.dts
+
+Examples:
+  $ attach-linux config-set overlay overlay.dtso
+  $ attach-linux config-set overlay-syntax label
+  $ attach-linux config-set deploy-ip 192.168.1.10`)
         .action(async (field: string, value: string) => {
             const environment_spec = CONFIG_REGISTRY.find(s => s.toml === field && s.env !== undefined);
             if (environment_spec !== undefined) {

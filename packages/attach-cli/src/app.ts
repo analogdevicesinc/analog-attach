@@ -28,33 +28,83 @@ export function buildApp(context: LocalContext): Command {
         .name(name)
         .description(description)
         .version(version)
-        .allowUnknownOption(false);
+        .allowUnknownOption(false)
+        .helpCommand(false)
+        .configureHelp({
+            visibleOptions: (cmd) => cmd.options.filter(o => !o.hidden),
+            commandUsage: (cmd) => {
+                const visible = cmd.options.filter(o => !o.hidden);
+                const commands = cmd.commands.some(c => !(c as any)._hidden) ? ["[command]"] : [];
+                const parts = [...commands, ...(visible.length > 0 ? ["[options]"] : [])];
+                return cmd.name() + (parts.length > 0 ? " " + parts.join(" ") : "");
+            },
+            subcommandTerm: (cmd) => {
+                const arguments_ = cmd.registeredArguments.map(a =>
+                    a.required ? `<${a.name()}>` : `[${a.name()}${a.variadic ? "..." : ""}]`,
+                );
+                const visible = cmd.options.filter(o => !o.hidden);
+                const parts = [...arguments_, ...(visible.length > 0 ? ["[options]"] : [])];
+                return cmd.name() + (parts.length > 0 ? " " + parts.join(" ") : "");
+            },
+        })
+        .addHelpText("after", `
+Getting started:
+  Run 'attach-linux' with no arguments to enter interactive setup.
 
-    // protocol commands
+All commands accept --json for machine-readable output.
+Run any command with --help for detailed usage.`);
+
+    // hidden
     program.addCommand(build_attach_manifest_command(context), { hidden: true });
-    program.addCommand(build_config_get_command(context));
-    program.addCommand(build_config_set_command(context));
+    program.addCommand(build_internal_list_command(context), { hidden: true });
+
+    // setup & discovery
     program.addCommand(build_create_workfile_command(context));
+    program.addCommand(build_list_command(context));
+
+    // overlay editing
     program.addCommand(build_add_command(context));
     program.addCommand(build_read_command(context));
     program.addCommand(build_update_command(context));
     program.addCommand(build_delete_command(context));
-    program.addCommand(build_validate_command(context));
     program.addCommand(build_move_command(context));
     program.addCommand(build_rename_command(context));
-    program.addCommand(build_list_command(context));
-    program.addCommand(build_internal_list_command(context), { hidden: true });
-    program.addCommand(build_build_command(context));
-    program.addCommand(build_deploy_command(context));
-
-    // human-only commands
     program.addCommand(build_enable_command(context));
     program.addCommand(build_disable_command(context));
 
-    // skill + completion management
+    // build & deploy
+    program.addCommand(build_build_command(context));
+    program.addCommand(build_validate_command(context));
+    program.addCommand(build_deploy_command(context));
+
+    // configuration
+    program.addCommand(build_config_get_command(context));
+    program.addCommand(build_config_set_command(context));
+
+    // tooling
     program.addCommand(build_install_skill_command(context));
     program.addCommand(build_uninstall_skill_command(context));
     program.addCommand(build_completion_command(context));
+
+    const helpConfig = {
+        visibleOptions: (cmd: Command) => cmd.options.filter(o => !o.hidden),
+        commandUsage: (cmd: Command) => {
+            const visible = cmd.options.filter(o => !o.hidden);
+            const arguments_ = cmd.registeredArguments.map(a =>
+                a.required ? `<${a.name()}>` : `[${a.name()}${a.variadic ? "..." : ""}]`,
+            );
+            const parts = [
+                ...arguments_,
+                ...(visible.length > 0 ? ["[options]"] : []),
+            ];
+            let prefix = "";
+            for (let p = cmd.parent; p; p = p.parent) { prefix = p.name() + " " + prefix; }
+            return prefix + cmd.name() + (parts.length > 0 ? " " + parts.join(" ") : "");
+        },
+    };
+    for (const cmd of program.commands) {
+        cmd.configureHelp(helpConfig);
+    }
 
     return program;
 }

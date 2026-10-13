@@ -17,9 +17,27 @@ export const LIST_KINDS = [
 
 export function build_list_command(context: LocalContext): Command {
     const list = new Command("list")
-        .description("List device bindings, properties, values, parents or slots")
-        .argument("[kind]", "What to list: device, property, value, parent, slot")
+        .description("List devices, properties, suggested values, possible parents")
+        .argument("[kind]", "What to list: device, property, value, parent")
         .argument("[args...]", "Kind-specific arguments")
+        .addHelpText("after", `
+Kinds:
+  device [compatible]          Device bindings by compatible string
+  property <path> [property]   Properties of a node from its binding
+  value <path> <property>      Suggested values for a property
+  parent <compatible>          Valid parent buses for a device
+
+Paths:
+  Label:        spi0                       (a label in the base tree)
+  Label-first:  spi0/adi,ad7124-8@0       (label then child segments)
+  Absolute:     /soc/spi@7e204000          (full device tree path)
+
+Examples:
+  $ attach-linux list device                           All known bindings
+  $ attach-linux list device adi                       Filter by prefix
+  $ attach-linux list property spi0/adi,ad7124-8@0     Properties for a node
+  $ attach-linux list value spi0/adi,ad7124-8@0 reg    Values for a property
+  $ attach-linux list parent adi,ad7124-8              Valid parents`)
         .action(async (kind: string | undefined, arguments_: string[]) => {
             if (kind === undefined) {
                 const response: ListIntelligenceResponse = {

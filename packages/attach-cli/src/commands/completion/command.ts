@@ -192,6 +192,11 @@ export function build_completion_command(_context: LocalContext): Command {
     return new Command("completion")
         .description("Generate shell completion script")
         .argument("<shell>", "Shell to generate completions for (bash, fish, zsh)")
+        .addHelpText("after", `
+Examples:
+  $ source <(attach-linux completion bash)
+  $ attach-linux completion zsh > ~/.zfunc/_attach-linux
+  $ attach-linux completion fish | source`)
         .action((shell: string) => {
             const stub = STUBS[shell];
             if (stub === undefined) {

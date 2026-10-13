@@ -14,8 +14,23 @@ const FIELD_TO_CONFIG_KEY: Record<string, keyof AttachConfig> = Object.fromEntri
 
 export function build_config_get_command(context: LocalContext): Command {
     return new Command("config-get")
-        .description("Get tool configuration fields")
+        .description("Show configuration fields and values")
         .argument("[fields...]", "Config field names to retrieve (omit for all)")
+        .addHelpText("after", `
+Fields:
+  linux ($ATTACH_LINUX)       Kernel source tree          [required, env]
+  devicetree ($ATTACH_DEVICETREE)  Target base DTS file   [required, env]
+  overlay                     Working DTSO overlay file
+  overlay-syntax              Output syntax: fragment (default) or label
+  overlay-compiled            Compiled DTBO artifact path
+  preprocess-command          C preprocessor command template
+  deploy-ip                   Remote device IP or hostname
+  deploy-user                 SSH username
+  deploy-password             SSH password
+
+Examples:
+  $ attach-linux config-get
+  $ attach-linux config-get overlay deploy-ip`)
         .action(async (fields: string[]) => {
             const current = load_config() ?? {};
 

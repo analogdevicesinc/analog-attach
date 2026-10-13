@@ -66,9 +66,20 @@ export function read_target(
 
 export function build_read_command(context_: LocalContext): Command {
     return new Command("read")
-        .description("Read a node subtree or property value from the overlay")
-        .argument("[path]", "Path to node (label-first or absolute)")
+        .description("Read nodes or properties from the overlay")
+        .argument("[path]", "Path to node (label, label-first, or absolute)")
         .argument("[property]", "Property name")
+        .addHelpText("after", `
+Paths:
+  Label:        spi0                       (a label in the base tree)
+  Label-first:  spi0/adi,ad7124-8@0       (label then child segments)
+  Absolute:     /soc/spi@7e204000          (full device tree path)
+
+Examples:
+  $ attach-linux read                              Print the entire overlay
+  $ attach-linux read spi0                         Print a node by label
+  $ attach-linux read spi0/adi,ad7124-8@0          Print a node subtree
+  $ attach-linux read spi0/adi,ad7124-8@0 reg      Read a single property`)
         .action(async (path_argument: string | undefined, property_argument: string | undefined) => {
             const resolved = resolve_config(context_, ["overlay"]);
             if (resolved === undefined) { return; }

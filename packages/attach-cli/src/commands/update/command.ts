@@ -315,10 +315,35 @@ function read_property(context_: LocalContext, found: FoundNodeResult | undefine
 
 export function build_update_command(context_: LocalContext): Command {
     return new Command("update")
-        .description("Set a property value, or read it when no value is given. Flags are set with no value and cleared with delete.")
-        .argument("[path]", "Path to node (e.g. spi0/adi,ad7124-8@0)")
+        .description("Update/insert a property")
+        .argument("[path]", "Path to node (label, label-first, or absolute)")
         .argument("[property]", "Property name")
         .argument("[value...]", "Value tokens (omit to read or set a flag)")
+        .addHelpText("after", `
+Paths:
+  Label:        spi0                       (a label in the base tree)
+  Label-first:  spi0/adi,ad7124-8@0       (label then child segments)
+  Absolute:     /soc/spi@7e204000          (full device tree path)
+
+Value syntax:
+  Numbers:     0, 1, 0x1F                  Cell values
+  Macros:      GPIO_ACTIVE_LOW, IRQ_TYPE_EDGE_FALLING, ...
+  Labels:      &spi0, spi0                 Phandle references
+  Strings:     words without & are strings when the binding expects them
+  Arrays:      multiple tokens in one call
+  Matrices:    rows separated by ","
+
+Special cases:
+  No value     Sets a flag property, or reads the current value
+  Child name   'update <path> <child-name>' creates a child node
+  reg          'update <path> reg <n>' also renames the node's unit address
+
+Examples:
+  $ attach-linux update spi0/adi,ad7124-8@0 spi-max-frequency 1000000
+  $ attach-linux update spi0/adi,ad7124-8@0 reg 1
+  $ attach-linux update spi0/adi,ad7124-8@0 interrupts 25 IRQ_TYPE_EDGE_FALLING
+  $ attach-linux update spi0/adi,ad7124-8@0 io-channels 0 1 , 2 3
+  $ attach-linux update spi0/adi,ad7124-8@0 channel@0`)
         .action(async (path_argument: string | undefined, property_argument: string | undefined, value_arguments: string[]) => {
             if (path_argument === undefined) {
                 const message = "Missing: path";

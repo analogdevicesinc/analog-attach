@@ -4,7 +4,7 @@ import type { LocalContext } from "../../context";
 
 export function build_uninstall_skill_command(_context: LocalContext): Command {
     return new Command("uninstall-skill")
-        .description("Uninstall the Attach skill from Claude Code")
+        .description("Uninstall the Attach skill")
         .action(async () => {
             if (!isSkillInstalled()) {
                 console.log('Attach skill is not installed.');
