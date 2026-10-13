@@ -21,6 +21,7 @@ import type { Workfile } from "../workfile_handler/types";
 import { all_ops, resolve_reference, suggest_platform_extra } from "../workfile_handler/workfile_handler";
 import { load_resolved_ruleset } from "../resolver/resolver";
 import { provides_interface } from "../registry/drivers";
+import { ops_capability_fits } from "../workfile_handler/workfile_handler";
 import { format_number_in } from "../ruleset_parser/number_format";
 import { apply_overrides } from "./override_resolver";
 import type { CollectedRule, ValidationError } from "./types";
@@ -254,10 +255,11 @@ function validate_platform_ops(
 		return [];
 	}
 
-	if (parent_struct.$capability && ops.$capability && ops.$capability !== parent_struct.$capability) {
+	if (!ops_capability_fits(ops, property, parent_struct)) {
+		const expected = property.capability?.join(", ") ?? parent_struct.$capability ?? "none";
 		return [{
 			path: context.path,
-			message: `Capability mismatch: ops is '${ops.$capability}', expected '${parent_struct.$capability}'`,
+			message: `Capability mismatch: ops is '${ops.$capability ?? "none"}', expected '${expected}'`,
 			severity: "error"
 		}];
 	}

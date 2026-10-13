@@ -123,6 +123,21 @@ describe.skipIf(REPOS === undefined)('adxl355 on max32655fthr, from the real rep
         expect(stored(workfile)).toEqual({});
     });
 
+    test('the platform\'s ops tables come from its interfaces_file', () => {
+        const workfile = board_workfile();
+        expect(Object.keys(workfile.platform_ops)).toEqual(expect.arrayContaining(['maxim_capi_spi_ops', 'maxim_capi_i2c_ops', 'maxim_capi_gpio_ops', 'maxim_capi_uart_ops']));
+        expect(workfile.platform_ops['maxim_capi_spi_ops']).toMatchObject({ $capability: 'spi', $headers: ['maxim_capi_spi.h', 'capi_spi.h'] });
+    });
+
+    test('a SPI config the user makes gets the platform\'s SPI ops, by its capability', () => {
+        const workfile = board_workfile();
+        const config = load_resolved_ruleset_for_board('capi_spi_config', BOARD);
+        expectOk(config);
+        expectOk(add_symbol(workfile, 'my_spi', config.value));
+        expectOk(bootstrap(workfile));
+        expect(stored(workfile)['my_spi']?.ops).toBe('maxim_capi_spi_ops');
+    });
+
     test('the bootstrapped workfile survives a save and load unchanged', () => {
         const workfile = board_workfile();
         add_adxl355(workfile, 'adxl355');
