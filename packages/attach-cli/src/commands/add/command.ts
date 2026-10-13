@@ -12,7 +12,6 @@ import {
     is_valid_label,
     label_from_compatible,
     unique_label,
-    get_full_node_name,
     type DTProperty,
     type DTNode,
 } from "attach-lib";
@@ -53,7 +52,8 @@ export function build_add_command(context_: LocalContext): Command {
 
             let created_message: string | undefined;
             if (pre_config.overlay === undefined) {
-                const workfile = create_workfile(pre_config);
+                const device_name = key.includes(",") ? key.slice(key.indexOf(",") + 1) : key;
+                const workfile = create_workfile(pre_config, `${device_name}.dtso`);
                 if ("error" in workfile) {
                     if (context_.json) { respond_fail({ ok: false, message: workfile.error, severity: "error" }); }
                     else { console.log(workfile.error); }
@@ -85,9 +85,11 @@ export function build_add_command(context_: LocalContext): Command {
             // R3: check if binding defines reg to decide auto-addressing
             let binding_has_reg = false;
             try {
-                const stub_node: DTNode = { name: key, unit_addr: undefined, labels: [], children: [], properties: [
-                    PropertyBuilder.build_string().with_value(key).with_name("compatible").build(),
-                ] };
+                const stub_node: DTNode = {
+                    name: key, unit_addr: undefined, labels: [], children: [], properties: [
+                        PropertyBuilder.build_string().with_value(key).with_name("compatible").build(),
+                    ]
+                };
                 const binding = await resolve_node_binding(stub_node, undefined, "", base, linux, dtSchema, context_.json);
                 if (!("error" in binding)) {
                     binding_has_reg = binding.properties.some(p => p.key === "reg");
@@ -114,11 +116,11 @@ export function build_add_command(context_: LocalContext): Command {
                         if (context_.json) { diagnostic(diag); }
                         else { console.log(diag); }
                     }
-                    const label_suffix = result.label !== undefined ? ` (label: ${result.label})` : "";
+                    const label_suffix = result.label === undefined ? "" : ` (label: ${result.label})`;
                     const added_message = `Added ${result.key}${label_suffix}`;
-                    const full_message = created_message !== undefined
-                        ? `${created_message}; ${added_message}`
-                        : added_message;
+                    const full_message = created_message === undefined
+                        ? added_message
+                        : `${created_message}; ${added_message}`;
                     if (context_.json) {
                         const response: AddResponse = {
                             ok: true,
@@ -195,14 +197,14 @@ export function add_overlay_node(
     if (explicit_unit !== undefined) {
         // R7: explicit unit always creates reg
         const parsed = parse_unit_address(explicit_unit);
-        if (parsed !== undefined) {
+        if (parsed === undefined) {
+            diagnostics.push(`Non-hex unit address "${explicit_unit}"; no reg created`);
+        } else {
             const cells = address_cells_of(overlay, parent_path);
             reg_property = encode_reg_address(parsed, cells.address, cells.size);
             if (cells.size > 0) {
                 diagnostics.push("reg size set to 0; update reg with the real size");
             }
-        } else {
-            diagnostics.push(`Non-hex unit address "${explicit_unit}"; no reg created`);
         }
     } else if (binding_has_reg) {
         // R3/R6: auto-pick unit address
@@ -235,9 +237,9 @@ export function add_overlay_node(
     }
 
     // Build the node
-    const compatible_property: DTProperty | undefined = compatible !== undefined
-        ? PropertyBuilder.build_string().with_value(compatible).with_name("compatible").build()
-        : undefined;
+    const compatible_property: DTProperty | undefined = compatible === undefined
+        ? undefined
+        : PropertyBuilder.build_string().with_value(compatible).with_name("compatible").build();
 
     const properties: DTProperty[] = [];
     if (compatible_property !== undefined) { properties.push(compatible_property); }
@@ -246,7 +248,7 @@ export function add_overlay_node(
     const new_node = NodeBuilder.new()
         .with_name(base_name)
         .with_unit_address(unit)
-        .with_label(label !== undefined ? [label] : [])
+        .with_label(label === undefined ? [] : [label])
         .with_properties(properties.length > 0 ? properties : undefined);
 
     // C3: write #address-cells/#size-cells on overlay-added parent if missing
@@ -284,10 +286,10 @@ export function add_overlay_node(
     }
 
     // Resolve the final path
-    const search_ref = label !== undefined
-        ? { kind: "label" as const, labels: [] as string[], name: label }
-        : { kind: "path" as const, labels: [] as string[], path: `${parent_path === "/" ? "" : parent_path}/${node_key}` };
-    const found = overlay.find_node(search_ref);
+    const search_reference = label === undefined
+        ? { kind: "path" as const, labels: [] as string[], path: `${parent_path === "/" ? "" : parent_path}/${node_key}` }
+        : { kind: "label" as const, labels: [] as string[], name: label };
+    const found = overlay.find_node(search_reference);
     const path_segments = found === undefined ? [node_key] : found.node_path.split("/").filter(Boolean);
 
     return { status: "added", key: node_key, path: path_segments, label, diagnostics };
@@ -332,7 +334,6 @@ if (import.meta.vitest) {
         const overlay = DTO_cls.new_from_string(empty_overlay, base);
         if (typeof overlay === "string") { throw new TypeError(overlay); }
 
-        // eslint-disable-next-line unicorn/no-useless-undefined
         const result = add_overlay_node(base, overlay, "adi,ad7124-8", "spi0", undefined, "adi,ad7124-8", true);
 
         expect(result.status).toBe("added");
@@ -351,9 +352,7 @@ if (import.meta.vitest) {
         const overlay = DTO_cls.new_from_string(empty_overlay, base);
         if (typeof overlay === "string") { throw new TypeError(overlay); }
 
-        // eslint-disable-next-line unicorn/no-useless-undefined
         add_overlay_node(base, overlay, "adi,ad7124-8", "spi0", undefined, "adi,ad7124-8", true);
-        // eslint-disable-next-line unicorn/no-useless-undefined
         const result = add_overlay_node(base, overlay, "adi,ad7124-8", "spi0", undefined, "adi,ad7124-8", true);
 
         expect(result.status).toBe("added");
@@ -368,7 +367,6 @@ if (import.meta.vitest) {
         const overlay = DTO_cls.new_from_string(empty_overlay, base);
         if (typeof overlay === "string") { throw new TypeError(overlay); }
 
-        // eslint-disable-next-line unicorn/no-useless-undefined
         const result = add_overlay_node(base, overlay, "adc@a", "spi0", undefined, "adi,ad7124-8", false);
 
         expect(result.status).toBe("added");
@@ -414,7 +412,6 @@ if (import.meta.vitest) {
         const overlay = DTO_cls.new_from_string(empty_overlay, base);
         if (typeof overlay === "string") { throw new TypeError(overlay); }
 
-        // eslint-disable-next-line unicorn/no-useless-undefined
         const result = add_overlay_node(base, overlay, "regulator-fixed", undefined, undefined, "regulator-fixed", false);
         expect(result.status).toBe("added");
         if (result.status !== "added") { return; }

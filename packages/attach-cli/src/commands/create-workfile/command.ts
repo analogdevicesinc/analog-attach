@@ -12,7 +12,7 @@ import { load_board } from "../../board";
 import { respond, respond_fail } from "../../protocol/output";
 import type { CreateWorkfileResponse } from "../../protocol/types";
 import { is_tool_available, substitute_command } from "../../utilities";
-import { create_workfile } from "../../workfile";
+import { create_workfile, next_workfile_name } from "../../workfile";
 
 export function prepare_board_workfile(
     board: BoardDescription,
@@ -56,11 +56,12 @@ export function prepare_board_workfile(
 export function build_create_workfile_command(context: LocalContext): Command {
     return new Command("create-workfile")
         .description("Create a new workfile (DTSO overlay); starts from the board's overlay when the configured board ships one")
-        .option("--name <value>", "Output filename (default: overlay.dtso)")
-        .action(async (options) => {
-            const filename: string = options.name ?? "overlay.dtso";
+        .argument("[name]", "Output filename (default: overlay.dtso; auto-indexes to overlay-1.dtso etc. when it exists)")
+        .action(async (name) => {
+            const filename: string = name ?? next_workfile_name();
 
             const result = create_workfile(load_config() ?? {}, filename);
+
             if ("error" in result) {
                 if (context.json) {
                     respond_fail({ ok: false, message: result.error, severity: "error" });
@@ -71,6 +72,7 @@ export function build_create_workfile_command(context: LocalContext): Command {
             }
 
             const message = [result.message, ...result.warnings].join("; ");
+
             if (context.json) {
                 respond({
                     ok: true,
