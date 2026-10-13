@@ -23,14 +23,14 @@ function make_command(commandName: string, status_value: "okay" | "disabled", ve
                 return;
             }
 
-            const checked = check_config(config, ["overlay", "context"]);
+            const checked = check_config(config, ["overlay", "devicetree"]);
             if (!checked.ok) {
                 console.log(check_failure_message(checked).human);
                 return;
             }
-            const { overlay: input, context } = checked.values;
+            const { overlay: input, devicetree } = checked.values;
 
-            const trees = load_trees(_context, context, input, checked.parsed.context);
+            const trees = load_trees(_context, devicetree, input, checked.parsed.devicetree);
             if (trees === undefined) { return; }
             const { base_dt: base, overlay } = trees;
 
@@ -38,7 +38,7 @@ function make_command(commandName: string, status_value: "okay" | "disabled", ve
 
             switch (result) {
                 case "not-found": {
-                    console.log(`Couldn't find node ${path_argumentument} in ${context} or ${input}`);
+                    console.log(`Couldn't find node ${path_argumentument} in ${devicetree} or ${input}`);
                     return;
                 }
                 case "done": {

@@ -76,7 +76,7 @@ export async function resolve_node_binding(
             }
             controller_context = { compatibles: parent_compatibles, binding_path: controller_binding_path };
         }
-        const parse_options: ParseOptions | undefined = controller_context !== undefined ? { controller: controller_context } : undefined;
+        const parse_options: ParseOptions | undefined = controller_context === undefined ? undefined : { controller: controller_context };
         const initial = await Attach.new_populated_binding(binding_path, linux, dtSchema, base_dt, found_node, parent_name, options, parse_options);
         if (initial === undefined) {
             return { error: `Failed to parse binding ${binding_path}` };

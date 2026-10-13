@@ -14,11 +14,11 @@ export function build_delete_command(context_: LocalContext): Command {
         .argument("[property]", "Property name")
         .option("--force", "Force delete of non-leaf nodes (waterfall delete)")
         .action(async (path_argumentument: string | undefined, property_argument: string | undefined, options) => {
-            const resolved = resolve_config(context_, ["context", "overlay"]);
+            const resolved = resolve_config(context_, ["devicetree", "overlay"]);
             if (resolved === undefined) { return; }
-            const { context, overlay: input } = resolved.values;
+            const { devicetree, overlay: input } = resolved.values;
 
-            const trees = load_trees(context_, context, input, resolved.parsed.context);
+            const trees = load_trees(context_, devicetree, input, resolved.parsed.devicetree);
             if (trees === undefined) { return; }
             const { base_dt: base, overlay } = trees;
 
@@ -133,7 +133,7 @@ export function build_delete_command(context_: LocalContext): Command {
                         return;
                     }
                     case "in-base": {
-                        console.log(`${identifier} is part of the base device tree (${context}), not this overlay; delete only removes overlay-added nodes`);
+                        console.log(`${identifier} is part of the base device tree (${devicetree}), not this overlay; delete only removes overlay-added nodes`);
                         return;
                     }
                     case "is-root": {

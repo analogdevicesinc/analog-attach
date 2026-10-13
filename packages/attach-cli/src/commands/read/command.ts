@@ -3,7 +3,7 @@ import { DeviceTree, DeviceTreeOverlay, is_dt_flag, print_property } from "attac
 import * as fs from "node:fs";
 
 import type { LocalContext } from "../../context";
-import { resolve_config } from "../../resolve-config";
+import { resolve_config, preprocess_context } from "../../resolve-config";
 import { resolve_node_identifier, not_found_message, parse_node_path, parse_property_name, overlay_print_options } from "../../utilities";
 import { respond, respond_fail, input_error } from "../../protocol/output";
 import { convert_node, convert_property } from "../../protocol/dt-to-protocol";
@@ -73,15 +73,15 @@ export function build_read_command(context_: LocalContext): Command {
             const resolved = resolve_config(context_, ["overlay"]);
             if (resolved === undefined) { return; }
             const input = resolved.values.overlay;
-            const context = resolved.config.context;
+            const context = resolved.config.devicetree;
 
             const input_content = fs.readFileSync(input, "utf8");
 
             const base = (() => {
-                if (context !== undefined && fs.existsSync(context)) {
-                    return DeviceTree.new_from_string(fs.readFileSync(context, "utf8"));
-                }
-                return;
+                if (context === undefined || !fs.existsSync(context)) { return; }
+                const preprocessed = preprocess_context(context, resolved.config.linux, resolved.config.preprocessCommand);
+                const source = typeof preprocessed === "string" ? preprocessed : context;
+                return DeviceTree.new_from_string(fs.readFileSync(source, "utf8"));
             })();
 
             const overlay = typeof base === "string" || base === undefined

@@ -20,11 +20,11 @@ export function build_rename_command(context_: LocalContext): Command {
         .argument("<path>", "Path to node")
         .argument("<new-name>", "New name for the node (e.g. adc@1)")
         .action(async (path_argument: string, new_name: string) => {
-            const resolved = resolve_config(context_, ["context", "overlay"]);
+            const resolved = resolve_config(context_, ["devicetree", "overlay"]);
             if (resolved === undefined) { return; }
-            const { context, overlay: input } = resolved.values;
+            const { devicetree, overlay: input } = resolved.values;
 
-            const trees = load_trees(context_, context, input, resolved.parsed.context);
+            const trees = load_trees(context_, devicetree, input, resolved.parsed.devicetree);
             if (trees === undefined) { return; }
             const overlay = trees.overlay;
 
@@ -34,9 +34,9 @@ export function build_rename_command(context_: LocalContext): Command {
                 switch (result.status) {
                     case "renamed": {
                         write_overlay(input, overlay, resolved.config);
-                        const message = result.reg_message !== undefined
-                            ? `Renamed ${path_argument} to ${new_name}; ${result.reg_message}`
-                            : `Renamed ${path_argument} to ${new_name}`;
+                        const message = result.reg_message === undefined
+                            ? `Renamed ${path_argument} to ${new_name}`
+                            : `Renamed ${path_argument} to ${new_name}; ${result.reg_message}`;
                         respond({ ok: true, message, severity: "info" });
                         return;
                     }
@@ -64,7 +64,7 @@ export function build_rename_command(context_: LocalContext): Command {
                         return;
                     }
                     case "in-base": {
-                        console.log(`${path_argument} is part of the base device tree (${context}), not this overlay; rename only applies to overlay-added nodes`);
+                        console.log(`${path_argument} is part of the base device tree (${devicetree}), not this overlay; rename only applies to overlay-added nodes`);
                         return;
                     }
                     case "is-root": {
@@ -126,17 +126,17 @@ export function rename_overlay_node(
         if (parsed !== undefined) {
             const cells = address_cells_of(overlay, parent_path);
             const existing_reg = found.node.properties.find(p => p.name === "reg");
-            if (existing_reg !== undefined) {
+            if (existing_reg === undefined) {
+                // Create reg
+                const new_reg = encode_reg_address(parsed, cells.address, cells.size);
+                found.node.properties.push(new_reg);
+                reg_message = `reg created`;
+            } else {
                 // Replace first address cells, keep size cells and other entries
                 const new_reg = encode_reg_address(parsed, cells.address, cells.size);
                 const index = found.node.properties.indexOf(existing_reg);
                 found.node.properties[index] = new_reg;
                 reg_message = `reg first cell set to ${parsed}`;
-            } else {
-                // Create reg
-                const new_reg = encode_reg_address(parsed, cells.address, cells.size);
-                found.node.properties.push(new_reg);
-                reg_message = `reg created`;
             }
         }
     }

@@ -32,7 +32,7 @@ Set up configuration before using other commands. `linux` and `context` are read
 
 ```bash
 export ATTACH_LINUX=~/linux
-export ATTACH_CONTEXT=~/rpi-4.dts
+export ATTACH_DEVICETREE=~/rpi-4.dts
 ```
 
 Other fields (overlay, board, etc.) are stored in `.attach-linux/config.toml` via `config-set`. The dt-schema bindings, dtc and validation tools are bundled with the CLI.
@@ -41,17 +41,17 @@ Other fields (overlay, board, etc.) are stored in `.attach-linux/config.toml` vi
 - `config-set` / `config-get`: No prerequisites
 - `list device`: Needs `ATTACH_LINUX` (to build compat index on first run)
 - `create-workfile`: No prerequisites (also saves `overlay` path to config). When `board` ships an overlay, needs `ATTACH_LINUX` for the default `preprocess-command`
-- `list parent`: Needs `ATTACH_LINUX`, `ATTACH_CONTEXT`
-- `list value`: Needs `ATTACH_CONTEXT`, `overlay` (values come from `board`; without it the result is empty). `ATTACH_LINUX` is optional and enables binding check annotations
-- `list slot`: Needs `board` (plus `ATTACH_LINUX`, `ATTACH_CONTEXT` when given a compatible)
-- `add`: Needs `ATTACH_LINUX`, `ATTACH_CONTEXT`, `overlay` (auto-created if missing)
-- `update`: Needs `ATTACH_LINUX`, `ATTACH_CONTEXT`, `overlay`
-- `read`: Needs `overlay` (optionally `ATTACH_CONTEXT` for base-tree resolution)
+- `list parent`: Needs `ATTACH_LINUX`, `ATTACH_DEVICETREE`
+- `list value`: Needs `ATTACH_DEVICETREE`, `overlay` (values come from `board`; without it the result is empty). `ATTACH_LINUX` is optional and enables binding check annotations
+- `list slot`: Needs `board` (plus `ATTACH_LINUX`, `ATTACH_DEVICETREE` when given a compatible)
+- `add`: Needs `ATTACH_LINUX`, `ATTACH_DEVICETREE`, `overlay` (auto-created if missing)
+- `update`: Needs `ATTACH_LINUX`, `ATTACH_DEVICETREE`, `overlay`
+- `read`: Needs `overlay` (optionally `ATTACH_DEVICETREE` for base-tree resolution)
 - `validate`: Needs `overlay` (optionally `ATTACH_LINUX` to generate validation.json)
-- `delete`: Needs `ATTACH_CONTEXT`, `overlay`
-- `rename`: Needs `ATTACH_CONTEXT`, `overlay`
-- `move`: Needs `ATTACH_CONTEXT`, `overlay`
-- `enable`/`disable`: Needs `ATTACH_CONTEXT`, `overlay`
+- `delete`: Needs `ATTACH_DEVICETREE`, `overlay`
+- `rename`: Needs `ATTACH_DEVICETREE`, `overlay`
+- `move`: Needs `ATTACH_DEVICETREE`, `overlay`
+- `enable`/`disable`: Needs `ATTACH_DEVICETREE`, `overlay`
 - `build`: Needs `overlay`
 - `deploy`: Needs `overlay-compiled`, `deploy-ip`, `deploy-user`, `deploy-password`
 
@@ -104,7 +104,7 @@ attach-linux config-get [fields...]
 | Variable | Description |
 |----------|-------------|
 | `ATTACH_LINUX` | Path to Linux kernel source tree |
-| `ATTACH_CONTEXT` | Path to target base `.dts` file |
+| `ATTACH_DEVICETREE` | Path to target base `.dts` file |
 
 **Config fields** (stored in `.attach-linux/config.toml`):
 
@@ -123,7 +123,7 @@ attach-linux config-get [fields...]
 ```bash
 # Set up core paths (environment variables)
 export ATTACH_LINUX=~/linux
-export ATTACH_CONTEXT=~/rpi-4.dts
+export ATTACH_DEVICETREE=~/rpi-4.dts
 
 # Optional: describe the add-on board (HAT) the peripherals plug into
 attach-linux config-set board pmd-rpi-intz
@@ -506,7 +506,7 @@ attach-linux deploy [--dtbo <path>] [--ip <host>] [--user <user>] [--password <p
 ## Recommended Workflow
 
 ```
-0. CONFIGURE    export ATTACH_LINUX=... ATTACH_CONTEXT=...
+0. CONFIGURE    export ATTACH_LINUX=... ATTACH_DEVICETREE=...
 1. FIND DEVICE  list device <chip-name>
 2. FIND PARENT  list parent <compatible>  (with board: list slot <compatible>)
 3. ADD DEVICE   add <compatible> --parent <bus>  (auto-creates workfile)

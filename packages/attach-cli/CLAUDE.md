@@ -37,7 +37,7 @@ Commands in `src/app.ts` are annotated with `// protocol commands` (used by AI t
 ### Configuration and workspace state
 
 `src/config.ts` manages `.attach-linux/config.toml` (relative to CWD) and environment variables:
-- **Environment variables**: `ATTACH_LINUX`, `ATTACH_CONTEXT` replace config.toml for these two fields. `config-set` rejects them with an export hint; legacy TOML values are ignored with a warning.
+- **Environment variables**: `ATTACH_LINUX`, `ATTACH_DEVICETREE` replace config.toml for these two fields. `config-set` rejects them with an export hint; legacy TOML values are ignored with a warning.
 - **config.toml**: stores `overlay`, `board`, `overlay-syntax`, `build-command`, `preprocess-command`, and other fields.
 - `compat-index.json`: a binding compatibility index keyed by compatible string → YAML file path; rebuilt when stale (mtime-based or when the linux/dt-schema paths differ).
 

@@ -42,7 +42,7 @@ export function build_add_command(context_: LocalContext): Command {
         .option("--label <value>", "Label to attach to the new node (e.g. imu1)")
         .action(async (key: string, options) => {
             const pre_config = load_config() ?? {};
-            const pre_check = check_config(pre_config, ["linux", "dtSchema", "context"]);
+            const pre_check = check_config(pre_config, ["linux", "dtSchema", "devicetree"]);
             if (!pre_check.ok) {
                 const message = check_failure_message(pre_check);
                 if (context_.json) { input_error(message.json); }
@@ -64,14 +64,14 @@ export function build_add_command(context_: LocalContext): Command {
                 else { console.log(created_message); }
             }
 
-            const resolved = resolve_config(context_, ["linux", "dtSchema", "context", "overlay"]);
+            const resolved = resolve_config(context_, ["linux", "dtSchema", "devicetree", "overlay"]);
             if (resolved === undefined) { return; }
-            const { linux, dtSchema, context, overlay: input } = resolved.values;
+            const { linux, dtSchema, devicetree, overlay: input } = resolved.values;
 
             const { name, label } = options;
             const to: string | undefined = options.parent;
 
-            const trees = load_trees(context_, context, input, resolved.parsed.context);
+            const trees = load_trees(context_, devicetree, input, resolved.parsed.devicetree);
             if (trees === undefined) { return; }
             const { base_dt: base, overlay } = trees;
 
@@ -102,7 +102,7 @@ export function build_add_command(context_: LocalContext): Command {
             switch (result.status) {
                 case "parent-not-found": {
                     if (context_.json) { respond_fail({ ok: false, message: `Parent node ${to} not found`, severity: "error" }); }
-                    else { console.log(`Couldn't find parent node ${to} in ${context} or ${input}`); }
+                    else { console.log(`Couldn't find parent node ${to} in ${devicetree} or ${input}`); }
                     return;
                 }
                 case "duplicate": case "label-taken": case "invalid-label": case "bad-unit-address": {

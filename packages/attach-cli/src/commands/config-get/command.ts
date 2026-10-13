@@ -26,13 +26,13 @@ export function build_config_get_command(context: LocalContext): Command {
 
             const result: Config[] = specs.map(spec => {
                 const key = FIELD_TO_CONFIG_KEY[spec.toml];
-                const value = key !== undefined ? current[key] : undefined;
+                const value = key === undefined ? undefined : current[key];
                 const category = spec.env === undefined ? undefined : "environment";
                 return {
                     field_name: spec.toml,
                     category,
                     description: spec.description,
-                    type: spec.options !== undefined ? { options: [...spec.options] } : spec.type,
+                    type: spec.options === undefined ? spec.type : { options: [...spec.options] },
                     required: spec.required,
                     default: spec.default ?? null,
                     value: value ?? null,
@@ -53,8 +53,8 @@ export function build_config_get_command(context: LocalContext): Command {
                     const display = c.value === null ? "(not set)" : c.value;
                     const request = c.required ? " [required]" : "";
                     const spec = VISIBLE_SPECS.find(s => s.toml === c.field_name);
-                    const env_suffix = spec?.env !== undefined ? ` ($${spec.env})` : "";
-                    console.log(`${c.field_name}${request}${env_suffix}: ${display}`);
+                    const environment_suffix = spec?.env === undefined ? "" : ` ($${spec.env})`;
+                    console.log(`${c.field_name}${request}${environment_suffix}: ${display}`);
                 }
             }
         });
