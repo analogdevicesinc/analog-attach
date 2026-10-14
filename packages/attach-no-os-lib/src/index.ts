@@ -50,6 +50,7 @@ export {
     get_capi_path,
     get_module_roots,
     bootstrap_enabled,
+    example_enabled,
     get_settings_file_path,
     get_settings_sources,
     find_local_config_path,

@@ -5,7 +5,7 @@ import { error, ok } from "../ruleset_parser/result";
 import { make_environment } from "./eta_environment";
 import { load_devices } from "./device_loader";
 import { get_connected_symbols, reorder_symbols_topologically } from "../validator/connection_graph";
-import { effective_value, is_descriptor_reference, is_null_pointer, iio_devices, number_literal, post_init_blocks, property_default, reference_expression } from "./codegen_helpers";
+import { effective_value, example_blocks, is_descriptor_reference, is_null_pointer, iio_devices, number_literal, post_init_blocks, property_default, reference_expression } from "./codegen_helpers";
 import { STRUCTURE_FILENAME, resolve_template_set } from "./template_sets";
 import { schedule_patches } from "./patch_schedule";
 import { capi_project } from "./capi_project";
@@ -27,13 +27,13 @@ const template_helpers = {
 	reverse: <T>(array: T[]): T[] => [...array].reverse(),
 
 	// Was the `tab_indent` filter. Indent every non-empty line of a (possibly
-	// multi-line) block by one tab; empty lines are left bare to avoid trailing
-	// whitespace. Device init/remove templates emit full statement blocks and the
-	// main_c.eta loop only indents the first line, so the rest is re-indented here.
-	tab_indent: (text: unknown): string =>
+	// multi-line) block by `depth` tabs (one by default); empty lines are left bare to
+	// avoid trailing whitespace. Device init/remove templates emit full statement blocks
+	// and the main_c.eta loop only indents the first line, so the rest is re-indented here.
+	tab_indent: (text: unknown, depth = 1): string =>
 		String(text)
 			.split("\n")
-			.map(line => (line.length > 0 ? "\t" + line : line))
+			.map(line => (line.length > 0 ? "\t".repeat(depth) + line : line))
 			.join("\n"),
 
 	// The device init/remove blocks, in init order. The sole filesystem-touching
@@ -65,6 +65,8 @@ const template_helpers = {
 
 	// The rendered `$post_init` blocks, one per node bound to a field that declares one.
 	post_init_blocks,
+	// Each handle's example code, from its driver's `example:` (main.c, capi set).
+	example_blocks,
 
 	// The IIO devices an IIO app serves, with each one's device table member.
 	iio_devices,
@@ -184,6 +186,7 @@ export function generate_project(input: CodegenInput): Result<CodegenResult> {
 		board: input.board,
 		capi_path: input.capi_path,
 		files: files,
+		example: input.example ?? true,
 		h: template_helpers,
 	};
 

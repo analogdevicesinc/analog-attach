@@ -9,3 +9,7 @@ rulesets:
     - testpart_ops.yaml
   iio:
     - iio/testpart_iio_init_param.yaml
+
+# Only a loop: the part needs no setup.
+example:
+  loop: examples/loop.eta

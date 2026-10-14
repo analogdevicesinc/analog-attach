@@ -1,0 +1,3 @@
+<% if (it.symbol === "test_dac") { -%>
+set_dac(<%= it.handle %>);
+<% } -%>

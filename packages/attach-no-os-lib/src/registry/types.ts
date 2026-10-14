@@ -61,6 +61,18 @@ export interface ModuleInfo {
 	provides_interfaces?: string[],
 	/** `depends.packages` names: the libraries a driver builds against, e.g. capi-util. */
 	packages?: string[],
+	/** A driver's `example:` from its ruleset index, as absolute template paths. */
+	example?: ModuleExample,
+}
+
+/**
+ * What the generated main.c does with a driver's part once everything is up, so the user
+ * sees it work: Eta template files, `loop` run on every pass, `setup` once before. Rendered
+ * once per handle of the driver, with `it.handle` (its C name) and `it.symbol` (its type).
+ */
+export interface ModuleExample {
+	setup?: string,
+	loop: string,
 }
 
 /** Which MCU GPIO a pin is, in the chip's own port vocabulary (e.g. MXC_GPIO2). */

@@ -110,11 +110,24 @@ function index_module(
 		bsp_kinds.set(kind, type_);
 	}
 
-
-
 	// Paths in an index are relative to the index file, not to the module root, so the
 	// index can live in a subdirectory alongside the rulesets it lists.
 	const index_directory = path.dirname(index_file);
+
+	const example = index.value.example;
+	if (example !== undefined) {
+		for (const file of [example.loop, ...(example.setup === undefined ? [] : [example.setup])]) {
+			if (!fs.existsSync(path.join(index_directory, file))) {
+				return error(`Ruleset index '${index_file}' names example '${file}', which does not exist`, index_file);
+			}
+		}
+		// On the module itself: every symbol entry of this module holds this very object.
+		// eslint-disable-next-line no-param-reassign
+		module.example = {
+			loop: path.join(index_directory, example.loop),
+			...(example.setup === undefined ? {} : { setup: path.join(index_directory, example.setup) }),
+		};
+	}
 
 	for (const { group, files } of index.value.groups) {
 		for (const relative of files) {
