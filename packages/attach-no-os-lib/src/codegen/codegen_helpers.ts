@@ -2,9 +2,11 @@ import type { NumberProperty, Property } from "../ruleset_parser/types";
 import { format_number_in } from "../ruleset_parser/number_format";
 import { is_float_symbol } from "../ruleset_parser/types";
 import type { Workfile } from "../workfile_handler/types";
-import type { PostInitBlock } from "./types";
+import fs from "node:fs";
+import type { ExampleBlock, PostInitBlock } from "./types";
 import { IIO_GROUP } from "../registry/drivers";
 import { resolve_entry } from "../registry/registry";
+import type { ModuleInfo } from "../registry/types";
 import { make_string_environment } from "./eta_environment";
 import { resolve_reference } from "../workfile_handler/workfile_handler";
 
@@ -139,6 +141,70 @@ export function post_init_blocks(workfile: Workfile): PostInitBlock[] {
 	}
 
 	return blocks;
+}
+
+/**
+ * The example code of every handle a driver with an `example:` backs, in workfile order. A
+ * handle belongs to the driver whose struct or ops table its config names, so a channel
+ * handle gets its chip's example too; `it.symbol` (capi_adc, capi_adc_chan) tells them
+ * apart. An IIO handle is served by the IIO app instead, so it has none. A `loop` that
+ * renders empty leaves a setup-only block (set a DAC output once).
+ */
+export function example_blocks(workfile: Workfile): ExampleBlock[] {
+	const environment = make_string_environment();
+	const sources = new Map<string, string>();
+	const read = (file: string): string => {
+		let source = sources.get(file);
+		if (source === undefined) {
+			source = fs.readFileSync(file, "utf8");
+			sources.set(file, source);
+		}
+		return source;
+	};
+
+	const blocks: ExampleBlock[] = [];
+	for (const [handle, node] of Object.entries(workfile.symbols)) {
+		if (node._t !== "RulesetDescriptor") {
+			continue;
+		}
+		const own = resolve_entry(node.$symbol);
+		if (own.ok && own.value.group === IIO_GROUP) {
+			continue;
+		}
+		const driver = backing_driver(workfile, node.properties[0].value);
+		if (driver?.example === undefined) {
+			continue;
+		}
+		// A template renders nothing for a handle it has nothing to show on (ad74413r: the
+		// chip handles, where only its channels read anything), and that handle is skipped.
+		const view = { handle, symbol: node.$symbol };
+		const setup = driver.example.setup === undefined ? "" : environment.renderString(read(driver.example.setup), view).trim();
+		const loop = environment.renderString(read(driver.example.loop), view).trim();
+		if (setup === "" && loop === "") {
+			continue;
+		}
+		blocks.push({ handle, driver: driver.name, ...(setup === "" ? {} : { setup }), loop });
+	}
+	return blocks;
+}
+
+/** The driver module a handle's config names through its driver-backed fields. */
+function backing_driver(workfile: Workfile, config_name: unknown): ModuleInfo | undefined {
+	const config = typeof config_name === "string" ? workfile.symbols[config_name] : undefined;
+	if (config?._t !== "RulesetStruct") {
+		return undefined;
+	}
+	for (const property of config.properties) {
+		if ((property._t !== "DriverInitParameterProperty" && property._t !== "DriverOpsProperty") || typeof property.value !== "string") {
+			continue;
+		}
+		const target = workfile.symbols[property.value];
+		const entry = target === undefined ? undefined : resolve_entry(target.$symbol);
+		if (entry?.ok === true && entry.value.module.type === "driver") {
+			return entry.value.module;
+		}
+	}
+	return undefined;
 }
 
 /** An IIO device the app serves: its handle, and the handle member holding its device table. */

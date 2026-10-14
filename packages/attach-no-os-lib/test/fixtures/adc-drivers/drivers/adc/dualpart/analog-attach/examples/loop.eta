@@ -1,0 +1,3 @@
+<% if (it.symbol === "test_adc_chan") { -%>
+read_channel(<%= it.handle %>);
+<% } -%>

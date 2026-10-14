@@ -61,6 +61,8 @@ export interface SettingsFile {
 	probe: Setting;
 	/** Whether `add` fills in everything that leaves no room for choice (see bootstrap/). */
 	bootstrap: Setting;
+	/** Whether main.c runs the parts' examples or the user's app_main() (see codegen). */
+	example: Setting;
 };
 
 export function is_setting(value: unknown): value is Setting {

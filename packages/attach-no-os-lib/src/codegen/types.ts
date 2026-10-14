@@ -34,6 +34,19 @@ export interface CodegenInput {
 	// out-of-tree folder) renders the project. Omitted: the `template_set`
 	// setting, falling back to the bundled default.
 	template_set?: string;
+	// Whether main.c runs the parts' examples (the default) or the user's app_main().
+	example?: boolean;
+};
+
+/** One handle's example code, rendered for it: `setup` once, `loop` on every pass. */
+export interface ExampleBlock {
+	/** The handle node it reads, e.g. adxl355. */
+	handle: string,
+	/** The driver whose example it is. */
+	driver: string,
+	setup?: string,
+	/** Empty for a setup-only block. */
+	loop: string,
 };
 
 export interface CodegenResult {

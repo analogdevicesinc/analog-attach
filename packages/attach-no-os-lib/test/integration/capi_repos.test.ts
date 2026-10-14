@@ -3,7 +3,9 @@ import os from 'node:os';
 import path from 'node:path';
 import { describe, test, expect, beforeEach, afterEach } from 'vitest';
 import { attach_eval_board, bootstrap, pin_driver, referenced_nodes } from '../../src/bootstrap/bootstrap';
+import { generate_project } from '../../src/codegen/codegen';
 import { load_devices } from '../../src/codegen/device_loader';
+import { find_board } from '../../src/registry/platforms';
 import { driver_root, driver_root_for } from '../../src/registry/roots';
 import { load_resolved_ruleset_for_board } from '../../src/resolver/resolver';
 import { validate_workfile } from '../../src/validator/validator';
@@ -148,6 +150,36 @@ describe.skipIf(REPOS === undefined)('adxl355 on max32655fthr, from the real rep
         expectOk(add_symbol(workfile, 'my_spi', config.value));
         expectOk(bootstrap(workfile));
         expect(stored(workfile)['my_spi']?.ops).toBe('maxim_capi_spi_ops');
+    });
+
+    test('main.c runs its example once everything is up, or the app when examples are off', () => {
+        const workfile = board_workfile();
+        add_adxl355(workfile, 'adxl355');
+        const board = find_board(BOARD);
+        expectOk(board);
+        const main = (example: boolean): string => {
+            const output = fs.mkdtempSync(path.join(os.tmpdir(), 'aa-example-'));
+            try {
+                expectOk(generate_project({
+                    workfile, platform_name: 'max32655', platform_vendor: 'maxim', board: board.value,
+                    project_name: 'p', output_path: output, capi_path: REPOS?.capi ?? '', template_set: 'capi', example,
+                }));
+                return fs.readFileSync(path.join(output, 'p', 'src', 'main.c'), 'utf8');
+            } finally {
+                fs.rmSync(output, { recursive: true, force: true });
+            }
+        };
+
+        const with_example = main(true);
+        // The setup out of standby once, then the reading in the loop.
+        expect(with_example).toContain('ret = adxl355_set_op_mode(adxl355->priv, ADXL355_MEAS_TEMP_ON_DRDY_OFF);');
+        expect(with_example).toContain('ret = capi_accel_sensor_get_xyz(adxl355, &x, &y, &z);');
+        expect(with_example.indexOf('adxl355_set_op_mode')).toBeLessThan(with_example.indexOf('while (1)'));
+        expect(with_example).toContain('return example_main();');
+
+        const without = main(false);
+        expect(without).toContain('return app_main();');
+        expect(without).not.toContain('capi_accel_sensor_get_xyz');
     });
 
     test('the bootstrapped workfile survives a save and load unchanged', () => {

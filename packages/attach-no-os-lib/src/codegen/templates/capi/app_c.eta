@@ -1,0 +1,21 @@
+<%
+/*
+ * src/app.c: the user application. Written once and never again (protected), so it is
+ * theirs: main.c calls app_main() when the `example` setting is false.
+ *
+ * NOTE: apostrophes break the Eta parser even inside comments.
+ */
+-%>
+/*
+ * Your application. main.c brings every device up, then calls app_main() once the
+ * `example` setting is false (attach-noos tool-config-set example false). attach-noos
+ * generate writes this file only when it does not exist, so it is yours to change: add
+ * your own files and functions next to it. The handles and configs are declared in
+ * common/common_data.h.
+ */
+#include "common_data.h"
+
+int app_main(void)
+{
+	return 0;
+}

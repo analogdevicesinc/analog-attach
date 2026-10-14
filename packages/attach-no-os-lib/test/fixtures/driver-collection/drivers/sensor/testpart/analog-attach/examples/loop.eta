@@ -1,0 +1,1 @@
+printf("<%= it.handle %> is a <%= it.symbol %>\n");

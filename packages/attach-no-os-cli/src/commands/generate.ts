@@ -2,6 +2,7 @@ import path from "node:path";
 import { buildCommand } from "@stricli/core";
 import {
     configured_template_set,
+    example_enabled,
     generate_project,
     get_effective_setting_value,
     get_setting_value,
@@ -123,6 +124,7 @@ export const generateCommand = buildCommand<GenerateFlags, [], AttachContext>({
             output_path: output_path,
             capi_path: capi_path.value,
             template_set: flags.templateSet,
+            example: example_enabled(),
         });
 
         if (!result.ok) {

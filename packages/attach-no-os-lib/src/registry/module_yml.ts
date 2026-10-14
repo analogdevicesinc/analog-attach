@@ -20,7 +20,7 @@ import type { Result } from "../ruleset_parser/result";
 import { error, ok } from "../ruleset_parser/result";
 import type { ParseContext } from "../ruleset_parser/validators";
 import { asObject, at, integer_, optional, required, string_, stringArray } from "../ruleset_parser/validators";
-import type { ConnectorInfo, GpioIdentity, ModuleBuild, ModuleInfo, PinInfo, SocInfo } from "./types";
+import type { ConnectorInfo, GpioIdentity, ModuleBuild, ModuleExample, ModuleInfo, PinInfo, SocInfo } from "./types";
 
 export const MODULE_FILENAME = "module.yml";
 
@@ -57,6 +57,8 @@ export interface RulesetIndex {
 	 * every board of every platform. See the key's own comment in capi/analog-attach.
 	 */
 	bsp_kinds?: Record<string, string>,
+	/** `example:` — a driver's example code, as paths relative to the index file. */
+	example?: ModuleExample,
 }
 
 function read_yaml(file: string): Result<unknown> {
@@ -446,7 +448,29 @@ export function read_ruleset_index(index_file: string): Result<RulesetIndex> {
 		return chip_select;
 	}
 
-	return ok({ groups, bsp_kinds: bsp_kinds.value, chip_select: chip_select.value });
+	const example = optional(object.value, "example", context, parse_example);
+	if (!example.ok) {
+		return example;
+	}
+
+	return ok({ groups, bsp_kinds: bsp_kinds.value, chip_select: chip_select.value, example: example.value });
+}
+
+/** `example: {setup: <file>, loop: <file>}`: `loop` is what the example is, `setup` is optional. */
+function parse_example(value: unknown, context: ParseContext): Result<ModuleExample> {
+	const object = asObject(value, context);
+	if (!object.ok) {
+		return object;
+	}
+	const loop = required(object.value, "loop", context, string_);
+	if (!loop.ok) {
+		return loop;
+	}
+	const setup = optional(object.value, "setup", context, string_);
+	if (!setup.ok) {
+		return setup;
+	}
+	return ok(setup.value === undefined ? { loop: loop.value } : { setup: setup.value, loop: loop.value });
 }
 
 function parse_chip_select(value: unknown, context: ParseContext): Result<ChipSelectBinding> {

@@ -265,7 +265,16 @@ export function reset_setting_value(key: keyof SettingsFile): Result<undefined> 
  * turn it off.
  */
 export function bootstrap_enabled(): boolean {
-	const configured = get_effective_setting_value("bootstrap");
+	return setting_on("bootstrap");
+}
+
+/** Whether the generated main.c runs the parts' examples. On unless explicitly off, like bootstrap. */
+export function example_enabled(): boolean {
+	return setting_on("example");
+}
+
+function setting_on(key: "bootstrap" | "example"): boolean {
+	const configured = get_effective_setting_value(key);
 	if (!configured.ok || configured.value === undefined) {
 		return true;
 	}

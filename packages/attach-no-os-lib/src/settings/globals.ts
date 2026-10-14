@@ -138,6 +138,14 @@ export const SETTINGS_DEFAULTS: SettingsFile = {
 		options: ["true", "false"],
 		category: "workspace",
 	},
+	example: {
+		description: "Have the generated main.c run each part's example (true), or your own app_main() in src/app.c (false)",
+		required: false,
+		type: "bool",
+		default: "true",
+		options: ["true", "false"],
+		category: "build",
+	},
 };
 
 export const DEFAULT_SYSTEM_CONFIG_PATH = path.join(".config", "analog-attach");
