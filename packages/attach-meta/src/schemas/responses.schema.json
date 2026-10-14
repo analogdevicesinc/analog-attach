@@ -1,0 +1,429 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "analog-attach/responses",
+  "title": "Analog Attachable Response Types",
+  "description": "JSON Schemas for every response shape a conformant subtool must produce. Each command maps to a named $def; transport errors (non-zero exit, malformed JSON, timeout) are handled by analog-attach and are not modelled here.",
+
+  "$defs": {
+
+    "CommonResponse": {
+      "description": "Open base type composed into every command response via allOf. ok is the only semantic gate — if ok is false, always show the message field to the user. severity is a display hint for message only. Commands whose response adds no extra fields (update, rename, move, alias, tool-config-set, generate, build, deploy) return this shape directly.",
+      "type": "object",
+      "required": ["ok", "message", "severity"],
+      "properties": {
+        "ok":       { "type": "boolean" },
+        "message":  { "type": "string" },
+        "severity": { "enum": ["info", "warn", "error"] }
+      }
+    },
+
+    "InitResponse": {
+      "description": "Returned by analog-attach init. config_complete reflects whether all required config fields are present and valid after init.",
+      "allOf": [{ "$ref": "#/$defs/CommonResponse" }],
+      "required": ["config_complete", "missing_fields"],
+      "unevaluatedProperties": false,
+      "properties": {
+        "config_complete": { "type": "boolean" },
+        "missing_fields": {
+          "description": "Config.field_name values for all required configs that are absent or invalid.",
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+
+    "Config": {
+      "description": "Describes a single tool configuration field and its current value. value: null means the field is not yet set; default: null means no schema default exists. A required field with value: null needs a value before the tool is ready.",
+      "type": "object",
+      "required": ["field_name", "description", "type", "required", "default", "value"],
+      "additionalProperties": false,
+      "properties": {
+        "field_name":  { "type": "string" },
+        "category":    { "type": "string" },
+        "description": { "type": "string" },
+        "type": {
+          "description": "Scalar type name or enum descriptor.",
+          "oneOf": [
+            { "enum": ["numeric", "string", "bool", "path"] },
+            { "$ref": "#/$defs/ConfigEnum" }
+          ]
+        },
+        "required": { "type": "boolean" },
+        "default": {
+          "description": "Schema-declared default, or null when no default exists. null is not itself a valid config value — configs are paths, strings, numbers, or enums.",
+          "oneOf": [
+            { "type": "null" },
+            { "type": "string" },
+            { "type": "number" },
+            { "type": "boolean" }
+          ]
+        },
+        "value": {
+          "description": "Currently stored value, or null when not yet set. Sub-tools must pre-populate required configs that have a default so this reflects the live state.",
+          "oneOf": [
+            { "type": "null" },
+            { "type": "string" },
+            { "type": "number" },
+            { "type": "boolean" }
+          ]
+        }
+      }
+    },
+
+    "ConfigEnum": {
+      "description": "Restricts a config field to a fixed set of string or number options.",
+      "type": "object",
+      "required": ["options"],
+      "additionalProperties": false,
+      "properties": {
+        "options": {
+          "type": "array",
+          "items": { "oneOf": [{ "type": "string" }, { "type": "number" }] },
+          "minItems": 1
+        }
+      }
+    },
+
+    "ToolConfigResponse": {
+      "description": "Returned by tool-config-get. Contains all requested config field descriptors.",
+      "allOf": [{ "$ref": "#/$defs/CommonResponse" }],
+      "required": ["configs"],
+      "unevaluatedProperties": false,
+      "properties": {
+        "configs": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/Config" }
+        }
+      }
+    },
+
+    "CreateWorkfileResponse": {
+      "description": "Returned by create-workfile. path is the absolute path to the created workfile.",
+      "allOf": [{ "$ref": "#/$defs/CommonResponse" }],
+      "required": ["path"],
+      "unevaluatedProperties": false,
+      "properties": {
+        "path": { "type": "string" }
+      }
+    },
+
+    "Device": {
+      "description": "A logical device entry. Multiple entries may share the same key — grouping is the subtool's responsibility.",
+      "type": "object",
+      "required": ["tag", "key"],
+      "additionalProperties": false,
+      "properties": {
+        "tag": { "type": "string" },
+        "key": { "type": "string" }
+      }
+    },
+
+    "ListDevicesResponse": {
+      "description": "Returned by list-devices.",
+      "allOf": [{ "$ref": "#/$defs/CommonResponse" }],
+      "required": ["devices"],
+      "unevaluatedProperties": false,
+      "properties": {
+        "devices": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/Device" }
+        }
+      }
+    },
+
+    "ValidIdentifier": {
+      "description": "A non-empty string identifying a node by name or alias within its parent scope. Character grammar is tool-defined. A sequence of ValidIdentifiers forms a path resolved left-to-right from root. On the CLI, path segments are space-separated positional arguments (not slash-separated filesystem paths).",
+      "type": "string",
+      "minLength": 1
+    },
+
+    "NumberType": {
+      "description": "Numeric property (kind: 'number'). subtype is 'int' or 'float'. Render the value as-is; for float show the original precision. When prompting for update, hint the subtype so the user knows whether decimals are accepted.",
+      "type": "object",
+      "required": ["kind", "subtype"],
+      "additionalProperties": false,
+      "properties": {
+        "kind":    { "const": "number" },
+        "subtype": { "enum": ["int", "float"] }
+      }
+    },
+    "StringType": {
+      "description": "String property (kind: 'string'). Render the value quoted if it contains spaces or special characters, bare otherwise.",
+      "type": "object",
+      "required": ["kind"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "const": "string" }
+      }
+    },
+    "BoolType": {
+      "description": "Boolean property (kind: 'bool'). Render as 'true' or 'false'.",
+      "type": "object",
+      "required": ["kind"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "const": "bool" }
+      }
+    },
+    "EnumType": {
+      "description": "Enum property (kind: 'enum'). Render the current value; when prompting for update, list all options from the options array. If an option has a display_string, show it alongside the value.",
+      "type": "object",
+      "required": ["kind", "options"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "const": "enum" },
+        "options": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["value"],
+            "additionalProperties": false,
+            "properties": {
+              "value":          { "oneOf": [{ "type": "string" }, { "type": "number" }] },
+              "display_string": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "ArrayType": {
+      "description": "Variable-length array, all items the same type (kind: 'array'). Render as a comma-separated list in brackets, e.g. [1, 2, 3]. The items field describes the element type — use it to guide input prompts.",
+      "type": "object",
+      "required": ["kind", "items"],
+      "additionalProperties": false,
+      "properties": {
+        "kind":  { "const": "array" },
+        "items": { "$ref": "#/$defs/TYPES" }
+      }
+    },
+    "TupleType": {
+      "description": "Fixed-length tuple, each position independently typed (kind: 'tuple'). Render as a comma-separated list in parentheses, e.g. (3.3, 100).",
+      "type": "object",
+      "required": ["kind", "items"],
+      "additionalProperties": false,
+      "properties": {
+        "kind":  { "const": "tuple" },
+        "items": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/TYPES" }
+        }
+      }
+    },
+
+    "TYPES": {
+      "description": "Discriminated union of node property type descriptors, keyed by the 'kind' field. Exclusively used by the read command (Node properties).",
+      "oneOf": [
+        { "$ref": "#/$defs/NumberType" },
+        { "$ref": "#/$defs/StringType" },
+        { "$ref": "#/$defs/BoolType" },
+        { "$ref": "#/$defs/EnumType" },
+        { "$ref": "#/$defs/ArrayType" },
+        { "$ref": "#/$defs/TupleType" }
+      ]
+    },
+
+    "PropertyValue": {
+      "description": "JSON-serializable value whose concrete shape must match the Property's declared TYPES. Recursive — nesting depth follows the structure declared by type.",
+      "oneOf": [
+        { "type": "null" },
+        { "type": "string" },
+        { "type": "number" },
+        { "type": "boolean" },
+        {
+          "type": "array",
+          "items": { "$ref": "#/$defs/PropertyValue" }
+        }
+      ]
+    },
+
+    "Property": {
+      "description": "A leaf property (kind: 'property'). Render as 'key = value'.",
+      "type": "object",
+      "required": ["kind", "key", "type", "value"],
+      "additionalProperties": false,
+      "properties": {
+        "kind":  { "const": "property" },
+        "key":   { "type": "string" },
+        "type":  { "$ref": "#/$defs/TYPES" },
+        "value": { "$ref": "#/$defs/PropertyValue" }
+      }
+    },
+
+    "Node": {
+      "description": "A tree node (kind: 'node'). Reading a node always returns its full subtree. Alias is absent when the active tool does not declare alias support in its manifest.",
+      "type": "object",
+      "required": ["kind", "key", "properties", "children"],
+      "additionalProperties": false,
+      "properties": {
+        "kind":       { "const": "node" },
+        "key":        { "type": "string" },
+        "properties": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/Property" }
+        },
+        "children": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/Node" }
+        },
+        "alias": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+
+    "AddResponse": {
+      "description": "Returned by add. key is the device key of the created node (tool-generated if --key was not supplied). path is the absolute path from root to the created node.",
+      "allOf": [{ "$ref": "#/$defs/CommonResponse" }],
+      "required": ["key", "path"],
+      "unevaluatedProperties": false,
+      "properties": {
+        "key": { "type": "string" },
+        "path": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/ValidIdentifier" }
+        }
+      }
+    },
+
+    "ReadResponse": {
+      "description": "Returned by read. Discriminate via the 'kind' field: 'node' is a Node subtree, 'property' is a single Property.",
+      "oneOf": [
+        { "$ref": "#/$defs/Node" },
+        { "$ref": "#/$defs/Property" }
+      ]
+    },
+
+    "DeletePreview": {
+      "description": "Returned by delete when --force is absent and the target is a non-leaf node or implicit root. No changes are made; this is a dry-run preview.",
+      "allOf": [{ "$ref": "#/$defs/CommonResponse" }],
+      "required": ["node_count", "property_count", "paths"],
+      "unevaluatedProperties": false,
+      "properties": {
+        "node_count":     { "type": "integer", "minimum": 0 },
+        "property_count": { "type": "integer", "minimum": 0 },
+        "paths": {
+          "description": "All paths that would be deleted.",
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": { "$ref": "#/$defs/ValidIdentifier" }
+          }
+        }
+      }
+    },
+
+    "DeleteResponse": {
+      "description": "Returned by delete. Discriminate by presence of 'node_count': present means DeletePreview (dry-run, no changes made — show affected count and paths, confirm with --force); absent means CommonResponse (final result after --force).",
+      "anyOf": [
+        { "$ref": "#/$defs/CommonResponse" },
+        { "$ref": "#/$defs/DeletePreview" }
+      ]
+    },
+
+    "Error": {
+      "description": "A validation finding. path is empty for file-level errors. kind discriminates future extended shapes.",
+      "type": "object",
+      "required": ["kind", "path", "message"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "const": "generic" },
+        "path": {
+          "description": "Path to the offending node or property. Empty array means the error applies to the whole file.",
+          "type": "array",
+          "items": { "$ref": "#/$defs/ValidIdentifier" }
+        },
+        "message": { "type": "string" }
+      }
+    },
+
+    "ValidationResponse": {
+      "description": "Returned by validate. NOTE: does not have an 'ok' field — validity is determined by whether errors is empty. The subtool always validates the full workfile; analog-attach filters by path when a path argument is given. File-level errors (path: []) always pass through regardless of path filtering.",
+      "type": "object",
+      "required": ["errors", "warnings"],
+      "additionalProperties": false,
+      "properties": {
+        "errors": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/Error" }
+        },
+        "warnings": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/Error" }
+        }
+      }
+    },
+
+    "IntelligenceArg": {
+      "description": "Describes one positional argument accepted by a suggest kind. kind reuses the same kind tokens as completions[].kind.",
+      "type": "object",
+      "required": ["name", "description", "required"],
+      "additionalProperties": false,
+      "properties": {
+        "name":        { "type": "string" },
+        "description": { "type": "string" },
+        "required":    { "type": "boolean" },
+        "kind":        { "type": "string" }
+      }
+    },
+
+    "Intelligence": {
+      "description": "Advertises one suggestion kind the active tool supports.",
+      "type": "object",
+      "required": ["kind", "description", "args"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "description": "Free-form kind token. Tools may define any kinds they support.",
+          "type": "string"
+        },
+        "description": {
+          "description": "Agent-friendly description of when this intelligence kind is appropriate to use.",
+          "type": "string"
+        },
+        "args": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/IntelligenceArg" }
+        }
+      }
+    },
+
+    "ListIntelligenceResponse": {
+      "description": "Returned by list-intelligence. Presence of list-intelligence in the manifest declares intelligence support.",
+      "allOf": [{ "$ref": "#/$defs/CommonResponse" }],
+      "required": ["intelligence"],
+      "unevaluatedProperties": false,
+      "properties": {
+        "intelligence": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/Intelligence" }
+        }
+      }
+    },
+
+    "Suggestion": {
+      "type": "object",
+      "required": ["value"],
+      "additionalProperties": false,
+      "properties": {
+        "value":          { "type": "string" },
+        "display_string": { "type": "string" }
+      }
+    },
+
+    "SuggestResponse": {
+      "description": "Returned by suggest. Only valid for kinds advertised by list-intelligence.",
+      "allOf": [{ "$ref": "#/$defs/CommonResponse" }],
+      "required": ["suggestions"],
+      "unevaluatedProperties": false,
+      "properties": {
+        "suggestions": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/Suggestion" }
+        }
+      }
+    }
+
+  }
+}

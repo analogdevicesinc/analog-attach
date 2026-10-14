@@ -1,0 +1,83 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "analog-attach/manifest",
+  "title": "Analog Attachable Manifest",
+  "description": "Meta-schema that analog-attach validates every tool manifest against at init time and on content-hash change.",
+  "type": "object",
+  "required": ["protocol_version", "commands"],
+  "additionalProperties": false,
+  "properties": {
+    "protocol_version": {
+      "description": "Semver string (MAJOR.MINOR.PATCH). Major must match analog-attach's own major; mismatch is a hard error.",
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+    "commands": {
+      "type": "object",
+      "description": "Map from command name to its invocation mapping. Required commands must all be present.",
+      "propertyNames": {
+        "enum": [
+          "read", "add", "delete", "move", "update", "rename", "alias",
+          "validate", "generate", "build", "deploy",
+          "list-devices", "create-workfile",
+          "tool-config-get", "tool-config-set",
+          "list-intelligence", "suggest"
+        ]
+      },
+      "additionalProperties": { "$ref": "#/$defs/CommandMapping" },
+      "required": [
+        "tool-config-get", "tool-config-set",
+        "create-workfile", "list-devices",
+        "add", "read", "update", "delete",
+        "validate"
+      ]
+    }
+  },
+  "$defs": {
+    "CommandMapping": {
+      "type": "object",
+      "required": ["argv"],
+      "additionalProperties": false,
+      "properties": {
+        "description": {
+          "description": "Human-readable description of what this command does in the context of this specific tool. Used by agents to explain commands to users when driving analog-attach interactions.",
+          "type": "string"
+        },
+        "argv": {
+          "description": "The argv prefix prepended by analog-attach when dispatching this command. First element is typically the binary name or path.",
+          "type": "array",
+          "items": { "type": "string" },
+          "minItems": 1
+        },
+        "args": {
+          "description": "Tool-defined JSON Schema fragment for extra optional args. May only add optional properties — a top-level 'required' keyword is forbidden. Merged with the protocol base schema via allOf before input validation.",
+          "$ref": "https://json-schema.org/draft/2020-12/schema"
+        },
+        "timeout_ms": {
+          "description": "Maximum milliseconds analog-attach waits for this command's process. Process is killed and a transport error is raised on expiry. Absent means no timeout.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "completions": {
+          "description": "Completion hints for shell tab-completion and agent argument completion.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["arg", "kind"],
+            "additionalProperties": false,
+            "properties": {
+              "arg": {
+                "description": "Either a flag name (without '--') whose value should be completed, or the command name itself for positional argument completion. Must not equal the command's own name when used as a flag name.",
+                "type": "string"
+              },
+              "kind": {
+                "description": "Completion kind token. Must be advertised by list-intelligence for candidates to be returned; an unadvertised kind silently yields no candidates.",
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

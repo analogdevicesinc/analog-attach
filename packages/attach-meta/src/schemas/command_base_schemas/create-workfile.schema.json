@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "analog-attach/base/create-workfile",
+  "description": "Base schema for create-workfile. No named flags.",
+  "type": "object",
+  "properties": {
+    "help": {
+      "type": "boolean"
+    }
+  }
+}

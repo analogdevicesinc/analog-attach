@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "analog-attach/base/read",
+  "description": "Base schema for the read command. Path is a variadic positional (zero or more identifiers).",
+  "type": "object",
+  "properties": {
+    "path": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "x-positional": true
+    },
+    "help": {
+      "type": "boolean"
+    }
+  }
+}

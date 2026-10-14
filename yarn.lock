@@ -2419,7 +2419,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"ajv-formats@npm:~3.0.1":
+"ajv-formats@npm:^3.0.1, ajv-formats@npm:~3.0.1":
   version: 3.0.1
   resolution: "ajv-formats@npm:3.0.1"
   dependencies:
@@ -2656,6 +2656,28 @@ __metadata:
     yaml: "npm:^2.8.3"
   bin:
     attach-linux: dist/cli.js
+  languageName: unknown
+  linkType: soft
+
+"attach-meta@workspace:packages/attach-meta":
+  version: 0.0.0-use.local
+  resolution: "attach-meta@workspace:packages/attach-meta"
+  dependencies:
+    "@types/node": "npm:25.x"
+    "@typescript-eslint/eslint-plugin": "npm:^8.17.0"
+    "@typescript-eslint/parser": "npm:^8.17.0"
+    "@vitest/coverage-v8": "npm:^4.0.18"
+    ajv: "npm:^8.17.1"
+    ajv-formats: "npm:^3.0.1"
+    commander: "npm:^13.1.0"
+    eslint: "npm:^9.31.0"
+    eslint-plugin-unicorn: "npm:^60.0.0"
+    smol-toml: "npm:^1.7.1"
+    tsup: "npm:^6.7.0"
+    typescript: "npm:5.6.x"
+    vitest: "npm:^4.0.18"
+  bin:
+    attach-meta: dist/cli.js
   languageName: unknown
   linkType: soft
 

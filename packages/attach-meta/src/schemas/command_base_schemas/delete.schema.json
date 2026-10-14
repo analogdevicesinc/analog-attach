@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "analog-attach/base/delete",
+  "description": "Base schema for the delete command. Path is a variadic positional; --force is optional.",
+  "type": "object",
+  "properties": {
+    "path": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "x-positional": true
+    },
+    "force": {
+      "type": "boolean"
+    },
+    "help": {
+      "type": "boolean"
+    }
+  }
+}

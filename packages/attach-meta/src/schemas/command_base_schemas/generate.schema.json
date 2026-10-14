@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "analog-attach/base/generate",
+  "description": "Base schema for generate. No named flags.",
+  "type": "object",
+  "properties": {
+    "help": {
+      "type": "boolean"
+    }
+  }
+}
