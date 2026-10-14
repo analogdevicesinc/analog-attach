@@ -13,6 +13,8 @@
  */
 const project = it.h.capi_project(it.workfile);
 const examples = it.example && project.console ? it.h.example_blocks(it.workfile) : [];
+/* The handle, and its driver when the name does not already say it (capi_adc_chan). */
+const label = e => (e.handle === e.driver ? e.handle : `${e.handle} (${e.driver})`);
 -%>
 #include "common_data.h"
 <% if (examples.length > 0) { -%>
@@ -35,7 +37,7 @@ static int example_main(void)
 	int ret;
 <% for (const e of examples.filter(e => e.setup !== undefined)) { -%>
 
-	/* <%= e.handle %> (<%= e.driver %>) */
+	/* <%= label(e) %> */
 	{
 <%= it.h.tab_indent(e.setup, 2) %>
 	}
@@ -43,15 +45,13 @@ static int example_main(void)
 
 	while (1) {
 <% for (const e of examples.filter(e => e.loop !== "")) { -%>
-		/* <%= e.handle %> (<%= e.driver %>) */
+		/* <%= label(e) %> */
 		{
 <%= it.h.tab_indent(e.loop, 3) %>
 		}
 <% } -%>
 		capi_wait_ms(500);
 	}
-
-	return ret;
 }
 <% } -%>
 

@@ -151,7 +151,7 @@ ret = capi_accel_sensor_get_xyz(<%= it.handle %>, &x, &y, &z);
 if (ret)
 	return ret;
 ...
-printf("<%= it.handle %>: x %.4f g, ...\n", x, y, z, temp);
+printf("<%= it.handle %>: x %.4f g, ...\r\n", x, y, z, temp);
 ```
 
 Each is rendered once per handle the driver backs, given `it.handle` (the handle's C name)
