@@ -3,16 +3,50 @@ import { PropertyBuilder } from "./PropertyBuilder.js";
 import { has_property, is_enabled, number_property } from "./Access.js";
 import type { DeviceTreeOverlay } from "./DevicetreeOverlay.js";
 
-export function parse_unit_address(unit: string): bigint | undefined {
+/**
+ * Unit addresses are hex by convention (and dtc requires it on SPI, I2C and
+ * simple-bus children), but some bindings name child nodes in decimal, e.g.
+ * `^channel@([0-9]|1[0-5])$`.
+ */
+export type UnitRadix = 10 | 16;
+
+export function parse_unit_address(unit: string, radix: UnitRadix = 16): bigint | undefined {
     if (unit === "") { return undefined; }
     const cleaned = unit.toLowerCase();
+    if (radix === 10) { return /^\d+$/.test(cleaned) ? BigInt(cleaned) : undefined; }
     if (!/^[\da-f][\da-f,]*$/.test(cleaned)) { return undefined; }
     if (cleaned.includes(",")) { return undefined; }
     return BigInt(`0x${cleaned}`);
 }
 
-export function format_unit_address(value: bigint): string {
-    return value.toString(16);
+export function format_unit_address(value: bigint, radix: UnitRadix = 16): string {
+    return value.toString(radix);
+}
+
+const DIGITS = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"];
+const HEX_LETTERS = ["a", "b", "c", "d", "e", "f"];
+
+function accepts_any(regex: RegExp, name: string, units: string[]): boolean {
+    return units.some(unit => regex.test(`${name}@${unit}`));
+}
+
+/**
+ * The radix of `name@<unit>` children under a binding with these node
+ * patterns, found by probing: a pattern that accepts digits but no hex letter
+ * (`^channel@([0-9]|1[0-5])$`) means decimal, one that also accepts letters
+ * means hex. Decimal wins when both kinds match, since a decimal name satisfies
+ * both. Undefined when no pattern accepts the name.
+ */
+export function unit_radix(patterns: string[], name: string): UnitRadix | undefined {
+    let hex = false;
+    for (const pattern of patterns) {
+        let regex: RegExp;
+        try { regex = new RegExp(pattern); } catch { continue; }
+        if (!accepts_any(regex, name, DIGITS)) { continue; }
+        if (!accepts_any(regex, name, HEX_LETTERS)) { return 10; }
+        hex = true;
+    }
+    return hex ? 16 : undefined;
 }
 
 export interface AddressCells {
@@ -120,6 +154,7 @@ export function sync_unit_address_from_reg(
     node: DTNode,
     address_cells: number,
     effective_siblings: Map<string, DTNode>,
+    radix: UnitRadix = 16,
 ): SyncResult {
     const reg = node.properties.find(p => p.name === "reg");
     if (reg === undefined) { return "unchanged"; }
@@ -128,11 +163,11 @@ export function sync_unit_address_from_reg(
     if (new_address === undefined) { return "not-numeric"; }
 
     const current_unit = node.unit_addr;
-    const current_address = current_unit === undefined ? undefined : parse_unit_address(current_unit);
+    const current_address = current_unit === undefined ? undefined : parse_unit_address(current_unit, radix);
 
     if (current_address !== undefined && current_address === new_address) { return "unchanged"; }
 
-    const new_unit = format_unit_address(new_address);
+    const new_unit = format_unit_address(new_address, radix);
     const new_full_name = `${node.name}@${new_unit}`;
 
     if (effective_siblings.has(new_full_name)) { return "conflict"; }
@@ -152,6 +187,32 @@ if (import.meta.vitest) {
         expect(parse_unit_address("bar")).toBeUndefined();
         expect(parse_unit_address("")).toBeUndefined();
         expect(parse_unit_address("0x10")).toBeUndefined();
+    });
+
+    test("parse_unit_address / format_unit_address — decimal", () => {
+        expect(parse_unit_address("10", 10)).toBe(10n);
+        expect(parse_unit_address("a", 10)).toBeUndefined();
+        expect(format_unit_address(10n, 10)).toBe("10");
+    });
+
+    test("unit_radix", () => {
+        expect(unit_radix(["^channel@([0-9]|1[0-5])$"], "channel")).toBe(10);
+        expect(unit_radix(["^channel@[0-9a-f]+$"], "channel")).toBe(16);
+        expect(unit_radix(["^.*@[0-9a-f]+$"], "adc")).toBe(16);
+        expect(unit_radix(["^.*@[0-9a-f]+$", "^channel@[0-9]+$"], "channel")).toBe(10);
+        expect(unit_radix(["^led@[1-9]$"], "led")).toBe(10);
+        expect(unit_radix(["^channel@[0-9]+$"], "port")).toBeUndefined();
+        expect(unit_radix(["^(?invalid"], "x")).toBeUndefined();
+    });
+
+    test("sync_unit_address_from_reg — decimal radix", () => {
+        const node: DTNode = {
+            name: "channel", unit_addr: "1", labels: [], children: [],
+            properties: [encode_reg_address(12n, 1, 0)],
+        };
+        expect(sync_unit_address_from_reg(node, 1, new Map(), 10)).toBe("renamed");
+        expect(node.unit_addr).toBe("12");
+        expect(sync_unit_address_from_reg(node, 1, new Map(), 10)).toBe("unchanged");
     });
 
     test("format_unit_address", () => {

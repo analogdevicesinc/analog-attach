@@ -43,7 +43,9 @@ export {
     next_free_unit_address,
     ensure_address_cells,
     sync_unit_address_from_reg,
+    unit_radix,
     type AddressCells,
+    type UnitRadix,
     type SyncResult,
 } from './Devicetree/UnitAddress.js';
 export {
