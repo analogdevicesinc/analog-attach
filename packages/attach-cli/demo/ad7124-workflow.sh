@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Board-aware workflow demo for attach-linux
+# Single-device workflow demo for attach-linux
 # Configures an AD7124-8 ADC on SPI PMOD 1 of the PMD-RPI-INTZ HAT for a Raspberry Pi 4.
 
 BOLD='\033[1m'
@@ -54,46 +54,39 @@ banner() {
 
 # --- Prerequisites ---
 
-for path in ~/rpi-4.dts ~/linux ~/dt-schema "$CLI"; do
+for path in ~/rpi-4.dts ~/linux "$CLI"; do
     if [[ ! -e "$path" ]]; then
         echo -e "${RED}Missing prerequisite: $path${RESET}" >&2
         exit 1
     fi
 done
 
-for tool in dtc dt-validate; do
-    if ! command -v "$tool" >/dev/null; then
-        echo -e "${RED}Missing prerequisite: $tool on PATH${RESET}" >&2
-        exit 1
+# --- Sandbox setup ---
+
+# Reuse the package workspace's caches when it has them; the CLI rebuilds
+# whatever is missing (validation.json takes about a minute).
+rm -rf "$SANDBOX"
+mkdir -p "$SANDBOX/.attach-linux"
+for cache in compat-index.json validation.json validation.stamp.json; do
+    if [[ -f "$WORKSPACE/$cache" ]]; then
+        cp "$WORKSPACE/$cache" "$SANDBOX/.attach-linux/"
     fi
 done
 
-# --- Sandbox setup ---
-
-rm -rf "$SANDBOX"
-mkdir -p "$SANDBOX/.attach-linux"
-cp "$WORKSPACE/compat-index.json" "$SANDBOX/.attach-linux/"
-cp "$WORKSPACE/validation.json"   "$SANDBOX/.attach-linux/"
-
 export ATTACH_LINUX=~/linux
-export ATTACH_DT_SCHEMA=~/dt-schema
-export ATTACH_CONTEXT=~/rpi-4.dts
+export ATTACH_DEVICETREE=~/rpi-4.dts
 
 cd "$SANDBOX"
 
-# validation-json is internal (not settable with config-set): point it at the
-# copied bundle so validate doesn't regenerate it with dt-mk-schema.
-echo "validation-json = \"$SANDBOX/.attach-linux/validation.json\"" > "$SANDBOX/.attach-linux/config.toml"
-
-banner "Board-aware device tree overlay workflow"
+banner "Device tree overlay workflow"
 echo ""
 echo -e "  Target:  ${BOLD}AD7124-8${RESET} precision ADC (adi,ad7124-8) on SPI PMOD 1"
 echo -e "  Board:   ${BOLD}PMD-RPI-INTZ${RESET} — Analog Devices HAT for Raspberry Pi 4"
 echo -e "  Base DT: ${BOLD}rpi-4.dts${RESET}"
 echo ""
 echo -e "  ${DIM}This demo walks through configuring a peripheral from scratch. At every"
-echo -e "  step the tool says what is needed and suggests values: from the binding,"
-echo -e "  from the context devicetree, and from the board's wiring.${RESET}"
+echo -e "  step the tool says what is needed and suggests values from the binding"
+echo -e "  and the base devicetree. How the HAT is wired is up to the user.${RESET}"
 if $PAUSE; then
     echo ""
     echo -e "  ${DIM}[press Enter to start]${RESET}"
@@ -102,50 +95,34 @@ fi
 
 # --- Demo ---
 
-step "Configure the board" \
-    "A single name resolves to the bundled board description." \
-    "config-set board pmd-rpi-intz" \
-    "config-get board"
-
-step "Discover the board's slots" \
-    "Each slot lists its bus, chip selects and signals. spi_pmod1 and quikeval (in SPI mode) share chip select GPIO8, so they exclude each other." \
-    "list slot"
-
 step "Create the workfile" \
-    "This board ships no overlay of its own, so the workfile starts empty." \
+    "The workfile starts empty; create-workfile saves its path to the config." \
     "create-workfile"
 
-step "Which slots can host the ADC?" \
-    "Only slots on an SPI bus. The ADC's Pmod is plugged into SPI PMOD 1, so spi_pmod1 it is: spi0, reg 0." \
-    "list slot adi,ad7124-8"
+step "Which buses can host the ADC?" \
+    "Every SPI controller in the base tree. On the HAT, SPI PMOD 1 is wired to spi0, chip select 0." \
+    "list parent adi,ad7124-8"
 
 step "Add the device" \
     "The CLI adds the node under spi0." \
     "add adi,ad7124-8 --parent spi0 --label adc --name adc@0"
 
 step "What does the binding expect?" \
-    "Every property the AD7124-8 binding declares, required ones first, marked when already set. Only compatible is set so far; reg and interrupts are the remaining required ones. The last line lists the child nodes the binding allows: channel@N." \
+    "Every property the AD7124-8 binding declares, required ones first, marked when already set. add set reg from the unit address, so interrupts is the remaining required one. The last line lists the child nodes the binding allows: channel@N." \
     "list property adc"
 
-step "Suggest chip-select (reg) values" \
-    "The board knows all 6 chip selects and who uses them. spi_pmod1 is reg 0, but the base tree's spidev@0 occupies it." \
+step "Chip select (reg)" \
+    "reg follows the unit address: chip select 0, where SPI PMOD 1 is wired." \
     "list value adc reg"
 
-step "Free CS0 and set reg = 0" \
-    "Disable spidev@0, then take the chip select. The board still lists quikeval next to spi_pmod1: both are wired to CS0, and only the user knows which one is populated (here, spi_pmod1)." \
-    "disable spidev0" \
-    "update adc reg 0" \
-    "list value adc reg"
-
-step "Suggest interrupts" \
-    "The board offers GPIO19, spi_pmod1's interrupt pin, with every trigger type: the trigger depends on the device, not the board. The note flags that the node inherits the Pi's GIC as interrupt controller, but GPIO19 belongs to the GPIO block." \
-    "list value adc interrupts"
+step "Free CS0" \
+    "The base tree's spidev@0 also sits on chip select 0. Disable it so the ADC owns the line." \
+    "disable spidev0"
 
 step "Point the interrupt at the GPIO controller" \
-    "As the note asks, set interrupt-parent first. The board knows which controller its interrupt lines are on." \
+    "On SPI PMOD 1, RDY goes to GPIO19. Left alone, the node inherits the Pi's GIC as interrupt controller, but GPIO19 belongs to the GPIO block. list value offers both controllers with their cell counts; set interrupt-parent before interrupts." \
     "list value adc interrupt-parent" \
-    "update adc interrupt-parent gpio" \
-    "list value adc interrupts"
+    "update adc interrupt-parent gpio"
 
 step "Choose the trigger type" \
     "The AD7124-8 pulls RDY low when a conversion is ready: the binding example and the Linux driver both use a falling edge. Macros resolve to numbers (IRQ_TYPE_EDGE_FALLING is 2)." \
@@ -153,12 +130,11 @@ step "Choose the trigger type" \
     "read adc interrupts"
 
 step "A recommended GPIO: rdy-gpios" \
-    "Not required, but the binding highly recommends it: DOUT/RDY also toggles during SPI transfers, and reading the line is how the driver tells a real interrupt from a spurious one. On spi_pmod1 it is the same GPIO19; quikeval's GPIO22 is listed because it shares CS0. RDY is active low." \
-    "list value adc rdy-gpios" \
+    "Not required, but the binding highly recommends it: DOUT/RDY also toggles during SPI transfers, and reading the line is how the driver tells a real interrupt from a spurious one. On SPI PMOD 1 it is the same GPIO19 as the interrupt. RDY is active low." \
     "update adc rdy-gpios gpio 19 GPIO_ACTIVE_LOW"
 
 step "An optional external reference" \
-    "refin1-supply is optional: without it the ADC uses its internal 2.5 V reference. The context devicetree offers its regulators, but each is only right if it actually feeds REFIN1, so nothing is set here." \
+    "refin1-supply is optional: without it the ADC uses its internal 2.5 V reference. The base devicetree offers its regulators, but each is only right if it actually feeds REFIN1, so nothing is set here." \
     "list value adc refin1-supply"
 
 step "Child nodes need address cells" \

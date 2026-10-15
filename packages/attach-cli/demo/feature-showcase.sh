@@ -57,38 +57,28 @@ banner() {
 
 # --- Prerequisites ---
 
-for path in ~/rpi-4.dts ~/linux ~/dt-schema "$CLI"; do
+for path in ~/rpi-4.dts ~/linux "$CLI"; do
     if [[ ! -e "$path" ]]; then
         echo -e "${RED}Missing prerequisite: $path${RESET}" >&2
         exit 1
     fi
 done
 
-if ! command -v dtc &>/dev/null; then
-    echo -e "${RED}dtc not found on PATH${RESET}" >&2
-    exit 1
-fi
-
-# Cached data for the sandbox
-if [[ ! -f "$WORKSPACE/compat-index.json" ]]; then
-    echo -e "${RED}Missing $WORKSPACE/compat-index.json — run a command first to build it${RESET}" >&2
-    exit 1
-fi
-
 # --- Sandbox ---
 
+# Reuse the package workspace's caches when it has them; the CLI rebuilds
+# whatever is missing (validation.json takes about a minute).
 rm -rf "$SANDBOX"
 mkdir -p "$SANDBOX/.attach-linux"
-cp "$WORKSPACE/compat-index.json" "$SANDBOX/.attach-linux/"
-if [[ -f "$WORKSPACE/validation.json" ]]; then
-    cp "$WORKSPACE/validation.json" "$SANDBOX/.attach-linux/"
-    echo "validation-json = \"$SANDBOX/.attach-linux/validation.json\"" > "$SANDBOX/.attach-linux/config.toml"
-fi
+for cache in compat-index.json validation.json validation.stamp.json; do
+    if [[ -f "$WORKSPACE/$cache" ]]; then
+        cp "$WORKSPACE/$cache" "$SANDBOX/.attach-linux/"
+    fi
+done
 cd "$SANDBOX"
 
 export ATTACH_LINUX=~/linux
-export ATTACH_DT_SCHEMA=~/dt-schema
-export ATTACH_CONTEXT=~/rpi-4.dts
+export ATTACH_DEVICETREE=~/rpi-4.dts
 
 banner "Feature Showcase — attach-linux CLI"
 echo -e "  Target: Raspberry Pi 4 + Analog Devices AD7124-8 ADC on SPI0"
@@ -101,7 +91,7 @@ echo ""
 banner "1. Environment-variable config (note 24)"
 
 step "Show config from env vars" \
-    "ATTACH_LINUX, ATTACH_DT_SCHEMA, ATTACH_CONTEXT are read from the environment." \
+    "ATTACH_LINUX and ATTACH_DEVICETREE are read from the environment." \
     "config-get"
 
 step "config-set linux refused" \
@@ -114,7 +104,7 @@ step "config-set linux refused" \
 banner "2. Implicit workfile creation (note 2)"
 
 step "add creates the workfile automatically" \
-    "No overlay configured — add creates overlay.dtso, saves it to config, then adds the device." \
+    "No overlay configured — add creates ad7124-8.dtso (named after the device), saves it to config, then adds the device." \
     "add adi,ad7124-8 --parent spi0"
 
 step "Overlay content" \
