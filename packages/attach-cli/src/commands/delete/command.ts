@@ -23,13 +23,13 @@ Examples:
   $ attach-linux delete spi0/adi,ad7124-8@0              Delete a node
   $ attach-linux delete spi0/adi,ad7124-8@0 spi-cpha     Remove a property
   $ attach-linux delete spi0 --force                      Delete all overlay children and properties`)
-        .action(async (path_argumentument: string | undefined, property_argument: string | undefined, options) => {
+        .action(async (path_argument: string | undefined, property_argument: string | undefined, options) => {
             const workspace = load_workspace(context_, ["base", "overlay"]);
             if (workspace === undefined) { return; }
             const { source: devicetree, tree: base } = workspace.base;
             const { path: input, tree: overlay } = workspace.overlay;
 
-            if (path_argumentument === undefined) {
+            if (path_argument === undefined) {
                 const preview = count_overlay_root(overlay);
 
                 if (!options.force) {
@@ -60,7 +60,7 @@ Examples:
                 return;
             }
 
-            if (path_argumentument === "/" && property_argument === undefined) {
+            if (path_argument === "/" && property_argument === undefined) {
                 if (context_.json) {
                     respond_fail({ ok: false, message: "Cannot delete the root node", severity: "error" });
                 } else {
@@ -70,16 +70,16 @@ Examples:
             }
 
             if (property_argument !== undefined) {
-                const result = remove_overlay_property(overlay, path_argumentument, property_argument);
+                const result = remove_overlay_property(overlay, path_argument, property_argument);
                 if (result === "removed") {
                     workspace.overlay.save();
                     if (context_.json) {
-                        respond({ ok: true, message: `Removed ${property_argument} from ${path_argumentument}`, severity: "info" });
+                        respond({ ok: true, message: `Removed ${property_argument} from ${path_argument}`, severity: "info" });
                     } else {
-                        console.log(`Removed ${property_argument} from ${path_argumentument} in ${input}`);
+                        console.log(`Removed ${property_argument} from ${path_argument} in ${input}`);
                     }
                 } else {
-                    const message = `Not found: ${property_argument} on ${path_argumentument}`;
+                    const message = `Not found: ${property_argument} on ${path_argument}`;
                     if (context_.json) {
                         respond_fail({ ok: false, message, severity: "error" });
                     } else {
@@ -89,7 +89,7 @@ Examples:
                 return;
             }
 
-            const identifier = path_argumentument;
+            const identifier = path_argument;
 
             if (context_.json) {
                 const found = overlay.find_node(resolve_node_identifier(identifier, overlay));

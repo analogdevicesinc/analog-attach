@@ -18,8 +18,8 @@ Paths:
 Example:
   $ attach-linux ${commandName} spi0
   $ attach-linux ${commandName} spi0/spidev@0`)
-        .action(async (path_argumentument: string | undefined) => {
-            if (path_argumentument === undefined) {
+        .action(async (path_argument: string | undefined) => {
+            if (path_argument === undefined) {
                 console.log("Missing: path");
                 return;
             }
@@ -29,16 +29,16 @@ Example:
             const { source: devicetree, tree: base } = workspace.base;
             const { path: input, tree: overlay } = workspace.overlay;
 
-            const result = set_node_status(base, overlay, path_argumentument, status_value);
+            const result = set_node_status(base, overlay, path_argument, status_value);
 
             switch (result) {
                 case "not-found": {
-                    console.log(`Couldn't find node ${path_argumentument} in ${devicetree} or ${input}`);
+                    console.log(`Couldn't find node ${path_argument} in ${devicetree} or ${input}`);
                     return;
                 }
                 case "done": {
                     workspace.overlay.save();
-                    console.log(`${verb}d ${path_argumentument} in ${input}`);
+                    console.log(`${verb}d ${path_argument} in ${input}`);
                     return;
                 }
             }
