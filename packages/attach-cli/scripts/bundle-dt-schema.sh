@@ -13,9 +13,14 @@ DTC_DIR="$PKG_ROOT/dtc"
 TOOLS_DIR="$PKG_ROOT/bundled/tools"
 SCHEMA_DIR="$PKG_ROOT/bundled/dt-schema"
 
+# A binary that prints no version never reached the tool's main().
+runs() {
+    [ -x "$1" ] && [ -n "$("$1" --version 2>/dev/null)" ]
+}
+
 already_built() {
-    [ -x "$TOOLS_DIR/dt-mk-schema" ] && \
-        [ -x "$TOOLS_DIR/dt-validate" ] && \
+    runs "$TOOLS_DIR/dt-mk-schema" && \
+        runs "$TOOLS_DIR/dt-validate" && \
         [ -x "$TOOLS_DIR/dtc" ] && \
         [ -d "$SCHEMA_DIR/dtschema/schemas" ] && \
         [ -d "$DTSCHEMA_DIR/.git" ] && \
@@ -50,21 +55,25 @@ echo "==> Installing dt-schema and PyInstaller..."
 pip install --quiet pyinstaller
 pip install --quiet "$DTSCHEMA_DIR"
 
-echo "==> Building dt-mk-schema binary..."
-pyinstaller --onefile --name dt-mk-schema \
-    --distpath "$TOOLS_DIR" \
-    --workpath "$DTSCHEMA_DIR/.pyinstaller-build" \
-    --specpath "$DTSCHEMA_DIR/.pyinstaller-build" \
-    --collect-data dtschema \
-    "$(python3 -c "import dtschema.mk_schema; print(dtschema.mk_schema.__file__)")"
+# The dtschema modules have no __main__ block (pip reaches main() through
+# entry points), so PyInstaller gets a small script that calls it.
+build_tool() {
+    local name="$1" module="$2"
+    local entry="$DTSCHEMA_DIR/.pyinstaller-build/$name.py"
+    echo "==> Building $name binary..."
+    mkdir -p "$(dirname "$entry")"
+    printf 'import sys\nfrom %s import main\nsys.exit(main())\n' "$module" > "$entry"
+    pyinstaller --onefile --name "$name" \
+        --distpath "$TOOLS_DIR" \
+        --workpath "$DTSCHEMA_DIR/.pyinstaller-build" \
+        --specpath "$DTSCHEMA_DIR/.pyinstaller-build" \
+        --collect-data dtschema \
+        "$entry"
+    runs "$TOOLS_DIR/$name" || { echo "$name does not run" >&2; exit 1; }
+}
 
-echo "==> Building dt-validate binary..."
-pyinstaller --onefile --name dt-validate \
-    --distpath "$TOOLS_DIR" \
-    --workpath "$DTSCHEMA_DIR/.pyinstaller-build" \
-    --specpath "$DTSCHEMA_DIR/.pyinstaller-build" \
-    --collect-data dtschema \
-    "$(python3 -c "import dtschema.dtb_validate; print(dtschema.dtb_validate.__file__)")"
+build_tool dt-mk-schema dtschema.mk_schema
+build_tool dt-validate dtschema.dtb_validate
 
 echo "==> Copying dt-schema schemas..."
 rm -rf "$SCHEMA_DIR"
