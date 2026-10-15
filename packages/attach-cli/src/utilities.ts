@@ -54,14 +54,6 @@ export function resolve_path(path_string: string, overlay: DeviceTreeOverlay, ba
     return { reference, in_overlay, in_base };
 }
 
-export function base_target(resolved: ResolvedPath): DTLabel | DTPath | undefined {
-    if (resolved.in_base === undefined) { return undefined; }
-    if (resolved.in_base.node.labels.length > 0) {
-        return { kind: "label", labels: [], name: resolved.in_base.node.labels[0]! };
-    }
-    return { kind: "path", labels: [], path: resolved.in_base.path };
-}
-
 export function not_found_message(path_string: string, overlay: DeviceTreeOverlay, base?: DeviceTree): string {
     const split = split_property_reference(path_string);
     if (split.property_name !== undefined) {

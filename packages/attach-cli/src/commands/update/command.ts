@@ -1,4 +1,3 @@
-/* eslint-disable unicorn/no-useless-undefined */
 import { Command } from "commander";
 import {
     AttachEnumType,
@@ -13,6 +12,7 @@ import {
     get_full_node_name,
     address_cells_of,
     encode_reg_address,
+    ensure_address_cells,
     parse_unit_address,
     sync_unit_address_from_reg,
     type CellValue,
@@ -383,10 +383,11 @@ Examples:
             // R12: child nodes via update
             if (property_name.includes("@")) {
                 // A name with @ is always a child node, never a property
-                const effective = overlay.effective_children(found?.node_path ?? node_identifier);
+                const node_path = found?.node_path ?? base_dt.locate(target_reference)?.path ?? node_identifier;
+                const effective = overlay.effective_children(node_path);
                 const existing_child = effective.get(property_name);
                 if (existing_child !== undefined) {
-                    const child_path = `${found?.node_path ?? node_identifier}/${property_name}`;
+                    const child_path = `${node_path}/${property_name}`;
                     const child_found = overlay.find_node(child_path);
                     if (child_found === undefined) {
                         if (context_.json) { respond_fail({ ok: false, message: `Not found: ${child_path}`, severity: "error" }); }
@@ -439,33 +440,18 @@ Examples:
 
                     const parsed_addr = parse_unit_address(child_unit);
                     if (parsed_addr !== undefined) {
-                        const cells = address_cells_of(overlay, found?.node_path ?? node_identifier);
+                        const cells = address_cells_of(overlay, node_path);
                         child_properties.push(encode_reg_address(parsed_addr, cells.address, cells.size));
-
                         // C3: write #address-cells/#size-cells on parent if missing
-                        if (found !== undefined && !is_base_target) {
-                            const has_addr = found.node.properties.some(p => p.name === "#address-cells");
-                            if (!has_addr) {
-                                found.node.properties.push(
-                                    PropertyBuilder.build_cell_array().with_tagged_values(PropertyBuilder.tag_number(1n)).with_name("#address-cells").build(),
-                                    PropertyBuilder.build_cell_array().with_tagged_values(PropertyBuilder.tag_number(0n)).with_name("#size-cells").build(),
-                                );
-                            }
-                        }
+                        ensure_address_cells(overlay, node_path);
                     }
 
-                    const child_node = NodeBuilder.new()
+                    overlay.ensure_node(node_path)?.children.push(NodeBuilder.new()
                         .with_name(child_name)
                         .with_unit_address(child_unit)
                         .with_label([])
                         .with_properties(child_properties.length > 0 ? child_properties : undefined)
-                        .build();
-
-                    if (found !== undefined) {
-                        found.node.children.push(child_node);
-                    } else if (is_base_target) {
-                        overlay.add_fragment(target_reference, NodeBuilder.new().with_name(child_name).with_unit_address(child_unit).with_properties(child_properties.length > 0 ? child_properties : undefined), undefined);
-                    }
+                        .build());
 
                     workspace.overlay.save();
                     const message = `Added ${property_name} to ${node_identifier}`;

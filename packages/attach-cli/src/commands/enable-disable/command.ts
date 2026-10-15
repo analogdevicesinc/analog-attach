@@ -1,11 +1,9 @@
 import { Command } from "commander";
 import { DeviceTree, DeviceTreeOverlay, PropertyBuilder } from "attach-lib";
 
-import * as fs from 'node:fs';
-
 import type { LocalContext } from "../../context";
 import { load_workspace } from "../../config/workspace";
-import { resolve_node_identifier, resolve_path, base_target } from "../../utilities";
+import { resolve_path } from "../../utilities";
 
 function make_command(commandName: string, status_value: "okay" | "disabled", verb: string) {
     return (_context: LocalContext): Command => new Command(commandName)
@@ -63,24 +61,16 @@ export function set_node_status(
         .build();
 
     const resolved = resolve_path(identifier, overlay, base);
-    if (resolved.in_overlay !== undefined) {
-        const index = resolved.in_overlay.node.properties.findIndex(p => p.name === "status");
+    const path = resolved.in_overlay?.node_path ?? resolved.in_base?.path;
+    const node = path === undefined ? undefined : overlay.ensure_node(path);
+    if (node === undefined) { return "not-found"; }
 
-        if (index === -1) {
-            resolved.in_overlay.node.properties.push(status_property);
-        } else {
-            resolved.in_overlay.node.properties[index] = status_property;
-        }
-        return "done";
+    const index = node.properties.findIndex(p => p.name === "status");
+    if (index === -1) {
+        node.properties.push(status_property);
+    } else {
+        node.properties[index] = status_property;
     }
-
-    const base_referenceerence = base_target(resolved);
-    if (base_referenceerence === undefined) {
-        return "not-found";
-    }
-
-    overlay.add_fragment(base_referenceerence, undefined, status_property);
-
     return "done";
 }
 

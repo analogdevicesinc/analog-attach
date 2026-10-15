@@ -49,7 +49,7 @@ Config is parsed, not validated: `src/config/` turns env vars and config.toml in
   Errors from independent resources are collected and reported once (`report_config_errors`; exit 2 under `--json`). `parse_bindings` / `parse_overlay` are exported for callers that make bindings optional (`list value`, navigate completion) or that create the workfile first (`add`).
 - `cache.ts`: derived state under `.attach-linux/` that never goes into config.toml. `compat-index.json` maps compatible → binding YAML. `validation.json` is the `dt-mk-schema` output and has a `validation.stamp.json` next to it. Both are rebuilt when stale (mtime-based, or when the linux/dt-schema paths differ).
 
-Path helpers in `src/utilities.ts`: `parse_node_path`, `parse_property_name`, `parse_target`, `resolve_path`, `base_target`, `not_found_message`.
+Path helpers in `src/utilities.ts`: `parse_node_path`, `parse_property_name`, `parse_target`, `resolve_path`, `not_found_message`.
 
 ### Dependency on attach-lib
 
