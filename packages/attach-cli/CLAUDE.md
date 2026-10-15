@@ -36,24 +36,28 @@ Commands in `src/app.ts` are annotated with `// protocol commands` (used by AI t
 
 ### Configuration and workspace state
 
-`src/config.ts` manages `.attach-linux/config.toml` (relative to CWD) and environment variables:
-- **Environment variables**: `ATTACH_LINUX`, `ATTACH_DEVICETREE` replace config.toml for these two fields. `config-set` rejects them with an export hint; legacy TOML values are ignored with a warning.
-- **config.toml**: stores `overlay`, `board`, `overlay-syntax`, `build-command`, `preprocess-command`, and other fields.
-- `compat-index.json`: a binding compatibility index keyed by compatible string → YAML file path; rebuilt when stale (mtime-based or when the linux/dt-schema paths differ).
+Config is parsed, not validated: `src/config/` turns env vars and config.toml into checked resources, and a command that gets them cannot fail because of the configuration.
 
-`resolve_config` (`src/resolve-config.ts`) returns `{ values, config, parsed }`. The `parsed: ParsedConfig` object holds the pre-parsed `DeviceTree` and `BoardDescription` when `context` / `board` were among the required fields.
+- `settings.ts`: the `SETTINGS` registry, which config-set, config-get and completion all derive from. It holds only user settings: `linux` / `devicetree` from `ATTACH_LINUX` / `ATTACH_DEVICETREE`, and `overlay`, `overlay-syntax`, `preprocess-command`, `deploy-*` from `.attach-linux/config.toml` (relative to CWD). `parse_settings` is strict: unknown keys, non-string or out-of-options values, and env keys written in TOML are all errors. Paths are resolved to absolute and defaults are applied. `save_settings` writes in registry order and keeps unknown keys, so the next load still reports them.
+- `workspace.ts`: `load_workspace(context, needs)` reads the settings and parses the requested resources:
+  - `bindings`: the Linux tree has `Documentation/devicetree/bindings/` and `include/`, and the bundled dt-schema exists.
+  - `tools`: the bundled dtc and dt-* binaries.
+  - `base`: the DTS, run through `preprocess-command` into `.attach-linux/preprocessed.dts` on every invocation, then parsed.
+  - `overlay`: a `Workfile` parsed against the base, with `print()` / `save()` honouring `overlay-syntax`.
+  - `deploy`: the deploy fields plus the `.dtbo` derived from the overlay path.
 
-Path helpers in `src/utilities.ts`: `parse_node_path`, `parse_property_name`, `parse_target`, `resolve_path`, `base_target`, `not_found_message`, `overlay_print_options`, `write_overlay`.
+  Errors from independent resources are collected and reported once (`report_config_errors`; exit 2 under `--json`). `parse_bindings` / `parse_overlay` are exported for callers that make bindings optional (`list value`, navigate completion) or that create the workfile first (`add`).
+- `cache.ts`: derived state under `.attach-linux/` that never goes into config.toml. `compat-index.json` maps compatible → binding YAML. `validation.json` is the `dt-mk-schema` output and has a `validation.stamp.json` next to it. Both are rebuilt when stale (mtime-based, or when the linux/dt-schema paths differ).
+
+Path helpers in `src/utilities.ts`: `parse_node_path`, `parse_property_name`, `parse_target`, `resolve_path`, `base_target`, `not_found_message`.
 
 ### Dependency on attach-lib
 
 `attach-lib` is a dev dependency resolved from the workspace. `tsup` bundles it into the output via `noExternal: ["attach-lib"]`, so the published `dist/` is self-contained. The `yaml` package is intentionally kept external.
 
-### Board descriptions
+### Value suggestions
 
-The optional `board` config field names an add-on board (HAT, …) description: a path, or a bundled name resolved to `bundled/boards/<name>.yaml` (`src/board.ts`, `getBundledBoardsPath`). All board logic lives in attach-lib's Intelligence module as the third context layer (`board_layer`, see `packages/attach-lib/src/Intelligence/CLAUDE.md`); the CLI only loads the file, appends the layer to `IntelligenceStack.default()`, and formats results — `list value` / `list slot`, plus `suggestions` on `list property` via `resolve_node_binding`'s `options`. Slot inference is stateless (parent bus + `reg`, via `placement_from_overlay`). Lib suggestions are structured cell rows; `format_value` (`src/commands/update/command.ts`) turns them into value strings and is the inverse of `parse_value`.
-
-A board may ship an overlay for its onboard devices (`overlay:` in the YAML, relative to the board file, resolved by `resolve_board_overlay`; files live in `bundled/overlays/`). `create-workfile` then writes that overlay instead of the empty skeleton (`prepare_board_workfile`): it runs `preprocess-command` (default mirrors kbuild's `cpp` flags, `{linux}` = the configured tree; persisted to config on first use), parses it, and drops `__overrides__`. Command templates go through `substitute_command` / `is_tool_available` in `src/utilities.ts`.
+`list value` asks attach-lib's `IntelligenceStack.default()` for values (binding and base-devicetree layers, see `packages/attach-lib/src/Intelligence/CLAUDE.md`), placing the node with `placement_from_overlay`. Lib suggestions are structured cell rows; `format_suggestion` (`src/commands/update/command.ts`) turns them into value strings and is the inverse of `parse_value`. Command templates (`preprocess-command`, the build command) go through `substitute_command` / `is_tool_available` in `src/utilities.ts`.
 
 ### Bundled dt-schema and tools
 
@@ -61,7 +65,7 @@ A board may ship an overlay for its onboard devices (`overlay:` in the YAML, rel
 
 ### Overlay syntax
 
-The `overlay-syntax` config field controls the output format: `fragment` (default, `fragment@N { target = <&label>; __overlay__ { … } }`) or `label` (`&label { … }`). All overlay writes go through `write_overlay` / `overlay_print_options` in `src/utilities.ts`. The printer lives in `attach-lib/src/Devicetree/Printer.ts`.
+The `overlay-syntax` config field controls the output format: `fragment` (default, `fragment@N { target = <&label>; __overlay__ { … } }`) or `label` (`&label { … }`). All overlay writes go through the `Workfile` returned by `load_workspace` (`src/config/workspace.ts`). The printer lives in `attach-lib/src/Devicetree/Printer.ts`.
 
 ### update value format
 
@@ -75,7 +79,7 @@ The binding provides only a shape hint (`flag` / `strings` / `cells` / undefined
 
 ### list command and hidden __list
 
-`suggest`, `list-devices` and `list-intelligence` were replaced by a unified `list` command tree: `list device`, `list property`, `list value`, `list parent`, `list slot`. A hidden `__list` command handles completion-only kinds. The manifest's `suggest` key points at `__list`.
+`suggest`, `list-devices` and `list-intelligence` were replaced by a unified `list` command tree: `list device`, `list property`, `list value`, `list parent`. A hidden `__list` command handles completion-only kinds. The manifest's `suggest` key points at `__list`.
 
 ### Naming, unit addresses and labels
 
@@ -95,7 +99,7 @@ Setting `interrupts` without an explicit `interrupt-parent` writes the inherited
 
 ## Key Conventions
 
-- All commands follow the pattern: validate paths → parse files → call `attach-lib` → `console.log` or `respond()` output. Commands never throw to the user; they print a diagnostic and return early.
+- All commands follow the pattern: `load_workspace(context, needs)` → call `attach-lib` → `console.log` or `respond()` output. Commands never throw to the user; they print a diagnostic and return early.
 - `bigIntReplacer` in `src/utilities.ts` must be passed to `JSON.stringify` whenever output contains `BigInt` values (DTS cell arrays are always `bigint`).
 - Inline tests use Vitest's `includeSource` feature — `if (import.meta.vitest)` blocks sit directly in source files (see `src/commands/add/command.ts`).
 - TypeScript is configured with `noUncheckedIndexedAccess`, `noPropertyAccessFromIndexSignature`, and `verbatimModuleSyntax` — stricter than the monorepo baseline. Index access always requires a `undefined` check.

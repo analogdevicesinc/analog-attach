@@ -31,8 +31,8 @@ import {
 import * as fs from "node:fs";
 
 import type { LocalContext } from "../../context";
-import { resolve_config } from "../../resolve-config";
-import { load_trees, resolve_write_target, overlay_print_options, parse_node_path, not_found_message } from "../../utilities";
+import { load_workspace } from "../../config/workspace";
+import { resolve_write_target, parse_node_path, not_found_message } from "../../utilities";
 import { resolve_node_binding } from "../../binding-resolution";
 import { respond, respond_fail, input_error, diagnostic } from "../../protocol/output";
 import { convert_node, convert_property } from "../../protocol/dt-to-protocol";
@@ -359,13 +359,11 @@ Examples:
             }
             const node_identifier = parsed_path.value;
 
-            const resolved = resolve_config(context_, ["overlay", "devicetree", "linux", "dtSchema"]);
-            if (resolved === undefined) { return; }
-            const { overlay: input, devicetree, linux, dtSchema } = resolved.values;
-
-            const trees = load_trees(context_, devicetree, input, resolved.parsed.devicetree);
-            if (trees === undefined) { return; }
-            const { base_dt, overlay } = trees;
+            const workspace = load_workspace(context_, ["bindings", "base", "overlay"]);
+            if (workspace === undefined) { return; }
+            const { linux, dt_schema: dtSchema } = workspace.bindings;
+            const base_dt = workspace.base.tree;
+            const { path: input, tree: overlay } = workspace.overlay;
 
             const { target_reference, found, is_base_target, binding_node, binding_parent, parent_name } =
                 resolve_write_target(node_identifier, overlay, base_dt);
@@ -469,8 +467,7 @@ Examples:
                         overlay.add_fragment(target_reference, NodeBuilder.new().with_name(child_name).with_unit_address(child_unit).with_properties(child_properties.length > 0 ? child_properties : undefined), undefined);
                     }
 
-                    const printed = overlay.print(overlay_print_options(resolved.config));
-                    fs.writeFileSync(input, printed);
+                    workspace.overlay.save();
                     const message = `Added ${property_name} to ${node_identifier}`;
                     if (context_.json) { respond({ ok: true, message, severity: "info" }); }
                     else { console.log(message); }
@@ -506,7 +503,7 @@ Examples:
             if (decision === "set-flag") {
                 const built = PropertyBuilder.build_flag().set_flag().with_name(property_name).build();
                 place_property(overlay, target_reference, found, is_base_target, built, property_name);
-                const printed = overlay.print(overlay_print_options(resolved.config));
+                const printed = workspace.overlay.print();
                 const test_parse = DeviceTreeOverlay.new_from_string(printed, base_dt);
                 if (typeof test_parse === "string") {
                     if (context_.json) { respond_fail({ ok: false, message: `Update would produce an unreadable overlay: ${test_parse}`, severity: "error" }); }
@@ -568,7 +565,7 @@ Examples:
                 diagnostic("an overlay can't rename a base node; reg written but name unchanged");
             }
 
-            const printed = overlay.print(overlay_print_options(resolved.config));
+            const printed = workspace.overlay.print();
             const test_parse = DeviceTreeOverlay.new_from_string(printed, base_dt);
 
             if (typeof test_parse === "string") {

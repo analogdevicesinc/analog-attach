@@ -1,12 +1,11 @@
 import { Command } from "commander";
+import * as fs from "node:fs";
+import { stringify } from "smol-toml";
 
 import type { LocalContext } from "../../context";
-import { save_config, CONFIG_REGISTRY, type FieldSpec } from "../../config";
+import { parse_settings, read_settings, save_settings, setting_spec, TOML_SETTINGS } from "../../config/settings";
+import { format_config_errors } from "../../config/workspace";
 import { respond, respond_fail } from "../../protocol/output";
-
-export const SETTABLE_FIELDS: Map<string, FieldSpec> = new Map(
-    CONFIG_REGISTRY.filter((spec) => !spec.internal && spec.env === undefined).map((spec) => [spec.toml, spec]),
-);
 
 export function build_config_set_command(context: LocalContext): Command {
     return new Command("config-set")
@@ -15,8 +14,8 @@ export function build_config_set_command(context: LocalContext): Command {
         .argument("<value>", "Value to set")
         .addHelpText("after", `
 Settable fields:
-  overlay, overlay-syntax, overlay-compiled,
-  preprocess-command, deploy-ip, deploy-user, deploy-password
+  overlay, overlay-syntax, preprocess-command,
+  deploy-ip, deploy-user, deploy-password
 
   linux and devicetree are set via environment variables:
     export ATTACH_LINUX=/path/to/linux
@@ -27,51 +26,45 @@ Examples:
   $ attach-linux config-set overlay-syntax label
   $ attach-linux config-set deploy-ip 192.168.1.10`)
         .action(async (field: string, value: string) => {
-            const environment_spec = CONFIG_REGISTRY.find(s => s.toml === field && s.env !== undefined);
-            if (environment_spec !== undefined) {
-                const message = `${field} is read from the environment, not config.toml: export ${environment_spec.env}=${JSON.stringify(value)}`;
+            const fail = (message: string): void => {
                 if (context.json) {
                     respond_fail({ ok: false, message, severity: "error" });
                 } else {
                     console.log(message);
                 }
+            };
+
+            const spec = setting_spec(field);
+            if (spec?.env !== undefined) {
+                fail(`${field} is read from the environment, not config.toml: export ${spec.env}=${JSON.stringify(value)}`);
                 return;
             }
-
-            const spec = SETTABLE_FIELDS.get(field);
-
             if (spec === undefined) {
-                const valid = [...SETTABLE_FIELDS.keys()].join(", ");
-                if (context.json) {
-                    respond_fail({ ok: false, message: `Unknown config field: ${field}. Valid fields: ${valid}`, severity: "error" });
-                } else {
-                    console.log(`Unknown config field: ${field}. Valid fields: ${valid}`);
-                }
+                fail(`Unknown config field: ${field}. Valid fields: ${TOML_SETTINGS.map(s => s.key).join(", ")}`);
                 return;
             }
 
-            if (spec.options !== undefined && !spec.options.includes(value)) {
-                const message = `Invalid ${field}: must be one of ${spec.options.join(" | ")}`;
-                if (context.json) {
-                    respond_fail({ ok: false, message, severity: "error" });
-                } else {
-                    console.log(message);
-                }
+            // The rest of the file may be invalid (config-set is how it gets fixed), but it must be TOML.
+            const current = read_settings();
+            const syntax_error = current.ok ? undefined : current.errors.find(error => error.field === "config.toml");
+            if (syntax_error !== undefined) {
+                fail(syntax_error.message);
                 return;
             }
 
-            const validation_error = spec.validate?.(value);
-            if (validation_error !== undefined) {
-                const message = `Invalid ${field}: ${validation_error}`;
-                if (context.json) {
-                    respond_fail({ ok: false, message, severity: "error" });
-                } else {
-                    console.log(message);
-                }
+            // Parse the value exactly as loading config.toml would.
+            const parsed = parse_settings(stringify({ [field]: value }), {});
+            if (!parsed.ok) {
+                fail(format_config_errors(parsed.errors).human);
+                return;
+            }
+            const parsed_value = parsed.value[spec.field] ?? value;
+            if (spec.kind === "path" && !fs.existsSync(parsed_value)) {
+                fail(`${field}: ${parsed_value} does not exist`);
                 return;
             }
 
-            save_config({ [spec.key]: value });
+            save_settings({ [field]: parsed_value });
 
             if (context.json) {
                 respond({ ok: true, message: `Set ${field} = ${value}`, severity: "info" });

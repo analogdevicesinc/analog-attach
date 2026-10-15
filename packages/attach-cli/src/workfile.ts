@@ -1,7 +1,7 @@
 import * as fs from "node:fs";
 import path from "node:path";
 
-import { save_config, type AttachConfig } from "./config";
+import { save_settings } from "./config/settings";
 
 const EMPTY_DTSO = String.raw`/dts-v1/;
 /plugin/;
@@ -21,41 +21,20 @@ export function next_workfile_name(cwd?: string): string {
     return `overlay-${n}.dtso`;
 }
 
-/** The workfile to start from: an empty overlay. */
-export function initial_workfile(_config: AttachConfig): { text: string; source?: string; warnings: string[]; persist: Partial<AttachConfig> } | { error: string } {
-    return { text: EMPTY_DTSO, warnings: [], persist: {} };
-}
-
 export interface CreateWorkfileResult {
     path: string;
-    source?: string;
-    warnings: string[];
     message: string;
 }
 
 /**
- * Create a workfile and save the overlay path to config.
+ * Create an empty workfile and save the overlay path to config.
  * Used by both `create-workfile` and `add` (when no overlay is configured).
  */
-export function create_workfile(
-    config: AttachConfig,
-    filename = "overlay.dtso",
-    cwd?: string,
-): CreateWorkfileResult | { error: string } {
-    const initial = initial_workfile(config);
-    if ("error" in initial) { return initial; }
-
+export function create_workfile(filename = "overlay.dtso", cwd?: string): CreateWorkfileResult {
     const output_path = path.resolve(cwd ?? process.cwd(), filename);
-    fs.writeFileSync(output_path, initial.text);
-    save_config({ overlay: output_path, ...initial.persist });
-
-    const from = initial.source === undefined ? "" : ` from ${initial.source}`;
-    return {
-        path: output_path,
-        source: initial.source,
-        warnings: initial.warnings,
-        message: `Wrote ${output_path}${from}`,
-    };
+    fs.writeFileSync(output_path, EMPTY_DTSO);
+    save_settings({ overlay: output_path }, cwd);
+    return { path: output_path, message: `Wrote ${output_path}` };
 }
 
 if (import.meta.vitest) {

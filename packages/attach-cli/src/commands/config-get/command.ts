@@ -2,15 +2,10 @@
 import { Command } from "commander";
 
 import type { LocalContext } from "../../context";
-import { load_config, CONFIG_REGISTRY, type AttachConfig } from "../../config";
+import { read_settings, SETTINGS } from "../../config/settings";
+import { report_config_errors } from "../../config/workspace";
 import { respond } from "../../protocol/output";
 import type { Config, ToolConfigResponse } from "../../protocol/types";
-
-const VISIBLE_SPECS = CONFIG_REGISTRY.filter((spec) => !spec.internal);
-
-const FIELD_TO_CONFIG_KEY: Record<string, keyof AttachConfig> = Object.fromEntries(
-    VISIBLE_SPECS.map((spec) => [spec.toml, spec.key]),
-);
 
 export function build_config_get_command(context: LocalContext): Command {
     return new Command("config-get")
@@ -22,7 +17,6 @@ Fields:
   devicetree ($ATTACH_DEVICETREE)  Target base DTS file   [required, env]
   overlay                     Working DTSO overlay file
   overlay-syntax              Output syntax: fragment (default) or label
-  overlay-compiled            Compiled DTBO artifact path
   preprocess-command          C preprocessor command template
   deploy-ip                   Remote device IP or hostname
   deploy-user                 SSH username
@@ -32,27 +26,27 @@ Examples:
   $ attach-linux config-get
   $ attach-linux config-get overlay deploy-ip`)
         .action(async (fields: string[]) => {
-            const current = load_config() ?? {};
-
-            let specs = VISIBLE_SPECS;
-            if (fields.length > 0) {
-                specs = specs.filter(s => fields.includes(s.toml));
+            const settings = read_settings();
+            if (!settings.ok) {
+                report_config_errors(context, settings.errors);
+                return;
             }
 
-            const result: Config[] = specs.map(spec => {
-                const key = FIELD_TO_CONFIG_KEY[spec.toml];
-                const value = key === undefined ? undefined : current[key];
-                const category = spec.env === undefined ? undefined : "environment";
-                return {
-                    field_name: spec.toml,
-                    category,
+            const specs = fields.length > 0 ? SETTINGS.filter(s => fields.includes(s.key)) : SETTINGS;
+
+            const rows = specs.map(spec => ({
+                spec,
+                config: {
+                    field_name: spec.key,
+                    category: spec.env === undefined ? undefined : "environment",
                     description: spec.description,
-                    type: spec.options === undefined ? spec.type : { options: [...spec.options] },
+                    type: typeof spec.kind === "string" ? spec.kind : { options: [...spec.kind.options] },
                     required: spec.required,
                     default: spec.default ?? null,
-                    value: value ?? null,
-                };
-            });
+                    value: settings.value[spec.field] ?? null,
+                } satisfies Config,
+            }));
+            const result: Config[] = rows.map(row => row.config);
 
             const response: ToolConfigResponse = {
                 ok: true,
@@ -65,28 +59,22 @@ Examples:
                 respond(response);
             } else {
                 const hints: string[] = [];
-                for (const c of result) {
-                    const spec = VISIBLE_SPECS.find(s => s.toml === c.field_name);
+                for (const { spec, config: c } of rows) {
                     const required_tag = c.required ? " [required]" : "";
-                    const environment_suffix = spec?.env === undefined ? "" : ` ($${spec.env})`;
+                    const environment_suffix = spec.env === undefined ? "" : ` ($${spec.env})`;
                     let display: string;
-                    if (c.value === null && c.default === null) {
+                    if (c.value === null) {
                         display = "(not set)";
-                    } else if (c.value === null) {
-                        display = `(not set, default: ${c.default})`;
+                    } else if (c.value === c.default) {
+                        display = `${c.value} (default)`;
                     } else {
                         display = String(c.value);
                     }
                     console.log(`${c.field_name}${required_tag}${environment_suffix}: ${display}`);
-                    let desc = spec?.description ?? "";
-                    if (spec?.options !== undefined && spec.options.length > 0) {
-                        desc += ` [${spec.options.join(" | ")}]`;
-                    }
-                    if (desc !== "") {
-                        console.log(`  ${desc}`);
-                    }
+                    const options = typeof spec.kind === "string" ? "" : ` [${spec.kind.options.join(" | ")}]`;
+                    console.log(`  ${spec.description}${options}`);
                     console.log("");
-                    if (c.value === null && c.required && spec?.hint !== undefined && !hints.includes(spec.hint)) {
+                    if (c.value === null && c.required && spec.hint !== undefined && !hints.includes(spec.hint)) {
                         hints.push(spec.hint);
                     }
                 }

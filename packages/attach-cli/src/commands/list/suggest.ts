@@ -13,13 +13,10 @@ import {
     type ParsedBinding,
     type ValueSuggestion,
 } from "attach-lib";
-import * as fs from "node:fs";
-
 import type { LocalContext } from "../../context";
-import { load_config, type AttachConfig } from "../../config";
-import { resolve_config } from "../../resolve-config";
+import { load_workspace, parse_bindings, type Bindings } from "../../config/workspace";
 import { format_suggestion, build_raw_property, shape_hint, parse_value } from "../update/command";
-import { bigIntReplacer, effective_parent_compatibles, find_binding, fragment_target, get_or_build_compat_index, load_base, load_trees, parse_property_reference, resolve_node_identifier, resolve_positional_path, resolve_write_target } from "../../utilities";
+import { bigIntReplacer, effective_parent_compatibles, find_binding, fragment_target, get_or_build_compat_index, parse_property_reference, resolve_node_identifier, resolve_positional_path, resolve_write_target } from "../../utilities";
 import { respond, respond_fail, input_error } from "../../protocol/output";
 import { attach_type_to_protocol_type } from "../../protocol/dt-to-protocol";
 import { resolve_node_binding, type NodeBinding } from "../../binding-resolution";
@@ -83,12 +80,10 @@ async function suggest_parent(context_: LocalContext, arguments_: string[]): Pro
         return;
     }
 
-    const resolved = resolve_config(context_, ["linux", "dtSchema", "devicetree"]);
-    if (resolved === undefined) { return; }
-    const { linux, dtSchema, devicetree } = resolved.values;
-
-    const dt = load_base(context_, devicetree, resolved.parsed.devicetree);
-    if (dt === undefined) { return; }
+    const workspace = load_workspace(context_, ["bindings", "base"]);
+    if (workspace === undefined) { return; }
+    const { linux, dt_schema: dtSchema } = workspace.bindings;
+    const dt = workspace.base.tree;
 
     const binding = await load_binding(context_, linux, dtSchema, compatible);
     if (binding === undefined) { return; }
@@ -152,13 +147,12 @@ async function suggest_value(context_: LocalContext, arguments_: string[]): Prom
     }
     const { node_identifier, property_name } = reference;
 
-    const resolved = resolve_config(context_, ["devicetree", "overlay"]);
-    if (resolved === undefined) { return; }
-    const { devicetree, overlay: overlay_path } = resolved.values;
-
-    const trees = load_trees(context_, devicetree, overlay_path, resolved.parsed.devicetree);
-    if (trees === undefined) { return; }
-    const { base_dt, overlay } = trees;
+    const workspace = load_workspace(context_, ["base", "overlay"]);
+    if (workspace === undefined) { return; }
+    const base_dt = workspace.base.tree;
+    const overlay = workspace.overlay.tree;
+    // Bindings are optional here: without them suggestions are just not checked.
+    const bindings = parse_bindings(workspace.settings);
 
     const { binding_node, binding_parent, parent_name, parent_compatibles } = resolve_write_target(node_identifier, overlay, base_dt);
 
@@ -178,7 +172,7 @@ async function suggest_value(context_: LocalContext, arguments_: string[]): Prom
     let data = "{}";
     const binding = binding_node === undefined
         ? undefined
-        : await resolve_binding_for_data(binding_node, binding_parent, parent_name, base_dt, resolved.config, parent_compatibles);
+        : await resolve_binding_for_data(binding_node, binding_parent, parent_name, base_dt, bindings.ok ? bindings.value : undefined, parent_compatibles);
     if (binding_node !== undefined && binding !== undefined) {
         const input_data = Object.fromEntries(dt_to_validator_input(binding_node, {
             required_properties: binding.required_properties,
@@ -197,26 +191,16 @@ async function suggest_value(context_: LocalContext, arguments_: string[]): Prom
         ...(binding === undefined ? {} : { binding: { required_properties: binding.required_properties, properties: binding.properties } }),
     });
 
-    // Binding check: annotate suggestions when linux/dt-schema are available.
-    const linux = resolved.config.linux;
-    const dtSchema = resolved.config.dtSchema;
+    // Binding check: annotate suggestions (in place, via the note field) when bindings are available.
     let binding_check_reason: string | undefined;
-
-    if (linux !== undefined && dtSchema !== undefined && fs.existsSync(linux) && fs.existsSync(dtSchema) && binding_node !== undefined) {
-        const annotated = await annotate_suggestions(values, property_name, binding_node, binding_parent, parent_name, base_dt, linux, dtSchema, context_.json, overlay, parent_compatibles);
-        if (annotated === undefined) {
-            binding_check_reason = "binding could not be resolved";
-        } else {
-            // Annotations applied in-place via the note field
-        }
+    if (!bindings.ok) {
+        binding_check_reason = bindings.errors.map(error => error.message).join("; ");
+    } else if (binding_node === undefined) {
+        binding_check_reason = "node not found for binding resolution";
     } else {
-        if (linux === undefined || dtSchema === undefined) {
-            binding_check_reason = "linux/dt-schema not configured";
-        } else if (binding_node === undefined) {
-            binding_check_reason = "node not found for binding resolution";
-        } else {
-            binding_check_reason = "linux or dt-schema path does not exist";
-        }
+        const { linux, dt_schema } = bindings.value;
+        const annotated = await annotate_suggestions(values, property_name, binding_node, binding_parent, parent_name, base_dt, linux, dt_schema, context_.json, overlay, parent_compatibles);
+        if (annotated === undefined) { binding_check_reason = "binding could not be resolved"; }
     }
 
     const suggestions = values.map((value) => to_suggestion(value));
@@ -247,15 +231,12 @@ async function resolve_binding_for_data(
     binding_parent: DTNode | undefined,
     parent_name: string,
     base_dt: DeviceTree,
-    config: AttachConfig,
+    bindings: Bindings | undefined,
     parent_compatibles?: string[],
 ): Promise<NodeBinding | undefined> {
-    const linux = config.linux;
-    const dtSchema = config.dtSchema;
-    if (linux === undefined || dtSchema === undefined) { return; }
-    if (!fs.existsSync(linux) || !fs.existsSync(dtSchema)) { return; }
+    if (bindings === undefined) { return; }
 
-    const binding = await resolve_node_binding(binding_node, binding_parent, parent_name, base_dt, linux, dtSchema, true, undefined, parent_compatibles);
+    const binding = await resolve_node_binding(binding_node, binding_parent, parent_name, base_dt, bindings.linux, bindings.dt_schema, true, undefined, parent_compatibles);
     if ('error' in binding) { return; }
     return binding;
 }
@@ -332,15 +313,10 @@ function combine_notes(existing: string | undefined, addition: string): string {
 async function suggest_device_key(context: LocalContext, arguments_: string[]): Promise<void> {
     const filter = arguments_[0];
 
-    const config = load_config() ?? {};
+    const workspace = load_workspace(context, ["bindings"]);
+    if (workspace === undefined) { return; }
 
-    const index = await get_or_build_compat_index(config.linux, config.dtSchema);
-
-    if (index === undefined) {
-        if (context.json) { input_error("No compat-index.json found and linux/dt-schema not configured. Run 'attach config-set' first."); return; }
-        console.log("No compat-index.json found and linux/dt-schema not configured. Run 'attach config-set' first.");
-        return;
-    }
+    const index = await get_or_build_compat_index(workspace.bindings);
 
     const entries = Object.keys(index.entries);
     const matching = filter === undefined
@@ -366,13 +342,11 @@ async function suggest_node_property(context_: LocalContext, arguments_: string[
         return;
     }
 
-    const resolved = resolve_config(context_, ["linux", "dtSchema", "devicetree", "overlay"]);
-    if (resolved === undefined) { return; }
-    const { linux, dtSchema, devicetree, overlay: overlay_path } = resolved.values;
-
-    const trees = load_trees(context_, devicetree, overlay_path, resolved.parsed.devicetree);
-    if (trees === undefined) { return; }
-    const { base_dt, overlay } = trees;
+    const workspace = load_workspace(context_, ["bindings", "base", "overlay"]);
+    if (workspace === undefined) { return; }
+    const { linux, dt_schema: dtSchema } = workspace.bindings;
+    const base_dt = workspace.base.tree;
+    const overlay = workspace.overlay.tree;
 
     const found = overlay.find_node(resolve_node_identifier(identifier, overlay));
     if (found === undefined) {
@@ -499,14 +473,10 @@ async function suggest_children(context_: LocalContext, arguments_: string[]): P
         return;
     }
 
-    const resolved = resolve_config(context_, ["devicetree", "overlay"]);
-    if (resolved === undefined) { return; }
-    const { devicetree, overlay: overlay_path } = resolved.values;
+    const workspace = load_workspace(context_, ["base", "overlay"]);
+    if (workspace === undefined) { return; }
 
-    const trees = load_trees(context_, devicetree, overlay_path, resolved.parsed.devicetree);
-    if (trees === undefined) { return; }
-
-    const children = node_children(trees.base_dt, trees.overlay, identifier);
+    const children = node_children(workspace.base.tree, workspace.overlay.tree, identifier);
     if (children === undefined) {
         if (context_.json) {
             respond_fail({ ok: false, message: `Node ${identifier} not found`, severity: "error" });
@@ -524,15 +494,10 @@ async function suggest_children(context_: LocalContext, arguments_: string[]): P
 }
 
 async function suggest_navigate(context_: LocalContext, arguments_: string[]): Promise<void> {
-    const resolved = resolve_config(context_, ["devicetree", "overlay"]);
-    if (resolved === undefined) { return; }
-    const { devicetree, overlay: overlay_path } = resolved.values;
-    const linux = resolved.config.linux;
-    const dtSchema = resolved.config.dtSchema;
-
-    const trees = load_trees(context_, devicetree, overlay_path, resolved.parsed.devicetree);
-    if (trees === undefined) { return; }
-    const { base_dt, overlay } = trees;
+    const workspace = load_workspace(context_, ["base", "overlay"]);
+    if (workspace === undefined) { return; }
+    const base_dt = workspace.base.tree;
+    const overlay = workspace.overlay.tree;
 
     if (arguments_.length === 0) {
         const targets = [...new Set(
@@ -581,11 +546,13 @@ async function suggest_navigate(context_: LocalContext, arguments_: string[]): P
 
     const child_suggestions: Suggestion[] = found_node.children.map(child => ({ value: get_full_node_name(child) }));
 
+    // Bindings are optional here: without them the node's own properties are offered.
     let property_suggestions: Suggestion[] | undefined;
-    if (linux !== undefined && dtSchema !== undefined && fs.existsSync(linux) && fs.existsSync(dtSchema)) {
+    const bindings = parse_bindings(workspace.settings);
+    if (bindings.ok) {
         const nav_parent_name = found_node.labels.at(-1) ?? node_path;
         const nav_parent_compats = effective_parent_compatibles(parent_node, node_path, base_dt);
-        property_suggestions = await binding_property_suggestions(found_node, parent_node, nav_parent_name, base_dt, linux, dtSchema, context_.json, nav_parent_compats);
+        property_suggestions = await binding_property_suggestions(found_node, parent_node, nav_parent_name, base_dt, bindings.value.linux, bindings.value.dt_schema, context_.json, nav_parent_compats);
     }
     property_suggestions ??= found_node.properties.map(p => ({ value: p.name }));
 
@@ -609,13 +576,11 @@ async function suggest_type(context_: LocalContext, arguments_: string[]): Promi
     }
     const { node_identifier, property_name } = reference;
 
-    const resolved = resolve_config(context_, ["linux", "dtSchema", "devicetree", "overlay"]);
-    if (resolved === undefined) { return; }
-    const { linux, dtSchema, devicetree, overlay: overlay_path } = resolved.values;
-
-    const trees = load_trees(context_, devicetree, overlay_path, resolved.parsed.devicetree);
-    if (trees === undefined) { return; }
-    const { base_dt, overlay } = trees;
+    const workspace = load_workspace(context_, ["bindings", "base", "overlay"]);
+    if (workspace === undefined) { return; }
+    const { linux, dt_schema: dtSchema } = workspace.bindings;
+    const base_dt = workspace.base.tree;
+    const overlay = workspace.overlay.tree;
 
     const { binding_node, binding_parent, parent_name, parent_compatibles: slot_parent_compats } = resolve_write_target(node_identifier, overlay, base_dt);
     if (binding_node === undefined) {

@@ -1,31 +1,28 @@
 import { Attach } from "attach-lib";
 import type { LocalContext } from "../../context";
-import { load_config } from "../../config";
+import { load_workspace } from "../../config/workspace";
 import { find_binding, get_or_build_compat_index } from "../../utilities";
-import { respond, input_error } from "../../protocol/output";
+import { respond } from "../../protocol/output";
 import { describe_device } from "../../protocol/binding-to-description";
 import type { DeviceDescriptionResponse, ListNamesResponse } from "../../protocol/descriptions";
 
 export async function list_device(context_: LocalContext, arguments_: string[]): Promise<void> {
     const filter = arguments_[0];
 
-    const config = load_config() ?? {};
+    const workspace = load_workspace(context_, ["bindings"]);
+    if (workspace === undefined) { return; }
+    const { linux, dt_schema: dtSchema } = workspace.bindings;
 
-    const index = await get_or_build_compat_index(config.linux, config.dtSchema);
-    if (index === undefined) {
-        if (context_.json) { input_error("No compat-index.json found and linux/dt-schema not configured."); return; }
-        console.log("No compat-index.json found and linux/dt-schema not configured.");
-        return;
-    }
+    const index = await get_or_build_compat_index(workspace.bindings);
 
     const entries = Object.keys(index.entries);
 
     if (filter !== undefined) {
         const exact = entries.find(entry => entry === filter);
-        if (exact !== undefined && config.linux !== undefined && config.dtSchema !== undefined) {
-            const binding_path = await find_binding(config.linux, config.dtSchema, exact, context_.json);
+        if (exact !== undefined) {
+            const binding_path = await find_binding(linux, dtSchema, exact, context_.json);
             if (binding_path !== undefined) {
-                const binding = await Attach.new().parse_binding(binding_path, config.linux, config.dtSchema);
+                const binding = await Attach.new().parse_binding(binding_path, linux, dtSchema);
                 if (binding !== undefined) {
                     const device = describe_device(binding.parsed_binding, exact, binding_path);
                     if (context_.json) {

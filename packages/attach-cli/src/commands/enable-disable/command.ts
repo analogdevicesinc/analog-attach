@@ -4,8 +4,8 @@ import { DeviceTree, DeviceTreeOverlay, PropertyBuilder } from "attach-lib";
 import * as fs from 'node:fs';
 
 import type { LocalContext } from "../../context";
-import { load_config, check_config, check_failure_message } from "../../config";
-import { load_trees, resolve_node_identifier, resolve_path, base_target, write_overlay } from "../../utilities";
+import { load_workspace } from "../../config/workspace";
+import { resolve_node_identifier, resolve_path, base_target } from "../../utilities";
 
 function make_command(commandName: string, status_value: "okay" | "disabled", verb: string) {
     return (_context: LocalContext): Command => new Command(commandName)
@@ -26,22 +26,10 @@ Example:
                 return;
             }
 
-            const config = load_config();
-            if (config === undefined) {
-                console.log("No configuration found. Run 'attach-linux' to get started.");
-                return;
-            }
-
-            const checked = check_config(config, ["overlay", "devicetree"]);
-            if (!checked.ok) {
-                console.log(check_failure_message(checked.failures).human);
-                return;
-            }
-            const { overlay: input, devicetree } = checked.values;
-
-            const trees = load_trees(_context, devicetree, input, checked.parsed.devicetree);
-            if (trees === undefined) { return; }
-            const { base_dt: base, overlay } = trees;
+            const workspace = load_workspace(_context, ["base", "overlay"]);
+            if (workspace === undefined) { return; }
+            const { source: devicetree, tree: base } = workspace.base;
+            const { path: input, tree: overlay } = workspace.overlay;
 
             const result = set_node_status(base, overlay, path_argumentument, status_value);
 
@@ -51,7 +39,7 @@ Example:
                     return;
                 }
                 case "done": {
-                    write_overlay(input, overlay, config);
+                    workspace.overlay.save();
                     console.log(`${verb}d ${path_argumentument} in ${input}`);
                     return;
                 }

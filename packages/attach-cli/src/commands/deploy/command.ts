@@ -2,9 +2,8 @@ import { Command } from "commander";
 import { execSync } from "node:child_process";
 
 import type { LocalContext } from "../../context";
-import { resolve_config } from "../../resolve-config";
-import { is_tool_available } from "../../utilities";
-import { respond, respond_fail, input_error } from "../../protocol/output";
+import { load_workspace } from "../../config/workspace";
+import { respond, respond_fail } from "../../protocol/output";
 import type { DeployResponse } from "../../protocol/types";
 
 /** Remote directory device tree overlays are copied to. */
@@ -27,26 +26,17 @@ export function build_deploy_command(context_: LocalContext): Command {
     return new Command("deploy")
         .description("Deploy the compiled overlay to a remote device")
         .addHelpText("after", `
-Copies the compiled overlay to /boot/overlays/ on the remote device via scp,
-then reboots it. Requires scp and sshpass on PATH.
+Copies the .dtbo that 'build' compiled to /boot/overlays/ on the remote device
+via scp, then reboots it. Requires scp and sshpass on PATH.
 
 Required config fields (set with config-set):
-  overlay-compiled    Path to the .dtbo file (written by build)
   deploy-ip           IP address or hostname of the device
   deploy-user         SSH username
   deploy-password     SSH password`)
         .action(async () => {
-            const resolved = resolve_config(context_, ["overlayCompiled", "deployIp", "deployUser", "deployPassword"]);
-            if (resolved === undefined) { return; }
-            const { overlayCompiled: dtbo, deployIp: ip, deployUser: user, deployPassword: password } = resolved.values;
-
-            const missing = ["scp", "sshpass"].filter(tool => !is_tool_available(`which ${tool}`));
-            if (missing.length > 0) {
-                const message = `${missing.join(", ")} not found on PATH`;
-                if (context_.json) { input_error(message); return; }
-                console.log(message);
-                return;
-            }
+            const workspace = load_workspace(context_, ["deploy"]);
+            if (workspace === undefined) { return; }
+            const { dtbo, host: ip, user, password } = workspace.deploy;
 
             const environment = { ...process.env, SSHPASS: password };
 

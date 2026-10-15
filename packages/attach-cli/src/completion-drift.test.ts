@@ -7,19 +7,13 @@ import { buildContext } from "./context";
 import { build_completion_command } from "./commands/completion/command";
 import { run_complete, shell_dequote } from "./commands/completion/complete";
 import { COMPLETION_SPEC, NO_VALUE_COMPLETION, FILES_DIRECTIVE, DIRS_DIRECTIVE } from "./commands/completion/spec";
-import { CONFIG_REGISTRY } from "./config";
+import { SETTINGS, TOML_SETTINGS } from "./config/settings";
 import * as suggest from "./commands/list/suggest";
 import { LIST_KINDS } from "./commands/list/command";
 
-const CONFIG_SET_FIELD_NAMES = CONFIG_REGISTRY
-    .filter(spec => !spec.internal && spec.env === undefined)
-    .map(spec => spec.toml)
-    .sort();
+const CONFIG_SET_FIELD_NAMES = TOML_SETTINGS.map(spec => spec.key).sort();
 
-const CONFIG_GET_FIELD_NAMES = CONFIG_REGISTRY
-    .filter(spec => !spec.internal)
-    .map(spec => spec.toml)
-    .sort();
+const CONFIG_GET_FIELD_NAMES = SETTINGS.map(spec => spec.key).sort();
 
 function registered_commands(): string[] {
     return buildApp(buildContext(false)).commands.map(c => c.name()).filter(n => !n.startsWith("__"));

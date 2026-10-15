@@ -6,7 +6,6 @@ import {
     type DTLabel,
     type DTNode,
     type DTPath,
-    type DtoPrintOptions,
     type FoundNodeResult,
     type LocatedNode,
 } from 'attach-lib';
@@ -16,8 +15,8 @@ import { execSync } from "node:child_process";
 import * as fs from 'node:fs';
 import path from "node:path";
 
-import type { LocalContext } from "./context";
-import { load_compat_index, save_compat_index, type AttachConfig, type CompatIndex } from "./config";
+import { is_compat_index_stale, load_compat_index, save_compat_index, type CompatIndex } from "./config/cache";
+import type { Bindings } from "./config/workspace";
 import { input_error } from "./protocol/output";
 
 // --- New shared path helpers (Group A) ---
@@ -236,42 +235,6 @@ export function get_all_file_paths(directory: string): string[] {
     return results.sort(); // Sort to make hash order-independent
 }
 
-export function get_latest_mtime(directory: string): number {
-    if (!fs.existsSync(directory)) {
-        return 0;
-    }
-
-    let latest = fs.statSync(directory).mtimeMs;
-    const list = fs.readdirSync(directory);
-
-    for (const file of list) {
-        if (file === ".git") {
-            continue;
-        }
-
-        const filePath = path.join(directory, file);
-        const stat = fs.statSync(filePath);
-
-        latest = Math.max(latest, stat.isDirectory() ? get_latest_mtime(filePath) : stat.mtimeMs);
-    }
-
-    return latest;
-}
-
-export function is_compat_index_stale(index: CompatIndex, linux: string, dtSchema: string): boolean {
-    if (typeof index.generated_at !== "number" || index.entries === undefined) {
-        return true;
-    }
-
-    if (index.linux !== undefined && path.resolve(linux) !== path.resolve(index.linux)) { return true; }
-    if (index.dt_schema !== undefined && path.resolve(dtSchema) !== path.resolve(index.dt_schema)) { return true; }
-
-    const bindings_folder = path.resolve(linux, "Documentation", "devicetree", "bindings");
-    const latest_mtime = Math.max(get_latest_mtime(bindings_folder), get_latest_mtime(dtSchema));
-
-    return latest_mtime > index.generated_at;
-}
-
 export async function build_compat_index(linux: string, dtSchema: string): Promise<Record<string, string>> {
     const bindings_folder = path.resolve(linux, "Documentation", "devicetree", "bindings");
     const index: Record<string, string> = {};
@@ -388,43 +351,6 @@ export function resolve_write_target(
     const node_path = found?.node_path ?? (base_located === undefined ? "" : base_located.path);
     const parent_compats = effective_parent_compatibles(binding_parent, node_path, base_dt);
     return { target_reference, found, is_base_target, binding_node, binding_parent, parent_name, parent_compatibles: parent_compats };
-}
-
-export function load_trees(
-    context_: LocalContext,
-    context_path: string,
-    overlay_path: string,
-    base_dt?: DeviceTree,
-): { base_dt: DeviceTree; overlay: DeviceTreeOverlay } | undefined {
-    const dt = base_dt ?? DeviceTree.new_from_string(fs.readFileSync(context_path, "utf8"));
-    if (typeof dt === "string") {
-        if (context_.json) { input_error(`Failed to parse dts: ${dt}`); return; }
-        console.log(`Failed to parse dts ${context_path}: ${dt}`);
-        return;
-    }
-
-    const overlay = DeviceTreeOverlay.new_from_string(fs.readFileSync(overlay_path, "utf8"), dt);
-    if (typeof overlay === "string") {
-        if (context_.json) { input_error(`Failed to parse dtso: ${overlay}`); return; }
-        console.log(`Failed to parse dtso ${overlay_path}: ${overlay}`);
-        return;
-    }
-
-    return { base_dt: dt, overlay };
-}
-
-export function load_base(
-    context_: LocalContext,
-    context_path: string,
-    base_dt?: DeviceTree,
-): DeviceTree | undefined {
-    const dt = base_dt ?? DeviceTree.new_from_string(fs.readFileSync(context_path, "utf8"));
-    if (typeof dt === "string") {
-        if (context_.json) { input_error(`Failed to parse dts: ${dt}`); return; }
-        console.log(`Failed to parse dts ${context_path}: ${dt}`);
-        return;
-    }
-    return dt;
 }
 
 if (import.meta.vitest) {
@@ -563,41 +489,24 @@ if (import.meta.vitest) {
 
 /**
  * Load the compat index, building it if missing and rebuilding it if stale.
- * Returns undefined only when the index is absent and linux/dtSchema are unset
- * (so it cannot be built). `log` receives progress lines (stderr-worthy).
+ * `log` receives progress lines (stderr-worthy).
  */
 export async function get_or_build_compat_index(
-    linux: string | undefined,
-    dtSchema: string | undefined,
+    { linux, dt_schema }: Bindings,
     log?: (message: string) => void,
-): Promise<CompatIndex | undefined> {
+): Promise<CompatIndex> {
     const index = load_compat_index();
+    if (index !== undefined && !is_compat_index_stale(index, linux, dt_schema)) { return index; }
 
-    if (index === undefined) {
-        if (linux === undefined || dtSchema === undefined) { return undefined; }
-        log?.("compat-index.json not found, building...");
-        const entries = await build_compat_index(linux, dtSchema);
-        const compat_index_path = save_compat_index(entries, linux, dtSchema);
-        log?.(`Written: ${compat_index_path}`);
-        return { generated_at: Date.now(), linux, dt_schema: dtSchema, entries };
-    }
-
-    if (linux !== undefined && dtSchema !== undefined && is_compat_index_stale(index, linux, dtSchema)) {
-        log?.("compat-index.json is stale, rebuilding...");
-        const entries = await build_compat_index(linux, dtSchema);
-        const compat_index_path = save_compat_index(entries, linux, dtSchema);
-        log?.(`Written: ${compat_index_path}`);
-        return { generated_at: Date.now(), linux, dt_schema: dtSchema, entries };
-    }
-
-    return index;
+    log?.(index === undefined ? "compat-index.json not found, building..." : "compat-index.json is stale, rebuilding...");
+    const entries = await build_compat_index(linux, dt_schema);
+    const compat_index_path = save_compat_index(entries, linux, dt_schema);
+    log?.(`Written: ${compat_index_path}`);
+    return { generated_at: Date.now(), linux, dt_schema, entries };
 }
 
 export async function find_binding(linux: string, dtSchema: string, compatible_to_find: string, silent = false): Promise<string | undefined> {
-    const index = await get_or_build_compat_index(linux, dtSchema, silent ? undefined : (message) => console.error(message));
-
-    // linux/dtSchema are defined here, so the index is always built.
-    if (index === undefined) { return undefined; }
+    const index = await get_or_build_compat_index({ linux, dt_schema: dtSchema }, silent ? undefined : (message) => console.error(message));
 
     const cached_path = index.entries[compatible_to_find];
 
@@ -632,19 +541,4 @@ export function effective_parent_compatibles(
     const base_node = base_dt.node_at(parent_path);
     if (base_node === undefined) { return []; }
     return node_compatibles(base_node);
-}
-
-export function overlay_print_options(config: AttachConfig): DtoPrintOptions {
-    const syntax = config.overlaySyntax;
-    if (syntax === "fragment" || syntax === "label") {
-        return { syntax };
-    }
-    if (syntax !== undefined) {
-        console.error(`Unknown overlay-syntax "${syntax}", using fragment`);
-    }
-    return { syntax: "fragment" };
-}
-
-export function write_overlay(file: string, overlay: DeviceTreeOverlay, config: AttachConfig): void {
-    fs.writeFileSync(file, overlay.print(overlay_print_options(config)));
 }

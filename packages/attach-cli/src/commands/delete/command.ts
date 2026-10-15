@@ -2,8 +2,8 @@ import { Command } from "commander";
 import { DeviceTree, DeviceTreeOverlay, type DTNode } from "attach-lib";
 
 import type { LocalContext } from "../../context";
-import { resolve_config } from "../../resolve-config";
-import { load_trees, resolve_node_identifier, not_found_message, write_overlay } from "../../utilities";
+import { load_workspace } from "../../config/workspace";
+import { resolve_node_identifier, not_found_message } from "../../utilities";
 import { respond, respond_fail, input_error } from "../../protocol/output";
 import type { DeletePreview } from "../../protocol/types";
 
@@ -24,13 +24,10 @@ Examples:
   $ attach-linux delete spi0/adi,ad7124-8@0 spi-cpha     Remove a property
   $ attach-linux delete spi0 --force                      Delete all overlay children and properties`)
         .action(async (path_argumentument: string | undefined, property_argument: string | undefined, options) => {
-            const resolved = resolve_config(context_, ["devicetree", "overlay"]);
-            if (resolved === undefined) { return; }
-            const { devicetree, overlay: input } = resolved.values;
-
-            const trees = load_trees(context_, devicetree, input, resolved.parsed.devicetree);
-            if (trees === undefined) { return; }
-            const { base_dt: base, overlay } = trees;
+            const workspace = load_workspace(context_, ["base", "overlay"]);
+            if (workspace === undefined) { return; }
+            const { source: devicetree, tree: base } = workspace.base;
+            const { path: input, tree: overlay } = workspace.overlay;
 
             if (path_argumentument === undefined) {
                 const preview = count_overlay_root(overlay);
@@ -54,7 +51,7 @@ Examples:
                 }
 
                 overlay.delete_all();
-                write_overlay(input, overlay, resolved.config);
+                workspace.overlay.save();
                 if (context_.json) {
                     respond({ ok: true, message: "Deleted all overlay content", severity: "info" });
                 } else {
@@ -75,7 +72,7 @@ Examples:
             if (property_argument !== undefined) {
                 const result = remove_overlay_property(overlay, path_argumentument, property_argument);
                 if (result === "removed") {
-                    write_overlay(input, overlay, resolved.config);
+                    workspace.overlay.save();
                     if (context_.json) {
                         respond({ ok: true, message: `Removed ${property_argument} from ${path_argumentument}`, severity: "info" });
                     } else {
@@ -116,7 +113,7 @@ Examples:
 
                 switch (result) {
                     case "deleted": {
-                        write_overlay(input, overlay, resolved.config);
+                        workspace.overlay.save();
                         respond({ ok: true, message: `Deleted ${identifier}`, severity: "info" });
                         return;
                     }
@@ -151,7 +148,7 @@ Examples:
                         return;
                     }
                     case "deleted": {
-                        write_overlay(input, overlay, resolved.config);
+                        workspace.overlay.save();
                         console.log(`Deleted ${identifier} from ${input}`);
                         return;
                     }

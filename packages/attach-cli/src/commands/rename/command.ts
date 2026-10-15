@@ -10,8 +10,8 @@ import {
 } from "attach-lib";
 
 import type { LocalContext } from "../../context";
-import { resolve_config } from "../../resolve-config";
-import { load_trees, resolve_node_identifier, not_found_message, write_overlay } from "../../utilities";
+import { load_workspace } from "../../config/workspace";
+import { resolve_node_identifier, not_found_message } from "../../utilities";
 import { respond, respond_fail, diagnostic } from "../../protocol/output";
 
 export function build_rename_command(context_: LocalContext): Command {
@@ -32,20 +32,17 @@ Examples:
   $ attach-linux rename spi0/adi,ad7124-8@0 adc        Rename, keep unit address
   $ attach-linux rename spi0/adi,ad7124-8@0 adc@1      Rename and change unit address`)
         .action(async (path_argument: string, new_name: string) => {
-            const resolved = resolve_config(context_, ["devicetree", "overlay"]);
-            if (resolved === undefined) { return; }
-            const { devicetree, overlay: input } = resolved.values;
-
-            const trees = load_trees(context_, devicetree, input, resolved.parsed.devicetree);
-            if (trees === undefined) { return; }
-            const overlay = trees.overlay;
+            const workspace = load_workspace(context_, ["base", "overlay"]);
+            if (workspace === undefined) { return; }
+            const { source: devicetree, tree: base } = workspace.base;
+            const { path: input, tree: overlay } = workspace.overlay;
 
             const result = rename_overlay_node(overlay, path_argument, new_name);
 
             if (context_.json) {
                 switch (result.status) {
                     case "renamed": {
-                        write_overlay(input, overlay, resolved.config);
+                        workspace.overlay.save();
                         const message = result.reg_message === undefined
                             ? `Renamed ${path_argument} to ${new_name}`
                             : `Renamed ${path_argument} to ${new_name}; ${result.reg_message}`;
@@ -53,7 +50,7 @@ Examples:
                         return;
                     }
                     case "not-found": {
-                        respond_fail({ ok: false, message: not_found_message(path_argument, overlay, trees.base_dt), severity: "error" });
+                        respond_fail({ ok: false, message: not_found_message(path_argument, overlay, base), severity: "error" });
                         return;
                     }
                     case "in-base": {
@@ -72,7 +69,7 @@ Examples:
             } else {
                 switch (result.status) {
                     case "not-found": {
-                        console.log(not_found_message(path_argument, overlay, trees.base_dt));
+                        console.log(not_found_message(path_argument, overlay, base));
                         return;
                     }
                     case "in-base": {
@@ -88,7 +85,7 @@ Examples:
                         return;
                     }
                     case "renamed": {
-                        write_overlay(input, overlay, resolved.config);
+                        workspace.overlay.save();
                         if (result.reg_message !== undefined) { console.log(result.reg_message); }
                         console.log(`Renamed ${path_argument} to ${new_name} in ${input}`);
                         return;

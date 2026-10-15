@@ -1,26 +1,14 @@
 import { Command } from "commander";
-import * as fs from "node:fs";
-import path from "node:path";
 import { execSync } from "node:child_process";
 
 import type { LocalContext } from "../../context";
-import { save_config, DEFAULT_BUILD_COMMAND } from "../../config";
-import { resolve_config } from "../../resolve-config";
+import { derive_dtbo_path, load_workspace } from "../../config/workspace";
 import { substitute_command } from "../../utilities";
-import { getBundledToolsPath } from "../skill/utilities";
-import { respond, respond_fail, input_error } from "../../protocol/output";
+import { respond, respond_fail } from "../../protocol/output";
 import type { BuildResponse } from "../../protocol/types";
 
-/** Derive the compiled artifact path from the overlay source path. */
-export function derive_dtbo_path(overlay: string): string {
-    return overlay.endsWith(".dtso") ? `${overlay.slice(0, -".dtso".length)}.dtbo` : `${overlay}.dtbo`;
-}
-
-/** Substitute {dtc}/{input}/{output} placeholders, quoting paths so spaces are tolerated. */
-export function substitute_build_command(template: string, input: string, output: string): string {
-    const dtc = path.join(getBundledToolsPath(), "dtc");
-    return substitute_command(template, { dtc, input, output });
-}
+/** dtc invocation that compiles the overlay; {dtc}/{input}/{output} are substituted. */
+export const BUILD_COMMAND = "{dtc} -@ -I dts -O dtb -o {output} {input}";
 
 export function build_build_command(context_: LocalContext): Command {
     return new Command("build")
@@ -29,21 +17,12 @@ export function build_build_command(context_: LocalContext): Command {
 Compiles the configured overlay file into a binary .dtbo.
 Output path is derived from the overlay (e.g. overlay.dtso -> overlay.dtbo).`)
         .action(async () => {
-            const resolved = resolve_config(context_, ["overlay"]);
-            if (resolved === undefined) { return; }
-            const input = resolved.values.overlay;
-
-            const dtc = path.join(getBundledToolsPath(), "dtc");
-            if (!fs.existsSync(dtc)) {
-                const message = "Bundled dtc not found — run scripts/bundle-dt-schema.sh";
-                if (context_.json) { input_error(message); return; }
-                console.log(message);
-                return;
-            }
+            const workspace = load_workspace(context_, ["tools", "base", "overlay"]);
+            if (workspace === undefined) { return; }
+            const input = workspace.overlay.path;
 
             const output = derive_dtbo_path(input);
-            const template = resolved.config.buildCommand ?? DEFAULT_BUILD_COMMAND;
-            const command = substitute_build_command(template, input, output);
+            const command = substitute_command(BUILD_COMMAND, { dtc: workspace.tools.dtc, input, output });
 
             try {
                 execSync(command, { stdio: "pipe" });
@@ -53,8 +32,6 @@ Output path is derived from the overlay (e.g. overlay.dtso -> overlay.dtbo).`)
                 console.log(`Build failed:\n${stderr}`);
                 return;
             }
-
-            save_config({ overlayCompiled: output });
 
             if (context_.json) {
                 respond({ ok: true, message: "Compiled overlay", severity: "info", path: output } satisfies BuildResponse);
@@ -75,13 +52,8 @@ if (import.meta.vitest) {
         expect(derive_dtbo_path("/x/overlay")).toBe("/x/overlay.dtbo");
     });
 
-    test("substitute_build_command - replaces and quotes both placeholders", () => {
-        expect(substitute_build_command("dtc -o {output} {input}", "/a b/in.dtso", "/a b/out.dtbo"))
-            .toBe('dtc -o "/a b/out.dtbo" "/a b/in.dtso"');
-    });
-
-    test("substitute_build_command - replaces all occurrences", () => {
-        expect(substitute_build_command("{input} {input}", "/x.dtso", "/x.dtbo"))
-            .toBe('"/x.dtso" "/x.dtso"');
+    test("BUILD_COMMAND - substitutes and quotes every placeholder", () => {
+        expect(substitute_command(BUILD_COMMAND, { dtc: "/t/dtc", input: "/a b/in.dtso", output: "/a b/out.dtbo" }))
+            .toBe('"/t/dtc" -@ -I dts -O dtb -o "/a b/out.dtbo" "/a b/in.dtso"');
     });
 }

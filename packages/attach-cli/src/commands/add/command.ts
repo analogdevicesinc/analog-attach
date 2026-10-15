@@ -17,10 +17,9 @@ import {
 } from "attach-lib";
 
 import type { LocalContext } from "../../context";
-import { load_config, check_config, check_failure_message } from "../../config";
-import { find_binding, load_trees, resolve_path, base_target, write_overlay } from "../../utilities";
-import { resolve_config } from "../../resolve-config";
-import { respond, respond_fail, input_error, diagnostic } from "../../protocol/output";
+import { load_workspace, parse_overlay, report_config_errors } from "../../config/workspace";
+import { find_binding, resolve_path, base_target } from "../../utilities";
+import { respond, respond_fail, diagnostic } from "../../protocol/output";
 import { resolve_node_binding } from "../../binding-resolution";
 import type { AddResponse } from "../../protocol/types";
 import { create_workfile } from "../../workfile";
@@ -48,39 +47,32 @@ Examples:
 
 Use 'list device' to find compatible strings, 'list parent' to find valid buses.`)
         .action(async (key: string, options) => {
-            const pre_config = load_config() ?? {};
-            const pre_check = check_config(pre_config, ["linux", "dtSchema", "devicetree"]);
-            if (!pre_check.ok) {
-                const message = check_failure_message(pre_check.failures);
-                if (context_.json) { input_error(message.json); }
-                else { console.log(message.human); }
-                return;
-            }
+            const workspace = load_workspace(context_, ["bindings", "base"]);
+            if (workspace === undefined) { return; }
+            const { linux, dt_schema: dtSchema } = workspace.bindings;
+            const { source: devicetree, tree: base } = workspace.base;
 
+            let settings = workspace.settings;
             let created_message: string | undefined;
-            if (pre_config.overlay === undefined) {
+            if (settings.overlay === undefined) {
                 const device_name = key.includes(",") ? key.slice(key.indexOf(",") + 1) : key;
-                const workfile = create_workfile(pre_config, `${device_name}.dtso`);
-                if ("error" in workfile) {
-                    if (context_.json) { respond_fail({ ok: false, message: workfile.error, severity: "error" }); }
-                    else { console.log(workfile.error); }
-                    return;
-                }
-                created_message = workfile.message;
+                const created = create_workfile(`${device_name}.dtso`);
+                created_message = created.message;
                 if (context_.json) { diagnostic(created_message); }
                 else { console.log(created_message); }
+                settings = { ...settings, overlay: created.path };
             }
 
-            const resolved = resolve_config(context_, ["linux", "dtSchema", "devicetree", "overlay"]);
-            if (resolved === undefined) { return; }
-            const { linux, dtSchema, devicetree, overlay: input } = resolved.values;
+            const opened = parse_overlay(settings, workspace.base);
+            if (!opened.ok) {
+                report_config_errors(context_, opened.errors);
+                return;
+            }
+            const workfile = opened.value;
+            const { path: input, tree: overlay } = workfile;
 
             const { name, label } = options;
             const to: string | undefined = options.parent;
-
-            const trees = load_trees(context_, devicetree, input, resolved.parsed.devicetree);
-            if (trees === undefined) { return; }
-            const { base_dt: base, overlay } = trees;
 
             const binding_path = await find_binding(linux, dtSchema, key, context_.json);
             if (binding_path === undefined) {
@@ -118,7 +110,7 @@ Use 'list device' to find compatible strings, 'list parent' to find valid buses.
                     return;
                 }
                 case "added": {
-                    write_overlay(input, overlay, resolved.config);
+                    workfile.save();
                     for (const diag of result.diagnostics) {
                         if (context_.json) { diagnostic(diag); }
                         else { console.log(diag); }

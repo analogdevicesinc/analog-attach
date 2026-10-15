@@ -1,8 +1,9 @@
 import { Command } from "commander";
 
 import type { LocalContext } from "../../context";
-import { load_config } from "../../config";
-import { respond, respond_fail } from "../../protocol/output";
+import { read_settings } from "../../config/settings";
+import { report_config_errors } from "../../config/workspace";
+import { respond } from "../../protocol/output";
 import type { CreateWorkfileResponse } from "../../protocol/types";
 import { create_workfile, next_workfile_name } from "../../workfile";
 
@@ -22,29 +23,23 @@ Examples:
                 ? next_workfile_name()
                 : (name.endsWith(".dtso") ? name : `${name}.dtso`);
 
-            const result = create_workfile(load_config() ?? {}, filename);
-
-            if ("error" in result) {
-                if (context.json) {
-                    respond_fail({ ok: false, message: result.error, severity: "error" });
-                } else {
-                    console.log(result.error);
-                }
+            const settings = read_settings();
+            if (!settings.ok) {
+                report_config_errors(context, settings.errors);
                 return;
             }
 
-            const message = [result.message, ...result.warnings].join("; ");
+            const result = create_workfile(filename);
 
             if (context.json) {
                 respond({
                     ok: true,
-                    message: message.replace(/^Wrote /, "Created workfile "),
-                    severity: result.warnings.length > 0 ? "warn" : "info",
+                    message: result.message.replace(/^Wrote /, "Created workfile "),
+                    severity: "info",
                     path: result.path,
                 } satisfies CreateWorkfileResponse);
             } else {
                 console.log(result.message);
-                for (const warning of result.warnings) { console.log(warning); }
             }
         });
 }

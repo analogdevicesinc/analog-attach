@@ -28,32 +28,27 @@ You are helping a user configure Linux device tree overlays for hardware devices
 
 ## Prerequisites
 
-Set up configuration before using other commands. `linux` and `context` are read from environment variables:
+Set up configuration before using other commands. The Linux tree and the base devicetree are read from environment variables:
 
 ```bash
 export ATTACH_LINUX=~/linux
 export ATTACH_DEVICETREE=~/rpi-4.dts
 ```
 
-Other fields (overlay, board, etc.) are stored in `.attach-linux/config.toml` via `config-set`. The dt-schema bindings, dtc and validation tools are bundled with the CLI.
+Other fields (overlay, overlay-syntax, deploy-*, …) are stored in `.attach-linux/config.toml` via `config-set`. The dt-schema bindings, dtc and validation tools are bundled with the CLI.
+
+Every command checks the configuration it needs up front: `ATTACH_LINUX` must be a kernel tree (with `Documentation/devicetree/bindings/` and `include/`), `ATTACH_DEVICETREE` must preprocess and parse, and `overlay` must parse against it. Unknown or invalid keys in config.toml are errors. Problems are reported together (exit code 2 with `--json`) with a hint on how to fix them.
 
 **Per-command config requirements**:
-- `config-set` / `config-get`: No prerequisites
-- `list device`: Needs `ATTACH_LINUX` (to build compat index on first run)
-- `create-workfile`: No prerequisites (also saves `overlay` path to config). When `board` ships an overlay, needs `ATTACH_LINUX` for the default `preprocess-command`
+- `config-set` / `config-get` / `create-workfile`: No prerequisites (`create-workfile` saves the `overlay` path to config)
+- `list device`: Needs `ATTACH_LINUX` (to build the compat index on first run)
 - `list parent`: Needs `ATTACH_LINUX`, `ATTACH_DEVICETREE`
-- `list value`: Needs `ATTACH_DEVICETREE`, `overlay` (values come from `board`; without it the result is empty). `ATTACH_LINUX` is optional and enables binding check annotations
-- `list slot`: Needs `board` (plus `ATTACH_LINUX`, `ATTACH_DEVICETREE` when given a compatible)
+- `list property`: Needs `ATTACH_LINUX`, `ATTACH_DEVICETREE`, `overlay`
+- `list value`: Needs `ATTACH_DEVICETREE`, `overlay`. `ATTACH_LINUX` is optional and enables binding check annotations
 - `add`: Needs `ATTACH_LINUX`, `ATTACH_DEVICETREE`, `overlay` (auto-created if missing)
-- `update`: Needs `ATTACH_LINUX`, `ATTACH_DEVICETREE`, `overlay`
-- `read`: Needs `overlay` (optionally `ATTACH_DEVICETREE` for base-tree resolution)
-- `validate`: Needs `overlay` (optionally `ATTACH_LINUX` to generate validation.json)
-- `delete`: Needs `ATTACH_DEVICETREE`, `overlay`
-- `rename`: Needs `ATTACH_DEVICETREE`, `overlay`
-- `move`: Needs `ATTACH_DEVICETREE`, `overlay`
-- `enable`/`disable`: Needs `ATTACH_DEVICETREE`, `overlay`
-- `build`: Needs `overlay`
-- `deploy`: Needs `overlay-compiled`, `deploy-ip`, `deploy-user`, `deploy-password`
+- `update`, `validate`: Need `ATTACH_LINUX`, `ATTACH_DEVICETREE`, `overlay`
+- `read`, `delete`, `rename`, `move`, `enable`/`disable`, `build`: Need `ATTACH_DEVICETREE`, `overlay`
+- `deploy`: Needs `deploy-ip`, `deploy-user`, `deploy-password`, and the `.dtbo` that `build` wrote next to `overlay`
 
 Help users locate appropriate `.dts` files when needed — they're typically in `arch/<arch>/boot/dts/` within the Linux kernel (e.g., Raspberry Pi, BeagleBone).
 
@@ -111,10 +106,8 @@ attach-linux config-get [fields...]
 | Field | Required | Description |
 |-------|----------|-------------|
 | `overlay` | No | Path to the working `.dtso` overlay file (auto-set by `create-workfile` or `add`) |
-| `board` | No | Add-on board description (HAT, …): a path to a board YAML or a bundled board name (e.g. `pmd-rpi-intz`). Enables `list slot` and board-derived `list value` values |
 | `overlay-syntax` | No | Output syntax: `fragment` (default) or `label` (`&spi0 { }` style) |
-| `preprocess-command` | No | Preprocessor run by `create-workfile` on a board's shipped overlay |
-| `overlay-compiled` | No | Path to compiled `.dtbo` artifact (auto-set by `build`) |
+| `preprocess-command` | No | C preprocessor command that resolves `#include`s and macros in the base devicetree (default mirrors kbuild's `cpp` flags) |
 | `deploy-ip` | No | IP address or hostname of the remote device |
 | `deploy-user` | No | SSH username on the remote device |
 | `deploy-password` | No | SSH password on the remote device |
@@ -125,9 +118,6 @@ attach-linux config-get [fields...]
 export ATTACH_LINUX=~/linux
 export ATTACH_DEVICETREE=~/rpi-4.dts
 
-# Optional: describe the add-on board (HAT) the peripherals plug into
-attach-linux config-set board pmd-rpi-intz
-
 # Read all config (shows env vars and config.toml fields)
 attach-linux config-get
 ```
@@ -136,7 +126,7 @@ attach-linux config-get
 
 ### 1. `list` - Discovery and Lookup
 
-**Purpose**: Multi-kind lookup command for devices, properties, values, parents and board slots.
+**Purpose**: Multi-kind lookup command for devices, properties, values and parents.
 
 **Syntax**:
 ```bash
@@ -145,7 +135,6 @@ attach-linux list device [<filter>]         # compatible strings (substring filt
 attach-linux list property <path> [<prop>]  # properties of a node; with prop: type details
 attach-linux list value <path> <prop>       # concrete values for a property
 attach-linux list parent <compatible>       # valid parent buses for a device
-attach-linux list slot [<compatible>]       # board slots (requires board config)
 ```
 
 **Examples**:
@@ -159,17 +148,14 @@ attach-linux list property spi0/adi,ad7124-8@0
 # Get type details for a specific property
 attach-linux list property spi0/adi,ad7124-8@0 reg
 
-# Get concrete values (from board, context, binding)
+# Get concrete values (from the binding and the base devicetree)
 attach-linux list value spi0/adc interrupts
 
 # Find valid parent buses
 attach-linux list parent adi,ad7124-8
-
-# Board slots
-attach-linux list slot adi,ad7124-8
 ```
 
-**Strategy**: Ask the user what board they have or if they do not know for sure, start broad (e.g., `list device adi` for Analog Devices), then narrow down based on user's specific chip.
+**Strategy**: Ask the user which chip they have or, if they do not know for sure, start broad (e.g., `list device adi` for Analog Devices), then narrow down based on user's specific chip.
 
 ---
 
@@ -209,8 +195,6 @@ attach-linux create-workfile [--name <filename>]
 / {
 };
 ```
-
-**Board overlays**: when the configured `board` ships an overlay for its onboard devices (e.g. `adalm-lsmspg`), the workfile starts from that overlay instead: preprocessed with `preprocess-command`, with `__overrides__` removed. Its onboard devices are already present and enabled; use `disable <label>` to turn one off.
 
 **Next Steps After Create**:
 1. Use `add` to add a device node to the overlay
@@ -433,18 +417,13 @@ attach-linux update adc '#address-cells' 1                # quote # properties
 
 ---
 
-### 9. `list value` and board-aware workflow
+### 9. `list value` - Suggested Values
 
-**Board-aware workflow** — when `config-get board` is set, don't guess wiring:
-1. `list slot <compatible>` → ask the user which slot the device is plugged into.
-2. `add <compatible> --parent <slot's bus>`, then `update <label> reg <slot's chip select>`.
-3. For `reg`, `interrupt-parent`, `interrupts`, `reset-gpios` and other `*-gpios`: `list value <label> <prop>` and pick from the result, then `update <label> <prop> <value>`.
-4. If a chip select beyond CE0/CE1 is used (reg ≥ 2), set the bus's `cs-gpios` from `list value <bus> cs-gpios`.
+Don't guess wiring: for `reg`, `interrupt-parent`, `interrupts`, `reset-gpios` and other `*-gpios`, run `list value <label> <prop>` and pick from the result, then `update <label> <prop> <value>`.
 
 How to read `list value`:
-- The slot is inferred from the parent bus and `reg`, so set `reg` first.
-- `in use by <node>` means an enabled sibling holds that chip select; disable it or pick another.
-- Interrupt trigger types and reset polarity depend on the peripheral, not the board.
+- Values are pinned by the binding or taken from the base devicetree; a note means the value was checked against the binding and may be rejected by `validate`.
+- Interrupt trigger types and reset polarity depend on the peripheral; ask the user when unsure.
 - Phandle+cells properties can be set in one step: `update adc rdy-gpios gpio 21 GPIO_ACTIVE_LOW`.
 
 ---
@@ -508,7 +487,7 @@ attach-linux deploy [--dtbo <path>] [--ip <host>] [--user <user>] [--password <p
 ```
 0. CONFIGURE    export ATTACH_LINUX=... ATTACH_DEVICETREE=...
 1. FIND DEVICE  list device <chip-name>
-2. FIND PARENT  list parent <compatible>  (with board: list slot <compatible>)
+2. FIND PARENT  list parent <compatible>
 3. ADD DEVICE   add <compatible> --parent <bus>  (auto-creates workfile)
 4. CONFIGURE    update <path> <property> <value>
                 list property <path>        — see what's needed
@@ -592,7 +571,7 @@ node-name {
 8. **Pattern properties = channels** — If present, help user create each channel node with `update <label> channel@N`, then configure with `update`
 9. **Phandle references** — When setting phandle properties with `update`, just use the label name (e.g., `update <path> interrupt-parent gpio`)
 10. **Macros need includes** — If schema shows macros, the overlay may need `#include` directives
-11. **Interrupts need interrupt-parent** — When the board's interrupt controller differs from the inherited one (e.g., `gpio` vs `gic`), set `interrupt-parent` first: `update <path> interrupt-parent gpio`. Setting `interrupts` without an explicit `interrupt-parent` writes the inherited one automatically and warns about cell count mismatches
+11. **Interrupts need interrupt-parent** — When the device's interrupt controller differs from the inherited one (e.g., `gpio` vs `gic`), set `interrupt-parent` first: `update <path> interrupt-parent gpio`. Setting `interrupts` without an explicit `interrupt-parent` writes the inherited one automatically and warns about cell count mismatches
 12. **Use `add` for device nodes, `update` for child nodes** — `add <compatible> --parent <bus>` for devices; `update <path> channel@N` for child nodes (channels, etc.)
 13. **Use `delete` for both nodes and properties** — `delete <path>` removes a node; `delete <path> <property>` removes a property
 14. **Use `rename` to change a node's key** — `rename <path> <new-name>`. A unit address change updates `reg`.

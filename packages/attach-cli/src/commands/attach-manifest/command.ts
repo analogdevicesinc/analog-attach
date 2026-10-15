@@ -74,11 +74,11 @@ export function build_attach_manifest_command(_context: LocalContext): Command {
                         argv: ["attach-linux", "--json", "__list"],
                     },
                     "build": {
-                        description: "Compile the overlay DTSO into a DTBO using the bundled dtc. Reads the overlay config field for the source path (--overlay overrides) and writes the compiled .dtbo next to it, saving that path to the overlay-compiled config field for deploy to pick up. Fails with an input-error if overlay is unset or the source is missing; returns the artifact path on success.",
+                        description: "Compile the overlay DTSO into a DTBO using the bundled dtc. Reads the overlay config field for the source path (--overlay overrides) and writes the compiled .dtbo next to it (overlay.dtso -> overlay.dtbo), where deploy picks it up. Fails with an input-error if overlay is unset or the source is missing; returns the artifact path on success.",
                         argv: ["attach-linux", "--json", "build"],
                     },
                     "deploy": {
-                        description: "Copy the compiled DTBO to a remote device's /boot/overlays over sshpass+scp and reboot it. Reads overlay-compiled (the .dtbo path, written by build), deploy-ip, deploy-user, and deploy-password config fields; --dtbo, --ip, --user, --password override them. Fails with an input-error listing any unset field, if the .dtbo is missing, or if sshpass is not installed. Always reboots after a successful copy.",
+                        description: "Copy the compiled DTBO to a remote device's /boot/overlays over sshpass+scp and reboot it. Deploys the .dtbo that build wrote next to the overlay and reads the deploy-ip, deploy-user, and deploy-password config fields; --dtbo, --ip, --user, --password override them. Fails with an input-error listing any unset field, if the .dtbo is missing, or if sshpass is not installed. Always reboots after a successful copy.",
                         argv: ["attach-linux", "--json", "deploy"],
                     },
                 },

@@ -3,6 +3,8 @@ import * as fs from "node:fs";
 import path from "node:path";
 import * as os from "node:os";
 
+import { linux_tree_problem } from "./config/workspace";
+
 const BOLD = "\u001B[1m";
 const DIM = "\u001B[2m";
 const RESET = "\u001B[0m";
@@ -65,10 +67,6 @@ const SKIP_DIRS = new Set([
     "__pycache__", "venv", ".venv", "build", "dist",
 ]);
 
-function is_valid_linux_tree(directory: string): boolean {
-    return fs.existsSync(path.join(directory, "Documentation", "devicetree", "bindings"));
-}
-
 function find_linux_trees(): string[] {
     const home = os.homedir();
     const results: string[] = [];
@@ -97,7 +95,7 @@ function find_linux_trees(): string[] {
             const full = path.join(item.dir, entry.name);
 
             if (entry.name === "linux" || entry.name.startsWith("linux-")) {
-                if (is_valid_linux_tree(full)) {
+                if (linux_tree_problem(full) === undefined) {
                     results.push(full);
                 }
                 continue;
@@ -116,7 +114,7 @@ async function step_linux(rl: readline.Interface): Promise<string> {
     console.log(bold("Step 1: Linux kernel source tree"));
     console.log("");
     console.log("attach-linux needs the path to a Linux kernel source tree");
-    console.log(dim("(must contain Documentation/devicetree/bindings/)"));
+    console.log(dim("(must contain Documentation/devicetree/bindings/ and include/)"));
     console.log("");
 
     console.log("Searching for Linux source trees under ~...");
@@ -157,7 +155,7 @@ async function step_linux(rl: readline.Interface): Promise<string> {
 
 async function ask_linux_path(rl: readline.Interface): Promise<string> {
     console.log("");
-    console.log(dim("Tab-complete available. Path must contain Documentation/devicetree/bindings/."));
+    console.log(dim("Tab-complete available. Path must contain Documentation/devicetree/bindings/ and include/."));
     while (true) {
         const answer = await question(rl, "Linux source path: ");
         if (answer === "") { continue; }
@@ -169,8 +167,9 @@ async function ask_linux_path(rl: readline.Interface): Promise<string> {
             continue;
         }
 
-        if (!is_valid_linux_tree(resolved)) {
-            console.log(`No Documentation/devicetree/bindings/ under ${resolved}`);
+        const problem = linux_tree_problem(resolved);
+        if (problem !== undefined) {
+            console.log(problem);
             continue;
         }
 

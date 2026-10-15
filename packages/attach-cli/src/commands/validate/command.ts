@@ -16,10 +16,10 @@ import path from "node:path";
 import { execSync } from "node:child_process";
 
 import type { LocalContext } from "../../context";
-import { save_config } from "../../config";
-import { resolve_config, preprocess_context } from "../../resolve-config";
+import { config_directory } from "../../config/settings";
+import { is_validation_schema_fresh, stamp_validation_schema, validation_schema_path } from "../../config/cache";
+import { load_workspace } from "../../config/workspace";
 import { is_tool_available } from "../../utilities";
-import { getBundledToolsPath } from "../skill/utilities";
 import { respond, input_error } from "../../protocol/output";
 import type { ValidationResponse, ValidationError } from "../../protocol/types";
 
@@ -48,69 +48,27 @@ export function build_validate_command(context_: LocalContext): Command {
         .addHelpText("after", `
 Runs dt-validate on the overlay merged with the base device tree.`)
         .action(async () => {
-            const resolved = resolve_config(context_, ["overlay"]);
-            if (resolved === undefined) { return; }
-            const config = resolved.config;
-            const input = resolved.values.overlay;
-            const context = config.devicetree;
-
-            const input_content = fs.readFileSync(input, "utf8");
-
-            const base = (() => {
-                if (context === undefined || !fs.existsSync(context)) { return; }
-                const preprocessed = preprocess_context(context, config.linux, config.preprocessCommand);
-                const source = typeof preprocessed === "string" ? preprocessed : context;
-                return DeviceTree.new_from_string(fs.readFileSync(source, "utf8"));
-            })();
-
-            const overlay = typeof base === "string" || base === undefined
-                ? DeviceTreeOverlay.new_from_string(input_content)
-                : DeviceTreeOverlay.new_from_string(input_content, base);
-
-            if (typeof overlay === "string") {
-                if (context_.json) {
-                    respond({ errors: [{ kind: "generic", path: [], message: `Failed to parse overlay: ${overlay}` }], warnings: [] } satisfies ValidationResponse);
-                    return;
-                }
-                console.log(`Failed to parse dtso ${input}: ${overlay}`);
-                return;
-            }
+            const workspace = load_workspace(context_, ["bindings", "tools", "base", "overlay"]);
+            if (workspace === undefined) { return; }
+            const { linux, dt_schema } = workspace.bindings;
+            const { dtc, dt_mk_schema: dtMkSchema, dt_validate: dtValidate } = workspace.tools;
+            const overlay = workspace.overlay.tree;
 
             const output = build_validation_dts(overlay);
 
-            const config_directory = path.join(process.cwd(), '.attach-linux');
-            fs.mkdirSync(config_directory, { recursive: true });
+            const work_directory = config_directory();
+            fs.mkdirSync(work_directory, { recursive: true });
 
-            let validation_json_path = config.validationJson;
-
-            const toolsPath = getBundledToolsPath();
-            const dtMkSchema = path.join(toolsPath, 'dt-mk-schema');
-            const dtValidate = path.join(toolsPath, 'dt-validate');
-            const dtc = path.join(toolsPath, 'dtc');
-
-            if (!fs.existsSync(dtMkSchema) || !fs.existsSync(dtValidate) || !fs.existsSync(dtc)) {
-                const message = "Bundled tools not found — run scripts/bundle-dt-schema.sh";
-                if (context_.json) { input_error(message); return; }
-                console.log(message);
-                return;
-            }
-
-            if (validation_json_path === undefined) {
-                const linux = config.linux;
-                if (linux === undefined) {
-                    if (context_.json) { input_error("Missing environment variable: ATTACH_LINUX (required to generate validation.json)"); return; }
-                    console.log("Missing environment variable: ATTACH_LINUX (required to generate validation.json)");
-                    return;
-                }
-
+            const validation_json_path = validation_schema_path();
+            if (!is_validation_schema_fresh(linux, dt_schema)) {
                 const bindings_path = path.join(linux, 'Documentation', 'devicetree', 'bindings');
-                const generated_path = path.join(config_directory, 'validation.json');
 
                 if (!context_.json) { console.log("Generating validation.json (this may take a while)..."); }
 
                 try {
                     const schema_output = execSync(`${dtMkSchema} -j ${bindings_path}`, { stdio: 'pipe', maxBuffer: 256 * 1024 * 1024 });
-                    fs.writeFileSync(generated_path, schema_output);
+                    if (schema_output.length === 0) { throw new Error(`${dtMkSchema} produced no output`); }
+                    fs.writeFileSync(validation_json_path, schema_output);
                 } catch (error: any) {
                     const stderr: string = (error.stderr as Buffer | undefined)?.toString() ?? String(error);
                     if (context_.json) { input_error(`Failed to generate validation.json: ${stderr}`); return; }
@@ -118,20 +76,12 @@ Runs dt-validate on the overlay merged with the base device tree.`)
                     return;
                 }
 
-                save_config({ validationJson: generated_path });
-                validation_json_path = generated_path;
+                stamp_validation_schema(linux, dt_schema);
             }
 
-            if (!fs.existsSync(validation_json_path)) {
-                if (context_.json) { input_error(`validation.json not found: ${validation_json_path}`); return; }
-                console.log(`validation.json not found: ${validation_json_path}`);
-                return;
-            }
-            fs.mkdirSync(config_directory, { recursive: true });
-
-            const temporary_dts = path.join(config_directory, 'temp.dts');
-            const temporary_dtb = path.join(config_directory, 'temp.dtb');
-            const error_json = path.join(config_directory, 'error.json');
+            const temporary_dts = path.join(work_directory, 'temp.dts');
+            const temporary_dtb = path.join(work_directory, 'temp.dtb');
+            const error_json = path.join(work_directory, 'error.json');
             fs.writeFileSync(temporary_dts, output);
 
             let dtc_error: string | undefined;

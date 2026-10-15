@@ -1,4 +1,4 @@
-import { CONFIG_REGISTRY } from "../../config";
+import { SETTINGS, TOML_SETTINGS } from "../../config/settings";
 import { LIST_KINDS } from "../list/command";
 
 // Single source of truth for value completion.
@@ -51,11 +51,11 @@ export interface CommandSpec {
 const FILE: ValueSource = { kind: "file" };
 const CONFIG_SET_FIELDS: ValueSource = {
     kind: "values",
-    values: CONFIG_REGISTRY.filter(spec => !spec.internal && spec.env === undefined).map(spec => spec.toml),
+    values: TOML_SETTINGS.map(spec => spec.key),
 };
 const CONFIG_GET_FIELDS: ValueSource = {
     kind: "values",
-    values: CONFIG_REGISTRY.filter(spec => !spec.internal).map(spec => spec.toml),
+    values: SETTINGS.map(spec => spec.key),
 };
 
 const PATH_OVERLAY: ValueSource = { kind: "path", roots: "navigate", children: "children" };

@@ -2,8 +2,8 @@ import { Command } from "commander";
 import { DeviceTree, DeviceTreeOverlay, get_full_node_name, type DTNode } from "attach-lib";
 
 import type { LocalContext } from "../../context";
-import { load_trees, resolve_node_identifier, resolve_path, base_target, not_found_message, write_overlay } from "../../utilities";
-import { resolve_config } from "../../resolve-config";
+import { resolve_node_identifier, resolve_path, base_target, not_found_message } from "../../utilities";
+import { load_workspace } from "../../config/workspace";
 import { respond, respond_fail, input_error } from "../../protocol/output";
 
 export function build_move_command(context_: LocalContext): Command {
@@ -22,20 +22,17 @@ Example:
         .action(async (path_argument: string, destination: string) => {
             const parent_identifier = destination;
 
-            const resolved = resolve_config(context_, ["devicetree", "overlay"]);
-            if (resolved === undefined) { return; }
-            const { devicetree, overlay: input } = resolved.values;
-
-            const trees = load_trees(context_, devicetree, input, resolved.parsed.devicetree);
-            if (trees === undefined) { return; }
-            const { base_dt: base, overlay } = trees;
+            const workspace = load_workspace(context_, ["base", "overlay"]);
+            if (workspace === undefined) { return; }
+            const { source: devicetree, tree: base } = workspace.base;
+            const { path: input, tree: overlay } = workspace.overlay;
 
             const result = move_overlay_node(base, overlay, path_argument, parent_identifier);
 
             if (context_.json) {
                 switch (result) {
                     case "moved": {
-                        write_overlay(input, overlay, resolved.config);
+                        workspace.overlay.save();
                         respond({ ok: true, message: `Moved ${path_argument} to ${parent_identifier}`, severity: "info" });
                         return;
                     }
@@ -95,7 +92,7 @@ Example:
                         return;
                     }
                     case "moved": {
-                        write_overlay(input, overlay, resolved.config);
+                        workspace.overlay.save();
                         console.log(`Moved ${path_argument} to ${parent_identifier} in ${input}`);
                         return;
                     }
