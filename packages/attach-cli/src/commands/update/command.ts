@@ -15,6 +15,7 @@ import {
     ensure_address_cells,
     parse_unit_address,
     sync_unit_address_from_reg,
+    unit_radix,
     type CellValue,
     type DTNode,
     type DTProperty,
@@ -33,7 +34,7 @@ import * as fs from "node:fs";
 import type { LocalContext } from "../../context";
 import { load_workspace } from "../../config/workspace";
 import { resolve_write_target, parse_node_path, not_found_message } from "../../utilities";
-import { resolve_node_binding } from "../../binding-resolution";
+import { child_unit_radix, resolve_node_binding } from "../../binding-resolution";
 import { respond, respond_fail, input_error, diagnostic } from "../../protocol/output";
 import { convert_node, convert_property } from "../../protocol/dt-to-protocol";
 
@@ -410,19 +411,14 @@ Examples:
 
                 // Check if it matches a pattern_properties regex
                 // Try to find the binding's child_nodes (pattern_properties)
-                let matched_pattern = false;
+                let child_patterns: string[] = [];
                 if (binding_node !== undefined) {
                     const binding = await resolve_node_binding(binding_node, binding_parent, parent_name, base_dt, linux, dtSchema, context_.json);
-                    if (!("error" in binding) && binding.child_nodes.length > 0) {
-                        const patterns = binding.child_nodes.map(c => c.pattern);
-                        for (const pattern of patterns) {
-                            if (new RegExp(pattern).test(property_name)) {
-                                matched_pattern = true;
-                                break;
-                            }
-                        }
+                    if (!("error" in binding)) {
+                        child_patterns = binding.child_nodes.map(c => c.pattern);
                     }
                 }
+                const matched_pattern = child_patterns.some(pattern => new RegExp(pattern).test(property_name));
 
                 if (matched_pattern) {
                     if (value_arguments.length > 0) {
@@ -438,7 +434,7 @@ Examples:
                     const child_unit = property_name.slice(at + 1);
                     const child_properties: DTProperty[] = [];
 
-                    const parsed_addr = parse_unit_address(child_unit);
+                    const parsed_addr = parse_unit_address(child_unit, unit_radix(child_patterns, child_name) ?? 16);
                     if (parsed_addr !== undefined) {
                         const cells = address_cells_of(overlay, node_path);
                         child_properties.push(encode_reg_address(parsed_addr, cells.address, cells.size));
@@ -531,7 +527,8 @@ Examples:
                 const parent_path = found.node_path.split("/").slice(0, -1).join("/") || "/";
                 const cells = address_cells_of(overlay, parent_path);
                 const effective = overlay.effective_children(parent_path);
-                const sync = sync_unit_address_from_reg(found.node, cells.address, effective);
+                const radix = await child_unit_radix(overlay.effective_node(parent_path), found.node.name, linux, dtSchema);
+                const sync = sync_unit_address_from_reg(found.node, cells.address, effective, radix);
                 switch (sync) {
                     case "conflict": {
                         if (context_.json) { respond_fail({ ok: false, message: `reg update would create a naming conflict`, severity: "error" }); }

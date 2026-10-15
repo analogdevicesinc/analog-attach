@@ -3,9 +3,11 @@ import {
     is_dt_flag,
     dt_to_validator_input,
     get_full_node_name,
+    unit_radix,
 } from "attach-lib";
 import type {
     DTNode,
+    UnitRadix,
     DeviceTree,
     ResolvedProperty,
     PatternPropertyRule,
@@ -14,7 +16,7 @@ import type {
     ParseOptions,
 } from "attach-lib";
 
-import { find_binding, bigIntReplacer } from "./utilities";
+import { find_binding, bigIntReplacer, node_compatibles } from "./utilities";
 
 export type NodeBinding = {
     properties: ResolvedProperty[];
@@ -37,6 +39,31 @@ export function match_pattern_rule(
     const rule = rules?.find((r) => r.pattern === matched_pattern);
     if (rule === undefined) { return undefined; }
     return { pattern: matched_pattern, rule };
+}
+
+/**
+ * The radix of `child_name@<unit>` unit addresses under `parent`, read from the
+ * node patterns of the parent's binding. Undefined when the parent has no
+ * binding or none of its patterns accepts the name.
+ */
+export async function child_unit_radix(
+    parent: DTNode | undefined,
+    child_name: string,
+    linux: string,
+    dtSchema: string,
+): Promise<UnitRadix | undefined> {
+    if (parent === undefined) { return undefined; }
+    for (const compatible of node_compatibles(parent)) {
+        const binding_path = await find_binding(linux, dtSchema, compatible, true);
+        if (binding_path === undefined) { continue; }
+        try {
+            const binding = await Attach.new().parse_binding(binding_path, linux, dtSchema);
+            return binding === undefined ? undefined : unit_radix(binding.patterns, child_name);
+        } catch {
+            return undefined;
+        }
+    }
+    return undefined;
 }
 
 export async function resolve_node_binding(

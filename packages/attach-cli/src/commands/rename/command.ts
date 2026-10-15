@@ -7,10 +7,12 @@ import {
     encode_reg_address,
     decode_reg_address,
     is_dt_flag,
+    type UnitRadix,
 } from "attach-lib";
 
 import type { LocalContext } from "../../context";
-import { load_workspace } from "../../config/workspace";
+import { load_workspace, parse_bindings } from "../../config/workspace";
+import { child_unit_radix } from "../../binding-resolution";
 import { resolve_node_identifier, not_found_message } from "../../utilities";
 import { respond, respond_fail, diagnostic } from "../../protocol/output";
 
@@ -37,7 +39,15 @@ Examples:
             const { source: devicetree, tree: base } = workspace.base;
             const { path: input, tree: overlay } = workspace.overlay;
 
-            const result = rename_overlay_node(overlay, path_argument, new_name);
+            // Bindings are optional here: they only decide the radix of the unit address.
+            const bindings = parse_bindings(workspace.settings);
+            const found = overlay.find_node(resolve_node_identifier(path_argument, overlay));
+            const parent_path = found === undefined ? undefined : found.node_path.split("/").slice(0, -1).join("/") || "/";
+            const radix = bindings.ok && parent_path !== undefined
+                ? await child_unit_radix(overlay.effective_node(parent_path), new_name.split("@")[0] ?? new_name, bindings.value.linux, bindings.value.dt_schema)
+                : undefined;
+
+            const result = rename_overlay_node(overlay, path_argument, new_name, radix);
 
             if (context_.json) {
                 switch (result.status) {
@@ -103,6 +113,7 @@ export function rename_overlay_node(
     overlay: DeviceTreeOverlay,
     identifier: string,
     to: string,
+    radix: UnitRadix = 16,
 ): RenameResult {
     const found = overlay.find_node(resolve_node_identifier(identifier, overlay));
 
@@ -131,7 +142,7 @@ export function rename_overlay_node(
     // R9: update reg when unit address changes
     let reg_message: string | undefined;
     if (at !== -1 && new_unit !== undefined) {
-        const parsed = parse_unit_address(new_unit);
+        const parsed = parse_unit_address(new_unit, radix);
         if (parsed !== undefined) {
             const cells = address_cells_of(overlay, parent_path);
             const existing_reg = found.node.properties.find(p => p.name === "reg");
@@ -215,6 +226,16 @@ if (import.meta.vitest) {
         if (result.status !== "renamed") { return; }
         expect(result.reg_message).toContain("reg");
         expect(overlay.print()).toContain("adc@3");
+    });
+
+    test("rename_overlay_node — decimal radix reads the unit as decimal", () => {
+        const base = DeviceTree.new_from_string(base_dts);
+        if (typeof base === "string") { throw new TypeError(base); }
+        const overlay = DeviceTreeOverlay.new_from_string(overlay_with_imu, base);
+        if (typeof overlay === "string") { throw new TypeError(overlay); }
+
+        expect(rename_overlay_node(overlay, "imu1", "adc@10", 10)).toMatchObject({ status: "renamed" });
+        expect(overlay.print()).toMatch(/adc@10 \{[^}]*reg = <10>/s);
     });
 
     test("rename_overlay_node — conflict with effective sibling", () => {
