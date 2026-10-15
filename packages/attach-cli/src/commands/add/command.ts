@@ -1,36 +1,28 @@
 import { Command } from "commander";
 import {
-    DeviceTree,
-    DeviceTreeOverlay,
-    NodeBuilder,
-    PropertyBuilder,
-    parse_unit_address,
-    format_unit_address,
-    address_cells_of,
-    encode_reg_address,
-    next_free_unit_address,
-    is_valid_label,
-    label_from_compatible,
-    unique_label,
-    type DTProperty,
-    type DTNode,
+    Attach,
+    add_node,
+    type DeviceTree,
+    type DeviceTreeOverlay,
+    type AddNodeNote,
+    type AddNodeResult,
 } from "attach-lib";
 
 import type { LocalContext } from "../../context";
 import { load_workspace, parse_overlay, report_config_errors } from "../../config/workspace";
-import { find_binding, resolve_path, base_target } from "../../utilities";
-import { respond, respond_fail, diagnostic } from "../../protocol/output";
-import { resolve_node_binding } from "../../binding-resolution";
+import { find_binding, parse_node_path, resolve_path } from "../../utilities";
+import { respond, respond_fail, diagnostic, input_error } from "../../protocol/output";
 import type { AddResponse } from "../../protocol/types";
-import { create_workfile } from "../../workfile";
+import { new_workfile } from "../../workfile";
 
-export type AddResult =
-    | { status: "added"; key: string; path: string[]; label?: string; diagnostics: string[] }
-    | { status: "parent-not-found" }
-    | { status: "duplicate"; message: string }
-    | { status: "label-taken"; message: string }
-    | { status: "invalid-label"; message: string }
-    | { status: "bad-unit-address"; message: string };
+export interface AddRequest {
+    compatible: string;
+    /** Parent identifier (label, path or hybrid); the root when absent. */
+    parent?: string;
+    name?: string;
+    label?: string;
+    auto_address: boolean;
+}
 
 export function build_add_command(context_: LocalContext): Command {
     return new Command("add")
@@ -46,386 +38,188 @@ Examples:
   $ attach-linux add adi,ad7124-8 --parent spi0 --name adc@1
 
 Use 'list device' to find compatible strings, 'list parent' to find valid buses.`)
-        .action(async (key: string, options) => {
+        .action(async (compatible: string, options: { parent?: string; name?: string; label?: string }) => {
+            const report = (message: string): void => {
+                if (context_.json) { respond_fail({ ok: false, message, severity: "error" }); }
+                else { console.log(message); }
+            };
+
+            let parent = options.parent;
+            if (parent !== undefined) {
+                const parsed = parse_node_path(parent);
+                if (!parsed.ok) {
+                    if (context_.json) { input_error(parsed.error); } else { console.log(parsed.error); }
+                    return;
+                }
+                parent = parsed.value;
+            }
+
             const workspace = load_workspace(context_, ["bindings", "base"]);
             if (workspace === undefined) { return; }
             const { linux, dt_schema: dtSchema } = workspace.bindings;
-            const { source: devicetree, tree: base } = workspace.base;
+            const { settings } = workspace;
 
-            let settings = workspace.settings;
-            let created_message: string | undefined;
-            if (settings.overlay === undefined) {
-                const device_name = key.includes(",") ? key.slice(key.indexOf(",") + 1) : key;
-                const created = create_workfile(`${device_name}.dtso`);
-                created_message = created.message;
-                if (context_.json) { diagnostic(created_message); }
-                else { console.log(created_message); }
-                settings = { ...settings, overlay: created.path };
-            }
-
-            const opened = parse_overlay(settings, workspace.base);
+            const created = settings.overlay === undefined;
+            const opened = created
+                ? { ok: true as const, value: new_workfile(`${device_name(compatible)}.dtso`, workspace.base.tree, settings.overlay_syntax) }
+                : parse_overlay(settings, workspace.base);
             if (!opened.ok) {
                 report_config_errors(context_, opened.errors);
                 return;
             }
             const workfile = opened.value;
-            const { path: input, tree: overlay } = workfile;
 
-            const { name, label } = options;
-            const to: string | undefined = options.parent;
-
-            const binding_path = await find_binding(linux, dtSchema, key, context_.json);
+            const binding_path = await find_binding(linux, dtSchema, compatible, context_.json);
             if (binding_path === undefined) {
-                if (context_.json) { respond_fail({ ok: false, message: `Failed to find binding for ${key}`, severity: "error" }); }
-                else { console.log(`Failed to find binding for ${key}`); }
+                report(`Failed to find binding for ${compatible}`);
                 return;
             }
 
-            // R3: check if binding defines reg to decide auto-addressing
-            let binding_has_reg = false;
-            try {
-                const stub_node: DTNode = {
-                    name: key, unit_addr: undefined, labels: [], children: [], properties: [
-                        PropertyBuilder.build_string().with_value(key).with_name("compatible").build(),
-                    ]
+            const result = add_device(workspace.base.tree, workfile.tree, {
+                compatible,
+                parent,
+                name: options.name,
+                label: options.label,
+                auto_address: await binding_defines_reg(binding_path, linux, dtSchema),
+            });
+
+            if (result.status === "parent-not-found") {
+                if (context_.json) { respond_fail({ ok: false, message: `Parent node ${parent} not found`, severity: "error" }); }
+                else { console.log(`Couldn't find parent node ${parent} in ${workspace.base.source} or ${workfile.path}`); }
+                return;
+            }
+            if (result.status !== "added") {
+                report(failure_message(result, parent ?? "/"));
+                return;
+            }
+
+            workfile.save();
+            const created_message = created ? `Wrote ${workfile.path}` : undefined;
+            if (created_message !== undefined && !context_.json) { console.log(created_message); }
+            for (const note of result.notes) {
+                const message = note_message(note, result.path);
+                if (context_.json) { diagnostic(message); } else { console.log(message); }
+            }
+
+            const added_message = `Added ${result.key} (label: ${result.label})`;
+            if (context_.json) {
+                const response: AddResponse = {
+                    ok: true,
+                    message: created_message === undefined ? added_message : `${created_message}; ${added_message}`,
+                    severity: "info",
+                    key: result.key,
+                    path: result.path.split("/").filter(Boolean),
                 };
-                const binding = await resolve_node_binding(stub_node, undefined, "", base, linux, dtSchema, context_.json);
-                if (!("error" in binding)) {
-                    binding_has_reg = binding.properties.some(p => p.key === "reg");
-                }
-            } catch { /* best-effort */ }
-
-            const node_name = name ?? key;
-            const result = add_overlay_node(base, overlay, node_name, to, label, key, binding_has_reg);
-
-            switch (result.status) {
-                case "parent-not-found": {
-                    if (context_.json) { respond_fail({ ok: false, message: `Parent node ${to} not found`, severity: "error" }); }
-                    else { console.log(`Couldn't find parent node ${to} in ${devicetree} or ${input}`); }
-                    return;
-                }
-                case "duplicate": case "label-taken": case "invalid-label": case "bad-unit-address": {
-                    if (context_.json) { respond_fail({ ok: false, message: result.message, severity: "error" }); }
-                    else { console.log(result.message); }
-                    return;
-                }
-                case "added": {
-                    workfile.save();
-                    for (const diag of result.diagnostics) {
-                        if (context_.json) { diagnostic(diag); }
-                        else { console.log(diag); }
-                    }
-                    const label_suffix = result.label === undefined ? "" : ` (label: ${result.label})`;
-                    const added_message = `Added ${result.key}${label_suffix}`;
-                    const full_message = created_message === undefined
-                        ? added_message
-                        : `${created_message}; ${added_message}`;
-                    if (context_.json) {
-                        const response: AddResponse = {
-                            ok: true,
-                            message: full_message,
-                            severity: "info",
-                            key: result.key,
-                            path: result.path,
-                        };
-                        respond(response);
-                    } else {
-                        console.log(`${added_message} to ${input}`);
-                    }
-                    return;
-                }
+                respond(response);
+            } else {
+                console.log(`${added_message} to ${workfile.path}`);
             }
         });
 }
 
-export function add_overlay_node(
-    base: DeviceTree,
-    overlay: DeviceTreeOverlay,
-    node_name: string,
-    parent_identifier: string | undefined,
-    explicit_label: string | undefined,
-    compatible: string | undefined,
-    binding_has_reg: boolean,
-): AddResult {
-    const diagnostics: string[] = [];
+/** The compatible without its vendor prefix, used to name a new workfile. */
+function device_name(compatible: string): string {
+    return compatible.includes(",") ? compatible.slice(compatible.indexOf(",") + 1) : compatible;
+}
 
-    // R8: validate explicit label
-    if (explicit_label !== undefined) {
-        if (!is_valid_label(explicit_label)) {
-            return { status: "invalid-label", message: `Invalid label: ${explicit_label} (must match [A-Za-z_][A-Za-z0-9_]*)` };
-        }
-        const all_labels = overlay.all_labels();
-        if (all_labels.has(explicit_label)) {
-            const owner = all_labels.get(explicit_label)!;
-            return { status: "label-taken", message: `Label ${explicit_label} is already used by ${owner}` };
-        }
+/** Whether the binding has a `reg` property, i.e. the device needs a unit address. */
+async function binding_defines_reg(binding_path: string, linux: string, dtSchema: string): Promise<boolean> {
+    try {
+        const binding = await Attach.new().parse_binding(binding_path, linux, dtSchema);
+        return binding?.parsed_binding.properties.some(p => p.key === "reg") ?? false;
+    } catch {
+        return false;
+    }
+}
+
+/** Resolve the parent identifier against the overlay and base, then add the node there. */
+export function add_device(base: DeviceTree, overlay: DeviceTreeOverlay, request: AddRequest): AddNodeResult {
+    let parent_path = "/";
+    if (request.parent !== undefined) {
+        const resolved = resolve_path(request.parent, overlay, base);
+        const path = resolved.in_overlay?.node_path ?? resolved.in_base?.path;
+        if (path === undefined) { return { status: "parent-not-found" }; }
+        parent_path = path;
     }
 
-    // Parse node name for unit address
-    const at = node_name.indexOf('@');
-    const base_name = at === -1 ? node_name : node_name.slice(0, at);
-    const explicit_unit = at === -1 ? undefined : node_name.slice(at + 1);
+    return add_node(overlay, {
+        parent_path,
+        name: request.name ?? request.compatible,
+        compatible: request.compatible,
+        label: request.label,
+        auto_address: request.auto_address,
+    });
+}
 
-    if (explicit_unit === "") {
-        return { status: "bad-unit-address", message: "Empty unit address (name@ is invalid)" };
+function failure_message(result: Exclude<AddNodeResult, { status: "added" | "parent-not-found" }>, parent: string): string {
+    switch (result.status) {
+        case "empty-unit-address": { return "Empty unit address (name@ is invalid)"; }
+        case "invalid-label": { return `Invalid label: ${result.label} (must match [A-Za-z_][A-Za-z0-9_]*)`; }
+        case "label-taken": { return `Label ${result.label} is already used by ${result.owner}`; }
+        case "duplicate": { return `${parent} already has a child named ${result.key}`; }
     }
+}
 
-    // Resolve parent path for effective_children and addressing
-    let parent_path: string;
-    let parent_overlay_node: DTNode | undefined;
-    if (parent_identifier === undefined) {
-        parent_path = "/";
-    } else {
-        const resolved = resolve_path(parent_identifier, overlay, base);
-        if (resolved.in_overlay !== undefined) {
-            parent_path = resolved.in_overlay.node_path;
-            parent_overlay_node = resolved.in_overlay.node;
-        } else if (resolved.in_base === undefined) {
-            return { status: "parent-not-found" };
-        } else {
-            parent_path = resolved.in_base.path;
-        }
-    }
-
-    const effective = overlay.effective_children(parent_path);
-
-    // Determine unit address
-    let unit: string | undefined = explicit_unit;
-    let reg_property: DTProperty | undefined;
-
-    if (explicit_unit !== undefined) {
-        // R7: explicit unit always creates reg
-        const parsed = parse_unit_address(explicit_unit);
-        if (parsed === undefined) {
-            diagnostics.push(`Non-hex unit address "${explicit_unit}"; no reg created`);
-        } else {
-            const cells = address_cells_of(overlay, parent_path);
-            reg_property = encode_reg_address(parsed, cells.address, cells.size);
-            if (cells.size > 0) {
-                diagnostics.push("reg size set to 0; update reg with the real size");
-            }
-        }
-    } else if (binding_has_reg) {
-        // R3/R6: auto-pick unit address
-        const cells = address_cells_of(overlay, parent_path);
-        const { address, occupants } = next_free_unit_address(effective, cells.address);
-        unit = format_unit_address(address);
-        reg_property = encode_reg_address(address, cells.address, cells.size);
-        if (cells.size > 0) {
-            diagnostics.push("reg size set to 0; update reg with the real size");
-        }
-        if (address > 0n) {
-            const listing = occupants.map(o => `${o.address} ${o.name}`).join(", ");
-            diagnostics.push(`picked @${unit}: ${listing}`);
+function note_message(note: AddNodeNote, path: string): string {
+    switch (note.kind) {
+        case "reg-needed": { return `The parent is memory-mapped; set the address with: update ${path} reg <address> <size>`; }
+        case "non-hex-unit": { return `Non-hex unit address "${note.unit}"; no reg created`; }
+        case "reg-size-zero": { return "reg size set to 0; update reg with the real size"; }
+        case "picked-address": {
+            const listing = note.occupants.map(o => `${o.address} ${o.name}`).join(", ");
+            return `picked @${note.unit}: ${listing}`;
         }
     }
-
-    const node_key = unit === undefined ? base_name : `${base_name}@${unit}`;
-
-    // R2: duplicate check
-    if (effective.has(node_key)) {
-        return { status: "duplicate", message: `${parent_path === "/" ? "/" : parent_path} already has a child named ${node_key}` };
-    }
-
-    // R8: default label
-    let label = explicit_label;
-    if (label === undefined && compatible !== undefined) {
-        const all_labels = overlay.all_labels();
-        const default_label = label_from_compatible(compatible);
-        label = unique_label(default_label, all_labels);
-    }
-
-    // Build the node
-    const compatible_property: DTProperty | undefined = compatible === undefined
-        ? undefined
-        : PropertyBuilder.build_string().with_value(compatible).with_name("compatible").build();
-
-    const properties: DTProperty[] = [];
-    if (compatible_property !== undefined) { properties.push(compatible_property); }
-    if (reg_property !== undefined) { properties.push(reg_property); }
-
-    const new_node = NodeBuilder.new()
-        .with_name(base_name)
-        .with_unit_address(unit)
-        .with_label(label === undefined ? [] : [label])
-        .with_properties(properties.length > 0 ? properties : undefined);
-
-    // C3: write #address-cells/#size-cells on overlay-added parent if missing
-    if (unit !== undefined && parent_overlay_node !== undefined) {
-        const has_addr_cells = parent_overlay_node.properties.some(p => p.name === "#address-cells");
-        if (!has_addr_cells) {
-            const base_dt = overlay.get_base_dts();
-            let base_has_cells = false;
-            if (base_dt !== undefined) {
-                const base_node = base_dt.node_at(parent_path);
-                if (base_node !== undefined) {
-                    base_has_cells = base_node.properties.some(p => p.name === "#address-cells");
-                }
-            }
-            if (!base_has_cells) {
-                parent_overlay_node.properties.push(
-                    PropertyBuilder.build_cell_array().with_tagged_values(PropertyBuilder.tag_number(1n)).with_name("#address-cells").build(),
-                    PropertyBuilder.build_cell_array().with_tagged_values(PropertyBuilder.tag_number(0n)).with_name("#size-cells").build(),
-                );
-            }
-        }
-    }
-
-    // Insert the node
-    if (parent_identifier === undefined) {
-        // eslint-disable-next-line unicorn/no-useless-undefined
-        overlay.add_fragment("/", new_node, undefined);
-    } else if (parent_overlay_node === undefined) {
-        const base_reference = base_target(resolve_path(parent_identifier, overlay, base));
-        if (base_reference === undefined) { return { status: "parent-not-found" }; }
-        // eslint-disable-next-line unicorn/no-useless-undefined
-        overlay.add_fragment(base_reference, new_node, undefined);
-    } else {
-        parent_overlay_node.children.push(new_node.build());
-    }
-
-    // Resolve the final path
-    const search_reference = label === undefined
-        ? { kind: "path" as const, labels: [] as string[], path: `${parent_path === "/" ? "" : parent_path}/${node_key}` }
-        : { kind: "label" as const, labels: [] as string[], name: label };
-    const found = overlay.find_node(search_reference);
-    const path_segments = found === undefined ? [node_key] : found.node_path.split("/").filter(Boolean);
-
-    return { status: "added", key: node_key, path: path_segments, label, diagnostics };
 }
 
 if (import.meta.vitest) {
     const { test, expect } = import.meta.vitest;
-    const { DeviceTree: DT, DeviceTreeOverlay: DTO_cls } = await import('attach-lib');
+    const { DeviceTree: DT, DeviceTreeOverlay: DTO } = await import("attach-lib");
 
-    const base_dts = `/dts-v1/;
+    const setup = (): { base: DeviceTree; overlay: DeviceTreeOverlay } => {
+        const base = DT.new_from_string(`/dts-v1/;
 / {
-    #address-cells = <2>;
     soc {
         spi0: spi@7e204000 {
             #address-cells = <1>;
             #size-cells = <0>;
             spidev@0 {
                 reg = <0>;
-                compatible = "spidev";
             };
-            spidev@1 {
-                reg = <1>;
-                compatible = "spidev";
-            };
-        };
-        spi1: spi@7e205000 {
-            #address-cells = <1>;
-            #size-cells = <0>;
         };
     };
-};`;
-
-    const empty_overlay = `/dts-v1/;
-/plugin/;
-
-&spi0 {
-};`;
-
-    test("add_overlay_node — adds node with auto unit address and reg", () => {
-        const base = DT.new_from_string(base_dts);
+};`);
         if (typeof base === "string") { throw new TypeError(base); }
-        const overlay = DTO_cls.new_from_string(empty_overlay, base);
+        const overlay = DTO.new_from_string("/dts-v1/;\n/plugin/;\n\n&spi0 {\n\tadc@4 {\n\t\treg = <4>;\n\t};\n};", base);
         if (typeof overlay === "string") { throw new TypeError(overlay); }
+        return { base, overlay };
+    };
 
-        const result = add_overlay_node(base, overlay, "adi,ad7124-8", "spi0", undefined, "adi,ad7124-8", true);
+    const request: AddRequest = { compatible: "adi,ad7124-8", auto_address: true };
 
-        expect(result.status).toBe("added");
-        if (result.status !== "added") { return; }
-        expect(result.key).toBe("adi,ad7124-8@2");
-        expect(result.label).toBe("ad7124_8");
-        const output = overlay.print();
-        expect(output).toContain("adi,ad7124-8@2");
-        expect(output).toContain("reg = <2>");
-        expect(output).toContain("ad7124_8:");
+    test("add_device — parent by label, by absolute path and by hybrid path", () => {
+        const { base, overlay } = setup();
+        expect(add_device(base, overlay, { ...request, parent: "spi0" }))
+            .toMatchObject({ status: "added", path: "/soc/spi@7e204000/adi,ad7124-8@1" });
+        expect(add_device(base, overlay, { ...request, parent: "/soc/spi@7e204000" }))
+            .toMatchObject({ status: "added", path: "/soc/spi@7e204000/adi,ad7124-8@2" });
+        expect(add_device(base, overlay, { ...request, parent: "spi0/adc@4", name: "channel@0", auto_address: false }))
+            .toMatchObject({ status: "added", path: "/soc/spi@7e204000/adc@4/channel@0" });
     });
 
-    test("add_overlay_node — second add gets @3 and indexed label", () => {
-        const base = DT.new_from_string(base_dts);
-        if (typeof base === "string") { throw new TypeError(base); }
-        const overlay = DTO_cls.new_from_string(empty_overlay, base);
-        if (typeof overlay === "string") { throw new TypeError(overlay); }
-
-        add_overlay_node(base, overlay, "adi,ad7124-8", "spi0", undefined, "adi,ad7124-8", true);
-        const result = add_overlay_node(base, overlay, "adi,ad7124-8", "spi0", undefined, "adi,ad7124-8", true);
-
-        expect(result.status).toBe("added");
-        if (result.status !== "added") { return; }
-        expect(result.key).toBe("adi,ad7124-8@3");
-        expect(result.label).toBe("ad7124_8_1");
+    test("add_device — no parent adds under the root", () => {
+        const { base, overlay } = setup();
+        expect(add_device(base, overlay, { compatible: "regulator-fixed", auto_address: false }))
+            .toMatchObject({ status: "added", path: "/regulator-fixed" });
     });
 
-    test("add_overlay_node — explicit name@a creates reg <0xa>", () => {
-        const base = DT.new_from_string(base_dts);
-        if (typeof base === "string") { throw new TypeError(base); }
-        const overlay = DTO_cls.new_from_string(empty_overlay, base);
-        if (typeof overlay === "string") { throw new TypeError(overlay); }
-
-        const result = add_overlay_node(base, overlay, "adc@a", "spi0", undefined, "adi,ad7124-8", false);
-
-        expect(result.status).toBe("added");
-        if (result.status !== "added") { return; }
-        expect(result.key).toBe("adc@a");
-        const output = overlay.print();
-        expect(output).toContain("adc@a");
+    test("add_device — unknown parent", () => {
+        const { base, overlay } = setup();
+        expect(add_device(base, overlay, { ...request, parent: "i2c0" })).toEqual({ status: "parent-not-found" });
     });
 
-    test("add_overlay_node — duplicate refused", () => {
-        const base = DT.new_from_string(base_dts);
-        if (typeof base === "string") { throw new TypeError(base); }
-        const overlay = DTO_cls.new_from_string(empty_overlay, base);
-        if (typeof overlay === "string") { throw new TypeError(overlay); }
-
-        const result = add_overlay_node(base, overlay, "spidev@0", "spi0", "x", "spidev", false);
-        expect(result.status).toBe("duplicate");
-    });
-
-    test("add_overlay_node — label-taken refused", () => {
-        const base = DT.new_from_string(base_dts);
-        if (typeof base === "string") { throw new TypeError(base); }
-        const overlay = DTO_cls.new_from_string(empty_overlay, base);
-        if (typeof overlay === "string") { throw new TypeError(overlay); }
-
-        const result = add_overlay_node(base, overlay, "x", "spi0", "spi0", "x", false);
-        expect(result.status).toBe("label-taken");
-    });
-
-    test("add_overlay_node — invalid label refused", () => {
-        const base = DT.new_from_string(base_dts);
-        if (typeof base === "string") { throw new TypeError(base); }
-        const overlay = DTO_cls.new_from_string(empty_overlay, base);
-        if (typeof overlay === "string") { throw new TypeError(overlay); }
-
-        const result = add_overlay_node(base, overlay, "x", "spi0", "1bad", "x", false);
-        expect(result.status).toBe("invalid-label");
-    });
-
-    test("add_overlay_node — no unit address when binding has no reg", () => {
-        const base = DT.new_from_string(base_dts);
-        if (typeof base === "string") { throw new TypeError(base); }
-        const overlay = DTO_cls.new_from_string(empty_overlay, base);
-        if (typeof overlay === "string") { throw new TypeError(overlay); }
-
-        const result = add_overlay_node(base, overlay, "regulator-fixed", undefined, undefined, "regulator-fixed", false);
-        expect(result.status).toBe("added");
-        if (result.status !== "added") { return; }
-        expect(result.key).toBe("regulator-fixed");
-        expect(overlay.print()).toContain("regulator-fixed {");
-        expect(overlay.print()).not.toContain("regulator-fixed@");
-    });
-
-    test("add_overlay_node — parent-not-found", () => {
-        const base = DT.new_from_string(base_dts);
-        if (typeof base === "string") { throw new TypeError(base); }
-        const overlay = DTO_cls.new_from_string(empty_overlay, base);
-        if (typeof overlay === "string") { throw new TypeError(overlay); }
-
-        const result = add_overlay_node(base, overlay, "x", "i2c0", "x", "x", false);
-        expect(result.status).toBe("parent-not-found");
+    test("note_message — picked address lists the occupants", () => {
+        expect(note_message({ kind: "picked-address", unit: "2", occupants: [{ name: "spidev@0", address: 0n }, { name: "spidev@1", address: 1n }] }, "/x"))
+            .toBe("picked @2: 0 spidev@0, 1 spidev@1");
     });
 }

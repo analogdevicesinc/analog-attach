@@ -83,7 +83,7 @@ The binding provides only a shape hint (`flag` / `strings` / `cells` / undefined
 
 ### Naming, unit addresses and labels
 
-`add` auto-picks unit addresses (when the binding defines `reg`), generates default labels from the compatible, and refuses duplicates. `rename` syncs reg↔unit address. `update reg` renames the node. Child nodes (channels etc.) are created through `update <path> <child-name>`. The lib helpers are in `UnitAddress.ts` and `Labels.ts`.
+`add` auto-picks unit addresses (when the binding defines `reg`), generates default labels from the compatible, and refuses duplicates. The tree logic is the lib's `add_node` (`Devicetree/AddNode.ts`), which returns structured notes and refusals; the command only resolves the parent identifier, checks the binding for `reg`, and formats messages. When no overlay is configured, `add` uses an in-memory `new_workfile` that is written (and saved to config) only if the add succeeds. `rename` syncs reg↔unit address. `update reg` renames the node. Child nodes (channels etc.) are created through `update <path> <child-name>`. The lib helpers are in `UnitAddress.ts` and `Labels.ts`; `DeviceTreeOverlay.ensure_node(path)` gives the overlay node to write into for any absolute path, creating a fragment for base-only nodes.
 
 ### Interrupt-parent
 

@@ -1,7 +1,10 @@
 import * as fs from "node:fs";
 import path from "node:path";
 
-import { save_settings } from "./config/settings";
+import { DeviceTreeOverlay, type DeviceTree } from "attach-lib";
+
+import { save_settings, type OverlaySyntax } from "./config/settings";
+import { open_workfile, type Workfile } from "./config/workspace";
 
 const EMPTY_DTSO = String.raw`/dts-v1/;
 /plugin/;
@@ -37,6 +40,25 @@ export function create_workfile(filename = "overlay.dtso", cwd?: string): Create
     return { path: output_path, message: `Wrote ${output_path}` };
 }
 
+/**
+ * An empty workfile held in memory: nothing touches disk or config until
+ * `save()`, which writes the file and records it as the configured overlay.
+ * Used by `add` when no overlay is configured, so a failed add leaves no trace.
+ */
+export function new_workfile(filename: string, base: DeviceTree, syntax: OverlaySyntax, cwd?: string): Workfile {
+    const output_path = path.resolve(cwd ?? process.cwd(), filename);
+    const tree = DeviceTreeOverlay.new_from_string(EMPTY_DTSO, base);
+    if (typeof tree === "string") { throw new TypeError(`Empty overlay does not parse: ${tree}`); }
+    const workfile = open_workfile(output_path, tree, syntax);
+    return {
+        ...workfile,
+        save: () => {
+            workfile.save();
+            save_settings({ overlay: output_path }, cwd);
+        },
+    };
+}
+
 if (import.meta.vitest) {
     const { test, expect } = import.meta.vitest;
     const os = await import("node:os");
@@ -61,6 +83,24 @@ if (import.meta.vitest) {
 
             fs.writeFileSync(path.join(directory, "overlay-2.dtso"), "");
             expect(next_workfile_name(directory)).toBe("overlay-3.dtso");
+        } finally {
+            fs.rmSync(directory, { recursive: true });
+        }
+    });
+
+    test("new_workfile — writes the file and config only on save", async () => {
+        const { DeviceTree } = await import("attach-lib");
+        const base = DeviceTree.new_from_string("/dts-v1/;\n/ {\n};");
+        if (typeof base === "string") { throw new TypeError(base); }
+        const directory = fs.mkdtempSync(path.join(os.tmpdir(), "attach-wf-"));
+        try {
+            const workfile = new_workfile("dev.dtso", base, "fragment", directory);
+            expect(fs.existsSync(path.join(directory, "dev.dtso"))).toBe(false);
+            expect(fs.existsSync(path.join(directory, ".attach-linux"))).toBe(false);
+
+            workfile.save();
+            expect(fs.readFileSync(path.join(directory, "dev.dtso"), "utf8")).toContain("/plugin/;");
+            expect(fs.readFileSync(path.join(directory, ".attach-linux", "config.toml"), "utf8")).toContain("dev.dtso");
         } finally {
             fs.rmSync(directory, { recursive: true });
         }
