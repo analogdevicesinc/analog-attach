@@ -13,7 +13,7 @@ import { load_workspace, parse_overlay, report_config_errors } from "../../confi
 import { find_binding, parse_node_path, resolve_path } from "../../utilities";
 import { respond, respond_fail, diagnostic, input_error } from "../../protocol/output";
 import type { AddResponse } from "../../protocol/types";
-import { new_workfile } from "../../workfile";
+import { new_workfile, next_workfile_name } from "../../workfile";
 
 export interface AddRequest {
     compatible: string;
@@ -61,7 +61,7 @@ Use 'list device' to find compatible strings, 'list parent' to find valid buses.
 
             const created = settings.overlay === undefined;
             const opened = created
-                ? { ok: true as const, value: new_workfile(`${device_name(compatible)}.dtso`, workspace.base.tree, settings.overlay_syntax) }
+                ? { ok: true as const, value: new_workfile(next_workfile_name(device_name(compatible)), workspace.base.tree, settings.overlay_syntax) }
                 : parse_overlay(settings, workspace.base);
             if (!opened.ok) {
                 report_config_errors(context_, opened.errors);

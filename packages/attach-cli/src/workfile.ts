@@ -15,13 +15,13 @@ const EMPTY_DTSO = String.raw`/dts-v1/;
 
 export { EMPTY_DTSO };
 
-/** Pick the next available overlay filename: overlay.dtso, overlay-1.dtso, overlay-2.dtso, … */
-export function next_workfile_name(cwd?: string): string {
+/** Pick the next available overlay filename: <stem>.dtso, <stem>-1.dtso, <stem>-2.dtso, … */
+export function next_workfile_name(stem = "overlay", cwd?: string): string {
     const directory = cwd ?? process.cwd();
-    if (!fs.existsSync(path.join(directory, "overlay.dtso"))) { return "overlay.dtso"; }
+    if (!fs.existsSync(path.join(directory, `${stem}.dtso`))) { return `${stem}.dtso`; }
     let n = 1;
-    while (fs.existsSync(path.join(directory, `overlay-${n}.dtso`))) { n++; }
-    return `overlay-${n}.dtso`;
+    while (fs.existsSync(path.join(directory, `${stem}-${n}.dtso`))) { n++; }
+    return `${stem}-${n}.dtso`;
 }
 
 export interface CreateWorkfileResult {
@@ -66,7 +66,7 @@ if (import.meta.vitest) {
     test("next_workfile_name — returns overlay.dtso in an empty directory", () => {
         const directory = fs.mkdtempSync(path.join(os.tmpdir(), "attach-wf-"));
         try {
-            expect(next_workfile_name(directory)).toBe("overlay.dtso");
+            expect(next_workfile_name("overlay", directory)).toBe("overlay.dtso");
         } finally {
             fs.rmSync(directory, { recursive: true });
         }
@@ -76,13 +76,16 @@ if (import.meta.vitest) {
         const directory = fs.mkdtempSync(path.join(os.tmpdir(), "attach-wf-"));
         try {
             fs.writeFileSync(path.join(directory, "overlay.dtso"), "");
-            expect(next_workfile_name(directory)).toBe("overlay-1.dtso");
+            expect(next_workfile_name("overlay", directory)).toBe("overlay-1.dtso");
 
             fs.writeFileSync(path.join(directory, "overlay-1.dtso"), "");
-            expect(next_workfile_name(directory)).toBe("overlay-2.dtso");
+            expect(next_workfile_name("overlay", directory)).toBe("overlay-2.dtso");
 
             fs.writeFileSync(path.join(directory, "overlay-2.dtso"), "");
-            expect(next_workfile_name(directory)).toBe("overlay-3.dtso");
+            expect(next_workfile_name("overlay", directory)).toBe("overlay-3.dtso");
+
+            fs.writeFileSync(path.join(directory, "ad7124-8.dtso"), "");
+            expect(next_workfile_name("ad7124-8", directory)).toBe("ad7124-8-1.dtso");
         } finally {
             fs.rmSync(directory, { recursive: true });
         }
