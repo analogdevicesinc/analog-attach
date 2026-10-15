@@ -23,8 +23,35 @@ export function unique_label(base_label: string, all_labels: Map<string, string>
     }
 }
 
+export type LabelChoice =
+    | { status: "ok"; label: string }
+    | { status: "invalid" }
+    | { status: "taken"; owner: string };
+
+/** Accept `explicit` if it is valid and free, else derive a free label from `compatible`. */
+export function choose_label(
+    explicit: string | undefined,
+    compatible: string,
+    all_labels: Map<string, string>,
+): LabelChoice {
+    if (explicit === undefined) {
+        return { status: "ok", label: unique_label(label_from_compatible(compatible), all_labels) };
+    }
+    if (!is_valid_label(explicit)) { return { status: "invalid" }; }
+    const owner = all_labels.get(explicit);
+    return owner === undefined ? { status: "ok", label: explicit } : { status: "taken", owner };
+}
+
 if (import.meta.vitest) {
     const { test, expect } = import.meta.vitest;
+
+    test("choose_label", () => {
+        const labels = new Map<string, string>([["ad7124_8", "/spi0/adc@0"]]);
+        expect(choose_label(undefined, "adi,ad7124-8", labels)).toEqual({ status: "ok", label: "ad7124_8_1" });
+        expect(choose_label("imu1", "adi,ad7124-8", labels)).toEqual({ status: "ok", label: "imu1" });
+        expect(choose_label("1bad", "adi,ad7124-8", labels)).toEqual({ status: "invalid" });
+        expect(choose_label("ad7124_8", "x", labels)).toEqual({ status: "taken", owner: "/spi0/adc@0" });
+    });
 
     test("is_valid_label", () => {
         expect(is_valid_label("spi0")).toBe(true);

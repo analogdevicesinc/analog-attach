@@ -41,6 +41,7 @@ export {
     encode_reg_address,
     decode_reg_address,
     next_free_unit_address,
+    ensure_address_cells,
     sync_unit_address_from_reg,
     type AddressCells,
     type SyncResult,
@@ -49,7 +50,10 @@ export {
     is_valid_label,
     label_from_compatible,
     unique_label,
+    choose_label,
+    type LabelChoice,
 } from './Devicetree/Labels.js';
+export { add_node, type AddNodeRequest, type AddNodeNote, type AddNodeResult } from './Devicetree/AddNode.js';
 
 // Intelligence: queries, parent suggestions, layers, board, interrupt parent
 export * from './Intelligence/index.js';

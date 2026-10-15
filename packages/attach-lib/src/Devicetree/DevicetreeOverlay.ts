@@ -2,7 +2,9 @@ import { INodeBuilderBase, NodeBuilder } from "./NodeBuilder";
 import { PropertyBuilder } from "./PropertyBuilder";
 
 import {
+    DTLabel,
     DTNode,
+    DTPath,
     get_full_node_name,
     DTProperty,
     is_dt_flag,
@@ -109,6 +111,27 @@ export class DeviceTreeOverlay {
         this.create_fragment(target, nodes, properties);
 
         return true;
+    }
+
+    /**
+     * The overlay node that writes to the node at absolute `path`: the existing
+     * overlay node, or the `__overlay__` of a fragment targeting the base node
+     * (reused or created, by label when the base node has one).
+     */
+    public ensure_node(path: string): DTNode | undefined {
+        const found = this.find_node(path);
+        if (found !== undefined) { return found.node; }
+
+        const located = this.base_dts?.locate(path);
+        if (this.base_dts !== undefined && located === undefined) { return undefined; }
+
+        const label = located?.node.labels[0];
+        const target: DTLabel | DTPath = label === undefined
+            ? { kind: "path", labels: [], path: located?.path ?? path }
+            : { kind: "label", labels: [], name: label };
+        // eslint-disable-next-line unicorn/no-useless-undefined
+        if (!this.add_fragment(target, undefined, undefined)) { return undefined; }
+        return this.find_node(target)?.node;
     }
 
     private find_fragment(target: NodeTarget): DTNode | undefined {
@@ -672,6 +695,22 @@ if (import.meta.vitest !== undefined) {
         const before = overlay.get_fragments().length;
         overlay.add_fragment("spi0", undefined, undefined);
         expect(overlay.get_fragments().length).toBe(before);
+    });
+
+    test("ensure_node — reuses the overlay node, creates a fragment for a base-only node", () => {
+        const base = DeviceTree.new_from_string(`/dts-v1/;\n/ {\n\tsoc {\n\t\tspi0: spi@7e204000 {\n\t\t};\n\t\tbus {\n\t\t};\n\t};\n};`);
+        if (typeof base === "string") { throw new TypeError(base); }
+        const overlay = DeviceTreeOverlay.new_from_string(overlay_with_imu, base);
+        if (typeof overlay === "string") { throw new TypeError(overlay); }
+
+        expect(overlay.ensure_node("/soc/spi@7e204000/adi,ad7124-8@0")?.labels).toEqual(["imu1"]);
+        expect(overlay.ensure_node("/soc/spi@7e204000")?.name).toBe("__overlay__");
+        expect(overlay.get_fragments()).toHaveLength(1);
+
+        expect(overlay.ensure_node("/soc/bus")?.name).toBe("__overlay__");
+        expect(overlay.print()).toContain(`target-path = "/soc/bus"`);
+        expect(overlay.ensure_node("/soc/missing")).toBeUndefined();
+        expect(overlay.get_fragments()).toHaveLength(2);
     });
 
     const overlay_with_path_target = `/dts-v1/;
