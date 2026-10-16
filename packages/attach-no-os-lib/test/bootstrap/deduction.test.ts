@@ -307,6 +307,17 @@ describe('which part an eval board wires', () => {
         expect(bare?.problems.join(' ')).toContain('no eval board carries this testpart');
     });
 
+    test('a bare part is told which board pins its bus is on, once its bus is settled', () => {
+        // testboard has one SPI bus, so the bare part's controller, and with it the bus, is known.
+        const workfile = board_workfile();
+        add(workfile, 'sensor', 'test_sensor');
+        const report = bootstrap(workfile);
+        expectOk(report);
+        const wiring = report.value.wiring.find(entry => entry.device === device_of(workfile, 'sensor'));
+        expect(wiring?.peripheral).toBe('bsp_test_spi_cfg');
+        expect(wiring?.board_pins?.map(pin => pin.signal)).toEqual(['sck', 'mosi', 'miso']);
+    });
+
     test('an eval board attached to a part with a chain already is wired by the next run', () => {
         // On otherboard the part is jumper-wired to the board's one declared CS line.
         const workfile = create_workfile('othersoc');

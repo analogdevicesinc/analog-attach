@@ -69,8 +69,12 @@ function add_driver(workfile: Workfile, driver: string, name: string, interface_
     expectOk(ruleset);
     expectOk(add_symbol(workfile, name, ruleset.value));
     expectOk(pin_driver(workfile, name, driver));
-    // On its eval board, as `attach-noos add <eval board>` puts it, so its pinout wires it.
-    expectOk(attach_eval_board(workfile, EVAL_BOARDS[driver] ?? '', name));
+    // On its eval board, as `attach-noos add <eval board>` puts it, so its pinout wires it. A
+    // part with none is a bare part, as `attach-noos add <driver>` adds it.
+    const eval_board = EVAL_BOARDS[driver];
+    if (eval_board !== undefined) {
+        expectOk(attach_eval_board(workfile, eval_board, name));
+    }
     expectOk(bootstrap(workfile));
 }
 
@@ -214,6 +218,13 @@ describe.skipIf(!ENABLED)('generated CAPI apps build on max32655fthr', () => {
         add_driver(workfile, 'ad7156', 'ad7156');
         expect(Object.keys(workfile.symbols)).toEqual(expect.arrayContaining(['ad7156_capi_init_param', 'ad7156_init_param', 'capi_i2c_device']));
         expect(generated_warnings(generate_and_build(workfile, 'ad7156'))).toEqual([]);
+    }, BUILD_TIMEOUT);
+
+    test('max31889 over I2C, a bare part', () => {
+        const workfile = board_workfile();
+        add_driver(workfile, 'max31889', 'max31889');
+        expect(Object.keys(workfile.symbols)).toEqual(expect.arrayContaining(['max31889_init_param', 'capi_i2c_device']));
+        expect(generated_warnings(generate_and_build(workfile, 'max31889'))).toEqual([]);
     }, BUILD_TIMEOUT);
 
     test('adxl355 and ad74413r on one bus, the second chip-select set by hand', () => {

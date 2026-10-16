@@ -166,7 +166,7 @@ then the pin node), leaving exactly the bare part `add <driver>` gives.
 | `filled`       | values filled, and why (default, only value, override)               |
 | `linked`       | references set, and whether the node was created or is hidden        |
 | `chip_selects` | chip-selects settled from the wiring                                 |
-| `wiring`       | per bus device touched, or on an eval board with its CS still open: the connections, problems and free CS pins |
+| `wiring`       | per bus device touched, or on an eval board with its CS still open: the connections, problems and free CS pins; for a bare part, the board pins its bus is on |
 | `choices`      | required references left open, with their options                    |
 | `deleted`      | stored nodes deleted                                                 |
 | `dangling`     | nodes left unused that hold user values                              |

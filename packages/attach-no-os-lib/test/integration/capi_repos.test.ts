@@ -303,3 +303,63 @@ describe.skipIf(REPOS === undefined)('ad7156 on max32655fthr, from the real repo
             .toEqual(expect.arrayContaining(['i2c_scl -> J7 11', 'i2c_sda -> J7 12']));
     });
 });
+
+describe.skipIf(REPOS === undefined)('max31889 on max32655fthr, from the real repos', () => {
+    beforeEach(() => { setup_test_config(REPOS); });
+    afterEach(() => { teardown_test_config(); });
+
+    /** `attach-noos add max31889`: no eval board carries it, so it is a bare part. */
+    function bare_max31889(workfile: Workfile) {
+        const root = driver_root('max31889');
+        expectOk(root);
+        const ruleset = load_resolved_ruleset_for_board(root.value, BOARD);
+        expectOk(ruleset);
+        expectOk(add_symbol(workfile, 'max31889', ruleset.value));
+        expectOk(pin_driver(workfile, 'max31889', 'max31889'));
+        const report = bootstrap(workfile);
+        expectOk(report);
+        return report.value;
+    }
+
+    test('a bare I2C part is a valid workfile on the board\'s only I2C bus', () => {
+        const workfile = board_workfile();
+        bare_max31889(workfile);
+
+        expect(validate_workfile(workfile).valid).toBe(true);
+        const symbols = stored(workfile);
+        expect(symbols['capi_temp_sensor_init_config']).toMatchObject({ extra: 'max31889_init_param', ops: 'max31889_capi_temp_ops' });
+        expect(symbols['max31889_init_param']?.i2c_dev).toBe('capi_i2c_device');
+        expect(symbols['capi_i2c_device']).toMatchObject({ address: 0x50, speed: 'CAPI_I2C_SPEED_FAST', controller: 'bsp_i2c2_cfg_handle' });
+    });
+
+    test('its wiring is the user\'s, but the report says which board pins the bus is on', () => {
+        const report = bare_max31889(board_workfile());
+        const wiring = report.wiring.find(entry => entry.interface === 'i2c');
+        expect(wiring?.problems.join(' ')).toContain('no eval board carries this max31889');
+        expect(wiring?.peripheral).toBe('bsp_i2c2_cfg');
+        expect(wiring?.board_pins).toEqual([
+            { signal: 'scl', at: { connector: 'J7', pin: '11' } },
+            { signal: 'sda', at: { connector: 'J7', pin: '12' } },
+        ]);
+    });
+
+    test('main.c reads the temperature on every pass, with no setup', () => {
+        const workfile = board_workfile();
+        bare_max31889(workfile);
+        const board = find_board(BOARD);
+        expectOk(board);
+        const output = fs.mkdtempSync(path.join(os.tmpdir(), 'aa-example-'));
+        try {
+            expectOk(generate_project({
+                workfile, platform_name: 'max32655', platform_vendor: 'maxim', board: board.value,
+                project_name: 'p', output_path: output, capi_path: REPOS?.capi ?? '', template_set: 'capi',
+            }));
+            const main = fs.readFileSync(path.join(output, 'p', 'src', 'main.c'), 'utf8');
+            const loop = main.slice(main.indexOf('while (1)'));
+            expect(loop).toContain('ret = capi_temp_sensor_read_temp(max31889, &temp);');
+            expect(main.slice(0, main.indexOf('while (1)'))).not.toContain('max31889');
+        } finally {
+            fs.rmSync(output, { recursive: true, force: true });
+        }
+    });
+});
