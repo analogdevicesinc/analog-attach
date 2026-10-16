@@ -95,6 +95,11 @@ export function describe_bootstrap(report: BootstrapReport, workfile: Workfile):
         for (const problem of wiring.problems) {
             lines.push(`  ! ${problem}`);
         }
+        // A bare part: which board pins its bus is on, for the part's own pins to go to.
+        const board_pins = wiring.board_pins ?? [];
+        if (board_pins.length > 0) {
+            lines.push(`  Its bus is on: ${board_pins.map(pin => `${pin.signal.toUpperCase()} ${pin.at.connector} pin ${pin.at.pin}`).join(", ")}`);
+        }
         const options = wiring.chip_select_options ?? [];
         if (options.length > 0) {
             const shown = options.slice(0, CHIP_SELECT_OPTIONS_SHOWN).map(option =>

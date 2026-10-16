@@ -151,6 +151,9 @@ describe("bootstrap after each command", () => {
         const text = await cli("add", "testpart");
         expect(stored()["test_spi_device"]?.cs_gpio).toBeUndefined();
         expect(text).toContain("no eval board carries this testpart");
+        // With two SPI buses on otherboard the controller is still a choice, so which board
+        // pins the bus is on is not known yet either.
+        expect(text).not.toContain("Its bus is on");
     });
 
     it("with the bootstrap setting off, update changes only what it was told", async () => {

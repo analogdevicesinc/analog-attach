@@ -54,7 +54,7 @@ import type { RulesetEntry } from "../registry/types";
 import { driver_init_parameter_candidates, driver_ops_candidates, pinned_init_parameter, rank_driver_candidates } from "../registry/drivers";
 import { build_extern_index, hidden_candidates, wrapper_name } from "../registry/hidden";
 import type { ExternIndex, HiddenCandidate } from "../registry/hidden";
-import { board_gpio_ports } from "../registry/bsp";
+import { board_bus_pins, board_gpio_ports } from "../registry/bsp";
 import type { PinReference } from "../registry/bsp";
 import type { GpioIdentity } from "../registry/types";
 import { get_registry, resolve_entry } from "../registry/registry";
@@ -134,6 +134,11 @@ export interface BusWiring {
 	 * choice made.
 	 */
 	chip_select_options?: { at: PinReference, gpio?: GpioIdentity }[],
+	/**
+	 * For a bare part: the lines of the board bus its device is on, chip-selects aside. The
+	 * part's pins are not known without an eval board, but where they go on the board is.
+	 */
+	board_pins?: { signal: string, at: PinReference }[],
 }
 
 /** A required reference bootstrap left open, because it is a choice. */
@@ -774,15 +779,28 @@ function bare_part_wiring(workfile: Workfile, device: string, driver: string, in
 	const options = free?.ok === true
 		? free.value.map(pin => ({ at: pin.at, ...(pin.gpio === undefined ? {} : { gpio: pin.gpio }) }))
 		: [];
+
+	// The bus is known once the device has its controller: the one reference that names a
+	// board handle (bsp_i2c2_cfg_handle wraps bsp_i2c2_cfg).
+	const node = workfile.symbols[device];
+	const peripheral = node?._t === "RulesetStruct"
+		? node.properties.map(property => wrapped_extern(workfile, property.value)).find(extern => extern !== undefined)
+		: undefined;
+	const buses = peripheral === undefined || workfile.board === undefined ? undefined : board_bus_pins(workfile.board);
+	const bus = buses?.ok === true ? buses.value.find(candidate => candidate.peripheral === peripheral) : undefined;
+	const board_pins = (bus?.signals ?? []).filter(signal => signal.signal !== "cs").map(signal => ({ signal: signal.signal, at: signal.at }));
+
 	return {
 		device,
 		part: driver,
 		interface: interface_,
+		...(peripheral === undefined ? {} : { peripheral }),
 		connections: [],
 		problems: [is_spi
 			? `no eval board carries this ${driver}, so its wiring is yours: set ${device}.${chip_select?.gpio_list ?? "cs_gpio"} (or add the eval board instead: attach-noos add <eval board>)`
 			: `no eval board carries this ${driver}, so its wiring is yours (or add the eval board instead: attach-noos add <eval board>)`],
 		...(options.length === 0 ? {} : { chip_select_options: options }),
+		...(board_pins.length === 0 ? {} : { board_pins }),
 	};
 }
 
