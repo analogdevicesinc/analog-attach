@@ -10,7 +10,7 @@ import {
 
 import type { LocalContext } from "../../context";
 import { load_workspace, parse_overlay, report_config_errors } from "../../config/workspace";
-import { find_binding, parse_node_path, resolve_path } from "../../utilities";
+import { bus_kind, find_binding, parse_node_path, resolve_path, type BusKind } from "../../utilities";
 import { respond, respond_fail, diagnostic, input_error } from "../../protocol/output";
 import type { AddResponse } from "../../protocol/types";
 import { new_workfile, next_workfile_name } from "../../workfile";
@@ -96,8 +96,11 @@ Use 'list device' to find compatible strings, 'list parent' to find valid buses.
             workfile.save();
             const created_message = created ? `Wrote ${workfile.path}` : undefined;
             if (created_message !== undefined && !context_.json) { console.log(created_message); }
+            const parent_path = result.path.slice(0, result.path.lastIndexOf("/")) || "/";
+            const parent_node = workfile.tree.effective_node(parent_path);
+            const added: AddedNode = { ...result, bus: parent_node === undefined ? undefined : bus_kind(parent_node) };
             for (const note of result.notes) {
-                const message = note_message(note, result.path);
+                const message = note_message(note, added);
                 if (context_.json) { diagnostic(message); } else { console.log(message); }
             }
 
@@ -160,14 +163,31 @@ function failure_message(result: Exclude<AddNodeResult, { status: "added" | "par
     }
 }
 
-function note_message(note: AddNodeNote, path: string): string {
+/** The node add just created, and the kind of bus it sits on. */
+interface AddedNode {
+    path: string;
+    key: string;
+    label: string;
+    bus: BusKind | undefined;
+}
+
+const ADDRESS_WORD: Record<BusKind, string> = { spi: "chip select", i2c: "address" };
+
+function note_message(note: AddNodeNote, added: AddedNode): string {
     switch (note.kind) {
-        case "reg-needed": { return `The parent is memory-mapped; set the address with: update ${path} reg <address> <size>`; }
+        case "reg-needed": { return `The parent is memory-mapped; set the address with: update ${added.path} reg <address> <size>`; }
         case "non-hex-unit": { return `Non-hex unit address "${note.unit}"; no reg created`; }
         case "reg-size-zero": { return "reg size set to 0; update reg with the real size"; }
         case "picked-address": {
-            const listing = note.occupants.map(o => `${o.address} ${o.name}`).join(", ");
-            return `picked @${note.unit}: ${listing}`;
+            // I2C addresses read as 0x48, chip selects as decimal, other units as in the node name (hex).
+            const show = (value: bigint): string => {
+                if (added.bus === "i2c") { return `0x${value.toString(16)}`; }
+                return added.bus === "spi" ? value.toString() : value.toString(16);
+            };
+            const taken = note.occupants.map(o => `${show(o.address)} by ${o.name}`).join(", ");
+            const word = added.bus === undefined ? "unit address" : ADDRESS_WORD[added.bus];
+            const name = added.key.includes("@") ? added.key.slice(0, added.key.indexOf("@")) : added.key;
+            return `Picked ${word} ${show(BigInt(`0x${note.unit}`))} (taken: ${taken}).\nTo change it: rename ${added.label} ${name}@<n>`;
         }
     }
 }
@@ -218,8 +238,25 @@ if (import.meta.vitest) {
         expect(add_device(base, overlay, { ...request, parent: "i2c0" })).toEqual({ status: "parent-not-found" });
     });
 
-    test("note_message — picked address lists the occupants", () => {
-        expect(note_message({ kind: "picked-address", unit: "2", occupants: [{ name: "spidev@0", address: 0n }, { name: "spidev@1", address: 1n }] }, "/x"))
-            .toBe("picked @2: 0 spidev@0, 1 spidev@1");
+    const added = { path: "/soc/spi@7e204000/adi,ad7124-8@2", key: "adi,ad7124-8@2", label: "ad7124_8" };
+
+    test("note_message — picked chip select on SPI names the taken ones", () => {
+        expect(note_message({ kind: "picked-address", unit: "2", occupants: [{ name: "spidev@0", address: 0n }, { name: "spidev@1", address: 1n }] }, { ...added, bus: "spi" }))
+            .toBe("Picked chip select 2 (taken: 0 by spidev@0, 1 by spidev@1).\nTo change it: rename ad7124_8 adi,ad7124-8@<n>");
+    });
+
+    test("note_message — I2C addresses are hex", () => {
+        expect(note_message({ kind: "picked-address", unit: "49", occupants: [{ name: "temp@48", address: 0x48n }] }, { ...added, key: "adi,adt7410@49", label: "adt7410", bus: "i2c" }))
+            .toBe("Picked address 0x49 (taken: 0x48 by temp@48).\nTo change it: rename adt7410 adi,adt7410@<n>");
+    });
+
+    test("note_message — chip selects are decimal", () => {
+        expect(note_message({ kind: "picked-address", unit: "a", occupants: [{ name: "a@9", address: 9n }] }, { ...added, bus: "spi" }))
+            .toBe("Picked chip select 10 (taken: 9 by a@9).\nTo change it: rename ad7124_8 adi,ad7124-8@<n>");
+    });
+
+    test("note_message — other buses say unit address", () => {
+        expect(note_message({ kind: "picked-address", unit: "1", occupants: [{ name: "a@0", address: 0n }] }, { ...added, bus: undefined }))
+            .toBe("Picked unit address 1 (taken: 0 by a@0).\nTo change it: rename ad7124_8 adi,ad7124-8@<n>");
     });
 }

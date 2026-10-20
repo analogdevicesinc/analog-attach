@@ -477,6 +477,22 @@ if (import.meta.vitest) {
         if (typeof base === "string") { throw new TypeError(base); }
         expect(effective_parent_compatibles(undefined, "unknown", base)).toEqual([]);
     });
+
+    const bus_node = (name: string, compatible?: string): DTNode => ({
+        name,
+        unit_addr: "0",
+        labels: [],
+        children: [],
+        properties: compatible === undefined ? [] : [{ name: "compatible", value: [{ kind: "string", value: compatible }] }],
+    }) as unknown as DTNode;
+
+    test("bus_kind — from the node name, then the compatible", () => {
+        expect(bus_kind(bus_node("spi"))).toBe("spi");
+        expect(bus_kind(bus_node("i2c"))).toBe("i2c");
+        expect(bus_kind(bus_node("bus", "brcm,bcm2835-spi"))).toBe("spi");
+        expect(bus_kind(bus_node("bus", "brcm,bcm2711-i2c"))).toBe("i2c");
+        expect(bus_kind(bus_node("soc", "simple-bus"))).toBeUndefined();
+    });
 }
 
 /**
@@ -515,6 +531,20 @@ export function node_compatibles(node: DTNode): string[] {
     return compatible.value
         .filter(v => v.kind === "string")
         .map(v => (v as { kind: "string"; value: string }).value);
+}
+
+export type BusKind = "spi" | "i2c";
+
+/** The bus a node is, from its generic node name (`spi@…`, `i2c@…`) or else its compatible. */
+export function bus_kind(node: DTNode): BusKind | undefined {
+    for (const kind of ["spi", "i2c"] as const) {
+        if (node.name === kind) { return kind; }
+    }
+    for (const compatible of node_compatibles(node)) {
+        if (/\bspi\b/.test(compatible)) { return "spi"; }
+        if (/\bi2c\b/.test(compatible)) { return "i2c"; }
+    }
+    return undefined;
 }
 
 export function effective_parent_compatibles(
