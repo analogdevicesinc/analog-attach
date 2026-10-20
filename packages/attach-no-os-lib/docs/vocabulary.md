@@ -358,7 +358,9 @@ $override:
 
 What a rule can do to a field: `default`, `required`, `description`, `disabled`,
 `minimum`, `maximum`, `pointer`, `values` (narrow an enum or a number), `allowed` (narrow the
-symbols a reference may name), and `value` (force it).
+symbols a reference may name), and `value` (force it). A rule's `description` is added under
+the field's own rather than replacing it, labelled with the `$symbol` of the ruleset that
+declares the rule: the field says what it is, the rule what it means for one part.
 
 A condition tests one field: `value: <x>`, `value: $any` (it is set), or `not: <x>` /
 `not: [<x>, ...]` (it is set, and is none of these). Several fields in one condition must

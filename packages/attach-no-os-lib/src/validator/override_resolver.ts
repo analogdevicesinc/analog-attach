@@ -95,6 +95,7 @@ function apply_effect(
 	effect: Effect,
 	symbol_name: string,
 	errors: ValidationError[],
+	source: string,
 ): string | undefined {
 	switch (effect.op) {
 		case "setDefault": {
@@ -130,7 +131,11 @@ function apply_effect(
 			break;
 		}
 		case "setDescription": {
-			effective.description = effect.value;
+			// Added under what the field already says, never in place of it: the schema says
+			// what the field is, the override what it means for one part. Labelled with the
+			// ruleset that declared the override, so a person knows where each part came from.
+			const note = `${source}: ${effect.value}`;
+			effective.description = effective.description ? `${effective.description}\n\n${note}` : note;
 			break;
 		}
 		case "setPointer": {
@@ -219,12 +224,16 @@ export function apply_overrides(
 			continue;
 		}
 
+		// The ruleset that declared the rule, by its $symbol: stable, unlike the workfile
+		// node's name, and the file to open to change what the rule says.
+		const source = workfile.symbols[collected.self_symbol]?.$symbol ?? collected.self_symbol;
+
 		for (const effect of collected.rule.effects) {
 			const target_symbol = resolve_node(effect.reference, collected);
 			if (target_symbol !== symbol_name || effect.reference.property !== property.name) {
 				continue;
 			}
-			const reason = apply_effect(effective, effect, symbol_name, errors);
+			const reason = apply_effect(effective, effect, symbol_name, errors, source);
 			if (effect.op === "setDisabled") {
 				disable_reason = reason;
 			}

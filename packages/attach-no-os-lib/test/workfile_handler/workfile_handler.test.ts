@@ -17,6 +17,7 @@ import {
     suggest_platform_ops,
     suggest_platform_extra,
     suggest_for_property,
+    effective_property,
     list_available_structs,
     export_minimal,
     import_minimal,
@@ -52,6 +53,19 @@ function make_struct(name: string, properties: RulesetStruct['properties'] = [])
         $description: "Test struct",
         properties,
     };
+}
+
+// A node whose own rules describe its `mode`. Tests add it under a workfile name that
+// differs from the ruleset's $symbol on purpose: an override is labelled with the ruleset.
+function described(descriptions: string[], base = "Generic mode"): RulesetStruct {
+    const struct = make_struct("part_init_param", [
+        { _t: "EnumProperty", name: "mode", description: base, values: ["MODE_A", "MODE_B"] } as EnumProperty
+    ]);
+    struct.rules = descriptions.map(value => ({
+        when: { _t: "PredicateAlways" as const },
+        effects: [{ op: "setDescription" as const, reference: { node: "self" as const, property: "mode" }, value }],
+    }));
+    return struct;
 }
 
 function make_extern(symbol: string, provides: string, array?: boolean): RulesetExtern {
@@ -520,6 +534,47 @@ describe('workfile_handler', () => {
             add_symbol(workfile, "my_struct", make_struct("test", []));
             const result = suggest_for_property(workfile, "my_struct", "unknown");
             expectError(result);
+        });
+    });
+
+    describe('effective_property', () => {
+        test('adds an override description under the schema one, labelled by $symbol', () => {
+            add_symbol(workfile, "my_node", described(["Only MODE_A works on this part"]));
+
+            const result = effective_property(workfile, "my_node", "mode");
+            expectOk(result);
+            expect(result.value.description).toBe("Generic mode\n\npart_init_param: Only MODE_A works on this part");
+        });
+
+        test('stacks several override descriptions in rule order', () => {
+            add_symbol(workfile, "my_node", described(["First note", "Second note"]));
+
+            const result = effective_property(workfile, "my_node", "mode");
+            expectOk(result);
+            expect(result.value.description).toBe(
+                "Generic mode\n\npart_init_param: First note\n\npart_init_param: Second note"
+            );
+        });
+
+        test('is just the note when the schema gives no description', () => {
+            add_symbol(workfile, "my_node", described(["Only MODE_A works on this part"], ""));
+
+            const result = effective_property(workfile, "my_node", "mode");
+            expectOk(result);
+            expect(result.value.description).toBe("part_init_param: Only MODE_A works on this part");
+        });
+
+        test('leaves the stored property untouched', () => {
+            add_symbol(workfile, "my_node", described(["Only MODE_A works on this part"]));
+
+            expectOk(effective_property(workfile, "my_node", "mode"));
+            const stored = (workfile.symbols.my_node as RulesetStruct).properties[0];
+            expect(stored.description).toBe("Generic mode");
+        });
+
+        test('fails on an unknown property', () => {
+            add_symbol(workfile, "my_node", described([]));
+            expectError(effective_property(workfile, "my_node", "unknown"));
         });
     });
 
