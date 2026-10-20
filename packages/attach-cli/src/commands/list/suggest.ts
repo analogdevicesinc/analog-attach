@@ -104,7 +104,7 @@ async function suggest_parent(context_: LocalContext, arguments_: string[]): Pro
 }
 
 async function load_binding(context_: LocalContext, linux: string, dtSchema: string, compatible: string): Promise<ParsedBinding | undefined> {
-    const binding_path = await find_binding(linux, dtSchema, compatible, context_.json);
+    const binding_path = await find_binding(linux, dtSchema, compatible);
     if (binding_path === undefined) {
         if (context_.json) {
             respond({ ok: true, message: `No binding found for ${compatible}`, severity: "warn", suggestions: [] });
@@ -199,7 +199,7 @@ async function suggest_value(context_: LocalContext, arguments_: string[]): Prom
         binding_check_reason = "node not found for binding resolution";
     } else {
         const { linux, dt_schema } = bindings.value;
-        const annotated = await annotate_suggestions(values, property_name, binding_node, binding_parent, parent_name, base_dt, linux, dt_schema, context_.json, overlay, parent_compatibles);
+        const annotated = await annotate_suggestions(values, property_name, binding_node, binding_parent, parent_name, base_dt, linux, dt_schema, overlay, parent_compatibles);
         if (annotated === undefined) { binding_check_reason = "binding could not be resolved"; }
     }
 
@@ -236,7 +236,7 @@ async function resolve_binding_for_data(
 ): Promise<NodeBinding | undefined> {
     if (bindings === undefined) { return; }
 
-    const binding = await resolve_node_binding(binding_node, binding_parent, parent_name, base_dt, bindings.linux, bindings.dt_schema, true, undefined, parent_compatibles);
+    const binding = await resolve_node_binding(binding_node, binding_parent, parent_name, base_dt, bindings.linux, bindings.dt_schema, undefined, parent_compatibles);
     if ('error' in binding) { return; }
     return binding;
 }
@@ -250,11 +250,10 @@ async function annotate_suggestions(
     base_dt: DeviceTree,
     linux: string,
     dtSchema: string,
-    json: boolean,
     overlay: DeviceTreeOverlay,
     parent_compatibles?: string[],
 ): Promise<true | undefined> {
-    const binding = await resolve_node_binding(binding_node, binding_parent, parent_name, base_dt, linux, dtSchema, json, undefined, parent_compatibles);
+    const binding = await resolve_node_binding(binding_node, binding_parent, parent_name, base_dt, linux, dtSchema, undefined, parent_compatibles);
     if ('error' in binding) { return; }
 
     const origin_desc = binding.origin.kind === "compatible"
@@ -363,7 +362,7 @@ async function suggest_node_property(context_: LocalContext, arguments_: string[
     const parent_name = found_node.labels.at(-1) ?? node_path;
     const parent_compats = effective_parent_compatibles(parent_node, node_path, base_dt);
 
-    const binding = await resolve_node_binding(found_node, parent_node, parent_name, base_dt, linux, dtSchema, context_.json, undefined, parent_compats);
+    const binding = await resolve_node_binding(found_node, parent_node, parent_name, base_dt, linux, dtSchema, undefined, parent_compats);
     if ('error' in binding) {
         if (context_.json) {
             respond_fail({ ok: false, message: binding.error, severity: "error" });
@@ -432,10 +431,9 @@ async function binding_property_suggestions(
     base_dt: DeviceTree,
     linux: string,
     dtSchema: string,
-    json: boolean,
     parent_compatibles?: string[],
 ): Promise<Suggestion[] | undefined> {
-    const binding = await resolve_node_binding(found_node, parent_node, parent_name, base_dt, linux, dtSchema, json, undefined, parent_compatibles);
+    const binding = await resolve_node_binding(found_node, parent_node, parent_name, base_dt, linux, dtSchema, undefined, parent_compatibles);
     if ('error' in binding) { return undefined; }
 
     const required = new Set(binding.required_properties);
@@ -552,7 +550,7 @@ async function suggest_navigate(context_: LocalContext, arguments_: string[]): P
     if (bindings.ok) {
         const nav_parent_name = found_node.labels.at(-1) ?? node_path;
         const nav_parent_compats = effective_parent_compatibles(parent_node, node_path, base_dt);
-        property_suggestions = await binding_property_suggestions(found_node, parent_node, nav_parent_name, base_dt, bindings.value.linux, bindings.value.dt_schema, context_.json, nav_parent_compats);
+        property_suggestions = await binding_property_suggestions(found_node, parent_node, nav_parent_name, base_dt, bindings.value.linux, bindings.value.dt_schema, nav_parent_compats);
     }
     property_suggestions ??= found_node.properties.map(p => ({ value: p.name }));
 
@@ -592,7 +590,7 @@ async function suggest_type(context_: LocalContext, arguments_: string[]): Promi
         return;
     }
 
-    const binding = await resolve_node_binding(binding_node, binding_parent, parent_name, base_dt, linux, dtSchema, context_.json, undefined, slot_parent_compats);
+    const binding = await resolve_node_binding(binding_node, binding_parent, parent_name, base_dt, linux, dtSchema, undefined, slot_parent_compats);
     if ('error' in binding) {
         if (context_.json) {
             respond_fail({ ok: false, message: binding.error, severity: "error" });

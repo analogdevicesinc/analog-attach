@@ -20,7 +20,7 @@ export async function list_device(context_: LocalContext, arguments_: string[]):
     if (filter !== undefined) {
         const exact = entries.find(entry => entry === filter);
         if (exact !== undefined) {
-            const binding_path = await find_binding(linux, dtSchema, exact, context_.json);
+            const binding_path = await find_binding(linux, dtSchema, exact);
             if (binding_path !== undefined) {
                 const binding = await Attach.new().parse_binding(binding_path, linux, dtSchema);
                 if (binding !== undefined) {

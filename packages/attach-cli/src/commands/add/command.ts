@@ -69,7 +69,7 @@ Use 'list device' to find compatible strings, 'list parent' to find valid buses.
             }
             const workfile = opened.value;
 
-            const binding_path = await find_binding(linux, dtSchema, compatible, context_.json);
+            const binding_path = await find_binding(linux, dtSchema, compatible);
             if (binding_path === undefined) {
                 report(`Failed to find binding for ${compatible}`);
                 return;

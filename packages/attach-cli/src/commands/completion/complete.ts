@@ -16,6 +16,7 @@ import { run_internal_list } from "../list/internal";
 import type { Suggestion } from "../../protocol/types";
 import { COMPLETION_SPEC, LIST_SUBKIND_SPECS, FILES_DIRECTIVE, DIRS_DIRECTIVE, NOSPACE_DIRECTIVE, type CommandSpec, type ValueSource, type SuggestKind } from "./spec";
 import { LIST_KINDS } from "../list/command";
+import { disable_index_build } from "../../utilities";
 
 const GLOBAL_FLAGS: readonly Candidate[] = [
     { value: "--json", description: "Output as JSON" },
@@ -70,6 +71,8 @@ export function shell_dequote(word: string): string {
 }
 
 export async function run_complete(words: string[]): Promise<void> {
+    // Never build the compat index mid-TAB: no index completes nothing, a stale one is used as is.
+    disable_index_build();
     const prefix = words.length > 0 ? shell_dequote(words.at(-1)!) : "";
     const committed = words.slice(0, -1).map((element) => shell_dequote(element));
 

@@ -15,9 +15,10 @@ import { execSync } from "node:child_process";
 import * as fs from 'node:fs';
 import path from "node:path";
 
-import { is_compat_index_stale, load_compat_index, save_compat_index, type CompatIndex } from "./config/cache";
+import { compat_index_stale_reason, load_compat_index, save_compat_index, type CompatIndex, type StaleReason } from "./config/cache";
 import type { Bindings } from "./config/workspace";
 import { input_error } from "./protocol/output";
+import { format_duration, rebuild_message, start_progress } from "./progress";
 
 // --- New shared path helpers (Group A) ---
 
@@ -227,18 +228,23 @@ export function get_all_file_paths(directory: string): string[] {
     return results.sort(); // Sort to make hash order-independent
 }
 
-export async function build_compat_index(linux: string, dtSchema: string): Promise<Record<string, string>> {
+export async function build_compat_index(
+    linux: string,
+    dtSchema: string,
+    on_progress?: (done: number, total: number) => void,
+): Promise<{ entries: Record<string, string>; files: number }> {
     const bindings_folder = path.resolve(linux, "Documentation", "devicetree", "bindings");
     const index: Record<string, string> = {};
 
     if (!fs.existsSync(bindings_folder)) {
-        return index;
+        return { entries: index, files: 0 };
     }
 
     const all_files = get_all_file_paths(bindings_folder);
     const yaml_files = all_files.filter(file => file.endsWith(".yaml"));
 
-    for (const file of yaml_files) {
+    for (const [position, file] of yaml_files.entries()) {
+        on_progress?.(position + 1, yaml_files.length);
         const attach = Attach.new();
         const binding = await attach.parse_binding(file, linux, dtSchema);
 
@@ -261,7 +267,7 @@ export async function build_compat_index(linux: string, dtSchema: string): Promi
         }
     }
 
-    return index;
+    return { entries: index, files: yaml_files.length };
 }
 
 /** @deprecated Use parse_node_path instead. Kept only for suggest callers pending Group B. */
@@ -486,6 +492,15 @@ if (import.meta.vitest) {
         properties: compatible === undefined ? [] : [{ name: "compatible", value: [{ kind: "string", value: compatible }] }],
     }) as unknown as DTNode;
 
+    test("index_action — completion never builds: no index → empty, stale → the old one", () => {
+        const index: CompatIndex = { generated_at: 0, entries: { "adi,ad7124-8": "/x.yaml" } };
+        expect(index_action(undefined, { kind: "missing" }, false)).toBe("empty");
+        expect(index_action(index, { kind: "stale" }, false)).toBe("use");
+        expect(index_action(index, { kind: "stale" }, true)).toBe("build");
+        expect(index_action(undefined, { kind: "missing" }, true)).toBe("build");
+        expect(index_action(index, undefined, true)).toBe("use");
+    });
+
     test("bus_kind — from the node name, then the compatible", () => {
         expect(bus_kind(bus_node("spi"))).toBe("spi");
         expect(bus_kind(bus_node("i2c"))).toBe("i2c");
@@ -495,26 +510,44 @@ if (import.meta.vitest) {
     });
 }
 
+// Shell completion turns this off: building the index takes long and would
+// print into the prompt, so completion works from whatever index there is.
+let index_build_allowed = true;
+
+export function disable_index_build(): void {
+    index_build_allowed = false;
+}
+
+/** What to do with the cached index: use it, build a new one, or (completion, no index) use an empty one. */
+export function index_action(index: CompatIndex | undefined, reason: StaleReason | undefined, build_allowed: boolean): "use" | "build" | "empty" {
+    if (!build_allowed) { return index === undefined ? "empty" : "use"; }
+    return reason === undefined && index !== undefined ? "use" : "build";
+}
+
 /**
  * Load the compat index, building it if missing and rebuilding it if stale.
- * `log` receives progress lines (stderr-worthy).
+ * The build reports its progress on stderr (see progress.ts).
  */
-export async function get_or_build_compat_index(
-    { linux, dt_schema }: Bindings,
-    log?: (message: string) => void,
-): Promise<CompatIndex> {
-    const index = load_compat_index();
-    if (index !== undefined && !is_compat_index_stale(index, linux, dt_schema)) { return index; }
+export async function get_or_build_compat_index({ linux, dt_schema }: Bindings): Promise<CompatIndex> {
+    const loaded = load_compat_index();
+    const index = loaded?.entries === undefined ? undefined : loaded;
+    const reason = index_build_allowed ? compat_index_stale_reason(index, linux, dt_schema) : undefined;
+    switch (index_action(index, reason, index_build_allowed)) {
+        case "use": { return index!; }
+        case "empty": { return { generated_at: 0, linux, dt_schema, entries: {} }; }
+        case "build": { break; }
+    }
 
-    log?.(index === undefined ? "compat-index.json not found, building..." : "compat-index.json is stale, rebuilding...");
-    const entries = await build_compat_index(linux, dt_schema);
-    const compat_index_path = save_compat_index(entries, linux, dt_schema);
-    log?.(`Written: ${compat_index_path}`);
+    const started = Date.now();
+    const progress = start_progress(rebuild_message("index", reason ?? { kind: "missing" }));
+    const { entries, files } = await build_compat_index(linux, dt_schema, (done, total) => { progress.update(done, total); });
+    save_compat_index(entries, linux, dt_schema);
+    progress.done(`Indexed ${Object.keys(entries).length} compatibles from ${files} bindings in ${format_duration(Date.now() - started)}`);
     return { generated_at: Date.now(), linux, dt_schema, entries };
 }
 
-export async function find_binding(linux: string, dtSchema: string, compatible_to_find: string, silent = false): Promise<string | undefined> {
-    const index = await get_or_build_compat_index({ linux, dt_schema: dtSchema }, silent ? undefined : (message) => console.error(message));
+export async function find_binding(linux: string, dtSchema: string, compatible_to_find: string): Promise<string | undefined> {
+    const index = await get_or_build_compat_index({ linux, dt_schema: dtSchema });
 
     const cached_path = index.entries[compatible_to_find];
 

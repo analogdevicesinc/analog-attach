@@ -39,20 +39,30 @@ export function get_latest_mtime(directory: string): number {
     return latest;
 }
 
-/** Whether a cache built from `stamp` is out of date for these linux / dt-schema paths. */
-export function is_stale(stamp: CacheStamp, linux: string, dt_schema: string): boolean {
-    if (typeof stamp.generated_at !== "number") { return true; }
-    if (stamp.linux !== undefined && path.resolve(linux) !== path.resolve(stamp.linux)) { return true; }
-    if (stamp.dt_schema !== undefined && path.resolve(dt_schema) !== path.resolve(stamp.dt_schema)) { return true; }
+/** Why a cache has to be (re)built; `undefined` when it is current. */
+export type StaleReason =
+    | { kind: "missing" }
+    | { kind: "stale" }
+    | { kind: "linux-changed"; from: string; to: string };
+
+/** Why a cache built from `stamp` is out of date for these linux / dt-schema paths, if it is. */
+export function stale_reason(stamp: CacheStamp | undefined, linux: string, dt_schema: string): StaleReason | undefined {
+    if (stamp === undefined) { return { kind: "missing" }; }
+    if (typeof stamp.generated_at !== "number") { return { kind: "stale" }; }
+    if (stamp.linux !== undefined && path.resolve(linux) !== path.resolve(stamp.linux)) {
+        return { kind: "linux-changed", from: stamp.linux, to: linux };
+    }
+    if (stamp.dt_schema !== undefined && path.resolve(dt_schema) !== path.resolve(stamp.dt_schema)) { return { kind: "stale" }; }
 
     const bindings_folder = path.resolve(linux, "Documentation", "devicetree", "bindings");
     const latest_mtime = Math.max(get_latest_mtime(bindings_folder), get_latest_mtime(dt_schema));
 
-    return latest_mtime > stamp.generated_at;
+    return latest_mtime > stamp.generated_at ? { kind: "stale" } : undefined;
 }
 
-export function is_compat_index_stale(index: CompatIndex, linux: string, dt_schema: string): boolean {
-    return index.entries === undefined || is_stale(index, linux, dt_schema);
+export function compat_index_stale_reason(index: CompatIndex | undefined, linux: string, dt_schema: string): StaleReason | undefined {
+    if (index?.entries === undefined) { return { kind: "missing" }; }
+    return stale_reason(index, linux, dt_schema);
 }
 
 function read_json<T>(file: string): T | undefined {
@@ -88,11 +98,10 @@ export function validation_schema_path(): string {
 
 const validation_stamp_path = (): string => path.join(config_directory(), "validation.stamp.json");
 
-/** Whether the cached validation schema exists and is current for these paths. */
-export function is_validation_schema_fresh(linux: string, dt_schema: string): boolean {
-    if (!fs.existsSync(validation_schema_path())) { return false; }
-    const stamp = read_json<CacheStamp>(validation_stamp_path());
-    return stamp !== undefined && !is_stale(stamp, linux, dt_schema);
+/** Why the cached validation schema has to be (re)built for these paths, if it does. */
+export function validation_schema_stale_reason(linux: string, dt_schema: string): StaleReason | undefined {
+    if (!fs.existsSync(validation_schema_path())) { return { kind: "missing" }; }
+    return stale_reason(read_json<CacheStamp>(validation_stamp_path()), linux, dt_schema);
 }
 
 export function stamp_validation_schema(linux: string, dt_schema: string): void {
@@ -103,22 +112,16 @@ if (import.meta.vitest) {
     const { test, expect } = import.meta.vitest;
     const os = await import("node:os");
 
-    test("is_stale - a different linux path is stale", () => {
+    test("stale_reason - missing, a changed linux path, newer files, fresh", () => {
         const directory = fs.mkdtempSync(path.join(os.tmpdir(), "attach-cache-"));
         try {
-            const stamp: CacheStamp = { generated_at: Date.now() + 60_000, linux: "/elsewhere", dt_schema: directory };
-            expect(is_stale(stamp, directory, directory)).toBe(true);
-            expect(is_stale({ ...stamp, linux: directory }, directory, directory)).toBe(false);
-        } finally {
-            fs.rmSync(directory, { recursive: true });
-        }
-    });
-
-    test("is_stale - files newer than the stamp make it stale", () => {
-        const directory = fs.mkdtempSync(path.join(os.tmpdir(), "attach-cache-"));
-        try {
+            const future = Date.now() + 60_000;
+            expect(stale_reason(undefined, directory, directory)).toEqual({ kind: "missing" });
+            expect(stale_reason({ generated_at: future, linux: "/elsewhere", dt_schema: directory }, directory, directory))
+                .toEqual({ kind: "linux-changed", from: "/elsewhere", to: directory });
             fs.writeFileSync(path.join(directory, "x.yaml"), "");
-            expect(is_stale({ generated_at: 0, linux: directory, dt_schema: directory }, directory, directory)).toBe(true);
+            expect(stale_reason({ generated_at: 0, linux: directory, dt_schema: directory }, directory, directory)).toEqual({ kind: "stale" });
+            expect(stale_reason({ generated_at: future, linux: directory, dt_schema: directory }, directory, directory)).toBeUndefined();
         } finally {
             fs.rmSync(directory, { recursive: true });
         }

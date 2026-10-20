@@ -17,9 +17,10 @@ import { execSync } from "node:child_process";
 
 import type { LocalContext } from "../../context";
 import { config_directory } from "../../config/settings";
-import { is_validation_schema_fresh, stamp_validation_schema, validation_schema_path } from "../../config/cache";
+import { stamp_validation_schema, validation_schema_path, validation_schema_stale_reason } from "../../config/cache";
 import { load_workspace } from "../../config/workspace";
 import { is_tool_available } from "../../utilities";
+import { format_duration, rebuild_message, start_progress } from "../../progress";
 import { respond, input_error } from "../../protocol/output";
 import type { ValidationResponse, ValidationError } from "../../protocol/types";
 
@@ -60,16 +61,18 @@ Runs dt-validate on the overlay merged with the base device tree.`)
             fs.mkdirSync(work_directory, { recursive: true });
 
             const validation_json_path = validation_schema_path();
-            if (!is_validation_schema_fresh(linux, dt_schema)) {
+            const schema_reason = validation_schema_stale_reason(linux, dt_schema);
+            if (schema_reason !== undefined) {
                 const bindings_path = path.join(linux, 'Documentation', 'devicetree', 'bindings');
 
-                if (!context_.json) { console.log("Generating validation.json (this may take a while)..."); }
-
+                const started = Date.now();
+                const progress = start_progress(rebuild_message("schemas", schema_reason));
                 try {
                     const schema_output = execSync(`${dtMkSchema} -j ${bindings_path}`, { stdio: 'pipe', maxBuffer: 256 * 1024 * 1024 });
                     if (schema_output.length === 0) { throw new Error(`${dtMkSchema} produced no output`); }
                     fs.writeFileSync(validation_json_path, schema_output);
                 } catch (error: any) {
+                    progress.done("Compiling binding schemas failed");
                     const stderr: string = (error.stderr as Buffer | undefined)?.toString() ?? String(error);
                     if (context_.json) { input_error(`Failed to generate validation.json: ${stderr}`); return; }
                     console.log(`Failed to generate validation.json:\n${stderr}`);
@@ -77,6 +80,7 @@ Runs dt-validate on the overlay merged with the base device tree.`)
                 }
 
                 stamp_validation_schema(linux, dt_schema);
+                progress.done(`Compiled binding schemas in ${format_duration(Date.now() - started)}`);
             }
 
             const temporary_dts = path.join(work_directory, 'temp.dts');

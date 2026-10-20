@@ -54,7 +54,7 @@ export async function child_unit_radix(
 ): Promise<UnitRadix | undefined> {
     if (parent === undefined) { return undefined; }
     for (const compatible of node_compatibles(parent)) {
-        const binding_path = await find_binding(linux, dtSchema, compatible, true);
+        const binding_path = await find_binding(linux, dtSchema, compatible);
         if (binding_path === undefined) { continue; }
         try {
             const binding = await Attach.new().parse_binding(binding_path, linux, dtSchema);
@@ -73,7 +73,6 @@ export async function resolve_node_binding(
     base_dt: DeviceTree,
     linux: string,
     dtSchema: string,
-    json: boolean,
     options?: PopulateOptions,
     parent_compatibles?: string[],
 ): Promise<NodeBinding | { error: string }> {
@@ -89,7 +88,7 @@ export async function resolve_node_binding(
         }
         const compatible_value = first.value;
 
-        const binding_path = await find_binding(linux, dtSchema, compatible_value, json);
+        const binding_path = await find_binding(linux, dtSchema, compatible_value);
         if (binding_path === undefined) {
             return { error: `No binding found for ${compatible_value}` };
         }
@@ -98,7 +97,7 @@ export async function resolve_node_binding(
         if (parent_compatibles !== undefined && parent_compatibles.length > 0) {
             let controller_binding_path: string | undefined;
             for (const compat of parent_compatibles) {
-                controller_binding_path = await find_binding(linux, dtSchema, compat, true);
+                controller_binding_path = await find_binding(linux, dtSchema, compat);
                 if (controller_binding_path !== undefined) { break; }
             }
             controller_context = { compatibles: parent_compatibles, binding_path: controller_binding_path };
@@ -143,7 +142,7 @@ export async function resolve_node_binding(
     }
     const parent_compatible_value = parent_first.value;
 
-    const parent_binding_path = await find_binding(linux, dtSchema, parent_compatible_value, json);
+    const parent_binding_path = await find_binding(linux, dtSchema, parent_compatible_value);
     if (parent_binding_path === undefined) {
         return { error: `Failed to find binding for ${parent_compatible_value}` };
     }

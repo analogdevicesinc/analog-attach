@@ -245,12 +245,11 @@ export function resolve_property_definition(
     linux: string,
     dtSchema: string,
     property_name: string,
-    json: boolean,
     quiet = false,
 ): Promise<{ definition: ResolvedProperty | undefined }> {
     return (async () => {
         if (binding_node === undefined) { return { definition: undefined }; }
-        const binding = await resolve_node_binding(binding_node, binding_parent, parent_name, base_dt, linux, dtSchema, json);
+        const binding = await resolve_node_binding(binding_node, binding_parent, parent_name, base_dt, linux, dtSchema);
         if ('error' in binding) {
             if (!quiet) { diagnostic(`Property ${property_name} written without schema validation: ${binding.error}`); }
             return { definition: undefined };
@@ -413,7 +412,7 @@ Examples:
                 // Try to find the binding's child_nodes (pattern_properties)
                 let child_patterns: string[] = [];
                 if (binding_node !== undefined) {
-                    const binding = await resolve_node_binding(binding_node, binding_parent, parent_name, base_dt, linux, dtSchema, context_.json);
+                    const binding = await resolve_node_binding(binding_node, binding_parent, parent_name, base_dt, linux, dtSchema);
                     if (!("error" in binding)) {
                         child_patterns = binding.child_nodes.map(c => c.pattern);
                     }
@@ -460,7 +459,7 @@ Examples:
 
             const { definition: property_definition } = await resolve_property_definition(
                 binding_node, binding_parent, parent_name, base_dt, linux, dtSchema,
-                property_name, context_.json, value_arguments.length === 0,
+                property_name, value_arguments.length === 0,
             );
 
             const hint = shape_hint(property_definition);
