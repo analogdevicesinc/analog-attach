@@ -3,9 +3,11 @@ import os from 'node:os';
 import path from 'node:path';
 import { describe, test, expect, beforeEach, afterEach } from 'vitest';
 import { attach_eval_board, bootstrap, pin_driver, referenced_nodes } from '../../src/bootstrap/bootstrap';
+import { capi_project } from '../../src/codegen/capi_project';
 import { generate_project } from '../../src/codegen/codegen';
 import { load_devices } from '../../src/codegen/device_loader';
 import { find_board } from '../../src/registry/platforms';
+import { get_registry } from '../../src/registry/registry';
 import { driver_root, driver_root_for } from '../../src/registry/roots';
 import { load_resolved_ruleset_for_board } from '../../src/resolver/resolver';
 import { validate_workfile } from '../../src/validator/validator';
@@ -30,7 +32,10 @@ import { expectOk, setup_test_config, teardown_test_config } from '../test_utili
 function find_repos(): { capi: string, modules: string[] } | undefined {
     const home = path.join(os.homedir(), 'aurel');
     const capi = process.env.CAPI_PATH ?? path.join(home, 'capi');
-    const modules = process.env.CAPI_MODULE_PATHS?.split(':') ?? [path.join(home, 'capi-maxim'), path.join(home, 'capi-noos')];
+    // capi-util is optional here: the suite runs without it, and checks it when it is there.
+    const utility = path.join(home, 'capi-util');
+    const modules = process.env.CAPI_MODULE_PATHS?.split(':')
+        ?? [path.join(home, 'capi-maxim'), path.join(home, 'capi-noos'), ...(fs.existsSync(utility) ? [utility] : [])];
     return [capi, ...modules].every(directory => fs.existsSync(directory)) ? { capi, modules } : undefined;
 }
 
@@ -330,6 +335,25 @@ describe.skipIf(REPOS === undefined)('max31889 on max32655fthr, from the real re
         expect(symbols['capi_temp_sensor_init_config']).toMatchObject({ extra: 'max31889_init_param', ops: 'max31889_capi_temp_ops' });
         expect(symbols['max31889_init_param']?.i2c_dev).toBe('capi_i2c_device');
         expect(symbols['capi_i2c_device']).toMatchObject({ address: 0x50, speed: 'CAPI_I2C_SPEED_FAST', controller: 'bsp_i2c2_cfg_handle' });
+    });
+
+    test('depends on capi-util although the driver names no package', () => {
+        const workfile = board_workfile();
+        bare_max31889(workfile);
+
+        const registry = get_registry();
+        expectOk(registry);
+        const utilities = registry.value.modules.filter(module => module.type === 'utility').map(module => module.name);
+        // Nothing to check without capi-util among the configured modules.
+        if (utilities.length === 0) {
+            return;
+        }
+
+        const project = capi_project(workfile);
+        expectOk(project);
+        const names = project.value.dependencies.map(dependency => dependency.name);
+        expect(names).toEqual(expect.arrayContaining(utilities));
+        expect(new Set(names).size).toBe(names.length);
     });
 
     test('its wiring is the user\'s, but the report says which board pins the bus is on', () => {

@@ -134,6 +134,12 @@ export function capi_project(workfile: Workfile): Result<CapiProject> {
 	const package_names = [...new Set(driver_modules.flatMap(module => module.packages ?? []))].sort();
 	const package_modules = package_names.flatMap(name => modules.filter(module => module.name === name));
 
+	// capi's foundational libraries (capi-util), which the CAPI build only adds when the app's
+	// module.yml depends on them. Every app depends on them, not only one whose drivers name
+	// them: a part with no package of its own, or no part at all, builds against the same
+	// base, and app code reaches for its helpers.
+	const utilities = modules.filter(module => module.type === "utility");
+
 	// Served over IIO: a node from a driver's `iio` group brings in capi-iio, the middleware
 	// that provides the iio interface, and each such driver's own <KCONFIG>_IIO symbol.
 	const iio_drivers = driver_modules.filter(module => used.some(entry => entry.module.path === module.path && entry.group === IIO_GROUP));
@@ -230,7 +236,9 @@ export function capi_project(workfile: Workfile): Result<CapiProject> {
 			...package_names.map(name => `capi::${short_name(name)}`),
 			...iio.map(module => `capi::middleware::${short_name(module.name)}`),
 		],
-		dependencies: [platform, ...collections, ...iio, ...package_modules].map(module => dependency(module)),
+		// A module listed twice (capi-util, also a driver's package) is depended on once.
+		dependencies: [...new Map([platform, ...collections, ...iio, ...utilities, ...package_modules]
+			.map(module => [module.path, module])).values()].map(module => dependency(module)),
 		collections: collections.map(module => dependency(module)),
 		middleware: iio.map(module => dependency(module)),
 		kconfig,
