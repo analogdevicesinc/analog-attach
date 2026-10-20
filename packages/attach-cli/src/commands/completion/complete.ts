@@ -207,29 +207,29 @@ async function emit_value_source(source: ValueSource, prefix: string, positional
             return;
         }
         case "path": {
-            emit(await path_candidates(source.roots, source.children, prefix));
+            emit(await path_candidates(source.roots, source.children, prefix, positionals));
             return;
         }
     }
 }
 
-async function path_candidates(roots_kind: SuggestKind, children_kind: SuggestKind, prefix: string): Promise<Candidate[]> {
+async function path_candidates(roots_kind: SuggestKind, children_kind: SuggestKind, prefix: string, positionals: string[]): Promise<Candidate[]> {
     const slash = prefix.lastIndexOf("/");
     if (slash === -1) {
-        const roots = await capture_suggest(roots_kind, []);
+        // `parent` roots depend on the compatible; the other root kinds take no context.
+        const roots = roots_kind === "parent"
+            ? await suggest_values(roots_kind, prefix, positionals)
+            : await capture_suggest(roots_kind, []);
         return filter_by_prefix(
-            roots.map(s => ({ value: `${s.value}/`, description: s.display_string })),
+            roots.map(s => ({ value: s.value.endsWith("/") ? s.value : `${s.value}/`, description: s.display_string })),
             prefix,
         );
     }
-    if (prefix === "/") {
-        return [{ value: "/" }];
-    }
-    const parent = prefix.slice(0, slash);
-    const child_prefix = prefix.slice(slash + 1);
+    // A leading slash is the root node itself, not an empty parent.
+    const parent = slash === 0 ? "/" : prefix.slice(0, slash);
     const children = await capture_suggest(children_kind, [parent]);
     return filter_by_prefix(
-        children.map(s => ({ value: `${parent}/${s.value}`, description: s.display_string })),
+        children.map(s => ({ value: `${prefix.slice(0, slash + 1)}${s.value}`, description: s.display_string })),
         prefix,
     );
 }

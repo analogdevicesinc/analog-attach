@@ -60,6 +60,8 @@ const CONFIG_GET_FIELDS: ValueSource = {
 
 const PATH_OVERLAY: ValueSource = { kind: "path", roots: "navigate", children: "children" };
 const PATH_TREE: ValueSource = { kind: "path", roots: "navigate", children: "children" };
+// Roots are the valid buses for the compatible typed as the first positional.
+const PATH_PARENT: ValueSource = { kind: "path", roots: "parent", children: "children" };
 const VAL: ValueSource = { kind: "suggest", suggest: "value" };
 const PROPS: ValueSource = { kind: "suggest", suggest: "navigate" };
 
@@ -78,7 +80,7 @@ export const LIST_SUBKIND_SPECS: Readonly<Record<string, CommandSpec>> = {
 export const COMPLETION_SPEC: Readonly<Record<string, CommandSpec | "dynamic">> = {
     add: {
         positional: { mode: "byIndex", sources: [{ kind: "suggest", suggest: "device-key" }] },
-        flags: { "--parent": PATH_TREE },
+        flags: { "--parent": PATH_PARENT },
     },
     read: {
         positional: { mode: "byIndex", sources: [PATH_OVERLAY, PROPS] },

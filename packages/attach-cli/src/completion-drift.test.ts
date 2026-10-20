@@ -163,10 +163,25 @@ describe("__complete delegates dynamic values to suggest in-process", () => {
         expect(lines).toStrictEqual(["reg\treg (required)"]);
     });
 
-    test("add --parent completes as path with trailing /", async () => {
+    test("add --parent roots are the valid parents for the compatible", async () => {
         const lines = await complete(["add", "ad7124", "--parent", ""]);
         expect(lines[0]).toBe("__ATTACH_COMPLETE_NOSPACE__");
-        expect(values(lines.slice(1))).toStrictEqual(["spi0/", "i2c1/"]);
+        expect(lines.slice(1)).toStrictEqual(["spi0/\t/soc/spi@0"]);
+        expect(suggest.run_suggest).toHaveBeenCalledWith(expect.anything(), ["parent", "ad7124"]);
+    });
+
+    test("add --parent prefix-filters the valid parents", async () => {
+        expect(values(await complete(["add", "ad7124", "--parent", "spi"]))).toStrictEqual(["__ATTACH_COMPLETE_NOSPACE__", "spi0/"]);
+        expect(await complete(["add", "ad7124", "--parent", "i2c"])).toStrictEqual([]);
+    });
+
+    test("add --parent after slash offers children joined to parent", async () => {
+        expect(values(await complete(["add", "ad7124", "--parent", "spi0/"]))).toStrictEqual(["spi0/adc@0", "spi0/spidev@0"]);
+    });
+
+    test("an absolute path completes the children of the root", async () => {
+        expect(values(await complete(["add", "ad7124", "--parent", "/sp"]))).toStrictEqual(["/spidev@0"]);
+        expect(suggest.run_suggest).toHaveBeenCalledWith(expect.anything(), ["children", "/"]);
     });
 });
 
