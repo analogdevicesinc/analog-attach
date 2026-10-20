@@ -13,6 +13,7 @@ export {
     type AttachType,
 } from './Attach/StructuralTypes.js';
 export { dt_to_validator_input } from './Attach/DTxBinding.js';
+export { missing_required, PROPERTY_DEPENDENCIES } from './Attach/NodeState.js';
 
 // DTS AST, printer and ergonomic wrappers
 export {
