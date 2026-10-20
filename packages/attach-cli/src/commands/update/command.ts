@@ -41,6 +41,7 @@ import { read_target } from "../read/command";
 import { node_reg_warnings, reg_warning_lines } from "../../reg-conflicts";
 import { ask_for_missing, describe_missing, missing_required_of, type NewNode } from "../../missing-required";
 import type { UpdateChildResponse } from "../../protocol/types";
+import { count_warning, value_count } from "../../item-count";
 
 export type ShapeHint = "flag" | "strings" | "cells" | undefined;
 
@@ -601,12 +602,17 @@ export async function apply_update(
 
     const reg_warnings = property_name === "reg" && reg_path !== undefined ? node_reg_warnings(overlay, reg_path) : [];
     for (const line of reg_warnings.flatMap(w => reg_warning_lines(w))) { diagnostic(line); }
+    // The binding shapes the value but never refuses it: a count it doesn't allow is written, with a warning.
+    const count = property_definition === undefined || built === undefined
+        ? undefined
+        : count_warning(property_name, property_definition.value, value_count(built));
+    if (count !== undefined) { diagnostic(count); }
 
     return {
         kind: "set",
         message: `Set ${property_name} on ${node_identifier}${rename_message}`,
         ...(ip_result.message === undefined ? {} : { detail: ip_result.message }),
-        warned: ip_result.warning !== undefined || reg_warnings.length > 0,
+        warned: ip_result.warning !== undefined || reg_warnings.length > 0 || count !== undefined,
     };
 }
 

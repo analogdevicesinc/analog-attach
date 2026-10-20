@@ -770,6 +770,12 @@ export function property_info(
     };
 }
 
+/** `2`, `1..4`, `2..`; nothing when the binding only says "one or more". */
+function count_range(min = 0, max?: number): string {
+    if (max === undefined) { return min <= 1 ? "" : `${min}..`; }
+    return min === max ? String(max) : `${min}..${max}`;
+}
+
 export function format_type(type: Types): string {
     switch (type.kind) {
         case "number": {
@@ -785,7 +791,7 @@ export function format_type(type: Types): string {
             return `enum(${type.options.map(o => String(o.display_string ?? o.value)).join(" | ")})`;
         }
         case "array": {
-            return `${format_type(type.items)}[]`;
+            return `${format_type(type.items)}[${count_range(type.min_items, type.max_items)}]`;
         }
         case "tuple": {
             return `(${type.items.map((element) => format_type(element)).join(", ")})`;
@@ -1035,6 +1041,16 @@ if (import.meta.vitest) {
         test("array of numbers", () => {
             expect(format_type({ kind: "array", items: { kind: "number", subtype: "int" } }))
                 .toBe("number[]");
+        });
+
+        test("array with the binding's item counts", () => {
+            const number = { kind: "number", subtype: "int" } as const;
+            expect(format_type({ kind: "array", items: number, min_items: 2, max_items: 2 })).toBe("number[2]");
+            expect(format_type({ kind: "array", items: number, min_items: 1, max_items: 4 })).toBe("number[1..4]");
+            expect(format_type({ kind: "array", items: number, min_items: 2 })).toBe("number[2..]");
+            expect(format_type({ kind: "array", items: number, min_items: 1 })).toBe("number[]");
+            expect(format_type({ kind: "array", items: number, min_items: 0, max_items: 3 })).toBe("number[0..3]");
+            expect(format_type({ kind: "array", items: { kind: "array", items: number, min_items: 2, max_items: 2 } })).toBe("number[2][]");
         });
 
         test("tuple", () => {

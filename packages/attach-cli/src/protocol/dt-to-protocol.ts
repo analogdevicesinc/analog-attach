@@ -11,6 +11,7 @@ import {
 } from "attach-lib";
 
 import type { Node, Property, Types, PropertyValue } from "./types";
+import { item_bounds } from "../item-count";
 
 export function convert_node(node: DTNode): Node {
     const key = get_full_node_name(node);
@@ -97,6 +98,13 @@ function convert_cell_array(elements: CellArrayElement[]): { type: Types; value:
     };
 }
 
+/** The binding's minItems / maxItems on a value array, as the protocol names them. */
+function item_counts(value: AttachType): { min_items?: number; max_items?: number } {
+    const bounds = item_bounds(value);
+    if (bounds === undefined) { return {}; }
+    return { min_items: bounds.min, ...(bounds.max === undefined ? {} : { max_items: bounds.max }) };
+}
+
 export function attach_type_to_protocol_type(value: AttachType): Types {
     switch (value._t) {
         case "boolean": {
@@ -120,7 +128,7 @@ export function attach_type_to_protocol_type(value: AttachType): Types {
         case "string_array": {
             return value.maxItems === 1
                 ? { kind: "string" }
-                : { kind: "array", items: { kind: "string" } };
+                : { kind: "array", items: { kind: "string" }, ...item_counts(value) };
         }
         case "enum_array": {
             const options = value.enum.map(v =>
@@ -130,12 +138,12 @@ export function attach_type_to_protocol_type(value: AttachType): Types {
             );
             return value.maxItems === 1
                 ? { kind: "enum", options }
-                : { kind: "array", items: { kind: "enum", options } };
+                : { kind: "array", items: { kind: "enum", options }, ...item_counts(value) };
         }
         case "number_array": {
             return value.maxItems === 1
                 ? { kind: "number", subtype: "int" }
-                : { kind: "array", items: { kind: "number", subtype: "int" } };
+                : { kind: "array", items: { kind: "number", subtype: "int" }, ...item_counts(value) };
         }
         case "array": {
             return { kind: "array", items: { kind: "number", subtype: "int" } };
@@ -185,4 +193,19 @@ function convert_cell_element(element: CellArrayElement): { type: Types; value: 
             return { type: { kind: "string" }, value: element.value };
         }
     }
+}
+
+if (import.meta.vitest) {
+    const { test, expect } = import.meta.vitest;
+
+    test("attach_type_to_protocol_type — value arrays carry the binding's item counts, entry lists don't", () => {
+        expect(attach_type_to_protocol_type({ _t: "number_array", minItems: 2, maxItems: 2 } as AttachType))
+            .toEqual({ kind: "array", items: { kind: "number", subtype: "int" }, min_items: 2, max_items: 2 });
+        expect(attach_type_to_protocol_type({ _t: "string_array", minItems: 1, maxItems: undefined } as unknown as AttachType))
+            .toEqual({ kind: "array", items: { kind: "string" }, min_items: 1 });
+        expect(attach_type_to_protocol_type({ _t: "number_array", minItems: 1, maxItems: 1 } as AttachType))
+            .toEqual({ kind: "number", subtype: "int" });
+        expect(attach_type_to_protocol_type({ _t: "array", minItems: 1, maxItems: 2 } as AttachType))
+            .toEqual({ kind: "array", items: { kind: "number", subtype: "int" } });
+    });
 }

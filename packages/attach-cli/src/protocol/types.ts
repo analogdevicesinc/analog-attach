@@ -65,7 +65,8 @@ export type Types =
     | { kind: "string" }
     | { kind: "bool" }
     | { kind: "enum"; options: { value: string | number; display_string?: string }[] }
-    | { kind: "array"; items: Types }
+    /** `min_items` / `max_items`: how many values the binding allows, when it says (value arrays only). */
+    | { kind: "array"; items: Types; min_items?: number; max_items?: number }
     | { kind: "tuple"; items: Types[] };
 
 export interface Property {

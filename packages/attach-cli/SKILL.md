@@ -154,6 +154,10 @@ attach-linux list property spi0/adi,ad7124-8@0
 
 # Get type details for a specific property
 attach-linux list property spi0/adi,ad7124-8@0 reg
+# An array type carries how many values the binding allows: number[2] is
+# exactly two (diff-channels), number[1..4] a range, number[2..] a minimum
+# (--json: min_items / max_items). Phandle and specifier lists (interrupts,
+# *-gpios) count entries, not cells, so they show none.
 
 # Get concrete values (from the binding and the base devicetree)
 attach-linux list value spi0/adc interrupts
@@ -500,6 +504,8 @@ attach-linux update <path> <property> [value...] [--quiet] [--no-interview]
 | Macros | `update adc interrupts 19 IRQ_TYPE_EDGE_FALLING` | `interrupts = <19 2>;` |
 | Phandle | `update adc interrupt-parent gpio` | `interrupt-parent = <&gpio>;` |
 | Matrix | `update adc reg 0 0,1 0` | `reg = <0 0>, <1 0>;` |
+
+**Value counts**: a number of values the binding doesn't allow is still written, with `warning: diff-channels takes 2 values, got 3` (on stderr, severity warn under `--json`). Fix it before `validate`, which reports it as an error.
 
 **Examples**:
 ```bash
