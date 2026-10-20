@@ -36,7 +36,8 @@ import { load_workspace } from "../../config/workspace";
 import { resolve_write_target, parse_node_path, not_found_message } from "../../utilities";
 import { child_unit_radix, resolve_node_binding } from "../../binding-resolution";
 import { respond, respond_fail, input_error, diagnostic } from "../../protocol/output";
-import { convert_node, convert_property } from "../../protocol/dt-to-protocol";
+import { convert_node } from "../../protocol/dt-to-protocol";
+import { read_target } from "../read/command";
 
 export type ShapeHint = "flag" | "strings" | "cells" | undefined;
 
@@ -286,35 +287,13 @@ export function decide_update(hint: ShapeHint, value_tokens: string[], existing_
     return "value";
 }
 
-function read_property(context_: LocalContext, found: FoundNodeResult | undefined, property_name: string, node_identifier: string): void {
-    if (found === undefined) {
-        if (context_.json) { respond_fail({ ok: false, message: `Not found: ${node_identifier}`, severity: "error" }); }
-        else { console.log(`Not found: ${node_identifier}`); }
-        return;
-    }
-    const property = found.node.properties.find(p => p.name === property_name);
-    if (property === undefined) {
-        if (context_.json) { respond_fail({ ok: false, message: `Not found: ${property_name} on ${node_identifier}`, severity: "error" }); }
-        else { console.log(`Property ${property_name} not set on ${node_identifier}`); }
-        return;
-    }
-    if (context_.json) {
-        respond(convert_property(property));
-    } else {
-        if (is_dt_flag(property.value)) {
-            console.log("true");
-        } else {
-            console.log(print_property(property, "", 0).trim());
-        }
-    }
-}
-
 export function build_update_command(context_: LocalContext): Command {
     return new Command("update")
         .description("Update/insert a property")
         .argument("[path]", "Path to node (label, label-first, or absolute)")
         .argument("[property]", "Property name")
         .argument("[value...]", "Value tokens (omit to read or set a flag)")
+        .option("--quiet", "When reading: print only the value, as 'read --quiet' does")
         .addHelpText("after", `
 Paths:
   Label:        spi0                       (a label in the base tree)
@@ -330,7 +309,7 @@ Value syntax:
   Matrices:    rows separated by ","
 
 Special cases:
-  No value     Sets a flag property, or reads the current value
+  No value     Sets a flag property, or reads the current value (as 'read' does)
   Child name   'update <path> <child-name>' creates a child node
   reg          'update <path> reg <n>' also renames the node's unit address
 
@@ -340,7 +319,7 @@ Examples:
   $ attach-linux update spi0/adi,ad7124-8@0 interrupts 25 IRQ_TYPE_EDGE_FALLING
   $ attach-linux update spi0/adi,ad7124-8@0 io-channels 0 1 , 2 3
   $ attach-linux update spi0/adi,ad7124-8@0 channel@0`)
-        .action(async (path_argument: string | undefined, property_argument: string | undefined, value_arguments: string[]) => {
+        .action(async (path_argument: string | undefined, property_argument: string | undefined, value_arguments: string[], options: { quiet?: boolean }) => {
             if (path_argument === undefined) {
                 const message = "Missing: path";
                 if (context_.json) { input_error(message); } else { console.log(message); }
@@ -477,7 +456,7 @@ Examples:
             }
 
             if (decision === "read") {
-                read_property(context_, found, property_name, node_identifier);
+                await read_target(context_, overlay, { ok: true, value: workspace.bindings }, node_identifier, property_name, { quiet: options.quiet ?? false });
                 return;
             }
 

@@ -125,7 +125,7 @@ step "Point the interrupt at the GPIO controller" \
     "update adc interrupt-parent gpio"
 
 step "Choose the trigger type" \
-    "The AD7124-8 pulls RDY low when a conversion is ready: the binding example and the Linux driver both use a falling edge. Macros resolve to numbers (IRQ_TYPE_EDGE_FALLING is 2)." \
+    "The AD7124-8 pulls RDY low when a conversion is ready: the binding example and the Linux driver both use a falling edge. Macros resolve to numbers (IRQ_TYPE_EDGE_FALLING is 2). read shows the value with the binding's description." \
     "update adc interrupts 19 IRQ_TYPE_EDGE_FALLING" \
     "read adc interrupts"
 

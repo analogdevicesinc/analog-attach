@@ -58,7 +58,9 @@ export interface Node {
     alias?: string[];
 }
 
-export type ReadResponse = Node | Property;
+export type ReadResponse =
+    | (Node & { missing_required?: string[] })
+    | (Property & { description?: string; suggestions?: Suggestion[] });
 
 export interface DeletePreview extends CommonResponse {
     node_count: number;

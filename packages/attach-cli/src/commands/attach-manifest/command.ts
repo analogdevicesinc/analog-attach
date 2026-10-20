@@ -46,7 +46,7 @@ export function build_attach_manifest_command(_context: LocalContext): Command {
                         ]
                     },
                     "read": {
-                        description: "Read a node or property from the overlay. No path args returns the full overlay tree. Path args identify the target; accepted forms: bare label (imu1), absolute path (/soc/spi@7e204000), slash-separated label/child (imu1/channel@0), or multiple space-separated tokens resolved from root (soc spi@7e204000 → /soc/spi@7e204000). The last token may be a property name — the preceding tokens then identify the parent node.",
+                        description: "Read a node or property from the overlay. No path args returns the full overlay tree. The path identifies the node; accepted forms: bare label (imu1), absolute path (/soc/spi@7e204000), or label/child (imu1/channel@0). An optional second positional names a property. When bindings are available a property response also carries `description` and `suggestions` (values ready for update), and a node response carries `missing_required` (required properties not set yet, in the order to set them). --quiet leaves them out.",
                         argv: ["attach-linux", "--json", "read"],
                     },
                     "update": {

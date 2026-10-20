@@ -151,8 +151,9 @@ step "update with new grammar" \
     "update spi0/adi,ad7124-8@2 spi-max-frequency 5000000"
 
 step "read with path + property" \
-    "read <path> <property> — no space-separated pathing." \
-    "read spi0/adi,ad7124-8@2 spi-max-frequency"
+    "read <path> <property> — the value, then the binding's description, allowed values and suggestions. --quiet prints the value only." \
+    "read spi0/adi,ad7124-8@2 spi-max-frequency" \
+    "read --quiet spi0/adi,ad7124-8@2 spi-max-frequency"
 
 step "No-value update on a flag" \
     "update <path> <property> with no value on a known flag → sets it." \

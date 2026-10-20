@@ -57,7 +57,7 @@ Path helpers in `src/utilities.ts`: `parse_node_path`, `parse_property_name`, `p
 
 ### Value suggestions
 
-`list value` asks attach-lib's `IntelligenceStack.default()` for values (binding and base-devicetree layers, see `packages/attach-lib/src/Intelligence/CLAUDE.md`), placing the node with `placement_from_overlay`. Lib suggestions are structured cell rows; `format_suggestion` (`src/commands/update/command.ts`) turns them into value strings and is the inverse of `parse_value`. Command templates (`preprocess-command`, the build command) go through `substitute_command` / `is_tool_available` in `src/utilities.ts`.
+`list value` asks attach-lib's `IntelligenceStack.default()` for values (binding and base-devicetree layers, see `packages/attach-lib/src/Intelligence/CLAUDE.md`), placing the node with `placement_from_overlay`. The data paths are `resolve_target_binding` / `value_suggestions` / `property_info` in `src/commands/list/suggest.ts`, which `read` (and `update` without a value, via `read_target`) reuse for the description, allowed values and suggestions under a property; `src/node-state.ts` gives a node's missing required properties. Lib suggestions are structured cell rows; `format_suggestion` (`src/commands/update/command.ts`) turns them into value strings and is the inverse of `parse_value`. Command templates (`preprocess-command`, the build command) go through `substitute_command` / `is_tool_available` in `src/utilities.ts`.
 
 ### Bundled dt-schema and tools
 

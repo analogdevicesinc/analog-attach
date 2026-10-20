@@ -1,5 +1,6 @@
 import {
     Attach,
+    AttachEnumType,
     DeviceTree,
     DeviceTreeOverlay,
     IntelligenceStack,
@@ -15,13 +16,14 @@ import {
 } from "attach-lib";
 import type { LocalContext } from "../../context";
 import { load_workspace, parse_bindings, type Bindings } from "../../config/workspace";
+import type { Result } from "../../config/settings";
 import { format_suggestion, build_raw_property, shape_hint, parse_value } from "../update/command";
-import { bigIntReplacer, effective_parent_compatibles, find_binding, fragment_target, get_or_build_compat_index, parse_property_reference, resolve_node_identifier, resolve_positional_path, resolve_write_target } from "../../utilities";
+import { bigIntReplacer, effective_parent_compatibles, find_binding, fragment_target, get_or_build_compat_index, parse_property_reference, resolve_node_identifier, resolve_positional_path, resolve_write_target, type WriteTarget } from "../../utilities";
 import { respond, respond_fail, input_error } from "../../protocol/output";
 import { attach_type_to_protocol_type } from "../../protocol/dt-to-protocol";
 import { resolve_node_binding, type NodeBinding } from "../../binding-resolution";
 import { check_value } from "../../value-check";
-import type { TypeResponse, Suggestion } from "../../protocol/types";
+import type { TypeResponse, Suggestion, Types } from "../../protocol/types";
 
 export async function run_suggest(context: LocalContext, arguments_: string[]): Promise<void> {
     const kind = arguments_[0];
@@ -152,13 +154,9 @@ async function suggest_value(context_: LocalContext, arguments_: string[]): Prom
     const base_dt = workspace.base.tree;
     const overlay = workspace.overlay.tree;
     // Bindings are optional here: without them suggestions are just not checked.
-    const bindings = parse_bindings(workspace.settings);
-
-    const { binding_node, binding_parent, parent_name, parent_compatibles } = resolve_write_target(node_identifier, overlay, base_dt);
-
-    const target_reference = resolve_node_identifier(node_identifier, overlay);
-    const placement = placement_from_overlay(overlay, target_reference);
-    if (placement === undefined) {
+    const target = await resolve_target_binding(node_identifier, overlay, base_dt, parse_bindings(workspace.settings));
+    const result = value_suggestions(target, overlay, base_dt, node_identifier, property_name);
+    if (!result.ok) {
         if (context_.json) {
             respond_fail({ ok: false, message: `Node ${node_identifier} not found`, severity: "error" });
         } else {
@@ -166,44 +164,7 @@ async function suggest_value(context_: LocalContext, arguments_: string[]): Prom
         }
         return;
     }
-
-    // Pass the node's real data so the intelligence stack can resolve phandle
-    // references (e.g. interrupt-parent → controller → #interrupt-cells).
-    let data = "{}";
-    const binding = binding_node === undefined
-        ? undefined
-        : await resolve_binding_for_data(binding_node, binding_parent, parent_name, base_dt, bindings.ok ? bindings.value : undefined, parent_compatibles);
-    if (binding_node !== undefined && binding !== undefined) {
-        const input_data = Object.fromEntries(dt_to_validator_input(binding_node, {
-            required_properties: binding.required_properties,
-            properties: binding.properties,
-            pattern_properties: undefined,
-            examples: [],
-        }));
-        data = JSON.stringify(input_data, bigIntReplacer);
-    }
-
-    const stack = IntelligenceStack.default();
-    const values = stack.suggest_values(property_name, {
-        devicetree: base_dt,
-        data,
-        placement,
-        ...(binding === undefined ? {} : { binding: { required_properties: binding.required_properties, properties: binding.properties } }),
-    });
-
-    // Binding check: annotate suggestions (in place, via the note field) when bindings are available.
-    let binding_check_reason: string | undefined;
-    if (!bindings.ok) {
-        binding_check_reason = bindings.errors.map(error => error.message).join("; ");
-    } else if (binding_node === undefined) {
-        binding_check_reason = "node not found for binding resolution";
-    } else {
-        const { linux, dt_schema } = bindings.value;
-        const annotated = await annotate_suggestions(values, property_name, binding_node, binding_parent, parent_name, base_dt, linux, dt_schema, overlay, parent_compatibles);
-        if (annotated === undefined) { binding_check_reason = "binding could not be resolved"; }
-    }
-
-    const suggestions = values.map((value) => to_suggestion(value));
+    const { values, suggestions } = result;
 
     const count = (source: string) => values.filter(value => value.source === source).length;
     const parts = [
@@ -212,8 +173,8 @@ async function suggest_value(context_: LocalContext, arguments_: string[]): Prom
     ].filter(([n]) => (n as number) > 0).map(([n, origin]) => `${n} value(s) ${origin}`);
     let message = parts.length > 0 ? `Found ${parts.join("; ")}` : `No values for ${property_name}`;
 
-    if (binding_check_reason !== undefined) {
-        message = `${message}; not checked against a binding (${binding_check_reason})`;
+    if ("error" in target.binding) {
+        message = `${message}; not checked against a binding (${target.binding.error})`;
     }
 
     if (context_.json) {
@@ -226,36 +187,82 @@ async function suggest_value(context_: LocalContext, arguments_: string[]): Prom
     }
 }
 
-async function resolve_binding_for_data(
-    binding_node: DTNode,
-    binding_parent: DTNode | undefined,
-    parent_name: string,
-    base_dt: DeviceTree,
-    bindings: Bindings | undefined,
-    parent_compatibles?: string[],
-): Promise<NodeBinding | undefined> {
-    if (bindings === undefined) { return; }
-
-    const binding = await resolve_node_binding(binding_node, binding_parent, parent_name, base_dt, bindings.linux, bindings.dt_schema, undefined, parent_compatibles);
-    if ('error' in binding) { return; }
-    return binding;
+/** The node a property command targets, and its binding (or why there is none). */
+export interface TargetBinding {
+    target: WriteTarget;
+    binding: NodeBinding | { error: string };
 }
 
-async function annotate_suggestions(
+export async function resolve_target_binding(
+    node_identifier: string,
+    overlay: DeviceTreeOverlay,
+    base_dt: DeviceTree,
+    bindings: Result<Bindings>,
+): Promise<TargetBinding> {
+    const target = resolve_write_target(node_identifier, overlay, base_dt);
+    const { binding_node, binding_parent, parent_name, parent_compatibles } = target;
+    if (!bindings.ok) {
+        return { target, binding: { error: bindings.errors.map(error => error.message).join("; ") } };
+    }
+    if (binding_node === undefined) {
+        return { target, binding: { error: "node not found for binding resolution" } };
+    }
+    const { linux, dt_schema } = bindings.value;
+    return { target, binding: await resolve_node_binding(binding_node, binding_parent, parent_name, base_dt, linux, dt_schema, undefined, parent_compatibles) };
+}
+
+/**
+ * The values the intelligence stack offers for a property, checked against
+ * the binding when there is one. Undefined suggestions mean the node wasn't found.
+ */
+export function value_suggestions(
+    { target, binding }: TargetBinding,
+    overlay: DeviceTreeOverlay,
+    base_dt: DeviceTree,
+    node_identifier: string,
+    property_name: string,
+): { ok: true; values: ValueSuggestion[]; suggestions: Suggestion[] } | { ok: false } {
+    const placement = placement_from_overlay(overlay, resolve_node_identifier(node_identifier, overlay));
+    if (placement === undefined) { return { ok: false }; }
+
+    const resolved = "error" in binding ? undefined : binding;
+    // Pass the node's real data so the intelligence stack can resolve phandle
+    // references (e.g. interrupt-parent → controller → #interrupt-cells).
+    let data = "{}";
+    if (target.binding_node !== undefined && resolved !== undefined) {
+        const input_data = Object.fromEntries(dt_to_validator_input(target.binding_node, {
+            required_properties: resolved.required_properties,
+            properties: resolved.properties,
+            pattern_properties: undefined,
+            examples: [],
+        }));
+        data = JSON.stringify(input_data, bigIntReplacer);
+    }
+
+    const stack = IntelligenceStack.default();
+    const values = stack.suggest_values(property_name, {
+        devicetree: base_dt,
+        data,
+        placement,
+        ...(resolved === undefined ? {} : { binding: { required_properties: resolved.required_properties, properties: resolved.properties } }),
+    });
+
+    // Binding check: annotate suggestions in place, via the note field.
+    if (target.binding_node !== undefined && resolved !== undefined) {
+        annotate_suggestions(values, property_name, target.binding_node, resolved, base_dt, overlay);
+    }
+
+    return { ok: true, values, suggestions: values.map((value) => to_suggestion(value)) };
+}
+
+function annotate_suggestions(
     suggestions: ValueSuggestion[],
     property_name: string,
     binding_node: DTNode,
-    binding_parent: DTNode | undefined,
-    parent_name: string,
+    binding: NodeBinding,
     base_dt: DeviceTree,
-    linux: string,
-    dtSchema: string,
     overlay: DeviceTreeOverlay,
-    parent_compatibles?: string[],
-): Promise<true | undefined> {
-    const binding = await resolve_node_binding(binding_node, binding_parent, parent_name, base_dt, linux, dtSchema, undefined, parent_compatibles);
-    if ('error' in binding) { return; }
-
+): void {
     const origin_desc = binding.origin.kind === "compatible"
         ? `${binding.origin.compatible} binding`
         : `pattern "${binding.origin.pattern}" of ${binding.origin.parent_compatible}`;
@@ -301,7 +308,6 @@ async function annotate_suggestions(
         }
     }
 
-    return true;
 }
 
 function combine_notes(existing: string | undefined, addition: string): string {
@@ -576,89 +582,113 @@ async function suggest_type(context_: LocalContext, arguments_: string[]): Promi
 
     const workspace = load_workspace(context_, ["bindings", "base", "overlay"]);
     if (workspace === undefined) { return; }
-    const { linux, dt_schema: dtSchema } = workspace.bindings;
-    const base_dt = workspace.base.tree;
-    const overlay = workspace.overlay.tree;
 
-    const { binding_node, binding_parent, parent_name, parent_compatibles: slot_parent_compats } = resolve_write_target(node_identifier, overlay, base_dt);
-    if (binding_node === undefined) {
-        if (context_.json) {
-            respond_fail({ ok: false, message: `Node ${node_identifier} not found`, severity: "error" });
-        } else {
-            console.log(`Node not found: ${node_identifier}`);
-        }
+    const report = (message: string): void => {
+        if (context_.json) { respond_fail({ ok: false, message, severity: "error" }); }
+        else { console.log(message); }
+    };
+
+    const { target, binding } = await resolve_target_binding(node_identifier, workspace.overlay.tree, workspace.base.tree, { ok: true, value: workspace.bindings });
+    if (target.binding_node === undefined) {
+        report(context_.json ? `Node ${node_identifier} not found` : `Node not found: ${node_identifier}`);
+        return;
+    }
+    if ("error" in binding) {
+        report(binding.error);
         return;
     }
 
-    const binding = await resolve_node_binding(binding_node, binding_parent, parent_name, base_dt, linux, dtSchema, undefined, slot_parent_compats);
-    if ('error' in binding) {
-        if (context_.json) {
-            respond_fail({ ok: false, message: binding.error, severity: "error" });
-        } else {
-            console.log(binding.error);
-        }
+    const result = property_info(binding, target.binding_node, property_name);
+    if (!result.ok) {
+        report(result.message);
         return;
     }
-
-    const result = binding.narrow_and_populate(binding_node);
-    if (result === undefined) {
-        const message = binding.origin.kind === "compatible"
-            ? `Failed to narrow binding for ${binding.origin.compatible}`
-            : `Failed to validate against pattern "${binding.origin.pattern}" of ${binding.origin.parent_compatible}`;
-        if (context_.json) {
-            respond_fail({ ok: false, message: message, severity: "error" });
-        } else {
-            console.log(message);
-        }
-        return;
-    }
-
-    const origin_desc = binding.origin.kind === "compatible"
-        ? `${binding.origin.compatible} binding`
-        : `pattern "${binding.origin.pattern}" of ${binding.origin.parent_compatible}`;
-
-    const property_definition = result.properties.find(p => p.key === property_name);
-    if (property_definition === undefined) {
-        if (context_.json) {
-            respond_fail({ ok: false, message: `Property ${property_name} not found in ${origin_desc}`, severity: "error" });
-        } else {
-            console.log(`Property ${property_name} not found in ${origin_desc}`);
-        }
-        return;
-    }
-
-    const type = attach_type_to_protocol_type(property_definition.value);
-    const suggestions = (property_definition.suggestions ?? []).map((suggestion) => to_suggestion(suggestion));
+    const { info } = result;
 
     if (context_.json) {
         const response: TypeResponse = {
             ok: true,
             message: `Type of ${property_name}`,
             severity: "info",
-            type,
-            description: property_definition.value.description,
-            ...(suggestions.length > 0 ? { suggestions } : {}),
+            type: info.type,
+            description: info.description,
+            ...(info.suggestions.length > 0 ? { suggestions: info.suggestions } : {}),
         };
         respond(response);
     } else {
-        const is_required = binding.required_properties.includes(property_name);
-        const required = is_required ? " (required)" : "";
-        console.log(`${property_name}${required}: ${format_type(type)}`);
-        if (property_definition.value.description !== undefined) {
-            console.log(`  ${property_definition.value.description}`);
+        const required = info.required ? " (required)" : "";
+        console.log(`${property_name}${required}: ${format_type(info.type)}`);
+        if (info.description !== undefined) {
+            console.log(`  ${info.description}`);
         }
-        const v = property_definition.value as Record<string, unknown>;
-        if (v["const"] !== undefined) { console.log(`  const: ${JSON.stringify(v["const"], bigIntReplacer)}`); }
-        if (v["default"] !== undefined) { console.log(`  default: ${JSON.stringify(v["default"], bigIntReplacer)}`); }
-        if (v["minimum"] !== undefined) { console.log(`  min: ${v["minimum"]}`); }
-        if (v["maximum"] !== undefined) { console.log(`  max: ${v["maximum"]}`); }
-        for (const suggestion of suggestions) {
+        const { constraints } = info;
+        if (constraints.const !== undefined) { console.log(`  const: ${JSON.stringify(constraints.const, bigIntReplacer)}`); }
+        if (constraints.default !== undefined) { console.log(`  default: ${JSON.stringify(constraints.default, bigIntReplacer)}`); }
+        if (constraints.minimum !== undefined) { console.log(`  min: ${constraints.minimum}`); }
+        if (constraints.maximum !== undefined) { console.log(`  max: ${constraints.maximum}`); }
+        for (const suggestion of info.suggestions) {
             console.log(`  ${suggestion.value}\t${suggestion.display_string}`);
         }
     }
 }
 
-function format_type(type: import("../../protocol/types").Types): string {
+/** What a node's binding says about one of its properties. */
+export interface PropertyInfo {
+    type: Types;
+    description: string | undefined;
+    required: boolean;
+    /** The binding YAML the definition comes from. */
+    binding_path: string;
+    constraints: { const?: unknown; default?: unknown; minimum?: number | bigint; maximum?: number | bigint };
+    /** Values the binding's definition offers, ready for `update`. */
+    suggestions: Suggestion[];
+}
+
+export function property_info(
+    binding: NodeBinding,
+    binding_node: DTNode,
+    property_name: string,
+): { ok: true; info: PropertyInfo } | { ok: false; message: string } {
+    const result = binding.narrow_and_populate(binding_node);
+    if (result === undefined) {
+        const message = binding.origin.kind === "compatible"
+            ? `Failed to narrow binding for ${binding.origin.compatible}`
+            : `Failed to validate against pattern "${binding.origin.pattern}" of ${binding.origin.parent_compatible}`;
+        return { ok: false, message };
+    }
+
+    const property_definition = result.properties.find(p => p.key === property_name);
+    if (property_definition === undefined) {
+        const origin_desc = binding.origin.kind === "compatible"
+            ? `${binding.origin.compatible} binding`
+            : `pattern "${binding.origin.pattern}" of ${binding.origin.parent_compatible}`;
+        return { ok: false, message: `Property ${property_name} not found in ${origin_desc}` };
+    }
+
+    const v = property_definition.value as Record<string, unknown>;
+    const bound = (value: unknown): number | bigint | undefined => typeof value === "number" || typeof value === "bigint" ? value : undefined;
+    const minimum = bound(v["minimum"]);
+    const maximum = bound(v["maximum"]);
+    return {
+        ok: true,
+        info: {
+            type: attach_type_to_protocol_type(property_definition.value),
+            description: property_definition.value.description,
+            required: binding.required_properties.includes(property_name),
+            binding_path: binding.binding_path,
+            constraints: {
+                ...(v["const"] === undefined ? {} : { const: v["const"] }),
+                // A phandle enum's default is the value currently set (a preselect), not the binding's.
+                ...(v["default"] === undefined || v["enum_type"] === AttachEnumType.PHANDLE ? {} : { default: v["default"] }),
+                ...(minimum === undefined ? {} : { minimum }),
+                ...(maximum === undefined ? {} : { maximum }),
+            },
+            suggestions: (property_definition.suggestions ?? []).map((suggestion) => to_suggestion(suggestion)),
+        },
+    };
+}
+
+function format_type(type: Types): string {
     switch (type.kind) {
         case "number": {
             return "number";

@@ -23,6 +23,8 @@ export type NodeBinding = {
     required_properties: string[];
     /** Child nodes the binding allows (its node patternProperties, e.g. `^channel@([0-9]|1[0-5])$`). */
     child_nodes: PatternPropertyRule[];
+    /** The YAML file the properties come from (the parent's, for a pattern match). */
+    binding_path: string;
     origin:
     | { kind: "compatible"; compatible: string }
     | { kind: "pattern"; parent_compatible: string; pattern: string };
@@ -112,6 +114,7 @@ export async function resolve_node_binding(
             properties: initial.parsed_binding.properties,
             required_properties: initial.parsed_binding.required_properties,
             child_nodes: initial.parsed_binding.pattern_properties ?? [],
+            binding_path,
             origin: { kind: "compatible", compatible: compatible_value },
             narrow_and_populate(node: DTNode) {
                 const input_data = Object.fromEntries(dt_to_validator_input(node, initial.parsed_binding));
@@ -164,6 +167,7 @@ export async function resolve_node_binding(
         required_properties: match.rule.required,
         // Nested patterns (children of a pattern-matched node) aren't resolved.
         child_nodes: [],
+        binding_path: parent_binding_path,
         origin: { kind: "pattern", parent_compatible: parent_compatible_value, pattern: match.pattern },
         narrow_and_populate(node: DTNode) {
             const partial_input_data = Object.fromEntries(

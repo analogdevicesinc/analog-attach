@@ -359,14 +359,28 @@ attach-linux read [path] [property]
 ```
 
 - No args: prints the whole overlay (respects `overlay-syntax` config)
-- Path only: prints the node and its children
-- Path + property: prints the property value
+- Path only: prints the node and its children, then the required properties it still lacks (`Missing required: interrupt-parent, interrupts`)
+- Path + property: prints the property, then its binding description and file, the allowed values, and the suggestions (the same values as `list value`)
+- `--quiet`: only the value (`true` for a flag) or the node block, for scripts
+- Without bindings the extra lines are left out
+- `--json`: a property gets optional `description` and `suggestions`; a node gets `missing_required`
 
 **Examples**:
 ```bash
 attach-linux read                          # whole overlay
-attach-linux read spi0/adi,ad7124-8@0     # node subtree
-attach-linux read spi0/adi,ad7124-8@0 reg # property value
+attach-linux read spi0/adi,ad7124-8@0     # node subtree + missing required
+attach-linux read spi0/adi,ad7124-8@0 reg # property value + binding details
+attach-linux read --quiet spi0/adi,ad7124-8@0 reg   # value only
+```
+
+```
+$ attach-linux read adc interrupt-parent
+interrupt-parent = <&gpio>;
+  (adi,ad7124.yaml)
+  Allowed: gpio | gicv2 | aon_intr
+  Suggestions:
+    gicv2 — interrupt controller, #interrupt-cells = <3>; inherited from /
+    gpio — interrupt controller, #interrupt-cells = <2> (only right if the device's interrupt line is wired to this controller)
 ```
 
 ---
@@ -381,7 +395,7 @@ attach-linux update <path> <property> [value...]
 
 **Behaviour with no value**:
 - **Flag property** (binding says flag): sets it (the DTS `prop;` form)
-- **Known non-flag property**: acts as `read <path> <property>`
+- **Known non-flag property**: acts as `read <path> <property>` (with the same `--quiet`)
 - **Unknown absent property**: creates a flag
 - **Child node name** (e.g. `channel@0`): creates the child, or reads it if it exists
 
