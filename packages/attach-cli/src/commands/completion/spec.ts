@@ -19,6 +19,8 @@ import { LIST_KINDS } from "../list/command";
 export const FILES_DIRECTIVE = "__ATTACH_COMPLETE_FILES__";
 export const DIRS_DIRECTIVE = "__ATTACH_COMPLETE_DIRS__";
 export const NOSPACE_DIRECTIVE = "__ATTACH_COMPLETE_NOSPACE__";
+// Starts a group of candidates: `__ATTACH_COMPLETE_GROUP__<TAB><heading>`. zsh lists each group apart; bash and fish skip the line.
+export const GROUP_DIRECTIVE = "__ATTACH_COMPLETE_GROUP__";
 
 // "entry-points" is completion-only: `suggest navigate` with no node (the overlay's top-level targets).
 export type SuggestKind = "device-key" | "parent" | "navigate" | "entry-points" | "children" | "value" | "overlay";

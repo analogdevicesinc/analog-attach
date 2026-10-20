@@ -161,6 +161,8 @@ export interface Suggestion {
     note?: string;
     /** The start of a name, to be typed on (a binding pattern's stem, e.g. `fan-`). */
     partial?: boolean;
+    /** The completion group it is listed under (`set`, `not set`); the shell shows each group apart. */
+    group?: string;
 }
 
 export interface SuggestResponse extends CommonResponse {

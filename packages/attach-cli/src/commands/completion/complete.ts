@@ -14,7 +14,7 @@ import { buildApp } from "../../app";
 import { buildContext } from "../../context";
 import { run_internal_list } from "../list/internal";
 import type { Suggestion } from "../../protocol/types";
-import { COMPLETION_SPEC, LIST_SUBKIND_SPECS, FILES_DIRECTIVE, DIRS_DIRECTIVE, NOSPACE_DIRECTIVE, type CommandSpec, type ValueSource, type SuggestKind } from "./spec";
+import { COMPLETION_SPEC, LIST_SUBKIND_SPECS, FILES_DIRECTIVE, DIRS_DIRECTIVE, NOSPACE_DIRECTIVE, GROUP_DIRECTIVE, type CommandSpec, type ValueSource, type SuggestKind } from "./spec";
 import { LIST_KINDS } from "../list/command";
 import { disable_index_build } from "../../utilities";
 
@@ -29,6 +29,8 @@ interface Candidate {
     description?: string;
     /** Completes without a trailing space (see `Suggestion.partial`). */
     partial?: boolean;
+    /** Listed under this heading, apart from the other groups (see `Suggestion.group`). */
+    group?: string;
 }
 
 export function shell_dequote(word: string): string {
@@ -243,7 +245,22 @@ async function path_candidates(roots_kind: SuggestKind, children_kind: SuggestKi
 async function source_candidates(source: ValueSource, prefix: string, positionals: string[]): Promise<Candidate[]> {
     if (source.kind !== "suggest") { return []; }
     const suggestions = await suggest_values(source.suggest, prefix, positionals);
-    return suggestions.map(s => ({ value: s.value, description: s.display_string, ...(s.partial === true ? { partial: true } : {}) }));
+    return suggestions.map(s => {
+        const description = s.display_string === undefined ? undefined : short_description(s.value, s.display_string);
+        return {
+            value: s.value,
+            ...(description === undefined ? {} : { description }),
+            ...(s.partial === true ? { partial: true } : {}),
+            ...(s.group === undefined ? {} : { group: s.group }),
+        };
+    });
+}
+
+/** A display that repeats the value with a note (`reg (required)`, `fan-… (child node …)`) describes it by the note alone. */
+export function short_description(value: string, display: string): string | undefined {
+    if (display === value) { return undefined; }
+    const note = /^(.*?)…? \((.*)\)$/.exec(display);
+    return note?.[1] === value || note?.[1] === value.replace(/…$/, "") ? note[2] : display;
 }
 
 // Build the `suggest` context argv for each dynamic kind, mirroring what the old
@@ -320,7 +337,12 @@ function emit(candidates: Candidate[]): void {
     if (candidates.length > 0 && candidates.every(c => c.value.endsWith("/") || c.partial === true)) {
         console.log(NOSPACE_DIRECTIVE);
     }
-    for (const c of candidates) {
-        console.log(c.description ? `${c.value}\t${c.description}` : c.value);
+    // Grouped candidates come after the others, each group under a heading line, in the order the groups first appear.
+    const groups = [...new Set(candidates.flatMap(c => c.group === undefined ? [] : [c.group]))];
+    const print = (c: Candidate): void => { console.log(c.description ? `${c.value}\t${c.description}` : c.value); };
+    for (const c of candidates) { if (c.group === undefined) { print(c); } }
+    for (const group of groups) {
+        console.log(`${GROUP_DIRECTIVE}\t${group}`);
+        for (const c of candidates) { if (c.group === group) { print(c); } }
     }
 }

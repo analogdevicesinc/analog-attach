@@ -75,7 +75,7 @@ complete_step() {
 
     for words in "$@"; do
         echo -e "  ${YELLOW}\$ attach-linux ${words} <TAB>${RESET}"
-        eval "node \"$CLI\" __complete -- $words" 2>&1 | sed 's/^__ATTACH_COMPLETE_NOSPACE__$/(no trailing space)/; s/\t/  — /; s/^/  /'
+        eval "node \"$CLI\" __complete -- $words" 2>&1 | sed 's/^__ATTACH_COMPLETE_NOSPACE__$/(no trailing space)/; s/^__ATTACH_COMPLETE_GROUP__\t\(.*\)/[\1]/; s/\t/  — /; s/^/  /'
         echo ""
     done
     pause
@@ -166,7 +166,7 @@ step "Names from binding patterns" \
     "list property hwmon"
 
 complete_step "Completion knows the patterns" \
-    "Completion offers the pattern names not set yet; an unbounded pattern completes its stem, with no trailing space." \
+    "Completion lists what the node has, then what it could have: the properties not set yet and the names the patterns allow. An unbounded pattern completes its stem, with no trailing space." \
     "update hwmon adi,bypass" \
     "update hwmon fa"
 

@@ -1,7 +1,7 @@
 import { Command } from "commander";
 
 import type { LocalContext } from "../../context";
-import { FILES_DIRECTIVE, DIRS_DIRECTIVE, NOSPACE_DIRECTIVE } from "./spec";
+import { FILES_DIRECTIVE, DIRS_DIRECTIVE, NOSPACE_DIRECTIVE, GROUP_DIRECTIVE } from "./spec";
 
 // The completion scripts are thin stubs: on every TAB press they hand the
 // words typed so far to `attach-linux __complete` and render whatever it prints
@@ -65,6 +65,7 @@ _attach_linux_complete() {
     local -a values
     local line value
     for line in "\${lines[@]}"; do
+        [[ "$line" == ${GROUP_DIRECTIVE}* ]] && continue
         value="\${line%%$'\\t'*}"
         if [[ "$cur" != '"'* && "$cur" != "'"* && "$value" == *" "* ]]; then
             printf -v value '%q' "$value"
@@ -128,17 +129,37 @@ _attach-linux() {
         shift raw
     fi
 
-    local -a described
-    local line
-    for line in "\${raw[@]}"; do
+    # Each group (after a ${GROUP_DIRECTIVE} line) is listed apart, under its heading.
+    local -a described suffix
+    $nospace && suffix=( -S '' )
+    local line heading=""
+    local -i group=0 ret=1
+    for line in "\${raw[@]}" "${GROUP_DIRECTIVE}"; do
+        if [[ "$line" == ${GROUP_DIRECTIVE}* ]]; then
+            if (( \${#described} )); then
+                if [[ -n "$heading" ]]; then
+                    _describe -t "attach-linux-$group" "$heading" described "\${suffix[@]}" -V "attach-linux-$group" -X "%B$heading%b" && ret=0
+                else
+                    _describe -t attach-linux 'attach-linux' described "\${suffix[@]}" && ret=0
+                fi
+            fi
+            described=()
+            heading="\${line#*$'\\t'}"
+            [[ "$heading" == "$line" ]] && heading=""
+            group+=1
+            continue
+        fi
         described+=( "\${line/$'\\t'/:}" )
     done
-    if $nospace; then
-        _describe -t attach-linux 'attach-linux' described -S ''
-    else
-        _describe -t attach-linux 'attach-linux' described
-    fi
+    return ret
 }
+
+# One line per candidate, in the engine's order (zsh's grouped listing would
+# put names that share a description on one line, reversed). Kept when the
+# user has set the style for attach-linux.
+if [[ -z "$(zstyle -L ':completion:*:*:attach-linux:*' list-grouped)" ]]; then
+    zstyle ':completion:*:*:attach-linux:*' list-grouped false
+fi
 
 # Works both ways: when autoloaded from $fpath the function is invoked inside a
 # completion context (funcstack[1] is the function itself), so run it; when the
@@ -175,7 +196,7 @@ function __attach_linux_complete
                 set -e out[1]
         end
     end
-    printf '%s\\n' $out
+    string match -v -- '${GROUP_DIRECTIVE}*' $out
 end
 
 complete -c attach-linux -f -a '(__attach_linux_complete)'
@@ -187,6 +208,11 @@ const STUBS: Record<string, () => string> = {
     fish: fish_stub,
     zsh: zsh_stub,
 };
+
+/** The completion script for a shell, or undefined for a shell it doesn't support. */
+export function completion_script(shell: string): string | undefined {
+    return STUBS[shell]?.();
+}
 
 export function build_completion_command(_context: LocalContext): Command {
     return new Command("completion")

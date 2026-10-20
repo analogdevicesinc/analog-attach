@@ -4,8 +4,8 @@ import { describe, test, expect, vi, beforeEach, afterEach } from "vitest";
 
 import { buildApp } from "./app";
 import { buildContext } from "./context";
-import { build_completion_command } from "./commands/completion/command";
-import { run_complete, shell_dequote } from "./commands/completion/complete";
+import { build_completion_command, completion_script } from "./commands/completion/command";
+import { run_complete, shell_dequote, short_description } from "./commands/completion/complete";
 import { COMPLETION_SPEC, NO_VALUE_COMPLETION, FILES_DIRECTIVE, DIRS_DIRECTIVE } from "./commands/completion/spec";
 import { SETTINGS, TOML_SETTINGS } from "./config/settings";
 import * as suggest from "./commands/list/suggest";
@@ -132,6 +132,13 @@ describe("__complete delegates dynamic values to suggest in-process", () => {
                 : arguments_[0] === "parent" ? [{ value: "spi0", display_string: "/soc/spi@0" }]
                 : key === "navigate" ? [{ value: "spi0" }, { value: "i2c1" }]
                 : key === "navigate spi0/adc@0" ? [{ value: "reg", display_string: "reg (required)" }]
+                : key === "navigate spi0" ? [
+                    { value: "spidev@0", group: "set" },
+                    { value: "compatible", display_string: "compatible (required)", group: "set" },
+                    { value: "cs-gpios", group: "set" },
+                    { value: "num-cs", group: "not set" },
+                    { value: "channel@0", display_string: "channel@0 (child node)", group: "not set" },
+                ]
                 : key === "navigate i2c1/hwmon@2e" ? [{ value: "adi,bypass-attenuator-in0", display_string: "adi,bypass-attenuator-in0 (pattern)" }, { value: "fan-", display_string: "fan-… (child node ^fan-[0-9]+$)", partial: true }]
                 : arguments_[0] === "children" ? [{ value: "adc@0" }, { value: "spidev@0" }]
                 : arguments_[0] === "value" ? [{ value: "19 IRQ_TYPE_EDGE_FALLING", display_string: "19 IRQ_TYPE_EDGE_FALLING — spi_pmod1.int" }]
@@ -166,11 +173,46 @@ describe("__complete delegates dynamic values to suggest in-process", () => {
 
     test("read second positional completes properties via navigate", async () => {
         const lines = await complete(["read", "spi0/adc@0", ""]);
-        expect(lines).toStrictEqual(["reg\treg (required)"]);
+        expect(lines).toStrictEqual(["reg\trequired"]);
+    });
+
+    test("the property positional comes in groups, set then not set, each under a group line", async () => {
+        expect(await complete(["update", "spi0", ""])).toStrictEqual([
+            "__ATTACH_COMPLETE_GROUP__\tset",
+            "spidev@0",
+            "compatible\trequired",
+            "cs-gpios",
+            "__ATTACH_COMPLETE_GROUP__\tnot set",
+            "num-cs",
+            "channel@0\tchild node",
+        ]);
+        expect(await complete(["update", "spi0", "c"])).toStrictEqual([
+            "__ATTACH_COMPLETE_GROUP__\tset",
+            "compatible\trequired",
+            "cs-gpios",
+            "__ATTACH_COMPLETE_GROUP__\tnot set",
+            "channel@0\tchild node",
+        ]);
+        expect(await complete(["update", "spi0", "n"])).toStrictEqual(["__ATTACH_COMPLETE_GROUP__\tnot set", "num-cs"]);
+    });
+
+    test("short_description — a display that repeats the value keeps only its note", () => {
+        expect(short_description("reg", "reg (required)")).toBe("required");
+        expect(short_description("fan-", "fan-… (child node ^fan-[0-9]+$)")).toBe("child node ^fan-[0-9]+$");
+        expect(short_description("aon_intr", "aon_intr (disabled)")).toBe("disabled");
+        expect(short_description("reg", "reg")).toBeUndefined();
+        expect(short_description("gpio", "gpio — interrupt controller (only right if wired to it)")).toBe("gpio — interrupt controller (only right if wired to it)");
+        expect(short_description("spi0/", "/soc/spi@0")).toBe("/soc/spi@0");
+    });
+
+    test("every shell stub skips the group lines", () => {
+        for (const shell of ["bash", "fish", "zsh"]) {
+            expect(completion_script(shell), shell).toContain("__ATTACH_COMPLETE_GROUP__");
+        }
     });
 
     test("a pattern stem completes without a trailing space when it is the only candidate left", async () => {
-        expect(await complete(["update", "i2c1/hwmon@2e", "fa"])).toStrictEqual(["__ATTACH_COMPLETE_NOSPACE__", "fan-\tfan-… (child node ^fan-[0-9]+$)"]);
+        expect(await complete(["update", "i2c1/hwmon@2e", "fa"])).toStrictEqual(["__ATTACH_COMPLETE_NOSPACE__", "fan-\tchild node ^fan-[0-9]+$"]);
         expect(values(await complete(["update", "i2c1/hwmon@2e", ""]))).toStrictEqual(["adi,bypass-attenuator-in0", "fan-"]);
     });
 

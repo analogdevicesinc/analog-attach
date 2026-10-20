@@ -508,31 +508,38 @@ export function navigate_node(identifier: string, overlay: DeviceTreeOverlay, ba
     return { properties: node.properties.map(p => p.name), children };
 }
 
-/** What the property positional offers: the children, then the binding's properties (or the node's own without one) and the pattern names. */
+/**
+ * What the property positional offers, in two groups: what the node has (its
+ * children and set properties), then what it could have (the binding's unset
+ * properties and the names its patterns allow). Without a binding, only the first.
+ */
 export function navigate_candidates(node: { properties: string[]; children: string[] }, binding?: NodeBinding): Suggestion[] {
-    const children: Suggestion[] = node.children.map(child => ({ value: child }));
-    if (binding === undefined) { return [...children, ...node.properties.map(name => ({ value: name }))]; }
+    const children: Suggestion[] = node.children.map(child => ({ value: child, group: "set" }));
+    if (binding === undefined) { return [...children, ...node.properties.map(name => ({ value: name, group: "set" }))]; }
 
     const required = new Set(binding.required_properties);
     const existing_keys = new Set(node.properties);
-    const named = binding.properties.map(p => {
-        const labels = [
-            ...(existing_keys.has(p.key) ? ["set"] : []),
-            ...(required.has(p.key) ? ["required"] : []),
-        ].join(", ");
-        return {
-            value: p.key,
-            ...(labels ? { display_string: `${p.key} (${labels})` } : {}),
-        };
-    });
+    const named = binding.properties.map(p => ({
+        value: p.key,
+        ...(required.has(p.key) ? { display_string: `${p.key} (required)` } : {}),
+        group: existing_keys.has(p.key) ? "set" : "not set",
+    }));
     // Names the binding's patterns allow: properties not set yet, child nodes not present yet.
     const taken_properties = new Set([...existing_keys, ...binding.properties.map(p => p.key)]);
     const present = new Set(node.children);
-    return [
-        ...children,
-        ...named,
+    const allowed = [
         ...binding.property_patterns.flatMap(rule => pattern_candidates(rule.pattern, taken_properties, "pattern")),
         ...binding.child_nodes.flatMap(rule => pattern_candidates(rule.pattern, present, "child node")),
+    ].map(suggestion => ({ ...suggestion, group: "not set" }));
+    // Set properties the binding doesn't name, or names by a pattern (status, adi,bypass-attenuator-in1).
+    const named_keys = new Set(binding.properties.map(p => p.key));
+    const unnamed = node.properties.filter(name => !named_keys.has(name)).map(name => ({ value: name, group: "set" }));
+    return [
+        ...children,
+        ...named.filter(s => s.group === "set"),
+        ...unnamed,
+        ...named.filter(s => s.group === "not set"),
+        ...allowed,
     ];
 }
 
@@ -810,7 +817,7 @@ if (import.meta.vitest) {
         expect(navigate_node("nope", overlay, base)).toBeUndefined();
     });
 
-    test("navigate_candidates — children, then the binding's properties marked set and required, then the pattern names", () => {
+    test("navigate_candidates — what is there (children, set properties), then what is not (unset properties, pattern names)", () => {
         const binding: NodeBinding = {
             properties: [
                 { key: "compatible", value: { _t: "generic", description: "" } },
@@ -824,14 +831,29 @@ if (import.meta.vitest) {
             origin: { kind: "compatible", compatible: "brcm,bcm2835-spi" },
             narrow_and_populate: () => ({ properties: [], errors: [] }),
         };
-        expect(navigate_candidates({ properties: ["compatible", "status"], children: ["spidev@0"] }, binding)).toEqual([
-            { value: "spidev@0" },
-            { value: "compatible", display_string: "compatible (set, required)" },
-            { value: "cs-gpios" },
-            { value: "num-cs" },
+        expect(navigate_candidates({ properties: ["compatible", "cs-gpios"], children: ["spidev@0"] }, binding)).toEqual([
+            { value: "spidev@0", group: "set" },
+            { value: "compatible", display_string: "compatible (required)", group: "set" },
+            { value: "cs-gpios", group: "set" },
+            { value: "num-cs", group: "not set" },
         ]);
+        // What the binding doesn't name, or names by a pattern, is still set.
+        expect(navigate_candidates({ properties: ["compatible", "status", "adi,bypass-attenuator-in1"], children: [] }, {
+            ...binding,
+            property_patterns: [{ pattern: "^adi,bypass-attenuator-in[0-2]$", description: "", value: { _t: "generic", description: "" } }],
+        })).toEqual([
+            { value: "compatible", display_string: "compatible (required)", group: "set" },
+            { value: "status", group: "set" },
+            { value: "adi,bypass-attenuator-in1", group: "set" },
+            { value: "cs-gpios", group: "not set" },
+            { value: "num-cs", group: "not set" },
+            { value: "adi,bypass-attenuator-in0", display_string: "adi,bypass-attenuator-in0 (pattern)", group: "not set" },
+            { value: "adi,bypass-attenuator-in2", display_string: "adi,bypass-attenuator-in2 (pattern)", group: "not set" },
+        ]);
+        expect(navigate_candidates({ properties: [], children: [] }, { ...binding, required_properties: ["num-cs"] }).at(-1))
+            .toEqual({ value: "num-cs", display_string: "num-cs (required)", group: "not set" });
         expect(navigate_candidates({ properties: ["compatible", "status"], children: ["spidev@0"] }))
-            .toEqual([{ value: "spidev@0" }, { value: "compatible" }, { value: "status" }]);
+            .toEqual([{ value: "spidev@0", group: "set" }, { value: "compatible", group: "set" }, { value: "status", group: "set" }]);
     });
 
     test("property_info — a pattern property's type and description; an empty default is left out", () => {
