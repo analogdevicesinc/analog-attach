@@ -1,14 +1,16 @@
 import type { StaleReason } from "./config/cache";
 
 // Progress lines for slow cache builds (the compat index, the validation
-// schemas). They go to stderr in every mode, so stdout and --json responses
-// stay clean; shell completion never builds a cache, so it never prints them.
+// schemas, the overlay index). They go to stderr in every mode, so stdout and
+// --json responses stay clean; shell completion never builds a cache, so it
+// never prints them.
 
-export type CacheSubject = "index" | "schemas";
+export type CacheSubject = "index" | "schemas" | "overlays";
 
-const REBUILD: Record<CacheSubject, { first: string; changed: string; action: string }> = {
-    index: { first: "Indexing device bindings", changed: "the last index", action: "re-indexing" },
-    schemas: { first: "Compiling binding schemas for validation", changed: "the last schema build", action: "recompiling binding schemas" },
+const REBUILD: Record<CacheSubject, { first: string; sources: string; changed: string; action: string }> = {
+    index: { first: "Indexing device bindings", sources: "Bindings", changed: "the last index", action: "re-indexing" },
+    schemas: { first: "Compiling binding schemas for validation", sources: "Bindings", changed: "the last schema build", action: "recompiling binding schemas" },
+    overlays: { first: "Indexing overlays", sources: "Overlays", changed: "the last overlay index", action: "re-indexing overlays" },
 };
 
 /** The line printed before a cache is (re)built, saying why. */
@@ -16,7 +18,7 @@ export function rebuild_message(subject: CacheSubject, reason: StaleReason): str
     const words = REBUILD[subject];
     switch (reason.kind) {
         case "missing": { return `${words.first} (first run)...`; }
-        case "stale": { return `Bindings changed since ${words.changed}, ${words.action}...`; }
+        case "stale": { return `${words.sources} changed since ${words.changed}, ${words.action}...`; }
         case "linux-changed": { return `Linux tree changed (${reason.from} → ${reason.to}), ${words.action}...`; }
     }
 }
@@ -74,6 +76,13 @@ if (import.meta.vitest) {
         expect(rebuild_message("schemas", { kind: "stale" })).toBe("Bindings changed since the last schema build, recompiling binding schemas...");
         expect(rebuild_message("schemas", { kind: "linux-changed", from: "/a", to: "/b" }))
             .toBe("Linux tree changed (/a → /b), recompiling binding schemas...");
+    });
+
+    test("rebuild_message - the overlay index", () => {
+        expect(rebuild_message("overlays", { kind: "missing" })).toBe("Indexing overlays (first run)...");
+        expect(rebuild_message("overlays", { kind: "stale" })).toBe("Overlays changed since the last overlay index, re-indexing overlays...");
+        expect(rebuild_message("overlays", { kind: "linux-changed", from: "/a", to: "/b" }))
+            .toBe("Linux tree changed (/a → /b), re-indexing overlays...");
     });
 
     test("format_duration - tenths under 10s, seconds, then minutes", () => {

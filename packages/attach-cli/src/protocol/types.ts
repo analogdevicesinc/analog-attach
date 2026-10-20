@@ -112,6 +112,21 @@ export interface Intelligence {
     args: IntelligenceArgument[];
 }
 
+export interface ListOverlayResponse extends CommonResponse {
+    /** Compatible ones first, then unknown, then incompatible. */
+    overlays: OverlayDescription[];
+}
+
+export interface OverlayDescription {
+    /** The file name, which `import` takes. */
+    name: string;
+    /** Absolute path. */
+    path: string;
+    /** How the overlay's root compatible fits the base's. */
+    fit: "compatible" | "incompatible" | "unknown";
+    reason: string;
+}
+
 export interface ListIntelligenceResponse extends CommonResponse {
     intelligence: Intelligence[];
 }

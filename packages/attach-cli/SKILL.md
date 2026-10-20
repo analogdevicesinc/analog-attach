@@ -42,7 +42,7 @@ Every command checks the configuration it needs up front: `ATTACH_LINUX` must be
 **Per-command config requirements**:
 - `config-set` / `config-get` / `create-workfile`: No prerequisites (`create-workfile` saves the `overlay` path to config)
 - `list device`: Needs `ATTACH_LINUX` (to build the compat index on first run)
-- `list parent`: Needs `ATTACH_LINUX`, `ATTACH_DEVICETREE`
+- `list parent`, `list overlay`: Need `ATTACH_LINUX`, `ATTACH_DEVICETREE`
 - `list property`: Needs `ATTACH_LINUX`, `ATTACH_DEVICETREE`, `overlay`
 - `list value`: Needs `ATTACH_DEVICETREE`, `overlay`. `ATTACH_LINUX` is optional and enables binding check annotations
 - `add`: Needs `ATTACH_LINUX`, `ATTACH_DEVICETREE`, `overlay` (auto-created if missing)
@@ -126,7 +126,7 @@ attach-linux config-get
 
 ### 1. `list` - Discovery and Lookup
 
-**Purpose**: Multi-kind lookup command for devices, properties, values and parents.
+**Purpose**: Multi-kind lookup command for devices, properties, values, parents and overlays.
 
 **Syntax**:
 ```bash
@@ -135,6 +135,7 @@ attach-linux list device [<filter>]         # compatible strings (substring filt
 attach-linux list property <path> [<prop>]  # properties of a node; with prop: type details
 attach-linux list value <path> <prop>       # concrete values for a property
 attach-linux list parent <compatible>       # valid parent buses for a device
+attach-linux list overlay <compatible>      # overlays in the Linux tree with the device
 ```
 
 **Examples**:
@@ -175,6 +176,29 @@ attach-linux list parent <compatible>
 **Output**: One parent per line: `label  /path`.
 
 **Strategy**: SPI devices → look for `spi` in label; I2C → look for `i2c`. If multiple, ask the user which physical bus. Always list ALL returned parents so users see every valid option.
+
+---
+
+### 2b. `list overlay` - Find Existing Overlays for a Device
+
+**Purpose**: Find the overlays already in the Linux tree (RPi `arch/arm/boot/dts/overlays/*-overlay.dts`, and `*.dtso` under `arch/*/boot/dts`) that add the device, and whether each is meant for the base's board.
+
+```bash
+attach-linux list overlay <compatible>
+```
+
+**Output**: one overlay per line, compatible ones first:
+```
+rpi-ad7124-8-all-diff-overlay.dts  compatible (family: brcm,bcm2835 → raspberrypi)
+ad7124-8-overlay.dts               compatible (brcm,bcm2711)
+generic-adc-overlay.dts            unknown (no root compatible)
+zynqmp-ad7124.dtso                 incompatible (overlay: xlnx,zynqmp; base: raspberrypi,4-model-b, brcm,bcm2711)
+```
+The fit compares the overlay's root `compatible` with the base's. A generic SoC compatible that means any board of a family (`brcm,bcm2835` on RPi overlays) matches every base of that family, shown as `family: …`. A root compatible that isn't `vendor,name` (a typo) is unknown. `--json` gives `overlays: [{ name, path, fit, reason }]`.
+
+The overlays are indexed on first use into `.attach-linux/overlay-index.json` (a text scan; quick) and re-indexed when an overlay file changes.
+
+**Strategy**: when a compatible overlay exists, offer it to the user as a starting point rather than building the node by hand.
 
 ---
 

@@ -518,8 +518,13 @@ export function disable_index_build(): void {
     index_build_allowed = false;
 }
 
+/** Whether this run may build a missing or stale index (not in shell completion). */
+export function can_build_index(): boolean {
+    return index_build_allowed;
+}
+
 /** What to do with the cached index: use it, build a new one, or (completion, no index) use an empty one. */
-export function index_action(index: CompatIndex | undefined, reason: StaleReason | undefined, build_allowed: boolean): "use" | "build" | "empty" {
+export function index_action(index: object | undefined, reason: StaleReason | undefined, build_allowed: boolean): "use" | "build" | "empty" {
     if (!build_allowed) { return index === undefined ? "empty" : "use"; }
     return reason === undefined && index !== undefined ? "use" : "build";
 }

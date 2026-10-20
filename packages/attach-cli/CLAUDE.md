@@ -47,7 +47,7 @@ Config is parsed, not validated: `src/config/` turns env vars and config.toml in
   - `deploy`: the deploy fields plus the `.dtbo` derived from the overlay path.
 
   Errors from independent resources are collected and reported once (`report_config_errors`; exit 2 under `--json`). `parse_bindings` / `parse_overlay` are exported for callers that make bindings optional (`list value`, navigate completion) or that create the workfile first (`add`).
-- `cache.ts`: derived state under `.attach-linux/` that never goes into config.toml. `compat-index.json` maps compatible → binding YAML. `validation.json` is the `dt-mk-schema` output and has a `validation.stamp.json` next to it. Both are rebuilt when stale (mtime-based, or when the linux/dt-schema paths differ); `stale_reason` says why. While they build, `src/progress.ts` prints why and a counter on stderr (in every mode). Shell completion calls `disable_index_build()`, so it never builds the index: no index completes nothing, and a stale one is used as is.
+- `cache.ts`: derived state under `.attach-linux/` that never goes into config.toml. `compat-index.json` maps compatible → binding YAML. `validation.json` is the `dt-mk-schema` output and has a `validation.stamp.json` next to it. `overlay-index.json` (`src/overlay-index.ts`) maps each overlay file in the Linux tree (RPi `*-overlay.dts`, every `*.dtso`) to the compatibles of the devices it adds and its root compatible (the board), from a text scan with quoted `#include`s inlined. All are rebuilt when stale (mtime-based, or when the linux/dt-schema paths differ; the overlay index also when files are added or removed); `stale_reason` says why. While they build, `src/progress.ts` prints why and a counter on stderr (in every mode). Shell completion calls `disable_index_build()`, so it never builds the index: no index completes nothing, and a stale one is used as is.
 
 Path helpers in `src/utilities.ts`: `parse_node_path`, `parse_property_name`, `parse_target`, `resolve_path`, `not_found_message`.
 
@@ -83,7 +83,7 @@ The binding provides only a shape hint (`flag` / `strings` / `cells` / undefined
 
 ### list command and hidden __list
 
-`suggest`, `list-devices` and `list-intelligence` were replaced by a unified `list` command tree: `list device`, `list property`, `list value`, `list parent`. A hidden `__list` command handles completion-only kinds. The manifest's `suggest` key points at `__list`.
+`suggest`, `list-devices` and `list-intelligence` were replaced by a unified `list` command tree: `list device`, `list property`, `list value`, `list parent`, `list overlay`. `list overlay <compatible>` reads the overlay index and grades each overlay with `board_fit` (`src/board-fit.ts`): its root compatible against the base's, loosened by the `FAMILIES` table for generic SoC compatibles (`brcm,bcm2835` = any Pi); compatible ones come first. A hidden `__list` command handles completion-only kinds. The manifest's `suggest` key points at `__list`.
 
 ### Naming, unit addresses and labels
 

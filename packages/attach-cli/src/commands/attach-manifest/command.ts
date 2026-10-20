@@ -23,7 +23,7 @@ export function build_attach_manifest_command(_context: LocalContext): Command {
                         argv: ["attach-linux", "--json", "create-workfile"],
                     },
                     "list": {
-                        description: "List device bindings, properties, values or parents. Subkinds: device [compatible], property <path> [property], value <path> <property>, parent <compatible>. Bare `list` shows available kinds.",
+                        description: "List device bindings, properties, values, parents or overlays. Subkinds: device [compatible], property <path> [property], value <path> <property>, parent <compatible>, overlay <compatible>. `list overlay` gives the overlays in the Linux tree (RPi *-overlay.dts, *.dtso) that add the device, as {name, path, fit, reason}: fit compares the overlay's root compatible with the base's (compatible, incompatible, unknown when it has none); compatible ones come first. Bare `list` shows available kinds.",
                         argv: ["attach-linux", "--json", "list"],
                     },
                     "add": {

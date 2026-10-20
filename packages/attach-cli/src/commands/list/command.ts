@@ -6,18 +6,20 @@ import { list_device } from "./device";
 import { list_property } from "./property";
 import { list_value } from "./value";
 import { list_parent } from "./placement";
+import { list_overlay } from "./overlay";
 
 export const LIST_KINDS = [
     { kind: "device", summary: "Device bindings by compatible string", args: "[compatible]" },
     { kind: "property", summary: "Properties of a node from its binding", args: "<path> [property]" },
     { kind: "value", summary: "Concrete values for a property", args: "<path> <property>" },
     { kind: "parent", summary: "Valid parent buses for a device", args: "<compatible>" },
+    { kind: "overlay", summary: "Overlays in the Linux tree with a device, and whether they fit the board", args: "<compatible>" },
 ] as const;
 
 export function build_list_command(context: LocalContext): Command {
     const list = new Command("list")
-        .description("List devices, properties, suggested values, possible parents")
-        .argument("[kind]", "What to list: device, property, value, parent")
+        .description("List devices, properties, suggested values, possible parents, overlays")
+        .argument("[kind]", "What to list: device, property, value, parent, overlay")
         .argument("[args...]", "Kind-specific arguments")
         .addHelpText("after", `
 Kinds:
@@ -25,6 +27,8 @@ Kinds:
   property <path> [property]   Properties of a node from its binding
   value <path> <property>      Suggested values for a property
   parent <compatible>          Valid parent buses for a device
+  overlay <compatible>         Overlays in the Linux tree with the device, and
+                               whether their root compatible fits the board
 
 Paths:
   Label:        spi0                       (a label in the base tree)
@@ -36,7 +40,8 @@ Examples:
   $ attach-linux list device adi                       Filter by prefix
   $ attach-linux list property spi0/adi,ad7124-8@0     Properties for a node
   $ attach-linux list value spi0/adi,ad7124-8@0 reg    Values for a property
-  $ attach-linux list parent adi,ad7124-8              Valid parents`)
+  $ attach-linux list parent adi,ad7124-8              Valid parents
+  $ attach-linux list overlay adi,ad7124-8             Overlays to import`)
         .action(async (kind: string | undefined, arguments_: string[]) => {
             if (kind === undefined) {
                 const response: ListIntelligenceResponse = {
@@ -75,6 +80,10 @@ Examples:
                 }
                 case "parent": {
                     await list_parent(context, arguments_);
+                    return;
+                }
+                case "overlay": {
+                    await list_overlay(context, arguments_);
                     return;
                 }
                 default: {
