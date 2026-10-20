@@ -11,6 +11,8 @@ import type {
     DeviceTree,
     ResolvedProperty,
     PatternPropertyRule,
+    PropertyPatternRule,
+    AttachType,
     PopulateOptions,
     ControllerContext,
     ParseOptions,
@@ -23,6 +25,8 @@ export type NodeBinding = {
     required_properties: string[];
     /** Child nodes the binding allows (its node patternProperties, e.g. `^channel@([0-9]|1[0-5])$`). */
     child_nodes: PatternPropertyRule[];
+    /** Properties named by a pattern (e.g. `^adi,bypass-attenuator-in[0-4]$`). */
+    property_patterns: PropertyPatternRule[];
     /** The YAML file the properties come from (the parent's, for a pattern match). */
     binding_path: string;
     origin:
@@ -30,6 +34,23 @@ export type NodeBinding = {
     | { kind: "pattern"; parent_compatible: string; pattern: string };
     narrow_and_populate(node: DTNode): { properties: ResolvedProperty[]; errors: unknown[] } | undefined;
 };
+
+/** A binding's definition of a property, and the pattern it came from when it isn't named. */
+export type PropertyDefinition = ResolvedProperty & { pattern?: string };
+
+/** The definition of `name`: the property of that name, else the first property pattern that matches it. */
+export function find_property_definition(
+    binding: Pick<NodeBinding, "property_patterns">,
+    properties: ResolvedProperty[],
+    name: string,
+): PropertyDefinition | undefined {
+    const named = properties.find(p => p.key === name);
+    if (named !== undefined) { return named; }
+    const rule = binding.property_patterns.find(r => new RegExp(r.pattern).test(name));
+    if (rule === undefined) { return undefined; }
+    const value = rule.value.description === undefined && rule.description !== "" ? { ...rule.value, description: rule.description } : rule.value;
+    return { key: name, value, pattern: rule.pattern };
+}
 
 export function match_pattern_rule(
     patterns: string[],
@@ -114,6 +135,7 @@ export async function resolve_node_binding(
             properties: initial.parsed_binding.properties,
             required_properties: initial.parsed_binding.required_properties,
             child_nodes: initial.parsed_binding.pattern_properties ?? [],
+            property_patterns: initial.parsed_binding.property_patterns ?? [],
             binding_path,
             origin: { kind: "compatible", compatible: compatible_value },
             narrow_and_populate(node: DTNode) {
@@ -167,6 +189,7 @@ export async function resolve_node_binding(
         required_properties: match.rule.required,
         // Nested patterns (children of a pattern-matched node) aren't resolved.
         child_nodes: [],
+        property_patterns: [],
         binding_path: parent_binding_path,
         origin: { kind: "pattern", parent_compatible: parent_compatible_value, pattern: match.pattern },
         narrow_and_populate(node: DTNode) {
@@ -232,6 +255,28 @@ if (import.meta.vitest) {
 
     test("match_pattern_rule returns undefined when rules is undefined", () => {
         expect(match_pattern_rule(["^channel@[0-9]+$"], undefined, "channel@0")).toBeUndefined();
+    });
+
+    test("find_property_definition — a named property first, else the first property pattern that matches", () => {
+        const enum_type: AttachType = { _t: "enum_integer", enum: [0n, 1n], description: "bypass" };
+        const flag: AttachType = { _t: "boolean", description: "named" };
+        const binding = {
+            property_patterns: [
+                { pattern: "^adi,bypass-attenuator-in[0-4]$", description: "Configures bypassing", value: enum_type },
+                { pattern: "^adi,.*$", description: "catch-all", value: { _t: "generic" } as AttachType },
+            ],
+        };
+        const named = [{ key: "adi,bypass-attenuator-in1", value: flag }];
+
+        expect(find_property_definition(binding, [], "adi,bypass-attenuator-in1")).toEqual({ key: "adi,bypass-attenuator-in1", value: enum_type, pattern: "^adi,bypass-attenuator-in[0-4]$" });
+        expect(find_property_definition(binding, named, "adi,bypass-attenuator-in1")).toEqual(named[0]);
+        expect(find_property_definition(binding, [], "adi,other")?.pattern).toBe("^adi,.*$");
+        expect(find_property_definition(binding, [], "reg")).toBeUndefined();
+    });
+
+    test("find_property_definition — the pattern's description when the type has none", () => {
+        const binding = { property_patterns: [{ pattern: "-supply$", description: "Input supply", value: { _t: "generic" } as const }] };
+        expect(find_property_definition(binding, [], "vdd-supply")?.value.description).toBe("Input supply");
     });
 
     test("match_pattern_rule prefers the first matching pattern", () => {

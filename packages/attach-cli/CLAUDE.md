@@ -55,6 +55,10 @@ Path helpers in `src/utilities.ts`: `parse_node_path`, `parse_property_name`, `p
 
 `attach-lib` is a dev dependency resolved from the workspace. `tsup` bundles it into the output via `noExternal: ["attach-lib"]`, so the published `dist/` is self-contained. The `yaml` package is intentionally kept external.
 
+### Property patterns
+
+A binding's patternProperties are split by the lib (`Bindings/PatternKind.ts`): object schemas and patterns with an `@` are child nodes (`NodeBinding.child_nodes`, matched by `match_pattern_rule`); the rest name properties (`NodeBinding.property_patterns`, e.g. `^adi,bypass-attenuator-in[0-4]$`), with the same fixups and types as named properties. `find_property_definition` (`src/binding-resolution.ts`) looks a property up by name, then by property pattern; `update`'s shape hint, the suggestion check, `list value` and `property_info` (`read`, `list property <path> <prop>`) all go through it. `list property <path>` lists the patterns as their regex, marked `(pattern)`.
+
 ### Value suggestions
 
 `list value` asks attach-lib's `IntelligenceStack.default()` for values (binding and base-devicetree layers, see `packages/attach-lib/src/Intelligence/CLAUDE.md`), placing the node with `placement_from_overlay`. The data paths are `resolve_target_binding` / `value_suggestions` / `property_info` in `src/commands/list/suggest.ts`, which `read` (and `update` without a value, via `read_target`) reuse for the description, allowed values and suggestions under a property; `src/node-state.ts` gives a node's missing required properties. Lib suggestions are structured cell rows; `format_suggestion` (`src/commands/update/command.ts`) turns them into value strings and is the inverse of `parse_value`. Command templates (`preprocess-command`, the build command) go through `substitute_command` / `is_tool_available` in `src/utilities.ts`.

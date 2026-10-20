@@ -9,8 +9,10 @@ import {
     parent_path_string,
     placement_from_overlay,
     suggest_parents,
+    type AttachType,
     type DTNode,
     type PatternPropertyRule,
+    type PropertyPatternRule,
     type ParsedBinding,
     type ValueSuggestion,
 } from "attach-lib";
@@ -21,7 +23,7 @@ import { format_suggestion, build_raw_property, shape_hint, parse_value } from "
 import { bigIntReplacer, effective_parent_compatibles, find_binding, fragment_target, get_or_build_compat_index, parse_property_reference, resolve_node_identifier, resolve_positional_path, resolve_write_target, type WriteTarget } from "../../utilities";
 import { respond, respond_fail, input_error } from "../../protocol/output";
 import { attach_type_to_protocol_type } from "../../protocol/dt-to-protocol";
-import { resolve_node_binding, type NodeBinding } from "../../binding-resolution";
+import { find_property_definition, resolve_node_binding, type NodeBinding } from "../../binding-resolution";
 import { check_value } from "../../value-check";
 import type { TypeResponse, Suggestion, Types } from "../../protocol/types";
 
@@ -239,12 +241,18 @@ export function value_suggestions(
         data = JSON.stringify(input_data, bigIntReplacer);
     }
 
+    // A property named by a pattern is offered to the stack under its own name.
+    const pattern_definition = resolved === undefined ? undefined : find_property_definition(resolved, resolved.properties, property_name);
+    const properties = resolved === undefined ? [] : [
+        ...resolved.properties,
+        ...(pattern_definition?.pattern === undefined ? [] : [{ key: pattern_definition.key, value: pattern_definition.value }]),
+    ];
     const stack = IntelligenceStack.default();
     const values = stack.suggest_values(property_name, {
         devicetree: base_dt,
         data,
         placement,
-        ...(resolved === undefined ? {} : { binding: { required_properties: resolved.required_properties, properties: resolved.properties } }),
+        ...(resolved === undefined ? {} : { binding: { required_properties: resolved.required_properties, properties } }),
     });
 
     // Binding check: annotate suggestions in place, via the note field.
@@ -277,7 +285,7 @@ function annotate_suggestions(
         const preview_node = structuredClone(binding_node);
 
         // Build the property from the suggestion value and place it on the preview node
-        const hint = shape_hint(binding.properties.find(p => p.key === property_name));
+        const hint = shape_hint(find_property_definition(binding, binding.properties, property_name));
         const built = build_raw_property(formatted, property_name, hint, is_label);
         if (built !== null && built !== undefined && !("error" in built)) {
             const existing_index = preview_node.properties.findIndex(p => p.name === property_name);
@@ -292,7 +300,7 @@ function annotate_suggestions(
         const result = binding.narrow_and_populate(preview_node);
         if (result === undefined) { continue; }
 
-        const definition = result.properties.find(p => p.key === property_name);
+        const definition = find_property_definition(binding, result.properties, property_name);
         if (definition === undefined) {
             suggestion.note = combine_notes(suggestion.note, `not defined by ${origin_desc}; validate may reject it`);
             continue;
@@ -380,6 +388,7 @@ async function suggest_node_property(context_: LocalContext, arguments_: string[
 
     const required = new Set(binding.required_properties);
     const all_properties = binding.properties;
+    const patterns = binding.property_patterns.map(rule => describe_property_pattern(rule, found_node));
     const children = binding.child_nodes.map(rule => describe_child_nodes(rule, found_node));
 
     if (context_.json) {
@@ -394,10 +403,12 @@ async function suggest_node_property(context_: LocalContext, arguments_: string[
                     ...(labels ? { display_string: `${p.key} (${labels})` } : {}),
                 };
             }),
+            ...patterns,
             ...children,
         ];
+        const pattern_note = patterns.length > 0 ? `, ${patterns.length} property pattern(s)` : "";
         const child_note = children.length > 0 ? ` and ${children.length} child node pattern(s)` : "";
-        respond({ ok: true, message: `Found ${all_properties.length} properties${child_note}`, severity: "info", suggestions });
+        respond({ ok: true, message: `Found ${all_properties.length} properties${pattern_note}${child_note}`, severity: "info", suggestions });
     } else {
         for (const p of all_properties) {
             const markers = [
@@ -406,8 +417,17 @@ async function suggest_node_property(context_: LocalContext, arguments_: string[
             ].join(", ");
             console.log(markers ? `${p.key} (${markers})` : p.key);
         }
+        for (const pattern of patterns) { console.log(pattern.display_string); }
         for (const child of children) { console.log(child.display_string); }
     }
+}
+
+/** A property pattern of the binding as a suggestion: its regex, marked "(pattern)", and the names already set. */
+export function describe_property_pattern(rule: PropertyPatternRule, node: DTNode): Suggestion {
+    const pattern = new RegExp(rule.pattern);
+    const set = node.properties.map(p => p.name).filter(name => pattern.test(name));
+    const details = ["pattern", ...(set.length > 0 ? [`set: ${set.join(", ")}`] : [])];
+    return { value: rule.pattern, display_string: `${rule.pattern} (${details.join("; ")})` };
 }
 
 /**
@@ -619,7 +639,7 @@ async function suggest_type(context_: LocalContext, arguments_: string[]): Promi
         const required = info.required ? " (required)" : "";
         console.log(`${property_name}${required}: ${format_type(info.type)}`);
         if (info.description !== undefined) {
-            console.log(`  ${info.description}`);
+            for (const line of info.description.trim().split("\n").map(l => l.trim()).filter(Boolean)) { console.log(`  ${line}`); }
         }
         const { constraints } = info;
         if (constraints.const !== undefined) { console.log(`  const: ${JSON.stringify(constraints.const, bigIntReplacer)}`); }
@@ -657,7 +677,7 @@ export function property_info(
         return { ok: false, message };
     }
 
-    const property_definition = result.properties.find(p => p.key === property_name);
+    const property_definition = find_property_definition(binding, result.properties, property_name);
     if (property_definition === undefined) {
         const origin_desc = binding.origin.kind === "compatible"
             ? `${binding.origin.compatible} binding`
@@ -679,7 +699,10 @@ export function property_info(
             constraints: {
                 ...(v["const"] === undefined ? {} : { const: v["const"] }),
                 // A phandle enum's default is the value currently set (a preselect), not the binding's.
-                ...(v["default"] === undefined || v["enum_type"] === AttachEnumType.PHANDLE ? {} : { default: v["default"] }),
+                // An empty array is no default either.
+                ...(v["default"] === undefined || v["enum_type"] === AttachEnumType.PHANDLE || (Array.isArray(v["default"]) && v["default"].length === 0)
+                    ? {}
+                    : { default: v["default"] }),
                 ...(minimum === undefined ? {} : { minimum }),
                 ...(maximum === undefined ? {} : { maximum }),
             },
@@ -713,6 +736,32 @@ export function format_type(type: Types): string {
 
 if (import.meta.vitest) {
     const { test, expect, describe } = import.meta.vitest;
+
+    test("property_info — a pattern property's type and description; an empty default is left out", () => {
+        const value: AttachType = { _t: "enum_array", minItems: 1, maxItems: 1, enum: ["pwm2", "smbalert#"], default: [], enum_type: AttachEnumType.STRING, description: "Pin 5 function" };
+        const binding: NodeBinding = {
+            properties: [],
+            required_properties: [],
+            child_nodes: [],
+            property_patterns: [{ pattern: "^adi,pin(5|10)-function$", description: "", value }],
+            binding_path: "/linux/hwmon/adt7475.yaml",
+            origin: { kind: "compatible", compatible: "adi,adt7475" },
+            narrow_and_populate: () => ({ properties: [], errors: [] }),
+        };
+        const result = property_info(binding, { name: "hwmon", labels: [], properties: [], children: [] } as unknown as DTNode, "adi,pin5-function");
+        expect(result.ok && result.info.description).toBe("Pin 5 function");
+        expect(result.ok && result.info.constraints).toEqual({});
+    });
+
+    test("describe_property_pattern — the regex, marked as a pattern, with the names already set", () => {
+        const node = { name: "hwmon", labels: [], properties: [{ name: "adi,bypass-attenuator-in1", value: [] }, { name: "reg", value: [] }], children: [] } as unknown as DTNode;
+        const rule = { pattern: "^adi,bypass-attenuator-in[0-4]$", description: "", value: { _t: "generic" } as const };
+        expect(describe_property_pattern(rule, node)).toEqual({
+            value: "^adi,bypass-attenuator-in[0-4]$",
+            display_string: "^adi,bypass-attenuator-in[0-4]$ (pattern; set: adi,bypass-attenuator-in1)",
+        });
+        expect(describe_property_pattern(rule, { ...node, properties: [] }).display_string).toBe("^adi,bypass-attenuator-in[0-4]$ (pattern)");
+    });
     type VS = import("attach-lib").ValueSuggestion;
 
     // ── to_suggestion ──────────────────────────────────────────────────

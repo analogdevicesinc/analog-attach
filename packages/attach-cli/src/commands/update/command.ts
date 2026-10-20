@@ -34,7 +34,7 @@ import * as fs from "node:fs";
 import type { LocalContext } from "../../context";
 import { load_workspace, type Bindings, type Workfile } from "../../config/workspace";
 import { resolve_write_target, parse_node_path, not_found_message } from "../../utilities";
-import { child_unit_radix, resolve_node_binding } from "../../binding-resolution";
+import { child_unit_radix, find_property_definition, resolve_node_binding } from "../../binding-resolution";
 import { respond, respond_fail, input_error, diagnostic } from "../../protocol/output";
 import { convert_node } from "../../protocol/dt-to-protocol";
 import { read_target } from "../read/command";
@@ -261,7 +261,7 @@ export function resolve_property_definition(
             if (!quiet) { diagnostic(`Property ${property_name} written without schema validation: failed to narrow binding`); }
             return { definition: undefined };
         }
-        const definition = result.properties.find(entry => entry.key === property_name);
+        const definition = find_property_definition(binding, result.properties, property_name);
         if (definition === undefined && !quiet) {
             const origin_desc = binding.origin.kind === "compatible"
                 ? `${binding.origin.compatible} binding`
