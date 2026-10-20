@@ -379,7 +379,14 @@ export function format_property_details(property: Property, suggestions: Propert
     }
 
     if (property.description) {
-        out += `  ${"Description:".padEnd(15)}${property.description}\n`;
+        // A description can run several paragraphs (an override adds its own under the
+        // schema's), so continuation lines line up under the first, blank lines kept bare.
+        const indent = " ".repeat(2 + 15);
+        const description = property.description
+            .split("\n")
+            .map((line, index) => (index === 0 || line === "" ? line : `${indent}${line}`))
+            .join("\n");
+        out += `  ${"Description:".padEnd(15)}${description}\n`;
     }
 
     switch (property._t) {
