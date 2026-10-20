@@ -25,6 +25,9 @@ The currently active DTS implementation. Types: `DtsDocument`, `DtsNode`, `DtsPr
 **`Devicetree.ts` (`src/Devicetree.ts`) — WIP**
 An in-progress ergonomic wrapper (`DeviceTree`, `DeviceTreeOverlay` classes) built on top of the *new* `src/dts/` AST, not `dts_legacy/`. Provides tree traversal (`as_stream`, DFS/BFS) and mutation helpers (`add_fragment`, `set_status`, `remove_node`, etc.), using `src/DTBuilder/` to construct nodes/properties. Not yet exported from `src/index.ts` or consumed elsewhere — active development area, expect API churn.
 
+**Overlay checks (`src/Devicetree/RegConflicts.ts`, `src/Devicetree/References.ts`)**
+`reg_conflicts(overlay)` finds sibling nodes whose `reg` clashes. `unresolved_references(overlay, under?)` lists `&label` / `&{path}` references that name no node of the base tree or the overlay, and `unresolved_targets(overlay)` lists fragments whose `target` / `target-path` doesn't exist before the fragment is applied. Labels on `__overlay__` and inside `__dormant__` fragments count, as dtc resolves them too.
+
 **Node/property builder (`src/DTBuilder/`)**
 Fluent builders (`NodeBuilder`, `PropertyBuilder`) for constructing `src/dts/` AST nodes and properties programmatically, used by `Devicetree.ts`. Split into `DTBuilder.ts` (builder classes), `Types.ts` (cell/value input types), `TypeUtilities.ts` (helper type-level utilities like `AddCallOnce`).
 
