@@ -8,7 +8,7 @@
 -%>
 /*
  * Your application. main.c brings every device up, then calls app_main() once the
- * `example` setting is false (attach-noos tool-config-set example false). attach-noos
+ * `example` setting is false (attach-noos config example false). attach-noos
  * generate writes this file only when it does not exist, so it is yours to change: add
  * your own files and functions next to it. The handles and configs are declared in
  * common/common_data.h.

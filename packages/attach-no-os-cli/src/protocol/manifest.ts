@@ -176,18 +176,22 @@ export function build_manifest(): Manifest {
     return {
         protocol_version: PROTOCOL_VERSION,
         commands: {
+            // attach-meta's two config commands are one here: `config` reads with a key
+            // alone (or none, which is what its init sends) and writes with a value too.
+            // A get naming two or more keys would read as a write, so it is not supported.
             "tool-config-get": map(
-                "tool-config-get",
+                "config",
                 "Read the CLI's settings: where the workfile and CAPI repos are, which board and template set to use.",
                 { completions: [{ arg: "tool-config-get", kind: SUGGEST_KINDS.config_field }] },
             ),
             "tool-config-set": map(
-                "tool-config-set",
+                "config",
                 "Write one setting. Every command's inputs come from here, since the protocol commands take no options of their own.",
                 { completions: [{ arg: "tool-config-set", kind: SUGGEST_KINDS.config_field }] },
             ),
+            // attach-meta's name for it; ours is `init`.
             "create-workfile": map(
-                "create-workfile",
+                "init",
                 "Start an empty workfile at the configured path, targeting the configured board or platform.",
             ),
             "list-devices": map(

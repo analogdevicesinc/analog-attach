@@ -167,7 +167,7 @@ export function get_config_keys(): string[] {
  * scanned from what is configured (`enum_of`: every board, every chip, every template set).
  * Undefined for a free-form setting.
  *
- * The one source for a setting's choices, so tab completion, `tool-config-get` and what
+ * The one source for a setting's choices, so tab completion, `config` and what
  * attach-meta is told can never offer different lists.
  */
 export function setting_options(setting: Setting): string[] | undefined {
@@ -181,7 +181,7 @@ export function setting_options(setting: Setting): string[] | undefined {
         case "platform": {
             return get_platform_names();
         }
-        case "template_set": {
+        case "template": {
             return list_template_sets();
         }
         case undefined: {

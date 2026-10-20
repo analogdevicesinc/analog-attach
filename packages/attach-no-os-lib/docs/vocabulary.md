@@ -90,7 +90,7 @@ rulesets:
 | Key | Meaning |
 |---|---|
 | `rulesets` | groups of ruleset files. The group names are free, with two exceptions below. |
-| `rulesets.iio` | a driver's IIO side: its IIO device and what only it uses. Never offered for a generic handle's fields; under `template_set: capi-iio`, the descriptor in it is the driver's root. |
+| `rulesets.iio` | a driver's IIO side: its IIO device and what only it uses. Never offered for a generic handle's fields; under `template: capi-iio`, the descriptor in it is the driver's root. |
 | `bsp_kinds` | on capi only: board.yml peripheral kind to the C type it has (`spi: capi_spi_config`) |
 | `chip_select` | on capi only: which fields carry a SPI device's chip-select |
 | `example` | on a driver: code the generated main.c runs once everything is up, see below |

@@ -13,12 +13,12 @@ import {
 import { common_ok, type CreateWorkfileResponse } from "../protocol/responses";
 import { output, output_error } from "./shared";
 
-type CreateWorkfileFlags = {
+type InitFlags = {
     json?: boolean;
 };
 
 /**
- * `attach-noos create-workfile` — start a new workfile at the configured path.
+ * `attach-noos init` — start a new workfile at the configured path.
  *
  * The protocol gives this command no arguments at all — its base schema declares no flags
  * and attach-meta dispatches it with an empty argv — so every input is a setting: `workfile`
@@ -27,13 +27,13 @@ type CreateWorkfileFlags = {
  * `generate` from the same settings, so a target that lived only in one command's argv would
  * be a target nothing else could see.
  */
-export const createWorkfileCommand = buildCommand<CreateWorkfileFlags, []>({
+export const initCommand = buildCommand<InitFlags, []>({
     docs: {
         brief: "Create a new workfile at the configured path",
         fullDescription:
             "Creates the workfile named by the 'workfile' setting, for the board named by the\n" +
             "'board' setting (or the 'platform' setting, for platforms that have no boards).\n" +
-            "Set them with 'attach-noos tool-config-set'. Refuses to overwrite a workfile that already exists."
+            "Set them with 'attach-noos config'. Refuses to overwrite a workfile that already exists."
     },
     parameters: {
         positional: { kind: "tuple", parameters: [] },
@@ -41,7 +41,7 @@ export const createWorkfileCommand = buildCommand<CreateWorkfileFlags, []>({
             json: { kind: "boolean", brief: "Output as JSON", optional: true }
         }
     },
-    func: async (flags: CreateWorkfileFlags) => {
+    func: async (flags: InitFlags) => {
         const target = get_workfile_path();
         if (!target.ok) {
             output_error(flags, target.error.message);
@@ -120,7 +120,7 @@ function resolve_target(): ResolvedTarget {
     if (configured_board === undefined && configured_platform === undefined) {
         return {
             ok: false,
-            message: "No board or platform configured. Run: attach-noos tool-config-set board <name>",
+            message: "No board or platform configured. Run: attach-noos config board <name>",
             text: format_no_target()
         };
     }
@@ -162,8 +162,8 @@ function setting(key: "board" | "platform"): string | undefined {
 
 function format_no_target(): string {
     let out = "No board or platform configured.\n\n";
-    out += "  attach-noos tool-config-set board <name>       a board settles the platform on its own\n";
-    out += "  attach-noos tool-config-set platform <name>    for a chip with no board of its own\n\n";
+    out += "  attach-noos config board <name>       a board settles the platform on its own\n";
+    out += "  attach-noos config platform <name>    for a chip with no board of its own\n\n";
 
     const socs = list_socs();
     if (!socs.ok) {

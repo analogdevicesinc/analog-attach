@@ -1,7 +1,7 @@
 import path from "node:path";
 import type { SettingsFile } from "./types";
 
-// Template set codegen renders with when `template_set` is unset. Declared before
+// Template set codegen renders with when `template` is unset. Declared before
 // SETTINGS_DEFAULTS so the defaults can name it; kept in this module (not in
 // codegen/template_sets.ts) so settings never imports codegen, which imports
 // settings back.
@@ -38,7 +38,7 @@ export const SETTINGS_DEFAULTS: SettingsFile = {
 		description: "Path to the root of the capi repository",
 		required: true,
 		type: "path",
-		category: "paths",
+		category: "sources",
 	},
 	// Every other module root. Rulesets name each other by bare C symbol, so a reference
 	// reaches across repos without anybody declaring a dependency — which only works if
@@ -49,7 +49,7 @@ export const SETTINGS_DEFAULTS: SettingsFile = {
 		description: "Module repositories to load rulesets from (platform backends, driver collections), separated like PATH",
 		required: false,
 		type: "path_list",
-		category: "paths",
+		category: "sources",
 	},
 	// attach-meta has no --workfile flag: it forwards nothing but the arguments its own
 	// schema defines, so the workfile a command acts on has to come from config. Stored
@@ -60,21 +60,21 @@ export const SETTINGS_DEFAULTS: SettingsFile = {
 		required: true,
 		type: "path",
 		default: DEFAULT_WORKFILE_NAME,
-		category: "workspace",
+		category: "workfile",
 	},
 	board: {
 		description: "Board a new workfile targets; setting it also sets 'platform' to the chip it carries",
 		required: true,
 		type: "string",
 		enum_of: "board",
-		category: "workspace",
+		category: "target",
 	},
 	platform: {
 		description: "Chip a new workfile targets, for a chip with no board of its own; setting it clears a 'board' that carries another chip",
 		required: false,
 		type: "string",
 		enum_of: "platform",
-		category: "workspace",
+		category: "target",
 	},
 	project_name: {
 		description: "Name of the generated project (unset: the name of the workfile's directory)",
@@ -88,12 +88,12 @@ export const SETTINGS_DEFAULTS: SettingsFile = {
 		type: "path",
 		category: "project",
 	},
-	template_set: {
+	template: {
 		description: "Template set used by codegen: a folder name under codegen/templates, or a path to your own template folder",
 		required: false,
 		type: "string",
 		default: DEFAULT_TEMPLATE_SET,
-		enum_of: "template_set",
+		enum_of: "template",
 		category: "project",
 	},
 	// CAPI builds with CMake and Kconfig from inside the project directory
@@ -129,7 +129,7 @@ export const SETTINGS_DEFAULTS: SettingsFile = {
 		type: "bool",
 		default: "true",
 		options: ["true", "false"],
-		category: "workspace",
+		category: "workfile",
 	},
 	example: {
 		description: "Have the generated main.c run each part's example (true), or your own app_main() in src/app.c (false)",
@@ -137,7 +137,7 @@ export const SETTINGS_DEFAULTS: SettingsFile = {
 		type: "bool",
 		default: "true",
 		options: ["true", "false"],
-		category: "build",
+		category: "project",
 	},
 };
 
@@ -148,6 +148,6 @@ export const DEFAULT_SYSTEM_CONFIG_FILENAME = "config.json";
  * Project-local config, searched for upward from the current directory. Mirrors how
  * attach-meta keeps its own `.attach-meta.toml` per directory: settings that belong to
  * one project (which board, which project name) go here and shadow the global config,
- * so switching projects is a `cd` rather than a series of `tool-config-set` calls.
+ * so switching projects is a `cd` rather than a series of `config` calls.
  */
 export const LOCAL_CONFIG_FILENAME = ".analog-attach.json";

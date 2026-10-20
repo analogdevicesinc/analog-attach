@@ -1,6 +1,7 @@
 import { buildCommand } from "@stricli/core";
 import {
     SETTINGS_DEFAULTS,
+    SETTING_CATEGORIES,
     Setting,
     SettingEnumSource,
     SettingsFile,
@@ -22,81 +23,30 @@ import {
 import { common_ok, type Config, type ConfigType, type ToolConfigResponse } from "../protocol/responses";
 import { output, output_error } from "./shared";
 
-type ConfigGetFlags = { json?: boolean };
-type ConfigSetFlags = { json?: boolean; local?: boolean; reset?: boolean };
+type ConfigFlags = { json?: boolean; local?: boolean; reset?: boolean };
 
-// --- tool-config-get ---
+// --- config ---
 
-export const toolConfigGetCommand = buildCommand<ConfigGetFlags, string[]>({
+export const configCommand = buildCommand<ConfigFlags, [string | undefined, string | undefined]>({
     docs: {
-        brief: "Show CLI settings",
+        brief: "Show or change CLI settings",
         fullDescription:
-            "Shows every setting, or only the named ones.\n" +
+            "config                  shows every setting\n" +
+            "config <key>            shows one setting, and the values it can take\n" +
+            "config <key> <value>    sets it\n" +
+            "config <key> --reset    clears it\n" +
             "Values are read from the project-local config (.analog-attach.json, searched for\n" +
-            "upward from the current directory) and then from the global config."
-    },
-    parameters: {
-        positional: {
-            kind: "array",
-            parameter: {
-                placeholder: "field",
-                brief: "Setting to show (default: all of them)",
-                parse: String,
-                proposeCompletions(partial: string) {
-                    return filter_completions(get_config_keys(), partial);
-                }
-            }
-        },
-        flags: {
-            json: { kind: "boolean", brief: "Output as JSON", optional: true }
-        }
-    },
-    func: async (flags: ConfigGetFlags, ...fields: string[]) => {
-        const settings = get_settings();
-        if (!settings.ok) {
-            output_error(flags, settings.error.message);
-            return;
-        }
-
-        const unknown = fields.filter(field => !(field in settings.value));
-        if (unknown.length > 0) {
-            output_error(
-                flags,
-                `Unknown setting${unknown.length > 1 ? "s" : ""}: ${unknown.join(", ")}. ` +
-                `Available: ${Object.keys(settings.value).join(", ")}`
-            );
-            return;
-        }
-
-        const selected = (fields.length > 0 ? fields : Object.keys(settings.value)) as (keyof SettingsFile)[];
-        const configs = selected.map(field => to_config(field, settings.value[field]));
-
-        const response: ToolConfigResponse = {
-            ...common_ok(`${configs.length} setting${configs.length === 1 ? "" : "s"}`),
-            configs
-        };
-
-        output(flags, format_configs(settings.value, selected), response);
-    }
-});
-
-// --- tool-config-set ---
-
-export const toolConfigSetCommand = buildCommand<ConfigSetFlags, [string, string | undefined]>({
-    docs: {
-        brief: "Set a CLI setting",
-        fullDescription:
-            "Writes <field> = <value>.\n" +
-            "The project-local config is written when one exists at or above the current\n" +
-            "directory, or when --local is given; the global config otherwise."
+            "upward from the current directory) and then from the global config. A write goes to\n" +
+            "the project-local config when there is one, or with --local; to the global one otherwise."
     },
     parameters: {
         positional: {
             kind: "tuple",
             parameters: [
                 {
-                    placeholder: "field",
-                    brief: "Setting to write",
+                    placeholder: "key",
+                    brief: "Setting to show or change (omit to show all of them)",
+                    optional: true,
                     parse: String,
                     proposeCompletions(partial: string) {
                         return filter_completions(get_config_keys(), partial);
@@ -104,7 +54,7 @@ export const toolConfigSetCommand = buildCommand<ConfigSetFlags, [string, string
                 },
                 {
                     placeholder: "value",
-                    brief: "Value to write (omit with --reset to clear it)",
+                    brief: "Value to write (omit to show the setting)",
                     optional: true,
                     parse: String,
                     proposeCompletions(partial: string) {
@@ -118,83 +68,92 @@ export const toolConfigSetCommand = buildCommand<ConfigSetFlags, [string, string
             json: { kind: "boolean", brief: "Output as JSON", optional: true },
             local: {
                 kind: "boolean",
-                brief: "Write the project-local config, creating it here if there is none",
+                brief: "When writing: write the project-local config, creating it here if there is none",
                 optional: true
             },
-            reset: { kind: "boolean", brief: "Clear the setting instead of writing a value", optional: true }
+            reset: { kind: "boolean", brief: "Clear <key> instead of writing a value", optional: true }
         }
     },
-    func: async (flags: ConfigSetFlags, field: string, value?: string) => {
-        if (!(field in SETTINGS_DEFAULTS)) {
-            output_error(
-                flags,
-                `Unknown setting: ${field}. Available: ${Object.keys(SETTINGS_DEFAULTS).join(", ")}`
-            );
+    func: async (flags: ConfigFlags, key?: string, value?: string) => {
+        if (key === undefined) {
+            if (flags.reset || flags.local) {
+                output_error(flags, "--reset and --local need a setting: attach-noos config <key> [<value>] [--reset] [--local]");
+                return;
+            }
+            show_settings(flags);
             return;
         }
 
-        const key = field as keyof SettingsFile;
+        if (!(key in SETTINGS_DEFAULTS)) {
+            output_error(flags, `Unknown setting: ${key}. Available: ${Object.keys(SETTINGS_DEFAULTS).join(", ")}`);
+            return;
+        }
+        const field = key as keyof SettingsFile;
+
+        if (flags.reset && value !== undefined) {
+            output_error(flags, `Give '${key}' a value or --reset, not both.`);
+            return;
+        }
 
         if (value === undefined && !flags.reset) {
-            // Show the choices when there are some: asking for the setting by name is how
-            // someone finds out what it can be set to.
-            const settings = get_settings();
-            const setting = settings.ok ? settings.value[key] : undefined;
-            const options = setting === undefined ? undefined : setting_options(setting);
-            const message = `No value given for '${field}'. Pass one, or use --reset to clear it.`;
-            if (options === undefined || options.length === 0) {
-                // A scanned set that came up empty is a configuration gap, not a free-form
-                // setting, so say what the scan needs rather than nothing.
-                const why = setting?.enum_of === undefined ? undefined : empty_scan_reason(setting.enum_of);
-                output_error(flags, why === undefined ? message : `${message} No options found: ${why}`);
+            if (flags.local) {
+                output_error(flags, `--local only applies when writing: attach-noos config ${key} <value> --local`);
                 return;
             }
-            const listing = key === "board"
-                ? describe_boards(setting?.value)
-                : options.map(option => `  ${option === setting?.value ? "●" : "○"} ${option}`);
-            output_error(flags, `${message} Options: ${options.join(", ")}`, {
-                text: [
-                    `No value given for '${field}'. Choose one:`,
-                    "",
-                    ...listing,
-                    "",
-                    `Use: attach-noos tool-config-set ${field} <value>`,
-                ].join("\n"),
-            });
+            show_settings(flags, field);
             return;
         }
 
-        const new_value = flags.reset ? undefined : value;
+        write_setting(flags, field, flags.reset ? undefined : value);
+    }
+});
 
-        // A board and its platform are one choice: writing either keeps the other agreeing.
-        if (is_target_setting(key)) {
-            const written = set_target_setting(key, new_value, { local: flags.local });
-            if (!written.ok) {
-                output_error(flags, written.error.message);
-                return;
-            }
-            const parts = Object.entries(written.value.changed).map(([name, changed]) =>
-                changed === undefined ? `cleared '${name}'` : `set '${name}' to '${changed}'`);
-            const said = parts.join(" and ");
-            const reason = written.value.reason === undefined ? "" : ` (${written.value.reason})`;
-            const message = `${said.charAt(0).toUpperCase()}${said.slice(1)}${reason}`;
-            output(flags, message, common_ok(message));
-            return;
-        }
+/** Every setting, or the one named. */
+function show_settings(flags: ConfigFlags, field?: keyof SettingsFile): void {
+    const settings = get_settings();
+    if (!settings.ok) {
+        output_error(flags, settings.error.message);
+        return;
+    }
 
-        const written = set_setting_value(key, new_value, { local: flags.local });
+    const selected = field === undefined ? Object.keys(settings.value) as (keyof SettingsFile)[] : [field];
+    const configs = selected.map(name => to_config(name, settings.value[name]));
+
+    const response: ToolConfigResponse = {
+        ...common_ok(`${configs.length} setting${configs.length === 1 ? "" : "s"}`),
+        configs
+    };
+
+    output(flags, format_configs(settings.value, selected), response);
+}
+
+/** Write one setting, or clear it with value undefined. */
+function write_setting(flags: ConfigFlags, field: keyof SettingsFile, value: string | undefined): void {
+    // A board and its platform are one choice: writing either keeps the other agreeing.
+    if (is_target_setting(field)) {
+        const written = set_target_setting(field, value, { local: flags.local });
         if (!written.ok) {
             output_error(flags, written.error.message);
             return;
         }
-
-        const message = flags.reset
-            ? `Cleared '${field}'`
-            : `Set '${field}' to '${value}'`;
-
+        const parts = Object.entries(written.value.changed).map(([name, changed]) =>
+            changed === undefined ? `cleared '${name}'` : `set '${name}' to '${changed}'`);
+        const said = parts.join(" and ");
+        const reason = written.value.reason === undefined ? "" : ` (${written.value.reason})`;
+        const message = `${said.charAt(0).toUpperCase()}${said.slice(1)}${reason}`;
         output(flags, message, common_ok(message));
+        return;
     }
-});
+
+    const written = set_setting_value(field, value, { local: flags.local });
+    if (!written.ok) {
+        output_error(flags, written.error.message);
+        return;
+    }
+
+    const message = value === undefined ? `Cleared '${field}'` : `Set '${field}' to '${value}'`;
+    output(flags, message, common_ok(message));
+}
 
 // --- Config conversion ---
 
@@ -213,7 +172,7 @@ export function to_config(field: keyof SettingsFile, setting: Setting): Config {
     /* eslint-disable unicorn/no-null */
     return {
         field_name: field,
-        ...(setting.category === undefined ? {} : { category: setting.category }),
+        category: setting.category,
         description: setting.description,
         type: config_type(setting),
         required: setting.required,
@@ -271,9 +230,9 @@ function empty_scan_reason(source: SettingEnumSource): string {
             return boards.error.message;
         }
     }
-    const what = source === "template_set" ? "template sets" : `${source}s`;
+    const what = source === "template" ? "template sets" : `${source}s`;
     return `no ${what} in the configured modules. Set capi_path and module_paths ` +
-        "(attach-noos tool-config-set capi_path <dir>; attach-noos tool-config-set module_paths <dirs>)";
+        "(attach-noos config capi_path <dir>; attach-noos config module_paths <dirs>)";
 }
 
 // --- Formatters ---
@@ -281,7 +240,11 @@ function empty_scan_reason(source: SettingEnumSource): string {
 /** Options listed before the human rendering truncates. */
 const OPTIONS_SHOWN = 15;
 
-function format_configs(settings: SettingsFile, selected: (keyof SettingsFile)[]): string {
+/** Marks a required setting in the list, explained by REQUIRED_LEGEND under it. */
+const REQUIRED_MARK = "*";
+const REQUIRED_LEGEND = `${REQUIRED_MARK} required: a command that needs it fails while it has no value (configured or default)`;
+
+export function format_configs(settings: SettingsFile, selected: (keyof SettingsFile)[]): string {
     const sources = get_settings_sources();
 
     let out = `Config: ${sources.global}\n`;
@@ -297,14 +260,30 @@ function format_configs(settings: SettingsFile, selected: (keyof SettingsFile)[]
 
     // As wide as the longest value: paths are long, and a fixed width ran them into Source.
     const width = Math.max(22, ...selected.map(field => (settings[field].value ?? settings[field].default ?? "-").length)) + 2;
-    out += `  ${"Setting".padEnd(16)}${"Value".padEnd(width)}Source\n`;
-    out += `  ${"─".repeat(16 + width + 18)}\n`;
+    out += `    ${"Setting".padEnd(16)}${"Value".padEnd(width)}Source\n`;
+    out += `  ${"─".repeat(2 + 16 + width + 18)}\n`;
 
-    for (const field of selected) {
-        const setting = settings[field];
-        const value = setting.value ?? setting.default ?? "-";
-        const source = setting_source(setting);
-        out += `  ${field.padEnd(16)}${value.padEnd(width)}${source}\n`;
+    // Grouped by the question each setting answers, in the order someone sets things up.
+    // Within a group, the settings keep their declared order.
+    let first = true;
+    for (const category of SETTING_CATEGORIES) {
+        const fields = selected.filter(field => settings[field].category === category);
+        if (fields.length === 0) {
+            continue;
+        }
+        out += `${first ? "" : "\n"}  ${category}\n`;
+        first = false;
+        for (const field of fields) {
+            const setting = settings[field];
+            const value = setting.value ?? setting.default ?? "-";
+            const source = setting_source(setting);
+            const mark = setting.required ? REQUIRED_MARK : " ";
+            out += `  ${mark} ${field.padEnd(16)}${value.padEnd(width)}${source}\n`;
+        }
+    }
+
+    if (selected.some(field => settings[field].required)) {
+        out += `\n  ${REQUIRED_LEGEND}\n`;
     }
 
     return out;
@@ -327,25 +306,33 @@ function format_setting(field: string, setting: Setting): string {
     out += `  ${"Default:".padEnd(14)}${setting.default ?? "-"}\n`;
     out += `  ${"Required:".padEnd(14)}${setting.required ? "yes" : "no"}\n`;
     out += `  ${"Type:".padEnd(14)}${setting.type}\n`;
-    if (setting.category) {
-        out += `  ${"Category:".padEnd(14)}${setting.category}\n`;
-    }
+    out += `  ${"Category:".padEnd(14)}${setting.category}\n`;
     out += `  ${"Description:".padEnd(14)}${setting.description}\n`;
 
     const options = setting_options(setting);
     if (options && options.length > 0) {
-        // A scanned option set can be long, so the human listing is truncated.
-        // `tool-config-get --json` still carries all of them.
-        const shown = options.slice(0, OPTIONS_SHOWN);
         out += "\n  Options:\n";
-        for (const option of shown) {
-            const marker = setting.value === option ? "●" : "○";
-            out += `    ${marker} ${option}\n`;
+        if (field === "board") {
+            // Each board with its chip and what its board.yml declares, so the choice can be
+            // made from here.
+            out += describe_boards(setting.value).map(line => `  ${line}\n`).join("");
+        } else {
+            // A scanned option set can be long, so the human listing is truncated.
+            // `config --json` still carries all of them.
+            const shown = options.slice(0, OPTIONS_SHOWN);
+            for (const option of shown) {
+                const marker = setting.value === option ? "●" : "○";
+                out += `    ${marker} ${option}\n`;
+            }
+            if (options.length > shown.length) {
+                out += `    … ${options.length - shown.length} more\n`;
+            }
         }
-        if (options.length > shown.length) {
-            out += `    … ${options.length - shown.length} more\n`;
-        }
+    } else if (setting.enum_of !== undefined) {
+        // A scanned set that came up empty is a configuration gap, not a free-form setting.
+        out += `\n  Options:      none found: ${empty_scan_reason(setting.enum_of)}\n`;
     }
 
+    out += `\n  Set it with:  attach-noos config ${field} <value>\n`;
     return out;
 }
