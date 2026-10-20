@@ -28,7 +28,8 @@ export interface CodegenInput {
 	// never have to handle a missing board.
 	board: BoardInfo;
 	project_name: string;
-	output_path: string;
+	// The project's own directory: the files are written straight into it.
+	project_path: string;
 	capi_path: string;
 	// Which template set (folder under codegen/templates, or a path to an
 	// out-of-tree folder) renders the project. Omitted: the `template_set`

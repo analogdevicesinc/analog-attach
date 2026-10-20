@@ -32,8 +32,8 @@ export const deployCommand = buildCommand<DeployFlags, []>({
     docs: {
         brief: "Flash the generated CAPI project to the board",
         fullDescription:
-            "Flashes the project named by the 'project_path' setting, or the one 'generate' would\n" +
-            "have written ('<output_path>/<project_name>'), or the current directory."
+            "Flashes the project 'generate' writes: the 'project_path' setting, or\n" +
+            "out/<project_name> when it is unset."
     },
     parameters: {
         positional: { kind: "tuple", parameters: [] },

@@ -30,8 +30,8 @@ export const buildCommandDefinition = buildCommand<BuildFlags, []>({
     docs: {
         brief: "Build the generated CAPI project",
         fullDescription:
-            "Builds the project named by the 'project_path' setting, or the one 'generate' would\n" +
-            "have written ('<output_path>/<project_name>'), or the current directory."
+            "Builds the project 'generate' writes: the 'project_path' setting, or\n" +
+            "out/<project_name> when it is unset."
     },
     parameters: {
         positional: { kind: "tuple", parameters: [] },

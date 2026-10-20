@@ -162,7 +162,7 @@ describe.skipIf(REPOS === undefined)('adxl355 on max32655fthr, from the real rep
             try {
                 expectOk(generate_project({
                     workfile, platform_name: 'max32655', platform_vendor: 'maxim', board: board.value,
-                    project_name: 'p', output_path: output, capi_path: REPOS?.capi ?? '', template_set: 'capi', example,
+                    project_name: 'p', project_path: path.join(output, 'p'), capi_path: REPOS?.capi ?? '', template_set: 'capi', example,
                 }));
                 return fs.readFileSync(path.join(output, 'p', 'src', 'main.c'), 'utf8');
             } finally {
@@ -352,7 +352,7 @@ describe.skipIf(REPOS === undefined)('max31889 on max32655fthr, from the real re
         try {
             expectOk(generate_project({
                 workfile, platform_name: 'max32655', platform_vendor: 'maxim', board: board.value,
-                project_name: 'p', output_path: output, capi_path: REPOS?.capi ?? '', template_set: 'capi',
+                project_name: 'p', project_path: path.join(output, 'p'), capi_path: REPOS?.capi ?? '', template_set: 'capi',
             }));
             const main = fs.readFileSync(path.join(output, 'p', 'src', 'main.c'), 'utf8');
             const loop = main.slice(main.indexOf('while (1)'));

@@ -63,14 +63,14 @@ export const SETTINGS_DEFAULTS: SettingsFile = {
 		category: "workspace",
 	},
 	board: {
-		description: "Board a new workfile targets; also decides its platform",
+		description: "Board a new workfile targets; setting it also sets 'platform' to the chip it carries",
 		required: true,
 		type: "string",
 		enum_of: "board",
 		category: "workspace",
 	},
 	platform: {
-		description: "Platform to use instead of the one implied by 'board'",
+		description: "Chip a new workfile targets, for a chip with no board of its own; setting it clears a 'board' that carries another chip",
 		required: false,
 		type: "string",
 		enum_of: "platform",
@@ -82,15 +82,8 @@ export const SETTINGS_DEFAULTS: SettingsFile = {
 		type: "string",
 		category: "project",
 	},
-	output_path: {
-		description: "Directory 'generate' writes the project into",
-		required: false,
-		type: "path",
-		default: ".",
-		category: "project",
-	},
 	project_path: {
-		description: "Project directory 'build' and 'deploy' act on (unset: <output_path>/<project_name>)",
+		description: "Directory of the generated project: 'generate' writes it, 'build' and 'deploy' act on it (unset: out/<project_name>)",
 		required: false,
 		type: "path",
 		category: "project",

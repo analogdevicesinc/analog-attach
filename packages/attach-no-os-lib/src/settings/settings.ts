@@ -212,6 +212,48 @@ export interface SetSettingOptions {
 	local?: boolean;
 }
 
+/** The config file a write lands in, and what the other one contributes beneath it. */
+export interface ConfigLayers {
+	/** The file set_setting_value() writes, given the same options. */
+	target: string,
+	/** The values that file holds now. */
+	values: Record<string, string>,
+	/** Where `beneath` comes from: the global config, when the target is the local one. */
+	beneath_path?: string,
+	/** Values from that file the target overrides key by key, and that stay in effect where
+	 * the target sets nothing - clearing a key in the target does not clear them. */
+	beneath: Record<string, string>,
+}
+
+/**
+ * Both config layers as a write with these options sees them. A setting that has to agree
+ * with another (a board and the platform it carries) is checked against the effective
+ * values a write would leave, which is the target's values over `beneath`.
+ */
+export function config_layers(options: SetSettingOptions = {}): Result<ConfigLayers> {
+	const local_path = find_local_config_path();
+	const global_path = get_settings_file_path();
+
+	const read = (file_path: string): Result<Record<string, string>> =>
+		fs.existsSync(file_path) ? read_values(file_path) : ok({});
+
+	if (local_path === undefined && !options.local) {
+		const values = read(global_path);
+		return values.ok ? ok({ target: global_path, values: values.value, beneath: {} }) : values;
+	}
+
+	const target = local_path ?? path.join(process.cwd(), LOCAL_CONFIG_FILENAME);
+	const values = read(target);
+	if (!values.ok) {
+		return values;
+	}
+	const beneath = read(global_path);
+	if (!beneath.ok) {
+		return beneath;
+	}
+	return ok({ target, values: values.value, beneath_path: global_path, beneath: beneath.value });
+}
+
 export function set_setting_value(
 	key: keyof SettingsFile,
 	value?: string,

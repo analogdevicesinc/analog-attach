@@ -150,7 +150,6 @@ function load_file_specs(templates_directory: string): Result<FileSpec[]> {
 }
 
 export function generate_project(input: CodegenInput): Result<CodegenResult> {
-	const { output_path, project_name } = input;
 	const files_created: string[] = [];
 
 	// Which set of templates to render with — the per-call override, else the
@@ -190,7 +189,7 @@ export function generate_project(input: CodegenInput): Result<CodegenResult> {
 		h: template_helpers,
 	};
 
-	const project_directory = path.join(output_path, project_name);
+	const project_directory = input.project_path;
 
 	// One Eta engine per owning set, not one per project. A template borrowed from a
 	// base set must render with `views` pointing at THAT set, or its
