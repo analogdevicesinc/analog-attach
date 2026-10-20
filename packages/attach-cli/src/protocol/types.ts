@@ -33,6 +33,15 @@ export interface AddResponse extends CommonResponse {
     path: string[];
     /** Required properties the node still lacks, in the order to set them (dependencies first). */
     missing_required: MissingProperty[];
+    /** With --from-example: the references in the copied node that name nothing in the base or overlay. */
+    unresolved?: UnresolvedEntry[];
+}
+
+export interface UnresolvedEntry {
+    path: string[];
+    property: string;
+    /** As written: `&label` or `&{/path}`. */
+    reference: string;
 }
 
 export interface MissingProperty {

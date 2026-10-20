@@ -1,16 +1,22 @@
+import path from "node:path";
+
 import { Command } from "commander";
 import {
     Attach,
     add_node,
+    unresolved_references,
     type DeviceTree,
     type DeviceTreeOverlay,
     type AddNodeNote,
     type AddNodeResult,
+    type ParsedBinding,
+    type UnresolvedReference,
 } from "attach-lib";
 
 import type { LocalContext } from "../../context";
 import { load_workspace, parse_overlay, report_config_errors, type Bindings, type Workfile } from "../../config/workspace";
-import { bus_kind, find_binding, parse_node_path, resolve_path, type BusKind } from "../../utilities";
+import type { Settings } from "../../config/settings";
+import { bus_kind, find_binding, get_or_build_compat_index, parse_node_path, resolve_path, type BusKind } from "../../utilities";
 import { respond, respond_fail, diagnostic, input_error } from "../../protocol/output";
 import type { AddResponse, MissingProperty } from "../../protocol/types";
 import { new_workfile, next_workfile_name } from "../../workfile";
@@ -20,6 +26,15 @@ import { apply_update } from "../update/command";
 import { node_missing_required, property_details } from "../../node-state";
 import { run_interview, type InterviewSteps } from "./interview";
 import { node_reg_warnings, reg_warning_lines } from "../../reg-conflicts";
+import {
+    choose_example,
+    copy_example_node,
+    example_bus,
+    find_in_example,
+    parse_example,
+    type ExampleMatch,
+    type ExampleNote,
+} from "./example";
 
 export interface AddRequest {
     compatible: string;
@@ -37,12 +52,19 @@ export function build_add_command(context_: LocalContext): Command {
         .option("--parent <value>", "Parent node: label, path, or hybrid (e.g. spi0, /soc/spi@7e204000, spi0/adc@2)")
         .option("--name <value>", "Node name override (e.g. adc@0); defaults to the compatible string")
         .option("--label <value>", "Label override (a label is generated automatically)")
+        .option("--from-example", "Copy the node from the binding's example for the parent's bus")
         .option("--no-interview", "Don't ask for the missing required properties; just list them")
         .addHelpText("after", `
 Examples:
   $ attach-linux add adi,ad7124-8 --parent spi0
   $ attach-linux add invensense,icm42688 --parent spi0 --label imu1
   $ attach-linux add adi,ad7124-8 --parent spi0 --name adc@1
+  $ attach-linux add adi,ad7124-8 --parent spi0 --from-example
+
+--from-example copies the node from the binding's examples: the first one on
+the parent's bus (SPI or I2C), else the first one with the device. Name, reg
+and references stay as in the example; references that name nothing in the
+base or overlay are listed as errors to fix with update.
 
 On a terminal, add then asks for each required property that is still
 missing, showing the binding's description and suggestions: Enter takes the
@@ -50,7 +72,7 @@ first suggestion, - skips one, Ctrl-D stops. Piped runs, --json and
 --no-interview list the missing properties instead.
 
 Use 'list device' to find compatible strings, 'list parent' to find valid buses.`)
-        .action(async (compatible: string, options: { parent?: string; name?: string; label?: string; interview: boolean }) => {
+        .action(async (compatible: string, options: { parent?: string; name?: string; label?: string; fromExample?: boolean; interview: boolean }) => {
             const report = (message: string): void => {
                 if (context_.json) { respond_fail({ ok: false, message, severity: "error" }); }
                 else { console.log(message); }
@@ -87,21 +109,27 @@ Use 'list device' to find compatible strings, 'list parent' to find valid buses.
                 return;
             }
 
-            const result = add_device(workspace.base.tree, workfile.tree, {
-                compatible,
-                parent,
-                name: options.name,
-                label: options.label,
-                auto_address: await binding_defines_reg(binding_path, linux, dtSchema),
-            });
+            const from_example = options.fromExample === true;
+            if (from_example && options.name !== undefined) {
+                report("--name doesn't apply with --from-example: the node keeps the example's name (rename it afterwards)");
+                return;
+            }
+            const request = { compatible, parent, label: options.label };
+            const result = from_example
+                ? await add_from_example(workfile.tree, workspace.base.tree, settings, workspace.bindings, binding_path, request)
+                : add_by_hand(workspace.base.tree, workfile.tree, {
+                    ...request,
+                    name: options.name,
+                    auto_address: await binding_defines_reg(binding_path, linux, dtSchema),
+                });
 
             if (result.status === "parent-not-found") {
                 if (context_.json) { respond_fail({ ok: false, message: `Parent node ${parent} not found`, severity: "error" }); }
                 else { console.log(`Couldn't find parent node ${parent} in ${workspace.base.source} or ${workfile.path}`); }
                 return;
             }
-            if (result.status !== "added") {
-                report(failure_message(result, parent ?? "/"));
+            if (result.status === "failed") {
+                report(result.message);
                 return;
             }
 
@@ -111,12 +139,15 @@ Use 'list device' to find compatible strings, 'list parent' to find valid buses.
             const parent_path = result.path.slice(0, result.path.lastIndexOf("/")) || "/";
             const parent_node = workfile.tree.effective_node(parent_path);
             const added: AddedNode = { ...result, bus: parent_node === undefined ? undefined : bus_kind(parent_node) };
-            for (const note of result.notes) {
-                const message = note_message(note, added);
+            for (const message of result.messages(added)) {
                 if (context_.json) { diagnostic(message); } else { console.log(message); }
             }
             for (const line of node_reg_warnings(workfile.tree, result.path).flatMap(w => reg_warning_lines(w))) {
                 if (context_.json) { diagnostic(line); } else { console.log(line); }
+            }
+            const unresolved = from_example ? unresolved_references(workfile.tree, result.path) : [];
+            if (!context_.json) {
+                for (const line of unresolved_lines(result.path, result.label, unresolved)) { console.log(line); }
             }
 
             const bindings = workspace.bindings;
@@ -130,6 +161,9 @@ Use 'list device' to find compatible strings, 'list parent' to find valid buses.
                     key: result.key,
                     path: result.path.split("/").filter(Boolean),
                     missing_required: await describe_missing(workfile, workspace.base.tree, bindings, result.label, missing),
+                    ...(from_example
+                        ? { unresolved: unresolved.map(u => ({ path: u.path.split("/").filter(Boolean), property: u.property, reference: u.reference })) }
+                        : {}),
                 };
                 respond(response);
                 return;
@@ -203,25 +237,93 @@ function device_name(compatible: string): string {
     return compatible.includes(",") ? compatible.slice(compatible.indexOf(",") + 1) : compatible;
 }
 
+async function parse_binding(binding_path: string, linux: string, dtSchema: string): Promise<ParsedBinding | undefined> {
+    try {
+        const result = await Attach.new().parse_binding(binding_path, linux, dtSchema);
+        return result?.parsed_binding;
+    } catch {
+        return undefined;
+    }
+}
+
 /** Whether the binding has a `reg` property, i.e. the device needs a unit address. */
 async function binding_defines_reg(binding_path: string, linux: string, dtSchema: string): Promise<boolean> {
-    try {
-        const binding = await Attach.new().parse_binding(binding_path, linux, dtSchema);
-        return binding?.parsed_binding.properties.some(p => p.key === "reg") ?? false;
-    } catch {
-        return false;
+    const binding = await parse_binding(binding_path, linux, dtSchema);
+    return binding?.properties.some(p => p.key === "reg") ?? false;
+}
+
+/** What add did: the new node and the notes to print about it (worded for its bus), or why it didn't. */
+type AddOutcome =
+    | { status: "added"; key: string; path: string; label: string; messages: (added: AddedNode) => string[] }
+    | { status: "parent-not-found" }
+    | { status: "failed"; message: string };
+
+function add_by_hand(base: DeviceTree, overlay: DeviceTreeOverlay, request: AddRequest): AddOutcome {
+    const result = add_device(base, overlay, request);
+    if (result.status === "parent-not-found") { return result; }
+    if (result.status !== "added") { return { status: "failed", message: failure_message(result, request.parent ?? "/") }; }
+    return { ...result, messages: added => result.notes.map(note => note_message(note, added)) };
+}
+
+/** Copy the device's node from the binding example that best fits the parent's bus. */
+async function add_from_example(
+    overlay: DeviceTreeOverlay,
+    base: DeviceTree,
+    settings: Settings,
+    bindings: Bindings,
+    binding_path: string,
+    request: { compatible: string; parent?: string; label?: string },
+): Promise<AddOutcome> {
+    const parent_path = resolve_parent_path(base, overlay, request.parent);
+    if (parent_path === undefined) { return { status: "parent-not-found" }; }
+
+    const file = path.basename(binding_path);
+    const binding = await parse_binding(binding_path, bindings.linux, bindings.dt_schema);
+    const examples = binding?.examples ?? [];
+    // An example may show another device of the same binding (adi,ad7124-4 for adi,ad7124-8).
+    const index = await get_or_build_compat_index(bindings);
+    const belongs = (candidate: string): boolean => candidate === request.compatible || index.entries[candidate] === binding_path;
+    const matches: ExampleMatch[] = [];
+    const broken: string[] = [];
+    for (const [position, example] of examples.entries()) {
+        const root = parse_example(example, settings, bindings.linux);
+        if (typeof root === "string") {
+            broken.push(`example ${position + 1} doesn't compile: ${root.split("\n")[0] ?? ""}`);
+            continue;
+        }
+        const found = find_in_example(root, belongs);
+        if (found !== undefined) { matches.push({ index: position + 1, node: found.node, bus: example_bus(found.wrapper) }); }
     }
+
+    const parent_node = overlay.effective_node(parent_path);
+    const bus = parent_node === undefined ? undefined : bus_kind(parent_node);
+    const chosen = choose_example(matches, bus);
+    if (chosen === undefined) {
+        const why = examples.length === 0 ? `${file} has no examples` : `No example in ${file} has a node for ${request.compatible}`;
+        return { status: "failed", message: [why, ...broken].join("\n") };
+    }
+
+    const copied = copy_example_node(overlay, parent_path, chosen.match.node, request);
+    if (copied.status === "parent-not-found") { return copied; }
+    if (copied.status !== "added") { return { status: "failed", message: failure_message(copied, request.parent ?? "/") }; }
+    const messages = [
+        example_choice_message(chosen, bus, request.compatible, file),
+        ...copied.notes.map(note => example_note_message(note, request.compatible)),
+    ];
+    return { ...copied, messages: () => messages };
+}
+
+/** The absolute path of the parent identifier, in the overlay or the base; the root when absent. */
+function resolve_parent_path(base: DeviceTree, overlay: DeviceTreeOverlay, parent: string | undefined): string | undefined {
+    if (parent === undefined) { return "/"; }
+    const resolved = resolve_path(parent, overlay, base);
+    return resolved.in_overlay?.node_path ?? resolved.in_base?.path;
 }
 
 /** Resolve the parent identifier against the overlay and base, then add the node there. */
 export function add_device(base: DeviceTree, overlay: DeviceTreeOverlay, request: AddRequest): AddNodeResult {
-    let parent_path = "/";
-    if (request.parent !== undefined) {
-        const resolved = resolve_path(request.parent, overlay, base);
-        const path = resolved.in_overlay?.node_path ?? resolved.in_base?.path;
-        if (path === undefined) { return { status: "parent-not-found" }; }
-        parent_path = path;
-    }
+    const parent_path = resolve_parent_path(base, overlay, request.parent);
+    if (parent_path === undefined) { return { status: "parent-not-found" }; }
 
     return add_node(overlay, {
         parent_path,
@@ -250,6 +352,44 @@ interface AddedNode {
 }
 
 const ADDRESS_WORD: Record<BusKind, string> = { spi: "chip select", i2c: "address" };
+const BUS_NAME: Record<BusKind, string> = { spi: "SPI", i2c: "I2C" };
+
+function example_choice_message(chosen: { match: ExampleMatch; fits: boolean }, bus: BusKind | undefined, compatible: string, file: string): string {
+    const { index, bus: example_bus } = chosen.match;
+    const on = example_bus === undefined ? "" : ` (${example_bus})`;
+    if (chosen.fits || bus === undefined) { return `Copied example ${index} of ${file}${on}`; }
+    return `No ${BUS_NAME[bus]} example for ${compatible}; using example ${index}${on}`;
+}
+
+function example_note_message(note: ExampleNote, compatible: string): string {
+    switch (note.kind) {
+        case "compatible-replaced": { return `The example is for ${note.from}; compatible set to ${compatible}`; }
+        case "label-renamed": { return `Label ${note.from} is taken; labelled ${note.to} instead`; }
+    }
+}
+
+/** The references under the new node that resolve to nothing, one line per property, and how to fix them. */
+function unresolved_lines(node_path: string, label: string, unresolved: UnresolvedReference[]): string[] {
+    if (unresolved.length === 0) { return []; }
+    const groups = new Map<string, { labels: string[]; paths: string[] }>();
+    for (const { path: at, property, reference } of unresolved) {
+        const where = at === node_path ? property : `${at.slice(node_path.length + 1)}/${property}`;
+        const group = groups.get(where) ?? { labels: [], paths: [] };
+        if (reference.startsWith("&{")) { group.paths.push(reference.slice(2, -1)); } else { group.labels.push(reference.slice(1)); }
+        groups.set(where, group);
+    }
+    return [
+        ...[...groups].map(([where, { labels, paths }]) =>
+            `error: ${where}: ${[...missing_names("label", labels), ...missing_names("node", paths)].join(", ")} in the base or overlay`),
+        `(fix with: update ${label} <property> <value>)`,
+    ];
+}
+
+/** `no label "a"`, `no labels "a", "b"`, or nothing. */
+function missing_names(kind: string, values: string[]): string[] {
+    if (values.length === 0) { return []; }
+    return [`no ${kind}${values.length > 1 ? "s" : ""} ${values.map(v => `"${v}"`).join(", ")}`];
+}
 
 function note_message(note: AddNodeNote, added: AddedNode): string {
     switch (note.kind) {
@@ -336,6 +476,40 @@ if (import.meta.vitest) {
     test("note_message — other buses say unit address", () => {
         expect(note_message({ kind: "picked-address", unit: "1", occupants: [{ name: "a@0", address: 0n }] }, { ...added, bus: undefined }))
             .toBe("Picked unit address 1 (taken: 0 by a@0).\nTo change it: rename ad7124_8 adi,ad7124-8@<n>");
+    });
+
+    test("example_choice_message — the bus matched, didn't, or isn't known", () => {
+        const match = (bus?: BusKind): ExampleMatch => ({ index: 2, node: { labels: [], name: "adc", unit_addr: undefined, properties: [], children: [] }, bus });
+        expect(example_choice_message({ match: match("spi"), fits: true }, "spi", "adi,ad7124-8", "adi,ad7124.yaml"))
+            .toBe("Copied example 2 of adi,ad7124.yaml (spi)");
+        expect(example_choice_message({ match: match("i2c"), fits: false }, "spi", "adi,ad7124-8", "adi,ad7124.yaml"))
+            .toBe("No SPI example for adi,ad7124-8; using example 2 (i2c)");
+        expect(example_choice_message({ match: match(), fits: false }, "i2c", "adi,ad7124-8", "adi,ad7124.yaml"))
+            .toBe("No I2C example for adi,ad7124-8; using example 2");
+        expect(example_choice_message({ match: match(), fits: true }, undefined, "adi,ad7124-8", "adi,ad7124.yaml"))
+            .toBe("Copied example 2 of adi,ad7124.yaml");
+    });
+
+    test("example_note_message", () => {
+        expect(example_note_message({ kind: "compatible-replaced", from: "adi,ad7124-4" }, "adi,ad7124-8"))
+            .toBe("The example is for adi,ad7124-4; compatible set to adi,ad7124-8");
+        expect(example_note_message({ kind: "label-renamed", from: "adc", to: "adc_1" }, "adi,ad7124-8"))
+            .toBe("Label adc is taken; labelled adc_1 instead");
+    });
+
+    test("unresolved_lines — one line per property, relative to the node, with the fix", () => {
+        expect(unresolved_lines("/soc/spi@7e204000/adc@0", "ad7124", [
+            { path: "/soc/spi@7e204000/adc@0", property: "interrupt-parent", reference: "&gpio" },
+            { path: "/soc/spi@7e204000/adc@0", property: "clocks", reference: "&clk_a" },
+            { path: "/soc/spi@7e204000/adc@0", property: "clocks", reference: "&clk_b" },
+            { path: "/soc/spi@7e204000/adc@0/channel@0", property: "io-backends", reference: "&{/backend}" },
+        ])).toEqual([
+            'error: interrupt-parent: no label "gpio" in the base or overlay',
+            'error: clocks: no labels "clk_a", "clk_b" in the base or overlay',
+            'error: channel@0/io-backends: no node "/backend" in the base or overlay',
+            "(fix with: update ad7124 <property> <value>)",
+        ]);
+        expect(unresolved_lines("/a", "x", [])).toEqual([]);
     });
 
     test("missing_lines — the missing list with how to set them, nothing when complete", () => {

@@ -213,7 +213,7 @@ attach-linux create-workfile [--name <filename>]
 **Purpose**: Add a device node (with a compatible string) to the overlay. If no overlay is configured, one is created automatically.
 
 ```bash
-attach-linux add <compatible> [--parent <path>] [--name <name>] [--label <label>] [--no-interview]
+attach-linux add <compatible> [--parent <path>] [--name <name>] [--label <label>] [--from-example] [--no-interview]
 ```
 
 **Parameters**:
@@ -223,6 +223,7 @@ attach-linux add <compatible> [--parent <path>] [--name <name>] [--label <label>
 | `--parent` | No | Parent node: label or path (e.g. `spi0`). Defaults to root `/` |
 | `--name` | No | Node name override (e.g. `adc@0`); defaults to the compatible string |
 | `--label` | No | Label to attach (auto-derived if omitted, e.g. `ad7124_8`) |
+| `--from-example` | No | Copy the node from the binding's example instead of creating a bare one (not with `--name`) |
 | `--no-interview` | No | On a terminal, list the missing required properties instead of asking for them |
 
 The node gets an automatic unit address and `reg` when the binding defines `reg` and the parent is addressed. Duplicates are refused. Labels are auto-indexed on collision.
@@ -231,6 +232,10 @@ The node gets an automatic unit address and `reg` when the binding defines `reg`
 - `--json`: `missing_required: [{ property, description, suggestions }]` in the response. Ask the user for each one in that order, then use `update`.
 - Piped runs and `--no-interview`: `Missing required: interrupt-parent, interrupts`.
 - On a terminal, `add` asks for each one, showing the binding's description and suggestions. Enter takes the first suggestion, `-` skips, Ctrl-D stops and keeps what was set.
+
+**From the binding's example** (`--from-example`): the node is copied from the first example on the parent's bus (SPI or I2C), else from the first example that has the device (`No SPI example for adi,ad7124-8; using example 1 (i2c)`). An example for another device of the same binding gets the requested compatible. Name, unit address, `reg`, children and references are copied as they are, so:
+- `reg` may clash with a sibling; the clash is reported as a warning (`rename` to move it).
+- References that name nothing in the base or overlay (`<&adc_vref>`) are listed as `error: refin1-supply: no label "adc_vref" in the base or overlay`, and under `--json` as `unresolved: [{ path, property, reference }]`. The node is still written; fix them with `update` before deploying.
 
 **Child nodes** (channels, etc.) are created with `update`, not `add`: `update adc channel@0`.
 
@@ -244,6 +249,9 @@ attach-linux add adi,ad7124-8 --parent spi0 --name adc@0 --label imu1
 
 # Add at root (no --parent)
 attach-linux add regulator-fixed
+
+# Copy the binding's SPI example under spi0
+attach-linux add adi,ad7124-8 --parent spi0 --from-example
 ```
 
 ---
