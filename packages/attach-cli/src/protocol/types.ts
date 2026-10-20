@@ -122,6 +122,8 @@ export interface ImportResponse extends CommonResponse {
     path: string;
     /** The imported overlay source. */
     source: string;
+    /** The overlay configured before, which the new workfile replaces as the configured one (the file is kept). */
+    replaced?: string;
     /** How the overlay's root compatible fits the base's, as in `list overlay`. */
     fit: "compatible" | "incompatible" | "unknown";
     reason: string;

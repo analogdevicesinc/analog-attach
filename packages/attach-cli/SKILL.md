@@ -217,7 +217,7 @@ attach-linux import ./my-board-overlay.dts              # or a path
 **Behavior**:
 - Every fragment comes along as written (the bus enable, spidev disables, regulators); targets and phandles are not remapped. The RPi `__overrides__` node (the overlay's parameters) is dropped.
 - The workfile is named after the overlay (`rpi-ad7124-8-all-diff.dtso`) and saved as the `overlay` config field.
-- Refuses when an overlay is already configured: `An overlay is already configured (<path>); import only creates a new one.`
+- When an overlay is already configured, the new workfile replaces it in the config; the old file is kept: `The configured overlay is now <new> (was <old>, kept; switch back with: config-set overlay <old>)`. Under `--json`, `replaced` gives the old one.
 - Warns when the overlay is for another board (the `list overlay` fit is incompatible), and for each target or reference the base doesn't have:
 ```
 warning: this overlay is for another board: brcm,bcm2712

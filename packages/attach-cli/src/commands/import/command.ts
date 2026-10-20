@@ -36,8 +36,8 @@ export function build_import_command(context: LocalContext): Command {
 Every fragment is imported as written; the __overrides__ node (the RPi
 overlay parameters) is dropped. Targets and phandles are not remapped: the
 ones the base doesn't have are listed as warnings. The new workfile is named
-after the overlay and becomes the configured overlay. import refuses when an
-overlay is already configured.
+after the overlay and becomes the configured overlay; one configured before
+is kept as it is (config-set overlay <file> switches back).
 
 Examples:
   $ attach-linux list overlay adi,ad7124-8
@@ -58,10 +58,7 @@ async function run_import(context: LocalContext, name: string): Promise<void> {
         report_config_errors(context, settings.errors);
         return;
     }
-    if (settings.value.overlay !== undefined) {
-        fail(`An overlay is already configured (${settings.value.overlay}); import only creates a new one.`);
-        return;
-    }
+    const previous = settings.value.overlay;
 
     const workspace = load_workspace(context, ["bindings", "base"]);
     if (workspace === undefined) { return; }
@@ -104,7 +101,7 @@ async function run_import(context: LocalContext, name: string): Promise<void> {
     const fit = board_fit(board, base_board);
     const warnings = import_warnings(imported.tree);
     const shown = path.relative(linux, source).startsWith("..") ? source : path.relative(linux, source);
-    const message = `Imported ${shown} into ${workfile.path}`;
+    const [message = "", ...switched] = import_message(shown, workfile.path, previous);
 
     if (context.json) {
         const warned = fit.fit === "incompatible" || warnings.targets.length > 0 || warnings.references.length > 0;
@@ -114,6 +111,7 @@ async function run_import(context: LocalContext, name: string): Promise<void> {
             severity: warned ? "warn" : "info",
             path: workfile.path,
             source,
+            ...(previous === undefined ? {} : { replaced: previous }),
             ...fit,
             unresolved_targets: warnings.targets,
             unresolved: warnings.references.map(u => ({ path: u.path.split("/").filter(Boolean), property: u.property, reference: u.reference })),
@@ -121,6 +119,7 @@ async function run_import(context: LocalContext, name: string): Promise<void> {
         return;
     }
     console.log(message);
+    for (const line of switched) { console.log(line); }
     if (imported.dropped_overrides) { console.log("Dropped __overrides__ (the overlay's parameters)"); }
     if (fit.fit === "incompatible") { for (const line of board_lines(board, base_board)) { console.log(line); } }
     for (const line of import_warning_lines(warnings, imported.tree.all_labels())) { console.log(line); }
@@ -171,6 +170,13 @@ export function import_warnings(tree: DeviceTreeOverlay): ImportWarnings {
         };
     });
     return { targets, references: unique_references(unresolved_references(tree)) };
+}
+
+/** What import did: the new workfile, and the configured overlay it replaces, when there was one. */
+export function import_message(shown: string, workfile: string, previous?: string): string[] {
+    const imported = `Imported ${shown} into ${workfile}`;
+    if (previous === undefined) { return [imported]; }
+    return [imported, `The configured overlay is now ${workfile} (was ${previous}, kept; switch back with: config-set overlay ${previous})`];
 }
 
 /** The targets the base lacks, then the references that resolve to nothing. */
@@ -293,6 +299,15 @@ if (import.meta.vitest) {
             "/soc/spi@7e204000/adc@0 refin1-supply &vref",
             "/soc/spi@7e204000/adc@0 clocks &adc_clk",
             "/soc/spi@7e204000/adc@0/channel@0 io-supply &vio",
+        ]);
+    });
+
+    test("import_message — the import, and the overlay it replaces as the configured one", () => {
+        expect(import_message("arch/arm/boot/dts/overlays/rpi-ad7124-overlay.dts", "/w/rpi-ad7124.dtso"))
+            .toEqual(["Imported arch/arm/boot/dts/overlays/rpi-ad7124-overlay.dts into /w/rpi-ad7124.dtso"]);
+        expect(import_message("arch/arm/boot/dts/overlays/max31827-overlay.dts", "/w/max31827.dtso", "/w/rpi-ad7124.dtso")).toEqual([
+            "Imported arch/arm/boot/dts/overlays/max31827-overlay.dts into /w/max31827.dtso",
+            "The configured overlay is now /w/max31827.dtso (was /w/rpi-ad7124.dtso, kept; switch back with: config-set overlay /w/rpi-ad7124.dtso)",
         ]);
     });
 

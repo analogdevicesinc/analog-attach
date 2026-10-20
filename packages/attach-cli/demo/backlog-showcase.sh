@@ -194,11 +194,11 @@ step "Which overlays already add the device?" \
     "list overlay sony,imx500"
 
 step "Import one" \
-    "import brings in every fragment as written (the regulator, the ADC on spi0, the spidevs it replaces) into a new workfile named after the overlay, and makes it the configured overlay. A second import refuses." \
+    "import brings in every fragment as written (the regulator, the ADC on spi0, the spidevs it replaces) into a new workfile named after the overlay, and makes it the configured overlay. A second import switches to its own workfile and keeps the first, with the command to switch back." \
+    "import rpi-ad7124-8-all-diff-overlay.dts" \
     "import rpi-ad7124-overlay.dts" \
     "read spi0/adc@0 refin1-supply --quiet" \
-    "read spidev0 status --quiet" \
-    "import rpi-ad7124-8-all-diff-overlay.dts"
+    "read spidev0 status --quiet"
 
 step "Validate the imported overlay" \
     "The validation schemas for this tree are compiled on first use, with the same progress lines as the index." \
