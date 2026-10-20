@@ -32,7 +32,7 @@ import {
 import * as fs from "node:fs";
 
 import type { LocalContext } from "../../context";
-import { load_workspace } from "../../config/workspace";
+import { load_workspace, type Bindings, type Workfile } from "../../config/workspace";
 import { resolve_write_target, parse_node_path, not_found_message } from "../../utilities";
 import { child_unit_radix, resolve_node_binding } from "../../binding-resolution";
 import { respond, respond_fail, input_error, diagnostic } from "../../protocol/output";
@@ -342,7 +342,7 @@ Examples:
             if (workspace === undefined) { return; }
             const { linux, dt_schema: dtSchema } = workspace.bindings;
             const base_dt = workspace.base.tree;
-            const { path: input, tree: overlay } = workspace.overlay;
+            const { tree: overlay } = workspace.overlay;
 
             const { target_reference, found, is_base_target, binding_node, binding_parent, parent_name } =
                 resolve_write_target(node_identifier, overlay, base_dt);
@@ -436,118 +436,145 @@ Examples:
                 // Fall through to property handling (creates a flag for unknown names)
             }
 
-            const { definition: property_definition } = await resolve_property_definition(
-                binding_node, binding_parent, parent_name, base_dt, linux, dtSchema,
-                property_name, value_arguments.length === 0,
-            );
-
-            const hint = shape_hint(property_definition);
-
-            const existing_property = found?.node.properties.find(p => p.name === property_name);
-            const existing_has_value = existing_property !== undefined && !is_dt_flag(existing_property.value);
-
-            const decision = decide_update(hint, value_arguments, existing_has_value);
-
-            if (typeof decision === "object" && "error" in decision) {
-                const message = `${property_name} ${decision.error}`;
-                if (context_.json) { respond_fail({ ok: false, message, severity: "error" }); }
-                else { console.log(message); }
-                return;
-            }
-
-            if (decision === "read") {
-                await read_target(context_, overlay, { ok: true, value: workspace.bindings }, node_identifier, property_name, { quiet: options.quiet ?? false });
-                return;
-            }
-
-            if (decision === "set-flag") {
-                const built = PropertyBuilder.build_flag().set_flag().with_name(property_name).build();
-                place_property(overlay, target_reference, found, is_base_target, built, property_name);
-                const printed = workspace.overlay.print();
-                const test_parse = DeviceTreeOverlay.new_from_string(printed, base_dt);
-                if (typeof test_parse === "string") {
-                    if (context_.json) { respond_fail({ ok: false, message: `Update would produce an unreadable overlay: ${test_parse}`, severity: "error" }); }
-                    else { console.log(`Update would produce an unreadable overlay: ${test_parse}`); }
+            const outcome = await apply_update(workspace.overlay, base_dt, workspace.bindings, node_identifier, property_name, value_arguments);
+            switch (outcome.kind) {
+                case "read": {
+                    await read_target(context_, overlay, { ok: true, value: workspace.bindings }, node_identifier, property_name, { quiet: options.quiet ?? false });
                     return;
                 }
-                fs.writeFileSync(input, printed);
-                if (context_.json) { respond({ ok: true, message: `Set flag ${property_name} on ${node_identifier}`, severity: "info" }); }
-                else { console.log(`Set flag ${property_name} on ${node_identifier}`); }
-                return;
-            }
-
-            // decision === "value"
-            const with_value = value_arguments.join(" ");
-            const is_label = (name: string): boolean => {
-                if (base_dt.node_exists(name)) { return true; }
-                return overlay.find_node(name) !== undefined;
-            };
-
-            const built = build_raw_property(with_value, property_name, hint, is_label);
-
-            if (built !== null && typeof built === "object" && "error" in built) {
-                if (context_.json) {
-                    respond_fail({ ok: false, message: built.error, severity: "error" });
-                } else {
-                    console.log(built.error);
+                case "error": {
+                    if (context_.json) { respond_fail({ ok: false, message: outcome.message, severity: "error" }); }
+                    else { console.log(outcome.message); }
+                    return;
                 }
-                return;
-            }
-
-            place_property(overlay, target_reference, found, is_base_target, built, property_name);
-
-            const ip_result = implicit_interrupt_parent(overlay, base_dt, target_reference, found, is_base_target, property_name, built);
-            if (ip_result.warning !== undefined) { diagnostic(ip_result.warning); }
-
-            // R10: updating reg renames the node (overlay-added targets only)
-            let rename_message = "";
-            if (property_name === "reg" && found !== undefined && !is_base_target) {
-                const parent_path = found.node_path.split("/").slice(0, -1).join("/") || "/";
-                const cells = address_cells_of(overlay, parent_path);
-                const effective = overlay.effective_children(parent_path);
-                const radix = await child_unit_radix(overlay.effective_node(parent_path), found.node.name, linux, dtSchema);
-                const sync = sync_unit_address_from_reg(found.node, cells.address, effective, radix);
-                switch (sync) {
-                    case "conflict": {
-                        if (context_.json) { respond_fail({ ok: false, message: `reg update would create a naming conflict`, severity: "error" }); }
-                        else { console.log("reg update would create a naming conflict; not written"); }
-                        return;
+                case "set": {
+                    if (context_.json) {
+                        const message = outcome.detail === undefined ? outcome.message : `${outcome.message}; ${outcome.detail}`;
+                        respond({ ok: true, message, severity: outcome.warned ? "warn" : "info" });
+                    } else {
+                        console.log(outcome.message);
+                        if (outcome.detail !== undefined) { console.log(outcome.detail); }
                     }
-                    case "renamed": {
-                        rename_message = `; renamed to ${get_full_node_name(found.node)}`;
-                        break;
-                    }
-                    case "not-numeric": {
-                        diagnostic("reg contains non-numeric cells; node not renamed");
-                        break;
-                    }
+                    return;
                 }
-            } else if (property_name === "reg" && is_base_target) {
-                diagnostic("an overlay can't rename a base node; reg written but name unchanged");
-            }
-
-            const printed = workspace.overlay.print();
-            const test_parse = DeviceTreeOverlay.new_from_string(printed, base_dt);
-
-            if (typeof test_parse === "string") {
-                if (context_.json) {
-                    respond_fail({ ok: false, message: `Update would produce an unreadable overlay: ${test_parse}`, severity: "error" });
-                } else {
-                    console.log(`Update would produce an unreadable overlay: ${test_parse}`);
-                }
-                return;
-            }
-
-            fs.writeFileSync(input, printed);
-
-            const ip_message = ip_result.message === undefined ? "" : `; ${ip_result.message}`;
-            if (context_.json) {
-                respond({ ok: true, message: `Set ${property_name} on ${node_identifier}${rename_message}${ip_message}`, severity: ip_result.warning === undefined ? "info" : "warn" });
-            } else {
-                console.log(`Set ${property_name} on ${node_identifier}${rename_message}`);
-                if (ip_result.message !== undefined) { console.log(ip_result.message); }
             }
         });
+}
+
+export type UpdateOutcome =
+    | { kind: "read" }
+    | { kind: "error"; message: string }
+    /** `detail` is a second line (the implicit interrupt-parent); `warned` when a warning went to stderr. */
+    | { kind: "set"; message: string; detail?: string; warned: boolean };
+
+/**
+ * Set a property (or a flag) on a node and write the workfile, or say that
+ * the request is a read. Warnings go to stderr; the rest is returned.
+ * Shared by `update` and the interview after `add`.
+ */
+export async function apply_update(
+    workfile: Workfile,
+    base_dt: DeviceTree,
+    { linux, dt_schema: dtSchema }: Bindings,
+    node_identifier: string,
+    property_name: string,
+    value_arguments: string[],
+): Promise<UpdateOutcome> {
+    const { path: input, tree: overlay } = workfile;
+    const { target_reference, found, is_base_target, binding_node, binding_parent, parent_name } =
+        resolve_write_target(node_identifier, overlay, base_dt);
+    if (found === undefined && !is_base_target) {
+        return { kind: "error", message: not_found_message(node_identifier, overlay, base_dt) };
+    }
+
+    const { definition: property_definition } = await resolve_property_definition(
+        binding_node, binding_parent, parent_name, base_dt, linux, dtSchema,
+        property_name, value_arguments.length === 0,
+    );
+
+    const hint = shape_hint(property_definition);
+
+    const existing_property = found?.node.properties.find(p => p.name === property_name);
+    const existing_has_value = existing_property !== undefined && !is_dt_flag(existing_property.value);
+
+    const decision = decide_update(hint, value_arguments, existing_has_value);
+
+    if (typeof decision === "object" && "error" in decision) {
+        return { kind: "error", message: `${property_name} ${decision.error}` };
+    }
+
+    if (decision === "read") { return { kind: "read" }; }
+
+    if (decision === "set-flag") {
+        const built = PropertyBuilder.build_flag().set_flag().with_name(property_name).build();
+        place_property(overlay, target_reference, found, is_base_target, built, property_name);
+        const printed = workfile.print();
+        const test_parse = DeviceTreeOverlay.new_from_string(printed, base_dt);
+        if (typeof test_parse === "string") {
+            return { kind: "error", message: `Update would produce an unreadable overlay: ${test_parse}` };
+        }
+        fs.writeFileSync(input, printed);
+        return { kind: "set", message: `Set flag ${property_name} on ${node_identifier}`, warned: false };
+    }
+
+    // decision === "value"
+    const with_value = value_arguments.join(" ");
+    const is_label = (name: string): boolean => {
+        if (base_dt.node_exists(name)) { return true; }
+        return overlay.find_node(name) !== undefined;
+    };
+
+    const built = build_raw_property(with_value, property_name, hint, is_label);
+
+    if (built !== null && typeof built === "object" && "error" in built) {
+        return { kind: "error", message: built.error };
+    }
+
+    place_property(overlay, target_reference, found, is_base_target, built, property_name);
+
+    const ip_result = implicit_interrupt_parent(overlay, base_dt, target_reference, found, is_base_target, property_name, built);
+    if (ip_result.warning !== undefined) { diagnostic(ip_result.warning); }
+
+    // R10: updating reg renames the node (overlay-added targets only)
+    let rename_message = "";
+    if (property_name === "reg" && found !== undefined && !is_base_target) {
+        const parent_path = found.node_path.split("/").slice(0, -1).join("/") || "/";
+        const cells = address_cells_of(overlay, parent_path);
+        const effective = overlay.effective_children(parent_path);
+        const radix = await child_unit_radix(overlay.effective_node(parent_path), found.node.name, linux, dtSchema);
+        const sync = sync_unit_address_from_reg(found.node, cells.address, effective, radix);
+        switch (sync) {
+            case "conflict": {
+                return { kind: "error", message: "reg update would create a naming conflict; not written" };
+            }
+            case "renamed": {
+                rename_message = `; renamed to ${get_full_node_name(found.node)}`;
+                break;
+            }
+            case "not-numeric": {
+                diagnostic("reg contains non-numeric cells; node not renamed");
+                break;
+            }
+        }
+    } else if (property_name === "reg" && is_base_target) {
+        diagnostic("an overlay can't rename a base node; reg written but name unchanged");
+    }
+
+    const printed = workfile.print();
+    const test_parse = DeviceTreeOverlay.new_from_string(printed, base_dt);
+
+    if (typeof test_parse === "string") {
+        return { kind: "error", message: `Update would produce an unreadable overlay: ${test_parse}` };
+    }
+
+    fs.writeFileSync(input, printed);
+
+    return {
+        kind: "set",
+        message: `Set ${property_name} on ${node_identifier}${rename_message}`,
+        ...(ip_result.message === undefined ? {} : { detail: ip_result.message }),
+        warned: ip_result.warning !== undefined,
+    };
 }
 
 type ParsedInputValue = SingleInput | ArrayInput | MatrixInput;

@@ -1,6 +1,8 @@
-import { missing_required, type DeviceTreeOverlay } from "attach-lib";
+import { missing_required, type DeviceTree, type DeviceTreeOverlay } from "attach-lib";
 
 import type { NodeBinding } from "./binding-resolution";
+import { property_info, value_suggestions, type PropertyInfo, type TargetBinding } from "./commands/list/suggest";
+import type { Suggestion } from "./protocol/types";
 
 /**
  * The required properties the node at `path` doesn't have yet, in the order
@@ -10,6 +12,31 @@ import type { NodeBinding } from "./binding-resolution";
 export function node_missing_required(binding: Pick<NodeBinding, "required_properties">, overlay: DeviceTreeOverlay, path: string): string[] {
     const node = overlay.effective_node(path);
     return missing_required(binding.required_properties, node?.properties.map(p => p.name) ?? []);
+}
+
+export interface PropertyDetails {
+    /** What the binding says; undefined without a binding or when it doesn't define the property. */
+    info: PropertyInfo | undefined;
+    suggestions: Suggestion[];
+}
+
+/** What `read` and the add interview show about a property of the target node. */
+export function property_details(
+    target: TargetBinding,
+    overlay: DeviceTreeOverlay,
+    base: DeviceTree,
+    node_identifier: string,
+    property_name: string,
+): PropertyDetails {
+    const { binding_node } = target.target;
+    const info = "error" in target.binding || binding_node === undefined
+        ? undefined
+        : property_info(target.binding, binding_node, property_name);
+    const values = value_suggestions(target, overlay, base, node_identifier, property_name);
+    return {
+        info: info?.ok === true ? info.info : undefined,
+        suggestions: values.ok ? values.suggestions : [],
+    };
 }
 
 if (import.meta.vitest) {

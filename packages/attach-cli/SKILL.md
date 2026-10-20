@@ -208,7 +208,7 @@ attach-linux create-workfile [--name <filename>]
 **Purpose**: Add a device node (with a compatible string) to the overlay. If no overlay is configured, one is created automatically.
 
 ```bash
-attach-linux add <compatible> [--parent <path>] [--name <name>] [--label <label>]
+attach-linux add <compatible> [--parent <path>] [--name <name>] [--label <label>] [--no-interview]
 ```
 
 **Parameters**:
@@ -218,8 +218,14 @@ attach-linux add <compatible> [--parent <path>] [--name <name>] [--label <label>
 | `--parent` | No | Parent node: label or path (e.g. `spi0`). Defaults to root `/` |
 | `--name` | No | Node name override (e.g. `adc@0`); defaults to the compatible string |
 | `--label` | No | Label to attach (auto-derived if omitted, e.g. `ad7124_8`) |
+| `--no-interview` | No | On a terminal, list the missing required properties instead of asking for them |
 
 The node gets an automatic unit address and `reg` when the binding defines `reg` and the parent is addressed. Duplicates are refused. Labels are auto-indexed on collision.
+
+**Missing required properties**: after the add, the required properties the node still lacks are listed in the order to set them, with `interrupt-parent` before `interrupts`:
+- `--json`: `missing_required: [{ property, description, suggestions }]` in the response. Ask the user for each one in that order, then use `update`.
+- Piped runs and `--no-interview`: `Missing required: interrupt-parent, interrupts`.
+- On a terminal, `add` asks for each one, showing the binding's description and suggestions. Enter takes the first suggestion, `-` skips, Ctrl-D stops and keeps what was set.
 
 **Child nodes** (channels, etc.) are created with `update`, not `add`: `update adc channel@0`.
 

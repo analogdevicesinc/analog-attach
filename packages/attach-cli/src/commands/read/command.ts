@@ -10,8 +10,8 @@ import { bigIntReplacer, resolve_node_identifier, not_found_message, parse_node_
 import { respond, respond_fail, input_error } from "../../protocol/output";
 import { convert_node, convert_property } from "../../protocol/dt-to-protocol";
 import type { Node, ReadResponse, Suggestion, Types } from "../../protocol/types";
-import { property_info, resolve_target_binding, value_suggestions, type PropertyInfo } from "../list/suggest";
-import { node_missing_required } from "../../node-state";
+import { format_type, resolve_target_binding, type PropertyInfo } from "../list/suggest";
+import { node_missing_required, property_details } from "../../node-state";
 
 export interface ReadOptions {
     /** Only the value (or "true" for a flag), as before the binding details were added. */
@@ -71,16 +71,9 @@ export async function read_target(
         return;
     }
 
-    let info: PropertyInfo | undefined;
-    let suggestions: Suggestion[] = [];
-    if (target !== undefined && base !== undefined) {
-        if (binding !== undefined && target.target.binding_node !== undefined) {
-            const result = property_info(binding, target.target.binding_node, property.name);
-            if (result.ok) { info = result.info; }
-        }
-        const values = value_suggestions(target, overlay, base, path_string, property.name);
-        if (values.ok) { suggestions = values.suggestions; }
-    }
+    const { info, suggestions } = target === undefined || base === undefined
+        ? { info: undefined, suggestions: [] }
+        : property_details(target, overlay, base, path_string, property.name);
 
     if (context_.json) {
         const response: ReadResponse = {
@@ -101,8 +94,12 @@ function property_line(property: DTProperty): string {
     return is_dt_flag(property.value) ? `${property.name};` : print_property(property, "", 0).trim();
 }
 
-/** The lines under a property's value: its description and binding file, what's allowed, and the suggestions. */
-function format_details(info: PropertyInfo | undefined, suggestions: Suggestion[]): string[] {
+/**
+ * The lines under a property's value: its description and binding file, what's
+ * allowed, and the suggestions. `with_type` adds the type when nothing narrower
+ * is allowed, for a question that has no value to show yet.
+ */
+export function format_details(info: PropertyInfo | undefined, suggestions: Suggestion[], { with_type = false } = {}): string[] {
     const lines: string[] = [];
     if (info !== undefined) {
         const description = (info.description ?? "").trim().split("\n").map(line => line.trim()).filter(Boolean);
@@ -111,6 +108,7 @@ function format_details(info: PropertyInfo | undefined, suggestions: Suggestion[
         lines.push(...description.map(line => `  ${line}`), last === undefined ? `  ${file}` : `  ${last}   ${file}`);
         const allowed = allowed_text(info);
         if (allowed !== undefined) { lines.push(`  Allowed: ${allowed}`); }
+        else if (with_type) { lines.push(`  Type: ${format_type(info.type)}`); }
         if (info.constraints.default !== undefined) { lines.push(`  Default: ${JSON.stringify(info.constraints.default, bigIntReplacer)}`); }
     }
     if (suggestions.length > 0) {
@@ -154,7 +152,7 @@ function is_cell_width(minimum: number | bigint, maximum: number | bigint): bool
         || (low === -(1n << (bits - 1n)) && high === (1n << (bits - 1n)) - 1n));
 }
 
-function format_missing(missing: string[]): string[] {
+export function format_missing(missing: string[]): string[] {
     return missing.length === 0 ? [] : [`Missing required: ${missing.join(", ")}`];
 }
 
@@ -309,6 +307,14 @@ if (import.meta.vitest) {
             "  First line.",
             "  Second line.   (adi,ad7124.yaml)",
         ]);
+    });
+
+    test("format_details — with_type shows the type when nothing narrower is allowed", () => {
+        expect(format_details({ ...info, constraints: {} }, [], { with_type: true })).toEqual([
+            "  Maximum SPI clocking speed of the device in Hz.   (adi,ad7124.yaml)",
+            "  Type: number",
+        ]);
+        expect(format_details(info, [], { with_type: true }).at(-1)).toBe("  Allowed: <= 5000000");
     });
 
     test("format_details — no binding: suggestions only", () => {

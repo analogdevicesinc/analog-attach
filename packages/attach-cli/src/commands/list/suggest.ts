@@ -688,7 +688,7 @@ export function property_info(
     };
 }
 
-function format_type(type: Types): string {
+export function format_type(type: Types): string {
     switch (type.kind) {
         case "number": {
             return "number";

@@ -31,6 +31,15 @@ export interface CreateWorkfileResponse extends CommonResponse {
 export interface AddResponse extends CommonResponse {
     key: string;
     path: string[];
+    /** Required properties the node still lacks, in the order to set them (dependencies first). */
+    missing_required: MissingProperty[];
+}
+
+export interface MissingProperty {
+    property: string;
+    description?: string;
+    /** Values ready for `update`, as in `list value`. */
+    suggestions: Suggestion[];
 }
 
 export type PropertyValue = null | string | number | boolean | PropertyValue[];
