@@ -7,8 +7,10 @@ import {
     board_peripheral_kinds,
     get_settings,
     get_settings_sources,
+    is_target_setting,
     list_boards,
-    set_setting_value
+    set_setting_value,
+    set_target_setting
 } from "attach-no-os-lib";
 import {
     prior_positionals,
@@ -162,7 +164,25 @@ export const toolConfigSetCommand = buildCommand<ConfigSetFlags, [string, string
             return;
         }
 
-        const written = set_setting_value(key, flags.reset ? undefined : value, { local: flags.local });
+        const new_value = flags.reset ? undefined : value;
+
+        // A board and its platform are one choice: writing either keeps the other agreeing.
+        if (is_target_setting(key)) {
+            const written = set_target_setting(key, new_value, { local: flags.local });
+            if (!written.ok) {
+                output_error(flags, written.error.message);
+                return;
+            }
+            const parts = Object.entries(written.value.changed).map(([name, changed]) =>
+                changed === undefined ? `cleared '${name}'` : `set '${name}' to '${changed}'`);
+            const said = parts.join(" and ");
+            const reason = written.value.reason === undefined ? "" : ` (${written.value.reason})`;
+            const message = `${said.charAt(0).toUpperCase()}${said.slice(1)}${reason}`;
+            output(flags, message, common_ok(message));
+            return;
+        }
+
+        const written = set_setting_value(key, new_value, { local: flags.local });
         if (!written.ok) {
             output_error(flags, written.error.message);
             return;

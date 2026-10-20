@@ -100,13 +100,15 @@ export function get_project_name(context: WorkfileContext): Result<string> {
     return ok(configured.value || path.basename(path.dirname(context.path)));
 }
 
+/** Where projects go when `project_path` is unset: `out/<project_name>`. */
+export const DEFAULT_PROJECT_DIRECTORY = "out";
+
 /**
- * Directory `build` and `deploy` act on.
+ * Directory of the generated project: the one `generate` writes, and `build` and `deploy`
+ * act on.
  *
- * `project_path` names it outright. Otherwise it is where `generate` would have put the
- * project — `<output_path>/<project_name>` — which keeps generate/build/deploy pointed at
- * the same place from one setting. With neither, the current directory: that is the
- * "I am already in the project" case.
+ * `project_path` names it outright. Unset, it is `out/<project_name>` in the current
+ * directory, so all three agree on where the project is without any setting.
  */
 export function get_project_path(): Result<string> {
     const configured = get_effective_setting_value("project_path");
@@ -136,12 +138,7 @@ export function get_project_path(): Result<string> {
         project_name = path.basename(path.dirname(workfile.value));
     }
 
-    const output_path = get_effective_setting_value("output_path");
-    if (!output_path.ok) {
-        return output_path;
-    }
-
-    return ok(path.resolve(process.cwd(), output_path.value ?? ".", project_name));
+    return ok(path.resolve(process.cwd(), DEFAULT_PROJECT_DIRECTORY, project_name));
 }
 
 // --- Workfile Saving ---

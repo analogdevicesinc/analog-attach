@@ -4,7 +4,6 @@ import {
     configured_template_set,
     example_enabled,
     generate_project,
-    get_effective_setting_value,
     get_setting_value,
     list_template_sets,
     resolve_board,
@@ -13,6 +12,7 @@ import { filter_completions, get_board_names } from "../completion/completion";
 import type { AttachContext } from "./shared";
 import {
     get_project_name,
+    get_project_path,
     load_context,
     output,
     output_error,
@@ -37,8 +37,8 @@ export const generateCommand = buildCommand<GenerateFlags, [], AttachContext>({
     docs: {
         brief: "Generate a CAPI project from the workfile",
         fullDescription:
-            "Renders the workfile into <output_path>/<project_name>.\n" +
-            "Both come from settings ('attach-noos tool-config-get project_name output_path'); the flags override them."
+            "Renders the workfile into the project directory: the 'project_path' setting, or\n" +
+            "out/<project_name> when it is unset. --output overrides it for this run."
     },
     parameters: {
         positional: { kind: "tuple", parameters: [] },
@@ -46,7 +46,7 @@ export const generateCommand = buildCommand<GenerateFlags, [], AttachContext>({
             json: { kind: "boolean", brief: "Output as JSON", optional: true },
             output: {
                 kind: "parsed",
-                brief: "Directory to write the project into (default: the 'output_path' setting)",
+                brief: "Project directory to write (default: the 'project_path' setting, else out/<project_name>)",
                 optional: true,
                 parse: String
             },
@@ -107,13 +107,15 @@ export const generateCommand = buildCommand<GenerateFlags, [], AttachContext>({
             return;
         }
 
-        const configured_output = get_effective_setting_value("output_path");
-        if (!configured_output.ok) {
-            output_error(flags, configured_output.error.message);
+        // The same directory build and deploy act on, unless this run names another.
+        const configured_project = get_project_path();
+        if (!configured_project.ok) {
+            output_error(flags, configured_project.error.message);
             return;
         }
-
-        const output_path = path.resolve(process.cwd(), flags.output ?? configured_output.value ?? ".");
+        const project_path = flags.output === undefined
+            ? configured_project.value
+            : path.resolve(process.cwd(), flags.output);
 
         const result = generate_project({
             workfile: context.value.workfile,
@@ -121,7 +123,7 @@ export const generateCommand = buildCommand<GenerateFlags, [], AttachContext>({
             platform_vendor: platform_vendor,
             board: board.value,
             project_name: project_name.value,
-            output_path: output_path,
+            project_path: project_path,
             capi_path: capi_path.value,
             template_set: flags.templateSet,
             example: example_enabled(),
@@ -135,7 +137,6 @@ export const generateCommand = buildCommand<GenerateFlags, [], AttachContext>({
         // Which template set produced the project is worth reporting now that it
         // is configurable - the same workfile can generate different output.
         const template_set = flags.templateSet ?? configured_template_set();
-        const project_path = path.join(output_path, project_name.value);
         const files = result.value.files_created;
 
         const message = `Generated '${project_name.value}' in ${project_path}`

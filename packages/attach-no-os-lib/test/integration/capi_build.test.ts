@@ -90,6 +90,7 @@ function generate_and_build(workfile: Workfile, project_name: string): string {
     expect(validate_workfile(workfile).errors.filter(entry => entry.severity === 'error')).toEqual([]);
 
     const output_path = fs.mkdtempSync(path.join(os.tmpdir(), 'aa-capi-build-'));
+    const project = path.join(output_path, project_name);
     const board = find_board(BOARD);
     expectOk(board);
     expectOk(generate_project({
@@ -98,12 +99,11 @@ function generate_and_build(workfile: Workfile, project_name: string): string {
         platform_vendor: 'maxim',
         board: board.value,
         project_name,
-        output_path,
+        project_path: project,
         capi_path: REPOS?.capi ?? '',
         template_set: 'capi',
     }));
 
-    const project = path.join(output_path, project_name);
     const environment = { ...process.env, CAPI_DIR: REPOS?.capi ?? '' };
     const run = (arguments_: string[]): string =>
         execFileSync('cmake', arguments_, { cwd: project, env: environment, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });

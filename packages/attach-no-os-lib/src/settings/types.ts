@@ -50,9 +50,7 @@ export interface SettingsFile {
 	platform: Setting;
 	/** Name of the generated project. */
 	project_name: Setting;
-	/** Directory the project is generated into. */
-	output_path: Setting;
-	/** Directory `build`/`deploy` act on. */
+	/** Directory of the generated project: `generate` writes it, `build`/`deploy` act on it. */
 	project_path: Setting;
 	template_set: Setting;
 	build_command: Setting;

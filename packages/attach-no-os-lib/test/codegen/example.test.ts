@@ -131,7 +131,7 @@ describe('main.c without a console', () => {
         expectOk(board);
         expectOk(generate_project({
             workfile, platform_name: FIXTURE_SOC, platform_vendor: 'testvendor', board: board.value,
-            project_name: 'p', output_path: output, capi_path: FIXTURE_CAPI, template_set: 'capi',
+            project_name: 'p', project_path: path.join(output, 'p'), capi_path: FIXTURE_CAPI, template_set: 'capi',
         }));
         const main = fs.readFileSync(path.join(output, 'p', 'src', 'main.c'), 'utf8');
         expect(main).toContain('return app_main();');

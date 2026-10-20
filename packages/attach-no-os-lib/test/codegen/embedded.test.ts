@@ -93,7 +93,7 @@ describe('an embedded struct in the generated C', () => {
         expectOk(board);
         expectOk(generate_project({
             workfile, platform_name: FIXTURE_SOC, platform_vendor: 'testvendor', board: board.value,
-            project_name: 'embedded', output_path: output, capi_path: FIXTURE_CAPI, template_set: 'capi',
+            project_name: 'embedded', project_path: path.join(output, 'embedded'), capi_path: FIXTURE_CAPI, template_set: 'capi',
         }));
         const source = (file: string): string => fs.readFileSync(path.join(output, 'embedded', 'src', file), 'utf8');
         return { c: source('common/common_data.c'), h: source('common/common_data.h'), main: source('main.c') };

@@ -59,6 +59,8 @@ export {
     get_workfile_path
 } from "./settings/settings";
 export type { SettingsSources, SetSettingOptions } from "./settings/settings";
+export { set_target_setting, is_target_setting } from "./settings/target";
+export type { TargetSetting, TargetWrite } from "./settings/target";
 export {
     SETTINGS_DEFAULTS,
     DEFAULT_SYSTEM_CONFIG_PATH,
