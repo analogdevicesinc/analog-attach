@@ -27,6 +27,8 @@ const GLOBAL_FLAGS: readonly Candidate[] = [
 interface Candidate {
     value: string;
     description?: string;
+    /** Completes without a trailing space (see `Suggestion.partial`). */
+    partial?: boolean;
 }
 
 export function shell_dequote(word: string): string {
@@ -241,7 +243,7 @@ async function path_candidates(roots_kind: SuggestKind, children_kind: SuggestKi
 async function source_candidates(source: ValueSource, prefix: string, positionals: string[]): Promise<Candidate[]> {
     if (source.kind !== "suggest") { return []; }
     const suggestions = await suggest_values(source.suggest, prefix, positionals);
-    return suggestions.map(s => ({ value: s.value, description: s.display_string }));
+    return suggestions.map(s => ({ value: s.value, description: s.display_string, ...(s.partial === true ? { partial: true } : {}) }));
 }
 
 // Build the `suggest` context argv for each dynamic kind, mirroring what the old
@@ -313,7 +315,8 @@ function filter_by_prefix(candidates: readonly Candidate[], prefix: string): Can
 }
 
 function emit(candidates: Candidate[]): void {
-    if (candidates.length > 0 && candidates.every(c => c.value.endsWith("/"))) {
+    // The shell decides for all candidates at once: no space only when none is a whole word.
+    if (candidates.length > 0 && candidates.every(c => c.value.endsWith("/") || c.partial === true)) {
         console.log(NOSPACE_DIRECTIVE);
     }
     for (const c of candidates) {

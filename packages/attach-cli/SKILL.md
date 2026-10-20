@@ -144,9 +144,11 @@ attach-linux list device ad7124
 
 # List all properties of a node (marks required/set)
 attach-linux list property spi0/adi,ad7124-8@0
-# Properties named by a pattern are listed as their regex, marked (pattern):
-#   ^adi,bypass-attenuator-in[0-4]$ (pattern; set: adi,bypass-attenuator-in1)
-# Any name the regex matches works with list property, update and read.
+# Properties and child nodes named by a binding pattern show the names it matches:
+#   adi,bypass-attenuator-in0 … adi,bypass-attenuator-in4 (pattern ^adi,bypass-attenuator-in[0-4]$; set: adi,bypass-attenuator-in1)
+#   channel@0 … channel@15 (child node ^channel@([0-9]|1[0-5])$; present: channel@0)
+# Any name the regex matches works with list property, update and read. With
+# --json the suggestion value is the regex itself.
 
 # Get type details for a specific property
 attach-linux list property spi0/adi,ad7124-8@0 reg

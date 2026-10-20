@@ -5,6 +5,7 @@ import {
     DeviceTreeOverlay,
     IntelligenceStack,
     dt_to_validator_input,
+    expand_pattern,
     get_full_node_name,
     parent_path_string,
     placement_from_overlay,
@@ -422,32 +423,56 @@ async function suggest_node_property(context_: LocalContext, arguments_: string[
     }
 }
 
-/** A property pattern of the binding as a suggestion: its regex, marked "(pattern)", and the names already set. */
+/**
+ * A property pattern of the binding as a suggestion: the regex as the value,
+ * and a display with the names it matches and those already set, e.g.
+ * "adi,bypass-attenuator-in0 … adi,bypass-attenuator-in4 (pattern
+ * ^adi,bypass-attenuator-in[0-4]$; set: adi,bypass-attenuator-in1)".
+ */
 export function describe_property_pattern(rule: PropertyPatternRule, node: DTNode): Suggestion {
     const pattern = new RegExp(rule.pattern);
     const set = node.properties.map(p => p.name).filter(name => pattern.test(name));
-    const details = ["pattern", ...(set.length > 0 ? [`set: ${set.join(", ")}`] : [])];
-    return { value: rule.pattern, display_string: `${rule.pattern} (${details.join("; ")})` };
+    const names = pattern_names(rule.pattern);
+    const details = [names === undefined ? "pattern" : `pattern ${rule.pattern}`, ...(set.length > 0 ? [`set: ${set.join(", ")}`] : [])];
+    return { value: rule.pattern, display_string: `${names ?? rule.pattern} (${details.join("; ")})` };
 }
 
 /**
- * A child-node pattern of the binding as a suggestion: its regex as the value,
- * and a display naming the node, its required properties and the children
- * already present, e.g. "channel@N (child node ^channel@([0-9]|1[0-5])$;
- * requires reg, diff-channels; present: channel@0)".
+ * A child-node pattern of the binding as a suggestion: the regex as the value,
+ * and a display with the names it matches and the children already present,
+ * e.g. "channel@0 … channel@15 (child node ^channel@([0-9]|1[0-5])$; present: channel@0)".
  */
 export function describe_child_nodes(rule: PatternPropertyRule, node: DTNode): Suggestion {
     const pattern = new RegExp(rule.pattern);
     const present = node.children.map(child => get_full_node_name(child)).filter(name => pattern.test(name));
-    // Readable name: the literal prefix of the pattern, then N for the unit address.
-    const literal = rule.pattern.replace(/^\^/, "").replaceAll(/\(([\w@,.-]+)\)/g, "$1");
-    const prefix = /^[\w@,.-]*/.exec(literal)?.[0] ?? "";
-    const name = prefix.endsWith("@") ? `${prefix}N` : (prefix || rule.pattern);
     const details = [
         `child node ${rule.pattern}`,
         `present: ${present.length > 0 ? present.join(", ") : "none"}`,
     ];
-    return { value: rule.pattern, display_string: `${name} (${details.join("; ")})` };
+    return { value: rule.pattern, display_string: `${pattern_names(rule.pattern) ?? rule.pattern} (${details.join("; ")})` };
+}
+
+/** The names a pattern matches, short: "a, b", "first … last", or "stem…". Undefined when nothing is fixed. */
+function pattern_names(pattern: string): string | undefined {
+    if (!pattern.startsWith("^")) { return undefined; }
+    const expansion = expand_pattern(pattern);
+    if ("stem" in expansion) { return expansion.stem === "" ? undefined : `${expansion.stem}…`; }
+    const { names } = expansion;
+    return names.length <= 3 ? names.join(", ") : `${names[0]} … ${names.at(-1)}`;
+}
+
+/**
+ * Completion candidates for a binding pattern: the names it matches that
+ * aren't taken, or its stem as a partial candidate. Unanchored patterns match
+ * inside any name, so they offer nothing.
+ */
+export function pattern_candidates(pattern: string, taken: Set<string>, kind: "pattern" | "child node"): Suggestion[] {
+    if (!pattern.startsWith("^")) { return []; }
+    const expansion = expand_pattern(pattern);
+    if ("stem" in expansion) {
+        return expansion.stem === "" ? [] : [{ value: expansion.stem, display_string: `${expansion.stem}… (${kind} ${pattern})`, partial: true }];
+    }
+    return expansion.names.filter(name => !taken.has(name)).map(name => ({ value: name, display_string: `${name} (${kind})` }));
 }
 
 async function binding_property_suggestions(
@@ -465,7 +490,7 @@ async function binding_property_suggestions(
     const required = new Set(binding.required_properties);
     const existing_keys = new Set(found_node.properties.map(p => p.name));
 
-    return binding.properties.map(p => {
+    const named = binding.properties.map(p => {
         const labels = [
             ...(existing_keys.has(p.key) ? ["set"] : []),
             ...(required.has(p.key) ? ["required"] : []),
@@ -475,6 +500,14 @@ async function binding_property_suggestions(
             ...(labels ? { display_string: `${p.key} (${labels})` } : {}),
         };
     });
+    // Names the binding's patterns allow: properties not set yet, child nodes not present yet.
+    const taken_properties = new Set([...existing_keys, ...binding.properties.map(p => p.key)]);
+    const children = new Set(found_node.children.map(child => get_full_node_name(child)));
+    return [
+        ...named,
+        ...binding.property_patterns.flatMap(rule => pattern_candidates(rule.pattern, taken_properties, "pattern")),
+        ...binding.child_nodes.flatMap(rule => pattern_candidates(rule.pattern, children, "child node")),
+    ];
 }
 
 /** Child node names of `node`, from the base tree and the overlay merged, in first-seen order. */
@@ -753,14 +786,36 @@ if (import.meta.vitest) {
         expect(result.ok && result.info.constraints).toEqual({});
     });
 
-    test("describe_property_pattern — the regex, marked as a pattern, with the names already set", () => {
+    test("describe_property_pattern — the names it expands to, the regex, and the names already set", () => {
         const node = { name: "hwmon", labels: [], properties: [{ name: "adi,bypass-attenuator-in1", value: [] }, { name: "reg", value: [] }], children: [] } as unknown as DTNode;
         const rule = { pattern: "^adi,bypass-attenuator-in[0-4]$", description: "", value: { _t: "generic" } as const };
         expect(describe_property_pattern(rule, node)).toEqual({
             value: "^adi,bypass-attenuator-in[0-4]$",
-            display_string: "^adi,bypass-attenuator-in[0-4]$ (pattern; set: adi,bypass-attenuator-in1)",
+            display_string: "adi,bypass-attenuator-in0 … adi,bypass-attenuator-in4 (pattern ^adi,bypass-attenuator-in[0-4]$; set: adi,bypass-attenuator-in1)",
         });
-        expect(describe_property_pattern(rule, { ...node, properties: [] }).display_string).toBe("^adi,bypass-attenuator-in[0-4]$ (pattern)");
+        expect(describe_property_pattern({ ...rule, pattern: "^adi,pin(5|10)-function$" }, { ...node, properties: [] }).display_string)
+            .toBe("adi,pin5-function, adi,pin10-function (pattern ^adi,pin(5|10)-function$)");
+        expect(describe_property_pattern({ ...rule, pattern: ".*-supply$" }, node).display_string).toBe(".*-supply$ (pattern)");
+    });
+
+    test("describe_child_nodes — the names, or the stem, in place of the regex", () => {
+        const channel = { name: "channel", unit_addr: "0", labels: [], properties: [], children: [] };
+        const node = { name: "adc", labels: [], properties: [], children: [channel] } as unknown as DTNode;
+        const rule = { pattern: "^channel@([0-9]|1[0-5])$", description: "", properties: [], required: [] };
+        expect(describe_child_nodes(rule, node).display_string).toBe("channel@0 … channel@15 (child node ^channel@([0-9]|1[0-5])$; present: channel@0)");
+        expect(describe_child_nodes({ ...rule, pattern: "^fan-[0-9]+$" }, node).display_string).toBe("fan-… (child node ^fan-[0-9]+$; present: none)");
+    });
+
+    test("pattern_candidates — names not taken yet, or the stem as a partial candidate", () => {
+        expect(pattern_candidates("^channel@[0-3]$", new Set(["channel@1"]), "child node")).toEqual([
+            { value: "channel@0", display_string: "channel@0 (child node)" },
+            { value: "channel@2", display_string: "channel@2 (child node)" },
+            { value: "channel@3", display_string: "channel@3 (child node)" },
+        ]);
+        expect(pattern_candidates("^fan-[0-9]+$", new Set(), "child node")).toEqual([{ value: "fan-", display_string: "fan-… (child node ^fan-[0-9]+$)", partial: true }]);
+        // Unanchored patterns match inside any name; no fixed text gives nothing to type.
+        expect(pattern_candidates("-supply$", new Set(), "pattern")).toEqual([]);
+        expect(pattern_candidates("^.*-supply$", new Set(), "pattern")).toEqual([]);
     });
     type VS = import("attach-lib").ValueSuggestion;
 

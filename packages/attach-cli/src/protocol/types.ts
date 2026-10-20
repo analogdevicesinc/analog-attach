@@ -111,6 +111,8 @@ export interface Suggestion {
     value: string;
     display_string?: string;
     note?: string;
+    /** The start of a name, to be typed on (a binding pattern's stem, e.g. `fan-`). */
+    partial?: boolean;
 }
 
 export interface SuggestResponse extends CommonResponse {

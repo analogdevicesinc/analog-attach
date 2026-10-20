@@ -131,6 +131,7 @@ describe("__complete delegates dynamic values to suggest in-process", () => {
                 : arguments_[0] === "parent" ? [{ value: "spi0", display_string: "/soc/spi@0" }]
                 : key === "navigate" ? [{ value: "spi0" }, { value: "i2c1" }]
                 : key === "navigate spi0/adc@0" ? [{ value: "reg", display_string: "reg (required)" }]
+                : key === "navigate i2c1/hwmon@2e" ? [{ value: "adi,bypass-attenuator-in0", display_string: "adi,bypass-attenuator-in0 (pattern)" }, { value: "fan-", display_string: "fan-… (child node ^fan-[0-9]+$)", partial: true }]
                 : arguments_[0] === "children" ? [{ value: "adc@0" }, { value: "spidev@0" }]
                 : arguments_[0] === "value" ? [{ value: "19 IRQ_TYPE_EDGE_FALLING", display_string: "19 IRQ_TYPE_EDGE_FALLING — spi_pmod1.int" }]
                 : [];
@@ -161,6 +162,11 @@ describe("__complete delegates dynamic values to suggest in-process", () => {
     test("read second positional completes properties via navigate", async () => {
         const lines = await complete(["read", "spi0/adc@0", ""]);
         expect(lines).toStrictEqual(["reg\treg (required)"]);
+    });
+
+    test("a pattern stem completes without a trailing space when it is the only candidate left", async () => {
+        expect(await complete(["update", "i2c1/hwmon@2e", "fa"])).toStrictEqual(["__ATTACH_COMPLETE_NOSPACE__", "fan-\tfan-… (child node ^fan-[0-9]+$)"]);
+        expect(values(await complete(["update", "i2c1/hwmon@2e", ""]))).toStrictEqual(["adi,bypass-attenuator-in0", "fan-"]);
     });
 
     test("add --parent roots are the valid parents for the compatible", async () => {
