@@ -381,12 +381,11 @@ async function suggest_node_property(context_: LocalContext, arguments_: string[
 
     const workspace = load_workspace(context_, ["bindings", "base", "overlay"]);
     if (workspace === undefined) { return; }
-    const { linux, dt_schema: dtSchema } = workspace.bindings;
     const base_dt = workspace.base.tree;
     const overlay = workspace.overlay.tree;
 
-    const found = overlay.find_node(resolve_node_identifier(identifier, overlay));
-    if (found === undefined) {
+    const found_node = effective_target_node(identifier, overlay, base_dt);
+    if (found_node === undefined) {
         if (context_.json) {
             respond_fail({ ok: false, message: `Node ${identifier} not found`, severity: "error" });
         } else {
@@ -395,12 +394,8 @@ async function suggest_node_property(context_: LocalContext, arguments_: string[
         return;
     }
 
-    const { node: found_node, parent_node, node_path } = found;
     const existing_keys = new Set(found_node.properties.map(p => p.name));
-    const parent_name = found_node.labels.at(-1) ?? node_path;
-    const parent_compats = effective_parent_compatibles(parent_node, node_path, base_dt);
-
-    const binding = await resolve_node_binding(found_node, parent_node, parent_name, base_dt, linux, dtSchema, undefined, parent_compats);
+    const { binding } = await resolve_target_binding(identifier, overlay, base_dt, { ok: true, value: workspace.bindings });
     if ('error' in binding) {
         if (context_.json) {
             respond_fail({ ok: false, message: binding.error, severity: "error" });
@@ -498,21 +493,28 @@ export function pattern_candidates(pattern: string, taken: Set<string>, kind: "p
     return expansion.names.filter(name => !taken.has(name)).map(name => ({ value: name, display_string: `${name} (${kind})` }));
 }
 
-async function binding_property_suggestions(
-    found_node: DTNode,
-    parent_node: DTNode | undefined,
-    parent_name: string,
-    base_dt: DeviceTree,
-    linux: string,
-    dtSchema: string,
-    parent_compatibles?: string[],
-): Promise<Suggestion[] | undefined> {
-    const binding = await resolve_node_binding(found_node, parent_node, parent_name, base_dt, linux, dtSchema, undefined, parent_compatibles);
-    if ('error' in binding) { return undefined; }
+/** The node as the base tree and the overlay together have it (update writes base nodes too); undefined when neither has it. */
+export function effective_target_node(identifier: string, overlay: DeviceTreeOverlay, base_dt: DeviceTree): DTNode | undefined {
+    const reference = resolve_node_identifier(identifier, overlay);
+    const node_path = overlay.find_node(reference)?.node_path ?? base_dt.locate(reference)?.path;
+    return node_path === undefined ? undefined : overlay.effective_node(node_path);
+}
+
+/** The properties and children of a node, from the base tree and the overlay merged; undefined when neither has it. */
+export function navigate_node(identifier: string, overlay: DeviceTreeOverlay, base_dt: DeviceTree): { properties: string[]; children: string[] } | undefined {
+    const node = effective_target_node(identifier, overlay, base_dt);
+    const children = node_children(base_dt, overlay, identifier);
+    if (node === undefined || children === undefined) { return; }
+    return { properties: node.properties.map(p => p.name), children };
+}
+
+/** What the property positional offers: the children, then the binding's properties (or the node's own without one) and the pattern names. */
+export function navigate_candidates(node: { properties: string[]; children: string[] }, binding?: NodeBinding): Suggestion[] {
+    const children: Suggestion[] = node.children.map(child => ({ value: child }));
+    if (binding === undefined) { return [...children, ...node.properties.map(name => ({ value: name }))]; }
 
     const required = new Set(binding.required_properties);
-    const existing_keys = new Set(found_node.properties.map(p => p.name));
-
+    const existing_keys = new Set(node.properties);
     const named = binding.properties.map(p => {
         const labels = [
             ...(existing_keys.has(p.key) ? ["set"] : []),
@@ -525,11 +527,12 @@ async function binding_property_suggestions(
     });
     // Names the binding's patterns allow: properties not set yet, child nodes not present yet.
     const taken_properties = new Set([...existing_keys, ...binding.properties.map(p => p.key)]);
-    const children = new Set(found_node.children.map(child => get_full_node_name(child)));
+    const present = new Set(node.children);
     return [
+        ...children,
         ...named,
         ...binding.property_patterns.flatMap(rule => pattern_candidates(rule.pattern, taken_properties, "pattern")),
-        ...binding.child_nodes.flatMap(rule => pattern_candidates(rule.pattern, children, "child node")),
+        ...binding.child_nodes.flatMap(rule => pattern_candidates(rule.pattern, present, "child node")),
     ];
 }
 
@@ -597,8 +600,9 @@ async function suggest_navigate(context_: LocalContext, arguments_: string[]): P
     }
 
     const identifier = resolve_positional_path(arguments_)!;
-    const found = overlay.find_node(resolve_node_identifier(identifier, overlay));
-    if (found === undefined) {
+    // The node as the base and the overlay together have it: update writes base nodes too.
+    const node = navigate_node(identifier, overlay, base_dt);
+    if (node === undefined) {
         // The path may terminate at a property (a leaf), which has nothing to
         // navigate into but is not an error.
         const last_slash = identifier.lastIndexOf("/");
@@ -622,21 +626,10 @@ async function suggest_navigate(context_: LocalContext, arguments_: string[]): P
         return;
     }
 
-    const { node: found_node, parent_node, node_path } = found;
-
-    const child_suggestions: Suggestion[] = found_node.children.map(child => ({ value: get_full_node_name(child) }));
-
     // Bindings are optional here: without them the node's own properties are offered.
-    let property_suggestions: Suggestion[] | undefined;
     const bindings = parse_bindings(workspace.settings);
-    if (bindings.ok) {
-        const nav_parent_name = found_node.labels.at(-1) ?? node_path;
-        const nav_parent_compats = effective_parent_compatibles(parent_node, node_path, base_dt);
-        property_suggestions = await binding_property_suggestions(found_node, parent_node, nav_parent_name, base_dt, bindings.value.linux, bindings.value.dt_schema, nav_parent_compats);
-    }
-    property_suggestions ??= found_node.properties.map(p => ({ value: p.name }));
-
-    const suggestions = [...child_suggestions, ...property_suggestions];
+    const { binding } = bindings.ok ? await resolve_target_binding(identifier, overlay, base_dt, bindings) : { binding: undefined };
+    const suggestions = navigate_candidates(node, binding === undefined || "error" in binding ? undefined : binding);
 
     if (context_.json) {
         respond({ ok: true, message: `Found ${suggestions.length} items`, severity: "info", suggestions });
@@ -795,6 +788,51 @@ export function format_type(type: Types): string {
 
 if (import.meta.vitest) {
     const { test, expect, describe } = import.meta.vitest;
+    const { DeviceTree: DT, DeviceTreeOverlay: DTO } = await import("attach-lib");
+
+    const navigate_trees = (overlay_source: string): { base: DeviceTree; overlay: DeviceTreeOverlay } => {
+        const base = DT.new_from_string(`/dts-v1/;\n/ {\n\tsoc {\n\t\tspi0: spi@7e204000 {\n\t\t\tcompatible = "brcm,bcm2835-spi";\n\t\t\tstatus = "disabled";\n\t\t\tspidev0: spidev@0 {\n\t\t\t\treg = <0>;\n\t\t\t};\n\t\t};\n\t\tgpio: gpio@7e200000 {\n\t\t\tcompatible = "brcm,bcm2711-gpio";\n\t\t\tpin_a {\n\t\t\t};\n\t\t};\n\t};\n};`);
+        if (typeof base === "string") { throw new TypeError(base); }
+        const overlay = DTO.new_from_string(overlay_source, base);
+        if (typeof overlay === "string") { throw new TypeError(overlay); }
+        return { base, overlay };
+    };
+
+    test("navigate_node — a base node the overlay doesn't touch: its base properties and children", () => {
+        const { base, overlay } = navigate_trees(`/dts-v1/;\n/plugin/;\n\n&spi0 {\n\tstatus = "okay";\n};`);
+        expect(navigate_node("gpio", overlay, base)).toEqual({ properties: ["compatible"], children: ["pin_a"] });
+    });
+
+    test("navigate_node — a base node the overlay changes: base and overlay merged", () => {
+        const { base, overlay } = navigate_trees(`/dts-v1/;\n/plugin/;\n\n&spi0 {\n\tstatus = "okay";\n\tcs-gpios = <&gpio 8 1>;\n\tadc@1 {\n\t\treg = <1>;\n\t};\n};`);
+        expect(navigate_node("spi0", overlay, base)).toEqual({ properties: ["compatible", "status", "cs-gpios"], children: ["spidev@0", "adc@1"] });
+        expect(navigate_node("spi0/adc@1", overlay, base)).toEqual({ properties: ["reg"], children: [] });
+        expect(navigate_node("nope", overlay, base)).toBeUndefined();
+    });
+
+    test("navigate_candidates — children, then the binding's properties marked set and required, then the pattern names", () => {
+        const binding: NodeBinding = {
+            properties: [
+                { key: "compatible", value: { _t: "generic", description: "" } },
+                { key: "cs-gpios", value: { _t: "generic", description: "" } },
+                { key: "num-cs", value: { _t: "generic", description: "" } },
+            ],
+            required_properties: ["compatible"],
+            child_nodes: [],
+            property_patterns: [],
+            binding_path: "/linux/spi/brcm,bcm2835-spi.yaml",
+            origin: { kind: "compatible", compatible: "brcm,bcm2835-spi" },
+            narrow_and_populate: () => ({ properties: [], errors: [] }),
+        };
+        expect(navigate_candidates({ properties: ["compatible", "status"], children: ["spidev@0"] }, binding)).toEqual([
+            { value: "spidev@0" },
+            { value: "compatible", display_string: "compatible (set, required)" },
+            { value: "cs-gpios" },
+            { value: "num-cs" },
+        ]);
+        expect(navigate_candidates({ properties: ["compatible", "status"], children: ["spidev@0"] }))
+            .toEqual([{ value: "spidev@0" }, { value: "compatible" }, { value: "status" }]);
+    });
 
     test("property_info — a pattern property's type and description; an empty default is left out", () => {
         const value: AttachType = { _t: "enum_array", minItems: 1, maxItems: 1, enum: ["pwm2", "smbalert#"], default: [], enum_type: AttachEnumType.STRING, description: "Pin 5 function" };
