@@ -220,12 +220,17 @@ attach-linux import ./my-board-overlay.dts              # or a path
 - Refuses when an overlay is already configured: `An overlay is already configured (<path>); import only creates a new one.`
 - Warns when the overlay is for another board (the `list overlay` fit is incompatible), and for each target or reference the base doesn't have:
 ```
-warning: the overlay is for another board (overlay: brcm,bcm2712; base: raspberrypi,4-model-b, brcm,bcm2711)
-warning: fragment@0: target "spi7" not found in the base
-warning: fragment@1: target-path "/soc/nope" not found in the base
-warning: ad7124: refin1-supply: no label "vref"
+warning: this overlay is for another board: brcm,bcm2712
+  (base: raspberrypi,4-model-b, brcm,bcm2711)
+warning: 2 fragments target nodes the base doesn't have:
+  fragment@0  target spi7
+  fragment@1  target-path /soc/nope
+warning: 2 references point to nodes neither the base nor the overlay has:
+  ad7124            refin1-supply → &vref
+  ad7124/channel@0  io-supply → &vio
+  fix with: update <node> <property> <value>, or delete <node> <property>
 ```
-  Fix the references with `update` (the path is label-first), or drop the fragment.
+  The node column is label-first, ready for `update`.
 - `--json` gives `{ path, source, fit, reason, unresolved_targets: [{ fragment, property, target }], unresolved: [{ path, property, reference }] }`; severity `warn` when there is anything to fix.
 
 ---
@@ -287,7 +292,13 @@ The node gets an automatic unit address and `reg` when the binding defines `reg`
 
 **From the binding's example** (`--from-example`): the node is copied from the first example on the parent's bus (SPI or I2C), else from the first example that has the device (`No SPI example for adi,ad7124-8; using example 1 (i2c)`). An example for another device of the same binding gets the requested compatible. Name, unit address, `reg`, children and references are copied as they are, so:
 - `reg` may clash with a sibling; the clash is reported as a warning (`rename` to move it).
-- References that name nothing in the base or overlay (`<&adc_vref>`) are listed as `error: refin1-supply: no label "adc_vref" in the base or overlay`, and under `--json` as `unresolved: [{ path, property, reference }]`. The node is still written; fix them with `update` before deploying.
+- References that name nothing in the base or overlay (`<&adc_vref>`) are listed in the same form as for `import`, as errors:
+```
+error: 1 reference points to a node neither the base nor the overlay has:
+  ad7124_8  refin1-supply → &adc_vref
+  fix with: update <node> <property> <value>, or delete <node> <property>
+```
+  Under `--json` as `unresolved: [{ path, property, reference }]`. The node is still written; fix them with `update` before deploying.
 
 **Child nodes** (channels, etc.) are created with `update`, not `add`: `update adc channel@0`.
 

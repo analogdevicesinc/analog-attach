@@ -10,7 +10,6 @@ import {
     type AddNodeNote,
     type AddNodeResult,
     type ParsedBinding,
-    type UnresolvedReference,
 } from "attach-lib";
 
 import type { LocalContext } from "../../context";
@@ -26,6 +25,7 @@ import { apply_update } from "../update/command";
 import { node_missing_required, property_details } from "../../node-state";
 import { run_interview, type InterviewSteps } from "./interview";
 import { node_reg_warnings, reg_warning_lines } from "../../reg-conflicts";
+import { reference_lines, unique_references } from "../../unresolved";
 import {
     choose_example,
     copy_example_node,
@@ -145,9 +145,9 @@ Use 'list device' to find compatible strings, 'list parent' to find valid buses.
             for (const line of node_reg_warnings(workfile.tree, result.path).flatMap(w => reg_warning_lines(w))) {
                 if (context_.json) { diagnostic(line); } else { console.log(line); }
             }
-            const unresolved = from_example ? unresolved_references(workfile.tree, result.path) : [];
+            const unresolved = from_example ? unique_references(unresolved_references(workfile.tree, result.path)) : [];
             if (!context_.json) {
-                for (const line of unresolved_lines(result.path, result.label, unresolved)) { console.log(line); }
+                for (const line of reference_lines("error", unresolved, workfile.tree.all_labels())) { console.log(line); }
             }
 
             const bindings = workspace.bindings;
@@ -368,30 +368,6 @@ function example_note_message(note: ExampleNote, compatible: string): string {
     }
 }
 
-/** The references under the new node that resolve to nothing, one line per property, and how to fix them. */
-function unresolved_lines(node_path: string, label: string, unresolved: UnresolvedReference[]): string[] {
-    if (unresolved.length === 0) { return []; }
-    const groups = new Map<string, { labels: string[]; paths: string[] }>();
-    for (const { path: at, property, reference } of unresolved) {
-        const where = at === node_path ? property : `${at.slice(node_path.length + 1)}/${property}`;
-        const group = groups.get(where) ?? { labels: [], paths: [] };
-        if (reference.startsWith("&{")) { group.paths.push(reference.slice(2, -1)); } else { group.labels.push(reference.slice(1)); }
-        groups.set(where, group);
-    }
-    return [
-        ...[...groups].map(([where, { labels, paths }]) =>
-            `error: ${where}: ${[...missing_names("label", labels), ...missing_names("node", paths)].join(", ")} in the base or overlay`),
-        `(fix with: update ${label} <property> <value>)`,
-    ];
-}
-
-/** `no label "a"`, `no labels "a", "b"`, or nothing. */
-export function missing_names(kind: string, values: string[]): string[] {
-    const names = [...new Set(values)];
-    if (names.length === 0) { return []; }
-    return [`no ${kind}${names.length > 1 ? "s" : ""} ${names.map(v => `"${v}"`).join(", ")}`];
-}
-
 function note_message(note: AddNodeNote, added: AddedNode): string {
     switch (note.kind) {
         case "reg-needed": { return `The parent is memory-mapped; set the address with: update ${added.path} reg <address> <size>`; }
@@ -496,21 +472,6 @@ if (import.meta.vitest) {
             .toBe("The example is for adi,ad7124-4; compatible set to adi,ad7124-8");
         expect(example_note_message({ kind: "label-renamed", from: "adc", to: "adc_1" }, "adi,ad7124-8"))
             .toBe("Label adc is taken; labelled adc_1 instead");
-    });
-
-    test("unresolved_lines — one line per property, relative to the node, with the fix", () => {
-        expect(unresolved_lines("/soc/spi@7e204000/adc@0", "ad7124", [
-            { path: "/soc/spi@7e204000/adc@0", property: "interrupt-parent", reference: "&gpio" },
-            { path: "/soc/spi@7e204000/adc@0", property: "clocks", reference: "&clk_a" },
-            { path: "/soc/spi@7e204000/adc@0", property: "clocks", reference: "&clk_b" },
-            { path: "/soc/spi@7e204000/adc@0/channel@0", property: "io-backends", reference: "&{/backend}" },
-        ])).toEqual([
-            'error: interrupt-parent: no label "gpio" in the base or overlay',
-            'error: clocks: no labels "clk_a", "clk_b" in the base or overlay',
-            'error: channel@0/io-backends: no node "/backend" in the base or overlay',
-            "(fix with: update ad7124 <property> <value>)",
-        ]);
-        expect(unresolved_lines("/a", "x", [])).toEqual([]);
     });
 
     test("missing_lines — the missing list with how to set them, nothing when complete", () => {

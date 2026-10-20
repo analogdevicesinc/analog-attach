@@ -21,7 +21,7 @@ import { respond, respond_fail } from "../../protocol/output";
 import type { ImportResponse, UnresolvedTargetEntry } from "../../protocol/types";
 import { node_compatibles, run_preprocess } from "../../utilities";
 import { next_workfile_name, workfile_from_overlay } from "../../workfile";
-import { missing_names } from "../add/command";
+import { board_lines, reference_lines, target_lines, unique_references } from "../../unresolved";
 
 // `import <overlay>` brings a whole overlay of the Linux tree (or any overlay
 // file) into a new workfile: every fragment as written, minus the RPi
@@ -99,7 +99,9 @@ async function run_import(context: LocalContext, name: string): Promise<void> {
     workfile.save();
 
     const root = workspace.base.tree.node_at("/");
-    const fit = board_fit(scan_overlay(text).board, root === undefined ? [] : node_compatibles(root));
+    const board = scan_overlay(text).board ?? [];
+    const base_board = root === undefined ? [] : node_compatibles(root);
+    const fit = board_fit(board, base_board);
     const warnings = import_warnings(imported.tree);
     const shown = path.relative(linux, source).startsWith("..") ? source : path.relative(linux, source);
     const message = `Imported ${shown} into ${workfile.path}`;
@@ -120,7 +122,7 @@ async function run_import(context: LocalContext, name: string): Promise<void> {
     }
     console.log(message);
     if (imported.dropped_overrides) { console.log("Dropped __overrides__ (the overlay's parameters)"); }
-    if (fit.fit === "incompatible") { console.log(`warning: the overlay is for another board (${fit.reason})`); }
+    if (fit.fit === "incompatible") { for (const line of board_lines(board, base_board)) { console.log(line); } }
     for (const line of import_warning_lines(warnings, imported.tree.all_labels())) { console.log(line); }
 }
 
@@ -168,36 +170,12 @@ export function import_warnings(tree: DeviceTreeOverlay): ImportWarnings {
             target: target.replace(/^&/, ""),
         };
     });
-    return { targets, references: unresolved_references(tree) };
+    return { targets, references: unique_references(unresolved_references(tree)) };
 }
 
-/** `path` from its deepest labelled node (`spi0/adc@0`); a target that didn't resolve as written, without `&`. */
-export function display_path(at: string, labels: Map<string, string>): string {
-    if (!at.startsWith("/")) { return at.replace(/^&/, ""); }
-    const label_of = new Map<string, string>();
-    for (const [label, node] of labels) { if (!label_of.has(node)) { label_of.set(node, label); } }
-    const parts = at.split("/").filter(Boolean);
-    for (let n = parts.length; n > 0; n--) {
-        const label = label_of.get(`/${parts.slice(0, n).join("/")}`);
-        if (label !== undefined) { return [label, ...parts.slice(n)].join("/"); }
-    }
-    return at;
-}
-
-/** One warning per unresolved target, and per node and property for the references. */
+/** The targets the base lacks, then the references that resolve to nothing. */
 export function import_warning_lines(warnings: ImportWarnings, labels: Map<string, string>): string[] {
-    const groups = new Map<string, { labels: string[]; paths: string[] }>();
-    for (const { path: at, property, reference } of warnings.references) {
-        const where = `${display_path(at, labels)}: ${property}`;
-        const group = groups.get(where) ?? { labels: [], paths: [] };
-        if (reference.startsWith("&{")) { group.paths.push(reference.slice(2, -1)); } else { group.labels.push(reference.slice(1)); }
-        groups.set(where, group);
-    }
-    return [
-        ...warnings.targets.map(({ fragment, property, target }) => `warning: ${fragment}: ${property} "${target}" not found in the base`),
-        ...[...groups].map(([where, { labels: names, paths }]) =>
-            `warning: ${where}: ${[...missing_names("label", names), ...missing_names("node", paths)].join(", ")}`),
-    ];
+    return [...target_lines(warnings.targets), ...reference_lines("warning", warnings.references, labels)];
 }
 
 if (import.meta.vitest) {
@@ -318,42 +296,18 @@ if (import.meta.vitest) {
         ]);
     });
 
-    test("display_path — from the deepest labelled node; an unresolved target as written", () => {
-        const labels = new Map([["spi0", "/soc/spi@7e204000"], ["ad7124", "/soc/spi@7e204000/adc@0"]]);
-        expect(display_path("/soc/spi@7e204000/adc@0/channel@0", labels)).toBe("ad7124/channel@0");
-        expect(display_path("/soc/spi@7e204000/spidev@0", labels)).toBe("spi0/spidev@0");
-        expect(display_path("/soc", labels)).toBe("/soc");
-        expect(display_path("&spi7/adc@0", labels)).toBe("spi7/adc@0");
-    });
-
-    test("import_warning_lines — targets, then one line per node and property", () => {
+    test("import_warning_lines — the targets the base lacks, then the references", () => {
         const { tree } = imported();
         expect(import_warning_lines(import_warnings(tree), tree.all_labels())).toEqual([
-            'warning: fragment@1: target "spi7" not found in the base',
-            'warning: fragment@2: target-path "/soc/nope" not found in the base',
-            'warning: ad7124: refin1-supply: no label "vref"',
-            'warning: ad7124: clocks: no label "adc_clk"',
-            'warning: ad7124/channel@0: io-supply: no label "vio"',
+            "warning: 2 fragments target nodes the base doesn't have:",
+            "  fragment@1  target spi7",
+            "  fragment@2  target-path /soc/nope",
+            "warning: 3 references point to nodes neither the base nor the overlay has:",
+            "  ad7124            refin1-supply → &vref",
+            "  ad7124            clocks → &adc_clk",
+            "  ad7124/channel@0  io-supply → &vio",
+            "  fix with: update <node> <property> <value>, or delete <node> <property>",
         ]);
-        expect(import_warning_lines({
-            targets: [],
-            references: [
-                { path: "&spi7/adc@0", property: "clocks", reference: "&a" },
-                { path: "&spi7/adc@0", property: "clocks", reference: "&b" },
-                { path: "&spi7/adc@0", property: "io-channels", reference: "&{/soc/x}" },
-            ],
-        }, new Map())).toEqual([
-            'warning: spi7/adc@0: clocks: no labels "a", "b"',
-            'warning: spi7/adc@0: io-channels: no node "/soc/x"',
-        ]);
-        // A label named twice in one property (two GPIOs of the same controller) is listed once.
-        expect(import_warning_lines({
-            targets: [],
-            references: [
-                { path: "&spi7/adc@0", property: "gpios", reference: "&rp1_gpio" },
-                { path: "&spi7/adc@0", property: "gpios", reference: "&rp1_gpio" },
-            ],
-        }, new Map())).toEqual(['warning: spi7/adc@0: gpios: no label "rp1_gpio"']);
         expect(import_warning_lines({ targets: [], references: [] }, new Map())).toEqual([]);
     });
 }
