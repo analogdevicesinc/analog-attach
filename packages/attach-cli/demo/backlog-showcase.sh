@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Showcase of the backlog features: index progress, the add interview,
-# verbose read, reg clashes, binding patterns, add --from-example, and
-# list overlay / import. Raspberry Pi 4 base; the overlay part uses the ADI
-# Linux tree, which carries the RPi overlays.
+# Showcase of the backlog features: index progress, the interview after add
+# and for a new channel, verbose read, reg clashes, binding patterns,
+# add --from-example, and list overlay / import. Raspberry Pi 4 base; the
+# overlay part uses the ADI Linux tree, which carries the RPi overlays.
 
 BOLD='\033[1m'
 DIM='\033[2m'
@@ -123,9 +123,9 @@ echo ""
 echo -e "  Base DT: ${BOLD}rpi-4.dts${RESET} (Raspberry Pi 4)"
 echo -e "  Linux:   ${BOLD}~/linux${RESET}, then ${BOLD}~/linux_adi${RESET} for its RPi overlays"
 echo ""
-echo -e "  ${DIM}Each step shows one feature: index progress, the interview after add,"
-echo -e "  verbose read, reg clashes, binding patterns, add --from-example, and"
-echo -e "  starting from an overlay that already exists.${RESET}"
+echo -e "  ${DIM}Each step shows one feature: index progress, the interview after add"
+echo -e "  and for a new channel, verbose read, reg clashes, binding patterns,"
+echo -e "  add --from-example, and starting from an overlay that already exists.${RESET}"
 if $PAUSE; then
     echo ""
     echo -e "  ${DIM}[press Enter to start]${RESET}"
@@ -144,8 +144,13 @@ tty_step "add picks a chip select, then asks for what is missing" \
     $'gpio\n19 IRQ_TYPE_EDGE_FALLING' \
     add adi,ad7124-8 --parent spi0 --label adc
 
+tty_step "A new channel asks for what it needs" \
+    "update <node> <child> creates a child node the binding allows, with reg from the unit address (decimal, as the binding names channels). A channel has required properties of its own, so they are asked for the same way. Here: AIN0 against AIN1." \
+    '0 1' \
+    update adc channel@0
+
 step "read explains what it shows" \
-    "A property comes with its binding description, the allowed values and the suggestions. A phandle has no allowed list: the disabled nodes it could name come after the suggestions. --quiet gives the bare DTS. (A node read lists the required properties it still lacks: step 9.)" \
+    "A property comes with its binding description, the allowed values and the suggestions. A phandle has no allowed list: the disabled nodes it could name come after the suggestions. --quiet gives the bare DTS. (A node read lists the required properties it still lacks: step 10.)" \
     "read adc interrupt-parent" \
     "read adc interrupt-parent --quiet"
 
