@@ -59,16 +59,16 @@ export function is_active(node: DTNode): boolean {
 
 /**
  * Enabled siblings with clashing `reg`, over base and overlay merged, in the
- * whole tree. Children of disabled nodes aren't checked. Without size cells
- * (SPI chip selects, I2C addresses) equal addresses clash; with them, ranges
- * that overlap.
+ * whole tree. Without size cells (SPI chip selects, I2C addresses) equal
+ * addresses clash; with them, ranges that overlap. Buses are checked whatever
+ * their own status: a bus is often enabled later, and its devices clash then.
  */
 export function reg_conflicts(overlay: DeviceTreeOverlay): RegConflict[] {
     const conflicts: RegConflict[] = [];
     const walk = (path: string): void => {
         conflicts.push(...sibling_reg_conflicts(overlay, path));
-        for (const [name, child] of overlay.effective_children(path)) {
-            if (is_active(child)) { walk(path === "/" ? `/${name}` : `${path}/${name}`); }
+        for (const name of overlay.effective_children(path).keys()) {
+            walk(path === "/" ? `/${name}` : `${path}/${name}`);
         }
     };
     walk("/");
@@ -204,9 +204,9 @@ if (import.meta.vitest) {
         ]);
     });
 
-    test("reg_conflicts — children of a disabled controller are not checked", () => {
+    test("reg_conflicts — children of a disabled controller are checked too", () => {
         const overlay = setup(spi("\t\t\tspidev@0 { reg = <0>; };"), "&spi0 {\n\tstatus = \"disabled\";\n\tadc@0 { reg = <0>; };\n};");
-        expect(reg_conflicts(overlay)).toEqual([]);
+        expect(reg_conflicts(overlay).map(c => c.nodes)).toEqual([["spidev@0", "adc@0"]]);
     });
 
     test("reg_conflicts — nested buses; sibling_reg_conflicts checks one bus", () => {
