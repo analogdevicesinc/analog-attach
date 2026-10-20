@@ -1,7 +1,8 @@
-import { ParsedBinding, ResolvedProperty, PatternPropertyRule } from "../Attach/AttachTypes";
+import { ParsedBinding, ResolvedProperty, PatternPropertyRule, PropertyPatternRule } from "../Attach/AttachTypes";
 import { DtBindingSchema } from "../Attach/DtBindingSchema";
 import { AttachType, AttachEnumType, AttachArray, FixedIndex } from "../Attach/StructuralTypes";
 import { find_entry_in_object } from "./ObjectUtilities";
+import { is_node_pattern } from "./PatternKind.js";
 
 export function translate_JSONSchema(fixuped: DtBindingSchema): ParsedBinding {
 
@@ -26,22 +27,32 @@ export function translate_JSONSchema(fixuped: DtBindingSchema): ParsedBinding {
     resolved_properties = [...resolved_properties, ...translate_JSONSchema_allOf(fixuped.allOf)];
 
     const pattern_properties: PatternPropertyRule[] = [];
+    const property_patterns: PropertyPatternRule[] = [];
 
     if (fixuped.patternProperties !== undefined) {
 
         for (const [pattern, schema] of Object.entries(fixuped.patternProperties)) {
-            const cast_schema = schema as DtBindingSchema;
-            const description = cast_schema.description ?? "";
-            const required = cast_schema.required ?? [];
-
-            let resolved_properties_pattern: ResolvedProperty[] = [];
-
-            if (typeof cast_schema === 'boolean' || !("properties" in cast_schema)) {
-                // TODO: add non object pattern props support
+            // false forbids names that match
+            if (schema === false) {
                 continue;
             }
 
-            for (const [name, value] of Object.entries(cast_schema.properties)) {
+            if (!is_node_pattern(pattern, schema)) {
+                property_patterns.push({
+                    pattern: pattern,
+                    description: typeof schema === 'object' ? (schema as DtBindingSchema).description ?? "" : "",
+                    value: narrow_object(schema)
+                });
+                continue;
+            }
+
+            const cast_schema = schema as DtBindingSchema;
+            const description = typeof cast_schema === 'object' ? cast_schema.description ?? "" : "";
+            const required = typeof cast_schema === 'object' ? cast_schema.required ?? [] : [];
+
+            let resolved_properties_pattern: ResolvedProperty[] = [];
+
+            for (const [name, value] of Object.entries(typeof cast_schema === 'object' ? cast_schema.properties ?? {} : {})) {
                 // Shouldn't be of concern to users
                 if (name === "$nodename" || name === "label") {
                     continue;
@@ -53,7 +64,7 @@ export function translate_JSONSchema(fixuped: DtBindingSchema): ParsedBinding {
                 });
             }
 
-            resolved_properties_pattern = [...resolved_properties_pattern, ...translate_JSONSchema_allOf(cast_schema.allOf)];
+            resolved_properties_pattern = [...resolved_properties_pattern, ...translate_JSONSchema_allOf(typeof cast_schema === 'object' ? cast_schema.allOf : undefined)];
 
             pattern_properties.push({
                 pattern: pattern,
@@ -103,6 +114,7 @@ export function translate_JSONSchema(fixuped: DtBindingSchema): ParsedBinding {
         required_properties: fixuped.required === undefined ? [] : fixuped.required,
         properties: resolved_properties,
         pattern_properties: pattern_properties.length === 0 ? undefined : pattern_properties,
+        property_patterns: property_patterns.length === 0 ? undefined : property_patterns,
         examples: fixuped.examples ?? []
     };
 }

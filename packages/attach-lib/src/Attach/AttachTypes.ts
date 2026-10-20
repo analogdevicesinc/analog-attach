@@ -15,12 +15,20 @@ export type PatternPropertyRule = {
     required: string[];
 };
 
+/** A patternProperties entry that names properties rather than child nodes. */
+export type PropertyPatternRule = {
+    pattern: string;
+    description: string;
+    value: AttachType;
+};
+
 export type ParsedBinding = {
     title?: string,
     description?: string,
     required_properties: string[],
     properties: ResolvedProperty[],
     pattern_properties?: PatternPropertyRule[],
+    property_patterns?: PropertyPatternRule[],
     examples: string[],
 };
 
