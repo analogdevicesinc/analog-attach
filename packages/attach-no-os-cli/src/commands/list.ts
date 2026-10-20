@@ -72,7 +72,7 @@ export const listBoardsCommand = buildCommand<{ json?: boolean }, []>({
         }
 
         text += `${listed.length} board${listed.length === 1 ? "" : "s"} available.\n`;
-        text += "Use: attach-noos tool-config-set board <name>, then attach-noos create-workfile";
+        text += "Use: attach-noos config board <name>, then attach-noos init";
 
         const message = `${listed.length} board${listed.length === 1 ? "" : "s"} available`;
         output(flags, text, { ...common_ok(message), boards: listed });

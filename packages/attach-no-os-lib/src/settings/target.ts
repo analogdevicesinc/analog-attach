@@ -46,7 +46,7 @@ export function set_target_setting(key: TargetSetting, value?: string, options: 
 
 	if (key === "board" && value !== undefined) {
 		// The platform follows from the board, so a board whose chip cannot be found is
-		// refused here rather than left for create-workfile to fail on.
+		// refused here rather than left for init to fail on.
 		const soc = soc_for_board(value);
 		if (!soc.ok) {
 			return soc;
@@ -63,7 +63,7 @@ export function set_target_setting(key: TargetSetting, value?: string, options: 
 		next.platform = value;
 
 		// A board in this same file that carries another chip goes; one that cannot be
-		// resolved is left alone, for create-workfile to report as it always has.
+		// resolved is left alone, for init to report as it always has.
 		const board = next.board;
 		if (board !== undefined) {
 			const carried = soc_for_board(board);

@@ -22,7 +22,7 @@ import { common_ok } from "../protocol/responses";
 type GenerateFlags = {
     json?: boolean;
     output?: string;
-    templateSet?: string;
+    template?: string;
     board?: string;
 };
 
@@ -50,9 +50,9 @@ export const generateCommand = buildCommand<GenerateFlags, [], AttachContext>({
                 optional: true,
                 parse: String
             },
-            templateSet: {
+            template: {
                 kind: "parsed",
-                brief: "Template set to render with (default: the 'template_set' setting)",
+                brief: "Template set to render with (default: the 'template' setting)",
                 optional: true,
                 parse: String,
                 proposeCompletions(partial: string) {
@@ -79,7 +79,7 @@ export const generateCommand = buildCommand<GenerateFlags, [], AttachContext>({
 
         const capi_path = get_setting_value("capi_path");
         if (!capi_path.ok) {
-            output_error(flags, "capi_path is not configured. Run: attach-noos tool-config-set capi_path <path>");
+            output_error(flags, "capi_path is not configured. Run: attach-noos config capi_path <path>");
             return;
         }
 
@@ -125,7 +125,7 @@ export const generateCommand = buildCommand<GenerateFlags, [], AttachContext>({
             project_name: project_name.value,
             project_path: project_path,
             capi_path: capi_path.value,
-            template_set: flags.templateSet,
+            template_set: flags.template,
             example: example_enabled(),
         });
 
@@ -136,7 +136,7 @@ export const generateCommand = buildCommand<GenerateFlags, [], AttachContext>({
 
         // Which template set produced the project is worth reporting now that it
         // is configurable - the same workfile can generate different output.
-        const template_set = flags.templateSet ?? configured_template_set();
+        const template_set = flags.template ?? configured_template_set();
         const files = result.value.files_created;
 
         const message = `Generated '${project_name.value}' in ${project_path}`

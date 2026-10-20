@@ -95,7 +95,7 @@ export const buildCommandDefinition = buildCommand<BuildFlags, []>({
 
         const capi_path = get_setting_value("capi_path");
         if (!capi_path.ok) {
-            output_error(flags, "capi_path is not configured. Run: attach-noos tool-config-set capi_path <path>");
+            output_error(flags, "capi_path is not configured. Run: attach-noos config capi_path <path>");
             return;
         }
 

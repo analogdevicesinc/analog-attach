@@ -32,7 +32,7 @@ export interface CodegenInput {
 	project_path: string;
 	capi_path: string;
 	// Which template set (folder under codegen/templates, or a path to an
-	// out-of-tree folder) renders the project. Omitted: the `template_set`
+	// out-of-tree folder) renders the project. Omitted: the `template`
 	// setting, falling back to the bundled default.
 	template_set?: string;
 	// Whether main.c runs the parts' examples (the default) or the user's app_main().

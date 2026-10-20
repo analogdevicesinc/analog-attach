@@ -61,7 +61,7 @@ function stored(): Record<string, Record<string, unknown>> {
 }
 
 async function sensor(): Promise<void> {
-    const created = await cli("create-workfile");
+    const created = await cli("init");
     // On its eval board, so its pinout wires it: a bare `add testpart` would not be.
     const added = await cli("add", "eval-testpart");
     if (!fs.existsSync(path.join(directory, "workfile.json"))) {
@@ -120,7 +120,7 @@ describe("bootstrap after each command", () => {
     });
 
     it("deleting the eval board leaves the part as a bare one", async () => {
-        await cli("create-workfile");
+        await cli("init");
         await cli("add", "testpart");
         const bare = stored();
         fs.rmSync(path.join(directory, "workfile.json"));
@@ -131,7 +131,7 @@ describe("bootstrap after each command", () => {
     });
 
     it("a link to a node already in the workfile is reported, not only what was created", async () => {
-        await cli("create-workfile");
+        await cli("init");
         await cli("add", "test_spi_device");
         const text = await cli("add", "testpart");
         // The unused SPI device is reused: the connection is the only trace of it.
@@ -147,7 +147,7 @@ describe("bootstrap after each command", () => {
     });
 
     it("a bare part, with no eval board, is not wired and says why", async () => {
-        await cli("create-workfile");
+        await cli("init");
         const text = await cli("add", "testpart");
         expect(stored()["test_spi_device"]?.cs_gpio).toBeUndefined();
         expect(text).toContain("no eval board carries this testpart");
@@ -158,7 +158,7 @@ describe("bootstrap after each command", () => {
 
     it("with the bootstrap setting off, update changes only what it was told", async () => {
         await sensor();
-        await cli("tool-config-set", "bootstrap", "false");
+        await cli("config", "bootstrap", "false");
         await cli("update", "testpart_init_param", "comm_type", "TESTPART_I2C");
 
         const symbols = stored();

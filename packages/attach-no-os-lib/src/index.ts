@@ -73,8 +73,8 @@ export {
     PROBE_OPTIONS,
     DEFAULT_WORKFILE_NAME
 } from "./settings/globals";
-export type { Setting, SettingsFile, SettingType, SettingEnumSource } from "./settings/types";
-export { is_setting, is_settings_file } from "./settings/types";
+export type { Setting, SettingsFile, SettingType, SettingEnumSource, SettingCategory } from "./settings/types";
+export { is_setting, is_settings_file, SETTING_CATEGORIES } from "./settings/types";
 export {
     build_registry,
     get_registry,

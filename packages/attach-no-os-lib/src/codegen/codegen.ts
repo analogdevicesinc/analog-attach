@@ -153,7 +153,7 @@ export function generate_project(input: CodegenInput): Result<CodegenResult> {
 	const files_created: string[] = [];
 
 	// Which set of templates to render with — the per-call override, else the
-	// `template_set` setting, else the bundled default. Resolved (and checked to
+	// `template` setting, else the bundled default. Resolved (and checked to
 	// exist) before anything is written.
 	const templates_result = resolve_template_set(input.template_set);
 	if (!templates_result.ok) {

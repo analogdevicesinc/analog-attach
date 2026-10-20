@@ -13,7 +13,15 @@ export type SettingType = "path" | "path_list" | "string" | "numeric" | "bool";
  * describing the setting, not here: settings must not import the scanners, because
  * codegen and the schema loaders import settings.
  */
-export type SettingEnumSource = "platform" | "board" | "template_set";
+export type SettingEnumSource = "platform" | "board" | "template";
+
+/**
+ * The question a setting answers, in the order someone sets things up: where CAPI comes
+ * from, what hardware, which workfile, what `generate` makes, how it is built and flashed.
+ * `config` lists the settings grouped under these, in this order.
+ */
+export const SETTING_CATEGORIES = ["sources", "target", "workfile", "project", "build"] as const;
+export type SettingCategory = typeof SETTING_CATEGORIES[number];
 
 export interface Setting {
 	/** The configured value. The only part of a setting that lives on disk. */
@@ -22,8 +30,8 @@ export interface Setting {
 	required: boolean;
 	default?: string;
 	type: SettingType;
-	/** Grouping hint for display, e.g. "paths", "project", "build". */
-	category?: string;
+	/** The group `config` lists it under. */
+	category: SettingCategory;
 	/** Fixed option set, for settings whose choices are known at compile time. */
 	options?: string[];
 	/** Option set that must be scanned. Mutually exclusive with `options`. */
@@ -52,7 +60,7 @@ export interface SettingsFile {
 	project_name: Setting;
 	/** Directory of the generated project: `generate` writes it, `build`/`deploy` act on it. */
 	project_path: Setting;
-	template_set: Setting;
+	template: Setting;
 	build_command: Setting;
 	deploy_command: Setting;
 	/** Debug probe `deploy` flashes through. */

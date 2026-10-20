@@ -54,7 +54,7 @@ export function load_context(): Result<WorkfileContext> {
 
     const path = resolved.value;
     if (!fs.existsSync(path)) {
-        return error(`No workfile at '${path}'. Create one with 'attach-noos create-workfile', or point the 'workfile' setting elsewhere.`);
+        return error(`No workfile at '${path}'. Create one with 'attach-noos init', or point the 'workfile' setting elsewhere.`);
     }
 
     const minimal = load_minimal_workfile(path);

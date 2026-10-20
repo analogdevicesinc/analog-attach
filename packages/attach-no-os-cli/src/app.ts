@@ -3,8 +3,8 @@ import { addCommand } from "./commands/add";
 import { attachManifestCommand } from "./commands/attach_manifest";
 import { buildCommandDefinition } from "./commands/build";
 import { completionCommand } from "./commands/completion";
-import { toolConfigGetCommand, toolConfigSetCommand } from "./commands/config";
-import { createWorkfileCommand } from "./commands/create_workfile";
+import { configCommand } from "./commands/config";
+import { initCommand } from "./commands/init";
 import { deleteCommand } from "./commands/delete";
 import { deployCommand } from "./commands/deploy";
 import { generateCommand } from "./commands/generate";
@@ -31,9 +31,8 @@ import { TOOL_DESCRIPTION, TOOL_VERSION } from "./protocol/manifest";
 const routes = buildRouteMap({
 	routes: {
 		"attach-manifest": attachManifestCommand,
-		"tool-config-get": toolConfigGetCommand,
-		"tool-config-set": toolConfigSetCommand,
-		"create-workfile": createWorkfileCommand,
+		config: configCommand,
+		init: initCommand,
 		"list-devices": listDevicesCommand,
 		add: addCommand,
 		read: readCommand,
@@ -63,7 +62,7 @@ export const app = buildApplication(routes, {
 	},
 	// Multi-word flags are camelCase in the command definitions (stricli derives the
 	// flag name from the key), but the conventional CLI spelling is kebab-case. This
-	// accepts both — `--template-set` and `--templateSet` — and prints the kebab form
+	// accepts both — `--some-flag` and `--someFlag` — and prints the kebab form
 	// in help. Single-word flags (--json, --output) are unaffected.
 	scanner: {
 		caseStyle: "allow-kebab-for-camel",
