@@ -4,6 +4,8 @@ import { DeviceTree, DeviceTreeOverlay, PropertyBuilder } from "attach-lib";
 import type { LocalContext } from "../../context";
 import { load_workspace } from "../../config/workspace";
 import { resolve_path } from "../../utilities";
+import { input_error, respond, respond_fail } from "../../protocol/output";
+import type { CommonResponse } from "../../protocol/types";
 
 function make_command(commandName: string, status_value: "okay" | "disabled", verb: string) {
     return (_context: LocalContext): Command => new Command(commandName)
@@ -20,7 +22,7 @@ Example:
   $ attach-linux ${commandName} spi0/spidev@0`)
         .action(async (path_argument: string | undefined) => {
             if (path_argument === undefined) {
-                console.log("Missing: path");
+                if (_context.json) { input_error("Missing: path"); } else { console.log("Missing: path"); }
                 return;
             }
 
@@ -30,6 +32,12 @@ Example:
             const { path: input, tree: overlay } = workspace.overlay;
 
             const result = set_node_status(base, overlay, path_argument, status_value);
+            if (result === "done") { workspace.overlay.save(); }
+            if (_context.json) {
+                const response = status_response(result, verb, path_argument);
+                if (response.ok) { respond(response); } else { respond_fail(response); }
+                return;
+            }
 
             switch (result) {
                 case "not-found": {
@@ -37,12 +45,17 @@ Example:
                     return;
                 }
                 case "done": {
-                    workspace.overlay.save();
                     console.log(`${verb}d ${path_argument} in ${input}`);
                     return;
                 }
             }
         });
+}
+
+export function status_response(result: "done" | "not-found", verb: string, identifier: string): CommonResponse {
+    return result === "done"
+        ? { ok: true, message: `${verb}d ${identifier}`, severity: "info" }
+        : { ok: false, message: `Not found: ${identifier}`, severity: "error" };
 }
 
 export const build_enable_command = make_command("enable", "okay", "Enable");
@@ -196,5 +209,12 @@ if (import.meta.vitest) {
         const output = overlay.print();
 
         expect(output).toContain('status = "okay"');
+    });
+
+    test("status_response - the JSON for done and not-found", () => {
+        expect(status_response("done", "Disable", "spi0/spidev@0"))
+            .toEqual({ ok: true, message: "Disabled spi0/spidev@0", severity: "info" });
+        expect(status_response("not-found", "Enable", "nope"))
+            .toEqual({ ok: false, message: "Not found: nope", severity: "error" });
     });
 }
