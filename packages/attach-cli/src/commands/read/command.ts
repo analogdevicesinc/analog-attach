@@ -71,9 +71,11 @@ export async function read_target(
         return;
     }
 
-    const { info, suggestions } = target === undefined || base === undefined
-        ? { info: undefined, suggestions: [] }
+    const details = target === undefined || base === undefined
+        ? { info: undefined, suggestions: [], others: [] }
         : property_details(target, overlay, base, path_string, property.name);
+    const { info } = details;
+    const suggestions = [...details.suggestions, ...details.others];
 
     if (context_.json) {
         const response: ReadResponse = {
@@ -106,9 +108,10 @@ export function format_details(info: PropertyInfo | undefined, suggestions: Sugg
         const file = `(${path.basename(info.binding_path)})`;
         const last = description.pop();
         lines.push(...description.map(line => `  ${line}`), last === undefined ? `  ${file}` : `  ${last}   ${file}`);
-        const allowed = allowed_text(info);
+        // A phandle's options are every node it could name, so they are left to the suggestions.
+        const allowed = info.phandle_options === undefined ? allowed_text(info) : undefined;
         if (allowed !== undefined) { lines.push(`  Allowed: ${allowed}`); }
-        else if (with_type) { lines.push(`  Type: ${format_type(info.type)}`); }
+        else if (with_type) { lines.push(`  Type: ${info.phandle_options === undefined ? format_type(info.type) : "phandle"}`); }
         if (info.constraints.default !== undefined) { lines.push(`  Default: ${JSON.stringify(info.constraints.default, bigIntReplacer)}`); }
     }
     if (suggestions.length > 0) {
@@ -293,6 +296,26 @@ if (import.meta.vitest) {
             "    gicv2 — interrupt controller; inherited from /",
             "    gpio — interrupt controller",
         ]);
+    });
+
+    test("format_details — a phandle lists no Allowed line, and its type is phandle", () => {
+        const phandle_info: PropertyInfo = {
+            ...info,
+            description: "Interrupt parent",
+            type: { kind: "enum", options: [{ value: "gpio" }, { value: "gicv2" }, { value: "aon_intr" }] },
+            constraints: {},
+            phandle_options: ["gpio", "gicv2", "aon_intr"],
+        };
+        expect(format_details(phandle_info, [
+            { value: "gicv2", display_string: "gicv2 — interrupt controller; inherited from /" },
+            { value: "aon_intr", display_string: "aon_intr (disabled)" },
+        ])).toEqual([
+            "  Interrupt parent   (adi,ad7124.yaml)",
+            "  Suggestions:",
+            "    gicv2 — interrupt controller; inherited from /",
+            "    aon_intr (disabled)",
+        ]);
+        expect(format_details(phandle_info, [], { with_type: true })).toEqual(["  Interrupt parent   (adi,ad7124.yaml)", "  Type: phandle"]);
     });
 
     test("format_details — a display that doesn't start with the value shows both", () => {

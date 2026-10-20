@@ -145,7 +145,7 @@ tty_step "add picks a chip select, then asks for what is missing" \
     add adi,ad7124-8 --parent spi0 --label adc
 
 step "read explains what it shows" \
-    "A property comes with its binding description, the allowed values and the suggestions; --quiet gives the bare DTS. (A node read lists the required properties it still lacks: step 9.)" \
+    "A property comes with its binding description, the allowed values and the suggestions. A phandle has no allowed list: the disabled nodes it could name come after the suggestions. --quiet gives the bare DTS. (A node read lists the required properties it still lacks: step 9.)" \
     "read adc interrupt-parent" \
     "read adc interrupt-parent --quiet"
 

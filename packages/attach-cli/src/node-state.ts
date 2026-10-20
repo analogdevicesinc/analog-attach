@@ -1,4 +1,4 @@
-import { missing_required, type DeviceTree, type DeviceTreeOverlay } from "attach-lib";
+import { is_enabled, missing_required, type DeviceTree, type DeviceTreeOverlay } from "attach-lib";
 
 import type { NodeBinding } from "./binding-resolution";
 import { property_info, value_suggestions, type PropertyInfo, type TargetBinding } from "./commands/list/suggest";
@@ -18,6 +18,8 @@ export interface PropertyDetails {
     /** What the binding says; undefined without a binding or when it doesn't define the property. */
     info: PropertyInfo | undefined;
     suggestions: Suggestion[];
+    /** For a phandle, the other nodes it could name (disabled, or enabled by the overlay): shown after the suggestions, never a default. */
+    others: Suggestion[];
 }
 
 /** What `read` and the add interview show about a property of the target node. */
@@ -33,15 +35,44 @@ export function property_details(
         ? undefined
         : property_info(target.binding, binding_node, property_name);
     const values = value_suggestions(target, overlay, base, node_identifier, property_name);
-    return {
-        info: info?.ok === true ? info.info : undefined,
-        suggestions: values.ok ? values.suggestions : [],
-    };
+    const known = info?.ok === true ? info.info : undefined;
+    const suggestions = values.ok ? values.suggestions : [];
+    return { info: known, suggestions, others: other_candidates(known?.phandle_options ?? [], suggestions, overlay) };
+}
+
+/**
+ * The nodes a phandle property can name that the suggestions leave out, to list
+ * after them. The suggestions only take nodes the base enables, so these are
+ * disabled, or enabled by the overlay.
+ */
+export function other_candidates(options: string[], suggestions: Suggestion[], overlay: DeviceTreeOverlay): Suggestion[] {
+    const suggested = new Set(suggestions.map(s => s.value.replace(/^&/, "")));
+    const labels = overlay.all_labels();
+    return options.flatMap(label => {
+        const path = labels.get(label);
+        const node = path === undefined ? undefined : overlay.effective_node(path);
+        if (suggested.has(label) || node === undefined) { return []; }
+        const note = is_enabled(node) ? "enabled by the overlay" : "disabled";
+        return [{ value: label, display_string: `${label} (${note})`, note }];
+    });
 }
 
 if (import.meta.vitest) {
     const { test, expect } = import.meta.vitest;
     const { DeviceTree, DeviceTreeOverlay: DTO } = await import("attach-lib");
+
+    test("other_candidates — the nodes a phandle can name that the suggestions leave out: disabled, or enabled by the overlay", () => {
+        const base = DeviceTree.new_from_string(`/dts-v1/;\n/ {\n\tgpio: gpio@7e200000 {\n\t};\n\tgicv2: interrupt-controller@40041000 {\n\t};\n\taon_intr: interrupt-controller@7ef00100 {\n\t\tstatus = "disabled";\n\t};\n\tl2_intr: interrupt-controller@7ef00200 {\n\t\tstatus = "disabled";\n\t};\n};`);
+        if (typeof base === "string") { throw new TypeError(base); }
+        const overlay = DTO.new_from_string(`/dts-v1/;\n/plugin/;\n\n&l2_intr {\n\tstatus = "okay";\n};`, base);
+        if (typeof overlay === "string") { throw new TypeError(overlay); }
+
+        expect(other_candidates(["gpio", "gicv2", "aon_intr", "l2_intr", "nope"], [{ value: "gicv2" }, { value: "&gpio" }], overlay)).toEqual([
+            { value: "aon_intr", display_string: "aon_intr (disabled)", note: "disabled" },
+            { value: "l2_intr", display_string: "l2_intr (enabled by the overlay)", note: "enabled by the overlay" },
+        ]);
+        expect(other_candidates(["aon_intr"], [{ value: "aon_intr" }], overlay)).toEqual([]);
+    });
 
     test("node_missing_required — base and overlay properties both count", () => {
         const base = DeviceTree.new_from_string(`/dts-v1/;\n/ {\n\tsoc {\n\t\tspi0: spi@7e204000 {\n\t\t\tcompatible = "brcm,bcm2835-spi";\n\t\t};\n\t};\n};`);

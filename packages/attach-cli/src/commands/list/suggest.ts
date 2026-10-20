@@ -718,6 +718,8 @@ export interface PropertyInfo {
     constraints: { const?: unknown; default?: unknown; minimum?: number | bigint; maximum?: number | bigint };
     /** Values the binding's definition offers, ready for `update`. */
     suggestions: Suggestion[];
+    /** For a phandle, the labels of the nodes it can name, enabled or not: candidates, not a constraint. */
+    phandle_options?: string[];
 }
 
 export function property_info(
@@ -763,6 +765,7 @@ export function property_info(
                 ...(maximum === undefined ? {} : { maximum }),
             },
             suggestions: (property_definition.suggestions ?? []).map((suggestion) => to_suggestion(suggestion)),
+            ...(v["enum_type"] === AttachEnumType.PHANDLE && Array.isArray(v["enum"]) ? { phandle_options: v["enum"].map(String) } : {}),
         },
     };
 }
@@ -807,6 +810,22 @@ if (import.meta.vitest) {
         const result = property_info(binding, { name: "hwmon", labels: [], properties: [], children: [] } as unknown as DTNode, "adi,pin5-function");
         expect(result.ok && result.info.description).toBe("Pin 5 function");
         expect(result.ok && result.info.constraints).toEqual({});
+        expect(result.ok && result.info.phandle_options).toBeUndefined();
+    });
+
+    test("property_info — a phandle enum's options are the nodes it can name, not a constraint", () => {
+        const value: AttachType = { _t: "enum_array", minItems: 1, maxItems: 1, enum: ["gpio", "gicv2", "aon_intr"], default: ["gpio"], enum_type: AttachEnumType.PHANDLE, description: "" };
+        const binding: NodeBinding = {
+            properties: [{ key: "interrupt-parent", value }],
+            required_properties: [],
+            child_nodes: [],
+            property_patterns: [],
+            binding_path: "/linux/iio/adc/adi,ad7124.yaml",
+            origin: { kind: "compatible", compatible: "adi,ad7124-8" },
+            narrow_and_populate: () => ({ properties: [{ key: "interrupt-parent", value }], errors: [] }),
+        };
+        const result = property_info(binding, { name: "adc", labels: [], properties: [], children: [] } as unknown as DTNode, "interrupt-parent");
+        expect(result.ok && result.info.phandle_options).toEqual(["gpio", "gicv2", "aon_intr"]);
     });
 
     test("describe_property_pattern — the names it expands to, the regex, and the names already set", () => {

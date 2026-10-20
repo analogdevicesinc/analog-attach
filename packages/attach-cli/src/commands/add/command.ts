@@ -199,11 +199,11 @@ async function missing_after_add(workfile: Workfile, base: DeviceTree, bindings:
 async function describe_missing(workfile: Workfile, base: DeviceTree, bindings: Bindings, label: string, missing: string[]): Promise<MissingProperty[]> {
     const target = await resolve_target_binding(label, workfile.tree, base, { ok: true, value: bindings });
     return missing.map(property => {
-        const { info, suggestions } = property_details(target, workfile.tree, base, label, property);
+        const { info, suggestions, others } = property_details(target, workfile.tree, base, label, property);
         return {
             property,
             ...(info?.description === undefined ? {} : { description: info.description }),
-            suggestions,
+            suggestions: [...suggestions, ...others],
         };
     });
 }
@@ -213,8 +213,9 @@ function interview_steps(workfile: Workfile, base: DeviceTree, bindings: Binding
     return {
         ask: async (property) => {
             const target = await resolve_target_binding(label, workfile.tree, base, { ok: true, value: bindings });
-            const { info, suggestions } = property_details(target, workfile.tree, base, label, property);
-            return { property, details: format_details(info, suggestions, { with_type: true }), suggestions };
+            const { info, suggestions, others } = property_details(target, workfile.tree, base, label, property);
+            // Enter takes the first suggestion, never one of the other candidates.
+            return { property, details: format_details(info, [...suggestions, ...others], { with_type: true }), suggestions };
         },
         apply: async (property, tokens) => {
             const outcome = await apply_update(workfile, base, bindings, label, property, tokens);
