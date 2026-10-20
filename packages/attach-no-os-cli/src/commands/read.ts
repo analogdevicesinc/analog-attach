@@ -2,6 +2,7 @@ import { buildCommand } from "@stricli/core";
 import {
     Ruleset,
     PropertySuggestions,
+    effective_property,
     suggest_for_property
 } from "attach-no-os-lib";
 import type { AttachContext } from "./shared";
@@ -111,11 +112,19 @@ export const readCommand = buildCommand<
             console.warn(`Warning: could not compute suggestions: ${suggestions.error.message}`);
         }
 
+        // As the part's overrides leave it - their default, description and allowed values -
+        // the same view the suggestions above and the validator use, not the bare schema.
+        const effective = effective_property(context.value.workfile, node, lookup.value.property.name);
+        if (!effective.ok) {
+            console.warn(`Warning: could not apply overrides: ${effective.error.message}`);
+        }
+        const shown = effective.ok ? effective.value : lookup.value.property;
+
         const details: PropertySuggestions = suggestions.ok ? suggestions.value : {};
         output(
             flags,
-            format_property_details(lookup.value.property, details),
-            to_protocol_property(lookup.value.property)
+            format_property_details(shown, details),
+            to_protocol_property(shown)
         );
     }
 });
