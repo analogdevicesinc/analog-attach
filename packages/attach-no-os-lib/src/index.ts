@@ -24,6 +24,7 @@ export {
     mark_auto,
     get_value,
     suggest_for_property,
+    effective_property,
     list_available_structs,
     export_minimal,
     import_minimal,

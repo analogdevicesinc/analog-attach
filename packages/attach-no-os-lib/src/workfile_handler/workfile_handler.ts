@@ -9,6 +9,7 @@ import type {
     PlatformOpsProperty,
     Property,
     Ruleset,
+    RulesetDescriptor,
     RulesetPlatformOps,
     RulesetStruct,
     UnionProperty
@@ -571,7 +572,13 @@ export function suggest_platform_extra(workfile: Workfile, property: PlatformExt
     });
 }
 
-export function suggest_for_property(workfile: Workfile, symbol_name: string, property_name: string, union_member?: string): Result<PropertySuggestions> {
+/**
+ * A property as the workfile's overrides leave it: what a part's `$override` narrows,
+ * defaults or describes (adxl355 allows only CAPI_SPI_MODE_0), not the schema alone.
+ * Everything that shows or suggests a property reads it through here, so what a person
+ * is told about a field and what the validator then enforces never disagree.
+ */
+export function effective_property(workfile: Workfile, symbol_name: string, property_name: string): Result<Property> {
     const symbol = workfile.symbols[symbol_name];
     if (!symbol) {
         return error(`Could not find symbol with name: "${symbol_name}" in [${Object.keys(workfile.symbols).join(", ")}]`, "");
@@ -586,10 +593,19 @@ export function suggest_for_property(workfile: Workfile, symbol_name: string, pr
         return error(`Could not find property "${property_name}" in [${symbol.properties.map(p => p.name).join(", ")}]`, symbol_name);
     }
 
-    // What the part's overrides leave (adxl355 allows only CAPI_SPI_MODE_0), not the schema
-    // alone: a suggestion the validator would then refuse is no suggestion.
     const graph = create_connections_graph(workfile);
-    const overridden = apply_overrides(property, collect_child_overrides(symbol_name, workfile, graph), symbol_name, workfile).effective;
+    return ok(apply_overrides(property, collect_child_overrides(symbol_name, workfile, graph), symbol_name, workfile).effective);
+}
+
+export function suggest_for_property(workfile: Workfile, symbol_name: string, property_name: string, union_member?: string): Result<PropertySuggestions> {
+    // A suggestion the validator would then refuse is no suggestion.
+    const effective = effective_property(workfile, symbol_name, property_name);
+    if (!effective.ok) {
+        return effective;
+    }
+    const overridden = effective.value;
+    // effective_property() has already checked it exists and is a struct or descriptor.
+    const symbol = workfile.symbols[symbol_name] as RulesetStruct | RulesetDescriptor;
 
     switch (overridden._t) {
         case "NumberProperty": {
