@@ -1,4 +1,3 @@
-import { execSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -17,7 +16,7 @@ import {
 } from "attach-lib";
 
 import { config_directory, type Settings } from "../../config/settings";
-import { bus_kind, node_compatibles, substitute_command, type BusKind } from "../../utilities";
+import { bus_kind, node_compatibles, run_preprocess, type BusKind } from "../../utilities";
 
 /** A binding example that has a node for the device, and the bus it sits on there. */
 export interface ExampleMatch {
@@ -169,11 +168,8 @@ export function parse_example(example: string, settings: Settings, linux: string
     const input = path.join(directory, "example.dts");
     const output = path.join(directory, "example.preprocessed.dts");
     fs.writeFileSync(input, wrap_example(example));
-    try {
-        execSync(substitute_command(settings.preprocess_command, { input, output, linux }), { stdio: "pipe" });
-    } catch (error) {
-        return (error as { stderr?: Buffer }).stderr?.toString().trim() ?? String(error);
-    }
+    const error = run_preprocess(settings.preprocess_command, { input, output, linux });
+    if (error !== undefined) { return error; }
     const tree = DeviceTree.new_from_string(fs.readFileSync(output, "utf8"));
     if (typeof tree === "string") { return tree; }
     return tree.node_at("/") ?? "the example has no root node";

@@ -128,6 +128,7 @@ describe("__complete delegates dynamic values to suggest in-process", () => {
             const key = arguments_.join(" ");
             const suggestions =
                 arguments_[0] === "device-key" ? [{ value: "ad7124" }, { value: "ad5940" }]
+                : arguments_[0] === "overlay" ? [{ value: "ad7124-overlay.dts", display_string: "arch/arm/boot/dts/overlays/ad7124-overlay.dts" }, { value: "zynqmp-ad9081.dtso" }]
                 : arguments_[0] === "parent" ? [{ value: "spi0", display_string: "/soc/spi@0" }]
                 : key === "navigate" ? [{ value: "spi0" }, { value: "i2c1" }]
                 : key === "navigate spi0/adc@0" ? [{ value: "reg", display_string: "reg (required)" }]
@@ -142,6 +143,10 @@ describe("__complete delegates dynamic values to suggest in-process", () => {
 
     test("add positional completes device keys", async () => {
         expect(values(await complete(["add", ""])).sort()).toEqual(["ad5940", "ad7124"]);
+    });
+
+    test("import positional completes the indexed overlay names", async () => {
+        expect(await complete(["import", "ad"])).toStrictEqual(["ad7124-overlay.dts\tarch/arm/boot/dts/overlays/ad7124-overlay.dts"]);
     });
 
     test("add positional prefix-filters device keys", async () => {

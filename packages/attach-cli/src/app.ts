@@ -7,6 +7,7 @@ import { build_config_get_command } from "./commands/config-get/command";
 import { build_config_set_command } from "./commands/config-set/command";
 import { build_create_workfile_command } from "./commands/create-workfile/command";
 import { build_add_command } from "./commands/add/command";
+import { build_import_command } from "./commands/import/command";
 import { build_read_command } from "./commands/read/command";
 import { build_update_command } from "./commands/update/command";
 import { build_delete_command } from "./commands/delete/command";
@@ -64,6 +65,7 @@ Run any command with --help for detailed usage.`);
 
     // overlay editing
     program.addCommand(build_add_command(context));
+    program.addCommand(build_import_command(context));
     program.addCommand(build_read_command(context));
     program.addCommand(build_update_command(context));
     program.addCommand(build_delete_command(context));

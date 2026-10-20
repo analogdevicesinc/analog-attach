@@ -17,6 +17,8 @@ import {
     type ParsedBinding,
     type ValueSuggestion,
 } from "attach-lib";
+import path from "node:path";
+
 import type { LocalContext } from "../../context";
 import { load_workspace, parse_bindings, type Bindings } from "../../config/workspace";
 import type { Result } from "../../config/settings";
@@ -26,6 +28,7 @@ import { respond, respond_fail, input_error } from "../../protocol/output";
 import { attach_type_to_protocol_type } from "../../protocol/dt-to-protocol";
 import { find_property_definition, resolve_node_binding, type NodeBinding } from "../../binding-resolution";
 import { check_value } from "../../value-check";
+import { get_or_build_overlay_index } from "../../overlay-index";
 import type { TypeResponse, Suggestion, Types } from "../../protocol/types";
 
 export async function run_suggest(context: LocalContext, arguments_: string[]): Promise<void> {
@@ -44,6 +47,10 @@ export async function run_suggest(context: LocalContext, arguments_: string[]): 
         }
         case "device-key": {
             await suggest_device_key(context, arguments_.slice(1));
+            return;
+        }
+        case "overlay": {
+            suggest_overlay(context, arguments_.slice(1));
             return;
         }
         case "node-prop": {
@@ -344,6 +351,22 @@ async function suggest_device_key(context: LocalContext, arguments_: string[]): 
         for (const entry of matching) {
             console.log(entry);
         }
+    }
+}
+
+/** The overlay file names `import` takes, from the overlay index; completion uses a stale index as is and never builds one. */
+function suggest_overlay(context: LocalContext, arguments_: string[]): void {
+    const [filter] = arguments_;
+    const workspace = load_workspace(context, ["bindings"]);
+    if (workspace === undefined) { return; }
+
+    const files = Object.keys(get_or_build_overlay_index(workspace.bindings.linux).files).sort();
+    const matching = files.filter(file => filter === undefined || path.basename(file).startsWith(filter));
+    if (context.json) {
+        const suggestions = matching.map(file => ({ value: path.basename(file), display_string: file }));
+        respond({ ok: true, message: `Found ${suggestions.length} overlays`, severity: "info", suggestions });
+    } else {
+        for (const file of matching) { console.log(path.basename(file)); }
     }
 }
 

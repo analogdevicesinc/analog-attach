@@ -1,12 +1,11 @@
 import * as fs from "node:fs";
 import path from "node:path";
-import { execSync } from "node:child_process";
 import { DeviceTree, DeviceTreeOverlay } from "attach-lib";
 
 import type { LocalContext } from "../context";
 import { getBundledDtSchemaPath, getBundledToolsPath } from "../commands/skill/utilities";
 import { input_error } from "../protocol/output";
-import { is_tool_available, substitute_command } from "../utilities";
+import { is_tool_available, run_preprocess } from "../utilities";
 import {
     config_directory,
     invalid_setting,
@@ -179,18 +178,13 @@ export function parse_base(settings: Settings, linux: () => Result<string>, cwd 
 
     fs.mkdirSync(config_directory(cwd), { recursive: true });
     const preprocessed = path.join(config_directory(cwd), "preprocessed.dts");
-    try {
-        execSync(
-            substitute_command(command, {
-                input: source.value,
-                output: preprocessed,
-                ...(linux_result === undefined ? {} : { linux: linux_result.value }),
-            }),
-            { stdio: "pipe" },
-        );
-    } catch (error) {
-        const stderr = (error as { stderr?: Buffer }).stderr?.toString().trim() ?? String(error);
-        return fail(invalid_setting(spec_of("devicetree"), `preprocessing ${source.value} failed:\n${stderr}`));
+    const error = run_preprocess(command, {
+        input: source.value,
+        output: preprocessed,
+        ...(linux_result === undefined ? {} : { linux: linux_result.value }),
+    });
+    if (error !== undefined) {
+        return fail(invalid_setting(spec_of("devicetree"), `preprocessing ${source.value} failed:\n${error}`));
     }
 
     const tree = DeviceTree.new_from_string(fs.readFileSync(preprocessed, "utf8"));

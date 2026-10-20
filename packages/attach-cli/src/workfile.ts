@@ -46,9 +46,14 @@ export function create_workfile(filename = "overlay.dtso", cwd?: string): Create
  * Used by `add` when no overlay is configured, so a failed add leaves no trace.
  */
 export function new_workfile(filename: string, base: DeviceTree, syntax: OverlaySyntax, cwd?: string): Workfile {
-    const output_path = path.resolve(cwd ?? process.cwd(), filename);
     const tree = DeviceTreeOverlay.new_from_string(EMPTY_DTSO, base);
     if (typeof tree === "string") { throw new TypeError(`Empty overlay does not parse: ${tree}`); }
+    return workfile_from_overlay(filename, tree, syntax, cwd);
+}
+
+/** A workfile holding `tree`, written and recorded as the configured overlay only on `save()`. Used by `import`. */
+export function workfile_from_overlay(filename: string, tree: DeviceTreeOverlay, syntax: OverlaySyntax, cwd?: string): Workfile {
+    const output_path = path.resolve(cwd ?? process.cwd(), filename);
     const workfile = open_workfile(output_path, tree, syntax);
     return {
         ...workfile,
@@ -104,6 +109,23 @@ if (import.meta.vitest) {
             workfile.save();
             expect(fs.readFileSync(path.join(directory, "dev.dtso"), "utf8")).toContain("/plugin/;");
             expect(fs.readFileSync(path.join(directory, ".attach-linux", "config.toml"), "utf8")).toContain("dev.dtso");
+        } finally {
+            fs.rmSync(directory, { recursive: true });
+        }
+    });
+
+    test("workfile_from_overlay — writes the given overlay and the config only on save", () => {
+        const tree = DeviceTreeOverlay.new_from_string("/dts-v1/;\n/plugin/;\n&spi0 { adc@0 { reg = <0>; }; };\n");
+        if (typeof tree === "string") { throw new TypeError(tree); }
+        const directory = fs.mkdtempSync(path.join(os.tmpdir(), "attach-wf-"));
+        try {
+            const workfile = workfile_from_overlay("ad7124.dtso", tree, "label", directory);
+            expect(workfile.path).toBe(path.join(directory, "ad7124.dtso"));
+            expect(fs.existsSync(workfile.path)).toBe(false);
+
+            workfile.save();
+            expect(fs.readFileSync(workfile.path, "utf8")).toContain("&spi0 {");
+            expect(fs.readFileSync(path.join(directory, ".attach-linux", "config.toml"), "utf8")).toContain("ad7124.dtso");
         } finally {
             fs.rmSync(directory, { recursive: true });
         }

@@ -386,9 +386,10 @@ function unresolved_lines(node_path: string, label: string, unresolved: Unresolv
 }
 
 /** `no label "a"`, `no labels "a", "b"`, or nothing. */
-function missing_names(kind: string, values: string[]): string[] {
-    if (values.length === 0) { return []; }
-    return [`no ${kind}${values.length > 1 ? "s" : ""} ${values.map(v => `"${v}"`).join(", ")}`];
+export function missing_names(kind: string, values: string[]): string[] {
+    const names = [...new Set(values)];
+    if (names.length === 0) { return []; }
+    return [`no ${kind}${names.length > 1 ? "s" : ""} ${names.map(v => `"${v}"`).join(", ")}`];
 }
 
 function note_message(note: AddNodeNote, added: AddedNode): string {

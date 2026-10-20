@@ -115,6 +115,16 @@ export function substitute_command(template: string, values: Record<string, stri
     return command;
 }
 
+/** Run a `preprocess-command` template on `input` into `output`; the error output when it fails. */
+export function run_preprocess(template: string, values: { input: string; output: string; linux?: string }): string | undefined {
+    try {
+        execSync(substitute_command(template, values), { stdio: "pipe" });
+        return undefined;
+    } catch (error) {
+        return (error as { stderr?: Buffer }).stderr?.toString().trim() ?? String(error);
+    }
+}
+
 /** Whether the given tool is available on PATH (`check` is a cheap invocation, e.g. "dtc --version"). */
 export function is_tool_available(check: string): boolean {
     try {

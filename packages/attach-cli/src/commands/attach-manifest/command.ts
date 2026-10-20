@@ -45,6 +45,16 @@ export function build_attach_manifest_command(_context: LocalContext): Command {
                             }
                         ]
                     },
+                    "import": {
+                        description: "Create a new workfile from an existing overlay and make it the configured overlay. Positional <overlay>: a file name from `list overlay` (or its stem without -overlay.dts / .dtso), or a path to an overlay file. Every fragment is imported as written; the RPi __overrides__ node is dropped, and targets and phandles are not remapped. Refuses when an overlay is already configured. The response gives `path` (the new workfile), `source`, the board `fit` and `reason` as in `list overlay`, `unresolved_targets` ({fragment, property: target | target-path, target}) and `unresolved` ({path, property, reference}): the targets and references the base lacks, to fix with update; severity is warn when there is any, or when the overlay is for another board.",
+                        argv: ["attach-linux", "--json", "import"],
+                        completions: [
+                            {
+                                arg: "import",
+                                kind: "overlay"
+                            }
+                        ]
+                    },
                     "read": {
                         description: "Read a node or property from the overlay. No path args returns the full overlay tree. The path identifies the node; accepted forms: bare label (imu1), absolute path (/soc/spi@7e204000), or label/child (imu1/channel@0). An optional second positional names a property. When bindings are available a property response also carries `description` and `suggestions` (values ready for update), and a node response carries `missing_required` (required properties not set yet, in the order to set them). --quiet leaves them out.",
                         argv: ["attach-linux", "--json", "read"],

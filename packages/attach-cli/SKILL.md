@@ -43,6 +43,7 @@ Every command checks the configuration it needs up front: `ATTACH_LINUX` must be
 - `config-set` / `config-get` / `create-workfile`: No prerequisites (`create-workfile` saves the `overlay` path to config)
 - `list device`: Needs `ATTACH_LINUX` (to build the compat index on first run)
 - `list parent`, `list overlay`: Need `ATTACH_LINUX`, `ATTACH_DEVICETREE`
+- `import`: Needs `ATTACH_LINUX`, `ATTACH_DEVICETREE`, and no `overlay` yet (it creates one)
 - `list property`: Needs `ATTACH_LINUX`, `ATTACH_DEVICETREE`, `overlay`
 - `list value`: Needs `ATTACH_DEVICETREE`, `overlay`. `ATTACH_LINUX` is optional and enables binding check annotations
 - `add`: Needs `ATTACH_LINUX`, `ATTACH_DEVICETREE`, `overlay` (auto-created if missing)
@@ -135,7 +136,7 @@ attach-linux list device [<filter>]         # compatible strings (substring filt
 attach-linux list property <path> [<prop>]  # properties of a node; with prop: type details
 attach-linux list value <path> <prop>       # concrete values for a property
 attach-linux list parent <compatible>       # valid parent buses for a device
-attach-linux list overlay <compatible>      # overlays in the Linux tree with the device
+attach-linux list overlay <compatible>      # overlays in the Linux tree with the device (then: import <name>)
 ```
 
 **Examples**:
@@ -198,7 +199,34 @@ The fit compares the overlay's root `compatible` with the base's. A generic SoC 
 
 The overlays are indexed on first use into `.attach-linux/overlay-index.json` (a text scan; quick) and re-indexed when an overlay file changes.
 
-**Strategy**: when a compatible overlay exists, offer it to the user as a starting point rather than building the node by hand.
+**Strategy**: when a compatible overlay exists, offer it to the user as a starting point rather than building the node by hand (`import`, below).
+
+---
+
+### 2c. `import` - Start a Workfile from an Existing Overlay
+
+**Purpose**: Create a new workfile from an overlay of the Linux tree (a name from `list overlay`) or from an overlay file, and make it the configured overlay.
+
+```bash
+attach-linux import <overlay>
+attach-linux import rpi-ad7124-8-all-diff-overlay.dts   # file name from list overlay
+attach-linux import rpi-ad7124-8-all-diff               # or its stem
+attach-linux import ./my-board-overlay.dts              # or a path
+```
+
+**Behavior**:
+- Every fragment comes along as written (the bus enable, spidev disables, regulators); targets and phandles are not remapped. The RPi `__overrides__` node (the overlay's parameters) is dropped.
+- The workfile is named after the overlay (`rpi-ad7124-8-all-diff.dtso`) and saved as the `overlay` config field.
+- Refuses when an overlay is already configured: `An overlay is already configured (<path>); import only creates a new one.`
+- Warns when the overlay is for another board (the `list overlay` fit is incompatible), and for each target or reference the base doesn't have:
+```
+warning: the overlay is for another board (overlay: brcm,bcm2712; base: raspberrypi,4-model-b, brcm,bcm2711)
+warning: fragment@0: target "spi7" not found in the base
+warning: fragment@1: target-path "/soc/nope" not found in the base
+warning: ad7124: refin1-supply: no label "vref"
+```
+  Fix the references with `update` (the path is label-first), or drop the fragment.
+- `--json` gives `{ path, source, fit, reason, unresolved_targets: [{ fragment, property, target }], unresolved: [{ path, property, reference }] }`; severity `warn` when there is anything to fix.
 
 ---
 

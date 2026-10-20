@@ -250,7 +250,8 @@ async function source_candidates(source: ValueSource, prefix: string, positional
 // per-shell scripts computed, then run the intelligence in-process.
 async function suggest_values(kind: SuggestKind, prefix: string, positionals: string[]): Promise<Suggestion[]> {
     switch (kind) {
-        case "device-key": {
+        case "device-key":
+        case "overlay": {
             return capture_suggest(kind, [prefix]);
         }
         case "parent": {

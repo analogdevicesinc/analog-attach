@@ -117,6 +117,28 @@ export interface ListOverlayResponse extends CommonResponse {
     overlays: OverlayDescription[];
 }
 
+export interface ImportResponse extends CommonResponse {
+    /** The new workfile, now the configured overlay. */
+    path: string;
+    /** The imported overlay source. */
+    source: string;
+    /** How the overlay's root compatible fits the base's, as in `list overlay`. */
+    fit: "compatible" | "incompatible" | "unknown";
+    reason: string;
+    /** The fragments whose target names no node of the base or the overlay. */
+    unresolved_targets: UnresolvedTargetEntry[];
+    /** The references in the fragments that name nothing in the base or overlay. */
+    unresolved: UnresolvedEntry[];
+}
+
+export interface UnresolvedTargetEntry {
+    /** The fragment's node name, e.g. `fragment@0`. */
+    fragment: string;
+    property: "target" | "target-path";
+    /** The label (without `&`) or the path. */
+    target: string;
+}
+
 export interface OverlayDescription {
     /** The file name, which `import` takes. */
     name: string;

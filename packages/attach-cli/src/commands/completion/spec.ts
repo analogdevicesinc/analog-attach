@@ -21,7 +21,7 @@ export const DIRS_DIRECTIVE = "__ATTACH_COMPLETE_DIRS__";
 export const NOSPACE_DIRECTIVE = "__ATTACH_COMPLETE_NOSPACE__";
 
 // "entry-points" is completion-only: `suggest navigate` with no node (the overlay's top-level targets).
-export type SuggestKind = "device-key" | "parent" | "navigate" | "entry-points" | "children" | "value";
+export type SuggestKind = "device-key" | "parent" | "navigate" | "entry-points" | "children" | "value" | "overlay";
 
 export type ValueSource =
     | { kind: "file" }
@@ -82,6 +82,9 @@ export const COMPLETION_SPEC: Readonly<Record<string, CommandSpec | "dynamic">> 
     add: {
         positional: { mode: "byIndex", sources: [{ kind: "suggest", suggest: "device-key" }] },
         flags: { "--parent": PATH_PARENT },
+    },
+    import: {
+        positional: { mode: "byIndex", sources: [{ kind: "suggest", suggest: "overlay" }] },
     },
     read: {
         positional: { mode: "byIndex", sources: [PATH_OVERLAY, PROPS] },
