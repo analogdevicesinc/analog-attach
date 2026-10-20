@@ -13,17 +13,13 @@ import {
 } from "attach-lib";
 
 import type { LocalContext } from "../../context";
-import { load_workspace, parse_overlay, report_config_errors, type Bindings, type Workfile } from "../../config/workspace";
+import { load_workspace, parse_overlay, report_config_errors, type Bindings } from "../../config/workspace";
 import type { Settings } from "../../config/settings";
 import { bus_kind, find_binding, get_or_build_compat_index, parse_node_path, resolve_path, type BusKind } from "../../utilities";
 import { respond, respond_fail, diagnostic, input_error } from "../../protocol/output";
-import type { AddResponse, MissingProperty } from "../../protocol/types";
+import type { AddResponse } from "../../protocol/types";
 import { new_workfile, next_workfile_name } from "../../workfile";
-import { resolve_target_binding } from "../list/suggest";
-import { format_details, format_missing } from "../read/command";
-import { apply_update } from "../update/command";
-import { node_missing_required, property_details } from "../../node-state";
-import { run_interview, type InterviewSteps } from "./interview";
+import { ask_for_missing, describe_missing, missing_required_of, type NewNode } from "../../missing-required";
 import { node_reg_warnings, reg_warning_lines } from "../../reg-conflicts";
 import { reference_lines, unique_references } from "../../unresolved";
 import {
@@ -150,8 +146,14 @@ Use 'list device' to find compatible strings, 'list parent' to find valid buses.
                 for (const line of reference_lines("error", unresolved, workfile.tree.all_labels())) { console.log(line); }
             }
 
-            const bindings = workspace.bindings;
-            const missing = await missing_after_add(workfile, workspace.base.tree, bindings, result);
+            const added_node: NewNode = {
+                workfile,
+                base: workspace.base.tree,
+                bindings: workspace.bindings,
+                identifier: result.label,
+                path: result.path,
+            };
+            const missing = await missing_required_of(added_node);
             const added_message = `Added ${result.key} (label: ${result.label})`;
             if (context_.json) {
                 const response: AddResponse = {
@@ -160,7 +162,7 @@ Use 'list device' to find compatible strings, 'list parent' to find valid buses.
                     severity: "info",
                     key: result.key,
                     path: result.path.split("/").filter(Boolean),
-                    missing_required: await describe_missing(workfile, workspace.base.tree, bindings, result.label, missing),
+                    missing_required: await describe_missing(added_node, missing),
                     ...(from_example
                         ? { unresolved: unresolved.map(u => ({ path: u.path.split("/").filter(Boolean), property: u.property, reference: u.reference })) }
                         : {}),
@@ -170,67 +172,8 @@ Use 'list device' to find compatible strings, 'list parent' to find valid buses.
             }
 
             console.log(`${added_message} to ${workfile.path}`);
-            const interactive = options.interview && process.stdin.isTTY && process.stdout.isTTY;
-            if (!interactive || missing.length === 0) {
-                for (const line of missing_lines(result.label, missing)) { console.log(line); }
-                return;
-            }
-
-            console.log("");
-            await run_interview(missing, interview_steps(workfile, workspace.base.tree, bindings, result.label), {
-                input: process.stdin,
-                output: process.stdout,
-                terminal: true,
-            });
-            console.log("");
-            const left = await missing_after_add(workfile, workspace.base.tree, bindings, result);
-            const done = left.length === 0 ? ["All required properties are set."] : missing_lines(result.label, left);
-            for (const line of done) { console.log(line); }
+            await ask_for_missing(added_node, missing, { interview: options.interview });
         });
-}
-
-/** The required properties the new node still lacks, in the order to set them. */
-async function missing_after_add(workfile: Workfile, base: DeviceTree, bindings: Bindings, added: { path: string; label: string }): Promise<string[]> {
-    const { binding } = await resolve_target_binding(added.label, workfile.tree, base, { ok: true, value: bindings });
-    return "error" in binding ? [] : node_missing_required(binding, workfile.tree, added.path);
-}
-
-/** The missing properties with what the binding says about them, for an AI to ask itself. */
-async function describe_missing(workfile: Workfile, base: DeviceTree, bindings: Bindings, label: string, missing: string[]): Promise<MissingProperty[]> {
-    const target = await resolve_target_binding(label, workfile.tree, base, { ok: true, value: bindings });
-    return missing.map(property => {
-        const { info, suggestions, others } = property_details(target, workfile.tree, base, label, property);
-        return {
-            property,
-            ...(info?.description === undefined ? {} : { description: info.description }),
-            suggestions: [...suggestions, ...others],
-        };
-    });
-}
-
-/** The questions are rebuilt each time, so an answer (interrupt-parent) shapes the next one (interrupts). */
-function interview_steps(workfile: Workfile, base: DeviceTree, bindings: Bindings, label: string): InterviewSteps {
-    return {
-        ask: async (property) => {
-            const target = await resolve_target_binding(label, workfile.tree, base, { ok: true, value: bindings });
-            const { info, suggestions, others } = property_details(target, workfile.tree, base, label, property);
-            // Enter takes the first suggestion, never one of the other candidates.
-            return { property, details: format_details(info, [...suggestions, ...others], { with_type: true }), suggestions };
-        },
-        apply: async (property, tokens) => {
-            const outcome = await apply_update(workfile, base, bindings, label, property, tokens);
-            switch (outcome.kind) {
-                case "set": { return { ok: true, lines: outcome.detail === undefined ? [outcome.message] : [outcome.message, outcome.detail] }; }
-                case "error": { return { ok: false, lines: [outcome.message] }; }
-                case "read": { return { ok: false, lines: [`${property} needs a value`] }; }
-            }
-        },
-    };
-}
-
-function missing_lines(label: string, missing: string[]): string[] {
-    if (missing.length === 0) { return []; }
-    return [...format_missing(missing), `Set them with: update ${label} <property> <value>`];
 }
 
 /** The compatible without its vendor prefix, used to name a new workfile. */
@@ -475,11 +418,4 @@ if (import.meta.vitest) {
             .toBe("Label adc is taken; labelled adc_1 instead");
     });
 
-    test("missing_lines — the missing list with how to set them, nothing when complete", () => {
-        expect(missing_lines("ad7124_8", ["interrupt-parent", "interrupts"])).toEqual([
-            "Missing required: interrupt-parent, interrupts",
-            "Set them with: update ad7124_8 <property> <value>",
-        ]);
-        expect(missing_lines("ad7124_8", [])).toEqual([]);
-    });
 }

@@ -37,6 +37,13 @@ export interface AddResponse extends CommonResponse {
     unresolved?: UnresolvedEntry[];
 }
 
+/** `update <path> <child-name>` when it creates the child node. */
+export interface UpdateChildResponse extends CommonResponse {
+    path: string[];
+    /** Required properties the child still lacks, in the order to set them. */
+    missing_required: MissingProperty[];
+}
+
 export interface UnresolvedEntry {
     path: string[];
     property: string;

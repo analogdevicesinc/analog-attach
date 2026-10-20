@@ -39,6 +39,8 @@ import { respond, respond_fail, input_error, diagnostic } from "../../protocol/o
 import { convert_node } from "../../protocol/dt-to-protocol";
 import { read_target } from "../read/command";
 import { node_reg_warnings, reg_warning_lines } from "../../reg-conflicts";
+import { ask_for_missing, describe_missing, missing_required_of, type NewNode } from "../../missing-required";
+import type { UpdateChildResponse } from "../../protocol/types";
 
 export type ShapeHint = "flag" | "strings" | "cells" | undefined;
 
@@ -295,6 +297,7 @@ export function build_update_command(context_: LocalContext): Command {
         .argument("[property]", "Property name")
         .argument("[value...]", "Value tokens (omit to read or set a flag)")
         .option("--quiet", "When reading: print only the value, as 'read --quiet' does")
+        .option("--no-interview", "When creating a child node: list its missing required properties instead of asking for them")
         .addHelpText("after", `
 Paths:
   Label:        spi0                       (a label in the base tree)
@@ -311,7 +314,9 @@ Value syntax:
 
 Special cases:
   No value     Sets a flag property, or reads the current value (as 'read' does)
-  Child name   'update <path> <child-name>' creates a child node
+  Child name   'update <path> <child-name>' creates a child node, then asks
+               for its missing required properties on a terminal
+               (--no-interview lists them instead)
   reg          'update <path> reg <n>' also renames the node's unit address
 
 Examples:
@@ -320,7 +325,7 @@ Examples:
   $ attach-linux update spi0/adi,ad7124-8@0 interrupts 25 IRQ_TYPE_EDGE_FALLING
   $ attach-linux update spi0/adi,ad7124-8@0 io-channels 0 1 , 2 3
   $ attach-linux update spi0/adi,ad7124-8@0 channel@0`)
-        .action(async (path_argument: string | undefined, property_argument: string | undefined, value_arguments: string[], options: { quiet?: boolean }) => {
+        .action(async (path_argument: string | undefined, property_argument: string | undefined, value_arguments: string[], options: { quiet?: boolean; interview: boolean }) => {
             if (path_argument === undefined) {
                 const message = "Missing: path";
                 if (context_.json) { input_error(message); } else { console.log(message); }
@@ -407,31 +412,29 @@ Examples:
                         return;
                     }
 
-                    // Create the child node
-                    const at = property_name.indexOf("@");
-                    const child_name = property_name.slice(0, at);
-                    const child_unit = property_name.slice(at + 1);
-                    const child_properties: DTProperty[] = [];
-
-                    const parsed_addr = parse_unit_address(child_unit, unit_radix(child_patterns, child_name) ?? 16);
-                    if (parsed_addr !== undefined) {
-                        const cells = address_cells_of(overlay, node_path);
-                        child_properties.push(encode_reg_address(parsed_addr, cells.address, cells.size));
-                        // C3: write #address-cells/#size-cells on parent if missing
-                        ensure_address_cells(overlay, node_path);
-                    }
-
-                    overlay.ensure_node(node_path)?.children.push(NodeBuilder.new()
-                        .with_name(child_name)
-                        .with_unit_address(child_unit)
-                        .with_label([])
-                        .with_properties(child_properties.length > 0 ? child_properties : undefined)
-                        .build());
-
+                    const child_path = create_child_node(overlay, node_path, property_name, child_patterns);
                     workspace.overlay.save();
                     const message = `Added ${property_name} to ${node_identifier}`;
-                    if (context_.json) { respond({ ok: true, message, severity: "info" }); }
-                    else { console.log(message); }
+                    const child: NewNode = {
+                        workfile: workspace.overlay,
+                        base: base_dt,
+                        bindings: workspace.bindings,
+                        identifier: `${node_identifier}/${property_name}`,
+                        path: child_path,
+                    };
+                    const missing = await missing_required_of(child);
+                    if (context_.json) {
+                        respond({
+                            ok: true,
+                            message,
+                            severity: "info",
+                            path: child_path.split("/").filter(Boolean),
+                            missing_required: await describe_missing(child, missing),
+                        } satisfies UpdateChildResponse);
+                        return;
+                    }
+                    console.log(message);
+                    await ask_for_missing(child, missing, { interview: options.interview });
                     return;
                 }
                 // Fall through to property handling (creates a flag for unknown names)
@@ -460,6 +463,30 @@ Examples:
                 }
             }
         });
+}
+
+/** Add the child `name` (`channel@0`) under `node_path`, with a reg in the radix the parent's patterns name it in; its path. */
+export function create_child_node(overlay: DeviceTreeOverlay, node_path: string, name: string, child_patterns: string[]): string {
+    const at = name.indexOf("@");
+    const child_name = name.slice(0, at);
+    const child_unit = name.slice(at + 1);
+    const child_properties: DTProperty[] = [];
+
+    const parsed_addr = parse_unit_address(child_unit, unit_radix(child_patterns, child_name) ?? 16);
+    if (parsed_addr !== undefined) {
+        const cells = address_cells_of(overlay, node_path);
+        child_properties.push(encode_reg_address(parsed_addr, cells.address, cells.size));
+        // C3: write #address-cells/#size-cells on parent if missing
+        ensure_address_cells(overlay, node_path);
+    }
+
+    overlay.ensure_node(node_path)?.children.push(NodeBuilder.new()
+        .with_name(child_name)
+        .with_unit_address(child_unit)
+        .with_label([])
+        .with_properties(child_properties.length > 0 ? child_properties : undefined)
+        .build());
+    return `${node_path === "/" ? "" : node_path}/${name}`;
 }
 
 export type UpdateOutcome =
@@ -908,6 +935,17 @@ if (import.meta.vitest) {
     test("decide_update — value with any other hint → value", () => {
         expect(decide_update("cells", ["19", "2"], false)).toBe("value");
         expect(decide_update(undefined, ["okay"], false)).toBe("value");
+    });
+
+    test("create_child_node - writes reg in the radix the parent's pattern names, returns the child's path", () => {
+        const { overlay } = parse(overlay_with_imu);
+        const path = "/soc/spi@7e204000/adi,ad7124-8@0";
+        expect(create_child_node(overlay, path, "channel@10", ["^channel@([0-9]|1[0-5])$"])).toBe(`${path}/channel@10`);
+        const printed = overlay.print();
+        expect(printed).toMatch(/channel@10 \{\s*reg = <10>;/);
+        expect(printed).toContain("#address-cells = <1>;");
+        expect(create_child_node(overlay, path, "port@a", ["^port@[0-9a-f]+$"])).toBe(`${path}/port@a`);
+        expect(overlay.print()).toMatch(/port@a \{\s*reg = <10>;/);
     });
 
     test("place_property - writes a true multi-row matrix as separate <...> groups", () => {

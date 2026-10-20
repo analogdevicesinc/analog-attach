@@ -474,7 +474,7 @@ interrupt-parent = <&gpio>;
 **Purpose**: Set or update a property value on a node. Also creates child nodes (channels). Works on both overlay-added nodes and base-tree nodes.
 
 ```bash
-attach-linux update <path> <property> [value...]
+attach-linux update <path> <property> [value...] [--quiet] [--no-interview]
 ```
 
 **Behaviour with no value**:
@@ -482,6 +482,11 @@ attach-linux update <path> <property> [value...]
 - **Known non-flag property**: acts as `read <path> <property>` (with the same `--quiet`)
 - **Unknown absent property**: creates a flag
 - **Child node name** (e.g. `channel@0`): creates the child, or reads it if it exists
+
+**Creating a child node**: its `reg` follows the unit address. The required properties it still lacks are then handled as after `add`:
+- `--json`: the response carries `path` and `missing_required: [{ property, description, suggestions }]`. Ask the user for each one, then `update <path>/<child> <property> <value>`.
+- Piped runs and `--no-interview`: `Missing required: diff-channels`, then `Set them with: update adc/channel@0 <property> <value>`.
+- On a terminal, `update` asks for each one, as `add` does.
 
 **Flags**: set with no value, clear with `delete <path> <property>`. `true`/`false` are plain strings, not special.
 
