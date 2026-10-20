@@ -57,6 +57,7 @@ export {
     type LabelChoice,
 } from './Devicetree/Labels.js';
 export { add_node, type AddNodeRequest, type AddNodeNote, type AddNodeResult } from './Devicetree/AddNode.js';
+export { reg_conflicts, sibling_reg_conflicts, reg_entries, is_active, type RegConflict, type RegEntry } from './Devicetree/RegConflicts.js';
 
 // Intelligence: queries, parent suggestions, layers, board, interrupt parent
 export * from './Intelligence/index.js';
