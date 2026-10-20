@@ -6,6 +6,7 @@
 export { Attach, type PopulateOptions, type ParseOptions } from './Attach/Attach.js';
 export { type ControllerContext, filter_vendor_peripheral_props } from './Bindings/VendorPeripheralFilter.js';
 export type { ResolvedProperty, PatternPropertyRule, PropertyPatternRule, ParsedBinding } from './Attach/AttachTypes.js';
+export { expand_pattern, type PatternExpansion } from './RegexExpansion.js';
 export {
     AttachEnumType,
     to_attach_array,

@@ -35,11 +35,13 @@ Handles Device Tree Overlay (`.dtso`) files. Built on top of `dts_legacy/` — i
 Transforms raw YAML binding schemas into a UI-ready representation. Pipeline:
 
 1. `RefResolver` — dereferences `$ref` chains via `@apidevtools/json-schema-ref-parser`
-2. `PropertyResolver` — flattens `patternProperties` into `properties` (regex expansion via `src/RegexExpansion.ts`)
+2. `PropertyResolver` — flattens `patternProperties` into `properties`
 3. `RedefinitionMerger` — resolves `allOf`/`oneOf`/`if-then-else` into property constraints
 4. `CanaryInserter` — injects `__canary__` sentinel properties to make implicit `if/then` branches detectable by AJV
 5. `JSONSchemaFixups` — patches quirks in real-world ADI bindings before validation (individual fixups live in `src/binding-processor/fixups/`); property patterns get the same fixups as named properties
 6. `JSONSchemaTranslate` — builds the `ParsedBinding`. `patternProperties` are split by `Bindings/PatternKind.ts`: object schemas and `@` patterns become child-node rules (`pattern_properties`), the rest name properties (`property_patterns`); `false` entries are dropped
+
+`src/RegexExpansion.ts`'s `expand_pattern(pattern, cap = 32)` turns a binding pattern into the names it matches (`^channel@([0-9]|1[0-5])$` → channel@0 … channel@15), or into the literal stem when it is unbounded or larger than the cap (`^fan-[0-9]+$` → "fan-"). The CLI uses it for completion and `list property`.
 
 The output is a `ParsedBinding` that can be fed to AJV for validation and fed to the frontend for rendering. See `src/PROCESS.md` for the rationale and worked examples, and `src/BINDINGS.md` for real-world binding quirks encountered in ADI/Linux schemas.
 
