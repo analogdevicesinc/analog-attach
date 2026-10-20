@@ -38,6 +38,7 @@ import { child_unit_radix, resolve_node_binding } from "../../binding-resolution
 import { respond, respond_fail, input_error, diagnostic } from "../../protocol/output";
 import { convert_node } from "../../protocol/dt-to-protocol";
 import { read_target } from "../read/command";
+import { node_reg_warnings, reg_warning_lines } from "../../reg-conflicts";
 
 export type ShapeHint = "flag" | "strings" | "cells" | undefined;
 
@@ -537,6 +538,7 @@ export async function apply_update(
 
     // R10: updating reg renames the node (overlay-added targets only)
     let rename_message = "";
+    let reg_path = is_base_target ? base_dt.locate(target_reference)?.path : found?.node_path;
     if (property_name === "reg" && found !== undefined && !is_base_target) {
         const parent_path = found.node_path.split("/").slice(0, -1).join("/") || "/";
         const cells = address_cells_of(overlay, parent_path);
@@ -549,6 +551,7 @@ export async function apply_update(
             }
             case "renamed": {
                 rename_message = `; renamed to ${get_full_node_name(found.node)}`;
+                reg_path = parent_path === "/" ? `/${get_full_node_name(found.node)}` : `${parent_path}/${get_full_node_name(found.node)}`;
                 break;
             }
             case "not-numeric": {
@@ -569,11 +572,14 @@ export async function apply_update(
 
     fs.writeFileSync(input, printed);
 
+    const reg_warnings = property_name === "reg" && reg_path !== undefined ? node_reg_warnings(overlay, reg_path) : [];
+    for (const line of reg_warnings.flatMap(w => reg_warning_lines(w))) { diagnostic(line); }
+
     return {
         kind: "set",
         message: `Set ${property_name} on ${node_identifier}${rename_message}`,
         ...(ip_result.message === undefined ? {} : { detail: ip_result.message }),
-        warned: ip_result.warning !== undefined,
+        warned: ip_result.warning !== undefined || reg_warnings.length > 0,
     };
 }
 

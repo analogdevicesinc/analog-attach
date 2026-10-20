@@ -19,6 +19,7 @@ import { format_details, format_missing } from "../read/command";
 import { apply_update } from "../update/command";
 import { node_missing_required, property_details } from "../../node-state";
 import { run_interview, type InterviewSteps } from "./interview";
+import { node_reg_warnings, reg_warning_lines } from "../../reg-conflicts";
 
 export interface AddRequest {
     compatible: string;
@@ -113,6 +114,9 @@ Use 'list device' to find compatible strings, 'list parent' to find valid buses.
             for (const note of result.notes) {
                 const message = note_message(note, added);
                 if (context_.json) { diagnostic(message); } else { console.log(message); }
+            }
+            for (const line of node_reg_warnings(workfile.tree, result.path).flatMap(w => reg_warning_lines(w))) {
+                if (context_.json) { diagnostic(line); } else { console.log(line); }
             }
 
             const bindings = workspace.bindings;

@@ -58,7 +58,7 @@ export function build_attach_manifest_command(_context: LocalContext): Command {
                         argv: ["attach-linux", "--json", "delete"],
                     },
                     "validate": {
-                        description: "Validate the overlay against Linux dt-schema binding rules using dt-validate. Requires linux and overlay config fields. On first run generates .attach-linux/validation.json by running dt-mk-schema over the Linux bindings — this can take a minute; subsequent runs reuse the cached file. Empty errors array means validation passed; warnings may still be present.",
+                        description: "Validate the overlay against Linux dt-schema binding rules using dt-validate. Requires linux and overlay config fields. On first run generates .attach-linux/validation.json by running dt-mk-schema over the Linux bindings — this can take a minute; subsequent runs reuse the cached file. Empty errors array means validation passed; warnings may still be present, including reg clashes between enabled siblings (a taken chip select or address).",
                         argv: ["attach-linux", "--json", "validate"],
                     },
                     "move": {

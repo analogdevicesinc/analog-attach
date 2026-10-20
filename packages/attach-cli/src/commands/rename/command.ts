@@ -15,6 +15,7 @@ import { load_workspace, parse_bindings } from "../../config/workspace";
 import { child_unit_radix } from "../../binding-resolution";
 import { resolve_node_identifier, not_found_message } from "../../utilities";
 import { respond, respond_fail, diagnostic } from "../../protocol/output";
+import { node_reg_warnings, reg_warning_lines } from "../../reg-conflicts";
 
 export function build_rename_command(context_: LocalContext): Command {
     return new Command("rename")
@@ -56,7 +57,9 @@ Examples:
                         const message = result.reg_message === undefined
                             ? `Renamed ${path_argument} to ${new_name}`
                             : `Renamed ${path_argument} to ${new_name}; ${result.reg_message}`;
-                        respond({ ok: true, message, severity: "info" });
+                        const warnings = node_reg_warnings(overlay, result.path);
+                        for (const line of warnings.flatMap(w => reg_warning_lines(w))) { diagnostic(line); }
+                        respond({ ok: true, message, severity: warnings.length > 0 ? "warn" : "info" });
                         return;
                     }
                     case "not-found": {
@@ -98,6 +101,7 @@ Examples:
                         workspace.overlay.save();
                         if (result.reg_message !== undefined) { console.log(result.reg_message); }
                         console.log(`Renamed ${path_argument} to ${new_name} in ${input}`);
+                        for (const line of node_reg_warnings(overlay, result.path).flatMap(w => reg_warning_lines(w))) { console.log(line); }
                         return;
                     }
                 }
@@ -106,7 +110,7 @@ Examples:
 }
 
 type RenameResult =
-    | { status: "renamed"; reg_message?: string }
+    | { status: "renamed"; path: string; reg_message?: string }
     | { status: "not-found" | "in-base" | "is-root" | "conflict" };
 
 export function rename_overlay_node(
@@ -161,7 +165,7 @@ export function rename_overlay_node(
         }
     }
 
-    return { status: "renamed", reg_message };
+    return { status: "renamed", path: parent_path === "/" ? `/${new_key}` : `${parent_path}/${new_key}`, reg_message };
 }
 
 if (import.meta.vitest) {

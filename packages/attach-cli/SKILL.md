@@ -338,7 +338,7 @@ attach-linux move imu1 spi1
 attach-linux validate [path...] [--overlay <dtso>] [--linux <path>] [--context <dts>]
 ```
 
-Validates the overlay against device bindings using `dt-validate`. Errors and warnings are grouped by fragment target in human mode. An empty result prints `No errors!`.
+Validates the overlay against device bindings using `dt-validate`, then checks enabled siblings for clashing `reg` (a taken SPI chip select or I2C address, overlapping MMIO ranges) and reports them as warnings on `reg`. Clashes only within the base tree are left out. Errors and warnings are grouped by fragment target in human mode. An empty result prints `No errors!`.
 
 ```bash
 attach-linux validate
@@ -349,10 +349,11 @@ attach-linux validate
 spi0/adi,ad7124-8@0:
   error: (node): 'reg' is a required property
   error: interrupts: [[19], [2]] is too long
-No errors! (1 warning(s))
+  warning: reg: chip select 0 is already used by spidev@0
+    note: If adi,ad7124-8@0 replaces it: disable /soc/spi@7e204000/spidev@0
 ```
 
-**Interpretation**: Fix reported errors with `update`, then re-run until clean.
+**Interpretation**: Fix reported errors with `update`, then re-run until clean. For a reg clash, move the device (`update <path> reg <n>`) or disable the base node it replaces. `update … reg`, `rename` and `add` print the same warning as soon as they cause a clash.
 
 ---
 

@@ -23,6 +23,7 @@ import { is_tool_available } from "../../utilities";
 import { format_duration, rebuild_message, start_progress } from "../../progress";
 import { respond, input_error } from "../../protocol/output";
 import type { ValidationResponse, ValidationError } from "../../protocol/types";
+import { reg_warnings, type RegWarning } from "../../reg-conflicts";
 
 const TEMPLATE = `/dts-v1/;
 /plugin/;
@@ -138,13 +139,15 @@ Runs dt-validate on the overlay merged with the base device tree.`)
                 return;
             }
 
+            // dt-validate checks each node on its own; sibling reg clashes are checked here.
+            const all = [...diagnostics, ...reg_diagnostics(overlay, reg_warnings(overlay))];
             if (context_.json) {
-                respond(parse_dt_validate_output(diagnostics));
+                respond(parse_dt_validate_output(all));
                 return;
             }
 
             const targets = fragment_display_targets(overlay);
-            const report = format_validation_report(diagnostics, targets);
+            const report = format_validation_report(all, targets);
             for (const line of report) { console.log(line); }
         });
 }
@@ -460,6 +463,40 @@ export function format_validation_report(diagnostics: DtValidateDiagnostic[], ta
     return lines;
 }
 
+/**
+ * Reg clashes as warnings on `reg` of the node. A node the overlay writes gets
+ * its `/nodeN/…` path in the validation tree, so it groups with dt-validate's
+ * diagnostics; any other keeps its real path.
+ */
+export function reg_diagnostics(overlay: DeviceTreeOverlay, warnings: RegWarning[]): DtValidateDiagnostic[] {
+    return warnings.map(warning => ({
+        level: "warning",
+        node: validation_node(overlay, warning.path) ?? warning.path,
+        property_path: ["reg"],
+        message: warning.message,
+        ...(warning.hint === undefined
+            ? {}
+            : { note: warning.hint, formatted: `${warning.message}; ${warning.hint}` }),
+    }));
+}
+
+/** Where the node at an absolute path sits in the validation tree: `/nodeN` plus its path inside fragment N. */
+function validation_node(overlay: DeviceTreeOverlay, absolute: string): string | undefined {
+    for (const [index, fragment] of overlay.get_fragments().entries()) {
+        const root = overlay.get_fragment_root_path(fragment);
+        if (root === undefined) { continue; }
+        const rest = root === "/" ? absolute : absolute.slice(root.length);
+        if (root !== "/" && !(absolute.startsWith(root) && (rest === "" || rest.startsWith("/")))) { continue; }
+
+        let node = fragment.children.find(child => child.name === "__overlay__");
+        for (const name of rest.split("/").filter(Boolean)) {
+            node = node?.children.find(child => (child.unit_addr === undefined ? child.name : `${child.name}@${child.unit_addr}`) === name);
+        }
+        if (node !== undefined) { return `/node${index}${rest}`; }
+    }
+    return undefined;
+}
+
 function map_diagnostic(d: DtValidateDiagnostic): ValidationError {
     const node_segs = typeof d.node === 'string' ? d.node.split('/').filter(s => s.length > 0) : [];
     const property_segs = Array.isArray(d.property_path) ? d.property_path.map(String) : [];
@@ -632,5 +669,42 @@ if (import.meta.vitest) {
         expect(report.some(l => l.includes("note: see spec"))).toBe(true);
         expect(report.some(l => l.includes("context: line 1"))).toBe(true);
         expect(report.some(l => l.includes("context: line 2"))).toBe(true);
+    });
+
+    test("reg_diagnostics — a node in a fragment is grouped with dt-validate's /nodeN diagnostics", () => {
+        const reg_base = DeviceTree.new_from_string(`/dts-v1/;\n/ {\n\tsoc {\n\t\tspi0: spi@7e204000 {\n\t\t\t#address-cells = <1>;\n\t\t\t#size-cells = <0>;\n\t\t\tspidev0: spidev@0 { reg = <0>; };\n\t\t};\n\t};\n};`);
+        if (typeof reg_base === "string") { throw new TypeError(reg_base); }
+        const reg_overlay = DeviceTreeOverlay.new_from_string(`/dts-v1/;\n/plugin/;\n\n&spidev0 {\n\tstatus = "okay";\n};\n\n&spi0 {\n\tadc@1 { reg = <0>; };\n};`, reg_base);
+        if (typeof reg_overlay === "string") { throw new TypeError(reg_overlay); }
+        const nodes = reg_diagnostics(reg_overlay, [
+            { path: "/soc/spi@7e204000/adc@1", message: "m" },
+            { path: "/soc/spi@7e204000/spidev@0", message: "m" },
+            { path: "/soc/elsewhere@0", message: "m" },
+        ]).map(d => d.node);
+        expect(nodes).toEqual(["/node1/adc@1", "/node0", "/soc/elsewhere@0"]);
+        expect(nodes.map(node => display_node(node ?? "", fragment_display_targets(reg_overlay)))).toEqual(["spi0/adc@1", "spidev0", "/soc/elsewhere@0"]);
+    });
+
+    test("reg_diagnostics — reg clashes join the report as warnings on reg", () => {
+        // Not in any fragment of this overlay: the real path is kept.
+        const diagnostics = reg_diagnostics(overlay, [{
+            path: "/soc/spi@7e204000/adc@1",
+            message: "chip select 0 is already used by spidev@0",
+            hint: "If adc@1 replaces it: disable /soc/spi@7e204000/spidev@0",
+        }]);
+        expect(format_validation_report(diagnostics, new Map())).toEqual([
+            "/soc/spi@7e204000/adc@1:",
+            "  warning: reg: chip select 0 is already used by spidev@0",
+            "    note: If adc@1 replaces it: disable /soc/spi@7e204000/spidev@0",
+            "No errors! (1 warning(s))",
+        ]);
+        expect(parse_dt_validate_output(diagnostics)).toEqual({
+            errors: [],
+            warnings: [{
+                kind: "generic",
+                path: ["soc", "spi@7e204000", "adc@1", "reg"],
+                message: "chip select 0 is already used by spidev@0; If adc@1 replaces it: disable /soc/spi@7e204000/spidev@0",
+            }],
+        });
     });
 }
