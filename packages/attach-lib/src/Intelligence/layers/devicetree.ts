@@ -210,6 +210,22 @@ if (import.meta.vitest) {
         expect(values("vref-supply")[0]?.note).toBe("from the context devicetree: only right if this supply actually powers the device");
     });
 
+    test("devicetree_layer — on a merged tree, the overlay's providers and the ones it enables count", async () => {
+        const { DeviceTreeOverlay } = await import("../../Devicetree/index.js");
+        const overlay = DeviceTreeOverlay.new_from_string(`/dts-v1/;\n/plugin/;\n&{/} {\n\tvref: fixedregulator@0 {\n\t\tcompatible = "regulator-fixed";\n\t\tregulator-min-microvolt = <2500000>;\n\t};\n};\n&cam_clk {\n\tstatus = "okay";\n};`, devicetree);
+        if (typeof overlay === "string") { throw new TypeError(overlay); }
+        const merged = overlay.merged_tree();
+        if (merged === undefined) { throw new TypeError("no merged tree"); }
+        const merged_values = (property: string) => devicetree_layer.suggest_values!(property, { devicetree: merged, data: "{}" }, []);
+        expect(merged_values("vref-supply").map(s => s.display)).toStrictEqual([
+            `vdd_3v3_reg — regulator "3v3", 3.3 V, always on`,
+            `vref — regulator, 2.5 V`,
+        ]);
+        expect(merged_values("clocks").map(s => s.rows)).toStrictEqual([[[{ label: "clk_osc" }]], [[{ label: "cam_clk" }]]]);
+        // The base is left as it was.
+        expect(values("clocks")).toHaveLength(1);
+    });
+
     test("devicetree_layer — reg matches the unit address", () => {
         // eslint-disable-next-line unicorn/consistent-function-scoping
         const at = (node_path: string) => devicetree_layer.suggest_values!("reg", {

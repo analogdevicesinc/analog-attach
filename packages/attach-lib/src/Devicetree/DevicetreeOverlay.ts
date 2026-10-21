@@ -565,6 +565,26 @@ export class DeviceTreeOverlay {
     }
 
     /**
+     * The base tree with the overlay applied, as one tree: every node as
+     * `effective_node` builds it, so the overlay's nodes, properties and labels
+     * are in it. Undefined without a base.
+     */
+    public merged_tree(): DeviceTree | undefined {
+        if (this.base_dts === undefined) { return undefined; }
+        const build = (path: string): DTNode | undefined => {
+            const node = this.effective_node(path);
+            if (node === undefined) { return undefined; }
+            const children = [...this.effective_children(path).keys()].flatMap(name => {
+                const child = build(path === "/" ? `/${name}` : `${path}/${name}`);
+                return child === undefined ? [] : [child];
+            });
+            return { ...node, children };
+        };
+        const root = build("/");
+        return root === undefined ? undefined : DeviceTree.new_from_root(root);
+    }
+
+    /**
      * Collect every label in the base tree and the overlay, returning a map from
      * label name to absolute path. Overlay labels override base labels.
      */

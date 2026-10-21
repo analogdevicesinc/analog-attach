@@ -57,6 +57,11 @@ export class DeviceTree {
         }
     }
 
+    /** A tree from a root built elsewhere, such as an overlay merged with its base (`DeviceTreeOverlay.merged_tree`). */
+    static new_from_root(root: DTNode): DeviceTree {
+        return new DeviceTree({ memreserves: [], root });
+    }
+
     static new_empty(): DeviceTree {
         return new DeviceTree(
             {
