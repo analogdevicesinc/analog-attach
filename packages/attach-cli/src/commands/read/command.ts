@@ -45,7 +45,9 @@ export async function read_target(
         return;
     }
 
-    const property = property_name === undefined ? undefined : found.node.properties.find(p => p.name === property_name);
+    // The overlay may write the node in several fragments; a later one's value applies.
+    const node = overlay.merged_overlay_node(found.node_path) ?? found.node;
+    const property = property_name === undefined ? undefined : node.properties.find(p => p.name === property_name);
     if (property_name !== undefined && property === undefined) {
         const message = `Not found: ${property_name} on ${path_string}`;
         if (context_.json) {
@@ -62,10 +64,10 @@ export async function read_target(
     if (property === undefined) {
         const missing = binding === undefined ? undefined : node_missing_required(binding, overlay, found.node_path);
         if (context_.json) {
-            const response: ReadResponse = { ...convert_node(found.node), ...(missing === undefined ? {} : { missing_required: missing }) };
+            const response: ReadResponse = { ...convert_node(node), ...(missing === undefined ? {} : { missing_required: missing }) };
             respond(response);
         } else {
-            print_node_human(found.node);
+            print_node_human(node);
             for (const line of format_missing(missing ?? [])) { console.log(line); }
         }
         return;

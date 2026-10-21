@@ -736,9 +736,9 @@ export function place_property(
 
     if (found !== undefined) {
         if (built === undefined) {
-            found.node.properties = found.node.properties.filter(p => p.name !== property_name);
+            overlay.remove_property(found.node_path, property_name);
         } else {
-            upsert_property(found.node, built);
+            upsert_property(overlay.property_node(found.node_path, property_name) ?? found.node, built);
         }
     }
 }
