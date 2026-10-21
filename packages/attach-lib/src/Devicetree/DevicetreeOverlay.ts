@@ -91,13 +91,16 @@ export class DeviceTreeOverlay {
             }
 
             if (properties !== undefined) {
+                // A later fragment for the same node may already set it, and its value is the one applied.
+                const root = this.get_fragment_root_path(existing);
                 const properties_ = Array.isArray(properties) ? properties : [properties];
                 for (const property of properties_) {
-                    const index = overlay_node.properties.findIndex(p => p.name === property.name);
+                    const holder = (root === undefined ? undefined : this.property_node(root, property.name)) ?? overlay_node;
+                    const index = holder.properties.findIndex(p => p.name === property.name);
                     if (index === -1) {
-                        overlay_node.properties.push(property);
+                        holder.properties.push(property);
                     } else {
-                        overlay_node.properties[index] = property;
+                        holder.properties[index] = property;
                     }
                 }
             }
@@ -135,8 +138,21 @@ export class DeviceTreeOverlay {
         return this.find_node(target)?.node;
     }
 
+    /**
+     * The first fragment with an `__overlay__` for the node `target` resolves
+     * to, whatever label or path its own target names (`&i2c_arm` and `&i2c1`
+     * are one node). Without a resolved node, the one whose target is written
+     * the same way.
+     */
     private find_fragment(target: NodeTarget): DTNode | undefined {
         const normalized = normalize_target(target);
+        const path = normalized.kind === "label" ? this.label_path(normalized.name, new Set()) : normalized.path;
+        if (path !== undefined) {
+            const for_node = this.get_fragments().find(fragment =>
+                fragment.children.some(c => c.name === "__overlay__") && this.get_fragment_root_path(fragment) === path);
+            if (for_node !== undefined) { return for_node; }
+        }
+
         for (const fragment of this.get_fragments()) {
             if (normalized.kind === "label") {
                 const property = fragment.properties.find(p => p.name === "target");
@@ -223,14 +239,19 @@ export class DeviceTreeOverlay {
         return true;
     }
 
+    /** Remove the property from every overlay node for the target's node, so no fragment still sets it. */
     public remove_property(target: NodeTarget, property: string): boolean {
         const found = this.find_node(target);
         if (found === undefined) { return false; }
 
-        const index = found.node.properties.findIndex(p => p.name === property);
-        if (index === -1) { return false; }
-
-        found.node.properties.splice(index, 1);
+        let removed = false;
+        for (const node of this.overlay_nodes_at(found.node_path)) {
+            const index = node.properties.findIndex(p => p.name === property);
+            if (index === -1) { continue; }
+            node.properties.splice(index, 1);
+            removed = true;
+        }
+        if (!removed) { return false; }
 
         this.cleanup_empty_fragments();
         return true;
@@ -268,16 +289,7 @@ export class DeviceTreeOverlay {
                     if (element.kind === "label") {
                         const name = element.name.startsWith("&") ? element.name.slice(1) : element.name;
 
-                        const local = this.overlay_label_path(name, new Set([...visited, fragment]));
-                        if (local !== undefined) { return local.path; }
-
-                        if (this.base_dts !== undefined) {
-                            const located = this.base_dts.locate(name);
-
-                            if (located !== undefined) { return located.path; }
-                        }
-
-                        return undefined;
+                        return this.label_path(name, new Set([...visited, fragment]));
                     }
 
                     if (element.kind === "path") {
@@ -300,6 +312,13 @@ export class DeviceTreeOverlay {
         }
 
         return undefined;
+    }
+
+    /** Where a fragment target's label points: the overlay's own label first, as in dtc, then the base's. */
+    private label_path(name: string, visited: Set<DTNode>): string | undefined {
+        const local = this.overlay_label_path(name, visited);
+        if (local !== undefined) { return local.path; }
+        return this.base_dts?.locate(name)?.path;
     }
 
     /**
@@ -600,25 +619,95 @@ export class DeviceTreeOverlay {
     public effective_node(path: string): DTNode | undefined {
         const base_node = this.base_dts?.node_at(path);
 
-        const found = this.find_node(path);
-        if (found === undefined && base_node === undefined) { return undefined; }
+        const overlay_nodes = this.overlay_nodes_at(path);
+        if (overlay_nodes.length === 0 && base_node === undefined) { return undefined; }
 
         const properties = [...(base_node?.properties ?? [])];
-        if (found !== undefined) {
-            for (const property of found.node.properties) {
+        for (const property of this.overlay_properties(path)) {
+            const index = properties.findIndex(p => p.name === property.name);
+            if (index === -1) { properties.push(property); }
+            else { properties[index] = property; }
+        }
+
+        return {
+            name: base_node?.name ?? overlay_nodes[0]?.name ?? path.split("/").at(-1) ?? "",
+            unit_addr: base_node?.unit_addr ?? overlay_nodes[0]?.unit_addr,
+            labels: [...(base_node?.labels ?? []), ...overlay_nodes.flatMap(node => node.labels)],
+            properties,
+            children: [...this.effective_children(path).values()],
+        };
+    }
+
+    /**
+     * The overlay's nodes for the node at absolute `path`, in file order, which
+     * is the order dtc applies them in: the `__overlay__` of each fragment
+     * targeting it, and the node at its place under a fragment targeting an
+     * ancestor. A fragment whose target can't be placed counts from `/`, as in
+     * `find_node`.
+     */
+    public overlay_nodes_at(path: string): DTNode[] {
+        const nodes: DTNode[] = [];
+        for (const fragment of this.get_fragments()) {
+            const body = fragment.children.find(c => c.name === "__overlay__");
+            if (body === undefined) { continue; }
+            const root = this.get_fragment_root_path(fragment) ?? "";
+            if (root === path) { nodes.push(body); continue; }
+
+            const prefix = root.endsWith("/") ? root : `${root}/`;
+            if (!path.startsWith(prefix)) { continue; }
+            let node: DTNode | undefined = body;
+            for (const segment of path.slice(prefix.length).split("/")) {
+                node = node?.children.find(c => get_full_node_name(c) === segment);
+            }
+            if (node !== undefined) { nodes.push(node); }
+        }
+        return nodes;
+    }
+
+    /** The properties the overlay sets on the node at `path`: over all its overlay nodes, a later one's value wins. */
+    public overlay_properties(path: string): DTProperty[] {
+        const properties: DTProperty[] = [];
+        for (const node of this.overlay_nodes_at(path)) {
+            for (const property of node.properties) {
                 const index = properties.findIndex(p => p.name === property.name);
                 if (index === -1) { properties.push(property); }
                 else { properties[index] = property; }
             }
         }
+        return properties;
+    }
 
+    /**
+     * What the overlay writes to the node at `path`, as one node: its overlay
+     * nodes merged in file order (a later property wins, children with one
+     * name are patched together). Undefined when the overlay doesn't touch it.
+     */
+    public merged_overlay_node(path: string): DTNode | undefined {
+        const nodes = this.overlay_nodes_at(path);
+        const [first] = nodes;
+        if (first === undefined) { return undefined; }
+        const children = new Map<string, DTNode>();
+        for (const child of nodes.flatMap(node => node.children)) {
+            const name = get_full_node_name(child);
+            const existing = children.get(name);
+            children.set(name, existing === undefined ? child : patch_node(existing, child));
+        }
         return {
-            name: base_node?.name ?? found?.node.name ?? path.split("/").at(-1) ?? "",
-            unit_addr: base_node?.unit_addr ?? found?.node.unit_addr,
-            labels: [...(base_node?.labels ?? []), ...(found?.node.labels ?? [])],
-            properties,
-            children: [...this.effective_children(path).values()],
+            ...first,
+            labels: nodes.flatMap(node => node.labels),
+            properties: this.overlay_properties(path),
+            children: [...children.values()],
         };
+    }
+
+    /** The overlay node whose value of `property` applies to the node at `path`: the last one that sets it. */
+    public property_node(path: string, property: string): DTNode | undefined {
+        const nodes = this.overlay_nodes_at(path);
+        for (let index = nodes.length - 1; index >= 0; index--) {
+            const node = nodes[index];
+            if (node?.properties.some(p => p.name === property) === true) { return node; }
+        }
+        return undefined;
     }
 
     /**
@@ -988,6 +1077,51 @@ ${overlay_with_imu.replace("/dts-v1/;\n/plugin/;\n", "")}`);
     test("get_fragment_root_path — the overlay's label wins over the base's, as in dtc", () => {
         const overlay = overlay_on(fan_base, `/dts-v1/;\n/plugin/;\n/ {\n\tfragment@0 {\n\t\ttarget-path = "/";\n\t\t__overlay__ {\n\t\t\ti2c1: i2c-gpio@1 {};\n\t\t};\n\t};\n\tfragment@1 {\n\t\ttarget = <&i2c1>;\n\t\t__overlay__ { status = "okay"; };\n\t};\n};`);
         expect(overlay.get_fragment_root_path(fragment_with(overlay, "1"))).toBe("/i2c-gpio@1");
+    });
+
+    const two_labels = `/dts-v1/;\n/ {\n\tsoc {\n\t\ti2c_arm: i2c1: i2c@7e804000 {};\n\t};\n};`;
+    const I2C = "/soc/i2c@7e804000";
+    const frequency = (value: bigint): DTProperty => PropertyBuilder.build_cell_array()
+        .with_tagged_values(PropertyBuilder.tag_number(value))
+        .with_name("clock-frequency")
+        .build();
+
+    test("add_fragment — reuses the fragment for the node whatever label or path names it", () => {
+        const overlay = overlay_on(two_labels, `/dts-v1/;\n/plugin/;\n/ {\n\tfragment@0 {\n\t\ttarget = <&i2c_arm>;\n\t\t__overlay__ { status = "okay"; };\n\t};\n};`);
+        expect(overlay.add_fragment("i2c1", undefined, frequency(100_000n))).toBe(true);
+        expect(overlay.add_fragment({ kind: "path", labels: [], path: I2C }, undefined, frequency(400_000n))).toBe(true);
+        expect(overlay.get_fragments()).toHaveLength(1);
+        expect(overlay.overlay_properties(I2C).map(p => p.name)).toEqual(["status", "clock-frequency"]);
+        expect(overlay.remove_property("i2c1", "clock-frequency")).toBe(true);
+        expect(overlay.overlay_properties(I2C).map(p => p.name)).toEqual(["status"]);
+    });
+
+    const split = `/dts-v1/;\n/plugin/;\n/ {\n\tfragment@0 {\n\t\ttarget = <&i2c_arm>;\n\t\t__overlay__ { status = "okay"; clock-frequency = <100000>; };\n\t};\n\tfragment@1 {\n\t\ttarget = <&i2c1>;\n\t\t__overlay__ {\n\t\t\t#address-cells = <1>;\n\t\t\tclock-frequency = <400000>;\n\t\t\tadc@48 { reg = <0x48>; };\n\t\t};\n\t};\n\tfragment@2 {\n\t\ttarget-path = "/";\n\t\t__overlay__ {\n\t\t\tsoc {\n\t\t\t\ti2c@7e804000 { #size-cells = <0>; };\n\t\t\t};\n\t\t};\n\t};\n};`;
+
+    test("overlay_nodes_at — every fragment for the node, in file order; a later value wins", () => {
+        const overlay = overlay_on(two_labels, split);
+        expect(overlay.overlay_nodes_at(I2C)).toHaveLength(3);
+        expect(overlay.overlay_properties(I2C).map(p => p.name)).toEqual(["status", "clock-frequency", "#address-cells", "#size-cells"]);
+        expect(overlay.effective_node(I2C)?.properties.find(p => p.name === "clock-frequency")).toEqual(frequency(400_000n));
+        expect(overlay.property_node(I2C, "clock-frequency")).toBe(overlay.overlay_nodes_at(I2C)[1]);
+        expect(overlay.property_node(I2C, "#size-cells")).toBe(overlay.overlay_nodes_at(I2C)[2]);
+        expect(overlay.property_node(I2C, "nope")).toBeUndefined();
+        const merged = overlay.merged_overlay_node(I2C);
+        expect(merged?.properties.map(p => p.name)).toEqual(["status", "clock-frequency", "#address-cells", "#size-cells"]);
+        expect(merged?.children.map(c => get_full_node_name(c))).toEqual(["adc@48"]);
+        expect(overlay.merged_overlay_node("/soc")?.children.map(c => get_full_node_name(c))).toEqual(["i2c@7e804000"]);
+        expect(overlay.merged_overlay_node("/nowhere")).toBeUndefined();
+    });
+
+    test("add_fragment / remove_property — a property goes where its applied value is, and goes from every fragment", () => {
+        const overlay = overlay_on(two_labels, split);
+        overlay.add_fragment("i2c_arm", undefined, frequency(1_000_000n));
+        const [first, second] = overlay.overlay_nodes_at(I2C);
+        expect(first?.properties.find(p => p.name === "clock-frequency")).toEqual(frequency(100_000n));
+        expect(second?.properties.find(p => p.name === "clock-frequency")).toEqual(frequency(1_000_000n));
+        expect(overlay.remove_property("i2c1", "clock-frequency")).toBe(true);
+        expect(overlay.property_node(I2C, "clock-frequency")).toBeUndefined();
+        expect(overlay.remove_property("i2c1", "clock-frequency")).toBe(false);
     });
 
     test("get_fragment_root_path — targets that name each other resolve to nothing", () => {
