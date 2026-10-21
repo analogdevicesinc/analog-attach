@@ -218,7 +218,9 @@ export async function resolve_target_binding(
         return { target, binding: { error: "node not found for binding resolution" } };
     }
     const { linux, dt_schema } = bindings.value;
-    return { target, binding: await resolve_node_binding(binding_node, binding_parent, parent_name, base_dt, linux, dt_schema, undefined, parent_compatibles) };
+    // Phandle enums are filled from the tree with the overlay applied, so they name its nodes too.
+    const context = overlay.merged_tree() ?? base_dt;
+    return { target, binding: await resolve_node_binding(binding_node, binding_parent, parent_name, context, linux, dt_schema, undefined, parent_compatibles) };
 }
 
 /**
@@ -256,12 +258,25 @@ export function value_suggestions(
         ...(pattern_definition?.pattern === undefined ? [] : [{ key: pattern_definition.key, value: pattern_definition.value }]),
     ];
     const stack = IntelligenceStack.default();
+    // The overlay's own nodes (a regulator it adds, a controller it enables) are candidates too.
     const values = stack.suggest_values(property_name, {
-        devicetree: base_dt,
+        devicetree: overlay.merged_tree() ?? base_dt,
         data,
         placement,
         ...(resolved === undefined ? {} : { binding: { required_properties: resolved.required_properties, properties } }),
     });
+
+    // A clock or supply the overlay adds (its own regulator) is most likely the
+    // one meant, so it goes first. The interrupt parent keeps the inherited one first.
+    if (property_name === "clocks" || property_name.endsWith("-supply")) {
+        const labels = overlay.all_labels();
+        const added = (value: ValueSuggestion): boolean => {
+            const cell = value.rows[0]?.[0];
+            if (cell === undefined || typeof cell === "bigint" || !("label" in cell)) { return false; }
+            return !base_dt.node_exists(cell.label) && labels.has(cell.label);
+        };
+        values.sort((a, b) => Number(added(b)) - Number(added(a)));
+    }
 
     // Binding check: annotate suggestions in place, via the note field.
     if (target.binding_node !== undefined && resolved !== undefined) {
@@ -892,6 +907,16 @@ if (import.meta.vitest) {
         };
         const result = property_info(binding, { name: "adc", labels: [], properties: [], children: [] } as unknown as DTNode, "interrupt-parent");
         expect(result.ok && result.info.phandle_options).toEqual(["gpio", "gicv2", "aon_intr"]);
+    });
+
+    test("value_suggestions — a regulator the overlay adds is a supply candidate, listed first", () => {
+        const base = DT.new_from_string(`/dts-v1/;\n/ {\n\tvdd_3v3_reg: fixedregulator_3v3 {\n\t\tcompatible = "regulator-fixed";\n\t\tregulator-min-microvolt = <3300000>;\n\t};\n\tsoc {\n\t\tspi0: spi@7e204000 {\n\t\t\tcompatible = "brcm,bcm2835-spi";\n\t\t\t#address-cells = <1>;\n\t\t\t#size-cells = <0>;\n\t\t};\n\t};\n};`);
+        if (typeof base === "string") { throw new TypeError(base); }
+        const overlay = DTO.new_from_string(`/dts-v1/;\n/plugin/;\n&{/} {\n\tvref: fixedregulator@0 {\n\t\tcompatible = "regulator-fixed";\n\t\tregulator-min-microvolt = <2500000>;\n\t};\n};\n&spi0 {\n\tadc@0 {\n\t\tcompatible = "adi,ad7124-8";\n\t\treg = <0>;\n\t};\n};`, base);
+        if (typeof overlay === "string") { throw new TypeError(overlay); }
+        const target: TargetBinding = { target: resolve_write_target("spi0/adc@0", overlay, base), binding: { error: "no bindings" } };
+        const result = value_suggestions(target, overlay, base, "spi0/adc@0", "refin1-supply");
+        expect(result.ok && result.suggestions.map(s => s.value)).toEqual(["vref", "vdd_3v3_reg"]);
     });
 
     test("describe_property_pattern — the names it expands to, the regex, and the names already set", () => {

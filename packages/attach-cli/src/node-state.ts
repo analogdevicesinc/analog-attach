@@ -42,8 +42,9 @@ export function property_details(
 
 /**
  * The nodes a phandle property can name that the suggestions leave out, to list
- * after them. The suggestions only take nodes the base enables, so these are
- * disabled, or enabled by the overlay.
+ * after them. The suggestions take the enabled providers of the base with the
+ * overlay applied, so for clocks, supplies and interrupt parents these are the
+ * disabled ones; for other phandles, any node, marked by where it is enabled.
  */
 export function other_candidates(options: string[], suggestions: Suggestion[], overlay: DeviceTreeOverlay): Suggestion[] {
     const suggested = new Set(suggestions.map(s => s.value.replace(/^&/, "")));
@@ -51,8 +52,10 @@ export function other_candidates(options: string[], suggestions: Suggestion[], o
     return options.flatMap(label => {
         const path = labels.get(label);
         const node = path === undefined ? undefined : overlay.effective_node(path);
-        if (suggested.has(label) || node === undefined) { return []; }
-        const note = is_enabled(node) ? "enabled by the overlay" : "disabled";
+        if (suggested.has(label) || node === undefined || path === undefined) { return []; }
+        const base_node = overlay.get_base_dts()?.node_at(path);
+        let note = "disabled";
+        if (is_enabled(node)) { note = base_node !== undefined && is_enabled(base_node) ? "enabled" : "enabled by the overlay"; }
         return [{ value: label, display_string: `${label} (${note})`, note }];
     });
 }
@@ -61,7 +64,7 @@ if (import.meta.vitest) {
     const { test, expect } = import.meta.vitest;
     const { DeviceTree, DeviceTreeOverlay: DTO } = await import("attach-lib");
 
-    test("other_candidates — the nodes a phandle can name that the suggestions leave out: disabled, or enabled by the overlay", () => {
+    test("other_candidates — the nodes a phandle can name that the suggestions leave out, marked by where they are enabled", () => {
         const base = DeviceTree.new_from_string(`/dts-v1/;\n/ {\n\tgpio: gpio@7e200000 {\n\t};\n\tgicv2: interrupt-controller@40041000 {\n\t};\n\taon_intr: interrupt-controller@7ef00100 {\n\t\tstatus = "disabled";\n\t};\n\tl2_intr: interrupt-controller@7ef00200 {\n\t\tstatus = "disabled";\n\t};\n};`);
         if (typeof base === "string") { throw new TypeError(base); }
         const overlay = DTO.new_from_string(`/dts-v1/;\n/plugin/;\n\n&l2_intr {\n\tstatus = "okay";\n};`, base);
@@ -72,6 +75,7 @@ if (import.meta.vitest) {
             { value: "l2_intr", display_string: "l2_intr (enabled by the overlay)", note: "enabled by the overlay" },
         ]);
         expect(other_candidates(["aon_intr"], [{ value: "aon_intr" }], overlay)).toEqual([]);
+        expect(other_candidates(["gpio"], [], overlay)).toEqual([{ value: "gpio", display_string: "gpio (enabled)", note: "enabled" }]);
     });
 
     test("node_missing_required — base and overlay properties both count", () => {
