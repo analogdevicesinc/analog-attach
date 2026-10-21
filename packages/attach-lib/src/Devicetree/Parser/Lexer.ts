@@ -58,6 +58,8 @@ export function lex(content: string): Result<LexerResult, LexerError> {
     }
 
     const coordinates = input_stream.current_coordinates;
+    // `coordinates` follows the stream; a token is placed where it starts.
+    const start = { ...coordinates };
 
     const raw_token: Result<RawToken, LexerError> = (() => {
 
@@ -135,7 +137,7 @@ export function lex(content: string): Result<LexerResult, LexerError> {
     }
 
     // TODO: ugly to use slicing to create objects
-    const token: Token = { ...raw_token.value, ...coordinates };
+    const token: Token = { ...raw_token.value, ...start };
 
     if (token.kind === TokenKind.CommentBlock || token.kind === TokenKind.CommentLine) {
       comments.push(token);

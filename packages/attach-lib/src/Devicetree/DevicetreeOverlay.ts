@@ -10,7 +10,8 @@ import {
     is_dt_flag,
     DTO,
     parse_dto,
-    print_dto
+    print_dto,
+    format_parse_error
 } from "./Parser";
 
 import * as fs from 'node:fs';
@@ -35,7 +36,7 @@ export class DeviceTreeOverlay {
             const dto = parse_dto(content);
 
             if (Result.is_err(dto)) {
-                return "Failed to parse overlay!";
+                return `Failed to parse overlay: ${format_parse_error(dto.error)}`;
             }
 
             return new DeviceTreeOverlay(dto.value.dto, base_dts);

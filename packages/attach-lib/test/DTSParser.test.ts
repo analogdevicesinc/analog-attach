@@ -5,7 +5,7 @@ import { test, expect, describe } from 'vitest';
 import { Result } from '../src/result';
 
 import type { DTSParseResult, DTLabel, DTO, DTS } from "../src/Devicetree/Parser/index.js";
-import { parse_dto, parse_dts, print_dts, Bits, is_dt_flag, isDTMetadata } from "../src/Devicetree/Parser/index.js";
+import { parse_dto, parse_dts, print_dts, Bits, is_dt_flag, isDTMetadata, format_parse_error } from "../src/Devicetree/Parser/index.js";
 
 import { stringify as stringify_as_yaml } from "yaml";
 
@@ -327,6 +327,34 @@ describe("overlays (DTOs)", () => {
     const dto = parse_inline_dto(`/ { compatible = "a"; };\n/ { compatible = "b"; };`);
     expect(dto.root.properties).toHaveLength(1);
     expect(dto.root.properties[0]?.value).toMatchObject([{ kind: "string", value: "b" }]);
+  });
+
+  test("a root child repeated across root blocks is merged", () => {
+    const dto = parse_inline_dto(`/ { __overrides__ { a = <&x>, "reg:0"; b = <1>; }; };\n/ { __overrides__ { b = <2>; c = <3>; }; };`);
+    expect(child_names(dto)).toStrictEqual(["__overrides__"]);
+    const overrides = dto.root.children[0];
+    expect(overrides?.properties.map(p => p.name)).toStrictEqual(["a", "b", "c"]);
+    expect(overrides?.properties[1]?.value).toMatchObject([{ kind: "array", elements: [{ kind: "number", value: BigInt(2) }] }]);
+  });
+
+  test("a reference to a label of the overlay merges into that node", () => {
+    const dto = parse_inline_dto(`/ { fragment@0 { target = <&cma>; frag0: __overlay__ { size = <1>; }; }; };\n&frag0 { size = <2>; };\n/ { fragment@1 { target = <&ddc0>; __overlay__ { }; }; };`);
+    expect(child_names(dto)).toStrictEqual(["fragment@0", "fragment@1"]);
+    const overlay = dto.root.children[0]?.children[0];
+    expect(overlay?.properties).toHaveLength(1);
+    expect(overlay?.properties[0]?.value).toMatchObject([{ kind: "array", elements: [{ kind: "number", value: BigInt(2) }] }]);
+  });
+
+  test("a reference to a label outside the overlay still becomes a fragment", () => {
+    const dto = parse_inline_dto(`/ { fragment@0 { target = <&cma>; frag0: __overlay__ { }; }; };\nl: &spi0 { status = "okay"; };`);
+    expect(child_names(dto)).toStrictEqual(["fragment@0", "fragment@1"]);
+    expect(dto.root.children[1]?.labels).toStrictEqual(["l"]);
+  });
+
+  test("a parse error names the token and its position", () => {
+    const result = parse_dto(`/dts-v1/;\n/plugin/;\n/ {\n\ta = <1>\n};`);
+    if (Result.is_ok(result)) { expect.fail("expected a parse error"); }
+    expect(format_parse_error(result.error)).toMatch(/: '}' \(line 5, column 1\)$/);
   });
 
   test("label/path references become fragments", () => {

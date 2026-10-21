@@ -40,6 +40,13 @@ export type ParseError = {
   expected?: RawToken;
 }
 
+/** `message: 'found' (line R, column C)`; the position is in the parsed (preprocessed) text. */
+export function format_parse_error(error: ParseError): string {
+  if (error.found === undefined) { return error.message; }
+  const { value, row, col } = error.found;
+  return `${error.message}: '${value}' (line ${row}, column ${col})`;
+}
+
 export type DTSParseResult = {
   dts: DTS;
   metadata: DTMetadata | undefined;
@@ -168,7 +175,22 @@ export class Parser {
         continue;
       }
 
-      const r_fragment = this.parse_dto_reference_block();
+      const labels = this.parse_labels();
+
+      // A label defined earlier in the overlay itself is merged into, as dtc
+      // does for plugins (`&frag0 { … }` after including cma-overlay.dts).
+      const reference = this.token_stream.current;
+      if (reference.kind === TokenKind.LabelReference) {
+        const local = find_label_in_children(children_map, reference.value);
+        if (local) {
+          this.token_stream.advance();
+          const r_merge = this.parse_and_apply_overlay_statement(labels, local);
+          if (Result.is_err(r_merge)) { return r_merge; }
+          continue;
+        }
+      }
+
+      const r_fragment = this.parse_dto_reference_block(labels);
       if (Result.is_err(r_fragment)) { return r_fragment; }
 
       while (children_map.has(`fragment@${next_fragment}`)) { ++next_fragment; }
@@ -257,11 +279,14 @@ export class Parser {
         continue;
       }
 
-      if (children_map.has(identifier_token.value)) {
-        return Result.Err({
-          message: "Previously defined node with this identifier might conflict",
-          found: identifier_token
-        });
+      // A child defined by an earlier root block is merged into, as in dtc
+      // (an included .dtsi often brings its own `__overrides__`).
+      const existing = children_map.get(identifier_token.value);
+      if (existing) {
+        this.token_stream.advance();
+        const r_merge = this.parse_and_apply_overlay_statement(labels, existing);
+        if (Result.is_err(r_merge)) { return r_merge; }
+        continue;
       }
 
       const r_node = this.parse_node_statement(labels);
@@ -283,9 +308,7 @@ export class Parser {
    * Parse one `&label { ... };` / `&{/path} { ... };` block into a fragment
    * body (target property + `__overlay__`); the caller names and numbers it.
    */
-  private parse_dto_reference_block(): Result<Omit<DeletableNode, "name" | "unit_addr">, ParseError> {
-    const labels = this.parse_labels();
-
+  private parse_dto_reference_block(labels: Array<string>): Result<Omit<DeletableNode, "name" | "unit_addr">, ParseError> {
     const current = this.token_stream.current;
 
     let target_property: DeletableProperty;
@@ -1224,6 +1247,14 @@ function find_node_by_label(root: DeletableNode, label: string): Option<Deletabl
     .map(child => find_node_by_label(child, label))
     // eslint-disable-next-line unicorn/no-array-callback-reference
     .find(Option.is_some) ?? Option.None();
+}
+
+function find_label_in_children(children: Map<string, DeletableNode>, label: string): DeletableNode | undefined {
+  for (const child of children.values()) {
+    const found = find_node_by_label(child, label);
+    if (Option.is_some(found)) { return found.value; }
+  }
+  return undefined;
 }
 
 function find_node_by_path(root: DeletableNode, path: string): Result<Option<DeletableNode>, ParseError> {

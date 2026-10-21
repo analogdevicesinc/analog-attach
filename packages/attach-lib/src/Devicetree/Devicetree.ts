@@ -10,6 +10,7 @@ import {
     DTPath,
     get_full_node_name,
     DTProperty,
+    format_parse_error,
 } from "./Parser";
 
 import path from 'node:path';
@@ -38,7 +39,7 @@ export class DeviceTree {
             const dts = parse_dts(devicetree_content);
 
             if (Result.is_err(dts)) {
-                return "Failed to parse!";
+                return `Failed to parse: ${format_parse_error(dts.error)}`;
             }
 
             return new DeviceTree(dts.value.dts);
