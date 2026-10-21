@@ -72,6 +72,20 @@ driver's init_param in its driver-backed `extra`: its only candidate, or `<drive
 when it has several. Each further `--as` side gets its own
 handle and config, but the same init_param: one chip, several interfaces.
 
+A node bootstrap creates is named after its part and its role there, as a hand-written
+application names them (`name_for()`): `<part>_<role>`, where the part is the root the user
+added that reaches it (the first by name when several do).
+
+| Created for | Role | e.g. `add eval-adxl355-pmdz` |
+|---|---|---|
+| a root's `$init_param` | `cfg` | `adxl355_cfg` |
+| a driver-backed init_param field | `ip` | `adxl355_ip` |
+| any other field, or the union member picked | the field or member | `adxl355_spi_dev`, `adxl355_i2c_dev` |
+| the chip-select pin | the list field | `adxl355_cs_gpio` |
+
+A name already taken gets `_1`, `_2`. A node no root reaches is named after its type. Hidden
+nodes keep the name that identifies the resource (`bsp_spi1_cfg_handle`).
+
 ## Driver-backed fields
 
 A config's `extra` and `ops` name only an interface (`type: driver_init_param, interface:

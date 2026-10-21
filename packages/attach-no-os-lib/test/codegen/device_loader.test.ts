@@ -48,7 +48,7 @@ describe('load_devices', () => {
 
     test('the sensor is brought up from its config struct', () => {
         const sensor = load_devices(sensor_on_otherboard()).find(device => device.descriptor_name === 'sensor');
-        expect(sensor).toMatchObject({ symbol_name: 'test_sensor_config', init_param_type: 'test_sensor_config', init_function: 'test_sensor_init' });
+        expect(sensor).toMatchObject({ symbol_name: 'sensor_cfg', init_param_type: 'test_sensor_config', init_function: 'test_sensor_init' });
     });
 });
 
@@ -89,7 +89,7 @@ describe('parts before channels', () => {
         add_side(workfile, 'test_adc');
         expectOk(bootstrap(workfile));
         add(workfile, 'ch0', 'test_adc_chan');
-        add_side(workfile, 'test_dac', 'dualpart_init_param');
+        add_side(workfile, 'test_dac', 'test_adc_ip');
         expect(order(workfile)).toEqual(['test_adc', 'test_dac', 'ch0']);
     });
 

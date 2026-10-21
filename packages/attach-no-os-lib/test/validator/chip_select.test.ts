@@ -39,20 +39,20 @@ describe('shared chip-selects', () => {
         expect(chip_select_errors(workfile)).toEqual([]);
 
         // The second device was left without one; point it at the first device's pin.
-        expectOk(set_value(workfile, 'test_spi_device_1', 'cs_gpio', 'test_gpio_pin'));
-        expectOk(set_value(workfile, 'test_spi_device_1', 'cs_gpio_num', 1));
-        expect(chip_select_errors(workfile).sort()).toEqual(['test_spi_device.cs_gpio', 'test_spi_device_1.cs_gpio']);
+        expectOk(set_value(workfile, 'second_spi_dev', 'cs_gpio', 'first_cs_gpio'));
+        expectOk(set_value(workfile, 'second_spi_dev', 'cs_gpio_num', 1));
+        expect(chip_select_errors(workfile).sort()).toEqual(['first_spi_dev.cs_gpio', 'second_spi_dev.cs_gpio']);
     });
 
     test('two devices on the same native line of one controller are both flagged', () => {
         const workfile = two_sensors('testboard', FIXTURE_SOC);
-        expectOk(set_value(workfile, 'test_spi_device_1', 'native_cs', 1));
-        expect(chip_select_errors(workfile).sort()).toEqual(['test_spi_device.native_cs', 'test_spi_device_1.native_cs']);
+        expectOk(set_value(workfile, 'second_spi_dev', 'native_cs', 1));
+        expect(chip_select_errors(workfile).sort()).toEqual(['first_spi_dev.native_cs', 'second_spi_dev.native_cs']);
     });
 
     test('different native lines on one controller are fine', () => {
         const workfile = two_sensors('testboard', FIXTURE_SOC);
-        expectOk(set_value(workfile, 'test_spi_device_1', 'native_cs', 2));
+        expectOk(set_value(workfile, 'second_spi_dev', 'native_cs', 2));
         expect(chip_select_errors(workfile)).toEqual([]);
     });
 });

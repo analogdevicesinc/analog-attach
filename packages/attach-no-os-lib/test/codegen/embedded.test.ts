@@ -63,16 +63,16 @@ describe('a struct embedded in another is a part of it', () => {
 
     test('add <driver> pins the struct that embeds it, and bootstrap fills the part in', () => {
         const symbols = stored(otheradc_workfile());
-        expect(symbols['test_adc_config']?.extra).toBe('otheradc_capi_init_param');
-        expect(symbols['otheradc_capi_init_param']?.device).toBe('otheradc_init_param');
-        expect(symbols['otheradc_init_param']).toMatchObject({ rate: 1000, bus: 'bsp_test_spi_cfg_handle' });
+        expect(symbols['adc_cfg']?.extra).toBe('adc_ip');
+        expect(symbols['adc_ip']?.device).toBe('adc_device');
+        expect(symbols['adc_device']).toMatchObject({ rate: 1000, bus: 'bsp_test_spi_cfg_handle' });
     });
 
     test('naming the embedded one as the extra is an error, which says what the driver takes', () => {
         const workfile = otheradc_workfile();
-        expectOk(set_value(workfile, 'test_adc_config', 'extra', 'otheradc_init_param'));
+        expectOk(set_value(workfile, 'adc_cfg', 'extra', 'adc_device'));
         const messages = validate_workfile(workfile).errors.filter(entry => entry.severity === 'error').map(entry => entry.message);
-        expect(messages.join('\n')).toContain("'otheradc_init_param' (otheradc_init_param) is not a test_adc init_param: its driver takes otheradc_capi_init_param");
+        expect(messages.join('\n')).toContain("'adc_device' (otheradc_init_param) is not a test_adc init_param: its driver takes otheradc_capi_init_param");
     });
 });
 
@@ -108,7 +108,7 @@ describe('an embedded struct in the generated C', () => {
         }
         expectOk(bootstrap(workfile));
         expectOk(set_value(workfile, 'ch_b', 'gain', 4));
-        expectOk(set_value(workfile, 'otheradc_capi_init_param', 'channels', ['ch_a', 'ch_b']));
+        expectOk(set_value(workfile, 'adc_ip', 'channels', ['ch_a', 'ch_b']));
         return workfile;
     }
 
@@ -116,8 +116,8 @@ describe('an embedded struct in the generated C', () => {
         const { c, h } = generated(with_channels());
         expect(c).toContain('.device = { .rate = 1000 },');
         expect(c).not.toMatch(/struct otheradc_init_param \w+ = /);
-        expect(h).not.toContain('otheradc_init_param otheradc_init_param');
-        expect(h).toContain('extern struct otheradc_capi_init_param otheradc_capi_init_param;');
+        expect(h).not.toContain('otheradc_init_param adc_device');
+        expect(h).toContain('extern struct otheradc_capi_init_param adc_ip;');
     });
 
     test('an array of them is an array of initializers', () => {
@@ -128,9 +128,9 @@ describe('an embedded struct in the generated C', () => {
 
     test('a handle inside it is patched through the global it lives in', () => {
         const { main } = generated(with_channels());
-        expect(main).toContain('otheradc_capi_init_param.device.bus = bsp_test_spi_cfg_handle;');
+        expect(main).toContain('adc_ip.device.bus = bsp_test_spi_cfg_handle;');
         // Before the ADC is brought up from it.
-        expect(main.indexOf('otheradc_capi_init_param.device.bus')).toBeLessThan(main.indexOf('test_adc_init('));
+        expect(main.indexOf('adc_ip.device.bus')).toBeLessThan(main.indexOf('test_adc_init('));
     });
 });
 

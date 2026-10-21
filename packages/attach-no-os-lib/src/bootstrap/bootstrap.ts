@@ -969,7 +969,7 @@ function apply_chip_select(
 	if (!pin_ruleset.ok) {
 		return pin_ruleset;
 	}
-	const pin = unique_name(workfile, list.include);
+	const pin = name_for(workfile, device, binding.gpio_list, list.include);
 	const added = add_symbol(workfile, pin, pin_ruleset.value);
 	if (!added.ok) {
 		return added;
@@ -1180,8 +1180,59 @@ function unique_name(workfile: Workfile, base: string): string {
 	}
 }
 
+/**
+ * The part a node belongs to: the root the user added (adxl355) whose references reach it.
+ * Several roots reaching it (ad74413r and ad74413r_dac sharing one chip) give the first by
+ * name; none gives undefined. An eval board naming its part does not make the part a child.
+ */
+function part_of(workfile: Workfile, node: string): string | undefined {
+	const referenced = referenced_nodes(workfile);
+	const graph = create_connections_graph(workfile);
+	const roots = Object.keys(workfile.symbols)
+		.filter(name => !referenced.has(name) && !is_hidden(workfile, name) && !is_eval_board(workfile.symbols[name]))
+		.sort();
+	return roots.find(root => {
+		const seen = new Set<string>();
+		const queue = [root];
+		for (let name = queue.shift(); name !== undefined; name = queue.shift()) {
+			if (name === node) {
+				return true;
+			}
+			if (!seen.has(name)) {
+				seen.add(name);
+				queue.push(...child_names(graph, name));
+			}
+		}
+		return false;
+	});
+}
+
+/**
+ * The name for a node bootstrap creates under `parent`: its part and its role there
+ * (adxl355_spi_dev, adxl355_cs_gpio), as a hand-written application names them. A root's
+ * config is its `cfg` and a driver's init_param its `ip`; anything else takes the field, or
+ * the union member, it is linked from. With no part to name it after, it takes its type.
+ */
+function name_for(workfile: Workfile, parent: string, role: string, type_: string): string {
+	const part = part_of(workfile, parent);
+	if (part === undefined) {
+		return unique_name(workfile, type_);
+	}
+	const node = workfile.symbols[parent];
+	const field = node?._t === "RulesetStruct" || node?._t === "RulesetDescriptor"
+		? node.properties.find(property => property.name === role)
+		: undefined;
+	let suffix = role;
+	if (role === "$init_param") {
+		suffix = "cfg";
+	} else if (field?._t === "DriverInitParameterProperty") {
+		suffix = "ip";
+	}
+	return unique_name(workfile, `${part}_${suffix}`);
+}
+
 /** Put the option's node into the workfile if it is not there yet; its name either way. */
-function realize(workfile: Workfile, option: Option, externs: ExternIndex): Result<{ name: string, symbol: string, created: boolean, hidden: boolean }> {
+function realize(workfile: Workfile, option: Option, externs: ExternIndex, name_of_new: (type_: string) => string): Result<{ name: string, symbol: string, created: boolean, hidden: boolean }> {
 	switch (option.kind) {
 		case "existing": {
 			const node = workfile.symbols[option.name];
@@ -1199,7 +1250,7 @@ function realize(workfile: Workfile, option: Option, externs: ExternIndex): Resu
 			if (!loaded.ok) {
 				return loaded;
 			}
-			const name = unique_name(workfile, option.symbol);
+			const name = name_of_new(option.symbol);
 			const added = add_symbol(workfile, name, loaded.value);
 			return added.ok ? ok({ name, symbol: option.symbol, created: true, hidden: false }) : added;
 		}
@@ -1261,7 +1312,7 @@ export function pin_driver(workfile: Workfile, root: string, driver: string, chi
 		if (!loaded.ok) {
 			return loaded;
 		}
-		config = unique_name(workfile, config_type);
+		config = name_for(workfile, root, "cfg", config_type);
 		const added = add_symbol(workfile, config, loaded.value);
 		if (!added.ok) {
 			return added;
@@ -1297,7 +1348,7 @@ export function pin_driver(workfile: Workfile, root: string, driver: string, chi
 			if (!loaded.ok) {
 				return loaded;
 			}
-			name = unique_name(workfile, own_config);
+			name = name_for(workfile, config, "ip", own_config);
 			const added = add_symbol(workfile, name, loaded.value);
 			if (!added.ok) {
 				return added;
@@ -1396,7 +1447,7 @@ export function bootstrap(workfile: Workfile, options: BootstrapOptions = {}): R
 				break;
 			}
 			case "link": {
-				const target = realize(workfile, step.option, externs.value);
+				const target = realize(workfile, step.option, externs.value, type_ => name_for(workfile, step.node, step.member ?? step.property, type_));
 				if (!target.ok) {
 					return target;
 				}
