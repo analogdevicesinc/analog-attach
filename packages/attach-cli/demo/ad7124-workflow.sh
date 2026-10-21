@@ -104,7 +104,7 @@ step "Which buses can host the ADC?" \
     "list parent adi,ad7124-8"
 
 step "Add the device" \
-    "The CLI adds the node under spi0." \
+    "The CLI adds the node under spi0. It warns that the base tree's spidev@0 already sits on chip select 0 (freed below), and lists what is missing: interrupts, with interrupt-parent first, since the controller it names decides how interrupts is written." \
     "add adi,ad7124-8 --parent spi0 --label adc --name adc@0"
 
 step "What does the binding expect?" \
@@ -116,7 +116,7 @@ step "Chip select (reg)" \
     "list value adc reg"
 
 step "Free CS0" \
-    "The base tree's spidev@0 also sits on chip select 0. Disable it so the ADC owns the line." \
+    "As add warned, the base tree's spidev@0 also sits on chip select 0. Disable it so the ADC owns the line." \
     "disable spidev0"
 
 step "Point the interrupt at the GPIO controller" \
