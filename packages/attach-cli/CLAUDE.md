@@ -79,7 +79,7 @@ The value tokens after the property name in `update <path> <prop> <value...>` us
 - Labels that exist in the base tree or overlay (bare or `&label`) → phandle references (`&label`)
 - Unknown words in a cell context → **rejected** with a clear error message
 
-The binding provides only a shape hint (`flag` / `strings` / `cells` / undefined) and never causes a rejection. A value count outside the binding's minItems/maxItems is written with a warning (`count_warning` in `src/item-count.ts`); the same bounds show in the type (`number[2]`, protocol `min_items` / `max_items`). Only value arrays (number, string, enum) have bounds there: phandle and specifier lists and matrices count entries, not cells. `update <path> <prop>` with no value sets a flag or reads the property (see `decide_update`).
+The binding provides only a shape hint (`flag` / `strings` / `cells` / undefined) and never causes a rejection. A value count outside the binding's minItems/maxItems is written with a warning (`count_warning` in `src/item-count.ts`); the same bounds show in the type (`number[2]`, protocol `min_items` / `max_items`). Value arrays (number, string, enum) have bounds there, and so does a specifier list whose entries have a known width (`interrupts` once the lib has shaped it for the interrupt-parent: entries × `#interrupt-cells`, so `[2]` for one gpio interrupt). Lists whose entries name a phandle (clocks, dmas, `*-gpios`) have none, since each entry has as many cells as its provider. `update <path> <prop>` with no value sets a flag or reads the property (see `decide_update`).
 
 ### list command and hidden __list
 

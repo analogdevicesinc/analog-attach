@@ -156,8 +156,10 @@ attach-linux list property spi0/adi,ad7124-8@0
 attach-linux list property spi0/adi,ad7124-8@0 reg
 # An array type carries how many values the binding allows: number[2] is
 # exactly two (diff-channels), number[1..4] a range, number[2..] a minimum
-# (--json: min_items / max_items). Phandle and specifier lists (interrupts,
-# *-gpios) count entries, not cells, so they show none.
+# (--json: min_items / max_items). interrupts counts cells once its
+# interrupt-parent is known: (number, enum(...))[2] under a controller with
+# #interrupt-cells = <2>. Lists that name a phandle (clocks, dmas, *-gpios)
+# show none, since each entry takes as many cells as its provider.
 
 # Get concrete values (from the binding and the base devicetree)
 attach-linux list value spi0/adc interrupts

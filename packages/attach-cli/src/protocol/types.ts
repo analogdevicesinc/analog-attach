@@ -65,7 +65,7 @@ export type Types =
     | { kind: "string" }
     | { kind: "bool" }
     | { kind: "enum"; options: { value: string | number; display_string?: string }[] }
-    /** `min_items` / `max_items`: how many values the binding allows, when it says (value arrays only). */
+    /** `min_items` / `max_items`: how many values (cells) the binding allows, when it says: value arrays, and interrupts once the interrupt-parent is known. */
     | { kind: "array"; items: Types; min_items?: number; max_items?: number }
     | { kind: "tuple"; items: Types[] };
 

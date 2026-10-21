@@ -1,9 +1,12 @@
-import { is_dt_flag, type AttachType, type DTProperty } from "attach-lib";
+import { AttachEnumType, is_dt_flag, type AttachType, type DTProperty } from "attach-lib";
 
 // How many values a binding allows in a property (minItems / maxItems), for
 // the arrays whose items are single values: numbers, strings, enum members.
-// Phandle and specifier lists (`array`) and matrices count entries, not
-// cells (`interrupts = <25 2>` is one entry), so they have no bounds here.
+// A specifier list counts entries (`interrupts = <25 2>` is one), so its
+// bound is in cells only once every entry has a known width: interrupts
+// under a known interrupt-parent. Lists whose entries name a phandle
+// (clocks, dmas, *-gpios) have as many cells as the provider takes, so they
+// have no bounds here.
 
 export interface ItemBounds {
     min: number;
@@ -19,6 +22,14 @@ export function item_bounds(type: AttachType): ItemBounds | undefined {
             const min = type.minItems as number | undefined;
             const max = type.maxItems as number | undefined;
             return max === undefined ? { min: min ?? 0 } : { min: min ?? 0, max };
+        }
+        case "matrix": {
+            const row = type.values[0];
+            if (type.values.length !== 1 || row?._t !== "fixed_index") { return undefined; }
+            if (row.prefixItems.some(item => item._t === "enum" && item.enum_type === AttachEnumType.PHANDLE)) { return undefined; }
+            const width = row.prefixItems.length;
+            const min = (type.minItems as number | undefined ?? 0) * width;
+            return type.maxItems === undefined ? { min } : { min, max: type.maxItems * width };
         }
         default: {
             return undefined;
@@ -61,6 +72,18 @@ if (import.meta.vitest) {
         expect(item_bounds({ _t: "integer" } as AttachType)).toBeUndefined();
     });
 
+    const specifiers = (prefixItems: unknown[], minItems?: number, maxItems?: number): AttachType =>
+        ({ _t: "matrix", minItems, maxItems, values: [{ _t: "fixed_index", prefixItems, minItems: prefixItems.length, maxItems: prefixItems.length }] } as AttachType);
+    const flags = { _t: "enum", enum: ["IRQ_TYPE_EDGE_FALLING"], enum_type: AttachEnumType.MACRO };
+    const phandle = { _t: "enum", enum: ["clk_osc"], enum_type: AttachEnumType.PHANDLE };
+
+    test("item_bounds — a specifier list of a known width counts its cells; one naming a phandle has no bounds", () => {
+        expect(item_bounds(specifiers([{ _t: "number" }, flags], 1, 1))).toEqual({ min: 2, max: 2 });
+        expect(item_bounds(specifiers([{ _t: "number" }, { _t: "number" }, flags], 1, 4))).toEqual({ min: 3, max: 12 });
+        expect(item_bounds(specifiers([{ _t: "number" }, flags]))).toEqual({ min: 0 });
+        expect(item_bounds(specifiers([phandle], 1, 1))).toBeUndefined();
+    });
+
     test("value_count — the cells and the strings, over every group", () => {
         const tree = DeviceTree.new_from_string(`/dts-v1/;
 / {
@@ -87,5 +110,6 @@ if (import.meta.vitest) {
         expect(count_warning("mode", numbers(1, 1), 2)).toBe("warning: mode takes 1 value, got 2");
         expect(count_warning("lanes", numbers(1), 9)).toBeUndefined();
         expect(count_warning("interrupts", { _t: "array", minItems: 1, maxItems: 1 } as AttachType, 2)).toBeUndefined();
+        expect(count_warning("interrupts", specifiers([{ _t: "number" }, flags], 1, 1), 3)).toBe("warning: interrupts takes 2 values, got 3");
     });
 }

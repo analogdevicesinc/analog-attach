@@ -169,6 +169,7 @@ export function attach_type_to_protocol_type(value: AttachType): Types {
             return {
                 kind: "array",
                 items: row === undefined ? { kind: "number", subtype: "int" } : attach_type_to_protocol_type(row),
+                ...item_counts(value),
             };
         }
         default: {
@@ -207,5 +208,20 @@ if (import.meta.vitest) {
             .toEqual({ kind: "number", subtype: "int" });
         expect(attach_type_to_protocol_type({ _t: "array", minItems: 1, maxItems: 2 } as AttachType))
             .toEqual({ kind: "array", items: { kind: "number", subtype: "int" } });
+    });
+
+    test("attach_type_to_protocol_type — interrupts under a known parent count cells", () => {
+        const interrupts = {
+            _t: "matrix",
+            minItems: 1,
+            maxItems: 1,
+            values: [{ _t: "fixed_index", prefixItems: [{ _t: "number" }, { _t: "number" }], minItems: 2, maxItems: 2 }],
+        } as AttachType;
+        expect(attach_type_to_protocol_type(interrupts)).toEqual({
+            kind: "array",
+            items: { kind: "tuple", items: [{ kind: "number", subtype: "int" }, { kind: "number", subtype: "int" }] },
+            min_items: 2,
+            max_items: 2,
+        });
     });
 }
