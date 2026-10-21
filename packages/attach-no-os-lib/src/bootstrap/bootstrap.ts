@@ -675,6 +675,13 @@ function wrapped_extern(workfile: Workfile, handle: unknown): string | undefined
 	return typeof wrapped === "string" && workfile.symbols[wrapped]?._t === "RulesetExtern" ? wrapped : undefined;
 }
 
+/** The board bus a bus device is on: the one reference that names a board handle (its controller). */
+function controller_bus(workfile: Workfile, node: Ruleset | undefined): string | undefined {
+	return node?._t === "RulesetStruct"
+		? node.properties.map(property => wrapped_extern(workfile, property.value)).find(extern => extern !== undefined)
+		: undefined;
+}
+
 /**
  * The chip-select lines every SPI device but `device` already uses: each GPIO pin by its chip
  * port and number, each native line by its controller and bit.
@@ -703,10 +710,7 @@ function taken_chip_selects(workfile: Workfile, device: string, binding: ChipSel
 		}
 
 		const mask = value_of(node, binding.native_mask);
-		// The bus it is on: the one reference that names a board handle (its controller).
-		const peripheral = node._t === "RulesetStruct"
-			? node.properties.map(property => wrapped_extern(workfile, property.value)).find(extern => extern !== undefined)
-			: undefined;
+		const peripheral = controller_bus(workfile, node);
 		if (typeof mask === "number" && peripheral !== undefined) {
 			for (let bit = 0; bit < 32; bit++) {
 				if ((mask & (1 << bit)) !== 0) {
@@ -839,7 +843,7 @@ function parts_on_bus(workfile: Workfile): PartOnBus[] {
 
 /**
  * The next thing the wiring settles for a SPI device without a chip-select: first its bus,
- * if the device's controller is still open; then its chip-select.
+ * if the device's controller is still open; then its chip-select, once the bus is settled.
  */
 function chip_select_step(workfile: Workfile, externs: ExternIndex): Step | undefined {
 	const binding = get_registry();
@@ -862,15 +866,18 @@ function chip_select_step(workfile: Workfile, externs: ExternIndex): Step | unde
 		if (part === undefined) {
 			continue;
 		}
-		const resolved = resolve_bus(part, workfile.board, "spi", [], taken_chip_selects(workfile, device, chip_select));
+		// A controller already set is the bus; the wiring is read from that bus only.
+		const bus = controller_bus(workfile, device_node);
+		const taken = taken_chip_selects(workfile, device, chip_select);
+		const resolved = resolve_bus(part, workfile.board, "spi", bus === undefined ? { taken } : { bus, taken });
 		if (!resolved.ok) {
 			continue;
 		}
 
-		// The bus the part's lines land on decides the controller, where the board alone
-		// could not (two SPI buses means two controller handles to choose from).
+		// Otherwise the bus the part's lines land on decides the controller, where the board
+		// alone could not (two SPI buses means two controller handles to choose from).
 		const peripheral = resolved.value.peripheral;
-		if (peripheral !== undefined) {
+		if (bus === undefined && peripheral !== undefined) {
 			for (const property of device_node.properties) {
 				if (property._t !== "IncludeProperty" || property.value !== undefined || property.cleared === true || property.include === undefined) {
 					continue;
@@ -1048,7 +1055,11 @@ function wiring_of(workfile: Workfile, touched: Set<string>): BusWiring[] {
 		const taken = binding.ok && binding.value.chip_select !== undefined
 			? taken_chip_selects(workfile, device, binding.value.chip_select)
 			: undefined;
-		const resolved = resolve_bus(part, workfile.board, interface_, [], taken);
+		const bus = controller_bus(workfile, workfile.symbols[device]);
+		const resolved = resolve_bus(part, workfile.board, interface_, {
+			...(bus === undefined ? {} : { bus }),
+			...(taken === undefined ? {} : { taken }),
+		});
 		if (!resolved.ok) {
 			continue;
 		}

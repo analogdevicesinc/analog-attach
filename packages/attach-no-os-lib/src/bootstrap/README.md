@@ -142,14 +142,22 @@ drop a reference before bootstrap runs. Commands pass it as `referenced_before`
 
 For a part bound to a bus device, the part's eval-board pinout, the board's pinout and the
 board's board.yml `pins:` together decide where each pin lands (`registry/wiring.ts`). The
-order is: a stated wire, then same-standard mating (a Pmod into a Pmod port), then the
-board's own declaration, which only counts if it names exactly one pin.
+order is: a stated wire (nothing states one yet), then same-standard mating (a Pmod into a
+Pmod port), then the board's own declaration, which only counts if it names exactly one pin.
 
-For SPI, that also settles the chip-select: a native line of the controller, or a GPIO pin
-node on the right port. Lines another SPI device already uses are skipped. A GPIO is one
-physical pin, so it is taken whatever bus it selects for. A native line is taken only on
-its own controller. When no free line is left, bootstrap stops and lists free header pins
-as hints. `validate` flags two devices that share a chip-select, however they got there.
+The bus comes first. When the device's controller is already set (by bootstrap, or the user
+picking one of two buses), only that bus's declarations count, and a line that lands on
+another bus is reported. Otherwise the bus is the one the data lines land on, and it links
+the controller.
+
+For SPI, once the data lines settle the bus without a problem, the wiring settles the
+chip-select too: a native line of the controller, or a GPIO pin node on the right port. If
+they do not, the chip-select is left unset and the `$any_of` stays unmet, since on an
+unsettled bus it would select nothing that works. Lines another SPI device already uses
+are skipped. A GPIO is one physical pin, so it is taken whatever bus it selects for. A
+native line is taken only on its own controller. When no free line is left, bootstrap
+stops and lists free header pins as hints. `validate` flags two devices that share a
+chip-select, however they got there.
 
 The chip-select fields follow the wiring, not the fill rule, so step 1 leaves them alone.
 Only an eval-board node in the workfile wires a part, and its `part` link is not a

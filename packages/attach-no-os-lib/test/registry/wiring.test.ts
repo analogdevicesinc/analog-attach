@@ -200,7 +200,7 @@ describe('resolving the bus and its chip-select', () => {
 
     test('a chip-select wired to a header GPIO becomes that GPIO, on its BSP port', () => {
         // Data lines still mate; only CS is moved, as jumper wiring often does.
-        const resolved = resolve_bus(part(), FIXTURE_BOARD, 'spi', [wire('P1.1', 'H1.1')]);
+        const resolved = resolve_bus(part(), FIXTURE_BOARD, 'spi', { wires: [wire('P1.1', 'H1.1')] });
         expectOk(resolved);
         expect(resolved.value.problems).toEqual([]);
         expect(resolved.value.chip_select).toEqual({
@@ -212,7 +212,7 @@ describe('resolving the bus and its chip-select', () => {
     });
 
     test('a GPIO on a port the BSP does not configure is resolved, and the gap reported', () => {
-        const resolved = resolve_bus(part(), FIXTURE_BOARD, 'spi', [wire('P1.1', 'H1.2')]);
+        const resolved = resolve_bus(part(), FIXTURE_BOARD, 'spi', { wires: [wire('P1.1', 'H1.2')] });
         expectOk(resolved);
         expect(resolved.value.chip_select).toEqual({
             kind: 'gpio',
@@ -224,16 +224,48 @@ describe('resolving the bus and its chip-select', () => {
     });
 
     test('a chip-select on a pin that is neither is reported, with options offered', () => {
-        const resolved = resolve_bus(part(), FIXTURE_BOARD, 'spi', [wire('P1.1', 'H1.3')]);
+        const resolved = resolve_bus(part(), FIXTURE_BOARD, 'spi', { wires: [wire('P1.1', 'H1.3')] });
         expectOk(resolved);
         expect(resolved.value.chip_select?.kind).toBe('unwired');
         expect(resolved.value.problems.join('\n')).toContain('neither a native chip-select nor a GPIO');
     });
 
     test('a clock wired to a pin that carries none is reported', () => {
-        const resolved = resolve_bus(part(), FIXTURE_BOARD, 'spi', [wire('P1.4', 'H1.1')]);
+        const resolved = resolve_bus(part(), FIXTURE_BOARD, 'spi', { wires: [wire('P1.4', 'H1.1')] });
         expectOk(resolved);
         expect(resolved.value.problems.join('\n')).toContain('P1 pin 4 (sck) lands on testboard H1 pin 1, which carries no spi sck');
+        // A bus the data lines do not settle gets no chip-select: it would select nothing that works.
+        expect(resolved.value.chip_select?.kind).toBe('unwired');
+        expect(resolved.value.connections.map(connection => connection.role)).not.toContain('spi_cs');
+    });
+
+    test('a known bus limits the declaration to that bus', () => {
+        // twobusboard declares a full set of pins for both buses: on its own the declaration
+        // is two pins per signal, a question. The device's controller answers it.
+        const open = resolve_bus(part(), 'twobusboard', 'spi');
+        expectOk(open);
+        expect(open.value.peripheral).toBeUndefined();
+        expect(open.value.problems.join('\n')).toContain('2 spi sck pins');
+
+        const known = resolve_bus(part(), 'twobusboard', 'spi', { bus: 'bsp_test_spi2_cfg' });
+        expectOk(known);
+        expect(known.value.problems).toEqual([]);
+        expect(known.value.peripheral).toBe('bsp_test_spi2_cfg');
+        expect(known.value.connections.map(connection => `${connection.from.pin}->${connection.to.connector}.${connection.to.pin}`))
+            .toEqual(['2->H1.6', '3->H1.7', '4->H1.5', '1->H1.8']);
+        expect(known.value.chip_select).toMatchObject({ kind: 'gpio', gpio: { port: 'OTHER_GPIO1', number: 8 } });
+    });
+
+    test('a line landing off the controller\'s bus is a problem, and leaves the chip-select unset', () => {
+        // Wired onto bsp_test_spi_cfg's pins while the device's controller is the other bus.
+        const resolved = resolve_bus(part(), 'otherboard', 'spi', {
+            bus: 'bsp_test_spi2_cfg',
+            wires: [wire('P1.2', 'H1.2'), wire('P1.3', 'H1.3'), wire('P1.4', 'H1.1')],
+        });
+        expectOk(resolved);
+        expect(resolved.value.problems.join('\n'))
+            .toContain("P1 pin 4 (sck) lands on otherboard H1 pin 1, which is bsp_test_spi_cfg's sck, but the device's controller is bsp_test_spi2_cfg");
+        expect(resolved.value.chip_select?.kind).toBe('unwired');
     });
 
     test('jumper-wired, nothing stated: the board declaration settles every line', () => {
@@ -252,7 +284,7 @@ describe('resolving the bus and its chip-select', () => {
     });
 
     test('the connections are the wiring instructions, each saying how it was decided', () => {
-        const resolved = resolve_bus(part(), 'otherboard', 'spi', [wire('P1.1', 'H1.5')]);
+        const resolved = resolve_bus(part(), 'otherboard', 'spi', { wires: [wire('P1.1', 'H1.5')] });
         expectOk(resolved);
 
         const instructions = resolved.value.connections.map(
@@ -313,7 +345,7 @@ describe('resolving the bus and its chip-select', () => {
 
     test('options list the bus native chip-select ahead of plain GPIOs', () => {
         // Data on the PMOD, CS wired somewhere that cannot drive it, so options are offered.
-        const resolved = resolve_bus(part(), FIXTURE_BOARD, 'spi', [wire('P1.1', 'H1.3')]);
+        const resolved = resolve_bus(part(), FIXTURE_BOARD, 'spi', { wires: [wire('P1.1', 'H1.3')] });
         expectOk(resolved);
         const chip_select = resolved.value.chip_select;
         if (chip_select?.kind !== 'unwired') { throw new Error('expected an unwired chip-select'); }
