@@ -1,16 +1,14 @@
 import type { StaleReason } from "./config/cache";
 
 // Progress lines for slow cache builds (the compat index, the validation
-// schemas, the overlay index). They go to stderr in every mode, so stdout and
-// --json responses stay clean; shell completion never builds a cache, so it
-// never prints them.
+// schemas). They go to stderr in every mode, so stdout and --json responses
+// stay clean; shell completion never builds a cache, so it never prints them.
 
-export type CacheSubject = "index" | "schemas" | "overlays";
+export type CacheSubject = "index" | "schemas";
 
 const REBUILD: Record<CacheSubject, { first: string; sources: string; changed: string; action: string }> = {
     index: { first: "Indexing device bindings", sources: "Bindings", changed: "the last index", action: "re-indexing" },
     schemas: { first: "Compiling binding schemas for validation", sources: "Bindings", changed: "the last schema build", action: "recompiling binding schemas" },
-    overlays: { first: "Indexing overlays", sources: "Overlays", changed: "the last overlay index", action: "re-indexing overlays" },
 };
 
 /** The line printed before a cache is (re)built, saying why. */
@@ -78,12 +76,6 @@ if (import.meta.vitest) {
             .toBe("Linux tree changed (/a → /b), recompiling binding schemas...");
     });
 
-    test("rebuild_message - the overlay index", () => {
-        expect(rebuild_message("overlays", { kind: "missing" })).toBe("Indexing overlays (first run)...");
-        expect(rebuild_message("overlays", { kind: "stale" })).toBe("Overlays changed since the last overlay index, re-indexing overlays...");
-        expect(rebuild_message("overlays", { kind: "linux-changed", from: "/a", to: "/b" }))
-            .toBe("Linux tree changed (/a → /b), re-indexing overlays...");
-    });
 
     test("format_duration - tenths under 10s, seconds, then minutes", () => {
         expect(format_duration(4200)).toBe("4.2s");

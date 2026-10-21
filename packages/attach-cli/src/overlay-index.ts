@@ -1,43 +1,34 @@
 import * as fs from "node:fs";
 import path from "node:path";
 
-import { load_overlay_index, save_overlay_index, type OverlayEntry, type OverlayIndex, type StaleReason } from "./config/cache";
-import { format_duration, rebuild_message, start_progress } from "./progress";
-import { can_build_index, index_action } from "./utilities";
-
 // The overlays in the Linux tree, indexed by the compatibles of the devices
 // they add. A text scan, so no file is preprocessed: compatibles are always
 // literal strings. Each file also records its root `compatible`, the boards it
 // is meant for, which `list overlay` compares with the base (src/board-fit.ts).
-// Cached in .attach-linux/overlay-index.json and rebuilt when an overlay file
-// is added, removed or newer than the index.
+// Built on every call (about 10 ms for the 549 overlays of an RPi tree), so it
+// is never stale, whatever file an overlay includes.
 
-/**
- * Load the overlay index, building it when missing or stale. Shell completion
- * never builds it: no index gives an empty one, a stale one is used as is.
- */
-export function get_or_build_overlay_index(linux: string): OverlayIndex {
-    const loaded = load_overlay_index();
-    const allowed = can_build_index();
-    const files = allowed ? overlay_files(linux) : [];
-    const reason = allowed ? overlay_index_stale_reason(loaded, linux, files) : undefined;
-    switch (index_action(loaded, reason, allowed)) {
-        case "use": { return loaded!; }
-        case "empty": { return { generated_at: 0, linux, files: {} }; }
-        case "build": { break; }
-    }
+/** The overlays of a Linux tree. */
+export interface OverlayIndex {
+    linux: string;
+    /** Keyed by the path relative to the Linux tree. */
+    files: Record<string, OverlayEntry>;
+}
 
-    const started = Date.now();
-    const progress = start_progress(rebuild_message("overlays", reason ?? { kind: "missing" }));
-    const entries: Record<string, OverlayEntry> = {};
-    for (const [done, file] of files.entries()) {
-        entries[file] = scan_overlay(read_overlay_source(path.join(linux, file)));
-        progress.update(done + 1, files.length);
+export interface OverlayEntry {
+    /** Compatibles of the nodes the overlay adds or changes. */
+    devices: string[];
+    /** The overlay's root `compatible`; absent when it has none. */
+    board?: string[];
+}
+
+/** Scan every overlay of the Linux tree. */
+export function overlay_index(linux: string): OverlayIndex {
+    const files: Record<string, OverlayEntry> = {};
+    for (const file of overlay_files(linux)) {
+        files[file] = scan_overlay(read_overlay_source(path.join(linux, file)));
     }
-    const index: OverlayIndex = { generated_at: Date.now(), linux, files: entries };
-    save_overlay_index(index);
-    progress.done(`Indexed ${files.length} overlays in ${format_duration(Date.now() - started)}`);
-    return index;
+    return { linux, files };
 }
 
 /** The overlay sources of a Linux tree: the RPi `*-overlay.dts` files and every `.dtso`, relative to it. */
@@ -90,16 +81,6 @@ export function scan_overlay(text: string): OverlayEntry {
         }
     }
     return { devices: [...devices], ...(board.length === 0 ? {} : { board }) };
-}
-
-/** Why the overlay index has to be (re)built for this tree and its overlay files, if it does. */
-export function overlay_index_stale_reason(index: OverlayIndex | undefined, linux: string, files: string[]): StaleReason | undefined {
-    if (index?.files === undefined || typeof index.generated_at !== "number") { return { kind: "missing" }; }
-    if (path.resolve(index.linux) !== path.resolve(linux)) { return { kind: "linux-changed", from: index.linux, to: linux }; }
-    const indexed = index.files;
-    if (Object.keys(indexed).length !== files.length || files.some(file => indexed[file] === undefined)) { return { kind: "stale" }; }
-    const newer = files.some(file => fs.statSync(path.join(linux, file)).mtimeMs > index.generated_at);
-    return newer ? { kind: "stale" } : undefined;
 }
 
 /** The overlays that add a node with `compatible`, by relative path. */
@@ -217,29 +198,8 @@ if (import.meta.vitest) {
         }
     });
 
-    test("overlay_index_stale_reason — missing, another tree, files added or newer, current", () => {
-        const linux = fs.mkdtempSync(path.join(os.tmpdir(), "attach-overlays-"));
-        try {
-            const file = "arch/arm/boot/dts/overlays/a-overlay.dts";
-            fs.mkdirSync(path.join(linux, path.dirname(file)), { recursive: true });
-            fs.writeFileSync(path.join(linux, file), "");
-            const future = Date.now() + 60_000;
-            const index = (generated_at: number, files: string[]): OverlayIndex =>
-                ({ generated_at, linux, files: Object.fromEntries(files.map(f => [f, { devices: [] }])) });
-            expect(overlay_index_stale_reason(undefined, linux, [file])).toEqual({ kind: "missing" });
-            expect(overlay_index_stale_reason({ ...index(future, [file]), linux: "/elsewhere" }, linux, [file]))
-                .toEqual({ kind: "linux-changed", from: "/elsewhere", to: linux });
-            expect(overlay_index_stale_reason(index(future, []), linux, [file])).toEqual({ kind: "stale" });
-            expect(overlay_index_stale_reason(index(0, [file]), linux, [file])).toEqual({ kind: "stale" });
-            expect(overlay_index_stale_reason(index(future, [file]), linux, [file])).toBeUndefined();
-        } finally {
-            fs.rmSync(linux, { recursive: true });
-        }
-    });
-
     test("overlays_with — the files adding the compatible, sorted", () => {
         const index: OverlayIndex = {
-            generated_at: 0,
             linux: "/linux",
             files: {
                 "b-overlay.dts": { devices: ["adi,ad7124-8"] },

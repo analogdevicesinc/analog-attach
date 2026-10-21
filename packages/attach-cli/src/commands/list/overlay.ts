@@ -1,10 +1,9 @@
 import path from "node:path";
 
 import type { LocalContext } from "../../context";
-import type { OverlayIndex } from "../../config/cache";
 import { load_workspace } from "../../config/workspace";
 import { board_fit, type Fit } from "../../board-fit";
-import { get_or_build_overlay_index, overlays_with } from "../../overlay-index";
+import { overlay_index, overlays_with, type OverlayIndex } from "../../overlay-index";
 import { input_error, respond } from "../../protocol/output";
 import type { ListOverlayResponse, OverlayDescription } from "../../protocol/types";
 import { node_compatibles } from "../../utilities";
@@ -21,7 +20,7 @@ export async function list_overlay(context_: LocalContext, arguments_: string[])
     if (workspace === undefined) { return; }
     const { linux } = workspace.bindings;
     const root = workspace.base.tree.node_at("/");
-    const rows = overlay_rows(get_or_build_overlay_index(linux), compatible, root === undefined ? [] : node_compatibles(root));
+    const rows = overlay_rows(overlay_index(linux), compatible, root === undefined ? [] : node_compatibles(root));
 
     if (context_.json) {
         const response: ListOverlayResponse = {
@@ -58,7 +57,6 @@ if (import.meta.vitest) {
     const { test, expect } = import.meta.vitest;
 
     const index: OverlayIndex = {
-        generated_at: 0,
         linux: "/linux",
         files: {
             "arch/arm64/boot/dts/xilinx/zynqmp-ad7124.dtso": { devices: ["adi,ad7124-8"], board: ["xlnx,zynqmp"] },

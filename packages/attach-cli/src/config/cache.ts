@@ -17,21 +17,6 @@ export interface CompatIndex extends CacheStamp {
     entries: Record<string, string>;
 }
 
-/** The overlays of a Linux tree (src/overlay-index.ts). */
-export interface OverlayIndex {
-    generated_at: number;
-    linux: string;
-    /** Keyed by the path relative to the Linux tree. */
-    files: Record<string, OverlayEntry>;
-}
-
-export interface OverlayEntry {
-    /** Compatibles of the nodes the overlay adds or changes. */
-    devices: string[];
-    /** The overlay's root `compatible`; absent when it has none. */
-    board?: string[];
-}
-
 export function get_latest_mtime(directory: string): number {
     if (!fs.existsSync(directory)) {
         return 0;
@@ -104,16 +89,6 @@ export function save_compat_index(entries: Record<string, string>, linux: string
     const index: CompatIndex = { generated_at: Date.now(), linux, dt_schema, entries };
     write_json(compat_index_path(), index);
     return compat_index_path();
-}
-
-const overlay_index_path = (): string => path.join(config_directory(), "overlay-index.json");
-
-export function load_overlay_index(): OverlayIndex | undefined {
-    return read_json<OverlayIndex>(overlay_index_path());
-}
-
-export function save_overlay_index(index: OverlayIndex): void {
-    write_json(overlay_index_path(), index);
 }
 
 /** Where `dt-mk-schema` output is cached; its stamp sits next to it. */

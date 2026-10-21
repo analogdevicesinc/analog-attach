@@ -12,11 +12,10 @@ import {
 } from "attach-lib";
 
 import type { LocalContext } from "../../context";
-import type { OverlayIndex } from "../../config/cache";
 import { config_directory, read_settings } from "../../config/settings";
 import { load_workspace, report_config_errors } from "../../config/workspace";
 import { board_fit } from "../../board-fit";
-import { get_or_build_overlay_index, scan_overlay } from "../../overlay-index";
+import { overlay_index, scan_overlay, type OverlayIndex } from "../../overlay-index";
 import { respond, respond_fail } from "../../protocol/output";
 import type { ImportResponse, UnresolvedTargetEntry } from "../../protocol/types";
 import { node_compatibles, run_preprocess } from "../../utilities";
@@ -67,7 +66,7 @@ async function run_import(context: LocalContext, name: string): Promise<void> {
     const given = path.resolve(name);
     const found = fs.statSync(given, { throwIfNoEntry: false })?.isFile() === true
         ? { kind: "found" as const, file: given }
-        : find_overlay(get_or_build_overlay_index(linux), name);
+        : find_overlay(overlay_index(linux), name);
     if (found.kind === "none") {
         fail(`No overlay named ${name} in ${linux} (list overlay <compatible> finds them), and no such file`);
         return;
@@ -256,7 +255,6 @@ if (import.meta.vitest) {
 
     test("find_overlay — by path in the tree, file name or stem; several matches are ambiguous", () => {
         const index: OverlayIndex = {
-            generated_at: 0,
             linux: "/linux",
             files: {
                 "arch/arm/boot/dts/overlays/ad7124-overlay.dts": { devices: [] },
