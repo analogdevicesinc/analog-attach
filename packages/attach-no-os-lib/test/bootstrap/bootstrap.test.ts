@@ -546,6 +546,25 @@ describe('the chip-select', () => {
         expect(wiring?.problems.join('\n')).toContain('2 spi sck pins');
     });
 
+    test('on a board with two wired SPI buses, the controller the user picks settles the chip-select', () => {
+        const workfile = workfile_with('test_sensor', 'twobusboard', 'othersoc');
+        expectOk(bootstrap(workfile));
+        expectOk(set_value(workfile, 'test_spi_device', 'controller', 'bsp_test_spi2_cfg_handle'));
+
+        const report = bootstrap(workfile);
+        expectOk(report);
+        const symbols = stored(workfile);
+        expect(symbols['test_spi_device']?.controller).toBe('bsp_test_spi2_cfg_handle');
+        expect(symbols['test_spi_device']?.cs_gpio).toBe('test_gpio_pin');
+        expect(symbols['test_gpio_pin']?.number).toBe(8);
+
+        // The wiring is read from the picked bus only, so it no longer asks.
+        const [wiring] = report.value.wiring;
+        expect(wiring?.problems).toEqual([]);
+        expect(wiring?.connections.map(connection => `${connection.from.pin}->${connection.to.connector}.${connection.to.pin}`))
+            .toEqual(['2->H1.6', '3->H1.7', '4->H1.5', '1->H1.8']);
+    });
+
     test('a workfile with nothing left open reports no choices', () => {
         const workfile = workfile_with('test_sensor');
         const report = bootstrap(workfile);

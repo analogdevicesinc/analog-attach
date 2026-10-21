@@ -9,7 +9,8 @@
  *
  * A pin on the part LANDS on a pin of the board one of three ways, in this order:
  *
- *   1. a stated wire                 the user said where it goes
+ *   1. a stated wire                 said where it goes; nothing states one yet, so
+ *                                    this is for tests and a future command
  *   2. mating                        both connectors follow the same standard (both
  *                                    `pmod_12`), so pin N goes to pin N
  *   3. the board's own declaration   the board's BSP declares exactly ONE pin for that
@@ -24,6 +25,11 @@
  * Once a pin has landed, the board's own files say what it is: a GPIO on some port, and/or
  * a signal of some bus. From that the bus a part sits on, and how its chip-select is
  * driven, follow without the user ever naming a GPIO number.
+ *
+ * The bus comes first. When the device's controller is already set, that is the bus: only
+ * its declarations count, and a line landing elsewhere is a problem. Otherwise it is the
+ * one bus the data lines land on. The chip-select is only worked out once the data lines
+ * have settled the bus without a problem.
  */
 
 import type { Result } from "../ruleset_parser/result";
@@ -268,7 +274,7 @@ function part_pins_with_role(part: ModuleInfo, role: string): PinReference[] {
 
 /**
  * The pins a board's BSP declares for one signal of one kind of bus, deduplicated - limited
- * to one bus when the part's data lines have already settled which.
+ * to one bus when it is already known (the device's controller, or the data lines).
  */
 function declared_pins(buses: BusPins[], kind: string, signal: string, peripheral?: string): PinReference[] {
 	const pins: PinReference[] = [];
@@ -283,6 +289,13 @@ function declared_pins(buses: BusPins[], kind: string, signal: string, periphera
 		}
 	}
 	return pins;
+}
+
+/** The buses whose board.yml `pins:` put `signal` on the board pin `at`. */
+function buses_declaring(buses: BusPins[], kind: string, signal: string, at: PinReference): string[] {
+	return buses
+		.filter(bus => bus.kind === kind && bus.signals.some(declared => declared.signal === signal && same_reference(declared.at, at)))
+		.map(bus => bus.peripheral);
 }
 
 /**
@@ -362,20 +375,35 @@ export function free_chip_select_pins(board_name: string, taken: TakenChipSelect
 	return ok(chip_select_options(board.value, buses.value, undefined, taken));
 }
 
+export interface ResolveBusOptions {
+	/**
+	 * The board bus the device is already on: its controller, set by bootstrap or the user.
+	 * Every declaration is then read from that bus only, and a line landing on another bus
+	 * is a problem. Without it, the bus is whatever the lines land on.
+	 */
+	bus?: string,
+	/** Stated connections, which win over mating and the declaration. Nothing states one yet. */
+	wires?: Wire[],
+	/** Chip-select lines other devices already use. */
+	taken?: TakenChipSelects,
+}
+
 /**
  * Which board bus a part's bus lines land on, and - for SPI - how its chip-select is driven.
  *
  * `interface_` is the role prefix: `spi` reads the part's spi_sck/spi_mosi/spi_miso/spi_cs
- * pins, `i2c` its i2c_scl/i2c_sda. Each data line lands on a board pin; the bus is whatever
- * peripheral those pins carry the matching signal of, and they must agree on one.
+ * pins, `i2c` its i2c_scl/i2c_sda. Each data line lands on a board pin, and the bus is the
+ * peripheral those pins carry the matching signal of: they must agree on one, and on
+ * `options.bus` when it is given. A chip-select is only worked out once the data lines have
+ * settled the bus without a problem: on an unsettled bus it would select nothing that works.
  */
 export function resolve_bus(
 	part: ModuleInfo,
 	board_name: string,
 	interface_: string,
-	wires: Wire[] = [],
-	taken: TakenChipSelects = NOTHING_TAKEN,
+	options: ResolveBusOptions = {},
 ): Result<BusResolution> {
+	const { bus, wires = [], taken = NOTHING_TAKEN } = options;
 	const board = find_board(board_name);
 	if (!board.ok) {
 		return board;
@@ -398,26 +426,34 @@ export function resolve_bus(
 	for (const role of new Set(data_roles)) {
 		const signal = role.slice(prefix.length);
 		for (const from of part_pins_with_role(part, role)) {
-			const declared = declared_pins(buses.value, interface_, signal);
-			const landing = land_or_declared(part, board.value, from, wires, declared, `${interface_} ${signal} pin`);
+			const declared = declared_pins(buses.value, interface_, signal, bus);
+			const what = bus === undefined ? `${interface_} ${signal} pin` : `${signal} pin on ${bus}`;
+			const landing = land_or_declared(part, board.value, from, wires, declared, what);
 			if (landing.kind === "unwired") {
 				problems.push(`${part.name} ${show(from)} (${signal}): ${landing.reason}`);
 				continue;
 			}
 			connections.push({ from, role, to: landing.to, via: landing.via });
 
-			const pin = describe_board_pin(board_name, landing.to);
-			if (!pin.ok) {
-				return pin;
+			// Found by the declaration, the pin came with its bus. Mated or wired, it is only a
+			// position, so look up which bus board.yml puts this signal on there, if any.
+			if (landing.via !== "board") {
+				const exists = describe_board_pin(board_name, landing.to);
+				if (!exists.ok) {
+					return exists;
+				}
 			}
-
-			const carriers = pin.value.signals.filter(candidate => candidate.signal === signal && candidate.kind === interface_);
+			const carriers = buses_declaring(buses.value, interface_, signal, landing.to);
 			if (carriers.length === 0) {
 				problems.push(`${part.name} ${show(from)} (${signal}) lands on ${board_name} ${show(landing.to)}, which carries no ${interface_} ${signal}`);
 				continue;
 			}
-			for (const carrier of carriers) {
-				peripherals.add(carrier.peripheral);
+			if (bus !== undefined && !carriers.includes(bus)) {
+				problems.push(`${part.name} ${show(from)} (${signal}) lands on ${board_name} ${show(landing.to)}, which is ${carriers.join(", ")}'s ${signal}, but the device's controller is ${bus}`);
+				continue;
+			}
+			for (const carrier of bus === undefined ? carriers : [bus]) {
+				peripherals.add(carrier);
 			}
 		}
 	}
@@ -431,7 +467,22 @@ export function resolve_bus(
 		return ok({ peripheral, connections, problems });
 	}
 
-	const chip_select = resolve_chip_select(part, board.value, buses.value, peripheral, wires, connections, problems, taken);
+	// Data lines that did not settle one bus cleanly leave the chip-select to the user. A part
+	// with no data lines at all has nothing to settle, and says so from its chip-select.
+	if (problems.length > 0) {
+		return ok({
+			peripheral,
+			chip_select: {
+				kind: "unwired",
+				reason: `left unset, since the ${interface_} lines above do not settle one bus`,
+				options: chip_select_options(board.value, buses.value, peripheral ?? bus, taken),
+			},
+			connections,
+			problems,
+		});
+	}
+
+	const chip_select = resolve_chip_select(part, board.value, buses.value, peripheral ?? bus, wires, connections, problems, taken);
 	if (!chip_select.ok) {
 		return chip_select;
 	}

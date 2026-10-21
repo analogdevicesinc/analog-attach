@@ -104,7 +104,7 @@ export {
 } from "./registry/drivers";
 export type { BoardExterns, SkippedKind, BspKindProblem, PinReference, BusSignal, BusPins } from "./registry/bsp";
 export { find_eval_board, describe_board_pin, land, resolve_bus } from "./registry/wiring";
-export type { Wire, PinSignal, BoardPin, Landing, ChipSelect, BusResolution } from "./registry/wiring";
+export type { Wire, PinSignal, BoardPin, Landing, ChipSelect, BusResolution, ResolveBusOptions } from "./registry/wiring";
 export type { ConnectionGraph, SymbolReference, ReferenceKind } from "./validator/types";
 export { get_connected_symbols } from "./validator/connection_graph";
 export { validate_workfile } from "./validator/validator";
