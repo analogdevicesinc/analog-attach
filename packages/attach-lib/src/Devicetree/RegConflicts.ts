@@ -1,6 +1,7 @@
 import { DeviceTree } from "./Devicetree.js";
 import { DeviceTreeOverlay } from "./DevicetreeOverlay.js";
-import { type DTNode, type DTProperty, is_dt_flag } from "./Parser/AST.js";
+import { number_property } from "./Access.js";
+import { type CellArrayElement, type DTNode, type DTProperty, is_dt_flag } from "./Parser/AST.js";
 import { PropertyBuilder } from "./PropertyBuilder.js";
 import { address_cells_of } from "./UnitAddress.js";
 
@@ -13,6 +14,18 @@ export interface RegConflict {
     address: bigint;
     /** Whether the overlay adds each node or sets its reg or status; false means its claim comes from the base tree. */
     in_overlay: [boolean, boolean];
+}
+
+/** An enabled device whose chip select has no entry in its controller's `cs-gpios`. */
+export interface ChipSelectOverflow {
+    parent_path: string;
+    /** The device's full name (name@unit). */
+    node: string;
+    chip_select: bigint;
+    /** How many entries the controller's `cs-gpios` has: chip selects 0 to lines - 1. */
+    lines: number;
+    /** Whether the overlay adds the node or sets its reg or status; false means its claim comes from the base tree. */
+    in_overlay: boolean;
 }
 
 export interface RegEntry {
@@ -102,6 +115,78 @@ export function sibling_reg_conflicts(overlay: DeviceTreeOverlay, parent_path: s
         }
     }
     return conflicts;
+}
+
+/**
+ * Enabled devices whose chip select has no entry in their controller's
+ * `cs-gpios`, in the whole tree. Only controllers with a `cs-gpios` are
+ * checked: without one the chip selects are the controller's own, and how
+ * many it has is up to the driver.
+ */
+export function chip_select_overflows(overlay: DeviceTreeOverlay): ChipSelectOverflow[] {
+    const overflows: ChipSelectOverflow[] = [];
+    const walk = (path: string): void => {
+        overflows.push(...sibling_chip_select_overflows(overlay, path));
+        for (const name of overlay.effective_children(path).keys()) {
+            walk(path === "/" ? `/${name}` : `${path}/${name}`);
+        }
+    };
+    walk("/");
+    return overflows;
+}
+
+/** The overflows among the children of one controller (see `chip_select_overflows`). */
+export function sibling_chip_select_overflows(overlay: DeviceTreeOverlay, parent_path: string): ChipSelectOverflow[] {
+    const cs_gpios = overlay.effective_node(parent_path)?.properties.find(p => p.name === "cs-gpios");
+    const lines = cs_gpios === undefined ? undefined : gpio_specifier_count(overlay, cs_gpios);
+    if (lines === undefined) { return []; }
+
+    const cells = address_cells_of(overlay, parent_path);
+    const child_path = (name: string): string => parent_path === "/" ? `/${name}` : `${parent_path}/${name}`;
+
+    const overflows: ChipSelectOverflow[] = [];
+    for (const [name, child] of overlay.effective_children(parent_path)) {
+        if (!is_active(child)) { continue; }
+        const reg = child.properties.find(p => p.name === "reg");
+        const entries = reg === undefined ? undefined : reg_entries(reg, cells.address, cells.size);
+        const entry = entries?.find(e => e.address >= BigInt(lines));
+        if (entry === undefined) { continue; }
+        overflows.push({ parent_path, node: name, chip_select: entry.address, lines, in_overlay: changes_claim(overlay, child_path(name)) });
+    }
+    return overflows;
+}
+
+/**
+ * How many entries a GPIO specifier list has: a phandle followed by its
+ * provider's `#gpio-cells`, or a lone 0 (in `cs-gpios`, the controller's own
+ * chip select). Undefined when a provider or its cell count is unknown.
+ */
+function gpio_specifier_count(overlay: DeviceTreeOverlay, property: DTProperty): number | undefined {
+    if (is_dt_flag(property.value)) { return undefined; }
+    const elements: CellArrayElement[] = [];
+    for (const value of property.value) {
+        if (value.kind !== "array") { return undefined; }
+        elements.push(...value.elements);
+    }
+
+    let count = 0;
+    let index = 0;
+    while (index < elements.length) {
+        const element = elements[index];
+        if (element?.kind === "number" && element.value === 0n) {
+            index += 1;
+        } else if (element?.kind === "label" || element?.kind === "path") {
+            const provider = overlay.get_base_dts()?.locate(element.kind === "label" ? element.name : element.path);
+            const provider_node = provider === undefined ? undefined : overlay.effective_node(provider.path);
+            const gpio_cells = provider_node === undefined ? undefined : number_property(provider_node, "#gpio-cells");
+            if (gpio_cells === undefined) { return undefined; }
+            index += 1 + Number(gpio_cells);
+        } else {
+            return undefined;
+        }
+        count += 1;
+    }
+    return count;
 }
 
 /**
@@ -246,5 +331,36 @@ if (import.meta.vitest) {
         ]);
         expect(sibling_reg_conflicts(overlay, "/soc/spi@7e204000")).toEqual([]);
         expect(sibling_reg_conflicts(overlay, "/soc/spi@7e204000/adc@1")).toHaveLength(1);
+    });
+
+    const cs_base = (cs_gpios: string): string => `\tgpio: gpio@7e200000 { gpio-controller; #gpio-cells = <2>; };\n\tsoc {\n\t\tspi0: spi@7e204000 {\n\t\t\t#address-cells = <1>;\n\t\t\t#size-cells = <0>;\n${cs_gpios}\n\t\t\tspidev@0 { reg = <0>; };\n\t\t};\n\t};`;
+
+    test("chip_select_overflows — a chip select past the cs-gpios entries", () => {
+        const overlay = setup(cs_base("\t\t\tcs-gpios = <&gpio 8 1>, <&gpio 7 1>;"), "&spi0 {\n\tadc@1 { reg = <1>; };\n\tadc@2 { reg = <2>; };\n};");
+        expect(chip_select_overflows(overlay)).toEqual([
+            { parent_path: "/soc/spi@7e204000", node: "adc@2", chip_select: 2n, lines: 2, in_overlay: true },
+        ]);
+    });
+
+    test("chip_select_overflows — entries in one cell array, and 0 for a native chip select", () => {
+        const one_array = setup(cs_base("\t\t\tcs-gpios = <&gpio 8 1 &gpio 7 1>;"), "&spi0 {\n\tadc@2 { reg = <2>; };\n};");
+        expect(chip_select_overflows(one_array).map(o => o.lines)).toEqual([2]);
+        const native = setup(cs_base("\t\t\tcs-gpios = <0>, <&gpio 7 1>, <0>;"), "&spi0 {\n\tadc@2 { reg = <2>; };\n};");
+        expect(chip_select_overflows(native)).toEqual([]);
+    });
+
+    test("chip_select_overflows — the overlay's own cs-gpios counts", () => {
+        const overlay = setup(cs_base("\t\t\tcs-gpios = <&gpio 8 1>, <&gpio 7 1>;"), "&spi0 {\n\tcs-gpios = <&gpio 8 1>, <&gpio 7 1>, <&gpio 6 1>;\n\tadc@2 { reg = <2>; };\n};");
+        expect(chip_select_overflows(overlay)).toEqual([]);
+    });
+
+    test("chip_select_overflows — nothing without cs-gpios or with an unknown provider", () => {
+        expect(chip_select_overflows(setup(cs_base(""), "&spi0 {\n\tadc@5 { reg = <5>; };\n};"))).toEqual([]);
+        expect(chip_select_overflows(setup(cs_base("\t\t\tcs-gpios = <&nowhere 8 1>;"), "&spi0 {\n\tadc@5 { reg = <5>; };\n};"))).toEqual([]);
+    });
+
+    test("chip_select_overflows — a disabled device doesn't count", () => {
+        const overlay = setup(cs_base("\t\t\tcs-gpios = <&gpio 8 1>;"), "&spi0 {\n\tadc@1 { reg = <1>; status = \"disabled\"; };\n};");
+        expect(chip_select_overflows(overlay)).toEqual([]);
     });
 }
