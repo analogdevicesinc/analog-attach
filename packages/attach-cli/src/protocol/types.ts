@@ -84,9 +84,29 @@ export interface Node {
     alias?: string[];
 }
 
+/** Where a value `read` shows is set: the base devicetree, or the overlay (which may override the base). */
+export type ValueSource = "base" | "overlay";
+
+export interface ReadProperty extends Property {
+    source: ValueSource;
+}
+
+/**
+ * A node as the base and the overlay together have it. `origin` says which
+ * has it: "base" (the overlay doesn't change it), "overlay" (the overlay adds
+ * it) or "both". A `collapsed` child is a base node the overlay doesn't reach:
+ * only its name and labels are given, `read` on its path shows the rest.
+ */
+export interface ReadNode extends Omit<Node, "properties" | "children"> {
+    properties: ReadProperty[];
+    children: ReadNode[];
+    origin: "base" | "overlay" | "both";
+    collapsed?: true;
+}
+
 export type ReadResponse =
-    | (Node & { missing_required?: string[] })
-    | (Property & { description?: string; suggestions?: Suggestion[] });
+    | (ReadNode & { missing_required?: string[] })
+    | (ReadProperty & { description?: string; suggestions?: Suggestion[] });
 
 export interface DeletePreview extends CommonResponse {
     node_count: number;

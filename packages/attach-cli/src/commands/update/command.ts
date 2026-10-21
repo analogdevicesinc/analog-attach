@@ -523,7 +523,10 @@ export async function apply_update(
 
     const hint = shape_hint(property_definition);
 
-    const existing_property = found?.node.properties.find(p => p.name === property_name);
+    // The node as the base and the overlay together have it, as `read` shows it.
+    const node_path = found?.node_path ?? base_dt.locate(target_reference)?.path;
+    const existing_property = (node_path === undefined ? undefined : overlay.effective_node(node_path))
+        ?.properties.find(p => p.name === property_name);
     const existing_has_value = existing_property !== undefined && !is_dt_flag(existing_property.value);
 
     const decision = decide_update(hint, value_arguments, existing_has_value);

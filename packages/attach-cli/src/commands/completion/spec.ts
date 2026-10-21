@@ -23,7 +23,8 @@ export const NOSPACE_DIRECTIVE = "__ATTACH_COMPLETE_NOSPACE__";
 export const GROUP_DIRECTIVE = "__ATTACH_COMPLETE_GROUP__";
 
 // "entry-points" is completion-only: `suggest navigate` with no node (the overlay's top-level targets).
-export type SuggestKind = "device-key" | "parent" | "navigate" | "entry-points" | "children" | "value" | "overlay";
+// "overlay-props" is what the overlay sets on a node, the only properties delete can remove.
+export type SuggestKind = "device-key" | "parent" | "navigate" | "entry-points" | "children" | "value" | "overlay" | "overlay-props";
 
 export type ValueSource =
     | { kind: "file" }
@@ -66,6 +67,7 @@ const PATH_TREE: ValueSource = { kind: "path", roots: "navigate", children: "chi
 const PATH_PARENT: ValueSource = { kind: "path", roots: "parent", children: "children" };
 const VAL: ValueSource = { kind: "suggest", suggest: "value" };
 const PROPS: ValueSource = { kind: "suggest", suggest: "navigate" };
+const OVERLAY_PROPS: ValueSource = { kind: "suggest", suggest: "overlay-props" };
 
 const LIST_KIND_CHOICES: ValueSource = {
     kind: "choices",
@@ -95,7 +97,7 @@ export const COMPLETION_SPEC: Readonly<Record<string, CommandSpec | "dynamic">> 
         positional: { mode: "byIndex", sources: [PATH_TREE, PROPS], rest: VAL },
     },
     delete: {
-        positional: { mode: "byIndex", sources: [PATH_OVERLAY, PROPS] },
+        positional: { mode: "byIndex", sources: [PATH_OVERLAY, OVERLAY_PROPS] },
     },
     move: {
         positional: { mode: "byIndex", sources: [PATH_OVERLAY, PATH_TREE] },

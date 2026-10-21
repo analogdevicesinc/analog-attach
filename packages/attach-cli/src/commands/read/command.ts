@@ -1,7 +1,7 @@
 import path from "node:path";
 
 import { Command } from "commander";
-import { DeviceTreeOverlay, is_dt_flag, print_property, type DTProperty } from "attach-lib";
+import { DeviceTreeOverlay, get_full_node_name, is_dt_flag, print_property, type DTProperty } from "attach-lib";
 
 import type { LocalContext } from "../../context";
 import { load_workspace, parse_bindings, type Bindings } from "../../config/workspace";
@@ -9,7 +9,7 @@ import type { Result } from "../../config/settings";
 import { bigIntReplacer, resolve_node_identifier, not_found_message, parse_node_path, parse_property_name } from "../../utilities";
 import { respond, respond_fail, input_error } from "../../protocol/output";
 import { convert_node, convert_property } from "../../protocol/dt-to-protocol";
-import type { Node, ReadResponse, Suggestion, Types } from "../../protocol/types";
+import type { Node, ReadNode, ReadResponse, Suggestion, Types, ValueSource } from "../../protocol/types";
 import { format_type, resolve_target_binding, type PropertyInfo } from "../list/suggest";
 import { node_missing_required, property_details } from "../../node-state";
 
@@ -20,9 +20,10 @@ export interface ReadOptions {
 
 /**
  * Find a node and optionally a property on it, printing JSON or human output.
- * Unless quiet, a property comes with what its binding says about it and the
- * values on offer, and a node with the required properties it still lacks.
- * Shared with `update <path> <prop>` without a value.
+ * The node is read as the base and the overlay together have it, each value
+ * marked with where it is set. Unless quiet, a property comes with what its
+ * binding says about it and the values on offer, and a node with the required
+ * properties it still lacks. Shared with `update <path> <prop>` without a value.
  */
 export async function read_target(
     context_: LocalContext,
@@ -32,10 +33,12 @@ export async function read_target(
     property_name: string | undefined,
     options: ReadOptions,
 ): Promise<void> {
-    const found = overlay.find_node(resolve_node_identifier(path_string, overlay));
     const base = overlay.get_base_dts() ?? undefined;
+    const reference = resolve_node_identifier(path_string, overlay);
+    const node_path = overlay.find_node(reference)?.node_path ?? base?.locate(reference)?.path;
+    const node = node_path === undefined ? undefined : overlay.effective_node(node_path);
 
-    if (found === undefined) {
+    if (node_path === undefined || node === undefined) {
         const message = not_found_message(path_string, overlay, base);
         if (context_.json) {
             respond_fail({ ok: false, message, severity: "error" });
@@ -45,8 +48,6 @@ export async function read_target(
         return;
     }
 
-    // The overlay may write the node in several fragments; a later one's value applies.
-    const node = overlay.merged_overlay_node(found.node_path) ?? found.node;
     const property = property_name === undefined ? undefined : node.properties.find(p => p.name === property_name);
     if (property_name !== undefined && property === undefined) {
         const message = `Not found: ${property_name} on ${path_string}`;
@@ -62,12 +63,13 @@ export async function read_target(
     const binding = target === undefined || "error" in target.binding ? undefined : target.binding;
 
     if (property === undefined) {
-        const missing = binding === undefined ? undefined : node_missing_required(binding, overlay, found.node_path);
+        const missing = binding === undefined ? undefined : node_missing_required(binding, overlay, node_path);
+        const read = read_node(overlay, node_path);
         if (context_.json) {
-            const response: ReadResponse = { ...convert_node(node), ...(missing === undefined ? {} : { missing_required: missing }) };
+            const response: ReadResponse = { ...protocol_node(read), ...(missing === undefined ? {} : { missing_required: missing }) };
             respond(response);
         } else {
-            print_node_human(node);
+            for (const line of node_lines(read)) { console.log(line); }
             for (const line of format_missing(missing ?? [])) { console.log(line); }
         }
         return;
@@ -79,9 +81,11 @@ export async function read_target(
     const { info } = details;
     const suggestions = [...details.suggestions, ...details.others];
 
+    const source = property_source(overlay, node_path, property.name);
     if (context_.json) {
         const response: ReadResponse = {
             ...convert_property(property),
+            source,
             ...(info?.description === undefined ? {} : { description: info.description }),
             ...(suggestions.length === 0 ? {} : { suggestions }),
         };
@@ -89,13 +93,88 @@ export async function read_target(
     } else if (options.quiet) {
         console.log(is_dt_flag(property.value) ? "true" : print_property(property, "", 0).trim());
     } else {
-        console.log(property_line(property));
+        console.log(`${property_line(property)}${source === "base" ? BASE_MARK : ""}`);
         for (const line of format_details(info, suggestions)) { console.log(line); }
     }
 }
 
 function property_line(property: DTProperty): string {
     return is_dt_flag(property.value) ? `${property.name};` : print_property(property, "", 0).trim();
+}
+
+const BASE_MARK = "   // base";
+
+function property_source(overlay: DeviceTreeOverlay, node_path: string, name: string): ValueSource {
+    return overlay.property_node(node_path, name) === undefined ? "base" : "overlay";
+}
+
+/** A node as `read` shows it (see `ReadNode`), with its properties still parsed for printing. */
+interface NodeRead {
+    key: string;
+    labels: string[];
+    origin: ReadNode["origin"];
+    collapsed: boolean;
+    properties: { property: DTProperty; source: ValueSource }[];
+    children: NodeRead[];
+}
+
+/**
+ * The node at `node_path` as the base and the overlay together have it. The
+ * children the overlay reaches (it changes them or something below them) are
+ * read the same way; the others are collapsed to their name and labels, so a
+ * base subtree isn't printed whole.
+ */
+function read_node(overlay: DeviceTreeOverlay, node_path: string): NodeRead {
+    const roots = overlay.get_fragments().flatMap(fragment => overlay.get_fragment_root_path(fragment) ?? []);
+    const touches = (path: string): boolean => overlay.overlay_nodes_at(path).length > 0;
+    const reaches = (path: string): boolean => touches(path) || roots.some(root => root.startsWith(path === "/" ? "/" : `${path}/`));
+    const origin = (path: string): ReadNode["origin"] => {
+        if (overlay.get_base_dts()?.node_exists(path) !== true) { return "overlay"; }
+        return touches(path) ? "both" : "base";
+    };
+
+    const read = (path: string): NodeRead => {
+        const node = overlay.effective_node(path);
+        const children = [...overlay.effective_children(path)].map(([name, child]): NodeRead => {
+            const child_path = path === "/" ? `/${name}` : `${path}/${name}`;
+            if (reaches(child_path)) { return read(child_path); }
+            return { key: name, labels: child.labels, origin: "base", collapsed: true, properties: [], children: [] };
+        });
+        return {
+            key: node === undefined ? path : get_full_node_name(node),
+            labels: node?.labels ?? [],
+            origin: origin(path),
+            collapsed: false,
+            properties: (node?.properties ?? []).map(property => ({ property, source: property_source(overlay, path, property.name) })),
+            children,
+        };
+    };
+    return read(node_path);
+}
+
+function protocol_node(node: NodeRead): ReadNode {
+    return {
+        kind: "node",
+        key: node.key,
+        properties: node.properties.map(({ property, source }) => ({ ...convert_property(property), source })),
+        children: node.children.map(child => protocol_node(child)),
+        alias: node.labels,
+        origin: node.origin,
+        ...(node.collapsed ? { collapsed: true as const } : {}),
+    };
+}
+
+/** A read node as DTS, with `// base` after what the base sets and after collapsed children. */
+function node_lines(node: NodeRead, indent = ""): string[] {
+    const labels = node.labels.map(label => `${label}: `).join("");
+    if (node.collapsed) { return [`${indent}${labels}${node.key} { … };${BASE_MARK}`]; }
+    const lines = [`${indent}${labels}${node.key} {`];
+    for (const { property, source } of node.properties) {
+        lines.push(`${indent}    ${property_line(property)}${source === "base" ? BASE_MARK : ""}`);
+    }
+    for (const child of node.children) { lines.push(...node_lines(child, `${indent}    `)); }
+    lines.push(`${indent}};`);
+    return lines;
 }
 
 /**
@@ -229,23 +308,6 @@ Examples:
         });
 }
 
-function print_node_human(node: { name: string; unit_addr?: string; labels?: string[]; properties: any[]; children: any[] }, indent: string = ""): void {
-    const key = node.unit_addr ? `${node.name}@${node.unit_addr}` : node.name;
-    const label_prefix = node.labels !== undefined && node.labels.length > 0 ? `${node.labels.join(": ")}: ` : "";
-    console.log(`${indent}${label_prefix}${key} {`);
-    for (const property of node.properties) {
-        if (is_dt_flag(property.value)) {
-            console.log(`${indent}    ${property.name};`);
-        } else {
-            console.log(`${indent}    ${print_property(property, indent + "    ", 0).trim()}`);
-        }
-    }
-    for (const child of node.children) {
-        print_node_human(child, indent + "    ");
-    }
-    console.log(`${indent}};`);
-}
-
 if (import.meta.vitest) {
     const { test, expect, vi } = import.meta.vitest;
     const { DeviceTree: DT, DeviceTreeOverlay: DTO } = await import("attach-lib");
@@ -372,5 +434,55 @@ if (import.meta.vitest) {
             "    spi-max-frequency = <1000000>;",
             "};",
         ]);
+    });
+
+    test("read_target — the base and the overlay together, base values marked, base children collapsed", async () => {
+        const base = DT.new_from_string(`/dts-v1/;\n/ {\n\tsoc {\n\t\ti2c_arm: i2c1: i2c@7e804000 {\n\t\t\tcompatible = "brcm,bcm2835-i2c";\n\t\t\tstatus = "disabled";\n\t\t\trtc@51 {\n\t\t\t\treg = <0x51>;\n\t\t\t};\n\t\t};\n\t\tspi0: spi@7e204000 {\n\t\t\tcompatible = "brcm,bcm2835-spi";\n\t\t};\n\t};\n};`);
+        if (typeof base === "string") { throw new TypeError(base); }
+        const overlay = DTO.new_from_string(`/dts-v1/;\n/plugin/;\n\n&i2c_arm {\n\tstatus = "okay";\n\thwmon@2e {\n\t\treg = <0x2e>;\n\t};\n};`, base);
+        if (typeof overlay === "string") { throw new TypeError(overlay); }
+        const no_bindings: Result<Bindings> = { ok: false, errors: [{ field: "dt-schema", kind: "missing", message: "no dt-schema" }] };
+        const human = async (path: string, property?: string): Promise<string[]> => {
+            const logs: string[] = [];
+            const spy = vi.spyOn(console, "log").mockImplementation((line: string) => { logs.push(line); });
+            await read_target({ json: false }, overlay, no_bindings, path, property, { quiet: false });
+            spy.mockRestore();
+            return logs;
+        };
+
+        expect(await human("i2c1", "compatible")).toEqual([`compatible = "brcm,bcm2835-i2c";   // base`]);
+        expect(await human("i2c1", "status")).toEqual([`status = "okay";`]);
+        expect(await human("i2c1")).toEqual([
+            "i2c_arm: i2c1: i2c@7e804000 {",
+            `    compatible = "brcm,bcm2835-i2c";   // base`,
+            `    status = "okay";`,
+            "    rtc@51 { … };   // base",
+            "    hwmon@2e {",
+            "        reg = <0x2e>;",
+            "    };",
+            "};",
+        ]);
+        // A base node the overlay doesn't touch reads too.
+        expect(await human("spi0")).toEqual(["spi0: spi@7e204000 {", `    compatible = "brcm,bcm2835-spi";   // base`, "};"]);
+        // The overlay reaches /soc through i2c1, so it is read; spi0 isn't, so it is collapsed.
+        const soc = await human("/soc");
+        expect(soc.filter(line => line.startsWith("    ") && !line.startsWith("        "))).toEqual([
+            "    i2c_arm: i2c1: i2c@7e804000 {",
+            "    };",
+            "    spi0: spi@7e204000 { … };   // base",
+        ]);
+
+        const responses: unknown[] = [];
+        const spy = vi.spyOn(console, "log").mockImplementation((line: string) => { responses.push(JSON.parse(line)); });
+        await read_target({ json: true }, overlay, no_bindings, "i2c1", "compatible", { quiet: false });
+        await read_target({ json: true }, overlay, no_bindings, "i2c1", undefined, { quiet: false });
+        spy.mockRestore();
+        expect(responses[0]).toMatchObject({ key: "compatible", source: "base" });
+        expect(responses[1]).toMatchObject({
+            key: "i2c@7e804000",
+            origin: "both",
+            properties: [{ key: "compatible", source: "base" }, { key: "status", source: "overlay" }],
+            children: [{ key: "rtc@51", origin: "base", collapsed: true, properties: [] }, { key: "hwmon@2e", origin: "overlay" }],
+        });
     });
 }

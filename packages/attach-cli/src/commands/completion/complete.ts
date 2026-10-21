@@ -282,6 +282,7 @@ async function suggest_values(kind: SuggestKind, prefix: string, positionals: st
             return capture_suggest("navigate", []);
         }
         case "navigate":
+        case "overlay-props":
         case "value": {
             return capture_suggest(kind, positionals);
         }

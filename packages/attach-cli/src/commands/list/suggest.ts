@@ -61,6 +61,10 @@ export async function run_suggest(context: LocalContext, arguments_: string[]): 
             await suggest_navigate(context, arguments_.slice(1));
             return;
         }
+        case "overlay-props": {
+            suggest_overlay_properties(context, arguments_.slice(1));
+            return;
+        }
         case "children": {
             await suggest_children(context, arguments_.slice(1));
             return;
@@ -659,6 +663,22 @@ async function suggest_navigate(context_: LocalContext, arguments_: string[]): P
         for (const suggestion of suggestions) {
             console.log(suggestion.display_string ?? suggestion.value);
         }
+    }
+}
+
+/** The properties the overlay sets on a node: what `delete <path> <property>` can remove (a base value can only be overridden). */
+function suggest_overlay_properties(context_: LocalContext, arguments_: string[]): void {
+    const workspace = load_workspace(context_, ["base", "overlay"]);
+    if (workspace === undefined) { return; }
+    const overlay = workspace.overlay.tree;
+    const identifier = resolve_positional_path(arguments_);
+    const found = identifier === undefined ? undefined : overlay.find_node(resolve_node_identifier(identifier, overlay));
+    const names = found === undefined ? [] : overlay.overlay_properties(found.node_path).map(p => p.name);
+    const suggestions: Suggestion[] = names.map(value => ({ value, group: "set" }));
+    if (context_.json) {
+        respond({ ok: true, message: `Found ${suggestions.length} properties`, severity: "info", suggestions });
+    } else {
+        for (const { value } of suggestions) { console.log(value); }
     }
 }
 
