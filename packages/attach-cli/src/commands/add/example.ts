@@ -104,7 +104,7 @@ export function copy_example_node(
         notes.push({ kind: "compatible-replaced", from: compatibles[0] ?? "" });
     }
 
-    const taken = overlay.all_labels();
+    const taken = overlay.taken_labels();
     const claim = (wanted: string): string => {
         const free = unique_label(wanted, taken);
         taken.set(free, "");
