@@ -124,6 +124,7 @@ if (import.meta.vitest) {
 
     test("reg_warnings — clashes only within the base tree are left out", () => {
         expect(reg_warnings(setup("&spi0 {\n\tadc@1 { reg = <1>; };\n};"))).toEqual([]);
+        expect(reg_warnings(setup("&{/soc/gpio@7e200000} {\n\tpins { brcm,pins = <19>; };\n};"))).toEqual([]);
     });
 
     test("node_reg_warnings — only the clashes of that node", () => {
