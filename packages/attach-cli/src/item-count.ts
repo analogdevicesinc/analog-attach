@@ -18,6 +18,9 @@ export function item_bounds(type: AttachType): ItemBounds | undefined {
         case "number_array":
         case "string_array":
         case "enum_array": {
+            // An array of phandles is a phandle list before the lib knows its provider
+            // (rdy-gpios = <&gpio 19 1> is one item of three cells).
+            if (type._t === "enum_array" && type.enum_type === AttachEnumType.PHANDLE) { return undefined; }
             // The parsed binding leaves a bound out as undefined, whatever its type says.
             const min = type.minItems as number | undefined;
             const max = type.maxItems as number | undefined;
@@ -82,6 +85,9 @@ if (import.meta.vitest) {
         expect(item_bounds(specifiers([{ _t: "number" }, { _t: "number" }, flags], 1, 4))).toEqual({ min: 3, max: 12 });
         expect(item_bounds(specifiers([{ _t: "number" }, flags]))).toEqual({ min: 0 });
         expect(item_bounds(specifiers([phandle], 1, 1))).toBeUndefined();
+        // rdy-gpios before it is set: phandles only, maxItems counting entries.
+        expect(item_bounds({ ...phandle, _t: "enum_array", minItems: 1, maxItems: 1 } as AttachType)).toBeUndefined();
+        expect(count_warning("rdy-gpios", { ...phandle, _t: "enum_array", minItems: 1, maxItems: 1 } as AttachType, 3)).toBeUndefined();
     });
 
     test("value_count — the cells and the strings, over every group", () => {
