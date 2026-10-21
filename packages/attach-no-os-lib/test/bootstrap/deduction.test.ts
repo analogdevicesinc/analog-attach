@@ -199,7 +199,7 @@ describe('bootstrap follows the ranking', () => {
         const workfile = board_workfile();
         const adc = add_driver(workfile, 'dualpart', 'test_adc');
         expectOk(bootstrap(workfile));
-        expect(config_field(workfile, adc, 'extra')).toBe('dualpart_init_param');
+        expect(config_field(workfile, adc, 'extra')).toBe('dualpart_test_adc_ip');
         // dualpart ships an ADC and a DAC table; the ADC field takes the test_adc_ops one.
         expect(config_field(workfile, adc, 'adc_ops')).toBe('dualpart_adc_ops');
         expect(validate_workfile(workfile).valid).toBe(true);
@@ -223,8 +223,8 @@ describe('bootstrap follows the ranking', () => {
         expectOk(bootstrap(workfile));
 
         expect(config_field(workfile, 'ch0', 'adc_handle')).toBe(adc);
-        expect(config_field(workfile, 'ch0', 'extra')).toBe('dualpart_channel_config');
-        expect(config_field(workfile, adc, 'extra')).toBe('dualpart_init_param');
+        expect(config_field(workfile, 'ch0', 'extra')).toBe('ch0_ip');
+        expect(config_field(workfile, adc, 'extra')).toBe('dualpart_test_adc_ip');
     });
 
     test('a second channel gets a channel struct of its own', () => {
@@ -234,8 +234,8 @@ describe('bootstrap follows the ranking', () => {
             add(workfile, name, 'test_adc_chan');
             expectOk(bootstrap(workfile));
         }
-        expect(config_field(workfile, 'ch0', 'extra')).toBe('dualpart_channel_config');
-        expect(config_field(workfile, 'ch1', 'extra')).toBe('dualpart_channel_config_1');
+        expect(config_field(workfile, 'ch0', 'extra')).toBe('ch0_ip');
+        expect(config_field(workfile, 'ch1', 'extra')).toBe('ch1_ip');
     });
 });
 
@@ -247,11 +247,11 @@ describe('--as: two sides on one chip', () => {
         const workfile = board_workfile();
         const adc = add_driver(workfile, 'dualpart', 'test_adc');
         const chip = config_field(workfile, adc, 'extra');
-        expect(chip).toBe('dualpart_init_param');
+        expect(chip).toBe('dualpart_test_adc_ip');
         const dac = add_driver(workfile, 'dualpart', 'test_dac', chip as string);
         expectOk(bootstrap(workfile));
 
-        expect(config_field(workfile, dac, 'extra')).toBe('dualpart_init_param');
+        expect(config_field(workfile, dac, 'extra')).toBe('dualpart_test_adc_ip');
         expect(config_field(workfile, dac, 'dac_ops')).toBe('dualpart_dac_ops');
         expect(config_field(workfile, adc, 'adc_ops')).toBe('dualpart_adc_ops');
         expect(Object.values(workfile.symbols).filter(found => found.$symbol === 'dualpart_init_param')).toHaveLength(1);
@@ -262,7 +262,7 @@ describe('--as: two sides on one chip', () => {
         const workfile = board_workfile();
         add_driver(workfile, 'dualpart', 'test_adc');
         const dac = add_driver(workfile, 'dualpart', 'test_dac');
-        expect(config_field(workfile, dac, 'extra')).toBe('dualpart_init_param_1');
+        expect(config_field(workfile, dac, 'extra')).toBe('dualpart_test_dac_ip');
     });
 });
 
@@ -353,7 +353,7 @@ describe('which part an eval board wires', () => {
         expectOk(bootstrap(workfile));
         const referenced = referenced_nodes(workfile);
         expect(referenced.has('on_board')).toBe(false);
-        expect(referenced.has('test_sensor_config')).toBe(true);
+        expect(referenced.has('on_board_cfg')).toBe(true);
     });
 });
 

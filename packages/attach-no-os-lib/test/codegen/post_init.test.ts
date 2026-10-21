@@ -43,19 +43,19 @@ describe('$post_init in main.c', () => {
 
     test('renders once per bound node, with the target, owner and field', () => {
         const blocks = post_init_blocks(sensor_on_otherboard());
-        expect(blocks).toEqual([{ node: 'test_gpio_pin', code: 'test_gpio_pin_set_output(&test_gpio_pin, test_spi_device.cs_gpio_num);' }]);
+        expect(blocks).toEqual([{ node: 'sensor_cs_gpio', code: 'test_gpio_pin_set_output(&sensor_cs_gpio, sensor_spi_dev.cs_gpio_num);' }]);
     });
 
     test('runs once the pin is ready: after its port init and port patch, before the sensor init', () => {
         const workfile = sensor_on_otherboard();
         const devices = load_devices(workfile).map(device => device.descriptor_name);
         const schedule = schedule_patches(
-            [{ struct_name: 'test_gpio_pin', field_path: 'port_handle', value: 'bsp_other_gpio1_cfg_handle', source: 'bsp_other_gpio1_cfg_handle' }],
+            [{ struct_name: 'sensor_cs_gpio', field_path: 'port_handle', value: 'bsp_other_gpio1_cfg_handle', source: 'bsp_other_gpio1_cfg_handle' }],
             devices,
             post_init_blocks(workfile),
         );
         expect(schedule.post_init_before).toEqual([]);
-        expect(schedule.post_init_after.get('bsp_other_gpio1_cfg_handle')?.map(block => block.node)).toEqual(['test_gpio_pin']);
+        expect(schedule.post_init_after.get('bsp_other_gpio1_cfg_handle')?.map(block => block.node)).toEqual(['sensor_cs_gpio']);
         expect(devices.indexOf('bsp_other_gpio1_cfg_handle')).toBeLessThan(devices.indexOf('sensor'));
     });
 });

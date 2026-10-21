@@ -98,7 +98,7 @@ describe('the example blocks main.c gets', () => {
             const root = driver_root_for('dualpart', interface_);
             expectOk(root);
             add(workfile, interface_, root.value);
-            expectOk(pin_driver(workfile, interface_, 'dualpart', interface_ === 'test_dac' ? 'dualpart_init_param' : undefined));
+            expectOk(pin_driver(workfile, interface_, 'dualpart', interface_ === 'test_dac' ? 'test_adc_ip' : undefined));
         }
         expectOk(bootstrap(workfile));
         add(workfile, 'ch0', 'test_adc_chan');

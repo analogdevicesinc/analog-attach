@@ -97,13 +97,13 @@ describe('bootstrap from one node', () => {
         expectOk(report);
 
         expect(report.value.linked.map(link => `${link.node}.${link.property}${link.member === undefined ? '' : `.${link.member}`} -> ${link.target}${link.hidden ? ' [hidden]' : ''}`)).toEqual([
-            'test_sensor.$init_param -> test_sensor_config',
-            'test_sensor_config.extra -> testpart_init_param',
+            'test_sensor.$init_param -> test_sensor_cfg',
+            'test_sensor_cfg.extra -> test_sensor_ip',
             // The driver's ops table is an extern: hidden, named by its own symbol.
-            'test_sensor_config.ops -> testpart_ops [hidden]',
-            'testpart_init_param.comm_init.spi_dev -> test_spi_device',
+            'test_sensor_cfg.ops -> testpart_ops [hidden]',
+            'test_sensor_ip.comm_init.spi_dev -> test_sensor_spi_dev',
             // The handle wrapping the board's own SPI config, not a fresh controller.
-            'test_spi_device.controller -> bsp_test_spi_cfg_handle [hidden]',
+            'test_sensor_spi_dev.controller -> bsp_test_spi_cfg_handle [hidden]',
         ]);
     });
 
@@ -112,17 +112,17 @@ describe('bootstrap from one node', () => {
         const report = bootstrap(workfile);
         expectOk(report);
 
-        // In the order the steps happened: filling comm_type pins the union member, which
-        // creates the bus device, whose values come before the part's remaining dev_ready.
+        // In the order the steps happened, nodes taken by name: the part's own values, then
+        // the bus device that filling comm_type pinned the union member to.
         expect(report.value.filled.map(fill => `${fill.node}.${fill.property} = ${String(fill.value)} [${fill.from}]`)).toEqual([
-            'testpart_init_param.comm_type = TESTPART_SPI [default]',
+            'test_sensor_ip.comm_type = TESTPART_SPI [default]',
+            'test_sensor_ip.dev_ready = true [default]',
             // From the part's override on its bus device, not from the device's own schema.
-            'test_spi_device.max_speed_hz = 1000000 [default]',
+            'test_sensor_spi_dev.max_speed_hz = 1000000 [default]',
             // The part's override leaves exactly one mode.
-            'test_spi_device.mode = TEST_SPI_MODE_0 [only value]',
-            'testpart_init_param.dev_ready = true [default]',
+            'test_sensor_spi_dev.mode = TEST_SPI_MODE_0 [only value]',
             // Last: the chip-select, once nothing else applies. PMOD pin 1 is native line 0.
-            'test_spi_device.native_cs = 1 [only value]',
+            'test_sensor_spi_dev.native_cs = 1 [only value]',
         ]);
     });
 
@@ -140,7 +140,7 @@ describe('bootstrap from one node', () => {
 
         const symbols = stored(workfile);
         // Every value bootstrap wrote is listed as its own.
-        expect(symbols['test_spi_device']).toEqual({
+        expect(symbols['test_sensor_spi_dev']).toEqual({
             $compatible: 'test_spi_device',
             $auto: ['controller', 'max_speed_hz', 'mode', 'native_cs'],
             controller: 'bsp_test_spi_cfg_handle',
@@ -148,7 +148,7 @@ describe('bootstrap from one node', () => {
             mode: 'TEST_SPI_MODE_0',
             native_cs: 1,
         });
-        expect(symbols['testpart_init_param']?.comm_init).toEqual({ spi_dev: 'test_spi_device' });
+        expect(symbols['test_sensor_ip']?.comm_init).toEqual({ spi_dev: 'test_sensor_spi_dev' });
     });
 
     test('running it again changes nothing', () => {
@@ -180,7 +180,7 @@ describe('bootstrap leaves choices alone', () => {
         expectOk(bootstrap(workfile));
 
         expect(stored(workfile)['testpart_init_param']?.comm_init).toEqual({ spi_dev: 'spare_dev' });
-        expect(Object.keys(workfile.symbols)).not.toContain('test_spi_device');
+        expect(Object.keys(workfile.symbols)).not.toContain('testpart_init_param_spi_dev');
     });
 
     test('a struct already in use is someone else\'s, so a new one is made', () => {
@@ -190,7 +190,7 @@ describe('bootstrap leaves choices alone', () => {
         expectOk(set_value(workfile, 'other_part', 'comm_init', { spi_dev: 'used_dev' }));
         expectOk(bootstrap(workfile));
 
-        expect(stored(workfile)['testpart_init_param']?.comm_init).toEqual({ spi_dev: 'test_spi_device' });
+        expect(stored(workfile)['testpart_init_param']?.comm_init).toEqual({ spi_dev: 'testpart_init_param_spi_dev' });
     });
 
     test('two unused structs that fit are a choice, and are listed', () => {
@@ -214,7 +214,7 @@ describe('bootstrap leaves choices alone', () => {
         expectOk(bootstrap(workfile));
 
         const symbols = stored(workfile);
-        expect(symbols['test_spi_device_1']?.controller).toBe(symbols['test_spi_device']?.controller);
+        expect(symbols['second_spi_dev']?.controller).toBe(symbols['test_sensor_spi_dev']?.controller);
     });
 
     test('a second device builds a chain of its own', () => {
@@ -224,11 +224,11 @@ describe('bootstrap leaves choices alone', () => {
         expectOk(bootstrap(workfile));
 
         const symbols = stored(workfile);
-        expect(symbols['second']?.$init_param).toBe('test_sensor_config_1');
-        expect(symbols['test_sensor_config_1']?.extra).toBe('testpart_init_param_1');
-        expect(symbols['testpart_init_param_1']?.comm_init).toEqual({ spi_dev: 'test_spi_device_1' });
+        expect(symbols['second']?.$init_param).toBe('second_cfg');
+        expect(symbols['second_cfg']?.extra).toBe('second_ip');
+        expect(symbols['second_ip']?.comm_init).toEqual({ spi_dev: 'second_spi_dev' });
         // The bus controller is one board resource, shared by both.
-        expect(symbols['test_spi_device_1']?.controller).toBe('bsp_test_spi_cfg_handle');
+        expect(symbols['second_spi_dev']?.controller).toBe('bsp_test_spi_cfg_handle');
     });
 
     test('an extern already in the workfile is linked to - it is one C global, not a choice', () => {
@@ -249,7 +249,7 @@ describe('bootstrap leaves choices alone', () => {
         // chip-select comes from the wiring instead (here, the native line).
         const workfile = workfile_with('test_sensor');
         expectOk(bootstrap(workfile));
-        expect(stored(workfile)['test_spi_device']?.cs_gpio).toBeUndefined();
+        expect(stored(workfile)['test_sensor_spi_dev']?.cs_gpio).toBeUndefined();
         expect(Object.keys(stored(workfile))).not.toContain('bsp_test_led');
     });
 
@@ -258,7 +258,7 @@ describe('bootstrap leaves choices alone', () => {
         const report = bootstrap(workfile);
         expectOk(report);
         expect(report.value.linked).toEqual([{
-            node: 'test_spi_controller', property: '$init_param', target: 'test_spi_config', symbol: 'test_spi_config', created: true, hidden: false,
+            node: 'test_spi_controller', property: '$init_param', target: 'test_spi_controller_cfg', symbol: 'test_spi_config', created: true, hidden: false,
         }]);
     });
 
@@ -278,10 +278,10 @@ describe('who owns a value', () => {
     test('the user editing a value takes it out of bootstrap\'s hands', () => {
         const workfile = workfile_with('test_sensor');
         expectOk(bootstrap(workfile));
-        expect(stored(workfile)['test_spi_device']?.$auto).toContain('max_speed_hz');
+        expect(stored(workfile)['test_sensor_spi_dev']?.$auto).toContain('max_speed_hz');
 
-        expectOk(set_value(workfile, 'test_spi_device', 'max_speed_hz', 2000000));
-        expect(stored(workfile)['test_spi_device']?.$auto).not.toContain('max_speed_hz');
+        expectOk(set_value(workfile, 'test_sensor_spi_dev', 'max_speed_hz', 2000000));
+        expect(stored(workfile)['test_sensor_spi_dev']?.$auto).not.toContain('max_speed_hz');
     });
 
     test('ownership survives a save and load', () => {
@@ -299,60 +299,60 @@ describe('who owns a value', () => {
     test('a value the user cleared is not filled back in', () => {
         const workfile = workfile_with('test_sensor');
         expectOk(bootstrap(workfile));
-        expectOk(clear_value(workfile, 'test_spi_device', 'max_speed_hz'));
+        expectOk(clear_value(workfile, 'test_sensor_spi_dev', 'max_speed_hz'));
 
         const again = bootstrap(workfile);
         expectOk(again);
         expect(again.value.filled).toEqual([]);
-        expect(stored(workfile)['test_spi_device']?.max_speed_hz).toBeNull();
+        expect(stored(workfile)['test_sensor_spi_dev']?.max_speed_hz).toBeNull();
     });
 
     test('switching the bus: owned values follow the rules, the new bus is built', () => {
         const workfile = workfile_with('test_sensor');
         expectOk(bootstrap(workfile));
-        expectOk(set_value(workfile, 'testpart_init_param', 'comm_type', 'TESTPART_I2C'));
+        expectOk(set_value(workfile, 'test_sensor_ip', 'comm_type', 'TESTPART_I2C'));
 
         const report = bootstrap(workfile);
         expectOk(report);
         const symbols = stored(workfile);
 
         // The SPI member no longer fits the I2C case, so it went, and the I2C one was built.
-        expect(symbols['testpart_init_param']?.comm_init).toEqual({ i2c_dev: 'test_i2c_device' });
-        expect(symbols['test_i2c_device']).toEqual({ $compatible: 'test_i2c_device', $auto: ['address'], address: 0x1D });
+        expect(symbols['test_sensor_ip']?.comm_init).toEqual({ i2c_dev: 'test_sensor_i2c_dev' });
+        expect(symbols['test_sensor_i2c_dev']).toEqual({ $compatible: 'test_i2c_device', $auto: ['address'], address: 0x1D });
         expect(report.value.revised).toContainEqual({
-            node: 'testpart_init_param', property: 'comm_init', previous: { spi_dev: 'test_spi_device' },
+            node: 'test_sensor_ip', property: 'comm_init', previous: { spi_dev: 'test_sensor_spi_dev' },
         });
 
         // The SPI device lost its last reference, and every value on it was bootstrap's, so
         // it went - and the controller handle it alone used went with it.
-        expect(symbols['test_spi_device']).toBeUndefined();
+        expect(symbols['test_sensor_spi_dev']).toBeUndefined();
         expect(Object.keys(workfile.symbols)).not.toContain('bsp_test_spi_cfg_handle');
-        expect(report.value.deleted).toEqual(['test_spi_device']);
+        expect(report.value.deleted).toEqual(['test_sensor_spi_dev']);
         expect(report.value.dangling).toEqual([]);
     });
 
     test('switching the bus on a jumper-wired board drops the chip-select pin too', () => {
         const workfile = workfile_with('test_sensor', 'otherboard', 'othersoc');
         expectOk(bootstrap(workfile));
-        expect(stored(workfile)['test_gpio_pin']).toBeDefined();
-        expectOk(set_value(workfile, 'testpart_init_param', 'comm_type', 'TESTPART_I2C'));
+        expect(stored(workfile)['test_sensor_cs_gpio']).toBeDefined();
+        expectOk(set_value(workfile, 'test_sensor_ip', 'comm_type', 'TESTPART_I2C'));
 
         const report = bootstrap(workfile);
         expectOk(report);
-        expect(report.value.deleted).toEqual(['test_spi_device', 'test_gpio_pin']);
+        expect(report.value.deleted).toEqual(['test_sensor_spi_dev', 'test_sensor_cs_gpio']);
     });
 
     test('a node the user edited is left dangling, and reported, not deleted', () => {
         const workfile = workfile_with('test_sensor');
         expectOk(bootstrap(workfile));
-        expectOk(set_value(workfile, 'test_spi_device', 'max_speed_hz', 2000000));
-        expectOk(set_value(workfile, 'testpart_init_param', 'comm_type', 'TESTPART_I2C'));
+        expectOk(set_value(workfile, 'test_sensor_spi_dev', 'max_speed_hz', 2000000));
+        expectOk(set_value(workfile, 'test_sensor_ip', 'comm_type', 'TESTPART_I2C'));
 
         const report = bootstrap(workfile);
         expectOk(report);
-        expect(stored(workfile)['test_spi_device']?.max_speed_hz).toBe(2000000);
+        expect(stored(workfile)['test_sensor_spi_dev']?.max_speed_hz).toBe(2000000);
         expect(report.value.deleted).toEqual([]);
-        expect(report.value.dangling).toEqual(['test_spi_device']);
+        expect(report.value.dangling).toEqual(['test_sensor_spi_dev']);
     });
 
     test('a reference the user removed counts too, given what was referenced before', () => {
@@ -360,11 +360,11 @@ describe('who owns a value', () => {
         expectOk(bootstrap(workfile));
         const before = referenced_nodes(workfile);
         add(workfile, 'my_dev', 'test_spi_device');
-        expectOk(set_value(workfile, 'testpart_init_param', 'comm_init', { spi_dev: 'my_dev' }));
+        expectOk(set_value(workfile, 'test_sensor_ip', 'comm_init', { spi_dev: 'my_dev' }));
 
         const report = bootstrap(workfile, { referenced_before: before });
         expectOk(report);
-        expect(report.value.deleted).toEqual(['test_spi_device']);
+        expect(report.value.deleted).toEqual(['test_sensor_spi_dev']);
     });
 
     test('a root, never referenced, is never deleted', () => {
@@ -378,24 +378,24 @@ describe('who owns a value', () => {
     test('a value the user wrote is never revised, whatever the rules say now', () => {
         const workfile = workfile_with('test_sensor');
         expectOk(bootstrap(workfile));
-        expectOk(set_value(workfile, 'test_spi_device', 'max_speed_hz', 2000000));
-        expectOk(set_value(workfile, 'testpart_init_param', 'comm_type', 'TESTPART_I2C'));
+        expectOk(set_value(workfile, 'test_sensor_spi_dev', 'max_speed_hz', 2000000));
+        expectOk(set_value(workfile, 'test_sensor_ip', 'comm_type', 'TESTPART_I2C'));
 
         expectOk(bootstrap(workfile));
-        expect(stored(workfile)['test_spi_device']?.max_speed_hz).toBe(2000000);
+        expect(stored(workfile)['test_sensor_spi_dev']?.max_speed_hz).toBe(2000000);
     });
 
     test('a revised value is reported with what it was and what it is now', () => {
         // An owned value that differs from what the rule gives now is set to the rule's value.
         const workfile = workfile_with('test_sensor');
         expectOk(bootstrap(workfile));
-        expectOk(set_value(workfile, 'test_spi_device', 'max_speed_hz', 5000000));
-        expectOk(mark_auto(workfile, 'test_spi_device', 'max_speed_hz'));
+        expectOk(set_value(workfile, 'test_sensor_spi_dev', 'max_speed_hz', 5000000));
+        expectOk(mark_auto(workfile, 'test_sensor_spi_dev', 'max_speed_hz'));
 
         const report = bootstrap(workfile);
         expectOk(report);
-        expect(report.value.revised).toEqual([{ node: 'test_spi_device', property: 'max_speed_hz', previous: 5000000, value: 1000000 }]);
-        expect(stored(workfile)['test_spi_device']?.$auto).toContain('max_speed_hz');
+        expect(report.value.revised).toEqual([{ node: 'test_sensor_spi_dev', property: 'max_speed_hz', previous: 5000000, value: 1000000 }]);
+        expect(stored(workfile)['test_sensor_spi_dev']?.$auto).toContain('max_speed_hz');
     });
 
     test('a chip-select the user cleared is not settled from the wiring', () => {
@@ -423,7 +423,7 @@ describe('hidden nodes', () => {
         const workfile = workfile_with('test_sensor');
         expectOk(bootstrap(workfile));
 
-        expect(Object.keys(stored(workfile))).toEqual(['test_sensor', 'eval_testpart', 'test_sensor_config', 'testpart_init_param', 'test_spi_device']);
+        expect(Object.keys(stored(workfile))).toEqual(['test_sensor', 'eval_testpart', 'test_sensor_cfg', 'test_sensor_ip', 'test_sensor_spi_dev']);
         expect([...(workfile.hidden ?? [])].sort()).toEqual(['bsp_test_spi_cfg', 'bsp_test_spi_cfg_handle', 'testpart_ops']);
     });
 
@@ -501,9 +501,9 @@ describe('the chip-select', () => {
 
         const symbols = stored(workfile);
         // The pin is stored - its number is a real field - and its port is a hidden handle.
-        expect(symbols['test_gpio_pin']).toEqual({ $compatible: 'test_gpio_pin', $auto: ['port_handle', 'number'], port_handle: 'bsp_other_gpio1_cfg_handle', number: 4 });
-        expect(symbols['test_spi_device']?.cs_gpio).toBe('test_gpio_pin');
-        expect(symbols['test_spi_device']?.cs_gpio_num).toBe(1);
+        expect(symbols['test_sensor_cs_gpio']).toEqual({ $compatible: 'test_gpio_pin', $auto: ['port_handle', 'number'], port_handle: 'bsp_other_gpio1_cfg_handle', number: 4 });
+        expect(symbols['test_sensor_spi_dev']?.cs_gpio).toBe('test_sensor_cs_gpio');
+        expect(symbols['test_sensor_spi_dev']?.cs_gpio_num).toBe(1);
 
         // And the wiring to make it true on the bench.
         expect(report.value.wiring[0]?.connections.map(connection => `${connection.from.pin}->${connection.to.connector}.${connection.to.pin}`))
@@ -517,7 +517,7 @@ describe('the chip-select', () => {
         const workfile = workfile_with('test_sensor', 'otherboard', 'othersoc');
         expectOk(bootstrap(workfile));
 
-        expect(stored(workfile)['test_spi_device']?.controller).toBe('bsp_test_spi_cfg_handle');
+        expect(stored(workfile)['test_sensor_spi_dev']?.controller).toBe('bsp_test_spi_cfg_handle');
         expect(Object.keys(workfile.symbols)).not.toContain('bsp_test_spi2_cfg_handle');
     });
 
@@ -529,34 +529,34 @@ describe('the chip-select', () => {
         expectOk(report);
 
         const symbols = stored(workfile);
-        expect(symbols['test_spi_device']?.controller).toBeUndefined();
-        expect(symbols['test_spi_device']?.cs_gpio).toBeUndefined();
+        expect(symbols['test_sensor_spi_dev']?.controller).toBeUndefined();
+        expect(symbols['test_sensor_spi_dev']?.cs_gpio).toBeUndefined();
         expect(report.value.chip_selects).toEqual([]);
 
         // The stop is reported with the options, by the names `update` takes, in the
         // board's own order...
         expect(report.value.choices).toEqual([{
-            node: 'test_spi_device',
+            node: 'test_sensor_spi_dev',
             property: 'controller',
             options: ['bsp_test_spi_cfg_handle', 'bsp_test_spi2_cfg_handle'],
         }]);
         // ...and so is why the wiring could not decide it.
         const [wiring] = report.value.wiring;
-        expect(wiring?.device).toBe('test_spi_device');
+        expect(wiring?.device).toBe('test_sensor_spi_dev');
         expect(wiring?.problems.join('\n')).toContain('2 spi sck pins');
     });
 
     test('on a board with two wired SPI buses, the controller the user picks settles the chip-select', () => {
         const workfile = workfile_with('test_sensor', 'twobusboard', 'othersoc');
         expectOk(bootstrap(workfile));
-        expectOk(set_value(workfile, 'test_spi_device', 'controller', 'bsp_test_spi2_cfg_handle'));
+        expectOk(set_value(workfile, 'test_sensor_spi_dev', 'controller', 'bsp_test_spi2_cfg_handle'));
 
         const report = bootstrap(workfile);
         expectOk(report);
         const symbols = stored(workfile);
-        expect(symbols['test_spi_device']?.controller).toBe('bsp_test_spi2_cfg_handle');
-        expect(symbols['test_spi_device']?.cs_gpio).toBe('test_gpio_pin');
-        expect(symbols['test_gpio_pin']?.number).toBe(8);
+        expect(symbols['test_sensor_spi_dev']?.controller).toBe('bsp_test_spi2_cfg_handle');
+        expect(symbols['test_sensor_spi_dev']?.cs_gpio).toBe('test_sensor_cs_gpio');
+        expect(symbols['test_sensor_cs_gpio']?.number).toBe(8);
 
         // The wiring is read from the picked bus only, so it no longer asks.
         const [wiring] = report.value.wiring;
@@ -592,9 +592,9 @@ describe('the chip-select', () => {
 
         const report = bootstrap(workfile);
         expectOk(report);
-        expect(stored(workfile)['part']?.comm_init).toEqual({ i2c_dev: 'test_i2c_device' });
+        expect(stored(workfile)['part']?.comm_init).toEqual({ i2c_dev: 'test_sensor_i2c_dev' });
         expect(report.value.wiring).toEqual([{
-            device: 'test_i2c_device',
+            device: 'test_sensor_i2c_dev',
             part: 'eval-testpart',
             interface: 'i2c',
             connections: [],
@@ -612,9 +612,9 @@ describe('the chip-select', () => {
         expectOk(report);
 
         const symbols = stored(workfile);
-        expect(symbols['test_spi_device_1']?.cs_gpio).toBeUndefined();
+        expect(symbols['second_spi_dev']?.cs_gpio).toBeUndefined();
         expect(report.value.chip_selects).toEqual([]);
-        const wiring = report.value.wiring.find(entry => entry.device === 'test_spi_device_1');
+        const wiring = report.value.wiring.find(entry => entry.device === 'second_spi_dev');
         expect(wiring?.problems.join('\n')).toContain('already used by another device');
         // The free pins it could use instead: not H1.4 (taken), not H1.1-3 (they carry SPI).
         expect(wiring?.chip_select_options).toEqual([{ at: { connector: 'H1', pin: '5' }, gpio: { port: 'OTHER_GPIO1', number: 5 } }]);
@@ -630,8 +630,8 @@ describe('the chip-select', () => {
         const report = bootstrap(workfile);
         expectOk(report);
 
-        expect(stored(workfile)['test_spi_device_1']?.native_cs).toBeUndefined();
-        const problems = report.value.wiring.find(wiring => wiring.device === 'test_spi_device_1')?.problems ?? [];
+        expect(stored(workfile)['second_spi_dev']?.native_cs).toBeUndefined();
+        const problems = report.value.wiring.find(wiring => wiring.device === 'second_spi_dev')?.problems ?? [];
         expect(problems.join('\n')).toContain('already used by another device');
     });
 
@@ -641,23 +641,23 @@ describe('the chip-select', () => {
         add(workfile, 'second', 'test_sensor');
         expectOk(attach_eval_board(workfile, 'eval-testpart', 'second'));
         expectOk(bootstrap(workfile));
-        expect(stored(workfile)['test_spi_device']?.cs_gpio).toBe('test_gpio_pin');
+        expect(stored(workfile)['test_sensor_spi_dev']?.cs_gpio).toBe('test_sensor_cs_gpio');
     });
 
     test('a list\'s count follows its list: clearing the pins removes the count', () => {
         const workfile = workfile_with('test_sensor', 'otherboard', 'othersoc');
         expectOk(bootstrap(workfile));
-        expect(stored(workfile)['test_spi_device']?.cs_gpio_num).toBe(1);
+        expect(stored(workfile)['test_sensor_spi_dev']?.cs_gpio_num).toBe(1);
 
         const before = referenced_nodes(workfile);
-        expectOk(clear_value(workfile, 'test_spi_device', 'cs_gpio'));
+        expectOk(clear_value(workfile, 'test_sensor_spi_dev', 'cs_gpio'));
         const report = bootstrap(workfile, { referenced_before: before });
         expectOk(report);
 
         const symbols = stored(workfile);
-        expect(symbols['test_spi_device']?.cs_gpio).toBeNull();
-        expect(symbols['test_spi_device']?.cs_gpio_num).toBeUndefined();
-        expect(report.value.deleted).toEqual(['test_gpio_pin']);
+        expect(symbols['test_sensor_spi_dev']?.cs_gpio).toBeNull();
+        expect(symbols['test_sensor_spi_dev']?.cs_gpio_num).toBeUndefined();
+        expect(report.value.deleted).toEqual(['test_sensor_cs_gpio']);
     });
 
     test('a list the user set gets its count filled in', () => {
@@ -667,21 +667,21 @@ describe('the chip-select', () => {
         expectOk(attach_eval_board(workfile, 'eval-testpart', 'second'));
         expectOk(bootstrap(workfile));
         add(workfile, 'my_pin', 'test_gpio_pin');
-        expectOk(set_value(workfile, 'test_spi_device_1', 'cs_gpio', 'my_pin'));
+        expectOk(set_value(workfile, 'second_spi_dev', 'cs_gpio', 'my_pin'));
 
         expectOk(bootstrap(workfile));
-        expect(stored(workfile)['test_spi_device_1']?.cs_gpio_num).toBe(1);
+        expect(stored(workfile)['second_spi_dev']?.cs_gpio_num).toBe(1);
     });
 
     test('a device that already has a chip-select is left alone', () => {
         const workfile = workfile_with('test_sensor');
         expectOk(bootstrap(workfile));
-        expectOk(set_value(workfile, 'test_spi_device', 'native_cs', 2));
+        expectOk(set_value(workfile, 'test_sensor_spi_dev', 'native_cs', 2));
 
         const again = bootstrap(workfile);
         expectOk(again);
         expect(again.value.chip_selects).toEqual([]);
-        expect(stored(workfile)['test_spi_device']?.native_cs).toBe(2);
+        expect(stored(workfile)['test_sensor_spi_dev']?.native_cs).toBe(2);
     });
 
     test('running it again on a GPIO chip-select changes nothing', () => {

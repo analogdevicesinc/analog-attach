@@ -90,9 +90,9 @@ describe.skipIf(REPOS === undefined)('adxl355 on max32655fthr, from the real rep
 
         expect(validate_workfile(workfile).valid).toBe(true);
         const symbols = stored(workfile);
-        expect(symbols['capi_spi_device']?.controller).toBe('bsp_spi1_cfg_handle');
+        expect(symbols['adxl355_spi_dev']?.controller).toBe('bsp_spi1_cfg_handle');
         // P2_0, J9 pin 5: the chip-select line board.yml declares for this bus.
-        expect(symbols['capi_gpio_pin']).toMatchObject({ port_handle: 'bsp_gpio2_cfg_handle', number: 0 });
+        expect(symbols['adxl355_cs_gpio']).toMatchObject({ port_handle: 'bsp_gpio2_cfg_handle', number: 0 });
     });
 
     test('a second one gets a chain of its own, but not the taken chip-select', () => {
@@ -101,25 +101,25 @@ describe.skipIf(REPOS === undefined)('adxl355 on max32655fthr, from the real rep
         add_adxl355(workfile, 'adxl355_1');
 
         const symbols = stored(workfile);
-        expect(symbols['adxl355_init_param_1']?.comm_init).toEqual({ spi_dev: 'capi_spi_device_1' });
-        expect(symbols['capi_spi_device_1']?.controller).toBe('bsp_spi1_cfg_handle');
-        expect(symbols['capi_spi_device_1']?.cs_gpio).toBeUndefined();
+        expect(symbols['adxl355_1_ip']?.comm_init).toEqual({ spi_dev: 'adxl355_1_spi_dev' });
+        expect(symbols['adxl355_1_spi_dev']?.controller).toBe('bsp_spi1_cfg_handle');
+        expect(symbols['adxl355_1_spi_dev']?.cs_gpio).toBeUndefined();
         // validate is what tells the user: the second device has no chip-select yet.
         const errors = validate_workfile(workfile).errors.map(entry => entry.path);
-        expect(errors).toContain('capi_spi_device_1.cs_gpio');
+        expect(errors).toContain('adxl355_1_spi_dev.cs_gpio');
     });
 
     test('switching to I2C rebuilds the bus and deletes the SPI side', () => {
         const workfile = board_workfile();
         add_adxl355(workfile, 'adxl355');
-        expectOk(set_value(workfile, 'adxl355_init_param', 'comm_type', 'ADXL355_I2C_COMM'));
+        expectOk(set_value(workfile, 'adxl355_ip', 'comm_type', 'ADXL355_I2C_COMM'));
         const report = bootstrap(workfile);
         expectOk(report);
 
         expect(validate_workfile(workfile).valid).toBe(true);
         const symbols = stored(workfile);
-        expect(symbols['capi_i2c_device']).toMatchObject({ controller: 'bsp_i2c2_cfg_handle', address: 0x1D });
-        expect(report.value.deleted.sort()).toEqual(['capi_gpio_pin', 'capi_spi_device']);
+        expect(symbols['adxl355_i2c_dev']).toMatchObject({ controller: 'bsp_i2c2_cfg_handle', address: 0x1D });
+        expect(report.value.deleted.sort()).toEqual(['adxl355_cs_gpio', 'adxl355_spi_dev']);
     });
 
     test('deleting the eval board leaves the part as a bare one', () => {
@@ -139,7 +139,7 @@ describe.skipIf(REPOS === undefined)('adxl355 on max32655fthr, from the real rep
         expectOk(pin_driver(bare, 'adxl355', 'adxl355'));
         expectOk(bootstrap(bare));
         expect(stored(workfile)).toEqual(stored(bare));
-        expect(stored(workfile)['capi_spi_device']?.cs_gpio).toBeUndefined();
+        expect(stored(workfile)['adxl355_spi_dev']?.cs_gpio).toBeUndefined();
     });
 
     test('the platform\'s ops tables come from its interfaces_file', () => {
@@ -210,12 +210,12 @@ describe.skipIf(REPOS === undefined)('ad74413r on max32655fthr, from the real re
 
         expect(validate_workfile(workfile).valid).toBe(true);
         const symbols = stored(workfile);
-        expect(symbols['capi_adc_config']).toMatchObject({ adc_ops: 'ad74413r_capi_adc_ops', extra: 'ad74413r_init_param' });
+        expect(symbols['ad74413r_cfg']).toMatchObject({ adc_ops: 'ad74413r_capi_adc_ops', extra: 'ad74413r_ip' });
         // Through $node: SPI mode 1 and 1 MHz, from the part, on the generic SPI device.
-        expect(symbols['capi_spi_device']).toMatchObject({ controller: 'bsp_spi1_cfg_handle', mode: 'CAPI_SPI_MODE_1', max_speed_hz: 1_000_000 });
-        expect(symbols['capi_gpio_pin']).toMatchObject({ port_handle: 'bsp_gpio2_cfg_handle', number: 0 });
+        expect(symbols['ad74413r_spi_dev']).toMatchObject({ controller: 'bsp_spi1_cfg_handle', mode: 'CAPI_SPI_MODE_1', max_speed_hz: 1_000_000 });
+        expect(symbols['ad74413r_cs_gpio']).toMatchObject({ port_handle: 'bsp_gpio2_cfg_handle', number: 0 });
         // The reset line is optional: the driver falls back to a software reset.
-        expect(symbols['ad74413r_init_param']?.reset_gpio).toBeUndefined();
+        expect(symbols['ad74413r_ip']?.reset_gpio).toBeUndefined();
     });
 
     test('an ADC channel finds its ADC and the driver\'s channel struct, with nothing declared', () => {
@@ -230,10 +230,10 @@ describe.skipIf(REPOS === undefined)('ad74413r on max32655fthr, from the real re
 
         const symbols = stored(workfile);
         // Both on the one ADC handle, each with a channel config of its own. Its extra is
-        // the ad74413r struct left once the device's own (ad74413r_init_param) is taken.
-        expect(symbols['capi_adc_chan_config']).toMatchObject({ adc_handle: 'ad74413r', extra: 'ad74413r_channel_config' });
-        expect(symbols['capi_adc_chan_config_1']).toMatchObject({ adc_handle: 'ad74413r', extra: 'ad74413r_channel_config_1' });
-        expect(symbols['capi_adc_config']?.extra).toBe('ad74413r_init_param');
+        // the ad74413r struct left once the device's own (ad74413r_ip) is taken.
+        expect(symbols['ch0_cfg']).toMatchObject({ adc_handle: 'ad74413r', extra: 'ch0_ip' });
+        expect(symbols['ch1_cfg']).toMatchObject({ adc_handle: 'ad74413r', extra: 'ch1_ip' });
+        expect(symbols['ad74413r_cfg']?.extra).toBe('ad74413r_ip');
     });
 
     test('the DAC side is brought up before an ADC channel added ahead of it', () => {
@@ -249,7 +249,7 @@ describe.skipIf(REPOS === undefined)('ad74413r on max32655fthr, from the real re
         const dac_ruleset = load_resolved_ruleset_for_board(dac.value, BOARD);
         expectOk(dac_ruleset);
         expectOk(add_symbol(workfile, 'ad74413r_dac', dac_ruleset.value));
-        expectOk(pin_driver(workfile, 'ad74413r_dac', 'ad74413r', 'ad74413r_init_param'));
+        expectOk(pin_driver(workfile, 'ad74413r_dac', 'ad74413r', 'ad74413r_adc_ip'));
         expectOk(bootstrap(workfile));
 
         const names = load_devices(workfile).map(device => device.descriptor_name);
@@ -263,11 +263,11 @@ describe.skipIf(REPOS === undefined)('ad74413r on max32655fthr, from the real re
         add_driver(workfile, 'ad74413r', 'ad74413r', 'adc');
 
         const symbols = stored(workfile);
-        expect(symbols['capi_spi_device_1']?.controller).toBe('bsp_spi1_cfg_handle');
-        expect(symbols['capi_spi_device_1']?.cs_gpio).toBeUndefined();
+        expect(symbols['ad74413r_spi_dev']?.controller).toBe('bsp_spi1_cfg_handle');
+        expect(symbols['ad74413r_spi_dev']?.cs_gpio).toBeUndefined();
         // Each part's mode stays its own, though both devices are the same schema.
-        expect(symbols['capi_spi_device']?.mode).toBe('CAPI_SPI_MODE_0');
-        expect(symbols['capi_spi_device_1']?.mode).toBe('CAPI_SPI_MODE_1');
+        expect(symbols['adxl355_spi_dev']?.mode).toBe('CAPI_SPI_MODE_0');
+        expect(symbols['ad74413r_spi_dev']?.mode).toBe('CAPI_SPI_MODE_1');
     });
 });
 
@@ -282,11 +282,11 @@ describe.skipIf(REPOS === undefined)('ad7156 on max32655fthr, from the real repo
         expect(validate_workfile(workfile).valid).toBe(true);
         const symbols = stored(workfile);
         // The adapter's struct is the extra; the part's own is embedded in it as `device`.
-        expect(symbols['capi_proximity_sensor_init_config']).toMatchObject({ extra: 'ad7156_capi_init_param', ops: 'ad7156_capi_proximity_ops' });
-        expect(symbols['ad7156_capi_init_param']?.device).toBe('ad7156_init_param');
-        expect(symbols['ad7156_init_param']).toMatchObject({ i2c_dev: 'capi_i2c_device', channel1_range: 2, channel2_range: 2 });
+        expect(symbols['ad7156_cfg']).toMatchObject({ extra: 'ad7156_ip', ops: 'ad7156_capi_proximity_ops' });
+        expect(symbols['ad7156_ip']?.device).toBe('ad7156_device');
+        expect(symbols['ad7156_device']).toMatchObject({ i2c_dev: 'ad7156_i2c_dev', channel1_range: 2, channel2_range: 2 });
         // Fixed in silicon, and on the board's only I2C bus.
-        expect(symbols['capi_i2c_device']).toMatchObject({ address: 0x48, speed: 'CAPI_I2C_SPEED_FAST', controller: 'bsp_i2c2_cfg_handle' });
+        expect(symbols['ad7156_i2c_dev']).toMatchObject({ address: 0x48, speed: 'CAPI_I2C_SPEED_FAST', controller: 'bsp_i2c2_cfg_handle' });
     });
 
     test('its eval board wires it to the board\'s I2C pins', () => {
@@ -332,9 +332,9 @@ describe.skipIf(REPOS === undefined)('max31889 on max32655fthr, from the real re
 
         expect(validate_workfile(workfile).valid).toBe(true);
         const symbols = stored(workfile);
-        expect(symbols['capi_temp_sensor_init_config']).toMatchObject({ extra: 'max31889_init_param', ops: 'max31889_capi_temp_ops' });
-        expect(symbols['max31889_init_param']?.i2c_dev).toBe('capi_i2c_device');
-        expect(symbols['capi_i2c_device']).toMatchObject({ address: 0x50, speed: 'CAPI_I2C_SPEED_FAST', controller: 'bsp_i2c2_cfg_handle' });
+        expect(symbols['max31889_cfg']).toMatchObject({ extra: 'max31889_ip', ops: 'max31889_capi_temp_ops' });
+        expect(symbols['max31889_ip']?.i2c_dev).toBe('max31889_i2c_dev');
+        expect(symbols['max31889_i2c_dev']).toMatchObject({ address: 0x50, speed: 'CAPI_I2C_SPEED_FAST', controller: 'bsp_i2c2_cfg_handle' });
     });
 
     test('depends on capi-util although the driver names no package', () => {

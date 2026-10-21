@@ -73,50 +73,50 @@ describe("bootstrap after each command", () => {
     it("add builds the chain and marks what it set", async () => {
         await sensor();
         const symbols = stored();
-        expect(symbols["test_spi_device"]?.$auto).toContain("controller");
-        expect(symbols["test_gpio_pin"]).toMatchObject({ number: 4, port_handle: "bsp_other_gpio1_cfg_handle" });
+        expect(symbols["testpart_spi_dev"]?.$auto).toContain("controller");
+        expect(symbols["testpart_cs_gpio"]).toMatchObject({ number: 4, port_handle: "bsp_other_gpio1_cfg_handle" });
     });
 
     it("update switching the bus rebuilds it, deleting what nothing uses", async () => {
         await sensor();
-        const text = await cli("update", "testpart_init_param", "comm_type", "TESTPART_I2C");
+        const text = await cli("update", "testpart_ip", "comm_type", "TESTPART_I2C");
 
         const symbols = stored();
-        expect(symbols["testpart_init_param"]?.comm_init).toEqual({ i2c_dev: "test_i2c_device" });
-        expect(symbols["test_spi_device"]).toBeUndefined();
-        expect(symbols["test_gpio_pin"]).toBeUndefined();
+        expect(symbols["testpart_ip"]?.comm_init).toEqual({ i2c_dev: "testpart_i2c_dev" });
+        expect(symbols["testpart_spi_dev"]).toBeUndefined();
+        expect(symbols["testpart_cs_gpio"]).toBeUndefined();
         expect(text).toContain("Bootstrap deleted what nothing uses any more");
     });
 
     it("a node the user edited is kept when it stops being used, with a hint", async () => {
         await sensor();
-        await cli("update", "test_spi_device", "max_speed_hz", "2000000");
-        const text = await cli("update", "testpart_init_param", "comm_type", "TESTPART_I2C");
+        await cli("update", "testpart_spi_dev", "max_speed_hz", "2000000");
+        const text = await cli("update", "testpart_ip", "comm_type", "TESTPART_I2C");
 
-        expect(stored()["test_spi_device"]?.max_speed_hz).toBe(2_000_000);
-        expect(text).toContain("attach-noos delete test_spi_device");
+        expect(stored()["testpart_spi_dev"]?.max_speed_hz).toBe(2_000_000);
+        expect(text).toContain("attach-noos delete testpart_spi_dev");
     });
 
     it("an edited value is the user's, no longer bootstrap's", async () => {
         await sensor();
-        await cli("update", "test_spi_device", "max_speed_hz", "2000000");
-        expect(stored()["test_spi_device"]?.$auto).not.toContain("max_speed_hz");
+        await cli("update", "testpart_spi_dev", "max_speed_hz", "2000000");
+        expect(stored()["testpart_spi_dev"]?.$auto).not.toContain("max_speed_hz");
     });
 
     it("resetting a value stores null, and bootstrap leaves it empty", async () => {
         await sensor();
-        await cli("delete", "test_spi_device", "max_speed_hz");
-        expect(stored()["test_spi_device"]?.max_speed_hz).toBeNull();
+        await cli("delete", "testpart_spi_dev", "max_speed_hz");
+        expect(stored()["testpart_spi_dev"]?.max_speed_hz).toBeNull();
     });
 
     it("deleting the chip-select pin leaves it deleted, and drops its count", async () => {
         await sensor();
-        await cli("delete", "test_gpio_pin", "--force");
+        await cli("delete", "testpart_cs_gpio", "--force");
 
         const symbols = stored();
-        expect(symbols["test_gpio_pin"]).toBeUndefined();
-        expect(symbols["test_spi_device"]?.cs_gpio).toBeNull();
-        expect(symbols["test_spi_device"]?.cs_gpio_num).toBeUndefined();
+        expect(symbols["testpart_cs_gpio"]).toBeUndefined();
+        expect(symbols["testpart_spi_dev"]?.cs_gpio).toBeNull();
+        expect(symbols["testpart_spi_dev"]?.cs_gpio_num).toBeUndefined();
     });
 
     it("deleting the eval board leaves the part as a bare one", async () => {
@@ -135,13 +135,13 @@ describe("bootstrap after each command", () => {
         await cli("add", "test_spi_device");
         const text = await cli("add", "testpart");
         // The unused SPI device is reused: the connection is the only trace of it.
-        expect(text).toMatch(/> testpart_init_param\.comm_init\.spi_dev\s+test_spi_device \(already in the workfile\)/);
+        expect(text).toMatch(/> testpart_ip\.comm_init\.spi_dev\s+test_spi_device \(already in the workfile\)/);
     });
 
     it("read names each field's type as the schema writes it, in its own column", async () => {
         await sensor();
-        const text = await cli("read", "test_sensor_config");
-        expect(text).toMatch(/extra\s+driver_init_param\s+testpart_init_param/);
+        const text = await cli("read", "testpart_cfg");
+        expect(text).toMatch(/extra\s+driver_init_param\s+testpart_ip/);
         expect(text).toMatch(/ops\s+driver_ops\s+testpart_ops/);
         expect(text).not.toContain("DriverInitParameterProperty");
     });
@@ -149,7 +149,7 @@ describe("bootstrap after each command", () => {
     it("a bare part, with no eval board, is not wired and says why", async () => {
         await cli("init");
         const text = await cli("add", "testpart");
-        expect(stored()["test_spi_device"]?.cs_gpio).toBeUndefined();
+        expect(stored()["testpart_spi_dev"]?.cs_gpio).toBeUndefined();
         expect(text).toContain("no eval board carries this testpart");
         // With two SPI buses on otherboard the controller is still a choice, so which board
         // pins the bus is on is not known yet either.
@@ -159,10 +159,10 @@ describe("bootstrap after each command", () => {
     it("with the bootstrap setting off, update changes only what it was told", async () => {
         await sensor();
         await cli("config", "bootstrap", "false");
-        await cli("update", "testpart_init_param", "comm_type", "TESTPART_I2C");
+        await cli("update", "testpart_ip", "comm_type", "TESTPART_I2C");
 
         const symbols = stored();
-        expect(symbols["testpart_init_param"]?.comm_init).toEqual({ spi_dev: "test_spi_device" });
-        expect(symbols["test_spi_device"]).toBeDefined();
+        expect(symbols["testpart_ip"]?.comm_init).toEqual({ spi_dev: "testpart_spi_dev" });
+        expect(symbols["testpart_spi_dev"]).toBeDefined();
     });
 });
