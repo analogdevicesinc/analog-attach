@@ -56,7 +56,7 @@ export type AddNodeResult =
 export function add_node(overlay: DeviceTreeOverlay, request: AddNodeRequest): AddNodeResult {
     const { parent_path, compatible } = request;
 
-    const label = choose_label(request.label, compatible, overlay.all_labels());
+    const label = choose_label(request.label, compatible, overlay.taken_labels());
     if (label.status === "invalid") { return { status: "invalid-label", label: request.label ?? "" }; }
     if (label.status === "taken") { return { status: "label-taken", label: request.label ?? "", owner: label.owner }; }
 
@@ -279,6 +279,13 @@ if (import.meta.vitest) {
         const overlay = setup();
         expect(add_node(overlay, request({ label: "spi0" }))).toEqual({ status: "label-taken", label: "spi0", owner: SPI0 });
         expect(add_node(overlay, request({ label: "1bad" }))).toEqual({ status: "invalid-label", label: "1bad" });
+    });
+
+    test("add_node — labels on a fragment, its __overlay__ or a __dormant__ node are taken", () => {
+        const overlay = setup(`/dts-v1/;\n/plugin/;\n/ {\n\tbusfrag: fragment@0 {\n\t\ttarget = <&spi0>;\n\t\tspibus: __overlay__ {\n\t\t};\n\t};\n\tfragment@1 {\n\t\ttarget = <&spi0>;\n\t\t__dormant__ {\n\t\t\tsleeper: sleeper@5 { reg = <5>; };\n\t\t};\n\t};\n};`);
+        expect(add_node(overlay, request({ label: "busfrag" }))).toEqual({ status: "label-taken", label: "busfrag", owner: "/fragment@0" });
+        expect(add_node(overlay, request({ label: "spibus" }))).toEqual({ status: "label-taken", label: "spibus", owner: SPI0 });
+        expect(add_node(overlay, request({ label: "sleeper" }))).toEqual({ status: "label-taken", label: "sleeper", owner: `${SPI0}/sleeper@5` });
     });
 
     test("add_node — empty unit address refused", () => {

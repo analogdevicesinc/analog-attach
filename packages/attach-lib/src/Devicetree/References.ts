@@ -24,7 +24,7 @@ export interface UnresolvedTarget {
  * tree order. With `under`, only nodes at or below that absolute path.
  */
 export function unresolved_references(overlay: DeviceTreeOverlay, under?: string): UnresolvedReference[] {
-    const labels = overlay_labels(overlay);
+    const labels = overlay.all_labels();
     const exists: Exists = path => overlay.effective_node(path) !== undefined;
     const resolves = (value: DTLabel | DTPath): boolean =>
         locate(labels, exists, value.kind === "label" ? strip_ampersand(value.name) : value.path) !== undefined;
@@ -61,7 +61,7 @@ export function unresolved_references(overlay: DeviceTreeOverlay, under?: string
  * target must exist before the fragment is applied.
  */
 export function unresolved_targets(overlay: DeviceTreeOverlay): UnresolvedTarget[] {
-    const labels = overlay_labels(overlay);
+    const labels = overlay.all_labels();
     const below_fragments = overlay_paths(overlay);
     const base = overlay.get_base_dts();
     const exists: Exists = path => base?.node_exists(path) === true || below_fragments.has(path);
@@ -88,24 +88,6 @@ function locate(labels: Map<string, string>, exists: Exists, reference: string):
     if (root === undefined || rest.length === 0) { return root; }
     const path = join_path(root, rest.join("/"));
     return exists(path) ? path : undefined;
-}
-
-/**
- * Every label of the base tree and the overlay. Unlike `all_labels`, this
- * includes labels on `__overlay__` itself and inside `__dormant__` fragments
- * (the ones `__overrides__` switch on), which dtc resolves too.
- */
-function overlay_labels(overlay: DeviceTreeOverlay): Map<string, string> {
-    const labels = overlay.all_labels();
-    const collect = (node: DTNode, path: string): void => {
-        for (const label of node.labels) { labels.set(label, path); }
-        for (const child of node.children) { collect(child, join_path(path, get_full_node_name(child))); }
-    };
-    for (const fragment of overlay.get_fragments()) {
-        const body = fragment_body(fragment);
-        if (body !== undefined) { collect(body, overlay.get_fragment_root_path(fragment) ?? ""); }
-    }
-    return labels;
 }
 
 /** The fragment's `__overlay__`, or its `__dormant__` when `__overrides__` may switch it on. */
