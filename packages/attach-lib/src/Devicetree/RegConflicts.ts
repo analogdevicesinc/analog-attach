@@ -11,7 +11,7 @@ export interface RegConflict {
     nodes: [string, string];
     /** The first address both claim. */
     address: bigint;
-    /** Whether each node is added or patched by the overlay; false means it comes from the base tree as is. */
+    /** Whether the overlay adds each node or sets its reg or status; false means its claim comes from the base tree. */
     in_overlay: [boolean, boolean];
 }
 
@@ -97,11 +97,22 @@ export function sibling_reg_conflicts(overlay: DeviceTreeOverlay, parent_path: s
                 parent_path,
                 nodes: [a.name, b.name],
                 address,
-                in_overlay: [overlay.find_node(child_path(a.name)) !== undefined, overlay.find_node(child_path(b.name)) !== undefined],
+                in_overlay: [changes_claim(overlay, child_path(a.name)), changes_claim(overlay, child_path(b.name))],
             });
         }
     }
     return conflicts;
+}
+
+/**
+ * Whether the overlay adds the node or sets its reg or status, the only ways
+ * it can make the node clash. A base node the overlay only adds children to
+ * (pin groups under gpio) keeps the clashes it has in the base.
+ */
+function changes_claim(overlay: DeviceTreeOverlay, path: string): boolean {
+    const found = overlay.find_node(path);
+    if (found === undefined) { return false; }
+    return !found.is_in_base || found.node.properties.some(p => p.name === "reg" || p.name === "status");
 }
 
 /** The first address two regs both claim. A size of 0 still claims its address. */
@@ -202,6 +213,22 @@ if (import.meta.vitest) {
         expect(reg_conflicts(overlay).map(c => ({ nodes: c.nodes, in_overlay: c.in_overlay }))).toEqual([
             { nodes: ["spidev@0", "adc@0"], in_overlay: [true, true] },
         ]);
+    });
+
+    test("reg_conflicts — a base node the overlay only adds a child to stays on the base side", () => {
+        const overlay = setup(
+            "\t#address-cells = <1>;\n\t#size-cells = <1>;\n\tgpio: gpio@1000 { reg = <0x1000 0x100>; };\n\tgpiomem { reg = <0x1000 0x1000>; };",
+            "&gpio {\n\tpins { brcm,pins = <19>; };\n};",
+        );
+        expect(reg_conflicts(overlay).map(c => c.in_overlay)).toEqual([[false, false]]);
+    });
+
+    test("reg_conflicts — a base node whose reg the overlay sets is on the overlay side", () => {
+        const overlay = setup(
+            "\t#address-cells = <1>;\n\t#size-cells = <1>;\n\tgpio: gpio@1000 { reg = <0x1000 0x100>; };\n\tgpiomem { reg = <0x2000 0x1000>; };",
+            "&gpio {\n\treg = <0x2000 0x100>;\n};",
+        );
+        expect(reg_conflicts(overlay).map(c => c.in_overlay)).toEqual([[true, false]]);
     });
 
     test("reg_conflicts — children of a disabled controller are checked too", () => {
