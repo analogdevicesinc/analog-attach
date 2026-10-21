@@ -1,4 +1,7 @@
-import { address_cells_of, reg_conflicts, sibling_reg_conflicts, type DeviceTreeOverlay, type RegConflict } from "attach-lib";
+import {
+    address_cells_of, chip_select_overflows, reg_conflicts, sibling_chip_select_overflows, sibling_reg_conflicts,
+    type ChipSelectOverflow, type DeviceTreeOverlay, type RegConflict,
+} from "attach-lib";
 
 import { bus_kind } from "./utilities";
 
@@ -11,25 +14,36 @@ export interface RegWarning {
     hint?: string;
 }
 
-/** Clashes in the whole tree that involve the overlay; base-only clashes are left out. */
+/**
+ * Clashes and chip selects without a cs-gpios entry in the whole tree that
+ * involve the overlay; base-only ones are left out.
+ */
 export function reg_warnings(overlay: DeviceTreeOverlay): RegWarning[] {
-    return reg_conflicts(overlay)
+    const clashes = reg_conflicts(overlay)
         .filter(conflict => conflict.in_overlay.some(Boolean))
         .map(conflict => {
             // Report on the overlay's side; the later node when both are.
             const side = conflict.in_overlay[1] ? 1 : 0;
             return warning(overlay, conflict, side);
         });
+    const overflows = chip_select_overflows(overlay)
+        .filter(overflow => overflow.in_overlay)
+        .map(overflow => overflow_warning(overflow));
+    return [...clashes, ...overflows];
 }
 
-/** Clashes between the node at `path` and its siblings, whichever side they come from. */
+/** Clashes between the node at `path` and its siblings, whichever side they come from, and a chip select without a cs-gpios entry. */
 export function node_reg_warnings(overlay: DeviceTreeOverlay, path: string): RegWarning[] {
     const slash = path.lastIndexOf("/");
     const parent_path = slash <= 0 ? "/" : path.slice(0, slash);
     const name = path.slice(slash + 1);
-    return sibling_reg_conflicts(overlay, parent_path)
+    const clashes = sibling_reg_conflicts(overlay, parent_path)
         .filter(conflict => conflict.nodes.includes(name))
         .map(conflict => warning(overlay, conflict, conflict.nodes[0] === name ? 0 : 1));
+    const overflows = sibling_chip_select_overflows(overlay, parent_path)
+        .filter(overflow => overflow.node === name)
+        .map(overflow => overflow_warning(overflow));
+    return [...clashes, ...overflows];
 }
 
 /** The lines `update reg`, `rename` and `add` print for a warning (on stderr under --json). */
@@ -64,6 +78,16 @@ function warning(overlay: DeviceTreeOverlay, conflict: RegConflict, side: 0 | 1)
     };
 }
 
+function overflow_warning({ parent_path, node, chip_select, lines }: ChipSelectOverflow): RegWarning {
+    const controller = parent_path.slice(parent_path.lastIndexOf("/") + 1);
+    const range = lines === 1 ? "chip select 0" : `chip selects 0-${lines - 1}`;
+    return {
+        path: parent_path === "/" ? `/${node}` : `${parent_path}/${node}`,
+        message: `chip select ${chip_select} has no cs-gpios entry: ${controller} has ${range}`,
+        hint: `Use one of those, or add a GPIO for it to cs-gpios of ${parent_path}`,
+    };
+}
+
 if (import.meta.vitest) {
     const { test, expect } = import.meta.vitest;
     const { DeviceTree, DeviceTreeOverlay: DTO } = await import("attach-lib");
@@ -78,6 +102,7 @@ if (import.meta.vitest) {
             compatible = "brcm,bcm2835-spi";
             #address-cells = <1>;
             #size-cells = <0>;
+            cs-gpios = <&gpio 8 1>, <&gpio 7 1>;
             spidev@0 { reg = <0>; };
         };
         i2c1: i2c@7e804000 {
@@ -86,7 +111,7 @@ if (import.meta.vitest) {
             #size-cells = <0>;
             temp@48 { reg = <0x48>; };
         };
-        gpio@7e200000 { reg = <0x7e200000 0xb4>; };
+        gpio: gpio@7e200000 { reg = <0x7e200000 0xb4>; gpio-controller; #gpio-cells = <2>; };
         gpiomem { reg = <0x7e200000 0x1000>; };
     };
 };`;
@@ -127,11 +152,21 @@ if (import.meta.vitest) {
         expect(reg_warnings(setup("&{/soc/gpio@7e200000} {\n\tpins { brcm,pins = <19>; };\n};"))).toEqual([]);
     });
 
+    test("reg_warnings — a chip select without a cs-gpios entry", () => {
+        expect(reg_warnings(setup("&spi0 {\n\tadc@2 { reg = <2>; };\n};"))).toEqual([{
+            path: "/soc/spi@7e204000/adc@2",
+            message: "chip select 2 has no cs-gpios entry: spi@7e204000 has chip selects 0-1",
+            hint: "Use one of those, or add a GPIO for it to cs-gpios of /soc/spi@7e204000",
+        }]);
+    });
+
     test("node_reg_warnings — only the clashes of that node", () => {
         const overlay = setup("&spi0 {\n\tadc@0 { reg = <0>; };\n\tadc@1 { reg = <1>; };\n};");
         expect(node_reg_warnings(overlay, "/soc/spi@7e204000/adc@1")).toEqual([]);
         expect(node_reg_warnings(overlay, "/soc/spi@7e204000/adc@0").map(w => w.message)).toEqual(["chip select 0 is already used by spidev@0"]);
         expect(node_reg_warnings(overlay, "/soc/spi@7e204000/spidev@0").map(w => w.message)).toEqual(["chip select 0 is already used by adc@0"]);
+        const past_cs_gpios = setup("&spi0 {\n\tadc@2 { reg = <2>; };\n};");
+        expect(node_reg_warnings(past_cs_gpios, "/soc/spi@7e204000/adc@2").map(w => w.message)).toEqual(["chip select 2 has no cs-gpios entry: spi@7e204000 has chip selects 0-1"]);
     });
 
     test("reg_warning_lines — the warning and its hint", () => {
