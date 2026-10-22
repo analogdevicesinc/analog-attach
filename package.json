@@ -193,6 +193,7 @@
     "lint:extension": "yarn workspace @analog-attach/extension lint",
     "lint:cli": "yarn workspace attach-linux lint",
     "test-clean": "yarn clean:attach-lib && yarn clean:attach-linux && yarn workspace attach-lib install && yarn workspace attach-linux install && yarn workspace attach-lib build && yarn workspace attach-linux build && yarn workspace attach-lib test --run && yarn workspace attach-linux test",
+    "verify": "scripts/verify.sh",
     "test": "yarn workspace attach-lib test --run && yarn workspace attach-linux test",
     "clean": "yarn workspaces foreach -A run clean",
     "clean:all": "yarn run clean && rm -rf node_modules",

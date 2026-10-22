@@ -120,3 +120,30 @@ Setting `interrupts` without an explicit `interrupt-parent` writes the inherited
 - `bigIntReplacer` in `src/utilities.ts` must be passed to `JSON.stringify` whenever output contains `BigInt` values (DTS cell arrays are always `bigint`).
 - Inline tests use Vitest's `includeSource` feature — `if (import.meta.vitest)` blocks sit directly in source files (see `src/commands/add/command.ts`).
 - TypeScript is configured with `noUncheckedIndexedAccess`, `noPropertyAccessFromIndexSignature`, and `verbatimModuleSyntax` — stricter than the monorepo baseline. Index access always requires a `undefined` check.
+
+## Working rules
+
+### Definition of done
+
+Before saying a task is done, run `yarn verify` from the repo root (attach-lib build → lib tests → attach-cli build with `tsc` → lint → CLI tests) and fix every error, including pre-existing lint errors in files you edited. A Stop hook (`.claude/hooks/stop-verify.sh`) runs it when attach-lib or attach-cli changed and blocks on failure. Never report completion with failing lint or type checks.
+
+### Build order
+
+attach-cli consumes the *built* attach-lib. After changing attach-lib, rebuild it (`yarn workspace attach-lib build`) before running CLI tests, regenerating snapshots or checking by hand. Yarn 4 does not run `pre*`/`post*` lifecycle hooks, so call build steps explicitly.
+
+### Scope and git
+
+- Change only the files and packages in scope. Ask before touching `notes.txt`, other packages' plans, or any `CLAUDE.md`.
+- Never commit, amend, rebase or rewrite history unless asked. Subagents and forks never commit.
+- "Commit" means the full working diff unless told otherwise. Never revert uncommitted changes you didn't make.
+- Parallel agents get disjoint file lists, and the main agent runs `yarn verify` and waits for review before any commit.
+
+### Working through findings
+
+When going through a list of findings, take one at a time: explain the issue and the proposed fix, then wait for confirmation before editing. Don't move on to the next item.
+For an ambiguous request ("show me first", "test this e2e"), restate it in 2–3 bullets and wait for an OK.
+
+### Domain notes
+
+- "Test e2e" / "test this manually" means running the real CLI by hand against demo files, not writing automated e2e tests.
+- Interrupt cell counts come from the chosen interrupt-parent's `#interrupt-cells`, not from the specifier count.

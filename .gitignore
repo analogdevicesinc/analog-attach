@@ -31,3 +31,4 @@ packages/attach-ui-lib/tsconfig.tsbuildinfo
 #symlinks
 packages/extension/test/linux
 packages/extension/test/dt-schema
+.claude/.verify-pass
