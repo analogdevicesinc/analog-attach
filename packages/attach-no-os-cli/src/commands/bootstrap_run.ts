@@ -1,4 +1,4 @@
-import { bootstrap, bootstrap_enabled, format_number_in, ok } from "attach-no-os-lib";
+import { bootstrap, bootstrap_enabled, describe_board_pin, format_number_in, ok } from "attach-no-os-lib";
 import type { BootstrapReport, FilledValue, Result, Workfile } from "attach-no-os-lib";
 
 /**
@@ -19,6 +19,17 @@ const CHIP_SELECT_OPTIONS_SHOWN = 6;
 /** A value as the schema writes it: a number in its format, anything else as JSON. */
 function show(value: unknown, format: FilledValue["format"]): string {
     return typeof value === "number" ? format_number_in(value, format) : JSON.stringify(value);
+}
+
+/**
+ * A board pin as a person finds it: its header position, and the chip pin name the board
+ * prints next to it, when the pinout gives one (`J9 pin 5 (P2_0)`).
+ */
+function board_pin(board: string | undefined, at: { connector: string, pin: string }): string {
+    const position = `${at.connector} pin ${at.pin}`;
+    const described = board === undefined ? undefined : describe_board_pin(board, at);
+    const mnemonic = described?.ok === true ? described.value.pin.mnemonic : undefined;
+    return mnemonic === undefined || mnemonic === at.pin ? position : `${position} (${mnemonic})`;
 }
 
 /** What bootstrap did, for a person: the nodes it made, the values it chose, the wiring, and where it stopped. */
@@ -76,7 +87,7 @@ export function describe_bootstrap(report: BootstrapReport, workfile: Workfile):
         if (chip_select.kind === "native") {
             how = `native line ${String(chip_select.native_cs)} of ${chip_select.peripheral}`;
         } else if (chip_select.kind === "gpio") {
-            how = `GPIO ${chip_select.gpio.port} pin ${String(chip_select.gpio.number)} (${chip_select.at.connector} pin ${chip_select.at.pin})`;
+            how = `GPIO ${chip_select.gpio.port} pin ${String(chip_select.gpio.number)}, at ${board_pin(workfile.board, chip_select.at)}`;
         }
         lines.push("", `Chip-select for ${decision.device}: ${how}`);
     }
@@ -87,7 +98,7 @@ export function describe_bootstrap(report: BootstrapReport, workfile: Workfile):
             lines.push("", `Wire ${wiring.part} to ${workfile.board ?? "the board"} over ${bus}:`);
             for (const connection of wiring.connections) {
                 const from = `${connection.from.connector} pin ${connection.from.pin} (${connection.role})`;
-                lines.push(`  ${from.padEnd(24)} -> ${connection.to.connector} pin ${connection.to.pin}`);
+                lines.push(`  ${from.padEnd(24)} -> ${board_pin(workfile.board, connection.to)}`);
             }
         } else {
             lines.push("", `Wiring ${wiring.part} over ${bus}:`);
@@ -98,12 +109,12 @@ export function describe_bootstrap(report: BootstrapReport, workfile: Workfile):
         // A bare part: which board pins its bus is on, for the part's own pins to go to.
         const board_pins = wiring.board_pins ?? [];
         if (board_pins.length > 0) {
-            lines.push(`  Its bus is on: ${board_pins.map(pin => `${pin.signal.toUpperCase()} ${pin.at.connector} pin ${pin.at.pin}`).join(", ")}`);
+            lines.push(`  Its bus is on: ${board_pins.map(pin => `${pin.signal.toUpperCase()} ${board_pin(workfile.board, pin.at)}`).join(", ")}`);
         }
         const options = wiring.chip_select_options ?? [];
         if (options.length > 0) {
             const shown = options.slice(0, CHIP_SELECT_OPTIONS_SHOWN).map(option =>
-                `${option.at.connector} pin ${option.at.pin}${option.gpio === undefined ? "" : ` (${option.gpio.port} ${String(option.gpio.number)})`}`);
+                `${board_pin(workfile.board, option.at)}${option.gpio === undefined ? "" : ` = ${option.gpio.port} ${String(option.gpio.number)}`}`);
             const more = options.length > shown.length ? `, and ${String(options.length - shown.length)} more` : "";
             lines.push(
                 `  Free pins for its chip-select: ${shown.join(", ")}${more}`,
