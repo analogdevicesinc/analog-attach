@@ -4,6 +4,7 @@ import { app } from "../app";
 import { CompletionContext } from "../completion/completion";
 import { normalize_argv } from "../argv";
 import type { AttachContext } from "../commands/shared";
+import { run_setup } from "../commands/setup";
 
 const raw_arguments = process.argv.slice(2);
 
@@ -43,7 +44,16 @@ if (raw_arguments[0] === "complete") {
     process.exit(0);
 }
 
-const { argv } = normalize_argv(raw_arguments);
+// --- guided setup ---
+//
+// `attach-noos` alone, at a terminal: walk through the settings a first run needs. With
+// --quiet, or with no terminal to ask at (a pipe, CI, attach-meta), it is the plain help.
+const quiet = raw_arguments.length === 1 && raw_arguments[0] === "--quiet";
+if (raw_arguments.length === 0 && process.stdin.isTTY && process.stdout.isTTY) {
+    process.exit(await run_setup());
+}
+
+const { argv } = normalize_argv(quiet ? [] : raw_arguments);
 
 const context: AttachContext = { process };
 await run(app, argv, context);

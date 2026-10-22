@@ -42,63 +42,72 @@ export const initCommand = buildCommand<InitFlags, []>({
         }
     },
     func: async (flags: InitFlags) => {
-        const target = get_workfile_path();
-        if (!target.ok) {
-            output_error(flags, target.error.message);
+        const created = init_workfile();
+        if (!created.ok) {
+            output_error(flags, created.message, created.text === undefined ? {} : { text: created.text });
             return;
         }
-
-        // Never silently: a workfile is the user's design, and this command would replace
-        // it with an empty one.
-        if (fs.existsSync(target.value)) {
-            output_error(
-                flags,
-                `A workfile already exists at ${target.value}`,
-                { text: `A workfile already exists at ${target.value}.\nDelete it, or point the 'workfile' setting somewhere else.` }
-            );
-            return;
-        }
-
-        const resolved = resolve_target();
-        if (!resolved.ok) {
-            output_error(flags, resolved.message, { text: resolved.text });
-            return;
-        }
-
-        const workfile = create_workfile(resolved.platform);
-        if (!workfile.ok) {
-            output_error(flags, workfile.error.message);
-            return;
-        }
-
-        // Recorded so the board travels with the workfile: codegen reads it from there,
-        // which is what makes a workfile buildable on a machine configured differently.
-        if (resolved.board !== undefined) {
-            workfile.value.board = resolved.board;
-        }
-
-        const minimal = export_minimal(workfile.value);
-        if (!minimal.ok) {
-            output_error(flags, minimal.error.message);
-            return;
-        }
-
-        fs.mkdirSync(path.dirname(target.value), { recursive: true });
-        fs.writeFileSync(target.value, JSON.stringify(minimal.value, undefined, 2));
-
-        const description = resolved.board === undefined
-            ? `platform ${resolved.platform}`
-            : `board ${resolved.board} (platform ${resolved.platform})`;
-        const message = `Created a workfile for ${description}`;
-
         const response: CreateWorkfileResponse = {
-            ...common_ok(message),
-            path: target.value
+            ...common_ok(created.message),
+            path: created.path
         };
-
-        output(flags, `${message}\n  ${target.value}`, response);
+        output(flags, `${created.message}\n  ${created.path}`, response);
     }
 });
+
+export type InitResult =
+    | { ok: true; message: string; path: string }
+    | { ok: false; message: string; text?: string };
+
+/**
+ * Create the workfile the settings name, for the board (or platform) they name. Shared by
+ * `init` and the guided setup, so both refuse and report the same way.
+ */
+export function init_workfile(): InitResult {
+    const target = get_workfile_path();
+    if (!target.ok) {
+        return { ok: false, message: target.error.message };
+    }
+
+    // Never silently: a workfile is the user's design, and this would replace it with an
+    // empty one.
+    if (fs.existsSync(target.value)) {
+        return {
+            ok: false,
+            message: `A workfile already exists at ${target.value}`,
+            text: `A workfile already exists at ${target.value}.\nDelete it, or point the 'workfile' setting somewhere else.`
+        };
+    }
+
+    const resolved = resolve_target();
+    if (!resolved.ok) {
+        return resolved;
+    }
+
+    const workfile = create_workfile(resolved.platform);
+    if (!workfile.ok) {
+        return { ok: false, message: workfile.error.message };
+    }
+
+    // Recorded so the board travels with the workfile: codegen reads it from there,
+    // which is what makes a workfile buildable on a machine configured differently.
+    if (resolved.board !== undefined) {
+        workfile.value.board = resolved.board;
+    }
+
+    const minimal = export_minimal(workfile.value);
+    if (!minimal.ok) {
+        return { ok: false, message: minimal.error.message };
+    }
+
+    fs.mkdirSync(path.dirname(target.value), { recursive: true });
+    fs.writeFileSync(target.value, JSON.stringify(minimal.value, undefined, 2));
+
+    const description = resolved.board === undefined
+        ? `platform ${resolved.platform}`
+        : `board ${resolved.board} (platform ${resolved.platform})`;
+    return { ok: true, message: `Created a workfile for ${description}`, path: target.value };
+}
 
 // --- Target resolution ---
 
