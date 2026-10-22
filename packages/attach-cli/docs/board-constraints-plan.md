@@ -1,5 +1,26 @@
 # Layered intelligence: board descriptions as a context layer
 
+## Status (2026-10-22): to be deleted
+
+The board layer is going away, and this plan is kept as the map for removing it. The CLI side is already gone (`board.ts`,
+the `board` config field, `suggest board-slot`, `bundled/boards/`). What is left in the code:
+
+- **attach-lib, delete:** `src/Intelligence/board/` (`types`, `parse`, `slots`, `layer`, `derived`, `lookup`) and its tests,
+  the board exports in `src/index.ts` and `src/Intelligence/index.ts`, the board options in `src/Attach/Attach.ts` and
+  `src/Attach/AttachTypes.ts`, and the board parts of `src/Intelligence/layers/{types,devicetree}.ts`.
+- **attach-lib, keep:** the layer abstraction itself (`layers/`: `IntelligenceLayer`, `IntelligenceStack`, the binding and
+  devicetree layers). `IntelligenceStack.default()` is those two and is what the CLI uses.
+- **attach-cli:** two files still mention boards, `src/commands/import/command.ts` and `src/commands/list/suggest.ts`;
+  check whether they are leftovers or only the word "board" (the board *fit* of `list overlay` and `import`, in
+  `board-fit.ts`, is unrelated and stays).
+- **Docs:** `attach-lib/src/Intelligence/CLAUDE.md` describes the board layer in several paragraphs (the "board" layer in the
+  list, `board/lookup.ts`, the schema v4 paragraph, `SlotInference.unwired_reg`, `bus_node_values`, the board YAML parse
+  note). Remove those with the code, and keep the paragraphs on `ValueSuggestion.slots`, `PlacementSuggestion.slot` and
+  `target-path`, which are not board-specific.
+
+The list above comes from a grep for "board" in `.ts` files, not from tracing imports. Follow the imports before deleting.
+Sections below describe the original design and are unchanged.
+
 ## Context
 
 `pmd-rpi-intz.yaml` (in `~/claude_conversations`) records how the PMD-RPI-INTZ HAT fixes a Pi 4's wiring. For example, SPI PMOD #1 uses spi0 reg 0 (CE0/GPIO8), gets its interrupt on GPIO19 and its reset on GPIO21, and spi0 needs `cs-gpios` for CS2/CS3. Today the intelligence in attach-lib only knows what the binding and the base DTS allow. So the AI (or the user) has to guess board-specific values, as the notes in `packages/attach-cli/ad7124-8-annotated.dtso` point out ("reg = <0> //CS0 default => cross-reference intz ruleset", "interrupts = <19 2> … Default to PMD-RPI-INTZ P1 gpio19").
