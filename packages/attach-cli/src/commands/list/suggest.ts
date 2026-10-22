@@ -337,7 +337,10 @@ function annotate_suggestions(
             continue;
         }
 
-        const check = check_value(parse_value(formatted), property_name, definition);
+        // Strings are checked as they are: their text can hold commas (`adi,ad7124-4`), which parse_value reads as rows.
+        const { strings } = suggestion;
+        const parsed = strings === undefined ? parse_value(formatted) : (strings.length === 1 ? strings[0]! : strings);
+        const check = check_value(parsed, property_name, definition);
         if (check !== true) {
             suggestion.note = combine_notes(suggestion.note, check);
         }

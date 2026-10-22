@@ -294,7 +294,7 @@ The node gets an automatic unit address and `reg` when the binding defines `reg`
 **Missing required properties**: after the add, the required properties the node still lacks are listed in the order to set them, with `interrupt-parent` before `interrupts`:
 - `--json`: `missing_required: [{ property, description, suggestions }]` in the response. Ask the user for each one in that order, then use `update`.
 - Piped runs and `--no-interview`: `Missing required: interrupt-parent, interrupts`.
-- On a terminal, `add` asks for each one, showing the binding's description and suggestions. Enter takes the first suggestion, `-` skips, Ctrl-D stops and keeps what was set.
+- On a terminal, `add` asks for each one, showing the binding's description and suggestions. Enter takes the first suggestion, `-` skips, Ctrl-D stops and keeps what was set. Options (an enum, the nodes a phandle can name) are numbered from 1 and picked by number or by value; a fixed-size array (`diff-channels`, `interrupts`) is asked one entry per line.
 
 **From the binding's example** (`--from-example`): the node is copied from the first example on the parent's bus (SPI or I2C), else from the first example that has the device (`No SPI example for adi,ad7124-8; using example 1 (i2c)`). An example for another device of the same binding gets the requested compatible. Name, unit address, `reg`, children and references are copied as they are, so:
 - `reg` may clash with a sibling; the clash is reported as a warning (`rename` to move it).

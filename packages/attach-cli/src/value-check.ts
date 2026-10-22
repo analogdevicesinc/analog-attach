@@ -54,7 +54,11 @@ function macro_enum_values(enum_names: unknown[]): Set<bigint> {
 }
 
 function enum_accepts(element: bigint | string, enum_values: unknown[], macro_values: Set<bigint> | undefined): boolean {
-    if (enum_values.includes(element)) { return true; }
+    // A binding's numeric enum holds plain numbers, the parsed value a bigint.
+    const same = (option: unknown): boolean => typeof element === "bigint" && (typeof option === "number" || typeof option === "bigint")
+        ? BigInt(option) === element
+        : option === element;
+    if (enum_values.some(option => same(option))) { return true; }
     return typeof element === "bigint" && macro_values !== undefined && macro_values.has(element);
 }
 
@@ -493,5 +497,11 @@ if (import.meta.vitest) {
         const parsed: MatrixInput = [[1n, 2n], [0n], [5n, 6n]];
         const result = check_value(parsed, "reg", number_matrix);
         expect(result).toBe(true);
+    });
+
+    test("a number enum's plain numbers accept the parsed bigint", () => {
+        const width: ResolvedProperty = { key: "spi-rx-bus-width", value: { _t: "enum_array", minItems: 1, maxItems: 1, enum: [0, 1, 2, 4, 8], enum_type: AttachEnumType.NUMBER } };
+        expect(check_value([4n], "spi-rx-bus-width", width)).toBe(true);
+        expect(check_value([3n], "spi-rx-bus-width", width)).not.toBe(true);
     });
 }

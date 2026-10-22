@@ -180,20 +180,28 @@ function node_lines(node: NodeRead, indent = ""): string[] {
 /**
  * The lines under a property's value: its description and binding file, what's
  * allowed, and the suggestions. `with_type` adds the type when nothing narrower
- * is allowed, for a question that has no value to show yet.
+ * is allowed, for a question that has no value to show yet. Without
+ * `with_allowed`, what is allowed is left out too (a question that lists the
+ * options itself).
  */
-export function format_details(info: PropertyInfo | undefined, suggestions: Suggestion[], { with_type = false } = {}): string[] {
+export function format_details(info: PropertyInfo | undefined, all_suggestions: Suggestion[], { with_type = false, with_allowed = true } = {}): string[] {
     const lines: string[] = [];
+    let suggestions = all_suggestions;
     if (info !== undefined) {
         const description = (info.description ?? "").trim().split("\n").map(line => line.trim()).filter(Boolean);
         const file = `(${path.basename(info.binding_path)})`;
         const last = description.pop();
         lines.push(...description.map(line => `  ${line}`), last === undefined ? `  ${file}` : `  ${last}   ${file}`);
         // A phandle's options are every node it could name, so they are left to the suggestions.
-        const allowed = info.phandle_options === undefined ? allowed_text(info) : undefined;
+        const allowed = info.phandle_options === undefined && with_allowed ? allowed_text(info) : undefined;
         if (allowed !== undefined) { lines.push(`  Allowed: ${allowed}`); }
         else if (with_type) { lines.push(`  Type: ${info.phandle_options === undefined ? format_type(info.type) : "phandle"}`); }
         if (info.constraints.default !== undefined) { lines.push(`  Default: ${JSON.stringify(info.constraints.default, bigIntReplacer)}`); }
+        // The binding suggests each option of an enum, which the Allowed line already lists: those that say no more go.
+        const options = allowed === undefined ? undefined : enum_options(info.type);
+        if (options !== undefined) {
+            suggestions = suggestions.filter(s => !options.includes(s.value) || (s.display_string ?? s.value) !== s.value);
+        }
     }
     if (suggestions.length > 0) {
         const plain = suggestions.every(s => (s.display_string ?? s.value) === s.value);
@@ -360,6 +368,19 @@ if (import.meta.vitest) {
             "    gicv2 — interrupt controller; inherited from /",
             "    gpio — interrupt controller",
         ]);
+    });
+
+    test("format_details — an option the Allowed line lists is no suggestion of its own; without with_allowed, neither is shown", () => {
+        const reference: PropertyInfo = { ...info, description: undefined, type: { kind: "enum", options: [{ value: 0 }, { value: 1 }, { value: 3 }] }, constraints: { default: 3 } };
+        const suggestions = [{ value: "3", display_string: "3 — the binding's default" }, { value: "0", display_string: "0" }, { value: "1" }];
+        expect(format_details(reference, suggestions)).toEqual([
+            "  (adi,ad7124.yaml)",
+            "  Allowed: 0 | 1 | 3",
+            "  Default: 3",
+            "  Suggestions:",
+            "    3 — the binding's default",
+        ]);
+        expect(format_details(reference, [], { with_allowed: false })).toEqual(["  (adi,ad7124.yaml)", "  Default: 3"]);
     });
 
     test("format_details — a phandle lists no Allowed line, and its type is phandle", () => {

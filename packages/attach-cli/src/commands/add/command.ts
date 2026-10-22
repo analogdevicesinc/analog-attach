@@ -64,8 +64,10 @@ base or overlay are listed as errors to fix with update.
 
 On a terminal, add then asks for each required property that is still
 missing, showing the binding's description and suggestions: Enter takes the
-first suggestion, - skips one, Ctrl-D stops. Piped runs, --json and
---no-interview list the missing properties instead.
+first suggestion, - skips one, Ctrl-D stops. Options (an enum, the nodes a
+phandle can name) are numbered: type the number, or the value. A fixed-size
+array (diff-channels, interrupts) is asked one entry per line. Piped runs,
+--json and --no-interview list the missing properties instead.
 
 Use 'list device' to find compatible strings, 'list parent' to find valid buses.`)
         .action(async (compatible: string, options: { parent?: string; name?: string; label?: string; fromExample?: boolean; interview: boolean }) => {
