@@ -1,0 +1,40 @@
+{
+  "import": {
+    "ok": true,
+    "fit": "compatible",
+    "unresolved_targets": [
+      {
+        "fragment": "fragment@8",
+        "property": "target",
+        "target": "mop"
+      },
+      {
+        "fragment": "fragment@9",
+        "property": "target",
+        "target": "moplet"
+      },
+      {
+        "fragment": "fragment@16",
+        "property": "target",
+        "target": "disp_intr"
+      }
+    ],
+    "unresolved": [
+      {
+        "path": [
+          "gpu"
+        ],
+        "property": "iommus",
+        "reference": "&iommu4"
+      }
+    ]
+  },
+  "validate": {
+    "errors": [],
+    "warnings": [
+      "{\"kind\":\"generic\",\"path\":[\"node5\",\"reg\"],\"message\":\"reg overlaps interrupt-controller@7ef00100 at 0x7ef00100\"}",
+      "{\"kind\":\"generic\",\"path\":[\"node6\",\"reg\"],\"message\":\"reg overlaps hdmi@7ef00700 at 0x7ef20000\"}",
+      "{\"kind\":\"generic\",\"path\":[\"node6\",\"reg\"],\"message\":\"reg overlaps interrupt-controller@7ef00100 at 0x7ef00100\"}"
+    ]
+  }
+}

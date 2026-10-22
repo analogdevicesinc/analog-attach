@@ -1,0 +1,20 @@
+{
+  "import": {
+    "ok": true,
+    "fit": "compatible",
+    "unresolved_targets": [],
+    "unresolved": []
+  },
+  "validate": {
+    "errors": [
+      {
+        "path": [
+          "node0",
+          "arducam_pivariety@c"
+        ],
+        "message": ".attach-linux/temp.dtb: arducam_pivariety@c (arducam,arducam-pivariety): 'clock-names', 'orientation', 'rotation' do not match any of the regexes: '^pinctrl-[0-9]+$'\n\tfrom schema $id: http://devicetree.org/schemas/media/i2c/arducam-pivariety.yaml"
+      }
+    ],
+    "warnings": []
+  }
+}

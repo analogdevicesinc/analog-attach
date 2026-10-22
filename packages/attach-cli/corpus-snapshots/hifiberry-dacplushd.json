@@ -1,0 +1,69 @@
+{
+  "import": {
+    "ok": true,
+    "fit": "compatible",
+    "unresolved_targets": [],
+    "unresolved": []
+  },
+  "validate": {
+    "errors": [
+      {
+        "path": [
+          "node1",
+          "pll@62",
+          "176k4_pll_regs"
+        ],
+        "message": ".attach-linux/temp.dtb: pll@62 (hifiberry,dachd-clk): 176k4_pll_regs: b'\\x1a=\\x1b\\t\\x1e\\xf3 \\x13!u+\\x04-\\x11.\\xe03\\x025%6\\xc0<\"=z' is not of type 'object', 'integer', 'array', 'boolean', 'null'\n\tfrom schema $id: http://devicetree.org/schemas/dt-core.yaml"
+      },
+      {
+        "path": [
+          "node1",
+          "pll@62",
+          "192k_pll_regs"
+        ],
+        "message": ".attach-linux/temp.dtb: pll@62 (hifiberry,dachd-clk): 192k_pll_regs: b'\\x1a\\x0c\\x1b5\\x1e\\xf0 \\t!P+\\x02-\\x10.@3\\x015\"6\\x80<\"=F' is not of type 'object', 'integer', 'array', 'boolean', 'null'\n\tfrom schema $id: http://devicetree.org/schemas/dt-core.yaml"
+      },
+      {
+        "path": [
+          "node1",
+          "pll@62",
+          "44k1_pll_regs"
+        ],
+        "message": ".attach-linux/temp.dtb: pll@62 (hifiberry,dachd-clk): 44k1_pll_regs: b'\\x1a=\\x1b\\t\\x1e\\xf3 \\x13!u+\\x04-\\x11.\\xe03\\x015\\x9d6\\x00<B=z' is not of type 'object', 'integer', 'array', 'boolean', 'null'\n\tfrom schema $id: http://devicetree.org/schemas/dt-core.yaml"
+      },
+      {
+        "path": [
+          "node1",
+          "pll@62",
+          "48k_pll_regs"
+        ],
+        "message": ".attach-linux/temp.dtb: pll@62 (hifiberry,dachd-clk): 48k_pll_regs: b'\\x1a\\x0c\\x1b5\\x1e\\xf0 \\t!P+\\x02-\\x10.@3\\x015\\x906\\x00<B=F' is not of type 'object', 'integer', 'array', 'boolean', 'null'\n\tfrom schema $id: http://devicetree.org/schemas/dt-core.yaml"
+      },
+      {
+        "path": [
+          "node1",
+          "pll@62",
+          "88k2_pll_regs"
+        ],
+        "message": ".attach-linux/temp.dtb: pll@62 (hifiberry,dachd-clk): 88k2_pll_regs: b'\\x1a=\\x1b\\t\\x1e\\xf3 \\x13!u+\\x04-\\x11.\\xe03\\x015M6\\x80<2=z' is not of type 'object', 'integer', 'array', 'boolean', 'null'\n\tfrom schema $id: http://devicetree.org/schemas/dt-core.yaml"
+      },
+      {
+        "path": [
+          "node1",
+          "pll@62",
+          "96k_pll_regs"
+        ],
+        "message": ".attach-linux/temp.dtb: pll@62 (hifiberry,dachd-clk): 96k_pll_regs: b'\\x1a\\x0c\\x1b5\\x1e\\xf0 \\t!P+\\x02-\\x10.@3\\x015G6\\x00<2=F' is not of type 'object', 'integer', 'array', 'boolean', 'null'\n\tfrom schema $id: http://devicetree.org/schemas/dt-core.yaml"
+      },
+      {
+        "path": [
+          "node1",
+          "pll@62",
+          "common_pll_regs"
+        ],
+        "message": ".attach-linux/temp.dtb: pll@62 (hifiberry,dachd-clk): common_pll_regs: b'\\x02S\\x03\\x00\\x07 \\x0f\\x00\\x10\\r\\x11\\x1d\\x12\\r\\x13\\x8c\\x14\\x8c\\x15\\x8c\\x16\\x8c\\x17\\x8c\\x18*\\x1c\\x00\\x1d\\x0f\\x1f\\x00*\\x00,\\x00/\\x000\\x001\\x002\\x004\\x007\\x008\\x009\\x00:\\x00;\\x01>\\x00?\\x00@\\x00A\\x00Z\\x00[\\x00\\x95\\x00\\x96\\x00\\x97\\x00\\x98\\x00\\x99\\x00\\x9a\\x00\\x9b\\x00\\xa2\\x00\\xa3\\x00\\xa4\\x00\\xb7\\x92' is not of type 'object', 'integer', 'array', 'boolean', 'null'\n\tfrom schema $id: http://devicetree.org/schemas/dt-core.yaml"
+      }
+    ],
+    "warnings": []
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "import": {
+    "ok": true,
+    "fit": "compatible",
+    "unresolved_targets": [],
+    "unresolved": []
+  },
+  "validate": {
+    "errors": [
+      {
+        "path": [
+          "node1",
+          "panel@0",
+          "compatible",
+          "0"
+        ],
+        "message": ".attach-linux/temp.dtb: panel@0 (panel): compatible:0: 'panel' is not one of ['saef,sftc154b', 'sainsmart18', 'shineworld,lh133k']\n\tfrom schema $id: http://devicetree.org/schemas/display/panel/panel-mipi-dbi-spi.yaml"
+      }
+    ],
+    "warnings": [
+      "{\"kind\":\"generic\",\"path\":[\"node1\",\"panel@0\",\"reg\"],\"message\":\"chip select 0 is already used by spidev@0; If panel@0 replaces it: disable /soc/spi@7e204000/spidev@0\"}"
+    ]
+  }
+}

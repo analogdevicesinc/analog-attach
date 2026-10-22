@@ -1,0 +1,20 @@
+{
+  "import": {
+    "ok": true,
+    "fit": "unknown",
+    "unresolved_targets": [],
+    "unresolved": []
+  },
+  "validate": {
+    "errors": [
+      {
+        "path": [
+          "node2",
+          "ethernet@0"
+        ],
+        "message": ".attach-linux/temp.dtb: ethernet@0 (adi,adin2111): Unevaluated properties are not allowed ('#address-cells', '#size-cells', 'phy@0', 'phy@1' were unexpected)\n\tfrom schema $id: http://devicetree.org/schemas/net/adi,adin1110.yaml"
+      }
+    ],
+    "warnings": []
+  }
+}

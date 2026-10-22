@@ -1,0 +1,59 @@
+{
+  "import": {
+    "ok": true,
+    "fit": "compatible",
+    "unresolved_targets": [],
+    "unresolved": []
+  },
+  "validate": {
+    "errors": [
+      {
+        "path": [
+          "node2",
+          "ts@38"
+        ],
+        "message": ".attach-linux/temp.dtb: ts@38 (edt,edt-ft5506): 'anyOf' conditional failed, one must be fixed:\n\t'interrupts' is a required property\n\t'interrupts-extended' is a required property\n\tfrom schema $id: http://devicetree.org/schemas/input/touchscreen/edt-ft5x06.yaml"
+      },
+      {
+        "path": [
+          "node2",
+          "ts@38"
+        ],
+        "message": ".attach-linux/temp.dtb: ts@38 (edt,edt-ft5506): 'reset-gpio' does not match any of the regexes: '^pinctrl-[0-9]+$'\n\tfrom schema $id: http://devicetree.org/schemas/input/touchscreen/edt-ft5x06.yaml"
+      },
+      {
+        "path": [
+          "node4",
+          "panel_disp@1",
+          "reg",
+          "0"
+        ],
+        "message": ".attach-linux/temp.dtb: node4: panel_disp@1:reg:0: [1] is too short\n\tfrom schema $id: http://devicetree.org/schemas/reg.yaml"
+      },
+      {
+        "path": [
+          "node4",
+          "reg_bridge@1"
+        ],
+        "message": ".attach-linux/temp.dtb: reg_bridge@1 (regulator-fixed): Unevaluated properties are not allowed ('reg' was unexpected)\n\tfrom schema $id: http://devicetree.org/schemas/regulator/fixed-regulator.yaml"
+      },
+      {
+        "path": [
+          "node4",
+          "reg_bridge@1",
+          "reg",
+          "0"
+        ],
+        "message": ".attach-linux/temp.dtb: node4: reg_bridge@1:reg:0: [1] is too short\n\tfrom schema $id: http://devicetree.org/schemas/reg.yaml"
+      },
+      {
+        "path": [
+          "node5",
+          "reg_display@45"
+        ],
+        "message": ".attach-linux/temp.dtb: reg_display@45 (raspberrypi,7inch-touchscreen-panel-regulator): '#gpio-cells', 'gpio-controller' do not match any of the regexes: '^pinctrl-[0-9]+$'\n\tfrom schema $id: http://devicetree.org/schemas/regulator/raspberrypi,7inch-touchscreen-panel-regulator.yaml"
+      }
+    ],
+    "warnings": []
+  }
+}

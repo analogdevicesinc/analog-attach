@@ -1,0 +1,29 @@
+{
+  "import": {
+    "ok": true,
+    "fit": "incompatible",
+    "unresolved_targets": [],
+    "unresolved": [
+      {
+        "path": [
+          "clocks",
+          "midiclock_2"
+        ],
+        "property": "clocks",
+        "reference": "&rp1_clocks"
+      },
+      {
+        "path": [
+          "soc",
+          "serial@7e201400"
+        ],
+        "property": "clocks",
+        "reference": "&rp1_clocks"
+      }
+    ]
+  },
+  "validate": {
+    "errors": [],
+    "warnings": []
+  }
+}

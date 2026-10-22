@@ -1,0 +1,21 @@
+{
+  "import": {
+    "ok": true,
+    "fit": "incompatible",
+    "unresolved_targets": [],
+    "unresolved": [
+      {
+        "path": [
+          "soc",
+          "i2c@7e205600"
+        ],
+        "property": "pinctrl-0",
+        "reference": "&rp1_i2c3_6_7"
+      }
+    ]
+  },
+  "validate": {
+    "errors": [],
+    "warnings": []
+  }
+}

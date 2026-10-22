@@ -1,0 +1,38 @@
+{
+  "import": {
+    "ok": true,
+    "fit": "unknown",
+    "unresolved_targets": [],
+    "unresolved": []
+  },
+  "validate": {
+    "errors": [
+      {
+        "path": [
+          "node0",
+          "adxl313_pins",
+          "brcm,function"
+        ],
+        "message": ".attach-linux/temp.dtb: adxl313_pins: brcm,function: b'\\x00\\x00\\x00\\x00' is not of type 'object', 'integer', 'array', 'boolean', 'null'\n\tfrom schema $id: http://devicetree.org/schemas/dt-core.yaml"
+      },
+      {
+        "path": [
+          "node0",
+          "adxl313_pins",
+          "brcm,pins"
+        ],
+        "message": ".attach-linux/temp.dtb: adxl313_pins: brcm,pins: b'\\x00\\x00\\x00\\x19' is not of type 'object', 'integer', 'array', 'boolean', 'null'\n\tfrom schema $id: http://devicetree.org/schemas/dt-core.yaml"
+      },
+      {
+        "path": [
+          "node1",
+          "adxl313@1d",
+          "interrupt-names",
+          "0"
+        ],
+        "message": ".attach-linux/temp.dtb: adxl313@1d (adi,adxl313): interrupt-names:0: 'DRDY' is not one of ['INT1', 'INT2']\n\tfrom schema $id: http://devicetree.org/schemas/iio/accel/adi,adxl313.yaml"
+      }
+    ],
+    "warnings": []
+  }
+}

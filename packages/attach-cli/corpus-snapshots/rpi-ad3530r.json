@@ -1,0 +1,20 @@
+{
+  "import": {
+    "ok": true,
+    "fit": "compatible",
+    "unresolved_targets": [],
+    "unresolved": []
+  },
+  "validate": {
+    "errors": [
+      {
+        "path": [
+          "node3",
+          "ad3530r@0"
+        ],
+        "message": ".attach-linux/temp.dtb: ad3530r@0 (adi,ad3530r): Unevaluated properties are not allowed ('#address-cells', '#size-cells' were unexpected)\n\tfrom schema $id: http://devicetree.org/schemas/iio/dac/adi,ad3530r.yaml"
+      }
+    ],
+    "warnings": []
+  }
+}

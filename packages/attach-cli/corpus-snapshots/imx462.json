@@ -1,0 +1,31 @@
+{
+  "import": {
+    "ok": true,
+    "fit": "compatible",
+    "unresolved_targets": [],
+    "unresolved": []
+  },
+  "validate": {
+    "errors": [
+      {
+        "path": [
+          "node0",
+          "imx290@1a",
+          "port",
+          "endpoint"
+        ],
+        "message": ".attach-linux/temp.dtb: imx290@1a (sony,imx290lqr): port:endpoint: 'data-lanes' is a required property\n\tfrom schema $id: http://devicetree.org/schemas/media/i2c/sony,imx290.yaml"
+      },
+      {
+        "path": [
+          "node0",
+          "imx290@1a",
+          "port",
+          "endpoint"
+        ],
+        "message": ".attach-linux/temp.dtb: imx290@1a (sony,imx290lqr): port:endpoint: 'link-frequencies' is a required property\n\tfrom schema $id: http://devicetree.org/schemas/media/i2c/sony,imx290.yaml"
+      }
+    ],
+    "warnings": []
+  }
+}

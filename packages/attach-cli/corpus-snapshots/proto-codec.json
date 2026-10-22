@@ -1,0 +1,41 @@
+{
+  "import": {
+    "ok": true,
+    "fit": "compatible",
+    "unresolved_targets": [],
+    "unresolved": []
+  },
+  "validate": {
+    "errors": [
+      {
+        "path": [
+          "node1",
+          "wm8731@1a"
+        ],
+        "message": ".attach-linux/temp.dtb: wm8731@1a (wlf,wm8731): 'AVDD-supply' is a required property\n\tfrom schema $id: http://devicetree.org/schemas/sound/wlf,wm8731.yaml"
+      },
+      {
+        "path": [
+          "node1",
+          "wm8731@1a"
+        ],
+        "message": ".attach-linux/temp.dtb: wm8731@1a (wlf,wm8731): 'DBVDD-supply' is a required property\n\tfrom schema $id: http://devicetree.org/schemas/sound/wlf,wm8731.yaml"
+      },
+      {
+        "path": [
+          "node1",
+          "wm8731@1a"
+        ],
+        "message": ".attach-linux/temp.dtb: wm8731@1a (wlf,wm8731): 'DCVDD-supply' is a required property\n\tfrom schema $id: http://devicetree.org/schemas/sound/wlf,wm8731.yaml"
+      },
+      {
+        "path": [
+          "node1",
+          "wm8731@1a"
+        ],
+        "message": ".attach-linux/temp.dtb: wm8731@1a (wlf,wm8731): 'HPVDD-supply' is a required property\n\tfrom schema $id: http://devicetree.org/schemas/sound/wlf,wm8731.yaml"
+      }
+    ],
+    "warnings": []
+  }
+}

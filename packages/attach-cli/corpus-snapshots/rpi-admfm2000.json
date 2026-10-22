@@ -1,0 +1,20 @@
+{
+  "import": {
+    "ok": true,
+    "fit": "compatible",
+    "unresolved_targets": [],
+    "unresolved": []
+  },
+  "validate": {
+    "errors": [
+      {
+        "path": [
+          "node0",
+          "admfm2000"
+        ],
+        "message": ".attach-linux/temp.dtb: admfm2000 (adi,admfm2000): 'vcc-supply' does not match any of the regexes: '^channel@[0-1]$', '^pinctrl-[0-9]+$'\n\tfrom schema $id: http://devicetree.org/schemas/iio/frequency/adi,admfm2000.yaml"
+      }
+    ],
+    "warnings": []
+  }
+}

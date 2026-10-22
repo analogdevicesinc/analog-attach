@@ -25,7 +25,9 @@
     "format": "eslint . --fix",
     "test": "vitest",
     "test:watch": "vitest --watch",
-    "coverage": "vitest run --coverage"
+    "coverage": "vitest run --coverage",
+    "corpus": "node scripts/corpus.mjs run",
+    "corpus:diff": "node scripts/corpus.mjs diff"
   },
   "tsup": {
     "entry": [

@@ -1,0 +1,12 @@
+{
+  "import": {
+    "ok": true,
+    "fit": "incompatible",
+    "unresolved_targets": [],
+    "unresolved": []
+  },
+  "validate": {
+    "errors": [],
+    "warnings": []
+  }
+}

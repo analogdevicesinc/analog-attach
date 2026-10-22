@@ -1,0 +1,22 @@
+{
+  "import": {
+    "ok": true,
+    "fit": "unknown",
+    "unresolved_targets": [],
+    "unresolved": [
+      {
+        "path": [
+          "soc",
+          "i2c@7e804000",
+          "temperature-sensor@42"
+        ],
+        "property": "vref-supply",
+        "reference": "&reg_vdd"
+      }
+    ]
+  },
+  "validate": {
+    "errors": [],
+    "warnings": []
+  }
+}

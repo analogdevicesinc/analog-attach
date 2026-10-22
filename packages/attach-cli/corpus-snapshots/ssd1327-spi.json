@@ -1,0 +1,29 @@
+{
+  "import": {
+    "ok": true,
+    "fit": "compatible",
+    "unresolved_targets": [],
+    "unresolved": []
+  },
+  "validate": {
+    "errors": [
+      {
+        "path": [
+          "node3",
+          "ssd1327_pins",
+          "brcm,function"
+        ],
+        "message": ".attach-linux/temp.dtb: ssd1327_pins: brcm,function: b'\\x00\\x00\\x00\\x01\\x00\\x00\\x00\\x01' is not of type 'object', 'integer', 'array', 'boolean', 'null'\n\tfrom schema $id: http://devicetree.org/schemas/dt-core.yaml"
+      },
+      {
+        "path": [
+          "node3",
+          "ssd1327_pins",
+          "brcm,pins"
+        ],
+        "message": ".attach-linux/temp.dtb: ssd1327_pins: brcm,pins: b'\\x00\\x00\\x00\\x19\\x00\\x00\\x00\\x18' is not of type 'object', 'integer', 'array', 'boolean', 'null'\n\tfrom schema $id: http://devicetree.org/schemas/dt-core.yaml"
+      }
+    ],
+    "warnings": []
+  }
+}

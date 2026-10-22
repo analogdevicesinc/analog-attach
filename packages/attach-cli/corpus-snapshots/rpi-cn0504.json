@@ -1,0 +1,46 @@
+{
+  "import": {
+    "ok": true,
+    "fit": "compatible",
+    "unresolved_targets": [
+      {
+        "fragment": "fragment@0",
+        "property": "target",
+        "target": "ethernet"
+      }
+    ],
+    "unresolved": []
+  },
+  "validate": {
+    "errors": [
+      {
+        "path": [
+          "node2",
+          "ksz9477@0",
+          "$nodename",
+          "0"
+        ],
+        "message": ".attach-linux/temp.dtb: ksz9477@0 (microchip,ksz9477): $nodename:0: 'ksz9477@0' does not match '^(ethernet-)?switch(@.*)?$'\n\tfrom schema $id: http://devicetree.org/schemas/net/dsa/microchip,ksz.yaml"
+      },
+      {
+        "path": [
+          "node2",
+          "ksz9477@0",
+          "ports",
+          "port@0"
+        ],
+        "message": ".attach-linux/temp.dtb: ksz9477@0 (microchip,ksz9477): ports:port@0: 'oneOf' conditional failed, one must be fixed:\n\t'fixed-link' is a required property\n\t'phy-handle' is a required property\n\t'managed' is a required property\n\tfrom schema $id: http://devicetree.org/schemas/net/dsa/microchip,ksz.yaml"
+      },
+      {
+        "path": [
+          "node2",
+          "ksz9477@0",
+          "ports",
+          "port@0"
+        ],
+        "message": ".attach-linux/temp.dtb: ksz9477@0 (microchip,ksz9477): ports:port@0: 'phy-mode' is a required property\n\tfrom schema $id: http://devicetree.org/schemas/net/dsa/microchip,ksz.yaml"
+      }
+    ],
+    "warnings": []
+  }
+}

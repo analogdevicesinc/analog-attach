@@ -1,0 +1,48 @@
+{
+  "import": {
+    "ok": true,
+    "fit": "compatible",
+    "unresolved_targets": [],
+    "unresolved": []
+  },
+  "validate": {
+    "errors": [
+      {
+        "path": [
+          "node1",
+          "sc16is750@0",
+          "$nodename",
+          "0"
+        ],
+        "message": ".attach-linux/temp.dtb: sc16is750@0 (nxp,sc16is750): $nodename:0: 'sc16is750@0' does not match '^serial(@.*)?$'\n\tfrom schema $id: http://devicetree.org/schemas/serial/nxp,sc16is7xx.yaml"
+      },
+      {
+        "path": [
+          "node3",
+          "sc16is75x_pins@24",
+          "brcm,function"
+        ],
+        "message": ".attach-linux/temp.dtb: sc16is75x_pins@24: brcm,function: b'\\x00\\x00\\x00\\x00' is not of type 'object', 'integer', 'array', 'boolean', 'null'\n\tfrom schema $id: http://devicetree.org/schemas/dt-core.yaml"
+      },
+      {
+        "path": [
+          "node3",
+          "sc16is75x_pins@24",
+          "brcm,pins"
+        ],
+        "message": ".attach-linux/temp.dtb: sc16is75x_pins@24: brcm,pins: b'\\x00\\x00\\x00\\x18' is not of type 'object', 'integer', 'array', 'boolean', 'null'\n\tfrom schema $id: http://devicetree.org/schemas/dt-core.yaml"
+      },
+      {
+        "path": [
+          "node3",
+          "sc16is75x_pins@24",
+          "brcm,pull"
+        ],
+        "message": ".attach-linux/temp.dtb: sc16is75x_pins@24: brcm,pull: b'\\x00\\x00\\x00\\x00' is not of type 'object', 'integer', 'array', 'boolean', 'null'\n\tfrom schema $id: http://devicetree.org/schemas/dt-core.yaml"
+      }
+    ],
+    "warnings": [
+      "{\"kind\":\"generic\",\"path\":[\"node1\",\"sc16is750@0\",\"reg\"],\"message\":\"chip select 0 is already used by spidev@0; If sc16is750@0 replaces it: disable /soc/spi@7e204000/spidev@0\"}"
+    ]
+  }
+}

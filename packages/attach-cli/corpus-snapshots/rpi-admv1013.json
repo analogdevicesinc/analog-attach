@@ -1,0 +1,106 @@
+{
+  "import": {
+    "ok": true,
+    "fit": "compatible",
+    "unresolved_targets": [],
+    "unresolved": []
+  },
+  "validate": {
+    "errors": [
+      {
+        "path": [
+          "node3",
+          "admv1013@0"
+        ],
+        "message": ".attach-linux/temp.dtb: admv1013@0 (adi,admv1013): 'vcc-amp1-supply' is a required property\n\tfrom schema $id: http://devicetree.org/schemas/iio/frequency/adi,admv1013.yaml"
+      },
+      {
+        "path": [
+          "node3",
+          "admv1013@0"
+        ],
+        "message": ".attach-linux/temp.dtb: admv1013@0 (adi,admv1013): 'vcc-amp2-supply' is a required property\n\tfrom schema $id: http://devicetree.org/schemas/iio/frequency/adi,admv1013.yaml"
+      },
+      {
+        "path": [
+          "node3",
+          "admv1013@0"
+        ],
+        "message": ".attach-linux/temp.dtb: admv1013@0 (adi,admv1013): 'vcc-bg-supply' is a required property\n\tfrom schema $id: http://devicetree.org/schemas/iio/frequency/adi,admv1013.yaml"
+      },
+      {
+        "path": [
+          "node3",
+          "admv1013@0"
+        ],
+        "message": ".attach-linux/temp.dtb: admv1013@0 (adi,admv1013): 'vcc-bg2-supply' is a required property\n\tfrom schema $id: http://devicetree.org/schemas/iio/frequency/adi,admv1013.yaml"
+      },
+      {
+        "path": [
+          "node3",
+          "admv1013@0"
+        ],
+        "message": ".attach-linux/temp.dtb: admv1013@0 (adi,admv1013): 'vcc-drv-supply' is a required property\n\tfrom schema $id: http://devicetree.org/schemas/iio/frequency/adi,admv1013.yaml"
+      },
+      {
+        "path": [
+          "node3",
+          "admv1013@0"
+        ],
+        "message": ".attach-linux/temp.dtb: admv1013@0 (adi,admv1013): 'vcc-env-supply' is a required property\n\tfrom schema $id: http://devicetree.org/schemas/iio/frequency/adi,admv1013.yaml"
+      },
+      {
+        "path": [
+          "node3",
+          "admv1013@0"
+        ],
+        "message": ".attach-linux/temp.dtb: admv1013@0 (adi,admv1013): 'vcc-mixer-supply' is a required property\n\tfrom schema $id: http://devicetree.org/schemas/iio/frequency/adi,admv1013.yaml"
+      },
+      {
+        "path": [
+          "node3",
+          "admv1013@0"
+        ],
+        "message": ".attach-linux/temp.dtb: admv1013@0 (adi,admv1013): 'vcc-quad-supply' is a required property\n\tfrom schema $id: http://devicetree.org/schemas/iio/frequency/adi,admv1013.yaml"
+      },
+      {
+        "path": [
+          "node3",
+          "admv1013@0"
+        ],
+        "message": ".attach-linux/temp.dtb: admv1013@0 (adi,admv1013): 'vcc-vva-supply' is a required property\n\tfrom schema $id: http://devicetree.org/schemas/iio/frequency/adi,admv1013.yaml"
+      },
+      {
+        "path": [
+          "node3",
+          "admv1013@0"
+        ],
+        "message": ".attach-linux/temp.dtb: admv1013@0 (adi,admv1013): 'vcc2-drv-supply' is a required property\n\tfrom schema $id: http://devicetree.org/schemas/iio/frequency/adi,admv1013.yaml"
+      },
+      {
+        "path": [
+          "node3",
+          "admv1013@0"
+        ],
+        "message": ".attach-linux/temp.dtb: admv1013@0 (adi,admv1013): Unevaluated properties are not allowed ('adi,parity-en', 'clock-scales' were unexpected)\n\tfrom schema $id: http://devicetree.org/schemas/iio/frequency/adi,admv1013.yaml"
+      },
+      {
+        "path": [
+          "node3",
+          "admv1013@0",
+          "adi,quad-se-mode"
+        ],
+        "message": ".attach-linux/temp.dtb: admv1013@0 (adi,admv1013): adi,quad-se-mode: b'\\x00\\x00\\x00\\x0c' is not of type 'array'\n\tfrom schema $id: http://devicetree.org/schemas/iio/frequency/adi,admv1013.yaml"
+      },
+      {
+        "path": [
+          "node3",
+          "admv1013@0",
+          "adi,quad-se-mode"
+        ],
+        "message": ".attach-linux/temp.dtb: admv1013@0 (adi,admv1013): adi,quad-se-mode: b'\\x00\\x00\\x00\\x0c' is not of type 'object', 'integer', 'array', 'boolean', 'null'\n\tfrom schema $id: http://devicetree.org/schemas/dt-core.yaml"
+      }
+    ],
+    "warnings": []
+  }
+}
