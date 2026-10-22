@@ -44,18 +44,53 @@ export function pinned_value(definition: ResolvedProperty["value"], required: bo
     }
 }
 
+type EnumOption = PinnedValue & { is_default?: true };
+
+/**
+ * The options of a single-value enum, each a whole value, the binding's
+ * default first. Empty when the property isn't one: no option of a fixed-size
+ * enum array is a whole value.
+ */
+export function enum_options(definition: ResolvedProperty["value"]): EnumOption[] {
+    let options: PinnedValue[];
+    switch (definition._t) {
+        case "enum_integer": {
+            options = definition.enum.map(n => ({ rows: [[BigInt(n)]] }));
+            break;
+        }
+        case "enum_array": {
+            if (definition.minItems > 1) { return []; }
+            const enum_type = definition.enum_type;
+            options = definition.enum.flatMap(v => enum_value(v, enum_type) ?? []);
+            break;
+        }
+        default: { return []; }
+    }
+    const fallback: unknown = Array.isArray(definition.default) ? definition.default[0] : definition.default;
+    const key = typeof fallback === "string" ? `"${fallback}"` : String(fallback);
+    const index = fallback === undefined ? -1 : options.findIndex(o => describe_pinned(o) === key);
+    if (index === -1) { return options; }
+    return [{ ...options[index]!, is_default: true }, ...options.slice(0, index), ...options.slice(index + 1)];
+}
+
 function describe_pinned(pinned: PinnedValue): string {
     if (pinned.flag !== undefined) { return String(pinned.flag); }
     if (pinned.strings !== undefined) { return pinned.strings.map(s => `"${s}"`).join(", "); }
     return pinned.rows.map(row => row.map(String).join(" ")).join(", ");
 }
 
-function suggest_pinned(property: string, context: PropertyContext): ValueSuggestion[] {
+function suggest_from_binding(property: string, context: PropertyContext): ValueSuggestion[] {
     const definition = context.binding?.properties.find(p => p.key === property);
     if (definition === undefined) { return []; }
     const required = context.binding!.required_properties.includes(property);
     const pinned = pinned_value(definition.value, required);
-    if (pinned === undefined) { return []; }
+    if (pinned === undefined) {
+        return enum_options(definition.value).map(({ is_default, ...option }) => ({
+            ...option,
+            display: is_default ? `${describe_pinned(option)} — the binding's default` : describe_pinned(option),
+            source: "binding",
+        }));
+    }
     const why = pinned.flag === undefined
         ? `the only value the binding allows${required ? " (required)" : ""}`
         : "a flag the binding requires";
@@ -63,14 +98,14 @@ function suggest_pinned(property: string, context: PropertyContext): ValueSugges
 }
 
 // Layer 1: knowledge derived from the binding alone (well-known property
-// shapes, and values the binding pins).
+// shapes, the values the binding pins, and the options of an enum).
 export const binding_layer: IntelligenceLayer = {
     name: "binding",
     refine_properties(properties) {
         return insert_known_structures(properties);
     },
     suggest_values(property, context, lower) {
-        return [...lower, ...suggest_pinned(property, context)];
+        return [...lower, ...suggest_from_binding(property, context)];
     },
 };
 
@@ -87,6 +122,10 @@ if (import.meta.vitest) {
             { key: "spi-lsb-first", value: { _t: "boolean" } },
             { key: "adi,mode", value: { _t: "const", const: 3 } },
             { key: "adi,lines", value: { _t: "enum_integer", enum: [1n, 2n] } },
+            { key: "adi,gain", value: { _t: "enum_integer", enum: [1n, 2n, 4n], default: 4n } },
+            { key: "adi,mode-name", value: { _t: "enum_array", minItems: 1, maxItems: 1, enum: ["fast", "slow"], default: ["slow"], enum_type: AttachEnumType.STRING } },
+            { key: "adi,widths", value: { _t: "enum_array", minItems: 1, maxItems: 4, enum: [1, 4], enum_type: AttachEnumType.NUMBER } },
+            { key: "adi,pair", value: { _t: "enum_array", minItems: 2, maxItems: 2, enum: ["a", "b"], enum_type: AttachEnumType.STRING } },
             { key: "interrupt-parent", value: { _t: "enum_array", minItems: 1, maxItems: 1, enum: ["gpio"], enum_type: AttachEnumType.PHANDLE } },
             { key: "vref-supply", value: { _t: "generic" } },
         ],
@@ -105,9 +144,29 @@ if (import.meta.vitest) {
         ]);
     });
 
-    test("binding_layer — no suggestion when the binding leaves a choice", () => {
+    test("binding_layer — every option of an enum, the binding's default first", () => {
+        expect(values("adi,lines")).toStrictEqual([
+            { rows: [[1n]], display: "1", source: "binding" },
+            { rows: [[2n]], display: "2", source: "binding" },
+        ]);
+        expect(values("adi,gain")).toStrictEqual([
+            { rows: [[4n]], display: "4 — the binding's default", source: "binding" },
+            { rows: [[1n]], display: "1", source: "binding" },
+            { rows: [[2n]], display: "2", source: "binding" },
+        ]);
+        expect(values("adi,mode-name").map(s => [s.strings, s.display])).toStrictEqual([
+            [["slow"], `"slow" — the binding's default`],
+            [["fast"], `"fast"`],
+        ]);
+        expect(values("adi,widths").map(s => s.rows)).toStrictEqual([[[1n]], [[4n]]]);
+    });
+
+    test("binding_layer — no option of a fixed-size enum array is a whole value", () => {
+        expect(values("adi,pair")).toStrictEqual([]);
+    });
+
+    test("binding_layer — no suggestion when the binding leaves an open choice", () => {
         expect(values("spi-lsb-first")).toStrictEqual([]);    // optional flag
-        expect(values("adi,lines")).toStrictEqual([]);        // two options
         expect(values("interrupt-parent")).toStrictEqual([]); // filled from the devicetree
         expect(values("vref-supply")).toStrictEqual([]);      // external hardware
         expect(binding_layer.suggest_values!("clock-names", { devicetree, data: "{}" }, [])).toStrictEqual([]);
