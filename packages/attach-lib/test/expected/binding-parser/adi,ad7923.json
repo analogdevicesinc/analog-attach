@@ -19,9 +19,7 @@
                         "adi,ad7918",
                         "adi,ad7923",
                         "adi,ad7928",
-                        [
-                            "adi,ad7924"
-                        ],
+                        "adi,ad7924",
                         [
                             "adi,ad7924",
                             "adi,ad7923"

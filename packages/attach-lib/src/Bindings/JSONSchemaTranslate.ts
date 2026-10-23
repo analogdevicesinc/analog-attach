@@ -200,19 +200,17 @@ function described<T extends object>(schema: any, type: T): T & { description?: 
 }
 
 /**
- * A `oneOf` of lists that each hold exactly their `enum` / `const` entries (the values a `compatible` can take,
- * the fallback lists among them) is one list of one such value.
+ * A `oneOf` of lists whose entries are each an `enum` / `const` (the values a `compatible` can take, the fallback
+ * lists among them) is one list of one such value. The whole list of a branch is an option, also when the branch
+ * admits a shorter one (`minItems` below `maxItems`): the schema keeps that rule, the option is what to suggest.
  */
 function fixed_size_enum_list(object: any): AttachType | undefined {
     const oneOf: any[] = object.oneOf;
 
-    const only_fixed_size_arrays = oneOf.every((value) => {
+    const only_enum_arrays = oneOf.every((value) => {
         if (!("items" in value)) { return false; }
         if (!("type" in value)) { return false; }
         if (value.type !== "array") { return false; }
-        if (!("minItems" in value)) { return false; }
-        if (!("maxItems" in value)) { return false; }
-        if (value.minItems !== value.maxItems) { return false; }
 
         if (!Array.isArray(value.items)) {
             return false;
@@ -227,7 +225,7 @@ function fixed_size_enum_list(object: any): AttachType | undefined {
         return true;
     });
 
-    if (!only_fixed_size_arrays) { return undefined; }
+    if (!only_enum_arrays) { return undefined; }
 
     let enum_accumulator: unknown[] = [];
 
@@ -237,12 +235,22 @@ function fixed_size_enum_list(object: any): AttachType | undefined {
             continue;
         }
         // TODO: https://github.com/analogdevicesinc/linux/blob/main/Documentation/devicetree/bindings/iio/imu/st%2Clsm6dsx.yaml
-        enum_accumulator.push(entry.items.map((item: any) => item.const));
+        const values = entry.items.map((item: any) => item.const);
+        // One entry is one string, not a list of one
+        enum_accumulator.push(values.length === 1 ? values[0] : values);
     }
+
+    const seen = new Set<string>();
+    const options = enum_accumulator.filter((option) => {
+        const key = JSON.stringify(option);
+        if (seen.has(key)) { return false; }
+        seen.add(key);
+        return true;
+    });
 
     return described(object, {
         _t: "list" as const,
-        item: enum_cell(enum_accumulator),
+        item: enum_cell(options),
         minItems: 1,
         maxItems: 1,
     });
@@ -499,5 +507,35 @@ if (import.meta.vitest) {
     test("a list property keeps the default it gives for its number", () => {
         expect(translated({ "spi-cs-inactive-delay-ns": { type: "array", items: [{ minimum: 16_000, type: "integer" }], default: 16_000, minItems: 1, maxItems: 1 } })["spi-cs-inactive-delay-ns"])
             .toStrictEqual({ _t: "list", item: { _t: "number", minimum: 16_000n, default: 16_000n }, minItems: 1, maxItems: 1 });
+    });
+
+    const compatible_options = (schema: Record<string, unknown>) => {
+        const type = translated({ compatible: schema }).compatible;
+        if (type._t !== "list" || type.item._t !== "enum") { expect.fail(`not a list of enum: ${JSON.stringify(type, (_, v) => typeof v === "bigint" ? Number(v) : v)}`); }
+        return { options: type.item.enum, minItems: type.minItems, maxItems: type.maxItems };
+    };
+
+    test("a compatible oneOf of lists is a list of whole-value options, shorter lists included", () => {
+        expect(compatible_options({
+            oneOf: [
+                { type: "array", items: [{ const: "arm,psci" }], minItems: 1, maxItems: 1 },
+                { type: "array", items: [{ const: "arm,psci-0.2" }, { const: "arm,psci" }], minItems: 1, maxItems: 2 },
+                { type: "array", items: [{ const: "arm,psci-1.0" }, { const: "arm,psci-0.2" }, { const: "arm,psci" }], minItems: 1, maxItems: 3 },
+            ],
+        })).toStrictEqual({
+            options: ["arm,psci", ["arm,psci-0.2", "arm,psci"], ["arm,psci-1.0", "arm,psci-0.2", "arm,psci"]],
+            minItems: 1,
+            maxItems: 1,
+        });
+    });
+
+    test("a oneOf of one-const lists gives plain strings, without duplicates", () => {
+        expect(compatible_options({
+            oneOf: [
+                { type: "array", items: [{ const: "snps,dwc-ahci" }], minItems: 1, maxItems: 1 },
+                { type: "array", items: [{ const: "snps,spear-ahci" }], minItems: 1, maxItems: 1 },
+                { type: "array", items: [{ const: "snps,dwc-ahci" }], minItems: 1, maxItems: 1 },
+            ],
+        }).options).toStrictEqual(["snps,dwc-ahci", "snps,spear-ahci"]);
     });
 }
