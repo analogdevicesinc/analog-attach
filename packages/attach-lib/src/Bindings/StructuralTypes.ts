@@ -48,6 +48,11 @@ export function is_open_list(type: AttachType): type is Variant<"list"> & { item
     return type._t === "list" && !Array.isArray(type.item) && type.item._t === "any";
 }
 
+/** A property the binding says nothing about but how many values it has: an open list, or a matrix of open lists. */
+export function is_open(type: AttachType): boolean {
+    return is_open_list(type) || (type._t === "matrix" && type.rows.length > 0 && type.rows.every(row => is_open_list(row)));
+}
+
 /** The cell of a list's single `item`, undefined for one cell per position. */
 export function list_cell(list: List): Cell | undefined {
     return Array.isArray(list.item) ? undefined : list.item;

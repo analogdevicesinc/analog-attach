@@ -46,24 +46,36 @@
         {
             "key": "interrupts",
             "value": {
-                "_t": "list",
-                "item": {
-                    "_t": "any"
-                },
+                "_t": "matrix",
                 "minItems": 1,
                 "maxItems": 3,
+                "rows": [
+                    {
+                        "_t": "list",
+                        "item": {
+                            "_t": "any"
+                        }
+                    }
+                ],
                 "description": "Type for DRDY should be IRQ_TYPE_EDGE_RISING.\nThree configurable interrupt lines exist.\n"
             }
         },
         {
             "key": "interrupt-parent",
             "value": {
-                "_t": "list",
-                "item": {
-                    "_t": "any"
-                },
+                "_t": "matrix",
                 "minItems": 1,
-                "maxItems": 1
+                "maxItems": 1,
+                "rows": [
+                    {
+                        "_t": "list",
+                        "item": {
+                            "_t": "any"
+                        },
+                        "minItems": 1,
+                        "maxItems": 1
+                    }
+                ]
             }
         },
         {
@@ -87,14 +99,38 @@
         {
             "key": "vdd-supply",
             "value": {
-                "_t": "unknown",
+                "_t": "matrix",
+                "minItems": 1,
+                "maxItems": 1,
+                "rows": [
+                    {
+                        "_t": "list",
+                        "item": {
+                            "_t": "any"
+                        },
+                        "minItems": 1,
+                        "maxItems": 1
+                    }
+                ],
                 "description": "Regulator that provides power to the sensor"
             }
         },
         {
             "key": "vddio-supply",
             "value": {
-                "_t": "unknown",
+                "_t": "matrix",
+                "minItems": 1,
+                "maxItems": 1,
+                "rows": [
+                    {
+                        "_t": "list",
+                        "item": {
+                            "_t": "any"
+                        },
+                        "minItems": 1,
+                        "maxItems": 1
+                    }
+                ],
                 "description": "Regulator that provides power to the bus"
             }
         },

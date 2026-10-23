@@ -308,7 +308,24 @@
         {
             "key": "adi,ext-clk-freq-hz",
             "value": {
-                "_t": "unknown",
+                "_t": "matrix",
+                "minItems": 1,
+                "maxItems": 1,
+                "rows": [
+                    {
+                        "_t": "list",
+                        "item": {
+                            "_t": "enum",
+                            "enum": [
+                                76800,
+                                153600
+                            ],
+                            "enum_type": "number"
+                        },
+                        "minItems": 1,
+                        "maxItems": 1
+                    }
+                ],
                 "description": "Specify the frequency of the external clock."
             }
         },
@@ -701,12 +718,21 @@
                 {
                     "key": "reg",
                     "value": {
-                        "_t": "scalar",
-                        "cell": {
-                            "_t": "number",
-                            "minimum": 0,
-                            "maximum": 15
-                        },
+                        "_t": "matrix",
+                        "minItems": 1,
+                        "maxItems": 1,
+                        "rows": [
+                            {
+                                "_t": "list",
+                                "item": {
+                                    "_t": "number",
+                                    "minimum": 0,
+                                    "maximum": 15
+                                },
+                                "minItems": 1,
+                                "maxItems": 1
+                            }
+                        ],
                         "description": "The channel number."
                     }
                 },
@@ -775,21 +801,65 @@
                 {
                     "key": "adi,excitation-current-0-nanoamp",
                     "value": {
-                        "_t": "unknown",
+                        "_t": "list",
+                        "item": {
+                            "_t": "enum",
+                            "enum": [
+                                0,
+                                100,
+                                10000,
+                                20000,
+                                50000,
+                                100000,
+                                150000,
+                                200000
+                            ],
+                            "enum_type": "number"
+                        },
+                        "minItems": 1,
+                        "maxItems": 1,
                         "description": "Excitation current in nanoamps to be applied to pin specified in\nadi,excitation-pin-0 while this channel is active.\n"
                     }
                 },
                 {
                     "key": "adi,excitation-current-1-nanoamp",
                     "value": {
-                        "_t": "unknown",
+                        "_t": "list",
+                        "item": {
+                            "_t": "enum",
+                            "enum": [
+                                0,
+                                100,
+                                10000,
+                                20000,
+                                50000,
+                                100000,
+                                150000,
+                                200000
+                            ],
+                            "enum_type": "number"
+                        },
+                        "minItems": 1,
+                        "maxItems": 1,
                         "description": "Excitation current in nanoamps to be applied to pin specified in\nadi,excitation-pin-1 while this channel is active.\n"
                     }
                 },
                 {
                     "key": "adi,burnout-current-nanoamp",
                     "value": {
-                        "_t": "unknown",
+                        "_t": "list",
+                        "item": {
+                            "_t": "enum",
+                            "enum": [
+                                0,
+                                500,
+                                2000,
+                                4000
+                            ],
+                            "enum_type": "number"
+                        },
+                        "minItems": 1,
+                        "maxItems": 1,
                         "description": "Burnout current in nanoamps to be applied for this channel.\n"
                     }
                 },

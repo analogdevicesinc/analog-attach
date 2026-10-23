@@ -50,18 +50,28 @@
             "maxItems": 1,
             "type": "array",
             "minItems": 1,
-            "dtType": "phandle-array"
+            "dtType": "phandle-array",
+            "items": {
+                "type": "array"
+            }
         },
         "ldac-gpios": {
             "description": "LDAC pin to be used as a hardware trigger to update the DAC channels.\n",
             "maxItems": 1,
             "type": "array",
             "minItems": 1,
-            "dtType": "phandle-array"
+            "dtType": "phandle-array",
+            "items": {
+                "type": "array"
+            }
         },
         "vref-supply": {
             "description": "The regulator to use as an external reference. If it does not exists the internal reference will be used. External reference must be 2.5V",
-            "dtType": "phandle"
+            "dtType": "phandle",
+            "type": "array",
+            "items": {
+                "type": "array"
+            }
         },
         "adi,vref-out-en": {
             "description": "Vref I/O driven by internal vref to 2.5V. If not set, Vref pin will be floating.",
@@ -86,7 +96,10 @@
             "maxItems": 1,
             "type": "array",
             "minItems": 1,
-            "dtType": "phandle-array"
+            "dtType": "phandle-array",
+            "items": {
+                "type": "array"
+            }
         },
         "#address-cells": {
             "const": 1,
@@ -542,46 +555,67 @@
                                     {
                                         "items": [
                                             {
-                                                "const": 0
-                                            },
-                                            {
-                                                "enum": [
-                                                    2500000,
-                                                    3000000,
-                                                    5000000,
-                                                    10000000
-                                                ]
+                                                "items": [
+                                                    {
+                                                        "const": 0
+                                                    },
+                                                    {
+                                                        "enum": [
+                                                            2500000,
+                                                            3000000,
+                                                            5000000,
+                                                            10000000
+                                                        ]
+                                                    }
+                                                ],
+                                                "type": "array",
+                                                "minItems": 2,
+                                                "maxItems": 2
                                             }
                                         ],
                                         "type": "array",
-                                        "minItems": 2,
-                                        "maxItems": 2
+                                        "minItems": 1,
+                                        "maxItems": 1
                                     },
                                     {
                                         "items": [
                                             {
-                                                "const": -2500000
-                                            },
-                                            {
-                                                "const": 7500000
+                                                "items": [
+                                                    {
+                                                        "const": -2500000
+                                                    },
+                                                    {
+                                                        "const": 7500000
+                                                    }
+                                                ],
+                                                "type": "array",
+                                                "minItems": 2,
+                                                "maxItems": 2
                                             }
                                         ],
                                         "type": "array",
-                                        "minItems": 2,
-                                        "maxItems": 2
+                                        "minItems": 1,
+                                        "maxItems": 1
                                     },
                                     {
                                         "items": [
                                             {
-                                                "const": -5000000
-                                            },
-                                            {
-                                                "const": 5000000
+                                                "items": [
+                                                    {
+                                                        "const": -5000000
+                                                    },
+                                                    {
+                                                        "const": 5000000
+                                                    }
+                                                ],
+                                                "type": "array",
+                                                "minItems": 2,
+                                                "maxItems": 2
                                             }
                                         ],
                                         "type": "array",
-                                        "minItems": 2,
-                                        "maxItems": 2
+                                        "minItems": 1,
+                                        "maxItems": 1
                                     }
                                 ]
                             }
@@ -625,45 +659,66 @@
                                     {
                                         "items": [
                                             {
-                                                "const": 0
-                                            },
-                                            {
-                                                "enum": [
-                                                    2500000,
-                                                    5000000,
-                                                    10000000
-                                                ]
+                                                "items": [
+                                                    {
+                                                        "const": 0
+                                                    },
+                                                    {
+                                                        "enum": [
+                                                            2500000,
+                                                            5000000,
+                                                            10000000
+                                                        ]
+                                                    }
+                                                ],
+                                                "type": "array",
+                                                "minItems": 2,
+                                                "maxItems": 2
                                             }
                                         ],
                                         "type": "array",
-                                        "minItems": 2,
-                                        "maxItems": 2
+                                        "minItems": 1,
+                                        "maxItems": 1
                                     },
                                     {
                                         "items": [
                                             {
-                                                "const": -5000000
-                                            },
-                                            {
-                                                "const": 5000000
+                                                "items": [
+                                                    {
+                                                        "const": -5000000
+                                                    },
+                                                    {
+                                                        "const": 5000000
+                                                    }
+                                                ],
+                                                "type": "array",
+                                                "minItems": 2,
+                                                "maxItems": 2
                                             }
                                         ],
                                         "type": "array",
-                                        "minItems": 2,
-                                        "maxItems": 2
+                                        "minItems": 1,
+                                        "maxItems": 1
                                     },
                                     {
                                         "items": [
                                             {
-                                                "const": -10000000
-                                            },
-                                            {
-                                                "const": 10000000
+                                                "items": [
+                                                    {
+                                                        "const": -10000000
+                                                    },
+                                                    {
+                                                        "const": 10000000
+                                                    }
+                                                ],
+                                                "type": "array",
+                                                "minItems": 2,
+                                                "maxItems": 2
                                             }
                                         ],
                                         "type": "array",
-                                        "minItems": 2,
-                                        "maxItems": 2
+                                        "minItems": 1,
+                                        "maxItems": 1
                                     }
                                 ]
                             }
@@ -699,7 +754,21 @@
                     "channel@0": {
                         "properties": {
                             "reg": {
-                                "const": 0
+                                "items": [
+                                    {
+                                        "items": [
+                                            {
+                                                "const": 0
+                                            }
+                                        ],
+                                        "type": "array",
+                                        "minItems": 1,
+                                        "maxItems": 1
+                                    }
+                                ],
+                                "type": "array",
+                                "minItems": 1,
+                                "maxItems": 1
                             }
                         }
                     },

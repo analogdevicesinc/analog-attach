@@ -50,7 +50,15 @@
         {
             "key": "clocks",
             "value": {
-                "_t": "unknown",
+                "_t": "matrix",
+                "rows": [
+                    {
+                        "_t": "list",
+                        "item": {
+                            "_t": "any"
+                        }
+                    }
+                ],
                 "description": "Master clock"
             }
         },
@@ -73,12 +81,17 @@
         {
             "key": "dmas",
             "value": {
-                "_t": "list",
-                "item": {
-                    "_t": "any"
-                },
+                "_t": "matrix",
                 "minItems": 1,
-                "maxItems": 1
+                "maxItems": 1,
+                "rows": [
+                    {
+                        "_t": "list",
+                        "item": {
+                            "_t": "any"
+                        }
+                    }
+                ]
             }
         },
         {
@@ -100,12 +113,17 @@
         {
             "key": "reset-gpios",
             "value": {
-                "_t": "list",
-                "item": {
-                    "_t": "any"
-                },
+                "_t": "matrix",
                 "minItems": 1,
-                "maxItems": 1
+                "maxItems": 1,
+                "rows": [
+                    {
+                        "_t": "list",
+                        "item": {
+                            "_t": "any"
+                        }
+                    }
+                ]
             }
         },
         {
@@ -124,7 +142,19 @@
         {
             "key": "vref-supply",
             "value": {
-                "_t": "unknown",
+                "_t": "matrix",
+                "minItems": 1,
+                "maxItems": 1,
+                "rows": [
+                    {
+                        "_t": "list",
+                        "item": {
+                            "_t": "any"
+                        },
+                        "minItems": 1,
+                        "maxItems": 1
+                    }
+                ],
                 "description": "Reference voltage - difference voltage between the REFx+ and REFx- pins."
             }
         },

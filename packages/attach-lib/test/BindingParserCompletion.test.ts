@@ -1,7 +1,7 @@
 import path from 'node:path';
 import * as fs from 'node:fs';
 
-import { Attach, DeviceTree, is_open_list, populate_binding } from 'attach-lib';
+import { Attach, DeviceTree, is_open, populate_binding } from 'attach-lib';
 import { bundle, create_context, dereference, find_in_object } from '../src/Bindings/index.js';
 import { Result } from '../src/result.js';
 import { write_to_directory } from './testing_utils';
@@ -140,7 +140,7 @@ describe.runIf(run)('Completion suite', () => {
                 let returnValue = true;
 
                 for (const property of parsed_binding.properties) {
-                    if (is_open_list(property.value)) {
+                    if (is_open(property.value)) {
                         returnValue = false;
                         generic_arrays_and_files.push({ generic_array: property.key, file: file });
                     }
@@ -152,7 +152,7 @@ describe.runIf(run)('Completion suite', () => {
 
                 for (const pattern of parsed_binding.pattern_properties) {
                     for (const property of pattern.properties) {
-                        if (is_open_list(property.value)) {
+                        if (is_open(property.value)) {
                             returnValue = false;
                             generic_arrays_and_files.push({ generic_array: property.key, file: file });
                         }

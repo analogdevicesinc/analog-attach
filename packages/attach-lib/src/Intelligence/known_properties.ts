@@ -1,9 +1,13 @@
 import { ResolvedProperty } from "../Bindings/ParsedBinding.js";
-import { is_open_list, list_cell, type AttachType, type Cell, type List } from "../Bindings/StructuralTypes.js";
+import { is_open, is_open_list, list_cell, type AttachType, type Cell, type List } from "../Bindings/StructuralTypes.js";
 
 function array_bounds(value: AttachType): { minItems: number; maxItems: number } {
     if (is_open_list(value)) {
         return { minItems: value.minItems ?? 1, maxItems: value.maxItems ?? 1 };
+    }
+    // The cells of a row, not the rows, are what the suffix rules count
+    if (value._t === "matrix" && is_open(value)) {
+        return { minItems: value.rows[0]?.minItems ?? 1, maxItems: value.rows[0]?.maxItems ?? 1 };
     }
     return { minItems: 1, maxItems: 1 };
 }
@@ -120,7 +124,7 @@ function apply_constraints(base: AttachType, constraints: Constraints): AttachTy
 }
 
 function patch_from_binding(base: AttachType, binding: AttachType): AttachType {
-    if (binding._t === "unknown" || is_open_list(binding)) { return base; }
+    if (binding._t === "unknown" || is_open(binding)) { return base; }
     return apply_constraints(base, constraints_of(binding));
 }
 
@@ -173,15 +177,18 @@ export function insert_known_structures(properties: ResolvedProperty[]): Resolve
                 break;
             }
             case "reg": {
-                if (!is_open_list(property.value)) { break; }
+                if (!is_open(property.value) || (property.value._t !== "list" && property.value._t !== "matrix")) { break; }
                 property.value = {
                     _t: "matrix", minItems: property.value.minItems, maxItems: property.value.maxItems,
                     description: property.value.description,
-                    rows: [number_list({ minItems: 1, maxItems: 1 }, 0n, 0xFF_FF_FF_FFn)],
+                    rows: [number_list(property.value._t === "matrix" ? array_bounds(property.value) : { minItems: 1, maxItems: 1 }, 0n, 0xFF_FF_FF_FFn)],
                 };
                 break;
             }
         }
+
+        // A matrix the binding describes (by its `-hz` type, say) is as good as the rule's
+        if (property.value._t === "matrix" && !is_open(property.value)) { continue; }
 
         for (const rule of suffix_rules) {
             if (rule.test.test(property.key)) {

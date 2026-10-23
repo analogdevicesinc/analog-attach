@@ -14,6 +14,7 @@ export { unresolved_references, unresolved_targets, type UnresolvedReference, ty
 export {
     AttachEnumType,
     is_list,
+    is_open,
     is_open_list,
     list_cell,
     type AttachType,

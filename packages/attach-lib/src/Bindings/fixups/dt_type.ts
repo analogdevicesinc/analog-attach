@@ -1,9 +1,14 @@
 import { DT_TYPE } from "../RefResolver.js";
-import { PropertyFixup } from "../FixupWalker.js";
+import { PropertyFixup, PropertySchema } from "../FixupWalker.js";
 import { property_type, PropertyTypes } from "../PropertyTypes.js";
 
 /** Places a schema describes the property's own value in; the rest (conditions, refinements) only say more about it. */
 const NOT_THE_DEFINITION = new Set(["if", "not", "select", "then", "else"]);
+
+/** A property that holds child nodes (`cpus`, `port`) isn't the value the name's type is about. */
+function is_node_schema(schema: PropertySchema): boolean {
+    return typeof schema === "object" && (schema["type"] === "object" || ["properties", "patternProperties", "additionalProperties", "unevaluatedProperties"].some(key => key in schema));
+}
 
 /**
  * dt-schema: `validator.py:property_get_type`. A property that doesn't say what type it is (no `$ref` to
@@ -18,7 +23,7 @@ export function fixup_dt_type(types: PropertyTypes): PropertyFixup {
 
         const type = property_type(types, name);
 
-        if (type === undefined || schema === false) { return schema; }
+        if (type === undefined || schema === false || is_node_schema(schema)) { return schema; }
         if (schema === true) { return { [DT_TYPE]: type }; }
 
         // In place: the dereferenced schemas share objects, and a copy would split them
@@ -51,6 +56,7 @@ if (import.meta.vitest) {
         expect(tagged({ dtType: "uint32" }, "reg")).toStrictEqual({ dtType: "uint32" });
         expect(tagged({ maxItems: 1 }, "adi,thing")).toStrictEqual({ maxItems: 1 });
         expect(tagged(false, "reg")).toBe(false);
+        expect(tagged({ type: "object", properties: {} }, "reg")).toStrictEqual({ type: "object", properties: {} });
         expect(tagged({ maxItems: 1 }, "reg", ["allOf", "then", "properties", "reg"])).toStrictEqual({ maxItems: 1 });
         expect(tagged({ const: 1 }, "reg", ["if", "properties", "reg"])).toStrictEqual({ const: 1 });
     });

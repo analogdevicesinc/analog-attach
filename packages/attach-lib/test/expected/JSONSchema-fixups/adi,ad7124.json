@@ -42,15 +42,9 @@
             "type": "array",
             "minItems": 1,
             "dtType": "phandle-array",
-            "items": [
-                {
-                    "items": {
-                        "minimum": 0,
-                        "maximum": 4294967295
-                    },
-                    "type": "array"
-                }
-            ]
+            "items": {
+                "type": "array"
+            }
         },
         "clock-names": {
             "type": "array",
@@ -76,22 +70,23 @@
             "type": "array",
             "minItems": 1,
             "dtType": "uint32-matrix",
-            "items": [
-                {
-                    "items": {
-                        "minimum": 0,
-                        "maximum": 4294967295
-                    },
-                    "type": "array"
+            "items": {
+                "type": "array",
+                "items": {
+                    "minimum": 0,
+                    "maximum": 4294967295
                 }
-            ]
+            }
         },
         "rdy-gpios": {
             "description": "GPIO reading the R̅D̅Y̅ line. Having such a GPIO is technically optional but highly recommended because DOUT/R̅D̅Y̅ toggles during SPI transfers (in its DOUT aka MISO role) and so usually triggers a spurious interrupt. The distinction between such a spurious event and a real one can only be done by reading such a GPIO. (There is a register telling the same information, but accessing that one needs a SPI transfer which then triggers another interrupt event.)",
             "maxItems": 1,
             "type": "array",
             "minItems": 1,
-            "dtType": "phandle-array"
+            "dtType": "phandle-array",
+            "items": {
+                "type": "array"
+            }
         },
         "#address-cells": {
             "const": 1,
@@ -103,21 +98,36 @@
         },
         "refin1-supply": {
             "description": "refin1 supply can be used as reference for conversion.",
-            "dtType": "phandle"
+            "dtType": "phandle",
+            "type": "array",
+            "items": {
+                "type": "array"
+            }
         },
         "refin2-supply": {
             "description": "refin2 supply can be used as reference for conversion.",
-            "dtType": "phandle"
+            "dtType": "phandle",
+            "type": "array",
+            "items": {
+                "type": "array"
+            }
         },
         "avdd-supply": {
             "description": "avdd supply can be used as reference for conversion.",
-            "dtType": "phandle"
+            "dtType": "phandle",
+            "type": "array",
+            "items": {
+                "type": "array"
+            }
         },
         "interrupt-parent": {
             "minItems": 1,
             "maxItems": 1,
             "type": "array",
-            "dtType": "phandle"
+            "dtType": "phandle",
+            "items": {
+                "type": "array"
+            }
         }
     },
     "required": [

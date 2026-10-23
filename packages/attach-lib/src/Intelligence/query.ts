@@ -1,5 +1,5 @@
 import { ResolvedProperty } from "../Bindings/ParsedBinding.js";
-import { AttachEnumType, is_open_list, list_cell, type Cell, type List } from "../Bindings/StructuralTypes.js";
+import { AttachEnumType, is_open, list_cell, type Cell, type List } from "../Bindings/StructuralTypes.js";
 import { DeviceTree, number_property } from "../Devicetree/index.js";
 import {
     is_clock,
@@ -165,7 +165,7 @@ function refine_interrupts(
     parsed_data: Record<string, unknown>,
     inherited_interrupt_parent: string | undefined,
 ): boolean {
-    if (property.key !== "interrupts" || !is_open_list(property.value)) { return false; }
+    if (property.key !== "interrupts" || !is_open(property.value)) { return false; }
 
     const is_set = effective_interrupt_controller(parsed_data, inherited_interrupt_parent);
     if (is_set === undefined) { return false; }
@@ -206,7 +206,7 @@ function refine_dmas(
     let set_dma = parsed_data[property.key];
 
     if (set_dma === undefined || (Array.isArray(set_dma) && set_dma.length === 0)) {
-        if (!is_open_list(property.value)) { return true; }
+        if (!is_open(property.value)) { return true; }
         property.value = phandle_matrix(phandle_names(devicetree, is_dma_controller), counts_of(property.value), property.value.description);
         return true;
     }
@@ -249,7 +249,7 @@ function refine_pwms(
     let set_pwm = parsed_data[property.key];
 
     if (set_pwm === undefined || (Array.isArray(set_pwm) && set_pwm.length === 0)) {
-        if (!is_open_list(property.value)) { return true; }
+        if (!is_open(property.value)) { return true; }
         property.value = phandle_matrix(phandle_names(devicetree, is_pwm_controller), counts_of(property.value), property.value.description);
         return true;
     }

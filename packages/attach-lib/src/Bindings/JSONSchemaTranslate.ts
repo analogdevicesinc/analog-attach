@@ -3,6 +3,8 @@ import { DtBindingSchema } from "./Schema";
 import { AttachType, AttachEnumType, Cell, EnumOption, List } from "./StructuralTypes";
 import { find_entry_in_object } from "./ObjectUtilities";
 import { is_node_pattern } from "./PatternKind.js";
+import { is_matrix_type } from "./PropertyTypes.js";
+import { DT_TYPE } from "./RefResolver.js";
 
 export function translate_JSONSchema(fixuped: DtBindingSchema): ParsedBinding {
 
@@ -167,13 +169,15 @@ function enum_cell(options: unknown, default_value?: unknown): Cell {
     };
 }
 
-function number_cell(schema: any): Cell {
+function number_cell(schema: any, default_value?: unknown): Cell {
     const minimum = to_bigint(schema.minimum);
     const maximum = to_bigint(schema.maximum);
+    const default_number = to_bigint(default_value);
     return {
         _t: "number",
         ...(minimum === undefined ? {} : { minimum }),
         ...(maximum === undefined ? {} : { maximum }),
+        ...(default_number === undefined ? {} : { default: default_number }),
     };
 }
 
@@ -238,8 +242,32 @@ function fixed_size_enum_list(object: any): AttachType | undefined {
     });
 }
 
+/**
+ * A property of a matrix type (`reg`, `interrupts`, `clocks`: `<1 2>, <3 4>`): its rows are what its `items` describe
+ * (`items` itself, or its first entry when it is a list), each row a list of cells.
+ */
+function narrow_matrix(object: any, type: string): AttachType {
+    const items = Array.isArray(object.items) ? object.items[0] : object.items;
+    // The description of the first row says nothing of the others
+    const { description: _description, ...row_schema } = typeof items === "object" && items !== null ? items : {} as Record<string, unknown>;
+
+    return described(object, {
+        _t: "matrix",
+        // one phandle is one row of one cell
+        ...bounds(type === "phandle" ? { minItems: 1, maxItems: 1, ...object } : object),
+        rows: [{
+            ...narrow_array_object({ ...row_schema, type: "array" }),
+            ...(type === "phandle" ? { minItems: 1, maxItems: 1, ...bounds(row_schema) } : {}),
+        }],
+    });
+}
+
 // TODO: handle objects
 function narrow_object(object: any): AttachType {
+
+    if (typeof object === 'object' && object !== null && is_matrix_type(object[DT_TYPE])) {
+        return narrow_matrix(object, object[DT_TYPE]);
+    }
 
     if (typeof object === 'object' && "type" in object) {
         switch (object.type) {
@@ -403,17 +431,17 @@ function narrow_array_object(object: any): AttachType & { _t: "list" } {
 
     // Integer array with definition in items
     if ("items" in object && "type" in items && items.type === "integer") {
-        return list(number_cell(items), items.typeSize === undefined ? {} : { typeSize: items.typeSize });
+        return list(number_cell(items, object.default), items.typeSize === undefined ? {} : { typeSize: items.typeSize });
     }
 
     // Integer array with definition in items but items is an array
     if (items_array && items.length === 1 && "type" in items[0] && items[0].type === "integer") {
-        return list(number_cell(items[0]), items[0].typeSize === undefined ? {} : { typeSize: items[0].typeSize });
+        return list(number_cell(items[0], object.default), items[0].typeSize === undefined ? {} : { typeSize: items[0].typeSize });
     }
 
     // Integer array with constraints outside items
     if (!("items" in object) && ("minimum" in object || "maximum" in object)) {
-        return list(number_cell(object), object.typeSize === undefined ? {} : { typeSize: object.typeSize });
+        return list(number_cell(object, object.default), object.typeSize === undefined ? {} : { typeSize: object.typeSize });
     }
 
     const unique = object.uniqueItems === true ? { unique: true } : {};
@@ -436,4 +464,34 @@ function narrow_array_object(object: any): AttachType & { _t: "list" } {
 
     // Array of whatever
     return list({ _t: "any" });
+}
+
+if (import.meta.vitest) {
+
+    const { test, expect } = import.meta.vitest;
+
+    const translated = (properties: Record<string, unknown>) =>
+        Object.fromEntries(translate_JSONSchema({ $id: "id", $schema: "s", title: "t", maintainers: [], properties } as DtBindingSchema).properties.map(({ key, value }) => [key, value]));
+
+    test("a matrix type is a matrix, its rows what the items say", () => {
+        const { clocks, reg, interrupts } = translated({
+            clocks: { dtType: "phandle-array", minItems: 1, maxItems: 2, items: [{ description: "bus" }, { description: "core" }] },
+            reg: { dtType: "address", minItems: 1, maxItems: 1, items: [{ items: [{ description: "base" }, { description: "size" }], type: "array", minItems: 2, maxItems: 2 }] },
+            interrupts: { dtType: "uint32-matrix", maxItems: 1 },
+        });
+        expect(clocks).toStrictEqual({ _t: "matrix", minItems: 1, maxItems: 2, rows: [{ _t: "list", item: { _t: "any" } }] });
+        expect(reg).toStrictEqual({ _t: "matrix", minItems: 1, maxItems: 1, rows: [{ _t: "list", item: { _t: "any" }, minItems: 2, maxItems: 2 }] });
+        expect(interrupts).toStrictEqual({ _t: "matrix", maxItems: 1, rows: [{ _t: "list", item: { _t: "any" } }] });
+    });
+
+    test("one phandle is one row of one cell", () => {
+        expect(translated({ "vref-supply": { dtType: "phandle" } })["vref-supply"]).toStrictEqual({
+            _t: "matrix", minItems: 1, maxItems: 1, rows: [{ _t: "list", item: { _t: "any" }, minItems: 1, maxItems: 1 }],
+        });
+    });
+
+    test("a list property keeps the default it gives for its number", () => {
+        expect(translated({ "spi-cs-inactive-delay-ns": { type: "array", items: [{ minimum: 16_000, type: "integer" }], default: 16_000, minItems: 1, maxItems: 1 } })["spi-cs-inactive-delay-ns"])
+            .toStrictEqual({ _t: "list", item: { _t: "number", minimum: 16_000n, default: 16_000n }, minItems: 1, maxItems: 1 });
+    });
 }

@@ -315,9 +315,12 @@
                     {
                         "_t": "list",
                         "item": {
-                            "_t": "number",
-                            "minimum": 0,
-                            "maximum": 4294967295
+                            "_t": "enum",
+                            "enum": [
+                                76800,
+                                153600
+                            ],
+                            "enum_type": "number"
                         },
                         "minItems": 1,
                         "maxItems": 1
@@ -792,12 +795,21 @@
                 {
                     "key": "reg",
                     "value": {
-                        "_t": "scalar",
-                        "cell": {
-                            "_t": "number",
-                            "minimum": 0,
-                            "maximum": 15
-                        },
+                        "_t": "matrix",
+                        "minItems": 1,
+                        "maxItems": 1,
+                        "rows": [
+                            {
+                                "_t": "list",
+                                "item": {
+                                    "_t": "number",
+                                    "minimum": 0,
+                                    "maximum": 15
+                                },
+                                "minItems": 1,
+                                "maxItems": 1
+                            }
+                        ],
                         "description": "The channel number."
                     }
                 },

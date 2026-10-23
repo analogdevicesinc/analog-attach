@@ -39,15 +39,10 @@
         "clocks": {
             "description": "Master clock",
             "dtType": "phandle-array",
-            "items": [
-                {
-                    "items": {
-                        "minimum": 0,
-                        "maximum": 4294967295
-                    },
-                    "type": "array"
-                }
-            ]
+            "type": "array",
+            "items": {
+                "type": "array"
+            }
         },
         "clock-names": {
             "type": "array",
@@ -64,7 +59,10 @@
             "maxItems": 1,
             "type": "array",
             "minItems": 1,
-            "dtType": "phandle-array"
+            "dtType": "phandle-array",
+            "items": {
+                "type": "array"
+            }
         },
         "dma-names": {
             "type": "array",
@@ -81,7 +79,10 @@
             "maxItems": 1,
             "type": "array",
             "minItems": 1,
-            "dtType": "phandle-array"
+            "dtType": "phandle-array",
+            "items": {
+                "type": "array"
+            }
         },
         "spi-max-frequency": {
             "description": "Maximum SPI clocking speed of the device in Hz.",
@@ -93,7 +94,11 @@
         },
         "vref-supply": {
             "description": "Reference voltage - difference voltage between the REFx+ and REFx- pins.",
-            "dtType": "phandle"
+            "dtType": "phandle",
+            "type": "array",
+            "items": {
+                "type": "array"
+            }
         },
         "adi,data-lines": {
             "description": "Number of DOUTx pins channels data is output on.",

@@ -37,7 +37,11 @@
         },
         "vref-supply": {
             "description": "The regulator supply for ADC and DAC reference voltage.\n",
-            "dtType": "phandle"
+            "dtType": "phandle",
+            "type": "array",
+            "items": {
+                "type": "array"
+            }
         },
         "spi-cpha": true,
         "#address-cells": {

@@ -42,15 +42,13 @@
             "description": "Type for DRDY should be IRQ_TYPE_EDGE_RISING.\nThree configurable interrupt lines exist.\n",
             "type": "array",
             "dtType": "uint32-matrix",
-            "items": [
-                {
-                    "items": {
-                        "minimum": 0,
-                        "maximum": 4294967295
-                    },
-                    "type": "array"
+            "items": {
+                "type": "array",
+                "items": {
+                    "minimum": 0,
+                    "maximum": 4294967295
                 }
-            ]
+            }
         },
         "interrupt-names": {
             "type": "array",
@@ -68,17 +66,28 @@
         },
         "vdd-supply": {
             "description": "Regulator that provides power to the sensor",
-            "dtType": "phandle"
+            "dtType": "phandle",
+            "type": "array",
+            "items": {
+                "type": "array"
+            }
         },
         "vddio-supply": {
             "description": "Regulator that provides power to the bus",
-            "dtType": "phandle"
+            "dtType": "phandle",
+            "type": "array",
+            "items": {
+                "type": "array"
+            }
         },
         "interrupt-parent": {
             "minItems": 1,
             "maxItems": 1,
             "type": "array",
-            "dtType": "phandle"
+            "dtType": "phandle",
+            "items": {
+                "type": "array"
+            }
         }
     },
     "required": [

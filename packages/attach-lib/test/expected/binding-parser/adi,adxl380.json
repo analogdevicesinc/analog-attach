@@ -50,23 +50,35 @@
         {
             "key": "interrupts",
             "value": {
-                "_t": "list",
-                "item": {
-                    "_t": "any"
-                },
+                "_t": "matrix",
                 "minItems": 1,
-                "maxItems": 2
+                "maxItems": 2,
+                "rows": [
+                    {
+                        "_t": "list",
+                        "item": {
+                            "_t": "any"
+                        }
+                    }
+                ]
             }
         },
         {
             "key": "interrupt-parent",
             "value": {
-                "_t": "list",
-                "item": {
-                    "_t": "any"
-                },
+                "_t": "matrix",
                 "minItems": 1,
-                "maxItems": 1
+                "maxItems": 1,
+                "rows": [
+                    {
+                        "_t": "list",
+                        "item": {
+                            "_t": "any"
+                        },
+                        "minItems": 1,
+                        "maxItems": 1
+                    }
+                ]
             }
         },
         {

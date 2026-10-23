@@ -100,24 +100,34 @@
         {
             "key": "power-domains",
             "value": {
-                "_t": "list",
-                "item": {
-                    "_t": "any"
-                },
+                "_t": "matrix",
                 "minItems": 1,
                 "maxItems": 1,
+                "rows": [
+                    {
+                        "_t": "list",
+                        "item": {
+                            "_t": "any"
+                        }
+                    }
+                ],
                 "description": "Power domain to use for enable control. This binding is only available if the compatible is chosen to regulator-fixed-domain."
             }
         },
         {
             "key": "required-opps",
             "value": {
-                "_t": "list",
-                "item": {
-                    "_t": "any"
-                },
+                "_t": "matrix",
                 "minItems": 1,
                 "maxItems": 1,
+                "rows": [
+                    {
+                        "_t": "list",
+                        "item": {
+                            "_t": "any"
+                        }
+                    }
+                ],
                 "description": "Performance state to use for enable control. This binding is only available if the compatible is chosen to regulator-fixed-domain. The power-domain binding is mandatory if compatible is chosen to regulator-fixed-domain."
             }
         },
@@ -685,11 +695,18 @@
         {
             "key": "regulator-coupled-with",
             "value": {
-                "_t": "list",
-                "item": {
-                    "_t": "any"
-                },
+                "_t": "matrix",
                 "minItems": 1,
+                "rows": [
+                    {
+                        "_t": "list",
+                        "item": {
+                            "_t": "any"
+                        },
+                        "minItems": 1,
+                        "maxItems": 1
+                    }
+                ],
                 "description": "Regulators with which the regulator is coupled. The linkage is 2-way - all coupled regulators should be linked with each other. A regulator should not be coupled with its supplier."
             }
         },

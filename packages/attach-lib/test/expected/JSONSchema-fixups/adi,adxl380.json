@@ -41,15 +41,13 @@
             "maxItems": 2,
             "type": "array",
             "dtType": "uint32-matrix",
-            "items": [
-                {
-                    "items": {
-                        "minimum": 0,
-                        "maximum": 4294967295
-                    },
-                    "type": "array"
+            "items": {
+                "type": "array",
+                "items": {
+                    "minimum": 0,
+                    "maximum": 4294967295
                 }
-            ]
+            }
         },
         "interrupt-names": {
             "type": "array",
@@ -74,7 +72,10 @@
             "minItems": 1,
             "maxItems": 1,
             "type": "array",
-            "dtType": "phandle"
+            "dtType": "phandle",
+            "items": {
+                "type": "array"
+            }
         }
     },
     "required": [

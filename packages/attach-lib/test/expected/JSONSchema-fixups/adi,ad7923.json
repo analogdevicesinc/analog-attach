@@ -83,7 +83,11 @@
         },
         "refin-supply": {
             "description": "The regulator supply for ADC reference voltage.\n",
-            "dtType": "phandle"
+            "dtType": "phandle",
+            "type": "array",
+            "items": {
+                "type": "array"
+            }
         },
         "adi,range-double": {
             "description": "Sets the analog input range from 0 to 2xVREF.",

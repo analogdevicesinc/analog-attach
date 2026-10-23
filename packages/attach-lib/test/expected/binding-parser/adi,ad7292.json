@@ -52,7 +52,19 @@
         {
             "key": "vref-supply",
             "value": {
-                "_t": "unknown",
+                "_t": "matrix",
+                "minItems": 1,
+                "maxItems": 1,
+                "rows": [
+                    {
+                        "_t": "list",
+                        "item": {
+                            "_t": "any"
+                        },
+                        "minItems": 1,
+                        "maxItems": 1
+                    }
+                ],
                 "description": "The regulator supply for ADC and DAC reference voltage.\n"
             }
         },

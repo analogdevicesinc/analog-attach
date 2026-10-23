@@ -20,7 +20,14 @@
             "maxItems": 1,
             "type": "array",
             "minItems": 1,
-            "dtType": "address"
+            "dtType": "address",
+            "items": {
+                "type": "array",
+                "items": {
+                    "minimum": 0,
+                    "maximum": 4294967295
+                }
+            }
         },
         "spi-max-frequency": {
             "maximum": 1000000,
@@ -30,22 +37,19 @@
             "maxItems": 1,
             "type": "array",
             "minItems": 1,
-            "dtType": "phandle-array"
+            "dtType": "phandle-array",
+            "items": {
+                "type": "array"
+            }
         },
         "clocks": {
             "maxItems": 1,
             "type": "array",
             "minItems": 1,
             "dtType": "phandle-array",
-            "items": [
-                {
-                    "items": {
-                        "minimum": 0,
-                        "maximum": 4294967295
-                    },
-                    "type": "array"
-                }
-            ]
+            "items": {
+                "type": "array"
+            }
         },
         "clock-names": {
             "type": "array",
@@ -62,7 +66,10 @@
             "maxItems": 1,
             "type": "array",
             "minItems": 1,
-            "dtType": "phandle-array"
+            "dtType": "phandle-array",
+            "items": {
+                "type": "array"
+            }
         },
         "dma-names": {
             "type": "array",
@@ -79,7 +86,10 @@
             "maxItems": 1,
             "type": "array",
             "minItems": 1,
-            "dtType": "phandle-array"
+            "dtType": "phandle-array",
+            "items": {
+                "type": "array"
+            }
         },
         "pwm-names": {
             "type": "array",

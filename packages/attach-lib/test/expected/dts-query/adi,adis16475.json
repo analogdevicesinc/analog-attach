@@ -152,12 +152,14 @@
         {
             "key": "spi-cs-inactive-delay-ns",
             "value": {
-                "_t": "scalar",
-                "cell": {
+                "_t": "list",
+                "item": {
                     "_t": "number",
-                    "minimum": 16000
+                    "minimum": 16000,
+                    "default": 16000
                 },
-                "default": 16000,
+                "minItems": 1,
+                "maxItems": 1,
                 "description": "Delay in nanoseconds to be introduced by the controller after CS is de-asserted."
             }
         },

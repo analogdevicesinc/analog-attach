@@ -36,12 +36,17 @@
         {
             "key": "reg",
             "value": {
-                "_t": "list",
-                "item": {
-                    "_t": "any"
-                },
+                "_t": "matrix",
                 "minItems": 1,
-                "maxItems": 1
+                "maxItems": 1,
+                "rows": [
+                    {
+                        "_t": "list",
+                        "item": {
+                            "_t": "any"
+                        }
+                    }
+                ]
             }
         },
         {
@@ -228,7 +233,15 @@
         {
             "key": "st,max-clk-rate-hz",
             "value": {
-                "_t": "unknown",
+                "_t": "matrix",
+                "rows": [
+                    {
+                        "_t": "list",
+                        "item": {
+                            "_t": "any"
+                        }
+                    }
+                ],
                 "description": "Allow to specify desired max clock rate used by analog circuitry."
             }
         },
@@ -293,12 +306,17 @@
         {
             "key": "access-controllers",
             "value": {
-                "_t": "list",
-                "item": {
-                    "_t": "any"
-                },
+                "_t": "matrix",
                 "minItems": 1,
-                "maxItems": 2
+                "maxItems": 2,
+                "rows": [
+                    {
+                        "_t": "list",
+                        "item": {
+                            "_t": "any"
+                        }
+                    }
+                ]
             }
         }
     ],
@@ -328,12 +346,17 @@
                 {
                     "key": "reg",
                     "value": {
-                        "_t": "list",
-                        "item": {
-                            "_t": "any"
-                        },
+                        "_t": "matrix",
                         "minItems": 1,
                         "maxItems": 1,
+                        "rows": [
+                            {
+                                "_t": "list",
+                                "item": {
+                                    "_t": "any"
+                                }
+                            }
+                        ],
                         "description": "Offset of ADC instance in ADC block. Valid values are:\n  - 0x0:   ADC1\n  - 0x100: ADC2\n  - 0x200: ADC3 (stm32f4 only)\n"
                     }
                 },
@@ -382,36 +405,51 @@
                 {
                     "key": "interrupts",
                     "value": {
-                        "_t": "list",
-                        "item": {
-                            "_t": "any"
-                        },
+                        "_t": "matrix",
                         "minItems": 1,
                         "maxItems": 1,
+                        "rows": [
+                            {
+                                "_t": "list",
+                                "item": {
+                                    "_t": "any"
+                                }
+                            }
+                        ],
                         "description": "IRQ Line for the ADC instance. Valid values are:\n  - 0 for adc@0 (single adc for stm32mp13)\n  - 1 for adc@100\n  - 2 for adc@200 (stm32f4 only)\n"
                     }
                 },
                 {
                     "key": "clocks",
                     "value": {
-                        "_t": "list",
-                        "item": {
-                            "_t": "any"
-                        },
+                        "_t": "matrix",
                         "minItems": 1,
                         "maxItems": 1,
+                        "rows": [
+                            {
+                                "_t": "list",
+                                "item": {
+                                    "_t": "any"
+                                }
+                            }
+                        ],
                         "description": "Input clock private to this ADC instance. It's required only on stm32f4, that has per instance clock input for registers access."
                     }
                 },
                 {
                     "key": "dmas",
                     "value": {
-                        "_t": "list",
-                        "item": {
-                            "_t": "any"
-                        },
+                        "_t": "matrix",
                         "minItems": 1,
                         "maxItems": 1,
+                        "rows": [
+                            {
+                                "_t": "list",
+                                "item": {
+                                    "_t": "any"
+                                }
+                            }
+                        ],
                         "description": "RX DMA Channel"
                     }
                 },
@@ -455,11 +493,18 @@
                 {
                     "key": "st,adc-diff-channels",
                     "value": {
-                        "_t": "list",
-                        "item": {
-                            "_t": "any"
-                        },
+                        "_t": "matrix",
                         "minItems": 1,
+                        "rows": [
+                            {
+                                "_t": "list",
+                                "item": {
+                                    "_t": "any"
+                                },
+                                "minItems": 2,
+                                "maxItems": 2
+                            }
+                        ],
                         "description": "List of differential channels muxed for this ADC. Some channels can\nbe configured as differential instead of single-ended on stm32h7 and\non stm32mp1. Positive and negative inputs pairs are listed:\n<vinp vinn>, <vinp vinn>,... vinp and vinn are numbered from 0 to 19.\n\nNote: At least one of \"st,adc-channels\" or \"st,adc-diff-channels\" is\nrequired if no adc generic channel is defined. These legacy channel\nproperties are exclusive with adc generic channel bindings.\nBoth properties can be used together. Some channels can be\nused as single-ended and some other ones as differential (mixed). But\nchannels can't be configured both as single-ended and differential.\n"
                     }
                 },
@@ -507,12 +552,19 @@
                 {
                     "key": "interrupt-parent",
                     "value": {
-                        "_t": "list",
-                        "item": {
-                            "_t": "any"
-                        },
+                        "_t": "matrix",
                         "minItems": 1,
-                        "maxItems": 1
+                        "maxItems": 1,
+                        "rows": [
+                            {
+                                "_t": "list",
+                                "item": {
+                                    "_t": "any"
+                                },
+                                "minItems": 1,
+                                "maxItems": 1
+                            }
+                        ]
                     }
                 }
             ],

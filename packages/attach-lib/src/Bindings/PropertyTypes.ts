@@ -129,6 +129,22 @@ export function property_type(types: PropertyTypes, name: string): PropertyType 
     return types.names.get(name) ?? types.patterns.find(({ pattern }) => pattern.test(name))?.type;
 }
 
+/** A type whose value is a list of cell lists (`reg`, `interrupts`, `clocks`): `<1 2>, <3 4>`. A single phandle is one row of one cell. */
+export function is_matrix_type(type: PropertyType | undefined): boolean {
+    return type === "phandle" || type === "phandle-array" || type === "address" || type?.endsWith("-matrix") === true;
+}
+
+/** The numbers a type's cells can take (an `address` is `uint32`s); undefined for the types that aren't numbers. */
+export function cell_range(type: PropertyType): { minimum: bigint, maximum: bigint } | undefined {
+    const found = /^(u?)int(8|16|32|64)(-|$)/.exec(type === "address" ? "uint32" : type);
+    if (found === null) { return undefined; }
+
+    const bits = BigInt(found[2]!);
+    return found[1] === "u"
+        ? { minimum: 0n, maximum: (1n << bits) - 1n }
+        : { minimum: -(1n << (bits - 1n)), maximum: (1n << (bits - 1n)) - 1n };
+}
+
 if (import.meta.vitest) {
 
     const { test, expect } = import.meta.vitest;
@@ -141,6 +157,15 @@ if (import.meta.vitest) {
         expect(declared_type({ type: "boolean" })).toBe("flag");
         expect(declared_type({ maxItems: 1 })).toBeUndefined();
         expect(declared_type(true)).toBeUndefined();
+    });
+
+    test("a matrix type and the range of its cells", () => {
+        for (const type of ["address", "phandle", "phandle-array", "uint32-matrix", "int8-matrix"]) { expect(is_matrix_type(type)).toBe(true); }
+        for (const type of ["uint32-array", "uint32", "string-array", "flag"]) { expect(is_matrix_type(type)).toBe(false); }
+        expect(cell_range("uint32-matrix")).toStrictEqual({ minimum: 0n, maximum: 0xFF_FF_FF_FFn });
+        expect(cell_range("address")).toStrictEqual({ minimum: 0n, maximum: 0xFF_FF_FF_FFn });
+        expect(cell_range("int8-array")).toStrictEqual({ minimum: -128n, maximum: 127n });
+        expect(cell_range("phandle-array")).toBeUndefined();
     });
 
     test("a name's type is found by name before pattern", () => {

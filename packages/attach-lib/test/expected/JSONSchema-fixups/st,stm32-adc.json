@@ -23,7 +23,14 @@
             "maxItems": 1,
             "type": "array",
             "minItems": 1,
-            "dtType": "address"
+            "dtType": "address",
+            "items": {
+                "type": "array",
+                "items": {
+                    "minimum": 0,
+                    "maximum": 4294967295
+                }
+            }
         },
         "interrupts": {
             "description": "One or more interrupts for ADC block, depending on part used:\n  - stm32f4 and stm32h7 share a common ADC interrupt line.\n  - stm32mp1 has two separate interrupt lines, one for each ADC within\n    ADC block.\n  - stm32mp13 has an interrupt line per ADC block.\n",
@@ -31,15 +38,13 @@
             "maxItems": 2,
             "type": "array",
             "dtType": "uint32-matrix",
-            "items": [
-                {
-                    "items": {
-                        "minimum": 0,
-                        "maximum": 4294967295
-                    },
-                    "type": "array"
+            "items": {
+                "type": "array",
+                "items": {
+                    "minimum": 0,
+                    "maximum": 4294967295
                 }
-            ]
+            }
         },
         "clocks": {
             "minItems": 1,
@@ -47,15 +52,9 @@
             "description": "Core can use up to two clocks, depending on part used:\n  - \"adc\" clock: for the analog circuitry, common to all ADCs.\n    It's required on stm32f4.\n    It's optional on stm32h7 and stm32mp1.\n  - \"bus\" clock: for registers access, common to all ADCs.\n    It's not present on stm32f4.\n    It's required on stm32h7 and stm32mp1.\n",
             "type": "array",
             "dtType": "phandle-array",
-            "items": [
-                {
-                    "items": {
-                        "minimum": 0,
-                        "maximum": 4294967295
-                    },
-                    "type": "array"
-                }
-            ]
+            "items": {
+                "type": "array"
+            }
         },
         "clock-names": {
             "type": "array",
@@ -68,23 +67,47 @@
         },
         "st,max-clk-rate-hz": {
             "description": "Allow to specify desired max clock rate used by analog circuitry.",
-            "dtType": "uint32-matrix"
+            "dtType": "uint32-matrix",
+            "type": "array",
+            "items": {
+                "type": "array",
+                "items": {
+                    "minimum": 0,
+                    "maximum": 4294967295
+                }
+            }
         },
         "vdda-supply": {
             "description": "Phandle to the vdda input analog voltage.",
-            "dtType": "phandle"
+            "dtType": "phandle",
+            "type": "array",
+            "items": {
+                "type": "array"
+            }
         },
         "vref-supply": {
             "description": "Phandle to the vref input analog reference voltage.",
-            "dtType": "phandle"
+            "dtType": "phandle",
+            "type": "array",
+            "items": {
+                "type": "array"
+            }
         },
         "booster-supply": {
             "description": "Phandle to the embedded booster regulator that can be used to supply ADC analog input switches on stm32h7 and stm32mp1.",
-            "dtType": "phandle"
+            "dtType": "phandle",
+            "type": "array",
+            "items": {
+                "type": "array"
+            }
         },
         "vdd-supply": {
             "description": "Phandle to the vdd input voltage. It can be used to supply ADC analog input switches on stm32mp1.",
-            "dtType": "phandle"
+            "dtType": "phandle",
+            "type": "array",
+            "items": {
+                "type": "array"
+            }
         },
         "st,syscfg": {
             "description": "Phandle to system configuration controller. It can be used to control the analog circuitry on stm32mp1.",
@@ -136,13 +159,19 @@
             "minItems": 1,
             "maxItems": 2,
             "type": "array",
-            "dtType": "phandle-array"
+            "dtType": "phandle-array",
+            "items": {
+                "type": "array"
+            }
         },
         "interrupt-parent": {
             "minItems": 1,
             "maxItems": 1,
             "type": "array",
-            "dtType": "phandle"
+            "dtType": "phandle",
+            "items": {
+                "type": "array"
+            }
         }
     },
     "allOf": [
@@ -188,10 +217,24 @@
                         "maxItems": 1
                     },
                     "st,max-clk-rate-hz": {
-                        "minimum": 600000,
-                        "maximum": 36000000,
                         "default": 36000000,
-                        "type": "integer"
+                        "items": [
+                            {
+                                "items": [
+                                    {
+                                        "minimum": 600000,
+                                        "maximum": 36000000,
+                                        "type": "integer"
+                                    }
+                                ],
+                                "type": "array",
+                                "minItems": 1,
+                                "maxItems": 1
+                            }
+                        ],
+                        "type": "array",
+                        "minItems": 1,
+                        "maxItems": 1
                     },
                     "booster-supply": false,
                     "vdd-supply": false,
@@ -251,10 +294,24 @@
                         "maxItems": 1
                     },
                     "st,max-clk-rate-hz": {
-                        "minimum": 120000,
-                        "maximum": 36000000,
                         "default": 36000000,
-                        "type": "integer"
+                        "items": [
+                            {
+                                "items": [
+                                    {
+                                        "minimum": 120000,
+                                        "maximum": 36000000,
+                                        "type": "integer"
+                                    }
+                                ],
+                                "type": "array",
+                                "minItems": 1,
+                                "maxItems": 1
+                            }
+                        ],
+                        "type": "array",
+                        "minItems": 1,
+                        "maxItems": 1
                     },
                     "vdd-supply": false,
                     "st,syscfg": false,
@@ -316,10 +373,24 @@
                         "maxItems": 2
                     },
                     "st,max-clk-rate-hz": {
-                        "minimum": 120000,
-                        "maximum": 36000000,
                         "default": 36000000,
-                        "type": "integer"
+                        "items": [
+                            {
+                                "items": [
+                                    {
+                                        "minimum": 120000,
+                                        "maximum": 36000000,
+                                        "type": "integer"
+                                    }
+                                ],
+                                "type": "array",
+                                "minItems": 1,
+                                "maxItems": 1
+                            }
+                        ],
+                        "type": "array",
+                        "minItems": 1,
+                        "maxItems": 1
                     },
                     "__canary__": false,
                     "interrupt-parent": {
@@ -376,10 +447,24 @@
                         "maxItems": 1
                     },
                     "st,max-clk-rate-hz": {
-                        "minimum": 150000,
-                        "maximum": 75000000,
                         "default": 75000000,
-                        "type": "integer"
+                        "items": [
+                            {
+                                "items": [
+                                    {
+                                        "minimum": 150000,
+                                        "maximum": 75000000,
+                                        "type": "integer"
+                                    }
+                                ],
+                                "type": "array",
+                                "minItems": 1,
+                                "maxItems": 1
+                            }
+                        ],
+                        "type": "array",
+                        "minItems": 1,
+                        "maxItems": 1
                     },
                     "__canary__": false,
                     "interrupt-parent": {
@@ -431,7 +516,14 @@
                     "maxItems": 1,
                     "type": "array",
                     "minItems": 1,
-                    "dtType": "address"
+                    "dtType": "address",
+                    "items": {
+                        "type": "array",
+                        "items": {
+                            "minimum": 0,
+                            "maximum": 4294967295
+                        }
+                    }
                 },
                 "#io-channel-cells": {
                     "const": 1,
@@ -451,15 +543,13 @@
                     "type": "array",
                     "minItems": 1,
                     "dtType": "uint32-matrix",
-                    "items": [
-                        {
-                            "items": {
-                                "minimum": 0,
-                                "maximum": 4294967295
-                            },
-                            "type": "array"
+                    "items": {
+                        "type": "array",
+                        "items": {
+                            "minimum": 0,
+                            "maximum": 4294967295
                         }
-                    ]
+                    }
                 },
                 "clocks": {
                     "description": "Input clock private to this ADC instance. It's required only on stm32f4, that has per instance clock input for registers access.",
@@ -467,22 +557,19 @@
                     "type": "array",
                     "minItems": 1,
                     "dtType": "phandle-array",
-                    "items": [
-                        {
-                            "items": {
-                                "minimum": 0,
-                                "maximum": 4294967295
-                            },
-                            "type": "array"
-                        }
-                    ]
+                    "items": {
+                        "type": "array"
+                    }
                 },
                 "dmas": {
                     "description": "RX DMA Channel",
                     "maxItems": 1,
                     "type": "array",
                     "minItems": 1,
-                    "dtType": "phandle-array"
+                    "dtType": "phandle-array",
+                    "items": {
+                        "type": "array"
+                    }
                 },
                 "dma-names": {
                     "type": "array",
@@ -578,7 +665,10 @@
                     "minItems": 1,
                     "maxItems": 1,
                     "type": "array",
-                    "dtType": "phandle"
+                    "dtType": "phandle",
+                    "items": {
+                        "type": "array"
+                    }
                 }
             },
             "patternProperties": {
@@ -705,13 +795,20 @@
                                 "type": "integer"
                             },
                             "assigned-resolution-bits": {
-                                "enum": [
-                                    6,
-                                    8,
-                                    10,
-                                    12
+                                "default": 12,
+                                "items": [
+                                    {
+                                        "enum": [
+                                            6,
+                                            8,
+                                            10,
+                                            12
+                                        ]
+                                    }
                                 ],
-                                "default": 12
+                                "type": "array",
+                                "minItems": 1,
+                                "maxItems": 1
                             },
                             "st,adc-channels": {
                                 "minItems": 1,
@@ -791,14 +888,21 @@
                                 "type": "integer"
                             },
                             "assigned-resolution-bits": {
-                                "enum": [
-                                    8,
-                                    10,
-                                    12,
-                                    14,
-                                    16
+                                "default": 16,
+                                "items": [
+                                    {
+                                        "enum": [
+                                            8,
+                                            10,
+                                            12,
+                                            14,
+                                            16
+                                        ]
+                                    }
                                 ],
-                                "default": 16
+                                "type": "array",
+                                "minItems": 1,
+                                "maxItems": 1
                             },
                             "st,adc-channels": {
                                 "minItems": 1,
@@ -846,19 +950,40 @@
                     "then": {
                         "properties": {
                             "reg": {
-                                "const": 0
+                                "items": [
+                                    {
+                                        "items": [
+                                            {
+                                                "const": 0
+                                            }
+                                        ],
+                                        "type": "array",
+                                        "minItems": 1,
+                                        "maxItems": 1
+                                    }
+                                ],
+                                "type": "array",
+                                "minItems": 1,
+                                "maxItems": 1
                             },
                             "interrupts": {
                                 "const": 0
                             },
                             "assigned-resolution-bits": {
-                                "enum": [
-                                    6,
-                                    8,
-                                    10,
-                                    12
+                                "default": 12,
+                                "items": [
+                                    {
+                                        "enum": [
+                                            6,
+                                            8,
+                                            10,
+                                            12
+                                        ]
+                                    }
                                 ],
-                                "default": 12
+                                "type": "array",
+                                "minItems": 1,
+                                "maxItems": 1
                             },
                             "st,adc-channels": {
                                 "minItems": 1,

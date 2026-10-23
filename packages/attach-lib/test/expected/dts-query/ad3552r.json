@@ -140,12 +140,17 @@
         {
             "key": "io-backends",
             "value": {
-                "_t": "list",
-                "item": {
-                    "_t": "any"
-                },
+                "_t": "matrix",
                 "minItems": 1,
                 "maxItems": 1,
+                "rows": [
+                    {
+                        "_t": "list",
+                        "item": {
+                            "_t": "any"
+                        }
+                    }
+                ],
                 "description": "The iio backend reference. Device can be optionally connected to the \"axi-ad3552r IP\" fpga-based QSPI + DDR (Double Data Rate) controller to reach high speed transfers."
             }
         },

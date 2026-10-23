@@ -39,59 +39,84 @@
         {
             "key": "gpio",
             "value": {
-                "_t": "list",
-                "item": {
-                    "_t": "any"
-                },
+                "_t": "matrix",
                 "minItems": 1,
                 "maxItems": 1,
+                "rows": [
+                    {
+                        "_t": "list",
+                        "item": {
+                            "_t": "any"
+                        }
+                    }
+                ],
                 "description": "gpio to use for enable control"
             }
         },
         {
             "key": "gpios",
             "value": {
-                "_t": "list",
-                "item": {
-                    "_t": "any"
-                },
+                "_t": "matrix",
                 "minItems": 1,
-                "maxItems": 1
+                "maxItems": 1,
+                "rows": [
+                    {
+                        "_t": "list",
+                        "item": {
+                            "_t": "any"
+                        }
+                    }
+                ]
             }
         },
         {
             "key": "clocks",
             "value": {
-                "_t": "list",
-                "item": {
-                    "_t": "any"
-                },
+                "_t": "matrix",
                 "minItems": 1,
                 "maxItems": 1,
+                "rows": [
+                    {
+                        "_t": "list",
+                        "item": {
+                            "_t": "any"
+                        }
+                    }
+                ],
                 "description": "clock to use for enable control. This binding is only available if the compatible is chosen to regulator-fixed-clock. The clock binding is mandatory if compatible is chosen to regulator-fixed-clock."
             }
         },
         {
             "key": "power-domains",
             "value": {
-                "_t": "list",
-                "item": {
-                    "_t": "any"
-                },
+                "_t": "matrix",
                 "minItems": 1,
                 "maxItems": 1,
+                "rows": [
+                    {
+                        "_t": "list",
+                        "item": {
+                            "_t": "any"
+                        }
+                    }
+                ],
                 "description": "Power domain to use for enable control. This binding is only available if the compatible is chosen to regulator-fixed-domain."
             }
         },
         {
             "key": "required-opps",
             "value": {
-                "_t": "list",
-                "item": {
-                    "_t": "any"
-                },
+                "_t": "matrix",
                 "minItems": 1,
                 "maxItems": 1,
+                "rows": [
+                    {
+                        "_t": "list",
+                        "item": {
+                            "_t": "any"
+                        }
+                    }
+                ],
                 "description": "Performance state to use for enable control. This binding is only available if the compatible is chosen to regulator-fixed-domain. The power-domain binding is mandatory if compatible is chosen to regulator-fixed-domain."
             }
         },
@@ -126,31 +151,55 @@
         {
             "key": "vin-supply",
             "value": {
-                "_t": "unknown",
+                "_t": "matrix",
+                "minItems": 1,
+                "maxItems": 1,
+                "rows": [
+                    {
+                        "_t": "list",
+                        "item": {
+                            "_t": "any"
+                        },
+                        "minItems": 1,
+                        "maxItems": 1
+                    }
+                ],
                 "description": "Input supply phandle."
             }
         },
         {
             "key": "interrupts",
             "value": {
-                "_t": "list",
-                "item": {
-                    "_t": "any"
-                },
+                "_t": "matrix",
                 "minItems": 1,
                 "maxItems": 1,
+                "rows": [
+                    {
+                        "_t": "list",
+                        "item": {
+                            "_t": "any"
+                        }
+                    }
+                ],
                 "description": "Interrupt signaling a critical under-voltage event."
             }
         },
         {
             "key": "interrupt-parent",
             "value": {
-                "_t": "list",
-                "item": {
-                    "_t": "any"
-                },
+                "_t": "matrix",
                 "minItems": 1,
-                "maxItems": 1
+                "maxItems": 1,
+                "rows": [
+                    {
+                        "_t": "list",
+                        "item": {
+                            "_t": "any"
+                        },
+                        "minItems": 1,
+                        "maxItems": 1
+                    }
+                ]
             }
         },
         {
@@ -163,14 +212,30 @@
         {
             "key": "regulator-min-microvolt",
             "value": {
-                "_t": "unknown",
+                "_t": "matrix",
+                "rows": [
+                    {
+                        "_t": "list",
+                        "item": {
+                            "_t": "any"
+                        }
+                    }
+                ],
                 "description": "smallest voltage consumers may set"
             }
         },
         {
             "key": "regulator-max-microvolt",
             "value": {
-                "_t": "unknown",
+                "_t": "matrix",
+                "rows": [
+                    {
+                        "_t": "list",
+                        "item": {
+                            "_t": "any"
+                        }
+                    }
+                ],
                 "description": "largest voltage consumers may set"
             }
         },
@@ -368,42 +433,90 @@
         {
             "key": "regulator-ov-protection-microvolt",
             "value": {
-                "_t": "unknown",
+                "_t": "matrix",
+                "rows": [
+                    {
+                        "_t": "list",
+                        "item": {
+                            "_t": "any"
+                        }
+                    }
+                ],
                 "description": "Set over voltage protection limit. This is a limit where hardware performs emergency shutdown. Zero can be passed to disable protection and value '1' indicates that protection should be enabled but limit setting can be omitted. Limit is given as microvolt offset from voltage set to regulator."
             }
         },
         {
             "key": "regulator-ov-error-microvolt",
             "value": {
-                "_t": "unknown",
+                "_t": "matrix",
+                "rows": [
+                    {
+                        "_t": "list",
+                        "item": {
+                            "_t": "any"
+                        }
+                    }
+                ],
                 "description": "Set over voltage error limit. This is a limit where part of the hardware probably is malfunctional and damage prevention is requested Zero can be passed to disable error detection and value '1' indicates that detection should be enabled but limit setting can be omitted. Limit is given as microvolt offset from voltage set to regulator."
             }
         },
         {
             "key": "regulator-ov-warn-microvolt",
             "value": {
-                "_t": "unknown",
+                "_t": "matrix",
+                "rows": [
+                    {
+                        "_t": "list",
+                        "item": {
+                            "_t": "any"
+                        }
+                    }
+                ],
                 "description": "Set over voltage warning limit. This is a limit where hardware is assumed still to be functional but approaching limit where it gets damaged. Recovery actions should be initiated. Zero can be passed to disable detection and value '1' indicates that detection should be enabled but limit setting can be omitted. Limit is given as microvolt offset from voltage set to regulator."
             }
         },
         {
             "key": "regulator-uv-protection-microvolt",
             "value": {
-                "_t": "unknown",
+                "_t": "matrix",
+                "rows": [
+                    {
+                        "_t": "list",
+                        "item": {
+                            "_t": "any"
+                        }
+                    }
+                ],
                 "description": "Set over under voltage protection limit. This is a limit where hardware performs emergency shutdown. Zero can be passed to disable protection and value '1' indicates that protection should be enabled but limit setting can be omitted. Limit is given as microvolt offset from voltage set to regulator."
             }
         },
         {
             "key": "regulator-uv-error-microvolt",
             "value": {
-                "_t": "unknown",
+                "_t": "matrix",
+                "rows": [
+                    {
+                        "_t": "list",
+                        "item": {
+                            "_t": "any"
+                        }
+                    }
+                ],
                 "description": "Set under voltage error limit. This is a limit where part of the hardware probably is malfunctional and damage prevention is requested Zero can be passed to disable error detection and value '1' indicates that detection should be enabled but limit setting can be omitted. Limit is given as microvolt offset from voltage set to regulator."
             }
         },
         {
             "key": "regulator-uv-warn-microvolt",
             "value": {
-                "_t": "unknown",
+                "_t": "matrix",
+                "rows": [
+                    {
+                        "_t": "list",
+                        "item": {
+                            "_t": "any"
+                        }
+                    }
+                ],
                 "description": "Set over under voltage warning limit. This is a limit where hardware is assumed still to be functional but approaching limit where it gets damaged. Recovery actions should be initiated. Zero can be passed to disable detection and value '1' indicates that detection should be enabled but limit setting can be omitted. Limit is given as microvolt offset from voltage set to regulator."
             }
         },
@@ -454,11 +567,18 @@
         {
             "key": "regulator-coupled-with",
             "value": {
-                "_t": "list",
-                "item": {
-                    "_t": "any"
-                },
+                "_t": "matrix",
                 "minItems": 1,
+                "rows": [
+                    {
+                        "_t": "list",
+                        "item": {
+                            "_t": "any"
+                        },
+                        "minItems": 1,
+                        "maxItems": 1
+                    }
+                ],
                 "description": "Regulators with which the regulator is coupled. The linkage is 2-way - all coupled regulators should be linked with each other. A regulator should not be coupled with its supplier."
             }
         },
@@ -479,7 +599,15 @@
         {
             "key": "regulator-max-step-microvolt",
             "value": {
-                "_t": "unknown",
+                "_t": "matrix",
+                "rows": [
+                    {
+                        "_t": "list",
+                        "item": {
+                            "_t": "any"
+                        }
+                    }
+                ],
                 "description": "Maximum difference between current and target voltages that can be changed safely in a single step."
             }
         }

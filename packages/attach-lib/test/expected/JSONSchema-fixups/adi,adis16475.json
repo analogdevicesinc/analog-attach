@@ -73,47 +73,49 @@
         },
         "spi-cs-inactive-delay-ns": {
             "description": "Delay in nanoseconds to be introduced by the controller after CS is de-asserted.",
-            "minimum": 16000,
             "default": 16000,
-            "dtType": "uint32-array",
-            "type": "integer"
+            "items": [
+                {
+                    "minimum": 16000,
+                    "type": "integer"
+                }
+            ],
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 1,
+            "dtType": "uint32-array"
         },
         "interrupts": {
             "maxItems": 1,
             "type": "array",
             "minItems": 1,
             "dtType": "uint32-matrix",
-            "items": [
-                {
-                    "items": {
-                        "minimum": 0,
-                        "maximum": 4294967295
-                    },
-                    "type": "array"
+            "items": {
+                "type": "array",
+                "items": {
+                    "minimum": 0,
+                    "maximum": 4294967295
                 }
-            ]
+            }
         },
         "clocks": {
             "maxItems": 1,
             "type": "array",
             "minItems": 1,
             "dtType": "phandle-array",
-            "items": [
-                {
-                    "items": {
-                        "minimum": 0,
-                        "maximum": 4294967295
-                    },
-                    "type": "array"
-                }
-            ]
+            "items": {
+                "type": "array"
+            }
         },
         "reset-gpios": {
             "description": "Must be the device tree identifier of the RESET pin. If specified, it will be asserted during driver probe. As the line is active low, it should be marked GPIO_ACTIVE_LOW.",
             "maxItems": 1,
             "type": "array",
             "minItems": 1,
-            "dtType": "phandle-array"
+            "dtType": "phandle-array",
+            "items": {
+                "type": "array"
+            }
         },
         "adi,sync-mode": {
             "description": "Configures the device SYNC pin. The following modes are supported 0 - output_sync 1 - direct_sync 2 - scaled_sync 3 - pulse_sync",
@@ -127,7 +129,10 @@
             "minItems": 1,
             "maxItems": 1,
             "type": "array",
-            "dtType": "phandle"
+            "dtType": "phandle",
+            "items": {
+                "type": "array"
+            }
         }
     },
     "required": [

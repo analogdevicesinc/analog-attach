@@ -74,23 +74,35 @@
         {
             "key": "interrupts",
             "value": {
-                "_t": "list",
-                "item": {
-                    "_t": "any"
-                },
+                "_t": "matrix",
                 "minItems": 1,
-                "maxItems": 1
+                "maxItems": 1,
+                "rows": [
+                    {
+                        "_t": "list",
+                        "item": {
+                            "_t": "any"
+                        }
+                    }
+                ]
             }
         },
         {
             "key": "interrupt-parent",
             "value": {
-                "_t": "list",
-                "item": {
-                    "_t": "any"
-                },
+                "_t": "matrix",
                 "minItems": 1,
-                "maxItems": 1
+                "maxItems": 1,
+                "rows": [
+                    {
+                        "_t": "list",
+                        "item": {
+                            "_t": "any"
+                        },
+                        "minItems": 1,
+                        "maxItems": 1
+                    }
+                ]
             }
         },
         {
@@ -121,35 +133,47 @@
         {
             "key": "spi-cs-inactive-delay-ns",
             "value": {
-                "_t": "scalar",
-                "cell": {
+                "_t": "list",
+                "item": {
                     "_t": "number",
-                    "minimum": 16000
+                    "minimum": 16000,
+                    "default": 16000
                 },
-                "default": 16000,
+                "minItems": 1,
+                "maxItems": 1,
                 "description": "Delay in nanoseconds to be introduced by the controller after CS is de-asserted."
             }
         },
         {
             "key": "clocks",
             "value": {
-                "_t": "list",
-                "item": {
-                    "_t": "any"
-                },
+                "_t": "matrix",
                 "minItems": 1,
-                "maxItems": 1
+                "maxItems": 1,
+                "rows": [
+                    {
+                        "_t": "list",
+                        "item": {
+                            "_t": "any"
+                        }
+                    }
+                ]
             }
         },
         {
             "key": "reset-gpios",
             "value": {
-                "_t": "list",
-                "item": {
-                    "_t": "any"
-                },
+                "_t": "matrix",
                 "minItems": 1,
                 "maxItems": 1,
+                "rows": [
+                    {
+                        "_t": "list",
+                        "item": {
+                            "_t": "any"
+                        }
+                    }
+                ],
                 "description": "Must be the device tree identifier of the RESET pin. If specified, it will be asserted during driver probe. As the line is active low, it should be marked GPIO_ACTIVE_LOW."
             }
         },
