@@ -22,6 +22,7 @@ import { build_enable_command, build_disable_command } from "./commands/enable-d
 import { build_install_skill_command } from "./commands/skill/install-skill";
 import { build_uninstall_skill_command } from "./commands/skill/uninstall-skill";
 import { build_completion_command } from "./commands/completion/command";
+import { build_ui_command } from "./commands/ui/command";
 
 export function buildApp(context: LocalContext): Command {
     const program = new Command();
@@ -58,6 +59,7 @@ Run any command with --help for detailed usage.`);
     // hidden
     program.addCommand(build_attach_manifest_command(context), { hidden: true });
     program.addCommand(build_internal_list_command(context), { hidden: true });
+    program.addCommand(build_ui_command(context), { hidden: true });
 
     // setup & discovery
     program.addCommand(build_create_workfile_command(context));

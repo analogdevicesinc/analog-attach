@@ -38,6 +38,9 @@
     ],
     "tsconfig": "src/tsconfig.json",
     "clean": true,
+    "loader": {
+      ".html": "text"
+    },
     "splitting": true,
     "minify": true,
     "noExternal": [

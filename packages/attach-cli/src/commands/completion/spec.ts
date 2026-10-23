@@ -127,6 +127,7 @@ export const NO_VALUE_COMPLETION: readonly string[] = [
     "build",
     "deploy",
     "attach-manifest",
+    "ui",
     "create-workfile",
     "validate",
     "install-skill",
