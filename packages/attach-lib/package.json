@@ -27,6 +27,8 @@
     "format": "eslint . --fix",
     "test": "vitest",
     "test:watch": "vitest --watch",
+    "corpus": "node scripts/corpus-parse.mjs run",
+    "corpus:diff": "node scripts/corpus-parse.mjs diff",
     "coverage": "vitest run --coverage"
   },
   "dependencies": {

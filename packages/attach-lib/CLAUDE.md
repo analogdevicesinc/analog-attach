@@ -16,6 +16,8 @@ Most tests import from the built package (`from 'attach-lib'`, resolved via a wo
 
 `test/BindingParserCompletion.test.ts` parses the whole Linux bindings tree (about 40s) and is off (`const run = false`); flip the flag to run it. Snapshots in `test/expected/` are the JSON a test compares with; setting a test's `debug: true` rewrites them instead.
 
+`yarn corpus:diff` (`scripts/corpus-parse.mjs`, needs `yarn build` and the `test/linux` / `test/dt-schema` links, about 40s) parses every binding of the Linux tree and compares a hash of each `ParsedBinding` with `corpus/bindings.json`; after a pipeline change run it and read the changed files (the script prints a `diff -ru` command), and `yarn corpus` to accept them.
+
 ## Architecture
 
 ### Core Modules
