@@ -285,6 +285,45 @@ function narrow_matrix(object: any, type: string): AttachType {
     });
 }
 
+/** The values of a `oneOf` whose branches are all open lists of an `enum` (`items: {enum}`), undefined for any other. */
+function open_enum_union(object: any): unknown[] | undefined {
+    if (!Array.isArray(object.oneOf) || object.oneOf.length === 0) { return undefined; }
+
+    const union = new Set<unknown>();
+    for (const branch of object.oneOf) {
+        if (branch.type !== "array" || typeof branch.items !== "object" || branch.items === null || !Array.isArray(branch.items.enum)) {
+            return undefined;
+        }
+        for (const value of branch.items.enum) { union.add(value); }
+    }
+    return [...union];
+}
+
+/**
+ * A property dt-schema types as strings (`dtType`, tagged by the `dt_type` fixup) whose schema says nothing we can
+ * read is still a list of strings: the validator input must keep a lone `compatible = "x"` an array, or an `if` of
+ * `contains` never matches. Branches that are all open `enum` lists give the union of the enums as its options; any
+ * other the strings alone.
+ */
+function narrow_string_array(object: any): AttachType | undefined {
+    if (typeof object !== "object" || object === null) { return undefined; }
+
+    const dt_type = object[DT_TYPE];
+
+    if (dt_type === "string") {
+        return described(object, { _t: "list" as const, item: { _t: "string" as const }, ...bounds(object), maxItems: 1 });
+    }
+
+    if (dt_type !== "string-array" && dt_type !== "non-unique-string-array") { return undefined; }
+
+    const options = open_enum_union(object);
+    return described(object, {
+        _t: "list" as const,
+        item: options === undefined ? { _t: "string" as const } : enum_cell(options),
+        ...bounds(object),
+    });
+}
+
 // TODO: handle objects
 function narrow_object(object: any): AttachType {
 
@@ -376,7 +415,7 @@ function narrow_object(object: any): AttachType {
         });
     }
 
-    return described(object, { _t: "unknown" });
+    return narrow_string_array(object) ?? described(object, { _t: "unknown" });
 }
 
 function get_enum_type(options: unknown): AttachEnumType.STRING | AttachEnumType.NUMBER {
@@ -520,13 +559,13 @@ if (import.meta.vitest) {
 
     const compatible_options = (schema: Record<string, unknown>) => {
         const type = translated({ compatible: schema }).compatible;
-        if (type._t !== "list" || type.item._t !== "enum") { expect.fail(`not a list of enum: ${JSON.stringify(type, (_, v) => typeof v === "bigint" ? Number(v) : v)}`); }
+        if (type._t !== "list" || Array.isArray(type.item) || type.item._t !== "enum") { throw new Error(`not a list of enum: ${JSON.stringify(type, (_, v) => typeof v === "bigint" ? Number(v) : v)}`); }
         return { options: type.item.enum, minItems: type.minItems, maxItems: type.maxItems };
     };
 
     const not_enumerated = (schema: Record<string, unknown>) => {
         const type = translated({ compatible: schema }).compatible;
-        return !(type._t === "list" && type.item._t === "enum");
+        return !(type._t === "list" && !Array.isArray(type.item) && type.item._t === "enum");
     };
 
     test("a compatible oneOf of lists is a list of whole-value options, shorter lists included", () => {
@@ -579,5 +618,34 @@ if (import.meta.vitest) {
         ] })).toBe(true);
         // a position that is a pattern can't be listed
         expect(not_enumerated({ oneOf: [{ type: "array", items: [{ pattern: "^qcom,adreno-[0-9a-f]+$" }, { const: "qcom,adreno" }], minItems: 2, maxItems: 2 }] })).toBe(true);
+    });
+
+    test("a string-array property that is no list we know is a list of strings, whatever its branches", () => {
+        // gmu: a pattern position can't be listed
+        expect(translated({
+            compatible: {
+                dtType: "string-array",
+                oneOf: [
+                    { type: "array", items: [{ pattern: String.raw`^qcom,adreno-gmu-[67][0-9][0-9]\.[0-9]$` }, { const: "qcom,adreno-gmu" }], minItems: 2, maxItems: 2 },
+                    { type: "array", items: [{ const: "qcom,adreno-gmu-wrapper" }], minItems: 1, maxItems: 1 },
+                ],
+            },
+        }).compatible).toStrictEqual({ _t: "list", item: { _t: "string" } });
+
+        expect(translated({ model: { dtType: "string", oneOf: [{ pattern: "^a" }, { pattern: "^b" }] } }).model)
+            .toStrictEqual({ _t: "list", item: { _t: "string" }, maxItems: 1 });
+
+        // a type that isn't a string says nothing
+        expect(translated({ foo: { dtType: "uint32", oneOf: [{ pattern: "^a" }, { pattern: "^b" }] } }).foo).toStrictEqual({ _t: "unknown" });
+    });
+
+    test("a oneOf of open lists of an enum is a list of the union of the enums", () => {
+        expect(compatible_options({
+            dtType: "string-array",
+            oneOf: [
+                { description: "new", items: { enum: ["a,new-v2", "a,new"] }, type: "array" },
+                { description: "old", deprecated: true, items: { enum: ["a,old", "a,new"] }, type: "array" },
+            ],
+        })).toStrictEqual({ options: ["a,new-v2", "a,new", "a,old"], minItems: undefined, maxItems: undefined });
     });
 }
