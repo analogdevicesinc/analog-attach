@@ -531,7 +531,6 @@
             "dtType": "string-array"
         },
         "regulator-name": {
-            "description": "A string used as a descriptive name for regulator outputs",
             "type": "array",
             "items": {
                 "type": "string"
@@ -539,7 +538,8 @@
             "minItems": 1,
             "dtType": "string",
             "uniqueItems": true,
-            "maxItems": 1
+            "maxItems": 1,
+            "description": "A string used as a descriptive name for regulator outputs"
         },
         "gpio": {
             "description": "gpio to use for enable control",
