@@ -199,58 +199,67 @@ function described<T extends object>(schema: any, type: T): T & { description?: 
     return schema.description === undefined ? type : { ...type, description: schema.description };
 }
 
+/** The most options of a `compatible` we list; a larger product is left to what `dtType` says. */
+const MAX_ENUM_OPTIONS = 256;
+
 /**
  * A `oneOf` of lists whose entries are each an `enum` / `const` (the values a `compatible` can take, the fallback
  * lists among them) is one list of one such value. The whole list of a branch is an option, also when the branch
  * admits a shorter one (`minItems` below `maxItems`): the schema keeps that rule, the option is what to suggest.
+ * An `enum` position gives one option per value (the first position varies slowest). Undefined when a position is
+ * neither an `enum` nor a `const` (a `pattern`), or when there are more than `MAX_ENUM_OPTIONS` options: a partial
+ * list would mislead the suggestions.
  */
 function fixed_size_enum_list(object: any): AttachType | undefined {
     const oneOf: any[] = object.oneOf;
 
-    const only_enum_arrays = oneOf.every((value) => {
-        if (!("items" in value)) { return false; }
-        if (!("type" in value)) { return false; }
-        if (value.type !== "array") { return false; }
+    // The values each position of each branch can take
+    const branches: unknown[][][] = [];
 
-        if (!Array.isArray(value.items)) {
-            return false;
-        }
+    for (const value of oneOf) {
+        if (!("items" in value)) { return undefined; }
+        if (value.type !== "array") { return undefined; }
+        if (!Array.isArray(value.items)) { return undefined; }
 
+        const positions: unknown[][] = [];
         for (const element of value.items) {
-            if (!Object.entries(element).some((value) => value[0] === "enum" || value[0] === "const")) {
-                return false;
+            if (typeof element !== "object" || element === null) {
+                return undefined;
+            } else if ("const" in element) {
+                positions.push([element.const]);
+            } else if (Array.isArray(element.enum)) {
+                positions.push(element.enum);
+            } else {
+                return undefined;
             }
         }
-
-        return true;
-    });
-
-    if (!only_enum_arrays) { return undefined; }
-
-    let enum_accumulator: unknown[] = [];
-
-    for (const entry of oneOf) {
-        if (entry.items.length === 1 && "enum" in entry.items[0]) {
-            enum_accumulator = [...enum_accumulator, ...entry.items[0].enum];
-            continue;
-        }
-        // TODO: https://github.com/analogdevicesinc/linux/blob/main/Documentation/devicetree/bindings/iio/imu/st%2Clsm6dsx.yaml
-        const values = entry.items.map((item: any) => item.const);
-        // One entry is one string, not a list of one
-        enum_accumulator.push(values.length === 1 ? values[0] : values);
+        branches.push(positions);
     }
 
-    const seen = new Set<string>();
-    const options = enum_accumulator.filter((option) => {
-        const key = JSON.stringify(option);
-        if (seen.has(key)) { return false; }
-        seen.add(key);
-        return true;
-    });
+    const options = new Map<string, unknown>();
+
+    for (const positions of branches) {
+        // Count before expanding, a few positions of a dozen values are already a large product
+        let count = 1;
+        for (const values of positions) { count *= values.length; }
+        if (count > MAX_ENUM_OPTIONS) { return undefined; }
+
+        let lists: unknown[][] = [[]];
+        for (const values of positions) {
+            lists = lists.flatMap(prefix => values.map(entry => [...prefix, entry]));
+        }
+
+        for (const list of lists) {
+            // One entry is one string, not a list of one
+            const option = list.length === 1 ? list[0] : list;
+            options.set(JSON.stringify(option), option);
+        }
+        if (options.size > MAX_ENUM_OPTIONS) { return undefined; }
+    }
 
     return described(object, {
         _t: "list" as const,
-        item: enum_cell(options),
+        item: enum_cell([...options.values()]),
         minItems: 1,
         maxItems: 1,
     });
@@ -515,6 +524,11 @@ if (import.meta.vitest) {
         return { options: type.item.enum, minItems: type.minItems, maxItems: type.maxItems };
     };
 
+    const not_enumerated = (schema: Record<string, unknown>) => {
+        const type = translated({ compatible: schema }).compatible;
+        return !(type._t === "list" && type.item._t === "enum");
+    };
+
     test("a compatible oneOf of lists is a list of whole-value options, shorter lists included", () => {
         expect(compatible_options({
             oneOf: [
@@ -537,5 +551,33 @@ if (import.meta.vitest) {
                 { type: "array", items: [{ const: "snps,dwc-ahci" }], minItems: 1, maxItems: 1 },
             ],
         }).options).toStrictEqual(["snps,dwc-ahci", "snps,spear-ahci"]);
+    });
+
+    test("an enum position of a compatible branch is expanded, the first position varying slowest", () => {
+        expect(compatible_options({
+            oneOf: [
+                { type: "array", items: [{ enum: ["a", "b"] }, { const: "c" }], minItems: 2, maxItems: 2 },
+                { type: "array", items: [{ const: "d" }], minItems: 1, maxItems: 1 },
+            ],
+        }).options).toStrictEqual([["a", "c"], ["b", "c"], "d"]);
+
+        expect(compatible_options({
+            oneOf: [{ type: "array", items: [{ enum: ["a", "b"] }, { enum: ["x", "y", "z"] }], minItems: 2, maxItems: 2 }],
+        }).options).toStrictEqual([["a", "x"], ["a", "y"], ["a", "z"], ["b", "x"], ["b", "y"], ["b", "z"]]);
+    });
+
+    test("a compatible that can't be enumerated is not a list of enum", () => {
+        const many = Array.from({ length: 17 }, (_, index) => `v${index}`);
+
+        // 16 x 16 = 256 options fit, 17 x 16 do not
+        expect(not_enumerated({ oneOf: [{ type: "array", items: [{ enum: many.slice(0, 16) }, { enum: many.slice(0, 16) }], minItems: 2, maxItems: 2 }] })).toBe(false);
+        expect(not_enumerated({ oneOf: [{ type: "array", items: [{ enum: many }, { enum: many.slice(0, 16) }], minItems: 2, maxItems: 2 }] })).toBe(true);
+        // the options of several branches add up
+        expect(not_enumerated({ oneOf: [
+            { type: "array", items: [{ enum: many.slice(0, 16) }, { enum: many.slice(0, 16) }], minItems: 2, maxItems: 2 },
+            { type: "array", items: [{ const: "other" }], minItems: 1, maxItems: 1 },
+        ] })).toBe(true);
+        // a position that is a pattern can't be listed
+        expect(not_enumerated({ oneOf: [{ type: "array", items: [{ pattern: "^qcom,adreno-[0-9a-f]+$" }, { const: "qcom,adreno" }], minItems: 2, maxItems: 2 }] })).toBe(true);
     });
 }
