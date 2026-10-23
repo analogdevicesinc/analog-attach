@@ -29,6 +29,8 @@ import {
 export interface Bindings {
     linux: string;
     dt_schema: string;
+    /** `validation.json`, the `dt-mk-schema -j` output: it types the properties a binding leaves untyped. */
+    processed_schema: string;
 }
 
 export interface Tools {
@@ -161,7 +163,7 @@ export function parse_bindings(
     if (!linux.ok || !dt_schema.ok) { return { ok: false, errors: failures(linux, dt_schema) }; }
     const caches = parse_caches(cwd);
     if (!caches.ok) { return caches; }
-    return { ok: true, value: { linux: linux.value, dt_schema: dt_schema.value } };
+    return { ok: true, value: { linux: linux.value, dt_schema: dt_schema.value, processed_schema: validation_schema_path(cwd) } };
 }
 
 export function parse_tools(): ConfigResult<Tools> {
@@ -444,7 +446,10 @@ if (import.meta.vitest) {
 
     test("open_workspace - bindings are there once both caches exist", () => {
         caches();
-        expect(bindings()).toEqual({ ok: true, value: { linux, dt_schema: "/dt-schema" } });
+        expect(bindings()).toEqual({
+            ok: true,
+            value: { linux, dt_schema: "/dt-schema", processed_schema: path.join(workspace_directory, ".attach-linux", "validation.json") },
+        });
     });
 
     test("open_workspace - an unreadable compat index counts as missing", () => {

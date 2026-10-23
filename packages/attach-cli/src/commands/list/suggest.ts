@@ -100,10 +100,9 @@ async function suggest_parent(context_: LocalContext, arguments_: string[]): Pro
 
     const workspace = load_workspace(context_, ["bindings", "base"]);
     if (workspace === undefined) { return; }
-    const { linux, dt_schema: dtSchema } = workspace.bindings;
     const dt = workspace.base.tree;
 
-    const binding = await load_binding(context_, linux, dtSchema, compatible);
+    const binding = await load_binding(context_, workspace.bindings, compatible);
     if (binding === undefined) { return; }
 
     const parents = suggest_parents(dt, binding);
@@ -121,8 +120,8 @@ async function suggest_parent(context_: LocalContext, arguments_: string[]): Pro
     }
 }
 
-async function load_binding(context_: LocalContext, linux: string, dtSchema: string, compatible: string): Promise<ParsedBinding | undefined> {
-    const binding_path = await find_binding(linux, dtSchema, compatible);
+async function load_binding(context_: LocalContext, bindings: Bindings, compatible: string): Promise<ParsedBinding | undefined> {
+    const binding_path = await find_binding(bindings.linux, bindings.dt_schema, compatible);
     if (binding_path === undefined) {
         if (context_.json) {
             respond({ ok: true, message: `No binding found for ${compatible}`, severity: "warn", suggestions: [] });
@@ -132,7 +131,7 @@ async function load_binding(context_: LocalContext, linux: string, dtSchema: str
         return;
     }
 
-    const binding = await Attach.parse(binding_path, { linux, dt_schema: dtSchema });
+    const binding = await Attach.parse(binding_path, bindings);
     if (AttachResult.is_err(binding)) {
         if (context_.json) {
             respond_fail({ ok: false, message: `Failed to parse binding ${binding_path}`, severity: "error" });
@@ -223,10 +222,9 @@ export async function resolve_target_binding(
     if (binding_node === undefined) {
         return { target, binding: { error: "node not found for binding resolution" } };
     }
-    const { linux, dt_schema } = bindings.value;
     // Phandle enums are filled from the tree with the overlay applied, so they name its nodes too.
     const context = overlay.merged_tree() ?? base_dt;
-    return { target, binding: await resolve_node_binding(binding_node, binding_parent, parent_name, context, linux, dt_schema, undefined, parent_compatibles) };
+    return { target, binding: await resolve_node_binding(binding_node, binding_parent, parent_name, context, bindings.value, undefined, parent_compatibles) };
 }
 
 /**

@@ -119,7 +119,7 @@ Use 'list device' to find compatible strings, 'list parent' to find valid buses.
                 : add_by_hand(workspace.base.tree, workfile.tree, {
                     ...request,
                     name: options.name,
-                    auto_address: await binding_defines_reg(binding_path, linux, dtSchema),
+                    auto_address: await binding_defines_reg(binding_path, workspace.bindings),
                 });
 
             if (result.status === "parent-not-found") {
@@ -184,9 +184,9 @@ function device_name(compatible: string): string {
     return compatible.includes(",") ? compatible.slice(compatible.indexOf(",") + 1) : compatible;
 }
 
-async function parse_binding(binding_path: string, linux: string, dtSchema: string): Promise<ParsedBinding | undefined> {
+async function parse_binding(binding_path: string, bindings: Bindings): Promise<ParsedBinding | undefined> {
     try {
-        const result = await Attach.parse(binding_path, { linux, dt_schema: dtSchema });
+        const result = await Attach.parse(binding_path, bindings);
         return Result.is_ok(result) ? result.value.parsed_binding : undefined;
     } catch {
         return undefined;
@@ -194,8 +194,8 @@ async function parse_binding(binding_path: string, linux: string, dtSchema: stri
 }
 
 /** Whether the binding has a `reg` property, i.e. the device needs a unit address. */
-async function binding_defines_reg(binding_path: string, linux: string, dtSchema: string): Promise<boolean> {
-    const binding = await parse_binding(binding_path, linux, dtSchema);
+async function binding_defines_reg(binding_path: string, bindings: Bindings): Promise<boolean> {
+    const binding = await parse_binding(binding_path, bindings);
     return binding?.properties.some(p => p.key === "reg") ?? false;
 }
 
@@ -225,7 +225,7 @@ async function add_from_example(
     if (parent_path === undefined) { return { status: "parent-not-found" }; }
 
     const file = path.basename(binding_path);
-    const binding = await parse_binding(binding_path, bindings.linux, bindings.dt_schema);
+    const binding = await parse_binding(binding_path, bindings);
     const examples = binding?.examples ?? [];
     // An example may show another device of the same binding (adi,ad7124-4 for adi,ad7124-8).
     const index = get_compat_index(bindings);

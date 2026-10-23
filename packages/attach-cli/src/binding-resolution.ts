@@ -22,6 +22,9 @@ import type {
     ParseOptions,
 } from "attach-lib";
 
+import path from "node:path";
+
+import type { Bindings } from "./config/workspace";
 import { find_binding, node_compatibles } from "./utilities";
 
 export type NodeBinding = {
@@ -76,15 +79,14 @@ export function match_pattern_rule(
 export async function child_unit_radix(
     parent: DTNode | undefined,
     child_name: string,
-    linux: string,
-    dtSchema: string,
+    bindings: Bindings,
 ): Promise<UnitRadix | undefined> {
     if (parent === undefined) { return undefined; }
     for (const compatible of node_compatibles(parent)) {
-        const binding_path = await find_binding(linux, dtSchema, compatible);
+        const binding_path = await find_binding(bindings.linux, bindings.dt_schema, compatible);
         if (binding_path === undefined) { continue; }
         try {
-            const binding = await Attach.parse(binding_path, { linux, dt_schema: dtSchema });
+            const binding = await Attach.parse(binding_path, bindings);
             return Result.is_err(binding) ? undefined : unit_radix(binding.value.patterns, child_name);
         } catch {
             return undefined;
@@ -98,8 +100,7 @@ export async function resolve_node_binding(
     parent_node: DTNode | undefined,
     parent_name: string,
     base_dt: DeviceTree,
-    linux: string,
-    dtSchema: string,
+    bindings: Bindings,
     options?: PopulateOptions,
     parent_compatibles?: string[],
 ): Promise<NodeBinding | { error: string }> {
@@ -116,7 +117,7 @@ export async function resolve_node_binding(
         }
         const compatible_value = first.value;
 
-        const binding_path = await find_binding(linux, dtSchema, compatible_value);
+        const binding_path = await find_binding(bindings.linux, bindings.dt_schema, compatible_value);
         if (binding_path === undefined) {
             return { error: `No binding found for ${compatible_value}` };
         }
@@ -125,13 +126,13 @@ export async function resolve_node_binding(
         if (parent_compatibles !== undefined && parent_compatibles.length > 0) {
             let controller_binding_path: string | undefined;
             for (const compat of parent_compatibles) {
-                controller_binding_path = await find_binding(linux, dtSchema, compat);
+                controller_binding_path = await find_binding(bindings.linux, bindings.dt_schema, compat);
                 if (controller_binding_path !== undefined) { break; }
             }
             controller_context = { compatibles: parent_compatibles, binding_path: controller_binding_path };
         }
         const parse_options: ParseOptions | undefined = controller_context === undefined ? undefined : { controller: controller_context };
-        const attach = await Attach.parse(binding_path, { linux, dt_schema: dtSchema }, parse_options);
+        const attach = await Attach.parse(binding_path, bindings, parse_options);
         if (Result.is_err(attach)) {
             return { error: `Failed to parse binding ${binding_path}` };
         }
@@ -172,12 +173,12 @@ export async function resolve_node_binding(
     }
     const parent_compatible_value = parent_first.value;
 
-    const parent_binding_path = await find_binding(linux, dtSchema, parent_compatible_value);
+    const parent_binding_path = await find_binding(bindings.linux, bindings.dt_schema, parent_compatible_value);
     if (parent_binding_path === undefined) {
         return { error: `Failed to find binding for ${parent_compatible_value}` };
     }
 
-    const parent_result = await Attach.parse(parent_binding_path, { linux, dt_schema: dtSchema });
+    const parent_result = await Attach.parse(parent_binding_path, bindings);
     if (Result.is_err(parent_result)) {
         return { error: `Failed to parse binding ${parent_binding_path}` };
     }
@@ -216,7 +217,11 @@ export async function resolve_node_binding(
 }
 
 if (import.meta.vitest) {
-    const { test, expect } = import.meta.vitest;
+    const { test, expect, vi } = import.meta.vitest;
+    const fs = await import("node:fs");
+    const os = await import("node:os");
+    const { DeviceTree } = await import("attach-lib");
+    const { save_compat_index } = await import("./config/cache");
 
     test("match_pattern_rule matches first regex-matching pattern and returns its rule", () => {
         const rules = [
@@ -276,5 +281,50 @@ if (import.meta.vitest) {
         const result = match_pattern_rule(patterns, rules, "channel@0");
         expect(result).toBeDefined();
         expect(result!.rule.description).toBe("catch-all");
+    });
+
+    // A binding that leaves `nvmem-cells` untyped, and a processed schema (the `dt-mk-schema -j` output) that
+    // says another binding types it `phandle-array`.
+    const NVMEM_BINDING = [
+        "%YAML 1.2", "---",
+        "$id: http://devicetree.org/schemas/test/vendor,dev.yaml#",
+        "$schema: http://devicetree.org/meta-schemas/core.yaml#",
+        "title: Test device",
+        "maintainers:", "  - Someone <someone@example.com>",
+        "properties:", "  compatible:", "    const: vendor,dev", "  nvmem-cells:", "    maxItems: 2",
+        "required:", "  - compatible",
+        "additionalProperties: false", "",
+    ].join("\n");
+
+    const nvmem_type = async (processed_name: string): Promise<string | undefined> => {
+        const directory = fs.mkdtempSync(path.join(os.tmpdir(), "attach-binding-"));
+        const cwd = vi.spyOn(process, "cwd").mockReturnValue(directory);
+        try {
+            const linux = path.join(directory, "linux");
+            const binding = path.join(linux, "Documentation", "devicetree", "bindings", "vendor,dev.yaml");
+            fs.mkdirSync(path.dirname(binding), { recursive: true });
+            fs.writeFileSync(binding, NVMEM_BINDING);
+            const dt_schema = path.resolve(__dirname, "..", "bundled", "dt-schema");
+            save_compat_index({ "vendor,dev": binding }, linux, dt_schema, directory);
+            fs.writeFileSync(path.join(directory, "validation.json"), JSON.stringify({ "generated-types": { properties: { "nvmem-cells": [{ type: "phandle-array" }] } } }));
+
+            const base = DeviceTree.new_from_string(`/dts-v1/;\n/ { dev@0 { compatible = "vendor,dev"; }; };`);
+            if (typeof base === "string") { throw new TypeError(base); }
+            const node = base.node_at("/dev@0")!;
+            const bindings = { linux, dt_schema, processed_schema: path.join(directory, processed_name) };
+            const resolved = await resolve_node_binding(node, undefined, "", base, bindings);
+            return "error" in resolved ? resolved.error : resolved.properties.find(property => property.key === "nvmem-cells")?.value._t;
+        } finally {
+            cwd.mockRestore();
+            fs.rmSync(directory, { recursive: true });
+        }
+    };
+
+    test("resolve_node_binding - Bindings carry the processed schema, which types a property the binding leaves untyped", async () => {
+        expect(await nvmem_type("validation.json")).toBe("matrix");
+    });
+
+    test("resolve_node_binding - without the processed schema the property stays a list", async () => {
+        expect(await nvmem_type("missing.json")).toBe("list");
     });
 }

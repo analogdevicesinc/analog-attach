@@ -45,7 +45,7 @@ Examples:
             const found = overlay.find_node(resolve_node_identifier(path_argument, overlay));
             const parent_path = found === undefined ? undefined : found.node_path.split("/").slice(0, -1).join("/") || "/";
             const radix = bindings.ok && parent_path !== undefined
-                ? await child_unit_radix(overlay.effective_node(parent_path), new_name.split("@")[0] ?? new_name, bindings.value.linux, bindings.value.dt_schema)
+                ? await child_unit_radix(overlay.effective_node(parent_path), new_name.split("@")[0] ?? new_name, bindings.value)
                 : undefined;
 
             const result = rename_overlay_node(overlay, path_argument, new_name, radix);

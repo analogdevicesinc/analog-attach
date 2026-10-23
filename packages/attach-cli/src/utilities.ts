@@ -515,7 +515,7 @@ if (import.meta.vitest) {
  * never built here: `parse_bindings` has checked it is there, so an empty one
  * only stands in for an index that disappeared since.
  */
-export function get_compat_index({ linux, dt_schema }: Bindings): CompatIndex {
+export function get_compat_index({ linux, dt_schema }: Pick<Bindings, "linux" | "dt_schema">): CompatIndex {
     const index = load_compat_index();
     return index?.entries === undefined ? { generated_at: 0, linux, dt_schema, entries: {} } : index;
 }

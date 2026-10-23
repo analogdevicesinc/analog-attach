@@ -244,14 +244,13 @@ export function resolve_property_definition(
     binding_parent: DTNode | undefined,
     parent_name: string,
     base_dt: DeviceTree,
-    linux: string,
-    dtSchema: string,
+    bindings: Bindings,
     property_name: string,
     quiet = false,
 ): Promise<{ definition: ResolvedProperty | undefined }> {
     return (async () => {
         if (binding_node === undefined) { return { definition: undefined }; }
-        const binding = await resolve_node_binding(binding_node, binding_parent, parent_name, base_dt, linux, dtSchema);
+        const binding = await resolve_node_binding(binding_node, binding_parent, parent_name, base_dt, bindings);
         if ('error' in binding) {
             if (!quiet) { diagnostic(`Property ${property_name} written without schema validation: ${binding.error}`); }
             return { definition: undefined };
@@ -344,7 +343,6 @@ Examples:
 
             const workspace = load_workspace(context_, ["bindings", "base", "overlay"]);
             if (workspace === undefined) { return; }
-            const { linux, dt_schema: dtSchema } = workspace.bindings;
             const base_dt = workspace.base.tree;
             const { tree: overlay } = workspace.overlay;
 
@@ -395,7 +393,7 @@ Examples:
                 // Try to find the binding's child_nodes (pattern_properties)
                 let child_patterns: string[] = [];
                 if (binding_node !== undefined) {
-                    const binding = await resolve_node_binding(binding_node, binding_parent, parent_name, base_dt, linux, dtSchema);
+                    const binding = await resolve_node_binding(binding_node, binding_parent, parent_name, base_dt, workspace.bindings);
                     if (!("error" in binding)) {
                         child_patterns = binding.child_nodes.map(c => c.pattern);
                     }
@@ -501,7 +499,7 @@ export type UpdateOutcome =
 export async function apply_update(
     workfile: Workfile,
     base_dt: DeviceTree,
-    { linux, dt_schema: dtSchema }: Bindings,
+    bindings: Bindings,
     node_identifier: string,
     property_name: string,
     value_arguments: string[],
@@ -514,7 +512,7 @@ export async function apply_update(
     }
 
     const { definition: property_definition } = await resolve_property_definition(
-        binding_node, binding_parent, parent_name, base_dt, linux, dtSchema,
+        binding_node, binding_parent, parent_name, base_dt, bindings,
         property_name, value_arguments.length === 0,
     );
 
@@ -571,7 +569,7 @@ export async function apply_update(
         const parent_path = found.node_path.split("/").slice(0, -1).join("/") || "/";
         const cells = address_cells_of(overlay, parent_path);
         const effective = overlay.effective_children(parent_path);
-        const radix = await child_unit_radix(overlay.effective_node(parent_path), found.node.name, linux, dtSchema);
+        const radix = await child_unit_radix(overlay.effective_node(parent_path), found.node.name, bindings);
         const sync = sync_unit_address_from_reg(found.node, cells.address, effective, radix);
         switch (sync) {
             case "conflict": {
