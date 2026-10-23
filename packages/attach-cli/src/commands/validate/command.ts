@@ -17,10 +17,9 @@ import { execSync } from "node:child_process";
 
 import type { LocalContext } from "../../context";
 import { config_directory } from "../../config/settings";
-import { stamp_validation_schema, validation_schema_path, validation_schema_stale_reason } from "../../config/cache";
+import { validation_schema_path } from "../../config/cache";
 import { load_workspace } from "../../config/workspace";
 import { is_tool_available } from "../../utilities";
-import { format_duration, rebuild_message, start_progress } from "../../progress";
 import { respond, input_error } from "../../protocol/output";
 import type { ValidationResponse, ValidationError } from "../../protocol/types";
 import { reg_warnings, type RegWarning } from "../../reg-conflicts";
@@ -52,8 +51,7 @@ Runs dt-validate on the overlay merged with the base device tree.`)
         .action(async () => {
             const workspace = load_workspace(context_, ["bindings", "tools", "base", "overlay"]);
             if (workspace === undefined) { return; }
-            const { linux, dt_schema } = workspace.bindings;
-            const { dtc, dt_mk_schema: dtMkSchema, dt_validate: dtValidate } = workspace.tools;
+            const { dtc, dt_validate: dtValidate } = workspace.tools;
             const overlay = workspace.overlay.tree;
 
             const output = build_validation_dts(overlay);
@@ -62,27 +60,6 @@ Runs dt-validate on the overlay merged with the base device tree.`)
             fs.mkdirSync(work_directory, { recursive: true });
 
             const validation_json_path = validation_schema_path();
-            const schema_reason = validation_schema_stale_reason(linux, dt_schema);
-            if (schema_reason !== undefined) {
-                const bindings_path = path.join(linux, 'Documentation', 'devicetree', 'bindings');
-
-                const started = Date.now();
-                const progress = start_progress(rebuild_message("schemas", schema_reason));
-                try {
-                    const schema_output = execSync(`${dtMkSchema} -j ${bindings_path}`, { stdio: 'pipe', maxBuffer: 256 * 1024 * 1024 });
-                    if (schema_output.length === 0) { throw new Error(`${dtMkSchema} produced no output`); }
-                    fs.writeFileSync(validation_json_path, schema_output);
-                } catch (error: any) {
-                    progress.done("Compiling binding schemas failed");
-                    const stderr: string = (error.stderr as Buffer | undefined)?.toString() ?? String(error);
-                    if (context_.json) { input_error(`Failed to generate validation.json: ${stderr}`); return; }
-                    console.log(`Failed to generate validation.json:\n${stderr}`);
-                    return;
-                }
-
-                stamp_validation_schema(linux, dt_schema);
-                progress.done(`Compiled binding schemas in ${format_duration(Date.now() - started)}`);
-            }
 
             const temporary_dts = path.join(work_directory, 'temp.dts');
             const temporary_dtb = path.join(work_directory, 'temp.dtb');

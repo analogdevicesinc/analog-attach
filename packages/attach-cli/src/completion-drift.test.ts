@@ -7,11 +7,11 @@ import { buildContext } from "./context";
 import { build_completion_command, completion_script } from "./commands/completion/command";
 import { run_complete, shell_dequote, short_description } from "./commands/completion/complete";
 import { COMPLETION_SPEC, NO_VALUE_COMPLETION, FILES_DIRECTIVE, DIRS_DIRECTIVE } from "./commands/completion/spec";
-import { SETTINGS, TOML_SETTINGS } from "./config/settings";
+import { SETTINGS } from "./config/settings";
 import * as suggest from "./commands/list/suggest";
 import { LIST_KINDS } from "./commands/list/command";
 
-const CONFIG_SET_FIELD_NAMES = TOML_SETTINGS.map(spec => spec.key).sort();
+const CONFIG_SET_FIELD_NAMES = SETTINGS.map(spec => spec.key).sort();
 
 const CONFIG_GET_FIELD_NAMES = SETTINGS.map(spec => spec.key).sort();
 

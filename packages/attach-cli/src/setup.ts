@@ -3,7 +3,9 @@ import * as fs from "node:fs";
 import path from "node:path";
 import * as os from "node:os";
 
-import { linux_tree_problem } from "./config/workspace";
+import { reload_caches } from "./config/rebuild";
+import { read_settings, save_settings } from "./config/settings";
+import { format_config_errors, linux_tree_problem } from "./config/workspace";
 
 const BOLD = "\u001B[1m";
 const DIM = "\u001B[2m";
@@ -375,65 +377,26 @@ async function step_context(rl: readline.Interface, linux_path: string): Promise
 }
 
 // ---------------------------------------------------------------------------
-// Step 3: Output export lines
+// Step 3: Save the settings and build the binding caches
 // ---------------------------------------------------------------------------
 
-interface ShellInfo {
-    name: string;
-    rc_file: string;
-    format_export: (key: string, value: string) => string;
-    source_command: string;
+async function step_save(linux_path: string, context_path: string): Promise<boolean> {
+    save_settings({ linux: path.resolve(linux_path), devicetree: path.resolve(context_path) });
+    console.log(`Saved linux and devicetree to ${cyan(".attach-linux/config.toml")}.`);
+    console.log("");
+
+    const settings = read_settings();
+    const reloaded = settings.ok ? await reload_caches(settings.value) : settings;
+    if (reloaded.ok && reloaded.value.ok) { return true; }
+    console.log(reloaded.ok ? reloaded.value.message : format_config_errors(reloaded.errors).human);
+    console.log("");
+    console.log(`Fix the problem, then run ${cyan("attach-linux config-get --reload")} to build the binding caches.`);
+    return false;
 }
 
-function detect_shell(): ShellInfo {
-    const shell = process.env["SHELL"] ?? "";
-    const name = path.basename(shell);
-    const home = os.homedir();
-
-    switch (name) {
-        case "fish": {
-            return {
-                name: "fish",
-                rc_file: path.join(home, ".config", "fish", "config.fish"),
-                format_export: (key, value) => `set -gx ${key} ${value}`,
-                source_command: `source ${path.join(home, ".config", "fish", "config.fish")}`,
-            };
-        }
-        case "zsh": {
-            return {
-                name: "zsh",
-                rc_file: path.join(home, ".zshrc"),
-                format_export: (key, value) => `export ${key}=${value}`,
-                source_command: `source ${path.join(home, ".zshrc")}`,
-            };
-        }
-        default: {
-            return {
-                name: name || "bash",
-                rc_file: path.join(home, ".bashrc"),
-                format_export: (key, value) => `export ${key}=${value}`,
-                source_command: `source ${path.join(home, ".bashrc")}`,
-            };
-        }
-    }
-}
-
-function step_output(linux_path: string, context_path: string): void {
-    const shell = detect_shell();
-
-    const line_linux = shell.format_export("ATTACH_LINUX", linux_path);
-    const line_context = shell.format_export("ATTACH_DEVICETREE", context_path);
-
+function step_output(): void {
+    console.log("");
     console.log(bold("Setup complete!"));
-    console.log("");
-    console.log(`Add these lines to your ${cyan(shell.rc_file)}:`);
-    console.log("");
-    console.log(`  ${line_linux}`);
-    console.log(`  ${line_context}`);
-    console.log("");
-    console.log("Then reload your shell:");
-    console.log("");
-    console.log(`  ${shell.source_command}`);
     console.log("");
     console.log(bold("Next steps:"));
     console.log("");
@@ -442,7 +405,8 @@ function step_output(linux_path: string, context_path: string): void {
     console.log("");
     console.log(`  ${cyan("2.")} Search for devices to add to the overlay:`);
     console.log(`     ${dim("attach-linux list device [filter]")}`);
-    console.log(`     ${dim("The first run builds a binding index — subsequent runs are instant.")}`);
+    console.log("");
+    console.log(`  Run ${cyan("attach-linux config-get --reload")} after the bindings of the Linux tree change.`);
     console.log("");
 }
 
@@ -467,7 +431,7 @@ export async function run_setup(): Promise<void> {
         const context_path = await step_context(rl, linux_path);
         console.log("");
 
-        step_output(linux_path, context_path);
+        if (await step_save(linux_path, context_path)) { step_output(); }
     } catch (error: unknown) {
         if (error instanceof Error && error.message === "interrupted") {
             console.log("\nSetup cancelled.");

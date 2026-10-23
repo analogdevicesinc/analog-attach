@@ -1,25 +1,6 @@
-import type { StaleReason } from "./config/cache";
-
-// Progress lines for slow cache builds (the compat index, the validation
-// schemas). They go to stderr in every mode, so stdout and --json responses
-// stay clean; shell completion never builds a cache, so it never prints them.
-
-export type CacheSubject = "index" | "schemas";
-
-const REBUILD: Record<CacheSubject, { first: string; sources: string; changed: string; action: string }> = {
-    index: { first: "Indexing device bindings", sources: "Bindings", changed: "the last index", action: "re-indexing" },
-    schemas: { first: "Compiling binding schemas for validation", sources: "Bindings", changed: "the last schema build", action: "recompiling binding schemas" },
-};
-
-/** The line printed before a cache is (re)built, saying why. */
-export function rebuild_message(subject: CacheSubject, reason: StaleReason): string {
-    const words = REBUILD[subject];
-    switch (reason.kind) {
-        case "missing": { return `${words.first} (first run)...`; }
-        case "stale": { return `${words.sources} changed since ${words.changed}, ${words.action}...`; }
-        case "linux-changed": { return `Linux tree changed (${reason.from} → ${reason.to}), ${words.action}...`; }
-    }
-}
+// Progress lines for the slow cache build (the compat index and the validation
+// schemas, see config/rebuild.ts). They go to stderr in every mode, so stdout
+// and --json responses stay clean.
 
 /** 4.2s under 10 seconds, 48s under a minute, then 1m 12s. */
 export function format_duration(ms: number): string {
@@ -61,21 +42,6 @@ if (import.meta.vitest) {
         let written = "";
         return { stream: { isTTY: tty, write: (chunk: string) => { written += chunk; return true; } }, text: () => written };
     };
-
-    test("rebuild_message - says why the index is built", () => {
-        expect(rebuild_message("index", { kind: "missing" })).toBe("Indexing device bindings (first run)...");
-        expect(rebuild_message("index", { kind: "stale" })).toBe("Bindings changed since the last index, re-indexing...");
-        expect(rebuild_message("index", { kind: "linux-changed", from: "/old/linux", to: "/new/linux" }))
-            .toBe("Linux tree changed (/old/linux → /new/linux), re-indexing...");
-    });
-
-    test("rebuild_message - the same reasons for the validation schemas", () => {
-        expect(rebuild_message("schemas", { kind: "missing" })).toBe("Compiling binding schemas for validation (first run)...");
-        expect(rebuild_message("schemas", { kind: "stale" })).toBe("Bindings changed since the last schema build, recompiling binding schemas...");
-        expect(rebuild_message("schemas", { kind: "linux-changed", from: "/a", to: "/b" }))
-            .toBe("Linux tree changed (/a → /b), recompiling binding schemas...");
-    });
-
 
     test("format_duration - tenths under 10s, seconds, then minutes", () => {
         expect(format_duration(4200)).toBe("4.2s");

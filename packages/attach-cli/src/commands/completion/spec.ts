@@ -1,4 +1,4 @@
-import { SETTINGS, TOML_SETTINGS } from "../../config/settings";
+import { SETTINGS } from "../../config/settings";
 import { LIST_KINDS } from "../list/command";
 
 // Single source of truth for value completion.
@@ -54,7 +54,7 @@ export interface CommandSpec {
 const FILE: ValueSource = { kind: "file" };
 const CONFIG_SET_FIELDS: ValueSource = {
     kind: "values",
-    values: TOML_SETTINGS.map(spec => spec.key),
+    values: SETTINGS.map(spec => spec.key),
 };
 const CONFIG_GET_FIELDS: ValueSource = {
     kind: "values",

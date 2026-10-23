@@ -28,27 +28,27 @@ You are helping a user configure Linux device tree overlays for hardware devices
 
 ## Prerequisites
 
-Set up configuration before using other commands. The Linux tree and the base devicetree are read from environment variables:
+Set up configuration before using other commands. Every field, the Linux tree and the base devicetree included, is stored in `.attach-linux/config.toml` (relative to the current directory) via `config-set`:
 
 ```bash
-export ATTACH_LINUX=~/linux
-export ATTACH_DEVICETREE=~/rpi-4.dts
+attach-linux config-set linux ~/linux
+attach-linux config-set devicetree ~/rpi-4.dts
 ```
 
-Other fields (overlay, overlay-syntax, deploy-*, …) are stored in `.attach-linux/config.toml` via `config-set`. The dt-schema bindings, dtc and validation tools are bundled with the CLI.
+Setting `linux` also builds the binding caches (the compat index and `validation.json`) from its bindings, which takes about 40 s for the kernel tree. Commands never rebuild them: when the bindings change, run `attach-linux config-get --reload` (no field names). Until then commands warn on stderr that the caches look out of date; with a cache missing they fail with that hint. The dt-schema bindings, dtc and validation tools are bundled with the CLI.
 
-Every command checks the configuration it needs up front: `ATTACH_LINUX` must be a kernel tree (with `Documentation/devicetree/bindings/` and `include/`), `ATTACH_DEVICETREE` must preprocess and parse, and `overlay` must parse against it. Unknown or invalid keys in config.toml are errors. Problems are reported together (exit code 2 with `--json`) with a hint on how to fix them.
+Every command checks the configuration it needs up front: `linux` must be a kernel tree (with `Documentation/devicetree/bindings/` and `include/`) with its caches built, `devicetree` must preprocess and parse, and `overlay` must parse against it. Unknown or invalid keys in config.toml are errors. Problems are reported together (exit code 2 with `--json`) with a hint on how to fix them.
 
 **Per-command config requirements**:
 - `config-set` / `config-get` / `create-workfile`: No prerequisites (`create-workfile` saves the `overlay` path to config)
-- `list device`: Needs `ATTACH_LINUX` (to build the compat index on first run)
-- `list parent`, `list overlay`: Need `ATTACH_LINUX`, `ATTACH_DEVICETREE`
-- `import`: Needs `ATTACH_LINUX`, `ATTACH_DEVICETREE`, and no `overlay` yet (it creates one)
-- `list property`: Needs `ATTACH_LINUX`, `ATTACH_DEVICETREE`, `overlay`
-- `list value`: Needs `ATTACH_DEVICETREE`, `overlay`. `ATTACH_LINUX` is optional and enables binding check annotations
-- `add`: Needs `ATTACH_LINUX`, `ATTACH_DEVICETREE`, `overlay` (auto-created if missing)
-- `update`, `validate`: Need `ATTACH_LINUX`, `ATTACH_DEVICETREE`, `overlay`
-- `read`, `delete`, `rename`, `move`, `enable`/`disable`, `build`: Need `ATTACH_DEVICETREE`, `overlay`
+- `list device`: Needs `linux` (and its caches)
+- `list parent`, `list overlay`: Need `linux`, `devicetree`
+- `import`: Needs `linux`, `devicetree`, and no `overlay` yet (it creates one)
+- `list property`: Needs `linux`, `devicetree`, `overlay`
+- `list value`: Needs `devicetree`, `overlay`. `linux` is optional and enables binding check annotations
+- `add`: Needs `linux`, `devicetree`, `overlay` (auto-created if missing)
+- `update`, `validate`: Need `linux`, `devicetree`, `overlay`
+- `read`, `delete`, `rename`, `move`, `enable`/`disable`, `build`: Need `devicetree`, `overlay`
 - `deploy`: Needs `deploy-ip`, `deploy-user`, `deploy-password`, and the `.dtbo` that `build` wrote next to `overlay`
 
 Help users locate appropriate `.dts` files when needed — they're typically in `arch/<arch>/boot/dts/` within the Linux kernel (e.g., Raspberry Pi, BeagleBone).
@@ -95,17 +95,12 @@ attach-linux config-set <field> <value>
 attach-linux config-get [fields...]
 ```
 
-**Environment variables** (required, not settable via config-set):
-
-| Variable | Description |
-|----------|-------------|
-| `ATTACH_LINUX` | Path to Linux kernel source tree |
-| `ATTACH_DEVICETREE` | Path to target base `.dts` file |
-
 **Config fields** (stored in `.attach-linux/config.toml`):
 
 | Field | Required | Description |
 |-------|----------|-------------|
+| `linux` | Yes | Path to Linux kernel source tree; setting it builds the compat index and `validation.json` |
+| `devicetree` | Yes | Path to target base `.dts` file |
 | `overlay` | No | Path to the working `.dtso` overlay file (auto-set by `create-workfile` or `add`) |
 | `overlay-syntax` | No | Output syntax: `fragment` (default) or `label` (`&spi0 { }` style) |
 | `preprocess-command` | No | C preprocessor command that resolves `#include`s and macros in the base devicetree (default mirrors kbuild's `cpp` flags) |
@@ -115,11 +110,14 @@ attach-linux config-get [fields...]
 
 **Examples**:
 ```bash
-# Set up core paths (environment variables)
-export ATTACH_LINUX=~/linux
-export ATTACH_DEVICETREE=~/rpi-4.dts
+# Set up core paths (setting linux builds the binding caches, ~40 s)
+attach-linux config-set linux ~/linux
+attach-linux config-set devicetree ~/rpi-4.dts
 
-# Read all config (shows env vars and config.toml fields)
+# Rebuild the caches after the bindings changed
+attach-linux config-get --reload
+
+# Read all config
 attach-linux config-get
 ```
 
@@ -596,7 +594,7 @@ attach-linux deploy [--dtbo <path>] [--ip <host>] [--user <user>] [--password <p
 ## Recommended Workflow
 
 ```
-0. CONFIGURE    export ATTACH_LINUX=... ATTACH_DEVICETREE=...
+0. CONFIGURE    config-set linux ... ; config-set devicetree ...
 1. FIND DEVICE  list device <chip-name>
 2. FIND PARENT  list parent <compatible>
 3. ADD DEVICE   add <compatible> --parent <bus>  (auto-creates workfile)

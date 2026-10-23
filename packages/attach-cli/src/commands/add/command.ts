@@ -16,7 +16,7 @@ import {
 import type { LocalContext } from "../../context";
 import { load_workspace, parse_overlay, report_config_errors, type Bindings } from "../../config/workspace";
 import type { Settings } from "../../config/settings";
-import { bus_kind, find_binding, get_or_build_compat_index, parse_node_path, resolve_path, type BusKind } from "../../utilities";
+import { bus_kind, find_binding, get_compat_index, parse_node_path, resolve_path, type BusKind } from "../../utilities";
 import { respond, respond_fail, diagnostic, input_error } from "../../protocol/output";
 import type { AddResponse } from "../../protocol/types";
 import { new_workfile, next_workfile_name } from "../../workfile";
@@ -228,7 +228,7 @@ async function add_from_example(
     const binding = await parse_binding(binding_path, bindings.linux, bindings.dt_schema);
     const examples = binding?.examples ?? [];
     // An example may show another device of the same binding (adi,ad7124-4 for adi,ad7124-8).
-    const index = await get_or_build_compat_index(bindings);
+    const index = get_compat_index(bindings);
     const belongs = (candidate: string): boolean => candidate === request.compatible || index.entries[candidate] === binding_path;
     const matches: ExampleMatch[] = [];
     const broken: string[] = [];

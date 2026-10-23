@@ -5,6 +5,7 @@ import { DeviceTree, DeviceTreeOverlay } from "attach-lib";
 import type { LocalContext } from "../context";
 import { getBundledDtSchemaPath, getBundledToolsPath } from "../commands/skill/utilities";
 import { input_error } from "../protocol/output";
+import { cache_warning, load_compat_index, validation_schema_path } from "./cache";
 import { is_tool_available, run_preprocess } from "../utilities";
 import {
     config_directory,
@@ -96,8 +97,7 @@ function require_setting(settings: Settings, key: SettingKey): ConfigResult<stri
     const spec = spec_of(key);
     const value = settings[spec.field];
     if (value !== undefined) { return { ok: true, value }; }
-    const message = spec.env === undefined ? `Missing config field ${spec.key}` : `Missing environment variable ${spec.env}`;
-    return fail({ field: spec.key, kind: "missing", message, description: spec.description, hint: spec.hint });
+    return fail({ field: spec.key, kind: "missing", message: `Missing config field ${spec.key}`, description: spec.description, hint: spec.hint });
 }
 
 function require_path(settings: Settings, key: SettingKey, kind: "file" | "directory"): ConfigResult<string> {
@@ -137,10 +137,30 @@ export function parse_dt_schema(): ConfigResult<string> {
     return { ok: true, value: root };
 }
 
-export function parse_bindings(settings: Settings, linux_tree: () => ConfigResult<string> = () => parse_linux(settings)): ConfigResult<Bindings> {
+export const RELOAD_HINT = "Run 'attach-linux config-get --reload' to build the binding caches.";
+
+/** The caches `config-set linux` and `config-get --reload` build; commands only read them, so they must be there. */
+function parse_caches(cwd: string): ConfigResult<undefined> {
+    const missing = (field: string, file: string): ConfigError => ({
+        field, kind: "missing", message: `${file} not found or unreadable in ${config_directory(cwd)}`, hint: RELOAD_HINT,
+    });
+    const errors: ConfigError[] = [];
+    if (load_compat_index(cwd)?.entries === undefined) { errors.push(missing("compat-index", "compat-index.json")); }
+    if (!fs.existsSync(validation_schema_path(cwd))) { errors.push(missing("validation.json", "validation.json")); }
+    return errors.length > 0 ? { ok: false, errors } : { ok: true, value: undefined };
+}
+
+export function parse_bindings(
+    settings: Settings,
+    linux_tree: () => ConfigResult<string> = () => parse_linux(settings),
+    cwd = process.cwd(),
+    bundled_dt_schema: () => ConfigResult<string> = parse_dt_schema,
+): ConfigResult<Bindings> {
     const linux = linux_tree();
-    const dt_schema = parse_dt_schema();
+    const dt_schema = bundled_dt_schema();
     if (!linux.ok || !dt_schema.ok) { return { ok: false, errors: failures(linux, dt_schema) }; }
+    const caches = parse_caches(cwd);
+    if (!caches.ok) { return caches; }
     return { ok: true, value: { linux: linux.value, dt_schema: dt_schema.value } };
 }
 
@@ -244,7 +264,7 @@ export function open_workspace<N extends Need>(settings: Settings, needs: readon
     const base = (): ConfigResult<BaseTree> => (base_result ??= parse_base(settings, linux, cwd));
 
     const parsers: { [K in Need]: () => ConfigResult<Resources[K]> } = {
-        bindings: () => parse_bindings(settings, linux),
+        bindings: () => parse_bindings(settings, linux, cwd),
         tools: parse_tools,
         base,
         overlay: () => {
@@ -299,6 +319,11 @@ export function load_workspace<N extends Need>(context: LocalContext, needs: rea
         report_config_errors(context, workspace.errors);
         return undefined;
     }
+    if (needs.includes("bindings" as N)) {
+        const bindings = (workspace.value as Workspace<"bindings">).bindings;
+        const warning = cache_warning(bindings.linux, bindings.dt_schema);
+        if (warning !== undefined) { console.error(`warning: ${warning}`); }
+    }
     return workspace.value;
 }
 
@@ -333,19 +358,22 @@ if (import.meta.vitest) {
         fs.rmSync(root, { recursive: true });
     });
 
-    const settings_for = (toml: string, environment: Record<string, string>): Settings => {
-        const result = parse_settings(toml, environment, root);
+    const settings_for = (toml: string): Settings => {
+        const result = parse_settings(toml, root);
         if (!result.ok) { throw new Error(JSON.stringify(result.errors)); }
         return result.value;
     };
 
-    const open = <N extends Need>(toml: string, environment: Record<string, string>, needs: readonly N[]): ConfigResult<Workspace<N>> =>
-        open_workspace(settings_for(toml, environment), needs, workspace_directory);
+    const open = <N extends Need>(toml: string, needs: readonly N[]): ConfigResult<Workspace<N>> =>
+        open_workspace(settings_for(toml), needs, workspace_directory);
+
+    const with_linux = (extra = "", devicetree = "base.dts"): string =>
+        `linux = ${JSON.stringify(linux)}\ndevicetree = ${JSON.stringify(devicetree)}\n${extra}`;
 
     const fields = (result: ConfigResult<unknown>): string[] => (result.ok ? [] : result.errors.map(error => error.field));
 
     test("open_workspace - preprocesses #include and parses base and overlay", () => {
-        const result = open(`overlay = "overlay.dtso"`, { ATTACH_LINUX: linux, ATTACH_DEVICETREE: "base.dts" }, ["base", "overlay"]);
+        const result = open(with_linux(`overlay = "overlay.dtso"`), ["base", "overlay"]);
         expect(result.ok).toBe(true);
         if (!result.ok) { return; }
         expect(result.value.base.preprocessed).toBe(path.join(workspace_directory, ".attach-linux", "preprocessed.dts"));
@@ -354,63 +382,92 @@ if (import.meta.vitest) {
     });
 
     test("open_workspace - independent missing settings are all reported", () => {
-        const result = open("", {}, ["base", "overlay"]);
+        const result = open("", ["base", "overlay"]);
         expect(fields(result)).toEqual(["devicetree", "linux", "overlay"]);
     });
 
     test("open_workspace - a shared dependency is reported once", () => {
-        const result = open("", { ATTACH_DEVICETREE: "base.dts" }, ["base", "overlay"]);
+        const result = open(`devicetree = "base.dts"`, ["base", "overlay"]);
         expect(fields(result)).toEqual(["linux", "overlay"]);
     });
 
     test("open_workspace - linux without include/ is rejected", () => {
         const fake = path.join(root, "not-linux");
         fs.mkdirSync(path.join(fake, "Documentation", "devicetree", "bindings"), { recursive: true });
-        const result = open("", { ATTACH_LINUX: fake, ATTACH_DEVICETREE: "base.dts" }, ["base"]);
+        const result = open(`linux = ${JSON.stringify(fake)}\ndevicetree = "base.dts"`, ["base"]);
         expect(result.ok).toBe(false);
         if (result.ok) { return; }
         expect(result.errors[0]!.message).toContain("no include/");
     });
 
     test("open_workspace - a preprocessing failure is a hard error", () => {
-        const result = open("", { ATTACH_LINUX: linux, ATTACH_DEVICETREE: "broken.dts" }, ["base"]);
+        const result = open(with_linux("", "broken.dts"), ["base"]);
         expect(result.ok).toBe(false);
         if (result.ok) { return; }
         expect(result.errors[0]!.message).toContain("preprocessing");
     });
 
     test("open_workspace - an overlay that does not parse is a config error", () => {
-        const result = open(`overlay = "bad.dtso"`, { ATTACH_LINUX: linux, ATTACH_DEVICETREE: "base.dts" }, ["overlay"]);
+        const result = open(with_linux(`overlay = "bad.dtso"`), ["overlay"]);
         expect(fields(result)).toEqual(["overlay"]);
     });
 
     test("open_workspace - a missing overlay file is reported", () => {
-        const result = open(`overlay = "nope.dtso"`, { ATTACH_LINUX: linux, ATTACH_DEVICETREE: "base.dts" }, ["overlay"]);
+        const result = open(with_linux(`overlay = "nope.dtso"`), ["overlay"]);
         expect(result.ok).toBe(false);
         if (result.ok) { return; }
         expect(result.errors[0]!.message).toContain("does not exist");
     });
 
     test("open_workspace - deploy needs every deploy field", () => {
-        const result = open(`deploy-ip = "10.0.0.1"`, {}, ["deploy"]);
+        const result = open(`deploy-ip = "10.0.0.1"`, ["deploy"]);
         expect(fields(result)).toEqual(["deploy-user", "deploy-password", "overlay"]);
     });
 
+    const bindings = (): ConfigResult<Bindings> =>
+        parse_bindings(settings_for(with_linux()), undefined, workspace_directory, () => ({ ok: true, value: "/dt-schema" }));
+
+    const caches = (): void => {
+        const directory = path.join(workspace_directory, ".attach-linux");
+        fs.mkdirSync(directory, { recursive: true });
+        fs.writeFileSync(path.join(directory, "compat-index.json"), JSON.stringify({ generated_at: 1, entries: {} }));
+        fs.writeFileSync(path.join(directory, "validation.json"), "{}");
+    };
+
+    test("open_workspace - bindings need the compat index and validation.json, with a reload hint", () => {
+        fs.rmSync(path.join(workspace_directory, ".attach-linux"), { recursive: true, force: true });
+        const result = bindings();
+        expect(fields(result)).toEqual(["compat-index", "validation.json"]);
+        if (result.ok) { return; }
+        expect(format_config_errors(result.errors).human).toContain("attach-linux config-get --reload");
+    });
+
+    test("open_workspace - bindings are there once both caches exist", () => {
+        caches();
+        expect(bindings()).toEqual({ ok: true, value: { linux, dt_schema: "/dt-schema" } });
+    });
+
+    test("open_workspace - an unreadable compat index counts as missing", () => {
+        caches();
+        fs.writeFileSync(path.join(workspace_directory, ".attach-linux", "compat-index.json"), "{ not json");
+        expect(fields(bindings())).toEqual(["compat-index"]);
+    });
+
     test("format_config_errors - single error includes description and hint", () => {
-        const result = open("", {}, ["base"]);
+        const result = open("", ["base"]);
         if (result.ok) { throw new Error("expected errors"); }
         const message = format_config_errors(result.errors.slice(0, 1));
-        expect(message.human).toContain("ATTACH_DEVICETREE");
+        expect(message.human).toContain("devicetree");
         expect(message.human).toContain("base DTS file");
         expect(message.human).toContain("attach-linux");
     });
 
     test("format_config_errors - shared hints are printed once", () => {
-        const result = open("", {}, ["base"]);
+        const result = open("", ["base"]);
         if (result.ok) { throw new Error("expected errors"); }
         const message = format_config_errors(result.errors);
-        expect(message.human).toContain("ATTACH_LINUX");
-        expect(message.human).toContain("ATTACH_DEVICETREE");
+        expect(message.human).toContain("Missing config field linux");
+        expect(message.human).toContain("Missing config field devicetree");
         expect(message.human.split("Run 'attach-linux'").length - 1).toBe(1);
         expect(JSON.parse(message.json).errors).toHaveLength(2);
     });

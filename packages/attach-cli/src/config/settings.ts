@@ -8,7 +8,7 @@ export const DEFAULT_PREPROCESS_COMMAND = "cpp -nostdinc -undef -x assembler-wit
 export const OVERLAY_SYNTAXES = ["fragment", "label"] as const;
 export type OverlaySyntax = typeof OVERLAY_SYNTAXES[number];
 
-/** The user's settings: env vars and config.toml, shape-checked, defaults applied. Paths are absolute. */
+/** The user's settings from config.toml, shape-checked, defaults applied. Paths are absolute. */
 export interface Settings {
     linux?: string;
     devicetree?: string;
@@ -20,16 +20,12 @@ export interface Settings {
     deploy_password?: string;
 }
 
-export type EnvironmentKey = "linux" | "devicetree";
-export type TomlKey = "overlay" | "overlay-syntax" | "preprocess-command" | "deploy-ip" | "deploy-user" | "deploy-password";
-export type SettingKey = EnvironmentKey | TomlKey;
+export type SettingKey = "linux" | "devicetree" | "overlay" | "overlay-syntax" | "preprocess-command" | "deploy-ip" | "deploy-user" | "deploy-password";
 
 export interface SettingSpec {
     /** kebab-case name, as written in config.toml and accepted by config-set / config-get. */
     key: SettingKey;
     field: keyof Settings;
-    /** Environment variable the value is read from; config.toml must not carry it. */
-    env?: string;
     kind: "path" | "string" | { options: readonly string[] };
     description: string;
     /** Display metadata for config-get; what a command needs is decided by `load_workspace`. */
@@ -45,19 +41,17 @@ export const SETTINGS: readonly SettingSpec[] = [
     {
         key: "linux",
         field: "linux",
-        env: "ATTACH_LINUX",
         kind: "path",
         required: true,
-        description: "Path to Linux kernel source tree (set via $ATTACH_LINUX)",
+        description: "Path to Linux kernel source tree (setting it builds the binding caches)",
         hint: SETUP_HINT,
     },
     {
         key: "devicetree",
         field: "devicetree",
-        env: "ATTACH_DEVICETREE",
         kind: "path",
         required: true,
-        description: "Path to target base DTS file (set via $ATTACH_DEVICETREE)",
+        description: "Path to target base DTS file",
         hint: SETUP_HINT,
     },
     {
@@ -107,16 +101,8 @@ export const SETTINGS: readonly SettingSpec[] = [
     },
 ];
 
-/** Settings stored in config.toml (everything not read from the environment). */
-export const TOML_SETTINGS: readonly SettingSpec[] = SETTINGS.filter(spec => spec.env === undefined);
-
 export function setting_spec(key: string): SettingSpec | undefined {
     return SETTINGS.find(spec => spec.key === key);
-}
-
-/** How a setting is named in messages: its env var, or its config.toml key. */
-export function setting_label(spec: SettingSpec): string {
-    return spec.env ?? spec.key;
 }
 
 export interface ConfigError {
@@ -140,7 +126,7 @@ function config_path(cwd = process.cwd()): string {
 
 /** An `invalid` error for a setting, carrying its description and hint. */
 export function invalid_setting(spec: SettingSpec, problem: string): ConfigError {
-    return { field: spec.key, kind: "invalid", message: `${setting_label(spec)}: ${problem}`, description: spec.description, hint: spec.hint };
+    return { field: spec.key, kind: "invalid", message: `${spec.key}: ${problem}`, description: spec.description, hint: spec.hint };
 }
 
 function parse_setting_value(spec: SettingSpec, raw: string, cwd: string): string | ConfigError {
@@ -154,16 +140,11 @@ function parse_setting_value(spec: SettingSpec, raw: string, cwd: string): strin
 }
 
 /**
- * Parse config.toml text (undefined when there is no file) and the environment
- * into `Settings`. Strict: a TOML syntax error, an unknown key, a non-string
- * value, an env-sourced key written in TOML, or a value outside a field's
- * options is an error. An empty env var counts as unset.
+ * Parse config.toml text (undefined when there is no file) into `Settings`.
+ * Strict: a TOML syntax error, an unknown key, a non-string value, or a value
+ * outside a field's options is an error.
  */
-export function parse_settings(
-    toml_text: string | undefined,
-    environment: Record<string, string | undefined>,
-    cwd = process.cwd(),
-): ConfigResult<Settings> {
+export function parse_settings(toml_text?: string, cwd = process.cwd()): ConfigResult<Settings> {
     let table: Record<string, unknown> = {};
     if (toml_text !== undefined) {
         try {
@@ -185,14 +166,7 @@ export function parse_settings(
                 field: key,
                 kind: "unknown",
                 message: `.attach-linux/config.toml: unknown key ${key}`,
-                hint: `Remove unknown keys from .attach-linux/config.toml; valid keys are ${TOML_SETTINGS.map(s => s.key).join(", ")}.`,
-            });
-        } else if (spec.env !== undefined) {
-            errors.push({
-                field: key,
-                kind: "invalid",
-                message: `.attach-linux/config.toml: ${key} is read from $${spec.env}, not config.toml`,
-                hint: `Remove it from config.toml and export ${spec.env}=${JSON.stringify(raw)}`,
+                hint: `Remove unknown keys from .attach-linux/config.toml; valid keys are ${SETTINGS.map(s => s.key).join(", ")}.`,
             });
         } else if (typeof raw === "string") {
             const value = parse_setting_value(spec, raw, cwd);
@@ -200,14 +174,6 @@ export function parse_settings(
         } else {
             errors.push(invalid_setting(spec, "must be a string"));
         }
-    }
-
-    for (const spec of SETTINGS) {
-        if (spec.env === undefined) { continue; }
-        const raw = environment[spec.env];
-        if (raw === undefined || raw === "") { continue; }
-        const value = parse_setting_value(spec, raw, cwd);
-        if (typeof value === "string") { values[spec.field] = value; } else { errors.push(value); }
     }
 
     return errors.length > 0 ? { ok: false, errors } : { ok: true, value: settings };
@@ -218,9 +184,9 @@ export function read_config_file(cwd = process.cwd()): string | undefined {
     return fs.existsSync(file) ? fs.readFileSync(file, "utf8") : undefined;
 }
 
-/** Read the settings of the workspace in `cwd` from config.toml and `process.env`. */
+/** Read the settings of the workspace in `cwd` from its config.toml. */
 export function read_settings(cwd = process.cwd()): ConfigResult<Settings> {
-    return parse_settings(read_config_file(cwd), process.env, cwd);
+    return parse_settings(read_config_file(cwd), cwd);
 }
 
 /**
@@ -229,12 +195,12 @@ export function read_settings(cwd = process.cwd()): ConfigResult<Settings> {
  * still reported by the next load rather than dropped silently. Throws when
  * the current file is not valid TOML (callers have read the settings first).
  */
-export function save_settings(patch: Partial<Record<TomlKey, string>>, cwd = process.cwd()): void {
+export function save_settings(patch: Partial<Record<SettingKey, string>>, cwd = process.cwd()): void {
     const text = read_config_file(cwd);
     const merged: Record<string, unknown> = { ...(text === undefined ? {} : parse(text)), ...patch };
 
     const ordered: Record<string, unknown> = {};
-    for (const spec of TOML_SETTINGS) {
+    for (const spec of SETTINGS) {
         if (merged[spec.key] !== undefined) { ordered[spec.key] = merged[spec.key]; }
     }
     for (const [key, value] of Object.entries(merged)) {
@@ -246,7 +212,7 @@ export function save_settings(patch: Partial<Record<TomlKey, string>>, cwd = pro
 }
 
 if (import.meta.vitest) {
-    const { test, expect } = import.meta.vitest;
+    const { test, expect, vi } = import.meta.vitest;
     const os = await import("node:os");
 
     const errors_of = (result: ConfigResult<Settings>): ConfigError[] => (result.ok ? [] : result.errors);
@@ -257,47 +223,49 @@ if (import.meta.vitest) {
     });
 
     test("parse_settings - defaults apply with no file and no env", () => {
-        const result = parse_settings(undefined, {});
+        const result = parse_settings();
         expect(result).toEqual({ ok: true, value: { overlay_syntax: "fragment", preprocess_command: DEFAULT_PREPROCESS_COMMAND } });
     });
 
     test("parse_settings - paths resolve against cwd", () => {
-        const result = parse_settings(`overlay = "o.dtso"`, { ATTACH_DEVICETREE: "../x.dts" }, "/w/s");
+        const result = parse_settings(`overlay = "o.dtso"\ndevicetree = "../x.dts"`, "/w/s");
         expect(result.ok && result.value.overlay).toBe("/w/s/o.dtso");
         expect(result.ok && result.value.devicetree).toBe("/w/x.dts");
     });
 
-    test("parse_settings - empty env counts as unset", () => {
-        const result = parse_settings(undefined, { ATTACH_LINUX: "" });
-        expect(result.ok && result.value.linux).toBeUndefined();
+    test("parse_settings - linux and devicetree are read from config.toml, not the environment", () => {
+        vi.stubEnv("ATTACH_LINUX", "/from/env");
+        try {
+            const result = parse_settings(`linux = "/l"\ndevicetree = "d.dts"`, "/w");
+            expect(result.ok && result.value.linux).toBe("/l");
+            expect(result.ok && result.value.devicetree).toBe("/w/d.dts");
+            const unset = parse_settings();
+            expect(unset.ok && unset.value.linux).toBeUndefined();
+        } finally {
+            vi.unstubAllEnvs();
+        }
     });
 
     test("parse_settings - unknown key is an error", () => {
-        const errors = errors_of(parse_settings(`validation-json = "/x"`, {}));
+        const errors = errors_of(parse_settings(`validation-json = "/x"`));
         expect(errors).toHaveLength(1);
         expect(errors[0]!.kind).toBe("unknown");
         expect(errors[0]!.field).toBe("validation-json");
     });
 
-    test("parse_settings - env key in TOML is an error with an export hint", () => {
-        const errors = errors_of(parse_settings(`linux = "/old"`, { ATTACH_LINUX: "/new" }));
-        expect(errors).toHaveLength(1);
-        expect(errors[0]!.hint).toContain(`export ATTACH_LINUX="/old"`);
-    });
-
     test("parse_settings - value outside the options is an error", () => {
-        const errors = errors_of(parse_settings(`overlay-syntax = "bar"`, {}));
+        const errors = errors_of(parse_settings(`overlay-syntax = "bar"`));
         expect(errors).toHaveLength(1);
         expect(errors[0]!.message).toContain("fragment | label");
     });
 
     test("parse_settings - non-string and empty values are errors", () => {
-        const errors = errors_of(parse_settings(`deploy-ip = 10\ndeploy-user = ""`, {}));
+        const errors = errors_of(parse_settings(`deploy-ip = 10\ndeploy-user = ""`));
         expect(errors.map(error => error.field)).toEqual(["deploy-ip", "deploy-user"]);
     });
 
     test("parse_settings - TOML syntax error is reported", () => {
-        const errors = errors_of(parse_settings(`overlay = `, {}));
+        const errors = errors_of(parse_settings(`overlay = `));
         expect(errors).toHaveLength(1);
         expect(errors[0]!.field).toBe("config.toml");
     });
@@ -308,7 +276,7 @@ if (import.meta.vitest) {
             save_settings({ "overlay-syntax": "label" }, directory);
             save_settings({ overlay: "a.dtso" }, directory);
             expect(read_config_file(directory)).toBe(`overlay = "a.dtso"\noverlay-syntax = "label"\n`);
-            const result = parse_settings(read_config_file(directory), {}, directory);
+            const result = parse_settings(read_config_file(directory), directory);
             expect(result.ok && result.value.overlay).toBe(path.join(directory, "a.dtso"));
             expect(result.ok && result.value.overlay_syntax).toBe("label");
         } finally {
@@ -322,7 +290,7 @@ if (import.meta.vitest) {
             fs.mkdirSync(config_directory(directory));
             fs.writeFileSync(config_path(directory), `validation-json = "/x"\n`);
             save_settings({ overlay: "a.dtso" }, directory);
-            const errors = errors_of(parse_settings(read_config_file(directory), {}, directory));
+            const errors = errors_of(parse_settings(read_config_file(directory), directory));
             expect(errors.map(error => error.field)).toEqual(["validation-json"]);
         } finally {
             fs.rmSync(directory, { recursive: true });

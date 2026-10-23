@@ -25,7 +25,7 @@ import type { LocalContext } from "../../context";
 import { load_workspace, parse_bindings, type Bindings } from "../../config/workspace";
 import type { ConfigResult } from "../../config/settings";
 import { format_suggestion, build_raw_property, shape_hint, parse_value } from "../update/command";
-import { bigIntReplacer, effective_parent_compatibles, find_binding, fragment_target, get_or_build_compat_index, parse_property_reference, resolve_node_identifier, resolve_positional_path, resolve_write_target, type WriteTarget } from "../../utilities";
+import { bigIntReplacer, effective_parent_compatibles, find_binding, fragment_target, get_compat_index, parse_property_reference, resolve_node_identifier, resolve_positional_path, resolve_write_target, type WriteTarget } from "../../utilities";
 import { respond, respond_fail, input_error } from "../../protocol/output";
 import { attach_type_to_protocol_type } from "../../protocol/dt-to-protocol";
 import { find_property_definition, resolve_node_binding, type NodeBinding } from "../../binding-resolution";
@@ -355,7 +355,7 @@ async function suggest_device_key(context: LocalContext, arguments_: string[]): 
     const workspace = load_workspace(context, ["bindings"]);
     if (workspace === undefined) { return; }
 
-    const index = await get_or_build_compat_index(workspace.bindings);
+    const index = get_compat_index(workspace.bindings);
 
     const entries = Object.keys(index.entries);
     const matching = filter === undefined

@@ -1,7 +1,7 @@
 import { Attach, Result } from "attach-lib";
 import type { LocalContext } from "../../context";
 import { load_workspace } from "../../config/workspace";
-import { find_binding, get_or_build_compat_index } from "../../utilities";
+import { find_binding, get_compat_index } from "../../utilities";
 import { respond } from "../../protocol/output";
 import { describe_device } from "../../protocol/binding-to-description";
 import type { DeviceDescriptionResponse, ListNamesResponse } from "../../protocol/descriptions";
@@ -13,7 +13,7 @@ export async function list_device(context_: LocalContext, arguments_: string[]):
     if (workspace === undefined) { return; }
     const { linux, dt_schema: dtSchema } = workspace.bindings;
 
-    const index = await get_or_build_compat_index(workspace.bindings);
+    const index = get_compat_index(workspace.bindings);
 
     const entries = Object.keys(index.entries);
 
