@@ -1,9 +1,12 @@
 import {
     Attach,
+    Result,
     is_dt_flag,
-    dt_to_validator_input,
     get_full_node_name,
+    populate_binding,
+    populate_properties,
     unit_radix,
+    validator_input_json,
 } from "attach-lib";
 import type {
     DTNode,
@@ -18,7 +21,7 @@ import type {
     ParseOptions,
 } from "attach-lib";
 
-import { find_binding, bigIntReplacer, node_compatibles } from "./utilities";
+import { find_binding, node_compatibles } from "./utilities";
 
 export type NodeBinding = {
     properties: ResolvedProperty[];
@@ -80,8 +83,8 @@ export async function child_unit_radix(
         const binding_path = await find_binding(linux, dtSchema, compatible);
         if (binding_path === undefined) { continue; }
         try {
-            const binding = await Attach.new().parse_binding(binding_path, linux, dtSchema);
-            return binding === undefined ? undefined : unit_radix(binding.patterns, child_name);
+            const binding = await Attach.parse(binding_path, { linux, dt_schema: dtSchema });
+            return Result.is_err(binding) ? undefined : unit_radix(binding.value.patterns, child_name);
         } catch {
             return undefined;
         }
@@ -99,6 +102,7 @@ export async function resolve_node_binding(
     options?: PopulateOptions,
     parent_compatibles?: string[],
 ): Promise<NodeBinding | { error: string }> {
+    const populate_options: PopulateOptions = { ...options, parent_name };
     const compatible_property = found_node.properties.find(p => p.name === "compatible");
 
     if (compatible_property !== undefined) {
@@ -126,24 +130,24 @@ export async function resolve_node_binding(
             controller_context = { compatibles: parent_compatibles, binding_path: controller_binding_path };
         }
         const parse_options: ParseOptions | undefined = controller_context === undefined ? undefined : { controller: controller_context };
-        const initial = await Attach.new_populated_binding(binding_path, linux, dtSchema, base_dt, found_node, parent_name, options, parse_options);
-        if (initial === undefined) {
+        const attach = await Attach.parse(binding_path, { linux, dt_schema: dtSchema }, parse_options);
+        if (Result.is_err(attach)) {
             return { error: `Failed to parse binding ${binding_path}` };
         }
+        const initial = populate_binding(attach.value.parsed_binding, base_dt, found_node, populate_options);
 
         return {
-            properties: initial.parsed_binding.properties,
-            required_properties: initial.parsed_binding.required_properties,
-            child_nodes: initial.parsed_binding.pattern_properties ?? [],
-            property_patterns: initial.parsed_binding.property_patterns ?? [],
+            properties: initial.properties,
+            required_properties: initial.required_properties,
+            child_nodes: initial.pattern_properties ?? [],
+            property_patterns: initial.property_patterns ?? [],
             binding_path,
             origin: { kind: "compatible", compatible: compatible_value },
             narrow_and_populate(node: DTNode) {
-                const input_data = Object.fromEntries(dt_to_validator_input(node, initial.parsed_binding));
-                const input_json = JSON.stringify(input_data, bigIntReplacer);
-                const update = initial.attach.update_binding_by_changes(input_json);
+                const input_json = validator_input_json(node, initial.properties);
+                const update = attach.value.update_binding_by_changes(input_json);
                 if (update === undefined) { return; }
-                const populated = Attach.populate_parsed_binding(update.binding, base_dt, input_json, parent_name, options);
+                const populated = populate_binding(update.binding, base_dt, input_json, populate_options);
                 return { properties: populated.properties, errors: update.errors as unknown[] };
             },
         };
@@ -172,14 +176,14 @@ export async function resolve_node_binding(
         return { error: `Failed to find binding for ${parent_compatible_value}` };
     }
 
-    const parent_attach = Attach.new();
-    const parent_binding = await parent_attach.parse_binding(parent_binding_path, linux, dtSchema);
-    if (parent_binding === undefined) {
+    const parent_result = await Attach.parse(parent_binding_path, { linux, dt_schema: dtSchema });
+    if (Result.is_err(parent_result)) {
         return { error: `Failed to parse binding ${parent_binding_path}` };
     }
+    const parent_attach = parent_result.value;
 
     const node_key = get_full_node_name(found_node);
-    const match = match_pattern_rule(parent_binding.patterns, parent_binding.parsed_binding.pattern_properties, node_key);
+    const match = match_pattern_rule(parent_attach.patterns, parent_attach.parsed_binding.pattern_properties, node_key);
     if (match === undefined) {
         return { error: `Node does not match any patternProperties of ${parent_compatible_value}` };
     }
@@ -193,34 +197,16 @@ export async function resolve_node_binding(
         binding_path: parent_binding_path,
         origin: { kind: "pattern", parent_compatible: parent_compatible_value, pattern: match.pattern },
         narrow_and_populate(node: DTNode) {
-            const partial_input_data = Object.fromEntries(
-                dt_to_validator_input(node, {
-                    required_properties: match.rule.required,
-                    properties: match.rule.properties,
-                    pattern_properties: undefined,
-                    examples: [],
-                })
+            const populated = populate_properties(
+                match.rule.properties, base_dt, validator_input_json(node, match.rule.properties), populate_options
             );
 
-            const populated = Attach.populate_properties(
-                match.rule.properties, base_dt, JSON.stringify(partial_input_data, bigIntReplacer), parent_name, options
-            );
-
-            const input_data = Object.fromEntries(
-                dt_to_validator_input(node, {
-                    required_properties: match.rule.required,
-                    properties: populated,
-                    pattern_properties: undefined,
-                    examples: [],
-                })
-            );
-
-            const input_json = JSON.stringify(input_data, bigIntReplacer);
+            const input_json = validator_input_json(node, populated);
             const update = parent_attach.update_pattern_binding_by_changes(match.pattern, input_json);
             if (update === undefined) { return; }
 
-            const populated_properties = Attach.populate_properties(
-                update.binding.properties, base_dt, input_json, parent_name, options
+            const populated_properties = populate_properties(
+                update.binding.properties, base_dt, input_json, populate_options
             );
 
             return { properties: populated_properties, errors: update.errors as unknown[] };

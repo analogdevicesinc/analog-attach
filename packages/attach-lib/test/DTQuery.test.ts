@@ -1,7 +1,7 @@
 import * as fs from 'node:fs';
 import path from 'node:path';
 
-import { Attach, DeviceTree } from 'attach-lib';
+import { Attach, DeviceTree, Result } from 'attach-lib';
 import { query_devicetree } from '../src/Intelligence/query.js';
 
 import { BindingTestData, write_to_directory, bigIntReplacer } from './testing_utils';
@@ -199,18 +199,18 @@ async function test_impl(data: BindingTestData) {
     const linux_path = path.resolve(__dirname, 'linux');
     const dt_schema_path = path.resolve(__dirname, 'dt-schema');
 
-    const attach = Attach.new();
+    const parsed = await Attach.parse(binding_path, { linux: linux_path, dt_schema: dt_schema_path });
 
-    const binding = await attach.parse_binding(binding_path, linux_path, dt_schema_path);
+    if (Result.is_err(parsed)) { expect.fail(parsed.error.message); }
 
-    expect.assert.isDefined(binding);
+    const attach = parsed.value;
 
     const input_data = {
     };
 
-    binding.parsed_binding.properties = query_devicetree(
+    attach.parsed_binding.properties = query_devicetree(
         dt,
-        binding.parsed_binding.properties,
+        attach.parsed_binding.properties,
         JSON.stringify(input_data),
         "gicv2",
     );
@@ -219,12 +219,12 @@ async function test_impl(data: BindingTestData) {
         write_to_directory(
             path.resolve(__dirname, "expected/dts-query"),
             data.name,
-            binding.parsed_binding
+            attach.parsed_binding
         );
     }
 
     const expected_path = path.resolve(__dirname, `expected/dts-query/${data.name}.json`);
     const expected = JSON.stringify(JSON.parse(fs.readFileSync(expected_path, 'utf8')));
 
-    expect(JSON.stringify(binding.parsed_binding, bigIntReplacer)).toStrictEqual(expected);
+    expect(JSON.stringify(attach.parsed_binding, bigIntReplacer)).toStrictEqual(expected);
 }

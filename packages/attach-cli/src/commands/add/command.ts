@@ -3,6 +3,7 @@ import path from "node:path";
 import { Command } from "commander";
 import {
     Attach,
+    Result,
     add_node,
     unresolved_references,
     type DeviceTree,
@@ -185,8 +186,8 @@ function device_name(compatible: string): string {
 
 async function parse_binding(binding_path: string, linux: string, dtSchema: string): Promise<ParsedBinding | undefined> {
     try {
-        const result = await Attach.new().parse_binding(binding_path, linux, dtSchema);
-        return result?.parsed_binding;
+        const result = await Attach.parse(binding_path, { linux, dt_schema: dtSchema });
+        return Result.is_ok(result) ? result.value.parsed_binding : undefined;
     } catch {
         return undefined;
     }

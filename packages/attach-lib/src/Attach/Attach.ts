@@ -1,395 +1,69 @@
 import { BindingErrors } from './Errors.js';
-import { ParsedBinding, ResolvedProperty } from '../Bindings/ParsedBinding.js';
+import { ParsedBinding } from '../Bindings/ParsedBinding.js';
 
-import { CANARY } from '../Bindings/CanaryInserter.js';
-import { create_context } from '../Bindings/Context.js';
-import { process_binding } from '../Bindings/Pipeline.js';
-import { DtBindingSchema } from "../Bindings/Schema.js";
-
-import Ajv2019, { ValidateFunction, KeywordDefinition } from "ajv/dist/2019.js";
-import { deep_merge, delete_path, get_by_path } from "../Bindings/ObjectUtilities.js";
-import { translate_JSONSchema } from "../Bindings/JSONSchemaTranslate.js";
-import { DeviceTree, DTNode } from "../Devicetree/index.js";
-import { Result } from "../result.js";
-import { IntelligenceStack } from "../Intelligence/layers/stack.js";
-import { IntelligenceLayer, NodePlacement } from "../Intelligence/layers/types.js";
-import { dt_to_validator_input } from "./DTxBinding.js";
-import { filter_vendor_peripheral_properties, type ControllerContext } from "../Bindings/VendorPeripheralFilter.js";
+import { create_context, SchemaPaths } from '../Bindings/Context.js';
+import { translate_JSONSchema } from '../Bindings/JSONSchemaTranslate.js';
+import { PipelineStage, process_binding } from '../Bindings/Pipeline.js';
+import { Result } from '../result.js';
+import { filter_vendor_peripheral_properties, type ControllerContext } from '../Bindings/VendorPeripheralFilter.js';
+import { compile_targets, narrow, ValidationTarget } from './Validation.js';
 
 export type ParseOptions = {
     controller?: ControllerContext;
 };
 
-// Extra intelligence for populate_*: layers appended on top of the default
-// binding + devicetree stack, and the node's placement for layers that need it.
-export type PopulateOptions = {
-    layers?: IntelligenceLayer[];
-    placement?: NodePlacement;
+export type BindingParseError = {
+    stage: PipelineStage | "validation";
+    message: string;
 };
 
+/** A binding processed down to a `ParsedBinding`, with the validators that narrow it as the node's data changes. */
 export class Attach {
 
-    private original_binding: DtBindingSchema | undefined;
-    private current_binding: DtBindingSchema | undefined;
-
-    private validation_function: ValidateFunction | undefined;
-
-    private pattern_validation_functions: Map<string, ValidateFunction> = new Map();
-    private pattern_current_bindings: Map<string, DtBindingSchema> = new Map();
-
-    private constructor() {
+    /** The names of the child-node patterns the binding allows. */
+    public get patterns(): string[] {
+        return this.parsed_binding.pattern_properties?.map(pattern => pattern.pattern) ?? [];
     }
 
-    public static new(): Attach {
-        return new Attach();
-    }
+    private constructor(
+        private readonly root: ValidationTarget,
+        private readonly pattern_targets: Map<string, ValidationTarget>,
+        public readonly parsed_binding: ParsedBinding,
+    ) { }
 
-    public async parse_binding(
+    public static async parse(
         binding_path: string,
-        linux_path: string,
-        dt_schema_path: string,
-        parse_options?: ParseOptions,
-    ): Promise<{
-        parsed_binding: ParsedBinding,
-        patterns: string[]
-    } | undefined> {
+        paths: SchemaPaths,
+        options?: ParseOptions,
+    ): Promise<Result<Attach, BindingParseError>> {
 
-        const processed = await process_binding(binding_path, create_context({ linux: linux_path, dt_schema: dt_schema_path }));
+        const processed = await process_binding(binding_path, create_context(paths));
 
         if (Result.is_err(processed)) {
-            return;
+            return processed;
         }
 
-        const fixuped = processed.value;
-
-        let parsed_binding: ParsedBinding = translate_JSONSchema(fixuped);
-
-        if (parsed_binding === undefined) {
-            return undefined;
-        }
-
-        parsed_binding = filter_vendor_peripheral_properties(parsed_binding, parse_options?.controller);
-
-        this.original_binding = fixuped;
-        this.current_binding = fixuped;
+        const parsed_binding = filter_vendor_peripheral_properties(translate_JSONSchema(processed.value), options?.controller);
 
         try {
-
-            const ajv = new Ajv2019({ allErrors: true, logger: false });
-
-            const typeSizeKeyword: KeywordDefinition = {
-                keyword: "typeSize",
-                schemaType: "number",
-                errors: true,
-
-                compile(expectedSize: number) {
-                    return function validate(instance: unknown): boolean {
-                        let size = 32;
-
-                        if (
-                            instance !== null &&
-                            typeof instance === "object" &&
-                            "size" in instance
-                        ) {
-                            const value = (instance as { size?: unknown }).size;
-                            if (typeof value === "number") {
-                                size = value;
-                            }
-                        }
-
-                        const valid = expectedSize === size;
-
-                        if (!valid) {
-                            (validate as any).errors = [
-                                {
-                                    keyword: "typeSize",
-                                    message: `size is ${size}, expected ${expectedSize}`,
-                                    params: { size, expectedSize }
-                                }
-                            ];
-                        }
-
-                        return valid;
-                    };
-                }
-            };
-
-            ajv.addKeyword(typeSizeKeyword);
-
-            this.validation_function = ajv.compile(this.original_binding as Object);
-
-            const pattern_ajv = new Ajv2019({ allErrors: true, logger: false });
-            pattern_ajv.addKeyword(typeSizeKeyword);
-
-            for (const [pattern, schema] of Object.entries(this.original_binding!.patternProperties ?? {})) {
-                const cast_schema = schema as DtBindingSchema;
-
-                if (typeof cast_schema === 'boolean' || !("properties" in cast_schema)) {
-                    continue;
-                }
-
-                this.pattern_validation_functions.set(pattern, pattern_ajv.compile(structuredClone(cast_schema) as Object));
-                this.pattern_current_bindings.set(pattern, structuredClone(cast_schema));
-            }
-        } catch {
-            //console.log(error instanceof Error ? error.message : "Failed to compile validation function");
-            return undefined;
+            const targets = compile_targets(processed.value);
+            return Result.Ok(new Attach(targets.root, targets.patterns, parsed_binding));
+        } catch (error) {
+            return Result.Err({ stage: "validation", message: error instanceof Error ? error.message : "Failed to compile validation function" });
         }
-
-        return {
-            parsed_binding: parsed_binding,
-            patterns: parsed_binding.pattern_properties === undefined ? [] : parsed_binding.pattern_properties.map(pattern => pattern.pattern)
-        };
-    }
-
-
-    public static populate_properties(
-        properties: ResolvedProperty[],
-        devicetree: DeviceTree,
-        data: string,
-        parent_name?: string,
-        options?: PopulateOptions,
-    ): ResolvedProperty[] {
-        const stack = IntelligenceStack.default().with(...options?.layers ?? []);
-        return stack.refine_properties(properties, {
-            devicetree,
-            data,
-            ...(parent_name === undefined ? {} : { parent_name }),
-            ...(options?.placement === undefined ? {} : { placement: options.placement }),
-        });
-    }
-
-    public static populate_parsed_binding(
-        parsed_binding: ParsedBinding,
-        devicetree: DeviceTree,
-        data: string | DTNode,
-        parent_name?: string,
-        options?: PopulateOptions,
-    ): ParsedBinding {
-        const data_string = typeof data === 'string'
-            ? data
-            : JSON.stringify(
-                Object.fromEntries(dt_to_validator_input(data, parsed_binding)),
-                (_key, value) => typeof value === 'bigint' ? Number(value) : value
-            );
-
-        const pattern_options = options?.layers === undefined ? undefined : { layers: options.layers };
-        return {
-            ...parsed_binding,
-            properties: Attach.populate_properties(parsed_binding.properties, devicetree, data_string, parent_name, options),
-            pattern_properties: parsed_binding.pattern_properties?.map(pattern => ({
-                ...pattern,
-                properties: Attach.populate_properties(pattern.properties, devicetree, data_string, parent_name, pattern_options),
-            })),
-        };
-    }
-
-    public static async new_populated_binding(
-        binding_path: string,
-        linux_path: string,
-        dt_schema_path: string,
-        devicetree: DeviceTree,
-        data: string | DTNode,
-        parent_name?: string,
-        options?: PopulateOptions,
-        parse_options?: ParseOptions,
-    ): Promise<{ attach: Attach, parsed_binding: ParsedBinding, patterns: string[] } | undefined> {
-        const attach = Attach.new();
-        const result = await attach.parse_binding(binding_path, linux_path, dt_schema_path, parse_options);
-
-        if (result === undefined) {
-            return undefined;
-        }
-
-        return {
-            attach,
-            parsed_binding: Attach.populate_parsed_binding(result.parsed_binding, devicetree, data, parent_name, options),
-            patterns: result.patterns,
-        };
     }
 
     public update_binding_by_changes(data: string): { binding: ParsedBinding, errors: BindingErrors[] } | undefined {
-
-        if (this.original_binding === undefined || this.current_binding === undefined || this.validation_function === undefined) {
-            return;
-        }
-
-        const result = this.run_validation(this.original_binding, this.current_binding, this.validation_function, data);
-
-        if (result === undefined) {
-            return;
-        }
-
-        this.current_binding = result.current_binding;
-
-        return { binding: result.binding, errors: result.errors };
+        return narrow(this.root, data);
     }
 
     public update_pattern_binding_by_changes(pattern: string, data: string): { binding: ParsedBinding, errors: BindingErrors[] } | undefined {
+        const target = this.pattern_targets.get(pattern);
 
-        const original = this.original_binding?.patternProperties?.[pattern] as DtBindingSchema | undefined;
-        const current = this.pattern_current_bindings.get(pattern);
-        const validator = this.pattern_validation_functions.get(pattern);
-
-        if (original === undefined || current === undefined || validator === undefined) {
+        if (target === undefined) {
             return;
         }
 
-        const result = this.run_validation(original, current, validator, data);
-
-        if (result === undefined) {
-            return;
-        }
-
-        this.pattern_current_bindings.set(pattern, result.current_binding);
-
-        return { binding: result.binding, errors: result.errors };
+        return narrow(target, data);
     }
-
-    private run_validation(
-        original: DtBindingSchema,
-        current: DtBindingSchema,
-        validator: ValidateFunction,
-        data: string
-    ): { current_binding: DtBindingSchema, binding: ParsedBinding, errors: BindingErrors[] } | undefined {
-
-        let canary_data;
-
-        try {
-            canary_data = JSON.parse(data);
-        }
-        catch {
-            return;
-        }
-
-        canary_data[CANARY] = true;
-
-        if (validator(canary_data) === true) {
-            const binding = translate_JSONSchema(current);
-            return { current_binding: current, binding, errors: [] };
-        }
-
-        if (validator.errors === undefined || validator.errors === null) {
-            return;
-        }
-
-        let current_binding = structuredClone(original);
-
-        let error_accumulator: BindingErrors[] = [];
-
-        for (const error of validator.errors) {
-
-            const decoded_error_schema_path = decodeURIComponent(error.schemaPath);
-
-            if (error.instancePath.includes(CANARY)) {
-                const schema_path = decoded_error_schema_path.split('/').slice(1);
-                const then_tag_index = schema_path.indexOf("then");
-                const sub_schema_to_apply = schema_path.slice(0, then_tag_index + 1);
-
-                const sub_schema = get_by_path(original, sub_schema_to_apply) as Record<string, any>;
-                const strip_canaries = delete_path(sub_schema, [["properties", CANARY]]);
-
-                current_binding = deep_merge(current_binding, strip_canaries);
-            } else if (error.keyword === "additionalProperties" && error.params["additionalProperty"] === CANARY) {
-                // The injected canary marker itself tripped additionalProperties:false on a
-                // schema with no allOf/then branch to narrow into (e.g. a patternProperties
-                // sub-schema) — not a real validation error, so it is dropped.
-            } else if (error.keyword === "required") {
-
-                const instance = error.instancePath.split('/').slice(1);
-
-                error_accumulator.push(
-                    {
-                        _t: "missing_required",
-                        missing_property: error.params["missingProperty"] as string,
-                        instance: instance,
-                        msg: error.message
-                    }
-                );
-
-            } else if (["maximum", "minimum", "exclusiveMaximum", "exclusiveMinimum"].includes(error.keyword)) {
-
-                const failed_property = error.instancePath.split('/').slice(1);
-
-                error_accumulator.push(
-                    {
-                        _t: "number_limit",
-                        failed_property: failed_property,
-                        limit: error.params["limit"] as number,
-                        comparison: error.params["comparison"],
-                        msg: error.message
-                    });
-            } else if (error.keyword === "dependencies") {
-                error_accumulator.push(
-                    {
-                        _t: "failed_dependency",
-                        dependent_property: error.params["property"] as string,
-                        missing_property: error.params["missingProperty"] as string,
-                    }
-                );
-            }
-            else if (error.keyword !== "if") {
-                error_accumulator.push(
-                    {
-                        _t: "generic",
-                        origin: decoded_error_schema_path,
-                        msg: error.message
-                    });
-            }
-
-        }
-
-        const binding = translate_JSONSchema(current_binding);
-
-        return { current_binding, binding, errors: error_accumulator };
-    }
-}
-
-import { readFileSync as _readFileSync } from "node:fs";
-import { parse_board_description as _parse_board_description } from "../Intelligence/board/parse.js";
-import { board_layer as _board_layer } from "../Intelligence/board/layer.js";
-
-if (import.meta.vitest) {
-    const { test, expect } = import.meta.vitest;
-    const readFileSync = _readFileSync;
-    const parse_board_description = _parse_board_description;
-    const board_layer = _board_layer;
-    const PMD_RPI_INTZ_FIXTURE = readFileSync(new URL("../../test/fixtures/board/pmd-rpi-intz.yaml", import.meta.url), "utf8");
-    const RPI_BASE_FIXTURE = readFileSync(new URL("../../test/fixtures/board/rpi-base.dts", import.meta.url), "utf8");
-
-    test("populate_parsed_binding — pattern properties do not receive the parent placement", () => {
-        const dt = DeviceTree.new_from_string(RPI_BASE_FIXTURE);
-        if (typeof dt === "string") { throw new TypeError(dt); }
-        const board = parse_board_description(PMD_RPI_INTZ_FIXTURE);
-        if (typeof board === "string") { throw new TypeError(board); }
-        const layer = board_layer(board);
-
-        const reg_property: ResolvedProperty = { key: "reg", value: { _t: "integer" } };
-        const binding: ParsedBinding = {
-            required_properties: ["reg"],
-            properties: [reg_property],
-            pattern_properties: [{
-                pattern: "^channel@",
-                description: "ADC channel",
-                properties: [{ key: "reg", value: { _t: "integer" } }],
-                required: ["reg"],
-            }],
-            examples: [],
-        };
-
-        const placement: NodePlacement = {
-            node_path: "/soc/spi@7e204000/dev@0",
-            parent_path: "/soc/spi@7e204000",
-            reg: 0n,
-            siblings: [],
-        };
-
-        const populated = Attach.populate_parsed_binding(binding, dt, "{}", undefined, { layers: [layer], placement });
-
-        const top_reg = populated.properties.find(p => p.key === "reg");
-        expect(top_reg?.suggestions?.length).toBeGreaterThan(0);
-
-        const pattern_reg = populated.pattern_properties?.[0]?.properties.find(p => p.key === "reg");
-        expect(pattern_reg?.suggestions ?? []).toStrictEqual([]);
-    });
 }

@@ -1,7 +1,7 @@
 import path from 'node:path';
 import * as fs from 'node:fs';
 
-import { Attach, DeviceTree } from 'attach-lib';
+import { Attach, DeviceTree, populate_binding } from 'attach-lib';
 import { bundle, create_context, dereference, find_in_object } from '../src/Bindings/index.js';
 import { Result } from '../src/result.js';
 import { write_to_directory } from './testing_utils';
@@ -41,11 +41,9 @@ describe.runIf(run)('Completion suite', () => {
         await walk_directory(path.resolve(__dirname, 'linux/Documentation/devicetree/bindings'), async (file: string) => {
             binding_count++;
 
-            const attach = Attach.new();
+            const binding = await Attach.parse(file, { linux: linux_path, dt_schema: dt_schema_path });
 
-            const binding = await attach.parse_binding(file, linux_path, dt_schema_path);
-
-            if (binding === undefined) {
+            if (Result.is_err(binding)) {
                 failed_to_parse_bindings.push(file);
                 return;
             }
@@ -101,16 +99,16 @@ describe.runIf(run)('Completion suite', () => {
         await walk_directory(path.resolve(__dirname, 'linux/Documentation/devicetree/bindings'), async (file: string) => {
             binding_count++;
 
-            const result = await Attach.new_populated_binding(file, linux_path, dt_schema_path, document, '{}', "spi@7e204000");
+            const result = await Attach.parse(file, { linux: linux_path, dt_schema: dt_schema_path });
 
-            if (result === undefined) {
+            if (Result.is_err(result)) {
                 failed_to_parse_bindings.push(file);
                 return;
             }
 
             parsed_binding_count++;
 
-            const { parsed_binding } = result;
+            const parsed_binding = populate_binding(result.value.parsed_binding, document, '{}', { parent_name: "spi@7e204000" });
 
             const no_generic_property = (() => {
                 let returnValue = true;

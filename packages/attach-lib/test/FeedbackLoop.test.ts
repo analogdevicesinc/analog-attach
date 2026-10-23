@@ -1,7 +1,7 @@
 import path from 'node:path';
 import * as fs from 'node:fs';
 
-import { Attach } from 'attach-lib';
+import { Attach, Result } from 'attach-lib';
 
 import { BindingTestData, write_to_directory, bigIntReplacer } from './testing_utils';
 
@@ -18,11 +18,11 @@ test(adis16475.name, async () => {
     const linux_path = path.resolve(__dirname, 'linux');
     const dt_schema_path = path.resolve(__dirname, 'dt-schema');
 
-    const attach = Attach.new();
+    const parsed = await Attach.parse(binding_path, { linux: linux_path, dt_schema: dt_schema_path });
 
-    const binding = await attach.parse_binding(binding_path, linux_path, dt_schema_path);
+    if (Result.is_err(parsed)) { expect.fail(parsed.error.message); }
 
-    expect.assert.isDefined(binding);
+    const attach = parsed.value;
 
     const data_1 = String.raw`{
             "compatible": ["adi,adis16500"]
@@ -205,11 +205,11 @@ test('ad7124', async () => {
     const linux_path = path.resolve(__dirname, 'linux');
     const dt_schema_path = path.resolve(__dirname, 'dt-schema');
 
-    const attach = Attach.new();
+    const parsed = await Attach.parse(binding_path, { linux: linux_path, dt_schema: dt_schema_path });
 
-    const binding = await attach.parse_binding(binding_path, linux_path, dt_schema_path);
+    if (Result.is_err(parsed)) { expect.fail(parsed.error.message); }
 
-    expect.assert.isDefined(binding);
+    const attach = parsed.value;
 
     const data_1 = String.raw`{
             "compatible": ["adi,ad7124-8"],

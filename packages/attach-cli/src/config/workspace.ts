@@ -13,7 +13,7 @@ import {
     setting_spec,
     type ConfigError,
     type OverlaySyntax,
-    type Result,
+    type ConfigResult,
     type SettingKey,
     type SettingSpec,
     type Settings,
@@ -84,7 +84,7 @@ function spec_of(key: SettingKey): SettingSpec {
     return spec;
 }
 
-function failures(...results: Result<unknown>[]): ConfigError[] {
+function failures(...results: ConfigResult<unknown>[]): ConfigError[] {
     return results.flatMap(result => (result.ok ? [] : result.errors));
 }
 
@@ -92,7 +92,7 @@ function fail(error: ConfigError): { ok: false; errors: ConfigError[] } {
     return { ok: false, errors: [error] };
 }
 
-function require_setting(settings: Settings, key: SettingKey): Result<string> {
+function require_setting(settings: Settings, key: SettingKey): ConfigResult<string> {
     const spec = spec_of(key);
     const value = settings[spec.field];
     if (value !== undefined) { return { ok: true, value }; }
@@ -100,7 +100,7 @@ function require_setting(settings: Settings, key: SettingKey): Result<string> {
     return fail({ field: spec.key, kind: "missing", message, description: spec.description, hint: spec.hint });
 }
 
-function require_path(settings: Settings, key: SettingKey, kind: "file" | "directory"): Result<string> {
+function require_path(settings: Settings, key: SettingKey, kind: "file" | "directory"): ConfigResult<string> {
     const value = require_setting(settings, key);
     if (!value.ok) { return value; }
     const stat = fs.statSync(value.value, { throwIfNoEntry: false });
@@ -121,14 +121,14 @@ export function linux_tree_problem(directory: string): string | undefined {
     return undefined;
 }
 
-export function parse_linux(settings: Settings): Result<string> {
+export function parse_linux(settings: Settings): ConfigResult<string> {
     const linux = require_path(settings, "linux", "directory");
     if (!linux.ok) { return linux; }
     const problem = linux_tree_problem(linux.value);
     return problem === undefined ? linux : fail(invalid_setting(spec_of("linux"), problem));
 }
 
-export function parse_dt_schema(): Result<string> {
+export function parse_dt_schema(): ConfigResult<string> {
     const root = getBundledDtSchemaPath();
     const complete = ["schemas", "meta-schemas"].every(directory => fs.existsSync(path.join(root, "dtschema", directory)));
     if (!complete) {
@@ -137,14 +137,14 @@ export function parse_dt_schema(): Result<string> {
     return { ok: true, value: root };
 }
 
-export function parse_bindings(settings: Settings, linux_tree: () => Result<string> = () => parse_linux(settings)): Result<Bindings> {
+export function parse_bindings(settings: Settings, linux_tree: () => ConfigResult<string> = () => parse_linux(settings)): ConfigResult<Bindings> {
     const linux = linux_tree();
     const dt_schema = parse_dt_schema();
     if (!linux.ok || !dt_schema.ok) { return { ok: false, errors: failures(linux, dt_schema) }; }
     return { ok: true, value: { linux: linux.value, dt_schema: dt_schema.value } };
 }
 
-export function parse_tools(): Result<Tools> {
+export function parse_tools(): ConfigResult<Tools> {
     const directory = getBundledToolsPath();
     const tools: Tools = {
         dtc: path.join(directory, "dtc"),
@@ -163,7 +163,7 @@ export function parse_tools(): Result<Tools> {
  * `.attach-linux/preprocessed.dts` and parse it. Cheap enough to run on every
  * invocation, which avoids staleness problems.
  */
-export function parse_base(settings: Settings, linux: () => Result<string>, cwd = process.cwd()): Result<BaseTree> {
+export function parse_base(settings: Settings, linux: () => ConfigResult<string>, cwd = process.cwd()): ConfigResult<BaseTree> {
     const source = require_path(settings, "devicetree", "file");
     const command = settings.preprocess_command;
     const linux_result = command.includes("{linux}") ? linux() : undefined;
@@ -200,7 +200,7 @@ export function open_workfile(file: string, tree: DeviceTreeOverlay, syntax: Ove
 }
 
 /** Parse the configured overlay against an already parsed base tree. */
-export function parse_overlay(settings: Settings, base: BaseTree): Result<Workfile> {
+export function parse_overlay(settings: Settings, base: BaseTree): ConfigResult<Workfile> {
     const file = require_path(settings, "overlay", "file");
     if (!file.ok) { return file; }
     const tree = DeviceTreeOverlay.new_from_string(fs.readFileSync(file.value, "utf8"), base.tree);
@@ -210,7 +210,7 @@ export function parse_overlay(settings: Settings, base: BaseTree): Result<Workfi
     return { ok: true, value: open_workfile(file.value, tree, settings.overlay_syntax) };
 }
 
-function parse_deploy(settings: Settings): Result<DeployTarget> {
+function parse_deploy(settings: Settings): ConfigResult<DeployTarget> {
     const host = require_setting(settings, "deploy-ip");
     const user = require_setting(settings, "deploy-user");
     const password = require_setting(settings, "deploy-password");
@@ -237,13 +237,13 @@ function parse_deploy(settings: Settings): Result<DeployTarget> {
  * Errors from independent resources are all collected; a resource whose
  * dependency failed reports only its own setting problems on top.
  */
-export function open_workspace<N extends Need>(settings: Settings, needs: readonly N[], cwd = process.cwd()): Result<Workspace<N>> {
-    let linux_result: Result<string> | undefined;
-    let base_result: Result<BaseTree> | undefined;
-    const linux = (): Result<string> => (linux_result ??= parse_linux(settings));
-    const base = (): Result<BaseTree> => (base_result ??= parse_base(settings, linux, cwd));
+export function open_workspace<N extends Need>(settings: Settings, needs: readonly N[], cwd = process.cwd()): ConfigResult<Workspace<N>> {
+    let linux_result: ConfigResult<string> | undefined;
+    let base_result: ConfigResult<BaseTree> | undefined;
+    const linux = (): ConfigResult<string> => (linux_result ??= parse_linux(settings));
+    const base = (): ConfigResult<BaseTree> => (base_result ??= parse_base(settings, linux, cwd));
 
-    const parsers: { [K in Need]: () => Result<Resources[K]> } = {
+    const parsers: { [K in Need]: () => ConfigResult<Resources[K]> } = {
         bindings: () => parse_bindings(settings, linux),
         tools: parse_tools,
         base,
@@ -339,10 +339,10 @@ if (import.meta.vitest) {
         return result.value;
     };
 
-    const open = <N extends Need>(toml: string, environment: Record<string, string>, needs: readonly N[]): Result<Workspace<N>> =>
+    const open = <N extends Need>(toml: string, environment: Record<string, string>, needs: readonly N[]): ConfigResult<Workspace<N>> =>
         open_workspace(settings_for(toml, environment), needs, workspace_directory);
 
-    const fields = (result: Result<unknown>): string[] => (result.ok ? [] : result.errors.map(error => error.field));
+    const fields = (result: ConfigResult<unknown>): string[] => (result.ok ? [] : result.errors.map(error => error.field));
 
     test("open_workspace - preprocesses #include and parses base and overlay", () => {
         const result = open(`overlay = "overlay.dtso"`, { ATTACH_LINUX: linux, ATTACH_DEVICETREE: "base.dts" }, ["base", "overlay"]);

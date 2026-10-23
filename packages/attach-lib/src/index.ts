@@ -3,7 +3,10 @@
 // here deliberately rather than via `export *`.
 
 // Binding pipeline, validation and structural types
-export { Attach, type PopulateOptions, type ParseOptions } from './Attach/Attach.js';
+export { Attach, type ParseOptions, type BindingParseError } from './Attach/Attach.js';
+export { populate_binding, populate_properties, type PopulateOptions } from './Attach/Populate.js';
+export type { SchemaPaths } from './Bindings/Context.js';
+export { Result } from './result.js';
 export { type ControllerContext, filter_vendor_peripheral_properties } from './Bindings/VendorPeripheralFilter.js';
 export type { ResolvedProperty, PatternPropertyRule, PropertyPatternRule, ParsedBinding } from './Bindings/ParsedBinding.js';
 export { expand_pattern, type PatternExpansion } from './RegexExpansion.js';
@@ -14,7 +17,7 @@ export {
     type AttachArray,
     type AttachType,
 } from './Bindings/StructuralTypes.js';
-export { dt_to_validator_input } from './Attach/DTxBinding.js';
+export { dt_to_validator_input, validator_input_json } from './Attach/DTxBinding.js';
 export { missing_required, PROPERTY_DEPENDENCIES } from './Attach/NodeState.js';
 
 // DTS AST, printer and ergonomic wrappers

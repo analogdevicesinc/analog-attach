@@ -128,7 +128,7 @@ export interface ConfigError {
     hint?: string;
 }
 
-export type Result<T> = { ok: true; value: T } | { ok: false; errors: ConfigError[] };
+export type ConfigResult<T> = { ok: true; value: T } | { ok: false; errors: ConfigError[] };
 
 export function config_directory(cwd = process.cwd()): string {
     return path.join(cwd, ".attach-linux");
@@ -163,7 +163,7 @@ export function parse_settings(
     toml_text: string | undefined,
     environment: Record<string, string | undefined>,
     cwd = process.cwd(),
-): Result<Settings> {
+): ConfigResult<Settings> {
     let table: Record<string, unknown> = {};
     if (toml_text !== undefined) {
         try {
@@ -219,7 +219,7 @@ export function read_config_file(cwd = process.cwd()): string | undefined {
 }
 
 /** Read the settings of the workspace in `cwd` from config.toml and `process.env`. */
-export function read_settings(cwd = process.cwd()): Result<Settings> {
+export function read_settings(cwd = process.cwd()): ConfigResult<Settings> {
     return parse_settings(read_config_file(cwd), process.env, cwd);
 }
 
@@ -249,7 +249,7 @@ if (import.meta.vitest) {
     const { test, expect } = import.meta.vitest;
     const os = await import("node:os");
 
-    const errors_of = (result: Result<Settings>): ConfigError[] => (result.ok ? [] : result.errors);
+    const errors_of = (result: ConfigResult<Settings>): ConfigError[] => (result.ok ? [] : result.errors);
 
     test("SETTINGS - keys and fields are unique", () => {
         expect(new Set(SETTINGS.map(s => s.key)).size).toBe(SETTINGS.length);

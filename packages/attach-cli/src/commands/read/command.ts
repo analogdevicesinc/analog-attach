@@ -5,7 +5,7 @@ import { DeviceTreeOverlay, get_full_node_name, is_dt_flag, print_property, type
 
 import type { LocalContext } from "../../context";
 import { load_workspace, parse_bindings, type Bindings } from "../../config/workspace";
-import type { Result } from "../../config/settings";
+import type { ConfigResult } from "../../config/settings";
 import { bigIntReplacer, resolve_node_identifier, not_found_message, parse_node_path, parse_property_name } from "../../utilities";
 import { respond, respond_fail, input_error } from "../../protocol/output";
 import { convert_node, convert_property } from "../../protocol/dt-to-protocol";
@@ -28,7 +28,7 @@ export interface ReadOptions {
 export async function read_target(
     context_: LocalContext,
     overlay: DeviceTreeOverlay,
-    bindings: Result<Bindings>,
+    bindings: ConfigResult<Bindings>,
     path_string: string,
     property_name: string | undefined,
     options: ReadOptions,
@@ -440,7 +440,7 @@ if (import.meta.vitest) {
         if (typeof base === "string") { throw new TypeError(base); }
         const overlay = DTO.new_from_string(`/dts-v1/;\n/plugin/;\n\n&spi0 {\n\tadc@0 {\n\t\tcompatible = "adi,ad7124-8";\n\t\tspi-max-frequency = <1000000>;\n\t};\n};`, base);
         if (typeof overlay === "string") { throw new TypeError(overlay); }
-        const no_bindings: Result<Bindings> = { ok: false, errors: [{ field: "dt-schema", kind: "missing", message: "no dt-schema" }] };
+        const no_bindings: ConfigResult<Bindings> = { ok: false, errors: [{ field: "dt-schema", kind: "missing", message: "no dt-schema" }] };
 
         const logs: string[] = [];
         const spy = vi.spyOn(console, "log").mockImplementation((line: string) => { logs.push(line); });
@@ -462,7 +462,7 @@ if (import.meta.vitest) {
         if (typeof base === "string") { throw new TypeError(base); }
         const overlay = DTO.new_from_string(`/dts-v1/;\n/plugin/;\n\n&i2c_arm {\n\tstatus = "okay";\n\thwmon@2e {\n\t\treg = <0x2e>;\n\t};\n};`, base);
         if (typeof overlay === "string") { throw new TypeError(overlay); }
-        const no_bindings: Result<Bindings> = { ok: false, errors: [{ field: "dt-schema", kind: "missing", message: "no dt-schema" }] };
+        const no_bindings: ConfigResult<Bindings> = { ok: false, errors: [{ field: "dt-schema", kind: "missing", message: "no dt-schema" }] };
         const human = async (path: string, property?: string): Promise<string[]> => {
             const logs: string[] = [];
             const spy = vi.spyOn(console, "log").mockImplementation((line: string) => { logs.push(line); });

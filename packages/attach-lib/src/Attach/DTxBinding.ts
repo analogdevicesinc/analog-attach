@@ -1,13 +1,21 @@
 import { DTNode, DTProperty, is_dt_flag, DTValue, DTNumber, DTLabel, DTPath, DTExpression } from "../Devicetree";
-import { ParsedBinding } from "../Bindings/ParsedBinding";
+import { ResolvedProperty } from "../Bindings/ParsedBinding";
 
-export function dt_to_validator_input(node: DTNode, parsed_binding: ParsedBinding): Map<string, unknown> {
+/** `dt_to_validator_input` as the JSON string the validator and the intelligence layers take; bigints become numbers. */
+export function validator_input_json(node: DTNode, properties: readonly ResolvedProperty[]): string {
+    return JSON.stringify(
+        Object.fromEntries(dt_to_validator_input(node, properties)),
+        (_key, value) => typeof value === 'bigint' ? Number(value) : value
+    );
+}
+
+export function dt_to_validator_input(node: DTNode, properties: readonly ResolvedProperty[]): Map<string, unknown> {
     const map = new Map<string, unknown>();
     for (const property of node.properties) {
         if (property.name === "status") { continue; }
 
         const value = _parse_dt_property(property);
-        const definition = parsed_binding.properties.find((v) => v.key === property.name);
+        const definition = properties.find((v) => v.key === property.name);
 
         if (definition === undefined) {
             map.set(property.name, value);
@@ -47,6 +55,7 @@ export function dt_to_validator_input(node: DTNode, parsed_binding: ParsedBindin
                     continue;
                 }
                 map.set(property.name, value);
+                continue;
             }
             case "boolean":
             case "enum_integer":

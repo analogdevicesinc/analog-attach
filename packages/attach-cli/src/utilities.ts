@@ -1,5 +1,6 @@
 import {
     Attach,
+    Result,
     DeviceTree,
     extract_compatible,
     is_dt_flag,
@@ -255,14 +256,13 @@ export async function build_compat_index(
 
     for (const [position, file] of yaml_files.entries()) {
         on_progress?.(position + 1, yaml_files.length);
-        const attach = Attach.new();
-        const binding = await attach.parse_binding(file, linux, dtSchema);
+        const binding = await Attach.parse(file, { linux, dt_schema: dtSchema });
 
-        if (binding === undefined) {
+        if (Result.is_err(binding)) {
             continue;
         }
 
-        const compatible = extract_compatible(binding.parsed_binding);
+        const compatible = extract_compatible(binding.value.parsed_binding);
 
         if (compatible === undefined) {
             continue;

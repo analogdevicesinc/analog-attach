@@ -1,7 +1,7 @@
 import * as fs from 'node:fs';
 import path from 'node:path';
 
-import { Attach, DeviceTree } from 'attach-lib';
+import { Attach, DeviceTree, Result, populate_binding } from 'attach-lib';
 import { bigIntReplacer, BindingTestData, write_to_directory } from './testing_utils';
 
 import { describe, test, expect } from 'vitest';
@@ -196,11 +196,11 @@ async function test_impl(data: BindingTestData) {
     const linux_path = path.resolve(__dirname, 'linux');
     const dt_schema_path = path.resolve(__dirname, 'dt-schema');
 
-    const result = await Attach.new_populated_binding(binding_path, linux_path, dt_schema_path, document, '{}', "spi@7e204000");
+    const parsed = await Attach.parse(binding_path, { linux: linux_path, dt_schema: dt_schema_path });
 
-    expect.assert.isDefined(result);
+    if (Result.is_err(parsed)) { expect.fail(parsed.error.message); }
 
-    const { parsed_binding } = result;
+    const parsed_binding = populate_binding(parsed.value.parsed_binding, document, '{}', { parent_name: "spi@7e204000" });
 
     if (data.debug === true) {
         write_to_directory(

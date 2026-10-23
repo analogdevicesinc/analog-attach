@@ -1,7 +1,7 @@
 import * as fs from 'node:fs';
 import path from 'node:path';
 
-import { Attach, DeviceTree } from 'attach-lib';
+import { Attach, DeviceTree, Result } from 'attach-lib';
 import { suggest_parents } from '../src/Intelligence/parents.js';
 
 import { BindingTestData, write_to_directory } from './testing_utils';
@@ -200,13 +200,13 @@ async function test_impl(data: BindingTestData) {
     const linux_path = path.resolve(__dirname, 'linux');
     const dt_schema_path = path.resolve(__dirname, 'dt-schema');
 
-    const attach = Attach.new();
+    const parsed = await Attach.parse(binding_path, { linux: linux_path, dt_schema: dt_schema_path });
 
-    const binding = await attach.parse_binding(binding_path, linux_path, dt_schema_path);
+    if (Result.is_err(parsed)) { expect.fail(parsed.error.message); }
 
-    expect.assert.isDefined(binding);
+    const attach = parsed.value;
 
-    const parents = suggest_parents(dt, binding.parsed_binding);
+    const parents = suggest_parents(dt, attach.parsed_binding);
 
     if (data.debug === true) {
         write_to_directory(

@@ -1,10 +1,11 @@
 import {
     Attach,
     AttachEnumType,
+    Result as AttachResult,
     DeviceTree,
     DeviceTreeOverlay,
     IntelligenceStack,
-    dt_to_validator_input,
+    validator_input_json,
     expand_pattern,
     get_full_node_name,
     parent_path_string,
@@ -21,7 +22,7 @@ import path from "node:path";
 
 import type { LocalContext } from "../../context";
 import { load_workspace, parse_bindings, type Bindings } from "../../config/workspace";
-import type { Result } from "../../config/settings";
+import type { ConfigResult } from "../../config/settings";
 import { format_suggestion, build_raw_property, shape_hint, parse_value } from "../update/command";
 import { bigIntReplacer, effective_parent_compatibles, find_binding, fragment_target, get_or_build_compat_index, parse_property_reference, resolve_node_identifier, resolve_positional_path, resolve_write_target, type WriteTarget } from "../../utilities";
 import { respond, respond_fail, input_error } from "../../protocol/output";
@@ -130,8 +131,8 @@ async function load_binding(context_: LocalContext, linux: string, dtSchema: str
         return;
     }
 
-    const binding = await Attach.new().parse_binding(binding_path, linux, dtSchema);
-    if (binding === undefined) {
+    const binding = await Attach.parse(binding_path, { linux, dt_schema: dtSchema });
+    if (AttachResult.is_err(binding)) {
         if (context_.json) {
             respond_fail({ ok: false, message: `Failed to parse binding ${binding_path}`, severity: "error" });
         } else {
@@ -140,7 +141,7 @@ async function load_binding(context_: LocalContext, linux: string, dtSchema: str
         return;
     }
 
-    return binding.parsed_binding;
+    return binding.value.parsed_binding;
 }
 
 function to_suggestion(suggestion: ValueSuggestion): Suggestion {
@@ -211,7 +212,7 @@ export async function resolve_target_binding(
     node_identifier: string,
     overlay: DeviceTreeOverlay,
     base_dt: DeviceTree,
-    bindings: Result<Bindings>,
+    bindings: ConfigResult<Bindings>,
 ): Promise<TargetBinding> {
     const target = resolve_write_target(node_identifier, overlay, base_dt);
     const { binding_node, binding_parent, parent_name, parent_compatibles } = target;
@@ -246,13 +247,7 @@ export function value_suggestions(
     // references (e.g. interrupt-parent → controller → #interrupt-cells).
     let data = "{}";
     if (target.binding_node !== undefined && resolved !== undefined) {
-        const input_data = Object.fromEntries(dt_to_validator_input(target.binding_node, {
-            required_properties: resolved.required_properties,
-            properties: resolved.properties,
-            pattern_properties: undefined,
-            examples: [],
-        }));
-        data = JSON.stringify(input_data, bigIntReplacer);
+        data = validator_input_json(target.binding_node, resolved.properties);
     }
 
     // A property named by a pattern is offered to the stack under its own name.

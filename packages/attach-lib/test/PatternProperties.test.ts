@@ -1,6 +1,6 @@
 import path from 'node:path';
 
-import { Attach, type ParsedBinding } from 'attach-lib';
+import { Attach, Result, type ParsedBinding } from 'attach-lib';
 
 import { describe, test, expect } from 'vitest';
 
@@ -8,13 +8,12 @@ const linux_path = path.resolve(__dirname, 'linux');
 const dt_schema_path = path.resolve(__dirname, 'dt-schema');
 
 async function parse(binding: string): Promise<ParsedBinding> {
-    const result = await Attach.new().parse_binding(
+    const result = await Attach.parse(
         path.join(linux_path, 'Documentation/devicetree/bindings', binding),
-        linux_path,
-        dt_schema_path,
+        { linux: linux_path, dt_schema: dt_schema_path },
     );
-    expect.assert.isDefined(result);
-    return result.parsed_binding;
+    if (Result.is_err(result)) { expect.fail(result.error.message); }
+    return result.value.parsed_binding;
 }
 
 describe('patternProperties without inline properties', () => {

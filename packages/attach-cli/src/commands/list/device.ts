@@ -1,4 +1,4 @@
-import { Attach } from "attach-lib";
+import { Attach, Result } from "attach-lib";
 import type { LocalContext } from "../../context";
 import { load_workspace } from "../../config/workspace";
 import { find_binding, get_or_build_compat_index } from "../../utilities";
@@ -22,9 +22,9 @@ export async function list_device(context_: LocalContext, arguments_: string[]):
         if (exact !== undefined) {
             const binding_path = await find_binding(linux, dtSchema, exact);
             if (binding_path !== undefined) {
-                const binding = await Attach.new().parse_binding(binding_path, linux, dtSchema);
-                if (binding !== undefined) {
-                    const device = describe_device(binding.parsed_binding, exact, binding_path);
+                const binding = await Attach.parse(binding_path, { linux, dt_schema: dtSchema });
+                if (Result.is_ok(binding)) {
+                    const device = describe_device(binding.value.parsed_binding, exact, binding_path);
                     if (context_.json) {
                         const response: DeviceDescriptionResponse = {
                             ok: true,
