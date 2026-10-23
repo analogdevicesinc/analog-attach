@@ -124,6 +124,63 @@ export function load_property_types(dt_schema: string): PropertyTypes {
     return types;
 }
 
+type GeneratedTypes = { properties?: Record<string, { type?: string | null }[]> };
+
+const loaded_processed = new Map<string, { modified: number, base: PropertyTypes, types: PropertyTypes }>();
+
+/** The one type a property has in `generated-types`; a name several schemas type differently (`flag` and `uint32`) has none. */
+function single_type(entries: { type?: string | null }[]): PropertyType | undefined {
+    const types = new Set(entries.map(entry => entry.type).filter((type): type is string => typeof type === "string" && type !== "node"));
+    return types.size === 1 ? [...types][0] : undefined;
+}
+
+/**
+ * `base` (the types dt-schema's own schemas declare) and, for the names it doesn't know, the property types of a
+ * processed schema (the output of `dt-mk-schema -j`): its `generated-types` and `generated-pattern-types` are what
+ * `validator.py:extract_types` makes of every schema the tool was given, the Linux bindings included, so a property
+ * a binding leaves untyped gets the type another binding declares for its name (`nvmem-cells`, `mux-controls`).
+ * What dt-schema itself declares stays: `resets` is a `phandle-array` there, and a `phandle` in some binding.
+ * `base` alone when the file can't be read. Read once per file and modification time.
+ */
+export function load_processed_property_types(file: string, base: PropertyTypes): PropertyTypes {
+    let modified: number;
+    try {
+        modified = fs.statSync(file).mtimeMs;
+    } catch {
+        return base;
+    }
+
+    const cached = loaded_processed.get(file);
+    if (cached?.modified === modified && cached.base === base) { return cached.types; }
+
+    const types: PropertyTypes = { names: new Map(base.names), patterns: [...base.patterns] };
+
+    try {
+        const processed = JSON.parse(fs.readFileSync(file, "utf8")) as Record<string, GeneratedTypes | undefined>;
+
+        for (const [name, entries] of Object.entries(processed["generated-types"]?.properties ?? {})) {
+            const type = single_type(entries);
+            if (type !== undefined && !types.names.has(name)) { types.names.set(name, type); }
+        }
+
+        for (const [pattern, entries] of Object.entries(processed["generated-pattern-types"]?.properties ?? {})) {
+            const type = single_type(entries);
+            if (type === undefined) { continue; }
+
+            try {
+                types.patterns.push({ pattern: new RegExp(pattern), type });
+            } catch {
+                // a pattern only Python's `re` understands
+            }
+        }
+    } catch {
+        return base;
+    }
+
+    loaded_processed.set(file, { modified, base, types });
+    return types;
+}
+
 /** The type of the property named `name`, by exact name first, then by pattern. */
 export function property_type(types: PropertyTypes, name: string): PropertyType | undefined {
     return types.names.get(name) ?? types.patterns.find(({ pattern }) => pattern.test(name))?.type;
@@ -145,9 +202,12 @@ export function cell_range(type: PropertyType): { minimum: bigint, maximum: bigi
         : { minimum: -(1n << (bits - 1n)), maximum: (1n << (bits - 1n)) - 1n };
 }
 
+import { tmpdir as _tmpdir } from "node:os";
+
 if (import.meta.vitest) {
 
     const { test, expect } = import.meta.vitest;
+    const tmpdir = _tmpdir;
 
     test("the type of a schema is the one its $ref names, as dt-schema reads it", () => {
         expect(declared_type({ $ref: "/schemas/types.yaml#/definitions/uint32-matrix", maxItems: 1 })).toBe("uint32-matrix");
@@ -166,6 +226,31 @@ if (import.meta.vitest) {
         expect(cell_range("address")).toStrictEqual({ minimum: 0n, maximum: 0xFF_FF_FF_FFn });
         expect(cell_range("int8-array")).toStrictEqual({ minimum: -128n, maximum: 127n });
         expect(cell_range("phandle-array")).toBeUndefined();
+    });
+
+    test("the types of a processed schema fill in the names dt-schema doesn't know: one type per name, none for a name typed two ways or as a node", () => {
+        const directory = fs.mkdtempSync(path.join(tmpdir(), "attach-processed-"));
+        const file = path.join(directory, "processed-schema.json");
+        try {
+            fs.writeFileSync(file, `{
+                "generated-types": { "properties": {
+                    "nvmem-cells": [{ "type": "phandle-array" }, { "type": "phandle-array" }],
+                    "resets": [{ "type": "phandle" }, { "type": "phandle-array" }],
+                    "drive-open-drain": [{ "type": "flag" }, { "type": "uint32" }],
+                    "port": [{ "type": "node" }],
+                    "reg": [{ "type": null }, { "type": "address" }]
+                } },
+                "generated-pattern-types": { "properties": { "^#.*-cells$": [{ "type": "uint32" }], "(?P<x>a)": [{ "type": "flag" }] } }
+            }`);
+
+            const base: PropertyTypes = { names: new Map([["resets", "phandle-array"]]), patterns: [{ pattern: /-gpios$/, type: "phandle-array" }] };
+            const types = load_processed_property_types(file, base);
+            expect([...types.names]).toStrictEqual([["resets", "phandle-array"], ["nvmem-cells", "phandle-array"], ["reg", "address"]]);
+            expect(types.patterns.map(({ pattern, type }) => [pattern.source, type])).toStrictEqual([["-gpios$", "phandle-array"], ["^#.*-cells$", "uint32"]]);
+            expect(load_processed_property_types(path.join(directory, "missing.json"), base)).toBe(base);
+        } finally {
+            fs.rmSync(directory, { recursive: true });
+        }
     });
 
     test("a name's type is found by name before pattern", () => {

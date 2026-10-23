@@ -1,12 +1,17 @@
 import { $RefParser } from "@apidevtools/json-schema-ref-parser";
 import * as os from "node:os";
 import path from "node:path";
-import { load_property_types, PropertyTypes } from "./PropertyTypes.js";
+import { load_processed_property_types, load_property_types, PropertyTypes } from "./PropertyTypes.js";
 
 /** The two checkouts the binding schemas are read from. A leading `~` is expanded. */
 export type SchemaPaths = {
     linux: string;
     dt_schema: string;
+    /**
+     * The output of `dt-mk-schema -j` over the two checkouts: the property types of all their schemas by name. They
+     * come on top of the ones dt-schema's own schemas declare, which are all that's known without it.
+     */
+    processed_schema?: string;
 };
 
 /** `$ref`s starting with `prefix` are read from `dir`, with the prefix removed (like dt-schema's `DTSchema.paths`). */
@@ -27,6 +32,11 @@ function expand_home(directory: string): string {
     return directory.startsWith("~") ? directory.replace("~", os.homedir()) : directory;
 }
 
+function property_types(paths: SchemaPaths): PropertyTypes {
+    const own = load_property_types(expand_home(paths.dt_schema));
+    return paths.processed_schema === undefined ? own : load_processed_property_types(expand_home(paths.processed_schema), own);
+}
+
 export function create_context(paths: SchemaPaths): SchemaContext {
     return {
         parser: new $RefParser(),
@@ -34,6 +44,6 @@ export function create_context(paths: SchemaPaths): SchemaContext {
             { prefix: "/schemas", dir: path.join(expand_home(paths.linux), "Documentation/devicetree/bindings") },
             { prefix: "/schemas", dir: path.join(expand_home(paths.dt_schema), "dtschema/schemas") },
         ],
-        property_types: load_property_types(expand_home(paths.dt_schema)),
+        property_types: property_types(paths),
     };
 }

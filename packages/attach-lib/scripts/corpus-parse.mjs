@@ -12,18 +12,22 @@
 //
 // filter  substring of the binding path, to compare a subset
 // LINUX, DT_SCHEMA  the two trees (default test/linux and test/dt-schema)
+// PROCESSED_SCHEMA  the output of `dt-mk-schema -j` over them, whose property types the pipeline reads (default: the one
+//                   `make dt_binding_check` leaves in the bindings directory; empty for none). See processed-schema.mjs.
 //
 // Reads dist/: `yarn build` first. The baseline is only comparable on the Linux and
-// dt-schema commits it records; the script warns when they differ.
+// dt-schema commits and the processed schema it records; the script warns when they differ.
 import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { processed_schema_of } from "./processed-schema.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const linux = resolve(process.env.LINUX ?? join(root, "test/linux"));
 const dt_schema = resolve(process.env.DT_SCHEMA ?? join(root, "test/dt-schema"));
+const processed_schema = processed_schema_of(linux);
 const bindings_dir = join(linux, "Documentation/devicetree/bindings");
 const baseline_file = join(root, "corpus/bindings.json");
 const cache = join(root, "corpus/cache");
@@ -64,7 +68,7 @@ const replacer = (_key, value) => (typeof value === "bigint" ? `${value}n` : val
 // What goes into the baseline for one binding: a hash of the ParsedBinding, or "!stage: message".
 // The dump is the pretty ParsedBinding, kept for diff.
 async function summarize(file) {
-  const parsed = await Attach.parse(file, { linux, dt_schema });
+  const parsed = await Attach.parse(file, { linux, dt_schema, ...(processed_schema === undefined ? {} : { processed_schema }) });
   if (Result.is_err(parsed)) {
     const message = parsed.error.message.replaceAll(linux, "<linux>").replaceAll(dt_schema, "<dt-schema>").replaceAll("\n", " ");
     return { entry: `!${parsed.error.stage}: ${message.slice(0, 300)}` };
@@ -87,12 +91,17 @@ function save(directory, name, text) {
 // One line per binding, so the file diffs line by line.
 function write_baseline(meta, entries) {
   const lines = Object.entries(entries).map(([name, entry]) => `    ${JSON.stringify(name)}: ${JSON.stringify(entry)}`);
-  const text = `{\n  "linux": "${meta.linux}",\n  "dt_schema": "${meta.dt_schema}",\n  "bindings": {\n${lines.join(",\n")}\n  }\n}\n`;
+  const text = `{\n  "linux": "${meta.linux}",\n  "dt_schema": "${meta.dt_schema}",\n  "processed_schema": "${meta.processed_schema}",\n  "bindings": {\n${lines.join(",\n")}\n  }\n}\n`;
   mkdirSync(dirname(baseline_file), { recursive: true });
   writeFileSync(baseline_file, text);
 }
 
-const meta = { linux: commit_of(linux), dt_schema: commit_of(dt_schema) };
+// The processed schema is generated, so the baseline records which one it was made with
+const meta = {
+  linux: commit_of(linux),
+  dt_schema: commit_of(dt_schema),
+  processed_schema: processed_schema === undefined ? "none" : createHash("sha1").update(readFileSync(processed_schema)).digest("hex").slice(0, 12),
+};
 const files = [...walk(bindings_dir)].map((path) => relative(bindings_dir, path)).filter((name) => name.includes(filter));
 const base_cache = join(cache, "base");
 
@@ -100,7 +109,7 @@ if (mode === "run") rmSync(base_cache, { recursive: true, force: true });
 
 const baseline = mode === "diff" ? JSON.parse(readFileSync(baseline_file, "utf8")) : undefined;
 if (baseline) {
-  for (const key of ["linux", "dt_schema"]) {
+  for (const key of ["linux", "dt_schema", "processed_schema"]) {
     if (baseline[key] !== meta[key]) console.error(`warning: ${key} is at ${meta[key]}, the baseline was made at ${baseline[key]}`);
   }
 }

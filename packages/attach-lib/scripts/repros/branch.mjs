@@ -3,9 +3,10 @@
 // validator_input_json) and print the encoded data and the required properties after narrowing.
 //   node scripts/repros/branch.mjs <binding path under Documentation/devicetree/bindings> '<node body>' ['<node body>' ...]
 // A node body is what goes between the braces of `n@0 { ... };`, e.g. 'compatible = "arm,psci";'.
-// Reads dist/ (yarn build first) and test/linux, test/dt-schema.
+// Reads dist/ (yarn build first) and test/linux, test/dt-schema, and the processed schema of test/linux (scripts/processed-schema.mjs) if there is one.
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { schema_paths } from "../processed-schema.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const { Attach, DeviceTree, Result, populate_binding, validator_input_json } = await import(join(root, "dist/index.js"));
@@ -14,10 +15,7 @@ if (bodies.length === 0) {
   console.error("usage: branch.mjs <binding> '<node body>' ...");
   process.exit(2);
 }
-const parsed = await Attach.parse(join(root, "test/linux/Documentation/devicetree/bindings", file), {
-  linux: join(root, "test/linux"),
-  dt_schema: join(root, "test/dt-schema"),
-});
+const parsed = await Attach.parse(join(root, "test/linux/Documentation/devicetree/bindings", file), schema_paths(join(root, "test/linux"), join(root, "test/dt-schema")));
 if (Result.is_err(parsed)) {
   console.error(`${parsed.error.stage}: ${parsed.error.message}`);
   process.exit(1);
