@@ -18,6 +18,8 @@ Most tests import from the built package (`from 'attach-lib'`, resolved via a wo
 
 `yarn corpus:diff` (`scripts/corpus-parse.mjs`, needs `yarn build` and the `test/linux` / `test/dt-schema` links, about 40s) parses every binding of the Linux tree and compares a hash of each `ParsedBinding` with `corpus/bindings.json`; after a pipeline change run it and read the changed files (the script prints a `diff -ru` command), and `yarn corpus` to accept them.
 
+`scripts/repros/` has two small scripts for looking at one binding (both read `dist/`, so `yarn build` first, and the `test/linux` / `test/dt-schema` links): `node scripts/repros/property-type.mjs <binding> <property> [--pattern <regex>]` prints the `ParsedBinding` type of a property, and `node scripts/repros/branch.mjs <binding> '<node body>' ...` encodes nodes the way the CLI does and prints the validator input and the `required_properties` left after narrowing (to see whether an `if/then` branch is taken). `<binding>` is a path under `Documentation/devicetree/bindings`.
+
 ## Architecture
 
 ### Core Modules
