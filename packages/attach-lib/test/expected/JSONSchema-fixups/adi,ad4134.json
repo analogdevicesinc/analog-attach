@@ -13,12 +13,14 @@
             ],
             "type": "array",
             "minItems": 1,
-            "maxItems": 1
+            "maxItems": 1,
+            "dtType": "string-array"
         },
         "reg": {
             "maxItems": 1,
             "type": "array",
-            "minItems": 1
+            "minItems": 1,
+            "dtType": "address"
         },
         "spi-max-frequency": {
             "maximum": 1000000,
@@ -27,12 +29,14 @@
         "reset-gpios": {
             "maxItems": 1,
             "type": "array",
-            "minItems": 1
+            "minItems": 1,
+            "dtType": "phandle-array"
         },
         "clocks": {
             "maxItems": 1,
             "type": "array",
             "minItems": 1,
+            "dtType": "phandle-array",
             "items": [
                 {
                     "items": {
@@ -51,12 +55,14 @@
                 }
             ],
             "minItems": 1,
-            "maxItems": 1
+            "maxItems": 1,
+            "dtType": "string-array"
         },
         "dmas": {
             "maxItems": 1,
             "type": "array",
-            "minItems": 1
+            "minItems": 1,
+            "dtType": "phandle-array"
         },
         "dma-names": {
             "type": "array",
@@ -66,12 +72,14 @@
                 }
             ],
             "minItems": 1,
-            "maxItems": 1
+            "maxItems": 1,
+            "dtType": "string-array"
         },
         "pwms": {
             "maxItems": 1,
             "type": "array",
-            "minItems": 1
+            "minItems": 1,
+            "dtType": "phandle-array"
         },
         "pwm-names": {
             "type": "array",
@@ -81,7 +89,8 @@
                 }
             ],
             "minItems": 1,
-            "maxItems": 1
+            "maxItems": 1,
+            "dtType": "string-array"
         },
         "avdd5-supply": true,
         "avdd1v8-supply": true,
@@ -95,6 +104,7 @@
                 "type": "array",
                 "minItems": 1
             },
+            "dtType": "phandle",
             "type": "array",
             "minItems": 1
         }

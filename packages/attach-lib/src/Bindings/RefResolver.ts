@@ -7,6 +7,14 @@ import { RefResolvedBinding } from "./UtilityTypes.js";
 
 import * as fs from "node:fs";
 import path from "node:path";
+import { parse } from "yaml";
+
+/**
+ * The keyword that tells what a schema's `$ref` to `types.yaml` was (`uint32-matrix`, `phandle-array`, `string`, ...).
+ * dt-schema keeps the `$ref`s and reads a property's type from them (`validator.py:_extract_prop_type`); we
+ * dereference, so `schema_resolver` tags each definition of `types.yaml` with it and the tag comes along.
+ */
+export const DT_TYPE = "dtType";
 
 export async function resolve_references(
     source_path: string,
@@ -84,10 +92,25 @@ function schema_resolver(search_paths: SearchPath[]) {
                 : (candidates.find(candidate => is_readable(candidate)) ?? candidates.at(-1) ?? file.url);
 
             try {
-                return fs.readFileSync(file_path);
+                const content = fs.readFileSync(file_path);
+                return path.basename(file_path) === "types.yaml" ? tag_types(content) : content;
             } catch {
                 throw new ResolverError(`Error opening file "${file_path}"`);
             }
         },
     };
+}
+
+/** `types.yaml` with every definition carrying its own name under `DT_TYPE`. */
+function tag_types(content: Buffer): Buffer {
+    const document = parse(content.toString("utf8")) as { definitions?: Record<string, unknown> };
+
+    for (const [name, definition] of Object.entries(document.definitions ?? {})) {
+        if (typeof definition === "object" && definition !== null) {
+            (definition as Record<string, unknown>)[DT_TYPE] = name;
+        }
+    }
+
+    // JSON is YAML, so the parser plugin reads it back as it would the original
+    return Buffer.from(JSON.stringify(document));
 }

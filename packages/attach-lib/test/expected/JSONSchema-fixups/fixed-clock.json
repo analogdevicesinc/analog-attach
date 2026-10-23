@@ -19,7 +19,8 @@
                     "description": "Any name allowed",
                     "deprecated": true
                 }
-            ]
+            ],
+            "dtType": "string"
         },
         "compatible": {
             "items": [
@@ -29,10 +30,12 @@
             ],
             "type": "array",
             "minItems": 1,
-            "maxItems": 1
+            "maxItems": 1,
+            "dtType": "string-array"
         },
         "#clock-cells": {
-            "const": 0
+            "const": 0,
+            "dtType": "uint32"
         },
         "clock-frequency": true,
         "clock-accuracy": {
@@ -40,7 +43,8 @@
             "type": "integer",
             "typeSize": 32,
             "minimum": 0,
-            "maximum": 4294967295
+            "maximum": 4294967295,
+            "dtType": "uint32"
         },
         "clock-output-names": {
             "type": "array",
@@ -48,7 +52,8 @@
                 "type": "string"
             },
             "minItems": 1,
-            "maxItems": 1
+            "maxItems": 1,
+            "dtType": "string-array"
         }
     },
     "required": [

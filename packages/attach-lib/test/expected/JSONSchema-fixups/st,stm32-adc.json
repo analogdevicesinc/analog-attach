@@ -16,18 +16,21 @@
             ],
             "type": "array",
             "minItems": 1,
-            "maxItems": 1
+            "maxItems": 1,
+            "dtType": "string-array"
         },
         "reg": {
             "maxItems": 1,
             "type": "array",
-            "minItems": 1
+            "minItems": 1,
+            "dtType": "address"
         },
         "interrupts": {
             "description": "One or more interrupts for ADC block, depending on part used:\n  - stm32f4 and stm32h7 share a common ADC interrupt line.\n  - stm32mp1 has two separate interrupt lines, one for each ADC within\n    ADC block.\n  - stm32mp13 has an interrupt line per ADC block.\n",
             "minItems": 1,
             "maxItems": 2,
             "type": "array",
+            "dtType": "uint32-matrix",
             "items": [
                 {
                     "items": {
@@ -43,6 +46,7 @@
             "maxItems": 2,
             "description": "Core can use up to two clocks, depending on part used:\n  - \"adc\" clock: for the analog circuitry, common to all ADCs.\n    It's required on stm32f4.\n    It's optional on stm32h7 and stm32mp1.\n  - \"bus\" clock: for registers access, common to all ADCs.\n    It's not present on stm32f4.\n    It's required on stm32h7 and stm32mp1.\n",
             "type": "array",
+            "dtType": "phandle-array",
             "items": [
                 {
                     "items": {
@@ -59,22 +63,28 @@
                 "type": "string"
             },
             "minItems": 1,
-            "maxItems": 2
+            "maxItems": 2,
+            "dtType": "string-array"
         },
         "st,max-clk-rate-hz": {
-            "description": "Allow to specify desired max clock rate used by analog circuitry."
+            "description": "Allow to specify desired max clock rate used by analog circuitry.",
+            "dtType": "uint32-matrix"
         },
         "vdda-supply": {
-            "description": "Phandle to the vdda input analog voltage."
+            "description": "Phandle to the vdda input analog voltage.",
+            "dtType": "phandle"
         },
         "vref-supply": {
-            "description": "Phandle to the vref input analog reference voltage."
+            "description": "Phandle to the vref input analog reference voltage.",
+            "dtType": "phandle"
         },
         "booster-supply": {
-            "description": "Phandle to the embedded booster regulator that can be used to supply ADC analog input switches on stm32h7 and stm32mp1."
+            "description": "Phandle to the embedded booster regulator that can be used to supply ADC analog input switches on stm32h7 and stm32mp1.",
+            "dtType": "phandle"
         },
         "vdd-supply": {
-            "description": "Phandle to the vdd input voltage. It can be used to supply ADC analog input switches on stm32mp1."
+            "description": "Phandle to the vdd input voltage. It can be used to supply ADC analog input switches on stm32mp1.",
+            "dtType": "phandle"
         },
         "st,syscfg": {
             "description": "Phandle to system configuration controller. It can be used to control the analog circuitry on stm32mp1.",
@@ -103,29 +113,36 @@
                     "type": "integer",
                     "typeSize": 32,
                     "minimum": 0,
-                    "maximum": 4294967295
+                    "maximum": 4294967295,
+                    "dtType": "uint32"
                 }
-            }
+            },
+            "dtType": "phandle-array"
         },
         "interrupt-controller": true,
         "#interrupt-cells": {
-            "const": 1
+            "const": 1,
+            "dtType": "uint32"
         },
         "#address-cells": {
-            "const": 1
+            "const": 1,
+            "dtType": "uint32"
         },
         "#size-cells": {
-            "const": 0
+            "const": 0,
+            "dtType": "uint32"
         },
         "access-controllers": {
             "minItems": 1,
             "maxItems": 2,
-            "type": "array"
+            "type": "array",
+            "dtType": "phandle-array"
         },
         "interrupt-parent": {
             "minItems": 1,
             "maxItems": 1,
-            "type": "array"
+            "type": "array",
+            "dtType": "phandle"
         }
     },
     "allOf": [
@@ -406,28 +423,34 @@
                     ],
                     "type": "array",
                     "minItems": 1,
-                    "maxItems": 1
+                    "maxItems": 1,
+                    "dtType": "string-array"
                 },
                 "reg": {
                     "description": "Offset of ADC instance in ADC block. Valid values are:\n  - 0x0:   ADC1\n  - 0x100: ADC2\n  - 0x200: ADC3 (stm32f4 only)\n",
                     "maxItems": 1,
                     "type": "array",
-                    "minItems": 1
+                    "minItems": 1,
+                    "dtType": "address"
                 },
                 "#io-channel-cells": {
-                    "const": 1
+                    "const": 1,
+                    "dtType": "uint32"
                 },
                 "#address-cells": {
-                    "const": 1
+                    "const": 1,
+                    "dtType": "uint32"
                 },
                 "#size-cells": {
-                    "const": 0
+                    "const": 0,
+                    "dtType": "uint32"
                 },
                 "interrupts": {
                     "description": "IRQ Line for the ADC instance. Valid values are:\n  - 0 for adc@0 (single adc for stm32mp13)\n  - 1 for adc@100\n  - 2 for adc@200 (stm32f4 only)\n",
                     "maxItems": 1,
                     "type": "array",
                     "minItems": 1,
+                    "dtType": "uint32-matrix",
                     "items": [
                         {
                             "items": {
@@ -443,6 +466,7 @@
                     "maxItems": 1,
                     "type": "array",
                     "minItems": 1,
+                    "dtType": "phandle-array",
                     "items": [
                         {
                             "items": {
@@ -457,7 +481,8 @@
                     "description": "RX DMA Channel",
                     "maxItems": 1,
                     "type": "array",
-                    "minItems": 1
+                    "minItems": 1,
+                    "dtType": "phandle-array"
                 },
                 "dma-names": {
                     "type": "array",
@@ -467,10 +492,12 @@
                         }
                     ],
                     "minItems": 1,
-                    "maxItems": 1
+                    "maxItems": 1,
+                    "dtType": "string-array"
                 },
                 "assigned-resolution-bits": {
-                    "description": "Resolution (bits) to use for conversions:\n  - can be 6, 8, 10 or 12 on stm32f4 and stm32mp13\n  - can be 8, 10, 12, 14 or 16 on stm32h7 and stm32mp1\n"
+                    "description": "Resolution (bits) to use for conversions:\n  - can be 6, 8, 10 or 12 on stm32f4 and stm32mp13\n  - can be 8, 10, 12, 14 or 16 on stm32h7 and stm32mp1\n",
+                    "dtType": "uint32-array"
                 },
                 "st,adc-channels": {
                     "description": "List of single-ended channels muxed for this ADC. It can have up to:\n  - 16 channels, numbered from 0 to 15 (for in0..in15) on stm32f4\n  - 19 channels, numbered from 0 to 18 (for in0..in18) on stm32mp13.\n  - 20 channels, numbered from 0 to 19 (for in0..in19) on stm32h7 and\n    stm32mp1.\n",
@@ -481,8 +508,10 @@
                         "type": "integer",
                         "typeSize": 32,
                         "minimum": 0,
-                        "maximum": 4294967295
-                    }
+                        "maximum": 4294967295,
+                        "dtType": "uint32"
+                    },
+                    "dtType": "uint32-array"
                 },
                 "st,adc-diff-channels": {
                     "description": "List of differential channels muxed for this ADC. Some channels can\nbe configured as differential instead of single-ended on stm32h7 and\non stm32mp1. Positive and negative inputs pairs are listed:\n<vinp vinn>, <vinp vinn>,... vinp and vinn are numbered from 0 to 19.\n\nNote: At least one of \"st,adc-channels\" or \"st,adc-diff-channels\" is\nrequired if no adc generic channel is defined. These legacy channel\nproperties are exclusive with adc generic channel bindings.\nBoth properties can be used together. Some channels can be\nused as single-ended and some other ones as differential (mixed). But\nchannels can't be configured both as single-ended and differential.\n",
@@ -507,7 +536,8 @@
                     },
                     "deprecated": true,
                     "type": "array",
-                    "minItems": 1
+                    "minItems": 1,
+                    "dtType": "uint32-matrix"
                 },
                 "st,min-sample-time-nsecs": {
                     "description": "Minimum sampling time in nanoseconds. Depending on hardware (board) e.g. high/low analog input source impedance, fine tune of ADC sampling time may be recommended. This can be either one value or an array that matches \"st,adc-channels\" and/or \"st,adc-diff-channels\" list, to set sample time resp. for all channels, or independently for each channel.",
@@ -518,8 +548,10 @@
                         "type": "integer",
                         "typeSize": 32,
                         "minimum": 0,
-                        "maximum": 4294967295
-                    }
+                        "maximum": 4294967295,
+                        "dtType": "uint32"
+                    },
+                    "dtType": "uint32-array"
                 },
                 "nvmem-cells": {
                     "items": [
@@ -539,12 +571,14 @@
                         }
                     ],
                     "minItems": 1,
-                    "maxItems": 1
+                    "maxItems": 1,
+                    "dtType": "string-array"
                 },
                 "interrupt-parent": {
                     "minItems": 1,
                     "maxItems": 1,
-                    "type": "array"
+                    "type": "array",
+                    "dtType": "phandle"
                 }
             },
             "patternProperties": {
@@ -569,10 +603,12 @@
                                 }
                             ],
                             "type": "array",
-                            "minItems": 1
+                            "minItems": 1,
+                            "dtType": "address"
                         },
                         "label": {
-                            "description": "Unique name to identify which channel this is.\nReserved label names \"vddcore\", \"vddcpu\", \"vddq_ddr\", \"vrefint\" and \"vbat\"\nare used to identify internal channels with matching names.\n"
+                            "description": "Unique name to identify which channel this is.\nReserved label names \"vddcore\", \"vddcpu\", \"vddq_ddr\", \"vrefint\" and \"vbat\"\nare used to identify internal channels with matching names.\n",
+                            "dtType": "string"
                         },
                         "diff-channels": {
                             "maxItems": 2,
@@ -583,11 +619,14 @@
                                 "type": "integer",
                                 "typeSize": 32,
                                 "minimum": 0,
-                                "maximum": 19
-                            }
+                                "maximum": 19,
+                                "dtType": "uint32"
+                            },
+                            "dtType": "uint32-array"
                         },
                         "st,min-sample-time-ns": {
-                            "description": "Minimum sampling time in nanoseconds. Depending on hardware (board)\ne.g. high/low analog input source impedance, fine tune of ADC\nsampling time may be recommended.\n"
+                            "description": "Minimum sampling time in nanoseconds. Depending on hardware (board)\ne.g. high/low analog input source impedance, fine tune of ADC\nsampling time may be recommended.\n",
+                            "dtType": "uint32-array"
                         }
                     },
                     "required": [

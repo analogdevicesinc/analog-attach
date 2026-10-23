@@ -31,7 +31,8 @@
             "type": "integer",
             "typeSize": 32,
             "minimum": 0,
-            "maximum": 4294967295
+            "maximum": 4294967295,
+            "dtType": "uint32"
         },
         "clock-output-names": {
             "maxItems": 1

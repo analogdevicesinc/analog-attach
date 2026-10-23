@@ -1,6 +1,7 @@
 import { $RefParser } from "@apidevtools/json-schema-ref-parser";
 import * as os from "node:os";
 import path from "node:path";
+import { load_property_types, PropertyTypes } from "./PropertyTypes.js";
 
 /** The two checkouts the binding schemas are read from. A leading `~` is expanded. */
 export type SchemaPaths = {
@@ -18,6 +19,8 @@ export type SearchPath = {
 export type SchemaContext = {
     parser: $RefParser;
     search_paths: SearchPath[];
+    /** What dt-schema declares the type of properties to be, by name. */
+    property_types: PropertyTypes;
 };
 
 function expand_home(directory: string): string {
@@ -31,5 +34,6 @@ export function create_context(paths: SchemaPaths): SchemaContext {
             { prefix: "/schemas", dir: path.join(expand_home(paths.linux), "Documentation/devicetree/bindings") },
             { prefix: "/schemas", dir: path.join(expand_home(paths.dt_schema), "dtschema/schemas") },
         ],
+        property_types: load_property_types(expand_home(paths.dt_schema)),
     };
 }

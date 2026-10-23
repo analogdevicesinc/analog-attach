@@ -1,5 +1,6 @@
 import { DtBindingSchema } from "./Schema";
 import { fixup_collapse_allOf } from "./fixups/collapse_allOf";
+import { fixup_dt_type } from "./fixups/dt_type.js";
 import { fixup_interrupts } from "./fixups/interrupts.js";
 import { fixup_items_size } from "./fixups/items_size.js";
 import { fixup_ifs } from "./fixups/mark_ifs_required_properties.js";
@@ -9,16 +10,17 @@ import { fixup_names } from "./fixups/names.js";
 import { fixup_string_to_array } from "./fixups/string_to_array.js";
 import { fixup_reg } from "./fixups/reg.js";
 import { apply_fixups, Fixups } from "./FixupWalker.js";
+import { NO_PROPERTY_TYPES, PropertyTypes } from "./PropertyTypes.js";
 import { fixup_remove_invalid_keys } from "./fixups/remove_invalid_keys.js";
 
 /**
  * The fixups that work on one node's or one property's schema, in the order they run. They walk the schema
  * once, the way dt-schema's `fixups.py` does (see `FixupWalker.ts`); each names its counterpart there.
  */
-const FIXUPS: Fixups = {
+const fixups = (types: PropertyTypes): Fixups => ({
     node: [fixup_remove_invalid_keys, fixup_interrupts],
-    property: [fixup_string_to_array, fixup_names, fixup_reg, fixup_items_size],
-};
+    property: [fixup_string_to_array, fixup_names, fixup_reg, fixup_items_size, fixup_dt_type(types)],
+});
 
 /**
  * Our fixups run before and after the walk. dt-schema has nothing like them because it keeps the
@@ -31,10 +33,10 @@ const FIXUPS: Fixups = {
  * - `fixup_mark_integers` types a schema with `minimum` / `maximum` as an integer.
  * - `fixup_mark_matrix` shapes `interrupts` and `clocks` as lists of cell lists.
  */
-export function apply_JSONSchema_fixups(binding: DtBindingSchema): DtBindingSchema {
+export function apply_JSONSchema_fixups(binding: DtBindingSchema, types: PropertyTypes = NO_PROPERTY_TYPES): DtBindingSchema {
 
     const collapsed = fixup_collapse_allOf(binding);
-    const fixuped_properties = apply_fixups(collapsed, FIXUPS);
+    const fixuped_properties = apply_fixups(collapsed, fixups(types));
     const fixuped_ifs = fixup_ifs(fixuped_properties);
     const fixuped_marked_integers = fixup_mark_integers(fixuped_ifs);
     const fixuped_marked_matrix = fixup_mark_matrix(fixuped_marked_integers);

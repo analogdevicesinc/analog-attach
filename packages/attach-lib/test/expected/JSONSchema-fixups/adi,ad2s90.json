@@ -11,7 +11,8 @@
             ],
             "type": "array",
             "minItems": 1,
-            "maxItems": 1
+            "maxItems": 1,
+            "dtType": "string-array"
         },
         "reg": {
             "minItems": 1,
@@ -29,14 +30,16 @@
                 "maxItems": 1
             },
             "description": "Chip select used by the device.",
-            "type": "array"
+            "type": "array",
+            "dtType": "address"
         },
         "spi-max-frequency": {
             "description": "Chip's max frequency, as specified in its datasheet, is 2Mhz. But a 600ns\ndelay is expected between the application of a logic LO to CS and the\napplication of SCLK, as also specified. And since the delay is not\nimplemented in the spi code, to satisfy it, SCLK's period should be at\nmost 2 * 600ns, so the max frequency should be 1 / (2 * 6e-7), which gives\nroughly 830000Hz.\n",
             "type": "integer",
             "typeSize": 32,
             "minimum": 0,
-            "maximum": 830000
+            "maximum": 830000,
+            "dtType": "uint32"
         },
         "spi-cpol": true,
         "spi-cpha": true
@@ -69,7 +72,8 @@
                         {
                             "type": "null"
                         }
-                    ]
+                    ],
+                    "dtType": "flag"
                 },
                 "spi-lsb-first": {
                     "description": "The device requires the LSB first mode.",
@@ -81,16 +85,20 @@
                         {
                             "type": "null"
                         }
-                    ]
+                    ],
+                    "dtType": "flag"
                 },
                 "spi-cs-setup-delay-ns": {
-                    "description": "Delay in nanoseconds to be introduced by the controller after CS is asserted."
+                    "description": "Delay in nanoseconds to be introduced by the controller after CS is asserted.",
+                    "dtType": "uint32-array"
                 },
                 "spi-cs-hold-delay-ns": {
-                    "description": "Delay in nanoseconds to be introduced by the controller before CS is de-asserted."
+                    "description": "Delay in nanoseconds to be introduced by the controller before CS is de-asserted.",
+                    "dtType": "uint32-array"
                 },
                 "spi-cs-inactive-delay-ns": {
-                    "description": "Delay in nanoseconds to be introduced by the controller after CS is de-asserted."
+                    "description": "Delay in nanoseconds to be introduced by the controller after CS is de-asserted.",
+                    "dtType": "uint32-array"
                 },
                 "spi-rx-bus-width": {
                     "description": "Bus width to the SPI bus used for read transfers. If 0 is provided, then no RX will be possible on this device.",
@@ -105,13 +113,16 @@
                     "type": "integer",
                     "typeSize": 32,
                     "minimum": 0,
-                    "maximum": 4294967295
+                    "maximum": 4294967295,
+                    "dtType": "uint32"
                 },
                 "spi-rx-delay-us": {
-                    "description": "Delay, in microseconds, after a read transfer."
+                    "description": "Delay, in microseconds, after a read transfer.",
+                    "dtType": "uint32-array"
                 },
                 "rx-sample-delay-ns": {
-                    "description": "SPI Rx sample delay offset, unit is nanoseconds. The delay from the default sample time before the actual sample of the rxd input signal occurs."
+                    "description": "SPI Rx sample delay offset, unit is nanoseconds. The delay from the default sample time before the actual sample of the rxd input signal occurs.",
+                    "dtType": "uint32-array"
                 },
                 "spi-tx-bus-width": {
                     "description": "Bus width to the SPI bus used for write transfers. If 0 is provided, then no TX will be possible on this device.",
@@ -126,10 +137,12 @@
                     "type": "integer",
                     "typeSize": 32,
                     "minimum": 0,
-                    "maximum": 4294967295
+                    "maximum": 4294967295,
+                    "dtType": "uint32"
                 },
                 "spi-tx-delay-us": {
-                    "description": "Delay, in microseconds, after a write transfer."
+                    "description": "Delay, in microseconds, after a write transfer.",
+                    "dtType": "uint32-array"
                 },
                 "stacked-memories": {
                     "description": "Several SPI memories can be wired in stacked mode. This basically means that either a device features several chip selects, or that different devices must be seen as a single bigger chip. This basically doubles (or more) the total address space with only a single additional wire, while still needing to repeat the commands when crossing a chip boundary. The size of each chip should be provided as members of the array.",
@@ -140,8 +153,10 @@
                         "type": "integer",
                         "typeSize": 64,
                         "minimum": 0,
-                        "maximum": 18446744073709552000
-                    }
+                        "maximum": 18446744073709552000,
+                        "dtType": "uint64"
+                    },
+                    "dtType": "uint64-array"
                 },
                 "parallel-memories": {
                     "description": "Several SPI memories can be wired in parallel mode. The devices are physically on a different buses but will always act synchronously as each data word is spread across the different memories (eg. even bits are stored in one memory, odd bits in the other). This basically doubles the address space and the throughput while greatly complexifying the wiring because as many busses as devices must be wired. The size of each chip should be provided as members of the array.",
@@ -152,11 +167,14 @@
                         "type": "integer",
                         "typeSize": 64,
                         "minimum": 0,
-                        "maximum": 18446744073709552000
-                    }
+                        "maximum": 18446744073709552000,
+                        "dtType": "uint64"
+                    },
+                    "dtType": "uint64-array"
                 },
                 "st,spi-midi-ns": {
-                    "description": "Only for STM32H7, (Master Inter-Data Idleness) minimum time\ndelay in nanoseconds inserted between two consecutive data frames.\n"
+                    "description": "Only for STM32H7, (Master Inter-Data Idleness) minimum time\ndelay in nanoseconds inserted between two consecutive data frames.\n",
+                    "dtType": "uint32-array"
                 }
             },
             "allOf": [
@@ -174,7 +192,8 @@
                             "type": "integer",
                             "typeSize": 32,
                             "minimum": 0,
-                            "maximum": 4294967295
+                            "maximum": 4294967295,
+                            "dtType": "uint32"
                         },
                         "pl022,com-mode": {
                             "description": "Specifies the transfer mode",
@@ -187,28 +206,32 @@
                             "type": "integer",
                             "typeSize": 32,
                             "minimum": 0,
-                            "maximum": 4294967295
+                            "maximum": 4294967295,
+                            "dtType": "uint32"
                         },
                         "pl022,rx-level-trig": {
                             "description": "Rx FIFO watermark level",
                             "minimum": 0,
                             "maximum": 4,
                             "type": "integer",
-                            "typeSize": 32
+                            "typeSize": 32,
+                            "dtType": "uint32"
                         },
                         "pl022,tx-level-trig": {
                             "description": "Tx FIFO watermark level",
                             "minimum": 0,
                             "maximum": 4,
                             "type": "integer",
-                            "typeSize": 32
+                            "typeSize": 32,
+                            "dtType": "uint32"
                         },
                         "pl022,ctrl-len": {
                             "description": "Microwire interface - Control length",
                             "minimum": 3,
                             "maximum": 31,
                             "type": "integer",
-                            "typeSize": 32
+                            "typeSize": 32,
+                            "dtType": "uint32"
                         },
                         "pl022,wait-state": {
                             "description": "Microwire interface - Wait state",
@@ -219,7 +242,8 @@
                             "type": "integer",
                             "typeSize": 32,
                             "minimum": 0,
-                            "maximum": 4294967295
+                            "maximum": 4294967295,
+                            "dtType": "uint32"
                         },
                         "pl022,duplex": {
                             "description": "Microwire interface - Full/Half duplex",
@@ -230,7 +254,8 @@
                             "type": "integer",
                             "typeSize": 32,
                             "minimum": 0,
-                            "maximum": 4294967295
+                            "maximum": 4294967295,
+                            "dtType": "uint32"
                         }
                     },
                     "additionalProperties": true
@@ -245,19 +270,24 @@
                             "type": "integer",
                             "typeSize": 32,
                             "minimum": 0,
-                            "maximum": 4294967295
+                            "maximum": 4294967295,
+                            "dtType": "uint32"
                         },
                         "cdns,tshsl-ns": {
-                            "description": "Delay in nanoseconds for the length that the master mode chip select outputs are de-asserted between transactions."
+                            "description": "Delay in nanoseconds for the length that the master mode chip select outputs are de-asserted between transactions.",
+                            "dtType": "uint32-array"
                         },
                         "cdns,tsd2d-ns": {
-                            "description": "Delay in nanoseconds between one chip select being de-activated and the activation of another."
+                            "description": "Delay in nanoseconds between one chip select being de-activated and the activation of another.",
+                            "dtType": "uint32-array"
                         },
                         "cdns,tchsh-ns": {
-                            "description": "Delay in nanoseconds between last bit of current transaction and deasserting the device chip select (qspi_n_ss_out)."
+                            "description": "Delay in nanoseconds between last bit of current transaction and deasserting the device chip select (qspi_n_ss_out).",
+                            "dtType": "uint32-array"
                         },
                         "cdns,tslch-ns": {
-                            "description": "Delay in nanoseconds between setting qspi_n_ss_out low and first bit transfer."
+                            "description": "Delay in nanoseconds between setting qspi_n_ss_out low and first bit transfer.",
+                            "dtType": "uint32-array"
                         }
                     },
                     "additionalProperties": true
@@ -273,7 +303,8 @@
                             "type": "integer",
                             "typeSize": 32,
                             "minimum": 0,
-                            "maximum": 4294967295
+                            "maximum": 4294967295,
+                            "dtType": "uint32"
                         },
                         "fsl,spi-sck-cs-delay": {
                             "deprecated": true,
@@ -281,7 +312,8 @@
                             "type": "integer",
                             "typeSize": 32,
                             "minimum": 0,
-                            "maximum": 4294967295
+                            "maximum": 4294967295,
+                            "dtType": "uint32"
                         }
                     },
                     "additionalProperties": true
@@ -307,7 +339,8 @@
                                     "type": "integer",
                                     "typeSize": 32,
                                     "minimum": 0,
-                                    "maximum": 4294967295
+                                    "maximum": 4294967295,
+                                    "dtType": "uint32"
                                 }
                             }
                         }
@@ -323,14 +356,16 @@
                             "minimum": 0,
                             "maximum": 31,
                             "type": "integer",
-                            "typeSize": 32
+                            "typeSize": 32,
+                            "dtType": "uint32"
                         },
                         "nvidia,rx-clk-tap-delay": {
                             "description": "Delays the clock coming in from the device with this tap value. Tap value varies based on platform design trace lengths from Tegra QSPI to corresponding slave device.",
                             "minimum": 0,
                             "maximum": 255,
                             "type": "integer",
-                            "typeSize": 32
+                            "typeSize": 32,
+                            "dtType": "uint32"
                         }
                     },
                     "additionalProperties": true

@@ -4,6 +4,7 @@ export * from './ParsedBinding.js';
 export * from './Context.js';
 export * from './Pipeline.js';
 export * from './RefResolver.js';
+export * from './PropertyTypes.js';
 export * from './PropertyResolver.js';
 export * from './RedefinitionMerger.js';
 export * from './CanaryInserter.js';

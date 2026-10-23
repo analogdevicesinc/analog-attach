@@ -27,17 +27,20 @@
                                     "items": {
                                         "type": "string"
                                     },
-                                    "minItems": 1
+                                    "minItems": 1,
+                                    "dtType": "non-unique-string-array"
                                 },
                                 {
                                     "uniqueItems": true
                                 }
-                            ]
+                            ],
+                            "dtType": "string-array"
                         },
                         {
                             "maxItems": 1
                         }
-                    ]
+                    ],
+                    "dtType": "string"
                 },
                 "regulator-min-microvolt": {
                     "description": "smallest voltage consumers may set"
@@ -50,7 +53,8 @@
                     "type": "integer",
                     "typeSize": 32,
                     "minimum": 0,
-                    "maximum": 4294967295
+                    "maximum": 4294967295,
+                    "dtType": "uint32"
                 },
                 "regulator-min-microamp": {
                     "description": "smallest current consumers may set"
@@ -82,14 +86,16 @@
                     "type": "integer",
                     "typeSize": 32,
                     "minimum": 0,
-                    "maximum": 4294967295
+                    "maximum": 4294967295,
+                    "dtType": "uint32"
                 },
                 "regulator-enable-ramp-delay": {
                     "description": "The time taken, in microseconds, for the supply rail to reach the target voltage, plus/minus whatever tolerance the board design requires. This property describes the total system ramp time required due to the combination of internal ramping of the regulator itself, and board design issues such as trace capacitance and load on the supply.",
                     "type": "integer",
                     "typeSize": 32,
                     "minimum": 0,
-                    "maximum": 4294967295
+                    "maximum": 4294967295,
+                    "dtType": "uint32"
                 },
                 "regulator-settling-time-us": {
                     "description": "Settling time, in microseconds, for voltage change if regulator have the constant time for any level voltage change. This is useful when regulator have exponential voltage change."
@@ -109,7 +115,8 @@
                     "type": "integer",
                     "typeSize": 32,
                     "minimum": 0,
-                    "maximum": 4294967295
+                    "maximum": 4294967295,
+                    "dtType": "uint32"
                 },
                 "regulator-allowed-modes": {
                     "description": "list of operating modes that software is allowed to configure for the regulator at run-time.  Elements may be specified in any order. The set of possible operating modes depends on the capabilities of every hardware so each device binding document explains which values the regulator supports.",
@@ -119,14 +126,17 @@
                         "type": "integer",
                         "typeSize": 32,
                         "minimum": 0,
-                        "maximum": 4294967295
-                    }
+                        "maximum": 4294967295,
+                        "dtType": "uint32"
+                    },
+                    "dtType": "uint32-array"
                 },
                 "regulator-system-load": {
                     "type": "integer",
                     "typeSize": 32,
                     "minimum": 0,
                     "maximum": 4294967295,
+                    "dtType": "uint32",
                     "description": "Load in uA present on regulator that is not captured by any consumer request."
                 },
                 "regulator-pull-down": {
@@ -185,6 +195,7 @@
                     "typeSize": 32,
                     "minimum": 0,
                     "maximum": 4294967295,
+                    "dtType": "uint32",
                     "description": "tristate, enable/disable active discharge of regulators. The values are:\n0: Disable active discharge.\n1: Enable active discharge.\nAbsence of this property will leave configuration to default.\n",
                     "enum": [
                         0,
@@ -197,7 +208,8 @@
                         "maxItems": 1
                     },
                     "type": "array",
-                    "minItems": 1
+                    "minItems": 1,
+                    "dtType": "phandle-array"
                 },
                 "regulator-coupled-max-spread": {
                     "description": "Array of maximum spread between voltages of coupled regulators in microvolts, each value in the array relates to the corresponding couple specified by the regulator-coupled-with property.",
@@ -207,8 +219,10 @@
                         "type": "integer",
                         "typeSize": 32,
                         "minimum": 0,
-                        "maximum": 4294967295
-                    }
+                        "maximum": 4294967295,
+                        "dtType": "uint32"
+                    },
+                    "dtType": "uint32-array"
                 },
                 "regulator-max-step-microvolt": {
                     "description": "Maximum difference between current and target voltages that can be changed safely in a single step."
@@ -248,6 +262,7 @@
                             "typeSize": 32,
                             "minimum": 0,
                             "maximum": 4294967295,
+                            "dtType": "uint32",
                             "description": "operating mode in the given suspend state. The set of possible operating modes depends on the capabilities of every hardware so the valid modes are documented on each regulator device tree binding document."
                         }
                     },
@@ -331,17 +346,20 @@
                             "items": {
                                 "type": "string"
                             },
-                            "minItems": 1
+                            "minItems": 1,
+                            "dtType": "non-unique-string-array"
                         },
                         {
                             "uniqueItems": true
                         }
-                    ]
+                    ],
+                    "dtType": "string-array"
                 },
                 {
                     "maxItems": 1
                 }
-            ]
+            ],
+            "dtType": "string"
         },
         "gpio": {
             "description": "gpio to use for enable control",

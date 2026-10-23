@@ -8,26 +8,32 @@
             "title": "Voltage/Current Regulators",
             "properties": {
                 "regulator-min-microvolt": {
-                    "description": "smallest voltage consumers may set"
+                    "description": "smallest voltage consumers may set",
+                    "dtType": "int32-matrix"
                 },
                 "regulator-max-microvolt": {
-                    "description": "largest voltage consumers may set"
+                    "description": "largest voltage consumers may set",
+                    "dtType": "int32-matrix"
                 },
                 "regulator-microvolt-offset": {
                     "description": "Offset applied to voltages to compensate for voltage drops",
                     "type": "integer",
                     "typeSize": 32,
                     "minimum": 0,
-                    "maximum": 4294967295
+                    "maximum": 4294967295,
+                    "dtType": "uint32"
                 },
                 "regulator-min-microamp": {
-                    "description": "smallest current consumers may set"
+                    "description": "smallest current consumers may set",
+                    "dtType": "uint32-array"
                 },
                 "regulator-max-microamp": {
-                    "description": "largest current consumers may set"
+                    "description": "largest current consumers may set",
+                    "dtType": "uint32-array"
                 },
                 "regulator-input-current-limit-microamp": {
-                    "description": "maximum input current regulator allows"
+                    "description": "maximum input current regulator allows",
+                    "dtType": "uint32-array"
                 },
                 "regulator-always-on": {
                     "description": "boolean, regulator should never be disabled",
@@ -50,23 +56,28 @@
                     "type": "integer",
                     "typeSize": 32,
                     "minimum": 0,
-                    "maximum": 4294967295
+                    "maximum": 4294967295,
+                    "dtType": "uint32"
                 },
                 "regulator-enable-ramp-delay": {
                     "description": "The time taken, in microseconds, for the supply rail to reach the target voltage, plus/minus whatever tolerance the board design requires. This property describes the total system ramp time required due to the combination of internal ramping of the regulator itself, and board design issues such as trace capacitance and load on the supply.",
                     "type": "integer",
                     "typeSize": 32,
                     "minimum": 0,
-                    "maximum": 4294967295
+                    "maximum": 4294967295,
+                    "dtType": "uint32"
                 },
                 "regulator-settling-time-us": {
-                    "description": "Settling time, in microseconds, for voltage change if regulator have the constant time for any level voltage change. This is useful when regulator have exponential voltage change."
+                    "description": "Settling time, in microseconds, for voltage change if regulator have the constant time for any level voltage change. This is useful when regulator have exponential voltage change.",
+                    "dtType": "uint32-array"
                 },
                 "regulator-settling-time-up-us": {
-                    "description": "Settling time, in microseconds, for voltage increase if the regulator needs a constant time to settle after voltage increases of any level. This is useful for regulators with exponential voltage changes."
+                    "description": "Settling time, in microseconds, for voltage increase if the regulator needs a constant time to settle after voltage increases of any level. This is useful for regulators with exponential voltage changes.",
+                    "dtType": "uint32-array"
                 },
                 "regulator-settling-time-down-us": {
-                    "description": "Settling time, in microseconds, for voltage decrease if the regulator needs a constant time to settle after voltage decreases of any level. This is useful for regulators with exponential voltage changes."
+                    "description": "Settling time, in microseconds, for voltage decrease if the regulator needs a constant time to settle after voltage decreases of any level. This is useful for regulators with exponential voltage changes.",
+                    "dtType": "uint32-array"
                 },
                 "regulator-soft-start": {
                     "description": "Enable soft start so that voltage ramps slowly",
@@ -77,7 +88,8 @@
                     "type": "integer",
                     "typeSize": 32,
                     "minimum": 0,
-                    "maximum": 4294967295
+                    "maximum": 4294967295,
+                    "dtType": "uint32"
                 },
                 "regulator-allowed-modes": {
                     "description": "list of operating modes that software is allowed to configure for the regulator at run-time.  Elements may be specified in any order. The set of possible operating modes depends on the capabilities of every hardware so each device binding document explains which values the regulator supports.",
@@ -87,14 +99,17 @@
                         "type": "integer",
                         "typeSize": 32,
                         "minimum": 0,
-                        "maximum": 4294967295
-                    }
+                        "maximum": 4294967295,
+                        "dtType": "uint32"
+                    },
+                    "dtType": "uint32-array"
                 },
                 "regulator-system-load": {
                     "type": "integer",
                     "typeSize": 32,
                     "minimum": 0,
                     "maximum": 4294967295,
+                    "dtType": "uint32",
                     "description": "Load in uA present on regulator that is not captured by any consumer request."
                 },
                 "regulator-pull-down": {
@@ -106,49 +121,63 @@
                     "type": "boolean"
                 },
                 "regulator-oc-protection-microamp": {
-                    "description": "Set over current protection limit. This is a limit where hardware performs emergency shutdown. Zero can be passed to disable protection and value '1' indicates that protection should be enabled but limit setting can be omitted."
+                    "description": "Set over current protection limit. This is a limit where hardware performs emergency shutdown. Zero can be passed to disable protection and value '1' indicates that protection should be enabled but limit setting can be omitted.",
+                    "dtType": "uint32-array"
                 },
                 "regulator-oc-error-microamp": {
-                    "description": "Set over current error limit. This is a limit where part of the hardware probably is malfunctional and damage prevention is requested. Zero can be passed to disable error detection and value '1' indicates that detection should be enabled but limit setting can be omitted."
+                    "description": "Set over current error limit. This is a limit where part of the hardware probably is malfunctional and damage prevention is requested. Zero can be passed to disable error detection and value '1' indicates that detection should be enabled but limit setting can be omitted.",
+                    "dtType": "uint32-array"
                 },
                 "regulator-oc-warn-microamp": {
-                    "description": "Set over current warning limit. This is a limit where hardware is assumed still to be functional but approaching limit where it gets damaged. Recovery actions should be initiated. Zero can be passed to disable detection and value '1' indicates that detection should be enabled but limit setting can be omitted."
+                    "description": "Set over current warning limit. This is a limit where hardware is assumed still to be functional but approaching limit where it gets damaged. Recovery actions should be initiated. Zero can be passed to disable detection and value '1' indicates that detection should be enabled but limit setting can be omitted.",
+                    "dtType": "uint32-array"
                 },
                 "regulator-ov-protection-microvolt": {
-                    "description": "Set over voltage protection limit. This is a limit where hardware performs emergency shutdown. Zero can be passed to disable protection and value '1' indicates that protection should be enabled but limit setting can be omitted. Limit is given as microvolt offset from voltage set to regulator."
+                    "description": "Set over voltage protection limit. This is a limit where hardware performs emergency shutdown. Zero can be passed to disable protection and value '1' indicates that protection should be enabled but limit setting can be omitted. Limit is given as microvolt offset from voltage set to regulator.",
+                    "dtType": "int32-matrix"
                 },
                 "regulator-ov-error-microvolt": {
-                    "description": "Set over voltage error limit. This is a limit where part of the hardware probably is malfunctional and damage prevention is requested Zero can be passed to disable error detection and value '1' indicates that detection should be enabled but limit setting can be omitted. Limit is given as microvolt offset from voltage set to regulator."
+                    "description": "Set over voltage error limit. This is a limit where part of the hardware probably is malfunctional and damage prevention is requested Zero can be passed to disable error detection and value '1' indicates that detection should be enabled but limit setting can be omitted. Limit is given as microvolt offset from voltage set to regulator.",
+                    "dtType": "int32-matrix"
                 },
                 "regulator-ov-warn-microvolt": {
-                    "description": "Set over voltage warning limit. This is a limit where hardware is assumed still to be functional but approaching limit where it gets damaged. Recovery actions should be initiated. Zero can be passed to disable detection and value '1' indicates that detection should be enabled but limit setting can be omitted. Limit is given as microvolt offset from voltage set to regulator."
+                    "description": "Set over voltage warning limit. This is a limit where hardware is assumed still to be functional but approaching limit where it gets damaged. Recovery actions should be initiated. Zero can be passed to disable detection and value '1' indicates that detection should be enabled but limit setting can be omitted. Limit is given as microvolt offset from voltage set to regulator.",
+                    "dtType": "int32-matrix"
                 },
                 "regulator-uv-protection-microvolt": {
-                    "description": "Set over under voltage protection limit. This is a limit where hardware performs emergency shutdown. Zero can be passed to disable protection and value '1' indicates that protection should be enabled but limit setting can be omitted. Limit is given as microvolt offset from voltage set to regulator."
+                    "description": "Set over under voltage protection limit. This is a limit where hardware performs emergency shutdown. Zero can be passed to disable protection and value '1' indicates that protection should be enabled but limit setting can be omitted. Limit is given as microvolt offset from voltage set to regulator.",
+                    "dtType": "int32-matrix"
                 },
                 "regulator-uv-error-microvolt": {
-                    "description": "Set under voltage error limit. This is a limit where part of the hardware probably is malfunctional and damage prevention is requested Zero can be passed to disable error detection and value '1' indicates that detection should be enabled but limit setting can be omitted. Limit is given as microvolt offset from voltage set to regulator."
+                    "description": "Set under voltage error limit. This is a limit where part of the hardware probably is malfunctional and damage prevention is requested Zero can be passed to disable error detection and value '1' indicates that detection should be enabled but limit setting can be omitted. Limit is given as microvolt offset from voltage set to regulator.",
+                    "dtType": "int32-matrix"
                 },
                 "regulator-uv-warn-microvolt": {
-                    "description": "Set over under voltage warning limit. This is a limit where hardware is assumed still to be functional but approaching limit where it gets damaged. Recovery actions should be initiated. Zero can be passed to disable detection and value '1' indicates that detection should be enabled but limit setting can be omitted. Limit is given as microvolt offset from voltage set to regulator."
+                    "description": "Set over under voltage warning limit. This is a limit where hardware is assumed still to be functional but approaching limit where it gets damaged. Recovery actions should be initiated. Zero can be passed to disable detection and value '1' indicates that detection should be enabled but limit setting can be omitted. Limit is given as microvolt offset from voltage set to regulator.",
+                    "dtType": "int32-matrix"
                 },
                 "regulator-uv-less-critical-window-ms": {
-                    "description": "Specifies the time window (in milliseconds) following a critical under-voltage event during which the system can continue to operate safely while performing less critical operations. This property provides a defined duration before a more severe reaction to the under-voltage event is needed, allowing for certain non-urgent actions to be carried out in preparation for potential power loss."
+                    "description": "Specifies the time window (in milliseconds) following a critical under-voltage event during which the system can continue to operate safely while performing less critical operations. This property provides a defined duration before a more severe reaction to the under-voltage event is needed, allowing for certain non-urgent actions to be carried out in preparation for potential power loss.",
+                    "dtType": "uint32-array"
                 },
                 "regulator-temp-protection-kelvin": {
-                    "description": "Set over temperature protection limit. This is a limit where hardware performs emergency shutdown. Zero can be passed to disable protection and value '1' indicates that protection should be enabled but limit setting can be omitted."
+                    "description": "Set over temperature protection limit. This is a limit where hardware performs emergency shutdown. Zero can be passed to disable protection and value '1' indicates that protection should be enabled but limit setting can be omitted.",
+                    "dtType": "uint32-array"
                 },
                 "regulator-temp-error-kelvin": {
-                    "description": "Set over temperature error limit. This is a limit where part of the hardware probably is malfunctional and damage prevention is requested Zero can be passed to disable error detection and value '1' indicates that detection should be enabled but limit setting can be omitted."
+                    "description": "Set over temperature error limit. This is a limit where part of the hardware probably is malfunctional and damage prevention is requested Zero can be passed to disable error detection and value '1' indicates that detection should be enabled but limit setting can be omitted.",
+                    "dtType": "uint32-array"
                 },
                 "regulator-temp-warn-kelvin": {
-                    "description": "Set over temperature warning limit. This is a limit where hardware is assumed still to be functional but approaching limit where it gets damaged. Recovery actions should be initiated. Zero can be passed to disable detection and value '1' indicates that detection should be enabled but limit setting can be omitted."
+                    "description": "Set over temperature warning limit. This is a limit where hardware is assumed still to be functional but approaching limit where it gets damaged. Recovery actions should be initiated. Zero can be passed to disable detection and value '1' indicates that detection should be enabled but limit setting can be omitted.",
+                    "dtType": "uint32-array"
                 },
                 "regulator-active-discharge": {
                     "type": "integer",
                     "typeSize": 32,
                     "minimum": 0,
                     "maximum": 4294967295,
+                    "dtType": "uint32",
                     "description": "tristate, enable/disable active discharge of regulators. The values are:\n0: Disable active discharge.\n1: Enable active discharge.\nAbsence of this property will leave configuration to default.\n",
                     "enum": [
                         0,
@@ -163,7 +192,8 @@
                         "minItems": 1
                     },
                     "type": "array",
-                    "minItems": 1
+                    "minItems": 1,
+                    "dtType": "phandle-array"
                 },
                 "regulator-coupled-max-spread": {
                     "description": "Array of maximum spread between voltages of coupled regulators in microvolts, each value in the array relates to the corresponding couple specified by the regulator-coupled-with property.",
@@ -173,11 +203,14 @@
                         "type": "integer",
                         "typeSize": 32,
                         "minimum": 0,
-                        "maximum": 4294967295
-                    }
+                        "maximum": 4294967295,
+                        "dtType": "uint32"
+                    },
+                    "dtType": "uint32-array"
                 },
                 "regulator-max-step-microvolt": {
-                    "description": "Maximum difference between current and target voltages that can be changed safely in a single step."
+                    "description": "Maximum difference between current and target voltages that can be changed safely in a single step.",
+                    "dtType": "int32-matrix"
                 }
             },
             "patternProperties": {
@@ -197,13 +230,16 @@
                             "type": "boolean"
                         },
                         "regulator-suspend-min-microvolt": {
-                            "description": "minimum voltage may be set in suspend state."
+                            "description": "minimum voltage may be set in suspend state.",
+                            "dtType": "int32-matrix"
                         },
                         "regulator-suspend-max-microvolt": {
-                            "description": "maximum voltage may be set in suspend state."
+                            "description": "maximum voltage may be set in suspend state.",
+                            "dtType": "int32-matrix"
                         },
                         "regulator-suspend-microvolt": {
-                            "description": "the default voltage which regulator would be set in suspend. This property is now deprecated, instead setting voltage for suspend mode via the API which regulator driver provides is recommended."
+                            "description": "the default voltage which regulator would be set in suspend. This property is now deprecated, instead setting voltage for suspend mode via the API which regulator driver provides is recommended.",
+                            "dtType": "int32-matrix"
                         },
                         "regulator-changeable-in-suspend": {
                             "description": "whether the default voltage and the regulator on/off in suspend can be changed in runtime.",
@@ -214,6 +250,7 @@
                             "typeSize": 32,
                             "minimum": 0,
                             "maximum": 4294967295,
+                            "dtType": "uint32",
                             "description": "operating mode in the given suspend state. The set of possible operating modes depends on the capabilities of every hardware so the valid modes are documented on each regulator device tree binding document."
                         }
                     },
@@ -301,7 +338,8 @@
                     "description": "Any name allowed",
                     "deprecated": true
                 }
-            ]
+            ],
+            "dtType": "string"
         },
         "compatible": {
             "items": [
@@ -315,7 +353,8 @@
             ],
             "type": "array",
             "minItems": 1,
-            "maxItems": 1
+            "maxItems": 1,
+            "dtType": "string-array"
         },
         "regulator-name": {
             "description": "A string used as a descriptive name for regulator outputs",
@@ -324,6 +363,7 @@
                 "type": "string"
             },
             "minItems": 1,
+            "dtType": "string",
             "uniqueItems": true,
             "maxItems": 1
         },
@@ -331,18 +371,21 @@
             "description": "gpio to use for enable control",
             "maxItems": 1,
             "type": "array",
-            "minItems": 1
+            "minItems": 1,
+            "dtType": "phandle-array"
         },
         "gpios": {
             "maxItems": 1,
             "type": "array",
-            "minItems": 1
+            "minItems": 1,
+            "dtType": "phandle-array"
         },
         "clocks": {
             "description": "clock to use for enable control. This binding is only available if the compatible is chosen to regulator-fixed-clock. The clock binding is mandatory if compatible is chosen to regulator-fixed-clock.",
             "maxItems": 1,
             "type": "array",
             "minItems": 1,
+            "dtType": "phandle-array",
             "items": [
                 {
                     "items": {
@@ -358,20 +401,24 @@
             "description": "Power domain to use for enable control. This binding is only available if the compatible is chosen to regulator-fixed-domain.",
             "maxItems": 1,
             "type": "array",
-            "minItems": 1
+            "minItems": 1,
+            "dtType": "phandle-array"
         },
         "required-opps": {
             "deprecated": true,
             "description": "Performance state to use for enable control. This binding is only available if the compatible is chosen to regulator-fixed-domain. The power-domain binding is mandatory if compatible is chosen to regulator-fixed-domain.",
             "maxItems": 1,
             "type": "array",
-            "minItems": 1
+            "minItems": 1,
+            "dtType": "phandle-array"
         },
         "startup-delay-us": {
-            "description": "startup time in microseconds"
+            "description": "startup time in microseconds",
+            "dtType": "uint32-array"
         },
         "off-on-delay-us": {
-            "description": "off delay time in microseconds"
+            "description": "off delay time in microseconds",
+            "dtType": "uint32-array"
         },
         "enable-active-high": {
             "description": "Polarity of GPIO is Active high. If this property is missing, the default assumed is Active low.",
@@ -382,13 +429,15 @@
             "type": "boolean"
         },
         "vin-supply": {
-            "description": "Input supply phandle."
+            "description": "Input supply phandle.",
+            "dtType": "phandle"
         },
         "interrupts": {
             "maxItems": 1,
             "description": "Interrupt signaling a critical under-voltage event.",
             "type": "array",
             "minItems": 1,
+            "dtType": "uint32-matrix",
             "items": [
                 {
                     "items": {
@@ -406,7 +455,8 @@
         "interrupt-parent": {
             "minItems": 1,
             "maxItems": 1,
-            "type": "array"
+            "type": "array",
+            "dtType": "phandle"
         }
     },
     "required": [

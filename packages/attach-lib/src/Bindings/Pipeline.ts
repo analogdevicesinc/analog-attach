@@ -40,5 +40,5 @@ export async function process_binding(
 
     const canary_binding = insert_canaries(redefinition_merged);
 
-    return Result.Ok(apply_JSONSchema_fixups(canary_binding));
+    return Result.Ok(apply_JSONSchema_fixups(canary_binding, ctx.property_types));
 }

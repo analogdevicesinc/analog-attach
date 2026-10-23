@@ -2,6 +2,7 @@ import Ajv2019, { type ErrorObject, type KeywordDefinition, type ValidateFunctio
 import type { DataValidateFunction } from "ajv/dist/types/index.js";
 
 import { CANARY } from "../Bindings/CanaryInserter.js";
+import { DT_TYPE } from "../Bindings/RefResolver.js";
 import { translate_JSONSchema } from "../Bindings/JSONSchemaTranslate.js";
 import { deep_merge, delete_path, get_by_path } from "../Bindings/ObjectUtilities.js";
 import { ParsedBinding } from "../Bindings/ParsedBinding.js";
@@ -49,6 +50,9 @@ const TYPE_SIZE: KeywordDefinition = {
     compile: validate_type_size,
 };
 
+/** `dtType` (see `RefResolver.ts`) only annotates: it says what the schema was before dereferencing. */
+const DT_TYPE_KEYWORD: KeywordDefinition = { keyword: DT_TYPE, schemaType: "string" };
+
 /**
  * An AJV instance that knows the `typeSize` keyword, mirroring dt-schema's
  * `validator.py:typeSize`: the instance's `size` (default 32) must equal the schema's.
@@ -56,6 +60,7 @@ const TYPE_SIZE: KeywordDefinition = {
 export function create_ajv(): Ajv2019 {
     const ajv = new Ajv2019({ allErrors: true, logger: false });
     ajv.addKeyword(TYPE_SIZE);
+    ajv.addKeyword(DT_TYPE_KEYWORD);
     return ajv;
 }
 

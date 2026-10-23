@@ -211,7 +211,7 @@ async function test_impl(data: BindingTestData) {
 
     const canary_binding = insert_canaries(redefinition_merged);
 
-    const fixuped = apply_JSONSchema_fixups(canary_binding);
+    const fixuped = apply_JSONSchema_fixups(canary_binding, ctx.property_types);
 
     if (data.debug === true) {
         write_to_directory(
