@@ -45,9 +45,9 @@ function suggest_interrupt_parents(
     const controllers = labelled_providers(devicetree, is_interrupt_controller);
     if (controllers.length === 0) { return []; }
 
-    const inherited = node_path !== undefined
-        ? effective_interrupt_parent(base_lookup(devicetree), node_path, devicetree)
-        : undefined;
+    const inherited = node_path === undefined
+        ? undefined
+        : effective_interrupt_parent(base_lookup(devicetree), node_path, devicetree);
 
     const suggestions: ValueSuggestion[] = [];
 

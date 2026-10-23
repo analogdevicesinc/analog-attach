@@ -861,6 +861,7 @@ if (import.meta.vitest !== undefined) {
         if (typeof overlay === "string") { throw new TypeError(overlay); }
 
         const before = overlay.get_fragments().length;
+        // eslint-disable-next-line unicorn/no-useless-undefined
         overlay.add_fragment("spi0", undefined, undefined);
         expect(overlay.get_fragments().length).toBe(before);
     });

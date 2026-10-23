@@ -10,7 +10,7 @@ export function label_from_compatible(compatible: string): string {
     const vendor = comma === -1 ? undefined : compatible.slice(0, comma);
     let sanitized = base.replaceAll(/[^A-Za-z0-9_]/g, "_");
     if (/^\d/.test(sanitized)) {
-        sanitized = vendor !== undefined ? `${vendor.replaceAll(/[^A-Za-z0-9_]/g, "_")}_${sanitized}` : `_${sanitized}`;
+        sanitized = vendor === undefined ? `_${sanitized}` : `${vendor.replaceAll(/[^A-Za-z0-9_]/g, "_")}_${sanitized}`;
     }
     return sanitized;
 }

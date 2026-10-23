@@ -64,7 +64,7 @@ export function vendor_file_applies(property_name: string, controller: Controlle
     return rule.stems.some(stem => stem_matches_controller(stem, controller));
 }
 
-export function filter_vendor_peripheral_props(
+export function filter_vendor_peripheral_properties(
     binding: ParsedBinding,
     controller: ControllerContext | undefined,
 ): ParsedBinding {
@@ -140,16 +140,17 @@ if (import.meta.vitest) {
         expect(vendor_file_applies("st,spi-midi-ns", ctrl)).toBe(false);
     });
 
-    test("filter_vendor_peripheral_props — undefined controller returns unchanged", () => {
+    test("filter_vendor_peripheral_properties — undefined controller returns unchanged", () => {
         const binding: ParsedBinding = {
             required_properties: ["reg"],
             properties: [{ key: "reg", value: {} as any }, { key: "pl022,interface", value: {} as any }],
             examples: [],
         };
-        expect(filter_vendor_peripheral_props(binding, undefined)).toBe(binding);
+        // eslint-disable-next-line unicorn/no-useless-undefined
+        expect(filter_vendor_peripheral_properties(binding, undefined)).toBe(binding);
     });
 
-    test("filter_vendor_peripheral_props — bcm2835 removes all vendor props", () => {
+    test("filter_vendor_peripheral_properties — bcm2835 removes all vendor props", () => {
         const binding: ParsedBinding = {
             required_properties: ["reg"],
             properties: [
@@ -165,11 +166,11 @@ if (import.meta.vitest) {
             examples: [],
         };
         const ctrl: ControllerContext = { compatibles: ["brcm,bcm2835-spi"] };
-        const filtered = filter_vendor_peripheral_props(binding, ctrl);
+        const filtered = filter_vendor_peripheral_properties(binding, ctrl);
         expect(filtered.properties.map(p => p.key)).toEqual(["reg", "spi-max-frequency"]);
     });
 
-    test("filter_vendor_peripheral_props — input is not mutated", () => {
+    test("filter_vendor_peripheral_properties — input is not mutated", () => {
         const binding: ParsedBinding = {
             required_properties: ["reg"],
             properties: [
@@ -180,7 +181,7 @@ if (import.meta.vitest) {
         };
         const ctrl: ControllerContext = { compatibles: ["brcm,bcm2835-spi"] };
         const original_length = binding.properties.length;
-        filter_vendor_peripheral_props(binding, ctrl);
+        filter_vendor_peripheral_properties(binding, ctrl);
         expect(binding.properties.length).toBe(original_length);
     });
 }

@@ -16,7 +16,7 @@ import { DeviceTree, DTNode } from "../Devicetree/index.js";
 import { IntelligenceStack } from "../Intelligence/layers/stack.js";
 import { IntelligenceLayer, NodePlacement } from "../Intelligence/layers/types.js";
 import { dt_to_validator_input } from "./DTxBinding.js";
-import { filter_vendor_peripheral_props, type ControllerContext } from "../Bindings/VendorPeripheralFilter.js";
+import { filter_vendor_peripheral_properties, type ControllerContext } from "../Bindings/VendorPeripheralFilter.js";
 
 export type ParseOptions = {
     controller?: ControllerContext;
@@ -84,7 +84,7 @@ export class Attach {
             return undefined;
         }
 
-        parsed_binding = filter_vendor_peripheral_props(parsed_binding, parse_options?.controller);
+        parsed_binding = filter_vendor_peripheral_properties(parsed_binding, parse_options?.controller);
 
         this.original_binding = fixuped;
         this.current_binding = fixuped;

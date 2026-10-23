@@ -128,20 +128,30 @@ function parse_quantifier(parser: Parser, atom: PatternExpansion): PatternExpans
     const c = source[parser.index];
     let min: number;
     let max: number;
-    if (c === "?") {
-        [min, max] = [0, 1];
-    } else if (c === "*") {
-        [min, max] = [0, Number.POSITIVE_INFINITY];
-    } else if (c === "+") {
-        [min, max] = [1, Number.POSITIVE_INFINITY];
-    } else if (c === "{") {
-        const match = /^\{(\d+)(,(\d*))?\}/.exec(source.slice(parser.index));
-        if (match === null) { return atom; }
-        min = Number(match[1]);
-        max = match[2] === undefined ? min : (match[3] === "" ? Number.POSITIVE_INFINITY : Number(match[3]));
-        parser.index += match[0].length - 1;
-    } else {
-        return atom;
+    switch (c) {
+        case "?": {
+            [min, max] = [0, 1];
+            break;
+        }
+        case "*": {
+            [min, max] = [0, Number.POSITIVE_INFINITY];
+            break;
+        }
+        case "+": {
+            [min, max] = [1, Number.POSITIVE_INFINITY];
+            break;
+        }
+        case "{": {
+            const match = /^\{(\d+)(,(\d*))?\}/.exec(source.slice(parser.index));
+            if (match === null) { return atom; }
+            min = Number(match[1]);
+            max = match[2] === undefined ? min : (match[3] === "" ? Number.POSITIVE_INFINITY : Number(match[3]));
+            parser.index += match[0].length - 1;
+            break;
+        }
+        default: {
+            return atom;
+        }
     }
     parser.index++;
     // Lazy quantifiers match the same names.
@@ -153,7 +163,12 @@ function skip_group(parser: Parser): void {
     let depth = 1;
     while (parser.index < parser.source.length && depth > 0) {
         const c = parser.source[parser.index++];
-        if (c === "\\") { parser.index++; } else if (c === "(") { depth++; } else if (c === ")") { depth--; }
+        switch (c) {
+            case "\\": { parser.index++; break; }
+            case "(": { depth++; break; }
+            case ")": { depth--; break; }
+            // No default
+        }
     }
 }
 

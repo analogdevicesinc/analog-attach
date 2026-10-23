@@ -217,19 +217,19 @@ export class Parser {
     // Normalise target = <&{/path}> → target-path = "/path" in explicit fragments,
     // because dtc can't emit fixups for &{/path} in a plugin.
     for (const fragment of root.children) {
-      const idx = fragment.properties.findIndex(p => p.name === "target");
-      if (idx === -1) { continue; }
-      const prop = fragment.properties[idx]!;
-      if (is_dt_flag(prop.value)) { continue; }
-      if (prop.value.length !== 1) { continue; }
-      const cell = prop.value[0]!;
+      const index = fragment.properties.findIndex(p => p.name === "target");
+      if (index === -1) { continue; }
+      const property = fragment.properties[index]!;
+      if (is_dt_flag(property.value)) { continue; }
+      if (property.value.length !== 1) { continue; }
+      const cell = property.value[0]!;
       if (cell.kind !== "array" || cell.elements.length !== 1) { continue; }
-      const el = cell.elements[0]!;
-      if (el.kind !== "path") { continue; }
-      fragment.properties[idx] = {
-        labels: prop.labels,
+      const element = cell.elements[0]!;
+      if (element.kind !== "path") { continue; }
+      fragment.properties[index] = {
+        labels: property.labels,
         name: "target-path",
-        value: [{ labels: [], kind: "string", value: el.path }]
+        value: [{ labels: [], kind: "string", value: element.path }]
       };
     }
 

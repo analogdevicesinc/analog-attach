@@ -58,7 +58,7 @@ export function print_dto(document: DTO, metadata?: DTMetadata, options?: DtoPri
 
   if (syntax === "label") {
     const root = document.root;
-    const root_props = root.properties;
+    const root_properties = root.properties;
     const root_labels = root.labels;
     const non_fragment_children: DTNode[] = [];
     const label_bodies: string[] = [];
@@ -72,9 +72,9 @@ export function print_dto(document: DTO, metadata?: DTMetadata, options?: DtoPri
       }
     }
 
-    if (root_props.length > 0 || root_labels.length > 0 || non_fragment_children.length > 0) {
+    if (root_properties.length > 0 || root_labels.length > 0 || non_fragment_children.length > 0) {
       let root_block = "/ {\n";
-      for (const property of root_props) {
+      for (const property of root_properties) {
         root_block += print_property(property, indent, 1);
       }
       for (const child of non_fragment_children) {
@@ -88,7 +88,7 @@ export function print_dto(document: DTO, metadata?: DTMetadata, options?: DtoPri
       out.push(body);
     }
 
-    if (label_bodies.length === 0 && root_props.length === 0 && non_fragment_children.length === 0) {
+    if (label_bodies.length === 0 && root_properties.length === 0 && non_fragment_children.length === 0) {
       out.push("/ {\n};\n");
     }
   } else {
@@ -119,9 +119,9 @@ function sugar_fragment(child: DTNode): SugarableFragment | undefined {
   if (overlay_child.labels.length > 0) { return undefined; }
   if (child.children.length !== 1) { return undefined; }
 
-  const target_prop = child.properties.find(p => p.name === "target");
-  if (target_prop !== undefined && child.properties.length === 1 && !is_dt_flag(target_prop.value)) {
-    const first = target_prop.value[0];
+  const target_property = child.properties.find(p => p.name === "target");
+  if (target_property !== undefined && child.properties.length === 1 && !is_dt_flag(target_property.value)) {
+    const first = target_property.value[0];
     if (first?.kind === "array" && first.elements.length === 1) {
       const element = first.elements[0];
       if (element !== undefined && element.kind === "label") {
@@ -135,9 +135,9 @@ function sugar_fragment(child: DTNode): SugarableFragment | undefined {
     }
   }
 
-  const target_path_prop = child.properties.find(p => p.name === "target-path");
-  if (target_path_prop !== undefined && child.properties.length === 1 && !is_dt_flag(target_path_prop.value)) {
-    const first = target_path_prop.value[0];
+  const target_path_property = child.properties.find(p => p.name === "target-path");
+  if (target_path_property !== undefined && child.properties.length === 1 && !is_dt_flag(target_path_property.value)) {
+    const first = target_path_property.value[0];
     if (first?.kind === "string") {
       return {
         target: first.value,
@@ -151,10 +151,10 @@ function sugar_fragment(child: DTNode): SugarableFragment | undefined {
   return undefined;
 }
 
-function print_label_fragment(target: string, children: DTNode[], props: DTProperty[], indent: string): string {
-  const ref = target.startsWith("/") ? `&{${target}}` : `&${target}`;
-  let out = `${ref} {\n`;
-  for (const property of props) {
+function print_label_fragment(target: string, children: DTNode[], properties: DTProperty[], indent: string): string {
+  const reference = target.startsWith("/") ? `&{${target}}` : `&${target}`;
+  let out = `${reference} {\n`;
+  for (const property of properties) {
     out += print_property(property, indent, 1);
   }
   for (const child of children) {

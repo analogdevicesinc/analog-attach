@@ -33,6 +33,8 @@ export interface RegEntry {
     size: bigint;
 }
 
+const join_cells = (cells: bigint[]): bigint => cells.reduce((result, cell) => (result << 32n) | cell, 0n);
+
 /**
  * The (address, size) entries of a `reg`, read with the parent's cell counts.
  * Undefined when it doesn't decode: a flag, a phandle or expression cell, a
@@ -51,12 +53,11 @@ export function reg_entries(reg: DTProperty, address_cells: number, size_cells: 
     const width = address_cells + size_cells;
     if (values.length === 0 || values.length % width !== 0) { return undefined; }
 
-    const join = (cells: bigint[]): bigint => cells.reduce((result, cell) => (result << 32n) | cell, 0n);
     const entries: RegEntry[] = [];
     for (let index = 0; index < values.length; index += width) {
         entries.push({
-            address: join(values.slice(index, index + address_cells)),
-            size: join(values.slice(index + address_cells, index + width)),
+            address: join_cells(values.slice(index, index + address_cells)),
+            size: join_cells(values.slice(index + address_cells, index + width)),
         });
     }
     return entries;
@@ -149,7 +150,7 @@ export function sibling_chip_select_overflows(overlay: DeviceTreeOverlay, parent
         if (!is_active(child)) { continue; }
         const reg = child.properties.find(p => p.name === "reg");
         const entries = reg === undefined ? undefined : reg_entries(reg, cells.address, cells.size);
-        const entry = entries?.find(e => e.address >= BigInt(lines));
+        const entry = entries?.find(candidate => candidate.address >= BigInt(lines));
         if (entry === undefined) { continue; }
         overflows.push({ parent_path, node: name, chip_select: entry.address, lines, in_overlay: changes_claim(overlay, child_path(name)) });
     }
@@ -210,6 +211,7 @@ function shared_address(a: RegEntry[], b: RegEntry[], ranges: boolean): bigint |
             }
             const x_end = x.address + (x.size > 0n ? x.size : 1n);
             const y_end = y.address + (y.size > 0n ? y.size : 1n);
+            // eslint-disable-next-line unicorn/prefer-math-min-max -- bigint
             if (x.address < y_end && y.address < x_end) { return x.address > y.address ? x.address : y.address; }
         }
     }
@@ -217,6 +219,7 @@ function shared_address(a: RegEntry[], b: RegEntry[], ranges: boolean): bigint |
 }
 
 if (import.meta.vitest) {
+    /* eslint-disable unicorn/numeric-separators-style */
     const { test, expect } = import.meta.vitest;
 
     const setup = (base_source: string, overlay_source: string): DeviceTreeOverlay => {
@@ -246,14 +249,15 @@ if (import.meta.vitest) {
         expect(reg_entries(PropertyBuilder.build_flag().set_flag().with_name("reg").build(), 1, 0)).toBeUndefined();
     });
 
+    const node = (status?: string): DTNode => {
+        const tree = DeviceTree.new_from_string(`/dts-v1/;\n/ {\n\tn {${status === undefined ? "" : ` status = "${status}";`} };\n};`);
+        if (typeof tree === "string") { throw new TypeError(tree); }
+        const found = tree.node_at("/n");
+        if (found === undefined) { throw new TypeError("no /n"); }
+        return found;
+    };
+
     test("is_active — status absent, okay or ok", () => {
-        const node = (status?: string): DTNode => {
-            const tree = DeviceTree.new_from_string(`/dts-v1/;\n/ {\n\tn {${status === undefined ? "" : ` status = "${status}";`} };\n};`);
-            if (typeof tree === "string") { throw new TypeError(tree); }
-            const found = tree.node_at("/n");
-            if (found === undefined) { throw new TypeError("no /n"); }
-            return found;
-        };
         expect(is_active(node())).toBe(true);
         expect(is_active(node("okay"))).toBe(true);
         expect(is_active(node("ok"))).toBe(true);

@@ -4,7 +4,7 @@
 
 // Binding pipeline, validation and structural types
 export { Attach, type PopulateOptions, type ParseOptions } from './Attach/Attach.js';
-export { type ControllerContext, filter_vendor_peripheral_props } from './Bindings/VendorPeripheralFilter.js';
+export { type ControllerContext, filter_vendor_peripheral_properties } from './Bindings/VendorPeripheralFilter.js';
 export type { ResolvedProperty, PatternPropertyRule, PropertyPatternRule, ParsedBinding } from './Bindings/ParsedBinding.js';
 export { expand_pattern, type PatternExpansion } from './RegexExpansion.js';
 export { unresolved_references, unresolved_targets, type UnresolvedReference, type UnresolvedTarget } from './Devicetree/References.js';

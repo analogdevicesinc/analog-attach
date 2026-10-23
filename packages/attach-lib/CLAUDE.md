@@ -10,6 +10,8 @@
 
 There is no top-level test script that isolates just this package — use `cd packages/attach-lib && yarn test`.
 
+Lint with `yarn lint` (ESLint + unicorn, config in `eslint.config.mjs`, same as attach-cli).
+
 Most tests import from the built package (`from 'attach-lib'`, resolved via a workspace symlink at `node_modules/attach-lib` → `dist/`), so `yarn build` before `yarn test` if `dist/` is stale. A few tests (e.g. `test/DTSParser.test.ts`, `test/DTSParserRoundtrip.test.ts`) import directly from `../src` and don't need a build. Some source files also carry inline `import.meta.vitest` doctests (e.g. `src/DTBuilder/DTBuilder.ts`, `src/binding-processor/fixups/*.ts`) picked up via `includeSource` in `vitest.config.ts` — these run alongside the `test/*.test.ts` files.
 
 ## Architecture
