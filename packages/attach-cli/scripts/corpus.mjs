@@ -70,9 +70,16 @@ for (const [what, path] of [["Linux overlays", overlays_dir], ["base devicetree"
   }
 }
 
-// One sandbox for the whole run, so the compiled binding schemas (30 s) are built once.
+// One sandbox for the whole run: `config-set linux` builds the binding index and the compiled schemas (40 s) once.
 const sandbox = mkdtempSync(join(tmpdir(), "attach-corpus-"));
-const env = { ...process.env, ATTACH_LINUX: linux, ATTACH_DEVICETREE: devicetree };
+const env = process.env;
+for (const [field, value] of [["devicetree", devicetree], ["linux", linux]]) {
+  const set = spawnSync("node", [cli, "config-set", field, value], { cwd: sandbox, env, encoding: "utf8", stdio: ["ignore", "ignore", "inherit"] });
+  if (set.status !== 0) {
+    console.error(`config-set ${field} failed`);
+    process.exit(2);
+  }
+}
 
 function normalize(text) {
   return text.replaceAll(sandbox, "<sandbox>").replaceAll(devicetree, "<base>").replaceAll(linux, "<linux>");
