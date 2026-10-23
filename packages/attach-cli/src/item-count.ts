@@ -1,4 +1,4 @@
-import { AttachEnumType, is_dt_flag, type AttachType, type DTProperty } from "attach-lib";
+import { AttachEnumType, is_dt_flag, list_cell, type AttachType, type Cell, type DTProperty } from "attach-lib";
 
 // How many values a binding allows in a property (minItems / maxItems), for
 // the arrays whose items are single values: numbers, strings, enum members.
@@ -15,23 +15,23 @@ export interface ItemBounds {
 
 export function item_bounds(type: AttachType): ItemBounds | undefined {
     switch (type._t) {
-        case "number_array":
-        case "string_array":
-        case "enum_array": {
+        case "list": {
+            const cell = list_cell(type);
+            // Untyped arrays and one cell per position have no bounds of their own.
+            if (cell === undefined || cell._t === "any") { return undefined; }
             // An array of phandles is a phandle list before the lib knows its provider
             // (rdy-gpios = <&gpio 19 1> is one item of three cells).
-            if (type._t === "enum_array" && type.enum_type === AttachEnumType.PHANDLE) { return undefined; }
-            // The parsed binding leaves a bound out as undefined, whatever its type says.
-            const min = type.minItems as number | undefined;
-            const max = type.maxItems as number | undefined;
+            if (cell._t === "enum" && cell.enum_type === AttachEnumType.PHANDLE) { return undefined; }
+            const min = type.minItems;
+            const max = type.maxItems;
             return max === undefined ? { min: min ?? 0 } : { min: min ?? 0, max };
         }
         case "matrix": {
-            const row = type.values[0];
-            if (type.values.length !== 1 || row?._t !== "fixed_index") { return undefined; }
-            if (row.prefixItems.some(item => item._t === "enum" && item.enum_type === AttachEnumType.PHANDLE)) { return undefined; }
-            const width = row.prefixItems.length;
-            const min = (type.minItems as number | undefined ?? 0) * width;
+            const row = type.rows[0];
+            if (type.rows.length !== 1 || !Array.isArray(row?.item)) { return undefined; }
+            if (row.item.some(cell => cell._t === "enum" && cell.enum_type === AttachEnumType.PHANDLE)) { return undefined; }
+            const width = row.item.length;
+            const min = (type.minItems ?? 0) * width;
             return type.maxItems === undefined ? { min } : { min, max: type.maxItems * width };
         }
         default: {
@@ -63,22 +63,22 @@ if (import.meta.vitest) {
     const { DeviceTree } = await import("attach-lib");
 
     const numbers = (minItems: number | undefined, maxItems?: number): AttachType =>
-        ({ _t: "number_array", minItems, maxItems } as AttachType);
+        ({ _t: "list", item: { _t: "number" }, minItems, maxItems });
 
     test("item_bounds — value arrays only; a missing min is 0, a missing max unbounded", () => {
         expect(item_bounds(numbers(2, 2))).toEqual({ min: 2, max: 2 });
         expect(item_bounds(numbers(1))).toEqual({ min: 1 });
         expect(item_bounds(numbers(undefined, 4))).toEqual({ min: 0, max: 4 });
-        expect(item_bounds({ _t: "string_array", minItems: 1, maxItems: 3 } as AttachType)).toEqual({ min: 1, max: 3 });
-        expect(item_bounds({ _t: "enum_array", minItems: 2, maxItems: 2, enum: ["a", "b"] } as AttachType)).toEqual({ min: 2, max: 2 });
-        expect(item_bounds({ _t: "array", minItems: 1, maxItems: 2 } as AttachType)).toBeUndefined();
-        expect(item_bounds({ _t: "integer" } as AttachType)).toBeUndefined();
+        expect(item_bounds({ _t: "list", item: { _t: "string" }, minItems: 1, maxItems: 3 })).toEqual({ min: 1, max: 3 });
+        expect(item_bounds({ _t: "list", item: { _t: "enum", enum: ["a", "b"], enum_type: AttachEnumType.STRING }, minItems: 2, maxItems: 2 })).toEqual({ min: 2, max: 2 });
+        expect(item_bounds({ _t: "list", item: { _t: "any" }, minItems: 1, maxItems: 2 })).toBeUndefined();
+        expect(item_bounds({ _t: "scalar", cell: { _t: "number" } })).toBeUndefined();
     });
 
-    const specifiers = (prefixItems: unknown[], minItems?: number, maxItems?: number): AttachType =>
-        ({ _t: "matrix", minItems, maxItems, values: [{ _t: "fixed_index", prefixItems, minItems: prefixItems.length, maxItems: prefixItems.length }] } as AttachType);
-    const flags = { _t: "enum", enum: ["IRQ_TYPE_EDGE_FALLING"], enum_type: AttachEnumType.MACRO };
-    const phandle = { _t: "enum", enum: ["clk_osc"], enum_type: AttachEnumType.PHANDLE };
+    const specifiers = (cells: Cell[], minItems?: number, maxItems?: number): AttachType =>
+        ({ _t: "matrix", minItems, maxItems, rows: [{ _t: "list", item: cells, minItems: cells.length, maxItems: cells.length }] });
+    const flags: Cell = { _t: "enum", enum: ["IRQ_TYPE_EDGE_FALLING"], enum_type: AttachEnumType.MACRO };
+    const phandle: Cell = { _t: "enum", enum: ["clk_osc"], enum_type: AttachEnumType.PHANDLE };
 
     test("item_bounds — a specifier list of a known width counts its cells; one naming a phandle has no bounds", () => {
         expect(item_bounds(specifiers([{ _t: "number" }, flags], 1, 1))).toEqual({ min: 2, max: 2 });
@@ -86,8 +86,8 @@ if (import.meta.vitest) {
         expect(item_bounds(specifiers([{ _t: "number" }, flags]))).toEqual({ min: 0 });
         expect(item_bounds(specifiers([phandle], 1, 1))).toBeUndefined();
         // rdy-gpios before it is set: phandles only, maxItems counting entries.
-        expect(item_bounds({ ...phandle, _t: "enum_array", minItems: 1, maxItems: 1 } as AttachType)).toBeUndefined();
-        expect(count_warning("rdy-gpios", { ...phandle, _t: "enum_array", minItems: 1, maxItems: 1 } as AttachType, 3)).toBeUndefined();
+        expect(item_bounds({ _t: "list", item: phandle, minItems: 1, maxItems: 1 })).toBeUndefined();
+        expect(count_warning("rdy-gpios", { _t: "list", item: phandle, minItems: 1, maxItems: 1 }, 3)).toBeUndefined();
     });
 
     test("value_count — the cells and the strings, over every group", () => {
@@ -115,7 +115,7 @@ if (import.meta.vitest) {
         expect(count_warning("lanes", numbers(2), 1)).toBe("warning: lanes takes at least 2 values, got 1");
         expect(count_warning("mode", numbers(1, 1), 2)).toBe("warning: mode takes 1 value, got 2");
         expect(count_warning("lanes", numbers(1), 9)).toBeUndefined();
-        expect(count_warning("interrupts", { _t: "array", minItems: 1, maxItems: 1 } as AttachType, 2)).toBeUndefined();
+        expect(count_warning("interrupts", { _t: "list", item: { _t: "any" }, minItems: 1, maxItems: 1 }, 2)).toBeUndefined();
         expect(count_warning("interrupts", specifiers([{ _t: "number" }, flags], 1, 1), 3)).toBe("warning: interrupts takes 2 values, got 3");
     });
 }

@@ -1,5 +1,6 @@
 import {
     Attach,
+    AttachEnumType,
     Result,
     is_dt_flag,
     get_full_node_name,
@@ -244,12 +245,12 @@ if (import.meta.vitest) {
     });
 
     test("find_property_definition — a named property first, else the first property pattern that matches", () => {
-        const enum_type: AttachType = { _t: "enum_integer", enum: [0n, 1n], description: "bypass" };
-        const flag: AttachType = { _t: "boolean", description: "named" };
+        const enum_type: AttachType = { _t: "scalar", cell: { _t: "enum", enum: [0n, 1n], enum_type: AttachEnumType.NUMBER }, description: "bypass" };
+        const flag: AttachType = { _t: "flag", description: "named" };
         const binding = {
             property_patterns: [
                 { pattern: "^adi,bypass-attenuator-in[0-4]$", description: "Configures bypassing", value: enum_type },
-                { pattern: "^adi,.*$", description: "catch-all", value: { _t: "generic" } as AttachType },
+                { pattern: "^adi,.*$", description: "catch-all", value: { _t: "unknown" } as AttachType },
             ],
         };
         const named = [{ key: "adi,bypass-attenuator-in1", value: flag }];
@@ -261,7 +262,7 @@ if (import.meta.vitest) {
     });
 
     test("find_property_definition — the pattern's description when the type has none", () => {
-        const binding = { property_patterns: [{ pattern: "-supply$", description: "Input supply", value: { _t: "generic" } as const }] };
+        const binding = { property_patterns: [{ pattern: "-supply$", description: "Input supply", value: { _t: "unknown" } as const }] };
         expect(find_property_definition(binding, [], "vdd-supply")?.value.description).toBe("Input supply");
     });
 

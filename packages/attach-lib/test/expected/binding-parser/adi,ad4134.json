@@ -17,19 +17,25 @@
         {
             "key": "compatible",
             "value": {
-                "_t": "enum_array",
+                "_t": "list",
+                "item": {
+                    "_t": "enum",
+                    "enum": [
+                        "adi,ad4134"
+                    ],
+                    "enum_type": "string"
+                },
                 "minItems": 1,
-                "maxItems": 1,
-                "enum": [
-                    "adi,ad4134"
-                ],
-                "enum_type": "string"
+                "maxItems": 1
             }
         },
         {
             "key": "reg",
             "value": {
-                "_t": "array",
+                "_t": "list",
+                "item": {
+                    "_t": "any"
+                },
                 "minItems": 1,
                 "maxItems": 1
             }
@@ -37,7 +43,10 @@
         {
             "key": "clocks",
             "value": {
-                "_t": "array",
+                "_t": "list",
+                "item": {
+                    "_t": "any"
+                },
                 "minItems": 1,
                 "maxItems": 1
             }
@@ -45,20 +54,26 @@
         {
             "key": "clock-names",
             "value": {
-                "_t": "enum_array",
+                "_t": "list",
+                "item": {
+                    "_t": "enum",
+                    "enum": [
+                        "sys_clk"
+                    ],
+                    "enum_type": "string",
+                    "default": "sys_clk"
+                },
                 "minItems": 1,
-                "maxItems": 1,
-                "enum": [
-                    "sys_clk"
-                ],
-                "default": "sys_clk",
-                "enum_type": "string"
+                "maxItems": 1
             }
         },
         {
             "key": "dmas",
             "value": {
-                "_t": "array",
+                "_t": "list",
+                "item": {
+                    "_t": "any"
+                },
                 "minItems": 1,
                 "maxItems": 1
             }
@@ -66,20 +81,26 @@
         {
             "key": "dma-names",
             "value": {
-                "_t": "enum_array",
+                "_t": "list",
+                "item": {
+                    "_t": "enum",
+                    "enum": [
+                        "rx"
+                    ],
+                    "enum_type": "string",
+                    "default": "rx"
+                },
                 "minItems": 1,
-                "maxItems": 1,
-                "enum": [
-                    "rx"
-                ],
-                "default": "rx",
-                "enum_type": "string"
+                "maxItems": 1
             }
         },
         {
             "key": "pwms",
             "value": {
-                "_t": "array",
+                "_t": "list",
+                "item": {
+                    "_t": "any"
+                },
                 "minItems": 1,
                 "maxItems": 1
             }
@@ -87,26 +108,32 @@
         {
             "key": "pwm-names",
             "value": {
-                "_t": "enum_array",
+                "_t": "list",
+                "item": {
+                    "_t": "enum",
+                    "enum": [
+                        "odr_pwm"
+                    ],
+                    "enum_type": "string",
+                    "default": "odr_pwm"
+                },
                 "minItems": 1,
-                "maxItems": 1,
-                "enum": [
-                    "odr_pwm"
-                ],
-                "default": "odr_pwm",
-                "enum_type": "string"
+                "maxItems": 1
             }
         },
         {
             "key": "refin-supply",
             "value": {
-                "_t": "generic"
+                "_t": "unknown"
             }
         },
         {
             "key": "adi,spi-engine",
             "value": {
-                "_t": "array",
+                "_t": "list",
+                "item": {
+                    "_t": "any"
+                },
                 "minItems": 1,
                 "maxItems": 1,
                 "description": "phandle of the SPI slave connected to the SPI engine master"
@@ -115,14 +142,20 @@
         {
             "key": "spi-max-frequency",
             "value": {
-                "_t": "integer",
-                "maximum": 1000000
+                "_t": "scalar",
+                "cell": {
+                    "_t": "number",
+                    "maximum": 1000000
+                }
             }
         },
         {
             "key": "reset-gpios",
             "value": {
-                "_t": "array",
+                "_t": "list",
+                "item": {
+                    "_t": "any"
+                },
                 "minItems": 1,
                 "maxItems": 1
             }
@@ -130,19 +163,19 @@
         {
             "key": "avdd5-supply",
             "value": {
-                "_t": "generic"
+                "_t": "unknown"
             }
         },
         {
             "key": "avdd1v8-supply",
             "value": {
-                "_t": "generic"
+                "_t": "unknown"
             }
         },
         {
             "key": "iovdd-supply",
             "value": {
-                "_t": "generic"
+                "_t": "unknown"
             }
         }
     ],

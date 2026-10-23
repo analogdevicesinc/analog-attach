@@ -1,5 +1,5 @@
 import { ResolvedProperty } from "../../Bindings/ParsedBinding.js";
-import { AttachEnumType } from "../../Bindings/StructuralTypes.js";
+import { AttachEnumType, list_cell, type Cell } from "../../Bindings/StructuralTypes.js";
 import { DeviceTree } from "../../Devicetree/index.js";
 import { insert_known_structures } from "../known_properties.js";
 import { IntelligenceLayer, PropertyContext, ValueSuggestion } from "./types.js";
@@ -20,25 +20,21 @@ function enum_value(value: unknown, enum_type: AttachEnumType): PinnedValue | un
 }
 
 /**
- * The value a binding pins a property to: its `const`, the only option of a
- * one-value enum, or `true` for a required flag. Undefined when the binding
- * leaves a choice.
+ * The value a binding pins a property to: the only option of a one-value enum
+ * (a `const` is one), or `true` for a required flag. Undefined when the
+ * binding leaves a choice.
  */
 export function pinned_value(definition: ResolvedProperty["value"], required: boolean): PinnedValue | undefined {
     switch (definition._t) {
-        case "boolean": { return required ? { rows: [], flag: true } : undefined; }
-        case "const": {
-            if (typeof definition.const === "string") { return { rows: [], strings: [definition.const] }; }
-            return typeof definition.const === "bigint" || typeof definition.const === "number"
-                ? { rows: [[BigInt(definition.const)]] }
-                : undefined;
+        case "flag": { return required ? { rows: [], flag: true } : undefined; }
+        case "scalar": {
+            const cell = definition.cell;
+            return cell._t === "enum" && cell.enum.length === 1 ? enum_value(cell.enum[0], cell.enum_type) : undefined;
         }
-        case "enum_integer": {
-            return definition.enum.length === 1 ? { rows: [[BigInt(definition.enum[0]!)]] } : undefined;
-        }
-        case "enum_array": {
-            if (definition.enum.length !== 1 || definition.minItems !== 1 || definition.maxItems !== 1) { return; }
-            return enum_value(definition.enum[0], definition.enum_type);
+        case "list": {
+            const cell = list_cell(definition);
+            if (cell?._t !== "enum" || cell.enum.length !== 1 || definition.minItems !== 1 || definition.maxItems !== 1) { return; }
+            return enum_value(cell.enum[0], cell.enum_type);
         }
         default: { return; }
     }
@@ -53,20 +49,24 @@ type EnumOption = PinnedValue & { is_default?: true };
  */
 export function enum_options(definition: ResolvedProperty["value"]): EnumOption[] {
     let options: PinnedValue[];
+    let fallback: unknown;
     switch (definition._t) {
-        case "enum_integer": {
-            options = definition.enum.map(n => ({ rows: [[BigInt(n)]] }));
+        case "scalar": {
+            if (definition.cell._t !== "enum") { return []; }
+            const { enum: values, enum_type } = definition.cell;
+            options = values.flatMap(v => enum_value(v, enum_type) ?? []);
+            fallback = definition.default;
             break;
         }
-        case "enum_array": {
-            if (definition.minItems > 1) { return []; }
-            const enum_type = definition.enum_type;
-            options = definition.enum.flatMap(v => enum_value(v, enum_type) ?? []);
+        case "list": {
+            const cell = list_cell(definition);
+            if (cell?._t !== "enum" || (definition.minItems ?? 0) > 1) { return []; }
+            options = cell.enum.flatMap(v => enum_value(v, cell.enum_type) ?? []);
+            fallback = cell.default;
             break;
         }
         default: { return []; }
     }
-    const fallback: unknown = Array.isArray(definition.default) ? definition.default[0] : definition.default;
     const key = typeof fallback === "string" ? `"${fallback}"` : String(fallback);
     const index = fallback === undefined ? -1 : options.findIndex(o => describe_pinned(o) === key);
     if (index === -1) { return options; }
@@ -114,20 +114,24 @@ if (import.meta.vitest) {
 
     const devicetree = DeviceTree.new_from_string("/dts-v1/;\n/ { };");
     if (typeof devicetree === "string") { throw new TypeError(devicetree); }
+    const enum_cell = (values: (bigint | string)[], enum_type: AttachEnumType, default_value?: string): Cell =>
+        ({ _t: "enum", enum: values, enum_type, ...(default_value === undefined ? {} : { default: default_value }) });
+    const list_of = (item: Cell, minItems: number, maxItems: number): ResolvedProperty["value"] => ({ _t: "list", item, minItems, maxItems });
+    const scalar_of = (cell: Cell, default_value?: bigint): ResolvedProperty["value"] => ({ _t: "scalar", cell, ...(default_value === undefined ? {} : { default: default_value }) });
     const binding: PropertyContext["binding"] = {
         required_properties: ["clock-names", "spi-cpol", "vref-supply"],
         properties: [
-            { key: "clock-names", value: { _t: "enum_array", minItems: 1, maxItems: 1, enum: ["mclk"], enum_type: AttachEnumType.STRING } },
-            { key: "spi-cpol", value: { _t: "boolean" } },
-            { key: "spi-lsb-first", value: { _t: "boolean" } },
-            { key: "adi,mode", value: { _t: "const", const: 3 } },
-            { key: "adi,lines", value: { _t: "enum_integer", enum: [1n, 2n] } },
-            { key: "adi,gain", value: { _t: "enum_integer", enum: [1n, 2n, 4n], default: 4n } },
-            { key: "adi,mode-name", value: { _t: "enum_array", minItems: 1, maxItems: 1, enum: ["fast", "slow"], default: ["slow"], enum_type: AttachEnumType.STRING } },
-            { key: "adi,widths", value: { _t: "enum_array", minItems: 1, maxItems: 4, enum: [1, 4], enum_type: AttachEnumType.NUMBER } },
-            { key: "adi,pair", value: { _t: "enum_array", minItems: 2, maxItems: 2, enum: ["a", "b"], enum_type: AttachEnumType.STRING } },
-            { key: "interrupt-parent", value: { _t: "enum_array", minItems: 1, maxItems: 1, enum: ["gpio"], enum_type: AttachEnumType.PHANDLE } },
-            { key: "vref-supply", value: { _t: "generic" } },
+            { key: "clock-names", value: list_of(enum_cell(["mclk"], AttachEnumType.STRING), 1, 1) },
+            { key: "spi-cpol", value: { _t: "flag" } },
+            { key: "spi-lsb-first", value: { _t: "flag" } },
+            { key: "adi,mode", value: scalar_of(enum_cell([3n], AttachEnumType.NUMBER), 3n) },
+            { key: "adi,lines", value: scalar_of(enum_cell([1n, 2n], AttachEnumType.NUMBER)) },
+            { key: "adi,gain", value: scalar_of(enum_cell([1n, 2n, 4n], AttachEnumType.NUMBER), 4n) },
+            { key: "adi,mode-name", value: list_of(enum_cell(["fast", "slow"], AttachEnumType.STRING, "slow"), 1, 1) },
+            { key: "adi,widths", value: list_of(enum_cell([1n, 4n], AttachEnumType.NUMBER), 1, 4) },
+            { key: "adi,pair", value: list_of(enum_cell(["a", "b"], AttachEnumType.STRING), 2, 2) },
+            { key: "interrupt-parent", value: list_of(enum_cell(["gpio"], AttachEnumType.PHANDLE), 1, 1) },
+            { key: "vref-supply", value: { _t: "unknown" } },
         ],
     };
     const values = (property: string) => binding_layer.suggest_values!(property, { devicetree, data: "{}", binding }, []);

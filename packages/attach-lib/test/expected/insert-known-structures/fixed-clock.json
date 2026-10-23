@@ -9,38 +9,54 @@
         {
             "key": "compatible",
             "value": {
-                "_t": "enum_array",
+                "_t": "list",
+                "item": {
+                    "_t": "enum",
+                    "enum": [
+                        "fixed-clock"
+                    ],
+                    "enum_type": "string",
+                    "default": "fixed-clock"
+                },
                 "minItems": 1,
-                "maxItems": 1,
-                "enum": [
-                    "fixed-clock"
-                ],
-                "default": "fixed-clock",
-                "enum_type": "string"
+                "maxItems": 1
             }
         },
         {
             "key": "#clock-cells",
             "value": {
-                "_t": "const",
-                "const": 0
+                "_t": "scalar",
+                "cell": {
+                    "_t": "enum",
+                    "enum": [
+                        0
+                    ],
+                    "enum_type": "number"
+                },
+                "default": 0
             }
         },
         {
             "key": "clock-frequency",
             "value": {
-                "_t": "integer",
+                "_t": "scalar",
                 "description": "Legacy property for single, fixed frequency clocks",
-                "minimum": 0,
-                "maximum": 18446744073709552000
+                "cell": {
+                    "_t": "number",
+                    "minimum": 0,
+                    "maximum": 18446744073709552000
+                }
             }
         },
         {
             "key": "clock-accuracy",
             "value": {
-                "_t": "integer",
-                "minimum": 0,
-                "maximum": 4294967295,
+                "_t": "scalar",
+                "cell": {
+                    "_t": "number",
+                    "minimum": 0,
+                    "maximum": 4294967295
+                },
                 "typeSize": 32,
                 "description": "accuracy of clock in ppb (parts per billion)."
             }
@@ -48,10 +64,12 @@
         {
             "key": "clock-output-names",
             "value": {
-                "_t": "string_array",
+                "_t": "list",
+                "item": {
+                    "_t": "string"
+                },
                 "minItems": 1,
-                "maxItems": 1,
-                "unique_items": false
+                "maxItems": 1
             }
         }
     ],

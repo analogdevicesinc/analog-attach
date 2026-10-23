@@ -1,4 +1,5 @@
 import { ParsedBinding } from "../Bindings/ParsedBinding.js";
+import { list_cell, type Cell } from "../Bindings/StructuralTypes.js";
 import { DeviceTree, DTNode, has_property, type LocatedNode } from "../Devicetree/index.js";
 import { find_nodes, node_label } from "./providers.js";
 
@@ -110,21 +111,26 @@ export function extract_compatible(node: ParsedBinding): string[] | undefined {
         return;
     }
 
-    if (compatible.value._t === "enum_array") {
-        let compatible_accumulator: string[] = [];
-
-        for (const entry of compatible.value.enum) {
-            if (typeof entry === 'string') {
-                compatible_accumulator.push(entry);
-            } else if (Array.isArray(entry)) {
-                compatible_accumulator = [...compatible_accumulator, ...entry];
-            }
-        }
-
-        return compatible_accumulator;
-    } else if (compatible.value._t === 'const') {
-        return [compatible.value.const];
+    // A fixed list of compatibles (a `const` is one), each option a string or a fallback list.
+    let cell: Cell | undefined;
+    if (compatible.value._t === "list") {
+        cell = list_cell(compatible.value);
+    } else if (compatible.value._t === "scalar") {
+        cell = compatible.value.cell;
     }
+    if (cell?._t !== "enum") { return; }
+
+    let compatible_accumulator: string[] = [];
+
+    for (const entry of cell.enum) {
+        if (typeof entry === 'string') {
+            compatible_accumulator.push(entry);
+        } else if (Array.isArray(entry)) {
+            compatible_accumulator = [...compatible_accumulator, ...entry];
+        }
+    }
+
+    return compatible_accumulator;
 }
 
 

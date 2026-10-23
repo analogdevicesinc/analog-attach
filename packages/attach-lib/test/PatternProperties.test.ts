@@ -27,7 +27,7 @@ describe('patternProperties without inline properties', () => {
         ]);
         const bypass = patterns[0];
         expect(bypass?.description).toContain('bypassing the individual voltage input attenuator');
-        expect(bypass?.value).toMatchObject({ _t: 'enum_integer', enum: [BigInt(0), BigInt(1)] });
+        expect(bypass?.value).toMatchObject({ _t: 'scalar', cell: { _t: 'enum', enum: [BigInt(0), BigInt(1)] } });
         // Property patterns are not child-node rules.
         expect(binding.pattern_properties?.map(p => p.pattern)).toEqual(['^fan-[0-9]+$']);
     });
@@ -35,14 +35,14 @@ describe('patternProperties without inline properties', () => {
     test('property patterns get the fixups of named properties', async () => {
         const binding = await parse('hwmon/adt7475.yaml');
         const pin5 = binding.property_patterns?.find(p => p.pattern === '^adi,pin(5|10)-function$');
-        expect(pin5?.value._t).not.toBe('generic');
+        expect(pin5?.value._t).not.toBe('unknown');
         expect(JSON.stringify(pin5?.value)).toContain('"smbalert#"');
     });
 
     test('flag patterns are booleans', async () => {
         const binding = await parse('sound/realtek,rt5677.yaml');
         expect(binding.property_patterns?.find(p => p.pattern === '^realtek,in[1-2]-differential$')?.value)
-            .toMatchObject({ _t: 'boolean' });
+            .toMatchObject({ _t: 'flag' });
     });
 
     test('a bare `type: object` pattern is a child node with no known properties', async () => {

@@ -466,11 +466,11 @@ if (import.meta.vitest) {
 
     test("board_layer — refine_properties attaches suggestions without touching the schema", () => {
         const properties: ResolvedProperty[] = [
-            { key: "reset-gpios", value: { _t: "generic" } },
-            { key: "spi-max-frequency", value: { _t: "generic" } },
+            { key: "reset-gpios", value: { _t: "unknown" } },
+            { key: "spi-max-frequency", value: { _t: "unknown" } },
         ];
         const refined = layer.refine_properties!(properties, context(spi0, 0n));
-        expect(refined[0]?.value).toStrictEqual({ _t: "generic" });
+        expect(refined[0]?.value).toStrictEqual({ _t: "unknown" });
         expect(refined[0]?.suggestions?.map(s => s.slots)).toStrictEqual([["spi_pmod1"], ["spi_pmod1"]]);
         expect(refined[1]).toBe(properties[1]);
     });
@@ -615,7 +615,7 @@ if (import.meta.vitest) {
 
     test("board_layer — refine_properties is idempotent", () => {
         const context_ = context(spi0, 0n);
-        const properties: ResolvedProperty[] = [{ key: "reg", value: { _t: "integer" } }];
+        const properties: ResolvedProperty[] = [{ key: "reg", value: { _t: "scalar", cell: { _t: "number" } } }];
         const once = layer.refine_properties!(properties, context_);
         const twice = layer.refine_properties!(once, context_);
         expect(twice).toStrictEqual(once);

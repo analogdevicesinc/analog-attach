@@ -66,14 +66,14 @@ if (import.meta.vitest) {
         if (typeof board === "string") { throw new TypeError(board); }
         const layer = board_layer(board);
 
-        const reg_property: ResolvedProperty = { key: "reg", value: { _t: "integer" } };
+        const reg_property: ResolvedProperty = { key: "reg", value: { _t: "scalar", cell: { _t: "number" } } };
         const binding: ParsedBinding = {
             required_properties: ["reg"],
             properties: [reg_property],
             pattern_properties: [{
                 pattern: "^channel@",
                 description: "ADC channel",
-                properties: [{ key: "reg", value: { _t: "integer" } }],
+                properties: [{ key: "reg", value: { _t: "scalar", cell: { _t: "number" } } }],
                 required: ["reg"],
             }],
             examples: [],

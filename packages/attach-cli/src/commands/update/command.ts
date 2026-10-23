@@ -49,25 +49,22 @@ const ALL_MACROS = [...INTERRUPT_MACROS, ...GPIO_MACROS];
 
 export function shape_hint(definition: ResolvedProperty | undefined): ShapeHint {
     if (definition === undefined) { return undefined; }
-    switch (definition.value._t) {
-        case "boolean": { return "flag"; }
-        case "string_array": { return "strings"; }
-        case "enum_array":
-        case "fixed_index": {
-            if (definition.value._t === "enum_array" && definition.value.enum_type === AttachEnumType.STRING) { return "strings"; }
-            if (definition.value._t === "fixed_index" && definition.value.prefixItems.every(index => index._t === "enum" && index.enum_type === AttachEnumType.STRING)) { return "strings"; }
+    const type = definition.value;
+    switch (type._t) {
+        case "flag": { return "flag"; }
+        case "list": {
+            if (Array.isArray(type.item)) {
+                return type.item.every(cell => cell._t === "enum" && cell.enum_type === AttachEnumType.STRING) ? "strings" : "cells";
+            }
+            if (type.item._t === "string" || (type.item._t === "enum" && type.item.enum_type === AttachEnumType.STRING)) { return "strings"; }
             return "cells";
         }
-        case "integer":
-        case "enum_integer":
-        case "const":
-        case "number_array":
-        case "array":
+        case "scalar":
         case "matrix": { return "cells"; }
-        case "generic":
-        case "object": { return undefined; }
+        case "unknown":
+        case "node": { return undefined; }
         default: {
-            const _x: never = definition.value;
+            const _x: never = type;
             throw new Error("Exhaustive check failed!");
         }
     }

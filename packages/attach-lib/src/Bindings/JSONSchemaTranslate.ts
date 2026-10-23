@@ -1,6 +1,6 @@
 import { ParsedBinding, ResolvedProperty, PatternPropertyRule, PropertyPatternRule } from "./ParsedBinding";
 import { DtBindingSchema } from "./Schema";
-import { AttachType, AttachEnumType, AttachArray, FixedIndex } from "./StructuralTypes";
+import { AttachType, AttachEnumType, Cell, EnumOption, List } from "./StructuralTypes";
 import { find_entry_in_object } from "./ObjectUtilities";
 import { is_node_pattern } from "./PatternKind.js";
 
@@ -133,6 +133,62 @@ function matrix_row(object: any): any {
     return undefined;
 }
 
+/** A schema number as a bigint; undefined when it isn't a whole number. */
+function to_bigint(value: unknown): bigint | undefined {
+    if (typeof value === "bigint") { return value; }
+    return typeof value === "number" && Number.isInteger(value) ? BigInt(value) : undefined;
+}
+
+/** An enum option as the lib holds it: whole numbers as bigints, strings and string lists as they are. */
+function to_option(value: unknown): EnumOption | undefined {
+    if (typeof value === "string") { return value; }
+    if (Array.isArray(value) && value.every(entry => typeof entry === "string")) { return value as string[]; }
+    return to_bigint(value);
+}
+
+function to_options(values: unknown): EnumOption[] {
+    return (Array.isArray(values) ? values : [values]).map(value => to_option(value)).filter((option): option is EnumOption => option !== undefined);
+}
+
+/** The single default a cell can carry; a list-valued default (`[]`, `["gpio"]`) is reduced to its only entry. */
+function to_default(value: unknown): bigint | string | undefined {
+    const single = Array.isArray(value) ? (value.length === 1 ? value[0] : undefined) : value;
+    return typeof single === "string" ? single : to_bigint(single);
+}
+
+function enum_cell(options: unknown, default_value?: unknown): Cell {
+    const entries = to_options(options);
+    const default_option = to_default(default_value);
+    return {
+        _t: "enum",
+        enum: entries,
+        enum_type: get_enum_type(entries),
+        ...(default_option === undefined ? {} : { default: default_option }),
+    };
+}
+
+function number_cell(schema: any): Cell {
+    const minimum = to_bigint(schema.minimum);
+    const maximum = to_bigint(schema.maximum);
+    return {
+        _t: "number",
+        ...(minimum === undefined ? {} : { minimum }),
+        ...(maximum === undefined ? {} : { maximum }),
+    };
+}
+
+/** The bounds a schema gives, left out of the type when it doesn't. */
+function bounds(schema: any): Pick<List, "minItems" | "maxItems"> {
+    return {
+        ...(schema.minItems === undefined ? {} : { minItems: schema.minItems }),
+        ...(schema.maxItems === undefined ? {} : { maxItems: schema.maxItems }),
+    };
+}
+
+function described<T extends object>(schema: any, type: T): T & { description?: string } {
+    return schema.description === undefined ? type : { ...type, description: schema.description };
+}
+
 // TODO: handle objects
 function narrow_object(object: any): AttachType {
 
@@ -143,74 +199,40 @@ function narrow_object(object: any): AttachType {
                     const row = matrix_row(object);
 
                     if (row !== undefined) {
-                        return {
+                        return described(object, {
                             _t: "matrix",
-                            minItems: object.minItems,
-                            maxItems: object.maxItems,
-                            description: object.description,
-                            values: [narrow_array_object(row)]
-                        };
+                            ...bounds(object),
+                            rows: [narrow_array_object(row)]
+                        });
                     }
 
                     return narrow_array_object(object);
                 }
             case "string": {
-                const minItems = object.minItems;
-                const maxItems = object.maxItems;
-                const description = object.description;
+                const unique = find_entry_in_object(object, (_path: string[], key: string) => key === 'uniqueItems');
+                const unique_items = unique.length > 0 && unique[0].value === true;
 
-                const unique = find_entry_in_object(
-                    object,
-                    (_path: string[], key: string, _value: unknown) => {
-                        if (key === 'uniqueItems') {
-                            return true;
-                        };
-
-                        return false;
-                    }
-                );
-
-                const unique_items = unique.length === 0 ? false : (typeof unique[0].value === "boolean" ? unique[0].value : false);
-
-                return {
-                    _t: "string_array",
-                    minItems: minItems,
-                    maxItems: maxItems,
-                    description: description,
-                    unique_items: unique_items
-                };
+                return described(object, {
+                    _t: "list",
+                    item: { _t: "string" },
+                    ...bounds(object),
+                    ...(unique_items ? { unique: true } : {}),
+                });
             }
             case "integer":
                 {
-                    const minimum = object.minimum;
-                    const maximum = object.maximum;
                     const typeSize = object.typeSize;
-                    const description = object.description;
-                    const default_value = object.default;
+                    const default_value = to_default(object.default);
 
-                    if ("enum" in object) {
-
-                        return {
-                            _t: 'enum_integer',
-                            enum: (object.enum as number[]).map(BigInt),
-                            typeSize: typeSize,
-                            description: description,
-                            default: default_value
-                        };
-                    }
-
-                    return {
-                        _t: 'integer',
-                        minimum: minimum,
-                        maximum: maximum,
-                        typeSize: typeSize,
-                        description: description,
-                        default: default_value
-                    };
+                    return described(object, {
+                        _t: "scalar",
+                        cell: "enum" in object ? enum_cell(object.enum) : number_cell(object),
+                        ...(typeSize === undefined ? {} : { typeSize }),
+                        ...(default_value === undefined ? {} : { default: default_value }),
+                    });
                 }
             case "boolean": {
-                const description = object.description;
-                return { _t: "boolean", description: description };
+                return described(object, { _t: "flag" });
             }
         }
     }
@@ -224,8 +246,7 @@ function narrow_object(object: any): AttachType {
         object.oneOf[0].const === true &&
         object.oneOf[1].type === 'null'
     ) {
-        const description = object.description;
-        return { _t: "boolean", description: description };
+        return described(object, { _t: "flag" });
     }
 
     if (
@@ -257,7 +278,7 @@ function narrow_object(object: any): AttachType {
         });
 
         if (only_fixed_size_arrays === true) {
-            let enum_accumulator: any[] = [];
+            let enum_accumulator: unknown[] = [];
 
             for (const entry of oneOf) {
                 if (entry.items.length === 1 && "enum" in entry.items[0]) {
@@ -265,26 +286,15 @@ function narrow_object(object: any): AttachType {
                     continue;
                 }
                 // TODO: https://github.com/analogdevicesinc/linux/blob/main/Documentation/devicetree/bindings/iio/imu/st%2Clsm6dsx.yaml
-                let composed_enum: string[] = [];
-
-                for (const item of entry.items) {
-                    composed_enum.push(item.const);
-                }
-
-                enum_accumulator.push(composed_enum);
+                enum_accumulator.push(entry.items.map((item: any) => item.const));
             }
 
-            const description = object.description;
-
-            return {
-                _t: "enum_array",
+            return described(object, {
+                _t: "list",
+                item: enum_cell(enum_accumulator),
                 minItems: 1,
                 maxItems: 1,
-                enum: enum_accumulator,
-                description: description,
-                enum_type: get_enum_type(enum_accumulator)
-            };
-
+            });
         }
     }
 
@@ -293,8 +303,10 @@ function narrow_object(object: any): AttachType {
         "const" in object &&
         object.const !== undefined
     ) {
-        const description = object.description;
-        return { _t: "const", const: object.const, description: description };
+        const option = to_option(object.const);
+        if (option !== undefined && !Array.isArray(option)) {
+            return described(object, { _t: "scalar", cell: enum_cell([option]), default: option });
+        }
     }
 
     if (
@@ -302,33 +314,31 @@ function narrow_object(object: any): AttachType {
         "type" in object &&
         object.type === "object"
     ) {
-        const description = object.description;
-        return {
-            _t: "object",
-            description: description,
+        return described(object, {
+            _t: "node",
             properties: translate_JSONSchema(object).properties
-        };
+        });
     }
 
-    return { _t: "generic", description: object.description };
+    return described(object, { _t: "unknown" });
 }
 
-function get_enum_type(object: any): AttachEnumType.STRING | AttachEnumType.NUMBER {
+function get_enum_type(options: unknown): AttachEnumType.STRING | AttachEnumType.NUMBER {
 
-    if (typeof object === 'string') {
+    if (typeof options === 'string') {
         return AttachEnumType.STRING;
     }
 
-    if (typeof object === 'number') {
+    if (typeof options === 'number' || typeof options === 'bigint') {
         return AttachEnumType.NUMBER;
     }
 
-    if (Array.isArray(object)) {
-        if (object.every((entry) => typeof entry === 'string')) {
+    if (Array.isArray(options)) {
+        if (options.every((entry) => typeof entry === 'string')) {
             return AttachEnumType.STRING;
         }
 
-        if (object.every((entry) => typeof entry === 'number')) {
+        if (options.every((entry) => typeof entry === 'number' || typeof entry === 'bigint')) {
             return AttachEnumType.NUMBER;
         }
     }
@@ -337,249 +347,82 @@ function get_enum_type(object: any): AttachEnumType.STRING | AttachEnumType.NUMB
     return AttachEnumType.STRING;
 };
 
-function narrow_array_object(object: any): AttachArray {
+function narrow_array_object(object: any): AttachType & { _t: "list" } {
 
-    const minItems = object.minItems;
-    const maxItems = object.maxItems;
-    const description = object.description;
+    const list = (item: Cell | Cell[], extra: Partial<List> = {}): AttachType & { _t: "list" } =>
+        described(object, { _t: "list", item, ...bounds(object), ...extra });
 
+    const items = object.items;
+    const items_array = Array.isArray(items);
 
     // Ex. simple compatible definition
-    if (
-        "items" in object &&
-        Array.isArray(object.items) &&
-        object.items.length === 1 &&
-        "enum" in object.items[0]
-    ) {
-        return {
-            _t: 'enum_array',
-            minItems: minItems,
-            maxItems: maxItems,
-            enum: object.items[0].enum,
-            description: description,
-            enum_type: get_enum_type(object.items[0].enum)
-        };
+    if (items_array && items.length === 1 && "enum" in items[0]) {
+        return list(enum_cell(items[0].enum));
     }
 
     // Ex. simple compatible definition with only one value
-    if (
-        "items" in object &&
-        Array.isArray(object.items) &&
-        object.items.length === 1 &&
-        "const" in object.items[0]
-    ) {
-        return {
-            _t: 'enum_array',
-            minItems: minItems,
-            maxItems: maxItems,
-            enum: [object.items[0].const],
-            description: description,
-            default: object.items[0].const,
-            enum_type: get_enum_type(object.items[0].const)
-        };
+    if (items_array && items.length === 1 && "const" in items[0]) {
+        return list(enum_cell([items[0].const], items[0].const));
     }
 
-    if (
-        "items" in object &&
-        Array.isArray(object.items) &&
-        object.items.length > 1
-    ) {
+    if (items_array && items.length > 1) {
 
-        let prefix_items: FixedIndex[] = [];
+        const cells: Cell[] = [];
 
-        for (const definition of object.items) {
+        for (const definition of items) {
             if ("enum" in definition) {
-                prefix_items.push(
-                    {
-                        _t: "enum",
-                        enum: definition.enum,
-                        enum_type: get_enum_type(definition.enum)
-                    }
-                );
+                cells.push(enum_cell(definition.enum));
             } else if ("const" in definition) {
-                prefix_items.push(
-                    {
-                        _t: "enum",
-                        enum: definition.const,
-                        default: definition.const,
-                        enum_type: get_enum_type(definition.const),
-                    }
-                );
+                cells.push(enum_cell([definition.const], definition.const));
             } else {
                 // FAILSAFE
-                return {
-                    _t: 'array',
-                    minItems: minItems,
-                    maxItems: maxItems,
-                    description: description,
-                };
+                return list({ _t: "any" });
             }
         }
 
-        return {
-            _t: 'fixed_index',
-            minItems: minItems,
-            maxItems: maxItems,
-            description: description,
-            prefixItems: prefix_items
-        };
+        return list(cells);
     }
 
-    if (
-        "items" in object &&
-        !Array.isArray(object.items) &&
-        "enum" in object.items
-    ) {
-        return {
-            _t: 'enum_array',
-            minItems: minItems,
-            maxItems: maxItems,
-            enum: object.items.enum,
-            description: description,
-            enum_type: get_enum_type(object.items.enum)
-        };
+    if ("items" in object && !items_array && "enum" in items) {
+        return list(enum_cell(items.enum));
     }
 
-    if (
-        "items" in object &&
-        !Array.isArray(object.items) &&
-        "const" in object.items
-    ) {
-        return {
-            _t: 'enum_array',
-            minItems: minItems,
-            maxItems: maxItems,
-            enum: [object.items.const],
-            default: object.items.const,
-            description: description,
-            enum_type: get_enum_type(object.items.const)
-        };
+    if ("items" in object && !items_array && "const" in items) {
+        return list(enum_cell([items.const], items.const));
     }
 
     // object level enum with  $ref: /schemas/types.yaml#/definitions/string
-    if (
-        "enum" in object &&
-        "items" in object &&
-        "type" in object.items &&
-        object.items.type === "string"
-    ) {
-        const default_value = "default" in object ? object.default : [];
-
-        return {
-            _t: 'enum_array',
-            minItems: minItems,
-            maxItems: maxItems,
-            enum: object.enum,
-            description: description,
-            default: default_value,
-            enum_type: get_enum_type(object.enum)
-        };
+    if ("enum" in object && "items" in object && "type" in items && items.type === "string") {
+        return list(enum_cell(object.enum, object.default));
     }
 
     // Integer array with definition in items
-    if (
-        "items" in object &&
-        "type" in object.items &&
-        object.items.type === "integer"
-    ) {
-        const minimum = object.items.minimum;
-        const maximum = object.items.maximum;
-        const typeSize = object.items.typeSize;
-
-        return {
-            _t: 'number_array',
-            minItems: minItems,
-            maxItems: maxItems,
-            minimum: minimum,
-            maximum: maximum,
-            typeSize: typeSize,
-            description: description,
-        };
+    if ("items" in object && "type" in items && items.type === "integer") {
+        return list(number_cell(items), items.typeSize === undefined ? {} : { typeSize: items.typeSize });
     }
 
     // Integer array with definition in items but items is an array
-    if (
-        "items" in object &&
-        Array.isArray(object["items"]) &&
-        object["items"].length === 1 &&
-        "type" in object.items[0] &&
-        object.items[0].type === "integer"
-    ) {
-        const minimum = object.items[0].minimum;
-        const maximum = object.items[0].maximum;
-        const typeSize = object.items[0].typeSize;
-
-        return {
-            _t: 'number_array',
-            minItems: minItems,
-            maxItems: maxItems,
-            minimum: minimum,
-            maximum: maximum,
-            typeSize: typeSize,
-            description: description,
-        };
+    if (items_array && items.length === 1 && "type" in items[0] && items[0].type === "integer") {
+        return list(number_cell(items[0]), items[0].typeSize === undefined ? {} : { typeSize: items[0].typeSize });
     }
 
     // Integer array with constraints outside items
-    if (
-        !("items" in object) &&
-        ("minimum" in object || "maximum" in object)
-    ) {
-        const minimum = object.minimum;
-        const maximum = object.maximum;
-        const typeSize = object.typeSize;
-
-        return {
-            _t: 'number_array',
-            minItems: minItems,
-            maxItems: maxItems,
-            minimum: minimum,
-            maximum: maximum,
-            typeSize: typeSize,
-            description: description,
-        };
+    if (!("items" in object) && ("minimum" in object || "maximum" in object)) {
+        return list(number_cell(object), object.typeSize === undefined ? {} : { typeSize: object.typeSize });
     }
 
-    const unique_items = "uniqueItems" in object ? object.uniqueItems : false;
+    const unique = object.uniqueItems === true ? { unique: true } : {};
 
     // String array with type inside items object
-    if (
-        "items" in object &&
-        !Array.isArray(object.items) &&
-        "type" in object.items &&
-        object.items.type === "string"
-    ) {
-        return {
-            _t: "string_array",
-            minItems: minItems,
-            maxItems: maxItems,
-            description: description,
-            unique_items: unique_items
-        };
+    if ("items" in object && !items_array && "type" in items && items.type === "string") {
+        return list({ _t: "string" }, unique);
     }
 
     // String array with type inside items array
-    if (
-        "items" in object &&
-        Array.isArray(object.items) &&
-        object.items.length === 1 &&
-        "type" in object.items[0] &&
-        object.items[0].type === "string"
-    ) {
-        return {
-            _t: "string_array",
-            minItems: minItems,
-            maxItems: maxItems,
-            description: description,
-            unique_items: unique_items
-        };
+    if (items_array && items.length === 1 && "type" in items[0] && items[0].type === "string") {
+        return list({ _t: "string" }, unique);
     }
 
     // Array of whatever
-    return {
-        _t: 'array',
-        minItems: minItems,
-        maxItems: maxItems,
-        description: description,
-    };
+    return list({ _t: "any" });
 }

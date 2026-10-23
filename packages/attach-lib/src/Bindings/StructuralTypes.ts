@@ -1,40 +1,5 @@
 import { ResolvedProperty } from "./ParsedBinding";
 
-type AttachGenericArray = {
-    _t: "array",
-    minItems: number,
-    maxItems: number,
-    description?: string,
-}
-
-type AttachNumberArray = {
-    _t: "number_array",
-    minItems: number,
-    maxItems: number,
-    description?: string,
-    minimum: bigint,
-    maximum: bigint,
-    typeSize?: number,
-}
-
-type AttachStringArray = {
-    _t: "string_array",
-    minItems: number,
-    maxItems: number,
-    description?: string,
-    unique_items: boolean,
-}
-
-type AttachEnumArray = {
-    _t: "enum_array",
-    minItems: number,
-    maxItems: number,
-    description?: string,
-    default?: any,
-    enum: any[],
-    enum_type: AttachEnumType,
-}
-
 export enum AttachEnumType {
     PHANDLE = "phandle",
     MACRO = "macro",
@@ -42,120 +7,48 @@ export enum AttachEnumType {
     NUMBER = "number",
 }
 
-export type FixedIndex =
-    {
-        _t: "enum",
-        enum: any[],
-        default?: any,
-        enum_type: AttachEnumType
-    } |
-    {
-        _t: "number",
-        minimum?: bigint,
-        maximum?: bigint
-    };
+/** One option of an enum: a number, a string, or (compatible fallbacks like `["adi,adxl346", "adi,adxl345"]`) a whole list of strings. */
+export type EnumOption = bigint | string | string[];
 
-type AttachFixedIndexArray = {
-    _t: "fixed_index",
-    description?: string,
-    prefixItems: FixedIndex[],
-    minItems: number,
-    maxItems: number,
+/** One value of a property: a single cell or string. */
+export type Cell =
+    | { _t: "number"; minimum?: bigint; maximum?: bigint; default?: bigint }
+    | { _t: "enum"; enum: EnumOption[]; enum_type: AttachEnumType; default?: bigint | string }
+    | { _t: "string" }
+    /** A number, a label or a macro expression. */
+    | { _t: "any" };
+
+/** Values of one kind (`item` a single cell) or of fixed positions (`item` one cell per position). */
+export type List = {
+    _t: "list";
+    item: Cell | Cell[];
+    minItems?: number;
+    maxItems?: number;
+    typeSize?: number;
+    unique?: boolean;
+};
+
+export type AttachType = { description?: string } & (
+    | { _t: "flag" }
+    | { _t: "scalar"; cell: Cell; default?: bigint | string; typeSize?: number }
+    | List
+    | { _t: "matrix"; rows: List[]; minItems?: number; maxItems?: number }
+    | { _t: "node"; properties: ResolvedProperty[] }
+    | { _t: "unknown" }
+);
+
+type Variant<T extends AttachType["_t"]> = Extract<AttachType, { _t: T }>;
+
+export function is_list(type: AttachType): type is Variant<"list"> {
+    return type._t === "list";
 }
 
-export type AttachArray = AttachGenericArray | AttachNumberArray | AttachStringArray | AttachEnumArray | AttachFixedIndexArray;
-
-export function is_attach_array(object: AttachType): object is AttachArray {
-
-    switch (object._t) {
-        case "array":
-        case "number_array":
-        case "string_array":
-        case "enum_array":
-        case "fixed_index":
-            {
-                return true;
-            }
-        case "matrix":
-        case "integer":
-        case "object":
-        case "boolean":
-        case "enum_integer":
-        case "const":
-        case "generic":
-            {
-                return false;
-            }
-        default:
-            {
-                const _x: never = object;
-                throw new Error("Failed exhaustive check!");
-            }
-    }
+/** A list of values nothing is known about: the shape of an untyped array. */
+export function is_open_list(type: AttachType): type is Variant<"list"> & { item: { _t: "any" } } {
+    return type._t === "list" && !Array.isArray(type.item) && type.item._t === "any";
 }
 
-export function to_attach_array(resolved_property: ResolvedProperty): AttachArray | undefined {
-
-    if (is_attach_array(resolved_property.value)) {
-        return resolved_property.value;
-    }
-
-    return undefined;
+/** The cell of a list's single `item`, undefined for one cell per position. */
+export function list_cell(list: List): Cell | undefined {
+    return Array.isArray(list.item) ? undefined : list.item;
 }
-
-type AttachMatrix = {
-    _t: "matrix",
-    minItems: number,
-    maxItems?: number,
-    description?: string,
-    values: AttachArray[],
-}
-
-type AttachBoolean = {
-    _t: "boolean",
-    description?: string,
-}
-
-type AttachInteger = {
-    _t: "integer",
-    description?: string,
-    maximum?: bigint,
-    minimum?: bigint,
-    default?: bigint,
-    typeSize?: number
-}
-
-type AttachEnumInteger = {
-    _t: "enum_integer",
-    description?: string,
-    default?: bigint,
-    enum: bigint[],
-    typeSize?: number,
-}
-
-type AttachConst = {
-    _t: "const",
-    description?: string,
-    const: any,
-}
-
-type AttachGeneric = {
-    _t: "generic",
-    description?: string,
-}
-
-type AttachObject = {
-    _t: "object",
-    description?: string,
-    properties: ResolvedProperty[],
-}
-
-export type AttachType =
-    AttachArray |
-    AttachMatrix |
-    AttachBoolean |
-    AttachInteger |
-    AttachEnumInteger |
-    AttachConst |
-    AttachGeneric |
-    AttachObject;

@@ -13,9 +13,13 @@ export { expand_pattern, type PatternExpansion } from './RegexExpansion.js';
 export { unresolved_references, unresolved_targets, type UnresolvedReference, type UnresolvedTarget } from './Devicetree/References.js';
 export {
     AttachEnumType,
-    to_attach_array,
-    type AttachArray,
+    is_list,
+    is_open_list,
+    list_cell,
     type AttachType,
+    type Cell,
+    type EnumOption,
+    type List,
 } from './Bindings/StructuralTypes.js';
 export { dt_to_validator_input, validator_input_json } from './Attach/DTxBinding.js';
 export { missing_required, PROPERTY_DEPENDENCIES } from './Attach/NodeState.js';

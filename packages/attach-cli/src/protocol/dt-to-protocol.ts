@@ -4,6 +4,7 @@ import {
     get_full_node_name,
     AttachEnumType,
     type AttachType,
+    type Cell,
     type DTNode,
     type DTProperty as AttachDTProperty,
     type DTValue,
@@ -105,67 +106,54 @@ function item_counts(value: AttachType): { min_items?: number; max_items?: numbe
     return { min_items: bounds.min, ...(bounds.max === undefined ? {} : { max_items: bounds.max }) };
 }
 
-export function attach_type_to_protocol_type(value: AttachType): Types {
-    switch (value._t) {
-        case "boolean": {
-            return { kind: "bool" };
-        }
-        case "integer": {
-            return { kind: "number", subtype: "int" };
-        }
-        case "enum_integer": {
-            return { kind: "enum", options: value.enum.map(v => ({ value: Number(v) })) };
-        }
-        case "const": {
-            return typeof value.const === "string" ? { kind: "string" } : { kind: "number", subtype: "int" };
-        }
-        case "generic": {
+/** The protocol type of one value: a cell or a string. */
+function cell_to_protocol_type(cell: Cell): Types {
+    switch (cell._t) {
+        case "string": {
             return { kind: "string" };
         }
-        case "object": {
-            return { kind: "string" };
-        }
-        case "string_array": {
-            return value.maxItems === 1
-                ? { kind: "string" }
-                : { kind: "array", items: { kind: "string" }, ...item_counts(value) };
-        }
-        case "enum_array": {
-            const options = value.enum.map(v =>
-                value.enum_type === AttachEnumType.NUMBER
-                    ? { value: Number(v) as number }
-                    : { value: String(v) }
-            );
-            return value.maxItems === 1
-                ? { kind: "enum", options }
-                : { kind: "array", items: { kind: "enum", options }, ...item_counts(value) };
-        }
-        case "number_array": {
-            return value.maxItems === 1
-                ? { kind: "number", subtype: "int" }
-                : { kind: "array", items: { kind: "number", subtype: "int" }, ...item_counts(value) };
-        }
-        case "array": {
-            return { kind: "array", items: { kind: "number", subtype: "int" } };
-        }
-        case "fixed_index": {
+        case "enum": {
             return {
-                kind: "tuple",
-                items: value.prefixItems.map(item =>
-                    item._t === "number"
-                        ? { kind: "number", subtype: "int" } as Types
-                        : {
-                            kind: "enum", options: item.enum.map(v =>
-                                item.enum_type === AttachEnumType.NUMBER
-                                    ? { value: Number(v) as number }
-                                    : { value: String(v) }
-                            )
-                        } as Types
-                ),
+                kind: "enum",
+                options: cell.enum.map(v => cell.enum_type === AttachEnumType.NUMBER ? { value: Number(v) } : { value: String(v) }),
             };
         }
+        case "number":
+        case "any": {
+            return { kind: "number", subtype: "int" };
+        }
+    }
+}
+
+export function attach_type_to_protocol_type(value: AttachType): Types {
+    switch (value._t) {
+        case "flag": {
+            return { kind: "bool" };
+        }
+        case "scalar": {
+            const cell = value.cell;
+            // A one-option enum the binding also defaults to is a const.
+            if (cell._t === "enum" && cell.enum.length === 1 && cell.enum[0] === value.default) {
+                return typeof value.default === "string" ? { kind: "string" } : { kind: "number", subtype: "int" };
+            }
+            return cell_to_protocol_type(cell);
+        }
+        case "unknown":
+        case "node": {
+            return { kind: "string" };
+        }
+        case "list": {
+            if (Array.isArray(value.item)) {
+                return { kind: "tuple", items: value.item.map(cell => cell_to_protocol_type(cell)) };
+            }
+            const item = cell_to_protocol_type(value.item);
+            if (value.item._t === "any") {
+                return { kind: "array", items: item };
+            }
+            return value.maxItems === 1 ? item : { kind: "array", items: item, ...item_counts(value) };
+        }
         case "matrix": {
-            const row = value.values[0];
+            const row = value.rows[0];
             return {
                 kind: "array",
                 items: row === undefined ? { kind: "number", subtype: "int" } : attach_type_to_protocol_type(row),
@@ -200,23 +188,34 @@ if (import.meta.vitest) {
     const { test, expect } = import.meta.vitest;
 
     test("attach_type_to_protocol_type — value arrays carry the binding's item counts, entry lists don't", () => {
-        expect(attach_type_to_protocol_type({ _t: "number_array", minItems: 2, maxItems: 2 } as AttachType))
+        expect(attach_type_to_protocol_type({ _t: "list", item: { _t: "number" }, minItems: 2, maxItems: 2 }))
             .toEqual({ kind: "array", items: { kind: "number", subtype: "int" }, min_items: 2, max_items: 2 });
-        expect(attach_type_to_protocol_type({ _t: "string_array", minItems: 1, maxItems: undefined } as unknown as AttachType))
+        expect(attach_type_to_protocol_type({ _t: "list", item: { _t: "string" }, minItems: 1 }))
             .toEqual({ kind: "array", items: { kind: "string" }, min_items: 1 });
-        expect(attach_type_to_protocol_type({ _t: "number_array", minItems: 1, maxItems: 1 } as AttachType))
+        expect(attach_type_to_protocol_type({ _t: "list", item: { _t: "number" }, minItems: 1, maxItems: 1 }))
             .toEqual({ kind: "number", subtype: "int" });
-        expect(attach_type_to_protocol_type({ _t: "array", minItems: 1, maxItems: 2 } as AttachType))
+        expect(attach_type_to_protocol_type({ _t: "list", item: { _t: "any" }, minItems: 1, maxItems: 2 }))
             .toEqual({ kind: "array", items: { kind: "number", subtype: "int" } });
     });
 
+    test("attach_type_to_protocol_type — a defaulted one-option enum is a const", () => {
+        const one = (default_value: bigint | string | undefined, option: bigint | string): AttachType => ({
+            _t: "scalar",
+            cell: { _t: "enum", enum: [option], enum_type: typeof option === "string" ? AttachEnumType.STRING : AttachEnumType.NUMBER },
+            ...(default_value === undefined ? {} : { default: default_value }),
+        });
+        expect(attach_type_to_protocol_type(one(3n, 3n))).toEqual({ kind: "number", subtype: "int" });
+        expect(attach_type_to_protocol_type(one("a", "a"))).toEqual({ kind: "string" });
+        expect(attach_type_to_protocol_type(one(undefined, 3n))).toEqual({ kind: "enum", options: [{ value: 3 }] });
+    });
+
     test("attach_type_to_protocol_type — interrupts under a known parent count cells", () => {
-        const interrupts = {
+        const interrupts: AttachType = {
             _t: "matrix",
             minItems: 1,
             maxItems: 1,
-            values: [{ _t: "fixed_index", prefixItems: [{ _t: "number" }, { _t: "number" }], minItems: 2, maxItems: 2 }],
-        } as AttachType;
+            rows: [{ _t: "list", item: [{ _t: "number" }, { _t: "number" }], minItems: 2, maxItems: 2 }],
+        };
         expect(attach_type_to_protocol_type(interrupts)).toEqual({
             kind: "array",
             items: { kind: "tuple", items: [{ kind: "number", subtype: "int" }, { kind: "number", subtype: "int" }] },

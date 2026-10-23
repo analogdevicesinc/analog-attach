@@ -72,13 +72,13 @@ if (import.meta.vitest) {
 };`);
 
     const properties: ResolvedProperty[] = [
-        { key: "reg", value: { _t: "array", minItems: 1, maxItems: 1 } },
-        { key: "spi-cpol", value: { _t: "generic" } },
-        { key: "sample-rate-hz", value: { _t: "array", minItems: 1, maxItems: 1 } },
-        { key: "interrupt-parent", value: { _t: "generic" } },
-        { key: "interrupts", value: { _t: "array", minItems: 1, maxItems: 1 } },
-        { key: "reset-gpios", value: { _t: "generic" } },
-        { key: "vdd-supply", value: { _t: "generic" } },
+        { key: "reg", value: { _t: "list", item: { _t: "any" }, minItems: 1, maxItems: 1 } },
+        { key: "spi-cpol", value: { _t: "unknown" } },
+        { key: "sample-rate-hz", value: { _t: "list", item: { _t: "any" }, minItems: 1, maxItems: 1 } },
+        { key: "interrupt-parent", value: { _t: "unknown" } },
+        { key: "interrupts", value: { _t: "list", item: { _t: "any" }, minItems: 1, maxItems: 1 } },
+        { key: "reset-gpios", value: { _t: "unknown" } },
+        { key: "vdd-supply", value: { _t: "unknown" } },
     ];
 
     test("IntelligenceStack.default — matches the historical insert_known_structures(query_devicetree(...))", () => {

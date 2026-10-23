@@ -17,19 +17,25 @@
         {
             "key": "compatible",
             "value": {
-                "_t": "enum_array",
+                "_t": "list",
+                "item": {
+                    "_t": "enum",
+                    "enum": [
+                        "adi,ad4134"
+                    ],
+                    "enum_type": "string"
+                },
                 "minItems": 1,
-                "maxItems": 1,
-                "enum": [
-                    "adi,ad4134"
-                ],
-                "enum_type": "string"
+                "maxItems": 1
             }
         },
         {
             "key": "reg",
             "value": {
-                "_t": "array",
+                "_t": "list",
+                "item": {
+                    "_t": "any"
+                },
                 "minItems": 1,
                 "maxItems": 1
             }
@@ -40,12 +46,12 @@
                 "_t": "matrix",
                 "minItems": 1,
                 "maxItems": 1,
-                "values": [
+                "rows": [
                     {
-                        "_t": "fixed_index",
+                        "_t": "list",
                         "minItems": 1,
                         "maxItems": 1,
-                        "prefixItems": [
+                        "item": [
                             {
                                 "_t": "enum",
                                 "enum": [
@@ -64,14 +70,17 @@
         {
             "key": "clock-names",
             "value": {
-                "_t": "enum_array",
+                "_t": "list",
+                "item": {
+                    "_t": "enum",
+                    "enum": [
+                        "sys_clk"
+                    ],
+                    "enum_type": "string",
+                    "default": "sys_clk"
+                },
                 "minItems": 1,
-                "maxItems": 1,
-                "enum": [
-                    "sys_clk"
-                ],
-                "default": "sys_clk",
-                "enum_type": "string"
+                "maxItems": 1
             }
         },
         {
@@ -80,12 +89,12 @@
                 "_t": "matrix",
                 "minItems": 1,
                 "maxItems": 1,
-                "values": [
+                "rows": [
                     {
-                        "_t": "fixed_index",
+                        "_t": "list",
                         "minItems": 1,
                         "maxItems": 1,
-                        "prefixItems": [
+                        "item": [
                             {
                                 "_t": "enum",
                                 "enum": [
@@ -102,14 +111,17 @@
         {
             "key": "dma-names",
             "value": {
-                "_t": "enum_array",
+                "_t": "list",
+                "item": {
+                    "_t": "enum",
+                    "enum": [
+                        "rx"
+                    ],
+                    "enum_type": "string",
+                    "default": "rx"
+                },
                 "minItems": 1,
-                "maxItems": 1,
-                "enum": [
-                    "rx"
-                ],
-                "default": "rx",
-                "enum_type": "string"
+                "maxItems": 1
             }
         },
         {
@@ -118,12 +130,12 @@
                 "_t": "matrix",
                 "minItems": 1,
                 "maxItems": 1,
-                "values": [
+                "rows": [
                     {
-                        "_t": "fixed_index",
+                        "_t": "list",
                         "minItems": 1,
                         "maxItems": 1,
-                        "prefixItems": [
+                        "item": [
                             {
                                 "_t": "enum",
                                 "enum": [],
@@ -137,36 +149,45 @@
         {
             "key": "pwm-names",
             "value": {
-                "_t": "enum_array",
+                "_t": "list",
+                "item": {
+                    "_t": "enum",
+                    "enum": [
+                        "odr_pwm"
+                    ],
+                    "enum_type": "string",
+                    "default": "odr_pwm"
+                },
                 "minItems": 1,
-                "maxItems": 1,
-                "enum": [
-                    "odr_pwm"
-                ],
-                "default": "odr_pwm",
-                "enum_type": "string"
+                "maxItems": 1
             }
         },
         {
             "key": "refin-supply",
             "value": {
-                "_t": "enum_array",
+                "_t": "list",
+                "item": {
+                    "_t": "enum",
+                    "enum": [
+                        "cam1_reg",
+                        "cam_dummy_reg",
+                        "sd_vcc_reg",
+                        "vdd_3v3_reg",
+                        "vdd_5v0_reg"
+                    ],
+                    "enum_type": "phandle"
+                },
                 "minItems": 1,
-                "maxItems": 1,
-                "enum": [
-                    "cam1_reg",
-                    "cam_dummy_reg",
-                    "sd_vcc_reg",
-                    "vdd_3v3_reg",
-                    "vdd_5v0_reg"
-                ],
-                "enum_type": "phandle"
+                "maxItems": 1
             }
         },
         {
             "key": "adi,spi-engine",
             "value": {
-                "_t": "array",
+                "_t": "list",
+                "item": {
+                    "_t": "any"
+                },
                 "minItems": 1,
                 "maxItems": 1,
                 "description": "phandle of the SPI slave connected to the SPI engine master"
@@ -175,69 +196,84 @@
         {
             "key": "spi-max-frequency",
             "value": {
-                "_t": "integer",
-                "maximum": 1000000
+                "_t": "scalar",
+                "cell": {
+                    "_t": "number",
+                    "maximum": 1000000
+                }
             }
         },
         {
             "key": "reset-gpios",
             "value": {
-                "_t": "enum_array",
+                "_t": "list",
+                "item": {
+                    "_t": "enum",
+                    "enum": [
+                        "gpio",
+                        "expgpio"
+                    ],
+                    "enum_type": "phandle"
+                },
                 "minItems": 1,
-                "maxItems": 1,
-                "enum": [
-                    "gpio",
-                    "expgpio"
-                ],
-                "enum_type": "phandle"
+                "maxItems": 1
             }
         },
         {
             "key": "avdd5-supply",
             "value": {
-                "_t": "enum_array",
+                "_t": "list",
+                "item": {
+                    "_t": "enum",
+                    "enum": [
+                        "cam1_reg",
+                        "cam_dummy_reg",
+                        "sd_vcc_reg",
+                        "vdd_3v3_reg",
+                        "vdd_5v0_reg"
+                    ],
+                    "enum_type": "phandle"
+                },
                 "minItems": 1,
-                "maxItems": 1,
-                "enum": [
-                    "cam1_reg",
-                    "cam_dummy_reg",
-                    "sd_vcc_reg",
-                    "vdd_3v3_reg",
-                    "vdd_5v0_reg"
-                ],
-                "enum_type": "phandle"
+                "maxItems": 1
             }
         },
         {
             "key": "avdd1v8-supply",
             "value": {
-                "_t": "enum_array",
+                "_t": "list",
+                "item": {
+                    "_t": "enum",
+                    "enum": [
+                        "cam1_reg",
+                        "cam_dummy_reg",
+                        "sd_vcc_reg",
+                        "vdd_3v3_reg",
+                        "vdd_5v0_reg"
+                    ],
+                    "enum_type": "phandle"
+                },
                 "minItems": 1,
-                "maxItems": 1,
-                "enum": [
-                    "cam1_reg",
-                    "cam_dummy_reg",
-                    "sd_vcc_reg",
-                    "vdd_3v3_reg",
-                    "vdd_5v0_reg"
-                ],
-                "enum_type": "phandle"
+                "maxItems": 1
             }
         },
         {
             "key": "iovdd-supply",
             "value": {
-                "_t": "enum_array",
+                "_t": "list",
+                "item": {
+                    "_t": "enum",
+                    "enum": [
+                        "cam1_reg",
+                        "cam_dummy_reg",
+                        "sd_vcc_reg",
+                        "vdd_3v3_reg",
+                        "vdd_5v0_reg"
+                    ],
+                    "enum_type": "phandle"
+                },
                 "minItems": 1,
-                "maxItems": 1,
-                "enum": [
-                    "cam1_reg",
-                    "cam_dummy_reg",
-                    "sd_vcc_reg",
-                    "vdd_3v3_reg",
-                    "vdd_5v0_reg"
-                ],
-                "enum_type": "phandle"
+                "maxItems": 1
             }
         }
     ],

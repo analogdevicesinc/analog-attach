@@ -24,11 +24,7 @@ export function dt_to_validator_input(node: DTNode, properties: readonly Resolve
 
         const definition_type = definition.value._t;
         switch (definition_type) {
-            case "array":
-            case "enum_array":
-            case "fixed_index":
-            case "number_array":
-            case "string_array": {
+            case "list": {
                 if (Array.isArray(value)) {
                     map.set(property.name, value);
                     continue;
@@ -49,7 +45,9 @@ export function dt_to_validator_input(node: DTNode, properties: readonly Resolve
                     continue;
                 }
             }
-            case "const": {
+            case "flag":
+            case "scalar":
+            case "unknown": {
                 if (Array.isArray(value) && value.length === 1) {
                     map.set(property.name, value[0]);
                     continue;
@@ -57,18 +55,7 @@ export function dt_to_validator_input(node: DTNode, properties: readonly Resolve
                 map.set(property.name, value);
                 continue;
             }
-            case "boolean":
-            case "enum_integer":
-            case "generic":
-            case "integer": {
-                if (Array.isArray(value) && value.length === 1) {
-                    map.set(property.name, value[0]);
-                    continue;
-                }
-                map.set(property.name, value);
-                continue;
-            }
-            case "object": { continue; }
+            case "node": { continue; }
             default: {
                 const _x: never = definition_type;
                 throw new Error("Exhaustion check failed!");

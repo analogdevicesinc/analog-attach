@@ -2,6 +2,7 @@ import {
     Attach,
     AttachEnumType,
     Result as AttachResult,
+    list_cell,
     DeviceTree,
     DeviceTreeOverlay,
     IntelligenceStack,
@@ -328,7 +329,7 @@ function annotate_suggestions(
             continue;
         }
 
-        if (definition.value._t === "generic" || definition.value._t === "object") {
+        if (definition.value._t === "unknown" || definition.value._t === "node") {
             continue;
         }
 
@@ -776,10 +777,7 @@ export function property_info(
         return { ok: false, message: `Property ${property_name} not found in ${origin_desc}` };
     }
 
-    const v = property_definition.value as Record<string, unknown>;
-    const bound = (value: unknown): number | bigint | undefined => typeof value === "number" || typeof value === "bigint" ? value : undefined;
-    const minimum = bound(v["minimum"]);
-    const maximum = bound(v["maximum"]);
+    const constraints = type_constraints(property_definition.value);
     return {
         ok: true,
         info: {
@@ -788,19 +786,34 @@ export function property_info(
             required: binding.required_properties.includes(property_name),
             binding_path: binding.binding_path,
             constraints: {
-                ...(v["const"] === undefined ? {} : { const: v["const"] }),
-                // A phandle enum's default is the value currently set (a preselect), not the binding's.
-                // An empty array is no default either.
-                ...(v["default"] === undefined || v["enum_type"] === AttachEnumType.PHANDLE || (Array.isArray(v["default"]) && v["default"].length === 0)
-                    ? {}
-                    : { default: v["default"] }),
-                ...(minimum === undefined ? {} : { minimum }),
-                ...(maximum === undefined ? {} : { maximum }),
+                ...(constraints.const === undefined ? {} : { const: constraints.const }),
+                ...(constraints.default === undefined ? {} : { default: constraints.default }),
+                ...(constraints.minimum === undefined ? {} : { minimum: constraints.minimum }),
+                ...(constraints.maximum === undefined ? {} : { maximum: constraints.maximum }),
             },
             suggestions: (property_definition.suggestions ?? []).map((suggestion) => to_suggestion(suggestion)),
-            ...(v["enum_type"] === AttachEnumType.PHANDLE && Array.isArray(v["enum"]) ? { phandle_options: v["enum"].map(String) } : {}),
+            ...(constraints.phandle_options === undefined ? {} : { phandle_options: constraints.phandle_options }),
         },
     };
+}
+
+/** What a binding says about the values of a property: a const, a default, a range, the nodes a phandle can name. */
+function type_constraints(type: AttachType): { const?: bigint | string; default?: bigint | string; minimum?: bigint; maximum?: bigint; phandle_options?: string[] } {
+    const cell = type._t === "scalar" ? type.cell : (type._t === "list" ? list_cell(type) : undefined);
+    if (cell === undefined || cell._t === "string" || cell._t === "any") { return {}; }
+    const own_default = type._t === "scalar" ? type.default : cell.default;
+    if (cell._t === "number") {
+        return {
+            ...(own_default === undefined ? {} : { default: own_default }),
+            ...(cell.minimum === undefined ? {} : { minimum: cell.minimum }),
+            ...(cell.maximum === undefined ? {} : { maximum: cell.maximum }),
+        };
+    }
+    // A phandle enum's default is the value currently set (a preselect), not the binding's.
+    if (cell.enum_type === AttachEnumType.PHANDLE) { return { phandle_options: cell.enum.map(String) }; }
+    // A scalar whose only option is its default is a const.
+    if (type._t === "scalar" && cell.enum.length === 1 && cell.enum[0] === own_default) { return { const: own_default }; }
+    return own_default === undefined ? {} : { default: own_default };
 }
 
 /** `2`, `1..4`, `2..`; nothing when the binding only says "one or more". */
@@ -859,9 +872,9 @@ if (import.meta.vitest) {
     test("navigate_candidates — what is there (children, set properties), then what is not (unset properties, pattern names)", () => {
         const binding: NodeBinding = {
             properties: [
-                { key: "compatible", value: { _t: "generic", description: "" } },
-                { key: "cs-gpios", value: { _t: "generic", description: "" } },
-                { key: "num-cs", value: { _t: "generic", description: "" } },
+                { key: "compatible", value: { _t: "unknown", description: "" } },
+                { key: "cs-gpios", value: { _t: "unknown", description: "" } },
+                { key: "num-cs", value: { _t: "unknown", description: "" } },
             ],
             required_properties: ["compatible"],
             child_nodes: [],
@@ -879,7 +892,7 @@ if (import.meta.vitest) {
         // What the binding doesn't name, or names by a pattern, is still set.
         expect(navigate_candidates({ properties: ["compatible", "status", "adi,bypass-attenuator-in1"], children: [] }, {
             ...binding,
-            property_patterns: [{ pattern: "^adi,bypass-attenuator-in[0-2]$", description: "", value: { _t: "generic", description: "" } }],
+            property_patterns: [{ pattern: "^adi,bypass-attenuator-in[0-2]$", description: "", value: { _t: "unknown", description: "" } }],
         })).toEqual([
             { value: "compatible", display_string: "compatible (required)", group: "set" },
             { value: "status", group: "set" },
@@ -896,7 +909,7 @@ if (import.meta.vitest) {
     });
 
     test("property_info — a pattern property's type and description; an empty default is left out", () => {
-        const value: AttachType = { _t: "enum_array", minItems: 1, maxItems: 1, enum: ["pwm2", "smbalert#"], default: [], enum_type: AttachEnumType.STRING, description: "Pin 5 function" };
+        const value: AttachType = { _t: "list", item: { _t: "enum", enum: ["pwm2", "smbalert#"], enum_type: AttachEnumType.STRING }, minItems: 1, maxItems: 1, description: "Pin 5 function" };
         const binding: NodeBinding = {
             properties: [],
             required_properties: [],
@@ -913,7 +926,7 @@ if (import.meta.vitest) {
     });
 
     test("property_info — a phandle enum's options are the nodes it can name, not a constraint", () => {
-        const value: AttachType = { _t: "enum_array", minItems: 1, maxItems: 1, enum: ["gpio", "gicv2", "aon_intr"], default: ["gpio"], enum_type: AttachEnumType.PHANDLE, description: "" };
+        const value: AttachType = { _t: "list", item: { _t: "enum", enum: ["gpio", "gicv2", "aon_intr"], default: "gpio", enum_type: AttachEnumType.PHANDLE }, minItems: 1, maxItems: 1, description: "" };
         const binding: NodeBinding = {
             properties: [{ key: "interrupt-parent", value }],
             required_properties: [],
@@ -939,7 +952,7 @@ if (import.meta.vitest) {
 
     test("describe_property_pattern — the names it expands to, the regex, and the names already set", () => {
         const node = { name: "hwmon", labels: [], properties: [{ name: "adi,bypass-attenuator-in1", value: [] }, { name: "reg", value: [] }], children: [] } as unknown as DTNode;
-        const rule = { pattern: "^adi,bypass-attenuator-in[0-4]$", description: "", value: { _t: "generic" } as const };
+        const rule = { pattern: "^adi,bypass-attenuator-in[0-4]$", description: "", value: { _t: "unknown" } as const };
         expect(describe_property_pattern(rule, node)).toEqual({
             value: "^adi,bypass-attenuator-in[0-4]$",
             display_string: "adi,bypass-attenuator-in0 … adi,bypass-attenuator-in4 (pattern ^adi,bypass-attenuator-in[0-4]$; set: adi,bypass-attenuator-in1)",

@@ -1,5 +1,5 @@
 import { ResolvedProperty } from "../Bindings/ParsedBinding.js";
-import { AttachArray, AttachEnumType, FixedIndex } from "../Bindings/StructuralTypes.js";
+import { AttachEnumType, is_open_list, list_cell, type Cell, type List } from "../Bindings/StructuralTypes.js";
 import { DeviceTree, number_property } from "../Devicetree/index.js";
 import {
     is_clock,
@@ -77,51 +77,57 @@ function extract_gpio_controller(data: unknown): string | undefined {
 
 // --- Row builders ---
 
+/** The `minItems` / `maxItems` a list or matrix carries, nothing for the other types. */
+function counts_of(value: ResolvedProperty["value"]): { minItems?: number; maxItems?: number } {
+    if (value._t !== "list" && value._t !== "matrix") { return {}; }
+    return {
+        ...(value.minItems === undefined ? {} : { minItems: value.minItems }),
+        ...(value.maxItems === undefined ? {} : { maxItems: value.maxItems }),
+    };
+}
+
 function specifier_row(options: {
     phandle?: { enum: string[]; default?: string };
     numbers: number;
-    number_item: { _t: "number"; minimum?: bigint; maximum?: bigint } | { _t: "number" };
+    number_item: Cell;
     trailing_macros?: string[];
     description?: string;
-}): AttachArray {
+}): List {
     const { phandle, numbers, number_item, trailing_macros, description } = options;
-    const prefixItems: FixedIndex[] = [];
+    const cells: Cell[] = [];
     if (phandle !== undefined) {
-        prefixItems.push({ _t: "enum", enum: phandle.enum, ...(phandle.default === undefined ? {} : { default: phandle.default }), enum_type: AttachEnumType.PHANDLE });
+        cells.push({ _t: "enum", enum: phandle.enum, ...(phandle.default === undefined ? {} : { default: phandle.default }), enum_type: AttachEnumType.PHANDLE });
     }
     for (let index = 0; index < numbers; index++) {
-        prefixItems.push(number_item);
+        cells.push(number_item);
     }
     if (trailing_macros !== undefined) {
-        prefixItems.push({ _t: "enum", enum: trailing_macros, enum_type: AttachEnumType.MACRO });
+        cells.push({ _t: "enum", enum: trailing_macros, enum_type: AttachEnumType.MACRO });
     }
-    const size = prefixItems.length;
-    return { _t: "fixed_index", prefixItems, minItems: size, maxItems: size, ...(description === undefined ? {} : { description }) };
+    const size = cells.length;
+    return { _t: "list", item: cells, minItems: size, maxItems: size, ...(description === undefined ? {} : { description }) };
 }
 
 function phandle_enum_array(phandles: string[], description?: string, default_value?: string): ResolvedProperty["value"] {
     return {
-        _t: "enum_array",
+        _t: "list",
+        item: { _t: "enum", enum: phandles, enum_type: AttachEnumType.PHANDLE, ...(default_value === undefined ? {} : { default: default_value }) },
         minItems: 1,
         maxItems: 1,
-        enum: phandles,
-        ...(default_value === undefined ? {} : { default: default_value }),
-        enum_type: AttachEnumType.PHANDLE,
         description,
     };
 }
 
-function phandle_matrix(phandles: string[], bounds: { minItems: number; maxItems: number }, description?: string): ResolvedProperty["value"] {
+function phandle_matrix(phandles: string[], bounds: { minItems?: number; maxItems?: number }, description?: string): ResolvedProperty["value"] {
     return {
         _t: "matrix",
-        minItems: bounds.minItems,
-        maxItems: bounds.maxItems,
+        ...bounds,
         description,
-        values: [{
-            _t: "fixed_index",
+        rows: [{
+            _t: "list",
             minItems: 1,
             maxItems: 1,
-            prefixItems: [{ _t: "enum", enum: phandles, enum_type: AttachEnumType.PHANDLE }],
+            item: [{ _t: "enum", enum: phandles, enum_type: AttachEnumType.PHANDLE }],
         }],
     };
 }
@@ -159,7 +165,7 @@ function refine_interrupts(
     parsed_data: Record<string, unknown>,
     inherited_interrupt_parent: string | undefined,
 ): boolean {
-    if (property.key !== "interrupts" || property.value._t !== "array") { return false; }
+    if (property.key !== "interrupts" || !is_open_list(property.value)) { return false; }
 
     const is_set = effective_interrupt_controller(parsed_data, inherited_interrupt_parent);
     if (is_set === undefined) { return false; }
@@ -177,10 +183,9 @@ function refine_interrupts(
     });
     property.value = {
         _t: "matrix",
-        minItems: property.value.minItems,
-        maxItems: property.value.maxItems,
+        ...counts_of(property.value),
         description: property.value.description,
-        values: [row],
+        rows: [row],
     };
     return true;
 }
@@ -201,8 +206,8 @@ function refine_dmas(
     let set_dma = parsed_data[property.key];
 
     if (set_dma === undefined || (Array.isArray(set_dma) && set_dma.length === 0)) {
-        if (property.value._t !== "array") { return true; }
-        property.value = phandle_matrix(phandle_names(devicetree, is_dma_controller), { minItems: property.value.minItems, maxItems: property.value.maxItems }, property.value.description);
+        if (!is_open_list(property.value)) { return true; }
+        property.value = phandle_matrix(phandle_names(devicetree, is_dma_controller), counts_of(property.value), property.value.description);
         return true;
     }
 
@@ -220,12 +225,12 @@ function refine_dmas(
                 numbers: Number(cell_count),
                 number_item: { _t: "number", minimum: 0n, maximum: 0xFF_FF_FF_FFn },
             });
+            const own = property.value._t === "list" || property.value._t === "matrix" ? property.value : undefined;
             property.value = {
                 _t: "matrix",
-                minItems: "minItems" in property.value ? property.value.minItems : 1,
-                maxItems: "maxItems" in property.value ? property.value.maxItems : 1,
+                ...(own === undefined ? { minItems: 1, maxItems: 1 } : counts_of(own)),
                 description: property.value.description,
-                values: [row],
+                rows: [row],
             };
         }
         return true;
@@ -244,8 +249,8 @@ function refine_pwms(
     let set_pwm = parsed_data[property.key];
 
     if (set_pwm === undefined || (Array.isArray(set_pwm) && set_pwm.length === 0)) {
-        if (property.value._t !== "array") { return true; }
-        property.value = phandle_matrix(phandle_names(devicetree, is_pwm_controller), { minItems: property.value.minItems, maxItems: property.value.maxItems }, property.value.description);
+        if (!is_open_list(property.value)) { return true; }
+        property.value = phandle_matrix(phandle_names(devicetree, is_pwm_controller), counts_of(property.value), property.value.description);
         return true;
     }
 
@@ -270,10 +275,9 @@ function refine_pwms(
             });
             property.value = {
                 _t: "matrix",
-                minItems: property.value.minItems,
-                maxItems: property.value.maxItems,
+                ...counts_of(property.value),
                 description: property.value.description,
-                values: [row],
+                rows: [row],
             };
         }
         return true;
@@ -329,7 +333,7 @@ function refine_gpio(
             minItems: min_rows,
             ...(max_rows === undefined ? {} : { maxItems: max_rows }),
             description: property.value.description,
-            values: [row],
+            rows: [row],
         };
     }
 
@@ -369,14 +373,30 @@ export function query_devicetree(
  * is a bare phandle-array (types.yaml): at least one row, no upper bound.
  */
 function gpio_row_bounds(value: ResolvedProperty["value"]): { min_rows: number, max_rows: number | undefined } {
-    const min = "minItems" in value && typeof value.minItems === "number" ? value.minItems : undefined;
-    const max = "maxItems" in value && typeof value.maxItems === "number" ? value.maxItems : undefined;
+    const { minItems: min, maxItems: max } = counts_of(value);
     if (min === undefined && max === undefined) { return { min_rows: 1, max_rows: undefined }; }
     return { min_rows: min ?? max!, max_rows: max ?? min! };
 }
 
 if (import.meta.vitest) {
     const { test, expect } = import.meta.vitest;
+
+    const open_list = (minItems?: number, maxItems?: number): ResolvedProperty["value"] => ({
+        _t: "list",
+        item: { _t: "any" },
+        ...(minItems === undefined ? {} : { minItems }),
+        ...(maxItems === undefined ? {} : { maxItems }),
+    });
+
+    /** A list with one cell per position (a specifier row), or undefined for any other type. */
+    const tuple_of = (value: ResolvedProperty["value"] | undefined) =>
+        value?._t === "list" && Array.isArray(value.item) ? { cells: value.item, minItems: value.minItems, maxItems: value.maxItems } : undefined;
+
+    /** The enum cell of a list of single values. */
+    const enum_of = (value: ResolvedProperty["value"] | undefined) => {
+        const cell = value?._t === "list" ? list_cell(value) : undefined;
+        return cell?._t === "enum" ? cell : undefined;
+    };
 
     const dts = (source: string) => {
         const dt = DeviceTree.new_from_string(source);
@@ -397,15 +417,12 @@ if (import.meta.vitest) {
         const properties = [
             {
                 key: "interrupt-parent",
-                value: { _t: "generic" as const },
+                value: { _t: "unknown" as const },
             },
         ];
         const result = query_devicetree(dt, properties, "{}");
         const ip = result.find(p => p.key === "interrupt-parent");
-        expect(ip?.value._t).toBe("enum_array");
-        if (ip?.value._t === "enum_array") {
-            expect(ip.value.enum).toContain("gic");
-        }
+        expect(enum_of(ip?.value)?.enum).toContain("gic");
     });
 
     test("query_devicetree — interrupt-parent: inherited label refines interrupts to matrix", () => {
@@ -417,8 +434,8 @@ if (import.meta.vitest) {
     };
 };`);
         const properties = [
-            { key: "interrupt-parent", value: { _t: "generic" as const } },
-            { key: "interrupts", value: { _t: "array" as const, minItems: 1, maxItems: 1 } },
+            { key: "interrupt-parent", value: { _t: "unknown" as const } },
+            { key: "interrupts", value: open_list(1, 1) },
         ];
         const result = query_devicetree(dt, properties, "{}", "gic");
         const interrupts = result.find(p => p.key === "interrupts");
@@ -434,7 +451,7 @@ if (import.meta.vitest) {
     };
 };`);
         const properties = [
-            { key: "interrupts", value: { _t: "array" as const, minItems: 1, maxItems: 4 } },
+            { key: "interrupts", value: open_list(1, 4) },
         ];
         const result = query_devicetree(dt, properties, "{}", "gic");
         const interrupts = result.find(p => p.key === "interrupts");
@@ -454,19 +471,17 @@ if (import.meta.vitest) {
     };
 };`);
         const properties = [
-            { key: "interrupt-parent", value: { _t: "generic" as const } },
-            { key: "interrupts", value: { _t: "array" as const, minItems: 1, maxItems: 1 } },
+            { key: "interrupt-parent", value: { _t: "unknown" as const } },
+            { key: "interrupts", value: open_list(1, 1) },
         ];
         const result = query_devicetree(dt, properties, "{}", "intc");
         const interrupts = result.find(p => p.key === "interrupts");
         expect(interrupts?.value._t).toBe("matrix");
         if (interrupts?.value._t === "matrix") {
-            const row = interrupts.value.values[0];
-            expect(row?._t).toBe("fixed_index");
-            if (row?._t === "fixed_index") {
-                expect(row.prefixItems).toHaveLength(0);
-                expect(row.minItems).toBe(0);
-            }
+            const row = tuple_of(interrupts.value.rows[0]);
+            expect(row).toBeDefined();
+            expect(row?.cells).toHaveLength(0);
+            expect(row?.minItems).toBe(0);
         }
     });
 
@@ -479,14 +494,11 @@ if (import.meta.vitest) {
         #gpio-cells = <1>;
     };
 };`);
-        const properties = [{ key: "reset-gpios", value: { _t: "array" as const, minItems: 1, maxItems: 1 } }];
+        const properties = [{ key: "reset-gpios", value: open_list(1, 1) }];
         const result = query_devicetree(dt, properties, JSON.stringify({ "reset-gpios": ["gpio"] }));
-        const reset = result.find(p => p.key === "reset-gpios");
-        expect(reset?.value._t).toBe("fixed_index");
-        if (reset?.value._t === "fixed_index") {
-            expect(reset.value.prefixItems).toHaveLength(1);
-            expect(reset.value.prefixItems[0]?._t).toBe("enum");
-        }
+        const reset = tuple_of(result.find(p => p.key === "reset-gpios")?.value);
+        expect(reset?.cells).toHaveLength(1);
+        expect(reset?.cells[0]?._t).toBe("enum");
     });
 
     test("query_devicetree — *-gpios: item count is the phandle plus #gpio-cells", () => {
@@ -498,15 +510,12 @@ if (import.meta.vitest) {
         #gpio-cells = <2>;
     };
 };`);
-        const properties = [{ key: "reset-gpios", value: { _t: "array" as const, minItems: 1, maxItems: 1 } }];
+        const properties = [{ key: "reset-gpios", value: open_list(1, 1) }];
         const result = query_devicetree(dt, properties, JSON.stringify({ "reset-gpios": ["gpio"] }));
-        const reset = result.find(p => p.key === "reset-gpios");
-        expect(reset?.value._t).toBe("fixed_index");
-        if (reset?.value._t === "fixed_index") {
-            expect(reset.value.prefixItems).toHaveLength(3);
-            expect(reset.value.minItems).toBe(3);
-            expect(reset.value.maxItems).toBe(3);
-        }
+        const reset = tuple_of(result.find(p => p.key === "reset-gpios")?.value);
+        expect(reset?.cells).toHaveLength(3);
+        expect(reset?.minItems).toBe(3);
+        expect(reset?.maxItems).toBe(3);
     });
 
     test("query_devicetree — clocks: enumerates fixed-clock sources", () => {
@@ -518,7 +527,7 @@ if (import.meta.vitest) {
         clock-frequency = <19200000>;
     };
 };`);
-        const properties = [{ key: "clocks", value: { _t: "generic" as const } }];
+        const properties = [{ key: "clocks", value: { _t: "unknown" as const } }];
         const result = query_devicetree(dt, properties, "{}");
         const clocks_property = result.find(p => p.key === "clocks");
         expect(clocks_property?.value._t).toBe("matrix");
@@ -534,51 +543,46 @@ if (import.meta.vitest) {
 };`);
 
     test("query_devicetree — *-gpios: nested data [[\"gpio\", 8, 1], …] is typed as matrix", () => {
-        const properties = [{ key: "cs-gpios", value: { _t: "array" as const, minItems: 1, maxItems: 6 } }];
+        const properties = [{ key: "cs-gpios", value: open_list(1, 6) }];
         const data = JSON.stringify({ "cs-gpios": [["gpio", 8, 1], ["gpio", 7, 1]] });
         const result = query_devicetree(gpio_dt, properties, data);
         const cs = result.find(p => p.key === "cs-gpios");
         expect(cs?.value._t).toBe("matrix");
         if (cs?.value._t === "matrix") {
             expect(cs.value.maxItems).toBe(6);
-            expect(cs.value.values).toHaveLength(1);
-            expect(cs.value.values[0]?._t).toBe("fixed_index");
+            expect(cs.value.rows).toHaveLength(1);
+            expect(tuple_of(cs.value.rows[0])).toBeDefined();
         }
     });
 
-    test("query_devicetree — *-gpios: maxItems 1 stays fixed_index", () => {
-        const properties = [{ key: "reset-gpios", value: { _t: "array" as const, minItems: 1, maxItems: 1 } }];
+    test("query_devicetree — *-gpios: maxItems 1 stays a single row", () => {
+        const properties = [{ key: "reset-gpios", value: open_list(1, 1) }];
         const data = JSON.stringify({ "reset-gpios": ["gpio"] });
         const result = query_devicetree(gpio_dt, properties, data);
-        const reset = result.find(p => p.key === "reset-gpios");
-        expect(reset?.value._t).toBe("fixed_index");
+        expect(tuple_of(result.find(p => p.key === "reset-gpios")?.value)).toBeDefined();
     });
 
-    test("query_devicetree — *-gpios: plain string data 'gpio' is typed (not generic)", () => {
-        const properties = [{ key: "reset-gpios", value: { _t: "array" as const, minItems: 1, maxItems: 1 } }];
+    test("query_devicetree — *-gpios: plain string data 'gpio' is typed (not unknown)", () => {
+        const properties = [{ key: "reset-gpios", value: open_list(1, 1) }];
         const data = JSON.stringify({ "reset-gpios": "gpio" });
         const result = query_devicetree(gpio_dt, properties, data);
-        const reset = result.find(p => p.key === "reset-gpios");
-        expect(reset?.value._t).toBe("fixed_index");
-        if (reset?.value._t === "fixed_index") {
-            expect(reset.value.prefixItems).toHaveLength(3);
-        }
+        expect(tuple_of(result.find(p => p.key === "reset-gpios")?.value)?.cells).toHaveLength(3);
     });
 
     test("query_devicetree — *-gpios: row bounds follow dt-schema's _fixup_items_size", () => {
         const rows = (value: ResolvedProperty["value"]) => {
             const result = query_devicetree(gpio_dt, [{ key: "cs-gpios", value }], JSON.stringify({ "cs-gpios": ["gpio"] }));
             const cs = result.find(p => p.key === "cs-gpios");
-            if (cs?.value._t === "fixed_index") { return "single row"; }
+            if (tuple_of(cs?.value) !== undefined) { return "single row"; }
             return cs?.value._t === "matrix" ? [cs.value.minItems, cs.value.maxItems] : cs?.value._t;
         };
         // No sizing (e.g. spi-controller.yaml cs-gpios): a bare phandle-array.
-        expect(rows({ _t: "generic" })).toStrictEqual([1, undefined]);
+        expect(rows({ _t: "unknown" })).toStrictEqual([1, undefined]);
         // A lone minItems or maxItems fixes the count.
-        expect(rows({ _t: "array", minItems: 2 } as ResolvedProperty["value"])).toStrictEqual([2, 2]);
-        expect(rows({ _t: "array", maxItems: 3 } as ResolvedProperty["value"])).toStrictEqual([3, 3]);
-        expect(rows({ _t: "array", minItems: 1, maxItems: 6 })).toStrictEqual([1, 6]);
-        expect(rows({ _t: "array", minItems: 1, maxItems: 1 })).toBe("single row");
+        expect(rows(open_list(2))).toStrictEqual([2, 2]);
+        expect(rows(open_list(undefined, 3))).toStrictEqual([3, 3]);
+        expect(rows(open_list(1, 6))).toStrictEqual([1, 6]);
+        expect(rows(open_list(1, 1))).toBe("single row");
     });
 
     test("is_gpio_property — matches gpios, gpio, *-gpios, *-gpio; rejects vendor,nr-gpios and gpio-controller", () => {
@@ -592,20 +596,16 @@ if (import.meta.vitest) {
         expect(is_gpio_property("gpio-controller")).toBe(false);
     });
 
-    test("query_devicetree — singular reset-gpio with ['gpio'] data is typed as fixed_index", () => {
-        const properties = [{ key: "reset-gpio", value: { _t: "array" as const, minItems: 1, maxItems: 1 } }];
+    test("query_devicetree — singular reset-gpio with ['gpio'] data is typed as a single row", () => {
+        const properties = [{ key: "reset-gpio", value: open_list(1, 1) }];
         const data = JSON.stringify({ "reset-gpio": ["gpio"] });
         const result = query_devicetree(gpio_dt, properties, data);
-        const reset = result.find(p => p.key === "reset-gpio");
-        expect(reset?.value._t).toBe("fixed_index");
-        if (reset?.value._t === "fixed_index") {
-            expect(reset.value.prefixItems).toHaveLength(3);
-        }
+        expect(tuple_of(result.find(p => p.key === "reset-gpio")?.value)?.cells).toHaveLength(3);
     });
 
     test("extract_gpio_controller — [[0], ['gpio', 7, 1]] skips the <0> hole", () => {
         const data = [[0], ["gpio", 7, 1]];
-        const properties = [{ key: "cs-gpios", value: { _t: "array" as const, minItems: 1, maxItems: 4 } }];
+        const properties = [{ key: "cs-gpios", value: open_list(1, 4) }];
         const result = query_devicetree(gpio_dt, properties, JSON.stringify({ "cs-gpios": data }));
         const cs = result.find(p => p.key === "cs-gpios");
         expect(cs?.value._t).toBe("matrix");
@@ -619,19 +619,16 @@ if (import.meta.vitest) {
         #pwm-cells = <2>;
     };
 };`);
-        const properties = [{ key: "pwms", value: { _t: "matrix" as const, minItems: 1, maxItems: 1, values: [] } }];
+        const properties = [{ key: "pwms", value: { _t: "matrix" as const, minItems: 1, maxItems: 1, rows: [] } }];
         const data = JSON.stringify({ pwms: [["pwm"]] });
         const result = query_devicetree(dt, properties, data);
         const pwms = result.find(p => p.key === "pwms");
         expect(pwms?.value._t).toBe("matrix");
         if (pwms?.value._t === "matrix") {
-            const row = pwms.value.values[0];
-            expect(row?._t).toBe("fixed_index");
-            if (row?._t === "fixed_index") {
-                expect(row.prefixItems).toHaveLength(3);
-                expect(row.minItems).toBe(3);
-                expect(row.maxItems).toBe(3);
-            }
+            const row = tuple_of(pwms.value.rows[0]);
+            expect(row?.cells).toHaveLength(3);
+            expect(row?.minItems).toBe(3);
+            expect(row?.maxItems).toBe(3);
         }
     });
 
@@ -644,21 +641,18 @@ if (import.meta.vitest) {
         #dma-cells = <4>;
     };
 };`);
-        const properties = [{ key: "dmas", value: { _t: "array" as const, minItems: 1, maxItems: 2 } }];
+        const properties = [{ key: "dmas", value: open_list(1, 2) }];
         const result = query_devicetree(dt, properties, "{}");
         const dmas = result.find(p => p.key === "dmas");
         expect(dmas?.value._t).toBe("matrix");
         if (dmas?.value._t === "matrix") {
             expect(dmas.value.minItems).toBe(1);
             expect(dmas.value.maxItems).toBe(2);
-            const row = dmas.value.values[0];
-            expect(row?._t).toBe("fixed_index");
-            if (row?._t === "fixed_index") {
-                expect(row.prefixItems).toHaveLength(1);
-                expect(row.prefixItems[0]).toMatchObject({ _t: "enum", enum: ["dma"] });
-                expect(row.minItems).toBe(1);
-                expect(row.maxItems).toBe(1);
-            }
+            const row = tuple_of(dmas.value.rows[0]);
+            expect(row?.cells).toHaveLength(1);
+            expect(row?.cells[0]).toMatchObject({ _t: "enum", enum: ["dma"] });
+            expect(row?.minItems).toBe(1);
+            expect(row?.maxItems).toBe(1);
         }
     });
 
@@ -671,7 +665,7 @@ if (import.meta.vitest) {
         #dma-cells = <4>;
     };
 };`);
-        const properties = [{ key: "dmas", value: { _t: "array" as const, minItems: 1, maxItems: 2 } }];
+        const properties = [{ key: "dmas", value: open_list(1, 2) }];
         const data = JSON.stringify({ dmas: [["dma", 0, 1, 2, 3]] });
         const result = query_devicetree(dt, properties, data);
         const dmas = result.find(p => p.key === "dmas");
@@ -679,15 +673,12 @@ if (import.meta.vitest) {
         if (dmas?.value._t === "matrix") {
             expect(dmas.value.minItems).toBe(1);
             expect(dmas.value.maxItems).toBe(2);
-            const row = dmas.value.values[0];
-            expect(row?._t).toBe("fixed_index");
-            if (row?._t === "fixed_index") {
-                expect(row.prefixItems).toHaveLength(5);
-                expect(row.minItems).toBe(5);
-                expect(row.maxItems).toBe(5);
-                expect(row.prefixItems[0]).toMatchObject({ _t: "enum", default: "dma" });
-                expect(row.prefixItems[1]).toMatchObject({ _t: "number", minimum: 0n, maximum: 0xFF_FF_FF_FFn });
-            }
+            const row = tuple_of(dmas.value.rows[0]);
+            expect(row?.cells).toHaveLength(5);
+            expect(row?.minItems).toBe(5);
+            expect(row?.maxItems).toBe(5);
+            expect(row?.cells[0]).toMatchObject({ _t: "enum", default: "dma" });
+            expect(row?.cells[1]).toMatchObject({ _t: "number", minimum: 0n, maximum: 0xFF_FF_FF_FFn });
         }
     });
 
@@ -700,15 +691,11 @@ if (import.meta.vitest) {
         regulator-max-microvolt = <3300000>;
     };
 };`);
-        const properties = [{ key: "vdd-supply", value: { _t: "generic" as const } }];
+        const properties = [{ key: "vdd-supply", value: { _t: "unknown" as const } }];
         const result = query_devicetree(dt, properties, "{}");
         const supply = result.find(p => p.key === "vdd-supply");
-        expect(supply?.value._t).toBe("enum_array");
-        if (supply?.value._t === "enum_array") {
-            expect(supply.value.enum).toContain("reg_3v3");
-            expect(supply.value.minItems).toBe(1);
-            expect(supply.value.maxItems).toBe(1);
-        }
+        expect(enum_of(supply?.value)?.enum).toContain("reg_3v3");
+        expect(supply?.value).toMatchObject({ _t: "list", minItems: 1, maxItems: 1 });
     });
 
     test("query_devicetree — pwms: unset becomes phandle-only matrix", () => {
@@ -719,21 +706,18 @@ if (import.meta.vitest) {
         #pwm-cells = <2>;
     };
 };`);
-        const properties = [{ key: "pwms", value: { _t: "array" as const, minItems: 1, maxItems: 1 } }];
+        const properties = [{ key: "pwms", value: open_list(1, 1) }];
         const result = query_devicetree(dt, properties, "{}");
         const pwms = result.find(p => p.key === "pwms");
         expect(pwms?.value._t).toBe("matrix");
         if (pwms?.value._t === "matrix") {
             expect(pwms.value.minItems).toBe(1);
             expect(pwms.value.maxItems).toBe(1);
-            const row = pwms.value.values[0];
-            expect(row?._t).toBe("fixed_index");
-            if (row?._t === "fixed_index") {
-                expect(row.prefixItems).toHaveLength(1);
-                expect(row.prefixItems[0]).toMatchObject({ _t: "enum", enum: ["pwm"] });
-                expect(row.minItems).toBe(1);
-                expect(row.maxItems).toBe(1);
-            }
+            const row = tuple_of(pwms.value.rows[0]);
+            expect(row?.cells).toHaveLength(1);
+            expect(row?.cells[0]).toMatchObject({ _t: "enum", enum: ["pwm"] });
+            expect(row?.minItems).toBe(1);
+            expect(row?.maxItems).toBe(1);
         }
     });
 
@@ -746,19 +730,17 @@ if (import.meta.vitest) {
         clock-frequency = <24000000>;
     };
 };`);
-        const properties = [{ key: "clocks", value: { _t: "array" as const, minItems: 2, maxItems: 4 } }];
+        const properties = [{ key: "clocks", value: open_list(2, 4) }];
         const result = query_devicetree(dt, properties, "{}");
         const clocks = result.find(p => p.key === "clocks");
         expect(clocks?.value._t).toBe("matrix");
         if (clocks?.value._t === "matrix") {
             expect(clocks.value.minItems).toBe(1);
             expect(clocks.value.maxItems).toBe(1);
-            const row = clocks.value.values[0];
-            expect(row?._t).toBe("fixed_index");
-            if (row?._t === "fixed_index") {
-                expect(row.minItems).toBe(1);
-                expect(row.maxItems).toBe(1);
-            }
+            const row = tuple_of(clocks.value.rows[0]);
+            expect(row).toBeDefined();
+            expect(row?.minItems).toBe(1);
+            expect(row?.maxItems).toBe(1);
         }
     });
 }

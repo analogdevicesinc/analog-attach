@@ -18,16 +18,19 @@
         {
             "key": "compatible",
             "value": {
-                "_t": "enum_array",
+                "_t": "list",
+                "item": {
+                    "_t": "enum",
+                    "enum": [
+                        "st,stm32f4-adc-core",
+                        "st,stm32h7-adc-core",
+                        "st,stm32mp1-adc-core",
+                        "st,stm32mp13-adc-core"
+                    ],
+                    "enum_type": "string"
+                },
                 "minItems": 1,
-                "maxItems": 1,
-                "enum": [
-                    "st,stm32f4-adc-core",
-                    "st,stm32h7-adc-core",
-                    "st,stm32mp1-adc-core",
-                    "st,stm32mp13-adc-core"
-                ],
-                "enum_type": "string"
+                "maxItems": 1
             }
         },
         {
@@ -36,13 +39,16 @@
                 "_t": "matrix",
                 "minItems": 1,
                 "maxItems": 1,
-                "values": [
+                "rows": [
                     {
-                        "_t": "number_array",
+                        "_t": "list",
+                        "item": {
+                            "_t": "number",
+                            "minimum": 0,
+                            "maximum": 4294967295
+                        },
                         "minItems": 1,
-                        "maxItems": 1,
-                        "minimum": 0,
-                        "maximum": 4294967295
+                        "maxItems": 1
                     }
                 ]
             }
@@ -54,10 +60,10 @@
                 "minItems": 1,
                 "maxItems": 2,
                 "description": "One or more interrupts for ADC block, depending on part used:\n  - stm32f4 and stm32h7 share a common ADC interrupt line.\n  - stm32mp1 has two separate interrupt lines, one for each ADC within\n    ADC block.\n  - stm32mp13 has an interrupt line per ADC block.\n",
-                "values": [
+                "rows": [
                     {
-                        "_t": "fixed_index",
-                        "prefixItems": [
+                        "_t": "list",
+                        "item": [
                             {
                                 "_t": "number"
                             },
@@ -86,29 +92,39 @@
         {
             "key": "interrupt-parent",
             "value": {
-                "_t": "enum_array",
+                "_t": "list",
+                "item": {
+                    "_t": "enum",
+                    "enum": [
+                        "gpio",
+                        "gicv2",
+                        "aon_intr"
+                    ],
+                    "enum_type": "phandle",
+                    "default": "gicv2"
+                },
                 "minItems": 1,
-                "maxItems": 1,
-                "enum": [
-                    "gpio",
-                    "gicv2",
-                    "aon_intr"
-                ],
-                "default": "gicv2",
-                "enum_type": "phandle"
+                "maxItems": 1
             }
         },
         {
             "key": "#interrupt-cells",
             "value": {
-                "_t": "const",
-                "const": 1
+                "_t": "scalar",
+                "cell": {
+                    "_t": "enum",
+                    "enum": [
+                        1
+                    ],
+                    "enum_type": "number"
+                },
+                "default": 1
             }
         },
         {
             "key": "interrupt-controller",
             "value": {
-                "_t": "boolean"
+                "_t": "flag"
             }
         },
         {
@@ -118,12 +134,12 @@
                 "minItems": 1,
                 "maxItems": 1,
                 "description": "Core can use up to two clocks, depending on part used:\n  - \"adc\" clock: for the analog circuitry, common to all ADCs.\n    It's required on stm32f4.\n    It's optional on stm32h7 and stm32mp1.\n  - \"bus\" clock: for registers access, common to all ADCs.\n    It's not present on stm32f4.\n    It's required on stm32h7 and stm32mp1.\n",
-                "values": [
+                "rows": [
                     {
-                        "_t": "fixed_index",
+                        "_t": "list",
                         "minItems": 1,
                         "maxItems": 1,
-                        "prefixItems": [
+                        "item": [
                             {
                                 "_t": "enum",
                                 "enum": [
@@ -142,58 +158,80 @@
         {
             "key": "clock-names",
             "value": {
-                "_t": "string_array",
+                "_t": "list",
+                "item": {
+                    "_t": "string"
+                },
                 "minItems": 1,
-                "maxItems": 2,
-                "unique_items": false
+                "maxItems": 2
             }
         },
         {
             "key": "vdda-supply",
             "value": {
-                "_t": "enum_array",
+                "_t": "list",
+                "item": {
+                    "_t": "enum",
+                    "enum": [
+                        "cam1_reg",
+                        "cam_dummy_reg",
+                        "sd_vcc_reg",
+                        "vdd_3v3_reg",
+                        "vdd_5v0_reg"
+                    ],
+                    "enum_type": "phandle"
+                },
                 "minItems": 1,
                 "maxItems": 1,
-                "enum": [
-                    "cam1_reg",
-                    "cam_dummy_reg",
-                    "sd_vcc_reg",
-                    "vdd_3v3_reg",
-                    "vdd_5v0_reg"
-                ],
-                "enum_type": "phandle",
                 "description": "Phandle to the vdda input analog voltage."
             }
         },
         {
             "key": "vref-supply",
             "value": {
-                "_t": "enum_array",
+                "_t": "list",
+                "item": {
+                    "_t": "enum",
+                    "enum": [
+                        "cam1_reg",
+                        "cam_dummy_reg",
+                        "sd_vcc_reg",
+                        "vdd_3v3_reg",
+                        "vdd_5v0_reg"
+                    ],
+                    "enum_type": "phandle"
+                },
                 "minItems": 1,
                 "maxItems": 1,
-                "enum": [
-                    "cam1_reg",
-                    "cam_dummy_reg",
-                    "sd_vcc_reg",
-                    "vdd_3v3_reg",
-                    "vdd_5v0_reg"
-                ],
-                "enum_type": "phandle",
                 "description": "Phandle to the vref input analog reference voltage."
             }
         },
         {
             "key": "#address-cells",
             "value": {
-                "_t": "const",
-                "const": 1
+                "_t": "scalar",
+                "cell": {
+                    "_t": "enum",
+                    "enum": [
+                        1
+                    ],
+                    "enum_type": "number"
+                },
+                "default": 1
             }
         },
         {
             "key": "#size-cells",
             "value": {
-                "_t": "const",
-                "const": 0
+                "_t": "scalar",
+                "cell": {
+                    "_t": "enum",
+                    "enum": [
+                        0
+                    ],
+                    "enum_type": "number"
+                },
+                "default": 0
             }
         },
         {
@@ -202,11 +240,14 @@
                 "_t": "matrix",
                 "minItems": 1,
                 "maxItems": 1,
-                "values": [
+                "rows": [
                     {
-                        "_t": "number_array",
-                        "minimum": 0,
-                        "maximum": 4294967295,
+                        "_t": "list",
+                        "item": {
+                            "_t": "number",
+                            "minimum": 0,
+                            "maximum": 4294967295
+                        },
                         "minItems": 1,
                         "maxItems": 1
                     }
@@ -217,34 +258,40 @@
         {
             "key": "booster-supply",
             "value": {
-                "_t": "enum_array",
+                "_t": "list",
+                "item": {
+                    "_t": "enum",
+                    "enum": [
+                        "cam1_reg",
+                        "cam_dummy_reg",
+                        "sd_vcc_reg",
+                        "vdd_3v3_reg",
+                        "vdd_5v0_reg"
+                    ],
+                    "enum_type": "phandle"
+                },
                 "minItems": 1,
                 "maxItems": 1,
-                "enum": [
-                    "cam1_reg",
-                    "cam_dummy_reg",
-                    "sd_vcc_reg",
-                    "vdd_3v3_reg",
-                    "vdd_5v0_reg"
-                ],
-                "enum_type": "phandle",
                 "description": "Phandle to the embedded booster regulator that can be used to supply ADC analog input switches on stm32h7 and stm32mp1."
             }
         },
         {
             "key": "vdd-supply",
             "value": {
-                "_t": "enum_array",
+                "_t": "list",
+                "item": {
+                    "_t": "enum",
+                    "enum": [
+                        "cam1_reg",
+                        "cam_dummy_reg",
+                        "sd_vcc_reg",
+                        "vdd_3v3_reg",
+                        "vdd_5v0_reg"
+                    ],
+                    "enum_type": "phandle"
+                },
                 "minItems": 1,
                 "maxItems": 1,
-                "enum": [
-                    "cam1_reg",
-                    "cam_dummy_reg",
-                    "sd_vcc_reg",
-                    "vdd_3v3_reg",
-                    "vdd_5v0_reg"
-                ],
-                "enum_type": "phandle",
                 "description": "Phandle to the vdd input voltage. It can be used to supply ADC analog input switches on stm32mp1."
             }
         },
@@ -254,20 +301,26 @@
                 "_t": "matrix",
                 "minItems": 1,
                 "maxItems": 1,
-                "description": "Phandle to system configuration controller. It can be used to control the analog circuitry on stm32mp1.",
-                "values": [
+                "rows": [
                     {
-                        "_t": "array",
+                        "_t": "list",
+                        "item": {
+                            "_t": "any"
+                        },
                         "minItems": 1,
                         "maxItems": 1024
                     }
-                ]
+                ],
+                "description": "Phandle to system configuration controller. It can be used to control the analog circuitry on stm32mp1."
             }
         },
         {
             "key": "access-controllers",
             "value": {
-                "_t": "array",
+                "_t": "list",
+                "item": {
+                    "_t": "any"
+                },
                 "minItems": 1,
                 "maxItems": 2
             }
@@ -281,16 +334,19 @@
                 {
                     "key": "compatible",
                     "value": {
-                        "_t": "enum_array",
+                        "_t": "list",
+                        "item": {
+                            "_t": "enum",
+                            "enum": [
+                                "st,stm32f4-adc",
+                                "st,stm32h7-adc",
+                                "st,stm32mp1-adc",
+                                "st,stm32mp13-adc"
+                            ],
+                            "enum_type": "string"
+                        },
                         "minItems": 1,
-                        "maxItems": 1,
-                        "enum": [
-                            "st,stm32f4-adc",
-                            "st,stm32h7-adc",
-                            "st,stm32mp1-adc",
-                            "st,stm32mp13-adc"
-                        ],
-                        "enum_type": "string"
+                        "maxItems": 1
                     }
                 },
                 {
@@ -300,13 +356,16 @@
                         "minItems": 1,
                         "maxItems": 1,
                         "description": "Offset of ADC instance in ADC block. Valid values are:\n  - 0x0:   ADC1\n  - 0x100: ADC2\n  - 0x200: ADC3 (stm32f4 only)\n",
-                        "values": [
+                        "rows": [
                             {
-                                "_t": "number_array",
+                                "_t": "list",
+                                "item": {
+                                    "_t": "number",
+                                    "minimum": 0,
+                                    "maximum": 4294967295
+                                },
                                 "minItems": 1,
-                                "maxItems": 1,
-                                "minimum": 0,
-                                "maximum": 4294967295
+                                "maxItems": 1
                             }
                         ]
                     }
@@ -314,22 +373,43 @@
                 {
                     "key": "#io-channel-cells",
                     "value": {
-                        "_t": "const",
-                        "const": 1
+                        "_t": "scalar",
+                        "cell": {
+                            "_t": "enum",
+                            "enum": [
+                                1
+                            ],
+                            "enum_type": "number"
+                        },
+                        "default": 1
                     }
                 },
                 {
                     "key": "#address-cells",
                     "value": {
-                        "_t": "const",
-                        "const": 1
+                        "_t": "scalar",
+                        "cell": {
+                            "_t": "enum",
+                            "enum": [
+                                1
+                            ],
+                            "enum_type": "number"
+                        },
+                        "default": 1
                     }
                 },
                 {
                     "key": "#size-cells",
                     "value": {
-                        "_t": "const",
-                        "const": 0
+                        "_t": "scalar",
+                        "cell": {
+                            "_t": "enum",
+                            "enum": [
+                                0
+                            ],
+                            "enum_type": "number"
+                        },
+                        "default": 0
                     }
                 },
                 {
@@ -339,10 +419,10 @@
                         "minItems": 1,
                         "maxItems": 1,
                         "description": "IRQ Line for the ADC instance. Valid values are:\n  - 0 for adc@0 (single adc for stm32mp13)\n  - 1 for adc@100\n  - 2 for adc@200 (stm32f4 only)\n",
-                        "values": [
+                        "rows": [
                             {
-                                "_t": "fixed_index",
-                                "prefixItems": [
+                                "_t": "list",
+                                "item": [
                                     {
                                         "_t": "number"
                                     },
@@ -375,12 +455,12 @@
                         "minItems": 1,
                         "maxItems": 1,
                         "description": "Input clock private to this ADC instance. It's required only on stm32f4, that has per instance clock input for registers access.",
-                        "values": [
+                        "rows": [
                             {
-                                "_t": "fixed_index",
+                                "_t": "list",
                                 "minItems": 1,
                                 "maxItems": 1,
-                                "prefixItems": [
+                                "item": [
                                     {
                                         "_t": "enum",
                                         "enum": [
@@ -403,12 +483,12 @@
                         "minItems": 1,
                         "maxItems": 1,
                         "description": "RX DMA Channel",
-                        "values": [
+                        "rows": [
                             {
-                                "_t": "fixed_index",
+                                "_t": "list",
                                 "minItems": 1,
                                 "maxItems": 1,
-                                "prefixItems": [
+                                "item": [
                                     {
                                         "_t": "enum",
                                         "enum": [
@@ -425,35 +505,44 @@
                 {
                     "key": "dma-names",
                     "value": {
-                        "_t": "enum_array",
+                        "_t": "list",
+                        "item": {
+                            "_t": "enum",
+                            "enum": [
+                                "rx"
+                            ],
+                            "enum_type": "string",
+                            "default": "rx"
+                        },
                         "minItems": 1,
-                        "maxItems": 1,
-                        "enum": [
-                            "rx"
-                        ],
-                        "default": "rx",
-                        "enum_type": "string"
+                        "maxItems": 1
                     }
                 },
                 {
                     "key": "assigned-resolution-bits",
                     "value": {
-                        "_t": "number_array",
+                        "_t": "list",
+                        "item": {
+                            "_t": "number",
+                            "minimum": 0,
+                            "maximum": 4294967295
+                        },
                         "minItems": 1,
                         "maxItems": 1,
-                        "minimum": 0,
-                        "maximum": 4294967295,
                         "description": "Resolution (bits) to use for conversions:\n  - can be 6, 8, 10 or 12 on stm32f4 and stm32mp13\n  - can be 8, 10, 12, 14 or 16 on stm32h7 and stm32mp1\n"
                     }
                 },
                 {
                     "key": "st,adc-channels",
                     "value": {
-                        "_t": "number_array",
+                        "_t": "list",
+                        "item": {
+                            "_t": "number",
+                            "minimum": 0,
+                            "maximum": 4294967295
+                        },
                         "minItems": 1,
                         "maxItems": 1,
-                        "minimum": 0,
-                        "maximum": 4294967295,
                         "typeSize": 32,
                         "description": "List of single-ended channels muxed for this ADC. It can have up to:\n  - 16 channels, numbered from 0 to 15 (for in0..in15) on stm32f4\n  - 19 channels, numbered from 0 to 18 (for in0..in18) on stm32mp13.\n  - 20 channels, numbered from 0 to 19 (for in0..in19) on stm32h7 and\n    stm32mp1.\n"
                     }
@@ -461,7 +550,10 @@
                 {
                     "key": "st,adc-diff-channels",
                     "value": {
-                        "_t": "array",
+                        "_t": "list",
+                        "item": {
+                            "_t": "any"
+                        },
                         "minItems": 1,
                         "maxItems": 1,
                         "description": "List of differential channels muxed for this ADC. Some channels can\nbe configured as differential instead of single-ended on stm32h7 and\non stm32mp1. Positive and negative inputs pairs are listed:\n<vinp vinn>, <vinp vinn>,... vinp and vinn are numbered from 0 to 19.\n\nNote: At least one of \"st,adc-channels\" or \"st,adc-diff-channels\" is\nrequired if no adc generic channel is defined. These legacy channel\nproperties are exclusive with adc generic channel bindings.\nBoth properties can be used together. Some channels can be\nused as single-ended and some other ones as differential (mixed). But\nchannels can't be configured both as single-ended and differential.\n"
@@ -470,11 +562,14 @@
                 {
                     "key": "st,min-sample-time-nsecs",
                     "value": {
-                        "_t": "number_array",
+                        "_t": "list",
+                        "item": {
+                            "_t": "number",
+                            "minimum": 0,
+                            "maximum": 4294967295
+                        },
                         "minItems": 1,
                         "maxItems": 1,
-                        "minimum": 0,
-                        "maximum": 4294967295,
                         "typeSize": 32,
                         "description": "Minimum sampling time in nanoseconds. Depending on hardware (board) e.g. high/low analog input source impedance, fine tune of ADC sampling time may be recommended. This can be either one value or an array that matches \"st,adc-channels\" and/or \"st,adc-diff-channels\" list, to set sample time resp. for all channels, or independently for each channel."
                     }
@@ -482,7 +577,10 @@
                 {
                     "key": "nvmem-cells",
                     "value": {
-                        "_t": "array",
+                        "_t": "list",
+                        "item": {
+                            "_t": "any"
+                        },
                         "minItems": 1,
                         "maxItems": 1
                     }
@@ -490,29 +588,35 @@
                 {
                     "key": "nvmem-cell-names",
                     "value": {
-                        "_t": "enum_array",
+                        "_t": "list",
+                        "item": {
+                            "_t": "enum",
+                            "enum": [
+                                "vrefint"
+                            ],
+                            "enum_type": "string",
+                            "default": "vrefint"
+                        },
                         "minItems": 1,
-                        "maxItems": 1,
-                        "enum": [
-                            "vrefint"
-                        ],
-                        "default": "vrefint",
-                        "enum_type": "string"
+                        "maxItems": 1
                     }
                 },
                 {
                     "key": "interrupt-parent",
                     "value": {
-                        "_t": "enum_array",
+                        "_t": "list",
+                        "item": {
+                            "_t": "enum",
+                            "enum": [
+                                "gpio",
+                                "gicv2",
+                                "aon_intr"
+                            ],
+                            "enum_type": "phandle",
+                            "default": "gicv2"
+                        },
                         "minItems": 1,
-                        "maxItems": 1,
-                        "enum": [
-                            "gpio",
-                            "gicv2",
-                            "aon_intr"
-                        ],
-                        "default": "gicv2",
-                        "enum_type": "phandle"
+                        "maxItems": 1
                     }
                 }
             ],
