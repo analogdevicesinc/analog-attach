@@ -48,10 +48,11 @@
         },
         "clock-names": {
             "type": "array",
-            "items": {
-                "type": "string",
-                "const": "mclk"
-            },
+            "items": [
+                {
+                    "const": "mclk"
+                }
+            ],
             "minItems": 1,
             "maxItems": 1
         },
@@ -62,10 +63,11 @@
         },
         "dma-names": {
             "type": "array",
-            "items": {
-                "type": "string",
-                "const": "rx"
-            },
+            "items": [
+                {
+                    "const": "rx"
+                }
+            ],
             "minItems": 1,
             "maxItems": 1
         },

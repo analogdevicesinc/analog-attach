@@ -178,7 +178,6 @@
             "value": {
                 "_t": "matrix",
                 "minItems": 1,
-                "maxItems": 1,
                 "rows": [
                     {
                         "_t": "list",
@@ -350,7 +349,6 @@
                             "maximum": 4294967295
                         },
                         "minItems": 1,
-                        "maxItems": 1,
                         "typeSize": 32,
                         "description": "List of single-ended channels muxed for this ADC. It can have up to:\n  - 16 channels, numbered from 0 to 15 (for in0..in15) on stm32f4\n  - 19 channels, numbered from 0 to 18 (for in0..in18) on stm32mp13.\n  - 20 channels, numbered from 0 to 19 (for in0..in19) on stm32h7 and\n    stm32mp1.\n"
                     }
@@ -363,7 +361,6 @@
                             "_t": "any"
                         },
                         "minItems": 1,
-                        "maxItems": 1,
                         "description": "List of differential channels muxed for this ADC. Some channels can\nbe configured as differential instead of single-ended on stm32h7 and\non stm32mp1. Positive and negative inputs pairs are listed:\n<vinp vinn>, <vinp vinn>,... vinp and vinn are numbered from 0 to 19.\n\nNote: At least one of \"st,adc-channels\" or \"st,adc-diff-channels\" is\nrequired if no adc generic channel is defined. These legacy channel\nproperties are exclusive with adc generic channel bindings.\nBoth properties can be used together. Some channels can be\nused as single-ended and some other ones as differential (mixed). But\nchannels can't be configured both as single-ended and differential.\n"
                     }
                 },
@@ -377,7 +374,6 @@
                             "maximum": 4294967295
                         },
                         "minItems": 1,
-                        "maxItems": 1,
                         "typeSize": 32,
                         "description": "Minimum sampling time in nanoseconds. Depending on hardware (board) e.g. high/low analog input source impedance, fine tune of ADC sampling time may be recommended. This can be either one value or an array that matches \"st,adc-channels\" and/or \"st,adc-diff-channels\" list, to set sample time resp. for all channels, or independently for each channel."
                     }

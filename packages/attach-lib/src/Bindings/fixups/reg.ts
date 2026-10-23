@@ -1,239 +1,67 @@
-import { DtBindingSchema } from "../Schema";
-import { find_entry_in_object, overwrite_object_with_path_value } from "../ObjectUtilities.js";
-import { PathValue } from "../UtilityTypes";
+import { FixupContext, PropertySchema } from "../FixupWalker.js";
 
-export function fixup_reg(binding: DtBindingSchema): DtBindingSchema {
+const SINGLE_VALUE_KEYWORDS = new Set(["const", "enum", "minimum", "maximum", "multipleOf"]);
 
-    // TODO: implement find first occurrence of 
-    const reg_property = find_entry_in_object(
-        binding,
-        (path, key, _value) => {
-            if (key !== 'reg') {
-                return false;
+/**
+ * dt-schema: `fixups.py:_fixup_reg_schema`. Wraps the cell constraints of `reg`
+ * as the items of a one-entry matrix (`reg = <addr size>, ...`).
+ *
+ * dt-schema only does so for an integer schema (a `types.yaml` type); we look at
+ * the schema's own shape, as the `$ref`s are gone by now.
+ */
+export function fixup_reg(schema: PropertySchema, { name }: FixupContext): PropertySchema {
+    if (name !== "reg" || typeof schema === "boolean") { return schema; }
+
+    const items = schema["items"] as Record<string, unknown> | unknown[] | undefined;
+
+    if (typeof items === "object" && items !== null && !("items" in items)) {
+        schema["items"] = [{ items: Array.isArray(items) ? items : [items] }];
+    } else if (items === undefined && "enum" in schema) {
+        const single: Record<string, unknown> = {};
+
+        for (const key of Object.keys(schema)) {
+            if (SINGLE_VALUE_KEYWORDS.has(key)) {
+                single[key] = schema[key];
+                delete schema[key];
             }
-
-            if (path.includes('allOf') || path.includes('oneOf') || path.includes('anyOf')) {
-                return false;
-            }
-
-            return true;
         }
-    );
 
-    const fixuped_reg: PathValue[] = reg_property.map(
-        (reg) => {
+        schema["items"] = [{ items: [single] }];
+    }
 
-            let new_reg = reg.value as Record<string, any>;
-
-            // TODO: atp it shouldn't be bool
-
-            if (
-                !(typeof new_reg === 'boolean') &&
-                !("items" in new_reg)
-            ) {
-                // TODO: find a case like this and see how to resolve
-            }
-
-            if (
-                !(typeof new_reg === 'boolean') &&
-                "items" in new_reg &&
-                !("items" in new_reg["items"])
-            ) {
-                let items;
-
-                items = Array.isArray(new_reg["items"]) ? structuredClone(new_reg["items"]) : [structuredClone(new_reg["items"])];
-
-                new_reg = overwrite_object_with_path_value(
-                    new_reg,
-                    [
-                        {
-                            path: ["items"],
-                            value: [{ "items": items }]
-                        }
-                    ]
-                );
-            }
-
-            if (
-                !(typeof new_reg === 'boolean') &&
-                !("items" in new_reg) &&
-                "enum" in new_reg
-            ) {
-                let new_value: Record<string, any> = {};
-
-                for (const [key, value] of Object.entries(new_reg)) {
-                    if (["const", "enum", "minimum", "maximum", "multipleOf"].includes(key)) {
-                        new_value[key] = structuredClone(value);
-                        delete new_reg[key];
-                    }
-                }
-
-                new_reg = overwrite_object_with_path_value(
-                    new_reg,
-                    [
-                        {
-                            path: ["items"],
-                            value: [{ "items": [new_value] }]
-                        }
-                    ]
-                );
-            }
-
-            return {
-                path: [...reg.path, reg.key],
-                value: { ...new_reg }
-            };
-
-        }
-    );
-
-    return overwrite_object_with_path_value(binding, fixuped_reg);
+    return schema;
 }
 
 if (import.meta.vitest) {
 
     const { test, expect } = import.meta.vitest;
 
+    const reg = (schema: PropertySchema, name = "reg") => fixup_reg(schema, { path: ["properties", name], name });
+
     test("reg items array", () => {
-
-        const binding: DtBindingSchema = {
-            $id: "test_id",
-            $schema: "test_schema",
-            title: "test_binding",
-            maintainers: ["test"],
-            select: true,
-            properties:
-            {
-                reg: {
-                    items: [
-                        {
-                            minimum: 0,
-                            maximum: 15,
-                        }
-                    ],
-                    minItems: 1,
-                    maxItems: 1
-                }
-            }
-        };
-
-        const fixuped = fixup_reg(binding);
-
-        expect(fixuped).toStrictEqual({
-            $id: "test_id",
-            $schema: "test_schema",
-            title: "test_binding",
-            maintainers: ["test"],
-            select: true,
-            properties:
-            {
-                reg: {
-                    items: [
-                        {
-                            items: [
-                                {
-                                    minimum: 0,
-                                    maximum: 15,
-                                }
-                            ]
-                        }
-                    ],
-                    minItems: 1,
-                    maxItems: 1
-                }
-            }
+        expect(reg({ items: [{ minimum: 0, maximum: 15 }], minItems: 1, maxItems: 1 })).toStrictEqual({
+            items: [{ items: [{ minimum: 0, maximum: 15 }] }],
+            minItems: 1,
+            maxItems: 1,
         });
     });
 
     test("reg items object", () => {
-
-        const binding: DtBindingSchema = {
-            $id: "test_id",
-            $schema: "test_schema",
-            title: "test_binding",
-            maintainers: ["test"],
-            select: true,
-            properties:
-            {
-                reg: {
-                    items: {
-                        minimum: 0,
-                        maximum: 15,
-                    },
-                    minItems: 1,
-                    maxItems: 1
-                }
-            }
-        };
-
-        const fixuped = fixup_reg(binding);
-
-        expect(fixuped).toStrictEqual({
-            $id: "test_id",
-            $schema: "test_schema",
-            title: "test_binding",
-            maintainers: ["test"],
-            select: true,
-            properties:
-            {
-                reg: {
-                    items: [
-                        {
-                            items: [
-                                {
-                                    minimum: 0,
-                                    maximum: 15,
-                                }
-                            ]
-                        }
-                    ],
-                    minItems: 1,
-                    maxItems: 1
-                }
-            }
+        expect(reg({ items: { minimum: 0, maximum: 15 }, minItems: 1, maxItems: 1 })).toStrictEqual({
+            items: [{ items: [{ minimum: 0, maximum: 15 }] }],
+            minItems: 1,
+            maxItems: 1,
         });
     });
 
     test("reg no items", () => {
+        expect(reg({ enum: [0, 1] })).toStrictEqual({ items: [{ items: [{ enum: [0, 1] }] }] });
+    });
 
-        const binding: DtBindingSchema = {
-            $id: "test_id",
-            $schema: "test_schema",
-            title: "test_binding",
-            maintainers: ["test"],
-            select: true,
-            properties:
-            {
-                reg: {
-                    enum: [0, 1]
-                }
-            }
-        };
-
-        const fixuped = fixup_reg(binding);
-
-        expect(fixuped).toStrictEqual({
-            $id: "test_id",
-            $schema: "test_schema",
-            title: "test_binding",
-            maintainers: ["test"],
-            select: true,
-            properties:
-            {
-                reg: {
-                    items: [
-                        {
-                            items: [
-                                {
-                                    enum: [0, 1]
-                                }
-                            ]
-                        }
-                    ],
-                }
-            }
-        });
-
-
+    test("reg that already is a matrix, another property and a boolean are left alone", () => {
+        const matrix = { items: { items: [{ minimum: 0 }] } };
+        expect(reg(structuredClone(matrix))).toStrictEqual(matrix);
+        expect(reg({ enum: [0, 1] }, "other")).toStrictEqual({ enum: [0, 1] });
+        expect(reg(true)).toBe(true);
     });
 }

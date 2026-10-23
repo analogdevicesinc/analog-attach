@@ -105,8 +105,7 @@
                     "minimum": 0,
                     "maximum": 4294967295
                 }
-            },
-            "maxItems": 1
+            }
         },
         "interrupt-controller": true,
         "#interrupt-cells": {
@@ -152,7 +151,14 @@
                         "type": "array"
                     },
                     "clock-names": {
-                        "const": "adc"
+                        "type": "array",
+                        "items": [
+                            {
+                                "const": "adc"
+                            }
+                        ],
+                        "minItems": 1,
+                        "maxItems": 1
                     },
                     "interrupts": {
                         "items": [
@@ -160,7 +166,9 @@
                                 "description": "interrupt line common for all ADCs"
                             }
                         ],
-                        "type": "array"
+                        "type": "array",
+                        "minItems": 1,
+                        "maxItems": 1
                     },
                     "st,max-clk-rate-hz": {
                         "minimum": 600000,
@@ -171,7 +179,12 @@
                     "booster-supply": false,
                     "vdd-supply": false,
                     "st,syscfg": false,
-                    "__canary__": false
+                    "__canary__": false,
+                    "interrupt-parent": {
+                        "minItems": 1,
+                        "maxItems": 1,
+                        "type": "array"
+                    }
                 }
             }
         },
@@ -198,6 +211,7 @@
                         "type": "array"
                     },
                     "clock-names": {
+                        "type": "array",
                         "items": [
                             {
                                 "const": "bus"
@@ -207,7 +221,7 @@
                             }
                         ],
                         "minItems": 1,
-                        "type": "array"
+                        "maxItems": 2
                     },
                     "interrupts": {
                         "items": [
@@ -215,7 +229,9 @@
                                 "description": "interrupt line common for all ADCs"
                             }
                         ],
-                        "type": "array"
+                        "type": "array",
+                        "minItems": 1,
+                        "maxItems": 1
                     },
                     "st,max-clk-rate-hz": {
                         "minimum": 120000,
@@ -225,7 +241,12 @@
                     },
                     "vdd-supply": false,
                     "st,syscfg": false,
-                    "__canary__": false
+                    "__canary__": false,
+                    "interrupt-parent": {
+                        "minItems": 1,
+                        "maxItems": 1,
+                        "type": "array"
+                    }
                 }
             }
         },
@@ -252,6 +273,7 @@
                         "type": "array"
                     },
                     "clock-names": {
+                        "type": "array",
                         "items": [
                             {
                                 "const": "bus"
@@ -261,7 +283,7 @@
                             }
                         ],
                         "minItems": 1,
-                        "type": "array"
+                        "maxItems": 2
                     },
                     "interrupts": {
                         "items": [
@@ -272,7 +294,9 @@
                                 "description": "interrupt line for ADC2"
                             }
                         ],
-                        "type": "array"
+                        "type": "array",
+                        "minItems": 2,
+                        "maxItems": 2
                     },
                     "st,max-clk-rate-hz": {
                         "minimum": 120000,
@@ -280,7 +304,12 @@
                         "default": 36000000,
                         "type": "integer"
                     },
-                    "__canary__": false
+                    "__canary__": false,
+                    "interrupt-parent": {
+                        "minItems": 1,
+                        "maxItems": 1,
+                        "type": "array"
+                    }
                 }
             }
         },
@@ -307,6 +336,7 @@
                         "type": "array"
                     },
                     "clock-names": {
+                        "type": "array",
                         "items": [
                             {
                                 "const": "bus"
@@ -316,7 +346,7 @@
                             }
                         ],
                         "minItems": 1,
-                        "type": "array"
+                        "maxItems": 2
                     },
                     "interrupts": {
                         "items": [
@@ -324,7 +354,9 @@
                                 "description": "ADC interrupt line"
                             }
                         ],
-                        "type": "array"
+                        "type": "array",
+                        "minItems": 1,
+                        "maxItems": 1
                     },
                     "st,max-clk-rate-hz": {
                         "minimum": 150000,
@@ -332,7 +364,12 @@
                         "default": 75000000,
                         "type": "integer"
                     },
-                    "__canary__": false
+                    "__canary__": false,
+                    "interrupt-parent": {
+                        "minItems": 1,
+                        "maxItems": 1,
+                        "type": "array"
+                    }
                 }
             }
         }
@@ -424,10 +461,11 @@
                 },
                 "dma-names": {
                     "type": "array",
-                    "items": {
-                        "type": "string",
-                        "const": "rx"
-                    },
+                    "items": [
+                        {
+                            "const": "rx"
+                        }
+                    ],
                     "minItems": 1,
                     "maxItems": 1
                 },
@@ -444,8 +482,7 @@
                         "typeSize": 32,
                         "minimum": 0,
                         "maximum": 4294967295
-                    },
-                    "maxItems": 1
+                    }
                 },
                 "st,adc-diff-channels": {
                     "description": "List of differential channels muxed for this ADC. Some channels can\nbe configured as differential instead of single-ended on stm32h7 and\non stm32mp1. Positive and negative inputs pairs are listed:\n<vinp vinn>, <vinp vinn>,... vinp and vinn are numbered from 0 to 19.\n\nNote: At least one of \"st,adc-channels\" or \"st,adc-diff-channels\" is\nrequired if no adc generic channel is defined. These legacy channel\nproperties are exclusive with adc generic channel bindings.\nBoth properties can be used together. Some channels can be\nused as single-ended and some other ones as differential (mixed). But\nchannels can't be configured both as single-ended and differential.\n",
@@ -470,8 +507,7 @@
                     },
                     "deprecated": true,
                     "type": "array",
-                    "minItems": 1,
-                    "maxItems": 1
+                    "minItems": 1
                 },
                 "st,min-sample-time-nsecs": {
                     "description": "Minimum sampling time in nanoseconds. Depending on hardware (board) e.g. high/low analog input source impedance, fine tune of ADC sampling time may be recommended. This can be either one value or an array that matches \"st,adc-channels\" and/or \"st,adc-diff-channels\" list, to set sample time resp. for all channels, or independently for each channel.",
@@ -483,8 +519,7 @@
                         "typeSize": 32,
                         "minimum": 0,
                         "maximum": 4294967295
-                    },
-                    "maxItems": 1
+                    }
                 },
                 "nvmem-cells": {
                     "items": [
@@ -592,14 +627,7 @@
                         "properties": {
                             "compatible": {
                                 "contains": {
-                                    "items": [
-                                        {
-                                            "const": "st,stm32f4-adc"
-                                        }
-                                    ],
-                                    "type": "array",
-                                    "minItems": 1,
-                                    "maxItems": 1
+                                    "const": "st,stm32f4-adc"
                                 },
                                 "type": "array"
                             }
@@ -612,11 +640,25 @@
                     "then": {
                         "properties": {
                             "reg": {
-                                "enum": [
-                                    0,
-                                    256,
-                                    512
-                                ]
+                                "items": [
+                                    {
+                                        "items": [
+                                            {
+                                                "enum": [
+                                                    0,
+                                                    256,
+                                                    512
+                                                ]
+                                            }
+                                        ],
+                                        "type": "array",
+                                        "minItems": 1,
+                                        "maxItems": 1
+                                    }
+                                ],
+                                "type": "array",
+                                "minItems": 1,
+                                "maxItems": 1
                             },
                             "interrupts": {
                                 "minimum": 0,
@@ -669,17 +711,10 @@
                         "properties": {
                             "compatible": {
                                 "contains": {
-                                    "items": [
-                                        {
-                                            "enum": [
-                                                "st,stm32h7-adc",
-                                                "st,stm32mp1-adc"
-                                            ]
-                                        }
-                                    ],
-                                    "type": "array",
-                                    "minItems": 1,
-                                    "maxItems": 1
+                                    "enum": [
+                                        "st,stm32h7-adc",
+                                        "st,stm32mp1-adc"
+                                    ]
                                 },
                                 "type": "array"
                             }
@@ -692,10 +727,24 @@
                     "then": {
                         "properties": {
                             "reg": {
-                                "enum": [
-                                    0,
-                                    256
-                                ]
+                                "items": [
+                                    {
+                                        "items": [
+                                            {
+                                                "enum": [
+                                                    0,
+                                                    256
+                                                ]
+                                            }
+                                        ],
+                                        "type": "array",
+                                        "minItems": 1,
+                                        "maxItems": 1
+                                    }
+                                ],
+                                "type": "array",
+                                "minItems": 1,
+                                "maxItems": 1
                             },
                             "interrupts": {
                                 "minimum": 0,
@@ -745,14 +794,7 @@
                         "properties": {
                             "compatible": {
                                 "contains": {
-                                    "items": [
-                                        {
-                                            "const": "st,stm32mp13-adc"
-                                        }
-                                    ],
-                                    "type": "array",
-                                    "minItems": 1,
-                                    "maxItems": 1
+                                    "const": "st,stm32mp13-adc"
                                 },
                                 "type": "array"
                             }

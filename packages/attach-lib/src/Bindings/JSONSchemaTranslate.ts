@@ -189,6 +189,55 @@ function described<T extends object>(schema: any, type: T): T & { description?: 
     return schema.description === undefined ? type : { ...type, description: schema.description };
 }
 
+/**
+ * A `oneOf` of lists that each hold exactly their `enum` / `const` entries (the values a `compatible` can take,
+ * the fallback lists among them) is one list of one such value.
+ */
+function fixed_size_enum_list(object: any): AttachType | undefined {
+    const oneOf: any[] = object.oneOf;
+
+    const only_fixed_size_arrays = oneOf.every((value) => {
+        if (!("items" in value)) { return false; }
+        if (!("type" in value)) { return false; }
+        if (value.type !== "array") { return false; }
+        if (!("minItems" in value)) { return false; }
+        if (!("maxItems" in value)) { return false; }
+        if (value.minItems !== value.maxItems) { return false; }
+
+        if (!Array.isArray(value.items)) {
+            return false;
+        }
+
+        for (const element of value.items) {
+            if (!Object.entries(element).some((value) => value[0] === "enum" || value[0] === "const")) {
+                return false;
+            }
+        }
+
+        return true;
+    });
+
+    if (!only_fixed_size_arrays) { return undefined; }
+
+    let enum_accumulator: unknown[] = [];
+
+    for (const entry of oneOf) {
+        if (entry.items.length === 1 && "enum" in entry.items[0]) {
+            enum_accumulator = [...enum_accumulator, ...entry.items[0].enum];
+            continue;
+        }
+        // TODO: https://github.com/analogdevicesinc/linux/blob/main/Documentation/devicetree/bindings/iio/imu/st%2Clsm6dsx.yaml
+        enum_accumulator.push(entry.items.map((item: any) => item.const));
+    }
+
+    return described(object, {
+        _t: "list" as const,
+        item: enum_cell(enum_accumulator),
+        minItems: 1,
+        maxItems: 1,
+    });
+}
+
 // TODO: handle objects
 function narrow_object(object: any): AttachType {
 
@@ -249,53 +298,9 @@ function narrow_object(object: any): AttachType {
         return described(object, { _t: "flag" });
     }
 
-    if (
-        typeof object === 'object' &&
-        "oneOf" in object &&
-        Array.isArray(object.oneOf)
-    ) {
-        const oneOf: any[] = object.oneOf;
-
-        const only_fixed_size_arrays = oneOf.every((value) => {
-            if (!("items" in value)) { return false; }
-            if (!("type" in value)) { return false; }
-            if (value.type !== "array") { return false; }
-            if (!("minItems" in value)) { return false; }
-            if (!("maxItems" in value)) { return false; }
-            if (value.minItems !== value.maxItems) { return false; }
-
-            if (!Array.isArray(value.items)) {
-                return false;
-            }
-
-            for (const element of value.items) {
-                if (!Object.entries(element).some((value) => value[0] === "enum" || value[0] === "const")) {
-                    return false;
-                }
-            }
-
-            return true;
-        });
-
-        if (only_fixed_size_arrays === true) {
-            let enum_accumulator: unknown[] = [];
-
-            for (const entry of oneOf) {
-                if (entry.items.length === 1 && "enum" in entry.items[0]) {
-                    enum_accumulator = [...enum_accumulator, ...entry.items[0].enum];
-                    continue;
-                }
-                // TODO: https://github.com/analogdevicesinc/linux/blob/main/Documentation/devicetree/bindings/iio/imu/st%2Clsm6dsx.yaml
-                enum_accumulator.push(entry.items.map((item: any) => item.const));
-            }
-
-            return described(object, {
-                _t: "list",
-                item: enum_cell(enum_accumulator),
-                minItems: 1,
-                maxItems: 1,
-            });
-        }
+    if (typeof object === 'object' && Array.isArray(object.oneOf)) {
+        const enum_list = fixed_size_enum_list(object);
+        if (enum_list !== undefined) { return enum_list; }
     }
 
     if (
@@ -421,6 +426,12 @@ function narrow_array_object(object: any): AttachType & { _t: "list" } {
     // String array with type inside items array
     if (items_array && items.length === 1 && "type" in items[0] && items[0].type === "string") {
         return list({ _t: "string" }, unique);
+    }
+
+    // A `compatible` with a `pattern` is an array by now; its `oneOf` of fixed lists says more.
+    if (Array.isArray(object.oneOf)) {
+        const enum_list = fixed_size_enum_list(object);
+        if (enum_list?._t === "list" && !Array.isArray(enum_list.item) && enum_list.item._t === "enum" && enum_list.item.enum.length > 0) { return enum_list; }
     }
 
     // Array of whatever

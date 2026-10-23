@@ -74,15 +74,16 @@
         },
         "interrupt-names": {
             "type": "array",
-            "items": {
-                "type": "string",
-                "enum": [
-                    "int",
-                    "clk",
-                    "p2",
-                    "dout"
-                ]
-            },
+            "items": [
+                {
+                    "enum": [
+                        "int",
+                        "clk",
+                        "p2",
+                        "dout"
+                    ]
+                }
+            ],
             "minItems": 1,
             "description": "Specify which interrupt pin should be configured as Data Ready / FIFO\ninterrupt.\nDefault if not supplied is int.\n",
             "maxItems": 1

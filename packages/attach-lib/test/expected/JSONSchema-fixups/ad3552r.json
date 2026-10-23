@@ -506,7 +506,9 @@
                                                 ]
                                             }
                                         ],
-                                        "type": "array"
+                                        "type": "array",
+                                        "minItems": 2,
+                                        "maxItems": 2
                                     },
                                     {
                                         "items": [
@@ -517,7 +519,9 @@
                                                 "const": 7500000
                                             }
                                         ],
-                                        "type": "array"
+                                        "type": "array",
+                                        "minItems": 2,
+                                        "maxItems": 2
                                     },
                                     {
                                         "items": [
@@ -528,7 +532,9 @@
                                                 "const": 5000000
                                             }
                                         ],
-                                        "type": "array"
+                                        "type": "array",
+                                        "minItems": 2,
+                                        "maxItems": 2
                                     }
                                 ]
                             }
@@ -582,7 +588,9 @@
                                                 ]
                                             }
                                         ],
-                                        "type": "array"
+                                        "type": "array",
+                                        "minItems": 2,
+                                        "maxItems": 2
                                     },
                                     {
                                         "items": [
@@ -593,7 +601,9 @@
                                                 "const": 5000000
                                             }
                                         ],
-                                        "type": "array"
+                                        "type": "array",
+                                        "minItems": 2,
+                                        "maxItems": 2
                                     },
                                     {
                                         "items": [
@@ -604,7 +614,9 @@
                                                 "const": 10000000
                                             }
                                         ],
-                                        "type": "array"
+                                        "type": "array",
+                                        "minItems": 2,
+                                        "maxItems": 2
                                     }
                                 ]
                             }

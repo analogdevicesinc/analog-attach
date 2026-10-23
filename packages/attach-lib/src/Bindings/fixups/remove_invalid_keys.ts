@@ -1,61 +1,34 @@
-import { DtBindingSchema } from "../Schema";
-import { find_entry_in_object, delete_path } from "../ObjectUtilities.js";
+import { NodeFixup } from "../FixupWalker.js";
 
-export function fixup_remove_invalid_keys(binding: DtBindingSchema): DtBindingSchema {
-
-    const schema_tags = find_entry_in_object(binding,
-        (_path, key, _value) => {
-            if (key === "$schema" || key === "maintainers" || key === "select") {
-                return true;
-            }
-
-            return false;
-        }
-    );
-
-    const schema_tags_paths = schema_tags.map((value) => { return [...value.path, value.key]; });
-
-    return delete_path(binding, schema_tags_paths);
-}
+/**
+ * dt-schema: `fixups.py:fixup_schema` drops the parts of a schema file that validation doesn't
+ * need (`maintainers`, ...). A binding that includes other schema files carries theirs too,
+ * so this runs on every node schema. `$schema` and `select` go as well: neither means anything to AJV.
+ */
+export const fixup_remove_invalid_keys: NodeFixup = (schema) => {
+    delete schema["$schema"];
+    delete schema["maintainers"];
+    delete schema["select"];
+};
 
 if (import.meta.vitest) {
 
     const { test, expect } = import.meta.vitest;
 
-    test(fixup_remove_invalid_keys, () => {
-
-        const binding: DtBindingSchema = {
+    test("a node schema loses what validation doesn't need; its properties are not touched", () => {
+        const schema = {
             $id: "test_id",
             $schema: "test_schema",
             title: "test_binding",
             maintainers: ["test"],
             select: true,
-            properties:
-            {
-                compatible: {
-                    enum: [
-                        "one",
-                        "two"
-                    ]
-                }
-
-            }
+            properties: { select: { description: "a property that happens to be named select" }, compatible: { enum: ["one"] } },
         };
-
-        const fixuped = fixup_remove_invalid_keys(binding);
-
-        expect(fixuped).toStrictEqual({
+        fixup_remove_invalid_keys(schema, []);
+        expect(schema).toStrictEqual({
             $id: "test_id",
             title: "test_binding",
-            properties: {
-                compatible: {
-                    enum: [
-                        "one",
-                        "two"
-                    ]
-                }
-
-            }
+            properties: { select: { description: "a property that happens to be named select" }, compatible: { enum: ["one"] } },
         });
     });
 }

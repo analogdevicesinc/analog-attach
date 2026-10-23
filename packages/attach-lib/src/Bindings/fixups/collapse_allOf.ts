@@ -1,20 +1,22 @@
 import { DtBindingSchema } from "../Schema";
 import { find_entry_in_object, overwrite_object_with_path_value } from "../ObjectUtilities.js";
+import { is_node_pattern } from "../PatternKind.js";
 
 export function fixup_collapse_allOf(binding: DtBindingSchema): DtBindingSchema {
 
     const properties = find_entry_in_object(
         binding,
-        (path, _key, _value) => {
-            if (path.at(0) !== 'properties') {
-                return false;
-            }
-
+        (path, key, value) => {
             if (path.length !== 1) {
                 return false;
             }
 
-            return true;
+            // The properties, and the patterns that name properties rather than child nodes.
+            if (path[0] === 'properties') {
+                return true;
+            }
+
+            return path[0] === 'patternProperties' && !is_node_pattern(key, value);
         }
     );
 

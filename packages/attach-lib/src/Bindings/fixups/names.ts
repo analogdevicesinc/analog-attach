@@ -1,64 +1,34 @@
-import { DtBindingSchema } from "../Schema";
-import { find_entry_in_object, overwrite_object_with_path_value } from "../ObjectUtilities";
+import { FixupContext, PropertySchema } from "../FixupWalker.js";
 
-export function fixup_names_arrays(binding: DtBindingSchema): DtBindingSchema {
+/**
+ * dt-schema's `schemas/dt-core.yaml` types every `.*-names$` property as
+ * `types.yaml#/definitions/non-unique-string-array` (`type: array`, `items: {type: string}`,
+ * `minItems: 1`). dt-schema checks that as a separate schema on every node; we don't apply
+ * dt-core, so the binding's own schema gets it. What the binding gives (its `items`, a bound) wins.
+ */
+export function fixup_names(schema: PropertySchema, { name }: FixupContext): PropertySchema {
+    if (!name.endsWith("-names") || typeof schema === "boolean") { return schema; }
 
-    const names_properties = find_entry_in_object(
-        binding,
-        (path: string[], key: string, value: unknown) => {
-            const properties = path.at(-1);
+    return { type: "array", items: { type: "string" }, minItems: 1, ...schema };
+}
 
-            if (properties === undefined) {
-                return false;
-            }
+if (import.meta.vitest) {
 
-            if (path.includes("if") || path.includes("then") || path.includes("else")) {
-                return false;
-            }
+    const { test, expect } = import.meta.vitest;
 
-            if (properties !== "properties") {
-                return false;
-            }
+    const names = (schema: PropertySchema, name = "clock-names") => fixup_names(schema, { path: ["properties", name], name });
 
-            return key.endsWith("-names") && typeof value !== "boolean";
-        }
-    );
+    test("a names property without items is a list of strings", () => {
+        expect(names({ description: "d" })).toStrictEqual({ type: "array", items: { type: "string" }, minItems: 1, description: "d" });
+    });
 
-    const fixuped_names_properties = names_properties.map(
-        (names_property) => {
+    test("what the schema gives wins", () => {
+        const given = { items: [{ const: "mclk" }], minItems: 2 };
+        expect(names(given)).toStrictEqual({ type: "array", items: [{ const: "mclk" }], minItems: 2 });
+    });
 
-            const names_definition = {
-                type: "array",
-                items: { type: "string" },
-                minItems: 1
-            };
-
-            const original_definition: Record<string, unknown> = structuredClone(names_property.value as Record<string, unknown>);
-
-            if ("enum" in original_definition) {
-                const enum_value: Record<"enum", unknown> = {
-                    enum: structuredClone(original_definition["enum"])
-                };
-
-                delete original_definition["enum"];
-
-                names_definition.items = { ...names_definition.items, ...enum_value };
-            } else if ("const" in original_definition) {
-                const const_value: Record<"const", unknown> = {
-                    const: structuredClone(original_definition["const"])
-                };
-
-                delete original_definition["const"];
-
-                names_definition.items = { ...names_definition.items, ...const_value };
-            }
-
-            return {
-                path: [...names_property.path, names_property.key],
-                value: { ...names_definition, ...original_definition }
-            };
-        }
-    );
-
-    return overwrite_object_with_path_value(binding, fixuped_names_properties);
+    test("another property and a boolean are left alone", () => {
+        expect(names({ description: "d" }, "clocks")).toStrictEqual({ description: "d" });
+        expect(names(true)).toBe(true);
+    });
 }
