@@ -192,7 +192,6 @@
                     "maximum": 4294967295
                 },
                 "minItems": 1,
-                "maxItems": 1,
                 "description": "Delay in nanoseconds to be introduced by the controller after CS is asserted."
             }
         },
@@ -206,7 +205,6 @@
                     "maximum": 4294967295
                 },
                 "minItems": 1,
-                "maxItems": 1,
                 "description": "Delay in nanoseconds to be introduced by the controller before CS is de-asserted."
             }
         },
@@ -220,7 +218,6 @@
                     "maximum": 4294967295
                 },
                 "minItems": 1,
-                "maxItems": 1,
                 "description": "Delay in nanoseconds to be introduced by the controller after CS is de-asserted."
             }
         },
@@ -254,7 +251,6 @@
                     "maximum": 4294967295
                 },
                 "minItems": 1,
-                "maxItems": 1,
                 "description": "Delay, in microseconds, after a read transfer."
             }
         },
@@ -268,7 +264,6 @@
                     "maximum": 4294967295
                 },
                 "minItems": 1,
-                "maxItems": 1,
                 "description": "SPI Rx sample delay offset, unit is nanoseconds. The delay from the default sample time before the actual sample of the rxd input signal occurs."
             }
         },
@@ -302,7 +297,6 @@
                     "maximum": 4294967295
                 },
                 "minItems": 1,
-                "maxItems": 1,
                 "description": "Delay, in microseconds, after a write transfer."
             }
         },
@@ -346,7 +340,6 @@
                     "maximum": 4294967295
                 },
                 "minItems": 1,
-                "maxItems": 1,
                 "description": "Only for STM32H7, (Master Inter-Data Idleness) minimum time\ndelay in nanoseconds inserted between two consecutive data frames.\n"
             }
         },
@@ -479,7 +472,6 @@
                     "maximum": 4294967295
                 },
                 "minItems": 1,
-                "maxItems": 1,
                 "description": "Delay in nanoseconds for the length that the master mode chip select outputs are de-asserted between transactions."
             }
         },
@@ -493,7 +485,6 @@
                     "maximum": 4294967295
                 },
                 "minItems": 1,
-                "maxItems": 1,
                 "description": "Delay in nanoseconds between one chip select being de-activated and the activation of another."
             }
         },
@@ -507,7 +498,6 @@
                     "maximum": 4294967295
                 },
                 "minItems": 1,
-                "maxItems": 1,
                 "description": "Delay in nanoseconds between last bit of current transaction and deasserting the device chip select (qspi_n_ss_out)."
             }
         },
@@ -521,7 +511,6 @@
                     "maximum": 4294967295
                 },
                 "minItems": 1,
-                "maxItems": 1,
                 "description": "Delay in nanoseconds between setting qspi_n_ss_out low and first bit transfer."
             }
         },

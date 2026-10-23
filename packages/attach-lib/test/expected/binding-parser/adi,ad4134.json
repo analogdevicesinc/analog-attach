@@ -144,7 +144,19 @@
         {
             "key": "refin-supply",
             "value": {
-                "_t": "unknown"
+                "_t": "matrix",
+                "minItems": 1,
+                "maxItems": 1,
+                "rows": [
+                    {
+                        "_t": "list",
+                        "item": {
+                            "_t": "any"
+                        },
+                        "minItems": 1,
+                        "maxItems": 1
+                    }
+                ]
             }
         },
         {
@@ -195,19 +207,55 @@
         {
             "key": "avdd5-supply",
             "value": {
-                "_t": "unknown"
+                "_t": "matrix",
+                "minItems": 1,
+                "maxItems": 1,
+                "rows": [
+                    {
+                        "_t": "list",
+                        "item": {
+                            "_t": "any"
+                        },
+                        "minItems": 1,
+                        "maxItems": 1
+                    }
+                ]
             }
         },
         {
             "key": "avdd1v8-supply",
             "value": {
-                "_t": "unknown"
+                "_t": "matrix",
+                "minItems": 1,
+                "maxItems": 1,
+                "rows": [
+                    {
+                        "_t": "list",
+                        "item": {
+                            "_t": "any"
+                        },
+                        "minItems": 1,
+                        "maxItems": 1
+                    }
+                ]
             }
         },
         {
             "key": "iovdd-supply",
             "value": {
-                "_t": "unknown"
+                "_t": "matrix",
+                "minItems": 1,
+                "maxItems": 1,
+                "rows": [
+                    {
+                        "_t": "list",
+                        "item": {
+                            "_t": "any"
+                        },
+                        "minItems": 1,
+                        "maxItems": 1
+                    }
+                ]
             }
         }
     ],

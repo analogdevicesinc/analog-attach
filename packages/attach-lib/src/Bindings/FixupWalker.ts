@@ -80,16 +80,17 @@ export function walk_node_schema(schema: unknown, fixups: Fixups, path: string[]
  * conditionals. Models `fixups.py:walk_properties` and `fixup_vals`.
  */
 export function walk_property(schema: PropertySchema, fixups: Fixups, path: string[], name: string): PropertySchema {
-    if (!is_schema(schema)) { return schema; }
+    // `true` is a schema that says nothing yet (`properties: { clocks: true }`); the fixups may give it a type
+    if (schema === false || (!is_schema(schema) && schema !== true)) { return schema; }
 
-    for (const key of CONDITIONAL_KEYS) {
-        const branches = schema[key];
+    for (const key of is_schema(schema) ? CONDITIONAL_KEYS : []) {
+        const branches = (schema as Schema)[key];
         if (Array.isArray(branches)) {
-            schema[key] = branches.map(branch => walk_property(branch as PropertySchema, fixups, [...path, key], name));
+            (schema as Schema)[key] = branches.map(branch => walk_property(branch as PropertySchema, fixups, [...path, key], name));
         }
     }
 
-    if ("then" in schema) {
+    if (is_schema(schema) && "then" in schema) {
         // eslint-disable-next-line unicorn/no-thenable
         schema["then"] = walk_property(schema["then"] as PropertySchema, fixups, [...path, "then"], name);
     }

@@ -181,6 +181,12 @@ function number_cell(schema: any, default_value?: unknown): Cell {
     };
 }
 
+/** A schema of a number: an integer, or bounded (`mark_integers` types them, a unit property's cells come after it). */
+function is_number_schema(schema: any): boolean {
+    return typeof schema === "object" && schema !== null && !("enum" in schema || "const" in schema) &&
+        (schema.type === "integer" || "minimum" in schema || "maximum" in schema);
+}
+
 /** The bounds a schema gives, left out of the type when it doesn't. */
 function bounds(schema: any): Pick<List, "minItems" | "maxItems"> {
     return {
@@ -430,12 +436,12 @@ function narrow_array_object(object: any): AttachType & { _t: "list" } {
     }
 
     // Integer array with definition in items
-    if ("items" in object && "type" in items && items.type === "integer") {
+    if ("items" in object && is_number_schema(items)) {
         return list(number_cell(items, object.default), items.typeSize === undefined ? {} : { typeSize: items.typeSize });
     }
 
     // Integer array with definition in items but items is an array
-    if (items_array && items.length === 1 && "type" in items[0] && items[0].type === "integer") {
+    if (items_array && items.length === 1 && is_number_schema(items[0])) {
         return list(number_cell(items[0], object.default), items[0].typeSize === undefined ? {} : { typeSize: items[0].typeSize });
     }
 

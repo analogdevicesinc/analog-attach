@@ -142,21 +142,39 @@
         {
             "key": "spi-cs-setup-delay-ns",
             "value": {
-                "_t": "unknown",
+                "_t": "list",
+                "item": {
+                    "_t": "number",
+                    "minimum": 0,
+                    "maximum": 4294967295
+                },
+                "minItems": 1,
                 "description": "Delay in nanoseconds to be introduced by the controller after CS is asserted."
             }
         },
         {
             "key": "spi-cs-hold-delay-ns",
             "value": {
-                "_t": "unknown",
+                "_t": "list",
+                "item": {
+                    "_t": "number",
+                    "minimum": 0,
+                    "maximum": 4294967295
+                },
+                "minItems": 1,
                 "description": "Delay in nanoseconds to be introduced by the controller before CS is de-asserted."
             }
         },
         {
             "key": "spi-cs-inactive-delay-ns",
             "value": {
-                "_t": "unknown",
+                "_t": "list",
+                "item": {
+                    "_t": "number",
+                    "minimum": 0,
+                    "maximum": 4294967295
+                },
+                "minItems": 1,
                 "description": "Delay in nanoseconds to be introduced by the controller after CS is de-asserted."
             }
         },
@@ -183,14 +201,26 @@
         {
             "key": "spi-rx-delay-us",
             "value": {
-                "_t": "unknown",
+                "_t": "list",
+                "item": {
+                    "_t": "number",
+                    "minimum": 0,
+                    "maximum": 4294967295
+                },
+                "minItems": 1,
                 "description": "Delay, in microseconds, after a read transfer."
             }
         },
         {
             "key": "rx-sample-delay-ns",
             "value": {
-                "_t": "unknown",
+                "_t": "list",
+                "item": {
+                    "_t": "number",
+                    "minimum": 0,
+                    "maximum": 4294967295
+                },
+                "minItems": 1,
                 "description": "SPI Rx sample delay offset, unit is nanoseconds. The delay from the default sample time before the actual sample of the rxd input signal occurs."
             }
         },
@@ -217,7 +247,13 @@
         {
             "key": "spi-tx-delay-us",
             "value": {
-                "_t": "unknown",
+                "_t": "list",
+                "item": {
+                    "_t": "number",
+                    "minimum": 0,
+                    "maximum": 4294967295
+                },
+                "minItems": 1,
                 "description": "Delay, in microseconds, after a write transfer."
             }
         },
@@ -254,7 +290,13 @@
         {
             "key": "st,spi-midi-ns",
             "value": {
-                "_t": "unknown",
+                "_t": "list",
+                "item": {
+                    "_t": "number",
+                    "minimum": 0,
+                    "maximum": 4294967295
+                },
+                "minItems": 1,
                 "description": "Only for STM32H7, (Master Inter-Data Idleness) minimum time\ndelay in nanoseconds inserted between two consecutive data frames.\n"
             }
         },
@@ -380,28 +422,52 @@
         {
             "key": "cdns,tshsl-ns",
             "value": {
-                "_t": "unknown",
+                "_t": "list",
+                "item": {
+                    "_t": "number",
+                    "minimum": 0,
+                    "maximum": 4294967295
+                },
+                "minItems": 1,
                 "description": "Delay in nanoseconds for the length that the master mode chip select outputs are de-asserted between transactions."
             }
         },
         {
             "key": "cdns,tsd2d-ns",
             "value": {
-                "_t": "unknown",
+                "_t": "list",
+                "item": {
+                    "_t": "number",
+                    "minimum": 0,
+                    "maximum": 4294967295
+                },
+                "minItems": 1,
                 "description": "Delay in nanoseconds between one chip select being de-activated and the activation of another."
             }
         },
         {
             "key": "cdns,tchsh-ns",
             "value": {
-                "_t": "unknown",
+                "_t": "list",
+                "item": {
+                    "_t": "number",
+                    "minimum": 0,
+                    "maximum": 4294967295
+                },
+                "minItems": 1,
                 "description": "Delay in nanoseconds between last bit of current transaction and deasserting the device chip select (qspi_n_ss_out)."
             }
         },
         {
             "key": "cdns,tslch-ns",
             "value": {
-                "_t": "unknown",
+                "_t": "list",
+                "item": {
+                    "_t": "number",
+                    "minimum": 0,
+                    "maximum": 4294967295
+                },
+                "minItems": 1,
                 "description": "Delay in nanoseconds between setting qspi_n_ss_out low and first bit transfer."
             }
         },

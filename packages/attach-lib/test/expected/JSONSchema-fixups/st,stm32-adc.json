@@ -25,11 +25,7 @@
             "minItems": 1,
             "dtType": "address",
             "items": {
-                "type": "array",
-                "items": {
-                    "minimum": 0,
-                    "maximum": 4294967295
-                }
+                "type": "array"
             }
         },
         "interrupts": {
@@ -39,11 +35,7 @@
             "type": "array",
             "dtType": "uint32-matrix",
             "items": {
-                "type": "array",
-                "items": {
-                    "minimum": 0,
-                    "maximum": 4294967295
-                }
+                "type": "array"
             }
         },
         "clocks": {
@@ -142,7 +134,9 @@
             },
             "dtType": "phandle-array"
         },
-        "interrupt-controller": true,
+        "interrupt-controller": {
+            "dtType": "flag"
+        },
         "#interrupt-cells": {
             "const": 1,
             "dtType": "uint32"
@@ -518,11 +512,7 @@
                     "minItems": 1,
                     "dtType": "address",
                     "items": {
-                        "type": "array",
-                        "items": {
-                            "minimum": 0,
-                            "maximum": 4294967295
-                        }
+                        "type": "array"
                     }
                 },
                 "#io-channel-cells": {
@@ -544,11 +534,7 @@
                     "minItems": 1,
                     "dtType": "uint32-matrix",
                     "items": {
-                        "type": "array",
-                        "items": {
-                            "minimum": 0,
-                            "maximum": 4294967295
-                        }
+                        "type": "array"
                     }
                 },
                 "clocks": {
@@ -584,7 +570,13 @@
                 },
                 "assigned-resolution-bits": {
                     "description": "Resolution (bits) to use for conversions:\n  - can be 6, 8, 10 or 12 on stm32f4 and stm32mp13\n  - can be 8, 10, 12, 14 or 16 on stm32h7 and stm32mp1\n",
-                    "dtType": "uint32-array"
+                    "dtType": "uint32-array",
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                        "minimum": 0,
+                        "maximum": 4294967295
+                    }
                 },
                 "st,adc-channels": {
                     "description": "List of single-ended channels muxed for this ADC. It can have up to:\n  - 16 channels, numbered from 0 to 15 (for in0..in15) on stm32f4\n  - 19 channels, numbered from 0 to 18 (for in0..in18) on stm32mp13.\n  - 20 channels, numbered from 0 to 19 (for in0..in19) on stm32h7 and\n    stm32mp1.\n",
@@ -716,7 +708,13 @@
                         },
                         "st,min-sample-time-ns": {
                             "description": "Minimum sampling time in nanoseconds. Depending on hardware (board)\ne.g. high/low analog input source impedance, fine tune of ADC\nsampling time may be recommended.\n",
-                            "dtType": "uint32-array"
+                            "dtType": "uint32-array",
+                            "type": "array",
+                            "minItems": 1,
+                            "items": {
+                                "minimum": 0,
+                                "maximum": 4294967295
+                            }
                         }
                     },
                     "required": [

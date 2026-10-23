@@ -238,8 +238,6 @@
             "key": "st,max-clk-rate-hz",
             "value": {
                 "_t": "matrix",
-                "minItems": 1,
-                "maxItems": 1,
                 "rows": [
                     {
                         "_t": "list",
@@ -247,9 +245,7 @@
                             "_t": "number",
                             "minimum": 0,
                             "maximum": 4294967295
-                        },
-                        "minItems": 1,
-                        "maxItems": 1
+                        }
                     }
                 ],
                 "description": "Allow to specify desired max clock rate used by analog circuitry."
@@ -532,7 +528,6 @@
                             "maximum": 4294967295
                         },
                         "minItems": 1,
-                        "maxItems": 1,
                         "description": "Resolution (bits) to use for conversions:\n  - can be 6, 8, 10 or 12 on stm32f4 and stm32mp13\n  - can be 8, 10, 12, 14 or 16 on stm32h7 and stm32mp1\n"
                     }
                 },

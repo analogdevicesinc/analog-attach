@@ -37,7 +37,9 @@
             "const": 0,
             "dtType": "uint32"
         },
-        "clock-frequency": true,
+        "clock-frequency": {
+            "dtType": "uint32"
+        },
         "clock-accuracy": {
             "description": "accuracy of clock in ppb (parts per billion).",
             "type": "integer",

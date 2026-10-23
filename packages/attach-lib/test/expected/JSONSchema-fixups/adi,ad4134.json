@@ -22,11 +22,7 @@
             "minItems": 1,
             "dtType": "address",
             "items": {
-                "type": "array",
-                "items": {
-                    "minimum": 0,
-                    "maximum": 4294967295
-                }
+                "type": "array"
             }
         },
         "spi-max-frequency": {
@@ -102,10 +98,34 @@
             "maxItems": 1,
             "dtType": "string-array"
         },
-        "avdd5-supply": true,
-        "avdd1v8-supply": true,
-        "iovdd-supply": true,
-        "refin-supply": true,
+        "avdd5-supply": {
+            "dtType": "phandle",
+            "type": "array",
+            "items": {
+                "type": "array"
+            }
+        },
+        "avdd1v8-supply": {
+            "dtType": "phandle",
+            "type": "array",
+            "items": {
+                "type": "array"
+            }
+        },
+        "iovdd-supply": {
+            "dtType": "phandle",
+            "type": "array",
+            "items": {
+                "type": "array"
+            }
+        },
+        "refin-supply": {
+            "dtType": "phandle",
+            "type": "array",
+            "items": {
+                "type": "array"
+            }
+        },
         "adi,spi-engine": {
             "description": "phandle of the SPI slave connected to the SPI engine master",
             "maxItems": 1,

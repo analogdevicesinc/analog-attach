@@ -1,8 +1,8 @@
 import { FixupContext, PropertySchema } from "../FixupWalker.js";
 
 // Keep in sync with dt-schema's `property-units.yaml`
-const ARRAY_SUFFIX = /-(kBps|bits|percent|bp|db|mhz|sec|ms|us|ns|ps|mm|nanoamp|(micro-)?ohms|micro(amp|watt)(-hours)?|milliwatt|(femto|pico)farads|(milli)?celsius|kelvin|k?pascal)$/;
-const MATRIX_SUFFIX = /-(hz|microvolt)$/;
+export const ARRAY_SUFFIX = /-(kBps|bits|percent|bp|db|mhz|sec|ms|us|ns|ps|mm|nanoamp|(micro-)?ohms|micro(amp|watt)(-hours)?|milliwatt|(femto|pico)farads|(milli)?celsius|kelvin|k?pascal)$/;
+export const MATRIX_SUFFIX = /-(hz|microvolt)$/;
 
 const SINGLE_VALUE_KEYWORDS = ["const", "enum", "pattern", "minimum", "maximum", "multipleOf"];
 

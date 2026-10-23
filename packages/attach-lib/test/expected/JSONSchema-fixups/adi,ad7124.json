@@ -71,11 +71,7 @@
             "minItems": 1,
             "dtType": "uint32-matrix",
             "items": {
-                "type": "array",
-                "items": {
-                    "minimum": 0,
-                    "maximum": 4294967295
-                }
+                "type": "array"
             }
         },
         "rdy-gpios": {
@@ -290,15 +286,33 @@
                 },
                 "spi-cs-setup-delay-ns": {
                     "description": "Delay in nanoseconds to be introduced by the controller after CS is asserted.",
-                    "dtType": "uint32-array"
+                    "dtType": "uint32-array",
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                        "minimum": 0,
+                        "maximum": 4294967295
+                    }
                 },
                 "spi-cs-hold-delay-ns": {
                     "description": "Delay in nanoseconds to be introduced by the controller before CS is de-asserted.",
-                    "dtType": "uint32-array"
+                    "dtType": "uint32-array",
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                        "minimum": 0,
+                        "maximum": 4294967295
+                    }
                 },
                 "spi-cs-inactive-delay-ns": {
                     "description": "Delay in nanoseconds to be introduced by the controller after CS is de-asserted.",
-                    "dtType": "uint32-array"
+                    "dtType": "uint32-array",
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                        "minimum": 0,
+                        "maximum": 4294967295
+                    }
                 },
                 "spi-rx-bus-width": {
                     "description": "Bus width to the SPI bus used for read transfers. If 0 is provided, then no RX will be possible on this device.",
@@ -318,11 +332,23 @@
                 },
                 "spi-rx-delay-us": {
                     "description": "Delay, in microseconds, after a read transfer.",
-                    "dtType": "uint32-array"
+                    "dtType": "uint32-array",
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                        "minimum": 0,
+                        "maximum": 4294967295
+                    }
                 },
                 "rx-sample-delay-ns": {
                     "description": "SPI Rx sample delay offset, unit is nanoseconds. The delay from the default sample time before the actual sample of the rxd input signal occurs.",
-                    "dtType": "uint32-array"
+                    "dtType": "uint32-array",
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                        "minimum": 0,
+                        "maximum": 4294967295
+                    }
                 },
                 "spi-tx-bus-width": {
                     "description": "Bus width to the SPI bus used for write transfers. If 0 is provided, then no TX will be possible on this device.",
@@ -342,7 +368,13 @@
                 },
                 "spi-tx-delay-us": {
                     "description": "Delay, in microseconds, after a write transfer.",
-                    "dtType": "uint32-array"
+                    "dtType": "uint32-array",
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                        "minimum": 0,
+                        "maximum": 4294967295
+                    }
                 },
                 "stacked-memories": {
                     "description": "Several SPI memories can be wired in stacked mode. This basically means that either a device features several chip selects, or that different devices must be seen as a single bigger chip. This basically doubles (or more) the total address space with only a single additional wire, while still needing to repeat the commands when crossing a chip boundary. The size of each chip should be provided as members of the array.",
@@ -374,7 +406,13 @@
                 },
                 "st,spi-midi-ns": {
                     "description": "Only for STM32H7, (Master Inter-Data Idleness) minimum time\ndelay in nanoseconds inserted between two consecutive data frames.\n",
-                    "dtType": "uint32-array"
+                    "dtType": "uint32-array",
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                        "minimum": 0,
+                        "maximum": 4294967295
+                    }
                 }
             },
             "allOf": [
@@ -475,19 +513,43 @@
                         },
                         "cdns,tshsl-ns": {
                             "description": "Delay in nanoseconds for the length that the master mode chip select outputs are de-asserted between transactions.",
-                            "dtType": "uint32-array"
+                            "dtType": "uint32-array",
+                            "type": "array",
+                            "minItems": 1,
+                            "items": {
+                                "minimum": 0,
+                                "maximum": 4294967295
+                            }
                         },
                         "cdns,tsd2d-ns": {
                             "description": "Delay in nanoseconds between one chip select being de-activated and the activation of another.",
-                            "dtType": "uint32-array"
+                            "dtType": "uint32-array",
+                            "type": "array",
+                            "minItems": 1,
+                            "items": {
+                                "minimum": 0,
+                                "maximum": 4294967295
+                            }
                         },
                         "cdns,tchsh-ns": {
                             "description": "Delay in nanoseconds between last bit of current transaction and deasserting the device chip select (qspi_n_ss_out).",
-                            "dtType": "uint32-array"
+                            "dtType": "uint32-array",
+                            "type": "array",
+                            "minItems": 1,
+                            "items": {
+                                "minimum": 0,
+                                "maximum": 4294967295
+                            }
                         },
                         "cdns,tslch-ns": {
                             "description": "Delay in nanoseconds between setting qspi_n_ss_out low and first bit transfer.",
-                            "dtType": "uint32-array"
+                            "dtType": "uint32-array",
+                            "type": "array",
+                            "minItems": 1,
+                            "items": {
+                                "minimum": 0,
+                                "maximum": 4294967295
+                            }
                         }
                     },
                     "additionalProperties": true

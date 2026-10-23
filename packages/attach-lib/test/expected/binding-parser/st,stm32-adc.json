@@ -206,7 +206,9 @@
                     {
                         "_t": "list",
                         "item": {
-                            "_t": "any"
+                            "_t": "number",
+                            "minimum": 0,
+                            "maximum": 4294967295
                         }
                     }
                 ],
@@ -438,7 +440,13 @@
                 {
                     "key": "assigned-resolution-bits",
                     "value": {
-                        "_t": "unknown",
+                        "_t": "list",
+                        "item": {
+                            "_t": "number",
+                            "minimum": 0,
+                            "maximum": 4294967295
+                        },
+                        "minItems": 1,
                         "description": "Resolution (bits) to use for conversions:\n  - can be 6, 8, 10 or 12 on stm32f4 and stm32mp13\n  - can be 8, 10, 12, 14 or 16 on stm32h7 and stm32mp1\n"
                     }
                 },
