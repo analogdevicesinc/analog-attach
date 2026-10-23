@@ -200,7 +200,7 @@ function described<T extends object>(schema: any, type: T): T & { description?: 
 }
 
 /** The most options of a `compatible` we list; a larger product is left to what `dtType` says. */
-const MAX_ENUM_OPTIONS = 256;
+const MAX_ENUM_OPTIONS = 512;
 
 /**
  * A `oneOf` of lists whose entries are each an `enum` / `const` (the values a `compatible` can take, the fallback
@@ -606,16 +606,14 @@ if (import.meta.vitest) {
     });
 
     test("a compatible that can't be enumerated is not a list of enum", () => {
-        const many = Array.from({ length: 17 }, (_, index) => `v${index}`);
+        const many = Array.from({ length: 33 }, (_, index) => `v${index}`);
+        const fitting = { type: "array", items: [{ enum: many.slice(0, 32) }, { enum: many.slice(0, 16) }], minItems: 2, maxItems: 2 };
 
-        // 16 x 16 = 256 options fit, 17 x 16 do not
-        expect(not_enumerated({ oneOf: [{ type: "array", items: [{ enum: many.slice(0, 16) }, { enum: many.slice(0, 16) }], minItems: 2, maxItems: 2 }] })).toBe(false);
+        // 32 x 16 = 512 options fit, 33 x 16 do not
+        expect(not_enumerated({ oneOf: [fitting] })).toBe(false);
         expect(not_enumerated({ oneOf: [{ type: "array", items: [{ enum: many }, { enum: many.slice(0, 16) }], minItems: 2, maxItems: 2 }] })).toBe(true);
         // the options of several branches add up
-        expect(not_enumerated({ oneOf: [
-            { type: "array", items: [{ enum: many.slice(0, 16) }, { enum: many.slice(0, 16) }], minItems: 2, maxItems: 2 },
-            { type: "array", items: [{ const: "other" }], minItems: 1, maxItems: 1 },
-        ] })).toBe(true);
+        expect(not_enumerated({ oneOf: [fitting, { type: "array", items: [{ const: "other" }], minItems: 1, maxItems: 1 }] })).toBe(true);
         // a position that is a pattern can't be listed
         expect(not_enumerated({ oneOf: [{ type: "array", items: [{ pattern: "^qcom,adreno-[0-9a-f]+$" }, { const: "qcom,adreno" }], minItems: 2, maxItems: 2 }] })).toBe(true);
     });
