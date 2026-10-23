@@ -1,4 +1,4 @@
-import { ParsedBinding, ResolvedProperty } from "../../Attach/AttachTypes.js";
+import { ParsedBinding, ResolvedProperty } from "../../Bindings/ParsedBinding.js";
 import { DeviceTree } from "../../Devicetree/index.js";
 import { PathAndLabel } from "../parents.js";
 

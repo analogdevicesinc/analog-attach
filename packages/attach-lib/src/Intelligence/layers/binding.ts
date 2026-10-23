@@ -1,5 +1,5 @@
-import { ResolvedProperty } from "../../Attach/AttachTypes.js";
-import { AttachEnumType } from "../../Attach/StructuralTypes.js";
+import { ResolvedProperty } from "../../Bindings/ParsedBinding.js";
+import { AttachEnumType } from "../../Bindings/StructuralTypes.js";
 import { DeviceTree } from "../../Devicetree/index.js";
 import { insert_known_structures } from "../known_properties.js";
 import { IntelligenceLayer, PropertyContext, ValueSuggestion } from "./types.js";

@@ -1,4 +1,4 @@
-import { ResolvedProperty } from "./AttachTypes";
+import { ResolvedProperty } from "./ParsedBinding";
 
 type AttachGenericArray = {
     _t: "array",

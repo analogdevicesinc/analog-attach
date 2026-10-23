@@ -1,4 +1,4 @@
-import type { ParsedBinding, ResolvedProperty } from "../Attach/AttachTypes.js";
+import type { ParsedBinding, ResolvedProperty } from "./ParsedBinding.js";
 
 export interface ControllerContext {
     compatibles: string[];

@@ -1,5 +1,5 @@
 import { DTNode, DTProperty, is_dt_flag, DTValue, DTNumber, DTLabel, DTPath, DTExpression } from "../Devicetree";
-import { ParsedBinding } from "./AttachTypes";
+import { ParsedBinding } from "../Bindings/ParsedBinding";
 
 export function dt_to_validator_input(node: DTNode, parsed_binding: ParsedBinding): Map<string, unknown> {
     const map = new Map<string, unknown>();

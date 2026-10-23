@@ -1,4 +1,4 @@
-import { DtBindingSchema } from "../../Attach/DtBindingSchema";
+import { DtBindingSchema } from "../Schema";
 import { find_entry_in_object, delete_path } from "../ObjectUtilities.js";
 
 export function fixup_remove_invalid_keys(binding: DtBindingSchema): DtBindingSchema {

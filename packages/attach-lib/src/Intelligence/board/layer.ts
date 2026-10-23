@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import { ParsedBinding, ResolvedProperty } from "../../Attach/AttachTypes.js";
+import { ParsedBinding, ResolvedProperty } from "../../Bindings/ParsedBinding.js";
 import { DeviceTree, DeviceTreeOverlay, number_property } from "../../Devicetree/index.js";
 import { parent_path_string } from "../parents.js";
 import { effective_interrupt_parent, base_lookup } from "../interrupt_parent.js";

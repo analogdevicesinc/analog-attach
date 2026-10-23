@@ -1,6 +1,6 @@
-import { ParsedBinding, ResolvedProperty, PatternPropertyRule, PropertyPatternRule } from "../Attach/AttachTypes";
-import { DtBindingSchema } from "../Attach/DtBindingSchema";
-import { AttachType, AttachEnumType, AttachArray, FixedIndex } from "../Attach/StructuralTypes";
+import { ParsedBinding, ResolvedProperty, PatternPropertyRule, PropertyPatternRule } from "./ParsedBinding";
+import { DtBindingSchema } from "./Schema";
+import { AttachType, AttachEnumType, AttachArray, FixedIndex } from "./StructuralTypes";
 import { find_entry_in_object } from "./ObjectUtilities";
 import { is_node_pattern } from "./PatternKind.js";
 

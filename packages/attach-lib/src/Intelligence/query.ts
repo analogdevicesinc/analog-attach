@@ -1,5 +1,5 @@
-import { ResolvedProperty } from "../Attach/AttachTypes.js";
-import { AttachArray, AttachEnumType, FixedIndex } from "../Attach/StructuralTypes.js";
+import { ResolvedProperty } from "../Bindings/ParsedBinding.js";
+import { AttachArray, AttachEnumType, FixedIndex } from "../Bindings/StructuralTypes.js";
 import { DeviceTree, number_property } from "../Devicetree/index.js";
 import {
     is_clock,

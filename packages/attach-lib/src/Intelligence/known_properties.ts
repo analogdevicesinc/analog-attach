@@ -1,5 +1,5 @@
-import { ResolvedProperty } from "../Attach/AttachTypes.js";
-import { AttachType } from "../Attach/StructuralTypes.js";
+import { ResolvedProperty } from "../Bindings/ParsedBinding.js";
+import { AttachType } from "../Bindings/StructuralTypes.js";
 
 function array_bounds(value: AttachType): { minItems: number; maxItems: number } {
     if (value._t === "array") {

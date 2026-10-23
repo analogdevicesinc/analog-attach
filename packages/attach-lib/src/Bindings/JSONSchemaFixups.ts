@@ -1,4 +1,4 @@
-import { DtBindingSchema } from "../Attach/DtBindingSchema";
+import { DtBindingSchema } from "./Schema";
 import { fixup_collapse_allOf } from "./fixups/collapse_allOf";
 import { fixup_compatible } from "./fixups/compatible.js";
 import { fixup_interrupts } from "./fixups/interrupts.js";

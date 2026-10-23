@@ -1,3 +1,6 @@
+export * from './Schema.js';
+export * from './StructuralTypes.js';
+export * from './ParsedBinding.js';
 export * from './RefResolver.js';
 export * from './PropertyResolver.js';
 export * from './RedefinitionMerger.js';

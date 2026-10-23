@@ -1,12 +1,13 @@
 import { $RefParser } from "@apidevtools/json-schema-ref-parser";
-import { BindingErrors, ParsedBinding, ResolvedProperty } from './AttachTypes.js';
+import { BindingErrors } from './Errors.js';
+import { ParsedBinding, ResolvedProperty } from '../Bindings/ParsedBinding.js';
 import { resolve_references } from '../Bindings/RefResolver.js';
 import { resolve_properties } from '../Bindings/PropertyResolver.js';
 import { merge_redefinitions } from '../Bindings/RedefinitionMerger.js';
 import { insert_canaries } from '../Bindings/CanaryInserter.js';
 import { apply_JSONSchema_fixups } from '../Bindings/JSONSchemaFixups.js';
 
-import { DtBindingSchema } from "./DtBindingSchema.js";
+import { DtBindingSchema } from "../Bindings/Schema.js";
 
 import Ajv2019, { ValidateFunction, KeywordDefinition } from "ajv/dist/2019.js";
 import { deep_merge, delete_path, getByPath } from "../Bindings/ObjectUtilities.js";
