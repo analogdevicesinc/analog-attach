@@ -6,106 +6,35 @@ import { is_node_pattern } from "./PatternKind.js";
 
 export function translate_JSONSchema(fixuped: DtBindingSchema): ParsedBinding {
 
-    let resolved_properties: ResolvedProperty[] = [];
-
-    if (fixuped.properties !== undefined) {
-
-        for (const [name, value] of Object.entries(fixuped.properties)) {
-
-            // Shouldn't be of concern to users
-            if (name === "$nodename" || name === "label") {
-                continue;
-            }
-
-            resolved_properties.push({
-                key: name,
-                value: narrow_object(value)
-            });
-        }
-    }
-
-    resolved_properties = [...resolved_properties, ...translate_JSONSchema_allOf(fixuped.allOf)];
+    const resolved_properties = order_properties(translate_node_schema(fixuped), fixuped.required);
 
     const pattern_properties: PatternPropertyRule[] = [];
     const property_patterns: PropertyPatternRule[] = [];
 
-    if (fixuped.patternProperties !== undefined) {
+    for (const [pattern, schema] of Object.entries(fixuped.patternProperties ?? {})) {
+        // false forbids names that match
+        if (schema === false) {
+            continue;
+        }
 
-        for (const [pattern, schema] of Object.entries(fixuped.patternProperties)) {
-            // false forbids names that match
-            if (schema === false) {
-                continue;
-            }
+        const node_schema = typeof schema === 'object' ? schema as DtBindingSchema : undefined;
+        const description = node_schema?.description ?? "";
 
-            if (!is_node_pattern(pattern, schema)) {
-                property_patterns.push({
-                    pattern: pattern,
-                    description: typeof schema === 'object' ? (schema as DtBindingSchema).description ?? "" : "",
-                    value: narrow_object(schema)
-                });
-                continue;
-            }
-
-            const cast_schema = schema as DtBindingSchema;
-            const description = typeof cast_schema === 'object' ? cast_schema.description ?? "" : "";
-            const required = typeof cast_schema === 'object' ? cast_schema.required ?? [] : [];
-
-            let resolved_properties_pattern: ResolvedProperty[] = [];
-
-            for (const [name, value] of Object.entries(typeof cast_schema === 'object' ? cast_schema.properties ?? {} : {})) {
-                // Shouldn't be of concern to users
-                if (name === "$nodename" || name === "label") {
-                    continue;
-                }
-
-                resolved_properties_pattern.push({
-                    key: name,
-                    value: narrow_object(value)
-                });
-            }
-
-            resolved_properties_pattern = [...resolved_properties_pattern, ...translate_JSONSchema_allOf(typeof cast_schema === 'object' ? cast_schema.allOf : undefined)];
-
-            pattern_properties.push({
+        if (!is_node_pattern(pattern, schema)) {
+            property_patterns.push({
                 pattern: pattern,
                 description: description,
-                properties: resolved_properties_pattern,
-                required: required
+                value: narrow_object(schema)
             });
-
+            continue;
         }
-    }
 
-    if (fixuped.required !== undefined) {
-        // eslint-disable-next-line unicorn/no-array-reverse
-        const reverse_required = structuredClone(fixuped.required).reverse();
-        for (const property of reverse_required) {
-            const found = resolved_properties.find((value) => value.key === property);
-
-            if (found !== undefined) {
-                const found_index = resolved_properties.indexOf(found);
-                resolved_properties.unshift(found);
-                resolved_properties.splice(found_index + 1, 1);
-            }
-
-        }
-    }
-
-    for (const to_sort of [{ property: "clocks", search_term: "clock" }, { property: "interrupts", search_term: "interrupt" }]) {
-
-        const group_start = resolved_properties.find((value) => value.key === to_sort.property);
-
-        if (group_start !== undefined) {
-            const group_start_index = resolved_properties.indexOf(group_start);
-            for (const property of resolved_properties) {
-                if (property.key !== to_sort.property && property.key.includes(to_sort.search_term)) {
-                    const found_index = resolved_properties.indexOf(property);
-                    const element = structuredClone(property);
-                    resolved_properties.splice(found_index, 1);
-                    resolved_properties.splice(group_start_index + 1, 0, element);
-                }
-            }
-        }
+        pattern_properties.push({
+            pattern: pattern,
+            description: description,
+            properties: translate_node_schema(node_schema),
+            required: node_schema?.required ?? []
+        });
     }
 
     return {
@@ -119,15 +48,66 @@ export function translate_JSONSchema(fixuped: DtBindingSchema): ParsedBinding {
     };
 }
 
+/** The properties a node schema declares itself, followed by the ones its `allOf` entries bring. */
+function translate_node_schema(schema: DtBindingSchema | undefined): ResolvedProperty[] {
+    return [...collect_properties(schema?.properties), ...translate_JSONSchema_allOf(schema?.allOf)];
+}
+
+function collect_properties(properties: Record<string, unknown> | undefined): ResolvedProperty[] {
+    const collected: ResolvedProperty[] = [];
+
+    for (const [name, value] of Object.entries(properties ?? {})) {
+        // Shouldn't be of concern to users
+        if (name === "$nodename" || name === "label") {
+            continue;
+        }
+
+        collected.push({ key: name, value: narrow_object(value) });
+    }
+
+    return collected;
+}
+
+/** Required properties first, then the clock and interrupt properties right after `clocks` and `interrupts`. */
+function order_properties(properties: ResolvedProperty[], required: string[] | undefined): ResolvedProperty[] {
+    const ordered = [...properties];
+
+    // eslint-disable-next-line unicorn/no-array-reverse -- toReversed is past the lib target
+    for (const name of [...(required ?? [])].reverse()) {
+        const found = ordered.find((value) => value.key === name);
+
+        if (found !== undefined) {
+            const found_index = ordered.indexOf(found);
+            ordered.unshift(found);
+            ordered.splice(found_index + 1, 1);
+        }
+    }
+
+    for (const to_sort of [{ property: "clocks", search_term: "clock" }, { property: "interrupts", search_term: "interrupt" }]) {
+
+        const group_start = ordered.find((value) => value.key === to_sort.property);
+
+        if (group_start !== undefined) {
+            const group_start_index = ordered.indexOf(group_start);
+            for (const property of ordered) {
+                if (property.key !== to_sort.property && property.key.includes(to_sort.search_term)) {
+                    const found_index = ordered.indexOf(property);
+                    const element = structuredClone(property);
+                    ordered.splice(found_index, 1);
+                    ordered.splice(group_start_index + 1, 0, element);
+                }
+            }
+        }
+    }
+
+    return ordered;
+}
+
 function translate_JSONSchema_allOf(allOf: any[] | undefined): ResolvedProperty[] {
 
     let properties: ResolvedProperty[] = [];
 
-    if (allOf === undefined) {
-        return properties;
-    }
-
-    for (const item of allOf) {
+    for (const item of allOf ?? []) {
         if (!("$id" in item)) {
             continue;
         }
@@ -136,22 +116,21 @@ function translate_JSONSchema_allOf(allOf: any[] | undefined): ResolvedProperty[
             continue;
         }
 
-        for (const [name, value] of Object.entries(item.properties)) {
-            // Shouldn't be of concern to users
-            if (name === "$nodename" || name === "label") {
-                continue;
-            }
-
-            properties.push({
-                key: name,
-                value: narrow_object(value)
-            });
-        }
-
-        properties = [...properties, ...translate_JSONSchema_allOf(item.allOf)];
+        properties = [...properties, ...collect_properties(item.properties), ...translate_JSONSchema_allOf(item.allOf)];
     }
 
     return properties;
+}
+
+/** The row schema of an array of one-cell arrays (`items: {type: array, items: [x]}`, the `items` itself or wrapped in a one-element array). */
+function matrix_row(object: any): any {
+    const row = Array.isArray(object.items) ? (object.items.length === 1 ? object.items[0] : undefined) : object.items;
+
+    if (typeof row === 'object' && row !== null && row.type === "array" && Array.isArray(row.items) && row.items.length === 1) {
+        return row;
+    }
+
+    return undefined;
 }
 
 // TODO: handle objects
@@ -161,57 +140,24 @@ function narrow_object(object: any): AttachType {
         switch (object.type) {
             case "array":
                 {
-                    if (
-                        "items" in object &&
-                        !Array.isArray(object.items) &&
-                        "type" in object.items &&
-                        object.items.type === "array" &&
-                        "items" in object.items &&
-                        Array.isArray(object.items.items) &&
-                        object.items.items.length === 1
-                    ) {
-                        const minItems = "minItems" in object ? object.minItems : undefined;
-                        const maxItems = "maxItems" in object ? object.maxItems : undefined;
-                        const description = "description" in object ? object.description : undefined;
+                    const row = matrix_row(object);
 
+                    if (row !== undefined) {
                         return {
                             _t: "matrix",
-                            minItems: minItems,
-                            maxItems: maxItems,
-                            description: description,
-                            values: [narrow_array_object(object.items)]
-                        };
-                    }
-
-                    if (
-                        "items" in object &&
-                        Array.isArray(object.items) &&
-                        object.items.length === 1 &&
-                        "type" in object.items[0] &&
-                        object.items[0].type === "array" &&
-                        "items" in object.items[0] &&
-                        Array.isArray(object.items[0].items) &&
-                        object.items[0].items.length === 1
-                    ) {
-                        const minItems = "minItems" in object ? object.minItems : undefined;
-                        const maxItems = "maxItems" in object ? object.maxItems : undefined;
-                        const description = "description" in object ? object.description : undefined;
-
-                        return {
-                            _t: "matrix",
-                            minItems: minItems,
-                            maxItems: maxItems,
-                            description: description,
-                            values: [narrow_array_object(object.items[0])]
+                            minItems: object.minItems,
+                            maxItems: object.maxItems,
+                            description: object.description,
+                            values: [narrow_array_object(row)]
                         };
                     }
 
                     return narrow_array_object(object);
                 }
             case "string": {
-                const minItems = "minItems" in object ? object.minItems : undefined;
-                const maxItems = "maxItems" in object ? object.maxItems : undefined;
-                const description = "description" in object ? object.description : undefined;
+                const minItems = object.minItems;
+                const maxItems = object.maxItems;
+                const description = object.description;
 
                 const unique = find_entry_in_object(
                     object,
@@ -236,11 +182,11 @@ function narrow_object(object: any): AttachType {
             }
             case "integer":
                 {
-                    const minimum = "minimum" in object ? object.minimum : undefined;
-                    const maximum = "maximum" in object ? object.maximum : undefined;
-                    const typeSize = "typeSize" in object ? object.typeSize : undefined;
-                    const description = "description" in object ? object.description : undefined;
-                    const default_value = "default" in object ? object.default : undefined;
+                    const minimum = object.minimum;
+                    const maximum = object.maximum;
+                    const typeSize = object.typeSize;
+                    const description = object.description;
+                    const default_value = object.default;
 
                     if ("enum" in object) {
 
@@ -263,7 +209,7 @@ function narrow_object(object: any): AttachType {
                     };
                 }
             case "boolean": {
-                const description = "description" in object ? object.description : undefined;
+                const description = object.description;
                 return { _t: "boolean", description: description };
             }
         }
@@ -278,7 +224,7 @@ function narrow_object(object: any): AttachType {
         object.oneOf[0].const === true &&
         object.oneOf[1].type === 'null'
     ) {
-        const description = "description" in object ? object.description : undefined;
+        const description = object.description;
         return { _t: "boolean", description: description };
     }
 
@@ -328,7 +274,7 @@ function narrow_object(object: any): AttachType {
                 enum_accumulator.push(composed_enum);
             }
 
-            const description = "description" in object ? object.description : undefined;
+            const description = object.description;
 
             return {
                 _t: "enum_array",
@@ -347,7 +293,7 @@ function narrow_object(object: any): AttachType {
         "const" in object &&
         object.const !== undefined
     ) {
-        const description = "description" in object ? object.description : undefined;
+        const description = object.description;
         return { _t: "const", const: object.const, description: description };
     }
 
@@ -356,7 +302,7 @@ function narrow_object(object: any): AttachType {
         "type" in object &&
         object.type === "object"
     ) {
-        const description = "description" in object ? object.description : undefined;
+        const description = object.description;
         return {
             _t: "object",
             description: description,
@@ -393,9 +339,9 @@ function get_enum_type(object: any): AttachEnumType.STRING | AttachEnumType.NUMB
 
 function narrow_array_object(object: any): AttachArray {
 
-    const minItems = "minItems" in object ? object.minItems : undefined;
-    const maxItems = "maxItems" in object ? object.maxItems : undefined;
-    const description = "description" in object ? object.description : undefined;
+    const minItems = object.minItems;
+    const maxItems = object.maxItems;
+    const description = object.description;
 
 
     // Ex. simple compatible definition
@@ -536,9 +482,9 @@ function narrow_array_object(object: any): AttachArray {
         "type" in object.items &&
         object.items.type === "integer"
     ) {
-        const minimum = "minimum" in object.items ? object.items.minimum : undefined;
-        const maximum = "maximum" in object.items ? object.items.maximum : undefined;
-        const typeSize = "typeSize" in object.items ? object.items.typeSize : undefined;
+        const minimum = object.items.minimum;
+        const maximum = object.items.maximum;
+        const typeSize = object.items.typeSize;
 
         return {
             _t: 'number_array',
@@ -559,9 +505,9 @@ function narrow_array_object(object: any): AttachArray {
         "type" in object.items[0] &&
         object.items[0].type === "integer"
     ) {
-        const minimum = "minimum" in object.items[0] ? object.items[0].minimum : undefined;
-        const maximum = "maximum" in object.items[0] ? object.items[0].maximum : undefined;
-        const typeSize = "typeSize" in object.items[0] ? object.items[0].typeSize : undefined;
+        const minimum = object.items[0].minimum;
+        const maximum = object.items[0].maximum;
+        const typeSize = object.items[0].typeSize;
 
         return {
             _t: 'number_array',
@@ -579,9 +525,9 @@ function narrow_array_object(object: any): AttachArray {
         !("items" in object) &&
         ("minimum" in object || "maximum" in object)
     ) {
-        const minimum = "minimum" in object ? object.minimum : undefined;
-        const maximum = "maximum" in object ? object.maximum : undefined;
-        const typeSize = "typeSize" in object ? object.typeSize : undefined;
+        const minimum = object.minimum;
+        const maximum = object.maximum;
+        const typeSize = object.typeSize;
 
         return {
             _t: 'number_array',

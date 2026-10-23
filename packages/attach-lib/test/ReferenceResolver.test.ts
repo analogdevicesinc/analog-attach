@@ -1,8 +1,8 @@
 import path from 'node:path';
 import * as fs from 'node:fs';
 
-import { resolve_references } from '../src/Bindings/index.js';
-import $RefParser from '@apidevtools/json-schema-ref-parser';
+import { create_context, resolve_references } from '../src/Bindings/index.js';
+import { Result } from '../src/result.js';
 
 import { BindingTestData, write_to_directory } from './testing_utils';
 
@@ -190,12 +190,12 @@ async function test_impl(data: BindingTestData) {
     const linux_path = path.resolve(__dirname, 'linux');
     const dt_schema_path = path.resolve(__dirname, 'dt-schema');
 
-    const reference_parser = new $RefParser;
+    const ctx = create_context({ linux: linux_path, dt_schema: dt_schema_path });
 
-    const reference_resolved = await resolve_references(binding_path, reference_parser, linux_path, dt_schema_path);
+    const reference_resolved = await resolve_references(binding_path, ctx);
 
-    if (typeof reference_resolved === 'string') {
-        console.log(reference_resolved);
+    if (Result.is_err(reference_resolved)) {
+        console.log(reference_resolved.error);
         expect.fail();
     }
 
@@ -203,12 +203,12 @@ async function test_impl(data: BindingTestData) {
         write_to_directory(
             path.resolve(__dirname, "expected/ref-resolver"),
             data.name,
-            reference_resolved.root_binding
+            reference_resolved.value.root_binding
         );
     }
 
     const expected_path = path.resolve(__dirname, `expected/ref-resolver/${data.name}.json`);
     const expected = JSON.stringify(JSON.parse(fs.readFileSync(expected_path, { encoding: 'utf8' })));
 
-    expect(JSON.stringify(reference_resolved.root_binding)).toStrictEqual(expected);
+    expect(JSON.stringify(reference_resolved.value.root_binding)).toStrictEqual(expected);
 } 

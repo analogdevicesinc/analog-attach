@@ -110,17 +110,7 @@ export function overwrite_object_with_path_value<T extends Record<string, any>>(
     target: T,
     updates: PathValue[]
 ): T {
-    const cloneDeep = (object: any): any => {
-        if (object === null || typeof object !== "object") { return object; }
-        if (Array.isArray(object)) { return object.map((element) => cloneDeep(element)); }
-        const result: any = {};
-        for (const key of Object.keys(object)) {
-            result[key] = cloneDeep(object[key]);
-        }
-        return result;
-    };
-
-    const setByPath = (object: any, path: string[], value: unknown): any => {
+    const set_by_path = (object: any, path: string[], value: unknown): any => {
         if (path.length === 0) { return object; }
         const [key, ...rest] = path;
 
@@ -131,7 +121,7 @@ export function overwrite_object_with_path_value<T extends Record<string, any>>(
             newObject[key] = value;
         } else {
             const currentValue = object?.[key];
-            newObject[key] = setByPath(
+            newObject[key] = set_by_path(
                 typeof currentValue === "object" && currentValue !== null
                     ? currentValue
                     : {},
@@ -144,10 +134,10 @@ export function overwrite_object_with_path_value<T extends Record<string, any>>(
     };
 
     // Deep clone the target before merging
-    let result = cloneDeep(target);
+    let result = structuredClone(target);
 
     for (const { path, value } of updates) {
-        result = setByPath(result, path, value);
+        result = set_by_path(result, path, value);
     }
 
     return result;
@@ -250,7 +240,7 @@ export function delete_path<T extends Record<string, any>>(object: T, paths: str
     return result;
 }
 
-export function getByPath<T extends object, R = unknown>(
+export function get_by_path<T extends object, R = unknown>(
     object: T,
     path: string[]
 ): R | undefined {

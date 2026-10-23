@@ -6,17 +6,6 @@ export type RefResolvedBinding = {
     refs: DtBindingSchema[]
 };
 
-export type BindingAndPatterns = {
-    binding: DtBindingSchema,
-    patterns: PathPatternValue[],
-}
-
-export type PathPatternValue = {
-    path: string[],
-    pattern: string,
-    value: unknown
-};
-
 export type PathEntry = {
     path: string[];
     key: string;

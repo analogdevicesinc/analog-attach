@@ -1,8 +1,8 @@
 import path from 'node:path';
 import * as fs from 'node:fs';
 
-import { resolve_properties, resolve_references, merge_redefinitions, insert_canaries, apply_JSONSchema_fixups, } from '../src/Bindings/index.js';
-import $RefParser from '@apidevtools/json-schema-ref-parser';
+import { create_context, resolve_properties, resolve_references, merge_redefinitions, insert_canaries, apply_JSONSchema_fixups } from '../src/Bindings/index.js';
+import { Result } from '../src/result.js';
 
 import { BindingTestData, write_to_directory } from './testing_utils';
 
@@ -191,23 +191,23 @@ async function test_impl(data: BindingTestData) {
     const linux_path = path.resolve(__dirname, 'linux');
     const dt_schema_path = path.resolve(__dirname, 'dt-schema');
 
-    const reference_parser = new $RefParser;
+    const ctx = create_context({ linux: linux_path, dt_schema: dt_schema_path });
 
-    const reference_resolved = await resolve_references(binding_path, reference_parser, linux_path, dt_schema_path);
+    const reference_resolved = await resolve_references(binding_path, ctx);
 
-    if (typeof reference_resolved === 'string') {
-        console.log(reference_resolved);
+    if (Result.is_err(reference_resolved)) {
+        console.log(reference_resolved.error);
         expect.fail();
     }
 
-    const property_resolved = await resolve_properties(reference_resolved, reference_parser, linux_path, dt_schema_path);
+    const property_resolved = await resolve_properties(reference_resolved.value, ctx);
 
-    if (typeof property_resolved === 'string') {
-        console.log(property_resolved);
+    if (Result.is_err(property_resolved)) {
+        console.log(property_resolved.error);
         expect.fail();
     }
 
-    const redefinition_merged = await merge_redefinitions(property_resolved, reference_resolved.refs, reference_parser, linux_path, dt_schema_path);
+    const redefinition_merged = await merge_redefinitions(property_resolved.value, reference_resolved.value.refs, ctx);
 
     const canary_binding = insert_canaries(redefinition_merged);
 

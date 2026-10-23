@@ -2,6 +2,9 @@ import { DtBindingSchema } from "./Schema";
 import { deep_merge, find_entry_in_object, overwrite_object_with_path_value } from "./ObjectUtilities.js";
 import { PathValue } from "./UtilityTypes.js";
 
+/** Property name that makes an implicit `if/then` branch detectable by AJV; see `Attach.narrow`. Not for any other use. */
+export const CANARY = "__canary__";
+
 export function insert_canaries(binding: DtBindingSchema): DtBindingSchema {
     const branches = find_entry_in_object(
         binding,
@@ -22,7 +25,7 @@ export function insert_canaries(binding: DtBindingSchema): DtBindingSchema {
         (path_entry) => {
             return {
                 path: [...path_entry.path, path_entry.key],
-                value: deep_merge(path_entry.value, { properties: { __canary__: false } })
+                value: deep_merge(path_entry.value, { properties: { [CANARY]: false } })
             };
         }
     );

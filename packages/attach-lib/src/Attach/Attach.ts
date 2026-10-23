@@ -1,18 +1,16 @@
-import { $RefParser } from "@apidevtools/json-schema-ref-parser";
 import { BindingErrors } from './Errors.js';
 import { ParsedBinding, ResolvedProperty } from '../Bindings/ParsedBinding.js';
-import { resolve_references } from '../Bindings/RefResolver.js';
-import { resolve_properties } from '../Bindings/PropertyResolver.js';
-import { merge_redefinitions } from '../Bindings/RedefinitionMerger.js';
-import { insert_canaries } from '../Bindings/CanaryInserter.js';
-import { apply_JSONSchema_fixups } from '../Bindings/JSONSchemaFixups.js';
 
+import { CANARY } from '../Bindings/CanaryInserter.js';
+import { create_context } from '../Bindings/Context.js';
+import { process_binding } from '../Bindings/Pipeline.js';
 import { DtBindingSchema } from "../Bindings/Schema.js";
 
 import Ajv2019, { ValidateFunction, KeywordDefinition } from "ajv/dist/2019.js";
-import { deep_merge, delete_path, getByPath } from "../Bindings/ObjectUtilities.js";
+import { deep_merge, delete_path, get_by_path } from "../Bindings/ObjectUtilities.js";
 import { translate_JSONSchema } from "../Bindings/JSONSchemaTranslate.js";
 import { DeviceTree, DTNode } from "../Devicetree/index.js";
+import { Result } from "../result.js";
 import { IntelligenceStack } from "../Intelligence/layers/stack.js";
 import { IntelligenceLayer, NodePlacement } from "../Intelligence/layers/types.js";
 import { dt_to_validator_input } from "./DTxBinding.js";
@@ -56,27 +54,13 @@ export class Attach {
         patterns: string[]
     } | undefined> {
 
-        const reference_parser = new $RefParser;
+        const processed = await process_binding(binding_path, create_context({ linux: linux_path, dt_schema: dt_schema_path }));
 
-        const reference_resolved = await resolve_references(binding_path, reference_parser, linux_path, dt_schema_path);
-
-        if (typeof reference_resolved === 'string') {
-            //console.log(`ERROR: ${binding_path} with ${reference_resolved}`);
+        if (Result.is_err(processed)) {
             return;
         }
 
-        const property_resolved = await resolve_properties(reference_resolved, reference_parser, linux_path, dt_schema_path);
-
-        if (typeof property_resolved === 'string') {
-            //console.log(`ERROR: ${binding_path} with ${property_resolved}`);
-            return;
-        }
-
-        const redefinition_merged = await merge_redefinitions(property_resolved, reference_resolved.refs, reference_parser, linux_path, dt_schema_path);
-
-        const canary_binding = insert_canaries(redefinition_merged);
-
-        const fixuped = apply_JSONSchema_fixups(canary_binding);
+        const fixuped = processed.value;
 
         let parsed_binding: ParsedBinding = translate_JSONSchema(fixuped);
 
@@ -278,7 +262,7 @@ export class Attach {
             return;
         }
 
-        canary_data["__canary__"] = true;
+        canary_data[CANARY] = true;
 
         if (validator(canary_data) === true) {
             const binding = translate_JSONSchema(current);
@@ -297,16 +281,16 @@ export class Attach {
 
             const decoded_error_schema_path = decodeURIComponent(error.schemaPath);
 
-            if (error.instancePath.includes("__canary__")) {
+            if (error.instancePath.includes(CANARY)) {
                 const schema_path = decoded_error_schema_path.split('/').slice(1);
                 const then_tag_index = schema_path.indexOf("then");
                 const sub_schema_to_apply = schema_path.slice(0, then_tag_index + 1);
 
-                const sub_schema = getByPath(original, sub_schema_to_apply) as Record<string, any>;
-                const strip_canaries = delete_path(sub_schema, [["properties", "__canary__"]]);
+                const sub_schema = get_by_path(original, sub_schema_to_apply) as Record<string, any>;
+                const strip_canaries = delete_path(sub_schema, [["properties", CANARY]]);
 
                 current_binding = deep_merge(current_binding, strip_canaries);
-            } else if (error.keyword === "additionalProperties" && error.params["additionalProperty"] === "__canary__") {
+            } else if (error.keyword === "additionalProperties" && error.params["additionalProperty"] === CANARY) {
                 // The injected canary marker itself tripped additionalProperties:false on a
                 // schema with no allOf/then branch to narrow into (e.g. a patternProperties
                 // sub-schema) — not a real validation error, so it is dropped.

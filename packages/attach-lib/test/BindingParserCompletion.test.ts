@@ -2,9 +2,9 @@ import path from 'node:path';
 import * as fs from 'node:fs';
 
 import { Attach, DeviceTree } from 'attach-lib';
-import { bidirectional_custom_resolve, circular_custom_resolve, find_in_object } from '../src/Bindings/index.js';
+import { bundle, create_context, dereference, find_in_object } from '../src/Bindings/index.js';
+import { Result } from '../src/result.js';
 import { write_to_directory } from './testing_utils';
-import $RefParser from '@apidevtools/json-schema-ref-parser';
 
 import { describe, test } from 'vitest';
 
@@ -209,14 +209,16 @@ describe.runIf(run)('Completion suite', () => {
 
         await walk_directory(dt_schema_schemas_folder_path, async (file: string) => {
 
-            const reference_parser = new $RefParser;
+            const ctx = create_context({ linux: path.resolve(__dirname, 'linux'), dt_schema: path.resolve(__dirname, 'dt-schema') });
 
-            const content = await circular_custom_resolve(reference_parser, file, dt_schema_folder_path);
+            const resolved = await bundle(ctx, file);
 
-            if (typeof content === "string") {
-                console.log(`${content}`);
+            if (Result.is_err(resolved)) {
+                console.log(`${resolved.error}`);
                 return;
             }
+
+            const content = resolved.value;
 
             const select = find_in_object(content,
                 (path: string[], value: unknown) => {
@@ -268,12 +270,10 @@ describe.runIf(run)('Completion suite', () => {
 
         await walk_directory(path.resolve(__dirname, 'linux/Documentation/devicetree/bindings'), async (file: string) => {
 
-            const reference_parser = new $RefParser;
+            const content = await dereference(create_context({ linux: binding_folder_path, dt_schema: dt_schema_folder_path }), file);
 
-            const content = await bidirectional_custom_resolve(reference_parser, file, binding_folder_path, dt_schema_folder_path);
-
-            if (typeof content === "string") {
-                errors.push([file, content]);
+            if (Result.is_err(content)) {
+                errors.push([file, content.error]);
                 return;
             }
 

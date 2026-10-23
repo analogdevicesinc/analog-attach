@@ -20,6 +20,7 @@ eslintPluginUnicorn.configs.recommended,
     rules: {
         'unicorn/empty-brace-spaces': "off",
         'unicorn/filename-case': "off",
+        'unicorn/prevent-abbreviations': ["error", { allowList: { ctx: true } }],
         "@typescript-eslint/naming-convention": ["warn", {
             selector: "import",
             format: ["camelCase", "PascalCase"],
