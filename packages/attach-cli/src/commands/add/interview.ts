@@ -131,17 +131,17 @@ export interface InterviewResult {
     stopped: boolean;
 }
 
-/** Ask for each missing property in turn and apply the answers. */
-export async function run_interview(missing: string[], steps: InterviewSteps, io: InterviewIO): Promise<InterviewResult> {
-    const result: InterviewResult = { set: [], skipped: [], stopped: false };
-    if (missing.length === 0) { return result; }
-
-    let completions: string[] = [];
+/** A readline over the interview's streams: lines from it (answers typed ahead are kept), with the prompt echoed for piped input. */
+function open_prompt(io: InterviewIO, complete: (line: string) => string[]): {
+    write(text: string): void;
+    read_line(prompt: string): Promise<string | undefined>;
+    close(): void;
+} {
     const rl = readline.createInterface({
         input: io.input,
         output: io.output,
         terminal: io.terminal,
-        completer: (line: string): [string[], string] => [completions.filter(c => c.startsWith(line)), line],
+        completer: (line: string): [string[], string] => [complete(line), line],
     });
     // Ctrl-C ends the interview like Ctrl-D.
     rl.on("SIGINT", () => { rl.close(); });
@@ -155,6 +155,16 @@ export async function run_interview(missing: string[], steps: InterviewSteps, io
         if (!io.terminal && line !== undefined) { write(`${line}\n`); }
         return line;
     };
+    return { write, read_line, close: () => { rl.close(); } };
+}
+
+/** Ask for each missing property in turn and apply the answers. */
+export async function run_interview(missing: string[], steps: InterviewSteps, io: InterviewIO): Promise<InterviewResult> {
+    const result: InterviewResult = { set: [], skipped: [], stopped: false };
+    if (missing.length === 0) { return result; }
+
+    let completions: string[] = [];
+    const { write, read_line, close } = open_prompt(io, line => completions.filter(c => c.startsWith(line)));
     /** Each entry on its own line; a wrong answer asks that entry again. */
     const ask_entries = async (property: string, entries: Entry[]): Promise<Answer> => {
         const tokens: string[] = [];
@@ -211,7 +221,67 @@ export async function run_interview(missing: string[], steps: InterviewSteps, io
         }
         return result;
     } finally {
-        rl.close();
+        close();
+    }
+}
+
+/** The question that comes before the node exists: where it goes. */
+export interface ParentQuestion {
+    /** The line above the list. */
+    title: string;
+    /** The valid parents, lettered a, b, …: the value is what `--parent` takes (label, or path), the display the path. Enter takes the first. */
+    options: Suggestion[];
+    /** What Tab completes a typed label or path to, segment by segment. */
+    complete(line: string): string[];
+    /** A message when the identifier names no node, checked as `--parent` is. */
+    check(identifier: string): string | undefined;
+}
+
+/** An answer to the parent question: Enter takes the first parent, a letter picks one, anything else is a label or path to check; `-` isn't accepted (a parent is needed). */
+export function interpret_parent(line: string | undefined, options: Suggestion[]): Answer {
+    if (line === undefined) { return { kind: "stop" }; }
+    const answer = line.trim();
+    const range = pick_range(options.length);
+    if (answer === "-") { return { kind: "again", message: `A parent is needed: ${range}, or type a label or path` }; }
+    if (answer === "") {
+        const first = options[0]?.value;
+        return first === undefined ? { kind: "again", message: "Type a label or path" } : { kind: "value", tokens: [first] };
+    }
+    const words = tokens_of(answer);
+    const [word] = words;
+    if (words.length !== 1 || word === undefined) { return { kind: "again", message: "A parent is one label or path" }; }
+    const index = code_index(word);
+    const picked = index === undefined ? undefined : options[index]?.value;
+    // A path is one token; spi0/ is spi0.
+    return { kind: "value", tokens: [picked ?? (word === "/" ? word : word.replace(/\/$/, ""))] };
+}
+
+/** Ask where the node goes. The parent as `--parent` takes it, or undefined when the question was stopped (Ctrl-D, Ctrl-C): nothing is added then. */
+export async function ask_parent(question: ParentQuestion, io: InterviewIO): Promise<string | undefined> {
+    const { write, read_line, close } = open_prompt(io, line => question.complete(line));
+    try {
+        write(`${question.title} (Enter takes ${pick_code(0)}, a letter picks, or type a label or path, Ctrl-D stops)\n`);
+        for (const line of option_lines(question.options)) { write(`${line}\n`); }
+        const first = question.options[0];
+        const entry: Entry = { options: question.options, ...(first === undefined ? {} : { default: first.value }) };
+        for (;;) {
+            const answer = interpret_parent(await read_line(entry_prompt("parent", entry, 0, 1)), question.options);
+            if (answer.kind === "stop") {
+                if (io.terminal) { write("\n"); }
+                return undefined;
+            }
+            if (answer.kind === "again") {
+                write(`${answer.message}\n`);
+                continue;
+            }
+            const identifier = answer.kind === "value" ? answer.tokens[0] : undefined;
+            if (identifier === undefined) { continue; } // `-` never gets here: interpret_parent asks again
+            const problem = question.check(identifier);
+            if (problem === undefined) { return identifier; }
+            write(`${problem}\n`);
+        }
+    } finally {
+        close();
     }
 }
 
@@ -466,5 +536,83 @@ if (import.meta.vitest) {
     test("run_interview — - on any entry skips the property, Ctrl-D stops", async () => {
         expect(await diff_channels("0\n-\n")).toEqual({ set: [], skipped: ["diff-channels"], stopped: false });
         expect(await diff_channels("0\n")).toEqual({ set: [], skipped: [], stopped: true });
+    });
+
+    const parents: Suggestion[] = [
+        { value: "spi", display_string: "/soc/spi@7e204000" },
+        { value: "spi1", display_string: "/soc/spi@7e215080" },
+        { value: "/soc/odd@0" },
+    ];
+
+    test("interpret_parent — Enter takes the first, a letter picks, a label or path is typed", () => {
+        expect(interpret_parent("", parents)).toEqual({ kind: "value", tokens: ["spi"] });
+        expect(interpret_parent("c", parents)).toEqual({ kind: "value", tokens: ["/soc/odd@0"] });
+        // A letter out of range isn't a pick: it is a label to check.
+        expect(interpret_parent("d", parents)).toEqual({ kind: "value", tokens: ["d"] });
+        expect(interpret_parent("spi0", parents)).toEqual({ kind: "value", tokens: ["spi0"] });
+        expect(interpret_parent("spi0/adc@0", parents)).toEqual({ kind: "value", tokens: ["spi0/adc@0"] });
+        expect(interpret_parent("/soc/spi@7e204000/", parents)).toEqual({ kind: "value", tokens: ["/soc/spi@7e204000"] });
+        expect(interpret_parent("/", parents)).toEqual({ kind: "value", tokens: ["/"] });
+        expect(interpret_parent(undefined, parents)).toEqual({ kind: "stop" });
+    });
+
+    test("interpret_parent — a parent is needed: - and several words ask again", () => {
+        expect(interpret_parent("-", parents)).toEqual({ kind: "again", message: "A parent is needed: pick a to c, or type a label or path" });
+        expect(interpret_parent("a b", parents)).toEqual({ kind: "again", message: "A parent is one label or path" });
+        expect(interpret_parent("", [])).toEqual({ kind: "again", message: "Type a label or path" });
+    });
+
+    /** The parent question over fake streams with the answers already typed. */
+    const ask = async (answers: string[], known: string[] = ["spi", "spi1", "spi0/adc@0", "/soc/odd@0"]) => {
+        const input = new PassThrough();
+        const output = new PassThrough();
+        let printed = "";
+        output.on("data", (chunk: Buffer) => { printed += chunk.toString(); });
+        const checked: string[] = [];
+        const question: ParentQuestion = {
+            title: "Where does adi,adxl345 go?",
+            options: parents,
+            complete: line => [line],
+            check: identifier => {
+                checked.push(identifier);
+                return known.includes(identifier) ? undefined : `Couldn't find parent node ${identifier}`;
+            },
+        };
+        input.end(answers.map(answer => `${answer}\n`).join(""));
+        const parent = await ask_parent(question, { input, output, terminal: false });
+        return { parent, printed, checked };
+    };
+
+    test("ask_parent — the lettered list, Enter takes the first", async () => {
+        const { parent, printed } = await ask([""]);
+        expect(parent).toBe("spi");
+        expect(printed).toBe([
+            "Where does adi,adxl345 go? (Enter takes a, a letter picks, or type a label or path, Ctrl-D stops)",
+            "  a) spi  /soc/spi@7e204000",
+            "  b) spi1  /soc/spi@7e215080",
+            "  c) /soc/odd@0",
+            "parent [a]: ",
+            "",
+        ].join("\n"));
+    });
+
+    test("ask_parent — a letter, a typed label, a typed path", async () => {
+        const { parent: letter } = await ask(["b"]);
+        const { parent: label } = await ask(["spi0/adc@0"]);
+        const { parent: path } = await ask(["/soc/odd@0/"]);
+        expect([letter, label, path]).toEqual(["spi1", "spi0/adc@0", "/soc/odd@0"]);
+    });
+
+    test("ask_parent — a parent that isn't there, and -, are asked again", async () => {
+        const { parent, printed, checked } = await ask(["nope", "-", "b"]);
+        expect(parent).toBe("spi1");
+        expect(checked).toEqual(["nope", "spi1"]);
+        expect(printed).toContain("parent [a]: nope\nCouldn't find parent node nope\nparent [a]: -\nA parent is needed: pick a to c, or type a label or path\nparent [a]: b\n");
+    });
+
+    test("ask_parent — Ctrl-D asks nothing more and gives no parent", async () => {
+        const { parent: nothing } = await ask([]);
+        const { parent: wrong } = await ask(["nope"]);
+        expect([nothing, wrong]).toEqual([undefined, undefined]);
     });
 }

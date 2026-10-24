@@ -21,6 +21,9 @@ export interface NewNode {
     path: string;
 }
 
+/** Whether a person is at the other end: questions can be asked. */
+export const on_terminal = (): boolean => process.stdin.isTTY && process.stdout.isTTY;
+
 /** The required properties the node still lacks, in the order to set them. */
 export async function missing_required_of(node: NewNode): Promise<string[]> {
     const { binding } = await resolve_target_binding(node.identifier, node.workfile.tree, node.base, { ok: true, value: node.bindings });
@@ -130,7 +133,7 @@ export function missing_lines(identifier: string, missing: string[]): string[] {
  * is off), or list them. Human output only; --json uses `describe_missing`.
  */
 export async function ask_for_missing(node: NewNode, missing: string[], { interview }: { interview: boolean }): Promise<void> {
-    const interactive = interview && process.stdin.isTTY && process.stdout.isTTY;
+    const interactive = interview && on_terminal();
     if (!interactive || missing.length === 0) {
         for (const line of missing_lines(node.identifier, missing)) { console.log(line); }
         return;

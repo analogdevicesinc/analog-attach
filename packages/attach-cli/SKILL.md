@@ -282,13 +282,20 @@ attach-linux add <compatible> [--parent <path>] [--name <name>] [--label <label>
 | Parameter | Required | Description |
 |-----------|----------|-------------|
 | `<compatible>` | Yes | Compatible string of the device binding (positional) |
-| `--parent` | No | Parent node: label or path (e.g. `spi0`). Defaults to root `/` |
+| `--parent` | No | Parent node: label or path (e.g. `spi0`). Without it, see **Parent** below |
 | `--name` | No | Node name override (e.g. `adc@0`); defaults to the compatible string |
 | `--label` | No | Label to attach (auto-derived if omitted, e.g. `ad7124_8`) |
 | `--template` | No | What the node starts from: `required` (default), `example:<N>` or `overlay:<name>`, see below. The copied kinds don't take `--name` |
 | `--quiet` | No | On a terminal, list the missing required properties instead of asking for them (`--template required` only; the copied templates never ask) |
 
 The node gets an automatic unit address and `reg` when the binding defines `reg` and the parent is addressed. Duplicates are refused. Labels are auto-indexed on collision.
+
+**Parent** (without `--parent`):
+- Piped runs, `--quiet`, `--json`: the node goes under the first entry of `list parent <compatible>`, and a note says so: `Parent: spi (use --parent to choose another)` (stderr under `--json`). That is a guess, not a decision: with several buses, ask the user which one and pass `--parent`.
+- On a terminal (`--template required`, no `--quiet`): the parent is the first question, a lettered list of the `list parent` results. Enter takes `a`, a letter picks, or type a label or path (Tab completes it); Ctrl-D adds nothing.
+- `--template example:<N>` never asks: it takes the first `list parent` bus of the example's kind (SPI or I2C): `Parent: i2c1 (use --parent to choose another)`. A base without a bus of that kind falls back to the first entry: `Parent: spi (no I2C bus for example 1; use --parent to choose another)`.
+- A device with no parent but the root (`regulator-fixed`, `fixed-clock`) goes under `/`, with no note and no question.
+- Known limit: `adi,ad5593r` (I2C) shares ad5592r's binding, so `list parent` offers SPI buses for it; always pass `--parent` for it.
 
 **Missing required properties**: after the add, the required properties the node still lacks are listed in the order to set them, with `interrupt-parent` before `interrupts`:
 - `--json`: `missing_required: [{ property, description, suggestions }]` in the response. Ask the user for each one in that order, then use `update`.
@@ -297,7 +304,7 @@ The node gets an automatic unit address and `reg` when the binding defines `reg`
 
 **Templates** (`--template`): what the node starts from.
 - `required` (the default): a bare node, then the interview above.
-- `example:<N>`: the node is copied from example N of the binding (its position in the binding's examples; `list`ed in the error when N doesn't hold the device: `use example:1 (I2C), example:2 (SPI)`). An example for another device of the same binding gets the requested compatible. With `--parent` on another bus than the example's, the example is used anyway and the output notes it (`Example 2 is on I2C; the parent is SPI`). Without `--parent` the node goes under the root.
+- `example:<N>`: the node is copied from example N of the binding (its position in the binding's examples; `list`ed in the error when N doesn't hold the device: `use example:1 (I2C), example:2 (SPI)`). An example for another device of the same binding gets the requested compatible. With `--parent` on another bus than the example's, the example is used anyway and the output notes it (`Example 2 is on I2C; the parent is SPI`). Without `--parent` see **Parent** above.
 - `overlay:<name>`: the node and its children are copied from an overlay of the Linux tree, nothing else of the overlay. `<name>` is what `import` takes: a name from `list overlay <compatible>`, its stem, or a file path. The node is the first one with the compatible or another of the binding's, in the `__overlay__` bodies (a `__dormant__` one only when no live body has the device, with a note); when the overlay has more, they are listed (not copied). Without `--parent` it goes where the overlay's fragment puts it (`&spi0`); when the base doesn't have that node, it goes under the first `list parent` bus of the target's kind (`spi7` → the first SPI bus), else the first `list parent` entry, else the root, with a warning (`move` it if that isn't the bus you want): `warning: the overlay puts it in spi7, which the base doesn't have; using spi (first SPI bus)`. A warning also tells when the overlay is for another board. The overlay's other nodes (pinctrl groups, a vref regulator) stay behind, so references to them are unresolved.
 - `--json`: the response's `template` says which was used.
 
@@ -321,7 +328,10 @@ attach-linux add adi,ad7124-8 --parent spi0
 # Add with explicit name and label
 attach-linux add adi,ad7124-8 --parent spi0 --name adc@0 --label imu1
 
-# Add at root (no --parent)
+# Add under the first valid parent (a note says which; on a terminal it is asked)
+attach-linux add adi,adxl345
+
+# Add at root (nothing but the root is a valid parent)
 attach-linux add regulator-fixed
 
 # Copy example 2 of the binding under spi0

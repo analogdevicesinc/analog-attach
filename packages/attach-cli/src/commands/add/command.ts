@@ -11,6 +11,9 @@ import {
     type AddNodeNote,
     type AddNodeResult,
     type ParsedBinding,
+    type PathAndLabel,
+    parent_path_string,
+    suggest_parents,
 } from "attach-lib";
 
 import type { LocalContext } from "../../context";
@@ -20,17 +23,19 @@ import { bus_kind, find_binding, parse_node_path, resolve_path, type BusKind } f
 import { respond, respond_fail, diagnostic, input_error } from "../../protocol/output";
 import type { AddResponse } from "../../protocol/types";
 import { new_workfile, next_workfile_name } from "../../workfile";
-import { ask_for_missing, describe_missing, missing_required_of, type NewNode } from "../../missing-required";
+import { ask_for_missing, describe_missing, missing_required_of, on_terminal, type NewNode } from "../../missing-required";
+import { node_children } from "../list/suggest";
 import { node_reg_warnings, reg_warning_lines } from "../../reg-conflicts";
 import { reference_lines, unique_references } from "../../unresolved";
 import { binding_examples, copy_example_node, device_matcher, find_examples, pick_example, type ExampleMatch, type ExampleNote } from "./example";
 import { load_overlay_template, type OverlayTemplate } from "./overlay-template";
-import { default_parent, pick_parent, target_bus, type DefaultParent } from "./parent";
+import { ask_parent, type ParentQuestion } from "./interview";
+import { BUS_NAME, default_parent, has_parent_choice, parent_completions, parent_note, pick_parent, target_bus, type DefaultParent } from "./parent";
 import { parse_template, template_text, type Template } from "./template";
 
 export interface AddRequest {
     compatible: string;
-    /** Parent identifier (label, path or hybrid); the root when absent. */
+    /** Parent identifier (label, path or hybrid); the root when absent (the caller picks the first valid parent before that). */
     parent?: string;
     name?: string;
     label?: string;
@@ -41,7 +46,7 @@ export function build_add_command(context_: LocalContext): Command {
     return new Command("add")
         .description("Add a device node to the overlay")
         .argument("<compatible>", "Compatible string of the device to add")
-        .option("--parent <value>", "Parent node: label, path, or hybrid (e.g. spi0, /soc/spi@7e204000, spi0/adc@2)")
+        .option("--parent <value>", "Parent node: label, path, or hybrid (e.g. spi0, /soc/spi@7e204000, spi0/adc@2); default: the first bus of 'list parent'")
         .option("--name <value>", "Node name override (e.g. adc@0); defaults to the compatible string")
         .option("--label <value>", "Label override (a label is generated automatically)")
         .option("--template <template>", "What to start the node from: required (default), example:<N> or overlay:<name>")
@@ -53,6 +58,14 @@ Examples:
   $ attach-linux add adi,ad7124-8 --parent spi0 --name adc@1
   $ attach-linux add adi,ad7124-8 --parent spi0 --template example:2
   $ attach-linux add adi,ad7124-8 --template overlay:rpi-ad7124-8-all-diff
+
+Without --parent the node goes under the first bus 'list parent <compatible>'
+shows, and a note says which. On a terminal (--template required, no --quiet)
+that is the first question instead: a lettered list of the valid parents,
+Enter takes the first, or type a label or path (Tab completes it); Ctrl-D adds
+nothing. A device without a bus to sit on (regulator-fixed, fixed-clock) goes
+under the root. A copied example takes the first bus of the example's kind
+(SPI or I2C), even on a terminal.
 
 --template says what the node starts from:
   required         (the default) a bare node, then the interview below
@@ -127,6 +140,22 @@ Use 'list device' to find compatible strings, 'list parent' to find valid buses.
                 return;
             }
 
+            let note: string | undefined;
+            if (parent === undefined && !copies) {
+                const chosen = await choose_parent(compatible, binding_path, {
+                    bindings: workspace.bindings,
+                    base: workspace.base.tree,
+                    overlay: workfile.tree,
+                    sources: `${workspace.base.source} or ${workfile.path}`,
+                    ask: options.quiet !== true && !context_.json && on_terminal(),
+                });
+                if (chosen.status === "stopped") {
+                    console.log("No parent chosen; nothing added.");
+                    return;
+                }
+                ({ parent, note } = chosen);
+            }
+
             const result = await add_with_template(template, {
                 overlay: workfile.tree,
                 base: workspace.base.tree,
@@ -152,7 +181,7 @@ Use 'list device' to find compatible strings, 'list parent' to find valid buses.
             const parent_path = result.path.slice(0, result.path.lastIndexOf("/")) || "/";
             const parent_node = workfile.tree.effective_node(parent_path);
             const added: AddedNode = { ...result, bus: parent_node === undefined ? undefined : bus_kind(parent_node) };
-            for (const message of result.messages(added)) {
+            for (const message of [...(note === undefined ? [] : [note]), ...result.messages(added)]) {
                 if (context_.json) { diagnostic(message); } else { console.log(message); }
             }
             for (const line of node_reg_warnings(workfile.tree, result.path).flatMap(w => reg_warning_lines(w))) {
@@ -214,6 +243,49 @@ async function binding_defines_reg(binding_path: string, bindings: Bindings): Pr
     return binding?.properties.some(p => p.key === "reg") ?? false;
 }
 
+interface ParentChoice {
+    bindings: Bindings;
+    base: DeviceTree;
+    overlay: DeviceTreeOverlay;
+    /** Where a parent is looked for, for the message when a typed one isn't there. */
+    sources: string;
+    /** Whether to ask (a terminal, no --quiet); otherwise the first valid parent is taken. */
+    ask: boolean;
+}
+
+/** The question of where the node goes: the valid parents, lettered; a typed label or path is checked as --parent is. */
+function parent_question(compatible: string, candidates: PathAndLabel[], { base, overlay, sources }: ParentChoice): ParentQuestion {
+    const labels = candidates.flatMap(candidate => candidate.label === undefined ? [] : [candidate.label]);
+    return {
+        title: `Where does ${compatible} go?`,
+        options: candidates.map(candidate => ({ value: candidate.label ?? parent_path_string(candidate), display_string: parent_path_string(candidate) })),
+        complete: line => parent_completions(line, labels, identifier => node_children(base, overlay, identifier)),
+        check: identifier => {
+            const parsed = parse_node_path(identifier);
+            if (!parsed.ok) { return parsed.error; }
+            return resolve_parent_path(base, overlay, parsed.value) === undefined ? `Couldn't find parent node ${identifier} in ${sources}` : undefined;
+        },
+    };
+}
+
+/**
+ * The parent of a node added by hand without --parent: asked for first on a
+ * terminal, else the first valid parent with a note saying so. A device with
+ * nothing to sit on but the root stays there, without a note or a question.
+ */
+async function choose_parent(compatible: string, binding_path: string, choice: ParentChoice): Promise<{ status: "chosen"; parent?: string; note?: string } | { status: "stopped" }> {
+    const binding = await parse_binding(binding_path, choice.bindings);
+    const candidates = binding === undefined ? [] : suggest_parents(choice.base, binding);
+    if (!has_parent_choice(candidates)) { return { status: "chosen" }; }
+    if (choice.ask) {
+        const asked = await ask_parent(parent_question(compatible, candidates, choice), { input: process.stdin, output: process.stdout, terminal: true });
+        return asked === undefined ? { status: "stopped" } : { status: "chosen", parent: asked };
+    }
+    const placed = pick_parent(choice.base, candidates);
+    const note = parent_note(placed);
+    return { status: "chosen", parent: placed.path, ...(note === undefined ? {} : { note }) };
+}
+
 /** What add did: the new node and the notes to print about it (worded for its bus), or why it didn't. */
 type AddOutcome =
     | { status: "added"; key: string; path: string; label: string; messages: (added: AddedNode) => string[] }
@@ -251,21 +323,32 @@ async function add_with_template(template: Template, input: TemplateInput): Prom
 /** Copy the device's node from example `index` of its binding. */
 async function add_from_example(input: TemplateInput, index: number): Promise<AddOutcome> {
     const { overlay, base, settings, bindings, binding_path, request } = input;
-    const parent_path = resolve_parent_path(base, overlay, request.parent);
-    if (parent_path === undefined) { return { status: "parent-not-found" }; }
+    const named = request.parent === undefined ? undefined : resolve_parent_path(base, overlay, request.parent);
+    if (request.parent !== undefined && named === undefined) { return { status: "parent-not-found" }; }
 
     const file = path.basename(binding_path);
     const search = find_examples(await binding_examples(binding_path, bindings), device_matcher(bindings, binding_path, request.compatible), settings, bindings.linux);
     const picked = pick_example(search, index, request.compatible, file);
     if (typeof picked === "string") { return { status: "failed", message: picked }; }
 
+    // Without --parent: the first valid parent on the bus the example is on, else the first valid parent.
+    let placed: DefaultParent | undefined;
+    if (named === undefined) {
+        const binding = await parse_binding(binding_path, bindings);
+        placed = binding === undefined ? pick_parent(base, [], picked.bus) : default_parent(base, binding, picked.bus);
+    }
+    const parent_path = named ?? placed?.path ?? "/";
+
     const parent_node = overlay.effective_node(parent_path);
     const bus = parent_node === undefined ? undefined : bus_kind(parent_node);
     const copied = copy_example_node(overlay, parent_path, picked.node, request);
     if (copied.status === "parent-not-found") { return copied; }
-    if (copied.status !== "added") { return { status: "failed", message: failure_message(copied, request.parent ?? "/") }; }
+    if (copied.status !== "added") { return { status: "failed", message: failure_message(copied, request.parent ?? placed?.label ?? parent_path) }; }
+    const note = placed === undefined ? undefined : parent_note(placed, picked.index);
     const messages = [
-        ...example_messages(picked, bus, file),
+        ...(note === undefined ? [] : [note]),
+        // The parent note already says when the bus isn't the example's.
+        ...example_messages(picked, placed === undefined ? bus : undefined, file),
         ...copied.notes.map(note => copy_note_message(note, request.compatible, "example")),
     ];
     return { ...copied, messages: () => messages };
@@ -361,7 +444,6 @@ interface AddedNode {
 }
 
 const ADDRESS_WORD: Record<BusKind, string> = { spi: "chip select", i2c: "address" };
-const BUS_NAME: Record<BusKind, string> = { spi: "SPI", i2c: "I2C" };
 
 /** The copied example, and a note when its bus isn't the parent's. */
 function example_messages(match: ExampleMatch, bus: BusKind | undefined, file: string): string[] {
@@ -466,6 +548,21 @@ if (import.meta.vitest) {
     test("note_message — other buses say unit address", () => {
         expect(note_message({ kind: "picked-address", unit: "1", occupants: [{ name: "a@0", address: 0n }] }, { ...added, bus: undefined }))
             .toBe("Picked unit address 1 (taken: 0 by a@0).\nTo change it: rename ad7124_8 adi,ad7124-8@<n>");
+    });
+
+    test("parent_question — the valid parents lettered, a typed parent checked as --parent is, Tab through labels and children", () => {
+        const { base, overlay } = setup();
+        const candidates: PathAndLabel[] = [{ path: ["/", "soc", "spi@7e204000"], label: "spi0" }, { path: ["/", "soc"] }];
+        const question = parent_question("adi,ad7124-8", candidates, { bindings: {} as Bindings, base, overlay, sources: "base.dts or ad7124.dtso", ask: true });
+        expect(question.options).toEqual([{ value: "spi0", display_string: "/soc/spi@7e204000" }, { value: "/soc", display_string: "/soc" }]);
+        expect(question.check("spi0")).toBeUndefined();
+        expect(question.check("spi0/adc@4")).toBeUndefined();
+        expect(question.check("/soc/spi@7e204000")).toBeUndefined();
+        expect(question.check("i2c0")).toBe("Couldn't find parent node i2c0 in base.dts or ad7124.dtso");
+        expect(question.check("spi0 x")).toBe("a path is one token (join segments with /)");
+        expect(question.complete("sp")).toEqual(["spi0/"]);
+        expect(question.complete("spi0/")).toEqual(["spi0/spidev@0", "spi0/adc@4"]);
+        expect(question.complete("/soc/")).toEqual(["/soc/spi@7e204000"]);
     });
 
     test("example_messages — the example, and a note when its bus isn't the parent's", () => {
