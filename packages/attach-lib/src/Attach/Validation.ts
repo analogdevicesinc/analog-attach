@@ -64,12 +64,33 @@ export function create_ajv(): Ajv2019 {
     return ajv;
 }
 
+/**
+ * A copy of `schema` without the `$id` of the schemas inlined into it. Dereferencing copies a
+ * referenced schema, `$id` included, to every place that points at it, and AJV rejects an `$id`
+ * that appears twice in one schema. (`translate_JSONSchema` still reads those `$id`s, so the
+ * schema itself keeps them.)
+ */
+function without_nested_ids<T extends object>(schema: T): T {
+    const strip = (node: unknown, is_root: boolean): void => {
+        if (Array.isArray(node)) {
+            for (const item of node) { strip(item, false); }
+        } else if (typeof node === "object" && node !== null) {
+            const record = node as Record<string, unknown>;
+            if (!is_root && typeof record.$id === "string") { delete record.$id; }
+            for (const value of Object.values(record)) { strip(value, false); }
+        }
+    };
+    const copy = structuredClone(schema);
+    strip(copy, true);
+    return copy;
+}
+
 /** Throws when AJV can't compile a schema. */
 export function compile_targets(schema: DtBindingSchema): ValidationTargets {
     const root: ValidationTarget = {
         original: schema,
         current: schema,
-        validator: create_ajv().compile(schema as object),
+        validator: create_ajv().compile(without_nested_ids(schema) as object),
     };
 
     // Kept apart from the root's instance, as a pattern schema may reuse its ids.
@@ -84,7 +105,7 @@ export function compile_targets(schema: DtBindingSchema): ValidationTargets {
         patterns.set(pattern, {
             original: pattern_schema as DtBindingSchema,
             current: structuredClone(pattern_schema) as DtBindingSchema,
-            validator: pattern_ajv.compile(structuredClone(pattern_schema) as object),
+            validator: pattern_ajv.compile(without_nested_ids(pattern_schema) as object),
         });
     }
 
