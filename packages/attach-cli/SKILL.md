@@ -301,6 +301,7 @@ The node gets an automatic unit address and `reg` when the binding defines `reg`
 - `--json`: `missing_required: [{ property, description, suggestions }]` in the response. Ask the user for each one in that order, then use `update`.
 - Piped runs and `--quiet`: `Missing required: interrupt-parent, interrupts`.
 - On a terminal, `add` asks for each one, showing the binding's description and suggestions. Enter takes the first suggestion, `-` skips, Ctrl-D stops and keeps what was set. Options (an enum, the nodes a phandle can name) are lettered `a`, `b`, `c`, … (`aa`, `ab`, … past `z`) and picked by letter or by value (a number is always a value, never a pick; write `&ab` or `"a"` for a value that looks like a letter); a fixed-size array (`diff-channels`, `interrupts`) is asked one entry per line.
+- Before the first question, on a terminal only, `add` sets without asking, one line each: the required properties the binding pins to one value (`#address-cells`, a `const`, a one-option enum, a flag the binding requires such as `spi-cpol` for ad5592r): `Set #address-cells = <1> (the only value the binding allows)`; and, from the binding's first example on the parent's bus, `spi-max-frequency` on SPI (written whether required or not, as the example has it) or `reg` on I2C (the node is renamed to the address; a clash with another device is warned about, a sibling of the same name at that address keeps the node's own): `Set spi-max-frequency = <1000000> (from example 1)`. The chip select is never taken from an example, and without an example on the parent's bus nothing is taken. Those properties are left out of "N required properties to set". `--json`, piped runs, `--quiet` and the copied templates fill nothing: the pinned ones are listed as missing with the single value as their suggestion.
 
 **Templates** (`--template`): what the node starts from.
 - `required` (the default): a bare node, then the interview above.
@@ -510,7 +511,7 @@ attach-linux update <path> <property> [value...] [--quiet]
 **Creating a child node**: its `reg` follows the unit address. The required properties it still lacks are then handled as after `add`:
 - `--json`: the response carries `path` and `missing_required: [{ property, description, suggestions }]`. Ask the user for each one, then `update <path>/<child> <property> <value>`.
 - Piped runs and `--quiet`: `Missing required: diff-channels`, then `Set them with: update adc/channel@0 <property> <value>`.
-- On a terminal, `update` asks for each one, as `add` does. `--quiet` lists them instead: the one flag means "value only" when reading and "don't ask" when creating a child.
+- On a terminal, `update` asks for each one, as `add` does, after setting without asking the ones the binding pins to one value (no example fill: the example describes the device node). `--quiet` lists them instead: the one flag means "value only" when reading and "don't ask" when creating a child.
 
 **Flags**: set with no value, clear with `delete <path> <property>`. `true`/`false` are plain strings, not special.
 

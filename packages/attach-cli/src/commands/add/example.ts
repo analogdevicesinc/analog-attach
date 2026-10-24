@@ -6,6 +6,7 @@ import {
     DeviceTree,
     Result,
     PropertyBuilder,
+    cell_extract_first_value,
     ensure_address_cells,
     get_full_node_name,
     is_dt_flag,
@@ -201,6 +202,32 @@ export function find_examples(examples: readonly string[], belongs: (compatible:
     return { count: examples.length, matches, broken };
 }
 
+/** A value the interview takes from the binding's example on the parent's bus. */
+export interface ExampleValue {
+    property: string;
+    value: bigint;
+    /** The example it comes from, 1-based. */
+    index: number;
+}
+
+/** What the example of a bus gives: the clock limit of an SPI device, the address of an I2C one (the chip select is never taken). */
+const BUS_EXAMPLE_PROPERTY: Record<BusKind, string> = { spi: "spi-max-frequency", i2c: "reg" };
+
+/**
+ * The values to take from the first example whose node sits on the parent's
+ * `bus`: `spi-max-frequency` on SPI, `reg` (the address) on I2C. Nothing when
+ * no example is on that bus, or the one there lacks the property: another
+ * bus's example never stands in.
+ */
+export function bus_example_values(search: ExampleSearch, bus: BusKind | undefined): ExampleValue[] {
+    const match = bus === undefined ? undefined : search.matches.find(candidate => candidate.bus === bus);
+    if (match === undefined || bus === undefined) { return []; }
+    const property = BUS_EXAMPLE_PROPERTY[bus];
+    const found = match.node.properties.find(candidate => candidate.name === property);
+    const value = found === undefined ? undefined : cell_extract_first_value(found);
+    return typeof value === "bigint" ? [{ property, value, index: match.index }] : [];
+}
+
 export const BUS_LABEL: Record<BusKind, string> = { spi: "SPI", i2c: "I2C" };
 
 /** `example:1 (I2C), example:2 (SPI)` */
@@ -350,6 +377,34 @@ spi {
             expect(search.count).toBe(4);
             expect(search.matches.map(match => [match.index, match.bus])).toEqual([[1, "i2c"], [4, "spi"]]);
             expect([...search.broken.keys()]).toEqual([3]);
+        } finally {
+            fs.rmSync(directory, { recursive: true });
+        }
+    });
+
+    // The examples of adi,adxl345.yaml: the first on I2C, the second on SPI.
+    const ADXL345_EXAMPLES = [
+        "i2c {\n  #address-cells = <1>;\n  #size-cells = <0>;\n  accelerometer@2a {\n    compatible = \"adi,adxl345\";\n    reg = <0x2a>;\n  };\n};",
+        "spi {\n  #address-cells = <1>;\n  #size-cells = <0>;\n  accelerometer@0 {\n    compatible = \"adi,adxl345\";\n    reg = <0>;\n    spi-max-frequency = <5000000>;\n    spi-cpol;\n  };\n};",
+    ];
+
+    test("bus_example_values — the example on the parent's bus: an I2C address, an SPI clock, never the chip select", () => {
+        const directory = fs.mkdtempSync(path.join(os.tmpdir(), "attach-examples-"));
+        try {
+            const settings: Settings = { overlay_syntax: "fragment", preprocess_command: "cp {input} {output}" };
+            const search = find_examples(ADXL345_EXAMPLES, c => c === "adi,adxl345", settings, "/linux", directory);
+            expect(bus_example_values(search, "i2c")).toEqual([{ property: "reg", value: 0x2An, index: 1 }]);
+            expect(bus_example_values(search, "spi")).toEqual([{ property: "spi-max-frequency", value: 5_000_000n, index: 2 }]);
+
+            // No example on the bus, or one without the property: nothing, and no other bus's example stands in.
+            const only_spi = find_examples([ADXL345_EXAMPLES[1]!], c => c === "adi,adxl345", settings, "/linux", directory);
+            expect(bus_example_values(only_spi, "i2c")).toEqual([]);
+            const no_clock = find_examples([ADXL345_EXAMPLES[1]!.replace("spi-max-frequency = <5000000>;", ""), ADXL345_EXAMPLES[0]!], c => c === "adi,adxl345", settings, "/linux", directory);
+            expect(bus_example_values(no_clock, "spi")).toEqual([]);
+            // A broken example is skipped (the interview goes on without it).
+            const broken = find_examples(["spi { adc@0 { ", ADXL345_EXAMPLES[0]!], c => c === "adi,adxl345", settings, "/linux", directory);
+            expect(bus_example_values(broken, "spi")).toEqual([]);
+            expect(bus_example_values(broken, "i2c")).toEqual([{ property: "reg", value: 0x2An, index: 2 }]);
         } finally {
             fs.rmSync(directory, { recursive: true });
         }

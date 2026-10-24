@@ -1,10 +1,12 @@
-import type { DeviceTree } from "attach-lib";
+import { cell_extract_first_value, type AttachEnumType, type AttachType, type DeviceTree, type DeviceTreeOverlay, type ValueSuggestion } from "attach-lib";
 
+import type { NodeBinding } from "./binding-resolution";
 import type { Bindings, Workfile } from "./config/workspace";
 import type { MissingProperty, Suggestion, Types } from "./protocol/types";
-import { resolve_target_binding, type PropertyInfo } from "./commands/list/suggest";
+import { resolve_target_binding, value_suggestions, type PropertyInfo, type TargetBinding } from "./commands/list/suggest";
 import { format_details, format_missing } from "./commands/read/command";
-import { apply_update } from "./commands/update/command";
+import { apply_update, format_suggestion } from "./commands/update/command";
+import type { ExampleValue } from "./commands/add/example";
 import { node_missing_required, property_details } from "./node-state";
 import { run_interview, type Entry, type InterviewSteps } from "./commands/add/interview";
 
@@ -128,21 +130,138 @@ export function missing_lines(identifier: string, missing: string[]): string[] {
     return [...format_missing(missing), `Set them with: update ${identifier} <property> <value>`];
 }
 
+/** A value as a line shows it: `<1>`, `<0x2a>` (`hex`), `"adi,x"`. */
+function show_value(suggestion: Pick<ValueSuggestion, "rows" | "strings">, hex = false): string {
+    if (suggestion.strings !== undefined) { return suggestion.strings.map(text => `"${text}"`).join(", "); }
+    const cell = (value: ValueSuggestion["rows"][number][number]): string => {
+        if (typeof value === "bigint") { return hex ? `0x${value.toString(16)}` : value.toString(); }
+        return "label" in value ? `&${value.label}` : value.macro;
+    };
+    return suggestion.rows.map(row => `<${row.map(element => cell(element)).join(" ")}>`).join(", ");
+}
+
+/** The outcome of one fill as a line: what was set and why, or what refused it. */
+function fill_lines(shown: string, why: string, outcome: Awaited<ReturnType<typeof apply_update>>, renamed?: string): string[] {
+    switch (outcome.kind) {
+        case "set": { return [`Set ${shown} (${why})${renamed === undefined ? "" : `; renamed to ${renamed}`}`, ...(outcome.detail === undefined ? [] : [outcome.detail])]; }
+        case "error": { return [`Couldn't set ${shown} (${why}): ${outcome.message}`]; }
+        case "read": { return [`Couldn't set ${shown} (${why})`]; }
+    }
+}
+
+/**
+ * The value the binding pins `property` to, when it pins one: the binding
+ * layer offers exactly one value then (a `const`, a one-option enum, a flag the
+ * narrowed binding requires). A binding that leaves a choice offers none or
+ * several; its `default:` is one of them, never the only one.
+ */
+export function pinned_value_of(
+    target: TargetBinding,
+    overlay: DeviceTreeOverlay,
+    base: DeviceTree,
+    identifier: string,
+    property: string,
+): ValueSuggestion | undefined {
+    const result = value_suggestions(target, overlay, base, identifier, property);
+    if (!result.ok) { return; }
+    const offered = result.values.filter(value => value.source === "binding");
+    const only = offered.length === 1 ? offered[0] : undefined;
+    return only?.flag === false ? undefined : only;
+}
+
+/**
+ * Set the missing properties the binding pins to one value without asking:
+ * `Set #address-cells = <1> (the only value the binding allows)`. Returns the
+ * lines to print and what is still missing. Setting a value can narrow the
+ * binding and require more, so it goes on until nothing more is pinned.
+ */
+export async function fill_pinned(node: NewNode, missing: string[]): Promise<{ lines: string[]; left: string[] }> {
+    const { workfile, base, bindings, identifier } = node;
+    const lines: string[] = [];
+    const tried = new Set<string>();
+    let left = missing;
+    for (;;) {
+        const target = await resolve_target_binding(identifier, workfile.tree, base, { ok: true, value: bindings });
+        let filled = false;
+        for (const property of left.filter(name => !tried.has(name))) {
+            tried.add(property);
+            const only = pinned_value_of(target, workfile.tree, base, identifier, property);
+            if (only === undefined) { continue; }
+            const flag = only.flag === true;
+            const outcome = await apply_update(workfile, base, bindings, identifier, property, flag ? [] : [format_suggestion(only)]);
+            const why = flag ? "a flag the binding requires" : "the only value the binding allows";
+            lines.push(...fill_lines(flag ? property : `${property} = ${show_value(only)}`, why, outcome));
+            filled ||= outcome.kind === "set";
+        }
+        left = await missing_required_of(node);
+        if (!filled || left.every(name => tried.has(name))) { return { lines, left }; }
+    }
+}
+
+/**
+ * Write the values taken from the binding's example on the node's bus
+ * (`spi-max-frequency`, an I2C `reg`) through `update`, which renames the node
+ * to its new address and warns about clashes. The node keeps its own value when
+ * it is the example's already, or when a sibling of the same name is at the
+ * example's address (`update` couldn't rename it). Returns the lines and the
+ * node, whose path changed when `reg` renamed it.
+ */
+export async function fill_from_example(node: NewNode, values: ExampleValue[]): Promise<{ node: NewNode; lines: string[] }> {
+    const { workfile, base, bindings, identifier } = node;
+    const lines: string[] = [];
+    let current = node;
+    for (const { property, value, index } of values) {
+        const present = workfile.tree.effective_node(current.path);
+        const existing = present?.properties.find(candidate => candidate.name === property);
+        if (existing !== undefined && cell_extract_first_value(existing) === value) { continue; }
+        const shown = `${property} = <${property === "reg" ? `0x${value.toString(16)}` : value.toString()}>`;
+        const why = `from example ${index}`;
+        const parent = current.path.slice(0, current.path.lastIndexOf("/")) || "/";
+        if (property === "reg" && present !== undefined && workfile.tree.effective_children(parent).has(`${present.name}@${value.toString(16)}`)) {
+            lines.push(`Kept the address: ${present.name}@${value.toString(16)} is there already (${why})`);
+            continue;
+        }
+        const outcome = await apply_update(workfile, base, bindings, identifier, property, [value.toString()]);
+        const path = workfile.tree.all_labels().get(identifier) ?? current.path;
+        const renamed = path === current.path ? undefined : path.slice(path.lastIndexOf("/") + 1);
+        current = { ...current, path };
+        lines.push(...fill_lines(shown, why, outcome, renamed));
+    }
+    return { node: current, lines };
+}
+
+export interface AskOptions {
+    /** Ask on a terminal; off lists what is missing. */
+    interview: boolean;
+    /** Values to take from the binding's example before the first question (`add` on a terminal). */
+    example?: ExampleValue[];
+}
+
 /**
  * Ask for the `missing` required properties on a terminal (unless `interview`
- * is off), or list them. Human output only; --json uses `describe_missing`.
+ * is off), or list them. On a terminal the properties the binding pins and
+ * the `example` values are set first, without asking, each with a line. Human
+ * output only; --json uses `describe_missing`.
  */
-export async function ask_for_missing(node: NewNode, missing: string[], { interview }: { interview: boolean }): Promise<void> {
-    const interactive = interview && on_terminal();
-    if (!interactive || missing.length === 0) {
+export async function ask_for_missing(node: NewNode, missing: string[], { interview, example = [] }: AskOptions): Promise<void> {
+    if (!interview || !on_terminal()) {
         for (const line of missing_lines(node.identifier, missing)) { console.log(line); }
         return;
     }
 
-    console.log("");
-    await run_interview(missing, interview_steps(node), { input: process.stdin, output: process.stdout, terminal: true });
-    console.log("");
-    const left = await missing_required_of(node);
+    const pinned = await fill_pinned(node, missing);
+    const from_example = await fill_from_example(node, example);
+    const rest = from_example.lines.length === 0 ? pinned.left : await missing_required_of(from_example.node);
+    const filled = [...pinned.lines, ...from_example.lines];
+    for (const line of filled) { console.log(line); }
+    if (missing.length === 0 && filled.length === 0) { return; }
+
+    if (rest.length > 0) {
+        console.log("");
+        await run_interview(rest, interview_steps(from_example.node), { input: process.stdin, output: process.stdout, terminal: true });
+        console.log("");
+    }
+    const left = await missing_required_of(from_example.node);
     const done = left.length === 0 ? ["All required properties are set."] : missing_lines(node.identifier, left);
     for (const line of done) { console.log(line); }
 }
@@ -166,6 +285,76 @@ if (import.meta.vitest) {
         ({ type, description: "", required: true, binding_path: "/b.yaml", constraints: {}, suggestions: [], ...extra });
     const number: Types = { kind: "number", subtype: "int" };
     const irq_types: Types = { kind: "enum", options: [{ value: "IRQ_TYPE_NONE" }, { value: "IRQ_TYPE_EDGE_RISING" }] };
+
+    const { DeviceTree: DT, DeviceTreeOverlay: DTO, AttachEnumType: Kind } = await import("attach-lib");
+    const { resolve_write_target } = await import("./utilities");
+
+    // A node `adc@0` under spi0 whose binding is made of `properties` and requires `required`.
+    const pinned_case = (properties: NodeBinding["properties"], required: string[]) => {
+        const base = DT.new_from_string(`/dts-v1/;\n/ {\n\tspi0: spi@7e204000 {\n\t};\n};`);
+        if (typeof base === "string") { throw new TypeError(base); }
+        const overlay = DTO.new_from_string(`/dts-v1/;\n/plugin/;\n\n&spi0 {\n\tadc@0 {\n\t\tcompatible = "adi,ad5592r";\n\t\treg = <0>;\n\t};\n};`, base);
+        if (typeof overlay === "string") { throw new TypeError(overlay); }
+        const binding: NodeBinding = {
+            properties,
+            required_properties: required,
+            child_nodes: [],
+            property_patterns: [],
+            binding_path: "/linux/iio/dac/adi,ad5592r.yaml",
+            origin: { kind: "compatible", compatible: "adi,ad5592r" },
+            narrow_and_populate: () => ({ properties, required_properties: required, errors: [] }),
+        };
+        const target: TargetBinding = { target: resolve_write_target("spi0/adc@0", overlay, base), binding };
+        return (property: string) => pinned_value_of(target, overlay, base, "spi0/adc@0", property);
+    };
+    const one_of = (values: (bigint | string)[], enum_type: AttachEnumType = Kind.NUMBER, default_value?: string): AttachType =>
+        ({ _t: "scalar", cell: { _t: "enum", enum: values, enum_type, ...(default_value === undefined ? {} : { default: default_value }) } });
+
+    test("pinned_value_of — a const, a one-option enum and a required flag are pinned", () => {
+        const pinned = pinned_case([
+            { key: "#address-cells", value: one_of([1n]) },
+            { key: "adi,mode", value: one_of(["only"], Kind.STRING) },
+            { key: "spi-cpol", value: { _t: "flag" } },
+        ], ["#address-cells", "adi,mode", "spi-cpol"]);
+        expect(pinned("#address-cells")).toMatchObject({ rows: [[1n]], source: "binding" });
+        expect(pinned("adi,mode")).toMatchObject({ strings: ["only"] });
+        expect(pinned("spi-cpol")).toMatchObject({ flag: true });
+    });
+
+    test("pinned_value_of — a choice, a default and an optional flag are not pinned", () => {
+        const pinned = pinned_case([
+            { key: "adi,mode", value: one_of([0n, 1n]) },
+            { key: "adi,rate", value: { _t: "scalar", cell: { _t: "number", signed: false }, default: 8n } as unknown as AttachType },
+            { key: "spi-cpha", value: { _t: "flag" } },
+            { key: "adi,names", value: one_of(["a", "b"], Kind.STRING, "a") },
+        ], ["adi,mode", "adi,rate", "adi,names"]);
+        // Two options: several suggestions, the first being the binding's default for the name list.
+        expect(pinned("adi,mode")).toBeUndefined();
+        expect(pinned("adi,rate")).toBeUndefined();
+        expect(pinned("spi-cpha")).toBeUndefined();
+        expect(pinned("adi,names")).toBeUndefined();
+        expect(pinned("unknown")).toBeUndefined();
+    });
+
+    test("pinned_value_of — a property no layer has a value for is not pinned", () => {
+        expect(pinned_case([{ key: "reg", value: { _t: "unknown" } }], ["reg"])("reg")).toBeUndefined();
+    });
+
+    test("show_value — cells, hex on request, macros, labels, strings", () => {
+        expect(show_value({ rows: [[1n]] })).toBe("<1>");
+        expect(show_value({ rows: [[42n]] }, true)).toBe("<0x2a>");
+        expect(show_value({ rows: [[{ label: "gpio" }, 5n, { macro: "GPIO_ACTIVE_LOW" }], [1n]] })).toBe("<&gpio 5 GPIO_ACTIVE_LOW>, <1>");
+        expect(show_value({ rows: [], strings: ["a", "b"] })).toBe('"a", "b"');
+    });
+
+    test("fill_lines — what was set and why, the rename, or what refused it", () => {
+        expect(fill_lines("reg = <0x2a>", "from example 1", { kind: "set", message: "Set reg on acc", warned: false }, "adi,adxl345@2a"))
+            .toEqual(["Set reg = <0x2a> (from example 1); renamed to adi,adxl345@2a"]);
+        expect(fill_lines("spi-cpol", "a flag the binding requires", { kind: "set", message: "m", detail: "Set interrupt-parent", warned: false }))
+            .toEqual(["Set spi-cpol (a flag the binding requires)", "Set interrupt-parent"]);
+        expect(fill_lines("reg = <0x2a>", "from example 1", { kind: "error", message: "reg update would create a naming conflict; not written" }))
+            .toEqual(["Couldn't set reg = <0x2a> (from example 1): reg update would create a naming conflict; not written"]);
+    });
 
     test("question_entries — an enum is one lettered pick, the first suggestion (the binding's default) taken by Enter", () => {
         const reference = info({ kind: "enum", options: [{ value: 0 }, { value: 1 }, { value: 3 }] });

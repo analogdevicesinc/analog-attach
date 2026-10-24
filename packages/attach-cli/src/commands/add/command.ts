@@ -27,7 +27,7 @@ import { ask_for_missing, describe_missing, missing_required_of, on_terminal, ty
 import { node_children } from "../list/suggest";
 import { node_reg_warnings, reg_warning_lines } from "../../reg-conflicts";
 import { reference_lines, unique_references } from "../../unresolved";
-import { binding_examples, copy_example_node, device_matcher, find_examples, pick_example, type ExampleMatch, type ExampleNote } from "./example";
+import { binding_examples, bus_example_values, copy_example_node, device_matcher, find_examples, pick_example, type ExampleMatch, type ExampleNote } from "./example";
 import { load_overlay_template, type OverlayTemplate } from "./overlay-template";
 import { ask_parent, type ParentQuestion } from "./interview";
 import { BUS_NAME, default_parent, has_parent_choice, parent_completions, parent_note, pick_parent, target_bus, type DefaultParent } from "./parent";
@@ -90,6 +90,12 @@ phandle can name) are lettered a, b, c, ...: type the letter, or the value
 (&label or "text" when the value itself looks like a letter). A fixed-size
 array (diff-channels, interrupts) is asked one entry per line. Piped runs,
 --json and --quiet list the missing properties instead (--template required only).
+
+Before the first question, a terminal run sets without asking (one line each):
+the required properties the binding pins to one value (#address-cells, a
+const, a flag such as spi-cpol), and what the binding's first example on the
+parent's bus has: spi-max-frequency on SPI, reg (the address, renaming the node)
+on I2C. Those are left out of the questions.
 
 Use 'list device' to find compatible strings, 'list parent' to find valid buses.`)
         .action(async (compatible: string, options: { parent?: string; name?: string; label?: string; template?: string; quiet?: boolean }) => {
@@ -219,7 +225,12 @@ Use 'list device' to find compatible strings, 'list parent' to find valid buses.
             }
 
             console.log(`${added_message} to ${workfile.path}`);
-            await ask_for_missing(added_node, missing, { interview: !copies && options.quiet !== true });
+            const interview = !copies && options.quiet !== true;
+            // On a terminal the node also takes what the binding's example on its bus sets (spi-max-frequency, an I2C address).
+            const example = interview && on_terminal() && added.bus !== undefined
+                ? bus_example_values(find_examples(await binding_examples(binding_path, workspace.bindings), device_matcher(workspace.bindings, binding_path, compatible), settings, linux), added.bus)
+                : [];
+            await ask_for_missing(added_node, missing, { interview, example });
         });
 }
 
