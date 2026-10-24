@@ -11,12 +11,13 @@
 // To move the corpus to another kernel, change LINUX_COMMIT and rerun `run`.
 //
 // filter  substring of the overlay file name, to run a subset
+// CORPUS_JOBS  overlays in parallel, one sandbox each (default: the CPUs minus one, at most 8)
 // CORPUS_CACHE  where the checkout goes (default $XDG_CACHE_HOME/attach-corpus)
 //
 // Build first (`yarn workspace attach-linux build`): this runs dist/cli.js.
-import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { homedir, tmpdir } from "node:os";
+import { spawn, spawnSync } from "node:child_process";
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { availableParallelism, homedir, tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -70,40 +71,63 @@ for (const [what, path] of [["Linux overlays", overlays_dir], ["base devicetree"
   }
 }
 
-// One sandbox for the whole run: `config-set linux` builds the binding index and the compiled schemas (40 s) once.
-const sandbox = mkdtempSync(join(tmpdir(), "attach-corpus-"));
+// One sandbox per worker, so overlays run in parallel without sharing `.attach-linux/` (the configured overlay,
+// `preprocessed.dts`, `temp.dts`, ... are per workspace). The first sandbox runs `config-set linux`, which builds the
+// binding index and the compiled schemas (45 s); the others get a copy of its config and caches.
 const env = process.env;
+const jobs = Math.max(1, Number(process.env.CORPUS_JOBS ?? Math.min(8, availableParallelism() - 1)));
+const sandboxes = Array.from({ length: jobs }, () => mkdtempSync(join(tmpdir(), "attach-corpus-")));
+const cleanup = () => sandboxes.forEach((dir) => rmSync(dir, { recursive: true, force: true }));
+process.on("exit", cleanup);
+for (const signal of ["SIGINT", "SIGTERM"]) process.on(signal, () => process.exit(130));
+
 for (const [field, value] of [["devicetree", devicetree], ["linux", linux]]) {
-  const set = spawnSync("node", [cli, "config-set", field, value], { cwd: sandbox, env, encoding: "utf8", stdio: ["ignore", "ignore", "inherit"] });
+  const set = spawnSync("node", [cli, "config-set", field, value], { cwd: sandboxes[0], env, encoding: "utf8", stdio: ["ignore", "ignore", "inherit"] });
   if (set.status !== 0) {
     console.error(`config-set ${field} failed`);
     process.exit(2);
   }
 }
-
-function normalize(text) {
-  return text.replaceAll(sandbox, "<sandbox>").replaceAll(devicetree, "<base>").replaceAll(linux, "<linux>");
+for (const dir of sandboxes.slice(1)) {
+  mkdirSync(join(dir, ".attach-linux"));
+  for (const name of ["config.toml", "compat-index.json", "validation.json", "validation.stamp.json"]) {
+    copyFileSync(join(sandboxes[0], ".attach-linux", name), join(dir, ".attach-linux", name));
+  }
 }
 
-function run(args) {
-  const result = spawnSync("node", [cli, "--json", ...args], { cwd: sandbox, env, encoding: "utf8", timeout: 300_000 });
-  let json = null;
-  try {
-    json = JSON.parse(result.stdout);
-  } catch {
-    // not JSON: reported as a crash below
-  }
-  return { status: result.status, json, stderr: result.stderr };
+function normalize(text) {
+  let result = text;
+  for (const dir of sandboxes) result = result.replaceAll(dir, "<sandbox>");
+  return result.replaceAll(devicetree, "<base>").replaceAll(linux, "<linux>");
+}
+
+function run(args, cwd) {
+  return new Promise((resolvePromise) => {
+    const child = spawn("node", [cli, "--json", ...args], { cwd, env, timeout: 300_000 });
+    let stdout = "";
+    let stderr = "";
+    child.stdout.on("data", (chunk) => (stdout += chunk));
+    child.stderr.on("data", (chunk) => (stderr += chunk));
+    child.on("close", (status) => {
+      let json = null;
+      try {
+        json = JSON.parse(stdout);
+      } catch {
+        // not JSON: reported as a crash below
+      }
+      resolvePromise({ status, json, stdout, stderr });
+    });
+  });
 }
 
 const key = (error) => `${(error.path ?? []).join("/")}: ${error.message}`;
 
-function snapshot(file) {
-  const imported = run(["import", file]);
+async function snapshot(file, cwd) {
+  const imported = await run(["import", file], cwd);
   if (!imported.json?.ok) {
     return { import: { ok: false, crash: imported.json === null, message: imported.json?.message ?? normalize(imported.stderr).slice(0, 500) } };
   }
-  const validated = run(["validate"]);
+  const validated = await run(["validate"], cwd);
   const result = {
     import: { ok: true, fit: imported.json.fit, unresolved_targets: imported.json.unresolved_targets, unresolved: imported.json.unresolved },
   };
@@ -121,12 +145,17 @@ function snapshot(file) {
 const files = readdirSync(overlays_dir).filter((f) => f.endsWith("-overlay.dts") && f.includes(filter)).sort();
 const out = mode === "run" ? baseline : mkdtempSync(join(tmpdir(), "attach-corpus-out-"));
 mkdirSync(out, { recursive: true });
-files.forEach((file, i) => {
-  process.stderr.write(`\r${i + 1}/${files.length} ${file}\x1b[K`);
-  writeFileSync(join(out, file.replace(/-overlay\.dts$/, ".json")), JSON.stringify(snapshot(file), null, 2) + "\n");
-});
+let next = 0;
+let done = 0;
+await Promise.all(sandboxes.map(async (cwd) => {
+  while (next < files.length) {
+    const file = files[next++];
+    writeFileSync(join(out, file.replace(/-overlay\.dts$/, ".json")), JSON.stringify(await snapshot(file, cwd), null, 2) + "\n");
+    process.stderr.write(`\r${++done}/${files.length} ${file}\x1b[K`);
+  }
+}));
 process.stderr.write("\n");
-rmSync(sandbox, { recursive: true, force: true });
+cleanup();
 
 if (mode === "run") {
   console.log(`wrote ${files.length} snapshots to ${baseline}`);
