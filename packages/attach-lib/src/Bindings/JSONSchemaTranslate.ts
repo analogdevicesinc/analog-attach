@@ -433,10 +433,13 @@ function narrow_object(object: any): AttachType {
         }
     }
 
+    // dt-schema's `_extract_prop_type`: a `type: object`, or one of these keys (a `$ref` to a node schema without
+    // `type`, once dereferenced, has them), makes the property a node
     if (
         typeof object === 'object' &&
-        "type" in object &&
-        object.type === "object"
+        object !== null &&
+        (("type" in object && object.type === "object") ||
+            ["properties", "patternProperties", "additionalProperties"].some((key) => key in object))
     ) {
         return described(object, {
             _t: "node",
