@@ -3,7 +3,7 @@ import { DtBindingSchema } from "./Schema";
 import { AttachType, AttachEnumType, Cell, EnumOption, List } from "./StructuralTypes";
 import { find_entry_in_object } from "./ObjectUtilities";
 import { is_node_pattern } from "./PatternKind.js";
-import { is_matrix_type } from "./PropertyTypes.js";
+import { cell_range, is_matrix_type } from "./PropertyTypes.js";
 import { DT_TYPE } from "./RefResolver.js";
 
 export function translate_JSONSchema(fixuped: DtBindingSchema): ParsedBinding {
@@ -324,6 +324,35 @@ function narrow_string_array(object: any): AttachType | undefined {
     });
 }
 
+/**
+ * A property whose schema says nothing but the type dt-schema gives its name (`dtType`, tagged by the `dt_type` fixup:
+ * a binding's `adi,loop-filter-inverting: {description}` is a `flag` because another one says so, `#io-channel-cells`
+ * a `uint32` as every `#*-cells`) is what the type says: a flag, or a number of the type's range, or of its `enum`. A
+ * schema with anything else to say (`oneOf`, `items`) is left to the readers of those.
+ */
+function narrow_dt_scalar(object: any): AttachType | undefined {
+    if (typeof object !== "object" || object === null) { return undefined; }
+
+    const dt_type = object[DT_TYPE];
+    if (typeof dt_type !== "string") { return undefined; }
+
+    if (dt_type === "flag") {
+        return described(object, { _t: "flag" as const });
+    }
+
+    const found = /^u?int(8|16|32|64)$/.exec(dt_type);
+    const range = cell_range(dt_type);
+    if (found === null || range === undefined || ["oneOf", "anyOf", "allOf", "const", "items", "type"].some(key => key in object)) {
+        return undefined;
+    }
+
+    return described(object, {
+        _t: "scalar" as const,
+        cell: "enum" in object ? enum_cell(object.enum) : { _t: "number" as const, minimum: range.minimum, maximum: range.maximum },
+        typeSize: Number(found[1]),
+    });
+}
+
 // TODO: handle objects
 function narrow_object(object: any): AttachType {
 
@@ -415,7 +444,7 @@ function narrow_object(object: any): AttachType {
         });
     }
 
-    return narrow_string_array(object) ?? described(object, { _t: "unknown" });
+    return narrow_string_array(object) ?? narrow_dt_scalar(object) ?? described(object, { _t: "unknown" });
 }
 
 function get_enum_type(options: unknown): AttachEnumType.STRING | AttachEnumType.NUMBER {
@@ -635,6 +664,23 @@ if (import.meta.vitest) {
 
         // a type that isn't a string says nothing
         expect(translated({ foo: { dtType: "uint32", oneOf: [{ pattern: "^a" }, { pattern: "^b" }] } }).foo).toStrictEqual({ _t: "unknown" });
+    });
+
+    test("a property with only the type of its name is a flag, or a number of that type", () => {
+        const { flag, cells, small, signed } = translated({
+            flag: { dtType: "flag", description: "d" },
+            cells: { dtType: "uint32", description: "d" },
+            small: { dtType: "uint8" },
+            signed: { dtType: "int16" },
+        });
+        expect(flag).toStrictEqual({ _t: "flag", description: "d" });
+        expect(cells).toStrictEqual({ _t: "scalar", cell: { _t: "number", minimum: 0n, maximum: 0xFF_FF_FF_FFn }, typeSize: 32, description: "d" });
+        expect(small).toStrictEqual({ _t: "scalar", cell: { _t: "number", minimum: 0n, maximum: 255n }, typeSize: 8 });
+        expect(signed).toStrictEqual({ _t: "scalar", cell: { _t: "number", minimum: -32_768n, maximum: 32_767n }, typeSize: 16 });
+        expect(translated({ cells: { dtType: "uint32", enum: [0, 1] } }).cells).toMatchObject({ _t: "scalar", cell: { _t: "enum", enum_type: "number" }, typeSize: 32 });
+        // arrays, and numbers a schema says more of, are not scalars
+        expect(translated({ foo: { dtType: "uint32-array" } }).foo).toStrictEqual({ _t: "unknown" });
+        expect(translated({ foo: { dtType: "uint32", items: { minimum: 1 } } }).foo).toStrictEqual({ _t: "unknown" });
     });
 
     test("a oneOf of open lists of an enum is a list of the union of the enums", () => {

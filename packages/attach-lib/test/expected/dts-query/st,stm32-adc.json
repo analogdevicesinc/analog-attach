@@ -120,7 +120,7 @@
         {
             "key": "interrupt-controller",
             "value": {
-                "_t": "unknown"
+                "_t": "flag"
             }
         },
         {
