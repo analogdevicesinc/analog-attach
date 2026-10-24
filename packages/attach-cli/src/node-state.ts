@@ -7,11 +7,18 @@ import type { Suggestion } from "./protocol/types";
 /**
  * The required properties the node at `path` doesn't have yet, in the order
  * to set them (see the lib's `missing_required`). Properties the base tree
- * already sets on the node count as set.
+ * already sets on the node count as set. What the binding requires depends on
+ * the node's data (an if/then branch can add to it), so the list is the one
+ * after narrowing, the binding's unconditional one when that fails.
  */
-export function node_missing_required(binding: Pick<NodeBinding, "required_properties">, overlay: DeviceTreeOverlay, path: string): string[] {
+export function node_missing_required(
+    binding: Pick<NodeBinding, "required_properties" | "narrow_and_populate">,
+    overlay: DeviceTreeOverlay,
+    path: string,
+): string[] {
     const node = overlay.effective_node(path);
-    return missing_required(binding.required_properties, node?.properties.map(p => p.name) ?? []);
+    const required = (node === undefined ? undefined : binding.narrow_and_populate(node)?.required_properties) ?? binding.required_properties;
+    return missing_required(required, node?.properties.map(p => p.name) ?? []);
 }
 
 export interface PropertyDetails {
@@ -63,6 +70,8 @@ export function other_candidates(options: string[], suggestions: Suggestion[], o
 if (import.meta.vitest) {
     const { test, expect } = import.meta.vitest;
     const { DeviceTree, DeviceTreeOverlay: DTO } = await import("attach-lib");
+    const cannot_narrow = (): undefined => { return; };
+    const unnarrowed = (required_properties: string[]) => ({ required_properties, narrow_and_populate: cannot_narrow });
 
     test("other_candidates — the nodes a phandle can name that the suggestions leave out, marked by where they are enabled", () => {
         const base = DeviceTree.new_from_string(`/dts-v1/;\n/ {\n\tgpio: gpio@7e200000 {\n\t};\n\tgicv2: interrupt-controller@40041000 {\n\t};\n\taon_intr: interrupt-controller@7ef00100 {\n\t\tstatus = "disabled";\n\t};\n\tl2_intr: interrupt-controller@7ef00200 {\n\t\tstatus = "disabled";\n\t};\n};`);
@@ -84,8 +93,23 @@ if (import.meta.vitest) {
         const overlay = DTO.new_from_string(`/dts-v1/;\n/plugin/;\n\n&spi0 {\n\treg = <0x7e204000 0x200>;\n\tadc@0 {\n\t\tcompatible = "adi,ad7124-8";\n\t};\n};`, base);
         if (typeof overlay === "string") { throw new TypeError(overlay); }
 
-        expect(node_missing_required({ required_properties: ["compatible", "reg", "clocks"] }, overlay, "/soc/spi@7e204000")).toEqual(["clocks"]);
-        expect(node_missing_required({ required_properties: ["compatible", "reg", "interrupts"] }, overlay, "/soc/spi@7e204000/adc@0"))
+        expect(node_missing_required(unnarrowed(["compatible", "reg", "clocks"]), overlay, "/soc/spi@7e204000")).toEqual(["clocks"]);
+        expect(node_missing_required(unnarrowed(["compatible", "reg", "interrupts"]), overlay, "/soc/spi@7e204000/adc@0"))
             .toEqual(["reg", "interrupt-parent", "interrupts"]);
+    });
+
+    test("node_missing_required — the list after narrowing counts: an if/then branch can require more", () => {
+        const base = DeviceTree.new_from_string(`/dts-v1/;\n/ {\n\tspi0: spi@7e204000 {\n\t};\n};`);
+        if (typeof base === "string") { throw new TypeError(base); }
+        const overlay = DTO.new_from_string(`/dts-v1/;\n/plugin/;\n\n&spi0 {\n\tadc@0 {\n\t\tcompatible = "adi,ad5592r";\n\t\treg = <0>;\n\t};\n};`, base);
+        if (typeof overlay === "string") { throw new TypeError(overlay); }
+
+        const binding = {
+            required_properties: ["compatible", "reg"],
+            narrow_and_populate: () => ({ properties: [], required_properties: ["compatible", "reg", "spi-cpol"], errors: [] }),
+        };
+        expect(node_missing_required(binding, overlay, "/spi@7e204000/adc@0")).toEqual(["spi-cpol"]);
+        // A binding that can't be narrowed keeps its own list.
+        expect(node_missing_required({ ...binding, narrow_and_populate: cannot_narrow }, overlay, "/spi@7e204000/adc@0")).toEqual([]);
     });
 }

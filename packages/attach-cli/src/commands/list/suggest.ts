@@ -28,7 +28,7 @@ import { format_suggestion, build_raw_property, shape_hint, parse_value } from "
 import { bigIntReplacer, effective_parent_compatibles, find_binding, fragment_target, get_compat_index, parse_property_reference, resolve_node_identifier, resolve_positional_path, resolve_write_target, type WriteTarget } from "../../utilities";
 import { respond, respond_fail, input_error } from "../../protocol/output";
 import { attach_type_to_protocol_type } from "../../protocol/dt-to-protocol";
-import { find_property_definition, resolve_node_binding, type NodeBinding } from "../../binding-resolution";
+import { find_property_definition, narrowed_binding, resolve_node_binding, type NodeBinding } from "../../binding-resolution";
 import { check_value } from "../../value-check";
 import { overlay_files } from "../../overlay-index";
 import type { TypeResponse, Suggestion, Types } from "../../protocol/types";
@@ -241,7 +241,8 @@ export function value_suggestions(
     const placement = placement_from_overlay(overlay, resolve_node_identifier(node_identifier, overlay));
     if (placement === undefined) { return { ok: false }; }
 
-    const resolved = "error" in binding ? undefined : binding;
+    // The properties and required list the node's own data selects (an if/then branch can add or forbid).
+    const resolved = "error" in binding ? undefined : (target.binding_node === undefined ? binding : narrowed_binding(binding, target.binding_node));
     // Pass the node's real data so the intelligence stack can resolve phandle
     // references (e.g. interrupt-parent → controller → #interrupt-cells).
     let data = "{}";
@@ -421,8 +422,9 @@ async function suggest_node_property(context_: LocalContext, arguments_: string[
         return;
     }
 
-    const required = new Set(binding.required_properties);
-    const all_properties = binding.properties;
+    const applicable = narrowed_binding(binding, found_node);
+    const required = new Set(applicable.required_properties);
+    const all_properties = applicable.properties;
     const patterns = binding.property_patterns.map(rule => describe_property_pattern(rule, found_node));
     const children = binding.child_nodes.map(rule => describe_child_nodes(rule, found_node));
 
@@ -652,7 +654,10 @@ async function suggest_navigate(context_: LocalContext, arguments_: string[]): P
     // Bindings are optional here: without them the node's own properties are offered.
     const bindings = parse_bindings(workspace.settings);
     const { binding } = bindings.ok ? await resolve_target_binding(identifier, overlay, base_dt, bindings) : { binding: undefined };
-    const suggestions = navigate_candidates(node, binding === undefined || "error" in binding ? undefined : binding);
+    const found_node = effective_target_node(identifier, overlay, base_dt);
+    // What the node's data selects: a property an if/then branch forbids isn't offered, one it requires is marked.
+    const applicable = binding === undefined || "error" in binding ? undefined : (found_node === undefined ? binding : narrowed_binding(binding, found_node));
+    const suggestions = navigate_candidates(node, applicable);
 
     if (context_.json) {
         respond({ ok: true, message: `Found ${suggestions.length} items`, severity: "info", suggestions });
@@ -781,7 +786,7 @@ export function property_info(
         info: {
             type: attach_type_to_protocol_type(property_definition.value),
             description: property_definition.value.description,
-            required: binding.required_properties.includes(property_name),
+            required: result.required_properties.includes(property_name),
             binding_path: binding.binding_path,
             constraints: {
                 ...(constraints.const === undefined ? {} : { const: constraints.const }),
@@ -879,7 +884,7 @@ if (import.meta.vitest) {
             property_patterns: [],
             binding_path: "/linux/spi/brcm,bcm2835-spi.yaml",
             origin: { kind: "compatible", compatible: "brcm,bcm2835-spi" },
-            narrow_and_populate: () => ({ properties: [], errors: [] }),
+            narrow_and_populate: () => ({ properties: [], required_properties: [], errors: [] }),
         };
         expect(navigate_candidates({ properties: ["compatible", "cs-gpios"], children: ["spidev@0"] }, binding)).toEqual([
             { value: "spidev@0", group: "set" },
@@ -915,12 +920,27 @@ if (import.meta.vitest) {
             property_patterns: [{ pattern: "^adi,pin(5|10)-function$", description: "", value }],
             binding_path: "/linux/hwmon/adt7475.yaml",
             origin: { kind: "compatible", compatible: "adi,adt7475" },
-            narrow_and_populate: () => ({ properties: [], errors: [] }),
+            narrow_and_populate: () => ({ properties: [], required_properties: [], errors: [] }),
         };
         const result = property_info(binding, { name: "hwmon", labels: [], properties: [], children: [] } as unknown as DTNode, "adi,pin5-function");
         expect(result.ok && result.info.description).toBe("Pin 5 function");
         expect(result.ok && result.info.constraints).toEqual({});
         expect(result.ok && result.info.phandle_options).toBeUndefined();
+    });
+
+    test("property_info — required follows the list after narrowing", () => {
+        const value: AttachType = { _t: "flag", description: "" };
+        const binding: NodeBinding = {
+            properties: [{ key: "spi-cpol", value }],
+            required_properties: ["compatible", "reg"],
+            child_nodes: [],
+            property_patterns: [],
+            binding_path: "/linux/iio/dac/adi,ad5592r.yaml",
+            origin: { kind: "compatible", compatible: "adi,ad5592r" },
+            narrow_and_populate: () => ({ properties: [{ key: "spi-cpol", value }], required_properties: ["compatible", "reg", "spi-cpol"], errors: [] }),
+        };
+        const result = property_info(binding, { name: "dac", labels: [], properties: [], children: [] } as unknown as DTNode, "spi-cpol");
+        expect(result.ok && result.info.required).toBe(true);
     });
 
     test("property_info — a phandle enum's options are the nodes it can name, not a constraint", () => {
@@ -932,7 +952,7 @@ if (import.meta.vitest) {
             property_patterns: [],
             binding_path: "/linux/iio/adc/adi,ad7124.yaml",
             origin: { kind: "compatible", compatible: "adi,ad7124-8" },
-            narrow_and_populate: () => ({ properties: [{ key: "interrupt-parent", value }], errors: [] }),
+            narrow_and_populate: () => ({ properties: [{ key: "interrupt-parent", value }], required_properties: [], errors: [] }),
         };
         const result = property_info(binding, { name: "adc", labels: [], properties: [], children: [] } as unknown as DTNode, "interrupt-parent");
         expect(result.ok && result.info.phandle_options).toEqual(["gpio", "gicv2", "aon_intr"]);
@@ -946,6 +966,39 @@ if (import.meta.vitest) {
         const target: TargetBinding = { target: resolve_write_target("spi0/adc@0", overlay, base), binding: { error: "no bindings" } };
         const result = value_suggestions(target, overlay, base, "spi0/adc@0", "refin1-supply");
         expect(result.ok && result.suggestions.map(s => s.value)).toEqual(["vref", "vdd_3v3_reg"]);
+    });
+
+    // A binding whose if/then requires `spi-cpol` once the node says it is an ad5592r; the unconditional lists don't have it.
+    const branch_binding = (): NodeBinding => ({
+        properties: [{ key: "compatible", value: { _t: "unknown" } }, { key: "spi-cpol", value: { _t: "flag" } }, { key: "spi-cpha", value: { _t: "flag" } }],
+        required_properties: ["compatible"],
+        child_nodes: [],
+        property_patterns: [],
+        binding_path: "/linux/iio/dac/adi,ad5592r.yaml",
+        origin: { kind: "compatible", compatible: "adi,ad5592r" },
+        narrow_and_populate: () => ({
+            properties: [{ key: "compatible", value: { _t: "unknown" } }, { key: "spi-cpol", value: { _t: "flag" } }],
+            required_properties: ["compatible", "spi-cpol"],
+            errors: [],
+        }),
+    });
+
+    test("value_suggestions — a flag the narrowed binding requires is offered, pinned", () => {
+        const { base, overlay } = navigate_trees(`/dts-v1/;\n/plugin/;\n\n&spi0 {\n\tdac@0 {\n\t\tcompatible = "adi,ad5592r";\n\t\treg = <0>;\n\t};\n};`);
+        const target: TargetBinding = { target: resolve_write_target("spi0/dac@0", overlay, base), binding: branch_binding() };
+        const result = value_suggestions(target, overlay, base, "spi0/dac@0", "spi-cpol");
+        expect(result.ok && result.values.map(value => value.flag)).toContain(true);
+    });
+
+    test("list property / navigate_candidates — the narrowed binding: a required property is marked, a forbidden one is gone", () => {
+        const node = { name: "dac", labels: [], properties: [{ name: "compatible", value: [] }], children: [] } as unknown as DTNode;
+        const applicable = narrowed_binding(branch_binding(), node);
+        expect(applicable.required_properties).toEqual(["compatible", "spi-cpol"]);
+        expect(applicable.properties.map(p => p.key)).toEqual(["compatible", "spi-cpol"]);
+        expect(navigate_candidates({ properties: ["compatible"], children: [] }, applicable)).toEqual([
+            { value: "compatible", display_string: "compatible (required)", group: "set" },
+            { value: "spi-cpol", display_string: "spi-cpol (required)", group: "not set" },
+        ]);
     });
 
     test("describe_property_pattern — the names it expands to, the regex, and the names already set", () => {

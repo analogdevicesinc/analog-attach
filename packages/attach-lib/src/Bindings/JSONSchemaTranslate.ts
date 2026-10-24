@@ -64,6 +64,11 @@ function collect_properties(properties: Record<string, unknown> | undefined): Re
             continue;
         }
 
+        // `name: false` forbids the property: it isn't one to offer (as with a `false` pattern).
+        if (value === false) {
+            continue;
+        }
+
         collected.push({ key: name, value: narrow_object(value) });
     }
 

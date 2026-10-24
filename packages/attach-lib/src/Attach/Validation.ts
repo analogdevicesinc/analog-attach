@@ -113,6 +113,16 @@ export function compile_targets(schema: DtBindingSchema): ValidationTargets {
 }
 
 /**
+ * `branch` merged into `schema`. What a branch requires adds to what the binding requires
+ * (dt-schema validates both), where `deep_merge` would replace the list.
+ */
+function merge_branch(schema: DtBindingSchema, branch: Record<string, unknown>): DtBindingSchema {
+    const merged = deep_merge(schema, branch);
+    const required = [...new Set([...(schema.required ?? []), ...(Array.isArray(branch.required) ? branch.required as string[] : [])])];
+    return required.length === 0 ? merged : { ...merged, required };
+}
+
+/**
  * Validates `data` (validator-input JSON) against the target and narrows the
  * target's schema to the `if/then` branches that now apply. Undefined when
  * `data` isn't JSON or AJV gave no errors to read.
@@ -141,20 +151,24 @@ export function narrow(target: ValidationTarget, data: string): { binding: Parse
 
     let current = structuredClone(target.original);
 
-    // A failing canary names the `then` branch whose `if` matched: merge it in.
+    // A failing canary names the `then` or `else` branch whose `if` matched: merge it in.
     for (const error of ajv_errors) {
         if (!error.instancePath.includes(CANARY)) {
             continue;
         }
 
         const schema_path = decodeURIComponent(error.schemaPath).split('/').slice(1);
-        const then_tag_index = schema_path.indexOf("then");
-        const sub_schema_to_apply = schema_path.slice(0, then_tag_index + 1);
+        // The canary inserter only tags branches of an `allOf` entry: `allOf/<n>/then`.
+        const branch_index = schema_path.findIndex((key, index) => (key === "then" || key === "else") && schema_path[index - 2] === "allOf");
+        if (branch_index === -1) {
+            continue;
+        }
+        const sub_schema_to_apply = schema_path.slice(0, branch_index + 1);
 
         const sub_schema = get_by_path(target.original, sub_schema_to_apply) as Record<string, unknown>;
         const strip_canaries = delete_path(sub_schema, [["properties", CANARY]]);
 
-        current = deep_merge(current, strip_canaries);
+        current = merge_branch(current, strip_canaries);
     }
 
     target.current = current;

@@ -39,8 +39,19 @@ export type NodeBinding = {
     origin:
     | { kind: "compatible"; compatible: string }
     | { kind: "pattern"; parent_compatible: string; pattern: string };
-    narrow_and_populate(node: DTNode): { properties: ResolvedProperty[]; errors: unknown[] } | undefined;
+    /** The properties and required properties once the if/then branches the node's data selects apply (`required_properties` above is the unconditional list). */
+    narrow_and_populate(node: DTNode): { properties: ResolvedProperty[]; required_properties: string[]; errors: unknown[] } | undefined;
 };
+
+/**
+ * The binding as it applies to `node`: the properties and required list after
+ * the if/then/else branches its data selects (a property a branch forbids is
+ * gone, one it requires is required). The binding itself when narrowing fails.
+ */
+export function narrowed_binding(binding: NodeBinding, node: DTNode): NodeBinding {
+    const narrowed = binding.narrow_and_populate(node);
+    return narrowed === undefined ? binding : { ...binding, properties: narrowed.properties, required_properties: narrowed.required_properties };
+}
 
 /** A binding's definition of a property, and the pattern it came from when it isn't named. */
 export type PropertyDefinition = ResolvedProperty & { pattern?: string };
@@ -150,7 +161,7 @@ export async function resolve_node_binding(
                 const update = attach.value.update_binding_by_changes(input_json);
                 if (update === undefined) { return; }
                 const populated = populate_binding(update.binding, base_dt, input_json, populate_options);
-                return { properties: populated.properties, errors: update.errors as unknown[] };
+                return { properties: populated.properties, required_properties: update.binding.required_properties, errors: update.errors as unknown[] };
             },
         };
     }
@@ -211,12 +222,14 @@ export async function resolve_node_binding(
                 update.binding.properties, base_dt, input_json, populate_options
             );
 
-            return { properties: populated_properties, errors: update.errors as unknown[] };
+            return { properties: populated_properties, required_properties: update.binding.required_properties, errors: update.errors as unknown[] };
         },
     };
 }
 
 if (import.meta.vitest) {
+    const flag = (key: string) => ({ key, value: { _t: "flag" } as const });
+    const cannot_narrow = (): undefined => { return; };
     const { test, expect, vi } = import.meta.vitest;
     const fs = await import("node:fs");
     const os = await import("node:os");
@@ -269,6 +282,25 @@ if (import.meta.vitest) {
     test("find_property_definition — the pattern's description when the type has none", () => {
         const binding = { property_patterns: [{ pattern: "-supply$", description: "Input supply", value: { _t: "unknown" } as const }] };
         expect(find_property_definition(binding, [], "vdd-supply")?.value.description).toBe("Input supply");
+    });
+
+    test("narrowed_binding — the properties and required list the node's data selects; the binding itself when narrowing fails", () => {
+        const binding: NodeBinding = {
+            properties: [flag("spi-cpol"), flag("spi-cpha")],
+            required_properties: ["compatible"],
+            child_nodes: [],
+            property_patterns: [],
+            binding_path: "/linux/iio/dac/adi,ad5592r.yaml",
+            origin: { kind: "compatible", compatible: "adi,ad5592r" },
+            narrow_and_populate: () => ({ properties: [flag("spi-cpol")], required_properties: ["compatible", "spi-cpol"], errors: [] }),
+        };
+        const node = { name: "dac", labels: [], properties: [], children: [] } as unknown as DTNode;
+        const narrowed = narrowed_binding(binding, node);
+        expect(narrowed.properties.map(p => p.key)).toEqual(["spi-cpol"]);
+        expect(narrowed.required_properties).toEqual(["compatible", "spi-cpol"]);
+        expect(narrowed.binding_path).toBe(binding.binding_path);
+
+        expect(narrowed_binding({ ...binding, narrow_and_populate: cannot_narrow }, node)).toEqual({ ...binding, narrow_and_populate: cannot_narrow });
     });
 
     test("match_pattern_rule prefers the first matching pattern", () => {
