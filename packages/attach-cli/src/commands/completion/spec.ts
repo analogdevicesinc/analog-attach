@@ -24,7 +24,7 @@ export const GROUP_DIRECTIVE = "__ATTACH_COMPLETE_GROUP__";
 
 // "entry-points" is completion-only: `suggest navigate` with no node (the overlay's top-level targets).
 // "overlay-props" is what the overlay sets on a node, the only properties delete can remove.
-export type SuggestKind = "device-key" | "parent" | "navigate" | "entry-points" | "children" | "value" | "overlay" | "overlay-props";
+export type SuggestKind = "device-key" | "parent" | "navigate" | "entry-points" | "children" | "value" | "overlay" | "overlay-props" | "template";
 
 export type ValueSource =
     | { kind: "file" }
@@ -85,7 +85,7 @@ export const LIST_SUBKIND_SPECS: Readonly<Record<string, CommandSpec>> = {
 export const COMPLETION_SPEC: Readonly<Record<string, CommandSpec | "dynamic">> = {
     add: {
         positional: { mode: "byIndex", sources: [{ kind: "suggest", suggest: "device-key" }] },
-        flags: { "--parent": PATH_PARENT },
+        flags: { "--parent": PATH_PARENT, "--template": { kind: "suggest", suggest: "template" } },
     },
     import: {
         positional: { mode: "byIndex", sources: [{ kind: "suggest", suggest: "overlay" }] },

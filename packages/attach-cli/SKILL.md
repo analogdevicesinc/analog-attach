@@ -186,7 +186,7 @@ attach-linux list parent <compatible>
 
 ### 2b. `list overlay` - Find Existing Overlays for a Device
 
-**Purpose**: Find the overlays already in the Linux tree (RPi `arch/arm/boot/dts/overlays/*-overlay.dts`, and `*.dtso` under `arch/*/boot/dts`) that add the device, and whether each is meant for the base's board.
+**Purpose**: Find the overlays already in the Linux tree (RPi `arch/arm/boot/dts/overlays/*-overlay.dts`, and `*.dtso` under `arch/*/boot/dts`) that add the device, and whether each is meant for the base's board. Overlays that add another compatible of the same binding (`adi,ad7124-4` for `adi,ad7124-8`) are listed too, marked `via <compatible>`; within a fit group, the exact compatible comes first.
 
 ```bash
 attach-linux list overlay <compatible>
@@ -196,10 +196,11 @@ attach-linux list overlay <compatible>
 ```
 rpi-ad7124-8-all-diff-overlay.dts  compatible (family: brcm,bcm2835 → raspberrypi)
 ad7124-8-overlay.dts               compatible (brcm,bcm2711)
+rpi-cn0554-overlay.dts             compatible (family: brcm,bcm2835 → raspberrypi)  via adi,ad7124-4
 generic-adc-overlay.dts            unknown (no root compatible)
 zynqmp-ad7124.dtso                 incompatible (overlay: xlnx,zynqmp; base: raspberrypi,4-model-b, brcm,bcm2711)
 ```
-The fit compares the overlay's root `compatible` with the base's. A generic SoC compatible that means any board of a family (`brcm,bcm2835` on RPi overlays) matches every base of that family, shown as `family: …`. A root compatible that isn't `vendor,name` (a typo) is unknown. `--json` gives `overlays: [{ name, path, fit, reason }]`.
+The fit compares the overlay's root `compatible` with the base's. A generic SoC compatible that means any board of a family (`brcm,bcm2835` on RPi overlays) matches every base of that family, shown as `family: …`. A root compatible that isn't `vendor,name` (a typo) is unknown. `--json` gives `overlays: [{ name, path, fit, reason, matched? }]`; `matched` is only there when the overlay adds another compatible of the binding, not the one asked for.
 
 The overlays are indexed on first use into `.attach-linux/overlay-index.json` (a text scan; quick) and re-indexed when an overlay file changes.
 
@@ -274,7 +275,7 @@ attach-linux create-workfile [--name <filename>]
 **Purpose**: Add a device node (with a compatible string) to the overlay. If no overlay is configured, one is created automatically.
 
 ```bash
-attach-linux add <compatible> [--parent <path>] [--name <name>] [--label <label>] [--from-example] [--quiet]
+attach-linux add <compatible> [--parent <path>] [--name <name>] [--label <label>] [--template required|example:<N>|overlay:<name>] [--quiet]
 ```
 
 **Parameters**:
@@ -284,8 +285,8 @@ attach-linux add <compatible> [--parent <path>] [--name <name>] [--label <label>
 | `--parent` | No | Parent node: label or path (e.g. `spi0`). Defaults to root `/` |
 | `--name` | No | Node name override (e.g. `adc@0`); defaults to the compatible string |
 | `--label` | No | Label to attach (auto-derived if omitted, e.g. `ad7124_8`) |
-| `--from-example` | No | Copy the node from the binding's example instead of creating a bare one (not with `--name`) |
-| `--quiet` | No | On a terminal, list the missing required properties instead of asking for them |
+| `--template` | No | What the node starts from: `required` (default), `example:<N>` or `overlay:<name>`, see below. The copied kinds don't take `--name` |
+| `--quiet` | No | On a terminal, list the missing required properties instead of asking for them (`--template required` only; the copied templates never ask) |
 
 The node gets an automatic unit address and `reg` when the binding defines `reg` and the parent is addressed. Duplicates are refused. Labels are auto-indexed on collision.
 
@@ -294,7 +295,13 @@ The node gets an automatic unit address and `reg` when the binding defines `reg`
 - Piped runs and `--quiet`: `Missing required: interrupt-parent, interrupts`.
 - On a terminal, `add` asks for each one, showing the binding's description and suggestions. Enter takes the first suggestion, `-` skips, Ctrl-D stops and keeps what was set. Options (an enum, the nodes a phandle can name) are lettered `a`, `b`, `c`, … (`aa`, `ab`, … past `z`) and picked by letter or by value (a number is always a value, never a pick; write `&ab` or `"a"` for a value that looks like a letter); a fixed-size array (`diff-channels`, `interrupts`) is asked one entry per line.
 
-**From the binding's example** (`--from-example`): the node is copied from the first example on the parent's bus (SPI or I2C), else from the first example that has the device (`No SPI example for adi,ad7124-8; using example 1 (i2c)`). An example for another device of the same binding gets the requested compatible. Name, unit address, `reg`, children and references are copied as they are, so:
+**Templates** (`--template`): what the node starts from.
+- `required` (the default): a bare node, then the interview above.
+- `example:<N>`: the node is copied from example N of the binding (its position in the binding's examples; `list`ed in the error when N doesn't hold the device: `use example:1 (I2C), example:2 (SPI)`). An example for another device of the same binding gets the requested compatible. With `--parent` on another bus than the example's, the example is used anyway and the output notes it (`Example 2 is on I2C; the parent is SPI`). Without `--parent` the node goes under the root.
+- `overlay:<name>`: the node and its children are copied from an overlay of the Linux tree, nothing else of the overlay. `<name>` is what `import` takes: a name from `list overlay <compatible>`, its stem, or a file path. The node is the first one with the compatible or another of the binding's, in the `__overlay__` bodies (a `__dormant__` one only when no live body has the device, with a note); when the overlay has more, they are listed (not copied). Without `--parent` it goes where the overlay's fragment puts it (`&spi0`); when the base doesn't have that node, it goes under the first `list parent` bus of the target's kind (`spi7` → the first SPI bus), else the first `list parent` entry, else the root, with a warning (`move` it if that isn't the bus you want): `warning: the overlay puts it in spi7, which the base doesn't have; using spi (first SPI bus)`. A warning also tells when the overlay is for another board. The overlay's other nodes (pinctrl groups, a vref regulator) stay behind, so references to them are unresolved.
+- `--json`: the response's `template` says which was used.
+
+The copied templates never interview. Name, unit address, `reg`, children and references are copied as they are, so:
 - `reg` may clash with a sibling; the clash is reported as a warning (`rename` to move it).
 - References that name nothing in the base or overlay (`<&adc_vref>`) are listed in the same form as for `import`, as errors:
 ```
@@ -302,7 +309,7 @@ error: 1 reference points to a node neither the base nor the overlay has:
   ad7124_8  refin1-supply → &adc_vref
   fix with: update <node> <property> <value>, or delete <node> <property>
 ```
-  Under `--json` as `unresolved: [{ path, property, reference }]`. The node is still written; fix them with `update` before deploying.
+  Under `--json` as `unresolved: [{ path, property, reference }]`. The node is still written; fix them with `update` before deploying. Then the missing required properties are listed (`missing_required` under `--json`).
 
 **Child nodes** (channels, etc.) are created with `update`, not `add`: `update adc channel@0`.
 
@@ -317,8 +324,11 @@ attach-linux add adi,ad7124-8 --parent spi0 --name adc@0 --label imu1
 # Add at root (no --parent)
 attach-linux add regulator-fixed
 
-# Copy the binding's SPI example under spi0
-attach-linux add adi,ad7124-8 --parent spi0 --from-example
+# Copy example 2 of the binding under spi0
+attach-linux add adi,ad7124-8 --parent spi0 --template example:2
+
+# Copy the node (and channels) of an overlay of the Linux tree, where its fragment puts it
+attach-linux add adi,ad7124-8 --template overlay:rpi-ad7124-8-all-diff
 ```
 
 ---

@@ -271,7 +271,8 @@ async function suggest_values(kind: SuggestKind, prefix: string, positionals: st
         case "overlay": {
             return capture_suggest(kind, [prefix]);
         }
-        case "parent": {
+        case "parent":
+        case "template": {
             const key = positionals[0];
             return key === undefined ? [] : capture_suggest(kind, [key]);
         }

@@ -83,12 +83,24 @@ export function scan_overlay(text: string): OverlayEntry {
     return { devices: [...devices], ...(board.length === 0 ? {} : { board }) };
 }
 
-/** The overlays that add a node with `compatible`, by relative path. */
-export function overlays_with(index: OverlayIndex, compatible: string): string[] {
-    return Object.entries(index.files)
-        .filter(([, entry]) => entry.devices.includes(compatible))
-        .map(([file]) => file)
-        .sort();
+/** An overlay that adds the device, and the other compatible of its binding it names instead when it isn't `compatible` itself. */
+export interface OverlayMatch {
+    file: string;
+    matched?: string;
+}
+
+/**
+ * The overlays that add a node with `compatible`, or with one of `siblings`
+ * (the binding's other compatibles); exact ones first, then by relative path.
+ */
+export function overlays_matching(index: OverlayIndex, compatible: string, siblings: readonly string[] = []): OverlayMatch[] {
+    const matches: OverlayMatch[] = [];
+    for (const [file, entry] of Object.entries(index.files)) {
+        if (entry.devices.includes(compatible)) { matches.push({ file }); continue; }
+        const matched = siblings.find(sibling => entry.devices.includes(sibling));
+        if (matched !== undefined) { matches.push({ file, matched }); }
+    }
+    return matches.sort((a, b) => Number(a.matched !== undefined) - Number(b.matched !== undefined) || a.file.localeCompare(b.file));
 }
 
 if (import.meta.vitest) {
@@ -198,16 +210,19 @@ if (import.meta.vitest) {
         }
     });
 
-    test("overlays_with — the files adding the compatible, sorted", () => {
+    test("overlays_matching — the exact compatible first, then the binding's others, each by path", () => {
         const index: OverlayIndex = {
             linux: "/linux",
             files: {
                 "b-overlay.dts": { devices: ["adi,ad7124-8"] },
                 "a-overlay.dts": { devices: ["adi,ad7124-4", "adi,ad7124-8"], board: ["brcm,bcm2835"] },
                 "c-overlay.dts": { devices: ["adi,ad7124-4"], board: ["adi,ad7124-8"] },
+                "d-overlay.dts": { devices: ["adi,adxl345"] },
             },
         };
-        expect(overlays_with(index, "adi,ad7124-8")).toEqual(["a-overlay.dts", "b-overlay.dts"]);
-        expect(overlays_with(index, "adi,nope")).toEqual([]);
+        expect(overlays_matching(index, "adi,ad7124-8")).toEqual([{ file: "a-overlay.dts" }, { file: "b-overlay.dts" }]);
+        expect(overlays_matching(index, "adi,ad7124-8", ["adi,ad7124-4"]))
+            .toEqual([{ file: "a-overlay.dts" }, { file: "b-overlay.dts" }, { file: "c-overlay.dts", matched: "adi,ad7124-4" }]);
+        expect(overlays_matching(index, "adi,nope", ["adi,none"])).toEqual([]);
     });
 }

@@ -3,10 +3,10 @@ import path from "node:path";
 import type { LocalContext } from "../../context";
 import { load_workspace } from "../../config/workspace";
 import { board_fit, type Fit } from "../../board-fit";
-import { overlay_index, overlays_with, type OverlayIndex } from "../../overlay-index";
+import { overlay_index, overlays_matching, type OverlayIndex } from "../../overlay-index";
 import { input_error, respond } from "../../protocol/output";
 import type { ListOverlayResponse, OverlayDescription } from "../../protocol/types";
-import { node_compatibles } from "../../utilities";
+import { binding_siblings, node_compatibles } from "../../utilities";
 
 export async function list_overlay(context_: LocalContext, arguments_: string[]): Promise<void> {
     const [compatible] = arguments_;
@@ -20,7 +20,7 @@ export async function list_overlay(context_: LocalContext, arguments_: string[])
     if (workspace === undefined) { return; }
     const { linux } = workspace.bindings;
     const root = workspace.base.tree.node_at("/");
-    const rows = overlay_rows(overlay_index(linux), compatible, root === undefined ? [] : node_compatibles(root));
+    const rows = overlay_rows(overlay_index(linux), compatible, root === undefined ? [] : node_compatibles(root), await binding_siblings(workspace.bindings, compatible));
 
     if (context_.json) {
         const response: ListOverlayResponse = {
@@ -41,16 +41,25 @@ export async function list_overlay(context_: LocalContext, arguments_: string[])
 
 const FIT_ORDER: Record<Fit, number> = { compatible: 0, unknown: 1, incompatible: 2 };
 
-/** The overlays with the compatible and how they fit the base: compatible ones first, then unknown, then incompatible. */
-export function overlay_rows(index: OverlayIndex, compatible: string, base: string[]): OverlayDescription[] {
-    return overlays_with(index, compatible)
-        .map(file => ({ name: path.basename(file), path: path.join(index.linux, file), ...board_fit(index.files[file]?.board, base) }))
-        .sort((a, b) => FIT_ORDER[a.fit] - FIT_ORDER[b.fit] || a.name.localeCompare(b.name));
+/**
+ * The overlays with the compatible, or another compatible of its binding
+ * (`siblings`, shown as `matched`), and how they fit the base: compatible ones
+ * first, then unknown, then incompatible; exact matches before the others, by name.
+ */
+export function overlay_rows(index: OverlayIndex, compatible: string, base: string[], siblings: readonly string[] = []): OverlayDescription[] {
+    return overlays_matching(index, compatible, siblings)
+        .map(({ file, matched }) => ({
+            name: path.basename(file),
+            path: path.join(index.linux, file),
+            ...board_fit(index.files[file]?.board, base),
+            ...(matched === undefined ? {} : { matched }),
+        }))
+        .sort((a, b) => FIT_ORDER[a.fit] - FIT_ORDER[b.fit] || Number(a.matched !== undefined) - Number(b.matched !== undefined) || a.name.localeCompare(b.name));
 }
 
 export function format_overlay_rows(rows: OverlayDescription[]): string[] {
     const width = Math.max(...rows.map(row => row.name.length));
-    return rows.map(row => `${row.name.padEnd(width)}  ${row.fit} (${row.reason})`);
+    return rows.map(row => `${row.name.padEnd(width)}  ${row.fit} (${row.reason})${row.matched === undefined ? "" : `  via ${row.matched}`}`);
 }
 
 if (import.meta.vitest) {
@@ -75,6 +84,29 @@ if (import.meta.vitest) {
             { name: "generic-adc-overlay.dts", path: "/linux/arch/arm/boot/dts/overlays/generic-adc-overlay.dts", fit: "unknown", reason: "no root compatible" },
             { name: "zynqmp-ad7124.dtso", path: "/linux/arch/arm64/boot/dts/xilinx/zynqmp-ad7124.dtso", fit: "incompatible", reason: "overlay: xlnx,zynqmp; base: raspberrypi,4-model-b, brcm,bcm2711" },
         ]);
+    });
+
+    test("overlay_rows — overlays with another compatible of the binding come after the exact ones of their fit, marked", () => {
+        const wide: OverlayIndex = {
+            linux: "/linux",
+            files: {
+                "arch/arm/boot/dts/overlays/a-overlay.dts": { devices: ["adi,ad7124-4"], board: ["brcm,bcm2711"] },
+                "arch/arm/boot/dts/overlays/b-overlay.dts": { devices: ["adi,ad7124-8"], board: ["brcm,bcm2711"] },
+                "arch/arm64/boot/dts/xilinx/c.dtso": { devices: ["adi,ad7124-8"], board: ["xlnx,zynqmp"] },
+                "arch/arm/boot/dts/overlays/d-overlay.dts": { devices: ["adi,ad7124-4", "adi,ad7124-8"], board: ["brcm,bcm2711"] },
+            },
+        };
+        const rows = overlay_rows(wide, "adi,ad7124-8", PI4, ["adi,ad7124-4"]);
+        expect(rows.map(row => [row.name, row.fit, row.matched])).toEqual([
+            ["b-overlay.dts", "compatible", undefined],
+            ["d-overlay.dts", "compatible", undefined],
+            ["a-overlay.dts", "compatible", "adi,ad7124-4"],
+            ["c.dtso", "incompatible", undefined],
+        ]);
+        expect(rows[0]).not.toHaveProperty("matched");
+        expect(format_overlay_rows(rows)[2]).toBe("a-overlay.dts  compatible (brcm,bcm2711)  via adi,ad7124-4");
+        // Without siblings only the exact compatible is listed.
+        expect(overlay_rows(wide, "adi,ad7124-8", PI4).map(row => row.name)).toEqual(["b-overlay.dts", "d-overlay.dts", "c.dtso"]);
     });
 
     test("format_overlay_rows — names aligned, the fit and why", () => {

@@ -130,6 +130,12 @@ describe("__complete delegates dynamic values to suggest in-process", () => {
                 arguments_[0] === "device-key" ? [{ value: "ad7124" }, { value: "ad5940" }]
                 : arguments_[0] === "overlay" ? [{ value: "ad7124-overlay.dts", display_string: "arch/arm/boot/dts/overlays/ad7124-overlay.dts" }, { value: "zynqmp-ad9081.dtso" }]
                 : arguments_[0] === "parent" ? [{ value: "spi0", display_string: "/soc/spi@0" }]
+                : arguments_[0] === "template" ? [
+                    { value: "required", display_string: "interview for the required properties" },
+                    { value: "example:1", display_string: "I2C" },
+                    { value: "example:2", display_string: "SPI" },
+                    { value: "overlay:rpi-ad7124-overlay.dts", display_string: "compatible (brcm,bcm2711)" },
+                ]
                 : key === "navigate" ? [{ value: "spi0" }, { value: "i2c1" }]
                 : key === "navigate spi0/adc@0" ? [{ value: "reg", display_string: "reg (required)" }]
                 : key === "navigate spi0" ? [
@@ -221,6 +227,18 @@ describe("__complete delegates dynamic values to suggest in-process", () => {
         expect(lines[0]).toBe("__ATTACH_COMPLETE_NOSPACE__");
         expect(lines.slice(1)).toStrictEqual(["spi0/\t/soc/spi@0"]);
         expect(suggest.run_suggest).toHaveBeenCalledWith(expect.anything(), ["parent", "ad7124"]);
+    });
+
+    test("add --template offers required, the examples and the overlays for the compatible", async () => {
+        expect(await complete(["add", "ad7124", "--template", ""])).toStrictEqual([
+            "required\tinterview for the required properties",
+            "example:1\tI2C",
+            "example:2\tSPI",
+            "overlay:rpi-ad7124-overlay.dts\tcompatible (brcm,bcm2711)",
+        ]);
+        expect(suggest.run_suggest).toHaveBeenCalledWith(expect.anything(), ["template", "ad7124"]);
+        expect(values(await complete(["add", "ad7124", "--template", "example:"]))).toStrictEqual(["example:1", "example:2"]);
+        expect(values(await complete(["add", "ad7124", "--template", "o"]))).toStrictEqual(["overlay:rpi-ad7124-overlay.dts"]);
     });
 
     test("add --parent prefix-filters the valid parents", async () => {

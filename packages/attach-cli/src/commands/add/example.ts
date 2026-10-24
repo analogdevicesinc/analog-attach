@@ -2,7 +2,9 @@ import fs from "node:fs";
 import path from "node:path";
 
 import {
+    Attach,
     DeviceTree,
+    Result,
     PropertyBuilder,
     ensure_address_cells,
     get_full_node_name,
@@ -16,7 +18,8 @@ import {
 } from "attach-lib";
 
 import { config_directory, type Settings } from "../../config/settings";
-import { bus_kind, node_compatibles, run_preprocess, type BusKind } from "../../utilities";
+import type { Bindings } from "../../config/workspace";
+import { bus_kind, get_compat_index, node_compatibles, run_preprocess, type BusKind } from "../../utilities";
 
 /** A binding example that has a node for the device, and the bus it sits on there. */
 export interface ExampleMatch {
@@ -66,15 +69,6 @@ export function example_bus(wrapper?: DTNode): BusKind | undefined {
     if (wrapper === undefined) { return undefined; }
     const named = /^(spi|i2c)\d*$/.exec(wrapper.name)?.[1];
     return named === undefined ? bus_kind(wrapper) : named as BusKind;
-}
-
-/** The first example on the parent's bus, else the first one; `fits` says whether the bus matched. */
-export function choose_example(matches: ExampleMatch[], bus?: BusKind): { match: ExampleMatch; fits: boolean } | undefined {
-    const [first] = matches;
-    if (first === undefined) { return undefined; }
-    if (bus === undefined) { return { match: first, fits: true }; }
-    const on_bus = matches.find(match => match.bus === bus);
-    return on_bus === undefined ? { match: first, fits: false } : { match: on_bus, fits: true };
 }
 
 /**
@@ -161,6 +155,74 @@ function rename_references(node: DTNode, renames: Map<string, string>): void {
     for (const child of node.children) { rename_references(child, renames); }
 }
 
+/** The binding's examples as written in its YAML; none when it doesn't parse. */
+export async function binding_examples(binding_path: string, bindings: Bindings): Promise<string[]> {
+    try {
+        const result = await Attach.parse(binding_path, bindings);
+        return Result.is_ok(result) ? result.value.parsed_binding.examples ?? [] : [];
+    } catch {
+        return [];
+    }
+}
+
+/** Whether a compatible is the device's or another device of its binding (adi,ad7124-4 for adi,ad7124-8). */
+export function device_matcher(bindings: Bindings, binding_path: string, compatible: string): (candidate: string) => boolean {
+    const index = get_compat_index(bindings);
+    return candidate => candidate === compatible || index.entries[candidate] === binding_path;
+}
+
+/** What the binding's examples hold of one device. */
+export interface ExampleSearch {
+    /** How many examples the binding has. */
+    count: number;
+    /** The examples with a node for the device, in order. */
+    matches: ExampleMatch[];
+    /** Why an example didn't compile, by its 1-based index. */
+    broken: Map<number, string>;
+}
+
+/**
+ * Preprocess and parse each binding example and find the node of the device in
+ * it: the node with `belongs` compatibles, which may be for another device of
+ * the binding (adi,ad7124-4 for adi,ad7124-8).
+ */
+export function find_examples(examples: readonly string[], belongs: (compatible: string) => boolean, settings: Settings, linux: string, cwd = process.cwd()): ExampleSearch {
+    const matches: ExampleMatch[] = [];
+    const broken = new Map<number, string>();
+    for (const [position, example] of examples.entries()) {
+        const root = parse_example(example, settings, linux, cwd);
+        if (typeof root === "string") {
+            broken.set(position + 1, root.split("\n")[0] ?? "");
+            continue;
+        }
+        const found = find_in_example(root, belongs);
+        if (found !== undefined) { matches.push({ index: position + 1, node: found.node, bus: example_bus(found.wrapper) }); }
+    }
+    return { count: examples.length, matches, broken };
+}
+
+export const BUS_LABEL: Record<BusKind, string> = { spi: "SPI", i2c: "I2C" };
+
+/** `example:1 (I2C), example:2 (SPI)` */
+export function example_list(matches: readonly ExampleMatch[]): string {
+    return matches.map(match => `example:${match.index}${match.bus === undefined ? "" : ` (${BUS_LABEL[match.bus]})`}`).join(", ");
+}
+
+/** The example `index` of the search, or why it can't be used (the examples that do hold the device are named). */
+export function pick_example(search: ExampleSearch, index: number, compatible: string, file: string): ExampleMatch | string {
+    const match = search.matches.find(candidate => candidate.index === index);
+    if (match !== undefined) { return match; }
+    const holding = search.matches.length === 0 ? "" : `; use ${example_list(search.matches)}`;
+    if (index > search.count) {
+        return search.count === 0
+            ? `There is no example ${index}: ${file} has no examples`
+            : `There is no example ${index}: ${file} has ${search.count} example${search.count === 1 ? "" : "s"}${holding}`;
+    }
+    const broken = search.broken.get(index);
+    if (broken !== undefined) { return `Example ${index} of ${file} doesn't compile: ${broken}${holding}`; }
+    return `Example ${index} of ${file} has no node for ${compatible}${holding}`;
+}
+
 /** Run the example through `preprocess-command` (for its dt-bindings headers) and parse it. */
 export function parse_example(example: string, settings: Settings, linux: string, cwd = process.cwd()): DTNode | string {
     const directory = config_directory(cwd);
@@ -179,6 +241,7 @@ if (import.meta.vitest) {
     const { test, expect } = import.meta.vitest;
     const { DeviceTreeOverlay: DTO } = await import("attach-lib");
     const { EMPTY_DTSO } = await import("../../workfile");
+    const os = await import("node:os");
 
     const parse_root = (source: string): DTNode => {
         const tree = DeviceTree.new_from_string(source);
@@ -254,18 +317,42 @@ spi {
         expect(example_bus()).toBeUndefined();
     });
 
-    test("choose_example — the first on the parent's bus, else the first", () => {
+    test("pick_example — the numbered example, or an error naming the ones that hold the device", () => {
         const node = parse_root("/dts-v1/;\n/ { };");
-        const matches: ExampleMatch[] = [
-            { index: 1, node, bus: "i2c" },
-            { index: 2, node, bus: "spi" },
-            { index: 3, node, bus: "spi" },
-        ];
-        expect(choose_example(matches, "spi")).toEqual({ match: matches[1], fits: true });
-        expect(choose_example(matches, "i2c")).toEqual({ match: matches[0], fits: true });
-        expect(choose_example(matches.slice(1), "i2c")).toEqual({ match: matches[1], fits: false });
-        expect(choose_example(matches)).toEqual({ match: matches[0], fits: true });
-        expect(choose_example([], "spi")).toBeUndefined();
+        const search: ExampleSearch = {
+            count: 3,
+            matches: [{ index: 1, node, bus: "i2c" }, { index: 2, node, bus: "spi" }],
+            broken: new Map([[3, "syntax error"]]),
+        };
+        expect(pick_example(search, 2, "adi,adxl345", "adi,adxl345.yaml")).toBe(search.matches[1]);
+        expect(pick_example(search, 4, "adi,adxl345", "adi,adxl345.yaml"))
+            .toBe("There is no example 4: adi,adxl345.yaml has 3 examples; use example:1 (I2C), example:2 (SPI)");
+        expect(pick_example(search, 3, "adi,adxl345", "adi,adxl345.yaml"))
+            .toBe("Example 3 of adi,adxl345.yaml doesn't compile: syntax error; use example:1 (I2C), example:2 (SPI)");
+        expect(pick_example({ ...search, count: 3, broken: new Map(), matches: [{ index: 2, node, bus: undefined }] }, 1, "adi,adxl345", "adi,adxl345.yaml"))
+            .toBe("Example 1 of adi,adxl345.yaml has no node for adi,adxl345; use example:2");
+        expect(pick_example({ count: 1, matches: [], broken: new Map() }, 1, "adi,adxl345", "adi,adxl345.yaml"))
+            .toBe("Example 1 of adi,adxl345.yaml has no node for adi,adxl345");
+        expect(pick_example({ count: 0, matches: [], broken: new Map() }, 1, "adi,adxl345", "adi,adxl345.yaml"))
+            .toBe("There is no example 1: adi,adxl345.yaml has no examples");
+        expect(pick_example({ ...search, count: 1, matches: [search.matches[0]!] }, 2, "adi,adxl345", "adi,adxl345.yaml"))
+            .toBe("There is no example 2: adi,adxl345.yaml has 1 example; use example:1 (I2C)");
+    });
+
+    test("find_examples — each example preprocessed and searched, the broken ones with their first error line", () => {
+        const directory = fs.mkdtempSync(path.join(os.tmpdir(), "attach-examples-"));
+        try {
+            const settings: Settings = { overlay_syntax: "fragment", preprocess_command: "cp {input} {output}" };
+            const spi = "spi {\n adc@0 { compatible = \"adi,ad7124-4\"; };\n};";
+            const wired = "i2c1 {\n adc@48 { compatible = \"adi,ad7124-8\"; };\n};";
+            const other = "i2c { sensor@1 { compatible = \"adi,adt7410\"; }; };";
+            const search = find_examples([wired, other, "spi { adc@0 { ", spi], c => c.startsWith("adi,ad7124"), settings, "/linux", directory);
+            expect(search.count).toBe(4);
+            expect(search.matches.map(match => [match.index, match.bus])).toEqual([[1, "i2c"], [4, "spi"]]);
+            expect([...search.broken.keys()]).toEqual([3]);
+        } finally {
+            fs.rmSync(directory, { recursive: true });
+        }
     });
 
     const setup = (): DeviceTreeOverlay => {

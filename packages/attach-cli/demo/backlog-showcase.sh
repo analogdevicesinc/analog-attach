@@ -3,7 +3,7 @@ set -euo pipefail
 
 # Showcase of the backlog features: index progress, the interview after add
 # and for a new channel, verbose read, reg clashes, binding patterns,
-# add --from-example, and list overlay / import. Raspberry Pi 4 base; the
+# add --template, and list overlay / import. Raspberry Pi 4 base; the
 # overlay part uses the ADI Linux tree, which carries the RPi overlays.
 
 BOLD='\033[1m'
@@ -125,7 +125,7 @@ echo -e "  Linux:   ${BOLD}~/linux${RESET}, then ${BOLD}~/linux_adi${RESET} for 
 echo ""
 echo -e "  ${DIM}Each step shows one feature: index progress, the interview after add"
 echo -e "  and for a new channel, verbose read, reg clashes, binding patterns,"
-echo -e "  add --from-example, and starting from an overlay that already exists.${RESET}"
+echo -e "  add --template, and starting from an overlay that already exists.${RESET}"
 if $PAUSE; then
     echo ""
     echo -e "  ${DIM}[press Enter to start]${RESET}"
@@ -176,8 +176,8 @@ complete_step "Completion knows the patterns" \
     "update hwmon fa"
 
 step "Copy the binding's example" \
-    "--from-example copies the node from the binding's example for the bus: name, reg, channels and references as written. The example is for the AD7124-4, so the compatible is replaced. Its references that name nothing in the base come back as errors, with the fix." \
-    "add adi,ad7124-8 --parent spi1 --from-example --quiet" \
+    "--template example:1 copies the node from the binding's first example (the SPI one): name, reg, channels and references as written. The example is for the AD7124-4, so the compatible is replaced. Its references that name nothing in the base come back as errors, with the fix." \
+    "add adi,ad7124-8 --parent spi1 --template example:1" \
     "read ad7124_8 --quiet"
 
 step "Add the missing reference" \

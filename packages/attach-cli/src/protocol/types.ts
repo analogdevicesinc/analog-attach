@@ -31,9 +31,11 @@ export interface CreateWorkfileResponse extends CommonResponse {
 export interface AddResponse extends CommonResponse {
     key: string;
     path: string[];
+    /** What the node started from: `required`, `example:<N>` or `overlay:<name>`. */
+    template: string;
     /** Required properties the node still lacks, in the order to set them (dependencies first). */
     missing_required: MissingProperty[];
-    /** With --from-example: the references in the copied node that name nothing in the base or overlay. */
+    /** With --template example:<N> or overlay:<name>: the references in the copied node that name nothing in the base or overlay. */
     unresolved?: UnresolvedEntry[];
 }
 
@@ -141,7 +143,7 @@ export interface Intelligence {
 }
 
 export interface ListOverlayResponse extends CommonResponse {
-    /** Compatible ones first, then unknown, then incompatible. */
+    /** Compatible ones first, then unknown, then incompatible; within each, overlays with the compatible itself before those with another of its binding (`matched`). */
     overlays: OverlayDescription[];
 }
 
@@ -177,6 +179,8 @@ export interface OverlayDescription {
     /** How the overlay's root compatible fits the base's. */
     fit: "compatible" | "incompatible" | "unknown";
     reason: string;
+    /** Only when the overlay doesn't add the asked compatible itself: the other compatible of the same binding it adds. */
+    matched?: string;
 }
 
 export interface ListIntelligenceResponse extends CommonResponse {

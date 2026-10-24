@@ -63,28 +63,19 @@ async function run_import(context: LocalContext, name: string): Promise<void> {
     if (workspace === undefined) { return; }
     const { linux } = workspace.bindings;
 
-    const given = path.resolve(name);
-    const found = fs.statSync(given, { throwIfNoEntry: false })?.isFile() === true
-        ? { kind: "found" as const, file: given }
-        : find_overlay(overlay_index(linux), name);
-    if (found.kind === "none") {
-        fail(`No overlay named ${name} in ${linux} (list overlay <compatible> finds them), and no such file`);
+    const found = locate_overlay(linux, name);
+    if (found.kind !== "found") {
+        fail(lookup_failure(found, name, linux));
         return;
     }
-    if (found.kind === "ambiguous") {
-        fail(`Several overlays are named ${name}; pass one of: ${found.files.join(", ")}`);
-        return;
-    }
-    const source = path.resolve(linux, found.file);
+    const source = found.file;
 
-    const preprocessed = path.join(config_directory(), "import.preprocessed.dts");
-    fs.mkdirSync(config_directory(), { recursive: true });
-    const error = run_preprocess(workspace.settings.preprocess_command, { input: source, output: preprocessed, linux });
-    if (error !== undefined) {
-        fail(`preprocessing ${source} failed:\n${error}`);
+    const preprocessed = preprocess_overlay(source, workspace.settings.preprocess_command, linux, "import.preprocessed.dts");
+    if (!preprocessed.ok) {
+        fail(preprocessed.error);
         return;
     }
-    const text = fs.readFileSync(preprocessed, "utf8");
+    const text = preprocessed.text;
     const imported = import_overlay(text, workspace.base.tree);
     if (typeof imported === "string") {
         fail(`${source} does not parse after preprocessing: ${imported}`);
@@ -138,6 +129,34 @@ export function find_overlay(index: OverlayIndex, name: string): FoundOverlay {
     const [file] = files;
     if (file === undefined) { return { kind: "none" }; }
     return files.length === 1 ? { kind: "found", file } : { kind: "ambiguous", files };
+}
+
+/**
+ * The overlay `name` stands for: a file path (absolute result), else a name
+ * from the Linux tree's overlay index (`find_overlay`, absolute result).
+ */
+export function locate_overlay(linux: string, name: string): { kind: "found"; file: string } | { kind: "none" } | { kind: "ambiguous"; files: string[] } {
+    const given = path.resolve(name);
+    if (fs.statSync(given, { throwIfNoEntry: false })?.isFile() === true) { return { kind: "found", file: given }; }
+    const found = find_overlay(overlay_index(linux), name);
+    return found.kind === "found" ? { kind: "found", file: path.resolve(linux, found.file) } : found;
+}
+
+/** Why `locate_overlay` found nothing usable. */
+export function lookup_failure(found: { kind: "none" } | { kind: "ambiguous"; files: string[] }, name: string, linux: string): string {
+    return found.kind === "none"
+        ? `No overlay named ${name} in ${linux} (list overlay <compatible> finds them), and no such file`
+        : `Several overlays are named ${name}; pass one of: ${found.files.join(", ")}`;
+}
+
+/** The overlay run through `preprocess-command` (into `.attach-linux/<output>`), or the error to show. */
+export function preprocess_overlay(source: string, command: string, linux: string, output: string, cwd = process.cwd()): { ok: true; text: string } | { ok: false; error: string } {
+    const directory = config_directory(cwd);
+    fs.mkdirSync(directory, { recursive: true });
+    const preprocessed = path.join(directory, output);
+    const error = run_preprocess(command, { input: source, output: preprocessed, linux });
+    if (error !== undefined) { return { ok: false, error: `preprocessing ${source} failed:\n${error}` }; }
+    return { ok: true, text: fs.readFileSync(preprocessed, "utf8") };
 }
 
 export interface ImportedOverlay {

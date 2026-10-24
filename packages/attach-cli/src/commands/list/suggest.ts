@@ -31,6 +31,7 @@ import { attach_type_to_protocol_type } from "../../protocol/dt-to-protocol";
 import { find_property_definition, narrowed_binding, resolve_node_binding, type NodeBinding } from "../../binding-resolution";
 import { check_value } from "../../value-check";
 import { overlay_files } from "../../overlay-index";
+import { template_suggestions } from "../add/template-suggest";
 import type { TypeResponse, Suggestion, Types } from "../../protocol/types";
 
 export async function run_suggest(context: LocalContext, arguments_: string[]): Promise<void> {
@@ -53,6 +54,10 @@ export async function run_suggest(context: LocalContext, arguments_: string[]): 
         }
         case "overlay": {
             suggest_overlay(context, arguments_.slice(1));
+            return;
+        }
+        case "template": {
+            await suggest_template(context, arguments_.slice(1));
             return;
         }
         case "node-prop": {
@@ -368,6 +373,24 @@ async function suggest_device_key(context: LocalContext, arguments_: string[]): 
         for (const entry of matching) {
             console.log(entry);
         }
+    }
+}
+
+/** The `add --template` values for the device (completion only). */
+async function suggest_template(context: LocalContext, arguments_: string[]): Promise<void> {
+    const [compatible] = arguments_;
+    if (compatible === undefined) {
+        if (context.json) { input_error("compatible string is required for template suggestions"); return; }
+        console.log("Missing: compatible string");
+        return;
+    }
+    const workspace = load_workspace(context, ["bindings", "base"]);
+    if (workspace === undefined) { return; }
+    const suggestions = await template_suggestions(workspace, compatible);
+    if (context.json) {
+        respond({ ok: true, message: `Found ${suggestions.length} templates`, severity: "info", suggestions });
+    } else {
+        for (const s of suggestions) { console.log(`${s.value}  ${s.display_string ?? ""}`); }
     }
 }
 

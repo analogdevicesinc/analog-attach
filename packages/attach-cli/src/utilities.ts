@@ -520,6 +520,16 @@ export function get_compat_index({ linux, dt_schema }: Pick<Bindings, "linux" | 
     return index?.entries === undefined ? { generated_at: 0, linux, dt_schema, entries: {} } : index;
 }
 
+/** The other compatibles of the device's binding (the compat index maps each to its binding YAML). */
+export async function binding_siblings(bindings: Pick<Bindings, "linux" | "dt_schema">, compatible: string): Promise<string[]> {
+    const binding_path = await find_binding(bindings.linux, bindings.dt_schema, compatible);
+    if (binding_path === undefined) { return []; }
+    return Object.entries(get_compat_index(bindings).entries)
+        .filter(([candidate, file]) => file === binding_path && candidate !== compatible)
+        .map(([candidate]) => candidate)
+        .sort();
+}
+
 export async function find_binding(linux: string, dtSchema: string, compatible_to_find: string): Promise<string | undefined> {
     const index = get_compat_index({ linux, dt_schema: dtSchema });
 

@@ -2,7 +2,7 @@ import type { UnresolvedReference } from "attach-lib";
 
 import type { UnresolvedTargetEntry } from "./protocol/types";
 
-// What `import` and `add --from-example` print for the targets and references
+// What `import` and the copied `add --template` kinds print for the targets and references
 // that name nothing in the base or the overlay: a heading per kind of problem,
 // one row per node and property, and how to fix it.
 

@@ -27,8 +27,9 @@ Kinds:
   property <path> [property]   Properties of a node from its binding
   value <path> <property>      Suggested values for a property
   parent <compatible>          Valid parent buses for a device
-  overlay <compatible>         Overlays in the Linux tree with the device, and
-                               whether their root compatible fits the board
+  overlay <compatible>         Overlays in the Linux tree with the device (or
+                               another of its binding: "via ..."), and whether
+                               their root compatible fits the board
 
 Paths:
   Label:        spi0                       (a label in the base tree)
