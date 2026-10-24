@@ -1,6 +1,6 @@
 import path from "node:path";
 
-import { build_validation_schema, load_compat_index, save_compat_index, validation_schema_path } from "./cache";
+import { build_validation_schema, compat_index_stale_reason, load_compat_index, save_compat_index, validation_schema_path, validation_schema_stale_reason } from "./cache";
 import { format_duration, start_progress, type ProgressStream } from "../progress";
 import { build_compat_index } from "../utilities";
 import type { ConfigError, ConfigResult, Settings } from "./settings";
@@ -55,6 +55,28 @@ export async function reload_caches(settings: Settings, cwd = process.cwd(), str
     return { ok: true, value: await rebuild_caches({ linux: linux.value, dt_schema: dt_schema.value }, tools.value.dt_mk_schema, cwd, stream) };
 }
 
+/** True when the compat index and validation.json exist and are current for these paths: nothing to rebuild. */
+export function caches_current(linux: string, dt_schema: string, cwd = process.cwd()): boolean {
+    return compat_index_stale_reason(load_compat_index(cwd), linux, dt_schema) === undefined
+        && validation_schema_stale_reason(linux, dt_schema, cwd) === undefined;
+}
+
+export interface EnsureResult extends RebuildResult {
+    /** False when the caches were already current for the configured Linux tree. */
+    rebuilt: boolean;
+}
+
+/** `reload_caches`, skipped when the caches are already current for the configured Linux tree (`init`). */
+export async function ensure_caches(settings: Settings, cwd = process.cwd(), stream: ProgressStream = process.stderr): Promise<ConfigResult<EnsureResult>> {
+    const linux = parse_linux(settings);
+    const dt_schema = parse_dt_schema();
+    if (linux.ok && dt_schema.ok && caches_current(linux.value, dt_schema.value, cwd)) {
+        return { ok: true, value: { ok: true, rebuilt: false, message: "The binding caches are current" } };
+    }
+    const reloaded = await reload_caches(settings, cwd, stream);
+    return reloaded.ok ? { ok: true, value: { ...reloaded.value, rebuilt: true } } : reloaded;
+}
+
 if (import.meta.vitest) {
     const { test, expect } = import.meta.vitest;
     const fs = await import("node:fs");
@@ -80,6 +102,31 @@ if (import.meta.vitest) {
             expect(result.ok).toBe(false);
             expect(!result.ok && result.errors.map(error => error.field)).toContain("linux");
             expect(fs.existsSync(path.join(directory, ".attach-linux"))).toBe(false);
+        } finally {
+            fs.rmSync(directory, { recursive: true });
+        }
+    });
+
+    test("caches_current - false until both caches exist, true once they are current, false again for another Linux tree", () => {
+        const { directory, linux } = workspace("true");
+        try {
+            expect(caches_current(linux, "/dt-schema", directory)).toBe(false);
+            save_compat_index({}, linux, "/dt-schema", directory);
+            expect(caches_current(linux, "/dt-schema", directory)).toBe(false);
+            fs.writeFileSync(validation_schema_path(directory), "{}");
+            fs.writeFileSync(path.join(path.dirname(validation_schema_path(directory)), "validation.stamp.json"), JSON.stringify({ generated_at: Date.now() + 5000, linux, dt_schema: "/dt-schema" }));
+            expect(caches_current(linux, "/dt-schema", directory)).toBe(true);
+            expect(caches_current(path.join(directory, "other"), "/dt-schema", directory)).toBe(false);
+        } finally {
+            fs.rmSync(directory, { recursive: true });
+        }
+    });
+
+    test("ensure_caches - without a configured Linux tree it reports the config, builds nothing", async () => {
+        const directory = fs.mkdtempSync(path.join(os.tmpdir(), "attach-rebuild-"));
+        try {
+            const result = await ensure_caches({ overlay_syntax: "fragment", preprocess_command: "" }, directory, capture().stream);
+            expect(!result.ok && result.errors.map(error => error.field)).toContain("linux");
         } finally {
             fs.rmSync(directory, { recursive: true });
         }

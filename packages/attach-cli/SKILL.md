@@ -28,19 +28,23 @@ You are helping a user configure Linux device tree overlays for hardware devices
 
 ## Prerequisites
 
-Set up configuration before using other commands. Every field, the Linux tree and the base devicetree included, is stored in `.attach-linux/config.toml` (relative to the current directory) via `config-set`:
+Set up the workspace before using other commands. Every field, the Linux tree and the base devicetree included, is stored in `.attach-linux/config.toml` (relative to the current directory). `init` sets the two paths, builds the caches and creates the overlay file in one step; as an AI tool always pass the options, which never ask (without them `init` opens an interactive wizard meant for a terminal):
 
 ```bash
+attach-linux --json init --linux ~/linux --devicetree ~/rpi-4.dts
+# or, field by field:
 attach-linux config-set linux ~/linux
 attach-linux config-set devicetree ~/rpi-4.dts
 ```
 
-Setting `linux` also builds the binding caches (the compat index and `validation.json`) from its bindings, which takes about 40 s for the kernel tree. Commands never rebuild them: when the bindings change, run `attach-linux config-get --reload` (no field names). Until then commands warn on stderr that the caches look out of date; with a cache missing they fail with that hint. The dt-schema bindings, dtc and validation tools are bundled with the CLI.
+**Check the configuration first** with `config-get` (it needs nothing): most commands fail with an input error when a field they need is missing.
+
+Setting `linux` (or `init`) also builds the binding caches (the compat index and `validation.json`) from its bindings, which takes about 40 s for the kernel tree. Commands never rebuild them: when the bindings change, run `attach-linux config-get --reload` (no field names). Until then commands warn on stderr that the caches look out of date; with a cache missing they fail with that hint. The dt-schema bindings, dtc and validation tools are bundled with the CLI.
 
 Every command checks the configuration it needs up front: `linux` must be a kernel tree (with `Documentation/devicetree/bindings/` and `include/`) with its caches built, `devicetree` must preprocess and parse, and `overlay` must parse against it. Unknown or invalid keys in config.toml are errors. Problems are reported together (exit code 2 with `--json`) with a hint on how to fix them.
 
 **Per-command config requirements**:
-- `config-set` / `config-get` / `create-workfile`: No prerequisites (`create-workfile` saves the `overlay` path to config)
+- `init`, `config-set`, `config-get`: No prerequisites (`init` saves `linux`, `devicetree` and `overlay`)
 - `list device`: Needs `linux` (and its caches)
 - `list parent`, `list overlay`: Need `linux`, `devicetree`
 - `import`: Needs `linux`, `devicetree`, and no `overlay` yet (it creates one)
@@ -87,7 +91,7 @@ Shell completion works segment by segment: `read sp<TAB>` → `spi0/`, then `spi
 
 ### 0. `config-set` / `config-get` - Manage Configuration
 
-**Purpose**: Set or read tool configuration fields stored in `.attach-linux/config.toml`. Replaces the old `init` command — fields are set one at a time.
+**Purpose**: Set or read tool configuration fields stored in `.attach-linux/config.toml`. Fields are set one at a time; `init` sets the core ones together.
 
 **Syntax**:
 ```bash
@@ -101,7 +105,7 @@ attach-linux config-get [fields...]
 |-------|----------|-------------|
 | `linux` | Yes | Path to Linux kernel source tree; setting it builds the compat index and `validation.json` |
 | `devicetree` | Yes | Path to target base `.dts` file |
-| `overlay` | No | Path to the working `.dtso` overlay file (auto-set by `create-workfile` or `add`) |
+| `overlay` | No | Path to the working `.dtso` overlay file (auto-set by `init`, `import` or `add`) |
 | `overlay-syntax` | No | Output syntax: `fragment` (default) or `label` (`&spi0 { }` style) |
 | `preprocess-command` | No | C preprocessor command that resolves `#include`s and macros in the base devicetree (default mirrors kbuild's `cpp` flags) |
 | `deploy-ip` | No | IP address or hostname of the remote device |
@@ -240,21 +244,31 @@ warning: 2 references point to nodes neither the base nor the overlay has:
 
 ---
 
-### 4. `create-workfile` - Create Empty Overlay File
+### 4. `init` - Set Up the Workspace
 
-**Purpose**: Create a minimal empty `.dtso` overlay file and save its path to config as the working overlay.
+**Purpose**: Set up everything the other commands need: save `linux` and `devicetree`, build the binding caches (compat index and `validation.json`), and create an empty overlay workfile saved as `overlay`.
 
 **Syntax**:
 ```bash
-attach-linux create-workfile [--name <filename>]
+attach-linux init [--linux <path>] [--devicetree <path>] [--overlay <name>]
 ```
 
 **Parameters**:
 | Parameter | Required | Description |
 |-----------|----------|-------------|
-| `--name` | No | Output filename (default: `overlay.dtso`) |
+| `--linux` | Yes, unless configured | Linux kernel source tree (needs `Documentation/devicetree/bindings/` and `include/`) |
+| `--devicetree` | Yes, unless configured | Base `.dts` file |
+| `--overlay` | No | Name of a new overlay file (`.dtso` is added when missing). An existing file is never overwritten |
 
-**Output**: Writes an empty overlay file:
+**Behavior**:
+- Under `--json`, piped, or with both `--linux` and `--devicetree`, `init` never asks. A path left out is taken from the config; with none configured it is an input error (exit code 2): `init needs --linux <path>: no Linux tree is configured`. A path that is not a Linux tree, or not a file, is refused (`ok: false`).
+- On a terminal without options (a bare `attach-linux` too) it is a wizard: the Linux tree (lettered list or a typed path), the base `.dts` (search the tree with a live filter, or type a path), then the overlay file name. On a re-run the configured values are the Enter defaults and the overlay can be kept or replaced. With only some options it asks for what is neither given nor configured.
+- Overlay: with `--overlay <name>` that file is created (an existing file is refused: `mine.dtso already exists; use it with 'config-set overlay mine.dtso' or pick another name`). Without it the configured overlay is kept when its file exists; otherwise `overlay.dtso` is created, or `overlay-1.dtso`, `overlay-2.dtso`, … when it already exists.
+- The caches are built (about 50 s for the kernel tree, progress on stderr) unless they are already current for the Linux tree; the rebuild is also what `config-get --reload` does.
+- `overlay-syntax`, `preprocess-command` and the `deploy-*` fields are not asked: set them with `config-set`.
+- `--json` gives `{ linux, devicetree, overlay, created, indexed }` (`created`: init made the workfile, `indexed`: init built the caches).
+
+**Output**: the new workfile is empty:
 ```dts
 /dts-v1/;
 /plugin/;
@@ -263,8 +277,8 @@ attach-linux create-workfile [--name <filename>]
 };
 ```
 
-**Next Steps After Create**:
-1. Use `add` to add a device node to the overlay
+**Next Steps After Init**:
+1. Use `list device` / `list parent`, then `add` to add a device node to the overlay
 2. Use `update` to configure properties
 3. Validate and iterate
 
@@ -351,22 +365,22 @@ attach-linux add adi,ad7124-8 --template overlay:rpi-ad7124-8-all-diff
 
 **Syntax**:
 ```bash
-attach-linux delete [path...] [--overlay <dtso>] [--context <dts>] [--force]
+attach-linux delete [path] [property] [--force]
 ```
 
 **Parameters**:
 | Parameter | Required | Description |
 |-----------|----------|-------------|
-| `[path...]` | No | Path to node or property (positional segments). Omit for whole-overlay preview/delete |
-| `--overlay` | No | The `.dtso` file to edit (falls back to config) |
-| `--context` | No | Base `.dts` file (falls back to config) |
+| `[path]` | No | Path to the node (label, label-first or absolute). Omit for whole-overlay preview/delete |
+| `[property]` | No | Property to remove from the node (a separate argument) |
 | `--force` | No | Force delete of non-leaf nodes (waterfall delete) or clear entire overlay |
 
 **Behavior**:
 - **Node path**: Deletes the overlay-added node; refuses base-tree nodes
 - **Property path** (e.g. `imu1/reg`): Removes the property from the node (works for overlay-added and base-tree-override properties)
 - **No path**: Preview what would be deleted (node/property counts). Add `--force` to actually clear all overlay content
-- **Non-leaf node without `--force`**: Returns a preview of what would be deleted
+- **Non-leaf node without `--force`**: Returns a preview of what would be deleted (`ok: true`, severity `warn`, with `node_count` and `property_count`); call again with `--force` to delete
+- Removing a property from a base-tree node's overlay fragment prunes the fragment when it becomes empty
 
 **Examples**:
 ```bash
@@ -391,7 +405,7 @@ attach-linux delete --force
 
 **Error messages**:
 - `Node <path> not found` — node not in the merged tree
-- `<path> is part of the base device tree, not this overlay` — base-tree node deletion refused
+- `<path> is part of the base device tree, not this overlay` — base-tree node deletion refused (`in-base`): disable it with `disable <path>` instead
 
 ---
 
@@ -402,6 +416,8 @@ attach-linux delete --force
 ```bash
 attach-linux rename <path> <new-name>
 ```
+
+A bare name keeps the unit address; `name@unit` changes it and updates `reg` to match (with a warning when the new `reg` clashes with a sibling). A name already used under the same parent is refused, and base-tree nodes cannot be renamed (`in-base`).
 
 **Examples**:
 ```bash
@@ -423,6 +439,8 @@ attach-linux rename imu1 my_adc@1
 attach-linux move <path> <destination>
 ```
 
+Both arguments are label-first or absolute paths. Only overlay-added nodes can be moved; base-tree nodes return `in-base`.
+
 **Example**:
 ```bash
 # Move imu1 from spi0 to spi1
@@ -437,7 +455,7 @@ attach-linux move imu1 spi1
 
 **Syntax**:
 ```bash
-attach-linux validate [path...] [--overlay <dtso>] [--linux <path>] [--context <dts>]
+attach-linux validate
 ```
 
 Validates the overlay against device bindings using `dt-validate`, then checks enabled siblings for clashing `reg` (a taken SPI chip select or I2C address, overlapping MMIO ranges) and reports them as warnings on `reg`. Clashes only within the base tree are left out. Errors and warnings are grouped by fragment target in human mode. An empty result prints `No errors!`.
@@ -445,6 +463,8 @@ Validates the overlay against device bindings using `dt-validate`, then checks e
 ```bash
 attach-linux validate
 ```
+
+`--json` gives `errors` and `warnings` arrays (each `{ path, message }`); an empty `errors` array means validation passed, and warnings may still be present (including the `reg` clashes above).
 
 **Output in human mode**:
 ```
@@ -525,7 +545,7 @@ attach-linux update <path> <property> [value...] [--quiet]
 | Array | `update adc interrupts 19 2` | `interrupts = <19 2>;` |
 | Macros | `update adc interrupts 19 IRQ_TYPE_EDGE_FALLING` | `interrupts = <19 2>;` |
 | Phandle | `update adc interrupt-parent gpio` | `interrupt-parent = <&gpio>;` |
-| Matrix | `update adc reg 0 0,1 0` | `reg = <0 0>, <1 0>;` |
+| Matrix | `update adc reg 0 0,1 0` or `update adc reg 0 0 , 1 0` | `reg = <0 0>, <1 0>;` (a `,` separates rows) |
 
 **Value counts**: a number of values the binding doesn't allow is still written, with `warning: diff-channels takes 2 values, got 3` (on stderr, severity warn under `--json`). Fix it before `validate`, which reports it as an error.
 
@@ -545,6 +565,12 @@ attach-linux update adc '#address-cells' 1                # quote # properties
 **Implicit interrupt-parent**: setting `interrupts` without an explicit `interrupt-parent` writes the inherited one and warns about cell count mismatches.
 
 **reg ↔ unit address**: updating `reg` may rename the node to match.
+
+**Base-tree nodes**: `<path>` may name a base-tree node (`spi0`); the property goes into an overlay fragment targeting it, and the base tree is never modified.
+
+**Child unit addresses**: a child node's `reg` follows its unit address, in decimal when the parent binding names its children that way (`channel@0` … `channel@15` match `^channel@([0-9]|1[0-5])$`), hex otherwise. `add` always uses hex.
+
+**Unknown words**: where cells are expected a word that is not a number, a known macro or a label of the base or overlay is rejected; where the binding expects strings it is a string. The binding only shapes a value and never rejects it.
 
 ---
 
@@ -566,27 +592,20 @@ attach-linux enable <path>
 attach-linux disable <path>
 ```
 
-Sets `status = "okay"` or `status = "disabled"`. Works on both base-tree and overlay-added nodes.
+Sets `status = "okay"` or `status = "disabled"`. Works on both base-tree and overlay-added nodes; on a base-tree node the status goes into an overlay fragment targeting it. Use `disable` on base-tree nodes that clash with a new device (a `spidev` on the same chip select).
 
 ---
 
 ### 11. `build` - Compile Overlay
 
-**Purpose**: Compile the `.dtso` overlay into a `.dtbo` binary using `dtc`.
+**Purpose**: Compile the configured `.dtso` overlay into a `.dtbo` binary with the bundled `dtc`.
 
 **Syntax**:
 ```bash
-attach-linux build [--overlay <dtso>]
+attach-linux build
 ```
 
-**Parameters**:
-| Parameter | Required | Description |
-|-----------|----------|-------------|
-| `--overlay` | No | Path to `.dtso` to compile (falls back to config) |
-
-Uses the bundled `dtc` to compile.
-
-**Output**: Writes `.dtbo` file (same name as input with `.dtbo` extension) and saves its path to config as `overlay-compiled`.
+**Output**: Writes the `.dtbo` next to the overlay (`overlay.dtso` → `overlay.dtbo`), where `deploy` picks it up, and returns its path. Fails with an input error when `overlay` is unset or its file is missing.
 
 ---
 
@@ -596,27 +615,19 @@ Uses the bundled `dtc` to compile.
 
 **Syntax**:
 ```bash
-attach-linux deploy [--dtbo <path>] [--ip <host>] [--user <user>] [--password <pass>]
+attach-linux deploy
 ```
 
-**Parameters**:
-| Parameter | Required | Description |
-|-----------|----------|-------------|
-| `--dtbo` | No | Path to compiled `.dtbo` (falls back to `overlay-compiled` in config) |
-| `--ip` | No | Remote device IP/hostname (falls back to `deploy-ip` in config) |
-| `--user` | No | SSH username (falls back to `deploy-user` in config) |
-| `--password` | No | SSH password (falls back to `deploy-password` in config) |
+**Requirements**: the `deploy-ip`, `deploy-user` and `deploy-password` config fields, the `.dtbo` that `build` wrote next to the overlay, and `scp` and `sshpass` on PATH. Fails with an input error listing any unset field, a missing `.dtbo`, or a missing tool.
 
-**Requirements**: `sshpass` must be on PATH. All four fields (dtbo, ip, user, password) must be provided either as flags or via config.
-
-**Behavior**: Copies the `.dtbo` to `/boot/overlays/` on the remote device, then reboots it.
+**Behavior**: Copies the `.dtbo` to `/boot/overlays/` on the remote device, then always reboots it after a successful copy.
 
 ---
 
 ## Recommended Workflow
 
 ```
-0. CONFIGURE    config-set linux ... ; config-set devicetree ...
+0. CONFIGURE    init --linux ... --devicetree ...  (or config-set linux / devicetree)
 1. FIND DEVICE  list device <chip-name>
 2. FIND PARENT  list parent <compatible>
 3. ADD DEVICE   add <compatible> --parent <bus>  (auto-creates workfile)

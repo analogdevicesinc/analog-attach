@@ -17,11 +17,8 @@ const jsonIndex = argv.indexOf("--json");
 const json = jsonIndex !== -1;
 if (json) { argv.splice(jsonIndex, 1); }
 
-if (argv.length === 0 && !json && process.stdin.isTTY) {
-    const { run_setup } = await import("../setup");
-    await run_setup();
-    process.exit(0);
-}
+// A bare `attach-linux` on a terminal is `attach-linux init`.
+if (argv.length === 0 && !json && process.stdin.isTTY) { argv.push("init"); }
 
 const context = buildContext(json);
 const app = buildApp(context);

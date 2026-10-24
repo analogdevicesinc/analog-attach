@@ -24,6 +24,26 @@ export function next_workfile_name(stem = "overlay", cwd?: string): string {
     return `${stem}-${n}.dtso`;
 }
 
+/** What `init` does about the overlay: keep the configured file, or create a new one. */
+export type OverlayChoice = { kind: "keep"; path: string } | { kind: "create"; filename: string };
+
+/** A workfile name as the user typed it: `.dtso` is added when missing. */
+export function workfile_filename(name: string): string {
+    return name.endsWith(".dtso") ? name : `${name}.dtso`;
+}
+
+/** Why a new workfile cannot be created at `filename` (an existing file is never overwritten), or undefined. */
+export function workfile_problem(filename: string, cwd?: string): string | undefined {
+    const resolved = path.resolve(cwd ?? process.cwd(), filename);
+    if (fs.existsSync(resolved)) {
+        return `${filename} already exists; use it with 'config-set overlay ${filename}' or pick another name`;
+    }
+    if (!fs.statSync(path.dirname(resolved), { throwIfNoEntry: false })?.isDirectory()) {
+        return `${path.dirname(resolved)} is not a directory`;
+    }
+    return undefined;
+}
+
 export interface CreateWorkfileResult {
     path: string;
     message: string;
@@ -31,7 +51,7 @@ export interface CreateWorkfileResult {
 
 /**
  * Create an empty workfile and save the overlay path to config.
- * Used by both `create-workfile` and `add` (when no overlay is configured).
+ * Used by `init`.
  */
 export function create_workfile(filename = "overlay.dtso", cwd?: string): CreateWorkfileResult {
     const output_path = path.resolve(cwd ?? process.cwd(), filename);
@@ -91,6 +111,23 @@ if (import.meta.vitest) {
 
             fs.writeFileSync(path.join(directory, "ad7124-8.dtso"), "");
             expect(next_workfile_name("ad7124-8", directory)).toBe("ad7124-8-1.dtso");
+        } finally {
+            fs.rmSync(directory, { recursive: true });
+        }
+    });
+
+    test("workfile_filename — adds .dtso only when it is missing", () => {
+        expect(workfile_filename("my-overlay")).toBe("my-overlay.dtso");
+        expect(workfile_filename("my-overlay.dtso")).toBe("my-overlay.dtso");
+    });
+
+    test("workfile_problem — an existing file and a missing directory are refused", () => {
+        const directory = fs.mkdtempSync(path.join(os.tmpdir(), "attach-wf-"));
+        try {
+            expect(workfile_problem("overlay.dtso", directory)).toBeUndefined();
+            fs.writeFileSync(path.join(directory, "overlay.dtso"), "");
+            expect(workfile_problem("overlay.dtso", directory)).toContain("overlay.dtso already exists");
+            expect(workfile_problem("nope/overlay.dtso", directory)).toContain("is not a directory");
         } finally {
             fs.rmSync(directory, { recursive: true });
         }

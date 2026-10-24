@@ -73,9 +73,6 @@ for cache in compat-index.json validation.json validation.stamp.json; do
     fi
 done
 
-export ATTACH_LINUX=~/linux
-export ATTACH_DEVICETREE=~/rpi-4.dts
-
 cd "$SANDBOX"
 
 banner "Device tree overlay workflow"
@@ -95,9 +92,9 @@ fi
 
 # --- Demo ---
 
-step "Create the workfile" \
-    "The workfile starts empty; create-workfile saves its path to the config." \
-    "create-workfile"
+step "Set up the workspace" \
+    "init saves the Linux tree and the base devicetree to the config, builds the binding caches (skipped when the copied ones are current) and creates the empty workfile." \
+    "init --linux ~/linux --devicetree ~/rpi-4.dts"
 
 step "Which buses can host the ADC?" \
     "Every SPI controller in the base tree. On the HAT, SPI PMOD 1 is wired to spi0, chip select 0." \

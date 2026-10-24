@@ -4,18 +4,23 @@ import path from "node:path";
 import * as os from "node:os";
 
 import { code_index, pick_code } from "./commands/add/interview";
-import { reload_caches } from "./config/rebuild";
-import { read_settings, save_settings } from "./config/settings";
-import { format_config_errors, linux_tree_problem } from "./config/workspace";
+import { linux_tree_problem } from "./config/workspace";
+import { live_filter } from "./live-filter";
+import { next_workfile_name, workfile_filename, workfile_problem, type OverlayChoice } from "./workfile";
 
 const BOLD = "\u001B[1m";
 const DIM = "\u001B[2m";
 const RESET = "\u001B[0m";
 const CYAN = "\u001B[36m";
 
-function bold(text: string): string { return `${BOLD}${text}${RESET}`; }
-function dim(text: string): string { return `${DIM}${text}${RESET}`; }
-function cyan(text: string): string { return `${CYAN}${text}${RESET}`; }
+// Colours only on a terminal: `init` with flags is often piped.
+const paint = (code: string, text: string): string => process.stdout.isTTY ? `${code}${text}${RESET}` : text;
+export function bold(text: string): string { return paint(BOLD, text); }
+export function dim(text: string): string { return paint(DIM, text); }
+export function cyan(text: string): string { return paint(CYAN, text); }
+
+// The prompts of `init` on a terminal. Each step takes the current value of the
+// setting, when there is one, as its Enter default.
 
 // ---------------------------------------------------------------------------
 // Readline helpers
@@ -45,7 +50,7 @@ function path_completer(line: string): [string[], string] {
     }
 }
 
-function create_rl(): readline.Interface {
+export function create_rl(): readline.Interface {
     return readline.createInterface({
         input: process.stdin,
         output: process.stdout,
@@ -68,7 +73,7 @@ const code_range = (count: number): string => count === 1 ? pick_code(0) : `${pi
 /** An answer that is a path rather than a pick: it has a slash or starts with ~ or a dot. */
 const looks_like_path = (answer: string): boolean => answer.includes("/") || answer.startsWith("~") || answer.startsWith(".");
 
-function expand_home(answer: string): string {
+export function expand_home(answer: string): string {
     return answer === "~" || answer.startsWith("~/") ? path.join(os.homedir(), answer.slice(1)) : answer;
 }
 
@@ -132,7 +137,7 @@ function find_linux_trees(): string[] {
     return results;
 }
 
-async function step_linux(rl: readline.Interface): Promise<string> {
+export async function step_linux(rl: readline.Interface, current?: string): Promise<string> {
     console.log(bold("Step 1: Linux kernel source tree"));
     console.log("");
     console.log("attach-linux needs the path to a Linux kernel source tree");
@@ -140,13 +145,16 @@ async function step_linux(rl: readline.Interface): Promise<string> {
     console.log("");
 
     console.log("Searching for Linux source trees under ~...");
-    const trees = find_linux_trees();
+    const found = find_linux_trees();
     console.log("");
 
+    // The configured tree comes first: Enter keeps it.
+    const trees = current === undefined ? found : [current, ...found.filter(tree => tree !== current)];
+
     if (trees.length > 0) {
-        console.log("Found Linux source trees:");
+        console.log("Linux source trees:");
         for (const [index, tree] of trees.entries()) {
-            console.log(`  ${code_label(index)} ${tree}`);
+            console.log(`  ${code_label(index)} ${tree}${tree === current ? dim(" (current)") : ""}`);
         }
         console.log("");
         console.log(dim("Pick one by its letter, or type a path."));
@@ -157,9 +165,9 @@ async function step_linux(rl: readline.Interface): Promise<string> {
             const choice = answer === "" ? pick_code(0) : answer;
 
             if (looks_like_path(choice)) {
-                const resolved = linux_path_problem(choice);
-                if (typeof resolved === "string") { return resolved; }
-                console.log(resolved.problem);
+                const checked = check_linux(choice);
+                if (checked.ok) { console.log(`Selected: ${checked.path}`); return checked.path; }
+                console.log(checked.problem);
                 continue;
             }
 
@@ -179,14 +187,22 @@ async function step_linux(rl: readline.Interface): Promise<string> {
     }
 }
 
+export type PathCheck = { ok: true; path: string } | { ok: false; problem: string };
+
 /** The resolved path of a Linux tree, or what is wrong with the answer. */
-function linux_path_problem(answer: string): string | { problem: string } {
+export function check_linux(answer: string): PathCheck {
     const resolved = path.resolve(expand_home(answer));
-    if (!fs.existsSync(resolved)) { return { problem: `Path does not exist: ${resolved}` }; }
+    if (!fs.existsSync(resolved)) { return { ok: false, problem: `Path does not exist: ${resolved}` }; }
     const problem = linux_tree_problem(resolved);
-    if (problem !== undefined) { return { problem }; }
-    console.log(`Selected: ${resolved}`);
-    return resolved;
+    return problem === undefined ? { ok: true, path: resolved } : { ok: false, problem };
+}
+
+/** The resolved path of a base device tree file, or what is wrong with the answer. */
+export function check_devicetree(answer: string): PathCheck {
+    const resolved = path.resolve(expand_home(answer));
+    if (!fs.existsSync(resolved)) { return { ok: false, problem: `Path does not exist: ${resolved}` }; }
+    if (!fs.statSync(resolved).isFile()) { return { ok: false, problem: `Not a file: ${resolved}` }; }
+    return { ok: true, path: resolved };
 }
 
 async function ask_linux_path(rl: readline.Interface): Promise<string> {
@@ -196,9 +212,9 @@ async function ask_linux_path(rl: readline.Interface): Promise<string> {
         const answer = await question(rl, "Linux source path: ");
         if (answer === "") { continue; }
 
-        const resolved = linux_path_problem(answer);
-        if (typeof resolved === "string") { return resolved; }
-        console.log(resolved.problem);
+        const checked = check_linux(answer);
+        if (checked.ok) { console.log(`Selected: ${checked.path}`); return checked.path; }
+        console.log(checked.problem);
     }
 }
 
@@ -286,6 +302,16 @@ async function interactive_dts_search(rl: readline.Interface, linux_path: string
     }
     console.log(`Found ${all_files.length} .dts files.`);
     console.log("");
+
+    const absolute = (file: string): string => path.join(linux_path, "arch", arch, "boot", "dts", file);
+    if (process.stdin.isTTY && process.stdout.isTTY) {
+        console.log(dim("Type to filter, ↑/↓ to move, Enter to pick, Esc to go back to the architectures."));
+        const result = await live_filter(all_files);
+        if (result.kind === "back") { return await interactive_dts_search(rl, linux_path); }
+        console.log(`Selected: ${absolute(result.item)}`);
+        return absolute(result.item);
+    }
+
     console.log(dim("Type to filter, or enter a letter to pick from the list."));
     console.log(dim('Type "back" to go back to architecture selection.'));
 
@@ -318,10 +344,9 @@ async function interactive_dts_search(rl: readline.Interface, linux_path: string
 
         const index = picked_index(answer, Math.min(current_matches.length, MAX_DISPLAYED));
         if (index !== undefined) {
-            const selected = current_matches[index]!;
-            const absolute = path.join(linux_path, "arch", arch, "boot", "dts", selected);
-            console.log(`Selected: ${absolute}`);
-            return absolute;
+            const selected = absolute(current_matches[index]!);
+            console.log(`Selected: ${selected}`);
+            return selected;
         }
 
         if (answer !== "") {
@@ -336,10 +361,9 @@ async function interactive_dts_search(rl: readline.Interface, linux_path: string
             current_filter = "";
             current_matches = all_files;
         } else if (current_matches.length === 1) {
-            const selected = current_matches[0]!;
-            const absolute = path.join(linux_path, "arch", arch, "boot", "dts", selected);
-            console.log(`Selected: ${absolute}`);
-            return absolute;
+            const selected = absolute(current_matches[0]!);
+            console.log(`Selected: ${selected}`);
+            return selected;
         }
     }
 }
@@ -350,7 +374,7 @@ async function ask_dts_path(rl: readline.Interface): Promise<string> {
         const answer = await question(rl, "Path to .dts file: ");
         if (answer === "") { continue; }
 
-        const resolved = path.resolve(answer);
+        const resolved = path.resolve(expand_home(answer));
 
         if (!fs.existsSync(resolved)) {
             console.log(`Path does not exist: ${resolved}`);
@@ -367,102 +391,73 @@ async function ask_dts_path(rl: readline.Interface): Promise<string> {
     }
 }
 
-async function step_context(rl: readline.Interface, linux_path: string): Promise<string> {
+export async function step_context(rl: readline.Interface, linux_path: string, current?: string): Promise<string> {
     console.log(bold("Step 2: Base device tree (context)"));
     console.log("");
     console.log("Choose how to select the base .dts file:");
-    console.log(`  ${code_label(0)} Search in the Linux tree`);
-    console.log(`  ${code_label(1)} Enter path manually`);
-    console.log(`  ${code_label(2)} Export from remote device ${dim("(coming soon)")}`);
+    // With a configured base tree, the first choice keeps it and Enter takes it.
+    const choices: { label: string; pick?: () => Promise<string> }[] = [
+        ...(current === undefined ? [] : [{ label: `Keep ${current}`, pick: async () => current }]),
+        { label: "Search in the Linux tree", pick: async () => await interactive_dts_search(rl, linux_path) },
+        { label: "Enter path manually", pick: async () => await ask_dts_path(rl) },
+        { label: `Export from remote device ${dim("(coming soon)")}` },
+    ];
+    for (const [index, choice] of choices.entries()) {
+        console.log(`  ${code_label(index)} ${choice.label}`);
+    }
     console.log("");
 
     while (true) {
         const answer = await question(rl, `Choose [${pick_code(0)}]: `);
         const choice = answer === "" ? pick_code(0) : answer;
 
-        switch (picked_index(choice, 3)) {
-            case 0: {
-                return await interactive_dts_search(rl, linux_path);
-            }
-            case 1: {
-                return await ask_dts_path(rl);
-            }
-            case 2: {
-                console.log("Not yet available. Please choose another option.");
-                continue;
-            }
-            default: {
-                console.log("Please enter a, b, or c.");
-            }
+        const picked = choices[picked_index(choice, choices.length) ?? -1];
+        if (picked === undefined) {
+            console.log(`Please enter ${code_range(choices.length)}.`);
+        } else if (picked.pick === undefined) {
+            console.log("Not yet available. Please choose another option.");
+        } else {
+            return await picked.pick();
         }
     }
 }
 
 // ---------------------------------------------------------------------------
-// Step 3: Save the settings and build the binding caches
+// Step 3: The overlay workfile
 // ---------------------------------------------------------------------------
 
-async function step_save(linux_path: string, context_path: string): Promise<boolean> {
-    save_settings({ linux: path.resolve(linux_path), devicetree: path.resolve(context_path) });
-    console.log(`Saved linux and devicetree to ${cyan(".attach-linux/config.toml")}.`);
-    console.log("");
-
-    const settings = read_settings();
-    const reloaded = settings.ok ? await reload_caches(settings.value) : settings;
-    if (reloaded.ok && reloaded.value.ok) { return true; }
-    console.log(reloaded.ok ? reloaded.value.message : format_config_errors(reloaded.errors).human);
-    console.log("");
-    console.log(`Fix the problem, then run ${cyan("attach-linux config-get --reload")} to build the binding caches.`);
-    return false;
-}
-
-function step_output(): void {
-    console.log("");
-    console.log(bold("Setup complete!"));
-    console.log("");
-    console.log(bold("Next steps:"));
-    console.log("");
-    console.log(`  ${cyan("1.")} Create a bare overlay workfile:`);
-    console.log(`     ${dim("attach-linux create-workfile [name]")}`);
-    console.log("");
-    console.log(`  ${cyan("2.")} Search for devices to add to the overlay:`);
-    console.log(`     ${dim("attach-linux list device [filter]")}`);
-    console.log("");
-    console.log(`  Run ${cyan("attach-linux config-get --reload")} after the bindings of the Linux tree change.`);
-    console.log("");
-}
-
-// ---------------------------------------------------------------------------
-// Main
-// ---------------------------------------------------------------------------
-
-export async function run_setup(): Promise<void> {
-    const rl = create_rl();
-    try {
-        console.log("");
-        console.log(bold("attach-linux setup"));
-        console.log("==================");
-        console.log("");
-        console.log("This will help you configure attach-linux.");
-        console.log("You'll need a Linux kernel source tree and a target device tree file.");
-        console.log("");
-
-        const linux_path = await step_linux(rl);
-        console.log("");
-
-        const context_path = await step_context(rl, linux_path);
-        console.log("");
-
-        if (await step_save(linux_path, context_path)) { step_output(); }
-    } catch (error: unknown) {
-        if (error instanceof Error && error.message === "interrupted") {
-            console.log("\nSetup cancelled.");
-            return;
-        }
-        throw error;
-    } finally {
-        rl.close();
+/** Ask for the name of a new workfile; Enter takes the next free `overlay[-N].dtso`. */
+async function ask_workfile_name(rl: readline.Interface): Promise<string> {
+    const default_name = next_workfile_name();
+    while (true) {
+        const answer = await question(rl, `Overlay file name [${default_name}]: `);
+        const filename = answer === "" ? default_name : workfile_filename(answer);
+        const problem = workfile_problem(filename);
+        if (problem === undefined) { return filename; }
+        console.log(problem);
     }
+}
+
+/**
+ * The overlay workfile: keep the configured one (Enter) or create a new one.
+ * `configured` is the configured overlay when its file exists.
+ */
+export async function step_overlay(rl: readline.Interface, configured?: string): Promise<OverlayChoice> {
+    console.log(bold("Step 3: Overlay workfile"));
+    console.log("");
+    console.log("The workfile is the overlay file your changes are written to.");
+    console.log("");
+
+    if (configured !== undefined) {
+        while (true) {
+            const answer = await question(rl, `Overlay: [k]eep ${configured} / [n]ew [k]: `);
+            const lower = answer.toLowerCase();
+            if (lower === "" || lower === "k" || lower === "keep") { return { kind: "keep", path: configured }; }
+            if (lower === "n" || lower === "new") { return { kind: "create", filename: await ask_workfile_name(rl) }; }
+            console.log("Please enter k to keep it or n for a new one.");
+        }
+    }
+    return { kind: "create", filename: await ask_workfile_name(rl) };
 }
 
 if (import.meta.vitest) {
@@ -476,6 +471,36 @@ if (import.meta.vitest) {
         expect(picked_index("aa", 30)).toBe(26);
         expect(code_range(1)).toBe("a");
         expect(code_range(3)).toBe("a to c");
+    });
+
+    test("check_linux — a Linux tree is accepted, a missing path or another directory is not", () => {
+        const root = fs.mkdtempSync(path.join(os.tmpdir(), "attach-setup-"));
+        try {
+            fs.mkdirSync(path.join(root, "Documentation", "devicetree", "bindings"), { recursive: true });
+            fs.mkdirSync(path.join(root, "include"));
+            expect(check_linux(root)).toEqual({ ok: true, path: root });
+            const missing = check_linux(path.join(root, "nope"));
+            expect(!missing.ok && missing.problem).toContain("Path does not exist");
+            const other = check_linux(path.join(root, "include"));
+            expect(!other.ok && other.problem).toContain("not a Linux source tree");
+        } finally {
+            fs.rmSync(root, { recursive: true });
+        }
+    });
+
+    test("check_devicetree — a file is accepted, a directory or missing path is not", () => {
+        const root = fs.mkdtempSync(path.join(os.tmpdir(), "attach-setup-"));
+        try {
+            const file = path.join(root, "base.dts");
+            fs.writeFileSync(file, "");
+            expect(check_devicetree(file)).toEqual({ ok: true, path: file });
+            const directory = check_devicetree(root);
+            expect(!directory.ok && directory.problem).toContain("Not a file");
+            const missing = check_devicetree(path.join(root, "nope.dts"));
+            expect(!missing.ok && missing.problem).toContain("Path does not exist");
+        } finally {
+            fs.rmSync(root, { recursive: true });
+        }
     });
 
     test("looks_like_path — a slash, ~ or a leading dot makes the answer a path", () => {

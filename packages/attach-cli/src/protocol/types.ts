@@ -24,8 +24,16 @@ export interface ToolConfigResponse extends CommonResponse {
     configs: Config[];
 }
 
-export interface CreateWorkfileResponse extends CommonResponse {
-    path: string;
+/** `init`: the workspace it set up. */
+export interface InitResponse extends CommonResponse {
+    linux: string;
+    devicetree: string;
+    /** The overlay workfile, absolute. */
+    overlay: string;
+    /** True when init created the workfile, false when it kept the configured one. */
+    created: boolean;
+    /** True when init built the binding caches, false when they were already current. */
+    indexed: boolean;
 }
 
 export interface AddResponse extends CommonResponse {

@@ -2,10 +2,9 @@ import { Command } from "commander";
 import { name, version, description } from "../package.json";
 import type { LocalContext } from "./context";
 
-import { build_attach_manifest_command } from "./commands/attach-manifest/command";
 import { build_config_get_command } from "./commands/config-get/command";
 import { build_config_set_command } from "./commands/config-set/command";
-import { build_create_workfile_command } from "./commands/create-workfile/command";
+import { build_init_command } from "./commands/init/command";
 import { build_add_command } from "./commands/add/command";
 import { build_import_command } from "./commands/import/command";
 import { build_read_command } from "./commands/read/command";
@@ -51,18 +50,18 @@ export function buildApp(context: LocalContext): Command {
         })
         .addHelpText("after", `
 Getting started:
-  Run 'attach-linux' with no arguments to enter interactive setup.
+  Run 'attach-linux' with no arguments (or 'attach-linux init') to set up a
+  workspace: the Linux tree, the base devicetree and the overlay file.
 
 All commands accept --json for machine-readable output.
 Run any command with --help for detailed usage.`);
 
     // hidden
-    program.addCommand(build_attach_manifest_command(context), { hidden: true });
     program.addCommand(build_internal_list_command(context), { hidden: true });
     program.addCommand(build_ui_command(context), { hidden: true });
 
     // setup & discovery
-    program.addCommand(build_create_workfile_command(context));
+    program.addCommand(build_init_command(context));
     program.addCommand(build_list_command(context));
 
     // overlay editing

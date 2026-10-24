@@ -473,7 +473,7 @@ if (import.meta.vitest) {
         const message = format_config_errors(result.errors);
         expect(message.human).toContain("Missing config field linux");
         expect(message.human).toContain("Missing config field devicetree");
-        expect(message.human.split("Run 'attach-linux'").length - 1).toBe(1);
+        expect(message.human.split("Run 'attach-linux init'").length - 1).toBe(1);
         expect(JSON.parse(message.json).errors).toHaveLength(2);
     });
 }

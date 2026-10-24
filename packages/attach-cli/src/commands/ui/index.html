@@ -587,7 +587,7 @@ async function submit_add(ev) {
 async function refresh_overlay() {
     const r = await api("/api/overlay");
     $("overlay-path").textContent = r.path ? "· " + r.path.split("/").pop() : "";
-    $("overlay").textContent = r.path ? (r.text || "(empty)") : "No overlay yet. Add a device, or run create-workfile.";
+    $("overlay").textContent = r.path ? (r.text || "(empty)") : "No overlay yet. Add a device, or create a workfile.";
 }
 
 async function validate() {
@@ -622,10 +622,19 @@ function render_failure() {
         errors.map(e => h("div", { class: "issue error" }, e.field ? h("div", { class: "where" }, e.field) : null, e.message)),
         hints.map(t => h("p", { class: "dim" }, t)),
         h("div", { class: "row" },
-            overlay_problem ? h("button", { class: "primary", onclick: async () => { if ((await run("create-workfile", [])).ok) { await init(); } } }, "Create a new workfile") : null,
+            overlay_problem ? h("button", { class: "primary", onclick: async () => { if (await create_workfile()) { await init(); } } }, "Create a new workfile") : null,
             h("button", { onclick: () => init() }, "Retry"),
         ),
     ].flat().filter(Boolean));
+}
+
+/** Creates a workfile with `init --overlay`, taking the first of overlay, overlay-1, ... that doesn't exist yet. */
+async function create_workfile() {
+    for (let n = 0; n < 100; n++) {
+        const r = await run("init", ["--overlay", n === 0 ? "overlay" : "overlay-" + n]);
+        if (r.ok || !/already exists/.test(r.message)) { return r.ok; }
+    }
+    return false;
 }
 
 async function init() {
@@ -641,12 +650,12 @@ async function init() {
     if (!s.overlay) {
         $("detail").replaceChildren(...[
             !s.linux || !s.devicetree
-                ? h("div", { class: "issue error" }, "Not set in the environment of 'attach-linux ui': " + [!s.linux && "ATTACH_LINUX", !s.devicetree && "ATTACH_DEVICETREE"].filter(Boolean).join(", "))
+                ? h("div", { class: "issue error" }, "Not configured: " + [!s.linux && "linux", !s.devicetree && "devicetree"].filter(Boolean).join(", ") + ". Run 'attach-linux init' in this directory.")
                 : null,
             h("h2", {}, "No overlay yet"),
             h("p", {}, "The overlay file (workfile) is where your changes are written. Create an empty one, or add a device, which creates it for you."),
             h("div", { class: "row" },
-                h("button", { class: "primary", onclick: async () => { if ((await run("create-workfile", [])).ok) { await init(); } } }, "Create workfile"),
+                h("button", { class: "primary", onclick: async () => { if (await create_workfile()) { await init(); } } }, "Create workfile"),
                 h("button", { onclick: () => open_add("/") }, "Add device…"),
             ),
         ].flat().filter(Boolean));

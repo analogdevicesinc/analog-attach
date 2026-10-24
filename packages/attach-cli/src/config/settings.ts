@@ -35,7 +35,7 @@ export interface SettingSpec {
     hint?: string;
 }
 
-export const SETUP_HINT = "Run 'attach-linux' to set up a workspace interactively.";
+export const SETUP_HINT = "Run 'attach-linux init' on a terminal, or 'attach-linux init --linux <path> --devicetree <path>', to set up a workspace.";
 
 export const SETTINGS: readonly SettingSpec[] = [
     {
@@ -60,7 +60,7 @@ export const SETTINGS: readonly SettingSpec[] = [
         kind: "path",
         required: false,
         description: "Path to the working DTSO overlay file (workfile)",
-        hint: "Run 'create-workfile' to create one, or 'config-set overlay <path>'.",
+        hint: "Run 'attach-linux init' to create one, or 'config-set overlay <path>'.",
     },
     {
         key: "overlay-syntax",
