@@ -93,12 +93,42 @@ function schema_resolver(search_paths: SearchPath[]) {
 
             try {
                 const content = fs.readFileSync(file_path);
-                return path.basename(file_path) === "types.yaml" ? tag_types(content) : content;
+                if (path.basename(file_path) === "types.yaml") { return tag_types(content); }
+                return SELF_REFERENCE.test(content.toString("utf8")) ? drop_self_references(content) : content;
             } catch {
                 throw new ResolverError(`Error opening file "${file_path}"`);
             }
         },
     };
+}
+
+const SELF_REFERENCE = /\$ref:\s*['"]?#/;
+
+/**
+ * The file with the `$ref`s that point at a schema they are inside of removed (`i2c-controller.yaml`'s
+ * `i2c-bus` is `$ref: '#'`: a bus node within a bus node). Such a reference has no finite expansion, and
+ * ref-parser, which can't dereference it, leaves every reference to a file that holds one unresolved.
+ * The node keeps the keywords next to the `$ref` and accepts nothing more than they say.
+ */
+function drop_self_references(content: Buffer): Buffer {
+    const document = parse(content.toString("utf8")) as unknown;
+
+    const walk = (node: unknown, location: string[]): void => {
+        if (typeof node !== "object" || node === null) { return; }
+        const reference = (node as Record<string, unknown>).$ref;
+
+        if (typeof reference === "string" && reference.startsWith("#")) {
+            const target = reference.slice(1).split("/").slice(1).map((token) => token.replaceAll("~1", "/").replaceAll("~0", "~"));
+            if (target.every((token, index) => location[index] === token)) {
+                delete (node as Record<string, unknown>).$ref;
+            }
+        }
+
+        for (const [key, value] of Object.entries(node)) { walk(value, [...location, key]); }
+    };
+    walk(document, []);
+
+    return Buffer.from(JSON.stringify(document));
 }
 
 /** `types.yaml` with every definition carrying its own name under `DT_TYPE`. */
