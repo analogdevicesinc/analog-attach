@@ -233,6 +233,10 @@
                 },
                 "minItems": 1,
                 "maxItems": 1
+            },
+            "gpio_rows": {
+                "min_rows": 1,
+                "max_rows": 1
             }
         },
         {

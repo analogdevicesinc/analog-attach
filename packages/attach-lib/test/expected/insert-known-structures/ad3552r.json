@@ -73,6 +73,10 @@
                 },
                 "minItems": 1,
                 "maxItems": 1
+            },
+            "gpio_rows": {
+                "min_rows": 1,
+                "max_rows": 1
             }
         },
         {
@@ -90,6 +94,10 @@
                 "minItems": 1,
                 "maxItems": 1,
                 "description": "LDAC pin to be used as a hardware trigger to update the DAC channels.\n"
+            },
+            "gpio_rows": {
+                "min_rows": 1,
+                "max_rows": 1
             }
         },
         {

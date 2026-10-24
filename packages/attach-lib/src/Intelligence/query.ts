@@ -292,6 +292,32 @@ function refine_supply(property: ResolvedProperty, devicetree: DeviceTree): bool
     return true;
 }
 
+/** One cell of a `*-gpios` row after the controller's phandle: a number (the line, …) or the flags (one of `GPIO_*`). */
+export type GpioRowCell =
+    | { kind: "number" }
+    | { kind: "flags"; macros: MacroDefinition[] };
+
+/** The cells for `#gpio-cells = <count>`: count - 1 numbers, then the flags. */
+function gpio_cells_for(count: bigint): GpioRowCell[] {
+    const numbers = Math.max(Number(count) - (count > 1n ? 1 : 0), 0);
+    const cells: GpioRowCell[] = Array.from({ length: numbers }, () => ({ kind: "number" }));
+    if (count > 1n) { cells.push({ kind: "flags", macros: GPIO_MACROS }); }
+    return cells;
+}
+
+/**
+ * The cells that follow the controller's phandle in one row of a `*-gpios`
+ * property, from the controller's `#gpio-cells`: `<1>` is [number], `<2>` is
+ * [number, flags], `<3>` is [number, number, flags]. `controller` is its
+ * phandle name (label, or `&{path}`), enabled or not. Undefined when no
+ * gpio-controller has that name or it has no `#gpio-cells`.
+ */
+export function gpio_row_cells(devicetree: DeviceTree, controller: string): GpioRowCell[] | undefined {
+    const found = find_nodes(devicetree, is_gpio_controller).find(located => phandle_name(located) === controller);
+    const count = found === undefined ? undefined : number_property(found.node, "#gpio-cells");
+    return count === undefined ? undefined : gpio_cells_for(count);
+}
+
 function refine_gpio(
     property: ResolvedProperty,
     devicetree: DeviceTree,
@@ -299,10 +325,15 @@ function refine_gpio(
 ): boolean {
     if (!is_gpio_property(property.key)) { return false; }
 
+    const { min_rows, max_rows } = gpio_row_bounds(property.value);
+    property.gpio_rows = { min_rows, ...(max_rows === undefined ? {} : { max_rows }) };
+
     const set_controller = extract_gpio_controller(parsed_data[property.key]);
 
     if (set_controller === undefined) {
-        property.value = phandle_enum_array(phandle_names(devicetree, is_gpio_controller), property.value.description);
+        // Every controller, enabled or not: the consumer marks the disabled ones.
+        const controllers = find_nodes(devicetree, is_gpio_controller).map(located => phandle_name(located));
+        property.value = phandle_enum_array(controllers, property.value.description);
         return true;
     }
 
@@ -314,15 +345,14 @@ function refine_gpio(
     const cell_count = number_property(controller_node.node, "#gpio-cells");
     if (cell_count === undefined) { return true; }
 
+    const cells = gpio_cells_for(cell_count);
     const row = specifier_row({
         phandle: { enum: phandles, default: set_controller },
-        numbers: Number(cell_count) - 1,
+        numbers: cells.filter(cell => cell.kind === "number").length,
         number_item: { _t: "number" },
-        trailing_macros: cell_count > 1n ? GPIO_MACROS.map(m => m.name) : undefined,
+        trailing_macros: cells.some(cell => cell.kind === "flags") ? GPIO_MACROS.map(m => m.name) : undefined,
         description: property.value.description,
     });
-
-    const { min_rows, max_rows } = gpio_row_bounds(property.value);
 
     // eslint-disable-next-line unicorn/prefer-ternary
     if (max_rows !== undefined && max_rows <= 1) {
@@ -497,8 +527,9 @@ if (import.meta.vitest) {
         const properties = [{ key: "reset-gpios", value: open_list(1, 1) }];
         const result = query_devicetree(dt, properties, JSON.stringify({ "reset-gpios": ["gpio"] }));
         const reset = tuple_of(result.find(p => p.key === "reset-gpios")?.value);
-        expect(reset?.cells).toHaveLength(1);
+        expect(reset?.cells).toHaveLength(2);
         expect(reset?.cells[0]?._t).toBe("enum");
+        expect(reset?.cells[1]?._t).toBe("number");
     });
 
     test("query_devicetree — *-gpios: item count is the phandle plus #gpio-cells", () => {
@@ -583,6 +614,61 @@ if (import.meta.vitest) {
         expect(rows(open_list(undefined, 3))).toStrictEqual([3, 3]);
         expect(rows(open_list(1, 6))).toStrictEqual([1, 6]);
         expect(rows(open_list(1, 1))).toBe("single row");
+    });
+
+    const controllers_dt = (cells: string) => dts(`/dts-v1/;
+/ {
+    gpio: gpio@7e200000 {
+        compatible = "brcm,bcm2711-gpio";
+        gpio-controller;
+        ${cells}
+    };
+    expgpio: gpio {
+        compatible = "raspberrypi,firmware-gpio";
+        gpio-controller;
+        #gpio-cells = <2>;
+        status = "disabled";
+    };
+    plain {
+        compatible = "x,plain";
+    };
+};`);
+
+    test("gpio_row_cells — #gpio-cells 1, 2 and 3: the numbers, then the flags", () => {
+        const kinds = (cells: string, controller = "gpio") => gpio_row_cells(controllers_dt(cells), controller)?.map(cell => cell.kind);
+        expect(kinds("#gpio-cells = <1>;")).toEqual(["number"]);
+        expect(kinds("#gpio-cells = <2>;")).toEqual(["number", "flags"]);
+        expect(kinds("#gpio-cells = <3>;")).toEqual(["number", "number", "flags"]);
+        const flags = gpio_row_cells(controllers_dt("#gpio-cells = <2>;"), "gpio")?.[1];
+        expect(flags?.kind === "flags" && flags.macros).toBe(GPIO_MACROS);
+        // A disabled controller has a shape too.
+        expect(kinds("#gpio-cells = <2>;", "expgpio")).toEqual(["number", "flags"]);
+    });
+
+    test("gpio_row_cells — a name that is no gpio-controller, or a controller without #gpio-cells, has no shape", () => {
+        expect(gpio_row_cells(controllers_dt("#gpio-cells = <2>;"), "plain")).toBeUndefined();
+        expect(gpio_row_cells(controllers_dt("#gpio-cells = <2>;"), "nope")).toBeUndefined();
+        expect(gpio_row_cells(controllers_dt("// no cells"), "gpio")).toBeUndefined();
+    });
+
+    test("query_devicetree — *-gpios: gpio_rows carries the bounds before and after a controller is set", () => {
+        const rows = (value: ResolvedProperty["value"], data: object) =>
+            query_devicetree(gpio_dt, [{ key: "ctrl-gpios", value }], JSON.stringify(data)).find(p => p.key === "ctrl-gpios")?.gpio_rows;
+        for (const data of [{}, { "ctrl-gpios": ["gpio"] }]) {
+            expect(rows(open_list(1, 1), data)).toStrictEqual({ min_rows: 1, max_rows: 1 });
+            expect(rows(open_list(1, 4), data)).toStrictEqual({ min_rows: 1, max_rows: 4 });
+            expect(rows(open_list(6, 6), data)).toStrictEqual({ min_rows: 6, max_rows: 6 });
+            // A lone minItems fixes the count; unsized is one row or more.
+            expect(rows(open_list(2), data)).toStrictEqual({ min_rows: 2, max_rows: 2 });
+            expect(rows({ _t: "unknown" }, data)).toStrictEqual({ min_rows: 1 });
+        }
+        // Not a gpio property: no bounds.
+        expect(query_devicetree(gpio_dt, [{ key: "vcc-supply", value: open_list(1, 1) }], "{}")[0]?.gpio_rows).toBeUndefined();
+    });
+
+    test("query_devicetree — *-gpios without a controller: the enum names every gpio-controller, disabled ones too", () => {
+        const result = query_devicetree(controllers_dt("#gpio-cells = <2>;"), [{ key: "reset-gpios", value: open_list(1, 1) }], "{}");
+        expect(enum_of(result.find(p => p.key === "reset-gpios")?.value)?.enum).toEqual(["gpio", "expgpio"]);
     });
 
     test("is_gpio_property — matches gpios, gpio, *-gpios, *-gpio; rejects vendor,nr-gpios and gpio-controller", () => {

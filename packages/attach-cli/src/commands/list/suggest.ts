@@ -780,6 +780,8 @@ export interface PropertyInfo {
     suggestions: Suggestion[];
     /** For a phandle, the labels of the nodes it can name, enabled or not: candidates, not a constraint. */
     phandle_options?: string[];
+    /** For a `*-gpios` property, the rows (controller + cells) the binding gives it: `max_rows` is open when the binding sets no upper bound. */
+    gpio_rows?: { min_rows: number; max_rows?: number };
 }
 
 export function property_info(
@@ -819,6 +821,7 @@ export function property_info(
             },
             suggestions: (property_definition.suggestions ?? []).map((suggestion) => to_suggestion(suggestion)),
             ...(constraints.phandle_options === undefined ? {} : { phandle_options: constraints.phandle_options }),
+            ...(property_definition.gpio_rows === undefined ? {} : { gpio_rows: property_definition.gpio_rows }),
         },
     };
 }
@@ -979,6 +982,23 @@ if (import.meta.vitest) {
         };
         const result = property_info(binding, { name: "adc", labels: [], properties: [], children: [] } as unknown as DTNode, "interrupt-parent");
         expect(result.ok && result.info.phandle_options).toEqual(["gpio", "gicv2", "aon_intr"]);
+    });
+
+    test("property_info — a gpio property carries the rows the binding gives it", () => {
+        const value: AttachType = { _t: "list", item: { _t: "enum", enum: ["gpio", "expgpio"], enum_type: AttachEnumType.PHANDLE }, minItems: 1, maxItems: 1, description: "" };
+        const properties = [{ key: "ctrl-gpios", value, gpio_rows: { min_rows: 6, max_rows: 6 } }];
+        const binding: NodeBinding = {
+            properties,
+            required_properties: ["ctrl-gpios"],
+            child_nodes: [],
+            property_patterns: [],
+            binding_path: "/linux/iio/amplifiers/adi,hmc425a.yaml",
+            origin: { kind: "compatible", compatible: "adi,hmc425a" },
+            narrow_and_populate: () => ({ properties, required_properties: ["ctrl-gpios"], errors: [] }),
+        };
+        const result = property_info(binding, { name: "att", labels: [], properties: [], children: [] } as unknown as DTNode, "ctrl-gpios");
+        expect(result.ok && result.info.gpio_rows).toEqual({ min_rows: 6, max_rows: 6 });
+        expect(result.ok && result.info.phandle_options).toEqual(["gpio", "expgpio"]);
     });
 
     test("value_suggestions — a regulator the overlay adds is a supply candidate, listed first", () => {

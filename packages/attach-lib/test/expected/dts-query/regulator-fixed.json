@@ -51,6 +51,10 @@
                 "minItems": 1,
                 "maxItems": 1,
                 "description": "gpio to use for enable control"
+            },
+            "gpio_rows": {
+                "min_rows": 1,
+                "max_rows": 1
             }
         },
         {
@@ -67,6 +71,10 @@
                 },
                 "minItems": 1,
                 "maxItems": 1
+            },
+            "gpio_rows": {
+                "min_rows": 1,
+                "max_rows": 1
             }
         },
         {

@@ -206,6 +206,10 @@
                 "minItems": 1,
                 "maxItems": 1,
                 "description": "Must be the device tree identifier of the RESET pin. If specified, it will be asserted during driver probe. As the line is active low, it should be marked GPIO_ACTIVE_LOW."
+            },
+            "gpio_rows": {
+                "min_rows": 1,
+                "max_rows": 1
             }
         },
         {

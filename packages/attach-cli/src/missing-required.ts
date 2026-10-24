@@ -1,4 +1,4 @@
-import { cell_extract_first_value, type AttachEnumType, type AttachType, type DeviceTree, type DeviceTreeOverlay, type ValueSuggestion } from "attach-lib";
+import { cell_extract_first_value, GPIO_MACROS, gpio_row_cells, type AttachEnumType, type AttachType, type DeviceTree, type DeviceTreeOverlay, type ValueSuggestion } from "attach-lib";
 
 import type { NodeBinding } from "./binding-resolution";
 import type { Bindings, Workfile } from "./config/workspace";
@@ -63,6 +63,28 @@ function fixed_cells(type: Types): Cell[] | undefined {
 const enum_suggestions = (type: Extract<Types, { kind: "enum" }>, suggestions: Suggestion[]): Suggestion[] =>
     type.options.map(({ value }) => suggestions.find(s => s.value === String(value)) ?? { value: String(value) });
 
+/** A `*-gpios` property no controller is chosen for yet: the question is a row (controller, then its cells), asked once or several times. */
+const is_gpio_question = (info: PropertyInfo): info is PropertyInfo & { gpio_rows: NonNullable<PropertyInfo["gpio_rows"]> } =>
+    info.gpio_rows !== undefined && info.phandle_options !== undefined;
+
+/** `1..4`, `2`, `1 or more`: how many rows the binding gives a gpio property; nothing for exactly one. */
+export function gpio_rows_text({ min_rows, max_rows }: NonNullable<PropertyInfo["gpio_rows"]>): string | undefined {
+    if (max_rows === undefined) { return min_rows <= 1 ? "one or more" : `${min_rows} or more`; }
+    if (max_rows <= 1) { return undefined; }
+    return min_rows === max_rows ? String(max_rows) : `${min_rows}..${max_rows}`;
+}
+
+/** The entries of a gpio row after its controller: a number for each cell but the last, then the flags (one of `GPIO_*`, Enter = the first). `cells` is the controller's; a controller the tree doesn't give is asked for a line and flags. */
+function gpio_cell_entries(cells: ReturnType<typeof gpio_row_cells>): Entry[] {
+    const shape = cells ?? [{ kind: "number" as const }, { kind: "flags" as const, macros: GPIO_MACROS }];
+    let numbers = 0;
+    return shape.map((cell): Entry => {
+        if (cell.kind === "number") { numbers++; return { kind: "number", label: numbers === 1 ? "line" : `cell ${numbers}` }; }
+        const options = cell.macros.map(({ name, value }): Suggestion => ({ value: name, display_string: `${name} (${value})` }));
+        return { options, default: options[0]!.value, label: "flags" };
+    });
+}
+
 /**
  * How the interview asks for a property: a lettered list for a closed set (an
  * enum, the nodes a phandle can name), and one entry per line for a fixed-size
@@ -70,8 +92,21 @@ const enum_suggestions = (type: Extract<Types, { kind: "enum" }>, suggestions: S
  * whole value on one line. Enter takes the first suggestion (for a fixed-size
  * array, its cells), or the first option; never one of the other candidates.
  */
-export function question_entries(info: PropertyInfo | undefined, suggestions: Suggestion[], others: Suggestion[]): Entry[] | undefined {
+export function question_entries(
+    info: PropertyInfo | undefined,
+    suggestions: Suggestion[],
+    others: Suggestion[],
+    row_cells: (controller: string) => ReturnType<typeof gpio_row_cells> = (): undefined => { return; },
+): Entry[] | undefined {
     if (info === undefined) { return; }
+    if (is_gpio_question(info)) {
+        // One row: the controller first (the enabled ones, then the disabled), whose answer gives the cells that follow.
+        const disabled = (option: Suggestion): boolean => option.note === "disabled";
+        const options = [...suggestions, ...others.filter(o => !disabled(o)), ...others.filter(o => disabled(o))];
+        const first = options[0];
+        if (first === undefined) { return undefined; }
+        return [{ options, ...(disabled(first) ? {} : { default: first.value }), label: "controller", after: controller => gpio_cell_entries(row_cells(controller)) }];
+    }
     const first = suggestions[0]?.value;
     if (info.phandle_options !== undefined) {
         const options = [...suggestions, ...others];
@@ -105,14 +140,17 @@ function interview_steps({ workfile, base, bindings, identifier }: NewNode): Int
         ask: async (property) => {
             const target = await resolve_target_binding(identifier, workfile.tree, base, { ok: true, value: bindings });
             const { info, suggestions, others } = property_details(target, workfile.tree, base, identifier, property);
-            const entries = question_entries(info, suggestions, others);
+            const entries = question_entries(info, suggestions, others, controller => gpio_row_cells(workfile.tree.merged_tree() ?? base, controller));
             if (entries === undefined) {
                 // Enter takes the first suggestion, never one of the other candidates.
                 return { property, details: format_details(info, [...suggestions, ...others], { with_type: true }), suggestions };
             }
             // The entries list the options themselves.
             const listed = entries.some(entry => entry.options !== undefined);
-            return { property, details: format_details(info, [], { with_type: !listed, with_allowed: !listed }), suggestions, entries };
+            const details = format_details(info, [], { with_type: !listed, with_allowed: !listed });
+            if (info === undefined || !is_gpio_question(info)) { return { property, details, suggestions, entries }; }
+            const rows = gpio_rows_text(info.gpio_rows);
+            return { property, details: rows === undefined ? details : [...details, `  Rows: ${rows}`], suggestions, entries, rows: info.gpio_rows };
         },
         apply: async (property, tokens) => {
             const outcome = await apply_update(workfile, base, bindings, identifier, property, tokens);
@@ -396,5 +434,51 @@ if (import.meta.vitest) {
         expect(question_entries(info({ kind: "array", items: number, min_items: 1, max_items: 4 }), [], [])).toBeUndefined();
         expect(question_entries(info({ kind: "array", items: number }), [], [])).toBeUndefined();
         expect(question_entries(undefined, [{ value: "2" }], [])).toBeUndefined();
+    });
+
+    const gpio_info = (rows: { min_rows: number; max_rows?: number }): PropertyInfo =>
+        info({ kind: "enum", options: [{ value: "gpio" }, { value: "expgpio" }, { value: "aon_gpio" }] }, { phandle_options: ["gpio", "expgpio", "aon_gpio"], gpio_rows: rows });
+    const gpio_others = [
+        { value: "aon_gpio", display_string: "aon_gpio (disabled)", note: "disabled" },
+        { value: "gpio", display_string: "gpio (enabled)", note: "enabled" },
+        { value: "expgpio", display_string: "expgpio (enabled by the overlay)", note: "enabled by the overlay" },
+    ];
+
+    test("question_entries — a gpio property asks the controller first: enabled ones, then disabled, Enter takes the first enabled", () => {
+        const entries = question_entries(gpio_info({ min_rows: 6, max_rows: 6 }), [], gpio_others);
+        expect(entries).toHaveLength(1);
+        expect(entries?.[0]).toMatchObject({
+            options: [gpio_others[1], gpio_others[2], gpio_others[0]],
+            default: "gpio",
+            label: "controller",
+        });
+        // Only disabled controllers: listed, nothing taken by Enter.
+        expect(question_entries(gpio_info({ min_rows: 1 }), [], [gpio_others[0]!])?.[0]?.default).toBeUndefined();
+        expect(question_entries(gpio_info({ min_rows: 1 }), [], [])).toBeUndefined();
+    });
+
+    test("question_entries — the controller's answer gives the cells: #gpio-cells 1, 2, 3, and a controller the tree lacks", () => {
+        const flags = GPIO_MACROS.map(({ name, value }) => ({ value: name, display_string: `${name} (${value})` }));
+        const line = { kind: "number" as const, label: "line" };
+        const entries = question_entries(gpio_info({ min_rows: 1, max_rows: 1 }), [], gpio_others, () => [{ kind: "number" }]);
+        expect(entries?.[0]?.after?.("gpio")).toEqual([line]);
+        const of = (cells?: ReturnType<typeof gpio_row_cells>) => question_entries(gpio_info({ min_rows: 1 }), [], gpio_others, () => cells)?.[0]?.after?.("gpio");
+        expect(of([{ kind: "number" }, { kind: "flags", macros: GPIO_MACROS }])).toEqual([line, { options: flags, default: "GPIO_ACTIVE_HIGH", label: "flags" }]);
+        expect(of([{ kind: "number" }, { kind: "number" }, { kind: "flags", macros: GPIO_MACROS }])).toEqual([line, { kind: "number", label: "cell 2" }, { options: flags, default: "GPIO_ACTIVE_HIGH", label: "flags" }]);
+        // No #gpio-cells to read: a line and the flags.
+        expect(of()).toEqual([line, { options: flags, default: "GPIO_ACTIVE_HIGH", label: "flags" }]);
+    });
+
+    test("question_entries — a gpio property whose controller is set (no phandle options) is not a row question", () => {
+        const set = info({ kind: "array", items: number, min_items: 1, max_items: 4 }, { gpio_rows: { min_rows: 1, max_rows: 4 } });
+        expect(question_entries(set, [], [])).toBeUndefined();
+    });
+
+    test("gpio_rows_text — the count of rows, nothing for exactly one", () => {
+        expect(gpio_rows_text({ min_rows: 6, max_rows: 6 })).toBe("6");
+        expect(gpio_rows_text({ min_rows: 1, max_rows: 4 })).toBe("1..4");
+        expect(gpio_rows_text({ min_rows: 1 })).toBe("one or more");
+        expect(gpio_rows_text({ min_rows: 2 })).toBe("2 or more");
+        expect(gpio_rows_text({ min_rows: 1, max_rows: 1 })).toBeUndefined();
     });
 }

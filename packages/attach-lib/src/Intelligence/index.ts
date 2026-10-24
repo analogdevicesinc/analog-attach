@@ -21,6 +21,8 @@ export {
     is_gpio_property,
     INTERRUPT_MACROS,
     GPIO_MACROS,
+    gpio_row_cells,
+    type GpioRowCell,
     type MacroDefinition,
 } from "./query.js";
 

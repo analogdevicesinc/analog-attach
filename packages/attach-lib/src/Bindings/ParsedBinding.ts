@@ -6,6 +6,8 @@ export type ResolvedProperty = {
     value: AttachType,
     /** Concrete candidate values contributed by intelligence layers (e.g. a board description). */
     suggestions?: ValueSuggestion[],
+    /** For a `*-gpios` property: how many rows (controller + cells) it takes, as the binding sizes it (set by the devicetree layer). */
+    gpio_rows?: { min_rows: number; max_rows?: number },
 }
 
 export type PatternPropertyRule = {

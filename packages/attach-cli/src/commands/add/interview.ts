@@ -12,6 +12,16 @@ export interface Entry {
     several?: boolean;
     /** What Enter takes: one of `options` when there are. */
     default?: string;
+    /** What this entry is called in a row's prompt (`controller`, `line`, `flags`). */
+    label?: string;
+    /** The entries that follow once this one is answered (its answer shapes them: a gpio controller's `#gpio-cells`); they replace the ones after it. */
+    after?: (answer: string) => Entry[];
+}
+
+/** A property of several rows, each asked as `entries` are: a fixed count, or one row and then "another?" up to `max_rows`. */
+export interface Rows {
+    min_rows: number;
+    max_rows?: number;
 }
 
 export interface Question {
@@ -21,6 +31,8 @@ export interface Question {
     suggestions: Suggestion[];
     /** Ask entry by entry instead of the whole value on one line. */
     entries?: Entry[];
+    /** `entries` is one row of this many: asked again for each row, the first entry defaulting to the previous row's answer. */
+    rows?: Rows;
 }
 
 export type Answer =
@@ -165,18 +177,62 @@ export async function run_interview(missing: string[], steps: InterviewSteps, io
 
     let completions: string[] = [];
     const { write, read_line, close } = open_prompt(io, line => completions.filter(c => c.startsWith(line)));
-    /** Each entry on its own line; a wrong answer asks that entry again. */
-    const ask_entries = async (property: string, entries: Entry[]): Promise<Answer> => {
+    /** One value per entry, each on its own line; a wrong answer asks that entry again. An answered entry can reshape the ones after it. */
+    const ask_row = async (entries_of_row: Entry[], prompt_of: (entry: Entry, index: number, count: number) => string, carried?: string): Promise<Answer & { head?: string }> => {
+        let entries = entries_of_row;
         const tokens: string[] = [];
-        for (const [index, entry] of entries.entries()) {
+        let head: string | undefined;
+        for (let index = 0; index < entries.length; index++) {
+            const listed = entries[index]!;
+            // The first entry of a later row takes the previous row's answer on Enter.
+            const entry = index === 0 && carried !== undefined && listed.options?.some(o => o.value === carried) === true ? { ...listed, default: carried } : listed;
             completions = entry.options?.map(o => o.value) ?? [];
             if (entry.options !== undefined) { for (const line of option_lines(entry.options)) { write(`${line}\n`); } }
             for (;;) {
-                const answer = interpret_entry(await read_line(entry_prompt(property, entry, index, entries.length)), entry);
+                const answer = interpret_entry(await read_line(prompt_of(entry, index, entries.length)), entry);
                 if (answer.kind === "again") { write(`${answer.message}\n`); continue; }
                 if (answer.kind !== "value") { return answer; }
                 tokens.push(...answer.tokens);
+                if (index === 0) { head = answer.tokens[0]; }
+                if (entry.after !== undefined) { entries = [...entries.slice(0, index + 1), ...entry.after(answer.tokens[0] ?? "")]; }
                 break;
+            }
+        }
+        return { kind: "value", tokens, ...(head === undefined ? {} : { head }) };
+    };
+    /** "another?" after a row: Enter is done, y adds one. */
+    const ask_another = async (property: string): Promise<boolean | undefined> => {
+        for (;;) {
+            const line = await read_line(`${property}: another row? (y adds one, Enter = done) `);
+            if (line === undefined) { return undefined; }
+            const answer = line.trim().toLowerCase();
+            if (answer === "" || answer === "n" || answer === "-") { return false; }
+            if (answer === "y" || answer === "yes") { return true; }
+            write("Answer y for another row, or Enter when done\n");
+        }
+    };
+    const ask_entries = async (property: string, entries: Entry[]): Promise<Answer> => {
+        const answer = await ask_row(entries, (entry, index, count) => entry_prompt(property, entry, index, count));
+        return answer.kind === "value" ? { kind: "value", tokens: answer.tokens } : answer;
+    };
+    /** The rows of a property, comma-separated in the tokens: every row of a fixed count, else the minimum and "another?" up to the maximum. */
+    const ask_rows = async (property: string, entries: Entry[], rows: Rows): Promise<Answer> => {
+        const { min_rows, max_rows } = rows;
+        const tokens: string[] = [];
+        let carried: string | undefined;
+        for (let row = 1; ; row++) {
+            const place = max_rows === 1 ? property : `${property} row ${row}${max_rows !== undefined && max_rows === min_rows ? `/${max_rows}` : ""}`;
+            const answer = await ask_row(entries, (entry) => entry_prompt(entry.label === undefined ? place : `${place} ${entry.label}`, entry, 0, 1), carried);
+            if (answer.kind !== "value") { return answer; }
+            const last = tokens.length - 1;
+            if (last >= 0) { tokens[last] += ","; }
+            tokens.push(...answer.tokens);
+            carried = answer.head;
+            if (max_rows !== undefined && row >= max_rows) { break; }
+            if (row >= min_rows) {
+                const more = await ask_another(property);
+                if (more === undefined) { return { kind: "stop" }; }
+                if (!more) { break; }
             }
         }
         return { kind: "value", tokens };
@@ -196,7 +252,7 @@ export async function run_interview(missing: string[], steps: InterviewSteps, io
                     const first = question.suggestions[0]?.value;
                     answer = interpret_answer(await read_line(first === undefined ? `${property}: ` : `${property} [${first}]: `), question.suggestions);
                 } else {
-                    answer = await ask_entries(property, question.entries);
+                    answer = question.rows === undefined ? await ask_entries(property, question.entries) : await ask_rows(property, question.entries, question.rows);
                 }
                 if (answer.kind === "stop") {
                     if (io.terminal) { write("\n"); }
@@ -536,6 +592,74 @@ if (import.meta.vitest) {
     test("run_interview — - on any entry skips the property, Ctrl-D stops", async () => {
         expect(await diff_channels("0\n-\n")).toEqual({ set: [], skipped: ["diff-channels"], stopped: false });
         expect(await diff_channels("0\n")).toEqual({ set: [], skipped: [], stopped: true });
+    });
+
+    // A gpio row: the controller first, whose answer gives the cells after it (two for #gpio-cells = <2>).
+    const gpio_flags: Entry = { options: [{ value: "GPIO_ACTIVE_HIGH" }, { value: "GPIO_ACTIVE_LOW" }], default: "GPIO_ACTIVE_HIGH", label: "flags" };
+    const gpio_row: Entry[] = [{
+        options: [{ value: "gpio" }, { value: "expgpio" }],
+        default: "gpio",
+        label: "controller",
+        after: controller => controller === "gpio" ? [{ kind: "number", label: "line" }, gpio_flags] : [{ kind: "number", label: "line" }],
+    }];
+    /** An interview over one gpio property with `rows`, the answers already typed. */
+    const gpio_interview = async (rows: { min_rows: number; max_rows?: number }, answers: string[]) => {
+        const input = new PassThrough();
+        const output = new PassThrough();
+        let printed = "";
+        output.on("data", (chunk: Buffer) => { printed += chunk.toString(); });
+        const applied: string[] = [];
+        const steps: InterviewSteps = {
+            ask: (property) => Promise.resolve({ property, details: [], suggestions: [], entries: gpio_row, rows }),
+            apply: (property, tokens) => { applied.push(`${property}=${tokens.join(" ")}`); return Promise.resolve({ ok: true, lines: ["Set it"] }); },
+        };
+        input.end(answers.map(answer => `${answer}\n`).join(""));
+        const result = await run_interview(["ctrl-gpios"], steps, { input, output, terminal: false });
+        return { result, applied, printed };
+    };
+
+    test("run_interview — one row: the controller's answer gives the cells that follow", async () => {
+        const { applied, printed } = await gpio_interview({ min_rows: 1, max_rows: 1 }, ["", "5", "b"]);
+        expect(applied).toEqual(["ctrl-gpios=gpio 5 GPIO_ACTIVE_LOW"]);
+        expect(printed).toContain("ctrl-gpios controller [a]: \n");
+        expect(printed).toContain("ctrl-gpios line: 5\n");
+        expect(printed).toContain("ctrl-gpios flags [a]: b\n");
+        // The other controller has a single cell: its row has no flags.
+        const expgpio = await gpio_interview({ min_rows: 1, max_rows: 1 }, ["b", "7"]);
+        expect(expgpio.applied).toEqual(["ctrl-gpios=expgpio 7"]);
+    });
+
+    test("run_interview — a fixed row count asks every row without \"another?\", the later rows' controller defaulting to the previous one", async () => {
+        const { applied, printed } = await gpio_interview({ min_rows: 2, max_rows: 2 }, ["b", "1", "", "2"]);
+        expect(applied).toEqual(["ctrl-gpios=expgpio 1, expgpio 2"]);
+        expect(printed).toContain("ctrl-gpios row 1/2 controller [a]: b\n");
+        expect(printed).toContain("ctrl-gpios row 2/2 controller [b]: \n");
+        expect(printed).not.toContain("another");
+    });
+
+    test("run_interview — an unsized property asks a row, then another? until Enter", async () => {
+        const { applied, printed } = await gpio_interview({ min_rows: 1 }, ["", "5", "b", "y", "", "6", "", ""]);
+        expect(applied).toEqual(["ctrl-gpios=gpio 5 GPIO_ACTIVE_LOW, gpio 6 GPIO_ACTIVE_HIGH"]);
+        expect(printed).toContain("ctrl-gpios: another row? (y adds one, Enter = done) y\n");
+        expect(printed).toContain("ctrl-gpios row 2 controller [a]: \n");
+        expect(printed.endsWith("ctrl-gpios: another row? (y adds one, Enter = done) \nSet it\n")).toBe(true);
+    });
+
+    test("run_interview — a range asks the minimum, then another? up to the maximum", async () => {
+        // 2..3 rows: no question after the first, one after the second, none after the third.
+        const { applied, printed } = await gpio_interview({ min_rows: 2, max_rows: 3 }, ["", "1", "", "", "2", "", "y", "", "3", ""]);
+        expect(applied).toEqual(["ctrl-gpios=gpio 1 GPIO_ACTIVE_HIGH, gpio 2 GPIO_ACTIVE_HIGH, gpio 3 GPIO_ACTIVE_HIGH"]);
+        expect(printed.match(/another row/g)).toHaveLength(1);
+    });
+
+    test("run_interview — a stray answer to another? asks again, - skips, Ctrl-D stops", async () => {
+        const stray = await gpio_interview({ min_rows: 1 }, ["", "5", "", "maybe", ""]);
+        expect(stray.applied).toEqual(["ctrl-gpios=gpio 5 GPIO_ACTIVE_HIGH"]);
+        expect(stray.printed).toContain("Answer y for another row, or Enter when done\n");
+        const skipped = await gpio_interview({ min_rows: 2, max_rows: 2 }, ["", "5", "", "-"]);
+        expect(skipped.result).toEqual({ set: [], skipped: ["ctrl-gpios"], stopped: false });
+        const stopped = await gpio_interview({ min_rows: 1 }, ["", "5", ""]);
+        expect(stopped.result).toEqual({ set: [], skipped: [], stopped: true });
     });
 
     const parents: Suggestion[] = [
