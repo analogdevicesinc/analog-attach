@@ -94,10 +94,10 @@ const SKIP_DIRS = new Set([
     "__pycache__", "venv", ".venv", "build", "dist",
 ]);
 
-function find_linux_trees(): string[] {
-    const home = os.homedir();
+/** The Linux trees under `root` (any directory with `Documentation/devicetree/bindings/` and `include/`, whatever its name), breadth first. */
+function find_linux_trees(root = os.homedir()): string[] {
     const results: string[] = [];
-    const queue: { dir: string; depth: number }[] = [{ dir: home, depth: 0 }];
+    const queue: { dir: string; depth: number }[] = [{ dir: root, depth: 0 }];
     const MAX_DEPTH = 4;
     const MAX_RESULTS = 10;
     const start = Date.now();
@@ -112,7 +112,7 @@ function find_linux_trees(): string[] {
 
         let entries: fs.Dirent[];
         try {
-            entries = fs.readdirSync(item.dir, { withFileTypes: true });
+            entries = fs.readdirSync(item.dir, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name));
         } catch { continue; }
 
         for (const entry of entries) {
@@ -121,10 +121,8 @@ function find_linux_trees(): string[] {
 
             const full = path.join(item.dir, entry.name);
 
-            if (entry.name === "linux" || entry.name.startsWith("linux-")) {
-                if (linux_tree_problem(full) === undefined) {
-                    results.push(full);
-                }
+            if (linux_tree_problem(full) === undefined) {
+                results.push(full);
                 continue;
             }
 
@@ -471,6 +469,20 @@ if (import.meta.vitest) {
         expect(picked_index("aa", 30)).toBe(26);
         expect(code_range(1)).toBe("a");
         expect(code_range(3)).toBe("a to c");
+    });
+
+    test("find_linux_trees — any directory with the bindings and include/, not only one named linux", () => {
+        const root = fs.mkdtempSync(path.join(os.tmpdir(), "attach-setup-"));
+        try {
+            for (const tree of ["linux_adi", path.join("src", "kernel")]) {
+                fs.mkdirSync(path.join(root, tree, "Documentation", "devicetree", "bindings"), { recursive: true });
+                fs.mkdirSync(path.join(root, tree, "include"));
+            }
+            fs.mkdirSync(path.join(root, "linux-docs", "Documentation", "devicetree", "bindings"), { recursive: true });
+            expect(find_linux_trees(root)).toEqual([path.join(root, "linux_adi"), path.join(root, "src", "kernel")]);
+        } finally {
+            fs.rmSync(root, { recursive: true });
+        }
     });
 
     test("check_linux — a Linux tree is accepted, a missing path or another directory is not", () => {

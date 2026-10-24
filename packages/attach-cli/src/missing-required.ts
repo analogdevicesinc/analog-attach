@@ -105,12 +105,12 @@ export function question_entries(
         const options = [...suggestions, ...others.filter(o => !disabled(o)), ...others.filter(o => disabled(o))];
         const first = options[0];
         if (first === undefined) { return undefined; }
-        return [{ options, ...(disabled(first) ? {} : { default: first.value }), label: "controller", after: controller => gpio_cell_entries(row_cells(controller)) }];
+        return [{ options, ...(disabled(first) ? {} : { default: first.value }), label: "controller", reference: true, after: controller => gpio_cell_entries(row_cells(controller)) }];
     }
     const first = suggestions[0]?.value;
     if (info.phandle_options !== undefined) {
         const options = [...suggestions, ...others];
-        return options.length === 0 ? undefined : [{ options, ...(first === undefined ? {} : { default: first }) }];
+        return options.length === 0 ? undefined : [{ options, ...(first === undefined ? {} : { default: first }), reference: true }];
     }
     const enum_entry = (type: Extract<Types, { kind: "enum" }>, fallback: string | undefined): Entry => {
         const options = enum_suggestions(type, suggestions);
@@ -407,8 +407,8 @@ if (import.meta.vitest) {
         const parent = info({ kind: "enum", options: [{ value: "gicv2" }, { value: "gpio" }, { value: "aon_intr" }] }, { phandle_options: ["gicv2", "gpio", "aon_intr"] });
         const others = [{ value: "aon_intr", display_string: "aon_intr (disabled)" }];
         expect(question_entries(parent, [{ value: "gicv2" }, { value: "gpio" }], others))
-            .toEqual([{ options: [{ value: "gicv2" }, { value: "gpio" }, ...others], default: "gicv2" }]);
-        expect(question_entries(parent, [], others)).toEqual([{ options: others }]);
+            .toEqual([{ options: [{ value: "gicv2" }, { value: "gpio" }, ...others], default: "gicv2", reference: true }]);
+        expect(question_entries(parent, [], others)).toEqual([{ options: others, reference: true }]);
         expect(question_entries(parent, [], [])).toBeUndefined();
     });
 
