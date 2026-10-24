@@ -293,8 +293,7 @@ export function build_update_command(context_: LocalContext): Command {
         .argument("[path]", "Path to node (label, label-first, or absolute)")
         .argument("[property]", "Property name")
         .argument("[value...]", "Value tokens (omit to read or set a flag)")
-        .option("--quiet", "When reading: print only the value, as 'read --quiet' does")
-        .option("--no-interview", "When creating a child node: list its missing required properties instead of asking for them")
+        .option("--quiet", "When reading: print only the value, as 'read --quiet' does. When creating a child node: list its missing required properties instead of asking for them")
         .addHelpText("after", `
 Paths:
   Label:        spi0                       (a label in the base tree)
@@ -313,7 +312,7 @@ Special cases:
   No value     Sets a flag property, or reads the current value (as 'read' does)
   Child name   'update <path> <child-name>' creates a child node, then asks
                for its missing required properties on a terminal
-               (--no-interview lists them instead)
+               (--quiet lists them instead)
   reg          'update <path> reg <n>' also renames the node's unit address
 
 Examples:
@@ -322,7 +321,7 @@ Examples:
   $ attach-linux update spi0/adi,ad7124-8@0 interrupts 25 IRQ_TYPE_EDGE_FALLING
   $ attach-linux update spi0/adi,ad7124-8@0 io-channels 0 1 , 2 3
   $ attach-linux update spi0/adi,ad7124-8@0 channel@0`)
-        .action(async (path_argument: string | undefined, property_argument: string | undefined, value_arguments: string[], options: { quiet?: boolean; interview: boolean }) => {
+        .action(async (path_argument: string | undefined, property_argument: string | undefined, value_arguments: string[], options: { quiet?: boolean }) => {
             if (path_argument === undefined) {
                 const message = "Missing: path";
                 if (context_.json) { input_error(message); } else { console.log(message); }
@@ -430,7 +429,7 @@ Examples:
                         return;
                     }
                     console.log(message);
-                    await ask_for_missing(child, missing, { interview: options.interview });
+                    await ask_for_missing(child, missing, { interview: options.quiet !== true });
                     return;
                 }
                 // Fall through to property handling (creates a flag for unknown names)

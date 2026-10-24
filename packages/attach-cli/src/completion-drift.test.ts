@@ -201,7 +201,7 @@ describe("__complete delegates dynamic values to suggest in-process", () => {
         expect(short_description("fan-", "fan-… (child node ^fan-[0-9]+$)")).toBe("child node ^fan-[0-9]+$");
         expect(short_description("aon_intr", "aon_intr (disabled)")).toBe("disabled");
         expect(short_description("reg", "reg")).toBeUndefined();
-        expect(short_description("gpio", "gpio — interrupt controller (only right if wired to it)")).toBe("gpio — interrupt controller (only right if wired to it)");
+        expect(short_description("gpio", "gpio — interrupt controller, #interrupt-cells = <2>")).toBe("gpio — interrupt controller, #interrupt-cells = <2>");
         expect(short_description("spi0/", "/soc/spi@0")).toBe("/soc/spi@0");
     });
 

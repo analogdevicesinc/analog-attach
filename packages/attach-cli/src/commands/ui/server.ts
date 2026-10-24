@@ -131,8 +131,10 @@ export function create_ui_server(options: UiServerOptions): http.Server {
                 const checked = check_request(parse_json(body));
                 if ("error" in checked) { send(response, 400, checked); return; }
                 const [command] = checked.run;
-                // There is no terminal behind the page to ask the missing-properties questions.
-                const extra = command === "add" || command === "update" ? ["--no-interview"] : [];
+                // There is no terminal behind the page to ask the missing-properties questions. Runs are
+                // --json, which never asks; `add` still gets --quiet. `update` doesn't: there --quiet also
+                // means "value only" for a read, and creating a child never asks under --json.
+                const extra = command === "add" ? ["--quiet"] : [];
                 const result = await run([...checked.run, ...extra]);
                 send(response, 200, { code: result.code, json: parse_json(result.stdout), stdout: result.stdout, stderr: result.stderr });
                 return;
@@ -190,12 +192,13 @@ if (import.meta.vitest) {
         expect(response).toBe(403);
     });
 
-    test("add and update run without the interview, the result carries stdout, stderr and the parsed JSON", async () => {
+    test("add runs without the interview; update keeps its read output, the result carries stdout, stderr and the parsed JSON", async () => {
         const calls: string[][] = [];
         const base = await start(async arguments_ => { calls.push(arguments_); return { code: 0, stdout: '{"ok":true}', stderr: "warning: x" }; });
         const response = await post(base, { command: "update", args: ["adc", "reg", "1"] });
         const body = await response.json() as { json: unknown; stderr: string };
-        expect(calls).toEqual([["update", "adc", "reg", "1", "--no-interview"]]);
+        await post(base, { command: "add", args: ["adi,ad7124-8"] });
+        expect(calls).toEqual([["update", "adc", "reg", "1"], ["add", "adi,ad7124-8", "--quiet"]]);
         expect(body).toMatchObject({ json: { ok: true }, stderr: "warning: x" });
     });
 

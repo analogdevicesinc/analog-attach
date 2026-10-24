@@ -59,7 +59,7 @@ const enum_suggestions = (type: Extract<Types, { kind: "enum" }>, suggestions: S
     type.options.map(({ value }) => suggestions.find(s => s.value === String(value)) ?? { value: String(value) });
 
 /**
- * How the interview asks for a property: a numbered list for a closed set (an
+ * How the interview asks for a property: a lettered list for a closed set (an
  * enum, the nodes a phandle can name), and one entry per line for a fixed-size
  * array (diff-channels, interrupts once its parent is known). Undefined: the
  * whole value on one line. Enter takes the first suggestion (for a fixed-size
@@ -164,7 +164,7 @@ if (import.meta.vitest) {
     const number: Types = { kind: "number", subtype: "int" };
     const irq_types: Types = { kind: "enum", options: [{ value: "IRQ_TYPE_NONE" }, { value: "IRQ_TYPE_EDGE_RISING" }] };
 
-    test("question_entries — an enum is one numbered pick, the first suggestion (the binding's default) taken by Enter", () => {
+    test("question_entries — an enum is one lettered pick, the first suggestion (the binding's default) taken by Enter", () => {
         const reference = info({ kind: "enum", options: [{ value: 0 }, { value: 1 }, { value: 3 }] });
         expect(question_entries(reference, [{ value: "3", display_string: "3 — the binding's default" }, { value: "0" }, { value: "1" }], [])).toEqual([{
             options: [{ value: "0" }, { value: "1" }, { value: "3", display_string: "3 — the binding's default" }],
@@ -182,7 +182,7 @@ if (import.meta.vitest) {
         expect(question_entries(parent, [], [])).toBeUndefined();
     });
 
-    test("question_entries — a fixed-size array, one entry per cell: interrupts is a number then a numbered IRQ type", () => {
+    test("question_entries — a fixed-size array, one entry per cell: interrupts is a number then a lettered IRQ type", () => {
         const interrupts = info({ kind: "array", items: { kind: "tuple", items: [number, irq_types] }, min_items: 2, max_items: 2 });
         expect(question_entries(interrupts, [], [])).toEqual([
             { kind: "number" },

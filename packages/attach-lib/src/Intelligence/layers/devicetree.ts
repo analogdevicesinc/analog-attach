@@ -70,7 +70,6 @@ function suggest_interrupt_parents(
             rows: [[{ label }]],
             display: `${label} — interrupt controller, #interrupt-cells = <${cells ?? "?"}>`,
             source: "devicetree",
-            note: "only right if the device's interrupt line is wired to this controller",
         });
     }
 
@@ -79,8 +78,7 @@ function suggest_interrupt_parents(
 
 /**
  * Clock and supply providers the base tree already has. The board can't say
- * which one feeds the device (it is external hardware), so each candidate is
- * only valid if it is actually wired to the device.
+ * which one feeds the device (it is external hardware).
  */
 function suggest_labelled_providers(property: string, devicetree: DeviceTree): ValueSuggestion[] {
     if (property === "clocks") {
@@ -88,7 +86,6 @@ function suggest_labelled_providers(property: string, devicetree: DeviceTree): V
             rows: [[{ label }]],
             display: `${label} — ${describe_clock(node)}`,
             source: "devicetree",
-            note: "from the context devicetree: only right if this clock is actually wired to the device",
         }));
     }
     if (property.endsWith("-supply")) {
@@ -96,7 +93,6 @@ function suggest_labelled_providers(property: string, devicetree: DeviceTree): V
             rows: [[{ label }]],
             display: `${label} — ${describe_regulator(node)}`,
             source: "devicetree",
-            note: "from the context devicetree: only right if this supply actually powers the device",
         }));
     }
     return [];
@@ -201,13 +197,12 @@ if (import.meta.vitest) {
             rows: [[{ label: "clk_osc" }]],
             display: `clk_osc — fixed-clock "osc" 54 MHz`,
             source: "devicetree",
-            note: "from the context devicetree: only right if this clock is actually wired to the device",
         }]);
     });
 
     test("devicetree_layer — *-supply: labelled fixed regulators with their voltage", () => {
         expect(values("vref-supply").map(s => s.display)).toStrictEqual([`vdd_3v3_reg — regulator "3v3", 3.3 V, always on`]);
-        expect(values("vref-supply")[0]?.note).toBe("from the context devicetree: only right if this supply actually powers the device");
+        expect(values("vref-supply")[0]?.note).toBeUndefined();
     });
 
     test("devicetree_layer — on a merged tree, the overlay's providers and the ones it enables count", async () => {
@@ -282,7 +277,7 @@ if (import.meta.vitest) {
         expect(result[0]!.display).toContain("gicv2");
         expect(result[0]!.display).toContain("inherited");
         expect(result[1]!.display).toContain("gpio");
-        expect(result[1]!.note).toContain("only right if");
+        expect(result[1]!.note).toBeUndefined();
         expect(result.every(s => !s.display.includes("no_label_intc"))).toBe(true);
         expect(result.every(s => !s.display.includes("disabled_intc"))).toBe(true);
     });

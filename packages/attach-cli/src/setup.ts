@@ -3,6 +3,7 @@ import * as fs from "node:fs";
 import path from "node:path";
 import * as os from "node:os";
 
+import { code_index, pick_code } from "./commands/add/interview";
 import { reload_caches } from "./config/rebuild";
 import { read_settings, save_settings } from "./config/settings";
 import { format_config_errors, linux_tree_problem } from "./config/workspace";
@@ -50,6 +51,25 @@ function create_rl(): readline.Interface {
         output: process.stdout,
         completer: path_completer,
     });
+}
+
+/** The letter that picks the option at `index` in a list: `a)`. */
+const code_label = (index: number): string => cyan(`${pick_code(index)})`);
+
+/** The index of the option a pick code names, when the list has it. */
+function picked_index(answer: string, count: number): number | undefined {
+    const index = code_index(answer);
+    return index !== undefined && index < count ? index : undefined;
+}
+
+/** "a", "a to c": the codes of a list of `count` options. */
+const code_range = (count: number): string => count === 1 ? pick_code(0) : `${pick_code(0)} to ${pick_code(count - 1)}`;
+
+/** An answer that is a path rather than a pick: it has a slash or starts with ~ or a dot. */
+const looks_like_path = (answer: string): boolean => answer.includes("/") || answer.startsWith("~") || answer.startsWith(".");
+
+function expand_home(answer: string): string {
+    return answer === "~" || answer.startsWith("~/") ? path.join(os.homedir(), answer.slice(1)) : answer;
 }
 
 function question(rl: readline.Interface, prompt: string): Promise<string> {
@@ -126,22 +146,26 @@ async function step_linux(rl: readline.Interface): Promise<string> {
     if (trees.length > 0) {
         console.log("Found Linux source trees:");
         for (const [index, tree] of trees.entries()) {
-            console.log(`  ${cyan(`${index + 1})`)} ${tree}`);
+            console.log(`  ${code_label(index)} ${tree}`);
         }
-        console.log(`  ${cyan("m)")} Enter path manually`);
+        console.log("");
+        console.log(dim("Pick one by its letter, or type a path."));
         console.log("");
 
         while (true) {
-            const answer = await question(rl, `Choose [1]: `);
-            const choice = answer === "" ? "1" : answer;
+            const answer = await question(rl, `Choose [${pick_code(0)}]: `);
+            const choice = answer === "" ? pick_code(0) : answer;
 
-            if (choice === "m" || choice === "M") {
-                return await ask_linux_path(rl);
+            if (looks_like_path(choice)) {
+                const resolved = linux_path_problem(choice);
+                if (typeof resolved === "string") { return resolved; }
+                console.log(resolved.problem);
+                continue;
             }
 
-            const index = Number.parseInt(choice, 10) - 1;
-            if (Number.isNaN(index) || index < 0 || index >= trees.length) {
-                console.log(`Please enter 1-${trees.length} or m for manual entry.`);
+            const index = picked_index(choice, trees.length);
+            if (index === undefined) {
+                console.log(`Please enter ${code_range(trees.length)}, or a path.`);
                 continue;
             }
 
@@ -155,6 +179,16 @@ async function step_linux(rl: readline.Interface): Promise<string> {
     }
 }
 
+/** The resolved path of a Linux tree, or what is wrong with the answer. */
+function linux_path_problem(answer: string): string | { problem: string } {
+    const resolved = path.resolve(expand_home(answer));
+    if (!fs.existsSync(resolved)) { return { problem: `Path does not exist: ${resolved}` }; }
+    const problem = linux_tree_problem(resolved);
+    if (problem !== undefined) { return { problem }; }
+    console.log(`Selected: ${resolved}`);
+    return resolved;
+}
+
 async function ask_linux_path(rl: readline.Interface): Promise<string> {
     console.log("");
     console.log(dim("Tab-complete available. Path must contain Documentation/devicetree/bindings/ and include/."));
@@ -162,21 +196,9 @@ async function ask_linux_path(rl: readline.Interface): Promise<string> {
         const answer = await question(rl, "Linux source path: ");
         if (answer === "") { continue; }
 
-        const resolved = path.resolve(answer);
-
-        if (!fs.existsSync(resolved)) {
-            console.log(`Path does not exist: ${resolved}`);
-            continue;
-        }
-
-        const problem = linux_tree_problem(resolved);
-        if (problem !== undefined) {
-            console.log(problem);
-            continue;
-        }
-
-        console.log(`Selected: ${resolved}`);
-        return resolved;
+        const resolved = linux_path_problem(answer);
+        if (typeof resolved === "string") { return resolved; }
+        console.log(resolved.problem);
     }
 }
 
@@ -235,7 +257,7 @@ async function interactive_dts_search(rl: readline.Interface, linux_path: string
     console.log("");
     console.log("Architectures with device tree files:");
     for (const [index, arch_] of archs.entries()) {
-        console.log(`  ${cyan(`${index + 1})`)} ${arch_}`);
+        console.log(`  ${code_label(index)} ${arch_}`);
     }
     console.log("");
 
@@ -244,8 +266,8 @@ async function interactive_dts_search(rl: readline.Interface, linux_path: string
         const answer = await question(rl, "Architecture: ");
         if (answer === "") { continue; }
 
-        const index = Number.parseInt(answer, 10) - 1;
-        if (!Number.isNaN(index) && index >= 0 && index < archs.length) {
+        const index = picked_index(answer, archs.length);
+        if (index !== undefined) {
             arch = archs[index]!;
             break;
         }
@@ -253,7 +275,7 @@ async function interactive_dts_search(rl: readline.Interface, linux_path: string
         const match = archs.find(a => a === answer);
         if (match !== undefined) { arch = match; break; }
 
-        console.log(`Please enter 1-${archs.length} or an architecture name.`);
+        console.log(`Please enter ${code_range(archs.length)}, or an architecture name.`);
     }
 
     console.log(`Scanning ${arch}/boot/dts/...`);
@@ -264,7 +286,7 @@ async function interactive_dts_search(rl: readline.Interface, linux_path: string
     }
     console.log(`Found ${all_files.length} .dts files.`);
     console.log("");
-    console.log(dim("Type to filter, or enter a number to pick from the list."));
+    console.log(dim("Type to filter, or enter a letter to pick from the list."));
     console.log(dim('Type "back" to go back to architecture selection.'));
 
     let current_matches = all_files;
@@ -274,14 +296,14 @@ async function interactive_dts_search(rl: readline.Interface, linux_path: string
         if (current_matches.length <= MAX_DISPLAYED) {
             console.log("");
             for (const [index_, current_match] of current_matches.entries()) {
-                console.log(`  ${cyan(`${index_ + 1})`)} ${current_match}`);
+                console.log(`  ${code_label(index_)} ${current_match}`);
             }
             console.log("");
         } else {
             console.log("");
             console.log(`${current_matches.length} matches. Showing first ${MAX_DISPLAYED}:`);
             for (let index_ = 0; index_ < MAX_DISPLAYED; index_++) {
-                console.log(`  ${cyan(`${index_ + 1})`)} ${current_matches[index_]}`);
+                console.log(`  ${code_label(index_)} ${current_matches[index_]}`);
             }
             console.log(dim(`  ... and ${current_matches.length - MAX_DISPLAYED} more. Type to narrow.`));
             console.log("");
@@ -294,8 +316,8 @@ async function interactive_dts_search(rl: readline.Interface, linux_path: string
             return await interactive_dts_search(rl, linux_path);
         }
 
-        const index = Number.parseInt(answer, 10) - 1;
-        if (!Number.isNaN(index) && index >= 0 && index < current_matches.length && index < MAX_DISPLAYED) {
+        const index = picked_index(answer, Math.min(current_matches.length, MAX_DISPLAYED));
+        if (index !== undefined) {
             const selected = current_matches[index]!;
             const absolute = path.join(linux_path, "arch", arch, "boot", "dts", selected);
             console.log(`Selected: ${absolute}`);
@@ -349,28 +371,28 @@ async function step_context(rl: readline.Interface, linux_path: string): Promise
     console.log(bold("Step 2: Base device tree (context)"));
     console.log("");
     console.log("Choose how to select the base .dts file:");
-    console.log(`  ${cyan("1)")} Search in the Linux tree`);
-    console.log(`  ${cyan("2)")} Enter path manually`);
-    console.log(`  ${cyan("3)")} Export from remote device ${dim("(coming soon)")}`);
+    console.log(`  ${code_label(0)} Search in the Linux tree`);
+    console.log(`  ${code_label(1)} Enter path manually`);
+    console.log(`  ${code_label(2)} Export from remote device ${dim("(coming soon)")}`);
     console.log("");
 
     while (true) {
-        const answer = await question(rl, "Choose [1]: ");
-        const choice = answer === "" ? "1" : answer;
+        const answer = await question(rl, `Choose [${pick_code(0)}]: `);
+        const choice = answer === "" ? pick_code(0) : answer;
 
-        switch (choice) {
-            case "1": {
+        switch (picked_index(choice, 3)) {
+            case 0: {
                 return await interactive_dts_search(rl, linux_path);
             }
-            case "2": {
+            case 1: {
                 return await ask_dts_path(rl);
             }
-            case "3": {
+            case 2: {
                 console.log("Not yet available. Please choose another option.");
                 continue;
             }
             default: {
-                console.log("Please enter 1, 2, or 3.");
+                console.log("Please enter a, b, or c.");
             }
         }
     }
@@ -441,4 +463,23 @@ export async function run_setup(): Promise<void> {
     } finally {
         rl.close();
     }
+}
+
+if (import.meta.vitest) {
+    const { test, expect } = import.meta.vitest;
+
+    test("picked_index — a letter in range picks, a number or a letter past the list does not", () => {
+        expect(picked_index("a", 3)).toBe(0);
+        expect(picked_index("c", 3)).toBe(2);
+        expect(picked_index("d", 3)).toBeUndefined();
+        expect(picked_index("1", 3)).toBeUndefined();
+        expect(picked_index("aa", 30)).toBe(26);
+        expect(code_range(1)).toBe("a");
+        expect(code_range(3)).toBe("a to c");
+    });
+
+    test("looks_like_path — a slash, ~ or a leading dot makes the answer a path", () => {
+        expect(["/home/me/linux", "~/linux", "./linux", "../linux", "linux/"].map(answer => looks_like_path(answer))).toEqual([true, true, true, true, true]);
+        expect(["a", "arm", "b"].map(answer => looks_like_path(answer))).toEqual([false, false, false]);
+    });
 }

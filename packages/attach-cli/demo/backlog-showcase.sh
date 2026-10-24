@@ -166,7 +166,7 @@ step "Free the chip select" \
 
 step "Names from binding patterns" \
     "The ADT7475 binding names some properties by a regex (^adi,bypass-attenuator-in[0-4]\$). list property shows the names each pattern matches, and which are set." \
-    "add adi,adt7475 --parent i2c1 --name hwmon@2e --label hwmon --no-interview" \
+    "add adi,adt7475 --parent i2c1 --name hwmon@2e --label hwmon --quiet" \
     "update hwmon adi,bypass-attenuator-in1 1" \
     "list property hwmon"
 
@@ -177,12 +177,12 @@ complete_step "Completion knows the patterns" \
 
 step "Copy the binding's example" \
     "--from-example copies the node from the binding's example for the bus: name, reg, channels and references as written. The example is for the AD7124-4, so the compatible is replaced. Its references that name nothing in the base come back as errors, with the fix." \
-    "add adi,ad7124-8 --parent spi1 --from-example --no-interview" \
+    "add adi,ad7124-8 --parent spi1 --from-example --quiet" \
     "read ad7124_8 --quiet"
 
 step "Add the missing reference" \
     "A fixed regulator labelled adc_vref resolves the reference. read on the new node lists the required property it still lacks." \
-    "add regulator-fixed --label adc_vref --no-interview" \
+    "add regulator-fixed --label adc_vref --quiet" \
     "read adc_vref" \
     "update adc_vref regulator-name vref" \
     "validate"

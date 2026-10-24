@@ -50,7 +50,7 @@ export function build_add_command(context_: LocalContext): Command {
         .option("--name <value>", "Node name override (e.g. adc@0); defaults to the compatible string")
         .option("--label <value>", "Label override (a label is generated automatically)")
         .option("--from-example", "Copy the node from the binding's example for the parent's bus")
-        .option("--no-interview", "Don't ask for the missing required properties; just list them")
+        .option("--quiet", "Don't ask for the missing required properties; just list them")
         .addHelpText("after", `
 Examples:
   $ attach-linux add adi,ad7124-8 --parent spi0
@@ -66,12 +66,13 @@ base or overlay are listed as errors to fix with update.
 On a terminal, add then asks for each required property that is still
 missing, showing the binding's description and suggestions: Enter takes the
 first suggestion, - skips one, Ctrl-D stops. Options (an enum, the nodes a
-phandle can name) are numbered: type the number, or the value. A fixed-size
+phandle can name) are lettered a, b, c, ...: type the letter, or the value
+(&label or "text" when the value itself looks like a letter). A fixed-size
 array (diff-channels, interrupts) is asked one entry per line. Piped runs,
---json and --no-interview list the missing properties instead.
+--json and --quiet list the missing properties instead.
 
 Use 'list device' to find compatible strings, 'list parent' to find valid buses.`)
-        .action(async (compatible: string, options: { parent?: string; name?: string; label?: string; fromExample?: boolean; interview: boolean }) => {
+        .action(async (compatible: string, options: { parent?: string; name?: string; label?: string; fromExample?: boolean; quiet?: boolean }) => {
             const report = (message: string): void => {
                 if (context_.json) { respond_fail({ ok: false, message, severity: "error" }); }
                 else { console.log(message); }
@@ -175,7 +176,7 @@ Use 'list device' to find compatible strings, 'list parent' to find valid buses.
             }
 
             console.log(`${added_message} to ${workfile.path}`);
-            await ask_for_missing(added_node, missing, { interview: options.interview });
+            await ask_for_missing(added_node, missing, { interview: options.quiet !== true });
         });
 }
 

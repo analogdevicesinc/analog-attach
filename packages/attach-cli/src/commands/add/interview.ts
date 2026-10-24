@@ -6,7 +6,7 @@ import type { Suggestion } from "../../protocol/types";
 export interface Entry {
     /** What a value typed out is, shown in the prompt of an entry of several. */
     kind?: "number" | "string";
-    /** A closed list (an enum, the nodes a phandle can name): numbered from 1, answered by its number or the value. */
+    /** A closed list (an enum, the nodes a phandle can name): lettered a, b, … (`pick_code`), answered by its letter or the value. */
     options?: Suggestion[];
     /** Several picks on one line, for an enum list of any length. */
     several?: boolean;
@@ -42,19 +42,45 @@ export function interpret_answer(line: string | undefined, suggestions: Suggesti
     return { kind: "value", tokens: tokens_of(value) };
 }
 
-/** The option a word picks: a number counts from 1, anything else is the value typed out (a label with or without &). */
-function pick_option(word: string, options: Suggestion[]): string | undefined {
-    if (/^\d+$/.test(word)) { return options[Number(word) - 1]?.value; }
-    return options.find(o => bare(o.value) === bare(word))?.value;
+/** The letter code of the option at `index`: a … z, then aa, ab, … az, ba, … as a spreadsheet counts its columns. */
+export function pick_code(index: number): string {
+    let code = "";
+    for (let rest = index + 1; rest > 0; rest = Math.floor((rest - 1) / 26)) {
+        code = String.fromCodePoint(97 + ((rest - 1) % 26)) + code;
+    }
+    return code;
 }
 
-/** An answer to one entry: Enter takes its default, a number picks from its options, "-" skips the property. */
+/** The option index a pick code names (the inverse of `pick_code`); undefined for a word that is not lower-case letters. */
+export function code_index(word: string): number | undefined {
+    if (!/^[a-z]+$/.test(word)) { return undefined; }
+    let rest = 0;
+    for (const letter of word) { rest = rest * 26 + (letter.codePointAt(0)! - 96); }
+    return rest - 1;
+}
+
+/** `pick a to f`, or `pick a` for a lone option. */
+const pick_range = (count: number): string => count === 1 ? `pick ${pick_code(0)}` : `pick ${pick_code(0)} to ${pick_code(count - 1)}`;
+
+/**
+ * The option a word picks. A pick code in range is always a pick; anything
+ * else must be the value typed out: a number, a label with or without `&`
+ * (`&ab` for a label that looks like a code), a string in quotes (`"a"`).
+ */
+function pick_option(word: string, options: Suggestion[]): string | undefined {
+    const index = code_index(word);
+    if (index !== undefined && index < options.length) { return options[index]?.value; }
+    const unquoted = word.replace(/^"(.*)"$/, "$1");
+    return options.find(o => bare(o.value) === bare(unquoted))?.value;
+}
+
+/** An answer to one entry: Enter takes its default, a letter picks from its options, "-" skips the property. */
 export function interpret_entry(line: string | undefined, entry: Entry): Answer {
     if (line === undefined) { return { kind: "stop" }; }
     const answer = line.trim();
     if (answer === "-") { return { kind: "skip" }; }
     const { options } = entry;
-    const range = options === undefined ? "" : `pick 1 to ${options.length}`;
+    const range = options === undefined ? "" : pick_range(options.length);
     if (answer === "") {
         if (entry.default !== undefined) { return { kind: "value", tokens: tokens_of(entry.default) }; }
         return { kind: "again", message: `No default: ${options === undefined ? "type a value" : range}, or - to skip` };
@@ -65,23 +91,23 @@ export function interpret_entry(line: string | undefined, entry: Entry): Answer 
     }
     if (words.length > 1 && entry.several !== true) { return { kind: "again", message: `One pick: ${range}` }; }
     const picked = words.map(word => pick_option(word, options));
-    if (picked.includes(undefined)) { return { kind: "again", message: `Not an option: ${range}, or type one of the values` }; }
+    if (picked.includes(undefined)) { return { kind: "again", message: `Not an option: ${range}, or type one of the values (&label or "text" for one that looks like a letter)` }; }
     return { kind: "value", tokens: picked.flatMap(value => tokens_of(value ?? "")) };
 }
 
-/** The options numbered from 1, with what each one is when the display says more than the value. */
+/** The options lettered a, b, …, with what each one is when the display says more than the value. */
 export function option_lines(options: Suggestion[]): string[] {
-    const width = String(options.length).length;
+    const width = pick_code(options.length - 1).length;
     return options.map(({ value, display_string: display = value }, index) =>
-        `  ${String(index + 1).padStart(width)}) ${display.startsWith(value) ? display : `${value}  ${display}`}`);
+        `  ${pick_code(index).padStart(width)}) ${display.startsWith(value) ? display : `${value}  ${display}`}`);
 }
 
-/** `interrupts 2/2 [3]: `: the entry's place when there are several, what it is, and what Enter takes (an option by its number). */
+/** `interrupts 2/2 [3]: `: the entry's place when there are several, what it is, and what Enter takes (an option by its letter). */
 export function entry_prompt(property: string, entry: Entry, index: number, count: number): string {
     const place = count === 1 ? property : `${property} ${index + 1}/${count}`;
     const kind = count > 1 && entry.kind !== undefined ? ` (${entry.kind})` : "";
     const position = entry.default === undefined ? -1 : (entry.options?.findIndex(o => o.value === entry.default) ?? -1);
-    const fallback = position === -1 ? entry.default : String(position + 1);
+    const fallback = position === -1 ? entry.default : pick_code(position);
     return `${place}${kind}${fallback === undefined ? "" : ` [${fallback}]`}: `;
 }
 
@@ -147,7 +173,7 @@ export async function run_interview(missing: string[], steps: InterviewSteps, io
     };
 
     const count = missing.length === 1 ? "1 required property" : `${missing.length} required properties`;
-    write(`${count} to set (Enter takes the first suggestion, a number picks an option, - skips, Ctrl-D stops)\n`);
+    write(`${count} to set (Enter takes the default, a letter picks an option, - skips, Ctrl-D stops)\n`);
     try {
         for (const [index, property] of missing.entries()) {
             for (;;) {
@@ -269,7 +295,7 @@ if (import.meta.vitest) {
         expect(applied).toEqual(["interrupt-parent=gicv2", "interrupts=19 IRQ_TYPE_EDGE_FALLING"]);
         expect(result).toEqual({ set: ["interrupt-parent", "interrupts"], skipped: ["spi-max-frequency"], stopped: false });
         expect(printed).toBe([
-            "3 required properties to set (Enter takes the first suggestion, a number picks an option, - skips, Ctrl-D stops)",
+            "3 required properties to set (Enter takes the default, a letter picks an option, - skips, Ctrl-D stops)",
             "",
             "[1/3] interrupt-parent",
             "  about interrupt-parent",
@@ -308,7 +334,7 @@ if (import.meta.vitest) {
         input.end("-\n");
         const steps: InterviewSteps = { ask: (property) => Promise.resolve({ property, details: [], suggestions: [] }), apply: () => { throw new Error("applied"); } };
         await run_interview(["regulator-name"], steps, { input, output, terminal: false });
-        expect(printed.split("\n")[0]).toBe("1 required property to set (Enter takes the first suggestion, a number picks an option, - skips, Ctrl-D stops)");
+        expect(printed.split("\n")[0]).toBe("1 required property to set (Enter takes the default, a letter picks an option, - skips, Ctrl-D stops)");
     });
 
     test("run_interview — nothing missing asks nothing", async () => {
@@ -319,51 +345,82 @@ if (import.meta.vitest) {
         expect(await run_interview([], steps, { input, output, terminal: false })).toEqual({ set: [], skipped: [], stopped: false });
     });
 
+    const NOT_AN_OPTION = (range: string): string => `Not an option: ${range}, or type one of the values (&label or "text" for one that looks like a letter)`;
     const irq_types: Entry = { options: [{ value: "IRQ_TYPE_NONE" }, { value: "IRQ_TYPE_EDGE_RISING" }, { value: "IRQ_TYPE_EDGE_FALLING" }], default: "IRQ_TYPE_NONE" };
 
-    test("interpret_entry — a number picks an option from 1, a value can be typed out, Enter takes the default", () => {
-        expect(interpret_entry("3", irq_types)).toEqual({ kind: "value", tokens: ["IRQ_TYPE_EDGE_FALLING"] });
+    test("pick_code and code_index — a … z, then aa … az, ba …, and back", () => {
+        expect([0, 1, 25, 26, 27, 51, 52, 701, 702].map(index => pick_code(index))).toEqual(["a", "b", "z", "aa", "ab", "az", "ba", "zz", "aaa"]);
+        expect(["a", "b", "z", "aa", "ab", "az", "ba", "zz", "aaa"].map(word => code_index(word))).toEqual([0, 1, 25, 26, 27, 51, 52, 701, 702]);
+        for (let index = 0; index < 1500; index++) { expect(code_index(pick_code(index))).toBe(index); }
+        expect(code_index("A")).toBeUndefined();
+        expect(code_index("a1")).toBeUndefined();
+        expect(code_index("&ab")).toBeUndefined();
+        expect(code_index("")).toBeUndefined();
+    });
+
+    test("interpret_entry — a letter picks an option, a value can be typed out, Enter takes the default", () => {
+        expect(interpret_entry("c", irq_types)).toEqual({ kind: "value", tokens: ["IRQ_TYPE_EDGE_FALLING"] });
         expect(interpret_entry("IRQ_TYPE_EDGE_RISING", irq_types)).toEqual({ kind: "value", tokens: ["IRQ_TYPE_EDGE_RISING"] });
         expect(interpret_entry("", irq_types)).toEqual({ kind: "value", tokens: ["IRQ_TYPE_NONE"] });
         expect(interpret_entry(" - ", irq_types)).toEqual({ kind: "skip" });
         expect(interpret_entry(undefined, irq_types)).toEqual({ kind: "stop" });
     });
 
-    test("interpret_entry — a number is always a pick, even among numbers; a label with or without &", () => {
+    test("interpret_entry — a number is always a value, never a pick; a label with or without &", () => {
         const references: Entry = { options: [{ value: "0" }, { value: "1" }, { value: "3" }] };
         expect(interpret_entry("3", references)).toEqual({ kind: "value", tokens: ["3"] });
-        expect(interpret_entry("1", references)).toEqual({ kind: "value", tokens: ["0"] });
-        expect(interpret_entry("0", references)).toEqual({ kind: "again", message: "Not an option: pick 1 to 3, or type one of the values" });
+        expect(interpret_entry("1", references)).toEqual({ kind: "value", tokens: ["1"] });
+        expect(interpret_entry("a", references)).toEqual({ kind: "value", tokens: ["0"] });
+        expect(interpret_entry("2", references)).toEqual({ kind: "again", message: NOT_AN_OPTION("pick a to c") });
         expect(interpret_entry("&gpio", { options: [{ value: "gicv2" }, { value: "gpio" }] })).toEqual({ kind: "value", tokens: ["gpio"] });
+        expect(interpret_entry("gpio", { options: [{ value: "gicv2" }, { value: "gpio" }] })).toEqual({ kind: "value", tokens: ["gpio"] });
+    });
+
+    test("interpret_entry — past z the codes go aa, ab, …; &ab and \"a\" are values that look like codes", () => {
+        const many: Entry = { options: Array.from({ length: 30 }, (_, index) => ({ value: `opt${index}` })) };
+        expect(interpret_entry("z", many)).toEqual({ kind: "value", tokens: ["opt25"] });
+        expect(interpret_entry("aa", many)).toEqual({ kind: "value", tokens: ["opt26"] });
+        expect(interpret_entry("ad", many)).toEqual({ kind: "value", tokens: ["opt29"] });
+        expect(interpret_entry("ae", many)).toEqual({ kind: "again", message: NOT_AN_OPTION("pick a to ad") });
+        const lookalikes: Entry = { options: [{ value: "x" }, { value: "a" }, { value: "ab" }] };
+        expect(interpret_entry("a", lookalikes)).toEqual({ kind: "value", tokens: ["x"] });
+        expect(interpret_entry('"a"', lookalikes)).toEqual({ kind: "value", tokens: ["a"] });
+        expect(interpret_entry("&ab", lookalikes)).toEqual({ kind: "value", tokens: ["ab"] });
+        // Out of range, a code is the value typed out if it is one, else not an option.
+        expect(interpret_entry("ab", { options: [{ value: "x" }, { value: "ab" }] })).toEqual({ kind: "value", tokens: ["ab"] });
+        expect(interpret_entry("ac", { options: [{ value: "x" }, { value: "ab" }] })).toEqual({ kind: "again", message: NOT_AN_OPTION("pick a to b") });
     });
 
     test("interpret_entry — wrong answers ask again", () => {
-        expect(interpret_entry("4", irq_types)).toEqual({ kind: "again", message: "Not an option: pick 1 to 3, or type one of the values" });
-        expect(interpret_entry("1 2", irq_types)).toEqual({ kind: "again", message: "One pick: pick 1 to 3" });
-        expect(interpret_entry("", { options: [{ value: "a" }] })).toEqual({ kind: "again", message: "No default: pick 1 to 1, or - to skip" });
+        expect(interpret_entry("d", irq_types)).toEqual({ kind: "again", message: NOT_AN_OPTION("pick a to c") });
+        expect(interpret_entry("4", irq_types)).toEqual({ kind: "again", message: NOT_AN_OPTION("pick a to c") });
+        expect(interpret_entry("a b", irq_types)).toEqual({ kind: "again", message: "One pick: pick a to c" });
+        expect(interpret_entry("", { options: [{ value: "a" }] })).toEqual({ kind: "again", message: "No default: pick a, or - to skip" });
         expect(interpret_entry("", { kind: "number" })).toEqual({ kind: "again", message: "No default: type a value, or - to skip" });
         expect(interpret_entry("1 2", { kind: "number" })).toEqual({ kind: "again", message: "One value per line" });
     });
 
     test("interpret_entry — a list of any length takes several picks", () => {
-        expect(interpret_entry("2 IRQ_TYPE_NONE", { ...irq_types, several: true })).toEqual({ kind: "value", tokens: ["IRQ_TYPE_EDGE_RISING", "IRQ_TYPE_NONE"] });
+        expect(interpret_entry("b IRQ_TYPE_NONE", { ...irq_types, several: true })).toEqual({ kind: "value", tokens: ["IRQ_TYPE_EDGE_RISING", "IRQ_TYPE_NONE"] });
     });
 
-    test("option_lines — numbered from 1, aligned, with what the display adds", () => {
+    test("option_lines — lettered, aligned to the longest code, with what the display adds", () => {
         const options: Suggestion[] = [
             { value: "gicv2", display_string: "gicv2 — inherited" },
             { value: "aon_intr", display_string: "disabled" },
-            ...Array.from({ length: 8 }, (_, index) => ({ value: `o${index + 2}` })),
+            ...Array.from({ length: 28 }, (_, index) => ({ value: `o${index + 2}` })),
         ];
-        expect(option_lines(options).slice(0, 3)).toEqual(["   1) gicv2 — inherited", "   2) aon_intr  disabled", "   3) o2"]);
-        expect(option_lines(options).at(-1)).toBe("  10) o9");
+        expect(option_lines(options).slice(0, 3)).toEqual(["   a) gicv2 — inherited", "   b) aon_intr  disabled", "   c) o2"]);
+        expect(option_lines(options).at(-1)).toBe("  ad) o29");
+        expect(option_lines(options.slice(0, 3))).toEqual(["  a) gicv2 — inherited", "  b) aon_intr  disabled", "  c) o2"]);
     });
 
-    test("entry_prompt — the place among several, what a typed value is, the default (an option by number)", () => {
+    test("entry_prompt — the place among several, what a typed value is, the default (an option by letter)", () => {
         expect(entry_prompt("interrupts", { kind: "number" }, 0, 2)).toBe("interrupts 1/2 (number): ");
-        expect(entry_prompt("interrupts", { ...irq_types, default: "IRQ_TYPE_EDGE_FALLING" }, 1, 2)).toBe("interrupts 2/2 [3]: ");
+        expect(entry_prompt("interrupts", { ...irq_types, default: "IRQ_TYPE_EDGE_FALLING" }, 1, 2)).toBe("interrupts 2/2 [c]: ");
         expect(entry_prompt("diff-channels", { kind: "number", default: "0" }, 0, 2)).toBe("diff-channels 1/2 (number) [0]: ");
         expect(entry_prompt("interrupt-parent", { options: [{ value: "gpio" }] }, 0, 1)).toBe("interrupt-parent: ");
+        expect(entry_prompt("interrupt-parent", { options: [{ value: "gicv2" }, { value: "gpio" }], default: "gicv2" }, 0, 1)).toBe("interrupt-parent [a]: ");
     });
 
     test("run_interview — entry by entry: a wrong entry is asked again on its own, then the tokens are applied together", async () => {
@@ -376,7 +433,7 @@ if (import.meta.vitest) {
             ask: (property) => Promise.resolve({ property, details: ["  about it"], suggestions: [], entries: [{ kind: "number" }, irq_types] }),
             apply: (property, tokens) => { applied.push(`${property}=${tokens.join(" ")}`); return Promise.resolve({ ok: true, lines: ["Set it"] }); },
         };
-        input.end("25\n9\n3\n");
+        input.end("25\n9\nc\n");
         const result = await run_interview(["interrupts"], steps, { input, output, terminal: false });
         expect(result.set).toEqual(["interrupts"]);
         expect(applied).toEqual(["interrupts=25 IRQ_TYPE_EDGE_FALLING"]);
@@ -384,12 +441,12 @@ if (import.meta.vitest) {
             "[1/1] interrupts",
             "  about it",
             "interrupts 1/2 (number): 25",
-            "  1) IRQ_TYPE_NONE",
-            "  2) IRQ_TYPE_EDGE_RISING",
-            "  3) IRQ_TYPE_EDGE_FALLING",
-            "interrupts 2/2 [1]: 9",
-            "Not an option: pick 1 to 3, or type one of the values",
-            "interrupts 2/2 [1]: 3",
+            "  a) IRQ_TYPE_NONE",
+            "  b) IRQ_TYPE_EDGE_RISING",
+            "  c) IRQ_TYPE_EDGE_FALLING",
+            "interrupts 2/2 [a]: 9",
+            NOT_AN_OPTION("pick a to c"),
+            "interrupts 2/2 [a]: c",
             "Set it",
             "",
         ]);

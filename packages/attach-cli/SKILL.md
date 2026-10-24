@@ -274,7 +274,7 @@ attach-linux create-workfile [--name <filename>]
 **Purpose**: Add a device node (with a compatible string) to the overlay. If no overlay is configured, one is created automatically.
 
 ```bash
-attach-linux add <compatible> [--parent <path>] [--name <name>] [--label <label>] [--from-example] [--no-interview]
+attach-linux add <compatible> [--parent <path>] [--name <name>] [--label <label>] [--from-example] [--quiet]
 ```
 
 **Parameters**:
@@ -285,14 +285,14 @@ attach-linux add <compatible> [--parent <path>] [--name <name>] [--label <label>
 | `--name` | No | Node name override (e.g. `adc@0`); defaults to the compatible string |
 | `--label` | No | Label to attach (auto-derived if omitted, e.g. `ad7124_8`) |
 | `--from-example` | No | Copy the node from the binding's example instead of creating a bare one (not with `--name`) |
-| `--no-interview` | No | On a terminal, list the missing required properties instead of asking for them |
+| `--quiet` | No | On a terminal, list the missing required properties instead of asking for them |
 
 The node gets an automatic unit address and `reg` when the binding defines `reg` and the parent is addressed. Duplicates are refused. Labels are auto-indexed on collision.
 
 **Missing required properties**: after the add, the required properties the node still lacks are listed in the order to set them, with `interrupt-parent` before `interrupts`:
 - `--json`: `missing_required: [{ property, description, suggestions }]` in the response. Ask the user for each one in that order, then use `update`.
-- Piped runs and `--no-interview`: `Missing required: interrupt-parent, interrupts`.
-- On a terminal, `add` asks for each one, showing the binding's description and suggestions. Enter takes the first suggestion, `-` skips, Ctrl-D stops and keeps what was set. Options (an enum, the nodes a phandle can name) are numbered from 1 and picked by number or by value; a fixed-size array (`diff-channels`, `interrupts`) is asked one entry per line.
+- Piped runs and `--quiet`: `Missing required: interrupt-parent, interrupts`.
+- On a terminal, `add` asks for each one, showing the binding's description and suggestions. Enter takes the first suggestion, `-` skips, Ctrl-D stops and keeps what was set. Options (an enum, the nodes a phandle can name) are lettered `a`, `b`, `c`, … (`aa`, `ab`, … past `z`) and picked by letter or by value (a number is always a value, never a pick; write `&ab` or `"a"` for a value that looks like a letter); a fixed-size array (`diff-channels`, `interrupts`) is asked one entry per line.
 
 **From the binding's example** (`--from-example`): the node is copied from the first example on the parent's bus (SPI or I2C), else from the first example that has the device (`No SPI example for adi,ad7124-8; using example 1 (i2c)`). An example for another device of the same binding gets the requested compatible. Name, unit address, `reg`, children and references are copied as they are, so:
 - `reg` may clash with a sibling; the clash is reported as a warning (`rename` to move it).
@@ -467,7 +467,7 @@ interrupt-parent = <&gpio>;
   (adi,ad7124.yaml)
   Suggestions:
     gicv2 — interrupt controller, #interrupt-cells = <3>; inherited from /
-    gpio — interrupt controller, #interrupt-cells = <2> (only right if the device's interrupt line is wired to this controller)
+    gpio — interrupt controller, #interrupt-cells = <2>
     aon_intr (disabled)
 ```
 
@@ -478,7 +478,7 @@ interrupt-parent = <&gpio>;
 **Purpose**: Set or update a property value on a node. Also creates child nodes (channels). Works on both overlay-added nodes and base-tree nodes.
 
 ```bash
-attach-linux update <path> <property> [value...] [--quiet] [--no-interview]
+attach-linux update <path> <property> [value...] [--quiet]
 ```
 
 **Behaviour with no value**:
@@ -489,8 +489,8 @@ attach-linux update <path> <property> [value...] [--quiet] [--no-interview]
 
 **Creating a child node**: its `reg` follows the unit address. The required properties it still lacks are then handled as after `add`:
 - `--json`: the response carries `path` and `missing_required: [{ property, description, suggestions }]`. Ask the user for each one, then `update <path>/<child> <property> <value>`.
-- Piped runs and `--no-interview`: `Missing required: diff-channels`, then `Set them with: update adc/channel@0 <property> <value>`.
-- On a terminal, `update` asks for each one, as `add` does.
+- Piped runs and `--quiet`: `Missing required: diff-channels`, then `Set them with: update adc/channel@0 <property> <value>`.
+- On a terminal, `update` asks for each one, as `add` does. `--quiet` lists them instead: the one flag means "value only" when reading and "don't ask" when creating a child.
 
 **Flags**: set with no value, clear with `delete <path> <property>`. `true`/`false` are plain strings, not special.
 
