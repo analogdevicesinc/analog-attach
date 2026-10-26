@@ -1,5 +1,6 @@
-import { bootstrap, bootstrap_enabled, describe_board_pin, format_number_in, ok } from "attach-no-os-lib";
-import type { BootstrapReport, FilledValue, Result, Workfile } from "attach-no-os-lib";
+import { bootstrap, bootstrap_enabled, describe_board_pin, format_number_in, ok, validate_workfile } from "attach-no-os-lib";
+import type { BootstrapReport, FilledValue, Property, Result, Workfile } from "attach-no-os-lib";
+import { format_property_type } from "./shared";
 
 /**
  * Run bootstrap after a command changed the workfile, when the `bootstrap` setting is on.
@@ -30,6 +31,42 @@ function board_pin(board: string | undefined, at: { connector: string, pin: stri
     const described = board === undefined ? undefined : describe_board_pin(board, at);
     const mnemonic = described?.ok === true ? described.value.pin.mnemonic : undefined;
     return mnemonic === undefined || mnemonic === at.pin ? position : `${position} (${mnemonic})`;
+}
+
+/** A required value still empty, which bootstrap had nothing to fill it from. */
+interface StillNeeded {
+    node: string,
+    property: Property,
+    /** The validator's reason, when a rule says more than "required". */
+    reason?: string,
+}
+
+/**
+ * Every required value still empty that is not already a choice: bootstrap has nothing to
+ * go on for it (a channel number, a part with no eval board's chip-select), so it is the
+ * user's to set. Read from validation, so it is the same list `validate` gives.
+ */
+function still_needed(report: BootstrapReport, workfile: Workfile): StillNeeded[] {
+    const offered = new Set(report.choices.map(choice => `${choice.node}.${choice.property}`));
+    const found = new Map<string, StillNeeded>();
+    for (const finding of validate_workfile(workfile).errors) {
+        const [node = "", name = ""] = finding.path.split(".");
+        const at = `${node}.${name}`;
+        if (finding.severity !== "error" || name === "" || offered.has(at) || found.has(at)) {
+            continue;
+        }
+        const ruleset = workfile.symbols[node];
+        const property = ruleset?._t === "RulesetStruct" || ruleset?._t === "RulesetDescriptor"
+            ? ruleset.properties.find(candidate => candidate.name === name)
+            : undefined;
+        // Only an empty value: an error on a value that is set is a wrong value, not a missing one.
+        if (property === undefined || (property.value !== undefined && property.value !== null && property.cleared !== true)) {
+            continue;
+        }
+        const reason = finding.message.startsWith("Required property has no value") ? undefined : finding.message;
+        found.set(at, { node, property, ...(reason === undefined ? {} : { reason }) });
+    }
+    return [...found.values()];
 }
 
 /** What bootstrap did, for a person: the nodes it made, the values it chose, the wiring, and where it stopped. */
@@ -134,6 +171,21 @@ export function describe_bootstrap(report: BootstrapReport, workfile: Workfile):
         if (first !== undefined && first.options.length > 0) {
             const value = first.member === undefined ? first.options[0] : `${first.member} ${first.options[0]}`;
             lines.push(`  e.g. attach-noos update ${first.node} ${first.property} ${value}`);
+        }
+    }
+
+    const needed = still_needed(report, workfile);
+    if (needed.length > 0) {
+        lines.push("", "Still yours to set - required, and nothing to fill them from:");
+        for (const { node, property, reason } of needed) {
+            const at = `${node}.${property.name}`;
+            const about = reason ?? (property.description.trim() === "" ? "no description" : property.description.trim());
+            const cleared = property.cleared === true ? " (you cleared it)" : "";
+            lines.push(`  ! ${at.padEnd(32)} ${format_property_type(property._t).padEnd(8)} ${about}${cleared}`);
+        }
+        const [first] = needed;
+        if (first !== undefined) {
+            lines.push(`  e.g. attach-noos update ${first.node} ${first.property.name} <value>   ('attach-noos read ${first.node} ${first.property.name}' says more)`);
         }
     }
 

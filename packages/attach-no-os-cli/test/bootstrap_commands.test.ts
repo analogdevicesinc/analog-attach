@@ -138,6 +138,16 @@ describe("bootstrap after each command", () => {
         expect(text).toMatch(/> testpart_ip\.comm_init\.spi_dev\s+test_spi_device0 \(already in the workfile\)/);
     });
 
+    it("a required value with nothing to fill it from is listed as the user's to set", async () => {
+        await cli("init");
+        const text = await cli("add", "test_gpio_pin");
+        expect(text).toContain("Still yours to set");
+        expect(text).toMatch(/! test_gpio0\.number\s+number\s+Pin number within its port/);
+        expect(text).toContain("attach-noos update test_gpio0 number <value>");
+        // A value bootstrap offers options for is a choice, listed there and not again.
+        expect(text).not.toMatch(/! test_gpio0\.port_handle/);
+    });
+
     it("a schema added by itself is numbered, not named after its type", async () => {
         await cli("init");
         await cli("add", "test_gpio_pin");
