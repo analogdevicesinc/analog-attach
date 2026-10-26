@@ -62,7 +62,7 @@ export function describe_bootstrap(report: BootstrapReport, workfile: Workfile):
     const connected = report.linked.filter(link => !link.created && !link.hidden);
 
     if (created.length > 0 || hidden.length > 0 || connected.length > 0 || report.filled.length > 0) {
-        lines.push("", "Bootstrap filled in what leaves no room for choice:");
+        lines.push("", "Bootstrap filled in defaults, values with only one option, and the nodes they need:");
     }
     for (const link of created) {
         const at = `${link.node}.${link.property}${link.member === undefined ? "" : `.${link.member}`}`;
