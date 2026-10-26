@@ -135,7 +135,17 @@ describe("bootstrap after each command", () => {
         await cli("add", "test_spi_device");
         const text = await cli("add", "testpart");
         // The unused SPI device is reused: the connection is the only trace of it.
-        expect(text).toMatch(/> testpart_ip\.comm_init\.spi_dev\s+test_spi_device \(already in the workfile\)/);
+        expect(text).toMatch(/> testpart_ip\.comm_init\.spi_dev\s+test_spi_device0 \(already in the workfile\)/);
+    });
+
+    it("a schema added by itself is numbered, not named after its type", async () => {
+        await cli("init");
+        await cli("add", "test_gpio_pin");
+        await cli("add", "test_gpio_pin");
+        await cli("add", "test_gpio_pin", "--name", "led");
+        const names = Object.keys(stored());
+        expect(names).toEqual(expect.arrayContaining(["test_gpio0", "test_gpio1", "led"]));
+        expect(names).not.toContain("test_gpio_pin");
     });
 
     it("read names each field's type as the schema writes it, in its own column", async () => {

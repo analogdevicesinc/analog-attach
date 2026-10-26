@@ -56,8 +56,8 @@ export const addCommand = buildCommand<AddFlags, [string | undefined]>({
         fullDescription:
             "Creates a node from a schema. <schema> is the device key (see 'attach-noos list-devices')\n" +
             "and may also be given as --key; --name is what the node is called in the workfile,\n" +
-            "defaulting to the schema's own name. <schema> can also be a driver name (adxl355),\n" +
-            "which adds the handle the part is used through.\n" +
+            "defaulting to its kind, numbered (capi_gpio_pin: gpio0, gpio1). <schema> can also be\n" +
+            "a driver name (adxl355), which adds the handle the part is used through.\n" +
             "With the 'bootstrap' setting on (the default), everything below the new node that\n" +
             "leaves no room for choice is then filled in, and what is left is shown."
     },
@@ -200,7 +200,12 @@ export const addCommand = buildCommand<AddFlags, [string | undefined]>({
             default_node_name = first_interface === undefined ? driver : `${driver}_${first_interface}`;
         }
 
-        const name = flags.name ?? unique_name(default_node_name, context.value);
+        // A schema added by itself is one more of its kind: numbered, not named after its type
+        // (`add capi_gpio_pin` gives gpio0, then gpio1), so the C never reads
+        // `struct capi_gpio_pin capi_gpio_pin`. Drivers and eval boards keep their own names.
+        const name = flags.name ?? (available.value.all.includes(key)
+            ? numbered_name(short_name(default_node_name), context.value)
+            : unique_name(default_node_name, context.value));
         if (context.value.workfile.symbols[name]) {
             output_error(flags, `'${name}' already exists. Pass --name to choose another name.`);
             return;
@@ -332,6 +337,22 @@ function chip_of(workfile: Workfile, root: string): string | undefined {
 /** `devices/ad7124/ad7124_init_param.yaml` → `ad7124_init_param`. */
 function default_name(key: string): string {
     return path.basename(key, path.extname(key));
+}
+
+/** A schema's name, shortened as an instance of it: `capi_gpio_pin` -> `gpio`, `capi_dac_chan` -> `dac_chan`. */
+function short_name(schema: string): string {
+    return schema.replace(/^capi_/, "").replace(/_pin$/, "") || schema;
+}
+
+/** `base` with the lowest free number from 0: gpio0, gpio1, ...; ad7124_0 when `base` ends in a digit. */
+function numbered_name(base: string, context: WorkfileContext): string {
+    const separator = /\d$/.test(base) ? "_" : "";
+    for (let index = 0; ; index++) {
+        const candidate = `${base}${separator}${index}`;
+        if (!context.workfile.symbols[candidate]) {
+            return candidate;
+        }
+    }
 }
 
 function unique_name(base: string, context: WorkfileContext): string {
