@@ -1,0 +1,20 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "composite": false,
+    "declaration": false,
+    "declarationMap": false,
+    "noEmit": true,
+    "rootDir": "..",
+    // As in vitest.config.ts: the tests run on the sources
+    "paths": { "attach-lib": ["../src/index.ts"] },
+  },
+  "include": [
+    "**/*.ts",
+    "../src/**/*",
+  ],
+  "exclude": [
+    "linux",
+    "dt-schema",
+  ],
+}
