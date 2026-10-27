@@ -16,7 +16,15 @@ function is_matrix_input(value: ParsedInputValue): value is MatrixInput {
     return Array.isArray(value) && value.length > 0 && value.every(row => Array.isArray(row));
 }
 
-const ALL_MACROS = [...INTERRUPT_MACROS, ...GPIO_MACROS];
+/** The macros a value may name for a number: `IRQ_TYPE_*` and `GPIO_*`. */
+export const ALL_MACROS = [...INTERRUPT_MACROS, ...GPIO_MACROS];
+
+export const HEX_LITERAL = /^0x[\da-f]+$/i;
+
+/** Whether a word can be a number cell: a decimal or hex number, or a known macro. */
+export function is_number_token(word: string): boolean {
+    return /^-?\d+$/.test(word) || HEX_LITERAL.test(word) || ALL_MACROS.some(m => m.name === word);
+}
 
 const MATRIX_STRING_ROW_ERROR = (property: string) =>
     `Property ${property} matrix rows must be numeric or reference values, not strings`;

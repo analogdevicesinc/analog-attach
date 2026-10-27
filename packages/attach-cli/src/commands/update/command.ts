@@ -5,8 +5,6 @@ import {
     DeviceTreeOverlay,
     NodeBuilder,
     PropertyBuilder,
-    INTERRUPT_MACROS,
-    GPIO_MACROS,
     is_dt_flag,
     print_property,
     get_full_node_name,
@@ -42,10 +40,9 @@ import { node_reg_warnings, reg_warning_lines } from "../../reg-conflicts";
 import { ask_for_missing, describe_missing, missing_required_of, type NewNode } from "../../missing-required";
 import type { UpdateChildResponse } from "../../protocol/types";
 import { count_warning, value_count } from "../../item-count";
+import { ALL_MACROS, HEX_LITERAL } from "../../value-check";
 
 export type ShapeHint = "flag" | "strings" | "cells" | undefined;
-
-const ALL_MACROS = [...INTERRUPT_MACROS, ...GPIO_MACROS];
 
 export function shape_hint(definition: ResolvedProperty | undefined): ShapeHint {
     if (definition === undefined) { return undefined; }
@@ -81,7 +78,7 @@ function resolve_token(
     }
 
     // A hex literal keeps its radix: `0x2a` is written as typed.
-    if (/^0x[\da-f]+$/i.test(token)) {
+    if (HEX_LITERAL.test(token)) {
         return PropertyBuilder.tag_number(BigInt(token), "hex");
     }
 

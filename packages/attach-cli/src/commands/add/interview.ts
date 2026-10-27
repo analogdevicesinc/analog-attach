@@ -1,6 +1,7 @@
 import * as readline from "node:readline";
 
 import type { Suggestion } from "../../protocol/types";
+import { is_number_token } from "../../value-check";
 
 /** One value of a question asked on its own line: a cell of a fixed-size array, or a pick from a list. */
 export interface Entry {
@@ -106,7 +107,10 @@ export function interpret_entry(line: string | undefined, entry: Entry): Answer 
     }
     const words = tokens_of(answer);
     if (options === undefined) {
-        return words.length === 1 ? { kind: "value", tokens: words } : { kind: "again", message: "One value per line" };
+        if (words.length !== 1) { return { kind: "again", message: "One value per line" }; }
+        // Checked here, not by the write: the entries after it are not asked for nothing.
+        if (entry.kind === "number" && !is_number_token(answer)) { return { kind: "again", message: `${answer} is not a number or a known macro` }; }
+        return { kind: "value", tokens: words };
     }
     if (words.length > 1 && entry.several !== true) { return { kind: "again", message: `One pick: ${range}` }; }
     const picked = words.map(word => pick_option(word, options));
@@ -636,6 +640,39 @@ if (import.meta.vitest) {
         expect(interpret_entry("", { options: [{ value: "a" }] })).toEqual({ kind: "again", message: "No default: pick a, or - to skip" });
         expect(interpret_entry("", { kind: "number" })).toEqual({ kind: "again", message: "No default: type a value, or - to skip" });
         expect(interpret_entry("1 2", { kind: "number" })).toEqual({ kind: "again", message: "One value per line" });
+    });
+
+    test("interpret_entry — a number entry takes a number, a hex literal or a known macro, nothing else", () => {
+        expect(interpret_entry("19", { kind: "number" })).toEqual({ kind: "value", tokens: ["19"] });
+        expect(interpret_entry("-1", { kind: "number" })).toEqual({ kind: "value", tokens: ["-1"] });
+        expect(interpret_entry("0x13", { kind: "number" })).toEqual({ kind: "value", tokens: ["0x13"] });
+        expect(interpret_entry("IRQ_TYPE_EDGE_FALLING", { kind: "number" })).toEqual({ kind: "value", tokens: ["IRQ_TYPE_EDGE_FALLING"] });
+        expect(interpret_entry("GPIO19", { kind: "number" })).toEqual({ kind: "again", message: "GPIO19 is not a number or a known macro" });
+        expect(interpret_entry("0x1g", { kind: "number" })).toEqual({ kind: "again", message: "0x1g is not a number or a known macro" });
+        // a string entry, or one of unknown kind, takes any word
+        expect(interpret_entry("GPIO19", { kind: "string" })).toEqual({ kind: "value", tokens: ["GPIO19"] });
+        expect(interpret_entry("GPIO19", {})).toEqual({ kind: "value", tokens: ["GPIO19"] });
+    });
+
+    test("run_interview — a word at a number entry is asked again there, before the entries after it", async () => {
+        const input = new PassThrough();
+        const output = new PassThrough();
+        let printed = "";
+        output.on("data", (chunk: Buffer) => { printed += chunk.toString(); });
+        const applied: string[] = [];
+        const steps: InterviewSteps = {
+            ask: (property) => Promise.resolve({ property, details: [], suggestions: [], entries: [{ kind: "number" }, irq_types] }),
+            apply: (property, tokens) => { applied.push(`${property}=${tokens.join(" ")}`); return Promise.resolve({ ok: true, lines: ["Set it"] }); },
+        };
+        input.end("GPIO19\n19\nc\n");
+        await run_interview(["interrupts"], steps, { input, output, terminal: false });
+        expect(applied).toEqual(["interrupts=19 IRQ_TYPE_EDGE_FALLING"]);
+        expect(printed.split("\n").slice(3, 7)).toEqual([
+            "interrupts 1/2 (number): GPIO19",
+            "GPIO19 is not a number or a known macro",
+            "interrupts 1/2 (number): 19",
+            "  a) IRQ_TYPE_NONE",
+        ]);
     });
 
     test("interpret_entry — a list of any length takes several picks", () => {

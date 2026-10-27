@@ -127,8 +127,8 @@ step "Where can it go?" \
 # --- Add it ---
 
 tty_step "Add the ADC" \
-    "On a terminal add asks where the node goes (Enter takes spi), takes spi-max-frequency from the binding's example, then asks for each required property. RDY is wired to GPIO19, so interrupt-parent is gpio. Wrong turn: GPIO19 is the pin's name, but interrupts wants the line number on that controller. It is refused and asked again: 19, falling edge." \
-    $'\nb\nGPIO19\nc\n19\nc' \
+    "On a terminal add asks where the node goes (Enter takes spi), takes spi-max-frequency from the binding's example, then asks for each required property. RDY is wired to GPIO19, so interrupt-parent is gpio. Wrong turn: GPIO19 is the pin's name, but interrupts wants the line number on that controller. It is refused and asked again, before the trigger type: 19, falling edge." \
+    $'\nb\nGPIO19\n19\nc' \
     add adi,ad7124-8 --label adc
 
 step "Wrong chip select" \
