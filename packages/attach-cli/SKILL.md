@@ -206,7 +206,7 @@ zynqmp-ad7124.dtso                 incompatible (overlay: xlnx,zynqmp; base: ras
 ```
 The fit compares the overlay's root `compatible` with the base's. A generic SoC compatible that means any board of a family (`brcm,bcm2835` on RPi overlays) matches every base of that family, shown as `family: …`. A root compatible that isn't `vendor,name` (a typo) is unknown. `--json` gives `overlays: [{ name, path, fit, reason, matched? }]`; `matched` is only there when the overlay adds another compatible of the binding, not the one asked for.
 
-The overlays are indexed on first use into `.attach-linux/overlay-index.json` (a text scan; quick) and re-indexed when an overlay file changes.
+The overlays are found by a text scan of the Linux tree on every call (about 10 ms), so the list is never stale.
 
 **Strategy**: when a compatible overlay exists, offer it to the user as a starting point rather than building the node by hand (`import`, below).
 
@@ -720,5 +720,4 @@ node-name {
 14. **Use `rename` to change a node's key** — `rename <path> <new-name>`. A unit address change updates `reg`.
 15. **Use `move` to reparent a node** — `move <path> <destination>` relocates an overlay-added node
 16. **Use `list` for discovery — `list property <path>` to see available properties, `list property <path> <prop>` for details
-17. **Config fields fall back to `config.toml`** — Most command flags are optional when the config is set up
-18. **Always pass `--label` when adding nodes** — Without a label, later commands can only target the node by its full path
+17. **Always pass `--label` when adding nodes** — Without a label, later commands can only target the node by its full path
