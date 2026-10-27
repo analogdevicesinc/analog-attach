@@ -89,7 +89,11 @@ if (import.meta.vitest) {
     const workspace = (tool_body: string): { directory: string; linux: string; tool: string } => {
         const directory = fs.mkdtempSync(path.join(os.tmpdir(), "attach-rebuild-"));
         const linux = path.join(directory, "linux");
-        fs.mkdirSync(path.join(linux, "Documentation", "devicetree", "bindings"), { recursive: true });
+        const bindings = path.join(linux, "Documentation", "devicetree", "bindings");
+        fs.mkdirSync(bindings, { recursive: true });
+        // Older than any cache a test builds: a stamp in the same millisecond would count as stale.
+        const before = new Date(Date.now() - 60_000);
+        fs.utimesSync(bindings, before, before);
         const tool = path.join(directory, "dt-mk-schema");
         fs.writeFileSync(tool, `#!/bin/sh\n${tool_body}\n`, { mode: 0o755 });
         return { directory, linux, tool };
