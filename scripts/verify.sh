@@ -9,6 +9,8 @@ step() { printf '\n== %s\n' "$1"; }
 
 step "attach-lib: build"
 yarn workspace attach-lib build
+step "attach-lib: type-check (the build does not fail on type errors)"
+yarn workspace attach-lib typecheck
 step "attach-lib: test"
 yarn workspace attach-lib test --run --exclude test/BindingParserCompletion.test.ts
 step "attach-lib: lint"
