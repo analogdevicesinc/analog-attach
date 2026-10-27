@@ -212,9 +212,5 @@
     "watch:attach-ui-lib": "yarn workspace attach-ui-lib watch",
     "watch:pnp-webview": "yarn workspace pnp-webview watch"
   },
-  "devDependencies": {
-    "@vitest/coverage-v8": "^4.0.18",
-    "typescript": "^5.7.2"
-  },
   "packageManager": "yarn@4.5.3"
 }

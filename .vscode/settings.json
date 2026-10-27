@@ -67,6 +67,6 @@
     "typescript"
   ],
   "eslint.run": "onType",
-  "js/ts.tsdk.path": "node_modules/typescript/lib",
+  "js/ts.tsdk.path": "packages/attach-lib/node_modules/typescript/lib",
   "js/ts.tsdk.promptToUseWorkspaceVersion": true
 }
