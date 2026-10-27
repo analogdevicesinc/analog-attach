@@ -2,9 +2,9 @@
 
 ## About This Package
 
-`attach-lib` is the core, UI-free library for Device Tree Source (DTS) parsing, binding processing, and schema validation. It is consumed by the VS Code extension and webviews. Built with Vite (dual ESM/CJS output), tested with Vitest.
+`attach-lib` is the core, UI-free library for Device Tree Source (DTS) parsing, binding processing, and schema validation. It is consumed by attach-cli (`attach-linux`), which bundles the built `dist/`. Built with Vite (dual ESM/CJS output), tested with Vitest.
 
-`plans/` (gitignored) contains working plans for Claude sessions — currently the Intelligence module structural dedup and behaviour findings.
+`plans/` (gitignored) contains working plans for Claude sessions.
 
 ## Commands
 
@@ -44,17 +44,17 @@ A property's type is an `AttachType` (`Bindings/StructuralTypes.ts`): `flag`, `s
 
 `src/RegexExpansion.ts`'s `expand_pattern(pattern, cap = 32)` turns a binding pattern into the names it matches (`^channel@([0-9]|1[0-5])$` → channel@0 … channel@15), or into the literal stem when it is unbounded or larger than the cap (`^fan-[0-9]+$` → "fan-"). The CLI uses it for completion and `list property`.
 
-The output is a `ParsedBinding` that can be fed to AJV for validation and to the frontend for rendering.
+The output is a `ParsedBinding` that can be fed to AJV for validation.
 
 **`Attach` class (`src/Attach/`)**
-`Attach.parse(bindingPath, { linux, dt_schema }, options?)` runs the pipeline and returns `Result<Attach, BindingParseError>`: an `Attach` holding the `readonly parsed_binding` and its compiled validators (`patterns` lists the child-node patterns). `Validation.ts` has `create_ajv()` (with the `typeSize` keyword of dt-schema's `validator.py`), `compile_targets`, `narrow(target, data)` and the pure `translate_ajv_errors`. `update_binding_by_changes(data)` re-runs the compiled AJV validator against edited DTS-derived JSON (`DTxBinding.ts`: `dt_to_validator_input`, `validator_input_json`), walks `__canary__` errors to figure out which `if/then` branches now apply (the `then` or the `else` of an `allOf` entry; a branch's `required` adds to the binding's list, binding's first), and translates the rest of the AJV errors into typed `BindingErrors` (`Errors.ts`: missing required property, number-limit violation, failed dependency, generic); `update_pattern_binding_by_changes(pattern, data)` does the same for a child-node pattern. `Populate.ts` has the free functions `populate_binding(binding, devicetree, data, options?)` and `populate_properties`, which run the Intelligence stack over a binding (`PopulateOptions`: extra `layers`, the node's `placement`, `parent_name`; child-node patterns get the layers but not the placement).
+`Attach.parse(bindingPath, paths: SchemaPaths, options?)` runs the pipeline and returns `Result<Attach, BindingParseError>`: an `Attach` holding the `readonly parsed_binding` and its compiled validators (`patterns` lists the child-node patterns). `Validation.ts` has `create_ajv()` (with the `typeSize` keyword of dt-schema's `validator.py`), `compile_targets`, `narrow(target, data)` and the pure `translate_ajv_errors`. `update_binding_by_changes(data)` re-runs the compiled AJV validator against edited DTS-derived JSON (`DTxBinding.ts`: `dt_to_validator_input`, `validator_input_json`), walks `__canary__` errors to figure out which `if/then` branches now apply (the `then` or the `else` of an `allOf` entry; a branch's `required` adds to the binding's list, binding's first), and translates the rest of the AJV errors into typed `BindingErrors` (`Errors.ts`: missing required property, number-limit violation, failed dependency, generic); `update_pattern_binding_by_changes(pattern, data)` does the same for a child-node pattern. `Populate.ts` has the free functions `populate_binding(binding, devicetree, data, options?)` and `populate_properties`, which run the Intelligence stack over a binding (`PopulateOptions`: extra `layers`, the node's `placement`, `parent_name`; child-node patterns get the layers but not the placement).
 
 **Intelligence (`src/Intelligence/`)**
 Suggestions for configuring a peripheral, organised as layers of context (binding → devicetree). Details — layer operations, `IntelligenceStack` — are in `src/Intelligence/CLAUDE.md`.
 
 ### Test Layout
 
-`test/legacy/` holds an older copy of the DTS parser tests plus a large `.dtb` fixture cache; `vitest.config.ts` excludes `test/legacy/**` from runs. `test/dt-schema` and `test/linux` are symlinks (see `.gitignore`) into local checkouts of the dt-schema meta-schemas and a Linux kernel tree, used as real-world binding corpora by tests like `BindingParserCompletion.test.ts`.
+`test/dt-schema` and `test/linux` are symlinks (see `.gitignore`) into local checkouts of the dt-schema meta-schemas and a Linux kernel tree, used as real-world binding corpora by tests like `BindingParserCompletion.test.ts`.
 ## Key Conventions
 
 - No `any` without justification.
