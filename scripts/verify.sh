@@ -11,6 +11,8 @@ step "attach-lib: build"
 yarn workspace attach-lib build
 step "attach-lib: test"
 yarn workspace attach-lib test --run --exclude test/BindingParserCompletion.test.ts
+step "attach-lib: lint"
+yarn workspace attach-lib lint
 step "attach-cli: build (tsc type-check + tsup)"
 yarn workspace attach-linux build
 step "attach-cli: lint"

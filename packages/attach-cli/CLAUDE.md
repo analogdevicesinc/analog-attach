@@ -133,7 +133,7 @@ Setting `interrupts` without an explicit `interrupt-parent` writes the inherited
 
 ### Definition of done
 
-Before saying a task is done, run `yarn verify` from the repo root (attach-lib build → lib tests → attach-cli build with `tsc` → lint → CLI tests) and fix every error, including pre-existing lint errors in files you edited. A Stop hook (`.claude/hooks/stop-verify.sh`) runs it when attach-lib or attach-cli changed and blocks on failure. Never report completion with failing lint or type checks.
+Before saying a task is done, run `yarn verify` from the repo root (attach-lib build → lib tests → lib lint → attach-cli build with `tsc` → CLI lint → CLI tests) and fix every error, including pre-existing lint errors in files you edited. A Stop hook (`.claude/hooks/stop-verify.sh`) runs it when attach-lib or attach-cli changed and blocks on failure. Never report completion with failing lint or type checks.
 
 ### Build order
 
