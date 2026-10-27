@@ -45,15 +45,6 @@ jobs:
       - name: Build all packages
         run: yarn build:all
 
-      - name: Bundle dt-schema
-        run: |
-          cd packages/attach-cli
-          git clone --depth 1 -b main https://github.com/devicetree-org/dt-schema bundled/dt-schema
-          # Remove unnecessary files to reduce package size
-          rm -rf bundled/dt-schema/.git
-          rm -rf bundled/dt-schema/.github
-          rm -rf bundled/dt-schema/test
-
       - name: Package CLI
         run: |
           cd packages/attach-cli
