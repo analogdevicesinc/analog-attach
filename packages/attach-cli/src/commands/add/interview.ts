@@ -46,13 +46,18 @@ export type Answer =
 const tokens_of = (value: string): string[] => value.split(/\s+/).filter(Boolean);
 const bare = (value: string): string => value.replace(/^&/, "");
 
-/** Enter takes the first suggestion, "-" skips, the end of input (Ctrl-D) stops. */
-export function interpret_answer(line: string | undefined, suggestions: Suggestion[]): Answer {
+/**
+ * Enter takes the first suggestion, "-" skips, the end of input (Ctrl-D) stops. With no suggestion, Enter asks again
+ * and a second Enter in a row (`empty_before`) skips.
+ */
+export function interpret_answer(line: string | undefined, suggestions: Suggestion[], empty_before = false): Answer {
     if (line === undefined) { return { kind: "stop" }; }
     const answer = line.trim();
     if (answer === "-") { return { kind: "skip" }; }
     const value = answer === "" ? suggestions[0]?.value : answer;
-    if (value === undefined) { return { kind: "again", message: "No suggestion to take: type a value, or - to skip" }; }
+    if (value === undefined) {
+        return empty_before ? { kind: "skip" } : { kind: "again", message: "No suggestion to take: type a value, or Enter again to skip" };
+    }
     return { kind: "value", tokens: tokens_of(value) };
 }
 
@@ -328,7 +333,13 @@ export async function run_interview(missing: string[], steps: InterviewSteps, io
                 let answer: Answer;
                 if (question.entries === undefined) {
                     const first = question.suggestions[0]?.value;
-                    answer = interpret_answer(await read_line(first === undefined ? `${property}: ` : `${property} [${first}]: `), question.suggestions);
+                    const prompt = first === undefined ? `${property}: ` : `${property} [${first}]: `;
+                    answer = interpret_answer(await read_line(prompt), question.suggestions);
+                    // Only an Enter with nothing to take asks again: the prompt line alone, and a second Enter skips.
+                    if (answer.kind === "again") {
+                        write(`${answer.message}\n`);
+                        answer = interpret_answer(await read_line(prompt), question.suggestions, true);
+                    }
                 } else {
                     answer = question.rows === undefined ? await ask_entries(property, question.entries) : await ask_rows(property, question.entries, question.rows);
                 }
@@ -466,8 +477,10 @@ if (import.meta.vitest) {
         expect(interpret_answer("", [{ value: "<0 1>" }])).toEqual({ kind: "value", tokens: ["<0", "1>"] });
     });
 
-    test("interpret_answer — Enter without a suggestion asks again", () => {
-        expect(interpret_answer("", [])).toEqual({ kind: "again", message: "No suggestion to take: type a value, or - to skip" });
+    test("interpret_answer — Enter without a suggestion asks again, a second Enter in a row skips", () => {
+        expect(interpret_answer("", [])).toEqual({ kind: "again", message: "No suggestion to take: type a value, or Enter again to skip" });
+        expect(interpret_answer(" ", [], true)).toEqual({ kind: "skip" });
+        expect(interpret_answer("19", [], true)).toEqual({ kind: "value", tokens: ["19"] });
     });
 
     /** Run an interview over fake streams with the answers already typed. */
@@ -523,6 +536,27 @@ if (import.meta.vitest) {
         expect(result.set).toEqual(["interrupt-parent", "interrupts"]);
         expect(asked).toEqual(["interrupt-parent", "interrupts", "interrupts", "spi-max-frequency"]);
         expect(printed).toContain("interrupts: banana\ninterrupts: bad value\n\n[2/3] interrupts\n");
+    });
+
+    test("run_interview — Enter without a suggestion asks the prompt line again, a second Enter skips", async () => {
+        const { result, asked, printed } = await interview(["gpio", "", "", "-"]);
+        expect(result).toEqual({ set: ["interrupt-parent"], skipped: ["interrupts", "spi-max-frequency"], stopped: false });
+        expect(asked).toEqual(["interrupt-parent", "interrupts", "spi-max-frequency"]);
+        expect(printed).toContain([
+            "[2/3] interrupts",
+            "  about interrupts",
+            "interrupts: ",
+            "No suggestion to take: type a value, or Enter again to skip",
+            "interrupts: ",
+            "",
+            "[3/3] spi-max-frequency",
+        ].join("\n"));
+    });
+
+    test("run_interview — a value typed after an empty Enter is taken", async () => {
+        const { result, applied } = await interview(["gpio", "", "19 2", "-"]);
+        expect(applied).toEqual(["interrupt-parent=gpio", "interrupts=19 2"]);
+        expect(result.skipped).toEqual(["spi-max-frequency"]);
     });
 
     test("run_interview — end of input stops and keeps what was set", async () => {
