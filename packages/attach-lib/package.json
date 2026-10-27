@@ -24,6 +24,7 @@
     "watch": "vite build --watch",
     "clean": "rm -rf dist tsconfig.tsbuildinfo node_modules",
     "lint": "eslint src",
+    "typecheck": "tsc --noEmit -p .",
     "format": "eslint . --fix",
     "test": "vitest",
     "test:watch": "vitest --watch",

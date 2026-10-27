@@ -2,6 +2,7 @@ import path from 'node:path';
 import * as fs from 'node:fs';
 
 import { Attach, Result } from 'attach-lib';
+import type { BindingErrors } from '../src/Attach/Errors.js';
 
 import { BindingTestData, write_to_directory, bigIntReplacer } from './testing_utils';
 
@@ -12,6 +13,20 @@ const adis16475: BindingTestData = {
     name: "adi,adis16475",
     debug: false
 } as const;
+
+/** The errors of a narrowing as short, sorted descriptions, so a test names every error it expects. */
+function summary(errors: BindingErrors[]): string[] {
+    return errors.map(error => {
+        switch (error._t) {
+            case 'missing_required': { return `missing ${error.missing_property}${error.instance.length > 0 ? ` in ${error.instance.join('/')}` : ''}`; }
+            case 'failed_dependency': { return `${error.dependent_property} needs ${error.missing_property}`; }
+            case 'number_limit': { return `${error.failed_property.join('/')} ${error.comparison} ${error.limit}`; }
+            case 'generic': { return `generic ${error.origin}`; }
+        }
+    }).sort();
+}
+
+const adis_missing = ['missing interrupts', 'missing reg', 'missing spi-cpha', 'missing spi-cpol'];
 
 test(adis16475.name, async () => {
     const binding_path = path.resolve(__dirname, adis16475.path);
@@ -45,22 +60,7 @@ test(adis16475.name, async () => {
 
     expect(JSON.stringify(new_binding_1.binding, bigIntReplacer)).toStrictEqual(expected_1);
 
-    for (const error of new_binding_1.errors) {
-        switch (error._t) {
-            case 'missing_required': {
-                if (!['reg', 'interrupts', 'spi-cpha', 'spi-cpol'].includes(error.missing_property)) {
-                    expect.fail();
-                }
-                if (error.instance.length > 0) {
-                    expect.fail();
-                }
-                break;
-            }
-            default: {
-                expect.fail('Should have no other errors');
-            }
-        }
-    }
+    expect(summary(new_binding_1.errors)).toEqual(adis_missing);
 
     const data_2 = String.raw`{
             "compatible": ["adi,adis16575-2"]
@@ -83,19 +83,7 @@ test(adis16475.name, async () => {
 
     expect(JSON.stringify(new_binding_2.binding, bigIntReplacer)).toStrictEqual(expected_2);
 
-    for (const error of new_binding_2.errors) {
-        switch (error._t) {
-            case 'missing_required': {
-                if (!['reg', 'interrupts', 'spi-cpha', 'spi-cpol'].includes(error.missing_property)) {
-                    expect.fail();
-                }
-                break;
-            }
-            default: {
-                expect.fail('Should have no other errors');
-            }
-        }
-    }
+    expect(summary(new_binding_2.errors)).toEqual(adis_missing);
 
     const data_3 = String.raw`{
             "compatible": ["adi,adis16575-2"],
@@ -119,28 +107,7 @@ test(adis16475.name, async () => {
 
     expect(JSON.stringify(new_binding_3.binding, bigIntReplacer)).toStrictEqual(expected_3);
 
-    for (const error of new_binding_3.errors) {
-        switch (error._t) {
-            case 'missing_required': {
-                if (!['reg', 'interrupts', 'spi-cpha', 'spi-cpol'].includes(error.missing_property)) {
-                    expect.fail(`Missing required ${error.msg}`);
-                }
-                break;
-            }
-            case 'failed_dependency': {
-                expect(
-                    error.dependent_property === "adi,sync-mode"
-                    && error.missing_property === "clocks",
-                    `Failed dependency`
-                );
-
-                break;
-            }
-            default: {
-                expect.fail('Should have no other errors');
-            }
-        }
-    }
+    expect(summary(new_binding_3.errors)).toEqual(['adi,sync-mode needs clocks', ...adis_missing]);
 
     // overlapping conditions
     const data_4 = String.raw`{
@@ -165,39 +132,7 @@ test(adis16475.name, async () => {
 
     expect(JSON.stringify(new_binding_4.binding, bigIntReplacer)).toStrictEqual(expected_4);
 
-    for (const error of new_binding_4.errors) {
-        switch (error._t) {
-            case 'missing_required': {
-                if (!['reg', 'interrupts', 'spi-cpha', 'spi-cpol'].includes(error.missing_property)) {
-                    expect.fail(`Missing required ${error.msg}`);
-                }
-                break;
-            }
-            case 'failed_dependency': {
-                expect(
-                    error.dependent_property === "adi,sync-mode"
-                    && error.missing_property === "clocks",
-                    `Failed dependency`
-                );
-
-                break;
-            }
-            case 'number_limit': {
-                expect(
-                    error.failed_property.length === 1 &&
-                    error.failed_property[0] === "adi,sync-mode" &&
-                    error.comparison === '<=' &&
-                    error.limit === 2,
-                    `Failed number limit ${error.failed_property} ${error.msg}`
-                );
-
-                break;
-            }
-            default: {
-                expect.fail('Should have no other errors');
-            }
-        }
-    }
+    expect(summary(new_binding_4.errors)).toEqual(['adi,sync-mode <= 2', 'adi,sync-mode needs clocks', ...adis_missing]);
 });
 
 test('ad7124', async () => {
@@ -223,22 +158,5 @@ test('ad7124', async () => {
 
     expect.assert.isDefined(new_binding);
 
-    expect(new_binding.errors.length).toStrictEqual(2);
-
-    const first_error = new_binding.errors[0];
-
-    expect(
-        first_error._t === "missing_required" &&
-        first_error.missing_property === "interrupts" &&
-        first_error.instance.length === 0
-    );
-
-    const second_error = new_binding.errors[1];
-
-    expect(
-        second_error._t === "missing_required" &&
-        second_error.missing_property === "diff-channels" &&
-        second_error.instance.length === 1 &&
-        second_error.instance[0] === "channel@0"
-    );
+    expect(summary(new_binding.errors)).toEqual(['missing diff-channels in channel@0', 'missing interrupts']);
 });

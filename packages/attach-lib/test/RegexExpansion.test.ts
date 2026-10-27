@@ -72,11 +72,11 @@ test('^channel@([0-1])$', () => {
 	expect(expanded).toStrictEqual(expected);
 });
 
-test('^channel(@[0-9])?$', () => {
+test('^channel(@[0-9])?$ — the optional group can be left out', () => {
 	const expanded = expand_regex(/^channel(@[0-9])?$/);
-	const expected = ["channel@0", "channel@1", "channel@2", "channel@3", "channel@4", "channel@5", "channel@6", "channel@7", "channel@8", "channel@9"];
+	const expected = ["channel", "channel@0", "channel@1", "channel@2", "channel@3", "channel@4", "channel@5", "channel@6", "channel@7", "channel@8", "channel@9"];
 
-	//expect(expanded).toStrictEqual(expected);
+	expect(expanded).toStrictEqual(expected);
 });
 
 describe('expand_pattern — binding patterns into names, or the literal stem when unbounded', () => {

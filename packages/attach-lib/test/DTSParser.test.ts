@@ -132,7 +132,7 @@ describe("delete behavior", () => {
 
     const leds = dts.root.children.find(c => c.name === "leds");
     expect.assert.isDefined(leds);
-    expect(leds.labels.includes("leds"), "Missing label on leds node");
+    expect(leds.labels, "Missing label on leds node").toContain("leds");
   });
 
   test("delete node from overlay successful delete", () => {
@@ -383,7 +383,7 @@ describe("overlays (DTOs)", () => {
     if (target_path_value.kind !== "string") {
       expect.fail("Expected string value");
     }
-    expect(target_path_value.value.startsWith("/"), "Expected valid path");
+    expect(target_path_value.value).toStrictEqual("/soc/gpio@7e200000/gpclk0_gpio49/pin-gpclk");
 
     expect(fragment0.children).toHaveLength(1);
 
@@ -459,7 +459,7 @@ describe("overlays (DTOs)", () => {
     if (target_path_value.kind !== "string") {
       expect.fail("Expected string value");
     }
-    expect(target_path_value.value.startsWith("/"), "Expected valid path");
+    expect(target_path_value.value).toStrictEqual("/soc/gpio@7e200000/gpclk0_gpio49/pin-gpclk");
 
     expect(fragment0.children).toHaveLength(1);
 

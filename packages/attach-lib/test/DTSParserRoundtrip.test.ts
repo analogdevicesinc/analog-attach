@@ -63,7 +63,7 @@ function assertIdenticalDts(
   // Compare decompiled outputs
   const ourDecompiled = fs.readFileSync(ourDecompiledPath, 'utf8');
 
-  expect(ourDecompiled, 'decompiled DTS files differ').toStrictEqual(origDecompiled);
+  expect(ourDecompiled, `${orig_dt}: decompiled DTS files differ`).toStrictEqual(origDecompiled);
 }
 
 test('local rpi roundtrip compile+decompile equals original compile+decompile', function (context) {
@@ -125,7 +125,7 @@ test('linux repo arm broadcom roundtrip comp+decomp === original comp+decomp', f
     context.skip();
   }
 
-  if (!fs.existsSync(path_to_dts_folder)) {
+  if (!fs.existsSync(path_to_linux_include)) {
     console.warn(`WARNING: could not find ${path_to_linux_include}`);
     context.skip();
   }
@@ -169,11 +169,9 @@ test('linux repo arm broadcom roundtrip comp+decomp === original comp+decomp', f
       const cache = path.resolve(__dirname, 'expected/cache');
       const prepro_path = path.resolve(cache, file_name);
 
-      try {
-        execFileSync('cpp', ['-nostdinc', '-I', path_to_linux_include, '-undef', '-x', 'assembler-with-cpp', file.file_path, prepro_path], { stdio: 'ignore' });
-        prepro.push({ file_name: file_name, file_path: prepro_path });
-      } catch { }
-
+      // A file cpp can't preprocess fails the test rather than leaving the set
+      execFileSync('cpp', ['-nostdinc', '-I', path_to_linux_include, '-undef', '-x', 'assembler-with-cpp', file.file_path, prepro_path], { stdio: 'ignore' });
+      prepro.push({ file_name: file_name, file_path: prepro_path });
     }
 
     return prepro;
@@ -184,11 +182,7 @@ test('linux repo arm broadcom roundtrip comp+decomp === original comp+decomp', f
     if (dt_name.includes('bcm911') || dt_name.includes('bcm95')) {
       continue;
     }
-    try {
-      assertIdenticalDts(absolute_cache_directory, prepro_dts.file_path, `my_${dt_name}`);
-    } catch (error) {
-      expect.fail(`Failed for ${dt_name} with :\n${JSON.stringify(error)}`);
-    }
+    assertIdenticalDts(absolute_cache_directory, prepro_dts.file_path, `my_${dt_name}`);
   }
 
 }, 120_000);

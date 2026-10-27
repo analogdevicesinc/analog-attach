@@ -13,7 +13,6 @@ import {
     format_parse_error,
 } from "./Parser";
 
-import path from 'node:path';
 import * as fs from 'node:fs';
 import { Result } from "../result";
 import { TraversalOrder, UnitAddr } from "./Types";
@@ -311,40 +310,11 @@ if (import.meta.vitest !== undefined) {
 `);
     });
 
-    test("Overwrite node and print DTS", () => {
-
-        const dts_path = path.resolve(__dirname, '../../test/dts_source', 'rpi.prepro.dts');
-        const content = fs.readFileSync(dts_path, 'utf8');
-
-        const dt = DeviceTree.new_from_string(content);
-
-        if (typeof dt === 'string') {
-            expect(false);
-            return;
-        }
-
-        console.log("TREE:");
-        for (const { node, path } of dt.as_stream().filter(({ node }) => node.name === 'spi')) {
-            console.log({ node: node.name, path });
-        }
-        console.log("==================================");
-
-    });
-
     const base_dts_source = `/dts-v1/;
 / {
     soc {
         spi0: spi@7e204000 {
         };
-    };
-};`;
-
-    const overlay_with_imu = `/dts-v1/;
-/plugin/;
-
-&spi0 {
-    imu1: adi,ad7124-8@0 {
-        compatible = "adi,ad7124-8";
     };
 };`;
 
