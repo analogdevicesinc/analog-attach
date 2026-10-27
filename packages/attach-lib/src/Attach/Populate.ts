@@ -47,24 +47,20 @@ export function populate_binding(
     };
 }
 
-import { readFileSync as _readFileSync } from "node:fs";
-import { parse_board_description as _parse_board_description } from "../Intelligence/board/parse.js";
-import { board_layer as _board_layer } from "../Intelligence/board/layer.js";
-
 if (import.meta.vitest) {
     const { test, expect } = import.meta.vitest;
-    const readFileSync = _readFileSync;
-    const parse_board_description = _parse_board_description;
-    const board_layer = _board_layer;
-    const PMD_RPI_INTZ_FIXTURE = readFileSync(new URL("../../test/fixtures/board/pmd-rpi-intz.yaml", import.meta.url), "utf8");
-    const RPI_BASE_FIXTURE = readFileSync(new URL("../../test/fixtures/board/rpi-base.dts", import.meta.url), "utf8");
 
     test("populate_binding — pattern properties do not receive the parent placement", () => {
-        const dt = DeviceTree.new_from_string(RPI_BASE_FIXTURE);
+        const dt = DeviceTree.new_from_string("/dts-v1/;\n/ {\n};\n");
         if (typeof dt === "string") { throw new TypeError(dt); }
-        const board = parse_board_description(PMD_RPI_INTZ_FIXTURE);
-        if (typeof board === "string") { throw new TypeError(board); }
-        const layer = board_layer(board);
+        // Suggests the placement's reg for `reg`, and nothing without a placement.
+        const layer: IntelligenceLayer = {
+            name: "placement",
+            refine_properties: (properties, context) => properties.map(property =>
+                property.key === "reg" && context.placement?.reg !== undefined
+                    ? { ...property, suggestions: [{ rows: [[context.placement.reg]], display: "reg", source: "placement" }] }
+                    : property),
+        };
 
         const reg_property: ResolvedProperty = { key: "reg", value: { _t: "scalar", cell: { _t: "number" } } };
         const binding: ParsedBinding = {

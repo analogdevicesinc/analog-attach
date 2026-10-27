@@ -69,5 +69,5 @@ export {
 export { add_node, type AddNodeRequest, type AddNodeNote, type AddNodeResult } from './Devicetree/AddNode.js';
 export { reg_conflicts, sibling_reg_conflicts, chip_select_overflows, sibling_chip_select_overflows, reg_entries, is_active, type RegConflict, type ChipSelectOverflow, type RegEntry } from './Devicetree/RegConflicts.js';
 
-// Intelligence: queries, parent suggestions, layers, board, interrupt parent
+// Intelligence: queries, parent suggestions, layers, interrupt parent
 export * from './Intelligence/index.js';

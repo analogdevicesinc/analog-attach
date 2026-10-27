@@ -1080,33 +1080,33 @@ if (import.meta.vitest) {
     // ── to_suggestion ──────────────────────────────────────────────────
 
     test("to_suggestion — carries note and appends it to display once", () => {
-        const suggestion: VS = { rows: [[19n, { macro: "IRQ_TYPE_EDGE_FALLING" }]], display: "19 IRQ_TYPE_EDGE_FALLING", source: "board:test", note: "needs interrupt-parent" };
+        const suggestion: VS = { rows: [[19n, { macro: "IRQ_TYPE_EDGE_FALLING" }]], display: "19 IRQ_TYPE_EDGE_FALLING", source: "test", note: "needs interrupt-parent" };
         const result = to_suggestion(suggestion);
         expect(result.note).toBe("needs interrupt-parent");
         expect(result.display_string).toBe("19 IRQ_TYPE_EDGE_FALLING (needs interrupt-parent)");
     });
 
     test("to_suggestion — does not duplicate note already in display", () => {
-        const suggestion: VS = { rows: [[0n]], display: "0 — in use by spidev@0 (in use by spidev@0)", source: "board:test", note: "in use by spidev@0" };
+        const suggestion: VS = { rows: [[0n]], display: "0 — in use by spidev@0 (in use by spidev@0)", source: "test", note: "in use by spidev@0" };
         const result = to_suggestion(suggestion);
         expect(result.note).toBe("in use by spidev@0");
         expect(result.display_string).not.toContain("(in use by spidev@0) (in use by spidev@0)");
     });
 
     test("to_suggestion — no note means no note field", () => {
-        const suggestion: VS = { rows: [[1n]], display: "1", source: "board:test" };
+        const suggestion: VS = { rows: [[1n]], display: "1", source: "test" };
         const result = to_suggestion(suggestion);
         expect(result.note).toBeUndefined();
         expect(result.display_string).toBe("1");
     });
 
-    // ── to_suggestion with board-layer-shaped suggestions ──────────────
+    // ── to_suggestion with multi-cell rows ─────────────────────────────
 
     test("to_suggestion — matrix rows produce comma-separated --with value", () => {
         const suggestion: VS = {
             rows: [[{ label: "gpio" }, 8n, { macro: "GPIO_ACTIVE_LOW" }], [{ label: "gpio" }, 7n, { macro: "GPIO_ACTIVE_LOW" }]],
             display: "2 chip selects — GPIO8, GPIO7",
-            source: "board:PMD-RPI-INTZ",
+            source: "test",
         };
         const result = to_suggestion(suggestion);
         expect(result.value).toBe("gpio 8 GPIO_ACTIVE_LOW,gpio 7 GPIO_ACTIVE_LOW");
@@ -1116,16 +1116,15 @@ if (import.meta.vitest) {
     test("to_suggestion — single-row label+number+macro formats as space-separated value", () => {
         const suggestion: VS = {
             rows: [[{ label: "gpio" }, 19n, { macro: "IRQ_TYPE_EDGE_FALLING" }]],
-            display: "gpio 19 IRQ_TYPE_EDGE_FALLING — spi_pmod1.int",
-            source: "board:PMD-RPI-INTZ",
-            slots: ["spi_pmod1"],
+            display: "gpio 19 IRQ_TYPE_EDGE_FALLING",
+            source: "test",
         };
         const result = to_suggestion(suggestion);
         expect(result.value).toBe("gpio 19 IRQ_TYPE_EDGE_FALLING");
     });
 
     test("to_suggestion — single-cell reg", () => {
-        const suggestion: VS = { rows: [[2n]], display: "2 — GPIO20 (spi_pmod1.cs2)", source: "board:PMD-RPI-INTZ", slots: ["spi_pmod1"] };
+        const suggestion: VS = { rows: [[2n]], display: "2", source: "test" };
         const result = to_suggestion(suggestion);
         expect(result.value).toBe("2");
     });

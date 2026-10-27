@@ -37,7 +37,7 @@ export {
 
 export { insert_known_structures } from "./known_properties.js";
 
-// Layered intelligence: binding → devicetree → board → …
+// Layered intelligence: binding → devicetree → …
 export type {
     IntelligenceLayer,
     NodePlacement,
@@ -50,33 +50,6 @@ export { IntelligenceStack } from "./layers/stack.js";
 export { binding_layer } from "./layers/binding.js";
 export { devicetree_layer } from "./layers/devicetree.js";
 export { placement_from_overlay } from "./layers/placement.js";
-
-// Board descriptions (HATs, capes, shields, …) as an intelligence layer
-export type {
-    BoardDescription,
-    BoardBus,
-    BoardSlot,
-    BoardSignal,
-    BoardChipSelect,
-    BusType,
-    SignalKind,
-} from "./board/types.js";
-export { BUS_TYPES, SIGNAL_KINDS } from "./board/types.js";
-export { parse_board_description } from "./board/parse.js";
-export {
-    bus_chip_selects,
-    exclusions_of,
-    exclusive_slots,
-    gpio_usage,
-    shared_with,
-    slot_primary_reg,
-    type ExclusionSide,
-    type GpioUse,
-    type SharedLine,
-    type SlotExclusion,
-} from "./board/derived.js";
-export { resolve_bus_paths, slots_for_placement, type SlotInference } from "./board/slots.js";
-export { board_layer, describe_slot, describe_placement, type BoardLayer } from "./board/layer.js";
 
 // Interrupt parent resolution
 export {

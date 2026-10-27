@@ -2,8 +2,8 @@ import { ParsedBinding, ResolvedProperty } from "../../Bindings/ParsedBinding.js
 import { DeviceTree } from "../../Devicetree/index.js";
 import { PathAndLabel } from "../parents.js";
 
-// Where a node sits in the combined base tree + overlay. Layers that reason
-// about physical wiring (e.g. board descriptions) infer slots from it.
+// Where a node sits in the combined base tree + overlay, for layers that
+// reason about the node's position on its bus.
 export type NodePlacement = {
     /** Absolute path of the node itself. */
     node_path: string;
@@ -41,7 +41,7 @@ export type ValueSuggestion = {
     display: string;
     /** Name of the layer that produced the suggestion. */
     source: string;
-    /** Provenance within the source (e.g. board slot ids). */
+    /** Provenance within the source (e.g. the slots that own a shared chip select). */
     slots?: string[];
     /** Extra caveat, e.g. "in use by adc@0". */
     note?: string;
@@ -56,7 +56,7 @@ export type PlacementSuggestion = {
 };
 
 // A layer of context used when configuring a peripheral. Layers are stacked
-// from least to most system-specific (binding → devicetree → board → …); each
+// from least to most system-specific (binding → devicetree → …); each
 // operation receives the results of the layers below it and may annotate,
 // narrow or extend them. Every operation is optional.
 export interface IntelligenceLayer {

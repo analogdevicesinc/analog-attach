@@ -77,8 +77,7 @@ function suggest_interrupt_parents(
 }
 
 /**
- * Clock and supply providers the base tree already has. The board can't say
- * which one feeds the device (it is external hardware).
+ * Clock and supply providers the base tree already has.
  */
 function suggest_labelled_providers(property: string, devicetree: DeviceTree): ValueSuggestion[] {
     if (property === "clocks") {
