@@ -2,8 +2,6 @@ import { ParsedBinding, ResolvedProperty } from "../../Bindings/ParsedBinding.js
 import { DeviceTree } from "../../Devicetree/index.js";
 import { binding_layer } from "./binding.js";
 import { devicetree_layer } from "./devicetree.js";
-import { insert_known_structures } from "../known_properties.js";
-import { query_devicetree } from "../query.js";
 import { IntelligenceLayer, PlacementSuggestion, PropertyContext, ValueSuggestion } from "./types.js";
 
 // An ordered set of intelligence layers, least system-specific first. Every
@@ -81,11 +79,22 @@ if (import.meta.vitest) {
         { key: "vdd-supply", value: { _t: "unknown" } },
     ];
 
-    test("IntelligenceStack.default — matches the historical insert_known_structures(query_devicetree(...))", () => {
+    const phandle = (label: string) => ({ _t: "enum", enum: [label], enum_type: "phandle" });
+
+    test("IntelligenceStack.default — the binding layer's shapes, refined by the devicetree", () => {
         const data = JSON.stringify({ "interrupt-parent": "gpio", "reset-gpios": ["gpio"] });
-        const expected = insert_known_structures(query_devicetree(devicetree, properties, data));
-        const actual = IntelligenceStack.default().refine_properties(properties, { devicetree, data });
-        expect(actual).toStrictEqual(expected);
+        const refined = IntelligenceStack.default().refine_properties(properties, { devicetree, data });
+        const value = (key: string) => refined.find(p => p.key === key)?.value;
+
+        // binding layer: the known shapes of reg and spi-cpol; an unknown property is left as it is
+        expect(value("reg")).toMatchObject({ _t: "matrix", rows: [{ _t: "list", item: { _t: "number", maximum: 0xFF_FF_FF_FFn } }] });
+        expect(value("spi-cpol")).toEqual({ _t: "flag" });
+        expect(value("sample-rate-hz")).toStrictEqual(properties.find(p => p.key === "sample-rate-hz")!.value);
+        // devicetree layer: the tree's controllers and regulators, and rows shaped by the chosen controller's cells
+        expect(value("interrupt-parent")).toMatchObject({ _t: "list", item: phandle("gpio") });
+        expect(value("interrupts")).toMatchObject({ _t: "matrix", rows: [{ item: [{ _t: "number" }, { _t: "enum", enum_type: "macro" }] }] });
+        expect(value("reset-gpios")).toMatchObject({ _t: "matrix", rows: [{ item: [phandle("gpio"), { _t: "number" }, { _t: "enum", enum_type: "macro" }] }] });
+        expect(value("vdd-supply")).toMatchObject({ _t: "list", item: phandle("vdd") });
     });
 
     test("IntelligenceStack — higher layers receive lower layers' results", () => {

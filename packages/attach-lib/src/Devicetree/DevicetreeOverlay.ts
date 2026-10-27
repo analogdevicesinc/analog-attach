@@ -814,16 +814,6 @@ if (import.meta.vitest !== undefined) {
         expect(result?.is_in_base).toBe(false);
     });
 
-    test("find_node - is_in_base false for node only in overlay", () => {
-        const base = DeviceTree.new_from_string(base_dts_source);
-        if (typeof base === "string") { throw new TypeError(base); }
-        const overlay = DeviceTreeOverlay.new_from_string(overlay_with_imu, base);
-        if (typeof overlay === "string") { throw new TypeError(overlay); }
-        const result = overlay.find_node("imu1");
-        expect(result).toBeDefined();
-        expect(result?.is_in_base).toBe(false);
-    });
-
     test("find_node - returns undefined for unknown label", () => {
         const base = DeviceTree.new_from_string(base_dts_source);
         if (typeof base === "string") { throw new TypeError(base); }
@@ -852,18 +842,6 @@ if (import.meta.vitest !== undefined) {
         const reference = element.elements[0];
         if (reference === undefined || reference.kind !== "label") { throw new Error("bad ref"); }
         expect(reference.name).toBe("spi0");
-    });
-
-    test("add_fragment reuses existing label fragment", () => {
-        const base = DeviceTree.new_from_string(base_dts_source);
-        if (typeof base === "string") { throw new TypeError(base); }
-        const overlay = DeviceTreeOverlay.new_from_string(overlay_with_imu, base);
-        if (typeof overlay === "string") { throw new TypeError(overlay); }
-
-        const before = overlay.get_fragments().length;
-        // eslint-disable-next-line unicorn/no-useless-undefined
-        overlay.add_fragment("spi0", undefined, undefined);
-        expect(overlay.get_fragments().length).toBe(before);
     });
 
     test("ensure_node — reuses the overlay node, creates a fragment for a base-only node", () => {

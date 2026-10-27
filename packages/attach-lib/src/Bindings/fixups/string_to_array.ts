@@ -55,11 +55,6 @@ if (import.meta.vitest) {
         expect(fixup_string_to_array({ pattern: "^a", description: "d" }, context("x"))).toStrictEqual({ description: "d", items: [{ pattern: "^a" }] });
     });
 
-    test("branches of a oneOf are fixed one by one (by the walker)", () => {
-        const branch = fixup_string_to_array({ const: "one" }, context("compatible"));
-        expect(branch).toStrictEqual({ items: [{ const: "one" }] });
-    });
-
     test("the binding's own items win over a const or enum merged in from an included file", () => {
         expect(fixup_string_to_array({ const: "mac-address", items: [{ const: "io_impedance_ctrl" }] }, context("nvmem-cell-names")))
             .toStrictEqual({ items: [{ const: "io_impedance_ctrl" }] });

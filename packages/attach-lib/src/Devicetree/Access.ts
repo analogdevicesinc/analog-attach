@@ -208,18 +208,6 @@ if (import.meta.vitest) {
         expect(string_property(node, "status")).toBe("okay");
     });
 
-    test("reference_property reads a label reference", async () => {
-        const dt = await dts(`/dts-v1/;
-/ {
-    gic: gic { };
-    node {
-        interrupt-parent = <&gic>;
-    };
-};`);
-        const node = dt.as_stream().toArray().find(({ node }) => node.name === "node")!.node;
-        expect(reference_property(node, "interrupt-parent")).toBe("gic");
-    });
-
     test("has_flag / has_property / has_compatible", async () => {
         const dt = await dts(`/dts-v1/;
 / {

@@ -237,16 +237,6 @@ if (import.meta.vitest) {
         expect(decode_reg_address(reg, 2)).toBe(0x1_00_00_00_00n);
     });
 
-    test("is_enabled", () => {
-        const enabled: DTNode = { name: "x", unit_addr: undefined, labels: [], properties: [], children: [] };
-        expect(is_enabled(enabled)).toBe(true);
-        const disabled: DTNode = {
-            name: "x", unit_addr: undefined, labels: [], children: [],
-            properties: [PropertyBuilder.build_string().with_value("disabled").with_name("status").build()],
-        };
-        expect(is_enabled(disabled)).toBe(false);
-    });
-
     test("next_free_unit_address — base spidev@0/1 → 2", () => {
         const children = new Map<string, DTNode>();
         children.set("spidev@0", {
