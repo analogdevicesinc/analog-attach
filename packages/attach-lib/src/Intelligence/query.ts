@@ -86,6 +86,14 @@ function counts_of(value: ResolvedProperty["value"]): { minItems?: number; maxIt
     };
 }
 
+/**
+ * The number cells of a specifier of `count` cells (`#interrupt-cells`, `#gpio-cells`): the last one is the flags
+ * macro when there are two or more, so `<1>` is one number (the line) and no flags.
+ */
+function specifier_numbers(count: bigint): number {
+    return Math.max(Number(count) - (count > 1n ? 1 : 0), 0);
+}
+
 function specifier_row(options: {
     phandle?: { enum: string[]; default?: string };
     numbers: number;
@@ -177,7 +185,7 @@ function refine_interrupts(
     if (cell_count === undefined) { return false; }
 
     const row = specifier_row({
-        numbers: Number(cell_count) - 1,
+        numbers: specifier_numbers(cell_count),
         number_item: { _t: "number" },
         trailing_macros: cell_count > 1n ? INTERRUPT_MACROS.map(m => m.name) : undefined,
     });
@@ -299,8 +307,7 @@ export type GpioRowCell =
 
 /** The cells for `#gpio-cells = <count>`: count - 1 numbers, then the flags. */
 function gpio_cells_for(count: bigint): GpioRowCell[] {
-    const numbers = Math.max(Number(count) - (count > 1n ? 1 : 0), 0);
-    const cells: GpioRowCell[] = Array.from({ length: numbers }, () => ({ kind: "number" }));
+    const cells: GpioRowCell[] = Array.from({ length: specifier_numbers(count) }, () => ({ kind: "number" }));
     if (count > 1n) { cells.push({ kind: "flags", macros: GPIO_MACROS }); }
     return cells;
 }
@@ -509,9 +516,33 @@ if (import.meta.vitest) {
         expect(interrupts?.value._t).toBe("matrix");
         if (interrupts?.value._t === "matrix") {
             const row = tuple_of(interrupts.value.rows[0]);
-            expect(row).toBeDefined();
-            expect(row?.cells).toHaveLength(0);
-            expect(row?.minItems).toBe(0);
+            expect(row?.cells.map(cell => cell._t)).toEqual(["number"]);
+            expect(row?.minItems).toBe(1);
+            expect(row?.maxItems).toBe(1);
+        }
+    });
+
+    test("query_devicetree — #interrupt-cells = <2>: row is [number, IRQ_TYPE_* macro]", () => {
+        const dt = dts(`/dts-v1/;
+/ {
+    intc: interrupt-controller {
+        interrupt-controller;
+        #interrupt-cells = <2>;
+    };
+};`);
+        const properties = [
+            { key: "interrupt-parent", value: { _t: "unknown" as const } },
+            { key: "interrupts", value: open_list(1, 1) },
+        ];
+        const interrupts = query_devicetree(dt, properties, "{}", "intc").find(p => p.key === "interrupts");
+        expect(interrupts?.value._t).toBe("matrix");
+        if (interrupts?.value._t === "matrix") {
+            const row = tuple_of(interrupts.value.rows[0]);
+            const [line, flags] = row?.cells ?? [];
+            expect(line?._t).toBe("number");
+            expect(flags?._t === "enum" ? flags.enum : []).toContain("IRQ_TYPE_EDGE_FALLING");
+            expect(row?.minItems).toBe(2);
+            expect(row?.maxItems).toBe(2);
         }
     });
 
