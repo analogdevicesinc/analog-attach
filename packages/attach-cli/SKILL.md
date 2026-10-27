@@ -305,9 +305,9 @@ attach-linux add <compatible> [--parent <path>] [--name <name>] [--label <label>
 The node gets an automatic unit address and `reg` when the binding defines `reg` and the parent is addressed. Duplicates are refused. Labels are auto-indexed on collision.
 
 **Parent** (without `--parent`):
-- Piped runs, `--quiet`, `--json`: the node goes under the first entry of `list parent <compatible>`, and a note says so: `Parent: spi (use --parent to choose another)` (stderr under `--json`). That is a guess, not a decision: with several buses, ask the user which one and pass `--parent`.
+- Piped runs, `--quiet`, `--json`: the node goes under the first entry of `list parent <compatible>`, and a note says so: `Parent: <bus> (use --parent to choose another)` (stderr under `--json`). That is a guess, not a decision: the `list parent` order is the base tree's order, which says nothing about the bus the device is wired to. With several buses, ask the user which one and pass `--parent`.
 - On a terminal (`--template required`, no `--quiet`): the parent is the first question, a lettered list of the `list parent` results. Enter takes `a`, a letter picks, or type a label or path (Tab completes it); Ctrl-D adds nothing.
-- `--template example:<N>` never asks: it takes the first `list parent` bus of the example's kind (SPI or I2C): `Parent: i2c1 (use --parent to choose another)`. A base without a bus of that kind falls back to the first entry: `Parent: spi (no I2C bus for example 1; use --parent to choose another)`.
+- `--template example:<N>` never asks: it takes the first `list parent` bus of the example's kind (SPI or I2C), in the base tree's order: `Parent: <bus> (use --parent to choose another)`. A base without a bus of that kind falls back to the first entry: `Parent: <bus> (no I2C bus for example 1; use --parent to choose another)`. The same guess as above: ask the user and pass `--parent`.
 - A device with no parent but the root (`regulator-fixed`, `fixed-clock`) goes under `/`, with no note and no question.
 - Known limit: `adi,ad5593r` (I2C) shares ad5592r's binding, so `list parent` offers SPI buses for it; always pass `--parent` for it.
 
