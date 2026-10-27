@@ -395,11 +395,18 @@ function narrow_object(object: any): AttachType {
             case "integer":
                 {
                     const typeSize = object.typeSize;
-                    const default_value = to_default(object.default);
+                    // A const next to the $ref (`$ref: uint32` + `const: 28`) is the one value, so also the default.
+                    const constant = "const" in object ? to_option(object.const) : undefined;
+                    const single = constant === undefined || Array.isArray(constant) ? undefined : constant;
+                    const default_value = single ?? to_default(object.default);
+
+                    let cell: Cell = number_cell(object);
+                    if ("enum" in object) { cell = enum_cell(object.enum); }
+                    else if (single !== undefined) { cell = enum_cell([single]); }
 
                     return described(object, {
                         _t: "scalar",
-                        cell: "enum" in object ? enum_cell(object.enum) : number_cell(object),
+                        cell,
                         ...(typeSize === undefined ? {} : { typeSize }),
                         ...(default_value === undefined ? {} : { default: default_value }),
                     });
@@ -686,6 +693,9 @@ if (import.meta.vitest) {
         expect(small).toStrictEqual({ _t: "scalar", cell: { _t: "number", minimum: 0n, maximum: 255n }, typeSize: 8 });
         expect(signed).toStrictEqual({ _t: "scalar", cell: { _t: "number", minimum: -32_768n, maximum: 32_767n }, typeSize: 16 });
         expect(translated({ cells: { dtType: "uint32", enum: [0, 1] } }).cells).toMatchObject({ _t: "scalar", cell: { _t: "enum", enum_type: "number" }, typeSize: 32 });
+        // a const next to the $ref (`$ref: uint32` + `const: 28`) is a one-option enum, the const its default
+        expect(translated({ cells: { type: "integer", typeSize: 32, minimum: 0, maximum: 0xFF_FF_FF_FF, const: 28, dtType: "uint32" } }).cells)
+            .toStrictEqual({ _t: "scalar", cell: { _t: "enum", enum: [28n], enum_type: "number" }, typeSize: 32, default: 28n });
         // arrays, and numbers a schema says more of, are not scalars
         expect(translated({ foo: { dtType: "uint32-array" } }).foo).toStrictEqual({ _t: "unknown" });
         expect(translated({ foo: { dtType: "uint32", items: { minimum: 1 } } }).foo).toStrictEqual({ _t: "unknown" });
