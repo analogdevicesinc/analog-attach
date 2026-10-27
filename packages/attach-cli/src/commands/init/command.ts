@@ -7,7 +7,7 @@ import { ensure_caches, type EnsureResult } from "../../config/rebuild";
 import { read_settings, save_settings, type ConfigResult, type Settings } from "../../config/settings";
 import { format_config_errors } from "../../config/workspace";
 import { on_terminal } from "../../missing-required";
-import { input_error, respond, respond_fail } from "../../protocol/output";
+import { cancelled, input_error, respond, respond_fail } from "../../protocol/output";
 import type { InitResponse } from "../../protocol/types";
 import type { ProgressStream } from "../../progress";
 import { bold, check_devicetree, check_linux, create_rl, cyan, dim, step_context, step_linux, step_overlay } from "../../setup";
@@ -199,10 +199,7 @@ async function ask_plan(options: InitOptions, current: Settings | undefined, wiz
         }
         return { ok: true, value: { linux, devicetree, overlay } };
     } catch (error: unknown) {
-        if (error instanceof Error && error.message === "interrupted") {
-            console.log("\nSetup cancelled.");
-            return "cancelled";
-        }
+        if (error instanceof Error && error.message === "interrupted") { return "cancelled"; }
         throw error;
     } finally {
         rl.close();
@@ -251,7 +248,10 @@ Examples:
             const ask = !context.json && on_terminal() && !full_flags;
 
             const planned = ask ? await ask_plan(options, current, !given) : plan_from_flags(options, current);
-            if (planned === "cancelled") { return; }
+            if (planned === "cancelled") {
+                cancelled("\nSetup cancelled.");
+                return;
+            }
             if (!planned.ok) {
                 if (planned.kind === "missing") { input_error(planned.message); }
                 else if (context.json) { respond_fail({ ok: false, message: planned.message, severity: "error" }); }

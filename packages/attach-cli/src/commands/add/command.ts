@@ -20,7 +20,7 @@ import type { LocalContext } from "../../context";
 import { load_workspace, parse_overlay, report_config_errors, type Bindings } from "../../config/workspace";
 import type { Settings } from "../../config/settings";
 import { bus_kind, find_binding, parse_node_path, resolve_path, type BusKind } from "../../utilities";
-import { respond, respond_fail, diagnostic, input_error } from "../../protocol/output";
+import { respond, respond_fail, diagnostic, input_error, cancelled } from "../../protocol/output";
 import type { AddResponse } from "../../protocol/types";
 import { new_workfile, next_workfile_name } from "../../workfile";
 import { ask_for_missing, describe_missing, missing_required_of, on_terminal, type NewNode } from "../../missing-required";
@@ -156,7 +156,7 @@ Use 'list device' to find compatible strings, 'list parent' to find valid buses.
                     ask: options.quiet !== true && !context_.json && on_terminal(),
                 });
                 if (chosen.status === "stopped") {
-                    console.log("No parent chosen; nothing added.");
+                    cancelled("No parent chosen; nothing added.");
                     return;
                 }
                 ({ parent, note } = chosen);
