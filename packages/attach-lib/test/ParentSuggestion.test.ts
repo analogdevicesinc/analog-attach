@@ -4,6 +4,8 @@ import path from 'node:path';
 import { Attach, DeviceTree, Result } from 'attach-lib';
 import { suggest_parents } from '../src/Intelligence/parents.js';
 
+import { binding, schema_paths } from './bindings';
+
 import { test, expect } from 'vitest';
 
 const rpi = DeviceTree.new_from_string(fs.readFileSync(path.resolve(__dirname, 'dts_source/rpi.prepro.dts'), 'utf8'));
@@ -17,13 +19,10 @@ test.each([
     ['an SPI device', 'iio/adc/adi,ad7124.yaml', spi],
     ['a device with an SPI and an I2C interface', 'iio/accel/adi,adxl345.yaml', [...spi, ...i2c]],
     ['a fixed clock', 'clock/fixed-clock.yaml', ['clocks']],
-    ['a fixed regulator', 'regulator/regulator-fixed.yaml', ['/']],
+    ['a fixed regulator', 'regulator/fixed-regulator.yaml', ['/']],
     ['a memory-mapped device (no bus to suggest)', 'iio/adc/st,stm32-adc.yaml', []],
-])('%s (%s)', async (_kind, binding, labels) => {
-    const parsed = await Attach.parse(path.resolve(__dirname, 'schemas', binding), {
-        linux: path.resolve(__dirname, 'linux'),
-        dt_schema: path.resolve(__dirname, 'dt-schema'),
-    });
+])('%s (%s)', async (_kind, file, labels) => {
+    const parsed = await Attach.parse(binding(file), schema_paths);
     if (Result.is_err(parsed)) { expect.fail(parsed.error.message); }
 
     expect(suggest_parents(rpi, parsed.value.parsed_binding).map(parent => parent.label)).toStrictEqual(labels);

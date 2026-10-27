@@ -1,516 +1,377 @@
 {
     "$id": "http://devicetree.org/schemas/iio/imu/adi,adis16475.yaml#",
-    "title": "Analog Devices ADIS16475 and similar IMUs",
-    "description": "Analog Devices ADIS16475 and similar IMUs\nhttps://www.analog.com/media/en/technical-documentation/data-sheets/ADIS16475.pdf\n",
-    "properties": {
-        "compatible": {
-            "items": [
-                {
-                    "enum": [
-                        "adi,adis16475-1",
-                        "adi,adis16475-2",
-                        "adi,adis16475-3",
-                        "adi,adis16477-1",
-                        "adi,adis16477-2",
-                        "adi,adis16477-3",
-                        "adi,adis16470",
-                        "adi,adis16465-1",
-                        "adi,adis16465-2",
-                        "adi,adis16465-3",
-                        "adi,adis16467-1",
-                        "adi,adis16467-2",
-                        "adi,adis16467-3",
-                        "adi,adis16500",
-                        "adi,adis16501",
-                        "adi,adis16505-1",
-                        "adi,adis16505-2",
-                        "adi,adis16505-3",
-                        "adi,adis16507-1",
-                        "adi,adis16507-2",
-                        "adi,adis16507-3",
-                        "adi,adis16575-2",
-                        "adi,adis16575-3",
-                        "adi,adis16576-2",
-                        "adi,adis16576-3",
-                        "adi,adis16577-2",
-                        "adi,adis16577-3"
-                    ]
-                }
-            ],
-            "type": "array",
-            "minItems": 1,
-            "maxItems": 1,
-            "dtType": "string-array"
-        },
-        "reg": {
-            "minItems": 1,
-            "maxItems": 1,
-            "items": {
-                "items": [
-                    {
-                        "minimum": 0,
-                        "maximum": 256,
-                        "type": "integer"
-                    }
-                ],
-                "type": "array",
-                "minItems": 1,
-                "maxItems": 1
-            },
-            "description": "Chip select used by the device.",
-            "type": "array",
-            "dtType": "address"
-        },
-        "spi-cpha": true,
-        "spi-cpol": true,
-        "spi-max-frequency": {
-            "description": "Maximum SPI clocking speed of the device in Hz.",
-            "type": "integer",
-            "typeSize": 32,
-            "minimum": 0,
-            "maximum": 2000000,
-            "dtType": "uint32"
-        },
-        "spi-cs-inactive-delay-ns": {
-            "description": "Delay in nanoseconds to be introduced by the controller after CS is de-asserted.",
-            "default": 16000,
-            "items": [
-                {
-                    "minimum": 16000,
-                    "type": "integer",
-                    "maximum": 4294967295
-                }
-            ],
-            "type": "array",
-            "minItems": 1,
-            "maxItems": 1,
-            "dtType": "uint32-array"
-        },
-        "interrupts": {
-            "maxItems": 1,
-            "type": "array",
-            "minItems": 1,
-            "dtType": "uint32-matrix",
-            "items": {
-                "type": "array"
-            }
-        },
-        "clocks": {
-            "maxItems": 1,
-            "type": "array",
-            "minItems": 1,
-            "dtType": "phandle-array",
-            "items": {
-                "type": "array"
-            }
-        },
-        "reset-gpios": {
-            "description": "Must be the device tree identifier of the RESET pin. If specified, it will be asserted during driver probe. As the line is active low, it should be marked GPIO_ACTIVE_LOW.",
-            "maxItems": 1,
-            "type": "array",
-            "minItems": 1,
-            "dtType": "phandle-array",
-            "items": {
-                "type": "array"
-            }
-        },
-        "adi,sync-mode": {
-            "description": "Configures the device SYNC pin. The following modes are supported 0 - output_sync 1 - direct_sync 2 - scaled_sync 3 - pulse_sync",
-            "minimum": 0,
-            "maximum": 3,
-            "type": "integer",
-            "typeSize": 32,
-            "dtType": "uint32"
-        },
-        "interrupt-parent": {
-            "minItems": 1,
-            "maxItems": 1,
-            "type": "array",
-            "dtType": "phandle",
-            "items": {
-                "type": "array"
-            }
-        }
-    },
-    "required": [
-        "compatible",
-        "reg",
-        "interrupts",
-        "spi-cpha",
-        "spi-cpol"
-    ],
     "allOf": [
         {
             "$id": "http://devicetree.org/schemas/spi/spi-peripheral-props.yaml#",
-            "title": "Peripheral-specific properties for a SPI bus.",
-            "description": "Many SPI controllers need to add properties to peripheral devices. They could be common properties like spi-max-frequency, spi-cpha, etc. or they could be controller specific like delay in clock or data lines, etc. These properties need to be defined in the peripheral node because they are per-peripheral and there can be multiple peripherals attached to a controller. All those properties are listed here. The controller specific properties should go in their own separate schema that should be referenced from here.",
-            "properties": {
-                "spi-cs-high": {
-                    "description": "The device requires the chip select active high.",
-                    "oneOf": [
-                        {
-                            "type": "boolean",
-                            "const": true
-                        },
-                        {
-                            "type": "null"
-                        }
-                    ],
-                    "dtType": "flag"
-                },
-                "spi-lsb-first": {
-                    "description": "The device requires the LSB first mode.",
-                    "oneOf": [
-                        {
-                            "type": "boolean",
-                            "const": true
-                        },
-                        {
-                            "type": "null"
-                        }
-                    ],
-                    "dtType": "flag"
-                },
-                "spi-cs-setup-delay-ns": {
-                    "description": "Delay in nanoseconds to be introduced by the controller after CS is asserted.",
-                    "dtType": "uint32-array",
-                    "type": "array",
-                    "minItems": 1,
-                    "items": {
-                        "minimum": 0,
-                        "maximum": 4294967295
-                    }
-                },
-                "spi-cs-hold-delay-ns": {
-                    "description": "Delay in nanoseconds to be introduced by the controller before CS is de-asserted.",
-                    "dtType": "uint32-array",
-                    "type": "array",
-                    "minItems": 1,
-                    "items": {
-                        "minimum": 0,
-                        "maximum": 4294967295
-                    }
-                },
-                "spi-rx-bus-width": {
-                    "description": "Bus width to the SPI bus used for read transfers. If 0 is provided, then no RX will be possible on this device.",
-                    "enum": [
-                        0,
-                        1,
-                        2,
-                        4,
-                        8
-                    ],
-                    "default": 1,
-                    "type": "integer",
-                    "typeSize": 32,
-                    "minimum": 0,
-                    "maximum": 4294967295,
-                    "dtType": "uint32"
-                },
-                "spi-rx-delay-us": {
-                    "description": "Delay, in microseconds, after a read transfer.",
-                    "dtType": "uint32-array",
-                    "type": "array",
-                    "minItems": 1,
-                    "items": {
-                        "minimum": 0,
-                        "maximum": 4294967295
-                    }
-                },
-                "rx-sample-delay-ns": {
-                    "description": "SPI Rx sample delay offset, unit is nanoseconds. The delay from the default sample time before the actual sample of the rxd input signal occurs.",
-                    "dtType": "uint32-array",
-                    "type": "array",
-                    "minItems": 1,
-                    "items": {
-                        "minimum": 0,
-                        "maximum": 4294967295
-                    }
-                },
-                "spi-tx-bus-width": {
-                    "description": "Bus width to the SPI bus used for write transfers. If 0 is provided, then no TX will be possible on this device.",
-                    "enum": [
-                        0,
-                        1,
-                        2,
-                        4,
-                        8
-                    ],
-                    "default": 1,
-                    "type": "integer",
-                    "typeSize": 32,
-                    "minimum": 0,
-                    "maximum": 4294967295,
-                    "dtType": "uint32"
-                },
-                "spi-tx-delay-us": {
-                    "description": "Delay, in microseconds, after a write transfer.",
-                    "dtType": "uint32-array",
-                    "type": "array",
-                    "minItems": 1,
-                    "items": {
-                        "minimum": 0,
-                        "maximum": 4294967295
-                    }
-                },
-                "stacked-memories": {
-                    "description": "Several SPI memories can be wired in stacked mode. This basically means that either a device features several chip selects, or that different devices must be seen as a single bigger chip. This basically doubles (or more) the total address space with only a single additional wire, while still needing to repeat the commands when crossing a chip boundary. The size of each chip should be provided as members of the array.",
-                    "minItems": 2,
-                    "maxItems": 4,
-                    "type": "array",
-                    "items": {
-                        "type": "integer",
-                        "typeSize": 64,
-                        "minimum": 0,
-                        "maximum": 18446744073709552000,
-                        "dtType": "uint64"
-                    },
-                    "dtType": "uint64-array"
-                },
-                "parallel-memories": {
-                    "description": "Several SPI memories can be wired in parallel mode. The devices are physically on a different buses but will always act synchronously as each data word is spread across the different memories (eg. even bits are stored in one memory, odd bits in the other). This basically doubles the address space and the throughput while greatly complexifying the wiring because as many busses as devices must be wired. The size of each chip should be provided as members of the array.",
-                    "minItems": 2,
-                    "maxItems": 4,
-                    "type": "array",
-                    "items": {
-                        "type": "integer",
-                        "typeSize": 64,
-                        "minimum": 0,
-                        "maximum": 18446744073709552000,
-                        "dtType": "uint64"
-                    },
-                    "dtType": "uint64-array"
-                },
-                "st,spi-midi-ns": {
-                    "description": "Only for STM32H7, (Master Inter-Data Idleness) minimum time\ndelay in nanoseconds inserted between two consecutive data frames.\n",
-                    "dtType": "uint32-array",
-                    "type": "array",
-                    "minItems": 1,
-                    "items": {
-                        "minimum": 0,
-                        "maximum": 4294967295
-                    }
-                }
-            },
+            "additionalProperties": true,
             "allOf": [
                 {
                     "$id": "http://devicetree.org/schemas/spi/arm,pl022-peripheral-props.yaml#",
-                    "title": "Peripheral-specific properties for Arm PL022 SPI controller",
+                    "additionalProperties": true,
                     "properties": {
-                        "pl022,interface": {
-                            "description": "SPI interface type",
-                            "enum": [
-                                0,
-                                1,
-                                2
-                            ],
-                            "type": "integer",
-                            "typeSize": 32,
-                            "minimum": 0,
-                            "maximum": 4294967295,
-                            "dtType": "uint32"
-                        },
                         "pl022,com-mode": {
+                            "default": 1,
                             "description": "Specifies the transfer mode",
+                            "dtType": "uint32",
                             "enum": [
                                 0,
                                 1,
                                 2
                             ],
-                            "default": 1,
-                            "type": "integer",
-                            "typeSize": 32,
-                            "minimum": 0,
                             "maximum": 4294967295,
-                            "dtType": "uint32"
-                        },
-                        "pl022,rx-level-trig": {
-                            "description": "Rx FIFO watermark level",
                             "minimum": 0,
-                            "maximum": 4,
                             "type": "integer",
-                            "typeSize": 32,
-                            "dtType": "uint32"
-                        },
-                        "pl022,tx-level-trig": {
-                            "description": "Tx FIFO watermark level",
-                            "minimum": 0,
-                            "maximum": 4,
-                            "type": "integer",
-                            "typeSize": 32,
-                            "dtType": "uint32"
+                            "typeSize": 32
                         },
                         "pl022,ctrl-len": {
                             "description": "Microwire interface - Control length",
-                            "minimum": 3,
+                            "dtType": "uint32",
                             "maximum": 31,
+                            "minimum": 3,
                             "type": "integer",
-                            "typeSize": 32,
-                            "dtType": "uint32"
-                        },
-                        "pl022,wait-state": {
-                            "description": "Microwire interface - Wait state",
-                            "enum": [
-                                0,
-                                1
-                            ],
-                            "type": "integer",
-                            "typeSize": 32,
-                            "minimum": 0,
-                            "maximum": 4294967295,
-                            "dtType": "uint32"
+                            "typeSize": 32
                         },
                         "pl022,duplex": {
                             "description": "Microwire interface - Full/Half duplex",
+                            "dtType": "uint32",
                             "enum": [
                                 0,
                                 1
                             ],
-                            "type": "integer",
-                            "typeSize": 32,
-                            "minimum": 0,
                             "maximum": 4294967295,
-                            "dtType": "uint32"
+                            "minimum": 0,
+                            "type": "integer",
+                            "typeSize": 32
+                        },
+                        "pl022,interface": {
+                            "description": "SPI interface type",
+                            "dtType": "uint32",
+                            "enum": [
+                                0,
+                                1,
+                                2
+                            ],
+                            "maximum": 4294967295,
+                            "minimum": 0,
+                            "type": "integer",
+                            "typeSize": 32
+                        },
+                        "pl022,rx-level-trig": {
+                            "description": "Rx FIFO watermark level",
+                            "dtType": "uint32",
+                            "maximum": 4,
+                            "minimum": 0,
+                            "type": "integer",
+                            "typeSize": 32
+                        },
+                        "pl022,tx-level-trig": {
+                            "description": "Tx FIFO watermark level",
+                            "dtType": "uint32",
+                            "maximum": 4,
+                            "minimum": 0,
+                            "type": "integer",
+                            "typeSize": 32
+                        },
+                        "pl022,wait-state": {
+                            "description": "Microwire interface - Wait state",
+                            "dtType": "uint32",
+                            "enum": [
+                                0,
+                                1
+                            ],
+                            "maximum": 4294967295,
+                            "minimum": 0,
+                            "type": "integer",
+                            "typeSize": 32
                         }
                     },
-                    "additionalProperties": true
+                    "title": "Peripheral-specific properties for Arm PL022 SPI controller"
                 },
                 {
                     "$id": "http://devicetree.org/schemas/spi/cdns,qspi-nor-peripheral-props.yaml#",
-                    "title": "Peripheral-specific properties for the Cadence QSPI controller.",
+                    "additionalProperties": true,
                     "description": "See spi-peripheral-props.yaml for more info.",
                     "properties": {
                         "cdns,read-delay": {
                             "description": "Delay for read capture logic, in clock cycles.",
-                            "type": "integer",
-                            "typeSize": 32,
-                            "minimum": 0,
+                            "dtType": "uint32",
                             "maximum": 4294967295,
-                            "dtType": "uint32"
-                        },
-                        "cdns,tshsl-ns": {
-                            "description": "Delay in nanoseconds for the length that the master mode chip select outputs are de-asserted between transactions.",
-                            "dtType": "uint32-array",
-                            "type": "array",
-                            "minItems": 1,
-                            "items": {
-                                "minimum": 0,
-                                "maximum": 4294967295
-                            }
-                        },
-                        "cdns,tsd2d-ns": {
-                            "description": "Delay in nanoseconds between one chip select being de-activated and the activation of another.",
-                            "dtType": "uint32-array",
-                            "type": "array",
-                            "minItems": 1,
-                            "items": {
-                                "minimum": 0,
-                                "maximum": 4294967295
-                            }
+                            "minimum": 0,
+                            "type": "integer",
+                            "typeSize": 32
                         },
                         "cdns,tchsh-ns": {
                             "description": "Delay in nanoseconds between last bit of current transaction and deasserting the device chip select (qspi_n_ss_out).",
                             "dtType": "uint32-array",
-                            "type": "array",
-                            "minItems": 1,
                             "items": {
-                                "minimum": 0,
-                                "maximum": 4294967295
-                            }
+                                "maximum": 4294967295,
+                                "minimum": 0
+                            },
+                            "minItems": 1,
+                            "type": "array"
+                        },
+                        "cdns,tsd2d-ns": {
+                            "description": "Delay in nanoseconds between one chip select being de-activated and the activation of another.",
+                            "dtType": "uint32-array",
+                            "items": {
+                                "maximum": 4294967295,
+                                "minimum": 0
+                            },
+                            "minItems": 1,
+                            "type": "array"
+                        },
+                        "cdns,tshsl-ns": {
+                            "description": "Delay in nanoseconds for the length that the master mode chip select outputs are de-asserted between transactions.",
+                            "dtType": "uint32-array",
+                            "items": {
+                                "maximum": 4294967295,
+                                "minimum": 0
+                            },
+                            "minItems": 1,
+                            "type": "array"
                         },
                         "cdns,tslch-ns": {
                             "description": "Delay in nanoseconds between setting qspi_n_ss_out low and first bit transfer.",
                             "dtType": "uint32-array",
-                            "type": "array",
-                            "minItems": 1,
                             "items": {
-                                "minimum": 0,
-                                "maximum": 4294967295
-                            }
+                                "maximum": 4294967295,
+                                "minimum": 0
+                            },
+                            "minItems": 1,
+                            "type": "array"
                         }
                     },
-                    "additionalProperties": true
+                    "title": "Peripheral-specific properties for the Cadence QSPI controller."
                 },
                 {
                     "$id": "http://devicetree.org/schemas/spi/fsl,dspi-peripheral-props.yaml#",
-                    "title": "Peripheral-specific properties for Freescale DSPI controller",
+                    "additionalProperties": true,
                     "description": "See spi-peripheral-props.yaml for more info.",
                     "properties": {
                         "fsl,spi-cs-sck-delay": {
                             "deprecated": true,
                             "description": "Delay in nanoseconds between activating chip select and the start of clock signal, at the start of a transfer.",
-                            "type": "integer",
-                            "typeSize": 32,
-                            "minimum": 0,
+                            "dtType": "uint32",
                             "maximum": 4294967295,
-                            "dtType": "uint32"
+                            "minimum": 0,
+                            "type": "integer",
+                            "typeSize": 32
                         },
                         "fsl,spi-sck-cs-delay": {
                             "deprecated": true,
                             "description": "Delay in nanoseconds between stopping the clock signal and deactivating chip select, at the end of a transfer.",
-                            "type": "integer",
-                            "typeSize": 32,
-                            "minimum": 0,
+                            "dtType": "uint32",
                             "maximum": 4294967295,
-                            "dtType": "uint32"
+                            "minimum": 0,
+                            "type": "integer",
+                            "typeSize": 32
                         }
                     },
-                    "additionalProperties": true
+                    "title": "Peripheral-specific properties for Freescale DSPI controller"
                 },
                 {
                     "$id": "http://devicetree.org/schemas/spi/samsung,spi-peripheral-props.yaml#",
-                    "title": "Peripheral-specific properties for Samsung S3C/S5P/Exynos SoC SPI controller",
+                    "additionalProperties": true,
                     "description": "See spi-peripheral-props.yaml for more info.",
                     "properties": {
                         "controller-data": {
-                            "type": "object",
                             "additionalProperties": false,
                             "properties": {
                                 "samsung,spi-feedback-delay": {
+                                    "default": 0,
                                     "description": "The sampling phase shift to be applied on the miso line (to account\nfor any lag in the miso line). Valid values:\n - 0: No phase shift.\n - 1: 90 degree phase shift sampling.\n - 2: 180 degree phase shift sampling.\n - 3: 270 degree phase shift sampling.\n",
+                                    "dtType": "uint32",
                                     "enum": [
                                         0,
                                         1,
                                         2,
                                         3
                                     ],
-                                    "default": 0,
-                                    "type": "integer",
-                                    "typeSize": 32,
-                                    "minimum": 0,
                                     "maximum": 4294967295,
-                                    "dtType": "uint32"
+                                    "minimum": 0,
+                                    "type": "integer",
+                                    "typeSize": 32
                                 }
-                            }
+                            },
+                            "type": "object"
                         }
                     },
-                    "additionalProperties": true
+                    "title": "Peripheral-specific properties for Samsung S3C/S5P/Exynos SoC SPI controller"
                 },
                 {
                     "$id": "http://devicetree.org/schemas/spi/nvidia,tegra210-quad-peripheral-props.yaml#",
-                    "title": "Peripheral properties for Tegra Quad SPI Controller",
+                    "additionalProperties": true,
                     "properties": {
-                        "nvidia,tx-clk-tap-delay": {
-                            "description": "Delays the clock going out to device with this tap value. Tap value varies based on platform design trace lengths from Tegra QSPI to corresponding slave device.",
-                            "minimum": 0,
-                            "maximum": 31,
-                            "type": "integer",
-                            "typeSize": 32,
-                            "dtType": "uint32"
-                        },
                         "nvidia,rx-clk-tap-delay": {
                             "description": "Delays the clock coming in from the device with this tap value. Tap value varies based on platform design trace lengths from Tegra QSPI to corresponding slave device.",
-                            "minimum": 0,
+                            "dtType": "uint32",
                             "maximum": 255,
+                            "minimum": 0,
                             "type": "integer",
-                            "typeSize": 32,
-                            "dtType": "uint32"
+                            "typeSize": 32
+                        },
+                        "nvidia,tx-clk-tap-delay": {
+                            "description": "Delays the clock going out to device with this tap value. Tap value varies based on platform design trace lengths from Tegra QSPI to corresponding slave device.",
+                            "dtType": "uint32",
+                            "maximum": 31,
+                            "minimum": 0,
+                            "type": "integer",
+                            "typeSize": 32
                         }
                     },
-                    "additionalProperties": true
+                    "title": "Peripheral properties for Tegra Quad SPI Controller"
                 }
             ],
-            "additionalProperties": true
+            "description": "Many SPI controllers need to add properties to peripheral devices. They could be common properties like spi-max-frequency, spi-cpha, etc. or they could be controller specific like delay in clock or data lines, etc. These properties need to be defined in the peripheral node because they are per-peripheral and there can be multiple peripherals attached to a controller. All those properties are listed here. The controller specific properties should go in their own separate schema that should be referenced from here.",
+            "properties": {
+                "parallel-memories": {
+                    "description": "Several SPI memories can be wired in parallel mode. The devices are physically on a different buses but will always act synchronously as each data word is spread across the different memories (eg. even bits are stored in one memory, odd bits in the other). This basically doubles the address space and the throughput while greatly complexifying the wiring because as many busses as devices must be wired. The size of each chip should be provided as members of the array.",
+                    "dtType": "uint64-array",
+                    "items": {
+                        "dtType": "uint64",
+                        "maximum": 18446744073709552000,
+                        "minimum": 0,
+                        "type": "integer",
+                        "typeSize": 64
+                    },
+                    "maxItems": 4,
+                    "minItems": 2,
+                    "type": "array"
+                },
+                "rx-sample-delay-ns": {
+                    "description": "SPI Rx sample delay offset, unit is nanoseconds. The delay from the default sample time before the actual sample of the rxd input signal occurs.",
+                    "dtType": "uint32-array",
+                    "items": {
+                        "maximum": 4294967295,
+                        "minimum": 0
+                    },
+                    "minItems": 1,
+                    "type": "array"
+                },
+                "spi-cs-high": {
+                    "description": "The device requires the chip select active high.",
+                    "dtType": "flag",
+                    "oneOf": [
+                        {
+                            "const": true,
+                            "type": "boolean"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "spi-cs-hold-delay-ns": {
+                    "description": "Delay in nanoseconds to be introduced by the controller before CS is de-asserted.",
+                    "dtType": "uint32-array",
+                    "items": {
+                        "maximum": 4294967295,
+                        "minimum": 0
+                    },
+                    "minItems": 1,
+                    "type": "array"
+                },
+                "spi-cs-setup-delay-ns": {
+                    "description": "Delay in nanoseconds to be introduced by the controller after CS is asserted.",
+                    "dtType": "uint32-array",
+                    "items": {
+                        "maximum": 4294967295,
+                        "minimum": 0
+                    },
+                    "minItems": 1,
+                    "type": "array"
+                },
+                "spi-lsb-first": {
+                    "description": "The device requires the LSB first mode.",
+                    "dtType": "flag",
+                    "oneOf": [
+                        {
+                            "const": true,
+                            "type": "boolean"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "spi-rx-bus-width": {
+                    "default": 1,
+                    "description": "Bus width to the SPI bus used for read transfers. If 0 is provided, then no RX will be possible on this device.",
+                    "dtType": "uint32",
+                    "enum": [
+                        0,
+                        1,
+                        2,
+                        4,
+                        8
+                    ],
+                    "maximum": 4294967295,
+                    "minimum": 0,
+                    "type": "integer",
+                    "typeSize": 32
+                },
+                "spi-rx-delay-us": {
+                    "description": "Delay, in microseconds, after a read transfer.",
+                    "dtType": "uint32-array",
+                    "items": {
+                        "maximum": 4294967295,
+                        "minimum": 0
+                    },
+                    "minItems": 1,
+                    "type": "array"
+                },
+                "spi-tx-bus-width": {
+                    "default": 1,
+                    "description": "Bus width to the SPI bus used for write transfers. If 0 is provided, then no TX will be possible on this device.",
+                    "dtType": "uint32",
+                    "enum": [
+                        0,
+                        1,
+                        2,
+                        4,
+                        8
+                    ],
+                    "maximum": 4294967295,
+                    "minimum": 0,
+                    "type": "integer",
+                    "typeSize": 32
+                },
+                "spi-tx-delay-us": {
+                    "description": "Delay, in microseconds, after a write transfer.",
+                    "dtType": "uint32-array",
+                    "items": {
+                        "maximum": 4294967295,
+                        "minimum": 0
+                    },
+                    "minItems": 1,
+                    "type": "array"
+                },
+                "st,spi-midi-ns": {
+                    "description": "Only for STM32H7, (Master Inter-Data Idleness) minimum time\ndelay in nanoseconds inserted between two consecutive data frames.\n",
+                    "dtType": "uint32-array",
+                    "items": {
+                        "maximum": 4294967295,
+                        "minimum": 0
+                    },
+                    "minItems": 1,
+                    "type": "array"
+                },
+                "stacked-memories": {
+                    "description": "Several SPI memories can be wired in stacked mode. This basically means that either a device features several chip selects, or that different devices must be seen as a single bigger chip. This basically doubles (or more) the total address space with only a single additional wire, while still needing to repeat the commands when crossing a chip boundary. The size of each chip should be provided as members of the array.",
+                    "dtType": "uint64-array",
+                    "items": {
+                        "dtType": "uint64",
+                        "maximum": 18446744073709552000,
+                        "minimum": 0,
+                        "type": "integer",
+                        "typeSize": 64
+                    },
+                    "maxItems": 4,
+                    "minItems": 2,
+                    "type": "array"
+                }
+            },
+            "title": "Peripheral-specific properties for a SPI bus."
         },
         {
             "if": {
@@ -544,12 +405,12 @@
             },
             "then": {
                 "properties": {
+                    "__canary__": false,
                     "adi,sync-mode": {
-                        "minimum": 0,
                         "maximum": 2,
+                        "minimum": 0,
                         "type": "integer"
-                    },
-                    "__canary__": false
+                    }
                 }
             }
         },
@@ -604,18 +465,157 @@
             },
             "then": {
                 "properties": {
+                    "__canary__": false,
                     "spi-max-frequency": {
                         "maximum": 15000000,
                         "type": "integer"
-                    },
-                    "__canary__": false
+                    }
                 }
             }
         }
     ],
-    "unevaluatedProperties": false,
+    "description": "Analog Devices ADIS16475 and similar IMUs\nhttps://www.analog.com/media/en/technical-documentation/data-sheets/ADIS16475.pdf\n",
     "examples": [
         "#include <dt-bindings/interrupt-controller/irq.h>\nspi {\n    #address-cells = <1>;\n    #size-cells = <0>;\n\n    adis16475: adis16475-3@0 {\n        compatible = \"adi,adis16475-3\";\n        reg = <0>;\n        spi-cpha;\n        spi-cpol;\n        spi-max-frequency = <2000000>;\n        interrupts = <4 IRQ_TYPE_EDGE_RISING>;\n        interrupt-parent = <&gpio>;\n    };\n};\n"
     ],
-    "type": "object"
+    "properties": {
+        "adi,sync-mode": {
+            "description": "Configures the device SYNC pin. The following modes are supported 0 - output_sync 1 - direct_sync 2 - scaled_sync 3 - pulse_sync",
+            "dtType": "uint32",
+            "maximum": 3,
+            "minimum": 0,
+            "type": "integer",
+            "typeSize": 32
+        },
+        "clocks": {
+            "dtType": "phandle-array",
+            "items": {
+                "type": "array"
+            },
+            "maxItems": 1,
+            "minItems": 1,
+            "type": "array"
+        },
+        "compatible": {
+            "dtType": "string-array",
+            "items": [
+                {
+                    "enum": [
+                        "adi,adis16475-1",
+                        "adi,adis16475-2",
+                        "adi,adis16475-3",
+                        "adi,adis16477-1",
+                        "adi,adis16477-2",
+                        "adi,adis16477-3",
+                        "adi,adis16470",
+                        "adi,adis16465-1",
+                        "adi,adis16465-2",
+                        "adi,adis16465-3",
+                        "adi,adis16467-1",
+                        "adi,adis16467-2",
+                        "adi,adis16467-3",
+                        "adi,adis16500",
+                        "adi,adis16501",
+                        "adi,adis16505-1",
+                        "adi,adis16505-2",
+                        "adi,adis16505-3",
+                        "adi,adis16507-1",
+                        "adi,adis16507-2",
+                        "adi,adis16507-3",
+                        "adi,adis16575-2",
+                        "adi,adis16575-3",
+                        "adi,adis16576-2",
+                        "adi,adis16576-3",
+                        "adi,adis16577-2",
+                        "adi,adis16577-3"
+                    ]
+                }
+            ],
+            "maxItems": 1,
+            "minItems": 1,
+            "type": "array"
+        },
+        "interrupt-parent": {
+            "dtType": "phandle",
+            "items": {
+                "type": "array"
+            },
+            "maxItems": 1,
+            "minItems": 1,
+            "type": "array"
+        },
+        "interrupts": {
+            "dtType": "uint32-matrix",
+            "items": {
+                "type": "array"
+            },
+            "maxItems": 1,
+            "minItems": 1,
+            "type": "array"
+        },
+        "reg": {
+            "description": "Chip select used by the device.",
+            "dtType": "address",
+            "items": {
+                "items": [
+                    {
+                        "maximum": 256,
+                        "minimum": 0,
+                        "type": "integer"
+                    }
+                ],
+                "maxItems": 1,
+                "minItems": 1,
+                "type": "array"
+            },
+            "maxItems": 1,
+            "minItems": 1,
+            "type": "array"
+        },
+        "reset-gpios": {
+            "description": "Must be the device tree identifier of the RESET pin. If specified, it will be asserted during driver probe. As the line is active low, it should be marked GPIO_ACTIVE_LOW.",
+            "dtType": "phandle-array",
+            "items": {
+                "type": "array"
+            },
+            "maxItems": 1,
+            "minItems": 1,
+            "type": "array"
+        },
+        "spi-cpha": true,
+        "spi-cpol": true,
+        "spi-cs-inactive-delay-ns": {
+            "default": 16000,
+            "description": "Delay in nanoseconds to be introduced by the controller after CS is de-asserted.",
+            "dtType": "uint32-array",
+            "items": [
+                {
+                    "maximum": 4294967295,
+                    "minimum": 16000,
+                    "type": "integer"
+                }
+            ],
+            "maxItems": 1,
+            "minItems": 1,
+            "type": "array"
+        },
+        "spi-max-frequency": {
+            "description": "Maximum SPI clocking speed of the device in Hz.",
+            "dtType": "uint32",
+            "maximum": 2000000,
+            "minimum": 0,
+            "type": "integer",
+            "typeSize": 32
+        }
+    },
+    "required": [
+        "compatible",
+        "reg",
+        "interrupts",
+        "spi-cpha",
+        "spi-cpol"
+    ],
+    "title": "Analog Devices ADIS16475 and similar IMUs",
+    "type": "object",
+    "unevaluatedProperties": false
 }

@@ -1,4 +1,4 @@
-import { Bits, DTCellArray, DTProperty, is_dt_flag } from "./Parser";
+import { DTProperty, is_dt_flag } from "./Parser";
 import { print_property } from "./Parser";
 import {
     CellArray,
@@ -11,15 +11,13 @@ import {
     is_cell_array,
     is_cell_array_or_cell_matrix,
     is_cell_entry_or_cell_array,
-    LabeledDTString,
-    LabeledTaggedCellValue,
     make_cell_array,
     NumberRepr,
     upcast_to_LabeledDTString,
     upcast_to_LabeledDTStringArray,
     upcast_to_LabeledTaggedCellValue_LabeledArray
 } from "./Types";
-import { AddCallOnce, make_labeled_iterable } from "./TypeUtilities";
+import { AddCallOnce } from "./TypeUtilities";
 
 interface IFlagPropertyBuilder {
     set_flag(): IPropertyNameBuilder;
@@ -202,853 +200,92 @@ if (import.meta.vitest !== undefined) {
 
     const { test, expect } = import.meta.vitest;
 
-    test(`Flag Builder`, () => {
-        const expected_flag: DTProperty = {
-            labels: [],
-            name: "spi-controller",
-            value: { kind: "flag" },
-        };
+    const number = PropertyBuilder.tag_number;
+    const label = PropertyBuilder.tag_label;
+    const path = PropertyBuilder.tag_path;
+    const expression = PropertyBuilder.tag_expression;
+    const labeled = <T>(payload: T, labels: string[]) => ({ payload, labels });
 
-        const flag: DTProperty = PropertyBuilder.build_flag()
-            .set_flag()
-            .with_name(expected_flag.name)
-            .with_label(expected_flag.labels)
-            .build();
+    const row: CellValue[] = [number(0), label("gpio0"), path("/soc/gpio0"), expression("(1+1)")];
+    const matrix = (index: number): CellValue[][] => [[number(index), label(`gpio${index}`)], [path(`/soc/gpio${index}`), expression("(1+1)")]];
+    const pair = (index: number): CellValue[] => [number(index), label(`gpio${index}`)];
 
-        console.log(`${PropertyBuilder.to_string(flag)}`);
-
-        expect(flag).toStrictEqual(expected_flag);
+    // What each way of giving a builder its values prints: a property is written as the overlay will hold it
+    test.each<[string, () => DTProperty, string]>([
+        ["flag", () => PropertyBuilder.build_flag().set_flag().with_name("spi-controller").build(), "spi-controller;"],
+        ["string", () => PropertyBuilder.build_string().with_value("adi,ad7124").with_name("compatible").build(), `compatible = "adi,ad7124";`],
+        ["labelled string", () => PropertyBuilder.build_string().with_value(labeled("adi,ad7124", ["my_compat"])).with_name("compatible").build(), `compatible = my_compat: "adi,ad7124";`],
+        ["string array", () => PropertyBuilder.build_string().with_value(["adi,ad7124", "adi,adxl355"]).with_name("compatible").build(), `compatible = "adi,ad7124", "adi,adxl355";`],
+        [
+            "labelled string array",
+            () => PropertyBuilder.build_string().with_value([labeled("adi,ad7124", ["a"]), labeled("adi,adxl355", ["b"])]).with_name("compatible").build(),
+            `compatible = a: "adi,ad7124", b: "adi,adxl355";`,
+        ],
+        ["strings", () => PropertyBuilder.build_string().with_value("adi,ad7124", "adi,adxl355").with_name("compatible").build(), `compatible = "adi,ad7124", "adi,adxl355";`],
+        [
+            "string arrays",
+            () => PropertyBuilder.build_string().with_value(["adi,ad7124-4", "adi,ad7124-8"], ["adi,adxl355"]).with_name("compatible").build(),
+            `compatible = "adi,ad7124-4", "adi,ad7124-8", "adi,adxl355";`,
+        ],
+        [
+            "a string array, then a string",
+            () => PropertyBuilder.build_string().with_value(["adi,ad7124-4", "adi,ad7124-8"], "adi,adxl355").with_name("compatible").build(),
+            `compatible = "adi,ad7124-4", "adi,ad7124-8", "adi,adxl355";`,
+        ],
+        [
+            "a string, then a string array",
+            () => PropertyBuilder.build_string().with_value("adi,ad7124-4", ["adi,adxl355", "adi,ad7124-8"]).with_name("compatible").build(),
+            `compatible = "adi,ad7124-4", "adi,adxl355", "adi,ad7124-8";`,
+        ],
+        [
+            "a string between string arrays",
+            () => PropertyBuilder.build_string().with_value(["adi,ad7124-4"], "adi,ad7124-8", ["adi,adxl355"]).with_name("compatible").build(),
+            `compatible = "adi,ad7124-4", "adi,ad7124-8", "adi,adxl355";`,
+        ],
+        ["label reference", () => PropertyBuilder.build_reference().with_label_value("gpio").with_name("gpio0").build(), "gpio0 = &gpio;"],
+        ["labelled label reference", () => PropertyBuilder.build_reference().with_label_value(labeled("gpio0", ["a"])).with_name("gpio0").build(), "gpio0 = a: &gpio0;"],
+        ["path reference", () => PropertyBuilder.build_reference().with_path_value("/soc/gpio").with_name("gpio0").build(), "gpio0 = &{/soc/gpio};"],
+        ["labelled path reference", () => PropertyBuilder.build_reference().with_path_value(labeled("/soc/gpio", ["a"])).with_name("gpio0").build(), "gpio0 = a: &{/soc/gpio};"],
+        ["cells", () => PropertyBuilder.build_cell_array().with_tagged_values(number(0), label("gpio0"), path("/soc/gpio0"), expression("(1+1)")).with_name("cells").build(), "cells = <0 &gpio0 &{/soc/gpio0} (1+1)>;"],
+        ["a cell array", () => PropertyBuilder.build_cell_array().with_tagged_values(row).with_name("cells").build(), "cells = <0 &gpio0 &{/soc/gpio0} (1+1)>;"],
+        [
+            "a labelled cell array",
+            () => PropertyBuilder.build_cell_array().with_tagged_values(row.map(cell => labeled(cell, ["a"]))).with_name("cells").build(),
+            "cells = <a: 0 a: &gpio0 a: &{/soc/gpio0} a: (1+1)>;",
+        ],
+        ["a cell, then a cell array", () => PropertyBuilder.build_cell_array().with_tagged_values(row[0]!, row.slice(1)).with_name("cells").build(), "cells = <0 &gpio0 &{/soc/gpio0} (1+1)>;"],
+        ["a cell array, then a cell", () => PropertyBuilder.build_cell_array().with_tagged_values(row.slice(1), row[0]!).with_name("cells").build(), "cells = <&gpio0 &{/soc/gpio0} (1+1) 0>;"],
+        ["cell arrays", () => PropertyBuilder.build_cell_array().with_tagged_values(row.slice(1, 3), [row[0]!, row[3]!]).with_name("cells").build(), "cells = <&gpio0 &{/soc/gpio0}>, <0 (1+1)>;"],
+        ["a matrix", () => PropertyBuilder.build_cell_array().with_tagged_values(matrix(0)).with_name("cells").build(), "cells = <0 &gpio0>, <&{/soc/gpio0} (1+1)>;"],
+        [
+            "matrices",
+            () => PropertyBuilder.build_cell_array().with_tagged_values(matrix(0), matrix(1)).with_name("cells").build(),
+            "cells = <0 &gpio0>, <&{/soc/gpio0} (1+1)>, <1 &gpio1>, <&{/soc/gpio1} (1+1)>;",
+        ],
+        ["a matrix, then a cell array", () => PropertyBuilder.build_cell_array().with_tagged_values(matrix(0), pair(1)).with_name("cells").build(), "cells = <0 &gpio0>, <&{/soc/gpio0} (1+1)>, <1 &gpio1>;"],
+        ["a cell array, then a matrix", () => PropertyBuilder.build_cell_array().with_tagged_values(pair(1), matrix(0)).with_name("cells").build(), "cells = <1 &gpio1>, <0 &gpio0>, <&{/soc/gpio0} (1+1)>;"],
+        [
+            "matrices and cell arrays",
+            () => PropertyBuilder.build_cell_array().with_tagged_values(matrix(0), pair(1), matrix(2)).with_name("cells").build(),
+            "cells = <0 &gpio0>, <&{/soc/gpio0} (1+1)>, <1 &gpio1>, <2 &gpio2>, <&{/soc/gpio2} (1+1)>;",
+        ],
+    ])("%s", (_name, build, printed) => {
+        expect(PropertyBuilder.to_string(build())).toBe(`${printed}\n`);
     });
 
-    test(`String Builder`, () => {
-        const string_value: string = "adi,ad7124";
-
-        const expected_compatible: DTProperty = {
-            labels: [],
-            name: "compatible",
-            value: [
-                {
-                    kind: 'string',
-                    value: string_value,
-                    labels: []
-                }
-            ]
-        };
-
-        const compatible: DTProperty = PropertyBuilder.build_string()
-            .with_value(string_value)
-            .with_name(expected_compatible.name)
-            .with_label(expected_compatible.labels)
-            .build();
-
-        console.log(`${PropertyBuilder.to_string(compatible)}`);
-        expect(compatible).toStrictEqual(expected_compatible);
+    // The assertions are the @ts-expect-errors, checked by `yarn typecheck`: loose cells may only come before or after
+    // one cell array, the cells of its row
+    test("cell arrays can't be mixed with loose cells", () => {
+        const cells = PropertyBuilder.build_cell_array();
+        // @ts-expect-error a cell array between cells
+        cells.with_tagged_values(number(0), pair(1), number(2));
+        // @ts-expect-error a cell after cell arrays
+        cells.with_tagged_values(pair(1), pair(2), number(0));
+        // @ts-expect-error a cell between cell arrays
+        cells.with_tagged_values(pair(1), number(0), pair(2));
+        // @ts-expect-error a cell before cell arrays
+        cells.with_tagged_values(number(0), pair(1), pair(2));
     });
-
-    test(`Labeled String Builder`, () => {
-        const string_value: LabeledDTString = {
-            payload: "adi,ad7124",
-            labels: ["my_compat"]
-        };
-
-        const expected_compatible: DTProperty = {
-            labels: [],
-            name: "compatible",
-            value: [
-                {
-                    kind: 'string',
-                    value: string_value.payload,
-                    labels: string_value.labels
-                }
-            ]
-        };
-
-        const compatible: DTProperty = PropertyBuilder.build_string()
-            .with_value(string_value)
-            .with_name(expected_compatible.name)
-            .with_label(expected_compatible.labels)
-            .build();
-
-        console.log(`${PropertyBuilder.to_string(compatible)}`);
-        expect(compatible).toStrictEqual(expected_compatible);
-    });
-
-    test(`Array String Builder`, () => {
-        const string_values: string[] = ["adi,ad7124", "adi,adxl355"];
-
-        const expected_compatible: DTProperty = {
-            labels: [],
-            name: "compatible",
-            value: string_values.map((entry) => {
-                return {
-                    kind: 'string',
-                    labels: [],
-                    value: entry
-                };
-            })
-        };
-
-        const compatible: DTProperty = PropertyBuilder.build_string()
-            .with_value(string_values)
-            .with_name(expected_compatible.name)
-            .with_label(expected_compatible.labels)
-            .build();
-
-        console.log(`${PropertyBuilder.to_string(compatible)}`);
-        expect(compatible).toStrictEqual(expected_compatible);
-    });
-
-    test(`Labeled Array String Builder`, () => {
-        const string_values: LabeledDTString[] = [
-            {
-                payload: "adi,ad7124",
-                labels: ["my_cool_label"]
-            },
-            {
-                payload: "adi,adxl355",
-                labels: ["my_lame_label"]
-            }
-        ];
-
-        const expected_compatible: DTProperty = {
-            labels: [],
-            name: "compatible",
-            value: string_values.map((entry) => {
-                return {
-                    kind: 'string',
-                    labels: entry.labels,
-                    value: entry.payload
-                };
-            })
-        };
-
-        const compatible: DTProperty = PropertyBuilder.build_string()
-            .with_value(string_values)
-            .with_name(expected_compatible.name)
-            .with_label(expected_compatible.labels)
-            .build();
-
-        console.log(`${PropertyBuilder.to_string(compatible)}`);
-        expect(compatible).toStrictEqual(expected_compatible);
-    });
-
-    test(`Variadic String Builder`, () => {
-        const string1_value: string = "adi,ad7124";
-        const string2_value: string = "adi,adxl355";
-
-        const expected_compatible: DTProperty = {
-            labels: [],
-            name: "compatible",
-            value:
-                [
-                    {
-                        kind: 'string',
-                        labels: [],
-                        value: string1_value
-                    },
-                    {
-                        kind: 'string',
-                        labels: [],
-                        value: string2_value
-                    }
-                ]
-        };
-
-        const compatible: DTProperty = PropertyBuilder.build_string()
-            .with_value(string1_value, string2_value)
-            .with_name(expected_compatible.name)
-            .build();
-
-        console.log(`${PropertyBuilder.to_string(compatible)}`);
-        expect(compatible).toStrictEqual(expected_compatible);
-    });
-
-    test(`Variadic String Array Builder`, () => {
-        const string1_values: string[] = ["adi,ad7124-4", "adi,ad7124-8"];
-        const string2_values: string[] = ["adi,adxl355"];
-
-        const composed = [...string1_values, ...string2_values];
-
-        const expected_compatible: DTProperty = {
-            labels: [],
-            name: "compatible",
-            value: composed.map((entry) => {
-                return {
-                    kind: 'string',
-                    labels: [],
-                    value: entry
-                };
-            })
-        };
-
-        const compatible: DTProperty = PropertyBuilder.build_string()
-            .with_value(string1_values, string2_values)
-            .with_name(expected_compatible.name)
-            .build();
-
-        console.log(`${PropertyBuilder.to_string(compatible)}`);
-        expect(compatible).toStrictEqual(expected_compatible);
-    });
-
-    test(`Variadic String Array and String Builder 1`, () => {
-        const string1_values: string[] = ["adi,ad7124-4", "adi,ad7124-8"];
-        const string2_value: string = "adi,adxl355";
-
-        const composed = [...string1_values, string2_value];
-
-        const expected_compatible: DTProperty = {
-            labels: [],
-            name: "compatible",
-            value: composed.map((entry) => {
-                return {
-                    kind: 'string',
-                    labels: [],
-                    value: entry
-                };
-            })
-        };
-
-        const compatible: DTProperty = PropertyBuilder.build_string()
-            .with_value(string1_values, string2_value)
-            .with_name(expected_compatible.name)
-            .build();
-
-        console.log(`${PropertyBuilder.to_string(compatible)}`);
-        expect(compatible).toStrictEqual(expected_compatible);
-    });
-
-    test(`Variadic String Array and String Builder 2`, () => {
-        const string1_values: string = "adi,ad7124-4";
-        const string2_value: string[] = ["adi,adxl355", "adi,ad7124-8"];
-
-        const composed = [string1_values, ...string2_value];
-
-        const expected_compatible: DTProperty = {
-            labels: [],
-            name: "compatible",
-            value: composed.map((entry) => {
-                return {
-
-                    kind: 'string',
-                    labels: [],
-                    value: entry
-                };
-            })
-        };
-
-        const compatible: DTProperty = PropertyBuilder.build_string()
-            .with_value(string1_values, string2_value)
-            .with_name(expected_compatible.name)
-            .build();
-
-        console.log(`${PropertyBuilder.to_string(compatible)}`);
-        expect(compatible).toStrictEqual(expected_compatible);
-    });
-
-    test(`Variadic String Array and String Builder 3`, () => {
-        const string1_values: string[] = ["adi,ad7124-4"];
-        const string2_value: string = "adi,ad7124-8";
-        const string3_values: string[] = ["adi,adxl355"];
-
-        const composed = [...string1_values, string2_value, ...string3_values];
-
-        const expected_compatible: DTProperty = {
-            labels: [],
-            name: "compatible",
-            value: composed.map((entry) => {
-                return {
-                    kind: 'string',
-                    labels: [],
-                    value: entry
-                };
-            })
-        };
-
-        const compatible: DTProperty = PropertyBuilder.build_string()
-            .with_value(string1_values, string2_value, string3_values)
-            .with_name(expected_compatible.name)
-            .with_label(expected_compatible.labels)
-            .build();
-
-        console.log(`${PropertyBuilder.to_string(compatible)}`);
-        expect(compatible).toStrictEqual(expected_compatible);
-    });
-
-    test(`Reference with label Builder`, () => {
-        const label_name: string = "gpio";
-
-        const expected_label_reference: DTProperty = {
-            labels: [],
-            name: "gpio0",
-            value: [
-                {
-                    kind: "label",
-                    labels: [],
-                    name: label_name
-                }
-            ]
-        };
-
-        const label_reference: DTProperty = PropertyBuilder.build_reference()
-            .with_label_value(label_name)
-            .with_name(expected_label_reference.name)
-            .build();
-
-        console.log(`${PropertyBuilder.to_string(label_reference)}`);
-        expect(label_reference).toStrictEqual(expected_label_reference);
-    });
-
-    test(`Labeled Reference with label Builder`, () => {
-        const label_name: LabeledDTString = {
-            payload: "gpio0",
-            labels: ["useless_label"]
-        };
-
-        const expected_label_reference: DTProperty = {
-            labels: [],
-            name: "gpio0",
-            value: [
-                {
-                    kind: "label",
-                    labels: label_name.labels,
-                    name: label_name.payload
-                }
-            ]
-        };
-
-        const label_reference: DTProperty = PropertyBuilder.build_reference()
-            .with_label_value(label_name)
-            .with_name(expected_label_reference.name)
-            .with_label(expected_label_reference.labels)
-            .build();
-
-        console.log(`${PropertyBuilder.to_string(label_reference)}`);
-        expect(label_reference).toStrictEqual(expected_label_reference);
-    });
-
-    test(`Reference with path Builder`, () => {
-        const path: string = "/soc/gpio";
-
-        const expected_path_reference: DTProperty = {
-            labels: [],
-            name: "gpio0",
-            value: [
-                {
-                    kind: "path",
-                    labels: [],
-                    path: path
-                }
-            ]
-        };
-
-        const path_reference: DTProperty = PropertyBuilder.build_reference()
-            .with_path_value(path)
-            .with_name(expected_path_reference.name)
-            .with_label(expected_path_reference.labels)
-            .build();
-
-        console.log(`${PropertyBuilder.to_string(path_reference)}`);
-        expect(path_reference).toStrictEqual(expected_path_reference);
-    });
-
-    test(`Labeled Reference with path Builder`, () => {
-        const path: LabeledDTString = {
-            payload: "/soc/gpio",
-            labels: ["doubtful_label"]
-        };
-
-        const expected_path_reference: DTProperty = {
-            labels: [],
-            name: "gpio0",
-            value: [
-                {
-                    kind: "path",
-                    labels: path.labels,
-                    path: path.payload
-                }
-            ]
-        };
-
-        const path_reference: DTProperty = PropertyBuilder.build_reference()
-            .with_path_value(path)
-            .with_name(expected_path_reference.name)
-            .with_label(expected_path_reference.labels)
-            .build();
-
-        console.log(`${PropertyBuilder.to_string(path_reference)}`);
-        expect(path_reference).toStrictEqual(expected_path_reference);
-    });
-
-    test(`Cell Array Builder : (...CellEntry[>=1])`, () => {
-        const number_value = PropertyBuilder.tag_number(0);
-        const label_value = PropertyBuilder.tag_label("gpio0");
-        const path_value = PropertyBuilder.tag_path("/soc/gpio0");
-        const expression_value = PropertyBuilder.tag_expression("(1+1)");
-
-        const composed = [[number_value, label_value, path_value, expression_value]];
-
-        const expected_cell: DTProperty = {
-            labels: [],
-            name: "unusual-cell",
-            value: cell_value_matrix_to_dts_cell_array_array(composed)
-        };
-
-        const cell = PropertyBuilder.build_cell_array()
-            .with_tagged_values(
-                PropertyBuilder.tag_number(0),
-                PropertyBuilder.tag_label("gpio0"),
-                PropertyBuilder.tag_path("/soc/gpio0"),
-                PropertyBuilder.tag_expression("(1+1)")
-            )
-            .with_name(expected_cell.name)
-            .with_label(expected_cell.labels)
-            .build();
-
-        console.log(`${PropertyBuilder.to_string(cell)}`);
-        expect(cell).toStrictEqual(expected_cell);
-    });
-
-    test(`Cell Array Builder : (CellArray)`, () => {
-        const values: CellValue[] = [
-            PropertyBuilder.tag_number(0),
-            PropertyBuilder.tag_label("gpio0"),
-            PropertyBuilder.tag_path("/soc/gpio0"),
-            PropertyBuilder.tag_expression("(1+1)"),
-        ];
-
-        const composed = [values];
-
-        const expected_cell: DTProperty = {
-            labels: [],
-            name: "unusual-cell",
-            value: cell_value_matrix_to_dts_cell_array_array(composed)
-        };
-
-        const cell = PropertyBuilder.build_cell_array()
-            .with_tagged_values(values)
-            .with_name(expected_cell.name)
-            .with_label(expected_cell.labels)
-            .build();
-
-        console.log(`${PropertyBuilder.to_string(cell)}`);
-        expect(cell).toStrictEqual(expected_cell);
-    });
-
-    test(`Labeled Cell Array Builder : (CellArray)`, () => {
-        const values: LabeledTaggedCellValue[] = [
-            {
-                payload: PropertyBuilder.tag_number(0),
-                labels: ["insane_label"]
-            },
-            {
-                payload: PropertyBuilder.tag_label("gpio0"),
-                labels: ["insane_label"]
-            },
-            {
-                payload: PropertyBuilder.tag_path("/soc/gpio0"),
-                labels: ["insane_label"]
-            },
-            {
-                payload: PropertyBuilder.tag_expression("(1+1)"),
-                labels: ["insane_label"]
-            },
-        ];
-
-        const composed = [values];
-
-        const expected_cell: DTProperty = {
-            labels: [],
-            name: "unusual-cell",
-            value: cell_value_matrix_to_dts_cell_array_array(composed)
-        };
-
-        const cell = PropertyBuilder.build_cell_array()
-            .with_tagged_values(values)
-            .with_name(expected_cell.name)
-            .with_label(expected_cell.labels)
-            .build();
-
-        console.log(`${PropertyBuilder.to_string(cell)}`);
-        expect(cell).toStrictEqual(expected_cell);
-    });
-
-    test(`Cell Array Builder : (...CellEntry[>=1], CellArray)`, () => {
-        const value: CellValue = PropertyBuilder.tag_number(0);
-
-        const values: CellValue[] = [
-            PropertyBuilder.tag_label("gpio0"),
-            PropertyBuilder.tag_path("/soc/gpio0"),
-            PropertyBuilder.tag_expression("(1+1)"),
-        ];
-
-        const composed = [[value, ...values]];
-
-        const expected_cell: DTProperty = {
-            labels: [],
-            name: "unusual-cell",
-            value: cell_value_matrix_to_dts_cell_array_array(composed)
-        };
-
-        const cell = PropertyBuilder.build_cell_array()
-            .with_tagged_values(value, values)
-            .with_name(expected_cell.name)
-            .with_label(expected_cell.labels)
-            .build();
-
-        console.log(`${PropertyBuilder.to_string(cell)}`);
-        expect(cell).toStrictEqual(expected_cell);
-    });
-
-    test(`Cell Array Builder : (CellArray, ...CellEntry[>=1])`, () => {
-        const value: CellValue = PropertyBuilder.tag_number(0);
-
-        const values: CellValue[] = [
-            PropertyBuilder.tag_label("gpio0"),
-            PropertyBuilder.tag_path("/soc/gpio0"),
-            PropertyBuilder.tag_expression("(1+1)"),
-        ];
-
-        const composed = [[...values, value]];
-
-        const expected_cell: DTProperty = {
-            labels: [],
-            name: "unusual-cell",
-            value: cell_value_matrix_to_dts_cell_array_array(composed)
-        };
-
-        const cell = PropertyBuilder.build_cell_array()
-            .with_tagged_values(values, value)
-            .with_name(expected_cell.name)
-            .with_label(expected_cell.labels)
-            .build();
-
-        console.log(`${PropertyBuilder.to_string(cell)}`);
-        expect(cell).toStrictEqual(expected_cell);
-    });
-
-    test(`FAIL Cell Array Builder : (...CellEntry[>=1], CellArray, ...CellEntry[>=1])`, () => {
-        const value1: CellValue = PropertyBuilder.tag_number(0);
-
-        const values: CellValue[] = [
-            PropertyBuilder.tag_label("gpio0"),
-            PropertyBuilder.tag_path("/soc/gpio0"),
-        ];
-
-        const value2: CellValue = PropertyBuilder.tag_expression("(1+1)");
-
-        const _cell = PropertyBuilder.build_cell_array()
-            // @ts-expect-error
-            .with_tagged_values(value1, values, value2)
-            .with_name("")
-            .build();
-    });
-
-    test(`Cell Array Builder : (...CellArray[>=1])`, () => {
-        const values1: CellValue[] = [
-            PropertyBuilder.tag_label("gpio0"),
-            PropertyBuilder.tag_path("/soc/gpio0"),
-        ];
-
-        const values2: CellValue[] = [
-            PropertyBuilder.tag_number(0),
-            PropertyBuilder.tag_expression("(1+1)")
-        ];
-
-        const composed: CellValue[][] = [values1, values2];
-
-        const expected_cell: DTProperty = {
-            labels: [],
-            name: "unusual-cell",
-            value: cell_value_matrix_to_dts_cell_array_array(composed)
-        };
-
-        const cell = PropertyBuilder.build_cell_array()
-            .with_tagged_values(values1, values2)
-            .with_name(expected_cell.name)
-            .with_label(expected_cell.labels)
-            .build();
-
-        console.log(`${PropertyBuilder.to_string(cell)}`);
-        expect(cell).toStrictEqual(expected_cell);
-    });
-
-    test(`FAIL Cell Array Builder : (...CellArray[>=2], ...CellEntry[>=1])`, () => {
-        const values1: CellValue[] = [
-            PropertyBuilder.tag_label("gpio0"),
-            PropertyBuilder.tag_path("/soc/gpio0"),
-        ];
-
-        const values2: CellValue[] = [
-            PropertyBuilder.tag_path("/soc/gpio0"),
-        ];
-
-        const value: CellValue = PropertyBuilder.tag_number(0);
-
-        const _cell = PropertyBuilder.build_cell_array()
-            // @ts-expect-error invalid combination
-            .with_tagged_values(values1, values2, value)
-            .with_name("")
-            .build();
-    });
-
-    test(`FAIL Cell Array Builder : (...CellArray[>=1], ...CellEntry[>=1], ...CellArray[>=1])`, () => {
-        const values1: CellValue[] = [
-            PropertyBuilder.tag_label("gpio0"),
-            PropertyBuilder.tag_path("/soc/gpio0"),
-        ];
-
-        const values2: CellValue[] = [
-            PropertyBuilder.tag_path("/soc/gpio0"),
-        ];
-
-        const value: CellValue = PropertyBuilder.tag_number(0);
-
-        const cell = PropertyBuilder.build_cell_array()
-            // @ts-expect-error invalid combination
-            .with_tagged_values(values1, value, values2)
-            .with_name("")
-            .build();
-    });
-
-    test(`FAIL Cell Array Builder : (...CellEntry[>=1], ...CellArray[>=2])`, () => {
-        const values1: CellValue[] = [
-            PropertyBuilder.tag_label("gpio0"),
-            PropertyBuilder.tag_path("/soc/gpio0"),
-        ];
-
-        const values2: CellValue[] = [
-            PropertyBuilder.tag_path("/soc/gpio0"),
-        ];
-
-        const value: CellValue = PropertyBuilder.tag_number(0);
-
-        const cell = PropertyBuilder.build_cell_array()
-            // @ts-expect-error invalid combination
-            .with_tagged_values(value, values1, values2)
-            .with_name("")
-            .build();
-    });
-
-    test(`Cell Array Builder : (CellMatrix)`, () => {
-        const values: CellValue[][] = [
-            [PropertyBuilder.tag_number(0),
-            PropertyBuilder.tag_label("gpio0")],
-            [PropertyBuilder.tag_path("/soc/gpio0"),
-            PropertyBuilder.tag_expression("(1+1)")],
-        ];
-
-        const composed = values;
-
-        const expected_cell: DTProperty = {
-            labels: [],
-            name: "unusual-cell",
-            value: cell_value_matrix_to_dts_cell_array_array(composed)
-        };
-
-        const cell = PropertyBuilder.build_cell_array()
-            .with_tagged_values(values)
-            .with_name(expected_cell.name)
-            .with_label(expected_cell.labels)
-            .build();
-
-        console.log(`${PropertyBuilder.to_string(cell)}`);
-        expect(cell).toStrictEqual(expected_cell);
-    });
-
-    test(`Cell Array Builder : (...CellMatrix[>=1])`, () => {
-        const values: CellValue[][] = [
-            [PropertyBuilder.tag_number(0),
-            PropertyBuilder.tag_label("gpio0")],
-            [PropertyBuilder.tag_path("/soc/gpio0"),
-            PropertyBuilder.tag_expression("(1+1)")],
-        ];
-
-        const values2: CellValue[][] = [
-            [PropertyBuilder.tag_number(1),
-            PropertyBuilder.tag_label("gpio1")],
-            [PropertyBuilder.tag_path("/soc/gpio1"),
-            PropertyBuilder.tag_expression("(1+1)")],
-        ];
-
-        const composed = [...values, ...values2];
-
-        const expected_cell: DTProperty = {
-            labels: [],
-            name: "unusual-cell",
-            value: cell_value_matrix_to_dts_cell_array_array(composed)
-        };
-
-        const cell = PropertyBuilder.build_cell_array()
-            .with_tagged_values(values, values2)
-            .with_name(expected_cell.name)
-            .with_label(expected_cell.labels)
-            .build();
-
-        console.log(`${PropertyBuilder.to_string(cell)}`);
-        expect(cell).toStrictEqual(expected_cell);
-    });
-
-    test(`Cell Array Builder : (CellMatrix, CellArray)`, () => {
-        const values: CellValue[][] = [
-            [PropertyBuilder.tag_number(0),
-            PropertyBuilder.tag_label("gpio0")],
-            [PropertyBuilder.tag_path("/soc/gpio0"),
-            PropertyBuilder.tag_expression("(1+1)")],
-        ];
-
-        const values2: CellValue[] = [
-            PropertyBuilder.tag_number(1),
-            PropertyBuilder.tag_label("gpio1")
-        ];
-
-        const composed = [...values, [...values2]];
-
-        const expected_cell: DTProperty = {
-            labels: [],
-            name: "unusual-cell",
-            value: cell_value_matrix_to_dts_cell_array_array(composed)
-        };
-
-        const cell = PropertyBuilder.build_cell_array()
-            .with_tagged_values(values, values2)
-            .with_name(expected_cell.name)
-            .with_label(expected_cell.labels)
-            .build();
-
-        console.log(`${PropertyBuilder.to_string(cell)}`);
-        expect(cell).toStrictEqual(expected_cell);
-    });
-
-    test(`Cell Array Builder : (CellArray, CellMatrix)`, () => {
-        const values: CellValue[][] = [
-            [PropertyBuilder.tag_number(0),
-            PropertyBuilder.tag_label("gpio0")],
-            [PropertyBuilder.tag_path("/soc/gpio0"),
-            PropertyBuilder.tag_expression("(1+1)")],
-        ];
-
-        const values2: CellValue[] = [
-            PropertyBuilder.tag_number(1),
-            PropertyBuilder.tag_label("gpio1")
-        ];
-
-        const composed = [[...values2], ...values];
-
-        const expected_cell: DTProperty = {
-            labels: [],
-            name: "unusual-cell",
-            value: cell_value_matrix_to_dts_cell_array_array(composed)
-        };
-
-        const cell = PropertyBuilder.build_cell_array()
-            .with_tagged_values(values2, values)
-            .with_name(expected_cell.name)
-            .with_label(expected_cell.labels)
-            .build();
-
-        console.log(`${PropertyBuilder.to_string(cell)}`);
-        expect(cell).toStrictEqual(expected_cell);
-    });
-
-    test(`Cell Array Builder : (CellMatrix, ...(CellArray,CellMatrix)[>=1])`, () => {
-        const values: CellValue[][] = [
-            [PropertyBuilder.tag_number(0),
-            PropertyBuilder.tag_label("gpio0")],
-            [PropertyBuilder.tag_path("/soc/gpio0"),
-            PropertyBuilder.tag_expression("(1+1)")],
-        ];
-
-        const values2: CellValue[] = [
-            PropertyBuilder.tag_number(1),
-            PropertyBuilder.tag_label("gpio1")
-        ];
-
-        const values3: CellValue[][] = [
-            [PropertyBuilder.tag_number(2),
-            PropertyBuilder.tag_label("gpio2")],
-            [PropertyBuilder.tag_path("/soc/gpio2"),
-            PropertyBuilder.tag_expression("(1+1)")],
-        ];
-
-        const composed = [...values, [...values2], ...values3];
-
-        const expected_cell: DTProperty = {
-            labels: [],
-            name: "unusual-cell",
-            value: cell_value_matrix_to_dts_cell_array_array(composed)
-        };
-
-        const cell = PropertyBuilder.build_cell_array()
-            .with_tagged_values(values, values2, values3)
-            .with_name(expected_cell.name)
-            .with_label(expected_cell.labels)
-            .build();
-
-        console.log(`${PropertyBuilder.to_string(cell)}`);
-        expect(cell).toStrictEqual(expected_cell);
-    });
-
-    function cell_value_matrix_to_dts_cell_array_array(input: CellMatrix): DTCellArray[] {
-        const cell_array_array: DTCellArray[] = [];
-
-        const upcast = input.map((entry) => upcast_to_LabeledTaggedCellValue_LabeledArray(entry));
-
-        for (const entry of upcast) {
-            const cell_array: DTCellArray = {
-                kind: "array",
-                bit_width: Bits.b32,
-                labels: [],
-                elements: []
-            };
-
-            const iterable = make_labeled_iterable(entry);
-
-            for (const sub_entry of iterable) {
-                switch (sub_entry.payload._tag) {
-                    case "number":
-                        {
-                            cell_array.elements.push({
-                                kind: "number",
-                                labels: sub_entry.labels,
-                                value: sub_entry.payload.value,
-                                repr: "dec"
-                            });
-                            break;
-                        }
-                    case "label":
-                        {
-                            cell_array.elements.push({
-                                kind: "label",
-                                labels: sub_entry.labels,
-                                name: sub_entry.payload.value
-                            });
-                            break;
-                        }
-                    case "path":
-                        {
-                            cell_array.elements.push({
-                                kind: "path",
-                                labels: sub_entry.labels,
-                                path: sub_entry.payload.value
-                            });
-                            break;
-                        }
-                    case "expression":
-                        {
-                            cell_array.elements.push({
-                                kind: "expression",
-                                labels: sub_entry.labels,
-                                value: sub_entry.payload.value
-                            });
-                            break;
-                        }
-                }
-            }
-            cell_array_array.push(cell_array);
-        }
-
-        return cell_array_array;
-    }
 
     test("tag_number — a hex repr is kept and printed, decimal is the default", () => {
         expect(PropertyBuilder.tag_number(5)).toStrictEqual({ _tag: "number", value: 5n });

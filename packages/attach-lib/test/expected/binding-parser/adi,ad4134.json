@@ -1,17 +1,7 @@
 {
-    "title": "Analog Devices AD4134 ADC",
     "description": "The AD4134 is a quad channel, low noise, simultaneous sampling,\nprecision analog-to-digital converter (ADC) that delivers on\nfunctionality, performance, and ease of use.\n\n  https://www.analog.com/en/products/ad4134.html\n",
-    "required_properties": [
-        "compatible",
-        "reg",
-        "clocks",
-        "clock-names",
-        "dmas",
-        "dma-names",
-        "pwms",
-        "pwm-names",
-        "refin-supply",
-        "adi,spi-engine"
+    "examples": [
+        "#include <dt-bindings/gpio/gpio.h>\n\nspi {\n  #address-cells = <1>;\n  #size-cells = <0>;\n\n  adc@0 {\n    compatible = \"adi,ad4134\";\n    reg = <0>;\n\n    spi-max-frequency = <1000000>;\n\n    reset-gpios = <&gpio0 86 GPIO_ACTIVE_LOW>;\n\n    clocks = <&sys_clk>;\n    clock-names = \"sys_clk\";\n\n    dmas = <&rx_dma 0>;\n    dma-names = \"rx\";\n\n    pwms = <&ad4134_odr_generator 0 0>;\n    pwm-names = \"odr_pwm\";\n\n    avdd5-supply = <&avdd5>;\n    avdd1v8-supply = <&avdd1v8>;\n    iovdd-supply = <&iovdd>;\n    refin-supply = <&refin>;\n\n    adi,spi-engine = <&ad4134_spi_engine>;\n  };\n};\n"
     ],
     "properties": [
         {
@@ -25,16 +15,16 @@
                     ],
                     "enum_type": "string"
                 },
-                "minItems": 1,
-                "maxItems": 1
+                "maxItems": 1,
+                "minItems": 1
             }
         },
         {
             "key": "reg",
             "value": {
                 "_t": "matrix",
-                "minItems": 1,
                 "maxItems": 1,
+                "minItems": 1,
                 "rows": [
                     {
                         "_t": "list",
@@ -49,8 +39,8 @@
             "key": "clocks",
             "value": {
                 "_t": "matrix",
-                "minItems": 1,
                 "maxItems": 1,
+                "minItems": 1,
                 "rows": [
                     {
                         "_t": "list",
@@ -67,22 +57,22 @@
                 "_t": "list",
                 "item": {
                     "_t": "enum",
+                    "default": "sys_clk",
                     "enum": [
                         "sys_clk"
                     ],
-                    "enum_type": "string",
-                    "default": "sys_clk"
+                    "enum_type": "string"
                 },
-                "minItems": 1,
-                "maxItems": 1
+                "maxItems": 1,
+                "minItems": 1
             }
         },
         {
             "key": "dmas",
             "value": {
                 "_t": "matrix",
-                "minItems": 1,
                 "maxItems": 1,
+                "minItems": 1,
                 "rows": [
                     {
                         "_t": "list",
@@ -99,22 +89,22 @@
                 "_t": "list",
                 "item": {
                     "_t": "enum",
+                    "default": "rx",
                     "enum": [
                         "rx"
                     ],
-                    "enum_type": "string",
-                    "default": "rx"
+                    "enum_type": "string"
                 },
-                "minItems": 1,
-                "maxItems": 1
+                "maxItems": 1,
+                "minItems": 1
             }
         },
         {
             "key": "pwms",
             "value": {
                 "_t": "matrix",
-                "minItems": 1,
                 "maxItems": 1,
+                "minItems": 1,
                 "rows": [
                     {
                         "_t": "list",
@@ -131,30 +121,30 @@
                 "_t": "list",
                 "item": {
                     "_t": "enum",
+                    "default": "odr_pwm",
                     "enum": [
                         "odr_pwm"
                     ],
-                    "enum_type": "string",
-                    "default": "odr_pwm"
+                    "enum_type": "string"
                 },
-                "minItems": 1,
-                "maxItems": 1
+                "maxItems": 1,
+                "minItems": 1
             }
         },
         {
             "key": "refin-supply",
             "value": {
                 "_t": "matrix",
-                "minItems": 1,
                 "maxItems": 1,
+                "minItems": 1,
                 "rows": [
                     {
                         "_t": "list",
                         "item": {
                             "_t": "any"
                         },
-                        "minItems": 1,
-                        "maxItems": 1
+                        "maxItems": 1,
+                        "minItems": 1
                     }
                 ]
             }
@@ -163,19 +153,19 @@
             "key": "adi,spi-engine",
             "value": {
                 "_t": "matrix",
-                "minItems": 1,
+                "description": "phandle of the SPI slave connected to the SPI engine master",
                 "maxItems": 1,
+                "minItems": 1,
                 "rows": [
                     {
                         "_t": "list",
                         "item": {
                             "_t": "any"
                         },
-                        "minItems": 1,
-                        "maxItems": 1
+                        "maxItems": 1,
+                        "minItems": 1
                     }
-                ],
-                "description": "phandle of the SPI slave connected to the SPI engine master"
+                ]
             }
         },
         {
@@ -184,7 +174,7 @@
                 "_t": "scalar",
                 "cell": {
                     "_t": "number",
-                    "maximum": 1000000
+                    "maximum": "1000000n"
                 }
             }
         },
@@ -192,8 +182,8 @@
             "key": "reset-gpios",
             "value": {
                 "_t": "matrix",
-                "minItems": 1,
                 "maxItems": 1,
+                "minItems": 1,
                 "rows": [
                     {
                         "_t": "list",
@@ -208,16 +198,16 @@
             "key": "avdd5-supply",
             "value": {
                 "_t": "matrix",
-                "minItems": 1,
                 "maxItems": 1,
+                "minItems": 1,
                 "rows": [
                     {
                         "_t": "list",
                         "item": {
                             "_t": "any"
                         },
-                        "minItems": 1,
-                        "maxItems": 1
+                        "maxItems": 1,
+                        "minItems": 1
                     }
                 ]
             }
@@ -226,16 +216,16 @@
             "key": "avdd1v8-supply",
             "value": {
                 "_t": "matrix",
-                "minItems": 1,
                 "maxItems": 1,
+                "minItems": 1,
                 "rows": [
                     {
                         "_t": "list",
                         "item": {
                             "_t": "any"
                         },
-                        "minItems": 1,
-                        "maxItems": 1
+                        "maxItems": 1,
+                        "minItems": 1
                     }
                 ]
             }
@@ -244,22 +234,32 @@
             "key": "iovdd-supply",
             "value": {
                 "_t": "matrix",
-                "minItems": 1,
                 "maxItems": 1,
+                "minItems": 1,
                 "rows": [
                     {
                         "_t": "list",
                         "item": {
                             "_t": "any"
                         },
-                        "minItems": 1,
-                        "maxItems": 1
+                        "maxItems": 1,
+                        "minItems": 1
                     }
                 ]
             }
         }
     ],
-    "examples": [
-        "#include <dt-bindings/gpio/gpio.h>\n\nspi {\n  #address-cells = <1>;\n  #size-cells = <0>;\n\n  adc@0 {\n    compatible = \"adi,ad4134\";\n    reg = <0>;\n\n    spi-max-frequency = <1000000>;\n\n    reset-gpios = <&gpio0 86 GPIO_ACTIVE_LOW>;\n\n    clocks = <&sys_clk>;\n    clock-names = \"sys_clk\";\n\n    dmas = <&rx_dma 0>;\n    dma-names = \"rx\";\n\n    pwms = <&ad4134_odr_generator 0 0>;\n    pwm-names = \"odr_pwm\";\n\n    avdd5-supply = <&avdd5>;\n    avdd1v8-supply = <&avdd1v8>;\n    iovdd-supply = <&iovdd>;\n    refin-supply = <&refin>;\n\n    adi,spi-engine = <&ad4134_spi_engine>;\n  };\n};\n"
-    ]
+    "required_properties": [
+        "compatible",
+        "reg",
+        "clocks",
+        "clock-names",
+        "dmas",
+        "dma-names",
+        "pwms",
+        "pwm-names",
+        "refin-supply",
+        "adi,spi-engine"
+    ],
+    "title": "Analog Devices AD4134 ADC"
 }

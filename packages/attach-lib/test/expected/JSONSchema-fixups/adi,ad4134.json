@@ -1,9 +1,59 @@
 {
     "$id": "http://devicetree.org/schemas/iio/adc/adi,ad4134.yaml#",
-    "title": "Analog Devices AD4134 ADC",
+    "additionalProperties": false,
     "description": "The AD4134 is a quad channel, low noise, simultaneous sampling,\nprecision analog-to-digital converter (ADC) that delivers on\nfunctionality, performance, and ease of use.\n\n  https://www.analog.com/en/products/ad4134.html\n",
+    "examples": [
+        "#include <dt-bindings/gpio/gpio.h>\n\nspi {\n  #address-cells = <1>;\n  #size-cells = <0>;\n\n  adc@0 {\n    compatible = \"adi,ad4134\";\n    reg = <0>;\n\n    spi-max-frequency = <1000000>;\n\n    reset-gpios = <&gpio0 86 GPIO_ACTIVE_LOW>;\n\n    clocks = <&sys_clk>;\n    clock-names = \"sys_clk\";\n\n    dmas = <&rx_dma 0>;\n    dma-names = \"rx\";\n\n    pwms = <&ad4134_odr_generator 0 0>;\n    pwm-names = \"odr_pwm\";\n\n    avdd5-supply = <&avdd5>;\n    avdd1v8-supply = <&avdd1v8>;\n    iovdd-supply = <&iovdd>;\n    refin-supply = <&refin>;\n\n    adi,spi-engine = <&ad4134_spi_engine>;\n  };\n};\n"
+    ],
     "properties": {
+        "adi,spi-engine": {
+            "description": "phandle of the SPI slave connected to the SPI engine master",
+            "dtType": "phandle",
+            "items": {
+                "maxItems": 1,
+                "minItems": 1,
+                "type": "array"
+            },
+            "maxItems": 1,
+            "minItems": 1,
+            "type": "array"
+        },
+        "avdd1v8-supply": {
+            "dtType": "phandle",
+            "items": {
+                "type": "array"
+            },
+            "type": "array"
+        },
+        "avdd5-supply": {
+            "dtType": "phandle",
+            "items": {
+                "type": "array"
+            },
+            "type": "array"
+        },
+        "clock-names": {
+            "dtType": "string-array",
+            "items": [
+                {
+                    "const": "sys_clk"
+                }
+            ],
+            "maxItems": 1,
+            "minItems": 1,
+            "type": "array"
+        },
+        "clocks": {
+            "dtType": "phandle-array",
+            "items": {
+                "type": "array"
+            },
+            "maxItems": 1,
+            "minItems": 1,
+            "type": "array"
+        },
         "compatible": {
+            "dtType": "string-array",
             "items": [
                 {
                     "enum": [
@@ -11,132 +61,85 @@
                     ]
                 }
             ],
-            "type": "array",
-            "minItems": 1,
             "maxItems": 1,
-            "dtType": "string-array"
-        },
-        "reg": {
-            "maxItems": 1,
-            "type": "array",
             "minItems": 1,
-            "dtType": "address",
-            "items": {
-                "type": "array"
-            }
-        },
-        "spi-max-frequency": {
-            "maximum": 1000000,
-            "type": "integer"
-        },
-        "reset-gpios": {
-            "maxItems": 1,
-            "type": "array",
-            "minItems": 1,
-            "dtType": "phandle-array",
-            "items": {
-                "type": "array"
-            }
-        },
-        "clocks": {
-            "maxItems": 1,
-            "type": "array",
-            "minItems": 1,
-            "dtType": "phandle-array",
-            "items": {
-                "type": "array"
-            }
-        },
-        "clock-names": {
-            "type": "array",
-            "items": [
-                {
-                    "const": "sys_clk"
-                }
-            ],
-            "minItems": 1,
-            "maxItems": 1,
-            "dtType": "string-array"
-        },
-        "dmas": {
-            "maxItems": 1,
-            "type": "array",
-            "minItems": 1,
-            "dtType": "phandle-array",
-            "items": {
-                "type": "array"
-            }
+            "type": "array"
         },
         "dma-names": {
-            "type": "array",
+            "dtType": "string-array",
             "items": [
                 {
                     "const": "rx"
                 }
             ],
-            "minItems": 1,
             "maxItems": 1,
-            "dtType": "string-array"
+            "minItems": 1,
+            "type": "array"
         },
-        "pwms": {
-            "maxItems": 1,
-            "type": "array",
-            "minItems": 1,
+        "dmas": {
             "dtType": "phandle-array",
             "items": {
                 "type": "array"
-            }
+            },
+            "maxItems": 1,
+            "minItems": 1,
+            "type": "array"
+        },
+        "iovdd-supply": {
+            "dtType": "phandle",
+            "items": {
+                "type": "array"
+            },
+            "type": "array"
         },
         "pwm-names": {
-            "type": "array",
+            "dtType": "string-array",
             "items": [
                 {
                     "const": "odr_pwm"
                 }
             ],
-            "minItems": 1,
             "maxItems": 1,
-            "dtType": "string-array"
+            "minItems": 1,
+            "type": "array"
         },
-        "avdd5-supply": {
-            "dtType": "phandle",
-            "type": "array",
+        "pwms": {
+            "dtType": "phandle-array",
             "items": {
                 "type": "array"
-            }
-        },
-        "avdd1v8-supply": {
-            "dtType": "phandle",
-            "type": "array",
-            "items": {
-                "type": "array"
-            }
-        },
-        "iovdd-supply": {
-            "dtType": "phandle",
-            "type": "array",
-            "items": {
-                "type": "array"
-            }
+            },
+            "maxItems": 1,
+            "minItems": 1,
+            "type": "array"
         },
         "refin-supply": {
             "dtType": "phandle",
-            "type": "array",
             "items": {
                 "type": "array"
-            }
-        },
-        "adi,spi-engine": {
-            "description": "phandle of the SPI slave connected to the SPI engine master",
-            "maxItems": 1,
-            "items": {
-                "maxItems": 1,
-                "type": "array",
-                "minItems": 1
             },
-            "dtType": "phandle",
-            "type": "array",
-            "minItems": 1
+            "type": "array"
+        },
+        "reg": {
+            "dtType": "address",
+            "items": {
+                "type": "array"
+            },
+            "maxItems": 1,
+            "minItems": 1,
+            "type": "array"
+        },
+        "reset-gpios": {
+            "dtType": "phandle-array",
+            "items": {
+                "type": "array"
+            },
+            "maxItems": 1,
+            "minItems": 1,
+            "type": "array"
+        },
+        "spi-max-frequency": {
+            "maximum": 1000000,
+            "type": "integer"
         }
     },
     "required": [
@@ -151,9 +154,6 @@
         "refin-supply",
         "adi,spi-engine"
     ],
-    "additionalProperties": false,
-    "examples": [
-        "#include <dt-bindings/gpio/gpio.h>\n\nspi {\n  #address-cells = <1>;\n  #size-cells = <0>;\n\n  adc@0 {\n    compatible = \"adi,ad4134\";\n    reg = <0>;\n\n    spi-max-frequency = <1000000>;\n\n    reset-gpios = <&gpio0 86 GPIO_ACTIVE_LOW>;\n\n    clocks = <&sys_clk>;\n    clock-names = \"sys_clk\";\n\n    dmas = <&rx_dma 0>;\n    dma-names = \"rx\";\n\n    pwms = <&ad4134_odr_generator 0 0>;\n    pwm-names = \"odr_pwm\";\n\n    avdd5-supply = <&avdd5>;\n    avdd1v8-supply = <&avdd1v8>;\n    iovdd-supply = <&iovdd>;\n    refin-supply = <&refin>;\n\n    adi,spi-engine = <&ad4134_spi_engine>;\n  };\n};\n"
-    ],
+    "title": "Analog Devices AD4134 ADC",
     "type": "object"
 }

@@ -1,18 +1,9 @@
-import path from 'node:path';
-import * as fs from 'node:fs';
-
 import { Attach, Result } from 'attach-lib';
 import type { BindingErrors } from '../src/Attach/Errors.js';
 
-import { BindingTestData, write_to_directory, bigIntReplacer } from './testing_utils';
+import { binding, schema_paths, snapshot } from './bindings';
 
 import { test, expect } from 'vitest';
-
-const adis16475: BindingTestData = {
-    path: "schemas/iio/imu/adi,adis16475.yaml",
-    name: "adi,adis16475",
-    debug: false
-} as const;
 
 /** The errors of a narrowing as short, sorted descriptions, so a test names every error it expects. */
 function summary(errors: BindingErrors[]): string[] {
@@ -28,12 +19,8 @@ function summary(errors: BindingErrors[]): string[] {
 
 const adis_missing = ['missing interrupts', 'missing reg', 'missing spi-cpha', 'missing spi-cpol'];
 
-test(adis16475.name, async () => {
-    const binding_path = path.resolve(__dirname, adis16475.path);
-    const linux_path = path.resolve(__dirname, 'linux');
-    const dt_schema_path = path.resolve(__dirname, 'dt-schema');
-
-    const parsed = await Attach.parse(binding_path, { linux: linux_path, dt_schema: dt_schema_path });
+test('adi,adis16475', async () => {
+    const parsed = await Attach.parse(binding('iio/imu/adi,adis16475.yaml'), schema_paths);
 
     if (Result.is_err(parsed)) { expect.fail(parsed.error.message); }
 
@@ -47,18 +34,7 @@ test(adis16475.name, async () => {
 
     expect.assert.isDefined(new_binding_1);
 
-    if (adis16475.debug === true) {
-        write_to_directory(
-            path.resolve(__dirname, "expected/feedback-loop"),
-            `${adis16475.name}-1`,
-            new_binding_1.binding
-        );
-    }
-
-    const expected_1_path = path.resolve(__dirname, `expected/feedback-loop/${adis16475.name}-1.json`);
-    const expected_1 = JSON.stringify(JSON.parse(fs.readFileSync(expected_1_path, 'utf8')));
-
-    expect(JSON.stringify(new_binding_1.binding, bigIntReplacer)).toStrictEqual(expected_1);
+    await expect(snapshot(new_binding_1.binding)).toMatchFileSnapshot('expected/feedback-loop/adi,adis16475-1.json');
 
     expect(summary(new_binding_1.errors)).toEqual(adis_missing);
 
@@ -70,18 +46,7 @@ test(adis16475.name, async () => {
 
     expect.assert.isDefined(new_binding_2);
 
-    if (adis16475.debug === true) {
-        write_to_directory(
-            path.resolve(__dirname, "expected/feedback-loop"),
-            `${adis16475.name}-2`,
-            new_binding_2.binding
-        );
-    }
-
-    const expected_2_path = path.resolve(__dirname, `expected/feedback-loop/${adis16475.name}-2.json`);
-    const expected_2 = JSON.stringify(JSON.parse(fs.readFileSync(expected_2_path, 'utf8')));
-
-    expect(JSON.stringify(new_binding_2.binding, bigIntReplacer)).toStrictEqual(expected_2);
+    await expect(snapshot(new_binding_2.binding)).toMatchFileSnapshot('expected/feedback-loop/adi,adis16475-2.json');
 
     expect(summary(new_binding_2.errors)).toEqual(adis_missing);
 
@@ -94,18 +59,7 @@ test(adis16475.name, async () => {
 
     expect.assert.isDefined(new_binding_3);
 
-    if (adis16475.debug === true) {
-        write_to_directory(
-            path.resolve(__dirname, "expected/feedback-loop"),
-            `${adis16475.name}-3`,
-            new_binding_3.binding
-        );
-    }
-
-    const expected_3_path = path.resolve(__dirname, `expected/feedback-loop/${adis16475.name}-3.json`);
-    const expected_3 = JSON.stringify(JSON.parse(fs.readFileSync(expected_3_path, 'utf8')));
-
-    expect(JSON.stringify(new_binding_3.binding, bigIntReplacer)).toStrictEqual(expected_3);
+    await expect(snapshot(new_binding_3.binding)).toMatchFileSnapshot('expected/feedback-loop/adi,adis16475-3.json');
 
     expect(summary(new_binding_3.errors)).toEqual(['adi,sync-mode needs clocks', ...adis_missing]);
 
@@ -119,28 +73,13 @@ test(adis16475.name, async () => {
 
     expect.assert.isDefined(new_binding_4);
 
-    if (adis16475.debug === true) {
-        write_to_directory(
-            path.resolve(__dirname, "expected/feedback-loop"),
-            `${adis16475.name}-4`,
-            new_binding_4.binding
-        );
-    }
-
-    const expected_4_path = path.resolve(__dirname, `expected/feedback-loop/${adis16475.name}-4.json`);
-    const expected_4 = JSON.stringify(JSON.parse(fs.readFileSync(expected_4_path, 'utf8')));
-
-    expect(JSON.stringify(new_binding_4.binding, bigIntReplacer)).toStrictEqual(expected_4);
+    await expect(snapshot(new_binding_4.binding)).toMatchFileSnapshot('expected/feedback-loop/adi,adis16475-4.json');
 
     expect(summary(new_binding_4.errors)).toEqual(['adi,sync-mode <= 2', 'adi,sync-mode needs clocks', ...adis_missing]);
 });
 
 test('ad7124', async () => {
-    const binding_path = path.resolve(__dirname, 'schemas/iio/adc/adi,ad7124.yaml');
-    const linux_path = path.resolve(__dirname, 'linux');
-    const dt_schema_path = path.resolve(__dirname, 'dt-schema');
-
-    const parsed = await Attach.parse(binding_path, { linux: linux_path, dt_schema: dt_schema_path });
+    const parsed = await Attach.parse(binding('iio/adc/adi,ad7124.yaml'), schema_paths);
 
     if (Result.is_err(parsed)) { expect.fail(parsed.error.message); }
 

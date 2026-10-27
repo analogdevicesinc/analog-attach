@@ -1,612 +1,388 @@
 {
     "$id": "http://devicetree.org/schemas/iio/dac/adi,ad3552r.yaml#",
-    "title": "Analog Devices AD2552R DAC device driver",
-    "description": "Bindings for the Analog Devices AD3552R DAC device and similar.\nDatasheet can be found here:\n  https://www.analog.com/media/en/technical-documentation/data-sheets/ad3541r.pdf\n  https://www.analog.com/media/en/technical-documentation/data-sheets/ad3542r.pdf\n  https://www.analog.com/media/en/technical-documentation/data-sheets/ad3551r.pdf\n  https://www.analog.com/media/en/technical-documentation/data-sheets/ad3552r.pdf\n",
-    "properties": {
-        "compatible": {
-            "items": [
-                {
-                    "enum": [
-                        "adi,ad3541r",
-                        "adi,ad3542r",
-                        "adi,ad3551r",
-                        "adi,ad3552r"
-                    ]
-                }
-            ],
-            "type": "array",
-            "minItems": 1,
-            "maxItems": 1,
-            "dtType": "string-array"
-        },
-        "reg": {
-            "minItems": 1,
-            "maxItems": 1,
-            "items": {
-                "items": [
-                    {
-                        "minimum": 0,
-                        "maximum": 256,
-                        "type": "integer"
-                    }
-                ],
-                "type": "array",
-                "minItems": 1,
-                "maxItems": 1
-            },
-            "description": "Chip select used by the device.",
-            "type": "array",
-            "dtType": "address"
-        },
-        "spi-max-frequency": {
-            "description": "Maximum SPI clocking speed of the device in Hz.",
-            "type": "integer",
-            "typeSize": 32,
-            "minimum": 0,
-            "maximum": 66000000,
-            "dtType": "uint32"
-        },
-        "reset-gpios": {
-            "maxItems": 1,
-            "type": "array",
-            "minItems": 1,
-            "dtType": "phandle-array",
-            "items": {
-                "type": "array"
-            }
-        },
-        "ldac-gpios": {
-            "description": "LDAC pin to be used as a hardware trigger to update the DAC channels.\n",
-            "maxItems": 1,
-            "type": "array",
-            "minItems": 1,
-            "dtType": "phandle-array",
-            "items": {
-                "type": "array"
-            }
-        },
-        "vref-supply": {
-            "description": "The regulator to use as an external reference. If it does not exists the internal reference will be used. External reference must be 2.5V",
-            "dtType": "phandle",
-            "type": "array",
-            "items": {
-                "type": "array"
-            }
-        },
-        "adi,vref-out-en": {
-            "description": "Vref I/O driven by internal vref to 2.5V. If not set, Vref pin will be floating.",
-            "type": "boolean"
-        },
-        "adi,sdo-drive-strength": {
-            "description": "Configure SDIO0 and SDIO1 strength levels:\n  - 0: low SDO drive strength.\n  - 1: medium low SDO drive strength.\n  - 2: medium high SDO drive strength.\n  - 3: high SDO drive strength\n",
-            "enum": [
-                0,
-                1,
-                2,
-                3
-            ],
-            "type": "integer",
-            "typeSize": 32,
-            "minimum": 0,
-            "maximum": 4294967295,
-            "dtType": "uint32"
-        },
-        "io-backends": {
-            "description": "The iio backend reference. Device can be optionally connected to the \"axi-ad3552r IP\" fpga-based QSPI + DDR (Double Data Rate) controller to reach high speed transfers.",
-            "maxItems": 1,
-            "type": "array",
-            "minItems": 1,
-            "dtType": "phandle-array",
-            "items": {
-                "type": "array"
-            }
-        },
-        "#address-cells": {
-            "const": 1,
-            "dtType": "uint32"
-        },
-        "#size-cells": {
-            "const": 0,
-            "dtType": "uint32"
-        }
-    },
-    "patternProperties": {
-        "^channel@([0-1])$": {
-            "type": "object",
-            "description": "Configurations of the DAC Channels",
-            "additionalProperties": false,
-            "properties": {
-                "reg": {
-                    "description": "Channel number",
-                    "items": [
-                        {
-                            "items": [
-                                {
-                                    "enum": [
-                                        0,
-                                        1
-                                    ]
-                                }
-                            ],
-                            "type": "array",
-                            "minItems": 1,
-                            "maxItems": 1
-                        }
-                    ],
-                    "type": "array",
-                    "minItems": 1,
-                    "maxItems": 1,
-                    "dtType": "address"
-                },
-                "adi,output-range-microvolt": {
-                    "dtType": "int32-matrix",
-                    "type": "array",
-                    "items": {
-                        "type": "array",
-                        "items": {
-                            "minimum": -2147483648,
-                            "maximum": 2147483647
-                        }
-                    }
-                },
-                "custom-output-range-config": {
-                    "type": "object",
-                    "additionalProperties": false,
-                    "description": "Configuration of custom range when adi,output-range-microvolt is not present. The formulas for calculation the output voltages are Vout_fs = 2.5 + [(GainN + Offset/1024) * 2.5 * Rfbx * 1.03] Vout_zs = 2.5 - [(GainP + Offset/1024) * 2.5 * Rfbx * 1.03]",
-                    "properties": {
-                        "adi,gain-offset": {
-                            "description": "Gain offset used in the above formula",
-                            "maximum": 511,
-                            "minimum": -511,
-                            "type": "integer",
-                            "dtType": "int32"
-                        },
-                        "adi,gain-scaling-p": {
-                            "description": "GainP = 1 / ( 2 ^ adi,gain-scaling-p)",
-                            "enum": [
-                                0,
-                                1,
-                                2,
-                                3
-                            ],
-                            "type": "integer",
-                            "typeSize": 32,
-                            "minimum": 0,
-                            "maximum": 4294967295,
-                            "dtType": "uint32"
-                        },
-                        "adi,gain-scaling-n": {
-                            "description": "GainN = 1 / ( 2 ^ adi,gain-scaling-n)",
-                            "enum": [
-                                0,
-                                1,
-                                2,
-                                3
-                            ],
-                            "type": "integer",
-                            "typeSize": 32,
-                            "minimum": 0,
-                            "maximum": 4294967295,
-                            "dtType": "uint32"
-                        },
-                        "adi,rfb-ohms": {
-                            "description": "Feedback Resistor",
-                            "dtType": "uint32-array",
-                            "type": "array",
-                            "minItems": 1,
-                            "items": {
-                                "minimum": 0,
-                                "maximum": 4294967295
-                            }
-                        }
-                    },
-                    "required": [
-                        "adi,gain-offset",
-                        "adi,gain-scaling-p",
-                        "adi,gain-scaling-n",
-                        "adi,rfb-ohms"
-                    ]
-                }
-            },
-            "required": [
-                "reg"
-            ],
-            "oneOf": [
-                {
-                    "required": [
-                        "adi,output-range-microvolt"
-                    ]
-                },
-                {
-                    "required": [
-                        "custom-output-range-config"
-                    ]
-                }
-            ]
-        }
-    },
+    "additionalProperties": false,
     "allOf": [
         {
             "$id": "http://devicetree.org/schemas/spi/spi-peripheral-props.yaml#",
-            "title": "Peripheral-specific properties for a SPI bus.",
-            "description": "Many SPI controllers need to add properties to peripheral devices. They could be common properties like spi-max-frequency, spi-cpha, etc. or they could be controller specific like delay in clock or data lines, etc. These properties need to be defined in the peripheral node because they are per-peripheral and there can be multiple peripherals attached to a controller. All those properties are listed here. The controller specific properties should go in their own separate schema that should be referenced from here.",
-            "properties": {
-                "spi-cs-high": {
-                    "description": "The device requires the chip select active high.",
-                    "oneOf": [
-                        {
-                            "type": "boolean",
-                            "const": true
-                        },
-                        {
-                            "type": "null"
-                        }
-                    ],
-                    "dtType": "flag"
-                },
-                "spi-lsb-first": {
-                    "description": "The device requires the LSB first mode.",
-                    "oneOf": [
-                        {
-                            "type": "boolean",
-                            "const": true
-                        },
-                        {
-                            "type": "null"
-                        }
-                    ],
-                    "dtType": "flag"
-                },
-                "spi-cs-setup-delay-ns": {
-                    "description": "Delay in nanoseconds to be introduced by the controller after CS is asserted.",
-                    "dtType": "uint32-array",
-                    "type": "array",
-                    "minItems": 1,
-                    "items": {
-                        "minimum": 0,
-                        "maximum": 4294967295
-                    }
-                },
-                "spi-cs-hold-delay-ns": {
-                    "description": "Delay in nanoseconds to be introduced by the controller before CS is de-asserted.",
-                    "dtType": "uint32-array",
-                    "type": "array",
-                    "minItems": 1,
-                    "items": {
-                        "minimum": 0,
-                        "maximum": 4294967295
-                    }
-                },
-                "spi-cs-inactive-delay-ns": {
-                    "description": "Delay in nanoseconds to be introduced by the controller after CS is de-asserted.",
-                    "dtType": "uint32-array",
-                    "type": "array",
-                    "minItems": 1,
-                    "items": {
-                        "minimum": 0,
-                        "maximum": 4294967295
-                    }
-                },
-                "spi-rx-bus-width": {
-                    "description": "Bus width to the SPI bus used for read transfers. If 0 is provided, then no RX will be possible on this device.",
-                    "enum": [
-                        0,
-                        1,
-                        2,
-                        4,
-                        8
-                    ],
-                    "default": 1,
-                    "type": "integer",
-                    "typeSize": 32,
-                    "minimum": 0,
-                    "maximum": 4294967295,
-                    "dtType": "uint32"
-                },
-                "spi-rx-delay-us": {
-                    "description": "Delay, in microseconds, after a read transfer.",
-                    "dtType": "uint32-array",
-                    "type": "array",
-                    "minItems": 1,
-                    "items": {
-                        "minimum": 0,
-                        "maximum": 4294967295
-                    }
-                },
-                "rx-sample-delay-ns": {
-                    "description": "SPI Rx sample delay offset, unit is nanoseconds. The delay from the default sample time before the actual sample of the rxd input signal occurs.",
-                    "dtType": "uint32-array",
-                    "type": "array",
-                    "minItems": 1,
-                    "items": {
-                        "minimum": 0,
-                        "maximum": 4294967295
-                    }
-                },
-                "spi-tx-bus-width": {
-                    "description": "Bus width to the SPI bus used for write transfers. If 0 is provided, then no TX will be possible on this device.",
-                    "enum": [
-                        0,
-                        1,
-                        2,
-                        4,
-                        8
-                    ],
-                    "default": 1,
-                    "type": "integer",
-                    "typeSize": 32,
-                    "minimum": 0,
-                    "maximum": 4294967295,
-                    "dtType": "uint32"
-                },
-                "spi-tx-delay-us": {
-                    "description": "Delay, in microseconds, after a write transfer.",
-                    "dtType": "uint32-array",
-                    "type": "array",
-                    "minItems": 1,
-                    "items": {
-                        "minimum": 0,
-                        "maximum": 4294967295
-                    }
-                },
-                "stacked-memories": {
-                    "description": "Several SPI memories can be wired in stacked mode. This basically means that either a device features several chip selects, or that different devices must be seen as a single bigger chip. This basically doubles (or more) the total address space with only a single additional wire, while still needing to repeat the commands when crossing a chip boundary. The size of each chip should be provided as members of the array.",
-                    "minItems": 2,
-                    "maxItems": 4,
-                    "type": "array",
-                    "items": {
-                        "type": "integer",
-                        "typeSize": 64,
-                        "minimum": 0,
-                        "maximum": 18446744073709552000,
-                        "dtType": "uint64"
-                    },
-                    "dtType": "uint64-array"
-                },
-                "parallel-memories": {
-                    "description": "Several SPI memories can be wired in parallel mode. The devices are physically on a different buses but will always act synchronously as each data word is spread across the different memories (eg. even bits are stored in one memory, odd bits in the other). This basically doubles the address space and the throughput while greatly complexifying the wiring because as many busses as devices must be wired. The size of each chip should be provided as members of the array.",
-                    "minItems": 2,
-                    "maxItems": 4,
-                    "type": "array",
-                    "items": {
-                        "type": "integer",
-                        "typeSize": 64,
-                        "minimum": 0,
-                        "maximum": 18446744073709552000,
-                        "dtType": "uint64"
-                    },
-                    "dtType": "uint64-array"
-                },
-                "st,spi-midi-ns": {
-                    "description": "Only for STM32H7, (Master Inter-Data Idleness) minimum time\ndelay in nanoseconds inserted between two consecutive data frames.\n",
-                    "dtType": "uint32-array",
-                    "type": "array",
-                    "minItems": 1,
-                    "items": {
-                        "minimum": 0,
-                        "maximum": 4294967295
-                    }
-                }
-            },
+            "additionalProperties": true,
             "allOf": [
                 {
                     "$id": "http://devicetree.org/schemas/spi/arm,pl022-peripheral-props.yaml#",
-                    "title": "Peripheral-specific properties for Arm PL022 SPI controller",
+                    "additionalProperties": true,
                     "properties": {
-                        "pl022,interface": {
-                            "description": "SPI interface type",
-                            "enum": [
-                                0,
-                                1,
-                                2
-                            ],
-                            "type": "integer",
-                            "typeSize": 32,
-                            "minimum": 0,
-                            "maximum": 4294967295,
-                            "dtType": "uint32"
-                        },
                         "pl022,com-mode": {
+                            "default": 1,
                             "description": "Specifies the transfer mode",
+                            "dtType": "uint32",
                             "enum": [
                                 0,
                                 1,
                                 2
                             ],
-                            "default": 1,
-                            "type": "integer",
-                            "typeSize": 32,
-                            "minimum": 0,
                             "maximum": 4294967295,
-                            "dtType": "uint32"
-                        },
-                        "pl022,rx-level-trig": {
-                            "description": "Rx FIFO watermark level",
                             "minimum": 0,
-                            "maximum": 4,
                             "type": "integer",
-                            "typeSize": 32,
-                            "dtType": "uint32"
-                        },
-                        "pl022,tx-level-trig": {
-                            "description": "Tx FIFO watermark level",
-                            "minimum": 0,
-                            "maximum": 4,
-                            "type": "integer",
-                            "typeSize": 32,
-                            "dtType": "uint32"
+                            "typeSize": 32
                         },
                         "pl022,ctrl-len": {
                             "description": "Microwire interface - Control length",
-                            "minimum": 3,
+                            "dtType": "uint32",
                             "maximum": 31,
+                            "minimum": 3,
                             "type": "integer",
-                            "typeSize": 32,
-                            "dtType": "uint32"
-                        },
-                        "pl022,wait-state": {
-                            "description": "Microwire interface - Wait state",
-                            "enum": [
-                                0,
-                                1
-                            ],
-                            "type": "integer",
-                            "typeSize": 32,
-                            "minimum": 0,
-                            "maximum": 4294967295,
-                            "dtType": "uint32"
+                            "typeSize": 32
                         },
                         "pl022,duplex": {
                             "description": "Microwire interface - Full/Half duplex",
+                            "dtType": "uint32",
                             "enum": [
                                 0,
                                 1
                             ],
-                            "type": "integer",
-                            "typeSize": 32,
-                            "minimum": 0,
                             "maximum": 4294967295,
-                            "dtType": "uint32"
+                            "minimum": 0,
+                            "type": "integer",
+                            "typeSize": 32
+                        },
+                        "pl022,interface": {
+                            "description": "SPI interface type",
+                            "dtType": "uint32",
+                            "enum": [
+                                0,
+                                1,
+                                2
+                            ],
+                            "maximum": 4294967295,
+                            "minimum": 0,
+                            "type": "integer",
+                            "typeSize": 32
+                        },
+                        "pl022,rx-level-trig": {
+                            "description": "Rx FIFO watermark level",
+                            "dtType": "uint32",
+                            "maximum": 4,
+                            "minimum": 0,
+                            "type": "integer",
+                            "typeSize": 32
+                        },
+                        "pl022,tx-level-trig": {
+                            "description": "Tx FIFO watermark level",
+                            "dtType": "uint32",
+                            "maximum": 4,
+                            "minimum": 0,
+                            "type": "integer",
+                            "typeSize": 32
+                        },
+                        "pl022,wait-state": {
+                            "description": "Microwire interface - Wait state",
+                            "dtType": "uint32",
+                            "enum": [
+                                0,
+                                1
+                            ],
+                            "maximum": 4294967295,
+                            "minimum": 0,
+                            "type": "integer",
+                            "typeSize": 32
                         }
                     },
-                    "additionalProperties": true
+                    "title": "Peripheral-specific properties for Arm PL022 SPI controller"
                 },
                 {
                     "$id": "http://devicetree.org/schemas/spi/cdns,qspi-nor-peripheral-props.yaml#",
-                    "title": "Peripheral-specific properties for the Cadence QSPI controller.",
+                    "additionalProperties": true,
                     "description": "See spi-peripheral-props.yaml for more info.",
                     "properties": {
                         "cdns,read-delay": {
                             "description": "Delay for read capture logic, in clock cycles.",
-                            "type": "integer",
-                            "typeSize": 32,
-                            "minimum": 0,
+                            "dtType": "uint32",
                             "maximum": 4294967295,
-                            "dtType": "uint32"
-                        },
-                        "cdns,tshsl-ns": {
-                            "description": "Delay in nanoseconds for the length that the master mode chip select outputs are de-asserted between transactions.",
-                            "dtType": "uint32-array",
-                            "type": "array",
-                            "minItems": 1,
-                            "items": {
-                                "minimum": 0,
-                                "maximum": 4294967295
-                            }
-                        },
-                        "cdns,tsd2d-ns": {
-                            "description": "Delay in nanoseconds between one chip select being de-activated and the activation of another.",
-                            "dtType": "uint32-array",
-                            "type": "array",
-                            "minItems": 1,
-                            "items": {
-                                "minimum": 0,
-                                "maximum": 4294967295
-                            }
+                            "minimum": 0,
+                            "type": "integer",
+                            "typeSize": 32
                         },
                         "cdns,tchsh-ns": {
                             "description": "Delay in nanoseconds between last bit of current transaction and deasserting the device chip select (qspi_n_ss_out).",
                             "dtType": "uint32-array",
-                            "type": "array",
-                            "minItems": 1,
                             "items": {
-                                "minimum": 0,
-                                "maximum": 4294967295
-                            }
+                                "maximum": 4294967295,
+                                "minimum": 0
+                            },
+                            "minItems": 1,
+                            "type": "array"
+                        },
+                        "cdns,tsd2d-ns": {
+                            "description": "Delay in nanoseconds between one chip select being de-activated and the activation of another.",
+                            "dtType": "uint32-array",
+                            "items": {
+                                "maximum": 4294967295,
+                                "minimum": 0
+                            },
+                            "minItems": 1,
+                            "type": "array"
+                        },
+                        "cdns,tshsl-ns": {
+                            "description": "Delay in nanoseconds for the length that the master mode chip select outputs are de-asserted between transactions.",
+                            "dtType": "uint32-array",
+                            "items": {
+                                "maximum": 4294967295,
+                                "minimum": 0
+                            },
+                            "minItems": 1,
+                            "type": "array"
                         },
                         "cdns,tslch-ns": {
                             "description": "Delay in nanoseconds between setting qspi_n_ss_out low and first bit transfer.",
                             "dtType": "uint32-array",
-                            "type": "array",
-                            "minItems": 1,
                             "items": {
-                                "minimum": 0,
-                                "maximum": 4294967295
-                            }
+                                "maximum": 4294967295,
+                                "minimum": 0
+                            },
+                            "minItems": 1,
+                            "type": "array"
                         }
                     },
-                    "additionalProperties": true
+                    "title": "Peripheral-specific properties for the Cadence QSPI controller."
                 },
                 {
                     "$id": "http://devicetree.org/schemas/spi/fsl,dspi-peripheral-props.yaml#",
-                    "title": "Peripheral-specific properties for Freescale DSPI controller",
+                    "additionalProperties": true,
                     "description": "See spi-peripheral-props.yaml for more info.",
                     "properties": {
                         "fsl,spi-cs-sck-delay": {
                             "deprecated": true,
                             "description": "Delay in nanoseconds between activating chip select and the start of clock signal, at the start of a transfer.",
-                            "type": "integer",
-                            "typeSize": 32,
-                            "minimum": 0,
+                            "dtType": "uint32",
                             "maximum": 4294967295,
-                            "dtType": "uint32"
+                            "minimum": 0,
+                            "type": "integer",
+                            "typeSize": 32
                         },
                         "fsl,spi-sck-cs-delay": {
                             "deprecated": true,
                             "description": "Delay in nanoseconds between stopping the clock signal and deactivating chip select, at the end of a transfer.",
-                            "type": "integer",
-                            "typeSize": 32,
-                            "minimum": 0,
+                            "dtType": "uint32",
                             "maximum": 4294967295,
-                            "dtType": "uint32"
+                            "minimum": 0,
+                            "type": "integer",
+                            "typeSize": 32
                         }
                     },
-                    "additionalProperties": true
+                    "title": "Peripheral-specific properties for Freescale DSPI controller"
                 },
                 {
                     "$id": "http://devicetree.org/schemas/spi/samsung,spi-peripheral-props.yaml#",
-                    "title": "Peripheral-specific properties for Samsung S3C/S5P/Exynos SoC SPI controller",
+                    "additionalProperties": true,
                     "description": "See spi-peripheral-props.yaml for more info.",
                     "properties": {
                         "controller-data": {
-                            "type": "object",
                             "additionalProperties": false,
                             "properties": {
                                 "samsung,spi-feedback-delay": {
+                                    "default": 0,
                                     "description": "The sampling phase shift to be applied on the miso line (to account\nfor any lag in the miso line). Valid values:\n - 0: No phase shift.\n - 1: 90 degree phase shift sampling.\n - 2: 180 degree phase shift sampling.\n - 3: 270 degree phase shift sampling.\n",
+                                    "dtType": "uint32",
                                     "enum": [
                                         0,
                                         1,
                                         2,
                                         3
                                     ],
-                                    "default": 0,
-                                    "type": "integer",
-                                    "typeSize": 32,
-                                    "minimum": 0,
                                     "maximum": 4294967295,
-                                    "dtType": "uint32"
+                                    "minimum": 0,
+                                    "type": "integer",
+                                    "typeSize": 32
                                 }
-                            }
+                            },
+                            "type": "object"
                         }
                     },
-                    "additionalProperties": true
+                    "title": "Peripheral-specific properties for Samsung S3C/S5P/Exynos SoC SPI controller"
                 },
                 {
                     "$id": "http://devicetree.org/schemas/spi/nvidia,tegra210-quad-peripheral-props.yaml#",
-                    "title": "Peripheral properties for Tegra Quad SPI Controller",
+                    "additionalProperties": true,
                     "properties": {
-                        "nvidia,tx-clk-tap-delay": {
-                            "description": "Delays the clock going out to device with this tap value. Tap value varies based on platform design trace lengths from Tegra QSPI to corresponding slave device.",
-                            "minimum": 0,
-                            "maximum": 31,
-                            "type": "integer",
-                            "typeSize": 32,
-                            "dtType": "uint32"
-                        },
                         "nvidia,rx-clk-tap-delay": {
                             "description": "Delays the clock coming in from the device with this tap value. Tap value varies based on platform design trace lengths from Tegra QSPI to corresponding slave device.",
-                            "minimum": 0,
+                            "dtType": "uint32",
                             "maximum": 255,
+                            "minimum": 0,
                             "type": "integer",
-                            "typeSize": 32,
-                            "dtType": "uint32"
+                            "typeSize": 32
+                        },
+                        "nvidia,tx-clk-tap-delay": {
+                            "description": "Delays the clock going out to device with this tap value. Tap value varies based on platform design trace lengths from Tegra QSPI to corresponding slave device.",
+                            "dtType": "uint32",
+                            "maximum": 31,
+                            "minimum": 0,
+                            "type": "integer",
+                            "typeSize": 32
                         }
                     },
-                    "additionalProperties": true
+                    "title": "Peripheral properties for Tegra Quad SPI Controller"
                 }
             ],
-            "additionalProperties": true
+            "description": "Many SPI controllers need to add properties to peripheral devices. They could be common properties like spi-max-frequency, spi-cpha, etc. or they could be controller specific like delay in clock or data lines, etc. These properties need to be defined in the peripheral node because they are per-peripheral and there can be multiple peripherals attached to a controller. All those properties are listed here. The controller specific properties should go in their own separate schema that should be referenced from here.",
+            "properties": {
+                "parallel-memories": {
+                    "description": "Several SPI memories can be wired in parallel mode. The devices are physically on a different buses but will always act synchronously as each data word is spread across the different memories (eg. even bits are stored in one memory, odd bits in the other). This basically doubles the address space and the throughput while greatly complexifying the wiring because as many busses as devices must be wired. The size of each chip should be provided as members of the array.",
+                    "dtType": "uint64-array",
+                    "items": {
+                        "dtType": "uint64",
+                        "maximum": 18446744073709552000,
+                        "minimum": 0,
+                        "type": "integer",
+                        "typeSize": 64
+                    },
+                    "maxItems": 4,
+                    "minItems": 2,
+                    "type": "array"
+                },
+                "rx-sample-delay-ns": {
+                    "description": "SPI Rx sample delay offset, unit is nanoseconds. The delay from the default sample time before the actual sample of the rxd input signal occurs.",
+                    "dtType": "uint32-array",
+                    "items": {
+                        "maximum": 4294967295,
+                        "minimum": 0
+                    },
+                    "minItems": 1,
+                    "type": "array"
+                },
+                "spi-cs-high": {
+                    "description": "The device requires the chip select active high.",
+                    "dtType": "flag",
+                    "oneOf": [
+                        {
+                            "const": true,
+                            "type": "boolean"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "spi-cs-hold-delay-ns": {
+                    "description": "Delay in nanoseconds to be introduced by the controller before CS is de-asserted.",
+                    "dtType": "uint32-array",
+                    "items": {
+                        "maximum": 4294967295,
+                        "minimum": 0
+                    },
+                    "minItems": 1,
+                    "type": "array"
+                },
+                "spi-cs-inactive-delay-ns": {
+                    "description": "Delay in nanoseconds to be introduced by the controller after CS is de-asserted.",
+                    "dtType": "uint32-array",
+                    "items": {
+                        "maximum": 4294967295,
+                        "minimum": 0
+                    },
+                    "minItems": 1,
+                    "type": "array"
+                },
+                "spi-cs-setup-delay-ns": {
+                    "description": "Delay in nanoseconds to be introduced by the controller after CS is asserted.",
+                    "dtType": "uint32-array",
+                    "items": {
+                        "maximum": 4294967295,
+                        "minimum": 0
+                    },
+                    "minItems": 1,
+                    "type": "array"
+                },
+                "spi-lsb-first": {
+                    "description": "The device requires the LSB first mode.",
+                    "dtType": "flag",
+                    "oneOf": [
+                        {
+                            "const": true,
+                            "type": "boolean"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "spi-rx-bus-width": {
+                    "default": 1,
+                    "description": "Bus width to the SPI bus used for read transfers. If 0 is provided, then no RX will be possible on this device.",
+                    "dtType": "uint32",
+                    "enum": [
+                        0,
+                        1,
+                        2,
+                        4,
+                        8
+                    ],
+                    "maximum": 4294967295,
+                    "minimum": 0,
+                    "type": "integer",
+                    "typeSize": 32
+                },
+                "spi-rx-delay-us": {
+                    "description": "Delay, in microseconds, after a read transfer.",
+                    "dtType": "uint32-array",
+                    "items": {
+                        "maximum": 4294967295,
+                        "minimum": 0
+                    },
+                    "minItems": 1,
+                    "type": "array"
+                },
+                "spi-tx-bus-width": {
+                    "default": 1,
+                    "description": "Bus width to the SPI bus used for write transfers. If 0 is provided, then no TX will be possible on this device.",
+                    "dtType": "uint32",
+                    "enum": [
+                        0,
+                        1,
+                        2,
+                        4,
+                        8
+                    ],
+                    "maximum": 4294967295,
+                    "minimum": 0,
+                    "type": "integer",
+                    "typeSize": 32
+                },
+                "spi-tx-delay-us": {
+                    "description": "Delay, in microseconds, after a write transfer.",
+                    "dtType": "uint32-array",
+                    "items": {
+                        "maximum": 4294967295,
+                        "minimum": 0
+                    },
+                    "minItems": 1,
+                    "type": "array"
+                },
+                "st,spi-midi-ns": {
+                    "description": "Only for STM32H7, (Master Inter-Data Idleness) minimum time\ndelay in nanoseconds inserted between two consecutive data frames.\n",
+                    "dtType": "uint32-array",
+                    "items": {
+                        "maximum": 4294967295,
+                        "minimum": 0
+                    },
+                    "minItems": 1,
+                    "type": "array"
+                },
+                "stacked-memories": {
+                    "description": "Several SPI memories can be wired in stacked mode. This basically means that either a device features several chip selects, or that different devices must be seen as a single bigger chip. This basically doubles (or more) the total address space with only a single additional wire, while still needing to repeat the commands when crossing a chip boundary. The size of each chip should be provided as members of the array.",
+                    "dtType": "uint64-array",
+                    "items": {
+                        "dtType": "uint64",
+                        "maximum": 18446744073709552000,
+                        "minimum": 0,
+                        "type": "integer",
+                        "typeSize": 64
+                    },
+                    "maxItems": 4,
+                    "minItems": 2,
+                    "type": "array"
+                }
+            },
+            "title": "Peripheral-specific properties for a SPI bus."
         },
         {
             "if": {
@@ -629,7 +405,6 @@
             "then": {
                 "patternProperties": {
                     "^channel@([0-1])$": {
-                        "type": "object",
                         "properties": {
                             "adi,output-range-microvolt": {
                                 "description": "Voltage output range of the channel as <minimum, maximum>\nRequired connections:\n  Rfb1x for: 0 to 2.5 V; 0 to 3V; 0 to 5 V;\n  Rfb2x for: 0 to 10 V; -2.5 to 7.5V; -5 to 5 V;\n",
@@ -650,14 +425,14 @@
                                                         ]
                                                     }
                                                 ],
-                                                "type": "array",
+                                                "maxItems": 2,
                                                 "minItems": 2,
-                                                "maxItems": 2
+                                                "type": "array"
                                             }
                                         ],
-                                        "type": "array",
+                                        "maxItems": 1,
                                         "minItems": 1,
-                                        "maxItems": 1
+                                        "type": "array"
                                     },
                                     {
                                         "items": [
@@ -670,14 +445,14 @@
                                                         "const": 7500000
                                                     }
                                                 ],
-                                                "type": "array",
+                                                "maxItems": 2,
                                                 "minItems": 2,
-                                                "maxItems": 2
+                                                "type": "array"
                                             }
                                         ],
-                                        "type": "array",
+                                        "maxItems": 1,
                                         "minItems": 1,
-                                        "maxItems": 1
+                                        "type": "array"
                                     },
                                     {
                                         "items": [
@@ -690,21 +465,22 @@
                                                         "const": 5000000
                                                     }
                                                 ],
-                                                "type": "array",
+                                                "maxItems": 2,
                                                 "minItems": 2,
-                                                "maxItems": 2
+                                                "type": "array"
                                             }
                                         ],
-                                        "type": "array",
+                                        "maxItems": 1,
                                         "minItems": 1,
-                                        "maxItems": 1
+                                        "type": "array"
                                     }
                                 ]
                             }
                         },
                         "required": [
                             "adi,output-range-microvolt"
-                        ]
+                        ],
+                        "type": "object"
                     }
                 },
                 "properties": {
@@ -733,7 +509,6 @@
             "then": {
                 "patternProperties": {
                     "^channel@([0-1])$": {
-                        "type": "object",
                         "properties": {
                             "adi,output-range-microvolt": {
                                 "description": "Voltage output range of the channel as <minimum, maximum>\nRequired connections:\n  Rfb1x for: 0 to 2.5 V; 0 to 5 V;\n  Rfb2x for: 0 to 10 V; -5 to 5 V;\n  Rfb4x for: -10 to 10V\n",
@@ -753,14 +528,14 @@
                                                         ]
                                                     }
                                                 ],
-                                                "type": "array",
+                                                "maxItems": 2,
                                                 "minItems": 2,
-                                                "maxItems": 2
+                                                "type": "array"
                                             }
                                         ],
-                                        "type": "array",
+                                        "maxItems": 1,
                                         "minItems": 1,
-                                        "maxItems": 1
+                                        "type": "array"
                                     },
                                     {
                                         "items": [
@@ -773,14 +548,14 @@
                                                         "const": 5000000
                                                     }
                                                 ],
-                                                "type": "array",
+                                                "maxItems": 2,
                                                 "minItems": 2,
-                                                "maxItems": 2
+                                                "type": "array"
                                             }
                                         ],
-                                        "type": "array",
+                                        "maxItems": 1,
                                         "minItems": 1,
-                                        "maxItems": 1
+                                        "type": "array"
                                     },
                                     {
                                         "items": [
@@ -793,18 +568,19 @@
                                                         "const": 10000000
                                                     }
                                                 ],
-                                                "type": "array",
+                                                "maxItems": 2,
                                                 "minItems": 2,
-                                                "maxItems": 2
+                                                "type": "array"
                                             }
                                         ],
-                                        "type": "array",
+                                        "maxItems": 1,
                                         "minItems": 1,
-                                        "maxItems": 1
+                                        "type": "array"
                                     }
                                 ]
                             }
-                        }
+                        },
+                        "type": "object"
                     }
                 },
                 "properties": {
@@ -832,7 +608,7 @@
             },
             "then": {
                 "properties": {
-                    "channel@1": false,
+                    "__canary__": false,
                     "channel@0": {
                         "properties": {
                             "reg": {
@@ -843,30 +619,254 @@
                                                 "const": 0
                                             }
                                         ],
-                                        "type": "array",
+                                        "maxItems": 1,
                                         "minItems": 1,
-                                        "maxItems": 1
+                                        "type": "array"
                                     }
                                 ],
-                                "type": "array",
+                                "maxItems": 1,
                                 "minItems": 1,
-                                "maxItems": 1
+                                "type": "array"
                             }
                         }
                     },
-                    "__canary__": false
+                    "channel@1": false
                 }
             }
         }
     ],
+    "description": "Bindings for the Analog Devices AD3552R DAC device and similar.\nDatasheet can be found here:\n  https://www.analog.com/media/en/technical-documentation/data-sheets/ad3541r.pdf\n  https://www.analog.com/media/en/technical-documentation/data-sheets/ad3542r.pdf\n  https://www.analog.com/media/en/technical-documentation/data-sheets/ad3551r.pdf\n  https://www.analog.com/media/en/technical-documentation/data-sheets/ad3552r.pdf\n",
+    "examples": [
+        "spi {\n    #address-cells = <1>;\n    #size-cells = <0>;\n    ad3552r@0 {\n        compatible = \"adi,ad3552r\";\n        reg = <0>;\n        spi-max-frequency = <20000000>;\n        #address-cells = <1>;\n        #size-cells = <0>;\n        channel@0 {\n            reg = <0>;\n            adi,output-range-microvolt = <0 10000000>;\n        };\n        channel@1 {\n            reg = <1>;\n            custom-output-range-config {\n                adi,gain-offset = <5>;\n                adi,gain-scaling-p = <1>;\n                adi,gain-scaling-n = <2>;\n                adi,rfb-ohms = <1>;\n            };\n        };\n    };\n};\n"
+    ],
+    "patternProperties": {
+        "^channel@([0-1])$": {
+            "additionalProperties": false,
+            "description": "Configurations of the DAC Channels",
+            "oneOf": [
+                {
+                    "required": [
+                        "adi,output-range-microvolt"
+                    ]
+                },
+                {
+                    "required": [
+                        "custom-output-range-config"
+                    ]
+                }
+            ],
+            "properties": {
+                "adi,output-range-microvolt": {
+                    "dtType": "int32-matrix",
+                    "items": {
+                        "items": {
+                            "maximum": 2147483647,
+                            "minimum": -2147483648
+                        },
+                        "type": "array"
+                    },
+                    "type": "array"
+                },
+                "custom-output-range-config": {
+                    "additionalProperties": false,
+                    "description": "Configuration of custom range when adi,output-range-microvolt is not present. The formulas for calculation the output voltages are Vout_fs = 2.5 + [(GainN + Offset/1024) * 2.5 * Rfbx * 1.03] Vout_zs = 2.5 - [(GainP + Offset/1024) * 2.5 * Rfbx * 1.03]",
+                    "properties": {
+                        "adi,gain-offset": {
+                            "description": "Gain offset used in the above formula",
+                            "dtType": "int32",
+                            "maximum": 511,
+                            "minimum": -511,
+                            "type": "integer"
+                        },
+                        "adi,gain-scaling-n": {
+                            "description": "GainN = 1 / ( 2 ^ adi,gain-scaling-n)",
+                            "dtType": "uint32",
+                            "enum": [
+                                0,
+                                1,
+                                2,
+                                3
+                            ],
+                            "maximum": 4294967295,
+                            "minimum": 0,
+                            "type": "integer",
+                            "typeSize": 32
+                        },
+                        "adi,gain-scaling-p": {
+                            "description": "GainP = 1 / ( 2 ^ adi,gain-scaling-p)",
+                            "dtType": "uint32",
+                            "enum": [
+                                0,
+                                1,
+                                2,
+                                3
+                            ],
+                            "maximum": 4294967295,
+                            "minimum": 0,
+                            "type": "integer",
+                            "typeSize": 32
+                        },
+                        "adi,rfb-ohms": {
+                            "description": "Feedback Resistor",
+                            "dtType": "uint32-array",
+                            "items": {
+                                "maximum": 4294967295,
+                                "minimum": 0
+                            },
+                            "minItems": 1,
+                            "type": "array"
+                        }
+                    },
+                    "required": [
+                        "adi,gain-offset",
+                        "adi,gain-scaling-p",
+                        "adi,gain-scaling-n",
+                        "adi,rfb-ohms"
+                    ],
+                    "type": "object"
+                },
+                "reg": {
+                    "description": "Channel number",
+                    "dtType": "address",
+                    "items": [
+                        {
+                            "items": [
+                                {
+                                    "enum": [
+                                        0,
+                                        1
+                                    ]
+                                }
+                            ],
+                            "maxItems": 1,
+                            "minItems": 1,
+                            "type": "array"
+                        }
+                    ],
+                    "maxItems": 1,
+                    "minItems": 1,
+                    "type": "array"
+                }
+            },
+            "required": [
+                "reg"
+            ],
+            "type": "object"
+        }
+    },
+    "properties": {
+        "#address-cells": {
+            "const": 1,
+            "dtType": "uint32"
+        },
+        "#size-cells": {
+            "const": 0,
+            "dtType": "uint32"
+        },
+        "adi,sdo-drive-strength": {
+            "description": "Configure SDIO0 and SDIO1 strength levels:\n  - 0: low SDO drive strength.\n  - 1: medium low SDO drive strength.\n  - 2: medium high SDO drive strength.\n  - 3: high SDO drive strength\n",
+            "dtType": "uint32",
+            "enum": [
+                0,
+                1,
+                2,
+                3
+            ],
+            "maximum": 4294967295,
+            "minimum": 0,
+            "type": "integer",
+            "typeSize": 32
+        },
+        "adi,vref-out-en": {
+            "description": "Vref I/O driven by internal vref to 2.5V. If not set, Vref pin will be floating.",
+            "type": "boolean"
+        },
+        "compatible": {
+            "dtType": "string-array",
+            "items": [
+                {
+                    "enum": [
+                        "adi,ad3541r",
+                        "adi,ad3542r",
+                        "adi,ad3551r",
+                        "adi,ad3552r"
+                    ]
+                }
+            ],
+            "maxItems": 1,
+            "minItems": 1,
+            "type": "array"
+        },
+        "io-backends": {
+            "description": "The iio backend reference. Device can be optionally connected to the \"axi-ad3552r IP\" fpga-based QSPI + DDR (Double Data Rate) controller to reach high speed transfers.",
+            "dtType": "phandle-array",
+            "items": {
+                "type": "array"
+            },
+            "maxItems": 1,
+            "minItems": 1,
+            "type": "array"
+        },
+        "ldac-gpios": {
+            "description": "LDAC pin to be used as a hardware trigger to update the DAC channels.\n",
+            "dtType": "phandle-array",
+            "items": {
+                "type": "array"
+            },
+            "maxItems": 1,
+            "minItems": 1,
+            "type": "array"
+        },
+        "reg": {
+            "description": "Chip select used by the device.",
+            "dtType": "address",
+            "items": {
+                "items": [
+                    {
+                        "maximum": 256,
+                        "minimum": 0,
+                        "type": "integer"
+                    }
+                ],
+                "maxItems": 1,
+                "minItems": 1,
+                "type": "array"
+            },
+            "maxItems": 1,
+            "minItems": 1,
+            "type": "array"
+        },
+        "reset-gpios": {
+            "dtType": "phandle-array",
+            "items": {
+                "type": "array"
+            },
+            "maxItems": 1,
+            "minItems": 1,
+            "type": "array"
+        },
+        "spi-max-frequency": {
+            "description": "Maximum SPI clocking speed of the device in Hz.",
+            "dtType": "uint32",
+            "maximum": 66000000,
+            "minimum": 0,
+            "type": "integer",
+            "typeSize": 32
+        },
+        "vref-supply": {
+            "description": "The regulator to use as an external reference. If it does not exists the internal reference will be used. External reference must be 2.5V",
+            "dtType": "phandle",
+            "items": {
+                "type": "array"
+            },
+            "type": "array"
+        }
+    },
     "required": [
         "compatible",
         "reg",
         "spi-max-frequency"
     ],
-    "additionalProperties": false,
-    "examples": [
-        "spi {\n    #address-cells = <1>;\n    #size-cells = <0>;\n    ad3552r@0 {\n        compatible = \"adi,ad3552r\";\n        reg = <0>;\n        spi-max-frequency = <20000000>;\n        #address-cells = <1>;\n        #size-cells = <0>;\n        channel@0 {\n            reg = <0>;\n            adi,output-range-microvolt = <0 10000000>;\n        };\n        channel@1 {\n            reg = <1>;\n            custom-output-range-config {\n                adi,gain-offset = <5>;\n                adi,gain-scaling-p = <1>;\n                adi,gain-scaling-n = <2>;\n                adi,rfb-ohms = <1>;\n            };\n        };\n    };\n};\n"
-    ],
+    "title": "Analog Devices AD2552R DAC device driver",
     "type": "object"
 }
