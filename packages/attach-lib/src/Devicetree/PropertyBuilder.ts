@@ -1,4 +1,4 @@
-import { Bits, DTCellArray, DTProperty } from "./Parser";
+import { Bits, DTCellArray, DTProperty, is_dt_flag } from "./Parser";
 import { print_property } from "./Parser";
 import {
     CellArray,
@@ -14,6 +14,7 @@ import {
     LabeledDTString,
     LabeledTaggedCellValue,
     make_cell_array,
+    NumberRepr,
     upcast_to_LabeledDTString,
     upcast_to_LabeledDTStringArray,
     upcast_to_LabeledTaggedCellValue_LabeledArray
@@ -188,7 +189,10 @@ export class PropertyBuilder implements
         return print_property(property, "", 0);
     }
 
-    static tag_number(value: number | bigint) { return { _tag: "number" as const, value: BigInt(value) }; };
+    /** A number cell, printed in decimal unless `repr` says hex (as the parser keeps a `0x…` literal). */
+    static tag_number(value: number | bigint, repr?: NumberRepr) {
+        return { _tag: "number" as const, value: BigInt(value), ...(repr === undefined ? {} : { repr }) };
+    };
     static tag_label(value: string) { return { _tag: "label" as const, value: value }; };
     static tag_path(value: string) { return { _tag: "path" as const, value: value }; };
     static tag_expression(value: string) { return { _tag: "expression" as const, value: value }; };
@@ -1045,4 +1049,24 @@ if (import.meta.vitest !== undefined) {
 
         return cell_array_array;
     }
+
+    test("tag_number — a hex repr is kept and printed, decimal is the default", () => {
+        expect(PropertyBuilder.tag_number(5)).toStrictEqual({ _tag: "number", value: 5n });
+        const cell = PropertyBuilder.build_cell_array()
+            .with_tagged_values(PropertyBuilder.tag_number(0x2an, "hex"), PropertyBuilder.tag_number(5))
+            .with_name("reg")
+            .build();
+        const [array] = is_dt_flag(cell.value) ? [] : cell.value;
+        const elements = array?.kind === "array" ? array.elements : [];
+        expect(elements.map(element => element.kind === "number" ? element.repr : element.kind)).toEqual(["hex", "dec"]);
+        expect(PropertyBuilder.to_string(cell)).toContain("reg = <0x2a 5>;");
+    });
+
+    test("tag_number — a hex repr is kept in every row of a matrix", () => {
+        const cell = PropertyBuilder.build_cell_array()
+            .with_tagged_values([[PropertyBuilder.tag_number(0x10n, "hex")], [PropertyBuilder.tag_number(0x20n, "hex"), PropertyBuilder.tag_number(3)]])
+            .with_name("reg")
+            .build();
+        expect(PropertyBuilder.to_string(cell)).toContain("reg = <0x10>, <0x20 3>;");
+    });
 }

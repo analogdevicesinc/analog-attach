@@ -252,14 +252,16 @@ export async function fill_from_example(node: NewNode, values: ExampleValue[]): 
         const present = workfile.tree.effective_node(current.path);
         const existing = present?.properties.find(candidate => candidate.name === property);
         if (existing !== undefined && cell_extract_first_value(existing) === value) { continue; }
-        const shown = `${property} = <${property === "reg" ? `0x${value.toString(16)}` : value.toString()}>`;
+        // An I2C address reads (and is written) as 0x48.
+        const token = property === "reg" ? `0x${value.toString(16)}` : value.toString();
+        const shown = `${property} = <${token}>`;
         const why = `from example ${index}`;
         const parent = current.path.slice(0, current.path.lastIndexOf("/")) || "/";
         if (property === "reg" && present !== undefined && workfile.tree.effective_children(parent).has(`${present.name}@${value.toString(16)}`)) {
             lines.push(`Kept the address: ${present.name}@${value.toString(16)} is there already (${why})`);
             continue;
         }
-        const outcome = await apply_update(workfile, base, bindings, identifier, property, [value.toString()]);
+        const outcome = await apply_update(workfile, base, bindings, identifier, property, [token]);
         const path = workfile.tree.all_labels().get(identifier) ?? current.path;
         const renamed = path === current.path ? undefined : path.slice(path.lastIndexOf("/") + 1);
         current = { ...current, path };

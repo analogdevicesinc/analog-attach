@@ -80,6 +80,11 @@ function resolve_token(
         return PropertyBuilder.tag_number(token);
     }
 
+    // A hex literal keeps its radix: `0x2a` is written as typed.
+    if (/^0x[\da-f]+$/i.test(token)) {
+        return PropertyBuilder.tag_number(BigInt(token), "hex");
+    }
+
     const macro = ALL_MACROS.find(m => m.name === token);
     if (macro !== undefined) {
         return PropertyBuilder.tag_number(BigInt(macro.value));
@@ -618,6 +623,7 @@ type SingleInput = bigint | string;
 type ArrayInput = (bigint | string)[];
 type MatrixInput = ArrayInput[];
 
+/** A decimal number becomes a bigint; anything else, a hex literal too, stays a token for `resolve_token`. */
 function parse_token(token: string): bigint | string {
     return /^-?\d+$/.test(token) ? BigInt(token) : token;
 }
@@ -877,6 +883,27 @@ if (import.meta.vitest) {
             { kind: "array", elements: [{ kind: "label", name: "gpio" }, { kind: "number", value: 8n }, { kind: "number", value: 1n }] },
             { kind: "array", elements: [{ kind: "label", name: "gpio" }, { kind: "number", value: 7n }, { kind: "number", value: 1n }] },
         ]);
+    });
+
+    const printed = (raw: string, hint?: ShapeHint): string => {
+        const result = build_raw_property(raw, "reg", hint, base_is_label);
+        if (result === undefined || "error" in result) { throw new TypeError(JSON.stringify(result)); }
+        return PropertyBuilder.to_string(result).trim();
+    };
+
+    test("build_raw_property — hex numbers are taken and print in hex, decimal ones in decimal", () => {
+        expect(printed("0x2a", "cells")).toBe("reg = <0x2a>;");
+        expect(printed("0X2A", "cells")).toBe("reg = <0x2a>;");
+        expect(printed("42", "cells")).toBe("reg = <42>;");
+        expect(printed("0x10 16, 0x20 32", "cells")).toBe("reg = <0x10 16>, <0x20 32>;");
+        expect(printed("gpio 0x1c GPIO_ACTIVE_LOW", "cells")).toBe("reg = <&gpio 0x1c 1>;");
+        // With no binding hint a lone hex literal is a number, not the string "0x2a".
+        expect(printed("0x2a")).toBe("reg = <0x2a>;");
+        expect(printed("0x10 0x20")).toBe("reg = <0x10 0x20>;");
+    });
+
+    test("build_raw_property — a malformed hex literal is a word, refused in cells", () => {
+        expect(build_raw_property("0x2g", "reg", "cells", base_is_label)).toEqual({ error: "'0x2g' is not a number, a known macro, or a label in the base tree/overlay" });
     });
 
     test("parse_value - scalars, flat arrays, and comma-separated matrices", () => {

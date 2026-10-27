@@ -99,11 +99,13 @@ function is_tagged(object: any): object is TagWith<string | bigint, CellValueTag
         return false;
     }
 
-    if (Object.entries(object).length > 2) {
+    const narrowed = object as TagWith<string | bigint, CellValueTag> & { repr?: unknown };
+
+    // A number may also say how it prints.
+    const extra = Object.keys(object).filter((key) => key !== "_tag" && key !== "value");
+    if (extra.length > 0 && !(narrowed._tag === "number" && extra.length === 1 && extra[0] === "repr" && (narrowed.repr === "dec" || narrowed.repr === "hex"))) {
         return false;
     }
-
-    const narrowed = object as TagWith<string | bigint, CellValueTag>;
 
     if (!CELL_VALUE_TAGS.includes(narrowed._tag)) {
         return false;
@@ -116,8 +118,10 @@ function is_tagged(object: any): object is TagWith<string | bigint, CellValueTag
     return true;
 }
 
+export type NumberRepr = "dec" | "hex";
+
 export type CellValue =
-    TagWith<bigint, "number"> |
+    (TagWith<bigint, "number"> & { repr?: NumberRepr }) |
     TagWith<string, "label"> |
     TagWith<string, "path"> |
     TagWith<string, "expression">
@@ -236,7 +240,7 @@ export function make_cell_array(values: LabeledTaggedCellValue_LabeledArray): DT
                     kind: "number",
                     value: entry.payload.value,
                     labels: entry.labels,
-                    repr: "dec"
+                    repr: entry.payload.repr ?? "dec"
                 };
             }
             case "label": {

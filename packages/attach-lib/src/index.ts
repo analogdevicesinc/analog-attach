@@ -38,7 +38,7 @@ export {
 } from './Devicetree/Parser/AST.js';
 export { is_enabled, cell_extract_first_value, type LocatedNode, type NodeTarget } from './Devicetree/Access.js';
 export { print_property, type OverlaySyntax, type DtoPrintOptions } from './Devicetree/Printer.js';
-export type { CellValue, FoundNodeResult } from './Devicetree/Types.js';
+export type { CellValue, FoundNodeResult, NumberRepr } from './Devicetree/Types.js';
 export { NodeBuilder } from './Devicetree/NodeBuilder.js';
 export { PropertyBuilder } from './Devicetree/PropertyBuilder.js';
 export { DeviceTree } from './Devicetree/Devicetree.js';
