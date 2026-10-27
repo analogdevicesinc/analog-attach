@@ -1053,7 +1053,7 @@ if (import.meta.vitest !== undefined) {
     test("tag_number — a hex repr is kept and printed, decimal is the default", () => {
         expect(PropertyBuilder.tag_number(5)).toStrictEqual({ _tag: "number", value: 5n });
         const cell = PropertyBuilder.build_cell_array()
-            .with_tagged_values(PropertyBuilder.tag_number(0x2an, "hex"), PropertyBuilder.tag_number(5))
+            .with_tagged_values(PropertyBuilder.tag_number(0x2An, "hex"), PropertyBuilder.tag_number(5))
             .with_name("reg")
             .build();
         const [array] = is_dt_flag(cell.value) ? [] : cell.value;
