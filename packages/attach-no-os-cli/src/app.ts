@@ -11,6 +11,7 @@ import { importCommand } from "./commands/import";
 import { listRoutes } from "./commands/list";
 import { readCommand } from "./commands/read";
 import { renameCommand } from "./commands/rename";
+import { skillRoutes } from "./commands/skill";
 import { updateCommand } from "./commands/update";
 import { validateCommand } from "./commands/validate";
 import { TOOL_DESCRIPTION, TOOL_VERSION } from "./tool";
@@ -35,6 +36,7 @@ const routes = buildRouteMap({
 		build: buildCommandDefinition,
 		deploy: deployCommand,
 		completion: completionCommand,
+		skill: skillRoutes,
 	},
 	docs: {
 		brief: TOOL_DESCRIPTION,

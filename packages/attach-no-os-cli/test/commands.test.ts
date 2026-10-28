@@ -284,3 +284,22 @@ describe("import", () => {
     });
 });
 
+describe("skill", () => {
+    it("installs the capi skill for Claude Code, refuses to overwrite it without --force, and removes it", async () => {
+        const installed = path.join(process.env.HOME ?? "", ".claude/skills/attach-noos-capi/SKILL.md");
+        expect(await cli("skill", "install", "capi")).toContain("Installed the capi skill");
+        expect(fs.readFileSync(installed, "utf8")).toMatch(/^---\nname: attach-noos-capi\n/);
+
+        expect(await cli("skill", "install", "capi")).toContain("already installed");
+        expect(await cli("skill", "install", "capi", "--force")).toContain("Installed the capi skill");
+
+        expect(await cli("skill", "uninstall", "capi")).toContain("Removed the capi skill");
+        expect(fs.existsSync(path.dirname(installed))).toBe(false);
+        expect(await cli("skill", "uninstall", "capi")).toContain("nothing to remove");
+    });
+
+    it("names the skills there are for one it does not have", async () => {
+        expect(await cli("skill", "install", "linux")).toContain("No skill called 'linux' here. Available: capi");
+    });
+});
+
