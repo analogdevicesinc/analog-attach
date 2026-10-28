@@ -17,8 +17,7 @@ import { build_internal_list_command } from "./commands/list/internal";
 import { build_build_command } from "./commands/build/command";
 import { build_deploy_command } from "./commands/deploy/command";
 import { build_enable_command, build_disable_command } from "./commands/enable-disable/command";
-import { build_install_skill_command } from "./commands/skill/install-skill";
-import { build_uninstall_skill_command } from "./commands/skill/uninstall-skill";
+import { build_skill_command } from "./commands/skill/command";
 import { build_completion_command } from "./commands/completion/command";
 import { build_ui_command } from "./commands/ui/command";
 
@@ -83,8 +82,7 @@ Run any command with --help for detailed usage.`);
     program.addCommand(build_config_command(context));
 
     // tooling
-    program.addCommand(build_install_skill_command(context));
-    program.addCommand(build_uninstall_skill_command(context));
+    program.addCommand(build_skill_command(context));
     program.addCommand(build_completion_command(context));
 
     const helpConfig = {

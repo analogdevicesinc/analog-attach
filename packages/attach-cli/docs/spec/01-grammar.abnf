@@ -38,7 +38,7 @@ command         = add / import / init
                 / list / internal-list
                 / build / validate / deploy
                 / config
-                / install-skill / uninstall-skill / completion
+                / skill / completion
                 / ui
 
 ; An option that takes a value is one element "--name=value" or two
@@ -87,8 +87,9 @@ config-option   = %s"--reset" / %s"--reload"  ; which combine: 03-commands/confi
 
 init            = %s"init"
 
-install-skill   = %s"install-skill" *( B %s"--force" )
-uninstall-skill = %s"uninstall-skill"
+skill           = %s"skill" B skill-action *( B %s"--force" )
+skill-action    = %s"install" / %s"uninstall" ; --force with uninstall:
+                                        ; an input error (skill.md SKILL-013)
 completion      = %s"completion" [ B shell ] *( B completion-opt )
 completion-opt  = %s"--install" / %s"--uninstall"   ; not both (COMPL-154)
 shell           = known-shell / element ; any other element: "Unknown shell"

@@ -1,20 +1,23 @@
-# install-skill, uninstall-skill
+# skill
 
 Install or remove the Claude Code skill that teaches Claude to use
-`attach-linux`.
+`attach-linux`. (These were the commands `install-skill` and
+`uninstall-skill`; they are gone, with no alias: an unknown command,
+GRM-004.)
 
 ## 1. Synopsis
 
 ```
-attach-linux install-skill [--force]
-attach-linux uninstall-skill
+attach-linux skill install [--force]
+attach-linux skill uninstall
 ```
 
-Grammar: rules `install-skill` and `uninstall-skill` in `01-grammar.abnf`.
+Grammar: rule `skill` in `01-grammar.abnf`.
 
 | Argument | Meaning | Default |
 |---|---|---|
-| `--force` | Install over an installed skill. | off |
+| `<action>` | `install` or `uninstall`. Another value, or none, is commander's error (GRM-004). | |
+| `--force` | With `install`: install over an installed skill. | off |
 
 ## 2. Terms
 
@@ -27,10 +30,10 @@ Grammar: rules `install-skill` and `uninstall-skill` in `01-grammar.abnf`.
 
 ## 3. Resources
 
-Neither command reads the workspace or its config: they work in any
+Neither action reads the workspace or its config: they work in any
 directory, configured or not.
 
-## 4. install-skill
+## 4. skill install
 
 **SKILL-001** The CLI shall check that Claude Code is installed by running
 `claude --version` from `PATH`, its output discarded. If that fails, then the
@@ -60,7 +63,7 @@ Try asking: "help me configure an ADC for my Raspberry Pi"
 shall write `SKILL.md not found at <path>` or `Failed to install skill:
 <error>` to standard error and exit with status 1 (COM-130).
 
-## 5. uninstall-skill
+## 5. skill uninstall
 
 **SKILL-010** If the skill isn't installed, then the CLI shall write `Attach
 skill is not installed.` and change nothing.
@@ -72,46 +75,54 @@ successfully.` and an empty line.
 **SKILL-012** If the removal fails, then the CLI shall write `Failed to
 uninstall skill: <error>` to standard error and exit with status 1 (COM-130).
 
-## 6. Both commands
+**SKILL-013** If `--force` is given, then the CLI shall treat it as an input
+error (COM-031, COM-033): `--force applies to 'skill install' only`, and
+change nothing.
 
-**SKILL-020** Except for the failures of SKILL-005 and SKILL-012, the CLI
-shall write every message to standard output and exit with status 0, in human
-and in JSON mode alike: neither command has a JSON response. (Open issue
-S-2.)
+## 6. Both actions
+
+**SKILL-020** Except for the failures of SKILL-005 and SKILL-012 and the input
+error of SKILL-013, the CLI shall write every message to standard output and
+exit with status 0, in human and in JSON mode alike: neither action has a JSON
+response. (Open issue S-2.)
 
 ## 7. Open issues
 
-**S-2. `--json` is ignored.** Both commands write their human text under
+**S-2. `--json` is ignored.** Both actions write their human text under
 `--json`. The CLI's convention (COM-020) is one JSON object or nothing.
 
 **S-3. An empty home installs into the CWD.** With `HOME` and `USERPROFILE`
 both unset or empty, the skill goes to `./.claude/skills/attach-linux`, and
-`uninstall-skill` removes it from there.
+`skill uninstall` removes it from there.
 
-**S-4. `uninstall-skill` removes the whole directory.** Files the user added
-next to `SKILL.md` are deleted with it, while `install-skill` keeps them
+**S-4. `skill uninstall` removes the whole directory.** Files the user added
+next to `SKILL.md` are deleted with it, while `skill install` keeps them
 (SKILL-003).
 
-**S-5. `install-skill` without Claude Code exits 0.** As C-1 in
+**S-5. `skill install` without Claude Code exits 0.** As C-1 in
 `02-common.md`: the refusals of SKILL-001 and SKILL-002 exit with status 0.
 
 ## 8. Examples
 
 ```
-$ attach-linux install-skill
+$ attach-linux skill install
                                                   (empty line)
 Attach skill installed successfully!
                                                   (empty line)
 Claude Code will now assist with device tree configuration.
 Try asking: "help me configure an ADC for my Raspberry Pi"
                                                   (empty line)
-$ attach-linux install-skill
+$ attach-linux skill install
 Attach skill is already installed.
 Use --force to overwrite.
-$ attach-linux uninstall-skill
+$ attach-linux skill uninstall
                                                   (empty line)
 Attach skill uninstalled successfully.
                                                   (empty line)
-$ attach-linux uninstall-skill
+$ attach-linux skill uninstall
 Attach skill is not installed.
+$ attach-linux skill uninstall --force
+--force applies to 'skill install' only
+$ attach-linux install-skill
+error: unknown command 'install-skill'                  (stderr, exit 1)
 ```

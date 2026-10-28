@@ -111,6 +111,9 @@ export const COMPLETION_SPEC: Readonly<Record<string, CommandSpec | "dynamic">> 
     completion: {
         positional: { mode: "byIndex", sources: [{ kind: "values", values: ["bash", "fish", "zsh"] }] },
     },
+    skill: {
+        positional: { mode: "byIndex", sources: [{ kind: "values", values: ["install", "uninstall"] }] },
+    },
     config: {
         positional: { mode: "byIndex", sources: [CONFIG_FIELDS, FILE] },
     },
@@ -122,6 +125,4 @@ export const NO_VALUE_COMPLETION: readonly string[] = [
     "deploy",
     "ui",
     "validate",
-    "install-skill",
-    "uninstall-skill",
 ];

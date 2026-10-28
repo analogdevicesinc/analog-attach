@@ -132,9 +132,9 @@ issue CO-9):
 | `list property`, `list value` | node path | property | |
 | `config` | config field (§8.1 of `02-common.md`) | file name (COMPL-012) | |
 | `completion` | `bash`, `fish`, `zsh` | | |
+| `skill` | `install`, `uninstall` | | |
 
-`init`, `build`, `validate`, `deploy`, `install-skill`, `uninstall-skill` and
-`ui` complete only their options.
+`init`, `build`, `validate`, `deploy` and `ui` complete only their options.
 
 ### 6.2 Option values
 
@@ -365,7 +365,7 @@ reports `error: option '--install' cannot be used with option '--uninstall'`
 
 **COMPL-155** The CLI shall write the lines of COMPL-151 and COMPL-152 to
 standard output and exit with status 0, in human and in JSON mode alike: there
-is no JSON response (as for `install-skill`, SKILL-020). If the file can't be
+is no JSON response (as for `skill`, SKILL-020). If the file can't be
 written or removed, the error is unhandled (COM-130): standard error, status
 1. (Open issue CO-11.)
 
@@ -434,7 +434,7 @@ position completed with `__ATTACH_COMPLETE_DIRS__` (COMPL-012); `config
 linux` completes a file name like every other field (CO-5).
 
 **CO-11. `completion --install` has no JSON response.** Like
-`install-skill` (`install-skill.md` S-2), JSON mode writes the human lines
+`skill` (`skill.md` S-2), JSON mode writes the human lines
 (COMPL-155).
 
 ## 12. Examples

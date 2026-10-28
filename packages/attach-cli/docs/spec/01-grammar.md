@@ -228,8 +228,7 @@ their meaning.
 | `build`, `validate`, `deploy` | | |
 | `config` | `[key] [value]` | `--reset`, `--reload` |
 | `init` | | |
-| `install-skill` | | `--force` |
-| `uninstall-skill` | | |
+| `skill` | `<install\|uninstall>` | `--force` |
 | `completion` | `[shell]` | `--install`, `--uninstall` |
 | `__list` (hidden) | `[args...]` | |
 | `ui` (hidden) | | `--port <number>`, `--open` |

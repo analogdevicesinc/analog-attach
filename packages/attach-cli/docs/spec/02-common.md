@@ -37,7 +37,7 @@ Exceptions. Each has an open issue, of its chapter or of this one:
 | `validate` | COM-020, COM-050 | its response has no `ok`, `message` or `severity` | `validate.md` V-4 |
 | `ui` | COM-020 | writes two text lines under `--json` | `ui.md` U-3 |
 | `ui` | COM-022, COM-033 | writes `Invalid port: <value>` to standard error with status 2 in human mode too (`ui.md` UI-001) | C-1 |
-| `install-skill`, `uninstall-skill` | COM-020 | ignore `--json` and write text | `install-skill.md` S-2 |
+| `skill` | COM-020 | ignores `--json` and writes text | `skill.md` S-2 |
 | `completion` | COM-020 | writes the shell script under `--json` | `05-completion.md` CO-6 |
 | `completion` | COM-022 | writes `Unknown shell: <shell>. Supported: bash, fish, zsh` to standard error, with status 0 | `05-completion.md` CO-6 |
 
@@ -123,8 +123,8 @@ bad `--port` (`ui.md` UI-001).
 **COM-130** If a command throws an error that isn't commander's, then the
 CLI shall write the error's message to standard error and exit with status 1,
 in human and in JSON mode alike. Standard output has what the command wrote
-before the error, if anything: in JSON mode no response. (`install-skill`
-with a read-only home, `ui --port` on a port in use, a `preprocess-command`
+before the error, if anything: in JSON mode no response. (`skill
+install` with a read-only home, `ui --port` on a port in use, a `preprocess-command`
 that writes no output.)
 
 A JSON client MUST read `ok` to tell success from refusal. The exit status
