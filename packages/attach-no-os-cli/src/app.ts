@@ -7,6 +7,7 @@ import { initCommand } from "./commands/init";
 import { deleteCommand } from "./commands/delete";
 import { deployCommand } from "./commands/deploy";
 import { generateCommand } from "./commands/generate";
+import { importCommand } from "./commands/import";
 import { listRoutes } from "./commands/list";
 import { readCommand } from "./commands/read";
 import { renameCommand } from "./commands/rename";
@@ -24,6 +25,7 @@ const routes = buildRouteMap({
 		init: initCommand,
 		list: listRoutes,
 		add: addCommand,
+		import: importCommand,
 		read: readCommand,
 		update: updateCommand,
 		delete: deleteCommand,

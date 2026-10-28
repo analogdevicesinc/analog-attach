@@ -241,3 +241,46 @@ describe("exit codes", () => {
     });
 });
 
+describe("import", () => {
+    async function exported(): Promise<string> {
+        await sensor();
+        const copy = path.join(directory, "elsewhere.json");
+        fs.copyFileSync(path.join(directory, "workfile.json"), copy);
+        fs.rmSync(path.join(directory, "workfile.json"));
+        return copy;
+    }
+
+    it("copies a workfile that loads to where the workfile setting points", async () => {
+        const source = await exported();
+        const text = await cli("import", source);
+        expect(text).toContain("Imported a workfile for board otherboard");
+        expect(fs.readFileSync(path.join(directory, "workfile.json"), "utf8")).toBe(fs.readFileSync(source, "utf8"));
+        expect(stored()["testpart_spi_dev"]).toBeDefined();
+
+        fs.rmSync(path.join(directory, "workfile.json"));
+        const response = JSON.parse(await cli("import", source, "--json")) as { ok: boolean, path: string, source: string };
+        expect(response).toMatchObject({ ok: true, path: path.join(directory, "workfile.json"), source });
+    });
+
+    it("never overwrites a workfile", async () => {
+        const source = await exported();
+        await cli("init");
+        const before = fs.readFileSync(path.join(directory, "workfile.json"), "utf8");
+        expect(await cli("import", source)).toContain("A workfile already exists");
+        expect(fs.readFileSync(path.join(directory, "workfile.json"), "utf8")).toBe(before);
+    });
+
+    it("refuses a file that does not load here, copying nothing", async () => {
+        const source = path.join(directory, "foreign.json");
+        fs.writeFileSync(source, JSON.stringify({ platform: "othersoc", symbols: { x: { $compatible: "no_such_schema" } } }));
+        expect(await cli("import", source)).toContain(`Cannot import '${source}'`);
+        expect(fs.existsSync(path.join(directory, "workfile.json"))).toBe(false);
+    });
+
+    it("refuses a missing file, and the workfile onto itself", async () => {
+        expect(await cli("import", path.join(directory, "missing.json"))).toContain("No workfile at");
+        await sensor();
+        expect(await cli("import", path.join(directory, "workfile.json"))).toContain("is already the workfile");
+    });
+});
+

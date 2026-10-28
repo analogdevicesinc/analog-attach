@@ -150,6 +150,13 @@ export interface CreateWorkfileResponse extends CommonResponse {
     path: string;
 }
 
+export interface ImportResponse extends CommonResponse {
+    /** Absolute path to the workfile it was copied to. */
+    path: string;
+    /** Absolute path to the file it was copied from. */
+    source: string;
+}
+
 /** `tag` groups entries for display; `key` is what `add --key` takes. */
 export interface Device {
     tag: string;
