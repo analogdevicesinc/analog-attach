@@ -1,4 +1,7 @@
-import { Command } from "commander";
+import { Command, Option } from "commander";
+import * as fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 
 import type { LocalContext } from "../../context";
 import { FILES_DIRECTIVE, DIRS_DIRECTIVE, NOSPACE_DIRECTIVE, GROUP_DIRECTIVE } from "./spec";
@@ -12,6 +15,7 @@ function bash_stub(): string {
     return `# bash completion for attach-linux
 #
 # Enable with:  source <(attach-linux completion bash)
+# or install with:  attach-linux completion bash --install
 
 _attach_linux_filedir() {
     if declare -F _filedir >/dev/null 2>&1; then
@@ -99,7 +103,7 @@ function zsh_stub(): string {
     return `#compdef attach-linux
 #
 # Enable with:  source <(attach-linux completion zsh)
-# or install to a directory on $fpath as \`_attach-linux\`.
+# or install to a directory on $fpath as \`_attach-linux\` (attach-linux completion zsh --install).
 
 # Named to match the command (and the conventional autoload file name
 # \`_attach-linux\`) so the funcstack guard below fires on the first TAB whether
@@ -177,7 +181,7 @@ function fish_stub(): string {
     return `# fish completion for attach-linux
 #
 # Enable with:  attach-linux completion fish | source
-# or install to ~/.config/fish/completions/attach-linux.fish
+# or install to ~/.config/fish/completions/attach-linux.fish (attach-linux completion fish --install)
 
 function __attach_linux_complete
     set -l tokens (commandline -opc)
@@ -214,21 +218,122 @@ export function completion_script(shell: string): string | undefined {
     return STUBS[shell]?.();
 }
 
+/** The shell `$SHELL` names (`/usr/bin/zsh` → `zsh`), when it is one of the supported ones. */
+export function shell_from_environment(environment: NodeJS.ProcessEnv = process.env): string | undefined {
+    const name = path.basename(environment["SHELL"] ?? "");
+    return name in STUBS ? name : undefined;
+}
+
+/** Where `--install` puts the script: a directory of the user's that the shell loads completions from by itself (zsh's needs adding to fpath). */
+export function install_path(shell: string, environment: NodeJS.ProcessEnv = process.env): string {
+    const home = environment["HOME"] ?? os.homedir();
+    const data = environment["XDG_DATA_HOME"] ?? path.join(home, ".local", "share");
+    const config = environment["XDG_CONFIG_HOME"] ?? path.join(home, ".config");
+    switch (shell) {
+        case "bash": { return path.join(data, "bash-completion", "completions", "attach-linux"); }
+        case "fish": { return path.join(config, "fish", "completions", "attach-linux.fish"); }
+        default: { return path.join(data, "zsh", "site-functions", "_attach-linux"); }
+    }
+}
+
+/** What to do after installing for `shell`, so the script loads. */
+function install_note(shell: string, file: string): string[] {
+    switch (shell) {
+        case "bash": { return ["It loads in new shells, through the bash-completion package."]; }
+        case "fish": { return ["It loads in new shells."]; }
+        default: {
+            return [
+                "Add its directory to fpath in ~/.zshrc, before compinit, then start a new shell:",
+                `  fpath=(${path.dirname(file)} $fpath)`,
+            ];
+        }
+    }
+}
+
+/** Write the script for `shell` to its install path, replacing an earlier one. Returns the lines to print. */
+export function install_completion(shell: string, environment: NodeJS.ProcessEnv = process.env): string[] {
+    const file = install_path(shell, environment);
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, `${STUBS[shell]?.() ?? ""}\n`);
+    return [`Installed ${shell} completion to ${file}`, ...install_note(shell, file)];
+}
+
+/** Remove the script `install_completion` wrote for `shell`. Returns the lines to print. */
+export function uninstall_completion(shell: string, environment: NodeJS.ProcessEnv = process.env): string[] {
+    const file = install_path(shell, environment);
+    if (!fs.existsSync(file)) { return [`${shell} completion is not installed (no ${file})`]; }
+    fs.rmSync(file);
+    return [`Removed ${file}`, ...(shell === "zsh" ? ["Remove its fpath line from ~/.zshrc if you added one."] : [])];
+}
+
 export function build_completion_command(_context: LocalContext): Command {
     return new Command("completion")
-        .description("Generate shell completion script")
-        .argument("<shell>", "Shell to generate completions for (bash, fish, zsh)")
+        .description("Print the shell completion script, or install it")
+        .argument("[shell]", "Shell to complete for (bash, fish, zsh); default: the one $SHELL names")
+        .addOption(new Option("--install", "Install the script where the shell loads it (in your home directory)").conflicts("uninstall"))
+        .addOption(new Option("--uninstall", "Remove the installed script"))
         .addHelpText("after", `
+--install writes the script to a directory of yours that the shell loads
+completions from by itself, replacing an earlier one:
+  bash  ~/.local/share/bash-completion/completions/attach-linux (needs bash-completion)
+  fish  ~/.config/fish/completions/attach-linux.fish
+  zsh   ~/.local/share/zsh/site-functions/_attach-linux (add the directory to fpath)
+It never edits a shell startup file.
+
 Examples:
   $ source <(attach-linux completion bash)
-  $ attach-linux completion zsh > ~/.zfunc/_attach-linux
-  $ attach-linux completion fish | source`)
-        .action((shell: string) => {
-            const stub = STUBS[shell];
+  $ attach-linux completion fish | source
+  $ attach-linux completion --install
+  $ attach-linux completion zsh --uninstall`)
+        .action((shell: string | undefined, options: { install?: boolean; uninstall?: boolean }) => {
+            const chosen = shell ?? shell_from_environment();
+            if (chosen === undefined) {
+                console.error(`Cannot tell the shell from $SHELL (${process.env["SHELL"] ?? "not set"}). Name one: ${Object.keys(STUBS).join(", ")}`);
+                return;
+            }
+            const stub = STUBS[chosen];
             if (stub === undefined) {
-                console.error(`Unknown shell: ${shell}. Supported: ${Object.keys(STUBS).join(", ")}`);
+                console.error(`Unknown shell: ${chosen}. Supported: ${Object.keys(STUBS).join(", ")}`);
+                return;
+            }
+            if (options.install === true || options.uninstall === true) {
+                const lines = options.install === true ? install_completion(chosen) : uninstall_completion(chosen);
+                for (const line of lines) { console.log(line); }
                 return;
             }
             console.log(stub());
         });
+}
+
+if (import.meta.vitest) {
+    const { test, expect } = import.meta.vitest;
+
+    test("shell_from_environment — the base name of $SHELL when it is a supported shell", () => {
+        expect(shell_from_environment({ SHELL: "/usr/bin/zsh" })).toBe("zsh");
+        expect(shell_from_environment({ SHELL: "/bin/bash" })).toBe("bash");
+        expect(shell_from_environment({ SHELL: "/bin/sh" })).toBeUndefined();
+        expect(shell_from_environment({})).toBeUndefined();
+    });
+
+    test("install_path — the user's autoload directories, XDG variables first", () => {
+        expect(install_path("bash", { HOME: "/h" })).toBe("/h/.local/share/bash-completion/completions/attach-linux");
+        expect(install_path("fish", { HOME: "/h" })).toBe("/h/.config/fish/completions/attach-linux.fish");
+        expect(install_path("zsh", { HOME: "/h", XDG_DATA_HOME: "/d" })).toBe("/d/zsh/site-functions/_attach-linux");
+    });
+
+    test("install_completion / uninstall_completion — write the script, replace it, remove it", () => {
+        const home = fs.mkdtempSync(path.join(os.tmpdir(), "attach-completion-"));
+        try {
+            const environment = { HOME: home };
+            const file = install_path("zsh", environment);
+            expect(install_completion("zsh", environment)[0]).toBe(`Installed zsh completion to ${file}`);
+            expect(install_completion("zsh", environment).join("\n")).toContain(`fpath=(${path.dirname(file)} $fpath)`);
+            expect(fs.readFileSync(file, "utf8")).toBe(`${completion_script("zsh") ?? ""}\n`);
+            expect(uninstall_completion("zsh", environment)[0]).toBe(`Removed ${file}`);
+            expect(fs.existsSync(file)).toBe(false);
+            expect(uninstall_completion("zsh", environment)).toEqual([`zsh completion is not installed (no ${file})`]);
+        } finally {
+            fs.rmSync(home, { recursive: true });
+        }
+    });
 }

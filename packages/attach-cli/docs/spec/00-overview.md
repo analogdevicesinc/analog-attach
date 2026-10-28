@@ -25,7 +25,7 @@ dt-schema, and anything that isn't observable from outside the process.
 | `02-common.md` | What every command shares: modes, streams, input errors, refusals, exit status, workspace loading, config fields, the base, the overlay, the binding caches |
 | `03-commands/<command>.md` | One chapter per command: `add`, `build`, `delete`, `deploy`, `enable-disable`, `import`, `init`, `install-skill` (with `uninstall-skill`), `list`, `__list`, `move`, `read`, `rename`, `config`, `ui`, `update`, `validate`; and `setup`, the bare `attach-linux` |
 | `04-protocol/*.schema.json` | JSON Schema (2020-12) of the `--json` responses. `common` and `config-error` are shared; the others are named after their command (`list` covers `list` and `__list`). `move`, `enable` and `disable` respond with `common`. |
-| `05-completion.md` | Shell completion: `__complete` and `completion <shell>` |
+| `05-completion.md` | Shell completion: `__complete` and `completion [<shell>] [--install \| --uninstall]` |
 
 ## 3. Conventions
 

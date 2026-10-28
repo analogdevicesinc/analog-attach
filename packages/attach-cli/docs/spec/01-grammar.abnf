@@ -89,7 +89,8 @@ init            = %s"init"
 
 install-skill   = %s"install-skill" *( B %s"--force" )
 uninstall-skill = %s"uninstall-skill"
-completion      = %s"completion" B shell
+completion      = %s"completion" [ B shell ] *( B completion-opt )
+completion-opt  = %s"--install" / %s"--uninstall"   ; not both (COMPL-154)
 shell           = known-shell / element ; any other element: "Unknown shell"
                                         ; on standard error, status 0
                                         ; (05-completion.md CO-6)

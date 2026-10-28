@@ -230,21 +230,27 @@ positional, nothing.
 that start with the current word, described by their path relative to the
 Linux tree.
 
-## 10. `completion <shell>`
+## 10. `completion [<shell>] [--install | --uninstall]`
 
-**COMPL-100** When `<shell>` is `bash`, `fish` or `zsh`, the CLI shall write
-that shell's completion script to standard output, followed by an empty
-line, and exit with status 0. The script is the same in JSON mode.
+**COMPL-100** When the shell (COMPL-103) is `bash`, `fish` or `zsh` and
+neither option is given, the CLI shall write that shell's completion script
+to standard output, followed by an empty line, and exit with status 0. The
+script is the same in JSON mode.
 
 **COMPL-101** If `<shell>` is anything else, then the CLI shall write `Unknown
 shell: <shell>. Supported: bash, fish, zsh` to standard error, write nothing
-to standard output, and exit with status 0, in human and in JSON mode. It is
-neither a refusal (COM-040, COM-041) nor an input error (COM-031). (Open
-issue CO-6.)
+to standard output, change nothing, and exit with status 0, in human and in
+JSON mode. It is neither a refusal (COM-040, COM-041) nor an input error
+(COM-031). (Open issue CO-6.)
 
-**COMPL-102** If `<shell>` is missing, then commander reports `error: missing
-required argument 'shell'` (GRM-004): on standard error with status 1 in
-human mode, status 2 in JSON mode.
+**COMPL-102** *Withdrawn.* (`<shell>` was required; without it commander
+reported a missing argument. COMPL-103 now picks the shell.)
+
+**COMPL-103** When `<shell>` is left out, the shell shall be the base name of
+the `SHELL` environment variable (`/usr/bin/zsh` → `zsh`). If that isn't
+`bash`, `fish` or `zsh`, then the CLI shall write `Cannot tell the shell from
+$SHELL (<value>). Name one: bash, fish, zsh` to standard error, `<value>`
+being `not set` when `SHELL` is unset, and otherwise behave as COMPL-101.
 
 ### 10.1 What every stub does
 
@@ -321,6 +327,48 @@ acting on it: fish adds no space after a completion that ends in `/`, `-`,
 `@`, `,`, `=` or `.`, and adds one otherwise (after `fanx`, for one) (open
 issue CO-8).
 
+### 10.5 Installing
+
+**COMPL-150** `--install` and `--uninstall` shall use one file per shell,
+under the user's home directory, where the shell loads completions from by
+itself:
+
+| Shell | File |
+|---|---|
+| bash | `$XDG_DATA_HOME/bash-completion/completions/attach-linux` (loaded by the bash-completion package) |
+| fish | `$XDG_CONFIG_HOME/fish/completions/attach-linux.fish` |
+| zsh | `$XDG_DATA_HOME/zsh/site-functions/_attach-linux` |
+
+`$XDG_DATA_HOME` defaults to `~/.local/share` and `$XDG_CONFIG_HOME` to
+`~/.config`, `~` being `$HOME`.
+
+**COMPL-151** With `--install`, the CLI shall create the file's directories
+when they don't exist, write the script of COMPL-100 (with its empty line) to
+the file, replacing an earlier one, and write `Installed <shell> completion
+to <file>` followed by: for bash, `It loads in new shells, through the
+bash-completion package.`; for fish, `It loads in new shells.`; for zsh, `Add
+its directory to fpath in ~/.zshrc, before compinit, then start a new
+shell:` and `  fpath=(<directory> $fpath)`.
+
+**COMPL-152** With `--uninstall`, when the file exists the CLI shall remove
+it and write `Removed <file>`, followed for zsh by `Remove its fpath line from
+~/.zshrc if you added one.` When it doesn't, the CLI shall write `<shell>
+completion is not installed (no <file>)` and change nothing.
+
+**COMPL-153** The CLI shall not edit a shell startup file (`~/.bashrc`,
+`~/.zshrc`, …), nor write outside the files of COMPL-150 and their
+directories.
+
+**COMPL-154** If both `--install` and `--uninstall` are given, then commander
+reports `error: option '--install' cannot be used with option '--uninstall'`
+(GRM-004).
+
+**COMPL-155** The CLI shall write the lines of COMPL-151 and COMPL-152 to
+standard output and exit with status 0, in human and in JSON mode alike: there
+is no JSON response (as for `install-skill`, SKILL-020). If the file can't be
+written or removed, the error is unhandled (COM-130): standard error, status
+1. (Open issue CO-11.)
+
 ## 11. Open issues
 
 **CO-1. Only the first value of `update` completes.** For a fourth positional
@@ -352,8 +400,8 @@ It also writes the message to standard error, where every other human-mode
 refusal goes to standard output (COM-022), and in JSON mode it gives no JSON
 response at all (COMPL-101). For a known shell, JSON mode writes the script
 rather than a JSON response. A fix would be to treat an unknown shell as an
-input error (COM-031, COM-033), as commander does for a missing one
-(COMPL-102).
+input error (COM-031, COM-033), as commander does for its own errors
+(GRM-004). The same goes for a `$SHELL` it can't use (COMPL-103).
 
 **CO-7. zsh sorts the ungrouped candidates.** The stub passes `-V` (keep the
 order) only to the `_describe` of a group. The ungrouped candidates, which
@@ -384,6 +432,10 @@ the kind's own index and to drop the `prefix === subkind` test in
 **CO-10. Nothing completes a directory name.** `init --linux` was the only
 position completed with `__ATTACH_COMPLETE_DIRS__` (COMPL-012); `config
 linux` completes a file name like every other field (CO-5).
+
+**CO-11. `completion --install` has no JSON response.** Like
+`install-skill` (`install-skill.md` S-2), JSON mode writes the human lines
+(COMPL-155).
 
 ## 12. Examples
 

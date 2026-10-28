@@ -84,7 +84,7 @@ attach-linux update spi0/adi,ad7124-8@0 reg 0
 attach-linux update adc '#address-cells' 1
 ```
 
-Shell completion works segment by segment: `read sp<TAB>` → `spi0/`, then `spi0/<TAB>` → `spi0/adi,ad7124-8@0`.
+Shell completion works segment by segment: `read sp<TAB>` → `spi0/`, then `spi0/<TAB>` → `spi0/adi,ad7124-8@0`. A user installs it with `attach-linux completion --install` (for the shell `$SHELL` names; `completion bash|fish|zsh` picks one, and without `--install` prints the script).
 
 ---
 

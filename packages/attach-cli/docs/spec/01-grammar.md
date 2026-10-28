@@ -230,7 +230,7 @@ their meaning.
 | `init` | | |
 | `install-skill` | | `--force` |
 | `uninstall-skill` | | |
-| `completion` | `<shell>` | |
+| `completion` | `[shell]` | `--install`, `--uninstall` |
 | `__list` (hidden) | `[args...]` | |
 | `ui` (hidden) | | `--port <number>`, `--open` |
 
