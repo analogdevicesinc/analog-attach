@@ -4,6 +4,8 @@ import { CommanderError } from "commander";
 import { buildContext } from "../context";
 import { buildApp } from "../app";
 import { run_complete } from "../commands/completion/complete";
+import { run_setup } from "../commands/setup/command";
+import { on_terminal } from "../missing-required";
 import { input_error } from "../protocol/output";
 
 const argv = process.argv.slice(2);
@@ -19,8 +21,12 @@ const jsonIndex = argv.indexOf("--json");
 const json = jsonIndex !== -1;
 if (json) { argv.splice(jsonIndex, 1); }
 
-// A bare `attach-linux` on a terminal is `attach-linux init`.
-if (argv.length === 0 && !json && process.stdin.isTTY) { argv.push("init"); }
+// A bare `attach-linux` on a terminal is the setup run. `--quiet` alone never asks: it is the bare usage.
+if (argv.length === 1 && argv[0] === "--quiet") { argv.pop(); }
+else if (argv.length === 0 && !json && on_terminal()) {
+    await run_setup();
+    process.exit();
+}
 
 const context = buildContext(json);
 const app = buildApp(context);

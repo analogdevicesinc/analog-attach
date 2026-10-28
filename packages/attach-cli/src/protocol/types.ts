@@ -32,8 +32,6 @@ export interface InitResponse extends CommonResponse {
     overlay: string;
     /** True when init created the workfile, false when it kept the configured one. */
     created: boolean;
-    /** True when init built the binding caches, false when they were already current. */
-    indexed: boolean;
 }
 
 export interface AddResponse extends CommonResponse {

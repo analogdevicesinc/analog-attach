@@ -628,13 +628,10 @@ function render_failure() {
     ].flat().filter(Boolean));
 }
 
-/** Creates a workfile with `init --overlay`, taking the first of overlay, overlay-1, ... that doesn't exist yet. */
+/** Creates a workfile with `init`, which takes the first of overlay, overlay-1, ... that doesn't exist yet. */
 async function create_workfile() {
-    for (let n = 0; n < 100; n++) {
-        const r = await run("init", ["--overlay", n === 0 ? "overlay" : "overlay-" + n]);
-        if (r.ok || !/already exists/.test(r.message)) { return r.ok; }
-    }
-    return false;
+    const r = await run("init", []);
+    return r.ok;
 }
 
 async function init() {
@@ -650,7 +647,7 @@ async function init() {
     if (!s.overlay) {
         $("detail").replaceChildren(...[
             !s.linux || !s.devicetree
-                ? h("div", { class: "issue error" }, "Not configured: " + [!s.linux && "linux", !s.devicetree && "devicetree"].filter(Boolean).join(", ") + ". Run 'attach-linux init' in this directory.")
+                ? h("div", { class: "issue error" }, "Not configured: " + [!s.linux && "linux", !s.devicetree && "devicetree"].filter(Boolean).join(", ") + ". Run 'attach-linux' in this directory.")
                 : null,
             h("h2", {}, "No overlay yet"),
             h("p", {}, "The overlay file (workfile) is where your changes are written. Create an empty one, or add a device, which creates it for you."),

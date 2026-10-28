@@ -28,29 +28,30 @@ You are helping a user configure Linux device tree overlays for hardware devices
 
 ## Prerequisites
 
-Set up the workspace before using other commands. Every field, the Linux tree and the base devicetree included, is stored in `.attach-linux/config.toml` (relative to the current directory). `init` sets the two paths, builds the caches and creates the overlay file in one step; as an AI tool always pass the options, which never ask (without them `init` opens an interactive wizard meant for a terminal):
+Set up the workspace before using other commands. Every field, the Linux tree and the base devicetree included, is stored in `.attach-linux/config.toml` (relative to the current directory). As an AI tool, set the two paths and the overlay's file name with `config`, then create the overlay file with `init` (none of them ask; a bare `attach-linux` on a terminal is an interactive setup meant for a person):
 
 ```bash
-attach-linux --json init --linux ~/linux --devicetree ~/rpi-4.dts
-# or, field by field:
-attach-linux config linux ~/linux
-attach-linux config devicetree ~/rpi-4.dts
+attach-linux --json config linux ~/linux
+attach-linux --json config devicetree ~/rpi-4.dts
+attach-linux --json config overlay overlay.dtso   # a name (in the current directory) or a path; init creates it
+attach-linux --json init
 ```
 
 **Check the configuration first** with `config` (it needs nothing): most commands fail with an input error when a field they need is missing.
 
-Setting `linux` (or `init`) also builds the binding caches (the compat index and `validation.json`) from its bindings, which takes about 40 s for the kernel tree. Commands never rebuild them: when the bindings change, run `attach-linux config --reload` (no key). Until then commands warn on stderr that the caches look out of date; with a cache missing they fail with that hint. The dt-schema bindings, dtc and validation tools are bundled with the CLI.
+Setting `linux` also builds the binding caches (the compat index and `validation.json`) from its bindings, which takes about 40 s for the kernel tree. Commands never rebuild them: when the bindings change, run `attach-linux config --reload` (no key). Until then commands warn on stderr that the caches look out of date; with a cache missing they fail with that hint. The dt-schema bindings, dtc and validation tools are bundled with the CLI.
 
 Every command checks the configuration it needs up front: `linux` must be a kernel tree (with `Documentation/devicetree/bindings/` and `include/`) with its caches built, `devicetree` must preprocess and parse, and `overlay` must parse against it. Unknown or invalid keys in config.toml are errors. Problems are reported together (exit code 2 with `--json`) with a hint on how to fix them.
 
 **Per-command config requirements**:
-- `init`, `config`: No prerequisites (`init` saves `linux`, `devicetree` and `overlay`)
+- `config`: No prerequisites
+- `init`: Needs `linux` (and its caches), `devicetree`, `overlay` (the file may not exist yet)
 - `list devices`: Needs `linux` (and its caches)
 - `list parent`, `list overlay`: Need `linux`, `devicetree`
 - `import`: Needs `linux`, `devicetree`, and no `overlay` yet (it creates one)
 - `list property`: Needs `linux`, `devicetree`, `overlay`
 - `list value`: Needs `devicetree`, `overlay`. `linux` is optional and enables binding check annotations
-- `add`: Needs `linux`, `devicetree`, `overlay` (auto-created if missing)
+- `add`: Needs `linux`, `devicetree`, `overlay` (its file created by `init`)
 - `update`, `validate`: Need `linux`, `devicetree`, `overlay`
 - `read`, `delete`, `rename`, `move`, `enable`/`disable`, `build`: Need `devicetree`, `overlay`
 - `deploy`: Needs `deploy-ip`, `deploy-user`, `deploy-password`, and the `.dtbo` that `build` wrote next to `overlay`
@@ -91,7 +92,7 @@ Shell completion works segment by segment: `read sp<TAB>` → `spi0/`, then `spi
 
 ### 0. `config` - Manage Configuration
 
-**Purpose**: Show, set or reset tool configuration fields stored in `.attach-linux/config.toml`. Fields are shown, set and reset one at a time (`config` alone shows them all); `init` sets the core ones together. An unknown field name is refused.
+**Purpose**: Show, set or reset tool configuration fields stored in `.attach-linux/config.toml`. Fields are shown, set and reset one at a time (`config` alone shows them all). An unknown field name is refused.
 
 **Syntax**:
 ```bash
@@ -107,7 +108,7 @@ attach-linux config --reload        # rebuild the binding caches
 |-------|----------|-------------|
 | `linux` | Yes | Path to Linux kernel source tree; setting it builds the compat index and `validation.json` |
 | `devicetree` | Yes | Path to target base `.dts` file |
-| `overlay` | No | Path to the working `.dtso` overlay file (auto-set by `init`, `import` or `add`) |
+| `overlay` | No | Path to the working `.dtso` overlay file; may name a file not created yet, which `init` creates (also set by `import`) |
 | `overlay-syntax` | No | Output syntax: `fragment` (default) or `label` (`&spi0 { }` style) |
 | `preprocess-command` | No | C preprocessor command that resolves `#include`s and macros in the base devicetree (default mirrors kbuild's `cpp` flags) |
 | `deploy-ip` | No | IP address or hostname of the remote device |
@@ -250,29 +251,20 @@ warning: 2 references point to nodes neither the base nor the overlay has:
 
 ---
 
-### 4. `init` - Set Up the Workspace
+### 4. `init` - Create the Workfile
 
-**Purpose**: Set up everything the other commands need: save `linux` and `devicetree`, build the binding caches (compat index and `validation.json`), and create an empty overlay workfile saved as `overlay`.
+**Purpose**: Create the configured overlay workfile, empty, or keep it when its file exists. `linux`, `devicetree` and `overlay` must be configured first (`config linux <path>`, `config devicetree <path>`, `config overlay <name>`); `init` builds no cache, changes no setting and never asks.
 
 **Syntax**:
 ```bash
-attach-linux init [--linux <path>] [--devicetree <path>] [--overlay <name>]
+attach-linux init
 ```
 
-**Parameters**:
-| Parameter | Required | Description |
-|-----------|----------|-------------|
-| `--linux` | Yes, unless configured | Linux kernel source tree (needs `Documentation/devicetree/bindings/` and `include/`) |
-| `--devicetree` | Yes, unless configured | Base `.dts` file |
-| `--overlay` | No | Name of a new overlay file (`.dtso` is added when missing). An existing file is never overwritten |
-
 **Behavior**:
-- Under `--json`, piped, or with both `--linux` and `--devicetree`, `init` never asks. A path left out is taken from the config; with none configured it is an input error (exit code 2): `init needs --linux <path>: no Linux tree is configured`. A path that is not a Linux tree, or not a file, is refused (`ok: false`).
-- On a terminal without options (a bare `attach-linux` too) it is a wizard: the Linux tree (lettered list or a typed path), the base `.dts` (search the tree with a live filter, or type a path), then the overlay file name. On a re-run the configured values are the Enter defaults and the overlay can be kept or replaced. With only some options it asks for what is neither given nor configured. Cancelling the wizard (Ctrl-C/Ctrl-D) saves nothing and exits 130.
-- Overlay: with `--overlay <name>` that file is created (an existing file is refused: `mine.dtso already exists; use it with 'config overlay mine.dtso' or pick another name`). Without it the configured overlay is kept when its file exists; otherwise `overlay.dtso` is created, or `overlay-1.dtso`, `overlay-2.dtso`, … when it already exists.
-- The caches are built (about 50 s for the kernel tree, progress on stderr) unless they are already current for the Linux tree; the rebuild is also what `config --reload` does.
-- `overlay-syntax`, `preprocess-command` and the `deploy-*` fields are not asked: set them with `config <field> <value>`.
-- `--json` gives `{ linux, devicetree, overlay, created, indexed }` (`created`: init made the workfile, `indexed`: init built the caches).
+- It takes no options. A missing or broken `linux`, `devicetree` or `overlay` setting is reported as by every other command (exit code 2 with `--json`).
+- The configured overlay is kept when its file exists, and created when it doesn't. `init` never picks another name and never overwrites a file; a path whose directory is missing is refused (`ok: false`).
+- `--json` gives `{ linux, devicetree, overlay, created }` (`created`: init made the workfile).
+- A bare `attach-linux` on a terminal is the interactive setup: it asks for the Linux tree, the base `.dts` and the overlay file name, saves them and builds the caches; `init` then creates the workfile. It is meant for a person, not for AI tools.
 
 **Output**: the new workfile is empty:
 ```dts
@@ -292,7 +284,7 @@ attach-linux init [--linux <path>] [--devicetree <path>] [--overlay <name>]
 
 ### 5. `add` - Add a Device Node
 
-**Purpose**: Add a device node (with a compatible string) to the overlay. If no overlay is configured, one is created automatically.
+**Purpose**: Add a device node (with a compatible string) to the overlay. The overlay must be configured and created (`config overlay <name>`, `init`); `add` never creates it.
 
 ```bash
 attach-linux add <compatible> [--parent <path>] [--name <name>] [--label <label>] [--template required|example:<N>|overlay:<name>] [--quiet]
@@ -635,10 +627,10 @@ attach-linux deploy
 ## Recommended Workflow
 
 ```
-0. CONFIGURE    init --linux ... --devicetree ...  (or config linux / devicetree)
+0. CONFIGURE    config linux ... ; config devicetree ... ; config overlay <name> ; init
 1. FIND DEVICE  list devices <chip-name>
 2. FIND PARENT  list parent <compatible>
-3. ADD DEVICE   add <compatible> --parent <bus>  (auto-creates workfile)
+3. ADD DEVICE   add <compatible> --parent <bus>
 4. CONFIGURE    update <path> <property> <value>
                 list property <path>        — see what's needed
                 list value <path> <prop>    — get suggested values

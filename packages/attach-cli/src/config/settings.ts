@@ -33,9 +33,28 @@ export interface SettingSpec {
     default?: string;
     /** Printed when the setting is missing or invalid. */
     hint?: string;
+    /** Printed instead of `hint` when the setting is missing. */
+    missing_hint?: string;
 }
 
-export const SETUP_HINT = "Run 'attach-linux init' on a terminal, or 'attach-linux init --linux <path> --devicetree <path>', to set up a workspace.";
+/** The fields the setup run sets, with the `config` command that sets each. */
+const SETUP_COMMANDS: readonly (readonly [SettingKey, string])[] = [
+    ["linux", "config linux <path>"],
+    ["devicetree", "config devicetree <path>"],
+    ["overlay", "config overlay <name>"],
+];
+
+/**
+ * How to set the `fields` (some of linux, devicetree and overlay): the setup
+ * run, or their `config` commands, then `init` when the overlay is among them.
+ * `format_config_errors` merges the hints of several fields into one.
+ */
+export function setup_hint(fields: readonly string[]): string {
+    const commands = SETUP_COMMANDS.filter(([key]) => fields.includes(key)).map(([, command], index) => `'${index === 0 ? "attach-linux " : ""}${command}'`);
+    const listed = commands.length > 1 ? `${commands.slice(0, -1).join(", ")} and ${commands.at(-1) ?? ""}` : commands[0] ?? "";
+    const init = fields.includes("overlay") ? ", then 'attach-linux init'" : "";
+    return `Run 'attach-linux' on a terminal, or ${listed}${init}, to set up a workspace.`;
+}
 
 export const SETTINGS: readonly SettingSpec[] = [
     {
@@ -44,7 +63,7 @@ export const SETTINGS: readonly SettingSpec[] = [
         kind: "path",
         required: true,
         description: "Path to Linux kernel source tree (setting it builds the binding caches)",
-        hint: SETUP_HINT,
+        hint: setup_hint(["linux"]),
     },
     {
         key: "devicetree",
@@ -52,7 +71,7 @@ export const SETTINGS: readonly SettingSpec[] = [
         kind: "path",
         required: true,
         description: "Path to target base DTS file",
-        hint: SETUP_HINT,
+        hint: setup_hint(["devicetree"]),
     },
     {
         key: "overlay",
@@ -60,7 +79,8 @@ export const SETTINGS: readonly SettingSpec[] = [
         kind: "path",
         required: false,
         description: "Path to the working DTSO overlay file (workfile)",
-        hint: "Run 'attach-linux init' to create one, or 'config overlay <path>'.",
+        hint: "Run 'attach-linux init' to create it, or 'attach-linux config overlay <name>' to use another.",
+        missing_hint: setup_hint(["overlay"]),
     },
     {
         key: "overlay-syntax",
@@ -228,6 +248,12 @@ function write_config(merged: Record<string, unknown>, cwd: string): void {
 
 if (import.meta.vitest) {
     const { test, expect, vi } = import.meta.vitest;
+
+    test("setup_hint — names the config commands of the fields given, and init after the overlay", () => {
+        expect(setup_hint(["linux"])).toBe("Run 'attach-linux' on a terminal, or 'attach-linux config linux <path>', to set up a workspace.");
+        expect(setup_hint(["overlay", "linux"])).toBe("Run 'attach-linux' on a terminal, or 'attach-linux config linux <path>' and 'config overlay <name>', then 'attach-linux init', to set up a workspace.");
+        expect(setup_hint(["linux", "devicetree", "overlay"])).toContain("'attach-linux config linux <path>', 'config devicetree <path>' and 'config overlay <name>', then");
+    });
     const os = await import("node:os");
 
     const errors_of = (result: ConfigResult<Settings>): ConfigError[] => (result.ok ? [] : result.errors);

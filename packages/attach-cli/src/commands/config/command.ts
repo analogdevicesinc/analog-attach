@@ -5,10 +5,11 @@ import { stringify } from "smol-toml";
 
 import type { LocalContext } from "../../context";
 import { reload_caches } from "../../config/rebuild";
-import { parse_settings, read_settings, reset_setting, save_settings, setting_spec, SETTINGS, type SettingSpec, type Settings } from "../../config/settings";
+import { parse_settings, read_settings, reset_setting, save_settings, setting_spec, SETTINGS, setup_hint, type SettingSpec, type Settings } from "../../config/settings";
 import { format_config_errors, linux_tree_problem, report_config_errors } from "../../config/workspace";
 import { respond, respond_fail } from "../../protocol/output";
 import type { Config, ToolConfigResponse } from "../../protocol/types";
+import { creation_problem } from "../../workfile";
 
 interface ConfigOptions {
     reset?: boolean;
@@ -115,7 +116,7 @@ function show(context: LocalContext, specs: readonly SettingSpec[]): void {
         return;
     }
 
-    const hints: string[] = [];
+    const unset = new Set<string>();
     for (const { spec, config: c } of rows) {
         const required_tag = c.required ? " [required]" : "";
         let display: string;
@@ -130,15 +131,11 @@ function show(context: LocalContext, specs: readonly SettingSpec[]): void {
         const options = typeof spec.kind === "string" ? "" : ` [${spec.kind.options.join(" | ")}]`;
         console.log(`  ${spec.description}${options}`);
         console.log("");
-        if (c.value === null && c.required && spec.hint !== undefined && !hints.includes(spec.hint)) {
-            hints.push(spec.hint);
-        }
+        if (c.value === null && c.required) { unset.add(spec.key); }
     }
-    if (hints.length > 0) {
+    if (unset.size > 0) {
         console.log("");
-        for (const hint of hints) {
-            console.log(hint);
-        }
+        console.log(setup_hint([...unset]));
     }
 }
 
@@ -175,8 +172,15 @@ async function set(context: LocalContext, spec: SettingSpec, value: string): Pro
         return;
     }
     const parsed_value = parsed.value[spec.field] ?? value;
-    if (spec.kind === "path" && !fs.existsSync(parsed_value)) {
+    // The overlay may name a file `init` has yet to create, in a directory that exists.
+    const missing = spec.kind === "path" && !fs.existsSync(parsed_value);
+    if (missing && field !== "overlay") {
         fail(context, `${field}: ${parsed_value} does not exist`);
+        return;
+    }
+    const not_creatable = missing ? creation_problem(parsed_value) : undefined;
+    if (not_creatable !== undefined) {
+        fail(context, `${field}: ${not_creatable}`);
         return;
     }
 
@@ -188,6 +192,7 @@ async function set(context: LocalContext, spec: SettingSpec, value: string): Pro
 
     save_settings({ [field]: parsed_value });
     let message = `Set ${field} = ${value}`;
+    if (missing) { message += ` (not created yet: 'attach-linux init' creates it)`; }
 
     if (field === "linux") {
         const settings = read_settings();

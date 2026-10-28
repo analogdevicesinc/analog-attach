@@ -69,9 +69,8 @@ status 1.
 
 **COM-033** While in human mode, when one of the CLI's own checks reports an
 input error (§3), the CLI shall write the message to standard output and exit
-with status 0. Exceptions: `ui --port` (`ui.md` UI-001) and `init` (`init.md`
-INIT-011, INIT-013) write theirs to standard error with status 2. (Open
-issue C-1.)
+with status 0. Exception: `ui --port` (`ui.md` UI-001) writes its own to
+standard error with status 2. (Open issue C-1.)
 
 ## 4. Refusals
 
@@ -90,8 +89,8 @@ the reason to standard output and exit with status 0. (Open issue C-1.)
 (`preprocessed.dts`, `example.dts`, …) may have been rewritten. Exceptions:
 `config linux <path>` saves `linux` before it builds the caches and refuses
 when the build doesn't happen or fails (`config.md` CONFIG-122, CONFIG-123,
-CF-6), and `init` keeps `linux` and `devicetree` saved when
-its cache build fails (`init.md` INIT-030, INIT-033, I-5).
+CF-6), and the setup run keeps `linux`, `devicetree` and `overlay` saved
+when its cache build fails (`setup.md` SETUP-030, SETUP-033, S-3).
 
 ## 5. Success
 
@@ -105,8 +104,8 @@ parent` for a compatible with no binding. (Exceptions in §2.)
 
 **COM-060** When the user stops a question (Ctrl-C or end of input) before
 the command has written anything, the CLI shall write a line saying so to
-standard output and exit with status 130. (`add` and `init` say which of their
-questions this applies to.)
+standard output and exit with status 130. (`add` and the setup run,
+`setup.md`, say which of their questions this applies to.)
 
 ## 7. Exit status
 
@@ -117,10 +116,9 @@ questions this applies to.)
 | 2 | JSON mode: input error (COM-031) or configuration error (COM-071). |
 | 130 | A question was stopped before anything was written (COM-060). |
 
-Exceptions: `init` reports a missing Linux tree or devicetree, and a
-`config.toml` that isn't TOML, on standard error with status 2 in human mode
-too (INIT-011, INIT-013), and so does `ui` for a bad `--port` (`ui.md`
-UI-001).
+Exceptions: the setup run reports a `config.toml` that isn't TOML on
+standard error with status 2 (`setup.md` SETUP-011), and so does `ui` for a
+bad `--port` (`ui.md` UI-001).
 
 **COM-130** If a command throws an error that isn't commander's, then the
 CLI shall write the error's message to standard error and exit with status 1,
@@ -150,7 +148,8 @@ CLI shall write to standard error one line, a JSON object conforming to
 exit with status 2.
 
 The object's `errors` has one entry per problem, and `hints` has the distinct
-hints of those problems in the order the problems were found.
+hints of those problems in the order the problems were found, the setup hints
+of several fields merged into one (§8.1).
 
 **COM-072** While in human mode, if workspace loading finds exactly one
 problem, then the CLI shall write `<message>` (or `<message> — <description>`
@@ -160,14 +159,15 @@ for each, indented by two spaces. In both cases, when there are hints, the CLI
 shall then write an empty line and one line per hint. The exit status is 0.
 (Open issue C-1.)
 
-Example, `add` with neither `linux` nor `devicetree` set:
+Example, `add` with nothing set:
 
 ```
 Configuration errors:
   Missing config field linux — Path to Linux kernel source tree (setting it builds the binding caches)
   Missing config field devicetree — Path to target base DTS file
+  Missing config field overlay — Path to the working DTSO overlay file (workfile)
 
-Run 'attach-linux init' on a terminal, or 'attach-linux init --linux <path> --devicetree <path>', to set up a workspace.
+Run 'attach-linux' on a terminal, or 'attach-linux config linux <path>', 'config devicetree <path>' and 'config overlay <name>', then 'attach-linux init', to set up a workspace.
 ```
 
 **COM-080** When a command needs the bindings and their caches exist, the CLI
@@ -201,11 +201,21 @@ of string values. The fields, in the order the CLI writes them:
 ¹ What `config` reports as `required`. Whether a command needs a field is
 decided by the resources it needs (COM-070), not by this column.
 
-Each field has a hint, printed when it is missing or invalid (COM-072): for
-`linux` and `devicetree`, `Run 'attach-linux init' on a terminal, or
-'attach-linux init --linux <path> --devicetree <path>', to set up a
-workspace.`; for `overlay`, `Run 'attach-linux init' to create one, or
-'config overlay <path>'.`; none for the others.
+Each field has a hint, printed when it is missing or invalid (COM-072). For
+`linux` and `devicetree`, and for a missing `overlay`, it is the *setup hint*
+of the field: `Run 'attach-linux' on a terminal, or <commands><then>, to set
+up a workspace.`, `<commands>` being the field's `config` command,
+`'attach-linux config linux <path>'`, `'attach-linux config devicetree
+<path>'` or `'attach-linux config overlay <name>'`, and `<then>` being `,
+then 'attach-linux init'` for `overlay` and empty otherwise. When several
+fields have a setup hint, they are merged into one: `<commands>` names each
+of them in field order, joined by `, ` and a last ` and `, `attach-linux`
+written only in the first (`'attach-linux config linux <path>' and 'config
+overlay <name>'`), and `<then>` is there when `overlay` is one of them. So a
+hint names only the fields that are unset or wrong. For an invalid `overlay`
+(its file missing or not parsing) the hint is `Run 'attach-linux init' to
+create it, or 'attach-linux config overlay <name>' to use another.`. The
+other fields have none.
 
 **COM-120** The CLI shall read its settings only from
 `.attach-linux/config.toml` under the CWD. It shall not read the environment.
@@ -348,7 +358,8 @@ tree's bindings, with `validation.stamp.json` `{ generated_at, linux,
 dt_schema }` next to it. `generated_at` is in milliseconds since the epoch.
 
 **COM-111** The CLI shall build the caches only in `config linux <path>`,
-`config --reload`, and `init` when they aren't current (COM-116). Every
+`config --reload`, and the setup run (`setup.md`) when they aren't current
+(COM-116). Every
 other command only reads them.
 
 **COM-112** When it builds the caches, the CLI shall build both at once and
@@ -399,9 +410,9 @@ incomplete; rebuild it (scripts/bundle-dt-schema.sh).`
 **C-1. Human-mode failures exit 0.** In human mode a refusal, a
 configuration error and the CLI's own input errors exit with status 0, and
 they are written to standard output. A script can't tell `attach-linux add …
-&& next` failed. Commander's own input errors exit with status 1. `init` and
-`ui --port` differ again: their input errors go to standard error with
-status 2 (COM-033). A fix would be: refusals and configuration errors exit 1,
+&& next` failed. Commander's own input errors exit with status 1. `ui
+--port` differs again: its input error goes to standard error with status 2
+(COM-033). A fix would be: refusals and configuration errors exit 1,
 input errors exit 2, and all of them write to standard error.
 
 **C-2. `--json` with `--help` or `--version` prints nothing.** `attach-linux
@@ -416,7 +427,7 @@ stops every command, `config` included when it shows fields, until it is
 removed by hand. `config <key> <value>` and `config <key> --reset` still write
 (they only refuse a TOML syntax error), but they keep the unknown key
 (COM-129), and `--reset` refuses a key that isn't a field (`config.md`
-CONFIG-101). `init` can't fix it either (INIT open issue I-1).
+CONFIG-101). The setup run can't fix it either (`setup.md` S-1).
 
 **C-4. The preprocessor check is `<tool> --version`.** A tool that exists but
 has no `--version`, or exits non-zero for it (`false`, some wrappers), is
@@ -446,7 +457,7 @@ as `update` and `add` do.
 
 **C-9. Some stale caches aren't reported, or are reported wrongly.**
 COM-081 is silent when `validation.stamp.json` is missing although the cache
-isn't current (`init` rebuilds it, COM-116), and a stamp naming another
+isn't current (the setup run rebuilds it, COM-116), and a stamp naming another
 dt-schema says `The binding caches are older than the bindings`. Repro:
 remove `.attach-linux/validation.stamp.json` and run `attach-linux list
 devices adi`: no warning. A fix would be to warn for a missing stamp too, and

@@ -90,7 +90,7 @@ if ! command -v script >/dev/null; then
     exit 1
 fi
 
-# --- Sandbox: empty, so init builds the binding caches ---
+# --- Sandbox: empty, so config linux builds the binding caches ---
 
 rm -rf "$SANDBOX"
 mkdir -p "$SANDBOX"
@@ -113,8 +113,11 @@ fi
 # --- Set up and find the device ---
 
 step "Set up the workspace" \
-    "init saves the Linux tree and the base devicetree to .attach-linux/config.toml, builds the binding caches (about a minute, once per Linux tree) and creates the empty workfile overlay.dtso." \
-    "init --linux ~/linux --devicetree ~/rpi-4.dts"
+    "config saves the Linux tree, the base devicetree and the workfile's name to .attach-linux/config.toml; setting linux builds the binding caches (about a minute, once per Linux tree). init then creates the empty workfile overlay.dtso. (On a terminal, a bare attach-linux asks for all three and saves them; init still creates the file.)" \
+    "config linux ~/linux" \
+    "config devicetree ~/rpi-4.dts" \
+    "config overlay overlay.dtso" \
+    "init"
 
 step "Find the device" \
     "The compatibles of the Linux tree's bindings that match the filter." \

@@ -85,8 +85,8 @@ value equals the default (set or not), and `<value>` otherwise. The options
 follow the description for a field that has them (`overlay-syntax`).
 
 **CONFIG-014** While in human mode, when a field shown is required and
-unset, the CLI shall then write an empty line and the hints of those fields
-(`02-common.md` §8.1), each once, in field order.
+unset, the CLI shall then write an empty line and the setup hint of those
+fields, merged (`02-common.md` §8.1).
 
 **CONFIG-015** While in JSON mode, the CLI shall respond with an object
 conforming to `config.schema.json#/$defs/fields`: `message` `<n> config
@@ -120,10 +120,16 @@ with the problem as COM-072 words it: `<key>: must not be empty — <description
 or `overlay-syntax: "<value>" is not one of fragment | label — <description>`,
 followed by an empty line and the field's hint when it has one.
 
-**CONFIG-104** If the field is a path (`linux`, `devicetree`, `overlay`) and
-`<value>`, resolved against the CWD, names nothing, then the CLI shall refuse
-with `<key>: <absolute path> does not exist`. Whether it is a file or a
-directory isn't checked here. (Open issue CF-5.)
+**CONFIG-104** If the field is `linux` or `devicetree` and `<value>`,
+resolved against the CWD, names nothing, then the CLI shall refuse with
+`<key>: <absolute path> does not exist`. Whether it is a file or a directory
+isn't checked here. (Open issue CF-5.)
+
+**CONFIG-106** The field `overlay` may name a file that doesn't exist yet,
+which `init` creates (`init.md` INIT-018): `<value>` is a path, or a file name
+in the CWD (it is resolved against the CWD either way). If it names nothing
+and its directory doesn't exist, then the CLI shall refuse with `overlay:
+<absolute directory> is not a directory`.
 
 **CONFIG-105** If the field is `linux` and the directory isn't a Linux tree
 (COM-128), then the CLI shall refuse with `linux: no <dir>/ under <path> (not
@@ -135,7 +141,9 @@ A leading `~` isn't expanded: the shell is expected to have done it.
 path made absolute, and keep the other keys.
 
 **CONFIG-111** For a field other than `linux`, the CLI shall then answer
-`Set <key> = <value>`, `<value>` as given (not made absolute).
+`Set <key> = <value>`, `<value>` as given (not made absolute), followed for an
+`overlay` that names nothing by ` (not created yet: 'attach-linux init'
+creates it)`.
 
 ## 5. Setting `linux`
 
@@ -212,8 +220,8 @@ looks the same as one left unset.
 
 **CF-4. A TOML syntax error is a refusal when setting or resetting,** where
 every other command, and `config` when showing, reports it as a configuration
-error (COM-071, exit 2 in JSON mode), and `init` as an input error
-(INIT-011).
+error (COM-071, exit 2 in JSON mode), and the setup run as an input error
+(`setup.md` SETUP-011).
 
 **CF-5. Path kinds aren't checked.** `config devicetree .` and `config
 overlay <directory>` succeed; the next command that loads them reports `is
@@ -287,7 +295,7 @@ $ attach-linux --json config linux ~/linux_adi        # config.toml also has bog
 $ attach-linux --json config --reload          # linux not set
 {"errors":[{"field":"linux","kind":"missing","message":"Missing config field linux",
  "description":"Path to Linux kernel source tree (setting it builds the binding caches)"}],
- "hints":["Run 'attach-linux init' on a terminal, or 'attach-linux init --linux <path> --devicetree <path>', to set up a workspace."]}
+ "hints":["Run 'attach-linux' on a terminal, or 'attach-linux config linux <path>', to set up a workspace."]}
                                                    (stderr, exit 2)
 ```
 

@@ -133,8 +133,8 @@ issue CO-9):
 | `config` | config field (§8.1 of `02-common.md`) | file name (COMPL-012) | |
 | `completion` | `bash`, `fish`, `zsh` | | |
 
-`build`, `validate`, `deploy`, `install-skill`, `uninstall-skill` and `ui`
-complete only their options.
+`init`, `build`, `validate`, `deploy`, `install-skill`, `uninstall-skill` and
+`ui` complete only their options.
 
 ### 6.2 Option values
 
@@ -142,8 +142,6 @@ complete only their options.
 |---|---|
 | `add --parent` | parent path (COMPL-052) |
 | `add --template` | template (COMPL-071) |
-| `init --linux` | directory name (COMPL-012) |
-| `init --devicetree` | file name (COMPL-012) |
 
 Other options that take a value (`--name`, `--label`, `--overlay`, `--port`)
 offer nothing.
@@ -383,6 +381,10 @@ devices devices<Tab>` offers the kind `devices`. A fix would be to count from
 the kind's own index and to drop the `prefix === subkind` test in
 `src/commands/completion/complete.ts`.
 
+**CO-10. Nothing completes a directory name.** `init --linux` was the only
+position completed with `__ATTACH_COMPLETE_DIRS__` (COMPL-012); `config
+linux` completes a file name like every other field (CO-5).
+
 ## 12. Examples
 
 ```
@@ -412,6 +414,6 @@ fan-	child node ^fan-[0-9]+$
 ```
 
 ```
-$ attach-linux __complete -- init --linux ""
-__ATTACH_COMPLETE_DIRS__
+$ attach-linux __complete -- config linux ""
+__ATTACH_COMPLETE_FILES__
 ```

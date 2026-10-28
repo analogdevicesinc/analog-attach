@@ -437,8 +437,9 @@ async function ask_workfile_name(rl: readline.Interface): Promise<string> {
 }
 
 /**
- * The overlay workfile: keep the configured one (Enter) or create a new one.
- * `configured` is the configured overlay when its file exists.
+ * The overlay workfile: keep the configured one (Enter) or name a new one,
+ * which `init` creates. `configured` is the configured overlay, whether its
+ * file exists or not.
  */
 export async function step_overlay(rl: readline.Interface, configured?: string): Promise<OverlayChoice> {
     console.log(bold("Step 3: Overlay workfile"));

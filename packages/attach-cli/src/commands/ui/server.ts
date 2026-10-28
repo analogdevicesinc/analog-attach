@@ -24,7 +24,7 @@ const COMMANDS: Record<string, readonly string[]> = {
     "enable": [],
     "disable": [],
     "validate": [],
-    "init": ["--overlay"],
+    "init": [],
 };
 
 /** The config fields the page may see; `config` also returns the deploy password. */
@@ -171,9 +171,9 @@ if (import.meta.vitest) {
         expect("error" in check_request({ command: "toString", args: [] })).toBe(true);
         expect("error" in check_request({ command: "read", args: ["--json"] })).toBe(true);
         expect("error" in check_request({ command: "update", args: ["adc", "x", 1] })).toBe(true);
-        // init may create a workfile, not point the workspace at other trees.
-        expect(check_request({ command: "init", args: ["--overlay", "overlay-1"] })).toEqual({ run: ["init", "--overlay", "overlay-1"] });
-        expect("error" in check_request({ command: "init", args: ["--linux", "/tmp/linux"] })).toBe(true);
+        // init may create a workfile, and takes no option.
+        expect(check_request({ command: "init", args: [] })).toEqual({ run: ["init"] });
+        expect("error" in check_request({ command: "init", args: ["--overlay", "overlay-1"] })).toBe(true);
         expect("error" in check_request({ command: "create-workfile", args: [] })).toBe(true);
     });
 

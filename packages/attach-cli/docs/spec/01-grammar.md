@@ -31,8 +31,8 @@ shell completion with the elements after the first `--`, or with all elements
 after `__complete` when there is no `--`, and then exit with status 0. GRM-001
 doesn't apply to such a run. (Specified in `05-completion.md`.)
 
-**GRM-003** While in human mode, when argv is empty and standard input is a
-terminal, the CLI shall run `init`.
+**GRM-003** While in human mode, when argv is empty and the run is a
+terminal run (COM-012), the CLI shall run the setup run (`setup.md`).
 
 **GRM-004** When argv (after GRM-001) matches no `command-line`, the CLI shall
 report an input error (COM-030) giving the reason, worded as commander words
@@ -45,9 +45,9 @@ unknown command or option, a second line follows: `(Did you mean <match>?)`
 (`move a` gives `(Did you mean move?)`, `--quiet=x` gives `(Did you mean
 --quiet?)`).
 
-**GRM-005** While in human mode, when argv is empty and standard input isn't
-a terminal, the CLI shall write the program's usage to standard error and
-exit with status 1. (In JSON mode, see open issue C-2 in `02-common.md`.)
+**GRM-005** While in human mode, when argv is empty and the run isn't a
+terminal run, or argv is the one element `--quiet`, the CLI shall write the
+program's usage to standard error and exit with status 1. (In JSON mode, see open issue C-2 in `02-common.md`.)
 
 The grammar accepts any element as a `list` kind, a `completion` shell or a
 `ui` port; what the command does with one it can't use is in its chapter
@@ -227,7 +227,7 @@ their meaning.
 | `list` | `[kind] [args...]` | |
 | `build`, `validate`, `deploy` | | |
 | `config` | `[key] [value]` | `--reset`, `--reload` |
-| `init` | | `--linux <path>`, `--devicetree <path>`, `--overlay <name>` |
+| `init` | | |
 | `install-skill` | | `--force` |
 | `uninstall-skill` | | |
 | `completion` | `<shell>` | |

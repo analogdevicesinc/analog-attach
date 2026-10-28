@@ -126,9 +126,8 @@ server.
 **UI-033** If an element of `args` starts with `-` and isn't an option the
 command may take, then the server shall respond 400 with `{"error":"option not
 allowed: <element>"}`. The options allowed: `--parent`, `--name` and `--label`
-for `add`; `--force` for `delete`; `--overlay` for `init`; none for the
-others. (So `--json`, `add --template`, `init --linux` and `--parent=…` are
-refused. Open issue U-2.)
+for `add`; `--force` for `delete`; none for the others. (So `--json`, `add
+--template` and `--parent=…` are refused. Open issue U-2.)
 
 **UI-034** The server shall run `<command> <args...>` as a child run, adding
 `--quiet` after the arguments of `add`, and respond 200 with `{"code": <exit
@@ -150,15 +149,14 @@ with every API request.
 
 **UI-041** On load, the page shall get `/api/status`. While no overlay is
 configured, it shall say so (and which of `linux` and `devicetree` is missing,
-pointing at `attach-linux init`) and offer *Create workfile* and *Add
+pointing at a bare `attach-linux`) and offer *Create workfile* and *Add
 device…*. Otherwise it shall read `/` with `read`, show the tree, the selected
 node's detail, the overlay's text (`/api/overlay`) and the result of
 `validate`.
 
-**UI-042** *Create workfile* shall run `init --overlay overlay`, then `init
---overlay overlay-1`, `overlay-2`, … while the response says `already exists`,
-up to `overlay-99`. When one succeeds, the page shall run its start-up again
-(UI-041) without reloading itself.
+**UI-042** *Create workfile* shall run `init` (`init.md`), once. When it
+succeeds, the page shall run its start-up again (UI-041) without reloading
+itself. (Open issue U-8.)
 
 **UI-043** When `read` of a node fails with configuration errors, the page
 shall show them with their hints, a *Retry* button, and, when an error is about
@@ -207,6 +205,11 @@ fix would be to accept only `^[0-9]+$` before converting.
 === "object"`, which an array passes, so `[1]` gets `command not allowed:
 undefined` instead of `expected a JSON object`. A fix would be to refuse
 arrays in UI-030 too (`Array.isArray`).
+
+**U-8. *Create a new workfile* can't replace an overlay that is there.**
+`init` keeps a configured overlay whose file exists (INIT-018), so when the
+`overlay` error of UI-043 is that the file doesn't parse, the button creates
+nothing and the page shows the same error again.
 
 ## 8. Examples
 

@@ -15,7 +15,7 @@
         "ok": { "const": true },
         "message": {
           "type": "string",
-          "description": "Added <key> (label: <label>), preceded by 'Wrote <overlay file>; ' when the overlay was new."
+          "description": "Added <key> (label: <label>)."
         },
         "severity": { "const": "info" },
         "key": { "type": "string", "description": "The new node's name with its unit address." },

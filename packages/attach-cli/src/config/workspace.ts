@@ -18,6 +18,7 @@ import {
     type SettingKey,
     type SettingSpec,
     type Settings,
+    setup_hint,
 } from "./settings";
 
 // Parse, don't validate: each resource below is produced only from settings
@@ -68,6 +69,8 @@ export interface Resources {
     tools: Tools;
     base: BaseTree;
     overlay: Workfile;
+    /** The configured overlay's path, whether its file exists or not (`init`). */
+    overlay_path: string;
     deploy: DeployTarget;
 }
 
@@ -99,7 +102,7 @@ function require_setting(settings: Settings, key: SettingKey): ConfigResult<stri
     const spec = spec_of(key);
     const value = settings[spec.field];
     if (value !== undefined) { return { ok: true, value }; }
-    return fail({ field: spec.key, kind: "missing", message: `Missing config field ${spec.key}`, description: spec.description, hint: spec.hint });
+    return fail({ field: spec.key, kind: "missing", message: `Missing config field ${spec.key}`, description: spec.description, hint: spec.missing_hint ?? spec.hint });
 }
 
 function require_path(settings: Settings, key: SettingKey, kind: "file" | "directory"): ConfigResult<string> {
@@ -274,6 +277,7 @@ export function open_workspace<N extends Need>(settings: Settings, needs: readon
             if (!base_value.ok) { return { ok: false, errors: [...base_value.errors, ...failures(require_path(settings, "overlay", "file"))] }; }
             return parse_overlay(settings, base_value.value);
         },
+        overlay_path: () => require_setting(settings, "overlay"),
         deploy: () => parse_deploy(settings),
     };
 
@@ -294,7 +298,10 @@ export function open_workspace<N extends Need>(settings: Settings, needs: readon
 }
 
 export function format_config_errors(errors: readonly ConfigError[]): { human: string; json: string } {
-    const hints = [...new Set(errors.map(error => error.hint).filter((hint): hint is string => hint !== undefined))];
+    // The setup hints of several fields become one that names them all.
+    const is_setup = (error: ConfigError): boolean => error.hint !== undefined && error.hint === setup_hint([error.field]);
+    const setup_fields = errors.filter(error => is_setup(error)).map(error => error.field);
+    const hints = [...new Set(errors.map(error => (is_setup(error) ? setup_hint(setup_fields) : error.hint)).filter((hint): hint is string => hint !== undefined))];
     const lines = errors.map(error => (error.description === undefined ? error.message : `${error.message} — ${error.description}`));
     const body = lines.length === 1 ? lines[0]! : ["Configuration errors:", ...lines.map(line => `  ${line}`)].join("\n");
     const human = hints.length > 0 ? `${body}\n\n${hints.join("\n")}` : body;
@@ -473,7 +480,16 @@ if (import.meta.vitest) {
         const message = format_config_errors(result.errors);
         expect(message.human).toContain("Missing config field linux");
         expect(message.human).toContain("Missing config field devicetree");
-        expect(message.human.split("Run 'attach-linux init'").length - 1).toBe(1);
+        expect(message.human.split("Run 'attach-linux' on a terminal").length - 1).toBe(1);
+        expect(message.human).toContain("'attach-linux config linux <path>' and 'config devicetree <path>', to set up");
         expect(JSON.parse(message.json).errors).toHaveLength(2);
+    });
+
+    test("format_config_errors - the setup hint names only the fields that are missing", () => {
+        const result = open(`linux = ${JSON.stringify(linux)}\n`, ["base", "overlay_path"]);
+        if (result.ok) { throw new Error("expected errors"); }
+        const message = format_config_errors(result.errors);
+        expect(JSON.parse(message.json).hints).toEqual([setup_hint(["devicetree", "overlay"])]);
+        expect(message.human).not.toContain("config linux");
     });
 }

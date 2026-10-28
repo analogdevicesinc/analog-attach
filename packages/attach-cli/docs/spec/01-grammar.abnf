@@ -19,13 +19,14 @@
 ;     GRM-015).
 ;   - An element "--" may appear anywhere after the command; every element
 ;     after it is a positional (GRM-012).
-;   - Empty argv matches command-line; what it does is GRM-003 and GRM-005.
+;   - Empty argv, or "--quiet" alone, matches command-line; what it does is
+;     GRM-003 and GRM-005.
 
 ; ===================================================================
 ; Layer 1: argv
 ; ===================================================================
 
-command-line    = [ global-option ]
+command-line    = [ global-option / %s"--quiet" ]   ; bare: GRM-003, GRM-005
                 / command [ B help-option / B version-option ]
 
 global-option   = version-option / help-option
@@ -84,10 +85,7 @@ config-option   = %s"--reset" / %s"--reload"  ; which combine: 03-commands/confi
 
 ; --- Setup and human-only commands ----------------------------------
 
-init            = %s"init" *( B init-option )
-init-option     = %s"--linux" B element
-                / %s"--devicetree" B element
-                / %s"--overlay" B element
+init            = %s"init"
 
 install-skill   = %s"install-skill" *( B %s"--force" )
 uninstall-skill = %s"uninstall-skill"

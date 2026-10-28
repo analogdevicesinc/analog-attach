@@ -83,9 +83,6 @@ export const COMPLETION_SPEC: Readonly<Record<string, CommandSpec | "dynamic">> 
         positional: { mode: "byIndex", sources: [{ kind: "suggest", suggest: "device-key" }] },
         flags: { "--parent": PATH_PARENT, "--template": { kind: "suggest", suggest: "template" } },
     },
-    init: {
-        flags: { "--linux": { kind: "dir" }, "--devicetree": FILE },
-    },
     import: {
         positional: { mode: "byIndex", sources: [{ kind: "suggest", suggest: "overlay" }] },
     },
@@ -120,6 +117,7 @@ export const COMPLETION_SPEC: Readonly<Record<string, CommandSpec | "dynamic">> 
 };
 
 export const NO_VALUE_COMPLETION: readonly string[] = [
+    "init",
     "build",
     "deploy",
     "ui",

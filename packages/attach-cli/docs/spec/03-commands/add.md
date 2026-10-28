@@ -57,15 +57,12 @@ workspace: a run they stop gives no configuration error.
 **ADD-010** When the workspace can't be loaded, the CLI shall report it per
 COM-071 or COM-072 and add nothing.
 
-**ADD-011** While no overlay is configured, the CLI shall add to a new, empty
-overlay in the CWD named `<device>.dtso`, or `<device>-<n>.dtso` with the
-smallest `<n>` from 1 that names no existing file when `<device>.dtso`
-exists. `<device>` is the compatible after its first `,`, or the whole
-compatible when it has no `,`. The file is created only on success (ADD-080).
+**ADD-011** *Withdrawn.* (With no overlay configured, `add` created
+`<device>.dtso`. It now needs one, ADD-012; `init` creates it.)
 
-**ADD-012** If the configured overlay can't be read (the file doesn't exist)
-or parsed, then the CLI shall report it per COM-071 or COM-072 and add
-nothing.
+**ADD-012** If no overlay is configured, or the configured overlay can't be
+read (the file doesn't exist) or parsed, then the CLI shall report it per
+COM-071 or COM-072 and add nothing. `add` never creates the workfile.
 
 **ADD-013** If no binding has `<compatible>` in its `compatible` list, then the
 CLI shall refuse with `Failed to find binding for <compatible>`.
@@ -348,9 +345,7 @@ ADD-072 followed by `/` and its key (`spi7/adc@1`, `i2cbus/adxl345@53`;
 
 ### 10.1 Writing
 
-**ADD-080** When the node is added, the CLI shall write the overlay file. When
-the overlay was new (ADD-011), the CLI shall also set `overlay` in the config
-to its absolute path.
+**ADD-080** When the node is added, the CLI shall write the overlay file.
 
 **ADD-081** When the CLI refuses, it shall write neither the overlay nor the
 config (COM-042).
@@ -359,17 +354,16 @@ config (COM-042).
 
 **ADD-090** While in human mode, the CLI shall write, in this order:
 
-1. `Wrote <overlay file>`, when the overlay was new;
-2. the parent note (ADD-022, ADD-062), if any;
-3. the notes of the placement (ADD-044 to ADD-048) or of the copy (ADD-064 to
+1. the parent note (ADD-022, ADD-062), if any;
+2. the notes of the placement (ADD-044 to ADD-048) or of the copy (ADD-064 to
    ADD-067, ADD-072 to ADD-074);
-4. the address warnings for the new node: clashes with siblings at the same
+3. the address warnings for the new node: clashes with siblings at the same
    address and a chip select that the controller's `cs-gpios` lacks
    (`validate.md` §7, VALIDATE-113);
-5. for a copy template, the references in the new node that name no node of
+4. for a copy template, the references in the new node that name no node of
    the merged tree (ADD-091);
-6. `Added <key> (label: <label>) to <overlay file>`;
-7. the missing required properties (§11).
+5. `Added <key> (label: <label>) to <overlay file>`;
+6. the missing required properties (§11).
 
 **ADD-091** The unresolved references block is:
 
@@ -395,7 +389,7 @@ object conforming to `04-protocol/add.schema.json`:
 |---|---|
 | `ok` | `true` |
 | `severity` | `"info"` |
-| `message` | `Added <key> (label: <label>)`, preceded by `Wrote <overlay file>; ` when the overlay was new |
+| `message` | `Added <key> (label: <label>)` |
 | `key` | The new node's key |
 | `path` | The new node's path (§3.5 of the overview) |
 | `template` | `required`, `example:<N>` or `overlay:<ref>` |
@@ -403,8 +397,8 @@ object conforming to `04-protocol/add.schema.json`:
 | `unresolved` | Copy templates only: the references of ADD-091, each `{ path, property, reference }`, `reference` as written (`&label`, `&{/path}`) |
 
 **ADD-101** While in JSON mode, the CLI shall write the notes and warnings of
-ADD-090 items 2 to 4 to standard error (COM-021), and write neither the
-`Wrote` line, nor the references block, nor the `Added` line.
+ADD-090 items 1 to 3 to standard error (COM-021), and write neither the
+references block nor the `Added` line.
 
 **ADD-102** While in JSON mode, the CLI shall not fill or ask for anything
 (COM-011): the node is as §7 to §9 leave it.
@@ -590,7 +584,7 @@ Picked chip select 2 (taken: 0 by spidev@0, 1 by spidev@1).
 To change it: rename ad7124_8 adi,ad7124-8@<n>
 warning: chip select 2 has no cs-gpios entry: spi@7e204000 has chip selects 0-1
   Use one of those, or add a GPIO for it to cs-gpios of /soc/spi@7e204000
-Added adi,ad7124-8@2 (label: ad7124_8) to /work/ad7124-8.dtso
+Added adi,ad7124-8@2 (label: ad7124_8) to /work/overlay.dtso
 Missing required: interrupt-parent, interrupts
 Set them with: update ad7124_8 <property> <value>
 ```

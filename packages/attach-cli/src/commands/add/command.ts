@@ -17,12 +17,11 @@ import {
 } from "attach-lib";
 
 import type { LocalContext } from "../../context";
-import { load_workspace, parse_overlay, report_config_errors, type Bindings } from "../../config/workspace";
+import { load_workspace, type Bindings } from "../../config/workspace";
 import type { Settings } from "../../config/settings";
 import { bus_kind, find_binding, parse_node_path, resolve_path, type BusKind } from "../../utilities";
 import { respond, respond_fail, diagnostic, input_error, cancelled } from "../../protocol/output";
 import type { AddResponse } from "../../protocol/types";
-import { new_workfile, next_workfile_name } from "../../workfile";
 import { ask_for_missing, describe_missing, missing_required_of, on_terminal, type NewNode } from "../../missing-required";
 import { node_children } from "../list/suggest";
 import { node_reg_warnings, reg_warning_lines } from "../../reg-conflicts";
@@ -125,20 +124,10 @@ Use 'list devices' to find compatible strings, 'list parent' to find valid buses
                 return;
             }
 
-            const workspace = load_workspace(context_, ["bindings", "base"]);
+            const workspace = load_workspace(context_, ["bindings", "base", "overlay"]);
             if (workspace === undefined) { return; }
             const { linux, dt_schema: dtSchema } = workspace.bindings;
-            const { settings } = workspace;
-
-            const created = settings.overlay === undefined;
-            const opened = created
-                ? { ok: true as const, value: new_workfile(next_workfile_name(device_name(compatible)), workspace.base.tree, settings.overlay_syntax) }
-                : parse_overlay(settings, workspace.base);
-            if (!opened.ok) {
-                report_config_errors(context_, opened.errors);
-                return;
-            }
-            const workfile = opened.value;
+            const { settings, overlay: workfile } = workspace;
 
             const binding_path = await find_binding(linux, dtSchema, compatible);
             if (binding_path === undefined) {
@@ -182,8 +171,6 @@ Use 'list devices' to find compatible strings, 'list parent' to find valid buses
             }
 
             workfile.save();
-            const created_message = created ? `Wrote ${workfile.path}` : undefined;
-            if (created_message !== undefined && !context_.json) { console.log(created_message); }
             const parent_path = result.path.slice(0, result.path.lastIndexOf("/")) || "/";
             const parent_node = workfile.tree.effective_node(parent_path);
             const added: AddedNode = { ...result, bus: parent_node === undefined ? undefined : bus_kind(parent_node) };
@@ -210,7 +197,7 @@ Use 'list devices' to find compatible strings, 'list parent' to find valid buses
             if (context_.json) {
                 const response: AddResponse = {
                     ok: true,
-                    message: created_message === undefined ? added_message : `${created_message}; ${added_message}`,
+                    message: added_message,
                     severity: "info",
                     key: result.key,
                     path: result.path.split("/").filter(Boolean),
@@ -234,10 +221,6 @@ Use 'list devices' to find compatible strings, 'list parent' to find valid buses
         });
 }
 
-/** The compatible without its vendor prefix, used to name a new workfile. */
-function device_name(compatible: string): string {
-    return compatible.includes(",") ? compatible.slice(compatible.indexOf(",") + 1) : compatible;
-}
 
 async function parse_binding(binding_path: string, bindings: Bindings): Promise<ParsedBinding | undefined> {
     try {
