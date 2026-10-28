@@ -54,6 +54,7 @@ export {
     example_enabled,
     get_settings_file_path,
     get_settings_sources,
+    LEGACY_SETTING_NAMES,
     find_local_config_path,
     set_config_path_override,
     get_workfile_path

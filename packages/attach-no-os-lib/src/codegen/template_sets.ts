@@ -3,7 +3,7 @@
 // side by side under `templates/` (`templates/capi/`, and any other set added
 // later), so a second target is a new folder rather than a change to codegen.
 //
-// Which set to use is a setting (`template`, see settings/globals.ts),
+// Which set to use is a setting (`project-template`, see settings/globals.ts),
 // overridable per invocation via `CodegenInput.template_set`. Codegen resolves
 // and validates the set BEFORE it renders anything, so a typo or a half-populated
 // folder fails loudly instead of producing a partial project.
@@ -32,7 +32,7 @@ export const TEMPLATES_ROOT = path.join(__dirname, "templates");
 export const STRUCTURE_FILENAME = "project_structure.json";
 
 // Names of the bundled template sets, sorted. Used for error messages and for
-// CLI completion of `attach-noos config template`.
+// CLI completion of `attach-noos config project-template`.
 export function list_template_sets(): string[] {
 	if (!fs.existsSync(TEMPLATES_ROOT)) {
 		return [];
@@ -46,12 +46,12 @@ export function list_template_sets(): string[] {
 		.sort();
 }
 
-// The configured set name: the `template` setting's value, its declared
+// The configured set name: the `project-template` setting's value, its declared
 // default, then DEFAULT_TEMPLATE_SET. Never fails — a missing or unreadable
 // config just means "the default set", since codegen worked without this setting
 // before it existed.
 export function configured_template_set(): string {
-	const setting = get_setting("template");
+	const setting = get_setting("project-template");
 	if (!setting.ok) {
 		return DEFAULT_TEMPLATE_SET;
 	}
@@ -60,7 +60,7 @@ export function configured_template_set(): string {
 
 // Resolve a template set to its directory on disk.
 //
-// Precedence: the explicit per-invocation name, then the `template` setting,
+// Precedence: the explicit per-invocation name, then the `project-template` setting,
 // then DEFAULT_TEMPLATE_SET. A name containing a path separator (or an absolute
 // path) is taken as a path to an out-of-tree set, so a user can keep their own
 // templates outside the installed app; a bare name is looked up under

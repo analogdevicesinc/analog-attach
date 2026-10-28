@@ -21,7 +21,7 @@ because a reviewer will look for keys that are not there.
 
 ## Where the files are
 
-The `capi_path` and `module_paths` settings name the repo roots. Every module under them
+The `capi-path` and `module-paths` settings name the repo roots. Every module under them
 is indexed by its `module.yml`. A module that describes C symbols points at its ruleset
 index with `rulesets_file:`, and that index lists one ruleset file per symbol.
 

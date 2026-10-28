@@ -95,12 +95,12 @@ export function setup_test_config(roots: { capi?: string; modules?: string[] } =
 
 	const settings: SettingsFile = {
 		...SETTINGS_DEFAULTS,
-		capi_path: {
-			...SETTINGS_DEFAULTS.capi_path,
+		"capi-path": {
+			...SETTINGS_DEFAULTS["capi-path"],
 			value: roots.capi ?? FIXTURE_CAPI
 		},
-		module_paths: {
-			...SETTINGS_DEFAULTS.module_paths,
+		"module-paths": {
+			...SETTINGS_DEFAULTS["module-paths"],
 			value: modules.join(PATH_LIST_DELIMITER)
 		}
 	};

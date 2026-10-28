@@ -88,11 +88,11 @@ export function root_key(context: WorkfileContext): string {
  * Name of the project `generate` writes.
  *
  * attach-meta calls `generate` with no arguments, so the name comes from the
- * `project_name` setting — and when that is unset, from the workfile's own directory,
+ * `project-name` setting — and when that is unset, from the workfile's own directory,
  * which is the name of the thing being built in every layout we have seen.
  */
 export function get_project_name(context: WorkfileContext): Result<string> {
-    const configured = get_effective_setting_value("project_name");
+    const configured = get_effective_setting_value("project-name");
     if (!configured.ok) {
         return configured;
     }
@@ -100,18 +100,18 @@ export function get_project_name(context: WorkfileContext): Result<string> {
     return ok(configured.value || path.basename(path.dirname(context.path)));
 }
 
-/** Where projects go when `project_path` is unset: `out/<project_name>`. */
+/** Where projects go when `project-path` is unset: `out/<project-name>`. */
 export const DEFAULT_PROJECT_DIRECTORY = "out";
 
 /**
  * Directory of the generated project: the one `generate` writes, and `build` and `deploy`
  * act on.
  *
- * `project_path` names it outright. Unset, it is `out/<project_name>` in the current
+ * `project-path` names it outright. Unset, it is `out/<project-name>` in the current
  * directory, so all three agree on where the project is without any setting.
  */
 export function get_project_path(): Result<string> {
-    const configured = get_effective_setting_value("project_path");
+    const configured = get_effective_setting_value("project-path");
     if (!configured.ok) {
         return configured;
     }
@@ -120,7 +120,7 @@ export function get_project_path(): Result<string> {
         return ok(path.resolve(process.cwd(), configured.value));
     }
 
-    const name = get_effective_setting_value("project_name");
+    const name = get_effective_setting_value("project-name");
     if (!name.ok) {
         return name;
     }

@@ -28,7 +28,7 @@ import { init_workfile } from "./init";
  * commands rather than running them: from there the user drives.
  */
 
-/** The module types the registry loads rulesets from: what `module_paths` is for. */
+/** The module types the registry loads rulesets from: what `module-paths` is for. */
 const MODULE_TYPES = new Set(["platform", "driver_collection", "utility", "middleware"]);
 
 export interface ModuleRoot {
@@ -68,9 +68,9 @@ export async function run_setup(): Promise<number> {
 // --- The steps ---
 
 async function ensure_capi_path(): Promise<string | undefined> {
-    const current = effective("capi_path");
+    const current = effective("capi-path");
     if (current !== undefined && looks_like_capi(current)) {
-        done("capi_path", current);
+        done("capi-path", current);
         return current;
     }
     if (current !== undefined) {
@@ -97,20 +97,20 @@ async function ensure_capi_path(): Promise<string | undefined> {
     }
 
     const capi = path.resolve(expand_home(answer));
-    return write("capi_path", capi) ? capi : undefined;
+    return write("capi-path", capi) ? capi : undefined;
 }
 
 async function ensure_module_paths(capi: string): Promise<void> {
-    const current = effective("module_paths");
+    const current = effective("module-paths");
     if (current !== undefined) {
-        done("module_paths", current.split(PATH_LIST_DELIMITER).map(entry => path.basename(entry)).join(", "));
+        done("module-paths", current.split(PATH_LIST_DELIMITER).map(entry => path.basename(entry)).join(", "));
         return;
     }
 
     const found = module_roots_near(capi);
     if (found.length === 0) {
         console.log(styleText("yellow", `No module repositories next to ${capi}.`));
-        console.log(`  Set them later: attach-noos config module_paths <path>${PATH_LIST_DELIMITER}<path>`);
+        console.log(`  Set them later: attach-noos config module-paths <path>${PATH_LIST_DELIMITER}<path>`);
         return;
     }
 
@@ -124,7 +124,7 @@ async function ensure_module_paths(capi: string): Promise<void> {
         })),
         required: true
     });
-    if (write("module_paths", picked.join(PATH_LIST_DELIMITER))) {
+    if (write("module-paths", picked.join(PATH_LIST_DELIMITER))) {
         // The boards come from these: read them afresh for the next step.
         reset_registry();
     }
@@ -288,12 +288,12 @@ function is_directory(candidate: string): boolean {
 
 // --- Settings ---
 
-function effective(key: "capi_path" | "module_paths" | "board"): string | undefined {
+function effective(key: "capi-path" | "module-paths" | "board"): string | undefined {
     const value = get_effective_setting_value(key);
     return value.ok && value.value !== undefined && value.value !== "" ? value.value : undefined;
 }
 
-function write(key: "capi_path" | "module_paths", value: string): boolean {
+function write(key: "capi-path" | "module-paths", value: string): boolean {
     const written = set_setting_value(key, value);
     if (!written.ok) {
         console.log(styleText("red", written.error.message));

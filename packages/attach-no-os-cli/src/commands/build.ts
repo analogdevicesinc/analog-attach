@@ -22,7 +22,7 @@ type BuildFlags = {
 /**
  * `attach-noos build` — build the generated project.
  *
- * Which project is a setting, not an argument: `project_path`, or where `generate` would have
+ * Which project is a setting, not an argument: `project-path`, or where `generate` would have
  * written it. See `get_project_path`.
  */
 // definition because otherwise it clashes with the stricli function
@@ -30,8 +30,8 @@ export const buildCommandDefinition = buildCommand<BuildFlags, []>({
     docs: {
         brief: "Build the generated CAPI project",
         fullDescription:
-            "Builds the project 'generate' writes: the 'project_path' setting, or\n" +
-            "out/<project_name> when it is unset."
+            "Builds the project 'generate' writes: the 'project-path' setting, or\n" +
+            "out/<project-name> when it is unset."
     },
     parameters: {
         positional: { kind: "tuple", parameters: [] },
@@ -70,7 +70,7 @@ export const buildCommandDefinition = buildCommand<BuildFlags, []>({
 
         // An explicit build_command takes the step over completely, for a project that
         // is not a generated CAPI project or a build CMake cannot express.
-        const override = get_effective_setting_value("build_command");
+        const override = get_effective_setting_value("build-command");
         if (!override.ok) {
             output_error(flags, override.error.message);
             return;
@@ -93,9 +93,9 @@ export const buildCommandDefinition = buildCommand<BuildFlags, []>({
             return;
         }
 
-        const capi_path = get_setting_value("capi_path");
+        const capi_path = get_setting_value("capi-path");
         if (!capi_path.ok) {
-            output_error(flags, "capi_path is not configured. Run: attach-noos config capi_path <path>");
+            output_error(flags, "capi-path is not configured. Run: attach-noos config capi-path <path>");
             return;
         }
 

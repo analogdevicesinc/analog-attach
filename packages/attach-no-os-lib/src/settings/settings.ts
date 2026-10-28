@@ -56,6 +56,34 @@ export function find_local_config_path(start?: string): string | undefined {
 }
 
 /**
+ * Setting names from before the merged CLI's naming (kebab-case, and `template` as
+ * `project-template`). A file using them still works: they are read as the new names, and
+ * the next write to that file stores the new names instead.
+ */
+export const LEGACY_SETTING_NAMES: Readonly<Record<string, keyof SettingsFile>> = {
+	capi_path: "capi-path",
+	module_paths: "module-paths",
+	project_name: "project-name",
+	project_path: "project-path",
+	template: "project-template",
+	build_command: "build-command",
+	deploy_command: "deploy-command",
+};
+
+/** Files already told about their old names in this run, so each is told once. */
+const noted_legacy_files = new Set<string>();
+
+function note_legacy_names(file_path: string, names: string[]): void {
+	if (names.length === 0 || noted_legacy_files.has(file_path)) {
+		return;
+	}
+	noted_legacy_files.add(file_path);
+	const renames = names.map(name => `${name} -> ${LEGACY_SETTING_NAMES[name]}`).join(", ");
+	// stderr: stdout carries the --json body that consumers parse.
+	console.warn(`Note: ${file_path} uses old setting names (${renames}). They still work; the next 'attach-noos config' write renames them.`);
+}
+
+/**
  * Values held in one config file, keyed by setting name.
  *
  * Two on-disk shapes are accepted per key: a bare string (`"board": "max32690evkit"`,
@@ -77,22 +105,35 @@ function read_values(file_path: string): Result<Record<string, string>> {
 	}
 
 	const values: Record<string, string> = {};
+	const legacy: Record<string, string> = {};
 	for (const [key, entry] of Object.entries(parsed as Record<string, unknown>)) {
+		let value: string | undefined;
 		if (typeof entry === "string") {
-			values[key] = entry;
+			value = entry;
+		} else if (typeof entry === "object" && entry !== null) {
+			const held = (entry as Record<string, unknown>).value;
+			value = typeof held === "string" ? held : undefined;
+		} else {
+			return error(`Malformed settings file at ${file_path}: setting "${key}" is neither a string nor an object`);
+		}
+		if (value === undefined) {
 			continue;
 		}
-
-		if (typeof entry === "object" && entry !== null) {
-			const value = (entry as Record<string, unknown>).value;
-			if (typeof value === "string") {
-				values[key] = value;
-			}
-			continue;
+		if (key in LEGACY_SETTING_NAMES) {
+			legacy[key] = value;
+		} else {
+			values[key] = value;
 		}
-
-		return error(`Malformed settings file at ${file_path}: setting "${key}" is neither a string nor an object`);
 	}
+
+	// An old name counts only where the file has no value under the new one.
+	for (const [old_name, value] of Object.entries(legacy)) {
+		const name = LEGACY_SETTING_NAMES[old_name];
+		if (name !== undefined && !(name in values)) {
+			values[name] = value;
+		}
+	}
+	note_legacy_names(file_path, Object.keys(legacy));
 
 	return ok(values);
 }
@@ -325,13 +366,13 @@ function setting_on(key: "bootstrap" | "example"): boolean {
 
 /** Root of the capi checkout, which every other module's rulesets reference into. */
 export function get_capi_path(): Result<string> {
-	return get_setting_value("capi_path");
+	return get_setting_value("capi-path");
 }
 
 /**
  * Every module root to load rulesets from, capi first.
  *
- * `module_paths` is optional: capi alone is a valid (if driver-less) configuration, and
+ * `module-paths` is optional: capi alone is a valid (if driver-less) configuration, and
  * an empty or whitespace-only entry is dropped rather than turned into the current
  * directory, which is what `"a::b".split(path.delimiter)` would otherwise hand back.
  */
@@ -341,7 +382,7 @@ export function get_module_roots(): Result<string[]> {
 		return capi;
 	}
 
-	const configured = get_effective_setting_value("module_paths");
+	const configured = get_effective_setting_value("module-paths");
 	if (!configured.ok) {
 		return configured;
 	}

@@ -21,8 +21,8 @@ beforeEach(() => {
     // is never the user's own.
     const config = path.join(directory, "config.json");
     fs.writeFileSync(config, JSON.stringify({
-        capi_path: path.join(FIXTURES, "capi"),
-        module_paths: [path.join(FIXTURES, "platform"), path.join(FIXTURES, "driver-collection")].join(":"),
+        "capi-path": path.join(FIXTURES, "capi"),
+        "module-paths": [path.join(FIXTURES, "platform"), path.join(FIXTURES, "driver-collection")].join(":"),
         board: "otherboard",
     }));
     set_config_path_override(config);
@@ -35,6 +35,9 @@ beforeEach(() => {
         printed.push(parts.map(String).join(" "));
     });
     vi.spyOn(console, "log").mockImplementation((...parts: unknown[]) => {
+        printed.push(parts.map(String).join(" "));
+    });
+    vi.spyOn(console, "warn").mockImplementation((...parts: unknown[]) => {
         printed.push(parts.map(String).join(" "));
     });
 });
@@ -54,7 +57,7 @@ async function cli(...argv: string[]): Promise<string> {
     return printed.join("\n");
 }
 
-function configured(key: "board" | "platform" | "project_name"): string | undefined {
+function configured(key: "board" | "platform" | "project-name"): string | undefined {
     const value = get_effective_setting_value(key);
     return value.ok ? value.value : undefined;
 }
@@ -63,7 +66,7 @@ describe("config", () => {
     it("with no key lists every setting", async () => {
         const out = await cli("config");
         expect(out).toContain("* board");
-        expect(out).toContain("project_name");
+        expect(out).toContain("project-name");
         expect(out).toContain("* required:");
     });
 
@@ -75,16 +78,16 @@ describe("config", () => {
     });
 
     it("with a key and a value writes it", async () => {
-        const out = await cli("config", "project_name", "demo");
-        expect(out).toContain("Set 'project_name' to 'demo'");
-        expect(configured("project_name")).toBe("demo");
+        const out = await cli("config", "project-name", "demo");
+        expect(out).toContain("Set 'project-name' to 'demo'");
+        expect(configured("project-name")).toBe("demo");
     });
 
     it("with --reset clears it", async () => {
-        await cli("config", "project_name", "demo");
-        const out = await cli("config", "project_name", "--reset");
-        expect(out).toContain("Cleared 'project_name'");
-        expect(configured("project_name")).toBeUndefined();
+        await cli("config", "project-name", "demo");
+        const out = await cli("config", "project-name", "--reset");
+        expect(out).toContain("Cleared 'project-name'");
+        expect(configured("project-name")).toBeUndefined();
     });
 
     it("keeps board and platform agreeing on a write", async () => {
@@ -98,8 +101,8 @@ describe("config", () => {
     });
 
     it("refuses a value and --reset together, writing nothing", async () => {
-        expect(await cli("config", "project_name", "demo", "--reset")).toContain("not both");
-        expect(configured("project_name")).toBeUndefined();
+        expect(await cli("config", "project-name", "demo", "--reset")).toContain("not both");
+        expect(configured("project-name")).toBeUndefined();
     });
 
     it("refuses --reset or --local without a key", async () => {
@@ -110,4 +113,47 @@ describe("config", () => {
     it("refuses --local on a read, since nothing is written", async () => {
         expect(await cli("config", "board", "--local")).toContain("--local only applies when writing");
     });
+
+    it("tells an old key's new name instead of calling it unknown", async () => {
+        expect(await cli("config", "capi_path")).toContain("'capi_path' is now called 'capi-path'");
+        expect(await cli("config", "template", "capi")).toContain("'template' is now called 'project-template'");
+    });
+
+    it("succeeds on --reload, with nothing to rebuild, and refuses it with a key", async () => {
+        expect(await cli("config", "--reload")).toContain("Nothing to rebuild");
+        expect(await cli("config", "board", "--reload")).toContain("--reload takes no setting");
+    });
 });
+
+describe("old setting names in a config file", () => {
+    it("still work, with a note, and the next write renames them", async () => {
+        const config = path.join(directory, "old.json");
+        fs.writeFileSync(config, JSON.stringify({
+            capi_path: path.join(FIXTURES, "capi"),
+            module_paths: [path.join(FIXTURES, "platform"), path.join(FIXTURES, "driver-collection")].join(":"),
+            template: "capi",
+            board: "otherboard",
+        }));
+        set_config_path_override(config);
+        reset_registry();
+
+        // Read as the new names: the board's chip is found through the old capi_path.
+        const shown = await cli("config", "project-template");
+        expect(shown).toContain("uses old setting names (capi_path -> capi-path, module_paths -> module-paths, template -> project-template)");
+        expect(shown).toContain("capi");
+
+        await cli("config", "project-name", "demo");
+        const written = JSON.parse(fs.readFileSync(config, "utf8")) as Record<string, unknown>;
+        expect(Object.keys(written)).toEqual(expect.arrayContaining(["capi-path", "module-paths", "project-template", "project-name"]));
+        expect(Object.keys(written)).not.toEqual(expect.arrayContaining(["capi_path"]));
+        expect(written).not.toHaveProperty("template");
+    });
+
+    it("give way to the new name when a file has both", async () => {
+        const config = path.join(directory, "both.json");
+        fs.writeFileSync(config, JSON.stringify({ project_name: "old", "project-name": "new" }));
+        set_config_path_override(config);
+        expect(get_effective_setting_value("project-name")).toEqual({ ok: true, value: "new" });
+    });
+});
+

@@ -89,7 +89,7 @@ describe('resolver', () => {
             setup_no_config();
             const result = load_resolved_ruleset('test_spi_device');
             teardown_no_config();
-            expectErrorContains(result, '"capi_path" is not configured');
+            expectErrorContains(result, '"capi-path" is not configured');
         });
     });
 });

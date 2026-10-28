@@ -9,7 +9,7 @@
  *   cmake --build build           build (the ELF, .hex and .bin)
  *   cmake --build build --target flash
  *
- * The only thing the build needs from outside is CAPI_DIR, which is the `capi_path` setting,
+ * The only thing the build needs from outside is CAPI_DIR, which is the `capi-path` setting,
  * plus whatever the platform's own toolchain needs (MAXIM_SDK_PATH for maxim).
  */
 
@@ -199,7 +199,7 @@ export function run(command: string, arguments_: string[], cwd: string, environm
 	});
 }
 
-/** Run a shell string, for the `build_command`/`deploy_command` override. */
+/** Run a shell string, for the `build-command`/`deploy-command` override. */
 export function run_shell(command: string, cwd: string): Promise<CommandResult> {
 	return new Promise((resolve) => {
 		const child = spawn(command, [], { cwd, shell: true, stdio: "inherit" });

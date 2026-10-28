@@ -1,7 +1,7 @@
 import path from "node:path";
 import type { SettingsFile } from "./types";
 
-// Template set codegen renders with when `template` is unset. Declared before
+// Template set codegen renders with when `project-template` is unset. Declared before
 // SETTINGS_DEFAULTS so the defaults can name it; kept in this module (not in
 // codegen/template_sets.ts) so settings never imports codegen, which imports
 // settings back.
@@ -34,7 +34,7 @@ export const DEFAULT_WORKFILE_NAME = "workfile.json";
  * puts it in the first-run questionnaire.
  */
 export const SETTINGS_DEFAULTS: SettingsFile = {
-	capi_path: {
+	"capi-path": {
 		description: "Path to the root of the capi repository",
 		required: true,
 		type: "path",
@@ -45,7 +45,7 @@ export const SETTINGS_DEFAULTS: SettingsFile = {
 	// the repos holding those symbols are listed here. CAPI's own resolver cannot supply
 	// this: it runs at CMake configure time from a project that does not exist yet when
 	// AA is the thing generating it.
-	module_paths: {
+	"module-paths": {
 		description: "Module repositories to load rulesets from (platform backends, driver collections), separated like PATH",
 		required: false,
 		type: "path_list",
@@ -76,19 +76,19 @@ export const SETTINGS_DEFAULTS: SettingsFile = {
 		enum_of: "platform",
 		category: "target",
 	},
-	project_name: {
+	"project-name": {
 		description: "Name of the generated project (unset: the name of the workfile's directory)",
 		required: false,
 		type: "string",
 		category: "project",
 	},
-	project_path: {
-		description: "Directory of the generated project: 'generate' writes it, 'build' and 'deploy' act on it (unset: out/<project_name>)",
+	"project-path": {
+		description: "Directory of the generated project: 'generate' writes it, 'build' and 'deploy' act on it (unset: out/<project-name>)",
 		required: false,
 		type: "path",
 		category: "project",
 	},
-	template: {
+	"project-template": {
 		description: "Template set used by codegen: a folder name under codegen/templates, or a path to your own template folder",
 		required: false,
 		type: "string",
@@ -100,13 +100,13 @@ export const SETTINGS_DEFAULTS: SettingsFile = {
 	// (`cmake --preset <board>`), which needs a configure step rather than one command.
 	// So these are escape hatches: set one to take over the step entirely, leave it unset
 	// to let `attach-noos build`/`attach-noos deploy` drive CMake.
-	build_command: {
+	"build-command": {
 		description: "Override the 'build' step with this command, run at the base of the project (unset: drive CMake directly)",
 		required: false,
 		type: "string",
 		category: "build",
 	},
-	deploy_command: {
+	"deploy-command": {
 		description: "Override the 'deploy' step with this command, run at the base of the project (unset: build the CMake flash target)",
 		required: false,
 		type: "string",

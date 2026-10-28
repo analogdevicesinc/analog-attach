@@ -43,13 +43,13 @@ export interface SettingsFile {
 	 * Path to the capi checkout. Special among the module roots: it holds the interface
 	 * catalog and the generic ruleset tree every other module's rulesets reference.
 	 */
-	capi_path: Setting;
+	"capi-path": Setting;
 	/**
 	 * The other module roots to load rulesets from — platform backends, driver
 	 * collections, middleware. A `path_list`, so one setting covers however many repos
 	 * are checked out.
 	 */
-	module_paths: Setting;
+	"module-paths": Setting;
 	/** Which workfile the commands act on, now that attach-meta has no --workfile flag. */
 	workfile: Setting;
 	/** Board a new workfile is created for; also implies its platform. */
@@ -57,12 +57,12 @@ export interface SettingsFile {
 	/** Overrides the platform implied by `board`. */
 	platform: Setting;
 	/** Name of the generated project. */
-	project_name: Setting;
+	"project-name": Setting;
 	/** Directory of the generated project: `generate` writes it, `build`/`deploy` act on it. */
-	project_path: Setting;
-	template: Setting;
-	build_command: Setting;
-	deploy_command: Setting;
+	"project-path": Setting;
+	"project-template": Setting;
+	"build-command": Setting;
+	"deploy-command": Setting;
 	/** Debug probe `deploy` flashes through. */
 	probe: Setting;
 	/** Whether `add` fills in everything that leaves no room for choice (see bootstrap/). */
@@ -103,10 +103,10 @@ export function is_settings_file(value: unknown): value is SettingsFile {
 	// Keys a config file must already contain. Most settings are deliberately absent:
 	// every setting's metadata is taken from SETTINGS_DEFAULTS on read, so a config
 	// missing a key is still valid and a newly added setting cannot invalidate a file
-	// that predates it. `capi_path` is here because nothing can be loaded without it, so
+	// that predates it. `capi-path` is here because nothing can be loaded without it, so
 	// a config lacking it is a config from before the CAPI move rather than merely an
 	// incomplete one, and saying so beats failing later with an empty registry.
-	const required_keys: (keyof SettingsFile)[] = ["capi_path", "build_command", "deploy_command"];
+	const required_keys: (keyof SettingsFile)[] = ["capi-path", "build-command", "deploy-command"];
 
 	for (const key of required_keys) {
 		if (!(key in object) || !is_setting(object[key])) {

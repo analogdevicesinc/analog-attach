@@ -131,7 +131,7 @@ export const addCommand = buildCommand<AddFlags, [string | undefined]>({
             }
             // Served over IIO (template capi-iio): the driver's IIO device is the root,
             // and it inits the part itself, so the generic handle is not added at all.
-            const template_set = get_effective_setting_value("template");
+            const template_set = get_effective_setting_value("project-template");
             const iio = template_set.ok && template_set.value === IIO_TEMPLATE_SET;
             const [first_interface] = interfaces;
             const root = iio

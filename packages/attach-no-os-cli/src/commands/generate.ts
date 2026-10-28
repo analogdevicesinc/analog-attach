@@ -37,8 +37,8 @@ export const generateCommand = buildCommand<GenerateFlags, [], AttachContext>({
     docs: {
         brief: "Generate a CAPI project from the workfile",
         fullDescription:
-            "Renders the workfile into the project directory: the 'project_path' setting, or\n" +
-            "out/<project_name> when it is unset. --output overrides it for this run."
+            "Renders the workfile into the project directory: the 'project-path' setting, or\n" +
+            "out/<project-name> when it is unset. --output overrides it for this run."
     },
     parameters: {
         positional: { kind: "tuple", parameters: [] },
@@ -46,13 +46,13 @@ export const generateCommand = buildCommand<GenerateFlags, [], AttachContext>({
             json: { kind: "boolean", brief: "Output as JSON", optional: true },
             output: {
                 kind: "parsed",
-                brief: "Project directory to write (default: the 'project_path' setting, else out/<project_name>)",
+                brief: "Project directory to write (default: the 'project-path' setting, else out/<project-name>)",
                 optional: true,
                 parse: String
             },
             projectTemplate: {
                 kind: "parsed",
-                brief: "Template set to render with (default: the 'template' setting)",
+                brief: "Template set to render with (default: the 'project-template' setting)",
                 optional: true,
                 parse: String,
                 proposeCompletions(partial: string) {
@@ -77,9 +77,9 @@ export const generateCommand = buildCommand<GenerateFlags, [], AttachContext>({
             return;
         }
 
-        const capi_path = get_setting_value("capi_path");
+        const capi_path = get_setting_value("capi-path");
         if (!capi_path.ok) {
-            output_error(flags, "capi_path is not configured. Run: attach-noos config capi_path <path>");
+            output_error(flags, "capi-path is not configured. Run: attach-noos config capi-path <path>");
             return;
         }
 

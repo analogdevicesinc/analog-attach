@@ -68,7 +68,7 @@ describe("to_config", () => {
     it("leaves a required setting with no default reported as missing", () => {
         // init's missing_fields is `required && value === null`, so this is the only shape
         // that makes attach-meta prompt for a setting on first run.
-        const config = to_config("capi_path", SETTINGS_DEFAULTS.capi_path);
+        const config = to_config("capi-path", SETTINGS_DEFAULTS["capi-path"]);
 
         expect(config.required).toBe(true);
         // eslint-disable-next-line unicorn/no-null
@@ -116,9 +116,9 @@ describe("setting_options", () => {
         set_config_path_override(path.join(config_directory, "config.json"));
         set_settings({
             ...SETTINGS_DEFAULTS,
-            capi_path: { ...SETTINGS_DEFAULTS.capi_path, value: path.join(fixtures, "capi") },
-            module_paths: {
-                ...SETTINGS_DEFAULTS.module_paths,
+            "capi-path": { ...SETTINGS_DEFAULTS["capi-path"], value: path.join(fixtures, "capi") },
+            "module-paths": {
+                ...SETTINGS_DEFAULTS["module-paths"],
                 value: [path.join(fixtures, "platform"), path.join(fixtures, "driver-collection")].join(PATH_LIST_DELIMITER),
             },
         });

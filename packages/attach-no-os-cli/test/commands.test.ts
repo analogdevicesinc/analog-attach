@@ -21,8 +21,8 @@ beforeEach(() => {
     directory = fs.mkdtempSync(path.join(os.tmpdir(), "attach-noos-commands-"));
     const config = path.join(directory, "config.json");
     fs.writeFileSync(config, JSON.stringify({
-        capi_path: path.join(FIXTURES, "capi"),
-        module_paths: [path.join(FIXTURES, "platform"), path.join(FIXTURES, "driver-collection")].join(":"),
+        "capi-path": path.join(FIXTURES, "capi"),
+        "module-paths": [path.join(FIXTURES, "platform"), path.join(FIXTURES, "driver-collection")].join(":"),
         board: "otherboard",
     }));
     set_config_path_override(config);

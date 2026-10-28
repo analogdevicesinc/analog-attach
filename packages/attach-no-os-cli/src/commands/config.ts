@@ -1,5 +1,6 @@
 import { buildCommand } from "@stricli/core";
 import {
+    LEGACY_SETTING_NAMES,
     SETTINGS_DEFAULTS,
     SETTING_CATEGORIES,
     Setting,
@@ -23,7 +24,7 @@ import {
 import { common_ok, type Config, type ConfigType, type ToolConfigResponse } from "../protocol/responses";
 import { output, output_error } from "./shared";
 
-type ConfigFlags = { json?: boolean; local?: boolean; reset?: boolean };
+type ConfigFlags = { json?: boolean; local?: boolean; reset?: boolean; reload?: boolean };
 
 // --- config ---
 
@@ -35,6 +36,7 @@ export const configCommand = buildCommand<ConfigFlags, [string | undefined, stri
             "config <key>            shows one setting, and the values it can take\n" +
             "config <key> <value>    sets it\n" +
             "config <key> --reset    clears it\n" +
+            "config --reload         rebuilds what the ecosystem caches (nothing, for CAPI)\n" +
             "Values are read from the project-local config (.analog-attach.json, searched for\n" +
             "upward from the current directory) and then from the global config. A write goes to\n" +
             "the project-local config when there is one, or with --local; to the global one otherwise."
@@ -71,10 +73,23 @@ export const configCommand = buildCommand<ConfigFlags, [string | undefined, stri
                 brief: "When writing: write the project-local config, creating it here if there is none",
                 optional: true
             },
-            reset: { kind: "boolean", brief: "Clear <key> instead of writing a value", optional: true }
+            reset: { kind: "boolean", brief: "Clear <key> instead of writing a value", optional: true },
+            reload: { kind: "boolean", brief: "Rebuild what the ecosystem caches (the CAPI ecosystem caches nothing)", optional: true }
         }
     },
     func: async (flags: ConfigFlags, key?: string, value?: string) => {
+        // The same flag as the merged CLI's other ecosystems, which keep caches built from
+        // their sources. The CAPI one reads its sources fresh every run.
+        if (flags.reload) {
+            if (key !== undefined || flags.reset || flags.local) {
+                output_error(flags, "--reload takes no setting: attach-noos config --reload");
+                return;
+            }
+            const message = "Nothing to rebuild: the CAPI ecosystem keeps no caches, it reads its sources on every run";
+            output(flags, message, common_ok(message));
+            return;
+        }
+
         if (key === undefined) {
             if (flags.reset || flags.local) {
                 output_error(flags, "--reset and --local need a setting: attach-noos config <key> [<value>] [--reset] [--local]");
@@ -84,6 +99,11 @@ export const configCommand = buildCommand<ConfigFlags, [string | undefined, stri
             return;
         }
 
+        const renamed = LEGACY_SETTING_NAMES[key];
+        if (renamed !== undefined) {
+            output_error(flags, `'${key}' is now called '${renamed}': attach-noos config ${renamed}${value === undefined ? "" : " <value>"}`);
+            return;
+        }
         if (!(key in SETTINGS_DEFAULTS)) {
             output_error(flags, `Unknown setting: ${key}. Available: ${Object.keys(SETTINGS_DEFAULTS).join(", ")}`);
             return;
@@ -232,7 +252,7 @@ function empty_scan_reason(source: SettingEnumSource): string {
     }
     const what = source === "template" ? "template sets" : `${source}s`;
     return `no ${what} in the configured modules. Set capi_path and module_paths ` +
-        "(attach-noos config capi_path <dir>; attach-noos config module_paths <dirs>)";
+        "(attach-noos config capi-path <dir>; attach-noos config module-paths <dirs>)";
 }
 
 // --- Formatters ---
@@ -260,8 +280,10 @@ export function format_configs(settings: SettingsFile, selected: (keyof Settings
 
     // As wide as the longest value: paths are long, and a fixed width ran them into Source.
     const width = Math.max(22, ...selected.map(field => (settings[field].value ?? settings[field].default ?? "-").length)) + 2;
-    out += `    ${"Setting".padEnd(16)}${"Value".padEnd(width)}Source\n`;
-    out += `  ${"─".repeat(2 + 16 + width + 18)}\n`;
+    // As wide as the longest name too, with a gap: project-template fills sixteen columns.
+    const name_width = Math.max(16, ...selected.map(field => field.length + 2));
+    out += `    ${"Setting".padEnd(name_width)}${"Value".padEnd(width)}Source\n`;
+    out += `  ${"─".repeat(2 + name_width + width + 18)}\n`;
 
     // Grouped by the question each setting answers, in the order someone sets things up.
     // Within a group, the settings keep their declared order.
@@ -278,7 +300,7 @@ export function format_configs(settings: SettingsFile, selected: (keyof Settings
             const value = setting.value ?? setting.default ?? "-";
             const source = setting_source(setting);
             const mark = setting.required ? REQUIRED_MARK : " ";
-            out += `  ${mark} ${field.padEnd(16)}${value.padEnd(width)}${source}\n`;
+            out += `  ${mark} ${field.padEnd(name_width)}${value.padEnd(width)}${source}\n`;
         }
     }
 

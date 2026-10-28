@@ -32,8 +32,8 @@ export const deployCommand = buildCommand<DeployFlags, []>({
     docs: {
         brief: "Flash the generated CAPI project to the board",
         fullDescription:
-            "Flashes the project 'generate' writes: the 'project_path' setting, or\n" +
-            "out/<project_name> when it is unset."
+            "Flashes the project 'generate' writes: the 'project-path' setting, or\n" +
+            "out/<project-name> when it is unset."
     },
     parameters: {
         positional: { kind: "tuple", parameters: [] },
@@ -79,7 +79,7 @@ export const deployCommand = buildCommand<DeployFlags, []>({
         }
 
         // An explicit deploy_command takes the step over completely.
-        const override = get_effective_setting_value("deploy_command");
+        const override = get_effective_setting_value("deploy-command");
         if (!override.ok) {
             output_error(flags, override.error.message);
             return;
@@ -114,9 +114,9 @@ export const deployCommand = buildCommand<DeployFlags, []>({
             return;
         }
 
-        const capi_path = get_setting_value("capi_path");
+        const capi_path = get_setting_value("capi-path");
         if (!capi_path.ok) {
-            output_error(flags, "capi_path is not configured. Run: attach-noos config capi_path <path>");
+            output_error(flags, "capi-path is not configured. Run: attach-noos config capi-path <path>");
             return;
         }
 
