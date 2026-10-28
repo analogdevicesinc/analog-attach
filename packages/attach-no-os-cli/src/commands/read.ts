@@ -26,8 +26,8 @@ import {
     get_node_names,
     get_property_names
 } from "../completion/completion";
-import { include_target, to_protocol_node, to_protocol_property, to_protocol_root } from "../protocol/convert";
-import { read_failure } from "../protocol/responses";
+import { include_target, node_origin, to_protocol_node, to_protocol_property, to_protocol_root } from "../protocol/convert";
+import { read_failure, type ReadProperty } from "../protocol/responses";
 
 /**
  * `attach-noos read [node] [property]` — the tree, a node, or one property.
@@ -114,7 +114,7 @@ export function read_target(flags: ReadFlags, node?: string, property?: string):
         }
 
         const text = flags.quiet === true ? format_node_values(found.value) : format_node_summary(node, found.value);
-        output(flags, text, to_protocol_node(node, found.value));
+        output(flags, text, to_protocol_node(node, found.value, node_origin(context.value.workfile, node)));
         return;
     }
 
@@ -142,10 +142,15 @@ export function read_target(flags: ReadFlags, node?: string, property?: string):
     const shown = effective.ok ? effective.value : lookup.value.property;
 
     const details: PropertySuggestions = suggestions.ok ? suggestions.value : {};
+    // The same lists the text shows under Suggestions and Can create.
+    const response: ReadProperty = {
+        ...to_protocol_property(shown),
+        suggestions: { values: details.values ?? [], can_create: details.types ?? [] },
+    };
     output(
         flags,
         flags.quiet === true ? quiet_value(shown) : format_property_details(shown, details),
-        to_protocol_property(shown)
+        response
     );
 }
 

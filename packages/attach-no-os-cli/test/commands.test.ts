@@ -171,3 +171,43 @@ describe("completion", () => {
         expect(await cli("completion", "bash", "--install", "--uninstall")).toContain("not both");
     });
 });
+
+describe("JSON", () => {
+    it("marks each node as stored in the workfile, or a board or driver resource", async () => {
+        await sensor();
+        const root = JSON.parse(await cli("read", "--json")) as { origin: string, alias: string[], children: { key: string, origin: string, alias: string[] }[] };
+        expect(root.origin).toBe("internal");
+        expect(root.children.every(child => child.origin === "internal" && Array.isArray(child.alias) && child.alias.length === 0)).toBe(true);
+
+        const device = JSON.parse(await cli("read", "testpart_spi_dev", "--json")) as { origin: string };
+        expect(device.origin).toBe("internal");
+        const handle = stored()["testpart_spi_dev"]?.controller as string;
+        const external = JSON.parse(await cli("read", handle, "--json")) as { origin: string };
+        expect(external.origin).toBe("external");
+    });
+
+    it("gives a single property's suggestions, values and what can be created", async () => {
+        await sensor();
+        const mode = JSON.parse(await cli("read", "testpart_spi_dev", "mode", "--json")) as { suggestions: { values: string[], can_create: string[] } };
+        expect(mode.suggestions.values).toContain("TEST_SPI_MODE_0");
+        expect(Array.isArray(mode.suggestions.can_create)).toBe(true);
+        // update with no value reads, so it answers the same.
+        expect(JSON.parse(await cli("update", "testpart_spi_dev", "mode", "--json"))).toEqual(mode);
+    });
+
+    it("reports where the build artifact is, also when build-command does the build", async () => {
+        await sensor();
+        const project = path.join(directory, "project");
+        fs.mkdirSync(path.join(project, "build"), { recursive: true });
+        fs.writeFileSync(path.join(project, "CMakePresets.json"), JSON.stringify({ version: 6, configurePresets: [{ name: "otherboard" }] }));
+        fs.writeFileSync(path.join(project, "CMakeLists.txt"), "project(demo_app)\n");
+        fs.writeFileSync(path.join(project, "build", "demo_app.elf"), "");
+        await cli("config", "project-path", project);
+        await cli("config", "build-command", "true");
+
+        const built = JSON.parse(await cli("build", "--json")) as { ok: boolean, path?: string };
+        expect(built.ok).toBe(true);
+        expect(built.path).toBe(path.join(project, "build", "demo_app.elf"));
+    });
+});
+

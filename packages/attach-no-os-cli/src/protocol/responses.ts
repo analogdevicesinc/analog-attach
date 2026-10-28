@@ -68,9 +68,9 @@ export type PropertyType =
 export type PropertyValue = null | string | number | boolean | PropertyValue[];
 
 /**
- * `additionalProperties: false` — there is nowhere to put `description`, `required`,
- * `default`, or numeric bounds. That information reaches the user through `suggest`
- * and through the human (non-`--json`) rendering instead.
+ * A property's name, type and value. Its description, whether it is required, its default
+ * and its bounds are in the human (non-`--json`) rendering; what it can be set to comes
+ * with a single property read (ReadProperty) and from `list value`.
  */
 export interface Property {
     kind: "property";
@@ -79,14 +79,33 @@ export interface Property {
     value: PropertyValue;
 }
 
+/**
+ * Where a node comes from: stored in the workfile (`internal`), or a board or driver
+ * resource the workfile only names - a BSP config, the handle wrapping it, an ops table -
+ * which is never stored (`external`).
+ */
+export type NodeOrigin = "internal" | "external";
+
 /** Reading a node always returns its full subtree. */
 export interface Node {
     kind: "node";
     key: string;
     properties: Property[];
     children: Node[];
-    /** Not produced yet. */
-    alias?: string[];
+    origin: NodeOrigin;
+    /** Other names for the node. None yet: always empty. */
+    alias: string[];
+}
+
+/** What a property can be set to: existing values, and the kinds of node that could be created. */
+export interface PropertySuggestionLists {
+    values: string[];
+    can_create: string[];
+}
+
+/** One property read on its own: the property, and what it can be set to. */
+export interface ReadProperty extends Property {
+    suggestions: PropertySuggestionLists;
 }
 
 // --- Config ---
@@ -184,6 +203,11 @@ export interface Suggestion {
 
 export interface SuggestResponse extends CommonResponse {
     suggestions: Suggestion[];
+}
+
+/** A build: where the artifact it produced is, when there is one. */
+export interface BuildResponse extends CommonResponse {
+    path?: string;
 }
 
 // --- Constructors ---

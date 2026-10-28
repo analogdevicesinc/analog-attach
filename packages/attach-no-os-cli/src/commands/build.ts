@@ -10,7 +10,7 @@ import {
     run_shell,
 } from "../build/cmake_build";
 import { filter_completions, get_board_names } from "../completion/completion";
-import { common_ok } from "../protocol/responses";
+import { common_ok, type BuildResponse } from "../protocol/responses";
 import { get_project_path, output, output_error } from "./shared";
 
 type BuildFlags = {
@@ -88,8 +88,15 @@ export const buildCommandDefinition = buildCommand<BuildFlags, []>({
                 return;
             }
 
+            // The command is the user's, but a generated project still puts its ELF where the
+            // plan says: report it when it is there.
+            const capi = get_effective_setting_value("capi-path");
+            const planned = capi.ok && capi.value !== undefined ? plan_build(target_path, capi.value, flags.board) : undefined;
+            const artifact = planned?.ok === true && fs.existsSync(planned.value.elf_path) ? planned.value.elf_path : undefined;
+
             const message = `Built ${target_path} with '${override.value}'`;
-            output(flags, "Build completed successfully", common_ok(message));
+            const response: BuildResponse = { ...common_ok(message), ...(artifact === undefined ? {} : { path: artifact }) };
+            output(flags, artifact === undefined ? "Build completed successfully" : `Build completed successfully\n\n  ${artifact}`, response);
             return;
         }
 
@@ -143,6 +150,10 @@ export const buildCommandDefinition = buildCommand<BuildFlags, []>({
             ? `Built ${plan.value.target} for ${plan.value.board}: ${plan.value.elf_path}`
             : `Built ${plan.value.target} for ${plan.value.board}, but no ELF was found at ${plan.value.elf_path}`;
 
-        output(flags, text, common_ok(message, elf_exists ? "info" : "warn"));
+        const response: BuildResponse = {
+            ...common_ok(message, elf_exists ? "info" : "warn"),
+            ...(elf_exists ? { path: plan.value.elf_path } : {}),
+        };
+        output(flags, text, response);
     }
 });

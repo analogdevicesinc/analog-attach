@@ -33,6 +33,7 @@ import {
 } from "attach-no-os-lib";
 import type {
     Node as ProtocolNode,
+    NodeOrigin,
     Property as ProtocolProperty,
     PropertyType,
     PropertyValue,
@@ -317,7 +318,7 @@ function descriptive_property(key: string, value: string | undefined): ProtocolP
  * defines — so what it exposes instead is the symbol and the type it satisfies. Read-only,
  * like `$compatible`.
  */
-export function to_protocol_node(name: string, ruleset: Ruleset): ProtocolNode {
+export function to_protocol_node(name: string, ruleset: Ruleset, origin: NodeOrigin): ProtocolNode {
     const properties: ProtocolProperty[] = [descriptive_property(COMPATIBLE_KEY, ruleset.$symbol)];
 
     if (ruleset._t === "RulesetExtern") {
@@ -329,7 +330,12 @@ export function to_protocol_node(name: string, ruleset: Ruleset): ProtocolNode {
         properties.push(...ruleset.properties.map(property => to_protocol_property(property)));
     }
 
-    return { kind: "node", key: name, properties, children: [] };
+    return { kind: "node", key: name, properties, children: [], origin, alias: [] };
+}
+
+/** Whether a node is stored in the workfile, or a board or driver resource it only names. */
+export function node_origin(workfile: Workfile, name: string): NodeOrigin {
+    return workfile.hidden?.includes(name) === true ? "external" : "internal";
 }
 
 /**
@@ -352,7 +358,10 @@ export function to_protocol_root(
             descriptive_property(BOARD_KEY, minimal.board),
         ],
         children: Object.keys(minimal.symbols).map(name =>
-            to_protocol_node(name, workfile.symbols[name]),
+            to_protocol_node(name, workfile.symbols[name], node_origin(workfile, name)),
         ),
+        // The workfile itself: what everything else hangs from.
+        origin: "internal",
+        alias: [],
     };
 }
