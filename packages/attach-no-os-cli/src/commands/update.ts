@@ -25,20 +25,17 @@ import { common_ok } from "../protocol/responses";
 
 type UpdateFlags = {
     json?: boolean;
-    with?: string;
 };
 
 /**
- * `attach-noos update <node> <property> --with <value>` — set one property.
+ * `attach-noos update <node> <property> <value>` — set one property.
  *
- * The protocol's `update` is an upsert: an unknown property is inserted. Ours cannot be.
- * A node's properties come from its schema, which is the C struct it generates — a property
- * that is not in the schema is a field that does not exist — so an unknown name is refused
- * with the list of names that do exist.
+ * Not an upsert: a node's properties come from its schema, which is the C struct it
+ * generates — a property that is not in the schema is a field that does not exist — so an
+ * unknown name is refused with the list of names that do exist.
  *
- * `--with` is a raw string by protocol, and none of the type information survives the trip,
- * so parsing it back into a number, an enum member or a union is entirely our job (see
- * parse_property_value).
+ * The value arrives as text, so parsing it into a number, an enum member or a union is
+ * this command's job (see parse_property_value).
  */
 export const updateCommand = buildCommand<
     UpdateFlags,
@@ -48,7 +45,7 @@ export const updateCommand = buildCommand<
     docs: {
         brief: "Set a property on a node",
         fullDescription:
-            "Sets <property> on <node>. The value can be given with --with or as a positional.\n" +
+            "Sets <property> on <node> to <value>.\n" +
             `A union takes '<member>${ELEMENT_SEPARATOR}<value>' (or two positionals), an array a comma-separated list.\n` +
             `A property whose name starts with '${RESERVED_PREFIX}' can be written without it: init_param means ${RESERVED_PREFIX}init_param.`
     },
@@ -86,24 +83,14 @@ export const updateCommand = buildCommand<
             ]
         },
         flags: {
-            json: { kind: "boolean", brief: "Output as JSON", optional: true },
-            with: {
-                kind: "parsed",
-                brief: "Value to set, as one string",
-                optional: true,
-                parse: String,
-                proposeCompletions(partial: string) {
-                    const [node, property] = prior_positionals(this, 1);
-                    return filter_completions(get_value_suggestions(node, property), partial);
-                }
-            }
+            json: { kind: "boolean", brief: "Output as JSON", optional: true }
         }
     },
     func: async (flags: UpdateFlags, node, property, value, union_value) => {
         if (!node || !property) {
             output_error(
                 flags,
-                "Nothing to update: pass <node> <property> --with <value>. " +
+                "Nothing to update: pass <node> <property> <value>. " +
                 "Use 'attach-noos read' to see the nodes and 'attach-noos read <node>' to see their properties."
             );
             return;
@@ -130,7 +117,7 @@ export const updateCommand = buildCommand<
         // `$init_param`. Everything below uses this, not `property`.
         const resolved = resolve_property_name(owner.value, property);
 
-        // The upsert half of the protocol's update: refused, with the names that would work.
+        // Not an upsert: an unknown property is refused, with the names that would work.
         if (!owner.value.properties.some(candidate => candidate.name === resolved)) {
             output_error(
                 flags,
@@ -147,18 +134,16 @@ export const updateCommand = buildCommand<
             return;
         }
 
-        // `--with` wins; the positional form is the human shorthand. Two positionals for a
-        // union ('<member> <value>') fold into the one string the parser expects.
-        const raw = flags.with ?? (
-            value !== undefined && union_value !== undefined
-                ? `${value}${ELEMENT_SEPARATOR}${union_value}`
-                : value
-        );
+        // Two positionals for a union ('<member> <value>') fold into the one string the
+        // parser expects.
+        const raw = value !== undefined && union_value !== undefined
+            ? `${value}${ELEMENT_SEPARATOR}${union_value}`
+            : value;
 
         if (raw === undefined) {
             output_error(
                 flags,
-                `No value given for '${node}.${property}'. Pass --with <value>; ` +
+                `No value given for '${node}.${property}'. Pass it after the property; ` +
                 `'attach-noos read ${node} ${property}' lists what it accepts.`
             );
             return;

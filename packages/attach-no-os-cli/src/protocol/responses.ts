@@ -85,7 +85,7 @@ export interface Node {
     key: string;
     properties: Property[];
     children: Node[];
-    /** Omitted: we do not declare `alias` in the manifest. */
+    /** Not produced yet. */
     alias?: string[];
 }
 
@@ -170,28 +170,11 @@ export interface ValidationError {
 
 /**
  * No `ok` field, and `additionalProperties: false` — an empty `errors` array *is* the
- * success signal. We always validate the whole workfile; attach-meta filters by path.
+ * success signal. The whole workfile is always validated; a caller filters by path.
  */
 export interface ValidationResponse {
     errors: ValidationError[];
     warnings: ValidationError[];
-}
-
-export interface IntelligenceArgument {
-    name: string;
-    description: string;
-    required: boolean;
-    /** A suggest kind, so completion can recurse into this argument. */
-    kind?: string;
-}
-
-export interface Intelligence {
-    kind: string;
-    args: IntelligenceArgument[];
-}
-
-export interface ListIntelligenceResponse extends CommonResponse {
-    intelligence: Intelligence[];
 }
 
 export interface Suggestion {

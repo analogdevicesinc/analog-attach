@@ -1,6 +1,5 @@
 import { buildApplication, buildRouteMap } from "@stricli/core";
 import { addCommand } from "./commands/add";
-import { attachManifestCommand } from "./commands/attach_manifest";
 import { buildCommandDefinition } from "./commands/build";
 import { completionCommand } from "./commands/completion";
 import { configCommand } from "./commands/config";
@@ -8,29 +7,20 @@ import { initCommand } from "./commands/init";
 import { deleteCommand } from "./commands/delete";
 import { deployCommand } from "./commands/deploy";
 import { generateCommand } from "./commands/generate";
-import { listIntelligenceCommand, suggestCommand } from "./commands/intelligence";
 import { listBoardsCommand, listPlatformsCommand } from "./commands/list";
 import { listDevicesCommand } from "./commands/list_devices";
-import { moveCommand } from "./commands/move";
 import { readCommand } from "./commands/read";
 import { renameCommand } from "./commands/rename";
 import { updateCommand } from "./commands/update";
 import { validateCommand } from "./commands/validate";
-import { TOOL_DESCRIPTION, TOOL_VERSION } from "./protocol/manifest";
+import { TOOL_DESCRIPTION, TOOL_VERSION } from "./tool";
 
 /**
- * One route per protocol command, spelled exactly as the protocol spells it.
- *
- * There is no separate machine interface: attach-meta invokes these same routes with
- * `--json` appended (that is all its manifest entry adds), so a person and attach-meta walk
- * the same commands and see the same behaviour in two renderings.
- *
- * `list-boards`, `list-platforms` and `completion` are ours alone — attach-meta has no
- * command that means either — and `attach-manifest` is the one fixed name it requires.
+ * Every command, by the name a person types. Each one prints text by default and JSON with
+ * `--json`, from the same code path.
  */
 const routes = buildRouteMap({
 	routes: {
-		"attach-manifest": attachManifestCommand,
 		config: configCommand,
 		init: initCommand,
 		"list-devices": listDevicesCommand,
@@ -39,13 +29,10 @@ const routes = buildRouteMap({
 		update: updateCommand,
 		delete: deleteCommand,
 		rename: renameCommand,
-		move: moveCommand,
 		validate: validateCommand,
 		generate: generateCommand,
 		build: buildCommandDefinition,
 		deploy: deployCommand,
-		"list-intelligence": listIntelligenceCommand,
-		suggest: suggestCommand,
 		"list-boards": listBoardsCommand,
 		"list-platforms": listPlatformsCommand,
 		completion: completionCommand,

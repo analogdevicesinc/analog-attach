@@ -8,26 +8,30 @@ import { load_context, output, output_error } from "./shared";
  *
  * "Device" is attach-meta's word for "the thing you add". Ours is an eval board, a driver,
  * or a schema, grouped by the module that ships it. `tag` is what carries that distinction,
- * since `key` has to be the exact string `add --key` takes.
+ * since `key` has to be the exact string `add` takes.
  *
  * The list depends on the workfile: which platform's schemas are available follows from
  * the platform the workfile was created for.
  */
-export const listDevicesCommand = buildCommand<{ json?: boolean; filter?: string }, []>({
+export const listDevicesCommand = buildCommand<{ json?: boolean }, [string | undefined]>({
     docs: {
         brief: "List the schemas a node can be created from",
         fullDescription:
             "Lists every schema available to the current workfile, grouped by kind.\n" +
-            "The key of each entry is what 'attach-noos add --key <key>' takes."
+            "The key of each entry is what 'attach-noos add <key>' takes. A filter keeps the keys that contain it."
     },
     parameters: {
-        positional: { kind: "tuple", parameters: [] },
+        positional: {
+            kind: "tuple",
+            parameters: [
+                { placeholder: "filter", brief: "Only list schemas whose key contains this", optional: true, parse: String }
+            ]
+        },
         flags: {
-            filter: { kind: "parsed", brief: "Only list schemas whose key contains this", optional: true, parse: String },
             json: { kind: "boolean", brief: "Output as JSON", optional: true }
         }
     },
-    func: async (flags) => {
+    func: async (flags, filter) => {
         const context = load_context();
         if (!context.ok) {
             output_error(flags, context.error.message);
@@ -53,7 +57,7 @@ export const listDevicesCommand = buildCommand<{ json?: boolean; filter?: string
         const devices: Device[] = [];
         for (const [tag, keys] of groups) {
             for (const key of keys) {
-                if (flags.filter === undefined || key.includes(flags.filter)) {
+                if (filter === undefined || key.includes(filter)) {
                     devices.push({ tag, key });
                 }
             }
@@ -91,6 +95,6 @@ function format_devices(devices: Device[], platform?: string): string {
         out += "\n";
     }
 
-    out += "Use: attach-noos add --key <key> --name <node name>";
+    out += "Use: attach-noos add <key> [--name <node name>]";
     return out;
 }

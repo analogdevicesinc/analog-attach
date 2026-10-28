@@ -6,11 +6,10 @@ import { common_ok } from "../protocol/responses";
 import { output, output_error } from "./shared";
 
 /**
- * `attach-noos completion install|uninstall` — ours alone, not a protocol command.
+ * `attach-noos completion install|uninstall` — tab-completion in the user's own shell.
  *
- * attach-meta drives completion through `list-intelligence`/`suggest` and never calls this;
- * it exists so a person can get tab-completion in their own shell. It still speaks the same
- * response shape as everything else, so `--json` means one thing across the whole CLI.
+ * It speaks the same response shape as everything else, so `--json` means one thing across
+ * the whole CLI.
  */
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));

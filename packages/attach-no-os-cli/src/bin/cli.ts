@@ -13,10 +13,8 @@ const raw_arguments = process.argv.slice(2);
 // `attach-noos complete <route> <partial> [prior tokens...]`, used by
 // completion/attach-noos.bash.
 //
-// attach-meta does not come through here: it drives completion through `list-intelligence`
-// and `suggest` instead (see src/commands/intelligence.ts). This entry point exists for the
-// shell, where stricli's own per-parameter hooks give better answers than a suggestion kind
-// can — they know about flags too.
+// This entry point exists for the shell: stricli's own per-parameter hooks know the
+// commands, their positionals and their flags.
 if (raw_arguments[0] === "complete") {
     const [, key, partial, ...tokens] = raw_arguments;
 
