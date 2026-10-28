@@ -137,19 +137,6 @@ export interface ValidationResponse {
     warnings: ValidationError[];
 }
 
-export interface IntelligenceArgument {
-    name: string;
-    description: string;
-    required: boolean;
-    kind?: string;
-}
-
-export interface Intelligence {
-    kind: string;
-    description: string;
-    args: IntelligenceArgument[];
-}
-
 export interface ListOverlayResponse extends CommonResponse {
     /** Compatible ones first, then unknown, then incompatible; within each, overlays with the compatible itself before those with another of its binding (`matched`). */
     overlays: OverlayDescription[];
@@ -189,10 +176,6 @@ export interface OverlayDescription {
     reason: string;
     /** Only when the overlay doesn't add the asked compatible itself: the other compatible of the same binding it adds. */
     matched?: string;
-}
-
-export interface ListIntelligenceResponse extends CommonResponse {
-    intelligence: Intelligence[];
 }
 
 export interface Suggestion {

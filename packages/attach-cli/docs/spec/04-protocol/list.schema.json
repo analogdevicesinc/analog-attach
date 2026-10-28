@@ -5,9 +5,6 @@
   "description": "Standard output of list and __list in JSON mode. Which shape a kind gives is in 03-commands/list.md and __list.md; any kind can also refuse.",
   "anyOf": [
     {
-      "$ref": "#/$defs/kinds"
-    },
-    {
       "$ref": "#/$defs/names-response"
     },
     {
@@ -27,80 +24,6 @@
     }
   ],
   "$defs": {
-    "kinds": {
-      "description": "list without a kind (LIST-001).",
-      "type": "object",
-      "required": [
-        "ok",
-        "message",
-        "severity",
-        "intelligence"
-      ],
-      "properties": {
-        "ok": {
-          "const": true
-        },
-        "message": {
-          "type": "string"
-        },
-        "severity": {
-          "const": "info"
-        },
-        "intelligence": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "required": [
-              "kind",
-              "description",
-              "args"
-            ],
-            "properties": {
-              "kind": {
-                "enum": [
-                  "devices",
-                  "property",
-                  "value",
-                  "parent",
-                  "overlay"
-                ]
-              },
-              "description": {
-                "type": "string"
-              },
-              "args": {
-                "type": "array",
-                "items": {
-                  "type": "object",
-                  "required": [
-                    "name",
-                    "description",
-                    "required"
-                  ],
-                  "properties": {
-                    "name": {
-                      "type": "string"
-                    },
-                    "description": {
-                      "type": "string"
-                    },
-                    "required": {
-                      "type": "boolean"
-                    },
-                    "kind": {
-                      "type": "string"
-                    }
-                  },
-                  "additionalProperties": false
-                }
-              }
-            },
-            "additionalProperties": false
-          }
-        }
-      },
-      "additionalProperties": false
-    },
     "names-response": {
       "description": "list devices without an exact match (LIST-011).",
       "type": "object",

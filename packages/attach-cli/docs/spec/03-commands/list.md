@@ -7,7 +7,6 @@ the Linux tree's overlays that have a device. Nothing is written.
 ## 1. Synopsis
 
 ```
-attach-linux [--json] list
 attach-linux [--json] list devices [<filter>]
 attach-linux [--json] list property <path> [<property>]
 attach-linux [--json] list value <path> <property>
@@ -43,25 +42,9 @@ GRM-020 to GRM-024 (LIST-004).
 
 ## 3. All kinds
 
-**LIST-001** When no kind is given, the CLI shall list the five kinds without
-loading the workspace. In human mode it shall write, for each kind, a line
-`<kind> <args>` and a line with four spaces and its summary:
-
-| Kind | Args | Summary |
-|---|---|---|
-| `devices` | `[compatible]` | `Device bindings by compatible string` |
-| `property` | `<path> [property]` | `Properties of a node from its binding` |
-| `value` | `<path> <property>` | `Concrete values for a property` |
-| `parent` | `<compatible>` | `Valid parent buses for a device` |
-| `overlay` | `<compatible>` | `Overlays in the Linux tree with a device, and whether they fit the board` |
-
-The Args column is literal: `<path>`, `<property>` and `<compatible>` are
-printed as is.
-
-In JSON mode it shall respond `{"ok": true, "message": "5 list kinds
-available", "severity": "info", "intelligence": [...]}` with one entry per
-kind, `{ kind, description: <summary>, args: [{ name: "args", description:
-<args>, required: false }] }` (`04-protocol/list.schema.json#/$defs/kinds`).
+**LIST-001** *Withdrawn.* (A `list` without a kind listed the kinds. The kind
+is now required: a bare `list` is commander's `error: missing required
+argument 'kind'` (GRM-004), and `list --help` describes the kinds, LIST-008.)
 
 **LIST-002** If the kind is none of the five, then the CLI shall refuse with
 `Unknown list kind: <kind>. Valid kinds: devices, property, value, parent,
@@ -104,6 +87,9 @@ and report problems with them per COM-071 and COM-072:
 report `Missing config field overlay` (02-common.md §8.3).
 
 **LIST-007** The CLI shall not write the overlay or the config.
+
+**LIST-008** `list --help` shall describe each kind under `Kinds:`, with its
+arguments and summary, and has no JSON form (C-2 in `02-common.md`).
 
 ## 4. `list devices`
 

@@ -1,7 +1,6 @@
 import { Command } from "commander";
 import type { LocalContext } from "../../context";
-import { respond, respond_fail, input_error } from "../../protocol/output";
-import type { ListIntelligenceResponse } from "../../protocol/types";
+import { respond_fail } from "../../protocol/output";
 import { list_device } from "./device";
 import { list_property } from "./property";
 import { list_value } from "./value";
@@ -9,17 +8,17 @@ import { list_parent } from "./placement";
 import { list_overlay } from "./overlay";
 
 export const LIST_KINDS = [
-    { kind: "devices", summary: "Device bindings by compatible string", args: "[compatible]" },
-    { kind: "property", summary: "Properties of a node from its binding", args: "<path> [property]" },
-    { kind: "value", summary: "Concrete values for a property", args: "<path> <property>" },
-    { kind: "parent", summary: "Valid parent buses for a device", args: "<compatible>" },
-    { kind: "overlay", summary: "Overlays in the Linux tree with a device, and whether they fit the board", args: "<compatible>" },
+    { kind: "devices", summary: "Device bindings by compatible string" },
+    { kind: "property", summary: "Properties of a node from its binding" },
+    { kind: "value", summary: "Concrete values for a property" },
+    { kind: "parent", summary: "Valid parent buses for a device" },
+    { kind: "overlay", summary: "Overlays in the Linux tree with a device, and whether they fit the board" },
 ] as const;
 
 export function build_list_command(context: LocalContext): Command {
     const list = new Command("list")
         .description("List devices, properties, suggested values, possible parents, overlays")
-        .argument("[kind]", "What to list: devices, property, value, parent, overlay")
+        .argument("<kind>", "What to list: devices, property, value, parent, overlay")
         .argument("[args...]", "Kind-specific arguments")
         .addHelpText("after", `
 Kinds:
@@ -43,29 +42,7 @@ Examples:
   $ attach-linux list value spi0/adi,ad7124-8@0 reg    Values for a property
   $ attach-linux list parent adi,ad7124-8              Valid parents
   $ attach-linux list overlay adi,ad7124-8             Overlays to import`)
-        .action(async (kind: string | undefined, arguments_: string[]) => {
-            if (kind === undefined) {
-                const response: ListIntelligenceResponse = {
-                    ok: true,
-                    message: `${LIST_KINDS.length} list kinds available`,
-                    severity: "info",
-                    intelligence: LIST_KINDS.map(k => ({
-                        kind: k.kind,
-                        description: k.summary,
-                        args: [{ name: "args", description: k.args, required: false }],
-                    })),
-                };
-                if (context.json) {
-                    respond(response);
-                } else {
-                    for (const k of LIST_KINDS) {
-                        console.log(`${k.kind} ${k.args}`);
-                        console.log(`    ${k.summary}`);
-                    }
-                }
-                return;
-            }
-
+        .action(async (kind: string, arguments_: string[]) => {
             switch (kind) {
                 case "devices": {
                     await list_device(context, arguments_);

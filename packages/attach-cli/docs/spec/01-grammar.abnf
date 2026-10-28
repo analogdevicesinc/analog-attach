@@ -69,7 +69,7 @@ rename          = %s"rename" B node-path B node-name
 enable          = %s"enable" [ B node-path ]
 disable         = %s"disable" [ B node-path ]
 
-list            = %s"list" [ B list-kind *( B list-argument ) ]
+list            = %s"list" B list-kind *( B list-argument )
 list-kind       = known-kind / element  ; any other element is a refusal,
                                         ; not an input error (list.md LIST-002)
 known-kind      = %s"devices" / %s"property" / %s"value" / %s"parent" / %s"overlay"

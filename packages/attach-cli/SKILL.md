@@ -133,7 +133,7 @@ attach-linux config-get
 
 **Syntax**:
 ```bash
-attach-linux list                           # show available kinds
+attach-linux list --help                    # show available kinds
 attach-linux list devices [<filter>]        # compatible strings (substring filter)
 attach-linux list property <path> [<prop>]  # properties of a node; with prop: type details
 attach-linux list value <path> <prop>       # concrete values for a property
