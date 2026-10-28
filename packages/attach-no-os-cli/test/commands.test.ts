@@ -211,3 +211,33 @@ describe("JSON", () => {
     });
 });
 
+describe("exit codes", () => {
+    // stricli sets the code on the process it is given; each case starts from none.
+    afterEach(() => {
+        process.exitCode = undefined;
+    });
+
+    it("are 0 when the command ran, with or without --json, whatever it found", async () => {
+        await sensor();
+        await cli("delete", "testpart_spi_dev", "max_speed_hz");
+        for (const argv of [
+            ["validate"], ["validate", "--json"],
+            ["read", "no_such_node"], ["read", "no_such_node", "--json"],
+            ["update", "testpart_spi_dev", "nonsense", "1"],
+            ["add", "no_such_schema"],
+        ]) {
+            process.exitCode = undefined;
+            await cli(...argv);
+            expect(process.exitCode ?? 0, argv.join(" ")).toBe(0);
+        }
+    });
+
+    it("are not 0 when the CLI cannot run the command at all", async () => {
+        await cli("no_such_command");
+        expect(process.exitCode).not.toBe(0);
+        process.exitCode = undefined;
+        await cli("read", "--no-such-flag");
+        expect(process.exitCode).not.toBe(0);
+    });
+});
+

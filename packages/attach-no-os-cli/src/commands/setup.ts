@@ -43,9 +43,10 @@ export async function run_setup(): Promise<number> {
     console.log(styleText("dim", `Settings are saved to ${sources.local ?? sources.global}\n`));
 
     try {
+        // Its failure is already printed; the setup ran, so it still exits 0.
         const capi = await ensure_capi_path();
         if (capi === undefined) {
-            return 1;
+            return 0;
         }
         await ensure_module_paths(capi);
         const board = await ensure_board();

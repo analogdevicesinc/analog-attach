@@ -43,12 +43,8 @@ export const validateCommand = buildCommand<{ json?: boolean }, [], AttachContex
             warnings: warnings.map(finding => to_protocol_error(finding))
         };
 
-        // A workfile with errors is a valid answer to "is it valid", not a failed run, so
-        // this reports through `output` — but a human still wants a non-zero status.
-        if (!flags.json && errors.length > 0) {
-            process.exitCode = 1;
-        }
-
+        // A workfile with errors is a valid answer to "is it valid", not a failed run: exit 0,
+        // with the errors in what is printed.
         output(
             flags,
             format_validation(

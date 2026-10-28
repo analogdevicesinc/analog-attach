@@ -17,10 +17,9 @@
 export type Severity = "info" | "warn" | "error";
 
 /**
- * Composed into every response except ReadResponse and ValidationResponse. `ok` is the
- * only semantic gate: attach-meta exits 1 when it is false, but the process itself must
- * still exit 0 (a non-zero exit is a *transport* error, which is a different, louder
- * failure mode owned by attach-meta).
+ * Composed into every response except ReadResponse and ValidationResponse. `ok` is what
+ * says whether the command did what was asked: the process exits 0 either way, since it
+ * ran (a non-zero exit means the CLI itself could not run the command).
  */
 export interface CommonResponse {
     ok: boolean;
@@ -221,13 +220,9 @@ export function common_error(message: string): CommonResponse {
 }
 
 /**
- * What we send when a `read` fails.
- *
- * ReadResponse is `oneOf [Node, Property]`, both closed, so a failed read has no
- * schema-legal shape. attach-meta does not validate responses against the schema; it
- * looks for `ok` to decide its own exit code. So a CommonResponse here degrades
- * gracefully (the user gets the message and a non-zero attach-meta exit) instead of
- * looking like an empty node.
+ * What we send when a `read` fails: a node or a property has no way to say "not found", so
+ * a failed read is a CommonResponse with `ok: false` instead of something that would look
+ * like an empty node.
  */
 export function read_failure(message: string): CommonResponse {
     return common_error(message);

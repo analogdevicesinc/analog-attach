@@ -166,10 +166,10 @@ export function output(flags: OutputFlags, text: string, json: unknown): void {
 /**
  * Report a failed operation.
  *
- * The exit code is deliberately asymmetric. A shell needs a non-zero status to know the
- * command failed, but attach-meta treats a non-zero exit as a *transport* error — the
- * subtool is broken — and never looks at the JSON it printed. So under `--json` a failure
- * is a successful run that reports `ok: false`, and the exit code stays 0.
+ * The exit code stays 0, with or without --json: the command ran, and what went wrong is in
+ * what it printed (`ok: false` under --json). A non-zero exit means the CLI itself could
+ * not run the command: a usage error stricli reports, or a crash. This is the convention
+ * every ecosystem of the merged CLI follows.
  *
  * `response` overrides the body for the two responses that have no `ok` field of their own
  * (see `read_failure` and `validation_failure`); `text` replaces what a human is shown when
@@ -181,11 +181,6 @@ export type ErrorOutput = {
 };
 
 export function output_error(flags: OutputFlags, message: string, options: ErrorOutput = {}): void {
-    if (!flags.json) {
-        // stricli's run() does `exitCode ??= ...`, so setting it here survives.
-        process.exitCode = 1;
-    }
-
     output(flags, options.text ?? message, options.response ?? common_error(message));
 }
 
