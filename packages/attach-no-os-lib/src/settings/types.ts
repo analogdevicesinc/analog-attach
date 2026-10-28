@@ -67,6 +67,8 @@ export interface SettingsFile {
 	probe: Setting;
 	/** Whether `add` fills in everything that leaves no room for choice (see bootstrap/). */
 	bootstrap: Setting;
+	/** Whether `add`, on a terminal, asks for what bootstrap leaves to the user. */
+	interview: Setting;
 	/** Whether main.c runs the parts' examples or the user's app_main() (see codegen). */
 	example: Setting;
 };

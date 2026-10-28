@@ -356,7 +356,12 @@ export function example_enabled(): boolean {
 	return setting_on("example");
 }
 
-function setting_on(key: "bootstrap" | "example"): boolean {
+/** Whether `add` asks, on a terminal, for what bootstrap leaves to the user. On unless explicitly off. */
+export function interview_enabled(): boolean {
+	return setting_on("interview");
+}
+
+function setting_on(key: "bootstrap" | "example" | "interview"): boolean {
 	const configured = get_effective_setting_value(key);
 	if (!configured.ok || configured.value === undefined) {
 		return true;

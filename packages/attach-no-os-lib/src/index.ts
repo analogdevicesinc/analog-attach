@@ -52,6 +52,7 @@ export {
     get_module_roots,
     bootstrap_enabled,
     example_enabled,
+    interview_enabled,
     get_settings_file_path,
     get_settings_sources,
     LEGACY_SETTING_NAMES,

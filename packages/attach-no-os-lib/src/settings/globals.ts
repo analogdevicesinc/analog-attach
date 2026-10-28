@@ -131,6 +131,16 @@ export const SETTINGS_DEFAULTS: SettingsFile = {
 		options: ["true", "false"],
 		category: "workfile",
 	},
+	// The counterpart of bootstrap, for what it cannot decide: on a terminal, `add` asks for
+	// the choices and the values left to the user. Never in --json or a pipe.
+	interview: {
+		description: "After 'add', on a terminal, ask for the choices and values bootstrap leaves to you (true/false)",
+		required: false,
+		type: "bool",
+		default: "true",
+		options: ["true", "false"],
+		category: "workfile",
+	},
 	example: {
 		description: "Have the generated main.c run each part's example (true), or your own app_main() in src/app.c (false)",
 		required: false,

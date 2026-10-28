@@ -43,7 +43,9 @@ at a terminal. Set things with `config` instead.
     separated like PATH
   - `board`: the target board; setting it also sets `platform`, its chip
   - `workfile` (default `workfile.json`), `project-path` (default `out/<project-name>`),
-    `project-template` (default `capi`), `bootstrap` and `example` (both default `true`)
+    `project-template` (default `capi`), `bootstrap`, `interview` and `example` (all default
+    `true`). `interview` makes `add` ask a person at a terminal for what is left; it never asks
+    with `--json` or without a terminal, so you get the report and set those values with `update`.
 - **The workfile** is the design: a flat set of named nodes, each an instance of a schema
   (`$compatible`). Never edit it by hand: change it through the commands.
 - **Nodes** are created with readable names: the part, then its role (`adxl355`,

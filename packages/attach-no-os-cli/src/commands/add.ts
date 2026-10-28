@@ -9,6 +9,7 @@ import {
     driver_root_for,
     find_eval_board_module,
     get_effective_setting_value,
+    interview_enabled,
     list_available_structs,
     list_drivers,
     load_resolved_ruleset_for_board,
@@ -19,12 +20,14 @@ import type { LinkedReference, Workfile } from "attach-no-os-lib";
 import { filter_completions, get_schema_paths } from "../completion/completion";
 import { common_ok, type AddResponse } from "../protocol/responses";
 import { describe_bootstrap, run_bootstrap } from "./bootstrap_run";
+import { run_interview } from "./interview";
 import { load_context, output, output_error, save_workfile, type WorkfileContext } from "./shared";
 
 type AddFlags = {
     as?: string;
     json?: boolean;
     name?: string;
+    quiet?: boolean;
 };
 
 /**
@@ -48,7 +51,9 @@ export const addCommand = buildCommand<AddFlags, [string | undefined]>({
             "defaulting to its kind, numbered (capi_gpio_pin: gpio0, gpio1). <schema> can also be\n" +
             "a driver name (adxl355), which adds the handle the part is used through.\n" +
             "With the 'bootstrap' setting on (the default), everything below the new node that\n" +
-            "leaves no room for choice is then filled in, and what is left is shown."
+            "leaves no room for choice is then filled in, and what is left is shown. With the\n" +
+            "'interview' setting on (the default), on a terminal, what is left is then asked for;\n" +
+            "--quiet lists it instead."
     },
     parameters: {
         positional: {
@@ -78,6 +83,7 @@ export const addCommand = buildCommand<AddFlags, [string | undefined]>({
                 optional: true,
                 parse: String
             },
+            quiet: { kind: "boolean", brief: "Do not ask for what is left: list it", optional: true },
             json: { kind: "boolean", brief: "Output as JSON", optional: true }
         }
     },
@@ -266,6 +272,19 @@ export const addCommand = buildCommand<AddFlags, [string | undefined]>({
             validation.valid ? "The workfile is valid." : `${left}. Run: attach-noos validate`,
         ];
         output(flags, text.join("\n"), response);
+
+        // On a terminal, ask for what is left rather than only listing it. Never in --json or
+        // a pipe: a script or a tool sets those values with update.
+        if (!flags.json && flags.quiet !== true && interview_enabled() && process.stdin.isTTY && process.stdout.isTTY) {
+            const asked = await run_interview(context.value);
+            if (asked.answered > 0 || asked.stopped) {
+                const after = validate_workfile(context.value.workfile);
+                const remaining = after.errors.filter(entry => entry.severity === "error").length;
+                console.log(`\n${asked.stopped ? "Stopped. " : ""}${after.valid
+                    ? "The workfile is valid."
+                    : `${String(remaining)} problem${remaining === 1 ? "" : "s"} left. Run: attach-noos validate`}`);
+            }
+        }
     }
 });
 

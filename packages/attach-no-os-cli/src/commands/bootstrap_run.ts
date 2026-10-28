@@ -34,7 +34,7 @@ function board_pin(board: string | undefined, at: { connector: string, pin: stri
 }
 
 /** A required value still empty, which bootstrap had nothing to fill it from. */
-interface StillNeeded {
+export interface StillNeeded {
     node: string,
     property: Property,
     /** The validator's reason, when a rule says more than "required". */
@@ -46,7 +46,7 @@ interface StillNeeded {
  * go on for it (a channel number, a part with no eval board's chip-select), so it is the
  * user's to set. Read from validation, so it is the same list `validate` gives.
  */
-function still_needed(report: BootstrapReport, workfile: Workfile): StillNeeded[] {
+export function still_needed(report: BootstrapReport, workfile: Workfile): StillNeeded[] {
     const offered = new Set(report.choices.map(choice => `${choice.node}.${choice.property}`));
     const found = new Map<string, StillNeeded>();
     for (const finding of validate_workfile(workfile).errors) {
