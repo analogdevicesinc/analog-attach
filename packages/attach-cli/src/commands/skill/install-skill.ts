@@ -29,7 +29,7 @@ export function build_install_skill_command(_context: LocalContext): Command {
                 console.log('Try asking: "help me configure an ADC for my Raspberry Pi"');
                 console.log('');
             } else {
-                throw new Error(`Failed to install skill: ${result.message}`);
+                throw new Error(result.message);
             }
         });
 }

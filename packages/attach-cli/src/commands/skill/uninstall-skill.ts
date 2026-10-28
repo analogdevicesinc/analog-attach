@@ -18,7 +18,7 @@ export function build_uninstall_skill_command(_context: LocalContext): Command {
                 console.log('Attach skill uninstalled successfully.');
                 console.log('');
             } else {
-                throw new Error(`Failed to uninstall skill: ${result.message}`);
+                throw new Error(result.message);
             }
         });
 }

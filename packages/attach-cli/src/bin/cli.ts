@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+import { CommanderError } from "commander";
+
 import { buildContext } from "../context";
 import { buildApp } from "../app";
 import { run_complete } from "../commands/completion/complete";
@@ -38,8 +40,12 @@ if (json) {
 
 try {
     await app.parseAsync(argv, { from: "user" });
-} catch (error: any) {
-    if (json && error?.exitCode !== undefined) {
-        process.exit(2);
+} catch (error: unknown) {
+    if (error instanceof CommanderError) {
+        if (json) { process.exit(2); }
+    } else {
+        // The command didn't finish, so there is no answer to give: say why on stderr and exit 1.
+        console.error(error instanceof Error ? error.message : String(error));
+        process.exitCode = 1;
     }
 }

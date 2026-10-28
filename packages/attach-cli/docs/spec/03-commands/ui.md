@@ -47,8 +47,9 @@ and `Press Ctrl+C to stop.` to standard output, also in JSON mode, and keep
 running until it is interrupted.
 
 **UI-004** If the port can't be bound (it is in use, or it is below 1024 and
-the user may not bind it), then the CLI shall write nothing and exit with
-status 0. (Open issue U-1.)
+the user may not bind it), then the CLI shall write the listen error
+(`listen EADDRINUSE: address already in use 127.0.0.1:<port>`) to standard
+error and exit with status 1 (COM-130).
 
 **UI-005** Where `--open` is given, the CLI shall start `$BROWSER <page URL>`
 when `BROWSER` is set and non-empty, else `open` on macOS, `cmd /c start ""` on
@@ -179,9 +180,6 @@ logged only when they fail or write to standard error.
 
 ## 7. Open issues
 
-**U-1. A port in use exits silently with status 0.** The listen error is
-thrown and swallowed by the entry point (as S-1 in `install-skill.md`).
-
 **U-2. Values that start with `-` are refused.** UI-033 checks every argument,
 not only options, so `update adc reg -1` from the page's editor gets `option
 not allowed: -1`. The terminal accepts it after `--` (GRM-012), which the
@@ -202,7 +200,7 @@ too large"}`, and close the connection after the response.
 **U-6. `--port` takes more than port numbers.** `Number()` (UI-001) reads an
 empty value as 0, and hexadecimal, exponents and blanks as numbers, so
 `--port ''` serves on a random port and `--port 1e3` tries port 1000, which
-fails silently for a normal user (UI-004). The grammar allows digits only. A
+fails for a normal user (UI-004). The grammar allows digits only. A
 fix would be to accept only `^[0-9]+$` before converting.
 
 **U-7. A JSON array body is taken for an object.** UI-030 checks `typeof body

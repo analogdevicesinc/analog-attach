@@ -112,8 +112,8 @@ questions this applies to.)
 
 | Status | When |
 |---|---|
-| 0 | Success. Also a refusal (COM-040, COM-041), in human mode the CLI's own input errors (COM-033), and an error the CLI doesn't handle (COM-130). |
-| 1 | Human mode: commander rejected the command line (COM-032). |
+| 0 | Success. Also a refusal (COM-040, COM-041), and in human mode the CLI's own input errors (COM-033). |
+| 1 | Human mode: commander rejected the command line (COM-032). Both modes: an error the CLI doesn't handle (COM-130). |
 | 2 | JSON mode: input error (COM-031) or configuration error (COM-071). |
 | 130 | A question was stopped before anything was written (COM-060). |
 
@@ -123,12 +123,15 @@ too (INIT-011, INIT-013), and so does `ui` for a bad `--port` (`ui.md`
 UI-001).
 
 **COM-130** If a command throws an error that isn't commander's, then the
-CLI shall write nothing to standard output or standard error and exit with
-status 0, in human and in JSON mode alike. (Open issue C-6.)
+CLI shall write the error's message to standard error and exit with status 1,
+in human and in JSON mode alike. Standard output has what the command wrote
+before the error, if anything: in JSON mode no response. (`install-skill`
+with a read-only home, `ui --port` on a port in use, a `preprocess-command`
+that writes no output.)
 
 A JSON client MUST read `ok` to tell success from refusal. The exit status
 only separates "the CLI answered" (0) from "the request was malformed or the
-workspace unusable" (2).
+workspace unusable" (2) and "the command failed without answering" (1).
 
 ## 8. Workspace loading
 
@@ -422,15 +425,6 @@ goes through `preprocess-command` but the overlay doesn't (COM-100), so a
 workfile with `#include <dt-bindings/…>` or a macro doesn't load. Every write
 reprints the file from the tree (COM-103), dropping comments a user added.
 
-**C-6. Unhandled errors are silent.** The entry point (`src/bin/cli.ts`)
-catches every error and acts only on commander's, so any other error (a
-crash in a command, `install-skill`'s failed copy) gives no output and status
-0 (COM-130). A JSON client gets no response at all, against COM-020. Seen
-with a `preprocess-command` that exits 0 without writing its output. Every
-error should be reported: in JSON mode as a response with `ok: false`,
-`severity: "error"` and the error's message, in human mode as the message on
-standard error, with a non-zero exit status in both.
-
 **C-7. Read responses aren't CommonResponses.** `read` (READ-011, READ-024,
 READ-035 in `read.md`) and `update <path> <property>` when it reads
 (`update.md` UPDATE-112) respond with the node or property itself:
@@ -460,6 +454,6 @@ to name the dt-schema when it differs.
 `parse_base` reads `.attach-linux/preprocessed.dts` without removing it
 first (COM-090). With `preprocess-command = "true {input} {output}"`, a
 workspace that has a `preprocessed.dts` from an earlier run parses that old
-file as the base; one without it crashes silently (COM-130, C-6). A fix
+file as the base; one without it fails with the read error (COM-130). A fix
 would be to delete the output before running the command and to report a
 missing output as `devicetree: preprocessing <devicetree> failed`.

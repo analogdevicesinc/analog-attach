@@ -57,7 +57,8 @@ Try asking: "help me configure an ADC for my Raspberry Pi"
 ```
 
 **SKILL-005** If the packaged skill is missing or the copy fails, then the CLI
-shall write nothing and exit with status 0 (COM-130). (Open issue S-1.)
+shall write `SKILL.md not found at <path>` or `Failed to install skill:
+<error>` to standard error and exit with status 1 (COM-130).
 
 ## 5. uninstall-skill
 
@@ -68,22 +69,17 @@ skill is not installed.` and change nothing.
 everything in it, and write an empty line, `Attach skill uninstalled
 successfully.` and an empty line.
 
-**SKILL-012** If the removal fails, then the CLI shall write nothing and exit
-with status 0 (COM-130). (Open issue S-1.)
+**SKILL-012** If the removal fails, then the CLI shall write `Failed to
+uninstall skill: <error>` to standard error and exit with status 1 (COM-130).
 
 ## 6. Both commands
 
-**SKILL-020** The CLI shall write every message to standard output and exit
-with status 0, in human and in JSON mode alike: neither command has a JSON
-response. (Open issue S-2.)
+**SKILL-020** Except for the failures of SKILL-005 and SKILL-012, the CLI
+shall write every message to standard output and exit with status 0, in human
+and in JSON mode alike: neither command has a JSON response. (Open issue
+S-2.)
 
 ## 7. Open issues
-
-**S-1. Failures are silent.** A failed copy or removal throws an error that
-the entry point (`src/bin/cli.ts`) swallows in human and JSON mode alike
-(`02-common.md` C-6), so the user sees nothing, and the exit status is 0. The
-message the code builds is never shown, and it is doubled (`Failed to install
-skill: Failed to install skill: …`). Seen with a read-only home.
 
 **S-2. `--json` is ignored.** Both commands write their human text under
 `--json`. The CLI's convention (COM-020) is one JSON object or nothing.
