@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "init.schema.json",
+  "title": "init response",
+  "description": "Standard output of init in JSON mode (INIT-040): the workspace set up, or a refusal. Input errors (INIT-011, INIT-013) go to standard error as plain text.",
+  "oneOf": [
+    { "$ref": "#/$defs/ready" },
+    { "$ref": "common.schema.json#/$defs/refusal" }
+  ],
+  "$defs": {
+    "ready": {
+      "type": "object",
+      "required": ["ok", "message", "severity", "linux", "devicetree", "overlay", "created", "indexed"],
+      "properties": {
+        "ok": { "const": true },
+        "message": {
+          "type": "string",
+          "pattern": "^Workspace ready: linux .+, devicetree .+, overlay .+ \\((created|kept)\\)$"
+        },
+        "severity": { "const": "info" },
+        "linux": { "type": "string", "pattern": "^/", "description": "The Linux tree now configured, absolute." },
+        "devicetree": { "type": "string", "pattern": "^/", "description": "The base devicetree now configured, absolute." },
+        "overlay": { "type": "string", "pattern": "^/", "description": "The overlay workfile now configured, absolute." },
+        "created": { "type": "boolean", "description": "true when init created the workfile (INIT-034), false when it kept the configured one." },
+        "indexed": { "type": "boolean", "description": "true when init built the binding caches (INIT-032), false when they were current." }
+      },
+      "additionalProperties": false
+    }
+  }
+}

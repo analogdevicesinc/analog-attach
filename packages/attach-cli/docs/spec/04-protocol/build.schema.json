@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "build.schema.json",
+  "title": "build response",
+  "description": "Standard output of build in JSON mode (BUILD-004, BUILD-005).",
+  "oneOf": [
+    {
+      "type": "object",
+      "required": ["ok", "message", "severity", "path"],
+      "properties": {
+        "ok": { "const": true },
+        "message": { "const": "Compiled overlay" },
+        "severity": { "const": "info" },
+        "path": { "type": "string", "pattern": "^/", "description": "The .dtbo written, absolute." }
+      },
+      "additionalProperties": false
+    },
+    {
+      "$ref": "common.schema.json#/$defs/refusal",
+      "description": "dtc failed: message is its standard error."
+    }
+  ]
+}

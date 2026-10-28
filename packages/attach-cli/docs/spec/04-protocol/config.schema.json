@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "config.schema.json",
+  "title": "config-get and config-set responses",
+  "description": "Standard output of config-get (CONFIGGET-015, CONFIGGET-022) and config-set (CONFIGSET-030) in JSON mode. Configuration errors go to standard error (config-error.schema.json).",
+  "oneOf": [
+    { "$ref": "#/$defs/fields" },
+    { "$ref": "#/$defs/done" },
+    { "$ref": "common.schema.json#/$defs/refusal" }
+  ],
+  "$defs": {
+    "fields": {
+      "description": "config-get without --reload: the fields shown (ToolConfigResponse).",
+      "type": "object",
+      "required": ["ok", "message", "severity", "configs"],
+      "properties": {
+        "ok": { "const": true },
+        "message": { "type": "string", "pattern": "^[0-9]+ config field\\(s\\)$" },
+        "severity": { "const": "info" },
+        "configs": {
+          "type": "array",
+          "maxItems": 8,
+          "items": { "$ref": "#/$defs/config" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "config": {
+      "type": "object",
+      "required": ["field_name", "description", "type", "required", "default", "value"],
+      "properties": {
+        "field_name": {
+          "enum": ["linux", "devicetree", "overlay", "overlay-syntax", "preprocess-command", "deploy-ip", "deploy-user", "deploy-password"]
+        },
+        "description": { "type": "string" },
+        "type": {
+          "oneOf": [
+            { "enum": ["path", "string"] },
+            {
+              "type": "object",
+              "required": ["options"],
+              "properties": { "options": { "type": "array", "items": { "type": "string" }, "minItems": 1 } },
+              "additionalProperties": false
+            }
+          ]
+        },
+        "required": { "type": "boolean" },
+        "default": { "type": ["string", "null"] },
+        "value": { "type": ["string", "null"], "description": "The setting as loaded (absolute for a path, the default when unset), null when it has neither." }
+      },
+      "additionalProperties": false
+    },
+    "done": {
+      "description": "config-get --reload (message: the build summary, CONFIGGET-022) or config-set (message: Set <field> = <value>[; <build summary>], CONFIGSET-030).",
+      "type": "object",
+      "required": ["ok", "message", "severity"],
+      "properties": {
+        "ok": { "const": true },
+        "message": { "type": "string", "pattern": "^(Set [a-z-]+ = .*|Indexed [0-9]+ compatibles from [0-9]+ bindings and compiled binding schemas in .+)$" },
+        "severity": { "const": "info" }
+      },
+      "additionalProperties": false
+    },
+    "reloaded": { "$ref": "#/$defs/done" },
+    "set": { "$ref": "#/$defs/done" }
+  }
+}

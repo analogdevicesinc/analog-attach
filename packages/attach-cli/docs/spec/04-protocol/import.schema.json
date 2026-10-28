@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "import.schema.json",
+  "title": "import response",
+  "description": "Standard output of import in JSON mode (IMPORT-060): the new workfile, or a refusal.",
+  "oneOf": [
+    { "$ref": "#/$defs/imported" },
+    { "$ref": "common.schema.json#/$defs/refusal" }
+  ],
+  "$defs": {
+    "imported": {
+      "type": "object",
+      "required": ["ok", "message", "severity", "path", "source", "fit", "reason", "unresolved_targets", "unresolved"],
+      "properties": {
+        "ok": { "const": true },
+        "message": { "type": "string", "pattern": "^Imported .+ into /.+$" },
+        "severity": {
+          "enum": ["info", "warn"],
+          "description": "warn when fit is incompatible or unresolved_targets or unresolved isn't empty."
+        },
+        "path": { "type": "string", "pattern": "^/", "description": "The new workfile, now the configured overlay." },
+        "source": { "type": "string", "pattern": "^/", "description": "The imported overlay file." },
+        "replaced": { "type": "string", "pattern": "^/", "description": "The overlay configured before; the file is kept." },
+        "fit": { "enum": ["compatible", "incompatible", "unknown"] },
+        "reason": { "type": "string", "minLength": 1, "description": "What matched, or why not (IMPORT-040)." },
+        "unresolved_targets": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/unresolved-target" }
+        },
+        "unresolved": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/unresolved-entry" }
+        }
+      },
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": { "properties": { "fit": { "const": "incompatible" } } },
+          "then": { "properties": { "severity": { "const": "warn" } } }
+        },
+        {
+          "if": { "properties": { "unresolved_targets": { "type": "array", "minItems": 1 } } },
+          "then": { "properties": { "severity": { "const": "warn" } } }
+        },
+        {
+          "if": { "properties": { "unresolved": { "type": "array", "minItems": 1 } } },
+          "then": { "properties": { "severity": { "const": "warn" } } }
+        }
+      ]
+    },
+    "unresolved-target": {
+      "description": "A fragment whose target names no node of the base or the overlay (IMPORT-041).",
+      "type": "object",
+      "required": ["fragment", "property", "target"],
+      "properties": {
+        "fragment": { "type": "string", "description": "The fragment's node name, e.g. fragment@0." },
+        "property": { "enum": ["target", "target-path"] },
+        "target": { "type": "string", "minLength": 1, "description": "The label without &, or the path." }
+      },
+      "additionalProperties": false
+    },
+    "unresolved-entry": {
+      "description": "A reference that names no node of the base or the overlay (IMPORT-042).",
+      "type": "object",
+      "required": ["path", "property", "reference"],
+      "properties": {
+        "path": {
+          "$ref": "common.schema.json#/$defs/node-path",
+          "description": "The node's segments. Under a target that didn't resolve, the first is that target as written (&label), open issue IM-2; under a target-path that didn't resolve, the segments are that path's."
+        },
+        "property": { "type": "string" },
+        "reference": { "type": "string", "pattern": "^&", "description": "As written: &label or &{/path}." }
+      },
+      "additionalProperties": false
+    }
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "config-error.schema.json",
+  "title": "ConfigErrors",
+  "description": "Written to standard error, with exit status 2, when the workspace can't be loaded in JSON mode (COM-071).",
+  "type": "object",
+  "required": ["errors", "hints"],
+  "properties": {
+    "errors": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["field", "kind", "message"],
+        "properties": {
+          "field": { "type": "string", "description": "The setting at fault (linux, overlay, ..., or an unknown key), or the resource: config.toml (not TOML), compat-index, validation.json, dt-schema, tools, deploy." },
+          "kind": { "enum": ["missing", "invalid", "unknown"] },
+          "message": { "type": "string" },
+          "description": { "type": "string", "description": "What the setting is." }
+        },
+        "additionalProperties": false
+      }
+    },
+    "hints": {
+      "description": "What to do about the errors, each once.",
+      "type": "array",
+      "items": { "type": "string" },
+      "uniqueItems": true
+    }
+  },
+  "additionalProperties": false
+}
