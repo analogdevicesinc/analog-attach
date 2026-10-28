@@ -36,7 +36,7 @@ Every fragment is imported as written; the __overrides__ node (the RPi
 overlay parameters) is dropped. Targets and phandles are not remapped: the
 ones the base doesn't have are listed as warnings. The new workfile is named
 after the overlay and becomes the configured overlay; one configured before
-is kept as it is (config-set overlay <file> switches back).
+is kept as it is (config overlay <file> switches back).
 
 Examples:
   $ attach-linux list overlay adi,ad7124-8
@@ -194,7 +194,7 @@ export function import_warnings(tree: DeviceTreeOverlay): ImportWarnings {
 export function import_message(shown: string, workfile: string, previous?: string): string[] {
     const imported = `Imported ${shown} into ${workfile}`;
     if (previous === undefined) { return [imported]; }
-    return [imported, `The configured overlay is now ${workfile} (was ${previous}, kept; switch back with: config-set overlay ${previous})`];
+    return [imported, `The configured overlay is now ${workfile} (was ${previous}, kept; switch back with: config overlay ${previous})`];
 }
 
 /** The targets the base lacks, then the references that resolve to nothing. */
@@ -324,7 +324,7 @@ if (import.meta.vitest) {
             .toEqual(["Imported arch/arm/boot/dts/overlays/rpi-ad7124-overlay.dts into /w/rpi-ad7124.dtso"]);
         expect(import_message("arch/arm/boot/dts/overlays/max31827-overlay.dts", "/w/max31827.dtso", "/w/rpi-ad7124.dtso")).toEqual([
             "Imported arch/arm/boot/dts/overlays/max31827-overlay.dts into /w/max31827.dtso",
-            "The configured overlay is now /w/max31827.dtso (was /w/rpi-ad7124.dtso, kept; switch back with: config-set overlay /w/rpi-ad7124.dtso)",
+            "The configured overlay is now /w/max31827.dtso (was /w/rpi-ad7124.dtso, kept; switch back with: config overlay /w/rpi-ad7124.dtso)",
         ]);
     });
 

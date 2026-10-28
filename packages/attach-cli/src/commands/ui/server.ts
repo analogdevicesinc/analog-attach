@@ -13,7 +13,7 @@ export type Runner = (arguments_: string[]) => Promise<RunResult>;
 /**
  * What the page may run, with the options each command takes. The server
  * is reachable by every page the browser opens, so anything that executes
- * configured commands (`config-set`, `build`, `deploy`, `import`) is left out.
+ * configured commands (`config`, `build`, `deploy`, `import`) is left out.
  */
 const COMMANDS: Record<string, readonly string[]> = {
     "read": [],
@@ -27,7 +27,7 @@ const COMMANDS: Record<string, readonly string[]> = {
     "init": ["--overlay"],
 };
 
-/** The config fields the page may see; `config-get` also returns the deploy password. */
+/** The config fields the page may see; `config` also returns the deploy password. */
 const VISIBLE_FIELDS = new Set(["linux", "devicetree", "overlay", "overlay-syntax"]);
 
 const MAX_BODY = 64 * 1024;
@@ -89,7 +89,7 @@ export function create_ui_server(options: UiServerOptions): http.Server {
     };
 
     const config = async (): Promise<Record<string, string | undefined>> => {
-        const result = await run(["config-get"]);
+        const result = await run(["config"]);
         const parsed = parse_json(result.stdout) as { configs?: { field_name: string; value: unknown }[] } | undefined;
         const values: Record<string, string | undefined> = {};
         for (const field of parsed?.configs ?? []) {
@@ -167,7 +167,7 @@ if (import.meta.vitest) {
         expect(check_request({ command: "read", args: ["/soc"] })).toEqual({ run: ["read", "/soc"] });
         expect(check_request({ command: "add", args: ["adi,ad7124-8", "--parent", "spi0"] })).toEqual({ run: ["add", "adi,ad7124-8", "--parent", "spi0"] });
         expect("error" in check_request({ command: "deploy", args: [] })).toBe(true);
-        expect("error" in check_request({ command: "config-set", args: ["preprocess-command", "x"] })).toBe(true);
+        expect("error" in check_request({ command: "config", args: ["preprocess-command", "x"] })).toBe(true);
         expect("error" in check_request({ command: "toString", args: [] })).toBe(true);
         expect("error" in check_request({ command: "read", args: ["--json"] })).toBe(true);
         expect("error" in check_request({ command: "update", args: ["adc", "x", 1] })).toBe(true);

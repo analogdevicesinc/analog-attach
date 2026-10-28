@@ -171,5 +171,5 @@ step "Build" \
 banner "Done"
 echo ""
 echo -e "  Overlay:  ${BOLD}$SANDBOX/overlay.dtso${RESET}"
-echo -e "  Next:     ${DIM}deploy (after config-set deploy-ip, deploy-user and deploy-password)${RESET}"
+echo -e "  Next:     ${DIM}deploy (after config deploy-ip, deploy-user and deploy-password)${RESET}"
 echo ""

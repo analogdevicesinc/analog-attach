@@ -72,7 +72,7 @@ checked.
 **INIT-017** Where `--overlay <name>` is given, the CLI shall plan to create
 `<name>`, with `.dtso` appended unless it already ends with it, relative to
 the CWD. If that file exists, then the CLI shall refuse with `<file> already
-exists; use it with 'config-set overlay <file>' or pick another name`. If its
+exists; use it with 'config overlay <file>' or pick another name`. If its
 directory doesn't exist, then the CLI shall refuse with `<directory> is not a
 directory`, `<directory>` absolute. It never overwrites a file.
 
@@ -95,7 +95,7 @@ words them, in both modes. (Open issue I-1.)
 CLI shall leave them. Otherwise it shall build them (COM-112 to COM-114).
 
 **INIT-033** If the build can't start or fails, then the CLI shall refuse with
-`<reason>`, a newline, and `Fix the problem, then run 'attach-linux config-get
+`<reason>`, a newline, and `Fix the problem, then run 'attach-linux config
 --reload' to build the binding caches and 'attach-linux init' again.`.
 `<reason>` is the configuration errors as COM-072 words them, or
 `Compiling binding schemas failed:` followed by a newline and the tool's
@@ -144,7 +144,7 @@ Next steps:
   2. Add one (it asks for the missing required properties):
      attach-linux add <compatible>
 
-  Run attach-linux config-get --reload after the bindings of the Linux tree change.
+  Run attach-linux config --reload after the bindings of the Linux tree change.
 
 ```
 
@@ -327,5 +327,5 @@ init needs --linux <path>: no Linux tree is configured                     (stde
 
 ```
 $ attach-linux --json init --overlay mine          # mine.dtso exists
-{"ok":false,"message":"mine.dtso already exists; use it with 'config-set overlay mine.dtso' or pick another name","severity":"error"}
+{"ok":false,"message":"mine.dtso already exists; use it with 'config overlay mine.dtso' or pick another name","severity":"error"}
 ```

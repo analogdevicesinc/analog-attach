@@ -7,7 +7,7 @@ import { config_directory } from "./settings";
 
 // Derived state kept under .attach-linux/. It is never part of config.toml:
 // every cache records the linux / dt-schema paths it was built from. They are
-// built by `config-set linux` and `config-get --reload` only; a cache older
+// built by `config linux <path>` and `config --reload` only; a cache older
 // than the bindings, or built for another tree, is just warned about.
 
 export interface CacheStamp {
@@ -114,12 +114,12 @@ export function silence_cache_warnings(silent = true): void {
     warnings_silenced = silent;
 }
 
-const RELOAD_HINT = "run 'attach-linux config-get --reload' to rebuild them.";
+const RELOAD_HINT = "run 'attach-linux config --reload' to rebuild them.";
 
 /**
  * A line saying the compat index or validation.json may no longer match the
  * bindings, or `undefined` when both are current (or warnings are silenced).
- * Nothing is rebuilt: the user decides with `config-get --reload`.
+ * Nothing is rebuilt: the user decides with `config --reload`.
  */
 export function cache_warning(linux: string, dt_schema: string, cwd = process.cwd()): string | undefined {
     if (warnings_silenced) { return undefined; }
@@ -240,7 +240,7 @@ if (import.meta.vitest) {
             save_both(directory, linux, 0);
             fs.writeFileSync(path.join(linux, "Documentation", "devicetree", "bindings", "x.yaml"), "");
             expect(cache_warning(linux, "/dt-schema", directory)).toBe(
-                "The binding caches are older than the bindings; run 'attach-linux config-get --reload' to rebuild them.",
+                "The binding caches are older than the bindings; run 'attach-linux config --reload' to rebuild them.",
             );
         } finally {
             fs.rmSync(directory, { recursive: true });
@@ -253,7 +253,7 @@ if (import.meta.vitest) {
             const linux = path.join(directory, "linux");
             save_both(directory, "/elsewhere", Date.now() + 60_000);
             expect(cache_warning(linux, "/dt-schema", directory)).toBe(
-                `The binding caches were built for /elsewhere, not ${linux}; run 'attach-linux config-get --reload' to rebuild them.`,
+                `The binding caches were built for /elsewhere, not ${linux}; run 'attach-linux config --reload' to rebuild them.`,
             );
         } finally {
             fs.rmSync(directory, { recursive: true });

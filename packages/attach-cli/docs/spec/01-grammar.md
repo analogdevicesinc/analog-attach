@@ -226,8 +226,7 @@ their meaning.
 | `enable`, `disable` | `[path]` | |
 | `list` | `[kind] [args...]` | |
 | `build`, `validate`, `deploy` | | |
-| `config-get` | `[fields...]` | `--reload` |
-| `config-set` | `<field> <value>` | |
+| `config` | `[key] [value]` | `--reset`, `--reload` |
 | `init` | | `--linux <path>`, `--devicetree <path>`, `--overlay <name>` |
 | `install-skill` | | `--force` |
 | `uninstall-skill` | | |

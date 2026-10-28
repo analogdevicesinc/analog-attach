@@ -72,7 +72,7 @@ for (const [what, path] of [["Linux overlays", overlays_dir], ["base devicetree"
 }
 
 // One sandbox per worker, so overlays run in parallel without sharing `.attach-linux/` (the configured overlay,
-// `preprocessed.dts`, `temp.dts`, ... are per workspace). The first sandbox runs `config-set linux`, which builds the
+// `preprocessed.dts`, `temp.dts`, ... are per workspace). The first sandbox runs `config linux`, which builds the
 // binding index and the compiled schemas (45 s); the others get a copy of its config and caches.
 const env = process.env;
 const jobs = Math.max(1, Number(process.env.CORPUS_JOBS ?? Math.min(8, availableParallelism() - 1)));
@@ -82,9 +82,9 @@ process.on("exit", cleanup);
 for (const signal of ["SIGINT", "SIGTERM"]) process.on(signal, () => process.exit(130));
 
 for (const [field, value] of [["devicetree", devicetree], ["linux", linux]]) {
-  const set = spawnSync("node", [cli, "config-set", field, value], { cwd: sandboxes[0], env, encoding: "utf8", stdio: ["ignore", "ignore", "inherit"] });
+  const set = spawnSync("node", [cli, "config", field, value], { cwd: sandboxes[0], env, encoding: "utf8", stdio: ["ignore", "ignore", "inherit"] });
   if (set.status !== 0) {
-    console.error(`config-set ${field} failed`);
+    console.error(`config ${field} failed`);
     process.exit(2);
   }
 }

@@ -36,7 +36,7 @@ export function workfile_filename(name: string): string {
 export function workfile_problem(filename: string, cwd?: string): string | undefined {
     const resolved = path.resolve(cwd ?? process.cwd(), filename);
     if (fs.existsSync(resolved)) {
-        return `${filename} already exists; use it with 'config-set overlay ${filename}' or pick another name`;
+        return `${filename} already exists; use it with 'config overlay ${filename}' or pick another name`;
     }
     if (!fs.statSync(path.dirname(resolved), { throwIfNoEntry: false })?.isDirectory()) {
         return `${path.dirname(resolved)} is not a directory`;

@@ -11,9 +11,7 @@ import { SETTINGS } from "./config/settings";
 import * as suggest from "./commands/list/suggest";
 import { LIST_KINDS } from "./commands/list/command";
 
-const CONFIG_SET_FIELD_NAMES = SETTINGS.map(spec => spec.key).sort();
-
-const CONFIG_GET_FIELD_NAMES = SETTINGS.map(spec => spec.key).sort();
+const CONFIG_FIELD_NAMES = SETTINGS.map(spec => spec.key).sort();
 
 function registered_commands(): string[] {
     return buildApp(buildContext(false)).commands.map(c => c.name()).filter(n => !n.startsWith("__"));
@@ -101,20 +99,17 @@ describe("__complete engine", () => {
     });
 
     test("a file-valued positional emits the file directive", async () => {
-        expect(await complete(["config-set", "linux", ""])).toEqual([FILES_DIRECTIVE]);
+        expect(await complete(["config", "linux", ""])).toEqual([FILES_DIRECTIVE]);
     });
 
     test("completion positional offers the shells", async () => {
         expect(values(await complete(["completion", ""])).sort()).toEqual(["bash", "fish", "zsh"]);
     });
 
-    test("config-set completes every settable field then a file path", async () => {
-        expect(values(await complete(["config-set", ""])).sort()).toEqual(CONFIG_SET_FIELD_NAMES);
-        expect(await complete(["config-set", "overlay", ""])).toEqual([FILES_DIRECTIVE]);
-    });
-
-    test("config-get completes every visible field", async () => {
-        expect(values(await complete(["config-get", ""])).sort()).toEqual(CONFIG_GET_FIELD_NAMES);
+    test("config completes every field then a file path, and its flags", async () => {
+        expect(values(await complete(["config", ""])).sort()).toEqual(CONFIG_FIELD_NAMES);
+        expect(await complete(["config", "overlay", ""])).toEqual([FILES_DIRECTIVE]);
+        expect(values(await complete(["config", "--"])).sort()).toEqual(["--help", "--reload", "--reset"]);
     });
 
     test("a free-value flag (no spec entry) yields no candidates", async () => {

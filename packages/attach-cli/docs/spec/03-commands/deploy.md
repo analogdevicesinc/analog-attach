@@ -39,7 +39,7 @@ base or the overlay's content.
 COM-072: that `deploy-ip`, `deploy-user`, `deploy-password` and `overlay` are
 set, each missing one being the problem `Missing config field <field>` with
 its description and hint (COM-126): `overlay` has the hint `Run 'attach-linux
-init' to create one, or 'config-set overlay <path>'.`, where `<path>` is
+init' to create one, or 'config overlay <path>'.`, where `<path>` is
 literal; the `deploy-*` fields have none. When all four are set, it then
 checks that the compiled overlay exists, and when it does, that `scp` and
 `sshpass` are on `PATH`.

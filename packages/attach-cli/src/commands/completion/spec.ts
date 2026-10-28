@@ -52,11 +52,7 @@ export interface CommandSpec {
 }
 
 const FILE: ValueSource = { kind: "file" };
-const CONFIG_SET_FIELDS: ValueSource = {
-    kind: "values",
-    values: SETTINGS.map(spec => spec.key),
-};
-const CONFIG_GET_FIELDS: ValueSource = {
+const CONFIG_FIELDS: ValueSource = {
     kind: "values",
     values: SETTINGS.map(spec => spec.key),
 };
@@ -118,11 +114,8 @@ export const COMPLETION_SPEC: Readonly<Record<string, CommandSpec | "dynamic">> 
     completion: {
         positional: { mode: "byIndex", sources: [{ kind: "values", values: ["bash", "fish", "zsh"] }] },
     },
-    "config-get": {
-        positional: { mode: "all", source: CONFIG_GET_FIELDS },
-    },
-    "config-set": {
-        positional: { mode: "byIndex", sources: [CONFIG_SET_FIELDS, FILE] },
+    config: {
+        positional: { mode: "byIndex", sources: [CONFIG_FIELDS, FILE] },
     },
 };
 

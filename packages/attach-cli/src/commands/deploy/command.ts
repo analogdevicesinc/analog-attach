@@ -29,7 +29,7 @@ export function build_deploy_command(context_: LocalContext): Command {
 Copies the .dtbo that 'build' compiled to /boot/overlays/ on the remote device
 via scp, then reboots it. Requires scp and sshpass on PATH.
 
-Required config fields (set with config-set):
+Required config fields (set with config <field> <value>):
   deploy-ip           IP address or hostname of the device
   deploy-user         SSH username
   deploy-password     SSH password`)

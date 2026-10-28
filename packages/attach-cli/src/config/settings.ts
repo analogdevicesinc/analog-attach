@@ -23,12 +23,12 @@ export interface Settings {
 export type SettingKey = "linux" | "devicetree" | "overlay" | "overlay-syntax" | "preprocess-command" | "deploy-ip" | "deploy-user" | "deploy-password";
 
 export interface SettingSpec {
-    /** kebab-case name, as written in config.toml and accepted by config-set / config-get. */
+    /** kebab-case name, as written in config.toml and accepted by `config`. */
     key: SettingKey;
     field: keyof Settings;
     kind: "path" | "string" | { options: readonly string[] };
     description: string;
-    /** Display metadata for config-get; what a command needs is decided by `load_workspace`. */
+    /** Display metadata for `config`; what a command needs is decided by `load_workspace`. */
     required: boolean;
     default?: string;
     /** Printed when the setting is missing or invalid. */
@@ -60,7 +60,7 @@ export const SETTINGS: readonly SettingSpec[] = [
         kind: "path",
         required: false,
         description: "Path to the working DTSO overlay file (workfile)",
-        hint: "Run 'attach-linux init' to create one, or 'config-set overlay <path>'.",
+        hint: "Run 'attach-linux init' to create one, or 'config overlay <path>'.",
     },
     {
         key: "overlay-syntax",
@@ -197,8 +197,23 @@ export function read_settings(cwd = process.cwd()): ConfigResult<Settings> {
  */
 export function save_settings(patch: Partial<Record<SettingKey, string>>, cwd = process.cwd()): void {
     const text = read_config_file(cwd);
-    const merged: Record<string, unknown> = { ...(text === undefined ? {} : parse(text)), ...patch };
+    write_config({ ...(text === undefined ? {} : parse(text)), ...patch }, cwd);
+}
 
+/**
+ * Remove `key` from config.toml, so it is back to its default or unset. The
+ * other keys are kept as `save_settings` keeps them. With no file, nothing
+ * is written. Throws when the file is not valid TOML.
+ */
+export function reset_setting(key: SettingKey, cwd = process.cwd()): void {
+    const text = read_config_file(cwd);
+    if (text === undefined) { return; }
+    const table: Record<string, unknown> = parse(text);
+    delete table[key];
+    write_config(table, cwd);
+}
+
+function write_config(merged: Record<string, unknown>, cwd: string): void {
     const ordered: Record<string, unknown> = {};
     for (const spec of SETTINGS) {
         if (merged[spec.key] !== undefined) { ordered[spec.key] = merged[spec.key]; }
@@ -279,6 +294,22 @@ if (import.meta.vitest) {
             const result = parse_settings(read_config_file(directory), directory);
             expect(result.ok && result.value.overlay).toBe(path.join(directory, "a.dtso"));
             expect(result.ok && result.value.overlay_syntax).toBe("label");
+        } finally {
+            fs.rmSync(directory, { recursive: true });
+        }
+    });
+
+    test("reset_setting - removes the key and keeps the others, unknown ones included", () => {
+        const directory = fs.mkdtempSync(path.join(os.tmpdir(), "attach-cfg-"));
+        try {
+            reset_setting("overlay", directory);
+            expect(read_config_file(directory)).toBeUndefined();
+            fs.mkdirSync(config_directory(directory));
+            fs.writeFileSync(config_path(directory), `overlay = "a.dtso"\noverlay-syntax = "label"\nbogus = "x"\n`);
+            reset_setting("overlay-syntax", directory);
+            expect(read_config_file(directory)).toBe(`overlay = "a.dtso"\nbogus = "x"\n`);
+            reset_setting("deploy-ip", directory);
+            expect(read_config_file(directory)).toBe(`overlay = "a.dtso"\nbogus = "x"\n`);
         } finally {
             fs.rmSync(directory, { recursive: true });
         }

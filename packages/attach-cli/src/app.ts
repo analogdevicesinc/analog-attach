@@ -2,8 +2,7 @@ import { Command } from "commander";
 import { name, version, description } from "../package.json";
 import type { LocalContext } from "./context";
 
-import { build_config_get_command } from "./commands/config-get/command";
-import { build_config_set_command } from "./commands/config-set/command";
+import { build_config_command } from "./commands/config/command";
 import { build_init_command } from "./commands/init/command";
 import { build_add_command } from "./commands/add/command";
 import { build_import_command } from "./commands/import/command";
@@ -81,8 +80,7 @@ Run any command with --help for detailed usage.`);
     program.addCommand(build_deploy_command(context));
 
     // configuration
-    program.addCommand(build_config_get_command(context));
-    program.addCommand(build_config_set_command(context));
+    program.addCommand(build_config_command(context));
 
     // tooling
     program.addCommand(build_install_skill_command(context));

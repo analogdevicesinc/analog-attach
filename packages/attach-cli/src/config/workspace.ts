@@ -139,9 +139,9 @@ export function parse_dt_schema(): ConfigResult<string> {
     return { ok: true, value: root };
 }
 
-export const RELOAD_HINT = "Run 'attach-linux config-get --reload' to build the binding caches.";
+export const RELOAD_HINT = "Run 'attach-linux config --reload' to build the binding caches.";
 
-/** The caches `config-set linux` and `config-get --reload` build; commands only read them, so they must be there. */
+/** The caches `config linux <path>` and `config --reload` build; commands only read them, so they must be there. */
 function parse_caches(cwd: string): ConfigResult<undefined> {
     const missing = (field: string, file: string): ConfigError => ({
         field, kind: "missing", message: `${file} not found or unreadable in ${config_directory(cwd)}`, hint: RELOAD_HINT,
@@ -441,7 +441,7 @@ if (import.meta.vitest) {
         const result = bindings();
         expect(fields(result)).toEqual(["compat-index", "validation.json"]);
         if (result.ok) { return; }
-        expect(format_config_errors(result.errors).human).toContain("attach-linux config-get --reload");
+        expect(format_config_errors(result.errors).human).toContain("attach-linux config --reload");
     });
 
     test("open_workspace - bindings are there once both caches exist", () => {

@@ -511,7 +511,7 @@ if (import.meta.vitest) {
 }
 
 /**
- * The compat index `config-set linux` / `config-get --reload` built. It is
+ * The compat index `config linux` / `config --reload` built. It is
  * never built here: `parse_bindings` has checked it is there, so an empty one
  * only stands in for an index that disappeared since.
  */

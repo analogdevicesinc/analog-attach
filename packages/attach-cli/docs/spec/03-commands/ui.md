@@ -82,7 +82,7 @@ listed below, the server shall respond 404 with `{"error":"not found"}`.
 
 **UI-015** The server shall run child runs one at a time, in the order the
 requests arrive, so two commands never write the overlay at once. (The status
-and overlay endpoints run `config-get` as a child run as well.)
+and overlay endpoints run `config` as a child run as well.)
 
 **UI-016** If handling a request fails unexpectedly (a child run that can't
 start), then the server shall respond 500 with `{"error":"<reason>"}` when it
@@ -91,7 +91,7 @@ it (`Error: …`).
 
 ### 5.1 `GET /api/status`
 
-**UI-020** The server shall run `config-get` and respond 200 with an object
+**UI-020** The server shall run `config` and respond 200 with an object
 whose keys are those of `linux`, `devicetree`, `overlay` and `overlay-syntax`
 that have a string value, each with that value. It shall never include the
 `deploy-*` fields.
@@ -116,7 +116,7 @@ not allowed: undefined`. (Open issue U-7.)
 `enable`, `disable`, `validate`, `init`, then the server shall respond 400 with
 `{"error":"command not allowed: <command>"}`, `<command>` being `undefined`
 when the body has none. Commands that run configured
-programs or point the workspace elsewhere (`config-set`, `build`, `deploy`,
+programs or point the workspace elsewhere (`config`, `build`, `deploy`,
 `import`) are left out because any page the browser opens can reach the
 server.
 

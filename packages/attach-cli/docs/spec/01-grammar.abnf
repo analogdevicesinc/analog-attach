@@ -36,7 +36,7 @@ command         = add / import / init
                 / read / update / delete / move / rename / enable / disable
                 / list / internal-list
                 / build / validate / deploy
-                / config-get / config-set
+                / config
                 / install-skill / uninstall-skill / completion
                 / ui
 
@@ -79,8 +79,8 @@ validate        = %s"validate"
 build           = %s"build"
 deploy          = %s"deploy"
 
-config-get      = %s"config-get" *( B config-field ) *( B %s"--reload" )
-config-set      = %s"config-set" B config-field B element
+config          = %s"config" [ B config-field [ B element ] ] *( B config-option )
+config-option   = %s"--reset" / %s"--reload"  ; which combine: 03-commands/config.md §2
 
 ; --- Setup and human-only commands ----------------------------------
 

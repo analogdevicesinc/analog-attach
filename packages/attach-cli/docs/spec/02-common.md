@@ -88,9 +88,9 @@ the reason to standard output and exit with status 0. (Open issue C-1.)
 **COM-042** When a command refuses, the CLI shall leave the overlay file and
 `config.toml` as they were. Scratch files under `.attach-linux/`
 (`preprocessed.dts`, `example.dts`, …) may have been rewritten. Exceptions:
-`config-set linux` saves `linux` before it builds the caches and refuses when
-the build doesn't happen or fails (`config-set.md` CONFIGSET-022,
-CONFIGSET-023, CS-3), and `init` keeps `linux` and `devicetree` saved when
+`config linux <path>` saves `linux` before it builds the caches and refuses
+when the build doesn't happen or fails (`config.md` CONFIG-122, CONFIG-123,
+CF-6), and `init` keeps `linux` and `devicetree` saved when
 its cache build fails (`init.md` INIT-030, INIT-033, I-5).
 
 ## 5. Success
@@ -175,7 +175,7 @@ shall use them even when they are out of date.
 
 **COM-081** When a command needs the bindings and a cache isn't current
 (COM-116), the CLI shall write one line to standard error, `warning:
-<reason>; run 'attach-linux config-get --reload' to rebuild them.`, and go on.
+<reason>; run 'attach-linux config --reload' to rebuild them.`, and go on.
 `<reason>` is `The binding caches were built for <old>, not <new>` when a
 stamp names another Linux tree, else `The binding caches are older than the
 bindings`, also when the cause is a stamp that names another dt-schema or
@@ -187,7 +187,7 @@ gives no warning. (Open issue C-9.)
 The settings live in `.attach-linux/config.toml` under the CWD, a TOML table
 of string values. The fields, in the order the CLI writes them:
 
-| Key | Kind | Required¹ | Default | Description (as `config-get` shows it) |
+| Key | Kind | Required¹ | Default | Description (as `config` shows it) |
 |---|---|---|---|---|
 | `linux` | path (directory) | yes | — | `Path to Linux kernel source tree (setting it builds the binding caches)` |
 | `devicetree` | path (file) | yes | — | `Path to target base DTS file` |
@@ -198,14 +198,14 @@ of string values. The fields, in the order the CLI writes them:
 | `deploy-user` | string | no | — | `SSH username on the remote device` |
 | `deploy-password` | string | no | — | `SSH password on the remote device (stored plaintext in config.toml)` |
 
-¹ What `config-get` reports as `required`. Whether a command needs a field is
+¹ What `config` reports as `required`. Whether a command needs a field is
 decided by the resources it needs (COM-070), not by this column.
 
 Each field has a hint, printed when it is missing or invalid (COM-072): for
 `linux` and `devicetree`, `Run 'attach-linux init' on a terminal, or
 'attach-linux init --linux <path> --devicetree <path>', to set up a
 workspace.`; for `overlay`, `Run 'attach-linux init' to create one, or
-'config-set overlay <path>'.`; none for the others.
+'config overlay <path>'.`; none for the others.
 
 **COM-120** The CLI shall read its settings only from
 `.attach-linux/config.toml` under the CWD. It shall not read the environment.
@@ -347,8 +347,8 @@ it; and `validation.json`, the output of `dt-mk-schema -j` over the Linux
 tree's bindings, with `validation.stamp.json` `{ generated_at, linux,
 dt_schema }` next to it. `generated_at` is in milliseconds since the epoch.
 
-**COM-111** The CLI shall build the caches only in `config-set linux`,
-`config-get --reload`, and `init` when they aren't current (COM-116). Every
+**COM-111** The CLI shall build the caches only in `config linux <path>`,
+`config --reload`, and `init` when they aren't current (COM-116). Every
 other command only reads them.
 
 **COM-112** When it builds the caches, the CLI shall build both at once and
@@ -374,7 +374,7 @@ bundled dt-schema are fine, if `compat-index.json` is missing, unreadable or
 has no `entries`, or `validation.json` is missing, then loading shall report
 for each `{ field: "compat-index" | "validation.json", kind: "missing",
 message: "<file> not found or unreadable in <.attach-linux directory>" }`
-with the hint `Run 'attach-linux config-get --reload' to build the binding
+with the hint `Run 'attach-linux config --reload' to build the binding
 caches.`
 
 **COM-116** The CLI shall treat a cache as current when its stamp exists,
@@ -412,9 +412,11 @@ exits with status 2.
 
 **C-3. One bad key blocks the whole workspace.** Loading is strict
 (COM-122 to COM-124), so an unknown key left by an older version, or a typo,
-stops every command, `config-get` included, until it is removed by hand.
-`config-set` still writes (it only refuses a TOML syntax error), but it keeps
-the unknown key (COM-129). `init` can't fix it either (INIT open issue I-1).
+stops every command, `config` included when it shows fields, until it is
+removed by hand. `config <key> <value>` and `config <key> --reset` still write
+(they only refuse a TOML syntax error), but they keep the unknown key
+(COM-129), and `--reset` refuses a key that isn't a field (`config.md`
+CONFIG-101). `init` can't fix it either (INIT open issue I-1).
 
 **C-4. The preprocessor check is `<tool> --version`.** A tool that exists but
 has no `--version`, or exits non-zero for it (`false`, some wrappers), is

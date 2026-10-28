@@ -130,8 +130,7 @@ issue CO-9):
 | `rename`, `enable`, `disable` | node path | | |
 | `list devices`, `list parent`, `list overlay` | device | | |
 | `list property`, `list value` | node path | property | |
-| `config-get` | config field (§8.1 of `02-common.md`) | config field | config field |
-| `config-set` | config field | file name (COMPL-012) | |
+| `config` | config field (§8.1 of `02-common.md`) | file name (COMPL-012) | |
 | `completion` | `bash`, `fish`, `zsh` | | |
 
 `build`, `validate`, `deploy`, `install-skill`, `uninstall-skill` and `ui`
@@ -346,7 +345,7 @@ loaded, so a workspace without one completes none of them. Only `add
 start with `__`, so `ui` is listed (first) with the public commands, though
 `--help` hides it.
 
-**CO-5. `config-set` always completes a file name.** The value of
+**CO-5. `config <key>` always completes a file name.** The value of
 `overlay-syntax` (`fragment`, `label`) and of the `deploy-*` fields complete as
 file names too.
 

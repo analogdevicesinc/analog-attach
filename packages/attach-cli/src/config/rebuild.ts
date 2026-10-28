@@ -14,8 +14,8 @@ export interface RebuildResult {
 /**
  * Build the compat index and `validation.json` from the Linux tree, both at
  * once (`dt-mk-schema` runs as a child process while the index parses in this
- * one). This is the only place the two caches are built: `config-set linux`
- * and `config-get --reload` call it. The progress goes to stderr.
+ * one). This is the only place the two caches are built: `config linux <path>`
+ * and `config --reload` call it. The progress goes to stderr.
  */
 export async function rebuild_caches(
     { linux, dt_schema }: { linux: string; dt_schema: string },

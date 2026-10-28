@@ -107,7 +107,7 @@ export async function execute_init(plan: InitPlan, options: ExecuteOptions = {})
     const ensured = await (options.ensure ?? ensure_caches)(settings.value, cwd, options.stream ?? process.stderr);
     if (!ensured.ok || !ensured.value.ok) {
         const reason = ensured.ok ? ensured.value.message : format_config_errors(ensured.errors).human;
-        return { ok: false, message: `${reason}\nFix the problem, then run 'attach-linux config-get --reload' to build the binding caches and 'attach-linux init' again.` };
+        return { ok: false, message: `${reason}\nFix the problem, then run 'attach-linux config --reload' to build the binding caches and 'attach-linux init' again.` };
     }
 
     const overlay = plan.overlay.kind === "keep" ? plan.overlay.path : create_workfile(plan.overlay.filename, cwd).path;
@@ -145,7 +145,7 @@ export function format_summary(response: InitResponse): string[] {
         `  ${cyan("2.")} Add one (it asks for the missing required properties):`,
         `     ${dim("attach-linux add <compatible>")}`,
         "",
-        `  Run ${cyan("attach-linux config-get --reload")} after the bindings of the Linux tree change.`,
+        `  Run ${cyan("attach-linux config --reload")} after the bindings of the Linux tree change.`,
     ];
 }
 
@@ -226,7 +226,7 @@ of the options, init asks for what is neither given nor configured.
 
 The binding caches (compat index and validation.json) are built from the Linux
 tree unless they are already current for it (about 50 s for the kernel tree).
-overlay-syntax, preprocess-command and deploy-* are set with config-set.
+overlay-syntax, preprocess-command and deploy-* are set with config.
 
 --json gives { linux, devicetree, overlay, created, indexed }.
 
@@ -400,7 +400,7 @@ if (import.meta.vitest) {
             const failing = async (): Promise<ConfigResult<EnsureResult>> => ({ ok: true, value: { ok: false, rebuilt: true, message: "Compiling binding schemas failed:\nbad binding" } });
             const result = await execute_init(planned.value, { cwd: work, ensure: failing, stream: capture().stream });
             expect(!result.ok && result.message).toContain("bad binding");
-            expect(!result.ok && result.message).toContain("config-get --reload");
+            expect(!result.ok && result.message).toContain("config --reload");
             expect(fs.existsSync(path.join(work, "overlay.dtso"))).toBe(false);
             const saved = read_settings(work);
             expect(saved.ok && saved.value.linux).toBe(linux);

@@ -112,7 +112,7 @@ reference.
 1. `Imported <shown> into <workfile>`, `<shown>` being the source relative to
    the Linux tree when it is inside it, and absolute otherwise.
 2. When an overlay was configured before: `The configured overlay is now
-   <workfile> (was <previous>, kept; switch back with: config-set overlay
+   <workfile> (was <previous>, kept; switch back with: config overlay
    <previous>)`.
 3. When IMPORT-023 removed `__overrides__`: `Dropped __overrides__ (the
    overlay's parameters)`.
@@ -192,7 +192,7 @@ Dropped __overrides__ (the overlay's parameters)
 ```
 $ attach-linux import ./mine-overlay.dts
 Imported /work/mine-overlay.dts into /work/mine.dtso
-The configured overlay is now /work/mine.dtso (was /work/rpi-ad7124-8-all-diff.dtso, kept; switch back with: config-set overlay /work/rpi-ad7124-8-all-diff.dtso)
+The configured overlay is now /work/mine.dtso (was /work/rpi-ad7124-8-all-diff.dtso, kept; switch back with: config overlay /work/rpi-ad7124-8-all-diff.dtso)
 warning: 1 fragment targets a node the base doesn't have:
   fragment@0  target nothere
 warning: 1 reference points to a node neither the base nor the overlay has:
