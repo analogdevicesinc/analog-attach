@@ -76,25 +76,32 @@ function suggest_interrupt_parents(
     return suggestions;
 }
 
+/** The providers a property names: `clocks` a fixed clock, `*-supply` a fixed regulator. */
+const PROVIDERS = [
+    { names: (property: string) => property === "clocks", compatible: "fixed-clock", is: is_clock, describe: describe_clock },
+    { names: (property: string) => property.endsWith("-supply"), compatible: "regulator-fixed", is: is_regulator, describe: describe_regulator },
+] as const;
+
 /**
  * Clock and supply providers the base tree already has.
  */
 function suggest_labelled_providers(property: string, devicetree: DeviceTree): ValueSuggestion[] {
-    if (property === "clocks") {
-        return labelled_providers(devicetree, is_clock).map(({ label, node }) => ({
-            rows: [[{ label }]],
-            display: `${label} — ${describe_clock(node)}`,
-            source: "devicetree",
-        }));
-    }
-    if (property.endsWith("-supply")) {
-        return labelled_providers(devicetree, is_regulator).map(({ label, node }) => ({
-            rows: [[{ label }]],
-            display: `${label} — ${describe_regulator(node)}`,
-            source: "devicetree",
-        }));
-    }
-    return [];
+    const provider = PROVIDERS.find(entry => entry.names(property));
+    if (provider === undefined) { return []; }
+    return labelled_providers(devicetree, provider.is).map(({ label, node }) => ({
+        rows: [[{ label }]],
+        display: `${label} — ${provider.describe(node)}`,
+        source: "devicetree",
+    }));
+}
+
+/**
+ * The compatibles of the providers a user can add for `property` instead of
+ * picking one the tree has: `fixed-clock` for `clocks`, `regulator-fixed` for
+ * `*-supply`, none for anything else.
+ */
+export function creatable_providers(property: string): string[] {
+    return PROVIDERS.filter(entry => entry.names(property)).map(entry => entry.compatible);
 }
 
 /**
@@ -202,6 +209,13 @@ if (import.meta.vitest) {
     test("devicetree_layer — *-supply: labelled fixed regulators with their voltage", () => {
         expect(values("vref-supply").map(s => s.display)).toStrictEqual([`vdd_3v3_reg — regulator "3v3", 3.3 V, always on`]);
         expect(values("vref-supply")[0]?.note).toBeUndefined();
+    });
+
+    test("creatable_providers — a fixed clock for clocks, a fixed regulator for supplies, nothing otherwise", () => {
+        expect(creatable_providers("clocks")).toStrictEqual(["fixed-clock"]);
+        expect(creatable_providers("vref-supply")).toStrictEqual(["regulator-fixed"]);
+        expect(creatable_providers("assigned-clocks")).toStrictEqual([]);
+        expect(creatable_providers("reg")).toStrictEqual([]);
     });
 
     test("devicetree_layer — on a merged tree, the overlay's providers and the ones it enables count", async () => {

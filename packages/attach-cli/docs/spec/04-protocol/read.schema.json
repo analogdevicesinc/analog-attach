@@ -267,7 +267,7 @@
       "unevaluatedProperties": false
     },
     "read-node": {
-      "description": "A merged node (READ-022, READ-052).",
+      "description": "A merged node (READ-022, READ-052). A collapsed child has origin base and no properties or children.",
       "type": "object",
       "required": [
         "kind",
@@ -293,7 +293,7 @@
         "children": {
           "type": "array",
           "items": {
-            "$ref": "#/$defs/read-child"
+            "$ref": "#/$defs/read-node"
           }
         },
         "alias": {
@@ -308,84 +308,9 @@
             "overlay",
             "both"
           ]
-        },
-        "missing_required": {
-          "description": "READ-025: present when the node's binding was found and --quiet wasn't given.",
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
         }
       },
       "additionalProperties": false
-    },
-    "read-child": {
-      "type": "object",
-      "required": [
-        "kind",
-        "key",
-        "properties",
-        "children",
-        "alias",
-        "origin"
-      ],
-      "properties": {
-        "kind": {
-          "const": "node"
-        },
-        "key": {
-          "type": "string"
-        },
-        "properties": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/read-property-entry"
-          }
-        },
-        "children": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/read-child"
-          }
-        },
-        "alias": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "origin": {
-          "enum": [
-            "base",
-            "overlay",
-            "both"
-          ]
-        },
-        "collapsed": {
-          "const": true
-        }
-      },
-      "additionalProperties": false,
-      "if": {
-        "required": [
-          "collapsed"
-        ]
-      },
-      "then": {
-        "properties": {
-          "origin": {
-            "const": "base"
-          },
-          "properties": {
-            "type": "array",
-            "maxItems": 0
-          },
-          "children": {
-            "type": "array",
-            "maxItems": 0
-          }
-        }
-      }
     },
     "read-property": {
       "type": "object",
@@ -407,6 +332,25 @@
           "description": "The binding's description."
         },
         "suggestions": {
+          "$ref": "#/$defs/read-suggestions"
+        }
+      },
+      "unevaluatedProperties": false
+    },
+    "read-suggestions": {
+      "description": "READ-035: the suggested values, and the providers the user can add instead (READ-036).",
+      "type": "object",
+      "required": [
+        "values"
+      ],
+      "properties": {
+        "values": {
+          "type": "array",
+          "items": {
+            "$ref": "common.schema.json#/$defs/suggestion"
+          }
+        },
+        "can_create": {
           "type": "array",
           "minItems": 1,
           "items": {
@@ -414,7 +358,7 @@
           }
         }
       },
-      "unevaluatedProperties": false
+      "additionalProperties": false
     }
   }
 }

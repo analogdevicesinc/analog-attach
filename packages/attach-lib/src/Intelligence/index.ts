@@ -48,7 +48,7 @@ export type {
 } from "./layers/types.js";
 export { IntelligenceStack } from "./layers/stack.js";
 export { binding_layer } from "./layers/binding.js";
-export { devicetree_layer } from "./layers/devicetree.js";
+export { devicetree_layer, creatable_providers } from "./layers/devicetree.js";
 export { placement_from_overlay } from "./layers/placement.js";
 
 // Interrupt parent resolution

@@ -15,7 +15,7 @@ Grammar: rule `read` in `01-grammar.abnf`.
 |---|---|---|
 | `<path>` | The node: a node path (GRM-020). | none: the whole overlay (§5) |
 | `<property>` | One property of the node (GRM-030). | none: the node (§6) |
-| `--quiet` | Leave out what the binding says: the description, allowed values, suggestions and missing required properties. | off |
+| `--quiet` | Leave out what the binding says: the description, allowed values, suggestions, providers to add and missing required properties. | off |
 
 ## 2. Terms
 
@@ -105,10 +105,8 @@ READ-052 (schema `read.schema.json#/$defs/read-node`).
 **READ-025** Where the bindings load, `--quiet` isn't given and the node's
 binding is found, the CLI shall give the node's missing required properties
 (as `add` §11 defines them). In human mode, it shall write `Missing required:
-<p1>, <p2>, …` after the node, and nothing when none are missing. In JSON
-mode, it shall add `missing_required`, an array of the names, which is
-present (empty) when none are missing. Without a binding there is neither the
-line nor the field.
+<p1>, <p2>, …` after the node, and nothing when none are missing. Without a
+binding there is no line. JSON mode doesn't give them.
 
 **READ-026** Where `--quiet` is given, the CLI shall show the node as
 READ-022 to READ-024 say, `// base` marks included, without the missing
@@ -140,6 +138,8 @@ order:
    signed or unsigned cell gives no line.
 3. `Default: <default>`, the binding's default as JSON, when it has one.
 4. The suggestions (READ-033), when there are any.
+5. `Or add your own: attach-linux add <compatible>` (`, ` between several),
+   when the property names a provider the user can add (READ-036).
 
 **READ-033** The suggestions are what `list value` gives, followed by the
 phandle's other candidates (marked `disabled`, `enabled`, `enabled by the
@@ -155,10 +155,20 @@ for a flag, and otherwise the property line of READ-023 without the `// base`
 mark (`reg = <2>;`). (Open issue R-2.)
 
 **READ-035** While in JSON mode, the CLI shall respond with the property per
-READ-050, plus `source`, plus `description` when the binding describes it and
-`suggestions` (READ-033, unfiltered) when there are any (schema
+READ-050, plus `source`, plus `description` when the binding describes it,
+plus `suggestions` when there are suggestions (READ-033, unfiltered) or
+providers to add (READ-036): `{ "values": [<suggestion>, …], "can_create":
+[<suggestion>, …] }`, `values` always there (empty when there are none),
+`can_create` only when it isn't empty (schema
 `read.schema.json#/$defs/read-property`). With `--quiet`, `description` and
 `suggestions` are left out.
+
+**READ-036** The providers a user can add for a property instead of naming
+one the tree has are attach-lib's `creatable_providers`: `fixed-clock` for
+`clocks` and `regulator-fixed` for a `*-supply`, none for any other
+property. In JSON each is `{ "value": <compatible>, "display_string": "add
+<compatible>" }`, `<compatible>` being what `add` takes. They don't depend on
+the binding.
 
 ## 8. JSON conversion
 
@@ -187,8 +197,8 @@ array of its labels (empty when it has none).
 
 **READ-052** For `read <path>`, the CLI shall give each property per READ-050
 with `source`, and each node per READ-051 with `origin`, its children
-recursively. A collapsed child has `"collapsed": true`, no properties and no
-children.
+recursively. A collapsed child (READ-022) has its key, labels and `origin`
+`"base"`, and no properties and no children.
 
 ## 9. Open issues
 
@@ -260,7 +270,18 @@ compatible = "brcm,bcm2835-spi";   // base
 $ attach-linux --json read adc/channel@0
 {"kind":"node","key":"channel@0","properties":[{"kind":"property","key":"reg",
  "type":{"kind":"number","subtype":"int"},"value":0,"source":"overlay"}],
- "children":[],"alias":[],"origin":"overlay","missing_required":["diff-channels"]}
+ "children":[],"alias":[],"origin":"overlay"}
 ```
 
 (Wrapped here; the CLI writes one line.)
+
+```
+$ attach-linux read adc refin1-supply
+refin1-supply = <&vdd_3v3_reg>;
+  refin1 supply can be used as reference for conversion.   (adi,ad7124.yaml)
+  Suggestions:
+    cam1_reg — regulator "cam1-reg"
+    vdd_3v3_reg — regulator "3v3", 3.3 V, always on
+    …
+  Or add your own: attach-linux add regulator-fixed
+```

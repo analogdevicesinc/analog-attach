@@ -287,13 +287,14 @@ doesn't have the property, then the CLI shall refuse with `Not found:
 **UPDATE-111** While in human mode, the CLI shall write the property as a DTS
 line (`spi-max-frequency = <1000000>;`). Without `--quiet`, the line ends
 with `   // base` when its value comes from the base, and the binding's
-description, allowed values and suggestions follow it. With `--quiet`, the
-DTS line is all.
+description, allowed values, suggestions and providers to add follow it
+(READ-032). With `--quiet`, the DTS line is all.
 
 **UPDATE-112** While in JSON mode, the CLI shall respond with the property
 object of `04-protocol/update.schema.json#/$defs/read-property`: `kind`,
 `key`, `type`, `value`, `source` (`base` or `overlay`), and, without
-`--quiet`, `description` and `suggestions` when the binding gives them.
+`--quiet`, `description` when the binding gives one and `suggestions` (`{
+values, can_create }`, READ-035) when there are any.
 
 **UPDATE-113** When reading, the CLI shall write nothing to the overlay and
 give no diagnostics of UPDATE-015.

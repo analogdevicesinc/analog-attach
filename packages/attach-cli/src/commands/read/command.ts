@@ -1,7 +1,7 @@
 import path from "node:path";
 
 import { Command } from "commander";
-import { DeviceTreeOverlay, get_full_node_name, is_dt_flag, print_property, type DTProperty } from "attach-lib";
+import { DeviceTreeOverlay, creatable_providers, get_full_node_name, is_dt_flag, print_property, type DTProperty } from "attach-lib";
 
 import type { LocalContext } from "../../context";
 import { load_workspace, parse_bindings, type Bindings } from "../../config/workspace";
@@ -22,8 +22,9 @@ export interface ReadOptions {
  * Find a node and optionally a property on it, printing JSON or human output.
  * The node is read as the base and the overlay together have it, each value
  * marked with where it is set. Unless quiet, a property comes with what its
- * binding says about it and the values on offer, and a node with the required
- * properties it still lacks. Shared with `update <path> <prop>` without a value.
+ * binding says about it, the values on offer and the providers that can be
+ * added for it, and a node (in human mode) with the required properties it
+ * still lacks. Shared with `update <path> <prop>` without a value.
  */
 export async function read_target(
     context_: LocalContext,
@@ -59,18 +60,20 @@ export async function read_target(
         return;
     }
 
-    const target = options.quiet || base === undefined ? undefined : await resolve_target_binding(path_string, overlay, base, bindings);
+    // A node's binding only gives the missing required properties, which JSON mode doesn't report.
+    const needs_binding = !options.quiet && (property !== undefined || !context_.json);
+    const target = !needs_binding || base === undefined ? undefined : await resolve_target_binding(path_string, overlay, base, bindings);
     const binding = target === undefined || "error" in target.binding ? undefined : target.binding;
 
     if (property === undefined) {
-        const missing = binding === undefined ? undefined : node_missing_required(binding, overlay, node_path);
         const read = read_node(overlay, node_path);
         if (context_.json) {
-            const response: ReadResponse = { ...protocol_node(read), ...(missing === undefined ? {} : { missing_required: missing }) };
+            const response: ReadResponse = protocol_node(read);
             respond(response);
         } else {
+            const missing = binding === undefined ? [] : node_missing_required(binding, overlay, node_path);
             for (const line of node_lines(read)) { console.log(line); }
-            for (const line of format_missing(missing ?? [])) { console.log(line); }
+            for (const line of format_missing(missing)) { console.log(line); }
         }
         return;
     }
@@ -80,6 +83,7 @@ export async function read_target(
         : property_details(target, overlay, base, path_string, property.name);
     const { info } = details;
     const suggestions = [...details.suggestions, ...details.others];
+    const creatable = options.quiet ? [] : creatable_providers(property.name);
 
     const source = property_source(overlay, node_path, property.name);
     if (context_.json) {
@@ -87,7 +91,12 @@ export async function read_target(
             ...convert_property(property),
             source,
             ...(info?.description === undefined ? {} : { description: info.description }),
-            ...(suggestions.length === 0 ? {} : { suggestions }),
+            ...(suggestions.length === 0 && creatable.length === 0 ? {} : {
+                suggestions: {
+                    values: suggestions,
+                    ...(creatable.length === 0 ? {} : { can_create: creatable.map(compatible => ({ value: compatible, display_string: `add ${compatible}` })) }),
+                },
+            }),
         };
         respond(response);
     } else if (options.quiet) {
@@ -95,6 +104,7 @@ export async function read_target(
     } else {
         console.log(`${property_line(property)}${source === "base" ? BASE_MARK : ""}`);
         for (const line of format_details(info, suggestions)) { console.log(line); }
+        if (creatable.length > 0) { console.log(`  Or add your own: ${creatable.map(compatible => `attach-linux add ${compatible}`).join(", ")}`); }
     }
 }
 
@@ -160,7 +170,6 @@ function protocol_node(node: NodeRead): ReadNode {
         children: node.children.map(child => protocol_node(child)),
         alias: node.labels,
         origin: node.origin,
-        ...(node.collapsed ? { collapsed: true as const } : {}),
     };
 }
 
@@ -503,7 +512,34 @@ if (import.meta.vitest) {
             key: "i2c@7e804000",
             origin: "both",
             properties: [{ key: "compatible", source: "base" }, { key: "status", source: "overlay" }],
-            children: [{ key: "rtc@51", origin: "base", collapsed: true, properties: [] }, { key: "hwmon@2e", origin: "overlay" }],
+            children: [{ key: "rtc@51", origin: "base", properties: [], children: [] }, { key: "hwmon@2e", origin: "overlay" }],
         });
+        expect(responses[1]).not.toHaveProperty("children.0.collapsed");
+        expect(responses[1]).not.toHaveProperty("missing_required");
+    });
+
+    test("read_target — a clock or a supply can be added instead of the values on offer, unless quiet", async () => {
+        const base = DT.new_from_string(`/dts-v1/;\n/ {\n\tsoc {\n\t\tspi0: spi@7e204000 {\n\t\t};\n\t};\n};`);
+        if (typeof base === "string") { throw new TypeError(base); }
+        const overlay = DTO.new_from_string(`/dts-v1/;\n/plugin/;\n\n&spi0 {\n\tadc@0 {\n\t\tvref-supply = <&spi0>;\n\t\tspi-max-frequency = <1000000>;\n\t};\n};`, base);
+        if (typeof overlay === "string") { throw new TypeError(overlay); }
+        const no_bindings: ConfigResult<Bindings> = { ok: false, errors: [{ field: "dt-schema", kind: "missing", message: "no dt-schema" }] };
+        const run = async (json: boolean, property: string, quiet = false): Promise<string[]> => {
+            const logs: string[] = [];
+            const spy = vi.spyOn(console, "log").mockImplementation((line: string) => { logs.push(line); });
+            await read_target({ json }, overlay, no_bindings, "spi0/adc@0", property, { quiet });
+            spy.mockRestore();
+            return logs;
+        };
+
+        const [supply] = await run(true, "vref-supply");
+        expect(JSON.parse(supply ?? "")).toMatchObject({
+            suggestions: { values: [], can_create: [{ value: "regulator-fixed", display_string: "add regulator-fixed" }] },
+        });
+        expect(await run(false, "vref-supply")).toEqual(["vref-supply = <&spi0>;", "  Or add your own: attach-linux add regulator-fixed"]);
+        const [quiet] = await run(true, "vref-supply", true);
+        expect(JSON.parse(quiet ?? "")).not.toHaveProperty("suggestions");
+        const [frequency] = await run(true, "spi-max-frequency");
+        expect(JSON.parse(frequency ?? "")).not.toHaveProperty("suggestions");
     });
 }

@@ -104,19 +104,25 @@ export interface ReadProperty extends Property {
 /**
  * A node as the base and the overlay together have it. `origin` says which
  * has it: "base" (the overlay doesn't change it), "overlay" (the overlay adds
- * it) or "both". A `collapsed` child is a base node the overlay doesn't reach:
- * only its name and labels are given, `read` on its path shows the rest.
+ * it) or "both". A child the overlay doesn't reach is a base node given by its
+ * name and labels only, with no properties or children: `read` on its path
+ * shows the rest.
  */
 export interface ReadNode extends Omit<Node, "properties" | "children"> {
     properties: ReadProperty[];
     children: ReadNode[];
     origin: "base" | "overlay" | "both";
-    collapsed?: true;
+}
+
+/** What a property can be set to: the values on offer, and the providers a user can add instead (`add <compatible>`). */
+export interface PropertySuggestions {
+    values: Suggestion[];
+    can_create?: Suggestion[];
 }
 
 export type ReadResponse =
-    | (ReadNode & { missing_required?: string[] })
-    | (ReadProperty & { description?: string; suggestions?: Suggestion[] });
+    | ReadNode
+    | (ReadProperty & { description?: string; suggestions?: PropertySuggestions });
 
 export interface DeletePreview extends CommonResponse {
     node_count: number;

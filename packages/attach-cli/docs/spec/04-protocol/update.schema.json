@@ -51,15 +51,12 @@
         "value": { "$ref": "#/$defs/property-value" },
         "source": { "enum": ["base", "overlay"] },
         "description": { "type": "string" },
-        "suggestions": {
-          "type": "array",
-          "items": { "$ref": "common.schema.json#/$defs/suggestion" }
-        }
+        "suggestions": { "$ref": "read.schema.json#/$defs/read-suggestions" }
       },
       "additionalProperties": false
     },
     "node": {
-      "description": "An existing child, as read <path>/<child> gives it (UPDATE-120): read's merged node, with missing_required unless --quiet.",
+      "description": "An existing child, as read <path>/<child> gives it (UPDATE-120): read's merged node.",
       "$ref": "read.schema.json#/$defs/read-node"
     },
     "property-value": {

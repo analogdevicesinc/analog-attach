@@ -492,9 +492,10 @@ attach-linux read [path] [property]
 - Path only: prints the node and its children, then the required properties it still lacks (`Missing required: interrupt-parent, interrupts`)
 - Path + property: prints the property, then its binding description and file, the allowed values, and the suggestions (the same values as `list value`)
 - A phandle (`interrupt-parent`, `*-supply`) has no `Allowed:` line: any node of the right kind will do. After the suggestions come the other nodes it could name, marked `(disabled)` or `(enabled by the overlay)` (`note` under `--json`); the add interview never takes one of them as its Enter default
+- `clocks` and `*-supply` end with `Or add your own: attach-linux add fixed-clock` (or `regulator-fixed`): when none of the suggestions fits, add that node and point the property at its label
 - `--quiet`: only the value (`true` for a flag) or the node block, for scripts
 - Without bindings the extra lines are left out
-- `--json`: a property gets optional `description` and `suggestions`; a node gets `missing_required`
+- `--json`: a property gets optional `description` and `suggestions: { values, can_create? }` (`can_create`: the compatibles to `add` instead, `fixed-clock` / `regulator-fixed`); a node gets no binding details (use `list property <path>` for what it still lacks)
 
 **Examples**:
 ```bash
