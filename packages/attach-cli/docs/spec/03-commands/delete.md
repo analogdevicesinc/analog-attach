@@ -15,7 +15,7 @@ Grammar: rule `delete` in `01-grammar.abnf`.
 |---|---|---|
 | `<path>` | The node. | none: the whole overlay (§5) |
 | `<property>` | A property the overlay sets on the node. | none: the node (§6) |
-| `--force` | Without `<path>`: delete instead of previewing. In JSON mode, with `<path>`: delete a node that has children instead of previewing. | off |
+| `--force` | Delete instead of previewing: without `<path>` the whole overlay, with `<path>` a node that has children. | off |
 
 ## 2. Terms
 
@@ -88,15 +88,15 @@ the base lacks (`target-path = "/nothere"`), then the CLI shall refuse with
 node without --force` in JSON mode. The nodes in that body are added nodes
 and can be deleted (`delete /nothere/baz`).
 
-**DELETE-024** While in JSON mode, when the added node has children and
-`--force` isn't given, the CLI shall write nothing and respond with a preview
-(`delete.schema.json#/$defs/preview`): `node_count` the node and its
-descendants, `property_count` their properties, `paths` each of them from the
-node, starting with `[<key>]`.
+**DELETE-024** When the added node has children and `--force` isn't given,
+the CLI shall write nothing and answer with a preview of the node: in human
+mode the lines of DELETE-011, in JSON mode a `DeletePreview`
+(`delete.schema.json#/$defs/preview`). It counts the node and its descendants
+(`node_count`) and their properties (`property_count`), and lists each of them
+from the node, starting with `<key>` (`paths`, starting with `[<key>]`).
 
 **DELETE-025** Otherwise, the CLI shall remove the added node with all its
-descendants and save the overlay. While in human mode, `--force` has no
-effect: a node with children is removed at once. (Open issue D-1.)
+descendants and save the overlay.
 
 **DELETE-026** When a removal leaves a fragment's `__overlay__` body with no
 properties and no nodes, the CLI shall remove that fragment and renumber the
@@ -127,11 +127,6 @@ in <overlay file>` in human mode, and respond `{"ok": true, "message":
 (`CommonResponse` with `ok` `true`, `severity` `"info"`) or a refusal.
 
 ## 9. Open issues
-
-**D-1. Human mode deletes a subtree without asking.** In JSON mode a node
-with children needs `--force` and gets a preview first. In human mode it is
-deleted at once and `--force` is ignored, although the help says `--force`
-deletes non-leaf nodes.
 
 **D-2. The overlay preview doesn't count everything `--force` deletes.**
 DELETE-010 counts only `__overlay__` bodies. `delete --force` also removes
@@ -172,6 +167,15 @@ $ attach-linux delete
 Would delete 2 node(s) and 8 property(ies)
   adi,ad7124-8@2
   adi,ad7124-8@2/channel@0
+```
+
+```
+$ attach-linux delete adc
+Would delete 2 node(s) and 7 property(ies)
+  adi,ad7124-8@2
+  adi,ad7124-8@2/channel@0
+$ attach-linux delete adc --force
+Deleted adc from /work/ad7124-8.dtso
 ```
 
 ```

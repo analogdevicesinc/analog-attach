@@ -91,24 +91,29 @@ Examples:
 
             const identifier = path_argument;
 
-            if (context_.json) {
-                const found = overlay.find_node(resolve_node_identifier(identifier, overlay));
-
-                if (found !== undefined && !found.is_in_base && found.parent_node !== undefined
-                    && found.node.children.length > 0 && !options.force) {
-                    const preview = count_subtree(found.node);
+            const found = overlay.find_node(resolve_node_identifier(identifier, overlay));
+            if (found !== undefined && !found.is_in_base && found.parent_node !== undefined
+                && found.node.children.length > 0 && !options.force) {
+                const preview = count_subtree(found.node);
+                const message = `Would delete ${preview.node_count} node(s) and ${preview.property_count} property(ies)`;
+                if (context_.json) {
                     const response: DeletePreview = {
                         ok: true,
-                        message: `Would delete ${preview.node_count} node(s) and ${preview.property_count} property(ies)`,
+                        message,
                         severity: "warn",
                         node_count: preview.node_count,
                         property_count: preview.property_count,
                         paths: preview.paths,
                     };
                     respond(response);
-                    return;
+                } else {
+                    console.log(message);
+                    for (const p of preview.paths) { console.log(`  ${p.join("/")}`); }
                 }
+                return;
+            }
 
+            if (context_.json) {
                 const result = delete_overlay_node(base, overlay, identifier);
 
                 switch (result) {
