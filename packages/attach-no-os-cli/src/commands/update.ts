@@ -22,9 +22,13 @@ import {
 } from "../completion/completion";
 import { ELEMENT_SEPARATOR, READONLY_KEYS, RESERVED_PREFIX, parse_property_value } from "../protocol/convert";
 import { common_ok } from "../protocol/responses";
+import { value_suggestions } from "./list";
+import { read_target } from "./read";
 
 type UpdateFlags = {
     json?: boolean;
+    quiet?: boolean;
+    suggest?: boolean;
 };
 
 /**
@@ -36,6 +40,9 @@ type UpdateFlags = {
  *
  * The value arrives as text, so parsing it into a number, an enum member or a union is
  * this command's job (see parse_property_value).
+ *
+ * With no value it reads the property instead, as `read` does, and with --suggest it lists
+ * what the property can be set to, as `list value` does.
  */
 export const updateCommand = buildCommand<
     UpdateFlags,
@@ -45,7 +52,8 @@ export const updateCommand = buildCommand<
     docs: {
         brief: "Set a property on a node",
         fullDescription:
-            "Sets <property> on <node> to <value>.\n" +
+            "Sets <property> on <node> to <value>. With no <value>, reads the property instead;\n" +
+            "with --suggest, lists what it can be set to (for a union, after the member).\n" +
             `A union takes '<member>${ELEMENT_SEPARATOR}<value>' (or two positionals), an array a comma-separated list.\n` +
             `A property whose name starts with '${RESERVED_PREFIX}' can be written without it: init_param means ${RESERVED_PREFIX}init_param.`
     },
@@ -83,7 +91,9 @@ export const updateCommand = buildCommand<
             ]
         },
         flags: {
-            json: { kind: "boolean", brief: "Output as JSON", optional: true }
+            json: { kind: "boolean", brief: "Output as JSON", optional: true },
+            quiet: { kind: "boolean", brief: "When reading, print only the value", optional: true },
+            suggest: { kind: "boolean", brief: "List what the property can be set to, instead of setting it", optional: true }
         }
     },
     func: async (flags: UpdateFlags, node, property, value, union_value) => {
@@ -93,6 +103,23 @@ export const updateCommand = buildCommand<
                 "Nothing to update: pass <node> <property> <value>. " +
                 "Use 'attach-noos read' to see the nodes and 'attach-noos read <node>' to see their properties."
             );
+            return;
+        }
+
+        // The values it can take: a union's are those of the member named after the property.
+        if (flags.suggest === true) {
+            const found = value_suggestions(node, property, value);
+            if (!found.ok) {
+                output_error(flags, found.message);
+                return;
+            }
+            output(flags, found.text, found.response);
+            return;
+        }
+
+        // No value: what it is now, rather than an error.
+        if (value === undefined) {
+            read_target(flags, node, property);
             return;
         }
 
@@ -136,18 +163,7 @@ export const updateCommand = buildCommand<
 
         // Two positionals for a union ('<member> <value>') fold into the one string the
         // parser expects.
-        const raw = value !== undefined && union_value !== undefined
-            ? `${value}${ELEMENT_SEPARATOR}${union_value}`
-            : value;
-
-        if (raw === undefined) {
-            output_error(
-                flags,
-                `No value given for '${node}.${property}'. Pass it after the property; ` +
-                `'attach-noos read ${node} ${property}' lists what it accepts.`
-            );
-            return;
-        }
+        const raw = union_value === undefined ? value : `${value}${ELEMENT_SEPARATOR}${union_value}`;
 
         const parsed = parse_property_value(raw, lookup.value.property);
         if (!parsed.ok) {

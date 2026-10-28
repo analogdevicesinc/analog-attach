@@ -2,27 +2,20 @@ import { buildCommand } from "@stricli/core";
 import { rename_symbol } from "attach-no-os-lib";
 import type { AttachContext } from "./shared";
 import { load_context, output, output_error, save_workfile } from "./shared";
-import {
-    prior_positionals,
-    filter_completions,
-    get_node_names,
-    get_property_names
-} from "../completion/completion";
+import { filter_completions, get_node_names } from "../completion/completion";
 import { common_ok } from "../protocol/responses";
 
 type RenameFlags = {
     json?: boolean;
-    to?: string;
 };
 
 /**
- * `attach-noos rename <node> --to <name>` — rename a node.
+ * `attach-noos rename <node> <new-name>` — rename a node.
  *
  * Renaming a node rewrites every reference to it, which is why this is a command of its own
- * rather than a delete-and-re-add: the references are the part that would be lost.
- *
- * A property cannot be renamed. Its name is a field name in the C struct the node's schema
- * describes, so a different name is a different field — which is what the refusal says.
+ * rather than a delete-and-re-add: the references are the part that would be lost. Only
+ * nodes are renamed: a property's name is a field of the C struct the node generates, and
+ * its schema decides it.
  */
 export const renameCommand = buildCommand<
     RenameFlags,
@@ -31,7 +24,7 @@ export const renameCommand = buildCommand<
 >({
     docs: {
         brief: "Rename a node",
-        fullDescription: "Renames <node> to --to, rewriting every reference to it. Properties cannot be renamed."
+        fullDescription: "Renames <node> to <new-name>, rewriting every reference to it."
     },
     parameters: {
         positional: {
@@ -43,37 +36,21 @@ export const renameCommand = buildCommand<
                         return filter_completions(get_node_names(), partial);
                     }
                 },
-                {
-                    placeholder: "property", brief: "Property (accepted, but properties cannot be renamed)", optional: true, parse: String,
-                    proposeCompletions(partial: string) {
-                        const [node] = prior_positionals(this, 1);
-                        return filter_completions(get_property_names(node), partial);
-                    }
-                }
+                { placeholder: "new-name", brief: "Its new name", optional: true, parse: String }
             ]
         },
         flags: {
-            json: { kind: "boolean", brief: "Output as JSON", optional: true },
-            to: { kind: "parsed", brief: "New name", optional: true, parse: String }
+            json: { kind: "boolean", brief: "Output as JSON", optional: true }
         }
     },
-    func: async (flags: RenameFlags, node, property) => {
+    func: async (flags: RenameFlags, node, new_name) => {
         if (!node) {
-            output_error(flags, "Nothing to rename: pass <node> --to <name>");
+            output_error(flags, "Nothing to rename: pass <node> <new-name>");
             return;
         }
 
-        if (!flags.to) {
-            output_error(flags, `No new name for '${node}': pass --to <name>`);
-            return;
-        }
-
-        if (property) {
-            output_error(
-                flags,
-                `'${property}' cannot be renamed: a property name is a field of the C struct '${node}' `
-                + "generates, and its schema decides what those fields are called."
-            );
+        if (!new_name) {
+            output_error(flags, `No new name for '${node}': pass it after the node`);
             return;
         }
 
@@ -83,7 +60,7 @@ export const renameCommand = buildCommand<
             return;
         }
 
-        const renamed = rename_symbol(context.value.workfile, node, flags.to);
+        const renamed = rename_symbol(context.value.workfile, node, new_name);
         if (!renamed.ok) {
             output_error(flags, renamed.error.message);
             return;
@@ -97,7 +74,7 @@ export const renameCommand = buildCommand<
             return;
         }
 
-        const message = `Renamed '${node}' to '${flags.to}'`;
+        const message = `Renamed '${node}' to '${new_name}'`;
         output(flags, message, common_ok(message));
     }
 });

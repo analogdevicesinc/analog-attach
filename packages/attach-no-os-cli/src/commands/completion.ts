@@ -1,115 +1,149 @@
-import { buildCommand, buildRouteMap } from "@stricli/core";
+import { buildCommand } from "@stricli/core";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { common_ok } from "../protocol/responses";
 import { output, output_error } from "./shared";
 
 /**
- * `attach-noos completion install|uninstall` — tab-completion in the user's own shell.
+ * `attach-noos completion [<shell>] [--install | --uninstall]` — tab-completion in the
+ * user's own shell.
  *
- * It speaks the same response shape as everything else, so `--json` means one thing across
- * the whole CLI.
+ * Bare, it prints the shell's script, to source or eval. --install writes it where that
+ * shell picks completion up for the user, and --uninstall removes it, so only those two
+ * change anything on the system. The shell is the one named, else the one in $SHELL.
+ *
+ * Every script calls `attach-noos complete`, so the three shells offer the same lists.
  */
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const COMPLETION_SCRIPT_PATH = path.join(__dirname, "../completion/attach-noos.bash");
-const SYSTEM_COMPLETION_DIR = "/etc/bash_completion.d";
-const USER_COMPLETION_DIR = path.join(process.env.HOME ?? "~", ".local/share/bash-completion/completions");
 
-type CompletionFlags = { json?: boolean; user?: boolean };
+/**
+ * The scripts' folder: dist/completion next to the bundle once built (the build copies it
+ * there), else the package's own completion/ folder, seen from dist/ or from src/commands/.
+ */
+function scripts_folder(): string {
+    const candidates = [
+        path.join(__dirname, "completion"),
+        path.join(__dirname, "../completion"),
+        path.join(__dirname, "../../completion"),
+    ];
+    return candidates.find(candidate => fs.existsSync(path.join(candidate, "attach-noos.bash"))) ?? candidates[0];
+}
 
-const installCommand = buildCommand<CompletionFlags, []>({
-    docs: { brief: "Install bash completion for attach-noos" },
+type Shell = "bash" | "fish" | "zsh";
+const SHELLS: readonly Shell[] = ["bash", "fish", "zsh"];
+
+/** Where each shell's script lives in the package, and where it is installed for the user. */
+const TARGETS: Record<Shell, { script: string, installed: () => string, after: string }> = {
+    bash: {
+        script: "attach-noos.bash",
+        installed: () => path.join(os.homedir(), ".local/share/bash-completion/completions/attach-noos"),
+        after: "Open a new shell (bash-completion loads it from there).",
+    },
+    fish: {
+        script: "attach-noos.fish",
+        installed: () => path.join(os.homedir(), ".config/fish/completions/attach-noos.fish"),
+        after: "Open a new shell (fish loads it from there).",
+    },
+    zsh: {
+        script: "_attach-noos",
+        installed: () => path.join(os.homedir(), ".zsh/completions/_attach-noos"),
+        after: "Make sure ~/.zshrc has, before compinit:\n  fpath=(~/.zsh/completions $fpath)\n  autoload -Uz compinit && compinit\nthen open a new shell.",
+    },
+};
+
+type CompletionFlags = { json?: boolean; install?: boolean; uninstall?: boolean };
+
+function shell_from_environment(): Shell | undefined {
+    const name = path.basename(process.env.SHELL ?? "");
+    return SHELLS.find(shell => shell === name);
+}
+
+export const completionCommand = buildCommand<CompletionFlags, [string | undefined]>({
+    docs: {
+        brief: "Print or install shell completion (bash, fish, zsh)",
+        fullDescription:
+            "Prints the completion script for <shell> (default: the shell in $SHELL), to source or eval:\n" +
+            "  bash:  source <(attach-noos completion bash)\n" +
+            "  fish:  attach-noos completion fish | source\n" +
+            "  zsh:   eval \"$(attach-noos completion zsh)\"\n" +
+            "--install writes it where the shell loads it for your user; --uninstall removes it."
+    },
     parameters: {
-        positional: { kind: "tuple", parameters: [] },
+        positional: {
+            kind: "tuple",
+            parameters: [
+                {
+                    placeholder: "shell", brief: "bash, fish or zsh (default: from $SHELL)", optional: true, parse: String,
+                    proposeCompletions(partial: string) {
+                        return SHELLS.filter(shell => shell.startsWith(partial));
+                    }
+                }
+            ]
+        },
         flags: {
-            json: { kind: "boolean", brief: "Output as JSON", optional: true },
-            user: { kind: "boolean", brief: "Install to user directory instead of system-wide", optional: true }
+            install: { kind: "boolean", brief: "Install it for your user", optional: true },
+            uninstall: { kind: "boolean", brief: "Remove the installed script", optional: true },
+            json: { kind: "boolean", brief: "Output as JSON", optional: true }
         }
     },
-    func: async (flags) => {
-        const target_directory = flags.user ? USER_COMPLETION_DIR : SYSTEM_COMPLETION_DIR;
-        const target_path = path.join(target_directory, "attach-noos");
-
-        if (!fs.existsSync(COMPLETION_SCRIPT_PATH)) {
-            output_error(flags, `Completion script not found at '${COMPLETION_SCRIPT_PATH}'. This is a packaging issue.`);
+    func: async (flags, named) => {
+        const shell = named === undefined ? shell_from_environment() : SHELLS.find(candidate => candidate === named);
+        if (shell === undefined) {
+            output_error(flags, named === undefined
+                ? `Cannot tell the shell from $SHELL ('${process.env.SHELL ?? ""}'): pass one of ${SHELLS.join(", ")}`
+                : `Unknown shell '${named}': pass one of ${SHELLS.join(", ")}`);
+            return;
+        }
+        if (flags.install === true && flags.uninstall === true) {
+            output_error(flags, "Pass --install or --uninstall, not both");
             return;
         }
 
-        if (flags.user && !fs.existsSync(target_directory)) {
-            try {
-                fs.mkdirSync(target_directory, { recursive: true });
-            } catch (error) {
-                output_error(flags, `Failed to create directory '${target_directory}': ${String(error)}`);
+        const target = TARGETS[shell];
+        const source = path.join(scripts_folder(), target.script);
+        // Resolved now, not at load: the home directory is the one of this run.
+        const installed = target.installed();
+        if (!fs.existsSync(source)) {
+            output_error(flags, `Completion script not found at '${source}'. This is a packaging issue.`);
+            return;
+        }
+
+        if (flags.uninstall === true) {
+            if (!fs.existsSync(installed)) {
+                // Not installed is the state that was asked for, so this is a success.
+                const message = `No ${shell} completion at '${installed}'; nothing to remove`;
+                output(flags, message, common_ok(message));
                 return;
             }
-        }
-
-        try {
-            fs.writeFileSync(target_path, fs.readFileSync(COMPLETION_SCRIPT_PATH, "utf8"));
-        } catch (error) {
-            const denied = (error as NodeJS.ErrnoException).code === "EACCES";
-            if (denied && !flags.user) {
-                const message = "Permission denied. Re-run with sudo, or use --user for a user-local install.";
-                output_error(flags, message, {
-                    text: `${message}\n\n  sudo attach-noos completion install\n  or\n  attach-noos completion install --user`
-                });
-            } else {
-                output_error(flags, `Failed to install completion script: ${String(error)}`);
+            try {
+                fs.unlinkSync(installed);
+            } catch (error) {
+                output_error(flags, `Failed to remove '${installed}': ${String(error)}`);
+                return;
             }
+            const message = `Removed the ${shell} completion from ${installed}`;
+            output(flags, `${message}\nOpen a new shell for the change to take effect.`, common_ok(message));
             return;
         }
 
-        const message = `Completion script installed to ${target_path}`;
-        output(flags, `${message}\n\nRestart your shell or run:\n  source ${target_path}`, common_ok(message));
-    }
-});
-
-const uninstallCommand = buildCommand<CompletionFlags, []>({
-    docs: { brief: "Uninstall bash completion for attach-noos" },
-    parameters: {
-        positional: { kind: "tuple", parameters: [] },
-        flags: {
-            json: { kind: "boolean", brief: "Output as JSON", optional: true },
-            user: { kind: "boolean", brief: "Uninstall from user directory", optional: true }
-        }
-    },
-    func: async (flags) => {
-        const target_directory = flags.user ? USER_COMPLETION_DIR : SYSTEM_COMPLETION_DIR;
-        const target_path = path.join(target_directory, "attach-noos");
-
-        if (!fs.existsSync(target_path)) {
-            // Not installed is the state that was asked for, so this is a success.
-            const message = `No completion script at '${target_path}'; nothing to remove`;
-            output(flags, message, common_ok(message));
+        const script = fs.readFileSync(source, "utf8");
+        if (flags.install !== true) {
+            // The script itself on stdout, nothing else, so it can be sourced as it is.
+            output(flags, script.trimEnd(), { ...common_ok(`${shell} completion script`), shell, script });
             return;
         }
 
         try {
-            fs.unlinkSync(target_path);
+            fs.mkdirSync(path.dirname(installed), { recursive: true });
+            fs.writeFileSync(installed, script);
         } catch (error) {
-            const denied = (error as NodeJS.ErrnoException).code === "EACCES";
-            if (denied && !flags.user) {
-                const message = "Permission denied. Re-run with sudo.";
-                output_error(flags, message, { text: `${message}\n\n  sudo attach-noos completion uninstall` });
-            } else {
-                output_error(flags, `Failed to uninstall completion script: ${String(error)}`);
-            }
+            output_error(flags, `Failed to install the ${shell} completion: ${String(error)}`);
             return;
         }
-
-        const message = `Completion script removed from ${target_path}`;
-        output(flags, `${message}\n\nRestart your shell for the change to take effect.`, common_ok(message));
+        const message = `Installed the ${shell} completion to ${installed}`;
+        output(flags, `${message}\n${target.after}`, common_ok(message));
     }
-});
-
-export const completionCommand = buildRouteMap({
-    routes: {
-        install: installCommand,
-        uninstall: uninstallCommand,
-    },
-    docs: {
-        brief: "Manage shell completion",
-    },
 });

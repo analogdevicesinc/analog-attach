@@ -7,8 +7,7 @@ import { initCommand } from "./commands/init";
 import { deleteCommand } from "./commands/delete";
 import { deployCommand } from "./commands/deploy";
 import { generateCommand } from "./commands/generate";
-import { listBoardsCommand, listPlatformsCommand } from "./commands/list";
-import { listDevicesCommand } from "./commands/list_devices";
+import { listRoutes } from "./commands/list";
 import { readCommand } from "./commands/read";
 import { renameCommand } from "./commands/rename";
 import { updateCommand } from "./commands/update";
@@ -23,7 +22,7 @@ const routes = buildRouteMap({
 	routes: {
 		config: configCommand,
 		init: initCommand,
-		"list-devices": listDevicesCommand,
+		list: listRoutes,
 		add: addCommand,
 		read: readCommand,
 		update: updateCommand,
@@ -33,8 +32,6 @@ const routes = buildRouteMap({
 		generate: generateCommand,
 		build: buildCommandDefinition,
 		deploy: deployCommand,
-		"list-boards": listBoardsCommand,
-		"list-platforms": listPlatformsCommand,
 		completion: completionCommand,
 	},
 	docs: {

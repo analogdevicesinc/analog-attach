@@ -1,5 +1,5 @@
 # Bash completion for attach-noos (Analog Attach CLI)
-# Install: attach-noos completion install [--user]
+# Print: attach-noos completion bash    Install: attach-noos completion bash --install
 #
 # Requires an `attach-noos` that provides `attach-noos complete` (0.1.0+). If you
 # upgrade attach-noos while a shell is open, re-source this file — an older cached
@@ -9,14 +9,15 @@ _attach_noos_complete() {
     local cur="${COMP_WORDS[COMP_CWORD]}"
     local completions
 
-    # attach-noos complete <route> <partial> [prior tokens...] — the same entrypoint
-    # attach-meta uses. The route is the first non-flag word; the words between it
-    # and the cursor are the prior tokens that give parameter hooks their context.
+    # attach-noos complete <route> <partial> [prior tokens...] — the same entry point
+    # the fish and zsh scripts call. The route is the first non-flag word; the words
+    # between it and the cursor are the prior tokens that give parameter hooks their
+    # context.
     #
     # Flags after the route must stay in the token list. A flag's value completion is
     # reached only by handing stricli the flag itself as the preceding word, so
-    # dropping it turns `--template-set <TAB>` into a bare `generate <TAB>` and
-    # proposes flag names instead of the set names. Positional hooks are unaffected:
+    # dropping it turns `--template <TAB>` into a bare `generate <TAB>` and
+    # proposes flag names instead of the template names. Positional hooks are unaffected:
     # prior_positionals() in src/completion/completion.ts filters flags out again.
     local route=""
     local tokens=()

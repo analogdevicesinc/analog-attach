@@ -129,7 +129,7 @@ function resolve_target(): ResolvedTarget {
     if (configured_board === undefined && configured_platform === undefined) {
         return {
             ok: false,
-            message: "No board or platform configured. Run: attach-noos config board <name>",
+            message: "No board or platform configured. Run: attach-noos config board <name>, or attach-noos for the guided setup",
             text: format_no_target()
         };
     }
@@ -172,7 +172,8 @@ function setting(key: "board" | "platform"): string | undefined {
 function format_no_target(): string {
     let out = "No board or platform configured.\n\n";
     out += "  attach-noos config board <name>       a board settles the platform on its own\n";
-    out += "  attach-noos config platform <name>    for a chip with no board of its own\n\n";
+    out += "  attach-noos config platform <name>    for a chip with no board of its own\n";
+    out += "  attach-noos                           the guided setup, which asks for what is missing\n\n";
 
     const socs = list_socs();
     if (!socs.ok) {

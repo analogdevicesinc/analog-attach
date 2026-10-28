@@ -4,7 +4,7 @@ import { common_ok, type Device, type ListDevicesResponse } from "../protocol/re
 import { load_context, output, output_error } from "./shared";
 
 /**
- * `attach-noos list-devices` — every schema a node can be created from.
+ * `attach-noos list devices` — every schema a node can be created from.
  *
  * "Device" is attach-meta's word for "the thing you add". Ours is an eval board, a driver,
  * or a schema, grouped by the module that ships it. `tag` is what carries that distinction,
@@ -15,7 +15,7 @@ import { load_context, output, output_error } from "./shared";
  */
 export const listDevicesCommand = buildCommand<{ json?: boolean }, [string | undefined]>({
     docs: {
-        brief: "List the schemas a node can be created from",
+        brief: "List the devices that can be added: eval boards, drivers, schemas",
         fullDescription:
             "Lists every schema available to the current workfile, grouped by kind.\n" +
             "The key of each entry is what 'attach-noos add <key>' takes. A filter keeps the keys that contain it."

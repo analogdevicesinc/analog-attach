@@ -1,0 +1,38 @@
+#compdef attach-noos
+# Zsh completion for attach-noos (Analog Attach CLI)
+# Print: attach-noos completion zsh     Install: attach-noos completion zsh --install
+#
+# Works both ways zsh loads completion: sourced (eval "$(attach-noos completion zsh)"), or
+# autoloaded as _attach-noos from a directory on $fpath. Every list comes from
+# `attach-noos complete <route> <partial> [prior tokens...]`, the same entry point the bash
+# and fish scripts call, so the three shells offer the same thing.
+
+_attach_noos() {
+    local route=""
+    local -a tokens completions
+    local index word
+
+    # The route is the first non-flag word after attach-noos; the words between it and the
+    # cursor are the prior tokens. Flags stay in the tokens: a flag's value completion is
+    # reached only with the flag as the preceding word.
+    for (( index = 2; index < CURRENT; index++ )); do
+        word="${words[index]}"
+        if [[ -z "$route" ]]; then
+            [[ "$word" == -* ]] && continue
+            route="$word"
+        else
+            tokens+=("$word")
+        fi
+    done
+
+    completions=("${(@f)$(attach-noos complete "$route" "${words[CURRENT]}" "${tokens[@]}" 2>/dev/null)}")
+    # -V: an unsorted group, keeping attach-noos's order (values first, flags last).
+    compadd -V attach-noos -- "${completions[@]}"
+}
+
+# Autoloaded, this file is the body of _attach-noos: complete now. Sourced, register it.
+if [[ "${funcstack[1]}" == "_attach-noos" ]]; then
+    _attach_noos "$@"
+else
+    compdef _attach_noos attach-noos
+fi

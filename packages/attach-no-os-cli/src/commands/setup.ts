@@ -195,7 +195,7 @@ async function ensure_workfile(board: string): Promise<void> {
 function print_next_steps(): void {
     console.log(`
 ${styleText("bold", "Next")}
-  attach-noos list-devices          what can be added: eval boards, drivers
+  attach-noos list devices          what can be added: eval boards, drivers
   attach-noos add <eval board>      e.g. attach-noos add eval-adxl355-pmdz
   attach-noos read                  what the workfile holds
   attach-noos config                every setting, and how to change one

@@ -31,7 +31,7 @@ type AddFlags = {
  * `attach-noos add <schema> [--name <node>]` — create a node.
  *
  * A node is an instance of a schema, and nothing but the caller knows which schema was
- * meant, so `--name` on its own is refused with a pointer at `list-devices` rather than
+ * meant, so `--name` on its own is refused with a pointer at `list devices` rather than
  * guessed at. The workfile is flat, so there is no parent to name: every node is at the root.
  *
  * The key may also be a DRIVER name (`add adxl355`). That adds the driver's root - the
@@ -43,7 +43,7 @@ export const addCommand = buildCommand<AddFlags, [string | undefined]>({
     docs: {
         brief: "Add a node to the workfile",
         fullDescription:
-            "Creates a node from a schema. <schema> is the device key (see 'attach-noos list-devices');\n" +
+            "Creates a node from a schema. <schema> is the device key (see 'attach-noos list devices');\n" +
             "--name is what the node is called in the workfile,\n" +
             "defaulting to its kind, numbered (capi_gpio_pin: gpio0, gpio1). <schema> can also be\n" +
             "a driver name (adxl355), which adds the handle the part is used through.\n" +
@@ -56,7 +56,7 @@ export const addCommand = buildCommand<AddFlags, [string | undefined]>({
             parameters: [
                 {
                     placeholder: "schema",
-                    brief: "Schema to instantiate (see: attach-noos list-devices)",
+                    brief: "Schema to instantiate (see: attach-noos list devices)",
                     optional: true,
                     parse: String,
                     proposeCompletions(partial: string) {
@@ -92,9 +92,9 @@ export const addCommand = buildCommand<AddFlags, [string | undefined]>({
             output_error(
                 flags,
                 flags.name === undefined
-                    ? "Nothing to add: pass <schema> (see: attach-noos list-devices)"
+                    ? "Nothing to add: pass <schema> (see: attach-noos list devices)"
                     : `Cannot add '${flags.name}' without a schema: a node is an instance of a schema, ` +
-                      "and there is no default schema. See: attach-noos list-devices"
+                      "and there is no default schema. See: attach-noos list devices"
             );
             return;
         }
@@ -126,7 +126,7 @@ export const addCommand = buildCommand<AddFlags, [string | undefined]>({
             }
             const is_driver = drivers.ok && drivers.value.some(candidate => candidate.name === driver);
             if (!is_driver) {
-                output_error(flags, `Unknown schema '${key}'. See: attach-noos list-devices`);
+                output_error(flags, `Unknown schema '${key}'. See: attach-noos list devices`);
                 return;
             }
             // Served over IIO (template capi-iio): the driver's IIO device is the root,

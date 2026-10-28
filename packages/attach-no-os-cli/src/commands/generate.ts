@@ -22,7 +22,7 @@ import { common_ok } from "../protocol/responses";
 type GenerateFlags = {
     json?: boolean;
     output?: string;
-    template?: string;
+    projectTemplate?: string;
     board?: string;
 };
 
@@ -50,7 +50,7 @@ export const generateCommand = buildCommand<GenerateFlags, [], AttachContext>({
                 optional: true,
                 parse: String
             },
-            template: {
+            projectTemplate: {
                 kind: "parsed",
                 brief: "Template set to render with (default: the 'template' setting)",
                 optional: true,
@@ -125,7 +125,7 @@ export const generateCommand = buildCommand<GenerateFlags, [], AttachContext>({
             project_name: project_name.value,
             project_path: project_path,
             capi_path: capi_path.value,
-            template_set: flags.template,
+            template_set: flags.projectTemplate,
             example: example_enabled(),
         });
 
@@ -136,7 +136,7 @@ export const generateCommand = buildCommand<GenerateFlags, [], AttachContext>({
 
         // Which template set produced the project is worth reporting now that it
         // is configurable - the same workfile can generate different output.
-        const template_set = flags.template ?? configured_template_set();
+        const template_set = flags.projectTemplate ?? configured_template_set();
         const files = result.value.files_created;
 
         const message = `Generated '${project_name.value}' in ${project_path}`
