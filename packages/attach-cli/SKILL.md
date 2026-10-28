@@ -528,7 +528,7 @@ attach-linux update <path> <property> [value...] [--quiet]
 - **Flag property** (binding says flag): sets it (the DTS `prop;` form)
 - **Known non-flag property**: acts as `read <path> <property>` (with the same `--quiet`)
 - **Unknown absent property**: creates a flag
-- **Child node name** (e.g. `channel@0`): creates the child, or reads it if it exists
+- **Child node name** (e.g. `channel@0`): creates the child, or reads it as `read <path>/<child>` does if it exists (values given with an existing child are refused)
 
 **Creating a child node**: its `reg` follows the unit address. The required properties it still lacks are then handled as after `add`:
 - `--json`: the response carries `path` and `missing_required: [{ property, description, suggestions }]`. Ask the user for each one, then `update <path>/<child> <property> <value>`.

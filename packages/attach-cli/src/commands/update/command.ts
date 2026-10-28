@@ -6,7 +6,6 @@ import {
     NodeBuilder,
     PropertyBuilder,
     is_dt_flag,
-    print_property,
     get_full_node_name,
     address_cells_of,
     encode_reg_address,
@@ -34,7 +33,6 @@ import { load_workspace, type Bindings, type Workfile } from "../../config/works
 import { resolve_write_target, parse_node_path, not_found_message } from "../../utilities";
 import { child_unit_radix, find_property_definition, resolve_node_binding } from "../../binding-resolution";
 import { respond, respond_fail, input_error, diagnostic } from "../../protocol/output";
-import { convert_node } from "../../protocol/dt-to-protocol";
 import { read_target } from "../read/command";
 import { node_reg_warnings, reg_warning_lines } from "../../reg-conflicts";
 import { ask_for_missing, describe_missing, missing_required_of, type NewNode } from "../../missing-required";
@@ -314,7 +312,8 @@ Special cases:
   No value     Sets a flag property, or reads the current value (as 'read' does)
   Child name   'update <path> <child-name>' creates a child node, then asks
                for its missing required properties on a terminal
-               (--quiet lists them instead)
+               (--quiet lists them instead); an existing child is read
+               (as 'read <path>/<child-name>' does)
   reg          'update <path> reg <n>' also renames the node's unit address
 
 Examples:
@@ -367,26 +366,15 @@ Examples:
                 // A name with @ is always a child node, never a property
                 const node_path = found?.node_path ?? base_dt.locate(target_reference)?.path ?? node_identifier;
                 const effective = overlay.effective_children(node_path);
-                const existing_child = effective.get(property_name);
-                if (existing_child !== undefined) {
-                    const child_path = `${node_path}/${property_name}`;
-                    const child_found = overlay.find_node(child_path);
-                    if (child_found === undefined) {
-                        if (context_.json) { respond_fail({ ok: false, message: `Not found: ${child_path}`, severity: "error" }); }
-                        else { console.log(`Not found: ${child_path}`); }
-                    } else {
-                        if (context_.json) {
-                            respond(convert_node(child_found.node));
-                        } else {
-                            const ck = existing_child.unit_addr ? `${existing_child.name}@${existing_child.unit_addr}` : existing_child.name;
-                            console.log(`${ck} {`);
-                            for (const p of existing_child.properties) {
-                                if (is_dt_flag(p.value)) { console.log(`    ${p.name};`); }
-                                else { console.log(`    ${print_property(p, "    ", 0).trim()}`); }
-                            }
-                            console.log("};");
-                        }
+                const child_node_message = `${property_name} is a child node; set its properties with \`update ${node_identifier}/${property_name} <prop> <value>\``;
+                if (effective.has(property_name)) {
+                    if (value_arguments.length > 0) {
+                        if (context_.json) { respond_fail({ ok: false, message: child_node_message, severity: "error" }); }
+                        else { console.log(child_node_message); }
+                        return;
                     }
+                    const child_identifier = node_identifier === "/" ? `/${property_name}` : `${node_identifier}/${property_name}`;
+                    await read_target(context_, overlay, { ok: true, value: workspace.bindings }, child_identifier, undefined, { quiet: options.quiet ?? false });
                     return;
                 }
 
@@ -403,9 +391,8 @@ Examples:
 
                 if (matched_pattern) {
                     if (value_arguments.length > 0) {
-                        const message = `${property_name} is a child node; set its properties with \`update ${node_identifier}/${property_name} <prop> <value>\``;
-                        if (context_.json) { respond_fail({ ok: false, message, severity: "error" }); }
-                        else { console.log(message); }
+                        if (context_.json) { respond_fail({ ok: false, message: child_node_message, severity: "error" }); }
+                        else { console.log(child_node_message); }
                         return;
                     }
 

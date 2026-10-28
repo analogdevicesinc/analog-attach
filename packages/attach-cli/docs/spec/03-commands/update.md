@@ -18,7 +18,7 @@ GRM-072).
 | `<path>` | The node: a node path (GRM-020). It may be a base node, an overlay node, or a base node the overlay changes. |
 | `<property>` | The property name. A name with `@` may be a child node instead (§8). |
 | `<value>...` | The value tokens. Without any, `update` sets a flag or reads (§5). A value starting with `-` needs `--` before it (GRM-012): `update adc offset -- -5`. |
-| `--quiet` | When reading: leave out the binding's description and the suggestions. When creating a child: list its missing required properties instead of asking. |
+| `--quiet` | When reading: as `read --quiet`, leave out what the binding says (description, suggestions, a child's missing required properties). When creating a child: list its missing required properties instead of asking. |
 
 ## 2. Terms
 
@@ -302,22 +302,15 @@ give no diagnostics of UPDATE-015.
 
 Applies when `<property>` contains `@`.
 
-**UPDATE-120** When the merged node has a child named `<property>` and the
-overlay has that child, the CLI shall show the child and ignore any value
-(Open issue U-3). In human mode it shall write the child as the merged tree
-has it: `<key> {`, one line per property of the merged child, base ones
-included, indented by four spaces (`    <name>;` for a flag, `    <name> =
-<value>;` otherwise), and `};`. Its labels and children aren't shown. In JSON
-mode it shall respond with the node object of
-`04-protocol/update.schema.json#/$defs/node`: the overlay's node at the
-child's path, with its properties, children and labels (`alias`). For a base
-child the overlay changes, that node is the fragment's `__overlay__` body:
-`key` is `"__overlay__"`, `alias` is empty, and only the properties the
-overlay sets are there (Open issue U-14).
+**UPDATE-120** When the merged node has a child named `<property>`, whether
+the overlay adds it, changes it, or only the base has it, and no value is
+given, the CLI shall show the child as `read <path>/<property>` shows it
+(`read.md` READ-022 to READ-026, `--quiet` included). In JSON mode that is
+read's node (`04-protocol/update.schema.json#/$defs/node`, which is
+`read.schema.json#/$defs/read-node`).
 
-**UPDATE-121** If the merged node has a child named `<property>` that only the
-base has, then the CLI shall refuse with `Not found: <node path>/<property>`
-(Open issue U-9).
+**UPDATE-121** When the merged node has a child named `<property>` and values
+are given, the CLI shall refuse with UPDATE-122's message and write nothing.
 
 **UPDATE-122** When the target node has no such child and `<property>`
 matches a child-node pattern of the target node's binding:
@@ -366,9 +359,6 @@ a terminal user by a different stream from each command.
 ``spi-cpol is a flag: `update <path> ` sets it, `delete <path> ` clears it``:
 the commands it suggests lack the property.
 
-**U-3. An existing child ignores its value.** `update adc channel@0 reg 3`,
-with `channel@0` present, prints the child and writes nothing, silently.
-
 **U-4. A name with `@` becomes a flag.** `update spi0 adc@5` (no binding
 pattern matches), or `update adc channel@99` (outside `^channel@([0-9]|1[0-5])$`),
 writes the flag property `adc@5;` (or `channel@99;`), which dtc rejects
@@ -398,9 +388,6 @@ change yet.** UPDATE-080 needs the node to be in the overlay before the
 command, so `update spidev1 interrupts 3 4` on an untouched base node writes
 no `interrupt-parent`, while the same command on a base node the overlay
 already has a fragment for does.
-
-**U-9. Base-only children read as not found.** `update /soc spi@7e215080`
-says `Not found: /soc/spi@7e215080` although the node exists (UPDATE-121).
 
 **U-10. A refused value stays in memory.** (From the source, not reproduced.)
 UPDATE-060 and UPDATE-072 refuse after the value has been placed in the
@@ -433,15 +420,6 @@ refuses an empty value (UPDATE-031). With the `cells` hint or none,
 a binding that bounds the count says anything (`warning: diff-channels takes
 2 values, got 0`). A fix would be to refuse an empty value whatever the hint, with
 UPDATE-031's `Value must not be empty`.
-
-**U-14. An existing base child reads as its fragment body in JSON.** After
-`update spidev0 status okay`, `update spi0 spidev@0` prints the merged child
-in human mode, but `--json` responds `{"kind":"node","key":"__overlay__",
-"properties":[{"kind":"property","key":"status",…}],"children":[],
-"alias":[]}`: the key is the fragment's `__overlay__`, the label `spidev0` is
-lost, and the base properties are missing (UPDATE-120). A fix would be to
-respond with the merged child, as human mode shows it, or as `read
-spi0/spidev@0` gives it.
 
 **U-15. With no shape hint a `,` splits a word.** `,` separates rows
 (GRM-070), and a row of words that don't resolve becomes strings
@@ -485,6 +463,16 @@ $ attach-linux update adc channel@0 </dev/null
 Added channel@0 to adc
 Missing required: diff-channels
 Set them with: update adc/channel@0 <property> <value>
+```
+
+```
+$ attach-linux update adc channel@0
+channel@0 {
+    reg = <0>;
+    diff-channels = <0 17>;
+};
+$ attach-linux update adc channel@0 reg 3
+channel@0 is a child node; set its properties with `update adc/channel@0 <prop> <value>`
 ```
 
 ```
