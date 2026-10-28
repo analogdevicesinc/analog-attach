@@ -8,7 +8,7 @@ the Linux tree's overlays that have a device. Nothing is written.
 
 ```
 attach-linux [--json] list
-attach-linux [--json] list device [<filter>]
+attach-linux [--json] list devices [<filter>]
 attach-linux [--json] list property <path> [<property>]
 attach-linux [--json] list value <path> <property>
 attach-linux [--json] list parent <compatible>
@@ -19,8 +19,8 @@ Grammar: rule `list` in `01-grammar.abnf`. The `list-argument` elements per
 kind:
 
 ```
-list-args       = list-device / list-property / list-value / list-parent / list-overlay
-list-device     = %s"device" [ B element ]                     ; filter
+list-args       = list-devices / list-property / list-value / list-parent / list-overlay
+list-devices    = %s"devices" [ B element ]                    ; filter
 list-property   = %s"property" B element [ B element ]        ; path, property
 list-value      = %s"value" B element B element               ; path, property
 list-parent     = %s"parent" B compatible
@@ -49,7 +49,7 @@ loading the workspace. In human mode it shall write, for each kind, a line
 
 | Kind | Args | Summary |
 |---|---|---|
-| `device` | `[compatible]` | `Device bindings by compatible string` |
+| `devices` | `[compatible]` | `Device bindings by compatible string` |
 | `property` | `<path> [property]` | `Properties of a node from its binding` |
 | `value` | `<path> <property>` | `Concrete values for a property` |
 | `parent` | `<compatible>` | `Valid parent buses for a device` |
@@ -64,7 +64,7 @@ kind, `{ kind, description: <summary>, args: [{ name: "args", description:
 <args>, required: false }] }` (`04-protocol/list.schema.json#/$defs/kinds`).
 
 **LIST-002** If the kind is none of the five, then the CLI shall refuse with
-`Unknown list kind: <kind>. Valid kinds: device, property, value, parent,
+`Unknown list kind: <kind>. Valid kinds: devices, property, value, parent,
 overlay`, without loading the workspace.
 
 **LIST-003** The CLI shall ignore the arguments after those §1 gives each
@@ -94,7 +94,7 @@ and report problems with them per COM-071 and COM-072:
 
 | Kind | Needs |
 |---|---|
-| `device` | bindings |
+| `devices` | bindings |
 | `property` | bindings, base, overlay |
 | `value` | base, overlay; bindings when they load (LIST-074) |
 | `parent` | bindings, base |
@@ -105,7 +105,7 @@ report `Missing config field overlay` (02-common.md §8.3).
 
 **LIST-007** The CLI shall not write the overlay or the config.
 
-## 4. `list device`
+## 4. `list devices`
 
 **LIST-010** When the filter is a compatible of the compat index and that
 binding parses, the CLI shall describe that one device (LIST-012).
@@ -396,16 +396,15 @@ property, where GRM-030 would refuse it. The hidden `__list children` (and so
 the completion of `&spi0/`) is the exception: `__list children &spi0`
 succeeds, with the base's children only (`__list.md` IL-3).
 
-**L-2. `list device` filters by substring.** The help says "Filter by
-prefix" (`list device adi`), but `list device 7124-` lists `adi,ad7124-4` and
-`adi,ad7124-8`. The names aren't sorted either.
+**L-2. `list devices` doesn't sort.** The names come in the compat index's
+order, the order its bindings were read in, not alphabetically.
 
 **L-3. A multi-line description is indented on its first line only** in
-`list device <compatible>`, and one that ends in a newline leaves an empty
-line before `binding:` (`list device adi,ad7124-8`). A fix would be to indent
+`list devices <compatible>`, and one that ends in a newline leaves an empty
+line before `binding:` (`list devices adi,ad7124-8`). A fix would be to indent
 every line of the trimmed text.
 
-**L-4. Two type notations.** `list device` writes arrays as `number[]` and
+**L-4. Two type notations.** `list devices` writes arrays as `number[]` and
 `list property` as `number[2]` / `number[]`: the same property shows
 different types.
 
@@ -429,7 +428,7 @@ back. Completion (`__list navigate`) offers them too.
 interrupt-parent` gives `gicv2` and `gpio`; `add`'s `missing_required` for
 the same property also gives `aon_intr` marked `disabled` (LIST-078).
 
-**L-9. `list device` leaves out property patterns.** `list device
+**L-9. `list devices` leaves out property patterns.** `list devices
 adi,adt7475` says `4 properties, 1 child node patterns`, and its JSON
 `device` has no entry for `^adi,bypass-attenuator-in[0-4]$`,
 `^adi,pin(5|10)-function$` or `^adi,pin(9|14)-function$`, which `list

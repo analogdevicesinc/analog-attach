@@ -75,7 +75,7 @@ const LIST_KIND_CHOICES: ValueSource = {
 };
 
 export const LIST_SUBKIND_SPECS: Readonly<Record<string, CommandSpec>> = {
-    device: { positional: { mode: "byIndex", sources: [{ kind: "suggest", suggest: "device-key" }] } },
+    devices: { positional: { mode: "byIndex", sources: [{ kind: "suggest", suggest: "device-key" }] } },
     property: { positional: { mode: "byIndex", sources: [PATH_TREE, PROPS] } },
     value: { positional: { mode: "byIndex", sources: [PATH_TREE, PROPS] } },
     parent: { positional: { mode: "byIndex", sources: [{ kind: "suggest", suggest: "device-key" }] } },

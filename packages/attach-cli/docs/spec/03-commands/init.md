@@ -139,7 +139,7 @@ Workspace ready
 Next steps:
 
   1. Search for devices to add to the overlay:
-     attach-linux list device [filter]
+     attach-linux list devices [filter]
 
   2. Add one (it asks for the missing required properties):
      attach-linux add <compatible>

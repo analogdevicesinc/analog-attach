@@ -532,7 +532,7 @@ async function open_add(parent) {
     dialog.showModal();
     $("add-compatible").focus();
     if (!devices) {
-        const r = await run("list", ["device"]);
+        const r = await run("list", ["devices"]);
         devices = r.json && r.json.names ? r.json.names : [];
     }
 }

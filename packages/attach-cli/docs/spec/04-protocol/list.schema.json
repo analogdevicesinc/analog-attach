@@ -58,7 +58,7 @@
             "properties": {
               "kind": {
                 "enum": [
-                  "device",
+                  "devices",
                   "property",
                   "value",
                   "parent",
@@ -102,7 +102,7 @@
       "additionalProperties": false
     },
     "names-response": {
-      "description": "list device without an exact match (LIST-011).",
+      "description": "list devices without an exact match (LIST-011).",
       "type": "object",
       "required": [
         "ok",
@@ -130,7 +130,7 @@
       "additionalProperties": false
     },
     "device-response": {
-      "description": "list device <compatible> (LIST-013).",
+      "description": "list devices <compatible> (LIST-013).",
       "type": "object",
       "required": [
         "ok",

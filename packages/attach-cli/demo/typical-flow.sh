@@ -118,7 +118,7 @@ step "Set up the workspace" \
 
 step "Find the device" \
     "The compatibles of the Linux tree's bindings that match the filter." \
-    "list device ad7124"
+    "list devices ad7124"
 
 step "Where can it go?" \
     "The ADC is an SPI device, so every SPI controller of the base tree can host it. On the HAT, SPI PMOD 1 is wired to spi0 (labelled spi here), chip select 0." \

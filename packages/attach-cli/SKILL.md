@@ -10,7 +10,7 @@ You are helping a user configure Linux device tree overlays for hardware devices
 - Showing valid options based on schema data
 
 **When to use selection questions**:
-- Choosing a device from `list device` results
+- Choosing a device from `list devices` results
 - Selecting a parent bus from `list parent` results
 - Choosing values for enum properties (when schema provides valid options)
 - Selecting which optional properties to configure
@@ -45,7 +45,7 @@ Every command checks the configuration it needs up front: `linux` must be a kern
 
 **Per-command config requirements**:
 - `init`, `config-set`, `config-get`: No prerequisites (`init` saves `linux`, `devicetree` and `overlay`)
-- `list device`: Needs `linux` (and its caches)
+- `list devices`: Needs `linux` (and its caches)
 - `list parent`, `list overlay`: Need `linux`, `devicetree`
 - `import`: Needs `linux`, `devicetree`, and no `overlay` yet (it creates one)
 - `list property`: Needs `linux`, `devicetree`, `overlay`
@@ -134,7 +134,7 @@ attach-linux config-get
 **Syntax**:
 ```bash
 attach-linux list                           # show available kinds
-attach-linux list device [<filter>]         # compatible strings (substring filter)
+attach-linux list devices [<filter>]        # compatible strings (substring filter)
 attach-linux list property <path> [<prop>]  # properties of a node; with prop: type details
 attach-linux list value <path> <prop>       # concrete values for a property
 attach-linux list parent <compatible>       # valid parent buses for a device
@@ -144,7 +144,7 @@ attach-linux list overlay <compatible>      # overlays in the Linux tree with th
 **Examples**:
 ```bash
 # Find devices matching "ad7124"
-attach-linux list device ad7124
+attach-linux list devices ad7124
 
 # List all properties of a node (marks required/set)
 attach-linux list property spi0/adi,ad7124-8@0
@@ -170,7 +170,7 @@ attach-linux list value spi0/adc interrupts
 attach-linux list parent adi,ad7124-8
 ```
 
-**Strategy**: Ask the user which chip they have or, if they do not know for sure, start broad (e.g., `list device adi` for Analog Devices), then narrow down based on user's specific chip.
+**Strategy**: Ask the user which chip they have or, if they do not know for sure, start broad (e.g., `list devices adi` for Analog Devices), then narrow down based on user's specific chip.
 
 ---
 
@@ -278,7 +278,7 @@ attach-linux init [--linux <path>] [--devicetree <path>] [--overlay <name>]
 ```
 
 **Next Steps After Init**:
-1. Use `list device` / `list parent`, then `add` to add a device node to the overlay
+1. Use `list devices` / `list parent`, then `add` to add a device node to the overlay
 2. Use `update` to configure properties
 3. Validate and iterate
 
@@ -629,7 +629,7 @@ attach-linux deploy
 
 ```
 0. CONFIGURE    init --linux ... --devicetree ...  (or config-set linux / devicetree)
-1. FIND DEVICE  list device <chip-name>
+1. FIND DEVICE  list devices <chip-name>
 2. FIND PARENT  list parent <compatible>
 3. ADD DEVICE   add <compatible> --parent <bus>  (auto-creates workfile)
 4. CONFIGURE    update <path> <property> <value>
@@ -692,7 +692,7 @@ node-name {
 |-------|-------|----------|
 | `Missing: <path>` | File/directory doesn't exist | Verify path with user |
 | `Failed to parse dts` | Invalid device tree syntax | Check for syntax errors in `.dts` file |
-| `Failed to find binding` | Compatible string not found | Use `list device` to find valid strings |
+| `Failed to find binding` | Compatible string not found | Use `list devices` to find valid strings |
 | `missing_required` error | Required property not set | Use `update` to add the property |
 | `number_limit` error | Value outside valid range | Use `update` with a value within schema bounds |
 | `interrupts` size error | Wrong number of cells | Set `interrupt-parent` first: `update <path> interrupt-parent gpio` |

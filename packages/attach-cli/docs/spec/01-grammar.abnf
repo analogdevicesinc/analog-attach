@@ -72,7 +72,7 @@ disable         = %s"disable" [ B node-path ]
 list            = %s"list" [ B list-kind *( B list-argument ) ]
 list-kind       = known-kind / element  ; any other element is a refusal,
                                         ; not an input error (list.md LIST-002)
-known-kind      = %s"device" / %s"property" / %s"value" / %s"parent" / %s"overlay"
+known-kind      = %s"devices" / %s"property" / %s"value" / %s"parent" / %s"overlay"
 list-argument   = element             ; per kind, see 03-commands/list.md
 
 validate        = %s"validate"

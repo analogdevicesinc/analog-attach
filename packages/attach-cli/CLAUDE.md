@@ -95,7 +95,7 @@ The binding provides only a shape hint (`flag` / `strings` / `cells` / undefined
 
 ### list command and hidden __list
 
-`suggest`, `list-devices` and `list-intelligence` were replaced by a unified `list` command tree: `list device`, `list property`, `list value`, `list parent`, `list overlay`. `list overlay <compatible>` reads the overlay index and grades each overlay with `board_fit` (`src/board-fit.ts`): its root compatible against the base's, loosened by the `FAMILIES` table for generic SoC compatibles (`brcm,bcm2835` = any Pi); compatible ones come first. It also lists the overlays that add another compatible of the device's binding (`binding_siblings`, `overlays_matching`), marked `matched` / `via`, after the exact ones of their fit. A hidden `__list` command handles completion-only kinds.
+`suggest`, `list-devices` and `list-intelligence` were replaced by a unified `list` command tree: `list devices`, `list property`, `list value`, `list parent`, `list overlay`. `list overlay <compatible>` reads the overlay index and grades each overlay with `board_fit` (`src/board-fit.ts`): its root compatible against the base's, loosened by the `FAMILIES` table for generic SoC compatibles (`brcm,bcm2835` = any Pi); compatible ones come first. It also lists the overlays that add another compatible of the device's binding (`binding_siblings`, `overlays_matching`), marked `matched` / `via`, after the exact ones of their fit. A hidden `__list` command handles completion-only kinds.
 
 ### init
 

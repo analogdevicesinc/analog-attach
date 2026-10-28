@@ -140,7 +140,7 @@ export function format_summary(response: InitResponse): string[] {
         bold("Next steps:"),
         "",
         `  ${cyan("1.")} Search for devices to add to the overlay:`,
-        `     ${dim("attach-linux list device [filter]")}`,
+        `     ${dim("attach-linux list devices [filter]")}`,
         "",
         `  ${cyan("2.")} Add one (it asks for the missing required properties):`,
         `     ${dim("attach-linux add <compatible>")}`,

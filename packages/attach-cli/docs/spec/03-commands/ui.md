@@ -169,7 +169,7 @@ typed: `read <path>` to expand a node, `list property` / `list value` / `read
 <path> <prop>` for a property's editor, `update <path> <prop> <value
 tokens>` to set it (the input split at whitespace), `enable` / `disable
 <path>`, `add <compatible> [--parent …] [--name …] [--label …]` from the add
-dialog (fed by `list device` and `list parent`), and `delete <path>`, which,
+dialog (fed by `list devices` and `list parent`), and `delete <path>`, which,
 when the preview has `severity: "warn"` (a node with children), asks for
 confirmation and runs `delete <path> --force`.
 

@@ -447,7 +447,7 @@ COM-081 is silent when `validation.stamp.json` is missing although the cache
 isn't current (`init` rebuilds it, COM-116), and a stamp naming another
 dt-schema says `The binding caches are older than the bindings`. Repro:
 remove `.attach-linux/validation.stamp.json` and run `attach-linux list
-device adi`: no warning. A fix would be to warn for a missing stamp too, and
+devices adi`: no warning. A fix would be to warn for a missing stamp too, and
 to name the dt-schema when it differs.
 
 **C-10. A preprocessor that writes nothing reuses the previous base.**

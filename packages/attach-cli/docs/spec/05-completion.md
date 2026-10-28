@@ -103,7 +103,7 @@ source of the next positional (§6.1). When the command takes no more
 positionals with a source, the CLI shall offer the options of COMPL-032.
 
 **COMPL-034** For `list`, the CLI shall complete the first positional from the
-list kinds (`device`, `property`, `value`, `parent`, `overlay`, each with its
+list kinds (`devices`, `property`, `value`, `parent`, `overlay`, each with its
 summary). It shall complete the positionals after it from that kind's sources
 (§6.1), counting from the one after the kind. After an unknown kind it shall
 offer nothing. The kind is the first committed word after `list` that doesn't
@@ -111,7 +111,7 @@ start with `-`, but the positionals are counted from the word right after
 `list`, and a current word equal to the kind completes the kind again (open
 issue CO-9):
 
-- `list device device<Tab>` offers the kind `device`, not compatibles;
+- `list devices devices<Tab>` offers the kind `devices`, not compatibles;
 - `list --json property <Tab>` takes `property` as the node path and offers
   nothing.
 
@@ -128,7 +128,7 @@ issue CO-9):
 | `delete` | node path | property the overlay sets (COMPL-064) | |
 | `move` | node path | node path | |
 | `rename`, `enable`, `disable` | node path | | |
-| `list device`, `list parent`, `list overlay` | device | | |
+| `list devices`, `list parent`, `list overlay` | device | | |
 | `list property`, `list value` | node path | property | |
 | `config-get` | config field (§8.1 of `02-common.md`) | config field | config field |
 | `config-set` | config field | file name (COMPL-012) | |
@@ -380,7 +380,7 @@ engine finds the kind as the first word after `list` that doesn't start with
 `-`, but counts the kind's positionals from the word right after `list`, and
 completes the kind again when the current word equals it. `list --json
 property <Tab>` offers nothing (the kind is read as the node path), and `list
-device device<Tab>` offers the kind `device`. A fix would be to count from
+devices devices<Tab>` offers the kind `devices`. A fix would be to count from
 the kind's own index and to drop the `prefix === subkind` test in
 `src/commands/completion/complete.ts`.
 

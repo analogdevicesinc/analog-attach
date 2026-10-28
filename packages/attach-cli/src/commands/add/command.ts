@@ -97,7 +97,7 @@ const, a flag such as spi-cpol), and what the binding's first example on the
 parent's bus has: spi-max-frequency on SPI, reg (the address, renaming the node)
 on I2C. Those are left out of the questions.
 
-Use 'list device' to find compatible strings, 'list parent' to find valid buses.`)
+Use 'list devices' to find compatible strings, 'list parent' to find valid buses.`)
         .action(async (compatible: string, options: { parent?: string; name?: string; label?: string; template?: string; quiet?: boolean }) => {
             const report = (message: string): void => {
                 if (context_.json) { respond_fail({ ok: false, message, severity: "error" }); }

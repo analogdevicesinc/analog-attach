@@ -9,7 +9,7 @@ import { list_parent } from "./placement";
 import { list_overlay } from "./overlay";
 
 export const LIST_KINDS = [
-    { kind: "device", summary: "Device bindings by compatible string", args: "[compatible]" },
+    { kind: "devices", summary: "Device bindings by compatible string", args: "[compatible]" },
     { kind: "property", summary: "Properties of a node from its binding", args: "<path> [property]" },
     { kind: "value", summary: "Concrete values for a property", args: "<path> <property>" },
     { kind: "parent", summary: "Valid parent buses for a device", args: "<compatible>" },
@@ -19,11 +19,11 @@ export const LIST_KINDS = [
 export function build_list_command(context: LocalContext): Command {
     const list = new Command("list")
         .description("List devices, properties, suggested values, possible parents, overlays")
-        .argument("[kind]", "What to list: device, property, value, parent, overlay")
+        .argument("[kind]", "What to list: devices, property, value, parent, overlay")
         .argument("[args...]", "Kind-specific arguments")
         .addHelpText("after", `
 Kinds:
-  device [compatible]          Device bindings by compatible string
+  devices [compatible]         Device bindings by compatible string
   property <path> [property]   Properties of a node from its binding
   value <path> <property>      Suggested values for a property
   parent <compatible>          Valid parent buses for a device
@@ -37,8 +37,8 @@ Paths:
   Absolute:     /soc/spi@7e204000          (full device tree path)
 
 Examples:
-  $ attach-linux list device                           All known bindings
-  $ attach-linux list device adi                       Filter by prefix
+  $ attach-linux list devices                          All known bindings
+  $ attach-linux list devices adi                      Filter by substring
   $ attach-linux list property spi0/adi,ad7124-8@0     Properties for a node
   $ attach-linux list value spi0/adi,ad7124-8@0 reg    Values for a property
   $ attach-linux list parent adi,ad7124-8              Valid parents
@@ -67,7 +67,7 @@ Examples:
             }
 
             switch (kind) {
-                case "device": {
+                case "devices": {
                     await list_device(context, arguments_);
                     return;
                 }
