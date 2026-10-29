@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "config-error.schema.json",
   "title": "ConfigErrors",
-  "description": "Written to standard error, with exit status 2, in JSON mode when the settings files can't be read (COM-121, CONFIG-102) or the workspace can't be loaded (COM-071).",
+  "description": "Written to standard error, with exit status 2, in JSON mode when the settings files can't be read (COM-121, COM-123, COM-132 to COM-134, CONFIG-005) or the workspace can't be loaded (COM-071).",
   "type": "object",
   "required": ["errors", "hints"],
   "properties": {
@@ -13,11 +13,11 @@
         "type": "object",
         "required": ["field", "kind", "message"],
         "properties": {
-          "field": { "type": "string", "description": "The setting at fault (backend, or the backend's: linux, workfile, ...), an unknown key, or the resource: config.json (a settings file that isn't a JSON object); where the backend is linux also compat-index, validation.json, dt-schema, tools, deploy." },
+          "field": { "type": "string", "description": "The setting at fault (backend, or the backend's: linux, workfile, ...), or the resource: config.json (a settings file that isn't a JSON object); where the backend is linux also compat-index, validation.json, dt-schema, tools, deploy. A problem of a settings file names the key as the file has it: an unknown top-level key or a backend's section that isn't an object by itself (devicetree, linux, COM-132, COM-134), a key of the active section as <id>.<key> (linux.bogus, linux.devicetree, COM-123, COM-133)." },
           "kind": { "enum": ["missing", "invalid", "unknown"] },
           "message": { "type": "string" },
           "description": { "type": "string", "description": "What the setting is." },
-          "hint": { "type": "string", "description": "What to do about this error; given for the problems of a settings file (COM-122)." }
+          "hint": { "type": "string", "description": "What to do about this error; given for the problems of a settings file (COM-121, COM-132 to COM-134)." }
         },
         "additionalProperties": false
       }

@@ -264,8 +264,8 @@ Linux tree, after the file directive (COMPL-012), so the shell also offers
 any file.
 
 **COMPL-080** `config`: the first positional (after `--global`, `--reset` or
-not) offers the backend's settings (`02-common.md` §8.1), each described by
-its description. The value offers, by the setting:
+not) offers `backend` and the active backend's settings (`02-common.md`
+§8.1, COM-131), each described by its description. The value offers, by the setting:
 
 | Setting | Value |
 |---|---|

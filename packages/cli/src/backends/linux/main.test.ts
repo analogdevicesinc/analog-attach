@@ -206,7 +206,7 @@ describe("the Linux backend through main", () => {
             unresolved: [{ path: ["soc", "spi@7e204000", "dac@1"], property: "vref-supply", reference: "&vref" }],
         });
         expect(result.stderr).toContain("vref-supply → &vref");
-        expect(JSON.parse(fs.readFileSync(path.join(project, ".analog-attach", "config.json"), "utf8"))).toMatchObject({ workfile });
+        expect(JSON.parse(fs.readFileSync(path.join(project, ".analog-attach", "config.json"), "utf8"))).toMatchObject({ backend: "linux", linux: { workfile } });
 
         const read = await run(["read", "--quiet", "spi0/dac@1", "reg"]);
         expect(read).toEqual({ code: 0, stdout: "reg = <1>;\n", stderr: "" });
@@ -364,7 +364,7 @@ describe("the Linux backend through main", () => {
         expect(result.stdout).not.toContain("Create the workfile:");
         expect(fs.readFileSync(path.join(project, "board.dtso"), "utf8")).toContain("/plugin/;");
         expect(JSON.parse(fs.readFileSync(path.join(project, ".analog-attach", "config.json"), "utf8"))).toEqual({
-            backend: "linux", linux, devicetree: path.join(base, "base.dts"), workfile: path.join(project, "board.dtso"),
+            backend: "linux", linux: { linux, devicetree: path.join(base, "base.dts"), workfile: path.join(project, "board.dtso") },
         });
     });
 
@@ -375,7 +375,7 @@ describe("the Linux backend through main", () => {
         const stopped = await run([], { prompter, registry: setup_registry });
         expect(stopped.code).toBe(130);
         expect(stopped.stdout).toMatch(/Setup cancelled\.\n$/);
-        expect(JSON.parse(fs.readFileSync(path.join(project, ".analog-attach", "config.json"), "utf8"))).toEqual({ backend: "linux" });
+        expect(JSON.parse(fs.readFileSync(path.join(project, ".analog-attach", "config.json"), "utf8"))).toEqual({ backend: "linux", linux: {} });
 
         fs.writeFileSync(path.join(project, ".analog-attach", "config.json"), "{ nope");
         const broken = scripted([]);
@@ -383,5 +383,13 @@ describe("the Linux backend through main", () => {
         expect(result.code).toBe(2);
         expect(broken.asked).toEqual([]);
         expect(result.stderr).toContain("not JSON");
+
+        // Nor can it save into a linux section that isn't an object: an old flat file.
+        fs.writeFileSync(path.join(project, ".analog-attach", "config.json"), JSON.stringify({ backend: "linux", linux, devicetree: path.join(base, "base.dts") }));
+        const flat = scripted([]);
+        const refused = await run([], { prompter: flat, registry: setup_registry });
+        expect(refused.code).toBe(2);
+        expect(flat.asked).toEqual([]);
+        expect(refused.stderr).toContain(".analog-attach/config.json: linux: must be an object");
     });
 });

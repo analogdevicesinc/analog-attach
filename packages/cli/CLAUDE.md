@@ -19,8 +19,9 @@ numbered decisions are in `docs/merged-cli-design.md`; the observable behaviour 
   `node_modules`.
 - From the repo root: `yarn build:cli` builds attach-lib, attach-no-os-lib and then this package;
   `yarn test:cli`, `yarn lint:cli`.
-- There is no dev-link script. To try the published shape, `yarn pack` in this directory and
-  `npm install -g` the tgz (what `.github/workflows/package-cli.yml` does).
+- `yarn dev-link`: build and symlink `dist/cli.js` to `~/.local/bin/analog-attach`;
+  `yarn dev-unlink` removes the link. To try the published shape instead, `yarn pack` in this
+  directory and `npm install -g` the tgz (what `.github/workflows/package-cli.yml` does).
 
 ## Architecture
 
@@ -97,12 +98,22 @@ reads argv or a settings file, never writes to stdout or stderr, and never opens
   - The files are the project-local `.analog-attach/config.json` (`CONFIG_DIRECTORY`,
     `CONFIG_FILE`, under `find_project_root`) and the global
     `$XDG_CONFIG_HOME/analog-attach/config.json`. Local wins over global, then the spec's default.
-  - Each file is a flat JSON object with kebab-case keys. Values are strings, except a
-    `path_list`, which is an array.
-  - The parse is strict: a non-object file, a wrong type, a value outside its options, or (in the
-    local file) a key the backend doesn't declare is an error.
+  - Each file is a JSON object: `backend` at the top level, and each backend's settings in an
+    object named after its id, its section (`{ "backend": "linux", "linux": { … }, "noos": { … }
+    }`). Keys are kebab-case; values are strings, except a `path_list`, which is an array.
+  - `open_settings({ files, top, sections, active })`: `top` is `[backend_setting(ids)]`,
+    `sections` the registry's ids, `active` the backend's `{ id, specs }` (none when no backend is
+    set). The store reads and writes only the active section, so each backend keeps its own
+    `workfile` and `config backend <id>` only changes which section is used. Local and global
+    layer section by section.
+  - The parse is strict: a non-object file, a wrong type, a value outside its options, a section
+    that isn't an object, or (in the local file) an unknown key is an error. Unknown keys are
+    those of neither the top level (`backend`, the section ids) nor the active section; the
+    message names a section key `<id>.<key>` (`unknown key linux.foo`). Other sections are kept
+    verbatim and never checked. A flat file of the old format fails with these errors (no
+    migration).
   - Errors are values: the store always opens and leaves an invalid value out. A file that isn't a
-    JSON object is never written over.
+    JSON object is never written over, nor an active section that isn't one written into.
   - `BACKEND_KEY` (`backend`) is the front end's own key (`backend_setting`).
 - `src/front/output.ts`: `print_outcome` / `run_outcome` print an `Outcome` and give its exit status
   (`EXIT_OK`, `EXIT_CRASH`, `EXIT_INPUT_ERROR`, `EXIT_CANCELLED`). Also `big_int_replacer` and
@@ -203,7 +214,7 @@ that gets them cannot fail because of the configuration.
   - `linux`, `devicetree`, `workfile` (the overlay), `overlay-syntax`, `preprocess-command`;
   - `deploy-ip`, `deploy-user`, `deploy-password`.
 
-  The front end stores and checks them. `read_settings` gives them from `session.settings`, with
+  The front end stores and checks them, in the `linux` section of the settings files. `read_settings` gives them from `session.settings`, with
   defaults applied and paths absolute. The hint of a missing `linux`, `devicetree` or `workfile` is
   `setup_hint` / `missing_hint`.
 - `config/hooks.ts`: `linux_settings_hooks`.
@@ -625,7 +636,7 @@ it to the interface.
   - build: `build-command`, `deploy-command`, `probe`, and `bootstrap`, `interview`, `example`.
 
   The lib reads settings and templates through module state. `install(session)` points it at the
-  session before every call (`use_settings(session.settings)`, and
+  session before every call (`use_settings(session.settings)`, which sees the `noos` section, and
   `use_templates_root(<assets_dir>/templates)` when that exists). `noos_settings_hooks` gives
   `check` (`capi-path` / `module-paths` must be module checkouts; `platform` / `board` are checked
   against each other and the workfile) and `options` (the boards, chips and template sets).

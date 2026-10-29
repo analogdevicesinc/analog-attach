@@ -111,7 +111,7 @@ if (import.meta.vitest) {
     const { capture_stream } = await import("./output");
     const { open_settings, settings_files } = await import("./settings-store");
 
-    const settings = open_settings({ files: settings_files({ cwd: "/nonexistent/p", home: "/nonexistent" }), specs: [] });
+    const settings = open_settings({ files: settings_files({ cwd: "/nonexistent/p", home: "/nonexistent" }) });
     const prompter = {} as Prompter;
     const make = (overrides: Partial<SessionOptions> = {}): { session: Session; stdout: ReturnType<typeof capture_stream>; stderr: ReturnType<typeof capture_stream> } => {
         const stdout = capture_stream();

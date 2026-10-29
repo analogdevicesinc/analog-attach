@@ -34,9 +34,9 @@ export interface NoosFixture {
     /** The cwd of a run, where `workfile.json` goes. */
     readonly project: string;
     readonly home: string;
-    /** `.analog-attach/config.json`: `backend: noos`, the fixtures' capi and modules, otherboard, no interview; `values` on top (undefined drops a key). */
+    /** `.analog-attach/config.json`: `backend: noos`, and in its `noos` section the fixtures' capi and modules, otherboard, no interview; `values` on top (undefined drops a key). */
     settings(values?: Record<string, unknown>): void;
-    /** The local settings file. */
+    /** The local settings file's `noos` section. */
     config(): Record<string, unknown>;
     /** The workfile's symbols. */
     stored(): Symbols;
@@ -70,16 +70,19 @@ export function create_noos_fixture(): NoosFixture {
         settings(values = {}) {
             fs.mkdirSync(path.dirname(settings_file), { recursive: true });
             fs.writeFileSync(settings_file, JSON.stringify({
-                "backend": "noos",
-                "capi-path": path.join(FIXTURES, "capi"),
-                "module-paths": [path.join(FIXTURES, "platform"), path.join(FIXTURES, "driver-collection")],
-                "board": "otherboard",
-                "interview": "false",
-                ...values,
+                backend: "noos",
+                noos: {
+                    "capi-path": path.join(FIXTURES, "capi"),
+                    "module-paths": [path.join(FIXTURES, "platform"), path.join(FIXTURES, "driver-collection")],
+                    "board": "otherboard",
+                    "interview": "false",
+                    ...values,
+                },
             }, undefined, 2));
         },
         config() {
-            return JSON.parse(fs.readFileSync(settings_file, "utf8")) as Record<string, unknown>;
+            const file = JSON.parse(fs.readFileSync(settings_file, "utf8")) as { noos?: Record<string, unknown> };
+            return file.noos ?? {};
         },
         stored() {
             const file = JSON.parse(fs.readFileSync(path.join(project, "workfile.json"), "utf8")) as { symbols: Symbols };

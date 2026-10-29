@@ -22,7 +22,7 @@
       "additionalProperties": false
     },
     "config": {
-      "description": "ConfigEntry: one field, backend first, then the backend's in its order (COM-120).",
+      "description": "ConfigEntry: one field, backend first, then the backend's in its order (CONFIG-010). The backend's come from its section of the settings files (COM-131); another backend's section is never listed.",
       "type": "object",
       "required": ["field_name", "category", "description", "type", "required", "default", "value", "source"],
       "properties": {
@@ -44,7 +44,7 @@
         "required": { "type": "boolean", "description": "Display only (the * of the table)." },
         "default": { "type": ["string", "null"] },
         "value": {
-          "description": "The effective value: local, then global, then the default (COM-123); absolute for a local path; null when it has none.",
+          "description": "The effective value: local, then global, then the default, a backend's field from its section of each file (COM-124); absolute for a local path; null when it has none.",
           "anyOf": [{ "type": ["string", "null"] }, { "type": "array", "items": { "type": "string" } }]
         },
         "source": { "enum": ["local", "global", "default", "unset"], "description": "Where value comes from." }

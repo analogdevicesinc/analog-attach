@@ -49,9 +49,15 @@ and ask nothing.
 **SETUP-011** If a settings file can't be read or isn't a JSON object
 (COM-121), then the CLI shall write the problem as COM-072 words it (the
 message, an empty line and `Fix or remove <file>.`) to standard error and
-exit with status 2, without asking anything.
+exit with status 2, without asking anything. The same holds when the active
+section of a file isn't an object (COM-134), the problem worded with its
+hint (`Make <id> an object in <file>; …`): before the backend question when
+`backend` is set, and right after it otherwise, the backend just saved
+(SETUP-021) being the one whose section can't be written. An old flat file
+stops the run this way (`02-common.md` §8.1).
 
-**SETUP-012** If the settings files have other problems (COM-122, COM-123),
+**SETUP-012** If the settings files have other problems (COM-123, COM-132,
+COM-133, or a section other than the active one that isn't an object),
 then the CLI shall go on with the current settings: an unknown key is
 ignored and an invalid value is left out. (Open issue S-1.)
 
@@ -83,7 +89,7 @@ the CLI shall write `Cancelled.` to standard output and exit with status
 Where the backend is linux:
 
 **SETUP-030** The CLI shall first write `linux`, `devicetree` and `workfile`
-to the local settings file (COM-129), `workfile` being the kept path or the
+to the `linux` section of the local settings file (COM-129), `workfile` being the kept path or the
 new file name made absolute against the CWD, then write `Saved linux,
 devicetree and workfile to <file>.` and an empty line, `<file>` relative to
 the CWD when it is under it (`.analog-attach/config.json`), else absolute.
@@ -251,7 +257,7 @@ asks only what is still missing.
 line, then run the steps of SETUP-510 to SETUP-540 in order.
 
 **SETUP-501** When a step writes a setting, the CLI shall write it to the
-local settings file at once, through the checks of `config` (`config.md`
+`noos` section of the local settings file at once, through the checks of `config` (`config.md`
 §4, §9), and write `✓ <key> = <value>` (`<value>` a list joined with `, `),
 followed for `board` by ` (and platform = <chip>)`. When a step skips a
 setting that is set, it shall write `✓ <key>: <value>`.
@@ -337,7 +343,7 @@ shall exit with status 0.
 ## 10. Open issues
 
 **S-1. Problems of the settings files go unreported.** With an unknown key
-or an invalid value (COM-122, COM-123), the setup run says nothing
+or an invalid value (COM-123, COM-132, COM-133), the setup run says nothing
 (SETUP-012): the unknown key stays in the file, and an invalid value has no
 Enter default. (The run used to refuse after saving, SETUP-031.)
 

@@ -117,6 +117,12 @@ const FRONT_ROUTES = new Set(["config", "completion", "skill"]);
 
 /** A local settings file that isn't JSON. */
 const broken_settings = (fixture: { settings_file: string }): void => { fs.writeFileSync(fixture.settings_file, "{"); };
+/** The settings file with a key of the old flat format at the top level, and an unknown one in the active section. */
+const unknown_settings = (fixture: { settings_file: string }): void => {
+    const table = JSON.parse(fs.readFileSync(fixture.settings_file, "utf8")) as Record<string, unknown>;
+    const id = table["backend"] as string;
+    fs.writeFileSync(fixture.settings_file, JSON.stringify({ ...table, workfile: "flat.json", [id]: { ...table[id] as object, bogus: "x" } }));
+};
 
 // =====================================================================================
 // The contract, for one backend
@@ -512,6 +518,7 @@ const LINUX_CASES: readonly Case<LinuxHarness>[] = [
     { route: "config", argv: ["config", "--reload"], shape: "answer", prepare: fixture => { fixture.tools(); } },
     { route: "config", argv: ["config", "--reload"], shape: "refusal", prepare: fixture => { fixture.tools({ fail: true }); } },
     { route: "config", argv: ["config"], shape: "config-error", prepare: broken_settings },
+    { route: "config", argv: ["config"], shape: "config-error", prepare: unknown_settings },
     { route: "completion", argv: ["completion", "bash"], shape: "answer" },
     { route: "completion", argv: ["completion", "zsh", "--install"], shape: "answer" },
     { route: "skill install", argv: ["skill", "install", "analog-attach-linux"], shape: "refusal" },
@@ -642,6 +649,7 @@ const NOOS_CASES: readonly Case<NoosHarness>[] = [
     { route: "config", argv: ["config", "board", "otherboard"], shape: "answer" },
     { route: "config", argv: ["config", "interview", "--reset"], shape: "answer" },
     { route: "config", argv: ["config"], shape: "config-error", prepare: broken_settings },
+    { route: "config", argv: ["config"], shape: "config-error", prepare: unknown_settings },
     { route: "completion", argv: ["completion", "bash"], shape: "answer" },
     { route: "skill install", argv: ["skill", "install", "analog-attach-noos"], shape: "refusal" },
     { route: "skill uninstall", argv: ["skill", "uninstall", "analog-attach-noos"], shape: "refusal" },

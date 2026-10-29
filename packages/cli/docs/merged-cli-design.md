@@ -176,6 +176,19 @@ The file covers:
     and carries the file name of its JSON Schema under `docs/spec/04-protocol/`, so the
     contract test (migration step 6) covers `move`, `list parent` or `generate` as it
     covers the shared commands.
+15. **Settings are sectioned per backend.** This supersedes the flat keys the first
+    version of the store had, where every backend's keys sat next to `backend`. A file
+    is `{ "backend": "linux", "linux": { … }, "noos": { … } }`: `backend` stays at the
+    top level, and each backend's settings live in an object named after its id. With
+    flat keys, `config backend noos` turned the Linux keys into unknown-key errors, and
+    the one `workfile` key was shared by both backends. Now `config backend <id>` only
+    changes which section is used, both sections stay intact, and each backend keeps its
+    own `workfile`. `config` and `SettingsView` see the active section only (the no-OS
+    lib's injected view, like the Linux backend's, simply sees the `noos` values). Local
+    and global layer section by section. Unknown keys are checked at the top level and in
+    the active section; other sections are kept verbatim and checked once active. A flat
+    file of the old format is not migrated: it fails with unknown-key errors naming its
+    path.
 
 ## Protocol alignments
 
@@ -214,9 +227,10 @@ The other shared responses (`import`, `delete`, `validate`, `build`, `deploy`, a
 - **Bundled assets.** `getBundledDtSchemaPath` and the bundled tool paths resolve
   relative to the Linux CLI's `dist/`. They break once the Linux backend is bundled
   into `aa`, so the asset root has to be passed in.
-- **Undecided settings.** The `SettingSpec` design depends on two open questions:
+- **Undecided settings.** The `SettingSpec` design depended on two open questions:
   whether keys are scoped per backend (`linux.devicetree` or a flat `devicetree`), and
-  K-01 (`overlay` → `workfile`).
+  K-01 (`overlay` → `workfile`). Both are settled: the keys are sectioned per backend
+  (decision 15), and both backends call the file `workfile`.
 
 ## Migration path
 
