@@ -1,0 +1,26 @@
+{
+  "parse": {
+    "ok": true,
+    "dropped_overrides": true,
+    "unresolved_targets": [],
+    "unresolved": []
+  },
+  "validate": {
+    "errors": [
+      {
+        "path": [
+          "node1",
+          "ds1337@68",
+          "$nodename",
+          "0"
+        ],
+        "message": "ds1337@68 (dallas,ds1337): $nodename:0: 'ds1337@68' does not match '^rtc(@.*|-([0-9]|[1-9][0-9]+))?$'\n\tfrom schema $id: http://devicetree.org/schemas/rtc/rtc-ds1307.yaml"
+      }
+    ],
+    "warnings": []
+  },
+  "reg": {
+    "conflicts": [],
+    "chip_select_overflows": []
+  }
+}

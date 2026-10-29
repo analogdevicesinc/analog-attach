@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "completion.schema.json",
+  "title": "completion response",
+  "description": "Standard output of completion in JSON mode (COMPL-100, COMPL-156): the script, or what --install or --uninstall did, or a refusal. The front end's: the same for every backend.",
+  "oneOf": [
+    {
+      "description": "completion [<shell>]: the script.",
+      "type": "object",
+      "required": ["ok", "message", "severity", "script"],
+      "properties": {
+        "ok": { "const": true },
+        "message": { "type": "string", "pattern": "^(bash|fish|zsh) completion script$" },
+        "severity": { "const": "info" },
+        "script": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    {
+      "description": "--install or --uninstall: message is the lines of the human output, joined with newlines.",
+      "$ref": "common.schema.json#/$defs/done"
+    },
+    { "$ref": "common.schema.json#/$defs/refusal" }
+  ]
+}

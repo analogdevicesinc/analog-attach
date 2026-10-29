@@ -1,0 +1,35 @@
+{
+  "parse": {
+    "ok": true,
+    "dropped_overrides": false,
+    "unresolved_targets": [
+      {
+        "fragment": "fragment@0",
+        "property": "target",
+        "target": "rp1_mmc0"
+      },
+      {
+        "fragment": "fragment@1",
+        "property": "target",
+        "target": "rp1_sdio_clk0"
+      }
+    ],
+    "unresolved": [
+      {
+        "path": [
+          "&rp1_mmc0"
+        ],
+        "property": "pinctrl-0",
+        "reference": "&rp1_sdio0_22_27"
+      }
+    ]
+  },
+  "validate": {
+    "errors": [],
+    "warnings": []
+  },
+  "reg": {
+    "conflicts": [],
+    "chip_select_overflows": []
+  }
+}

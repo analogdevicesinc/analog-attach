@@ -7,11 +7,8 @@ import { Result, error } from '../src/ruleset_parser/result';
 import { Property } from '../src/ruleset_parser/types';
 import { parse_property, parse_ruleset } from '../src/ruleset_parser/ruleset_parser';
 import { Ruleset } from '../src/ruleset_parser/types';
-import { set_settings, set_config_path_override } from '../src/settings/settings';
-import { SETTINGS_DEFAULTS } from '../src/settings/globals';
-import { SettingsFile } from '../src/settings/types';
+import { memory_settings, use_settings } from '../src/settings/settings';
 import { reset_registry } from '../src/registry/registry';
-import { PATH_LIST_DELIMITER } from '../src/settings/globals';
 
 /*
  * The miniature CAPI ecosystem under test/fixtures. Checked in rather than read out of a
@@ -76,58 +73,30 @@ export function loadAndParseRuleset(fixturePath: string): Result<Ruleset> {
 	return parse_ruleset(yaml);
 }
 
-const temp_config_paths: string[] = [];
-
 /**
- * Point the library at a set of module roots, defaulting to the fixture ecosystem.
+ * Point the library at a set of module roots, defaulting to the fixture ecosystem, through
+ * an in-memory settings source. `values` are more settings (`bootstrap`, `board`, ...).
  *
- * The registry is built once per process and memoised, so it is reset here as well as on
+ * The registry is built once per source and memoised, so it is reset here as well as on
  * teardown: a test that changes the roots must not inherit the previous test's index.
  */
-export function setup_test_config(roots: { capi?: string; modules?: string[] } = {}): void {
-	const temp_dir = fs.mkdtempSync(path.join(os.tmpdir(), 'attach-no-os-test-'));
-	const temp_config_path = path.join(temp_dir, 'config.json');
-
-	temp_config_paths.push(temp_config_path);
-	set_config_path_override(temp_config_path);
-
+export function setup_test_config(roots: { capi?: string; modules?: string[] } = {}, values: Record<string, string> = {}): void {
 	const modules = roots.modules ?? [FIXTURE_PLATFORM, FIXTURE_DRIVERS];
-
-	const settings: SettingsFile = {
-		...SETTINGS_DEFAULTS,
-		"capi-path": {
-			...SETTINGS_DEFAULTS["capi-path"],
-			value: roots.capi ?? FIXTURE_CAPI
-		},
-		"module-paths": {
-			...SETTINGS_DEFAULTS["module-paths"],
-			value: modules.join(PATH_LIST_DELIMITER)
-		}
-	};
-
-	set_settings(settings);
+	use_settings(memory_settings({ ...values, "capi-path": roots.capi ?? FIXTURE_CAPI, "module-paths": modules }, os.tmpdir()));
 	reset_registry();
 }
 
 export function teardown_test_config(): void {
-	const temp_config_path = temp_config_paths.pop();
-
-	set_config_path_override(null);
+	use_settings(undefined);
 	reset_registry();
-
-	if (temp_config_path && fs.existsSync(temp_config_path)) {
-		const temp_dir = path.dirname(temp_config_path);
-		fs.rmSync(temp_dir, { recursive: true, force: true });
-	}
 }
 
 export function setup_no_config(): void {
-	set_config_path_override('/nonexistent/path/to/config.json');
+	use_settings(memory_settings({}, '/nonexistent/path'));
 	reset_registry();
 }
 
 export function teardown_no_config(): void {
-	set_config_path_override(null);
+	use_settings(undefined);
 	reset_registry();
 }
-

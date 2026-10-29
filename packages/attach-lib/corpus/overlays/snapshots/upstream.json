@@ -1,0 +1,27 @@
+{
+  "parse": {
+    "ok": true,
+    "dropped_overrides": false,
+    "unresolved_targets": [
+      {
+        "fragment": "fragment@0",
+        "property": "target",
+        "target": "i2c2"
+      },
+      {
+        "fragment": "fragment@6",
+        "property": "target",
+        "target": "hdmi"
+      }
+    ],
+    "unresolved": []
+  },
+  "validate": {
+    "errors": [],
+    "warnings": []
+  },
+  "reg": {
+    "conflicts": [],
+    "chip_select_overflows": []
+  }
+}

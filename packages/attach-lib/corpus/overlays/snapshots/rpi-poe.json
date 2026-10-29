@@ -1,0 +1,25 @@
+{
+  "parse": {
+    "ok": true,
+    "dropped_overrides": true,
+    "unresolved_targets": [],
+    "unresolved": []
+  },
+  "validate": {
+    "errors": [
+      {
+        "path": [
+          "node0",
+          "pwm-fan",
+          "pwms"
+        ],
+        "message": "pwm-fan (pwm-fan): pwms: [[1, 0, 80000], [0]] is too long\n\tfrom schema $id: http://devicetree.org/schemas/hwmon/pwm-fan.yaml"
+      }
+    ],
+    "warnings": []
+  },
+  "reg": {
+    "conflicts": [],
+    "chip_select_overflows": []
+  }
+}

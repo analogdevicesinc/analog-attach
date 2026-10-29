@@ -14,10 +14,13 @@ jobs:
         with:
           token: ${{ secrets.GH_TOKEN }}
 
-      - name: Install dtc (Device Tree Compiler)
+      # dtc for the tests; flex, bison and python3-venv for the CLI's bundled
+      # dtc and dt-schema tools (packages/cli/scripts/bundle-dt-schema.sh, run by
+      # its build, as scripts/verify.sh does).
+      - name: Install dtc and the tools of the bundled dt-schema build
         run: |
           sudo apt-get update
-          sudo apt-get install -y device-tree-compiler
+          sudo apt-get install -y device-tree-compiler flex bison python3-venv
           dtc --version
 
       - name: Set up Node.js

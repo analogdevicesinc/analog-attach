@@ -1,0 +1,33 @@
+{
+  "parse": {
+    "ok": true,
+    "dropped_overrides": true,
+    "unresolved_targets": [],
+    "unresolved": []
+  },
+  "validate": {
+    "errors": [
+      {
+        "path": [
+          "node0",
+          "ov64a40@36"
+        ],
+        "message": "ov64a40@36 (ovti,ov64a40): Unevaluated properties are not allowed ('clock-names' was unexpected)\n\tfrom schema $id: http://devicetree.org/schemas/media/i2c/ovti,ov64a40.yaml"
+      },
+      {
+        "path": [
+          "node0",
+          "ov64a40@36",
+          "port",
+          "endpoint"
+        ],
+        "message": "ov64a40@36 (ovti,ov64a40): port:endpoint: 'clock-lanes' does not match any of the regexes: '^pinctrl-[0-9]+$'\n\tfrom schema $id: http://devicetree.org/schemas/media/i2c/ovti,ov64a40.yaml"
+      }
+    ],
+    "warnings": []
+  },
+  "reg": {
+    "conflicts": [],
+    "chip_select_overflows": []
+  }
+}

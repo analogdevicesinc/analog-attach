@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "rename.schema.json",
+  "title": "rename response",
+  "description": "Standard output of rename in JSON mode (RENAME-043), or a refusal. $defs/base is CommonResponse (overview 2.1).",
+  "anyOf": [{ "$ref": "#/$defs/linux" }, { "$ref": "#/$defs/noos" }],
+  "$defs": {
+    "base": { "$ref": "common.schema.json#/$defs/common" },
+    "linux": {
+      "oneOf": [
+        {
+          "allOf": [{ "$ref": "common.schema.json#/$defs/done" }],
+          "properties": {
+            "message": { "type": "string", "description": "Renamed <path> to <new-name>, then '; reg created' or '; reg first cell set to <n>' when reg changed." },
+            "severity": { "enum": ["info", "warn"], "description": "warn when an address warning was written to standard error." }
+          }
+        },
+        { "$ref": "common.schema.json#/$defs/refusal" }
+      ]
+    },
+    "noos": {
+      "anyOf": [
+        {
+          "description": "Where the backend is noos: the node was renamed (RENAME-500).",
+          "allOf": [{ "$ref": "common.schema.json#/$defs/done" }],
+          "properties": {
+            "message": { "type": "string", "pattern": "^Renamed '.+' to '.+'$" },
+            "severity": { "const": "info" }
+          }
+        },
+        { "$ref": "common.schema.json#/$defs/refusal" }
+      ]
+    }
+  }
+}

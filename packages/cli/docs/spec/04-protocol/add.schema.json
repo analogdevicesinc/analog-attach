@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "add.schema.json",
+  "title": "add response",
+  "description": "Standard output of add in JSON mode (ADD-100): the added node, or a refusal. $defs/base is AddResponse; $defs/linux and $defs/noos are the backends' responses (overview 2.1).",
+  "anyOf": [{ "$ref": "#/$defs/linux" }, { "$ref": "#/$defs/noos" }],
+  "$defs": {
+    "base": {
+      "description": "AddResponse.",
+      "allOf": [{ "$ref": "common.schema.json#/$defs/common" }],
+      "required": ["key", "path", "missing_required"],
+      "properties": {
+        "key": { "type": "string", "description": "The new node's name with its unit address." },
+        "path": { "$ref": "common.schema.json#/$defs/node-path" },
+        "missing_required": {
+          "description": "The required properties the node lacks, in the order to set them; [] when none (ADD-110).",
+          "type": "array",
+          "items": { "$ref": "common.schema.json#/$defs/missing-property" }
+        }
+      }
+    },
+    "linux": {
+      "oneOf": [{ "$ref": "#/$defs/linux-added" }, { "$ref": "common.schema.json#/$defs/refusal" }]
+    },
+    "linux-added": {
+      "allOf": [{ "$ref": "#/$defs/base" }],
+      "required": ["template"],
+      "properties": {
+        "ok": { "const": true },
+        "message": { "type": "string", "description": "Added <key> (label: <label>)." },
+        "severity": { "const": "info" },
+        "template": { "type": "string", "pattern": "^(required|example:[1-9][0-9]*|overlay:.+)$" },
+        "missing_required": { "type": "array", "items": { "$ref": "#/$defs/linux-missing" } },
+        "unresolved": {
+          "description": "Copy templates only: references in the new node that name no node of the merged tree (ADD-091).",
+          "type": "array",
+          "items": { "$ref": "common.schema.json#/$defs/unresolved-entry" }
+        }
+      },
+      "unevaluatedProperties": false,
+      "if": { "properties": { "template": { "const": "required" } } },
+      "then": { "not": { "required": ["unresolved"] } },
+      "else": { "required": ["unresolved"] }
+    },
+    "linux-missing": {
+      "description": "A required property the node lacks (ADD-110): the base's fields only.",
+      "allOf": [{ "$ref": "common.schema.json#/$defs/missing-property" }],
+      "unevaluatedProperties": false
+    },
+    "noos": {
+      "anyOf": [{ "$ref": "#/$defs/noos-added" }, { "$ref": "common.schema.json#/$defs/refusal" }]
+    },
+    "noos-added": {
+      "description": "Where the backend is noos: the node add made (ADD-523). key is what add was given (a schema, driver or eval board), path the new node's name; the nodes bootstrap made below it are not listed.",
+      "allOf": [{ "$ref": "#/$defs/base" }],
+      "properties": {
+        "ok": { "const": true },
+        "message": { "type": "string", "pattern": "^Added '[^']+' \\(.+\\) and [0-9]+ nodes? below it; (the workfile is valid|[0-9]+ problems? left - run: .+ validate)$" },
+        "severity": { "const": "info" },
+        "path": { "type": "array", "minItems": 1, "maxItems": 1, "items": { "type": "string", "minLength": 1 } },
+        "missing_required": { "type": "array", "items": { "$ref": "#/$defs/noos-missing" } }
+      },
+      "unevaluatedProperties": false
+    },
+    "noos-missing": {
+      "description": "A required value still empty on the added node or on a node bootstrap made for it (ADD-526).",
+      "allOf": [{ "$ref": "common.schema.json#/$defs/missing-property" }],
+      "required": ["node"],
+      "properties": { "node": { "type": "string", "minLength": 1, "description": "The node it belongs to." } },
+      "unevaluatedProperties": false
+    }
+  }
+}

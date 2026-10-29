@@ -30,6 +30,8 @@
     "test:watch": "vitest --watch",
     "corpus": "node scripts/corpus-parse.mjs run",
     "corpus:diff": "node scripts/corpus-parse.mjs diff",
+    "corpus:overlays": "node corpus/overlays/corpus.mjs run",
+    "corpus:overlays:diff": "node corpus/overlays/corpus.mjs diff",
     "coverage": "vitest run --coverage"
   },
   "dependencies": {

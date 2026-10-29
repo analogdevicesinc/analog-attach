@@ -1,0 +1,267 @@
+{
+  "parse": {
+    "ok": true,
+    "dropped_overrides": true,
+    "unresolved_targets": [],
+    "unresolved": []
+  },
+  "validate": {
+    "errors": [
+      {
+        "path": [
+          "node0",
+          "fsm-demo",
+          "debug"
+        ],
+        "message": "fsm-demo (rpi,gpio-fsm): debug: b'\\x00\\x00\\x00\\x00' is not of type 'object', 'integer', 'array', 'boolean', 'null'\n\tfrom schema $id: http://devicetree.org/schemas/dt-core.yaml"
+      },
+      {
+        "path": [
+          "node0",
+          "fsm-demo",
+          "get_set",
+          "go"
+        ],
+        "message": "get_set: go: b'\\x00\\x00\\x00\\x03\\x00\\x00\\x03\\xe8' is not of type 'object', 'integer', 'array', 'boolean', 'null'\n\tfrom schema $id: http://devicetree.org/schemas/dt-core.yaml"
+      },
+      {
+        "path": [
+          "node0",
+          "fsm-demo",
+          "get_set",
+          "set"
+        ],
+        "message": "get_set: set: b'\\x00\\x01\\x00\\x01\\x00\\x00\\x00\\x01' is not of type 'object', 'integer', 'array', 'boolean', 'null'\n\tfrom schema $id: http://devicetree.org/schemas/dt-core.yaml"
+      },
+      {
+        "path": [
+          "node0",
+          "fsm-demo",
+          "go",
+          "ready_wait"
+        ],
+        "message": "go: ready_wait: b'\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00' is not of type 'object', 'integer', 'array', 'boolean', 'null'\n\tfrom schema $id: http://devicetree.org/schemas/dt-core.yaml"
+      },
+      {
+        "path": [
+          "node0",
+          "fsm-demo",
+          "go",
+          "set"
+        ],
+        "message": "go: set: b'\\x00\\x00\\x00\\x01\\x00\\x00\\x00\\x00\\x00\\x01\\x00\\x01\\x00\\x00\\x00\\x00\\x00\\x02\\x00\\x01\\x00\\x00\\x00\\x01' is not of type 'object', 'integer', 'array', 'boolean', 'null'\n\tfrom schema $id: http://devicetree.org/schemas/dt-core.yaml"
+      },
+      {
+        "path": [
+          "node0",
+          "fsm-demo",
+          "go",
+          "shutdown1"
+        ],
+        "message": "go: shutdown1: b'\\x00\\x00\\x00\\x04\\x00\\x00\\x00\\x00' is not of type 'object', 'integer', 'array', 'boolean', 'null'\n\tfrom schema $id: http://devicetree.org/schemas/dt-core.yaml"
+      },
+      {
+        "path": [
+          "node0",
+          "fsm-demo",
+          "num-swgpios"
+        ],
+        "message": "fsm-demo (rpi,gpio-fsm): num-swgpios: b'\\x00\\x00\\x00\\x01' is not of type 'object', 'integer', 'array', 'boolean', 'null'\n\tfrom schema $id: http://devicetree.org/schemas/dt-core.yaml"
+      },
+      {
+        "path": [
+          "node0",
+          "fsm-demo",
+          "ready_wait",
+          "ready"
+        ],
+        "message": "ready_wait: ready: b'\\x00\\x00\\x00\\x03\\x00\\x00\\x03\\xe8' is not of type 'object', 'integer', 'array', 'boolean', 'null'\n\tfrom schema $id: http://devicetree.org/schemas/dt-core.yaml"
+      },
+      {
+        "path": [
+          "node0",
+          "fsm-demo",
+          "ready_wait",
+          "set"
+        ],
+        "message": "ready_wait: set: b'\\x00\\x00\\x00\\x02\\x00\\x00\\x00\\x00' is not of type 'object', 'integer', 'array', 'boolean', 'null'\n\tfrom schema $id: http://devicetree.org/schemas/dt-core.yaml"
+      },
+      {
+        "path": [
+          "node0",
+          "fsm-demo",
+          "ready_wait",
+          "shutdown1"
+        ],
+        "message": "ready_wait: shutdown1: b'\\x00\\x00\\x00\\x04\\x00\\x00\\x00\\x00' is not of type 'object', 'integer', 'array', 'boolean', 'null'\n\tfrom schema $id: http://devicetree.org/schemas/dt-core.yaml"
+      },
+      {
+        "path": [
+          "node0",
+          "fsm-demo",
+          "ready",
+          "shutdown1"
+        ],
+        "message": "ready: shutdown1: b'\\x00\\x00\\x00\\x04\\x00\\x00\\x00\\x00' is not of type 'object', 'integer', 'array', 'boolean', 'null'\n\tfrom schema $id: http://devicetree.org/schemas/dt-core.yaml"
+      },
+      {
+        "path": [
+          "node0",
+          "fsm-demo",
+          "ready",
+          "stopping"
+        ],
+        "message": "ready: stopping: b'\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x01\\x00\\x00\\x00\\x02\\x00\\x00\\x00\\x01' is not of type 'object', 'integer', 'array', 'boolean', 'null'\n\tfrom schema $id: http://devicetree.org/schemas/dt-core.yaml"
+      },
+      {
+        "path": [
+          "node0",
+          "fsm-demo",
+          "shutdown1",
+          "set"
+        ],
+        "message": "shutdown1: set: b'\\x00\\x00\\x00\\x01\\x00\\x00\\x00\\x00\\x00\\x01\\x00\\x01\\x00\\x00\\x00\\x00\\x00\\x02\\x00\\x01\\x00\\x00\\x00\\x01' is not of type 'object', 'integer', 'array', 'boolean', 'null'\n\tfrom schema $id: http://devicetree.org/schemas/dt-core.yaml"
+      },
+      {
+        "path": [
+          "node0",
+          "fsm-demo",
+          "shutdown1",
+          "shutdown2"
+        ],
+        "message": "shutdown1: shutdown2: b'\\x00\\x00\\x00\\x04\\x00\\x00\\x00\\xfa' is not of type 'object', 'integer', 'array', 'boolean', 'null'\n\tfrom schema $id: http://devicetree.org/schemas/dt-core.yaml"
+      },
+      {
+        "path": [
+          "node0",
+          "fsm-demo",
+          "shutdown2",
+          "set"
+        ],
+        "message": "shutdown2: set: b'\\x00\\x01\\x00\\x01\\x00\\x00\\x00\\x01\\x00\\x02\\x00\\x01\\x00\\x00\\x00\\x00' is not of type 'object', 'integer', 'array', 'boolean', 'null'\n\tfrom schema $id: http://devicetree.org/schemas/dt-core.yaml"
+      },
+      {
+        "path": [
+          "node0",
+          "fsm-demo",
+          "shutdown2",
+          "shutdown3"
+        ],
+        "message": "shutdown2: shutdown3: b'\\x00\\x00\\x00\\x04\\x00\\x00\\x00\\xfa' is not of type 'object', 'integer', 'array', 'boolean', 'null'\n\tfrom schema $id: http://devicetree.org/schemas/dt-core.yaml"
+      },
+      {
+        "path": [
+          "node0",
+          "fsm-demo",
+          "shutdown3",
+          "set"
+        ],
+        "message": "shutdown3: set: b'\\x00\\x00\\x00\\x01\\x00\\x00\\x00\\x01\\x00\\x01\\x00\\x01\\x00\\x00\\x00\\x00' is not of type 'object', 'integer', 'array', 'boolean', 'null'\n\tfrom schema $id: http://devicetree.org/schemas/dt-core.yaml"
+      },
+      {
+        "path": [
+          "node0",
+          "fsm-demo",
+          "shutdown3",
+          "shutdown4"
+        ],
+        "message": "shutdown3: shutdown4: b'\\x00\\x00\\x00\\x04\\x00\\x00\\x00\\xfa' is not of type 'object', 'integer', 'array', 'boolean', 'null'\n\tfrom schema $id: http://devicetree.org/schemas/dt-core.yaml"
+      },
+      {
+        "path": [
+          "node0",
+          "fsm-demo",
+          "shutdown4",
+          "set"
+        ],
+        "message": "shutdown4: set: b'\\x00\\x00\\x00\\x01\\x00\\x00\\x00\\x00\\x00\\x01\\x00\\x01\\x00\\x00\\x00\\x00\\x00\\x02\\x00\\x01\\x00\\x00\\x00\\x00' is not of type 'object', 'integer', 'array', 'boolean', 'null'\n\tfrom schema $id: http://devicetree.org/schemas/dt-core.yaml"
+      },
+      {
+        "path": [
+          "node0",
+          "fsm-demo",
+          "start",
+          "set"
+        ],
+        "message": "start: set: b'\\x00\\x00\\x00\\x01\\x00\\x00\\x00\\x01\\x00\\x01\\x00\\x01\\x00\\x00\\x00\\x00\\x00\\x02\\x00\\x01\\x00\\x00\\x00\\x00' is not of type 'object', 'integer', 'array', 'boolean', 'null'\n\tfrom schema $id: http://devicetree.org/schemas/dt-core.yaml"
+      },
+      {
+        "path": [
+          "node0",
+          "fsm-demo",
+          "start",
+          "start2"
+        ],
+        "message": "start: start2: b'\\x00\\x00\\x00\\x03\\x00\\x00\\x00\\xfa' is not of type 'object', 'integer', 'array', 'boolean', 'null'\n\tfrom schema $id: http://devicetree.org/schemas/dt-core.yaml"
+      },
+      {
+        "path": [
+          "node0",
+          "fsm-demo",
+          "start2",
+          "go"
+        ],
+        "message": "start2: go: b'\\x00\\x00\\x00\\x03\\x00\\x00\\x00\\xfa' is not of type 'object', 'integer', 'array', 'boolean', 'null'\n\tfrom schema $id: http://devicetree.org/schemas/dt-core.yaml"
+      },
+      {
+        "path": [
+          "node0",
+          "fsm-demo",
+          "start2",
+          "set"
+        ],
+        "message": "start2: set: b'\\x00\\x00\\x00\\x01\\x00\\x00\\x00\\x00\\x00\\x01\\x00\\x01\\x00\\x00\\x00\\x01' is not of type 'object', 'integer', 'array', 'boolean', 'null'\n\tfrom schema $id: http://devicetree.org/schemas/dt-core.yaml"
+      },
+      {
+        "path": [
+          "node0",
+          "fsm-demo",
+          "stopped",
+          "get_set"
+        ],
+        "message": "stopped: get_set: b'\\x00\\x00\\x00\\x03\\x00\\x00\\x0b\\xb8' is not of type 'object', 'integer', 'array', 'boolean', 'null'\n\tfrom schema $id: http://devicetree.org/schemas/dt-core.yaml"
+      },
+      {
+        "path": [
+          "node0",
+          "fsm-demo",
+          "stopped",
+          "set"
+        ],
+        "message": "stopped: set: b'\\x00\\x01\\x00\\x01\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x01\\x00\\x00\\x00\\x01' is not of type 'object', 'integer', 'array', 'boolean', 'null'\n\tfrom schema $id: http://devicetree.org/schemas/dt-core.yaml"
+      },
+      {
+        "path": [
+          "node0",
+          "fsm-demo",
+          "stopped",
+          "shutdown1"
+        ],
+        "message": "stopped: shutdown1: b'\\x00\\x00\\x00\\x04\\x00\\x00\\x00\\x00' is not of type 'object', 'integer', 'array', 'boolean', 'null'\n\tfrom schema $id: http://devicetree.org/schemas/dt-core.yaml"
+      },
+      {
+        "path": [
+          "node0",
+          "fsm-demo",
+          "stopping",
+          "set"
+        ],
+        "message": "stopping: set: b'\\x00\\x02\\x00\\x01\\x00\\x00\\x00\\x00\\x00\\x01\\x00\\x01\\x00\\x00\\x00\\x01' is not of type 'object', 'integer', 'array', 'boolean', 'null'\n\tfrom schema $id: http://devicetree.org/schemas/dt-core.yaml"
+      },
+      {
+        "path": [
+          "node0",
+          "fsm-demo",
+          "stopping",
+          "stopped"
+        ],
+        "message": "stopping: stopped: b'\\x00\\x00\\x00\\x03\\x00\\x00\\x03\\xe8' is not of type 'object', 'integer', 'array', 'boolean', 'null'\n\tfrom schema $id: http://devicetree.org/schemas/dt-core.yaml"
+      }
+    ],
+    "warnings": []
+  },
+  "reg": {
+    "conflicts": [],
+    "chip_select_overflows": []
+  }
+}

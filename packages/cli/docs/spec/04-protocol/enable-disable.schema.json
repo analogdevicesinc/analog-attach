@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "enable-disable.schema.json",
+  "title": "enable and disable response",
+  "description": "Where the backend is linux: standard output of enable and disable in JSON mode (ENABLE-013), or a refusal. A CommonResponse; the commands are the Linux backend's own (overview 2.1).",
+  "oneOf": [
+    {
+      "allOf": [{ "$ref": "common.schema.json#/$defs/done" }],
+      "properties": {
+        "message": { "type": "string", "pattern": "^(Enabled|Disabled) .+$", "description": "Enabled <path> or Disabled <path>, the path as typed." },
+        "severity": { "const": "info" }
+      }
+    },
+    { "$ref": "common.schema.json#/$defs/refusal" }
+  ]
+}

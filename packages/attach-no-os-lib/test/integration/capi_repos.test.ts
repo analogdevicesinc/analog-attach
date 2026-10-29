@@ -48,7 +48,7 @@ function stored(workfile: Workfile): Record<string, Record<string, unknown>> {
     return exported.value.symbols as Record<string, Record<string, unknown>>;
 }
 
-/** What `attach-noos add <driver>` does: the driver's root, named after the driver, then bootstrap. */
+/** What `analog-attach add <driver>` does: the driver's root, named after the driver, then bootstrap. */
 function add_driver(workfile: Workfile, driver: string, name: string, interface_?: string): void {
     const root = interface_ === undefined ? driver_root(driver) : driver_root_for(driver, interface_);
     expectOk(root);
@@ -56,7 +56,7 @@ function add_driver(workfile: Workfile, driver: string, name: string, interface_
     expectOk(ruleset);
     expectOk(add_symbol(workfile, name, ruleset.value));
     expectOk(pin_driver(workfile, name, driver));
-    // On its eval board, as `attach-noos add <eval board>` puts it, so its pinout wires it.
+    // On its eval board, as `analog-attach add <eval board>` puts it, so its pinout wires it.
     expectOk(attach_eval_board(workfile, EVAL_BOARDS[driver] ?? '', name));
     expectOk(bootstrap(workfile));
 }
@@ -313,7 +313,7 @@ describe.skipIf(REPOS === undefined)('max31889 on max32655fthr, from the real re
     beforeEach(() => { setup_test_config(REPOS); });
     afterEach(() => { teardown_test_config(); });
 
-    /** `attach-noos add max31889`: no eval board carries it, so it is a bare part. */
+    /** `analog-attach add max31889`: no eval board carries it, so it is a bare part. */
     function bare_max31889(workfile: Workfile) {
         const root = driver_root('max31889');
         expectOk(root);

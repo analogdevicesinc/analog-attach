@@ -1,0 +1,57 @@
+{
+  "parse": {
+    "ok": true,
+    "dropped_overrides": true,
+    "unresolved_targets": [],
+    "unresolved": []
+  },
+  "validate": {
+    "errors": [
+      {
+        "path": [
+          "node1",
+          "adafruit_pins",
+          "brcm,function"
+        ],
+        "message": "adafruit_pins: brcm,function: b'\\x00\\x00\\x00\\x01' is not of type 'object', 'integer', 'array', 'boolean', 'null'\n\tfrom schema $id: http://devicetree.org/schemas/dt-core.yaml"
+      },
+      {
+        "path": [
+          "node1",
+          "adafruit_pins",
+          "brcm,pins"
+        ],
+        "message": "adafruit_pins: brcm,pins: b'\\x00\\x00\\x00\\x19\\x00\\x00\\x00\\x18' is not of type 'object', 'integer', 'array', 'boolean', 'null'\n\tfrom schema $id: http://devicetree.org/schemas/dt-core.yaml"
+      },
+      {
+        "path": [
+          "node1",
+          "backlight_pins",
+          "brcm,function"
+        ],
+        "message": "backlight_pins: brcm,function: b'\\x00\\x00\\x00\\x01' is not of type 'object', 'integer', 'array', 'boolean', 'null'\n\tfrom schema $id: http://devicetree.org/schemas/dt-core.yaml"
+      },
+      {
+        "path": [
+          "node1",
+          "backlight_pins",
+          "brcm,pins"
+        ],
+        "message": "backlight_pins: brcm,pins: b'\\x00\\x00\\x00\\x12' is not of type 'object', 'integer', 'array', 'boolean', 'null'\n\tfrom schema $id: http://devicetree.org/schemas/dt-core.yaml"
+      },
+      {
+        "path": [
+          "node3",
+          "adafruit18@0",
+          "compatible"
+        ],
+        "message": "adafruit18@0 (jianda,jd-t18003-t01): compatible: 'oneOf' conditional failed, one must be fixed:\n\t['jianda,jd-t18003-t01'] is too short\n\t'jianda,jd-t18003-t01' is not one of ['okaya,rh128128t']\n\tfrom schema $id: http://devicetree.org/schemas/display/sitronix,st7735r.yaml"
+      }
+    ],
+    "warnings": []
+  },
+  "reg": {
+    "conflicts": [],
+    "chip_select_overflows": []
+  }
+}

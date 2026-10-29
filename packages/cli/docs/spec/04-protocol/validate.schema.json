@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "validate.schema.json",
+  "title": "validate response",
+  "description": "Standard output of validate in JSON mode (VALIDATE-013, VALIDATE-021). Not a CommonResponse: it has no ok, message or severity; an empty errors is the success. $defs/base is ValidationResponse (overview 2.1).",
+  "anyOf": [{ "$ref": "#/$defs/linux" }, { "$ref": "#/$defs/noos" }],
+  "$defs": {
+    "base": {
+      "description": "ValidationResponse.",
+      "type": "object",
+      "required": ["errors", "warnings"],
+      "properties": {
+        "errors": { "type": "array", "items": { "$ref": "common.schema.json#/$defs/validation-finding" } },
+        "warnings": { "type": "array", "items": { "$ref": "common.schema.json#/$defs/validation-finding" } }
+      }
+    },
+    "linux": {
+      "allOf": [{ "$ref": "#/$defs/base" }],
+      "properties": {
+        "errors": {
+          "description": "Diagnostics of any level other than warning, in the order of VALIDATE-020; or one tool failure with path [].",
+          "type": "array",
+          "items": { "$ref": "#/$defs/linux-diagnostic" }
+        },
+        "warnings": {
+          "description": "Diagnostics of level warning: dt-validate's, then the address warnings (7.4).",
+          "type": "array",
+          "items": { "$ref": "#/$defs/linux-diagnostic" }
+        }
+      },
+      "unevaluatedProperties": false
+    },
+    "linux-diagnostic": {
+      "allOf": [{ "$ref": "common.schema.json#/$defs/validation-finding" }],
+      "properties": {
+        "path": {
+          "description": "Validation-tree node segments (node<N>, ...), or the absolute path's segments for an address warning on a node no fragment holds (VALIDATE-112), followed by the property path; [] for a tool failure (VALIDATE-013). A diagnostic without a node has only its property path (VALIDATE-022).",
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "noos": {
+      "anyOf": [
+        {
+          "description": "Where the backend is noos: the workfile's problems (VALIDATE-500). Each path is [<node>, <property>] (and the union member, when the problem is in it), or [<node>]; a warning is a required raw value left empty, or a capability mismatch an override allows (VALIDATE-501).",
+          "allOf": [{ "$ref": "#/$defs/base" }],
+          "unevaluatedProperties": false
+        },
+        { "$ref": "common.schema.json#/$defs/refusal" }
+      ]
+    }
+  }
+}

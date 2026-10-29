@@ -1,0 +1,22 @@
+{
+  "parse": {
+    "ok": true,
+    "dropped_overrides": true,
+    "unresolved_targets": [
+      {
+        "fragment": "fragment@8",
+        "property": "target-path",
+        "target": "/__symbols__"
+      }
+    ],
+    "unresolved": []
+  },
+  "validate": {
+    "errors": [],
+    "warnings": []
+  },
+  "reg": {
+    "conflicts": [],
+    "chip_select_overflows": []
+  }
+}

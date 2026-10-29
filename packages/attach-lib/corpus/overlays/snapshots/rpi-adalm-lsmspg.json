@@ -1,0 +1,31 @@
+{
+  "parse": {
+    "ok": true,
+    "dropped_overrides": true,
+    "unresolved_targets": [],
+    "unresolved": []
+  },
+  "validate": {
+    "errors": [
+      {
+        "path": [
+          "node1",
+          "ad5592r@0"
+        ],
+        "message": "ad5592r@0 (adi,ad5592r): 'label' does not match any of the regexes: '^(channel@)[0-7]$', '^pinctrl-[0-9]+$'\n\tfrom schema $id: http://devicetree.org/schemas/iio/dac/adi,ad5592r.yaml"
+      },
+      {
+        "path": [
+          "node2",
+          "ad5593r@10"
+        ],
+        "message": "ad5593r@10 (adi,ad5593r): 'label' does not match any of the regexes: '^(channel@)[0-7]$', '^pinctrl-[0-9]+$'\n\tfrom schema $id: http://devicetree.org/schemas/iio/dac/adi,ad5592r.yaml"
+      }
+    ],
+    "warnings": []
+  },
+  "reg": {
+    "conflicts": [],
+    "chip_select_overflows": []
+  }
+}

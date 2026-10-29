@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "move.schema.json",
+  "title": "move response",
+  "description": "Where the backend is linux: standard output of move in JSON mode (MOVE-018), or a refusal. A CommonResponse; the command is the Linux backend's own (overview 2.1).",
+  "oneOf": [
+    {
+      "allOf": [{ "$ref": "common.schema.json#/$defs/done" }],
+      "properties": {
+        "message": { "type": "string", "pattern": "^Moved .+ to .+$", "description": "Moved <source> to <destination>, as typed." },
+        "severity": { "const": "info" }
+      }
+    },
+    { "$ref": "common.schema.json#/$defs/refusal" }
+  ]
+}

@@ -801,8 +801,8 @@ function bare_part_wiring(workfile: Workfile, device: string, driver: string, in
 		...(peripheral === undefined ? {} : { peripheral }),
 		connections: [],
 		problems: [is_spi
-			? `no eval board carries this ${driver}, so its wiring is yours: set ${device}.${chip_select?.gpio_list ?? "cs_gpio"} (or add the eval board instead: attach-noos add <eval board>)`
-			: `no eval board carries this ${driver}, so its wiring is yours (or add the eval board instead: attach-noos add <eval board>)`],
+			? `no eval board carries this ${driver}, so its wiring is yours: set ${device}.${chip_select?.gpio_list ?? "cs_gpio"} (or add the eval board instead: analog-attach add <eval board>)`
+			: `no eval board carries this ${driver}, so its wiring is yours (or add the eval board instead: analog-attach add <eval board>)`],
 		...(options.length === 0 ? {} : { chip_select_options: options }),
 		...(board_pins.length === 0 ? {} : { board_pins }),
 	};

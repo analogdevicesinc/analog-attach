@@ -1,8 +1,8 @@
 /**
  * Scalar type of a setting's value.
  *
- * These are the names attach-meta's `Config.type` uses, so a setting can be described to
- * it without a translation table. `numeric` and `bool` are still stored as strings on
+ * These are the names analog-attach's setting specs use (`config --json` lists them), so
+ * a setting can be described to it without a translation table. `numeric` and `bool` are still stored as strings on
  * disk — the type is a hint for editors and prompts, not a storage format.
  */
 export type SettingType = "path" | "path_list" | "string" | "numeric" | "bool";
@@ -50,7 +50,7 @@ export interface SettingsFile {
 	 * are checked out.
 	 */
 	"module-paths": Setting;
-	/** Which workfile the commands act on, now that attach-meta has no --workfile flag. */
+	/** Which workfile the commands act on: they have no --workfile flag. */
 	workfile: Setting;
 	/** Board a new workfile is created for; also implies its platform. */
 	board: Setting;
@@ -72,49 +72,3 @@ export interface SettingsFile {
 	/** Whether main.c runs the parts' examples or the user's app_main() (see codegen). */
 	example: Setting;
 };
-
-export function is_setting(value: unknown): value is Setting {
-	if (typeof value !== "object" || value === null) {
-		return false;
-	}
-
-	const object = value as Record<string, unknown>;
-
-	if (typeof object.description !== "string") {
-		return false;
-	}
-	if (typeof object.required !== "boolean") {
-		return false;
-	}
-	if (object.value !== undefined && typeof object.value !== "string") {
-		return false;
-	}
-	if (object.default !== undefined && typeof object.default !== "string") {
-		return false;
-	}
-
-	return true;
-}
-
-export function is_settings_file(value: unknown): value is SettingsFile {
-	if (typeof value !== "object" || value === null) {
-		return false;
-	}
-
-	const object = value as Record<string, unknown>;
-	// Keys a config file must already contain. Most settings are deliberately absent:
-	// every setting's metadata is taken from SETTINGS_DEFAULTS on read, so a config
-	// missing a key is still valid and a newly added setting cannot invalidate a file
-	// that predates it. `capi-path` is here because nothing can be loaded without it, so
-	// a config lacking it is a config from before the CAPI move rather than merely an
-	// incomplete one, and saying so beats failing later with an empty registry.
-	const required_keys: (keyof SettingsFile)[] = ["capi-path", "build-command", "deploy-command"];
-
-	for (const key of required_keys) {
-		if (!(key in object) || !is_setting(object[key])) {
-			return false;
-		}
-	}
-
-	return true;
-}

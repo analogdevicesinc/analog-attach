@@ -1,0 +1,46 @@
+{
+  "parse": {
+    "ok": true,
+    "dropped_overrides": true,
+    "unresolved_targets": [],
+    "unresolved": []
+  },
+  "validate": {
+    "errors": [
+      {
+        "path": [
+          "node3",
+          "imx500@1a",
+          "port",
+          "endpoint",
+          "data-lanes",
+          "0"
+        ],
+        "message": "imx500@1a (sony,imx500): port:endpoint:data-lanes:0: 2 was expected\n\tfrom schema $id: http://devicetree.org/schemas/media/i2c/sony,imx500.yaml"
+      },
+      {
+        "path": [
+          "node3",
+          "imx500@1a",
+          "port",
+          "endpoint",
+          "data-lanes",
+          "1"
+        ],
+        "message": "imx500@1a (sony,imx500): port:endpoint:data-lanes:1: 4 was expected\n\tfrom schema $id: http://devicetree.org/schemas/media/i2c/sony,imx500.yaml"
+      },
+      {
+        "path": [
+          "node3",
+          "spi@40"
+        ],
+        "message": "spi@40 (raspberrypi,rp2040-gpio-bridge): 'spidev@0' does not match any of the regexes: '^pinctrl-[0-9]+$'\n\tfrom schema $id: http://devicetree.org/schemas/spi/raspberrypi,rp2040-gpio-bridge.yaml"
+      }
+    ],
+    "warnings": []
+  },
+  "reg": {
+    "conflicts": [],
+    "chip_select_overflows": []
+  }
+}

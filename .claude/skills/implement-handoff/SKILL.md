@@ -11,4 +11,4 @@ Given a handoff doc as the argument:
 4. If attach-lib changed, run `yarn workspace attach-lib build` before any CLI test or snapshot.
 5. Run `yarn verify` from the repo root. All of it must pass; fix any lint or type error you see.
 6. Update the item's **Status** in the doc to `resolved`, with the root cause, files changed and tests added.
-7. Never commit, amend or rewrite history. Suggest a commit message (prefixed `attach-cli:` or `attach-lib:`) and wait.
+7. Never commit, amend or rewrite history. Suggest a commit message (prefixed `cli:` or `attach-lib:`) and wait.

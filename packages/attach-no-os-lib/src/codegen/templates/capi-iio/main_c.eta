@@ -12,7 +12,7 @@
 const project = it.h.capi_project(it.workfile);
 const iio_devices = it.h.iio_devices(it.workfile);
 if (iio_devices.length === 0) {
-	throw new Error("The capi-iio template set serves IIO devices, and the workfile has none. Add a part with: attach-noos add <driver>");
+	throw new Error("The capi-iio template set serves IIO devices, and the workfile has none. Add a part with: analog-attach add <driver>");
 }
 if (!project.console) {
 	throw new Error("The IIO app is served over the console UART, and the board declares no single UART for it");

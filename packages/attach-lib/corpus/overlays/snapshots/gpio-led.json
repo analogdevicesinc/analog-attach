@@ -1,0 +1,41 @@
+{
+  "parse": {
+    "ok": true,
+    "dropped_overrides": true,
+    "unresolved_targets": [],
+    "unresolved": []
+  },
+  "validate": {
+    "errors": [
+      {
+        "path": [
+          "node0",
+          "led_pins@19",
+          "brcm,function"
+        ],
+        "message": "led_pins@19: brcm,function: b'\\x00\\x00\\x00\\x01' is not of type 'object', 'integer', 'array', 'boolean', 'null'\n\tfrom schema $id: http://devicetree.org/schemas/dt-core.yaml"
+      },
+      {
+        "path": [
+          "node0",
+          "led_pins@19",
+          "brcm,pins"
+        ],
+        "message": "led_pins@19: brcm,pins: b'\\x00\\x00\\x00\\x13' is not of type 'object', 'integer', 'array', 'boolean', 'null'\n\tfrom schema $id: http://devicetree.org/schemas/dt-core.yaml"
+      },
+      {
+        "path": [
+          "node0",
+          "led_pins@19",
+          "brcm,pull"
+        ],
+        "message": "led_pins@19: brcm,pull: b'\\x00\\x00\\x00\\x00' is not of type 'object', 'integer', 'array', 'boolean', 'null'\n\tfrom schema $id: http://devicetree.org/schemas/dt-core.yaml"
+      }
+    ],
+    "warnings": []
+  },
+  "reg": {
+    "conflicts": [],
+    "chip_select_overflows": []
+  }
+}

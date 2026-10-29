@@ -41,33 +41,24 @@ export type {
     PropertySuggestions
 } from "./workfile_handler/types";
 export {
+    use_settings,
+    memory_settings,
     get_settings,
-    set_settings,
     get_setting,
     get_setting_value,
     get_effective_setting_value,
-    set_setting_value,
-    reset_setting_value,
     get_capi_path,
     get_module_roots,
     bootstrap_enabled,
     example_enabled,
     interview_enabled,
-    get_settings_file_path,
-    get_settings_sources,
-    LEGACY_SETTING_NAMES,
-    find_local_config_path,
-    set_config_path_override,
     get_workfile_path
 } from "./settings/settings";
-export type { SettingsSources, SetSettingOptions } from "./settings/settings";
-export { set_target_setting, is_target_setting } from "./settings/target";
-export type { TargetSetting, TargetWrite } from "./settings/target";
+export type { SettingsSource } from "./settings/settings";
+export { target_writes, target_mismatch, is_target_setting } from "./settings/target";
+export type { TargetSetting, TargetState, TargetWrite } from "./settings/target";
 export {
     SETTINGS_DEFAULTS,
-    DEFAULT_SYSTEM_CONFIG_PATH,
-    DEFAULT_SYSTEM_CONFIG_FILENAME,
-    LOCAL_CONFIG_FILENAME,
     PATH_LIST_DELIMITER,
     DEFAULT_TEMPLATE_SET,
     IIO_TEMPLATE_SET,
@@ -76,7 +67,7 @@ export {
     DEFAULT_WORKFILE_NAME
 } from "./settings/globals";
 export type { Setting, SettingsFile, SettingType, SettingEnumSource, SettingCategory } from "./settings/types";
-export { is_setting, is_settings_file, SETTING_CATEGORIES } from "./settings/types";
+export { SETTING_CATEGORIES } from "./settings/types";
 export {
     build_registry,
     get_registry,
@@ -123,5 +114,7 @@ export {
     resolve_template_set,
     configured_template_set,
     TEMPLATES_ROOT,
+    use_templates_root,
+    get_templates_root,
     STRUCTURE_FILENAME
 } from "./codegen/template_sets";

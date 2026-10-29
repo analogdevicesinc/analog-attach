@@ -1,0 +1,24 @@
+{
+  "parse": {
+    "ok": true,
+    "dropped_overrides": true,
+    "unresolved_targets": [],
+    "unresolved": []
+  },
+  "validate": {
+    "errors": [
+      {
+        "path": [
+          "node2",
+          "goodix@14"
+        ],
+        "message": "goodix@14 (goodix,gt911): 'anyOf' conditional failed, one must be fixed:\n\t'interrupts' is a required property\n\t'interrupts-extended' is a required property\n\tfrom schema $id: http://devicetree.org/schemas/input/touchscreen/goodix.yaml"
+      }
+    ],
+    "warnings": []
+  },
+  "reg": {
+    "conflicts": [],
+    "chip_select_overflows": []
+  }
+}

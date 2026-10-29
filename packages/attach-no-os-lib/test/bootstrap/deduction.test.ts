@@ -48,7 +48,7 @@ function add(workfile: Workfile, name: string, symbol: string): void {
     expectOk(add_symbol(workfile, name, ruleset.value));
 }
 
-/** What `attach-noos add <driver> [--as <interface>]` does, before bootstrap. */
+/** What `analog-attach add <driver> [--as <interface>]` does, before bootstrap. */
 function add_driver(workfile: Workfile, driver: string, interface_: string, chip?: string): string {
     const root = driver_root_for(driver, interface_);
     expectOk(root);

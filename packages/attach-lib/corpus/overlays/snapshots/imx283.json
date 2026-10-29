@@ -1,0 +1,24 @@
+{
+  "parse": {
+    "ok": true,
+    "dropped_overrides": true,
+    "unresolved_targets": [],
+    "unresolved": []
+  },
+  "validate": {
+    "errors": [
+      {
+        "path": [
+          "node4",
+          "imx283@1a"
+        ],
+        "message": "imx283@1a (sony,imx283): 'clock-names', 'orientation', 'rotation' do not match any of the regexes: '^pinctrl-[0-9]+$'\n\tfrom schema $id: http://devicetree.org/schemas/media/i2c/sony,imx283.yaml"
+      }
+    ],
+    "warnings": []
+  },
+  "reg": {
+    "conflicts": [],
+    "chip_select_overflows": []
+  }
+}

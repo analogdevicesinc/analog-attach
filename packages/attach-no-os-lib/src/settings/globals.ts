@@ -20,18 +20,17 @@ export const PATH_LIST_DELIMITER = path.delimiter;
 export const DEFAULT_PROBE = "openocd";
 export const PROBE_OPTIONS = ["openocd", "jlink"];
 
-/** Workfile the commands act on when `workfile` is unset, resolved against the cwd. */
+/** Workfile the commands act on when `workfile` is unset, resolved against the project root. */
 export const DEFAULT_WORKFILE_NAME = "workfile.json";
 
 /**
  * Every configurable setting, with the metadata used to describe it (to a human, and to
- * attach-meta as a `Config`). Only `value` is ever read back from disk — everything here
- * is owned by this file, so a description or a default can be corrected without
- * migrating anybody's config.
+ * analog-attach's `config` as a setting spec). Only `value` is ever read back from disk —
+ * everything here is owned by this file, so a description or a default can be corrected
+ * without migrating anybody's config.
  *
- * `required: true` is not just documentation: attach-meta's `init` prompts for exactly
- * the required settings that have no value and no default, so marking a setting required
- * puts it in the first-run questionnaire.
+ * `required: true` is not just documentation: analog-attach's `config` marks the required
+ * settings and prints the hint of each one that has no value and no default.
  */
 export const SETTINGS_DEFAULTS: SettingsFile = {
 	"capi-path": {
@@ -46,17 +45,16 @@ export const SETTINGS_DEFAULTS: SettingsFile = {
 	// this: it runs at CMake configure time from a project that does not exist yet when
 	// AA is the thing generating it.
 	"module-paths": {
-		description: "Module repositories to load rulesets from (platform backends, driver collections), separated like PATH",
+		description: "Module repositories to load rulesets from (platform backends, driver collections)",
 		required: false,
 		type: "path_list",
 		category: "sources",
 	},
-	// attach-meta has no --workfile flag: it forwards nothing but the arguments its own
-	// schema defines, so the workfile a command acts on has to come from config. Stored
-	// relative by default so it follows whichever directory you are working in, which is
-	// also what makes a single global config usable across projects.
+	// The commands have no --workfile flag, so the workfile a command acts on has to come
+	// from config. Stored relative by default so it follows whichever directory you are
+	// working in, which is also what makes a single global config usable across projects.
 	workfile: {
-		description: "Workfile the commands act on, relative to the current directory unless absolute",
+		description: "Workfile the commands act on, relative to the project root unless absolute",
 		required: true,
 		type: "path",
 		default: DEFAULT_WORKFILE_NAME,
@@ -99,7 +97,7 @@ export const SETTINGS_DEFAULTS: SettingsFile = {
 	// CAPI builds with CMake and Kconfig from inside the project directory
 	// (`cmake --preset <board>`), which needs a configure step rather than one command.
 	// So these are escape hatches: set one to take over the step entirely, leave it unset
-	// to let `attach-noos build`/`attach-noos deploy` drive CMake.
+	// to let `analog-attach build`/`analog-attach deploy` drive CMake.
 	"build-command": {
 		description: "Override the 'build' step with this command, run at the base of the project (unset: drive CMake directly)",
 		required: false,
@@ -120,9 +118,8 @@ export const SETTINGS_DEFAULTS: SettingsFile = {
 		options: PROBE_OPTIONS,
 		category: "build",
 	},
-	// A setting rather than a flag, for the same reason as `workfile`: attach-meta forwards
-	// only the arguments its own schema defines. `required: false` with a default keeps it
-	// out of attach-meta's first-run questions.
+	// A setting rather than a flag, like `workfile`. `required: false` with a default keeps
+	// it out of the required settings `config` reports as unset.
 	bootstrap: {
 		description: "After 'add', fill in every value and node that leaves no room for choice (true/false)",
 		required: false,
@@ -150,14 +147,3 @@ export const SETTINGS_DEFAULTS: SettingsFile = {
 		category: "project",
 	},
 };
-
-export const DEFAULT_SYSTEM_CONFIG_PATH = path.join(".config", "analog-attach");
-export const DEFAULT_SYSTEM_CONFIG_FILENAME = "config.json";
-
-/**
- * Project-local config, searched for upward from the current directory. Mirrors how
- * attach-meta keeps its own `.attach-meta.toml` per directory: settings that belong to
- * one project (which board, which project name) go here and shadow the global config,
- * so switching projects is a `cd` rather than a series of `config` calls.
- */
-export const LOCAL_CONFIG_FILENAME = ".analog-attach.json";

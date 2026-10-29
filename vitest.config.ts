@@ -4,9 +4,7 @@ export default defineProject({
     test: {
         projects: [
             'packages/attach-lib/vitest.config.ts',
-            'packages/attach-cli/vitest.config.ts',
-            'packages/attach-meta/vitest.config.ts',
-            'packages/attach-no-os-cli/vitest.config.ts',
+            'packages/cli/vitest.config.ts',
         ]
     },
 });

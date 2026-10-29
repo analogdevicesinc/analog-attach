@@ -61,7 +61,7 @@ function board_workfile(): Workfile {
     return created.value;
 }
 
-/** What `attach-noos add <driver>` does. */
+/** What `analog-attach add <driver>` does. */
 function add_driver(workfile: Workfile, driver: string, name: string, interface_?: string): void {
     const root = interface_ === undefined ? driver_root(driver) : driver_root_for(driver, interface_);
     expectOk(root);
@@ -69,8 +69,8 @@ function add_driver(workfile: Workfile, driver: string, name: string, interface_
     expectOk(ruleset);
     expectOk(add_symbol(workfile, name, ruleset.value));
     expectOk(pin_driver(workfile, name, driver));
-    // On its eval board, as `attach-noos add <eval board>` puts it, so its pinout wires it. A
-    // part with none is a bare part, as `attach-noos add <driver>` adds it.
+    // On its eval board, as `analog-attach add <eval board>` puts it, so its pinout wires it. A
+    // part with none is a bare part, as `analog-attach add <driver>` adds it.
     const eval_board = EVAL_BOARDS[driver];
     if (eval_board !== undefined) {
         expectOk(attach_eval_board(workfile, eval_board, name));
@@ -78,7 +78,7 @@ function add_driver(workfile: Workfile, driver: string, name: string, interface_
     expectOk(bootstrap(workfile));
 }
 
-/** What `attach-noos update` does: write the value, then let bootstrap follow. */
+/** What `analog-attach update` does: write the value, then let bootstrap follow. */
 function update(workfile: Workfile, node: string, property: string, value: unknown): void {
     const before = referenced_nodes(workfile);
     expectOk(set_value(workfile, node, property, value));

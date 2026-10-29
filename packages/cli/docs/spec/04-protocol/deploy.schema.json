@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "deploy.schema.json",
+  "title": "deploy response",
+  "description": "Standard output of deploy in JSON mode (DEPLOY-011, DEPLOY-022). $defs/base is DeployResponse (overview 2.1).",
+  "anyOf": [{ "$ref": "#/$defs/linux" }, { "$ref": "#/$defs/noos" }],
+  "$defs": {
+    "base": { "description": "DeployResponse: a CommonResponse.", "$ref": "common.schema.json#/$defs/common" },
+    "linux": {
+      "oneOf": [
+        {
+          "allOf": [{ "$ref": "#/$defs/base" }],
+          "required": ["host", "remote_path"],
+          "properties": {
+            "ok": { "const": true },
+            "message": { "const": "Deployed and rebooted" },
+            "severity": { "const": "info" },
+            "host": { "type": "string", "description": "deploy-ip as configured." },
+            "remote_path": { "const": "/boot/overlays/" }
+          },
+          "unevaluatedProperties": false
+        },
+        { "$ref": "common.schema.json#/$defs/refusal", "description": "The copy failed: message is 'Deploy failed (scp):', a newline and the command's standard error (DEPLOY-011)." }
+      ]
+    },
+    "noos": {
+      "anyOf": [
+        {
+          "description": "Where the backend is noos: the project was flashed (DEPLOY-520).",
+          "allOf": [{ "$ref": "common.schema.json#/$defs/done" }],
+          "properties": {
+            "message": { "type": "string", "pattern": "^(Deployed .+ with '.*'|Flashed .+ to .+ via (openocd|jlink))$" },
+            "severity": { "const": "info" }
+          }
+        },
+        { "$ref": "common.schema.json#/$defs/refusal" }
+      ]
+    }
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "parse": {
+    "ok": true,
+    "dropped_overrides": true,
+    "unresolved_targets": [],
+    "unresolved": []
+  },
+  "validate": {
+    "errors": [
+      {
+        "path": [
+          "node0",
+          "ak7375@c"
+        ],
+        "message": "ak7375@c (asahi-kasei,ak7375): 'vio-supply' is a required property\n\tfrom schema $id: http://devicetree.org/schemas/media/i2c/asahi-kasei,ak7375.yaml"
+      },
+      {
+        "path": [
+          "node0",
+          "imx519@1a"
+        ],
+        "message": "imx519@1a (sony,imx519): 'clock-names', 'orientation', 'rotation' do not match any of the regexes: '^pinctrl-[0-9]+$'\n\tfrom schema $id: http://devicetree.org/schemas/media/i2c/imx519.yaml"
+      }
+    ],
+    "warnings": []
+  },
+  "reg": {
+    "conflicts": [],
+    "chip_select_overflows": []
+  }
+}

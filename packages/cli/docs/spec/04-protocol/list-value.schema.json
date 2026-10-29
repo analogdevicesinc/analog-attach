@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "list-value.schema.json",
+  "title": "list value response",
+  "description": "Standard output of list value in JSON mode (LIST-077), or a refusal. $defs/base is SuggestResponse (overview 2.1).",
+  "anyOf": [{ "$ref": "#/$defs/linux" }, { "$ref": "#/$defs/noos" }],
+  "$defs": {
+    "base": { "$ref": "common.schema.json#/$defs/suggest-response" },
+    "linux": {
+      "oneOf": [
+        {
+          "allOf": [{ "$ref": "#/$defs/base" }],
+          "properties": { "ok": { "const": true }, "severity": { "enum": ["info", "warn"] } },
+          "unevaluatedProperties": false
+        },
+        { "$ref": "common.schema.json#/$defs/refusal" }
+      ]
+    },
+    "noos": {
+      "anyOf": [
+        {
+          "description": "Where the backend is noos: the values a property, or a union's member, can take (LIST-530). A schema the user can add instead has the display_string '<schema> (can create)'.",
+          "allOf": [{ "$ref": "#/$defs/base" }],
+          "properties": {
+            "ok": { "const": true },
+            "message": { "type": "string", "pattern": "^[0-9]+ suggestions?$" },
+            "severity": { "const": "info" }
+          },
+          "unevaluatedProperties": false
+        },
+        { "$ref": "common.schema.json#/$defs/refusal" }
+      ]
+    }
+  }
+}

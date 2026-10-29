@@ -1,0 +1,41 @@
+{
+  "parse": {
+    "ok": true,
+    "dropped_overrides": true,
+    "unresolved_targets": [],
+    "unresolved": []
+  },
+  "validate": {
+    "errors": [
+      {
+        "path": [
+          "node3",
+          "gpio_ir_pins@d",
+          "brcm,function"
+        ],
+        "message": "gpio_ir_pins@d: brcm,function: b'\\x00\\x00\\x00\\x00' is not of type 'object', 'integer', 'array', 'boolean', 'null'\n\tfrom schema $id: http://devicetree.org/schemas/dt-core.yaml"
+      },
+      {
+        "path": [
+          "node3",
+          "gpio_ir_pins@d",
+          "brcm,pins"
+        ],
+        "message": "gpio_ir_pins@d: brcm,pins: b'\\x00\\x00\\x00\\r' is not of type 'object', 'integer', 'array', 'boolean', 'null'\n\tfrom schema $id: http://devicetree.org/schemas/dt-core.yaml"
+      },
+      {
+        "path": [
+          "node3",
+          "gpio_ir_pins@d",
+          "brcm,pull"
+        ],
+        "message": "gpio_ir_pins@d: brcm,pull: b'\\x00\\x00\\x00\\x02' is not of type 'object', 'integer', 'array', 'boolean', 'null'\n\tfrom schema $id: http://devicetree.org/schemas/dt-core.yaml"
+      }
+    ],
+    "warnings": []
+  },
+  "reg": {
+    "conflicts": [],
+    "chip_select_overflows": []
+  }
+}

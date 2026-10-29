@@ -1,5 +1,5 @@
 // Main entry point for attach-lib package.
-// The public surface is restricted to what attach-cli consumes; add exports
+// The public surface is restricted to what the CLI (packages/cli) consumes; add exports
 // here deliberately rather than via `export *`.
 
 // Binding pipeline, validation and structural types

@@ -1,0 +1,204 @@
+; analog-attach command-line grammar
+;
+; ABNF per RFC 5234, with RFC 7405's %s"..." for case-sensitive strings.
+; Every string in this grammar is case-sensitive; a plain "..." is used only
+; where the string has no letters.
+;
+; Two layers (see 01-grammar.md):
+;   Layer 1 matches the argument vector (argv) after the CLI has removed every
+;   "--json" before the first "--" (GRM-001). Its terminals are whole argv
+;   elements, and B is the boundary between two elements, not a character.
+;   Layer 2 matches the characters inside one argv element.
+;
+; In layer 1, a command's options may appear in any order, before, between or
+; after its positionals (GRM-010), so the rules list the positionals and the
+; options separately, as <positionals> *( B <option> ). Three things the
+; rules leave out (01-grammar.md §2, §3):
+;   - help-option may appear anywhere among a command's options; it wins
+;     (GRM-014).
+;   - An element "--" may appear anywhere after the command; every element
+;     after it is a positional (GRM-012).
+;   - Empty argv, or "--quiet" alone, matches command-line; what it does is
+;     GRM-003 and GRM-005.
+;
+; The commands are the shared ones and the backend's own (GRM-002). The rules
+; marked "linux" exist where the backend is linux, those marked "noos" where
+; it is noos; a shared command the backend doesn't provide is an input error
+; (02-common.md COM-015). Where the backend is noos, every node-path below is
+; a noos-node instead (GRM-080).
+
+; ===================================================================
+; Layer 1: argv
+; ===================================================================
+
+command-line    = [ global-option / %s"--quiet" ]   ; bare: GRM-003, GRM-005
+                / command [ B help-option ]
+                / %s"help" *( B element )          ; GRM-016
+
+global-option   = version-option / help-option
+version-option  = ( %s"--version" / %s"-v" ) *( B element )   ; GRM-015
+help-option     = %s"--help" / %s"-h"
+
+command         = config / init / import
+                / add / read / update / delete / rename
+                / list
+                / validate / build / deploy
+                / completion / skill
+                / linux-command
+                / noos-command
+
+linux-command   = move / enable / disable            ; linux
+noos-command    = generate                           ; noos
+
+; An option that takes a value is one element "--name=value" or two
+; elements "--name" B value (GRM-011). A flag without a value may be given
+; one: "--quiet=true", "--force=false" (GRM-017).
+B               = %x00                ; placeholder: the argv element boundary
+
+; --- Shared commands --------------------------------------------------
+
+add             = %s"add" [ B device ] *( B add-option )   ; device left
+                                        ; out: an input error (ADD-001)
+device          = compatible            ; linux
+                / noos-device           ; noos
+add-option      = %s"--name" B node-name
+                / %s"--quiet"
+                / %s"--parent" B node-path      ; linux
+                / %s"--label" B label           ; linux
+                / %s"--template" B template     ; linux
+                / %s"--as" B as-list            ; noos, repeatable (ADD-504)
+
+import          = %s"import" B overlay-ref   ; the positional is <source>;
+                                        ; noos: a workfile's path (IMPORT-500)
+
+read            = %s"read" [ B node-path [ B property-name ] ] *( B %s"--quiet" )
+
+update          = %s"update" [ B node-path [ B property-name *( B value-token ) ] ]
+                  *( B update-option )
+update-option   = %s"--quiet"
+                / %s"--suggest"                 ; noos (UPDATE-530)
+
+delete          = %s"delete" [ B node-path [ B property-name ] ] *( B %s"--force" )
+
+rename          = %s"rename" B node-path B node-name
+
+list            = %s"list" [ B list-kind ]   ; no kind: the usage (LIST-001)
+list-kind       = %s"devices" [ B element ]                   ; [filter]
+                / %s"property" [ B node-path [ B property-name ] ]
+                / %s"value" B node-path B property-name [ B element ]
+                / %s"context" *( B element )  ; noos; not linux: COM-015
+                / %s"parent" B compatible                     ; linux
+                / %s"overlay" B compatible                    ; linux
+
+validate        = %s"validate"
+build           = %s"build" *( B build-option )
+build-option    = %s"--board" B element         ; noos
+                / %s"--clean"                   ; noos
+deploy          = %s"deploy" *( B deploy-option )
+deploy-option   = %s"--board" B element         ; noos
+                / %s"--probe" B element         ; noos: openocd / jlink (DEPLOY-500)
+
+init            = %s"init"
+
+; --- move, enable, disable: linux ------------------------------------
+
+move            = %s"move" B node-path B node-path
+
+enable          = %s"enable" [ B node-path ]
+disable         = %s"disable" [ B node-path ]
+
+; --- generate: noos ---------------------------------------------------
+
+generate        = %s"generate" *( B generate-option )
+generate-option = %s"--output" B element                 ; a directory
+                / %s"--project-template" B element       ; a set's name or a directory
+                / %s"--board" B element
+
+; --- Front-end commands ----------------------------------------------
+
+config          = %s"config" [ B config-field *( B element ) ] *( B config-option )
+config-option   = %s"--reset" / %s"--reload" / %s"--global"
+                                        ; which combine: 03-commands/config.md §2
+
+skill           = %s"skill" B ( skill-install / skill-uninstall )
+skill-install   = %s"install" B skill-name *( B %s"--force" )
+skill-uninstall = %s"uninstall" B skill-name
+skill-name      = element               ; one of the backend's skills (SKILL-002)
+
+completion      = %s"completion" [ B shell ] *( B completion-opt )
+completion-opt  = %s"--install" / %s"--uninstall"   ; not both (COMPL-154)
+shell           = known-shell / element ; any other element: an input
+                                        ; error (05-completion.md COMPL-101)
+known-shell     = %s"bash" / %s"fish" / %s"zsh"
+
+; "__complete" is recognised before anything else (GRM-002):
+;   complete    = %s"__complete" *( B element ) [ B "--" *( B element ) ]
+
+; ===================================================================
+; Layer 2: inside one argv element
+; ===================================================================
+
+element         = *ANYCHAR
+ANYCHAR         = %x00-10FFFF
+
+; --- Node paths (GRM-020 .. GRM-024) ---------------------------------
+
+node-path       = root / absolute-path / label-path
+root            = "/"
+absolute-path   = 1*( "/" segment ) [ "/" ]
+label-path      = label-ref *( "/" segment ) [ "/" ]
+label-ref       = first-char *path-char
+segment         = 1*path-char
+path-char       = %x21-2E / %x30-7E / %x80-10FFFF   ; no whitespace, no "/"
+first-char      = %x21-25 / %x27-2E / %x30-7E / %x80-10FFFF   ; also no "&"
+
+; --- noos node names (GRM-080) --------------------------------------
+
+noos-node       = 1*ANYCHAR           ; one node name of the workfile, not parsed
+noos-device     = 1*ANYCHAR           ; an eval board, a driver or a schema (ADD-500)
+as-list         = interface *( "," interface )
+interface       = 1*( %x00-2B / %x2D-10FFFF )         ; anything but ","
+
+; --- Property names (GRM-030) ----------------------------------------
+
+property-name   = 1*( %x00-2E / %x30-10FFFF )        ; anything but "/"
+
+; --- Labels (GRM-040) ------------------------------------------------
+
+label           = ( ALPHA / "_" ) *( ALPHA / DIGIT / "_" )
+
+; --- Node names (GRM-050) --------------------------------------------
+
+node-name       = base-name [ "@" unit-address ]
+base-name       = 1*( %x00-3F / %x41-10FFFF )        ; anything but "@"
+unit-address    = 1*ANYCHAR                          ; non-empty
+
+; --- Compatible strings ----------------------------------------------
+
+compatible      = 1*ANYCHAR           ; looked up in the bindings, not parsed
+                                      ; conventionally vendor "," device
+
+; --- add --template (GRM-060) ----------------------------------------
+
+template        = %s"required"
+                / %s"example:" example-number
+                / %s"overlay:" overlay-ref
+example-number  = %x31-39 *DIGIT      ; 1, 2, ...: no sign, no leading zero
+overlay-ref     = 1*ANYCHAR           ; a file name, stem or path
+
+; --- Config fields ---------------------------------------------------
+
+config-field    = 1*ANYCHAR           ; backend, or one of the backend's
+                                      ; settings (02-common.md §8.1)
+
+; --- update values (GRM-070 .. GRM-073) ------------------------------
+; The value tokens of update are joined with one SP and then parsed as
+; below, except for a property the binding gives strings (GRM-074):
+
+value           = row *( "," row )
+row             = *WSP [ cell *( 1*WSP cell ) *WSP ]
+cell            = dec-int / hex-int / word
+dec-int         = [ "-" ] 1*DIGIT
+hex-int         = "0" ( %x78 / %x58 ) 1*HEXDIG        ; 0x or 0X
+word            = 1*( %x21-2B / %x2D-10FFFF )         ; no whitespace, no ","
+value-token     = element

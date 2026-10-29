@@ -1,0 +1,78 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "list-property.schema.json",
+  "title": "list property response",
+  "description": "Standard output of list property in JSON mode: the names a node's binding allows (LIST-036), one property's description (LIST-054), or a refusal. $defs/base is ListPropertyResponse (overview 2.1).",
+  "anyOf": [{ "$ref": "#/$defs/linux" }, { "$ref": "#/$defs/noos" }],
+  "$defs": {
+    "base": {
+      "description": "ListPropertyResponse.",
+      "anyOf": [{ "$ref": "#/$defs/base-names" }, { "$ref": "#/$defs/base-property" }]
+    },
+    "base-names": {
+      "allOf": [{ "$ref": "common.schema.json#/$defs/common" }],
+      "required": ["names"],
+      "properties": { "names": { "type": "array", "items": { "type": "string" } } }
+    },
+    "base-property": {
+      "allOf": [{ "$ref": "common.schema.json#/$defs/common" }],
+      "required": ["property"],
+      "properties": { "property": { "$ref": "common.schema.json#/$defs/property-description" } }
+    },
+    "linux": {
+      "oneOf": [{ "$ref": "#/$defs/linux-names" }, { "$ref": "#/$defs/linux-property" }, { "$ref": "common.schema.json#/$defs/refusal" }]
+    },
+    "linux-names": {
+      "description": "list property <path> (LIST-036): each property's name, then the regex of each property pattern and child-node pattern.",
+      "allOf": [{ "$ref": "#/$defs/base-names" }],
+      "required": ["suggestions"],
+      "properties": {
+        "ok": { "const": true },
+        "severity": { "const": "info" },
+        "suggestions": {
+          "deprecated": true,
+          "description": "The same entries with their marks (compatible (set, required)), kept for one release.",
+          "type": "array",
+          "items": { "$ref": "common.schema.json#/$defs/suggestion" }
+        }
+      },
+      "unevaluatedProperties": false
+    },
+    "linux-property": {
+      "description": "list property <path> <property> (LIST-054).",
+      "allOf": [{ "$ref": "#/$defs/base-property" }],
+      "required": ["type"],
+      "properties": {
+        "ok": { "const": true },
+        "message": { "type": "string", "pattern": "^Type of .+$" },
+        "severity": { "const": "info" },
+        "type": { "$ref": "common.schema.json#/$defs/property-type", "deprecated": true, "description": "property.type, kept for one release." },
+        "description": { "type": "string", "deprecated": true, "description": "property.description, kept for one release." },
+        "suggestions": { "type": "array", "items": { "$ref": "common.schema.json#/$defs/suggestion" }, "deprecated": true, "description": "property.suggestions, kept for one release." }
+      },
+      "unevaluatedProperties": false
+    },
+    "noos": {
+      "anyOf": [
+        {
+          "description": "Where the backend is noos: the workfile's node names, or a node's property names (LIST-520, LIST-521).",
+          "allOf": [{ "$ref": "#/$defs/base-names" }],
+          "required": ["suggestions"],
+          "properties": {
+            "ok": { "const": true },
+            "message": { "type": "string", "pattern": "^[0-9]+ (nodes?|propert(y|ies) on .+)$" },
+            "severity": { "const": "info" },
+            "suggestions": {
+              "deprecated": true,
+              "description": "The entries of names, each with a display_string: a node's $compatible, or a property's kind with its marks (number (required, set)).",
+              "type": "array",
+              "items": { "allOf": [{ "$ref": "common.schema.json#/$defs/suggestion" }], "required": ["display_string"] }
+            }
+          },
+          "unevaluatedProperties": false
+        },
+        { "$ref": "common.schema.json#/$defs/refusal" }
+      ]
+    }
+  }
+}
