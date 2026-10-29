@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "build.schema.json",
+  "title": "build response",
+  "description": "Standard output of build in JSON mode (BUILD-004, BUILD-005). $defs/base is BuildResponse (overview 2.1).",
+  "anyOf": [{ "$ref": "#/$defs/linux" }, { "$ref": "#/$defs/noos" }],
+  "$defs": {
+    "base": {
+      "description": "BuildResponse: path is the artifact, when there is one.",
+      "allOf": [{ "$ref": "common.schema.json#/$defs/common" }],
+      "properties": { "path": { "type": "string" } }
+    },
+    "linux": {
+      "oneOf": [
+        {
+          "allOf": [{ "$ref": "#/$defs/base" }],
+          "required": ["path"],
+          "properties": {
+            "ok": { "const": true },
+            "message": { "const": "Compiled overlay" },
+            "severity": { "const": "info" },
+            "path": { "type": "string", "pattern": "^/", "description": "The .dtbo written, absolute." }
+          },
+          "unevaluatedProperties": false
+        },
+        { "$ref": "common.schema.json#/$defs/refusal", "description": "dtc failed: message is its standard error." }
+      ]
+    },
+    "noos": {
+      "anyOf": [
+        {
+          "description": "Where the backend is noos: the project was built (BUILD-520). path is the ELF, when the build left one; severity is warn when it didn't (BUILD-521).",
+          "allOf": [{ "$ref": "#/$defs/base" }],
+          "properties": {
+            "ok": { "const": true },
+            "message": { "type": "string", "pattern": "^Built .+" },
+            "severity": { "enum": ["info", "warn"] },
+            "path": { "type": "string", "pattern": "^/" }
+          },
+          "unevaluatedProperties": false
+        },
+        { "$ref": "common.schema.json#/$defs/refusal" }
+      ]
+    }
+  }
+}

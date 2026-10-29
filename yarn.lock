@@ -5,6 +5,31 @@ __metadata:
   version: 8
   cacheKey: 10c0
 
+"@analog-attach/cli@workspace:packages/cli":
+  version: 0.0.0-use.local
+  resolution: "@analog-attach/cli@workspace:packages/cli"
+  dependencies:
+    "@inquirer/core": "npm:^12.0.5"
+    "@inquirer/prompts": "npm:8.7.3"
+    "@stricli/core": "npm:^1.1.0"
+    "@types/node": "npm:25.x"
+    "@typescript-eslint/eslint-plugin": "npm:^8.72.1"
+    "@typescript-eslint/parser": "npm:^8.72.1"
+    ajv: "npm:^8.17.1"
+    attach-lib: "npm:*"
+    attach-no-os-lib: "workspace:*"
+    eslint: "npm:^9.31.0"
+    eslint-plugin-unicorn: "npm:^60.0.0"
+    eta: "npm:^3.5.0"
+    tsup: "npm:^6.7.0"
+    typescript: "npm:~6.0.3"
+    vitest: "npm:^4.0.18"
+    yaml: "npm:^2.8.3"
+  bin:
+    analog-attach: dist/cli.js
+  languageName: unknown
+  linkType: soft
+
 "@analog-attach/extension@workspace:packages/extension":
   version: 0.0.0-use.local
   resolution: "@analog-attach/extension@workspace:packages/extension"
@@ -1859,28 +1884,10 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@stricli/auto-complete@npm:^1.2.9":
-  version: 1.2.9
-  resolution: "@stricli/auto-complete@npm:1.2.9"
-  dependencies:
-    "@stricli/core": "npm:^1.2.9"
-  bin:
-    auto-complete: dist/bin/cli.js
-  checksum: 10c0/d5ef10711a5da134e45e78f7d331827bbfb3aae7f42e8ea67f1ed6132dbc8dabfe085b460e0fdbb264159e4d6855ce6deb8136bf04ced86d1289108270da6db6
-  languageName: node
-  linkType: hard
-
 "@stricli/core@npm:^1.1.0":
   version: 1.2.8
   resolution: "@stricli/core@npm:1.2.8"
   checksum: 10c0/7dd2927ad6f9fe3f62d4c65385b7b85969b1211266cf53a7f8f059c88545f188dd05eaa05cf08388774f42fb4ebe688fbfb7fbffb6a7e7c9f7215f548470c8d3
-  languageName: node
-  linkType: hard
-
-"@stricli/core@npm:^1.2.9":
-  version: 1.2.9
-  resolution: "@stricli/core@npm:1.2.9"
-  checksum: 10c0/3585af272827fdcd72a0473f116b6998ec9a4761c3eeac257e7ad4a27b2ff07cbe7e0d8cca9a2df95b00ae0d0f19c45fb7d0cf8d5ac0579be0b4194ce3dce5bc
   languageName: node
   linkType: hard
 
@@ -2990,7 +2997,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"ajv-formats@npm:^3.0.1, ajv-formats@npm:~3.0.1":
+"ajv-formats@npm:~3.0.1":
   version: 3.0.1
   resolution: "ajv-formats@npm:3.0.1"
   dependencies:
@@ -3218,70 +3225,6 @@ __metadata:
     vite-plugin-dts: "npm:^4.5.4"
     vitest: "npm:^4.0.18"
     yaml: "npm:^2.8.3"
-  languageName: unknown
-  linkType: soft
-
-"attach-linux@workspace:packages/attach-cli":
-  version: 0.0.0-use.local
-  resolution: "attach-linux@workspace:packages/attach-cli"
-  dependencies:
-    "@types/node": "npm:25.x"
-    "@typescript-eslint/eslint-plugin": "npm:^8.72.1"
-    "@typescript-eslint/parser": "npm:^8.72.1"
-    "@vitest/coverage-v8": "npm:^4.0.18"
-    attach-lib: "npm:*"
-    commander: "npm:^13.1.0"
-    eslint: "npm:^9.31.0"
-    eslint-plugin-unicorn: "npm:^60.0.0"
-    smol-toml: "npm:^1.7.1"
-    tsup: "npm:^6.7.0"
-    typescript: "npm:~6.0.3"
-    vitest: "npm:^4.0.18"
-    yaml: "npm:^2.8.3"
-  bin:
-    attach-linux: dist/cli.js
-  languageName: unknown
-  linkType: soft
-
-"attach-meta@workspace:packages/attach-meta":
-  version: 0.0.0-use.local
-  resolution: "attach-meta@workspace:packages/attach-meta"
-  dependencies:
-    "@types/node": "npm:25.x"
-    "@typescript-eslint/eslint-plugin": "npm:^8.17.0"
-    "@typescript-eslint/parser": "npm:^8.17.0"
-    "@vitest/coverage-v8": "npm:^4.0.18"
-    ajv: "npm:^8.17.1"
-    ajv-formats: "npm:^3.0.1"
-    commander: "npm:^13.1.0"
-    eslint: "npm:^9.31.0"
-    eslint-plugin-unicorn: "npm:^60.0.0"
-    smol-toml: "npm:^1.7.1"
-    tsup: "npm:^6.7.0"
-    typescript: "npm:5.6.x"
-    vitest: "npm:^4.0.18"
-  bin:
-    attach-meta: dist/cli.js
-  languageName: unknown
-  linkType: soft
-
-"attach-no-os-cli@workspace:packages/attach-no-os-cli":
-  version: 0.0.0-use.local
-  resolution: "attach-no-os-cli@workspace:packages/attach-no-os-cli"
-  dependencies:
-    "@inquirer/prompts": "npm:8.7.3"
-    "@stricli/auto-complete": "npm:^1.2.9"
-    "@stricli/core": "npm:^1.1.0"
-    "@types/node": "npm:20.x"
-    ajv: "npm:^8.17.1"
-    attach-no-os-lib: "workspace:*"
-    eta: "npm:^3.5.0"
-    tsup: "npm:^6.7.0"
-    typescript: "npm:^5.7.2"
-    vitest: "npm:^4.0.18"
-    yaml: "npm:^2.7.1"
-  bin:
-    attach-noos: ./dist/cli.js
   languageName: unknown
   linkType: soft
 
@@ -3692,13 +3635,6 @@ __metadata:
   version: 10.0.1
   resolution: "commander@npm:10.0.1"
   checksum: 10c0/53f33d8927758a911094adadda4b2cbac111a5b377d8706700587650fd8f45b0bbe336de4b5c3fe47fd61f420a3d9bd452b6e0e6e5600a7e74d7bf0174f6efe3
-  languageName: node
-  linkType: hard
-
-"commander@npm:^13.1.0":
-  version: 13.1.0
-  resolution: "commander@npm:13.1.0"
-  checksum: 10c0/7b8c5544bba704fbe84b7cab2e043df8586d5c114a4c5b607f83ae5060708940ed0b5bd5838cf8ce27539cde265c1cbd59ce3c8c6b017ed3eec8943e3a415164
   languageName: node
   linkType: hard
 
@@ -6898,13 +6834,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"smol-toml@npm:^1.7.1":
-  version: 1.7.1
-  resolution: "smol-toml@npm:1.7.1"
-  checksum: 10c0/c2494e19e748578cf9f81f918dd66a548dfe5a0e581ab9f980d5420f2319c882c661a62d01d216a43f2db490faaccd2185bcdb6f2ba0658eb303eda9db871d76
-  languageName: node
-  linkType: hard
-
 "socks-proxy-agent@npm:^8.0.3":
   version: 8.0.5
   resolution: "socks-proxy-agent@npm:8.0.5"
@@ -7408,16 +7337,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"typescript@npm:5.6.x":
-  version: 5.6.3
-  resolution: "typescript@npm:5.6.3"
-  bin:
-    tsc: bin/tsc
-    tsserver: bin/tsserver
-  checksum: 10c0/44f61d3fb15c35359bc60399cb8127c30bae554cd555b8e2b46d68fa79d680354b83320ad419ff1b81a0bdf324197b29affe6cc28988cd6a74d4ac60c94f9799
-  languageName: node
-  linkType: hard
-
 "typescript@npm:5.8.2":
   version: 5.8.2
   resolution: "typescript@npm:5.8.2"
@@ -7445,16 +7364,6 @@ __metadata:
     tsc: bin/tsc
     tsserver: bin/tsserver
   checksum: 10c0/4a25ff5045b984370f48f196b3a0120779b1b343d40b9a68d114ea5e5fff099809b2bb777576991a63a5cd59cf7bffd96ff6fe10afcefbcb8bd6fb96ad4b6606
-  languageName: node
-  linkType: hard
-
-"typescript@patch:typescript@npm%3A5.6.x#optional!builtin<compat/typescript>":
-  version: 5.6.3
-  resolution: "typescript@patch:typescript@npm%3A5.6.3#optional!builtin<compat/typescript>::version=5.6.3&hash=8c6c40"
-  bin:
-    tsc: bin/tsc
-    tsserver: bin/tsserver
-  checksum: 10c0/7c9d2e07c81226d60435939618c91ec2ff0b75fbfa106eec3430f0fcf93a584bc6c73176676f532d78c3594fe28a54b36eb40b3d75593071a7ec91301533ace7
   languageName: node
   linkType: hard
 
@@ -8017,15 +7926,6 @@ __metadata:
   version: 1.10.3
   resolution: "yaml@npm:1.10.3"
   checksum: 10c0/c309ff85a0a569a981d71ab9cf0fef68672a16b9cdf40639d1c3b30034f6cd16ee428602bd6d64ecf006f8c8bee499023cac236538f79898aa99fb5db529a2ed
-  languageName: node
-  linkType: hard
-
-"yaml@npm:^2.7.1":
-  version: 2.9.0
-  resolution: "yaml@npm:2.9.0"
-  bin:
-    yaml: bin.mjs
-  checksum: 10c0/f340718df45e97a9551b9bf9dac61c80050bc464513b710debfb5067c380c8472e3b67809cffacb4ab5ffb5e66ef9310816c88b05f371cec60abfedd8c88e0a2
   languageName: node
   linkType: hard
 

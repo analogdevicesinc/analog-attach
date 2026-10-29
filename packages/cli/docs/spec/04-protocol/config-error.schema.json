@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "config-error.schema.json",
+  "title": "ConfigErrors",
+  "description": "Written to standard error, with exit status 2, in JSON mode when the settings files can't be read (COM-121, CONFIG-102) or the workspace can't be loaded (COM-071).",
+  "type": "object",
+  "required": ["errors", "hints"],
+  "properties": {
+    "errors": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["field", "kind", "message"],
+        "properties": {
+          "field": { "type": "string", "description": "The setting at fault (backend, or the backend's: linux, workfile, ...), an unknown key, or the resource: config.json (a settings file that isn't a JSON object); where the backend is linux also compat-index, validation.json, dt-schema, tools, deploy." },
+          "kind": { "enum": ["missing", "invalid", "unknown"] },
+          "message": { "type": "string" },
+          "description": { "type": "string", "description": "What the setting is." },
+          "hint": { "type": "string", "description": "What to do about this error; given for the problems of a settings file (COM-122)." }
+        },
+        "additionalProperties": false
+      }
+    },
+    "hints": {
+      "description": "What to do about the errors, each once.",
+      "type": "array",
+      "items": { "type": "string" },
+      "uniqueItems": true
+    }
+  },
+  "additionalProperties": false
+}

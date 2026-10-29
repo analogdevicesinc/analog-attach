@@ -1,0 +1,12 @@
+plans/
+dist
+tsconfig.tsbuildinfo
+node_modules
+
+# The clones and output of scripts/bundle-dt-schema.sh
+dt-schema/
+dtc/
+bundled/
+
+# The workspace of demo/typical-flow.sh
+demo/workspace/

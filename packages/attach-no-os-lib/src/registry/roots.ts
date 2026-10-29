@@ -109,7 +109,7 @@ export function driver_root(driver: string): Result<string> {
 		if (module?.rulesets_file === undefined) {
 			return error(`Driver '${driver}' has no analog-attach rulesets yet, so it cannot be added`, driver);
 		}
-		return error(`Driver '${driver}' implements no interface that a generic handle is configured through, so there is nothing to add it by. Add its own structs instead (see: attach-noos list-devices)`, driver);
+		return error(`Driver '${driver}' implements no interface that a generic handle is configured through, so there is nothing to add it by. Add its own structs instead (see: analog-attach list devices)`, driver);
 	}
 	if (more.length > 0) {
 		const interfaces = roots.value.flatMap(root => driver_interfaces_of(root)).filter((interface_, index, all) => all.indexOf(interface_) === index);

@@ -5,12 +5,14 @@ on:
   push:
     branches: [main, ci/**]
     paths:
-      - 'packages/attach-cli/**'
+      - 'packages/cli/**'
       - 'packages/attach-lib/**'
+      - 'packages/attach-no-os-lib/**'
   pull_request:
     paths:
-      - 'packages/attach-cli/**'
+      - 'packages/cli/**'
       - 'packages/attach-lib/**'
+      - 'packages/attach-no-os-lib/**'
 
 permissions:
   contents: read
@@ -24,10 +26,13 @@ jobs:
         with:
           token: ${{ secrets.GH_TOKEN }}
 
-      - name: Install dtc (Device Tree Compiler)
+      # The CLI's build bundles a static dtc and the dt-schema tools
+      # (packages/cli/scripts/bundle-dt-schema.sh): dtc is built with make, flex
+      # and bison, dt-mk-schema and dt-validate with PyInstaller in a venv.
+      - name: Install the tools of the bundled dt-schema build
         run: |
           sudo apt-get update
-          sudo apt-get install -y device-tree-compiler
+          sudo apt-get install -y device-tree-compiler flex bison python3-venv
           dtc --version
 
       - name: Set up Node.js
@@ -42,20 +47,23 @@ jobs:
       - name: Install dependencies
         run: yarn install --immutable
 
-      - name: Build all packages
-        run: yarn build:all
+      # attach-lib and attach-no-os-lib, then the CLI, which bundles both and
+      # runs scripts/bundle-dt-schema.sh into packages/cli/bundled/.
+      - name: Build the CLI
+        run: yarn build:cli
 
       - name: Package CLI
         run: |
-          cd packages/attach-cli
-          npm pack
-          mv *.tgz ../../attach-cli.tgz
+          cd packages/cli
+          yarn pack --out ../../analog-attach-cli.tgz
+          tar -tzf ../../analog-attach-cli.tgz | grep -q '^package/bundled/linux/tools/dt-validate$'
+          tar -tzf ../../analog-attach-cli.tgz | grep -q '^package/skills/linux/SKILL.md$'
 
       - name: Upload CLI package
         uses: actions/upload-artifact@v4
         with:
-          name: attach-cli
-          path: attach-cli.tgz
+          name: analog-attach-cli
+          path: analog-attach-cli.tgz
 
   # Optional: Test the packaged CLI installs correctly
   test-package:
@@ -70,14 +78,12 @@ jobs:
       - name: Download CLI package
         uses: actions/download-artifact@v4
         with:
-          name: attach-cli
+          name: analog-attach-cli
 
       - name: Install packaged CLI
-        run: |
-          # Skip postinstall prompt in CI
-          npm install -g ./attach-cli.tgz
+        run: npm install -g ./analog-attach-cli.tgz
 
       - name: Verify CLI works
         run: |
-          attach --version
-          attach --help
+          analog-attach --version
+          analog-attach --help

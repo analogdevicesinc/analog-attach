@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "config.schema.json",
+  "title": "config responses",
+  "description": "Standard output of config in JSON mode: showing (CONFIG-015), setting (CONFIG-130), resetting (CONFIG-202), --reload (CONFIG-022), or a refusal. Problems with the settings files and refused values go to standard error (CONFIG-102, CONFIG-118). config is the front end's: the same shape for every backend; only the fields differ.",
+  "oneOf": [
+    { "$ref": "#/$defs/fields" },
+    { "$ref": "#/$defs/done" },
+    { "$ref": "common.schema.json#/$defs/refusal" }
+  ],
+  "$defs": {
+    "fields": {
+      "description": "config [<key>]: the fields shown, all of them or the one named (ConfigResponse).",
+      "type": "object",
+      "required": ["ok", "message", "severity", "configs"],
+      "properties": {
+        "ok": { "const": true },
+        "message": { "type": "string", "pattern": "^[0-9]+ config field\\(s\\)$" },
+        "severity": { "const": "info" },
+        "configs": { "type": "array", "items": { "$ref": "#/$defs/config" } }
+      },
+      "additionalProperties": false
+    },
+    "config": {
+      "description": "ConfigEntry: one field, backend first, then the backend's in its order (COM-120).",
+      "type": "object",
+      "required": ["field_name", "category", "description", "type", "required", "default", "value", "source"],
+      "properties": {
+        "field_name": { "type": "string", "description": "backend, or one of the backend's fields: linux, devicetree, workfile, overlay-syntax, preprocess-command, deploy-ip, deploy-user, deploy-password where the backend is linux; capi-path, module-paths, board, platform, workfile, bootstrap, interview, project-name, project-path, project-template, example, build-command, deploy-command, probe where it is noos (COM-500)." },
+        "category": { "type": "string", "description": "The group the human table lists it under: General for backend; Workspace and Deploy where the backend is linux; Sources, Target, Workfile, Project and Build where it is noos." },
+        "description": { "type": "string" },
+        "type": {
+          "description": "The kind; a setting with options gives them instead: a fixed list (overlay-syntax, probe; true and false for a noos bool), or the names the backend scans (noos board and platform, which are string when it finds none, CONFIG-510).",
+          "oneOf": [
+            { "enum": ["path", "path_list", "string", "numeric", "bool"] },
+            {
+              "type": "object",
+              "required": ["options"],
+              "properties": { "options": { "type": "array", "items": { "type": "string" }, "minItems": 1 } },
+              "additionalProperties": false
+            }
+          ]
+        },
+        "required": { "type": "boolean", "description": "Display only (the * of the table)." },
+        "default": { "type": ["string", "null"] },
+        "value": {
+          "description": "The effective value: local, then global, then the default (COM-123); absolute for a local path; null when it has none.",
+          "anyOf": [{ "type": ["string", "null"] }, { "type": "array", "items": { "type": "string" } }]
+        },
+        "source": { "enum": ["local", "global", "default", "unset"], "description": "Where value comes from." }
+      },
+      "additionalProperties": false
+    },
+    "done": {
+      "description": "config --reload (message: the build summary, CONFIG-022), config <key> <value> (message: Set <key> = <value>, then (global), then the backend's addition, CONFIG-130) or config <key> --reset (message: Reset <key>, then (global), then what applies now, CONFIG-202).",
+      "type": "object",
+      "required": ["ok", "message", "severity"],
+      "properties": {
+        "ok": { "const": true },
+        "message": { "type": "string", "pattern": "^(Set [a-z-]+ = .*|Reset [a-z-]+( \\(global\\))? \\((still set in the (local|global) config: .*|default: .+|not set)\\)|Indexed [0-9]+ compatibles from [0-9]+ bindings and compiled binding schemas in .+|Nothing to rebuild: .+)$" },
+        "severity": { "enum": ["info", "warn"] }
+      },
+      "additionalProperties": false
+    }
+  }
+}

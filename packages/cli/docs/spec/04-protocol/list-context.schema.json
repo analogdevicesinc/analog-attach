@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "list-context.schema.json",
+  "title": "list context response",
+  "description": "Standard output of list context in JSON mode, or a refusal. $defs/base is ListContextResponse, a CommonResponse: each backend says what it lists (overview 2.1). Only the noos backend implements it (LIST-510); the linux backend answers that it is not supported (COM-015), so there is no $defs/linux.",
+  "anyOf": [{ "$ref": "#/$defs/noos" }],
+  "$defs": {
+    "base": { "description": "ListContextResponse: a CommonResponse.", "$ref": "common.schema.json#/$defs/common" },
+    "noos": {
+      "oneOf": [
+        {
+          "description": "Where the backend is noos: the chips and boards of the configured modules (LIST-510). ListContextResponse in src/backends/noos/protocol/responses.ts.",
+          "allOf": [{ "$ref": "#/$defs/base" }],
+          "required": ["platforms", "boards"],
+          "properties": {
+            "ok": { "const": true },
+            "message": { "type": "string", "pattern": "^[0-9]+ boards? on [0-9]+ chips?$", "description": "<boards> boards on <chips> chips (LIST-511)." },
+            "severity": { "const": "info" },
+            "platforms": {
+              "description": "Every chip, by name, with the boards carrying it.",
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["name", "vendor", "boards"],
+                "properties": {
+                  "name": { "type": "string", "description": "What the platform setting takes." },
+                  "vendor": { "type": "string" },
+                  "description": { "type": "string" },
+                  "boards": { "type": "array", "items": { "type": "string" } }
+                },
+                "additionalProperties": false
+              }
+            },
+            "boards": {
+              "description": "Every board, in the order the modules define them.",
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["name"],
+                "properties": {
+                  "name": { "type": "string", "description": "What the board setting takes." },
+                  "platform": { "type": "string", "description": "The chip the board carries." },
+                  "vendor": { "type": "string" },
+                  "description": { "type": "string" }
+                },
+                "additionalProperties": false
+              }
+            }
+          },
+          "unevaluatedProperties": false
+        },
+        { "$ref": "common.schema.json#/$defs/refusal" }
+      ]
+    }
+  }
+}

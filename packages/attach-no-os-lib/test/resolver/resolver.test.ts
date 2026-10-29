@@ -84,8 +84,8 @@ describe('resolver', () => {
         });
 
         test('an unconfigured root is reported as the unset setting it is', () => {
-            // A missing config file is not an error in itself - attach-meta reads the
-            // settings before anything is configured - so the failure is the unset setting.
+            // A missing config file is not an error in itself - the CLI reads the settings
+            // before anything is configured - so the failure is the unset setting.
             setup_no_config();
             const result = load_resolved_ruleset('test_spi_device');
             teardown_no_config();

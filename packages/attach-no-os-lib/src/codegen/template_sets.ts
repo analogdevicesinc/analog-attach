@@ -24,25 +24,40 @@ export { DEFAULT_TEMPLATE_SET } from "../settings/globals";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-// Root holding the bundled sets. Every direct child folder with a
+// Root holding the bundled sets, next to this module (src/codegen/templates, or the
+// copy a bundling program ships). Every direct child folder with a
 // `project_structure.json` is a set.
 export const TEMPLATES_ROOT = path.join(__dirname, "templates");
+
+let templates_root = TEMPLATES_ROOT;
+
+// Where the bundled sets are, for a program that ships them elsewhere than next to the
+// bundled lib (the analog-attach CLI: its assets directory). `undefined` goes back to
+// TEMPLATES_ROOT.
+export function use_templates_root(directory: string | undefined): void {
+	templates_root = directory ?? TEMPLATES_ROOT;
+}
+
+// The root `list_template_sets` and `resolve_template_set` read.
+export function get_templates_root(): string {
+	return templates_root;
+}
 
 // The per-set manifest filename; also what marks a folder as a template set.
 export const STRUCTURE_FILENAME = "project_structure.json";
 
 // Names of the bundled template sets, sorted. Used for error messages and for
-// CLI completion of `attach-noos config project-template`.
+// CLI completion of `analog-attach config project-template`.
 export function list_template_sets(): string[] {
-	if (!fs.existsSync(TEMPLATES_ROOT)) {
+	if (!fs.existsSync(templates_root)) {
 		return [];
 	}
 
 	return fs
-		.readdirSync(TEMPLATES_ROOT, { withFileTypes: true })
+		.readdirSync(templates_root, { withFileTypes: true })
 		.filter(entry => entry.isDirectory())
 		.map(entry => entry.name)
-		.filter(name => fs.existsSync(path.join(TEMPLATES_ROOT, name, STRUCTURE_FILENAME)))
+		.filter(name => fs.existsSync(path.join(templates_root, name, STRUCTURE_FILENAME)))
 		.sort();
 }
 
@@ -64,12 +79,12 @@ export function configured_template_set(): string {
 // then DEFAULT_TEMPLATE_SET. A name containing a path separator (or an absolute
 // path) is taken as a path to an out-of-tree set, so a user can keep their own
 // templates outside the installed app; a bare name is looked up under
-// TEMPLATES_ROOT.
+// templates_root.
 export function resolve_template_set(requested?: string): Result<string> {
 	const name = requested ?? configured_template_set();
 
 	const is_path = path.isAbsolute(name) || name.includes("/") || name.includes("\\");
-	const directory = is_path ? path.resolve(name) : path.join(TEMPLATES_ROOT, name);
+	const directory = is_path ? path.resolve(name) : path.join(templates_root, name);
 
 	if (!fs.existsSync(directory) || !fs.statSync(directory).isDirectory()) {
 		const available = list_template_sets();

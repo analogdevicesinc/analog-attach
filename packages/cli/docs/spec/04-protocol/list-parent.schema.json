@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "list-parent.schema.json",
+  "title": "list parent response",
+  "description": "Where the backend is linux: standard output of list parent in JSON mode (LIST-092). A SuggestResponse; with a compatible no binding has, severity is warn and suggestions is empty (LIST-090). The command is the Linux backend's own (overview 2.1), so there is no base or noos shape.",
+  "oneOf": [
+    {
+      "allOf": [{ "$ref": "common.schema.json#/$defs/suggest-response" }],
+      "properties": {
+        "ok": { "const": true },
+        "message": { "type": "string", "description": "Found <n> valid parents, or No binding found for <compatible>." },
+        "severity": { "enum": ["info", "warn"] },
+        "suggestions": {
+          "description": "Each parent: value its label (or its path when it has none), display_string its absolute path.",
+          "type": "array",
+          "items": { "$ref": "common.schema.json#/$defs/suggestion" }
+        }
+      },
+      "unevaluatedProperties": false
+    },
+    { "$ref": "common.schema.json#/$defs/refusal" }
+  ]
+}

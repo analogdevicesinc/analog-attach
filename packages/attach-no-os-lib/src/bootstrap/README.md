@@ -1,7 +1,7 @@
 # Bootstrap
 
 Fills in a workfile wherever there is no room for choice, and keeps what it filled in
-line with the rules. With it, `attach-noos add eval-adxl355-pmdz` on a max32655fthr workfile
+line with the rules. With it, `analog-attach add eval-adxl355-pmdz` on a max32655fthr workfile
 gives a valid workfile, the wiring to make it true on the bench, and nothing left to decide.
 
 The law: **bootstrap supplies values, the engine enforces rules.** Bootstrap never decides
@@ -57,7 +57,7 @@ provides it. Either way the reference stays unset and is listed in the report's 
 
 ## Adding a part
 
-`attach-noos add` puts one node in the workfile, and bootstrap builds everything below it:
+`analog-attach add` puts one node in the workfile, and bootstrap builds everything below it:
 
 | Command | Adds |
 |---|---|
@@ -129,7 +129,7 @@ Each stored node lists the values bootstrap set in `"$auto": [...]`:
 
 - A value bootstrap writes (a default included) is bootstrap's, and is listed.
 - A value the user writes is the user's. Editing a bootstrap value takes it off the list.
-- A value the user clears (`attach-noos delete <node> <property>`) is written as `null`. It
+- A value the user clears (`analog-attach delete <node> <property>`) is written as `null`. It
   is the user's "nothing": unset to everything else, but bootstrap does not fill it back in.
   Deleting a node clears the references to it the same way, so bootstrap does not rebuild
   it straight back.
@@ -193,7 +193,8 @@ then the pin node), leaving exactly the bare part `add <driver>` gives.
 | `deleted`      | stored nodes deleted                                                 |
 | `dangling`     | nodes left unused that hold user values                              |
 
-The CLI prints it after each command (`attach-no-os-cli/src/commands/bootstrap_run.ts`).
+The CLI's no-OS backend prints it after each command
+(`packages/cli/src/backends/noos/commands/bootstrap_run.ts`).
 
 The keys all of this reads are listed in [docs/vocabulary.md](../../docs/vocabulary.md).
 

@@ -1,6 +1,6 @@
 import { describe, test, expect, beforeEach, afterEach } from 'vitest';
 import { addable_drivers, driver_root, driver_roots } from '../../src/registry/roots';
-import { bootstrap_enabled, set_setting_value } from '../../src/settings/settings';
+import { bootstrap_enabled } from '../../src/settings/settings';
 import { expectErrorContains, expectOk, setup_test_config, teardown_test_config } from '../test_utilities';
 
 // A part is added through its root: the generic handle whose config takes a driver for an
@@ -41,13 +41,13 @@ describe('the bootstrap setting', () => {
         expect(bootstrap_enabled()).toBe(true);
 
         for (const off of ['false', 'FALSE', ' 0 ', 'no', 'off']) {
-            expectOk(set_setting_value('bootstrap', off));
+            setup_test_config({}, { bootstrap: off });
             expect(bootstrap_enabled()).toBe(false);
         }
 
         // Anything else - including a typo - keeps the default rather than silently disabling it.
         for (const on of ['true', 'yes', '1', 'ture']) {
-            expectOk(set_setting_value('bootstrap', on));
+            setup_test_config({}, { bootstrap: on });
             expect(bootstrap_enabled()).toBe(true);
         }
     });

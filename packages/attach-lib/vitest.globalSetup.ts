@@ -14,9 +14,9 @@ const DT_SCHEMA_REMOTE = 'https://github.com/devicetree-org/dt-schema';
 
 /** The dt-schema the CLI bundles (`DTSCHEMA_COMMIT` in its bundle script): the tests resolve bindings against the same. */
 function bundled_dt_schema_commit(): string {
-    const script = readFileSync(resolve(package_dir, '../attach-cli/scripts/bundle-dt-schema.sh'), 'utf8');
+    const script = readFileSync(resolve(package_dir, '../cli/scripts/bundle-dt-schema.sh'), 'utf8');
     const commit = /^DTSCHEMA_COMMIT="([\da-f]{40})"$/m.exec(script)?.[1];
-    if (commit === undefined) { throw new Error('no DTSCHEMA_COMMIT in attach-cli/scripts/bundle-dt-schema.sh'); }
+    if (commit === undefined) { throw new Error('no DTSCHEMA_COMMIT in cli/scripts/bundle-dt-schema.sh'); }
     return commit;
 }
 

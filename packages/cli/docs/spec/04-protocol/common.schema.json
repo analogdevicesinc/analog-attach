@@ -1,0 +1,555 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "common.schema.json",
+  "title": "CommonResponse",
+  "description": "The fields of a response (COM-040, COM-050), and the base shapes the command schemas build on (src/interface/backend-responses.ts). Most responses have the three fields; read, update when it reads, and validate don't (02-common.md §2, C-7). A refusal is exactly this object, with ok false and severity error. The base shapes are open, so that a backend's subtype can add fields (overview 2.1).",
+  "type": "object",
+  "required": [
+    "ok",
+    "message",
+    "severity"
+  ],
+  "properties": {
+    "ok": {
+      "type": "boolean",
+      "description": "true: the command did what was asked. false: it refused."
+    },
+    "message": {
+      "type": "string",
+      "description": "One-line human-readable summary."
+    },
+    "severity": {
+      "$ref": "#/$defs/severity",
+      "description": "error for a refusal; info or warn for a success (warn where the command's chapter says so, COM-050)."
+    }
+  },
+  "$defs": {
+    "severity": {
+      "enum": [
+        "info",
+        "warn",
+        "error"
+      ]
+    },
+    "common": {
+      "description": "CommonResponse: the three fields, open to more.",
+      "type": "object",
+      "required": [
+        "ok",
+        "message",
+        "severity"
+      ],
+      "properties": {
+        "ok": {
+          "type": "boolean"
+        },
+        "message": {
+          "type": "string"
+        },
+        "severity": {
+          "$ref": "#/$defs/severity"
+        }
+      }
+    },
+    "done": {
+      "description": "A success with nothing but the three fields.",
+      "type": "object",
+      "required": [
+        "ok",
+        "message",
+        "severity"
+      ],
+      "properties": {
+        "ok": {
+          "const": true
+        },
+        "message": {
+          "type": "string"
+        },
+        "severity": {
+          "enum": [
+            "info",
+            "warn"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "refusal": {
+      "description": "A refusal (COM-040).",
+      "type": "object",
+      "required": [
+        "ok",
+        "message",
+        "severity"
+      ],
+      "properties": {
+        "ok": {
+          "const": false
+        },
+        "message": {
+          "type": "string"
+        },
+        "severity": {
+          "const": "error"
+        }
+      },
+      "additionalProperties": false
+    },
+    "node-path": {
+      "description": "A node path as segments without the root (overview 3.5): /soc/spi@7e204000 is [\"soc\", \"spi@7e204000\"], / is [].",
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "suggestion": {
+      "description": "Suggestion: a value ready to pass to update, or a name ready for the command line.",
+      "type": "object",
+      "required": [
+        "value"
+      ],
+      "properties": {
+        "value": {
+          "type": "string",
+          "description": "The value tokens as update takes them (GRM-070)."
+        },
+        "display_string": {
+          "type": "string",
+          "description": "What to show instead of the value."
+        },
+        "note": {
+          "type": "string",
+          "description": "A remark on the value: the overlay mark of a phandle option (disabled, enabled, enabled by the overlay), or why the binding may reject the value ('not defined by <binding>; validate may reject it', or a value check's message such as 'Property spi-cpol is a flag and can be set to appear with 'true' or disappear with 'false''). Several are joined with '; '."
+        },
+        "partial": {
+          "type": "boolean",
+          "description": "The start of a name to type on (a pattern's stem)."
+        },
+        "group": {
+          "type": "string",
+          "description": "Completion group: set, not set."
+        }
+      },
+      "additionalProperties": false
+    },
+    "property-suggestions": {
+      "description": "PropertySuggestions: the suggested values, and the providers the user can add instead.",
+      "type": "object",
+      "required": [
+        "values"
+      ],
+      "properties": {
+        "values": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/suggestion"
+          }
+        },
+        "can_create": {
+          "description": "Where the backend is linux: absent when there are none. Where it is noos: always there, [] when there are none.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/suggestion"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "property-value": {
+      "description": "PropertyValue (READ-050): null, a string (&label for a reference), a number, true for a flag, or an array of these.",
+      "anyOf": [
+        {
+          "type": [
+            "null",
+            "string",
+            "number",
+            "boolean"
+          ]
+        },
+        {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/property-value"
+          }
+        }
+      ]
+    },
+    "property-type": {
+      "description": "PropertyType. read infers it from the value (READ-050); list property gives the binding's.",
+      "oneOf": [
+        {
+          "type": "object",
+          "required": [
+            "kind",
+            "subtype"
+          ],
+          "properties": {
+            "kind": {
+              "const": "number"
+            },
+            "subtype": {
+              "enum": [
+                "int",
+                "float"
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "kind"
+          ],
+          "properties": {
+            "kind": {
+              "enum": [
+                "string",
+                "bool"
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "kind",
+            "options"
+          ],
+          "properties": {
+            "kind": {
+              "const": "enum"
+            },
+            "options": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "value"
+                ],
+                "properties": {
+                  "value": {
+                    "type": [
+                      "string",
+                      "number"
+                    ]
+                  },
+                  "display_string": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "kind",
+            "items"
+          ],
+          "properties": {
+            "kind": {
+              "const": "array"
+            },
+            "items": {
+              "$ref": "#/$defs/property-type"
+            },
+            "min_items": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "max_items": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "kind",
+            "items"
+          ],
+          "properties": {
+            "kind": {
+              "const": "tuple"
+            },
+            "items": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/property-type"
+              }
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "property": {
+      "description": "Property: one property of a node.",
+      "type": "object",
+      "required": [
+        "kind",
+        "key",
+        "type",
+        "value"
+      ],
+      "properties": {
+        "kind": {
+          "const": "property"
+        },
+        "key": {
+          "type": "string"
+        },
+        "type": {
+          "$ref": "#/$defs/property-type"
+        },
+        "value": {
+          "$ref": "#/$defs/property-value"
+        }
+      }
+    },
+    "node": {
+      "description": "Node: a node as read shows it. origin is the backend's word for where the node lives.",
+      "type": "object",
+      "required": [
+        "kind",
+        "key",
+        "properties",
+        "children",
+        "origin"
+      ],
+      "properties": {
+        "kind": {
+          "const": "node"
+        },
+        "key": {
+          "type": "string"
+        },
+        "properties": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/property"
+          }
+        },
+        "children": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/node"
+          }
+        },
+        "origin": {
+          "type": "string"
+        },
+        "alias": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "read-property": {
+      "description": "ReadProperty: one property read on its own.",
+      "allOf": [
+        {
+          "$ref": "#/$defs/property"
+        }
+      ],
+      "properties": {
+        "description": {
+          "type": "string",
+          "description": "The binding's description."
+        },
+        "suggestions": {
+          "$ref": "#/$defs/property-suggestions"
+        }
+      }
+    },
+    "missing-property": {
+      "description": "MissingProperty: a required property the node lacks. Open, so that a backend can add fields (noos: node).",
+      "type": "object",
+      "required": [
+        "property",
+        "suggestions"
+      ],
+      "properties": {
+        "property": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string",
+          "description": "The binding's description."
+        },
+        "suggestions": {
+          "description": "list value's values (which may carry a note from the binding, e.g. a required flag's explanation), then the other candidates, each marked by its note: disabled, enabled, enabled by the overlay (ADD-110).",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/suggestion"
+          }
+        }
+      }
+    },
+    "property-description": {
+      "description": "PropertyDescription: what the binding says about a property.",
+      "type": "object",
+      "required": [
+        "name",
+        "type",
+        "display",
+        "required"
+      ],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "type": {
+          "$ref": "#/$defs/property-type"
+        },
+        "display": {
+          "type": "string",
+          "description": "The type as printed: number[2], enum(a | b) (LIST-054)."
+        },
+        "required": {
+          "type": "boolean"
+        },
+        "set": {
+          "type": "boolean",
+          "description": "Whether the node has it (list property <path> <property>)."
+        },
+        "default": {
+          "$ref": "#/$defs/property-value"
+        },
+        "suggestions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/suggestion"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "device": {
+      "description": "Device: one entry of list devices.",
+      "type": "object",
+      "required": [
+        "key"
+      ],
+      "properties": {
+        "key": {
+          "type": "string",
+          "description": "What add takes: a compatible where the backend is linux; an eval board, a driver or a schema where it is noos."
+        },
+        "tag": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "device-description": {
+      "description": "DeviceDescription: one device in full.",
+      "type": "object",
+      "required": [
+        "key",
+        "properties"
+      ],
+      "properties": {
+        "key": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "properties": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/property-description"
+          }
+        }
+      }
+    },
+    "validation-finding": {
+      "description": "ValidationFinding: one error or warning of validate.",
+      "type": "object",
+      "required": [
+        "kind",
+        "path",
+        "message"
+      ],
+      "properties": {
+        "kind": {
+          "const": "generic"
+        },
+        "path": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Where the finding is; [] for the workfile as a whole."
+        },
+        "message": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "unresolved-entry": {
+      "description": "Linux: a reference in the workfile that names no node of the merged tree (ADD-091, IMPORT-030).",
+      "type": "object",
+      "required": [
+        "path",
+        "property",
+        "reference"
+      ],
+      "properties": {
+        "path": {
+          "$ref": "#/$defs/node-path"
+        },
+        "property": {
+          "type": "string"
+        },
+        "reference": {
+          "type": "string",
+          "pattern": "^&",
+          "description": "As written: &label or &{/path}."
+        }
+      },
+      "additionalProperties": false
+    },
+    "suggest-response": {
+      "description": "SuggestResponse: values or names to offer.",
+      "allOf": [
+        {
+          "$ref": "#/$defs/common"
+        }
+      ],
+      "required": [
+        "suggestions"
+      ],
+      "properties": {
+        "suggestions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/suggestion"
+          }
+        }
+      }
+    }
+  }
+}

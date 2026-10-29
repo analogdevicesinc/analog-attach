@@ -1,0 +1,94 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "list-devices.schema.json",
+  "title": "list devices response",
+  "description": "Standard output of list devices in JSON mode (LIST-011, LIST-013), or a refusal. $defs/base is ListDevicesResponse (overview 2.1).",
+  "anyOf": [{ "$ref": "#/$defs/linux" }, { "$ref": "#/$defs/noos" }],
+  "$defs": {
+    "base": {
+      "description": "ListDevicesResponse: the devices the filter matches, and the device when the filter names exactly one.",
+      "allOf": [{ "$ref": "common.schema.json#/$defs/common" }],
+      "required": ["devices"],
+      "properties": {
+        "devices": { "type": "array", "items": { "$ref": "common.schema.json#/$defs/device" } },
+        "device": { "$ref": "common.schema.json#/$defs/device-description" }
+      }
+    },
+    "linux": {
+      "oneOf": [{ "$ref": "#/$defs/linux-devices" }, { "$ref": "common.schema.json#/$defs/refusal" }]
+    },
+    "linux-devices": {
+      "allOf": [{ "$ref": "#/$defs/base" }],
+      "required": ["names"],
+      "properties": {
+        "ok": { "const": true },
+        "message": { "type": "string", "description": "Found <n> devices, or Device <compatible> when the filter names one (LIST-011)." },
+        "severity": { "const": "info" },
+        "devices": {
+          "type": "array",
+          "items": {
+            "allOf": [{ "$ref": "common.schema.json#/$defs/device" }],
+            "properties": { "key": { "description": "A compatible." } },
+            "not": { "anyOf": [{ "required": ["tag"] }, { "required": ["title"] }] }
+          }
+        },
+        "names": { "type": "array", "items": { "type": "string" }, "deprecated": true, "description": "The keys of devices, kept for one release." },
+        "device": { "$ref": "#/$defs/linux-device" }
+      },
+      "unevaluatedProperties": false
+    },
+    "linux-device": {
+      "description": "The device the filter names (LIST-013): the binding's description, with where it comes from and its child-node patterns.",
+      "allOf": [{ "$ref": "common.schema.json#/$defs/device-description" }],
+      "required": ["compatible", "binding", "children"],
+      "properties": {
+        "compatible": { "type": "string", "description": "The same as key." },
+        "binding": { "type": "string", "pattern": "^/", "description": "The binding file, absolute." },
+        "children": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["pattern", "name", "properties"],
+            "properties": {
+              "pattern": { "type": "string" },
+              "name": { "type": "string", "description": "The pattern's literal start, with N when it ends in @ (channel@N, fan-), or the pattern itself (LIST-013)." },
+              "description": { "type": "string" },
+              "properties": { "type": "array", "items": { "$ref": "common.schema.json#/$defs/property-description" } }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "unevaluatedProperties": false
+    },
+    "noos": {
+      "anyOf": [
+        {
+          "description": "Where the backend is noos: the eval boards, drivers and schemas the filter matches (LIST-500). Never has device.",
+          "allOf": [{ "$ref": "#/$defs/base" }],
+          "required": ["devices"],
+          "properties": {
+            "ok": { "const": true },
+            "message": { "type": "string", "pattern": "^[0-9]+ schemas? available$" },
+            "severity": { "const": "info" },
+            "devices": {
+              "type": "array",
+              "items": {
+                "allOf": [{ "$ref": "common.schema.json#/$defs/device" }],
+                "required": ["tag"],
+                "properties": {
+                  "key": { "description": "What add takes: an eval board, a driver or a schema." },
+                  "tag": { "description": "eval boards, drivers, or the module that defines the schema." }
+                },
+                "not": { "required": ["title"] }
+              }
+            }
+          },
+          "not": { "required": ["device"] },
+          "unevaluatedProperties": false
+        },
+        { "$ref": "common.schema.json#/$defs/refusal" }
+      ]
+    }
+  }
+}

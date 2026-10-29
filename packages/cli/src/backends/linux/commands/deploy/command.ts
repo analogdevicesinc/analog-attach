@@ -1,0 +1,74 @@
+import { execSync } from "node:child_process";
+
+import { answer, command, refuse } from "../../../../interface/backend-interface";
+import { load_workspace } from "../../config/workspace";
+import type { DeployResponse } from "../../protocol/types";
+
+/** Remote directory device tree overlays are copied to. */
+const REMOTE_OVERLAY_DIR = "/boot/overlays";
+
+/** Non-interactive ssh/scp options so the first connection does not prompt and hang. */
+const SSH_OPTS = "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null";
+
+/** Build the scp command that copies the compiled overlay to the remote overlay directory. */
+export function build_scp_command(dtbo: string, user: string, ip: string): string {
+    return `sshpass -e scp ${SSH_OPTS} "${dtbo}" ${user}@${ip}:${REMOTE_OVERLAY_DIR}/`;
+}
+
+/** Build the ssh command that reboots the remote device. */
+export function build_reboot_command(user: string, ip: string): string {
+    return `sshpass -e ssh ${SSH_OPTS} ${user}@${ip} sudo reboot`;
+}
+
+export const deploy = command<Record<never, never>, DeployResponse>({
+    docs: {
+        brief: "Deploy the compiled overlay to a remote device",
+        full: `Copies the .dtbo that 'build' compiled to /boot/overlays/ on the remote device
+via scp, then reboots it. Requires scp and sshpass on PATH.
+
+Required settings (set with config <key> <value>):
+  deploy-ip           IP address or hostname of the device
+  deploy-user         SSH username
+  deploy-password     SSH password`,
+    },
+    run(_arguments, _flags, session) {
+        const loaded = load_workspace(session, ["deploy"]);
+        if (!loaded.ok) { return Promise.resolve(loaded.outcome); }
+        const { dtbo, host: ip, user, password } = loaded.workspace.deploy;
+        const environment = { ...process.env, SSHPASS: password };
+
+        try {
+            execSync(build_scp_command(dtbo, user, ip), { stdio: "pipe", env: environment });
+        } catch (error: any) {
+            const stderr: string = (error.stderr as Buffer | undefined)?.toString() ?? String(error);
+            return Promise.resolve(refuse(`Deploy failed (scp):\n${stderr}`));
+        }
+
+        // The reboot drops the ssh connection, so a non-zero exit here is expected — the copy
+        // already succeeded with these credentials, so we treat the reboot as best-effort.
+        try {
+            execSync(build_reboot_command(user, ip), { stdio: "pipe", env: environment });
+        } catch {
+            // connection closed by reboot — ignore
+        }
+
+        return Promise.resolve(answer(
+            { ok: true, message: "Deployed and rebooted", severity: "info", host: ip, remote_path: `${REMOTE_OVERLAY_DIR}/` } satisfies DeployResponse,
+            `Deployed ${dtbo} to ${user}@${ip}:${REMOTE_OVERLAY_DIR}/ and rebooted`,
+        ));
+    },
+});
+
+if (import.meta.vitest) {
+    const { test, expect } = import.meta.vitest;
+
+    test("build_scp_command - copies dtbo to the remote overlay dir", () => {
+        expect(build_scp_command("/x/overlay.dtbo", "pi", "10.0.0.5"))
+            .toBe('sshpass -e scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "/x/overlay.dtbo" pi@10.0.0.5:/boot/overlays/');
+    });
+
+    test("build_reboot_command - reboots the remote device", () => {
+        expect(build_reboot_command("pi", "10.0.0.5"))
+            .toBe("sshpass -e ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null pi@10.0.0.5 sudo reboot");
+    });
+}

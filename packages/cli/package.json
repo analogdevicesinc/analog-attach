@@ -1,0 +1,68 @@
+{
+  "name": "@analog-attach/cli",
+  "author": "AnalogDevices",
+  "description": "Configure Linux device tree overlays and no-OS projects for peripherals",
+  "license": "Apache-2.0",
+  "type": "module",
+  "version": "0.1.0",
+  "files": [
+    "dist",
+    "bundled",
+    "skills"
+  ],
+  "bin": {
+    "analog-attach": "dist/cli.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "scripts/bundle-dt-schema.sh && tsc -p src/tsconfig.json && tsup --silent && rm -rf bundled/noos/templates && mkdir -p bundled/noos && cp -r ../attach-no-os-lib/src/codegen/templates bundled/noos/templates",
+    "clean": "rm -rf dist tsconfig.tsbuildinfo node_modules",
+    "lint": "eslint src",
+    "test": "vitest"
+  },
+  "tsup": {
+    "entry": [
+      "src/bin/cli.ts"
+    ],
+    "format": [
+      "esm"
+    ],
+    "tsconfig": "src/tsconfig.json",
+    "clean": true,
+    "splitting": true,
+    "noExternal": [
+      "attach-lib",
+      "attach-no-os-lib"
+    ],
+    "external": [
+      "yaml",
+      "eta"
+    ],
+    "define": {
+      "import.meta.vitest": "undefined"
+    },
+    "treeshake": true
+  },
+  "dependencies": {
+    "@inquirer/core": "^12.0.5",
+    "@inquirer/prompts": "8.7.3",
+    "@stricli/core": "^1.1.0",
+    "eta": "^3.5.0",
+    "yaml": "^2.8.3"
+  },
+  "devDependencies": {
+    "@types/node": "25.x",
+    "@typescript-eslint/eslint-plugin": "^8.72.1",
+    "@typescript-eslint/parser": "^8.72.1",
+    "ajv": "^8.17.1",
+    "attach-lib": "*",
+    "attach-no-os-lib": "workspace:*",
+    "eslint": "^9.31.0",
+    "eslint-plugin-unicorn": "^60.0.0",
+    "tsup": "^6.7.0",
+    "typescript": "~6.0.3",
+    "vitest": "^4.0.18"
+  }
+}

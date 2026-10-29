@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Full check for attach-lib and attach-cli, in dependency order.
-# attach-cli bundles the *built* attach-lib, so the lib is rebuilt first
+# Full check for attach-lib, attach-no-os-lib and @analog-attach/cli, in dependency order.
+# @analog-attach/cli bundles the *built* libs, so they are rebuilt first
 # (Yarn 4 does not run pre/post lifecycle hooks, so nothing is implicit).
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -15,10 +15,16 @@ step "attach-lib: test"
 yarn workspace attach-lib test --run --exclude test/BindingParserCompletion.test.ts
 step "attach-lib: lint"
 yarn workspace attach-lib lint
-step "attach-cli: build (tsc type-check + tsup)"
-yarn workspace attach-linux build
-step "attach-cli: lint"
-yarn workspace attach-linux lint
-step "attach-cli: test"
-yarn workspace attach-linux test --run
+step "attach-no-os-lib: build"
+yarn workspace attach-no-os-lib build
+step "attach-no-os-lib: test"
+yarn workspace attach-no-os-lib test --run
+step "attach-no-os-lib: lint"
+yarn workspace attach-no-os-lib lint
+step "@analog-attach/cli: build"
+yarn workspace @analog-attach/cli build
+step "@analog-attach/cli: lint"
+yarn workspace @analog-attach/cli lint
+step "@analog-attach/cli: test"
+yarn workspace @analog-attach/cli test --run
 printf '\nverify: all green\n'

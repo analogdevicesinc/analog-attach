@@ -1,0 +1,70 @@
+{
+  "parse": {
+    "ok": true,
+    "dropped_overrides": true,
+    "unresolved_targets": [],
+    "unresolved": []
+  },
+  "validate": {
+    "errors": [
+      {
+        "path": [
+          "node0",
+          "si446x@0",
+          "irq_pin"
+        ],
+        "message": "si446x@0 (silabs,si446x): irq_pin: b'\\x00\\x00\\x00\\x11' is not of type 'object', 'integer', 'array', 'boolean', 'null'\n\tfrom schema $id: http://devicetree.org/schemas/dt-core.yaml"
+      },
+      {
+        "path": [
+          "node0",
+          "si446x@0",
+          "sdn_pin"
+        ],
+        "message": "si446x@0 (silabs,si446x): sdn_pin: b'\\x00\\x00\\x00\\x1b' is not of type 'object', 'integer', 'array', 'boolean', 'null'\n\tfrom schema $id: http://devicetree.org/schemas/dt-core.yaml"
+      },
+      {
+        "path": [
+          "node1",
+          "uhf0_pins",
+          "brcm,function"
+        ],
+        "message": "uhf0_pins: brcm,function: b'\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x01' is not of type 'object', 'integer', 'array', 'boolean', 'null'\n\tfrom schema $id: http://devicetree.org/schemas/dt-core.yaml"
+      },
+      {
+        "path": [
+          "node1",
+          "uhf0_pins",
+          "brcm,pins"
+        ],
+        "message": "uhf0_pins: brcm,pins: b'\\x00\\x00\\x00\\x11\\x00\\x00\\x00\\x1b' is not of type 'object', 'integer', 'array', 'boolean', 'null'\n\tfrom schema $id: http://devicetree.org/schemas/dt-core.yaml"
+      },
+      {
+        "path": [
+          "node1",
+          "uhf0_pins",
+          "brcm,pull"
+        ],
+        "message": "uhf0_pins: brcm,pull: b'\\x00\\x00\\x00\\x02\\x00\\x00\\x00\\x00' is not of type 'object', 'integer', 'array', 'boolean', 'null'\n\tfrom schema $id: http://devicetree.org/schemas/dt-core.yaml"
+      }
+    ],
+    "warnings": []
+  },
+  "reg": {
+    "conflicts": [
+      {
+        "parent_path": "/soc/spi@7e204000",
+        "nodes": [
+          "spidev@0",
+          "si446x@0"
+        ],
+        "address": "0x0",
+        "in_overlay": [
+          false,
+          true
+        ]
+      }
+    ],
+    "chip_select_overflows": []
+  }
+}

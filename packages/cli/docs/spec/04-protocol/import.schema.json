@@ -1,0 +1,212 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "import.schema.json",
+  "title": "import response",
+  "description": "Standard output of import in JSON mode (IMPORT-060): the new workfile, or a refusal. $defs/base is ImportResponse (overview 2.1).",
+  "anyOf": [
+    {
+      "$ref": "#/$defs/linux"
+    },
+    {
+      "$ref": "#/$defs/noos"
+    }
+  ],
+  "$defs": {
+    "base": {
+      "description": "ImportResponse.",
+      "allOf": [
+        {
+          "$ref": "common.schema.json#/$defs/common"
+        }
+      ],
+      "required": [
+        "path",
+        "source"
+      ],
+      "properties": {
+        "path": {
+          "type": "string",
+          "description": "The new workfile, absolute; it is now the configured one."
+        },
+        "source": {
+          "type": "string",
+          "description": "What it was made from, absolute."
+        }
+      }
+    },
+    "linux": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/linux-imported"
+        },
+        {
+          "$ref": "common.schema.json#/$defs/refusal"
+        }
+      ]
+    },
+    "linux-imported": {
+      "required": [
+        "fit",
+        "reason",
+        "unresolved_targets",
+        "unresolved"
+      ],
+      "properties": {
+        "ok": {
+          "const": true
+        },
+        "message": {
+          "type": "string",
+          "pattern": "^Imported .+ into /.+$"
+        },
+        "severity": {
+          "enum": [
+            "info",
+            "warn"
+          ],
+          "description": "warn when fit is incompatible or unresolved_targets or unresolved isn't empty."
+        },
+        "path": {
+          "type": "string",
+          "pattern": "^/",
+          "description": "The new workfile, absolute; now the configured workfile."
+        },
+        "source": {
+          "type": "string",
+          "pattern": "^/",
+          "description": "The imported overlay file."
+        },
+        "replaced": {
+          "type": "string",
+          "pattern": "^/",
+          "description": "The workfile configured before; the file is kept."
+        },
+        "fit": {
+          "enum": [
+            "compatible",
+            "incompatible",
+            "unknown"
+          ]
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1,
+          "description": "What matched, or why not (IMPORT-040)."
+        },
+        "unresolved_targets": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/unresolved-target"
+          }
+        },
+        "unresolved": {
+          "type": "array",
+          "items": {
+            "$ref": "common.schema.json#/$defs/unresolved-entry"
+          },
+          "description": "References that name no node of the base or the overlay (IMPORT-042). Under a target that didn't resolve, the first path segment is that target as written (&label), open issue IM-2; under a target-path that didn't resolve, the segments are that path's."
+        }
+      },
+      "allOf": [
+        {
+          "$ref": "#/$defs/base"
+        },
+        {
+          "if": {
+            "properties": {
+              "fit": {
+                "const": "incompatible"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "severity": {
+                "const": "warn"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "unresolved_targets": {
+                "type": "array",
+                "minItems": 1
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "severity": {
+                "const": "warn"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "unresolved": {
+                "type": "array",
+                "minItems": 1
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "severity": {
+                "const": "warn"
+              }
+            }
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "unresolved-target": {
+      "description": "A fragment whose target names no node of the base or the overlay (IMPORT-041).",
+      "type": "object",
+      "required": [
+        "fragment",
+        "property",
+        "target"
+      ],
+      "properties": {
+        "fragment": {
+          "type": "string",
+          "description": "The fragment's node name, e.g. fragment@0."
+        },
+        "property": {
+          "enum": [
+            "target",
+            "target-path"
+          ]
+        },
+        "target": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The label without &, or the path."
+        }
+      },
+      "additionalProperties": false
+    },
+    "noos": {
+      "anyOf": [
+        {
+          "description": "Where the backend is noos: the workfile import made (IMPORT-520).",
+          "allOf": [{ "$ref": "#/$defs/base" }],
+          "properties": {
+            "ok": { "const": true },
+            "message": { "type": "string", "pattern": "^Imported a workfile for (board .+ \\(platform .+\\)|platform .+), [0-9]+ nodes?; (the workfile is valid|[0-9]+ problems? left - run: .+ validate)$" },
+            "severity": { "const": "info" },
+            "path": { "type": "string", "pattern": "^/" },
+            "source": { "type": "string", "pattern": "^/" }
+          },
+          "unevaluatedProperties": false
+        },
+        { "$ref": "common.schema.json#/$defs/refusal" }
+      ]
+    }
+  }
+}

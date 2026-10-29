@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "update.schema.json",
+  "title": "update response",
+  "description": "Standard output of update in JSON mode: a value or flag set (UPDATE-100), a read (UPDATE-112), an existing child node (UPDATE-120), a created child node (UPDATE-125), or a refusal (COM-040). $defs/base is UpdateResponse (overview 2.1).",
+  "anyOf": [{ "$ref": "#/$defs/linux" }, { "$ref": "#/$defs/noos" }],
+  "$defs": {
+    "base": {
+      "description": "UpdateResponse: a CommonResponse, a created child, or a ReadResponse.",
+      "anyOf": [
+        { "$ref": "common.schema.json#/$defs/common" },
+        { "$ref": "#/$defs/base-child" },
+        { "$ref": "read.schema.json#/$defs/base" }
+      ]
+    },
+    "base-child": {
+      "allOf": [{ "$ref": "common.schema.json#/$defs/common" }],
+      "required": ["path", "missing_required"],
+      "properties": {
+        "path": { "$ref": "common.schema.json#/$defs/node-path" },
+        "missing_required": { "type": "array", "items": { "$ref": "common.schema.json#/$defs/missing-property" } }
+      }
+    },
+    "linux": {
+      "oneOf": [
+        { "$ref": "#/$defs/set" },
+        { "$ref": "read.schema.json#/$defs/read-property" },
+        { "$ref": "read.schema.json#/$defs/read-node", "description": "An existing child, as read <path>/<child> gives it (UPDATE-120)." },
+        { "$ref": "#/$defs/child-created" },
+        { "$ref": "common.schema.json#/$defs/refusal" }
+      ]
+    },
+    "set": {
+      "allOf": [{ "$ref": "common.schema.json#/$defs/done" }],
+      "properties": {
+        "message": {
+          "type": "string",
+          "description": "Set <property> on <path>[; renamed to <key>][; <interrupt-parent detail>], or Set flag <property> on <path>.",
+          "pattern": "^Set (flag )?"
+        },
+        "severity": {
+          "enum": ["info", "warn"],
+          "description": "warn when a warning of UPDATE-040, UPDATE-075, UPDATE-082 or UPDATE-083 was given (UPDATE-100); the diagnostics of UPDATE-015, UPDATE-073 and UPDATE-074 leave it info."
+        }
+      }
+    },
+    "child-created": {
+      "allOf": [{ "$ref": "#/$defs/base-child" }],
+      "properties": {
+        "ok": { "const": true },
+        "message": { "type": "string", "pattern": "^Added .+ to .+$" },
+        "missing_required": { "type": "array", "items": { "$ref": "add.schema.json#/$defs/linux-missing" } },
+        "severity": { "const": "info" }
+      },
+      "unevaluatedProperties": false
+    },
+    "noos": {
+      "anyOf": [
+        {
+          "description": "Where the backend is noos: a value set (UPDATE-520).",
+          "allOf": [{ "$ref": "common.schema.json#/$defs/done" }],
+          "properties": {
+            "message": { "type": "string", "pattern": "^Set [^ ]+\\.[^ ]+ = .*$", "description": "Set <node>.<property> = <value>; a union's value is <member> = <value>." },
+            "severity": { "const": "info" }
+          }
+        },
+        { "$ref": "read.schema.json#/$defs/noos-property", "description": "update <node> <property> with no value reads it (UPDATE-540)." },
+        {
+          "description": "update --suggest (UPDATE-530): the values the property, or the union member, can take, as list value gives them.",
+          "$ref": "list-value.schema.json#/$defs/noos"
+        },
+        { "$ref": "common.schema.json#/$defs/refusal" }
+      ]
+    }
+  }
+}

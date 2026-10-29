@@ -2,7 +2,7 @@
 
 ## About This Package
 
-`attach-lib` is the core, UI-free library for Device Tree Source (DTS) parsing, binding processing, and schema validation. It is consumed by attach-cli (`attach-linux`), which bundles the built `dist/`. Built with Vite (dual ESM/CJS output), tested with Vitest.
+`attach-lib` is the core, UI-free library for Device Tree Source (DTS) parsing, binding processing, and schema validation. It is consumed by the CLI (`packages/cli`, `analog-attach`), which bundles the built `dist/`. Built with Vite (dual ESM/CJS output), tested with Vitest.
 
 `plans/` (gitignored) contains working plans for Claude sessions.
 
@@ -10,7 +10,7 @@
 
 There is no top-level test script that isolates just this package — use `cd packages/attach-lib && yarn test`.
 
-Lint with `yarn lint` (ESLint + unicorn, config in `eslint.config.mjs`, same as attach-cli).
+Lint with `yarn lint` (ESLint + unicorn, config in `eslint.config.mjs`, same as the CLI).
 
 Tests import the package by name (`from 'attach-lib'`) or from `../src`; `vitest.config.ts` aliases `attach-lib` to `src/index.ts`, so they run on the sources and need no build (the scripts below read `dist/`). Some source files also carry inline `import.meta.vitest` doctests (e.g. `src/Bindings/fixups/*.ts`, `src/Attach/Populate.ts`) picked up via `includeSource` in `vitest.config.ts` — these run alongside the `test/*.test.ts` files.
 
@@ -18,9 +18,13 @@ Tests import the package by name (`from 'attach-lib'`) or from `../src`; `vitest
 
 Tests assert what a caller sees, not how a stage gets there: the pipeline stages before the fixups have no tests of their own, `test/PipelineRules.test.ts` writes a small binding for each of their rules and checks what `Attach.parse` gives for it. A rule's test should fail when the rule is disabled (break the code and run it), and a test that only logs or compares a function with the ones it calls is not one. Snapshots are kept for the end results (`process_binding`'s schema, the `ParsedBinding`, the populated properties).
 
-`yarn corpus:diff` (`scripts/corpus-parse.mjs`, needs `yarn build` and the `test/linux` / `test/dt-schema` links, about 40s) parses every binding of the Linux tree and compares a hash of each `ParsedBinding` with `corpus/bindings.json`; it, the repro scripts and the corpus test pass the processed schema of the Linux tree (`<linux>/Documentation/devicetree/bindings/processed-schema.json`, `PROCESSED_SCHEMA=<file>` for another, empty for none) and the baseline records its hash, so generate it first with `attach-cli/bundled/tools/dt-mk-schema -j -o test/linux/Documentation/devicetree/bindings/processed-schema.json test/linux/Documentation/devicetree/bindings` (about 30s); after a pipeline change run it and read the changed files (the script prints a `diff -ru` command), and `yarn corpus` to accept them.
+`yarn corpus:diff` (`scripts/corpus-parse.mjs`, needs `yarn build` and the `test/linux` / `test/dt-schema` links, about 40s) parses every binding of the Linux tree and compares a hash of each `ParsedBinding` with `corpus/bindings.json`; it, the repro scripts and the corpus test pass the processed schema of the Linux tree (`<linux>/Documentation/devicetree/bindings/processed-schema.json`, `PROCESSED_SCHEMA=<file>` for another, empty for none) and the baseline records its hash, so generate it first with `../cli/bundled/linux/tools/dt-mk-schema -j -o test/linux/Documentation/devicetree/bindings/processed-schema.json test/linux/Documentation/devicetree/bindings` (about 30s); after a pipeline change run it and read the changed files (the script prints a `diff -ru` command), and `yarn corpus` to accept them.
 
 `scripts/repros/` has three small scripts for looking at one binding (they read `dist/`, so `yarn build` first, and the `test/linux` / `test/dt-schema` links): `node scripts/repros/property-type.mjs <binding> <property> [--pattern <regex>]` prints the `ParsedBinding` type of a property, and `node scripts/repros/branch.mjs <binding> '<node body>' ...` encodes nodes the way the CLI does and prints the validator input and the `required_properties` left after narrowing (to see whether an `if/then` branch is taken). `node scripts/repros/populate.mjs <binding> [--dts <file>] [--parent <node>] [--json]` populates a binding for the rpi DTS (what the corpus test does for every binding) and prints each property's type, marking the unknown and open ones. `<binding>` is a path under `Documentation/devicetree/bindings`.
+
+### Overlay corpus
+
+`yarn corpus:overlays:diff [filter]` (`corpus/overlays/corpus.mjs`; `yarn build` first) parses every Raspberry Pi overlay of a pinned `analogdevicesinc/linux` checkout (`LINUX_COMMIT`, fetched shallow and sparse on first run into `$CORPUS_CACHE`, default `~/.cache/attach-corpus`; needs network once) against that tree's `bcm2711-rpi-4-b.dts`, and compares the result with `corpus/overlays/snapshots/`; `yarn corpus:overlays` rewrites them. Per overlay it preprocesses with `cpp` (the CLI's default preprocess-command), parses with `DeviceTreeOverlay.new_from_string`, drops `__overrides__`, records `unresolved_targets` / `unresolved_references`, prints and re-parses the overlay as a workfile, records the overlay's `reg_conflicts` / `chip_select_overflows`, and validates the CLI's stand-in tree (`validation-tree.mjs`, a copy of the CLI validate's `build_validation_dts`: keep them in step) with the CLI's bundled dtc and dt-validate (`../cli/bundled/linux/tools`, from `bundle-dt-schema.sh`) against a processed schema that `dt-mk-schema -j` builds once per run. `diff` exits 1 on crashes, new errors, changed parse results or changed warnings/reg data; removed errors only print. A full run takes about 3.5 minutes with 8 jobs (`CORPUS_JOBS`), a filtered one about 30 s, mostly `dt-mk-schema`. It is not part of `yarn test`, verify or CI. What it records comes from dt-validate and the lib's overlay checks, not from the binding property types, so a property-type change (the processed schema's) does not show in it: after that change all 435 snapshots stayed identical although 75 overlays set `sound-dai`. Check such a change with `node corpus/overlays/repros/processed-types.mjs <binding> <property>`. `node corpus/overlays/repros/corpus-class.mjs '<regex>'` lists the snapshot errors of one class, and `corpus/overlays/snapshots/TRIAGE.md` has the baseline's error classes.
 
 ## Architecture
 
@@ -56,7 +60,7 @@ Suggestions for configuring a peripheral, organised as layers of context (bindin
 
 ### Test Layout
 
-`test/linux` and `test/dt-schema` (gitignored) are checkouts of ADI's Linux tree, at the commit `vitest.globalSetup.ts` pins, and of dt-schema, at the commit the CLI bundles (`DTSCHEMA_COMMIT` in `attach-cli/scripts/bundle-dt-schema.sh`), which it clones again when they are at another one. Bumping the CLI's dt-schema therefore changes what the tests resolve against: run them and `yarn corpus:diff` after. The tests read their bindings from the Linux tree and resolve them against both.
+`test/linux` and `test/dt-schema` (gitignored) are checkouts of ADI's Linux tree, at the commit `vitest.globalSetup.ts` pins, and of dt-schema, at the commit the CLI bundles (`DTSCHEMA_COMMIT` in `cli/scripts/bundle-dt-schema.sh`), which it clones again when they are at another one. Bumping the CLI's dt-schema therefore changes what the tests resolve against: run them and `yarn corpus:diff` after. The tests read their bindings from the Linux tree and resolve them against both.
 ## Key Conventions
 
 - No `any` without justification.

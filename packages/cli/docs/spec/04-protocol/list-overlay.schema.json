@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "list-overlay.schema.json",
+  "title": "list overlay response",
+  "description": "Where the backend is linux: standard output of list overlay in JSON mode (LIST-114), or a refusal. The command is the Linux backend's own (overview 2.1), so there is no base or noos shape.",
+  "oneOf": [
+    {
+      "description": "list overlay (LIST-114), in LIST-113's order.",
+      "required": [
+        "overlays"
+      ],
+      "properties": {
+        "ok": {
+          "const": true
+        },
+        "message": {
+          "type": "string",
+          "description": "<n> overlays with <compatible> (LIST-114)."
+        },
+        "severity": {
+          "const": "info"
+        },
+        "overlays": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "name",
+              "path",
+              "fit",
+              "reason"
+            ],
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "The file name, which import and add --template overlay: take."
+              },
+              "path": {
+                "type": "string",
+                "description": "Absolute."
+              },
+              "fit": {
+                "enum": [
+                  "compatible",
+                  "incompatible",
+                  "unknown"
+                ]
+              },
+              "reason": {
+                "type": "string"
+              },
+              "matched": {
+                "type": "string",
+                "description": "The sibling compatible the overlay adds, when it doesn't add the asked one."
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "allOf": [
+        {
+          "$ref": "common.schema.json#/$defs/common"
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    {
+      "$ref": "common.schema.json#/$defs/refusal"
+    }
+  ]
+}
