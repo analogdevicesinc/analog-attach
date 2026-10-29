@@ -1,5 +1,5 @@
 // One run of `analog-attach`: read `backend`, load that backend, open the settings with
-// its specs, build the routes, and run the words. Everything a run touches comes in
+// its section, build the routes, and run the words. Everything a run touches comes in
 // through `MainDeps`, so tests drive it in-process (bin/cli.ts passes the real ones).
 //
 //   - `__complete -- <words>`: the completion lines (complete.ts), nothing on stderr, exit 0.
@@ -88,12 +88,12 @@ function no_backend_message(id: string | undefined, registry: Registry): string 
     return `Unknown backend: ${id}. ${known.length === 0 ? "This build has none." : `Known backends: ${known.join(", ")}.`} Run ${choose}.`;
 }
 
-/** Read `backend`, load it, and open the settings with its specs. */
+/** Read `backend`, load it, and open the settings with its section. */
 async function open_front(deps: MainDeps, json: boolean, root: string): Promise<FrontEnd> {
     const files = settings_files(deps.location);
     const ids = Object.keys(deps.registry);
-    // `backend` first, its value unchecked and the other keys ignored: they are the backend's.
-    const bootstrap = open_settings({ files, specs: [{ ...backend_setting(ids), options: undefined }], unknown_local: "ignore" });
+    // `backend` first, its value unchecked; no section is read yet.
+    const bootstrap = open_settings({ files, top: [{ ...backend_setting(ids), options: undefined }], sections: ids });
     const id = bootstrap.get(BACKEND_KEY);
     const loader = id === undefined || !Object.hasOwn(deps.registry, id) ? undefined : deps.registry[id];
     const backend: Backend | undefined = loader === undefined ? undefined : await loader();
@@ -114,9 +114,10 @@ async function open_front(deps: MainDeps, json: boolean, root: string): Promise<
 
     const settings: SettingsStore = open_settings({
         files,
-        specs: [backend_setting(ids), ...backend?.settings ?? []],
-        // Without a backend, its keys in the local file are no error.
-        unknown_local: backend === undefined ? "ignore" : "error",
+        top: [backend_setting(ids)],
+        sections: ids,
+        // Without a backend no section is read: every section is kept as it is.
+        ...(backend === undefined ? {} : { active: { id: backend.id, specs: backend.settings } }),
         ...(backend?.settings_hooks === undefined ? {} : { hooks: backend.settings_hooks }),
         // The hooks never ask.
         session: () => make_session(json ? "json" : "text", settings),
@@ -446,9 +447,9 @@ if (import.meta.vitest) {
             write_local({ backend: "fake" });
             const set = await run(["config", "syntax", "label"]);
             expect(set).toMatchObject({ code: 0, stderr: "" });
-            expect(read_json(local_file())).toMatchObject({ backend: "fake", syntax: "label" });
+            expect(read_json(local_file())).toEqual({ backend: "fake", fake: { syntax: "label" } });
             expect(await code_of(["config", "chip", "c1", "--global"])).toBe(0);
-            expect(read_json(global_file())).toEqual({ chip: "c1" });
+            expect(read_json(global_file())).toEqual({ fake: { chip: "c1" } });
 
             const get = await run(["config", "syntax", "--json"]);
             expect(JSON.parse(get.stdout)).toMatchObject({ ok: true, configs: [{ field_name: "syntax", value: "label", source: "local" }] });
@@ -461,10 +462,10 @@ if (import.meta.vitest) {
         });
 
         test("--reset removes the key", async () => {
-            write_local({ backend: "fake", syntax: "label" });
+            write_local({ backend: "fake", fake: { syntax: "label", chip: "c" } });
             const reset = await run(["config", "syntax", "--reset"]);
             expect(reset.code).toBe(0);
-            expect(read_json(local_file())).toEqual({ backend: "fake" });
+            expect(read_json(local_file())).toEqual({ backend: "fake", fake: { chip: "c" } });
         });
 
         test("a bad value or an unknown key: exit 2", async () => {
@@ -483,6 +484,80 @@ if (import.meta.vitest) {
             const registry: Registry = { fake: () => Promise.resolve(fake.backend) };
             expect(await stdout_of(["config", "chip", "c2"], { registry })).toBe("Rebuilt (text)\n");
             expect(JSON.parse(await stdout_of(["config", "chip", "c3", "--json"], { registry }))).toMatchObject({ message: "rebuilt for chip" });
+        });
+
+        test("switching the backend keeps both sections; config shows only the active one's", async () => {
+            write_local({ backend: "fake" });
+            expect(await code_of(["config", "syntax", "label"])).toBe(0);
+            expect(await code_of(["config", "backend", "other"])).toBe(0);
+            const other = await run(["config", "--json"]);
+            expect(other.code).toBe(0);
+            const keys = (JSON.parse(other.stdout) as { configs: { field_name: string }[] }).configs.map(entry => entry.field_name);
+            expect(keys).toEqual(["backend", "tree", "modules", "syntax", "board", "chip"]);
+            const entries = (JSON.parse(other.stdout) as { configs: { field_name: string }[] }).configs;
+            expect(entries.find(entry => entry.field_name === "syntax")).toMatchObject({ value: "fragment", source: "default" });
+            expect(await code_of(["config", "syntax", "fragment"])).toBe(0);
+            expect(read_json(local_file())).toEqual({ backend: "other", fake: { syntax: "label" }, other: { syntax: "fragment" } });
+            expect(await code_of(["config", "backend", "fake"])).toBe(0);
+            expect(JSON.parse(await stdout_of(["config", "syntax", "--json"]))).toMatchObject({ configs: [{ value: "label", source: "local" }] });
+        });
+
+        test("a check hook's also lands in the active section of the file written", async () => {
+            write_local({ backend: "fake", other: { chip: "kept" } });
+            expect(await stdout_of(["config", "board", "eval-a"])).toBe("Set board = eval-a (and chip = chip-a)\n");
+            expect(read_json(local_file())).toEqual({ backend: "fake", fake: { board: "eval-a", chip: "chip-a" }, other: { chip: "kept" } });
+            expect(await stdout_of(["config", "board", "eval-b", "--global"])).toBe("Set board = eval-b (global)\n");
+            expect(read_json(global_file())).toEqual({ fake: { board: "eval-b", chip: "chip-b" } });
+        });
+
+        test("an unknown key: in the active section named with it, at the top level as itself; an inactive section's is no error", async () => {
+            write_local({ backend: "fake", fake: { bogus: "x" }, other: { anything: "y" } });
+            const section = await run(["config"]);
+            expect(section).toMatchObject({ code: 2, stdout: "" });
+            expect(section.stderr).toBe([
+                "~/project/.analog-attach/config.json: unknown key fake.bogus",
+                "",
+                "Remove unknown keys from ~/project/.analog-attach/config.json; valid keys in fake are tree, modules, syntax, board, chip.",
+                "",
+            ].join("\n"));
+            write_local({ backend: "fake", color: "blue", other: { anything: "y" } });
+            const top = await run(["--json", "config"]);
+            expect(top.code).toBe(2);
+            expect(JSON.parse(top.stderr)).toEqual({
+                errors: [{ field: "color", kind: "unknown", message: "~/project/.analog-attach/config.json: unknown key color", hint: "Remove unknown keys from ~/project/.analog-attach/config.json; valid top-level keys are backend and the backends' sections fake, other, each an object of that backend's settings." }],
+                hints: ["Remove unknown keys from ~/project/.analog-attach/config.json; valid top-level keys are backend and the backends' sections fake, other, each an object of that backend's settings."],
+            });
+            write_local({ backend: "fake", other: { anything: "y" } });
+            expect(await code_of(["config"])).toBe(0);
+        });
+
+        test("a section that isn't an object is an error, and isn't written into", async () => {
+            write_local({ backend: "fake", fake: "label" });
+            const shown = await run(["config"]);
+            expect(shown.code).toBe(2);
+            expect(shown.stderr).toContain("~/project/.analog-attach/config.json: fake: must be an object\n");
+            const set = await run(["config", "syntax", "label"]);
+            expect(set.code).toBe(2);
+            expect(set.stderr).toContain("~/project/.analog-attach/config.json: fake: must be an object — Output syntax");
+            expect(read_json(local_file())).toEqual({ backend: "fake", fake: "label" });
+        });
+
+        test("an old flat file fails with its keys, unknown at the top level", async () => {
+            write_local({ backend: "fake", tree: "/t", syntax: "label" });
+            const flat = await run(["config"]);
+            expect(flat.code).toBe(2);
+            expect(flat.stderr).toMatch(/^Configuration errors:\n {2}~\/project\/\.analog-attach\/config\.json: unknown key tree\n {2}~\/project\/\.analog-attach\/config\.json: unknown key syntax\n/);
+            expect(flat.stderr).toContain("valid top-level keys are backend and the backends' sections fake, other");
+        });
+
+        test("with no backend set, the sections are kept and not checked", async () => {
+            write_local({ fake: { bogus: 1 }, other: { syntax: "label" } });
+            const shown = await run(["config", "--json"]);
+            expect(shown.code).toBe(0);
+            expect((JSON.parse(shown.stdout) as { configs: unknown[] }).configs).toHaveLength(1);
+            expect(await code_of(["config", "backend", "other"])).toBe(0);
+            expect(read_json(local_file())).toEqual({ backend: "other", fake: { bogus: 1 }, other: { syntax: "label" } });
+            expect(JSON.parse(await stdout_of(["config", "syntax", "--json"]))).toMatchObject({ configs: [{ value: "label" }] });
         });
 
         test("--reload without a hook", async () => {
@@ -577,7 +652,7 @@ if (import.meta.vitest) {
             expect(result.stdout).toContain("Saved backend = fake to ~/project/.analog-attach/config.json.");
             expect(result.stdout).toContain("Saved tree.");
             expect(result.stdout).toMatch(/Created the workfile\n$/);
-            expect(read_json(local_file())).toEqual({ backend: "fake", tree });
+            expect(read_json(local_file())).toEqual({ backend: "fake", fake: { tree } });
         });
 
         test("a setup that isn't ready ends with its outcome; no setup lists the unset required settings", async () => {

@@ -136,7 +136,8 @@ root is `[]`. Two exceptions: the `paths` of a `delete` preview are relative
 | CLI | The `analog-attach` process. |
 | Backend | The ecosystem the project's `backend` setting names: `linux` or `noos` (`02-common.md` COM-013). |
 | Project root | The nearest directory, from the CWD up, with a `.analog-attach/` directory; the CWD when there is none (COM-120). |
-| Settings files | The local `.analog-attach/config.json` under the project root and the global `$XDG_CONFIG_HOME/analog-attach/config.json` (`02-common.md` §8.1). |
+| Settings files | The local `.analog-attach/config.json` under the project root and the global `$XDG_CONFIG_HOME/analog-attach/config.json` (`02-common.md` §8.1). Each is a JSON object with `backend` at the top level and one section per backend. |
+| Section | The object of a settings file named after a backend's id (`"linux": { … }`), holding that backend's settings. The active section is the one of the backend `backend` names; the others are kept and not read (COM-131, COM-135). |
 | State directory | `.analog-attach/<backend>/` under the project root (`.analog-attach/linux/`): the backend's caches and scratch files. |
 | Workspace | The project root with its settings and state directory. |
 | Linux tree | Where the backend is linux: the Linux source tree the `linux` setting names. |

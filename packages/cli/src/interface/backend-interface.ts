@@ -152,11 +152,13 @@ export interface Progress {
 
 /**
  * A setting the backend reads. The front end stores it (JSON, kebab-case keys, local wins
- * over global, D-02), lists it in `analog-attach config`, completes its values and asks
- * for it nowhere on its own: the backend's `setup` decides what the bare `analog-attach`
- * asks.
+ * over global, D-02) in the backend's section of the settings files, an object named after
+ * `Backend.id` (`{ "backend": "linux", "linux": { "devicetree": "…" } }`), so two backends
+ * can each have a `workfile`. It lists it in `analog-attach config`, completes its values
+ * and asks for it nowhere on its own: the backend's `setup` decides what the bare
+ * `analog-attach` asks.
  *
- * `backend` itself is the front end's and never appears in a backend's list.
+ * `backend` itself is the front end's, at the top level, and never appears in a backend's list.
  */
 export interface SettingSpec {
     /** kebab-case, as stored and as `analog-attach config` takes it. */
@@ -179,9 +181,14 @@ export interface SettingSpec {
     hint?: string;
 }
 
+/**
+ * The active backend's settings: its section of each file, plus the front end's `backend`.
+ * Another backend's section is never seen through it, nor changed by it.
+ */
 export interface SettingsView {
     /**
-     * The effective value: local, then global, then the default. Always a string, as on
+     * The effective value: local, then global, then the default, the files layered section
+     * by section. Always a string, as on
      * disk; `numeric` and `bool` are parsed by the reader. Paths are absolute: a local
      * setting's relative path is resolved against the project root (the directory that
      * holds `.analog-attach/`), and a global setting's path is absolute or starts with `~`, since

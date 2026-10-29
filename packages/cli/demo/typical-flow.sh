@@ -123,7 +123,7 @@ fi
 # --- Set up and find the device ---
 
 step "Set up the workspace" \
-    "config saves the backend, the Linux tree, the base devicetree and the workfile's name to .analog-attach/config.json; setting linux builds the binding caches (about a minute, once per Linux tree). init then creates the empty workfile overlay.dtso. (On a terminal, a bare analog-attach asks for all of them, saves them and runs init.)" \
+    "config saves the backend, the Linux tree, the base devicetree and the workfile's name to .analog-attach/config.json (backend at the top, the rest in its "linux" section); setting linux builds the binding caches (about a minute, once per Linux tree). init then creates the empty workfile overlay.dtso. (On a terminal, a bare analog-attach asks for all of them, saves them and runs init.)" \
     "config backend linux" \
     "config linux $LINUX" \
     "config devicetree $BASE" \

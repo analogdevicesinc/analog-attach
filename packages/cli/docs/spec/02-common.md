@@ -198,11 +198,42 @@ that is missing gives no warning. (Open issue C-9.)
 
 ### 8.1 Settings
 
-The settings are flat JSON objects of string values (a `path_list` is an
-array of strings) in two files: the local `.analog-attach/config.json` under
+The settings are in two files: the local `.analog-attach/config.json` under
 the project root, and the global `$XDG_CONFIG_HOME/analog-attach/config.json`
 (`~/.config/analog-attach/config.json` when `XDG_CONFIG_HOME` is unset, empty
-or relative). The keys are kebab-case.
+or relative). Each backend's settings are in their own object of a file, its
+*section*, named after the backend's id; the front end's `backend` is at the
+top level (COM-131):
+
+```json
+{
+  "backend": "linux",
+  "linux": { "linux": "~/linux_rpi", "devicetree": "/home/u/linux_rpi/arch/arm/boot/dts/broadcom/bcm2711-rpi-4-b.dts", "workfile": "/home/u/work/overlay.dtso" },
+  "noos": { "capi-path": "~/capi", "board": "max32655fthr", "platform": "max32655", "workfile": "/home/u/work/workfile.json" }
+}
+```
+
+The keys are kebab-case, and the values strings (a `path_list` is an array
+of strings). The *active section* is the section of the backend that
+`backend` names. Two backends can have a setting of the same name
+(`workfile`): each is its own.
+
+**COM-131** The CLI shall read each settings file as one JSON object whose
+top level has `backend` and, for each known backend (`linux`, `noos`), an
+object named after its id holding that backend's settings. It shall read the
+backend's settings from the active section only. With `backend` unset, or
+naming no known backend, no section is active: the settings are `backend`
+alone (`config.md` CONFIG-010).
+
+**COM-135** The CLI shall neither read nor check a section other than the
+active one, and shall keep it as it is when it writes the file (COM-129).
+`config backend <id>` only changes which section is active
+(`config.md` CONFIG-112), so switching back finds the settings as they were.
+
+A file of the earlier flat format, every key at the top level, is not
+converted: its keys are unknown top-level keys (COM-132), and where the
+backend is linux its `"linux": "<path>"` is a section that isn't an object
+(COM-134).
 
 The front end has one setting, `backend`:
 
@@ -289,30 +320,57 @@ kind: "invalid", message: "<file>: not JSON (<parser message>)" }` (or
 remove <file>.`. `<file>` is the file's path, with the home directory
 written `~`. A missing file is no error: its settings are unset.
 
-**COM-122** If the local file has a key that is neither `backend` nor one of
-the backend's settings, then reading shall report `{ field: <key>, kind:
+**COM-122** *Withdrawn.* (An unknown key of the flat local file: `<file>:
+unknown key <key>`, the hint naming `backend` and the backend's keys. The
+settings are now sectioned: COM-132 for the top level, COM-133 for the
+active section.)
+
+**COM-132** If the local file has a top-level key that is neither `backend`
+nor a known backend's id, then reading shall report `{ field: <key>, kind:
 "unknown", message: "<file>: unknown key <key>" }` with the hint `Remove
-unknown keys from <file>; valid keys are <keys>.`, `<keys>` being `backend`
-and the backend's keys in order, joined with `, `. Unknown keys of the global
-file are kept and ignored, since every backend shares it.
+unknown keys from <file>; valid top-level keys are backend and the backends'
+sections <ids>, each an object of that backend's settings.`, `<ids>` being
+the known backends joined with `, ` (`linux, noos`). Unknown top-level keys
+of the global file are kept and ignored.
+
+**COM-133** If the local file's active section has a key that isn't one of
+the backend's settings, then reading shall report `{ field: "<id>.<key>",
+kind: "unknown", message: "<file>: unknown key <id>.<key>" }` with the hint
+`Remove unknown keys from <file>; valid keys in <id> are <keys>.`, `<id>`
+being the backend's id and `<keys>` its keys in the order of the tables,
+joined with `, `. Unknown keys of the global file's active section are kept
+and ignored.
+
+**COM-134** If a known backend's id at the top level of either file names
+something that isn't a JSON object, then reading shall report `{ field: <id>,
+kind: "invalid", message: "<file>: <id>: must be an object" }` with the hint
+`Make <id> an object in <file>; valid top-level keys are …` worded as in
+COM-132, whether or not the section is active. The CLI shall not write into
+an active section that isn't an object (`config.md` CONFIG-102,
+CONFIG-200); the top level, `backend`, can still be written.
 
 **COM-123** If a value isn't a string, then reading shall report `<file>:
-<key>: must be a string`. If it is the empty string, `<file>: <key>: must not
-be empty`. If a setting with options has another value, `<file>: <key>:
-"<value>" is not one of <a> | <b>`. If a global path is relative, `<file>:
-<key>: "<value>" is relative; a global path must be absolute or start with
-~`. Each is `kind: "invalid"` and carries the field's description and hint.
-The invalid value is left out: the setting has the next layer's value, or
-none.
+<name>: must be a string`. If it is the empty string, `<file>: <name>: must
+not be empty`. If a setting with options has another value, `<file>:
+<name>: "<value>" is not one of <a> | <b>`. If a global path is relative,
+`<file>: <name>: "<value>" is relative; a global path must be absolute or
+start with ~`. `<name>` is `backend` at the top level, and `<id>.<key>` for a
+key of the active section (`linux.devicetree`); the error's `field` is
+`<name>`. Each is `kind: "invalid"` and carries the field's description and
+hint. The invalid value is left out: the setting has the next layer's value,
+or none.
 
 **COM-124** The effective value of a setting shall be the local file's, else
-the global file's, else the default. (Open issue C-3: which commands report
-the problems of COM-121 to COM-123.)
+the global file's, else the default, the files layered section by section: a
+backend's setting is the local file's in its section, else the global file's
+in its section. The source of a value (`config.md` CONFIG-012) is the file it
+comes from. (Open issue C-3: which commands report the problems of COM-121
+to COM-123 and COM-132 to COM-134.)
 
-**COM-125** The CLI shall resolve a relative path of the local file against
-the project root, and a path of either file that starts with `~` against
-the home directory. Reading doesn't check that the path exists; the resource
-that needs it does (COM-127).
+**COM-125** The CLI shall resolve a relative path of the local file, in any
+section, against the project root, and a path of either file that starts
+with `~` against the home directory. Reading doesn't check that the path
+exists; the resource that needs it does (COM-127).
 
 **COM-126** If a command needs a resource whose field is unset, then loading
 shall report `{ kind: "missing", message: "Missing config field <key>" }` with
@@ -331,11 +389,16 @@ being the first of the two it lacks.
 
 **COM-129** When the CLI writes a setting, it shall rewrite that one file
 (the local one, or the global one with `--global`) as a JSON object indented
-by two spaces: `backend` and the backend's settings first, in the order of
-the tables, then every other key the file had, unchanged. It shall create the
-file's directory when it doesn't exist. A path that starts with `~` is
-written as typed; any other local path absolute (resolved against the CWD),
-and a global path as typed. It shall not write over a file of COM-121.
+by two spaces, `backend` at its top level and a backend's setting in the
+active section. The top level has `backend` first, then the sections in the
+order of the known backends (`linux`, `noos`), then every other key the file
+had, unchanged. The active section has the backend's settings in the order
+of the tables, then every other key it had, unchanged; a section left empty
+is removed. The other sections are written as they were (COM-135). It shall
+create the file's directory when it doesn't exist. A path that starts with
+`~` is written as typed; any other local path absolute (resolved against the
+CWD), and a global path as typed. It shall not write over a file of COM-121,
+nor into an active section of COM-134.
 
 ### 8.2 The base devicetree
 
@@ -543,15 +606,16 @@ and the version on standard output with status 0; `analog-attach --json`
 alone writes the usage to standard error with status 2, GRM-008.)
 
 **C-3. Only `config` reports the problems of the settings files.** `config`
-shows the problems of COM-121 to COM-123 (`config.md` CONFIG-102). Every
+shows the problems of COM-121 to COM-123 and COM-132 to COM-134 (`config.md`
+CONFIG-005, CONFIG-102). Every
 other command reads the files and goes on without a word: an unknown key is
 ignored, an invalid value is left out (COM-123), so `devicetree = 5` is
 reported as `Missing config field devicetree`, and a local file that isn't
-JSON gives `No backend is set` (COM-014) instead of the parse error. A key of
-another backend, left when `config backend` switches, makes `config` refuse
-to show the fields (`config.md` CF-8). A fix would be to report the files'
-problems as configuration errors (COM-071, COM-072) in every command that
-loads the workspace.
+JSON gives `No backend is set` (COM-014) instead of the parse error; so
+does an old flat file whose `linux` isn't an object (COM-134), as `Missing
+config field linux`. A fix would be to report the files' problems as
+configuration errors (COM-071, COM-072) in every command that loads the
+workspace.
 
 **C-4. The preprocessor check is `<tool> --version`.** A tool that exists but
 has no `--version`, or exits non-zero for it (`false`, some wrappers), is

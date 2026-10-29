@@ -187,7 +187,8 @@ if (import.meta.vitest) {
             const files = settings_files({ cwd: base, home: path.join(base, "home") });
             const settings = open_settings({
                 files,
-                specs: [backend_setting(["fake"]), ...backend.settings],
+                top: [backend_setting(["fake"])],
+                active: { id: backend.id, specs: backend.settings },
                 hooks: backend.settings_hooks,
                 session: () => session,
             });

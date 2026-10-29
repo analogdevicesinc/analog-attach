@@ -170,7 +170,7 @@ export interface LinuxFixture {
     readonly linux: string;
     /** The project's state directory, where the Linux backend keeps its caches. */
     state_directory(): string;
-    /** `.analog-attach/config.json` with `backend: linux` and these values. */
+    /** `.analog-attach/config.json` with `backend: linux` and these values in its `linux` section. */
     write_settings(values: Record<string, string>): void;
     /** A binding YAML in the Linux tree, under `Documentation/devicetree/bindings/<relative>`, for `compatibles`; in the caches `write_caches` writes next. */
     write_binding(relative: string, yaml: string, compatibles: readonly string[]): void;
@@ -218,7 +218,7 @@ export function create_linux_fixture(): LinuxFixture {
         state_directory,
         write_settings(values) {
             fs.mkdirSync(path.join(project, ".analog-attach"), { recursive: true });
-            fs.writeFileSync(path.join(project, ".analog-attach", "config.json"), JSON.stringify({ backend: "linux", ...values }, undefined, 2));
+            fs.writeFileSync(path.join(project, ".analog-attach", "config.json"), JSON.stringify({ backend: "linux", linux: values }, undefined, 2));
         },
         write_binding,
         write_caches() {

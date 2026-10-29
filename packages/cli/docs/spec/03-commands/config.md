@@ -2,8 +2,8 @@
 
 Shows the settings and their values, sets or resets one, or rebuilds the
 backend's caches. `config` is the front end's: it works with no backend set
-(COM-013), and the settings it knows are `backend` and the backend's
-(`02-common.md` §8.1). Where the backend is linux, setting `linux` also
+(COM-013), and the settings it knows are `backend` and those of the
+backend's section of the settings files (`02-common.md` §8.1, COM-131). Where the backend is linux, setting `linux` also
 builds the binding caches. Where the backend is noos, writing a setting
 checks it against the checkouts on disk, and setting `board` or `platform`
 can write the other (§9).
@@ -26,7 +26,7 @@ Grammar: rule `config` in `01-grammar.abnf`.
 
 | Argument | Meaning | Default |
 |---|---|---|
-| `<key>` | A setting: `backend`, or one of the backend's. | none: every setting (§3) |
+| `<key>` | A setting: `backend`, or one of the backend's (in its section, COM-131). | none: every setting (§3) |
 | `<value>` | The value to set (§4); several only for a `path_list`. | none: show the setting |
 | `--global` | Set or reset in the global settings file instead of the local one (§8). | off |
 | `--reset` | Remove `<key>` from the settings file (§6). | off |
@@ -68,16 +68,19 @@ the caches with `--reload` (§7).
 ## 3. Showing settings
 
 **CONFIG-005** When showing, the CLI shall read both settings files and,
-when they have problems (COM-121 to COM-123), report them as an input error:
+when they have problems (COM-121 to COM-123, COM-132 to COM-134), report
+them as an input error:
 in human mode COM-072's text, in JSON mode an object conforming to
 `config-error.schema.json` (each error with its `hint`), on standard error
 with status 2, and do nothing else. It needs no other resource: an unset or
-wrong path is shown, not reported. (Was CONFIGGET-001. Open issue CF-8.)
+wrong path is shown, not reported. A section other than the active one is
+not read (COM-135), so its keys are no problem. (Was CONFIGGET-001.)
 
 **CONFIG-010** Without `<key>`, the CLI shall show every setting: `backend`,
-then the backend's, in the order of the tables in `02-common.md` §8.1. With
-no backend set, that is `backend` alone. With `<key>`, it shall show that
-setting only.
+then the backend's, in the order of the tables in `02-common.md` §8.1, their
+values from the active section (COM-124); another backend's section is not
+shown. With no backend set, that is `backend` alone. With `<key>`, it shall
+show that setting only.
 
 **CONFIG-011** *Withdrawn.* (`config-get` ignored a name that wasn't a field;
 `config` refuses it, CONFIG-101.)
@@ -142,9 +145,10 @@ setting:
 ## 4. Setting a field
 
 `config <key> <value>` writes the local settings file, or the global one
-with `--global` (§8). It doesn't use workspace loading (COM-070): it is how a
-broken configuration gets fixed, so problems of COM-122 and COM-123 in the
-files don't stop it.
+with `--global` (§8): `backend` at the top level, the backend's settings in
+its section (COM-129). It doesn't use workspace loading (COM-070): it is how
+a broken configuration gets fixed, so problems of COM-123, COM-132 and
+COM-133 in the files don't stop it.
 
 The checks apply in this order; the first that fails is an input error
 (COM-031) and nothing is written. A refused value is written as
@@ -152,7 +156,9 @@ The checks apply in this order; the first that fails is an input error
 when it has one.
 
 **CONFIG-102** If the file to write can't be read or isn't a JSON object
-(COM-121), then the CLI shall report its message as a refused value. (Open
+(COM-121), or the setting is the backend's and the file's active section
+isn't an object (COM-134), then the CLI shall report its message as a
+refused value: `<file>: <id>: must be an object — <description>`. (Open
 issue CF-4.)
 
 **CONFIG-107** If the setting isn't a `path_list` and more than one
@@ -187,7 +193,13 @@ A path that starts with `~` is stored as typed, in either file, and
 expanded when read (COM-125); any other local path is stored absolute.
 
 **CONFIG-110** The CLI shall write the setting (COM-129), a local path made
-absolute unless it starts with `~`, and keep the other keys.
+absolute unless it starts with `~`, and keep the other keys and the other
+sections.
+
+**CONFIG-112** When the setting is `backend`, the CLI shall write it at the
+top level and leave every section as it is (COM-135). The settings of the
+backend it names are then those its section holds: none for a backend that
+was never configured here, the earlier ones for a backend switched back to.
 
 **CONFIG-111** The CLI shall then answer `Set <key> = <value>`, `<value>` as
 given (not made absolute; several joined with `, `), followed by ` (global)`
@@ -225,16 +237,19 @@ write that answer.
 
 ## 6. Resetting a field
 
-Like setting, resetting doesn't use workspace loading, so problems of COM-122
-and COM-123 in the files don't stop it.
+Like setting, resetting doesn't use workspace loading, so problems of COM-123,
+COM-132 and COM-133 in the files don't stop it.
 
 **CONFIG-200** If the file to write can't be read or isn't a JSON object
-(COM-121), then the CLI shall report its message as an input error, and
-write nothing.
+(COM-121), or the setting is the backend's and the file's active section
+isn't an object (COM-134), then the CLI shall report its message as an input
+error, and write nothing.
 
 **CONFIG-201** The CLI shall remove `<key>` from the local file, or the
-global one with `--global`, and keep the other keys, unknown ones included,
-in the order of COM-129. Resetting a setting that isn't set is not an error.
+global one with `--global` (a backend's setting from the active section),
+and keep the other keys, unknown ones included, and the other sections, in
+the order of COM-129. Resetting a setting that isn't set is not an error;
+the same key in another backend's section is not that setting.
 
 **CONFIG-202** The CLI shall then answer `Reset <key>`, then ` (global)`
 with `--global`, then what applies now: ` (still set in the <scope> config:
@@ -273,8 +288,8 @@ output.
 ## 8. `--global`
 
 **CONFIG-140** With `--global`, the CLI shall set or reset the setting in the
-global settings file (`02-common.md` §8.1), and leave the local file as it
-is. A local value of the same setting still wins (COM-124): `config
+global settings file (`02-common.md` §8.1), a backend's setting in the
+backend's section of it, and leave the local file as it is. A local value of the same setting still wins (COM-124): `config
 overlay-syntax --reset` then answers `Reset overlay-syntax (still set in the
 global config: label)`, and the global value shows with source `global`.
 
@@ -318,9 +333,10 @@ sets: capi, capi-iio` for a name, `Template set '<value>' has no
 'project_structure.json' (looked in '<value>')` for a directory.
 
 **CONFIG-505** When the setting is `board`, the CLI shall also write
-`platform` with the chip the board carries, to the same file. When the
-setting is `platform` and `board` is set to a board that carries another
-chip, the CLI shall also remove `board` from the same file. The answer of
+`platform` with the chip the board carries, to the same file and section
+(`noos`). When the setting is `platform` and `board` is set to a board that
+carries another chip, the CLI shall also remove `board` from the same file
+and section. The answer of
 CONFIG-111 then ends with ` (and <changes>)`, one entry per other setting
 whose effective value changed, joined with `, `: `platform = <chip>`, or
 `reset board`. A write that changes nothing else has no such ending.
@@ -375,12 +391,10 @@ file` (COM-127). Nor is a `.dts` or `.dtso` extension checked.
 while the file gets the absolute path. `linux` and a new `workfile` are
 echoed absolute (CONFIG-111, CONFIG-121).
 
-**CF-8. Switching backends leaves keys that block `config`.** `config backend
-noos` in a Linux project keeps `linux`, `devicetree`, … in the local file.
-They are now unknown keys (COM-122), so `config` refuses to show anything
-(`Configuration errors:` and the unknown keys, status 2) until they are
-removed by hand or the backend is switched back. Other commands ignore them
-(`02-common.md` C-3).
+**CF-8.** *Fixed.* (Switching backends left the other backend's keys in the
+flat file, where they were unknown keys that made `config` refuse to show
+anything. Each backend's settings are now in their own section, COM-131,
+COM-135, CONFIG-112.)
 
 **CF-9. The table's hints aren't merged.** With `linux` and `devicetree`
 unset, `config` writes two setup hints (`Run 'analog-attach' on a terminal,
@@ -489,11 +503,50 @@ Indexed 18052 compatibles from 5197 bindings and compiled binding schemas in 1m 
 ```
 
 ```
-$ analog-attach --json config            # the local file also has "bogus": "x"
-{"errors":[{"field":"bogus","kind":"unknown","message":"~/work/.analog-attach/config.json: unknown key bogus",
- "hint":"Remove unknown keys from ~/work/.analog-attach/config.json; valid keys are backend, linux, devicetree, workfile, overlay-syntax, preprocess-command, deploy-ip, deploy-user, deploy-password."}],
- "hints":["Remove unknown keys from ~/work/.analog-attach/config.json; valid keys are backend, linux, devicetree, workfile, overlay-syntax, preprocess-command, deploy-ip, deploy-user, deploy-password."]}
+$ analog-attach --json config            # the local file's linux section also has "bogus": "x"
+{"errors":[{"field":"linux.bogus","kind":"unknown","message":"~/work/.analog-attach/config.json: unknown key linux.bogus",
+ "hint":"Remove unknown keys from ~/work/.analog-attach/config.json; valid keys in linux are linux, devicetree, workfile, overlay-syntax, preprocess-command, deploy-ip, deploy-user, deploy-password."}],
+ "hints":["Remove unknown keys from ~/work/.analog-attach/config.json; valid keys in linux are linux, devicetree, workfile, overlay-syntax, preprocess-command, deploy-ip, deploy-user, deploy-password."]}
                                                    (stderr, exit 2)
+```
+
+A file of the earlier flat format (COM-131):
+
+```
+$ cat .analog-attach/config.json
+{ "backend": "linux", "linux": "/home/u/linux_rpi", "devicetree": "/home/u/base.dts" }
+$ analog-attach config
+Configuration errors:
+  ~/work/.analog-attach/config.json: linux: must be an object
+  ~/work/.analog-attach/config.json: unknown key devicetree
+
+Make linux an object in ~/work/.analog-attach/config.json; valid top-level keys are backend and the backends' sections linux, noos, each an object of that backend's settings.
+Remove unknown keys from ~/work/.analog-attach/config.json; valid top-level keys are backend and the backends' sections linux, noos, each an object of that backend's settings.
+                                                   (stderr, exit 2)
+```
+
+Switching backends keeps both sections:
+
+```
+$ analog-attach config backend noos
+Set backend = noos
+$ analog-attach config board testboard
+Set board = testboard (and platform = testsoc)
+$ analog-attach config backend linux
+Set backend = linux
+$ cat .analog-attach/config.json
+{
+  "backend": "linux",
+  "linux": {
+    "devicetree": "/home/u/base.dts",
+    "workfile": "/home/u/work/overlay.dtso"
+  },
+  "noos": {
+    "capi-path": "/home/u/capi",
+    "board": "testboard",
+    "platform": "testsoc"
+  }
+}
 ```
 
 ```

@@ -8,7 +8,8 @@
 //
 // After a set or reset the backend's `settings_hooks.changed` runs, and its outcome, when it
 // gives one, takes the place of the front end's answer (decision 10). Without a backend,
-// `config` still knows `backend` itself.
+// `config` still knows `backend` itself. The keys it shows and writes are the top level's
+// `backend` and the active backend's section (settings-store.ts).
 
 import {
     answer, input_error,
@@ -318,7 +319,11 @@ export function config_route(front: FrontEnd): Route {
 Settings are read from the project's .analog-attach/config.json (in this directory or
 the nearest one above that has .analog-attach/), then from the global
 ~/.config/analog-attach/config.json. A write goes to the project's file, or with
---global to the global one.`,
+--global to the global one.
+
+Each backend's settings are kept in their own section of a file, an object named
+after the backend ("linux": { ... }). The keys shown and written are those of the
+active backend; switching backend leaves the other's section as it is.`,
         examples: ["config", "config backend", `config backend ${Object.keys(front.registry)[0] ?? "<id>"}`, "config <key> --reset", "config --reload"],
         group: "setup",
         positionals: [

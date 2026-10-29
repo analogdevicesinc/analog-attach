@@ -138,7 +138,7 @@ if (import.meta.vitest) {
         fs.writeFileSync(dts, "/dts-v1/;\n/ {\n};\n");
         const work = path.join(root, "work");
         fs.mkdirSync(work);
-        const settings = open_settings({ files: settings_files({ cwd: work, home: path.join(root, "home") }), specs: SETTINGS });
+        const settings = open_settings({ files: settings_files({ cwd: work, home: path.join(root, "home") }), active: { id: "linux", specs: SETTINGS } });
         const stdout = capture_stream();
         const session = create_session({
             program: "aa", mode: "text", cwd: work, project_root: work, backend_id: "linux", assets_dir: path.join(root, "assets"), settings,

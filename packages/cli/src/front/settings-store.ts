@@ -1,13 +1,20 @@
 // The settings files behind `SettingsView`: a project-local `.analog-attach/config.json`
 // and a global `$XDG_CONFIG_HOME/analog-attach/config.json`. Local wins over global, then
-// the `SettingSpec` default. Each file is one flat JSON object with kebab-case keys; the
-// values are strings, except a `path_list`, which is an array of strings.
+// the `SettingSpec` default. Each file is one JSON object: the front end's `backend` at the
+// top level, and each backend's settings in an object named after its id (its section):
+//
+//   { "backend": "linux", "linux": { "devicetree": "…", "workfile": "overlay.dtso" }, "noos": { … } }
+//
+// Only the active backend's section is read, and the files layer section by section. The
+// other sections are kept as they are. Keys are kebab-case; the values are strings, except
+// a `path_list`, which is an array of strings.
 //
 // The parse is strict, as attach-cli's `parse_settings` was: a file that isn't a JSON object,
-// a value of the wrong type or outside its options, and (in the local file) a key the active
-// backend doesn't declare are errors. Errors are values: a store always opens, carries its
-// errors, and leaves an invalid value out of the effective ones, so `config` can still fix
-// the file. A file that isn't a JSON object is never written over.
+// a section that isn't an object, a value of the wrong type or outside its options, and (in
+// the local file) a key that is neither the top level's nor the active backend's are errors.
+// Errors are values: a store always opens, carries its errors, and leaves an invalid value
+// out of the effective ones, so `config` can still fix the file. A file that isn't a JSON
+// object is never written over, nor a section that isn't one written into.
 
 import * as fs from "node:fs";
 import os from "node:os";
@@ -126,15 +133,43 @@ function expand_tilde(raw: string, home: string): string {
 
 type Value = string | readonly string[];
 
+/** The active backend: its id names its section, its specs are the keys there. */
+export interface ActiveSection {
+    id: string;
+    specs: readonly SettingSpec[];
+}
+
+/** What a file may hold: the top level's keys, the sections, and which section is read. */
+interface Shape {
+    top: readonly SettingSpec[];
+    /** Every registered backend's id, the active one included. */
+    sections: readonly string[];
+    active?: ActiveSection;
+}
+
 interface Layer {
     scope: Scope;
     file: string;
-    /** The whole object as on disk, unknown and invalid keys included, so a save keeps them. */
+    /** The whole object as on disk, unknown keys and the other sections included, so a save keeps them. */
     table: Record<string, unknown>;
-    /** The valid values of declared keys, paths resolved. */
+    /** The valid values of declared keys (the top level's and the active section's), paths resolved. */
     values: Map<string, Value>;
     /** Why the file can't be read or written over: not JSON, or not an object. */
     unreadable?: string;
+    /** Why the active section can't be written into: it isn't an object. */
+    bad_section?: string;
+}
+
+function is_object(value: unknown): value is Record<string, unknown> {
+    return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/** `valid top-level keys are backend and the backends' sections linux, noos, …`, for hints. */
+function valid_top_keys(shape: Shape): string {
+    const keys = shape.top.map(spec => spec.key);
+    if (shape.sections.length === 0) { return `valid top-level keys are ${keys.length === 0 ? "none" : keys.join(", ")}`; }
+    const sections = `the backends' sections ${shape.sections.join(", ")}, each an object of that backend's settings`;
+    return `valid top-level keys are ${keys.length === 0 ? sections : `${keys.join(", ")} and ${sections}`}`;
 }
 
 /** A path as stored → absolute, or why it can't be. */
@@ -174,7 +209,14 @@ function parse_stored(spec: SettingSpec, raw: unknown, scope: Scope, files: Sett
     return spec.type === "path" ? resolve_stored_path(raw, scope, files) : raw;
 }
 
-function read_layer(scope: Scope, files: SettingsFiles, specs: readonly SettingSpec[], errors: ConfigError[]): Layer {
+/**
+ * One file. The top level has the front end's keys and one object per registered backend
+ * (its section). Only the active section is read; the others are kept as they are. An
+ * unknown key, at the top level or in the active section, is an error in the local file
+ * only: the global one is shared by every project, and its unknown keys are kept and
+ * ignored. A wrong type is an error in either file, a section that isn't an object too.
+ */
+function read_layer(scope: Scope, files: SettingsFiles, shape: Shape, errors: ConfigError[]): Layer {
     const file = scope === "local" ? files.local : files.global;
     const shown = display_path(file, files.home);
     const layer: Layer = { scope, file, table: {}, values: new Map() };
@@ -195,7 +237,7 @@ function read_layer(scope: Scope, files: SettingsFiles, specs: readonly SettingS
     } catch (error) {
         layer.unreadable = `${shown}: not JSON (${error instanceof Error ? error.message : String(error)})`;
     }
-    if (layer.unreadable === undefined && (typeof parsed !== "object" || parsed === null || Array.isArray(parsed))) {
+    if (layer.unreadable === undefined && !is_object(parsed)) {
         layer.unreadable = `${shown}: not a JSON object`;
     }
     if (layer.unreadable !== undefined) {
@@ -203,29 +245,65 @@ function read_layer(scope: Scope, files: SettingsFiles, specs: readonly SettingS
         return layer;
     }
 
+    /** A declared key's value, `name` being how messages write it (`linux.devicetree` in a section). */
+    const read_value = (spec: SettingSpec, name: string, raw: unknown): void => {
+        const value = parse_stored(spec, raw, scope, files);
+        if (typeof value === "string" || Array.isArray(value)) {
+            layer.values.set(spec.key, value);
+        } else {
+            errors.push({ field: name, kind: "invalid", message: `${shown}: ${name}: ${(value as { problem: string }).problem}`, description: spec.description, hint: spec.hint });
+        }
+    };
+
     layer.table = parsed as Record<string, unknown>;
     for (const [key, raw] of Object.entries(layer.table)) {
-        const spec = specs.find(candidate => candidate.key === key);
-        if (spec === undefined) {
-            // The global file is shared by every backend: another one's keys are kept and ignored.
-            if (scope === "local") {
-                errors.push({
-                    field: key,
-                    kind: "unknown",
-                    message: `${shown}: unknown key ${key}`,
-                    hint: `Remove unknown keys from ${shown}; valid keys are ${specs.map(s => s.key).join(", ")}.`,
-                });
+        if (shape.sections.includes(key)) {
+            if (!is_object(raw)) {
+                const message = `${shown}: ${key}: must be an object`;
+                if (key === shape.active?.id) { layer.bad_section = message; }
+                errors.push({ field: key, kind: "invalid", message, hint: `Make ${key} an object in ${shown}; ${valid_top_keys(shape)}.` });
             }
             continue;
         }
-        const value = parse_stored(spec, raw, scope, files);
-        if (typeof value === "string" || Array.isArray(value)) {
-            layer.values.set(key, value);
-        } else {
-            errors.push({ field: key, kind: "invalid", message: `${shown}: ${key}: ${(value as { problem: string }).problem}`, description: spec.description, hint: spec.hint });
+        const spec = shape.top.find(candidate => candidate.key === key);
+        if (spec !== undefined) {
+            read_value(spec, key, raw);
+        } else if (scope === "local") {
+            errors.push({ field: key, kind: "unknown", message: `${shown}: unknown key ${key}`, hint: `Remove unknown keys from ${shown}; ${valid_top_keys(shape)}.` });
+        }
+    }
+
+    const { active } = shape;
+    const section = active === undefined ? undefined : layer.table[active.id];
+    if (active !== undefined && is_object(section)) {
+        for (const [key, raw] of Object.entries(section)) {
+            const name = `${active.id}.${key}`;
+            const spec = active.specs.find(candidate => candidate.key === key);
+            if (spec !== undefined) {
+                read_value(spec, name, raw);
+            } else if (scope === "local") {
+                errors.push({
+                    field: name,
+                    kind: "unknown",
+                    message: `${shown}: unknown key ${name}`,
+                    hint: `Remove unknown keys from ${shown}; valid keys in ${active.id} are ${active.specs.map(s => s.key).join(", ")}.`,
+                });
+            }
         }
     }
     return layer;
+}
+
+/** `table`'s keys in `order` first, then the rest as they were. */
+function ordered(table: Readonly<Record<string, unknown>>, order: readonly string[]): Record<string, unknown> {
+    const result: Record<string, unknown> = {};
+    for (const key of order) {
+        if (table[key] !== undefined) { result[key] = table[key]; }
+    }
+    for (const [key, value] of Object.entries(table)) {
+        if (!(key in result)) { result[key] = value; }
+    }
+    return result;
 }
 
 // =====================================================================================
@@ -234,20 +312,22 @@ function read_layer(scope: Scope, files: SettingsFiles, specs: readonly SettingS
 
 export interface SettingsStore extends SettingsView {
     readonly files: SettingsFiles;
+    /** Every key the store knows: the top level's, then the active section's. */
     readonly specs: readonly SettingSpec[];
+    /** The active section's id, undefined when no backend is active. */
+    readonly section: string | undefined;
     /** What the last read of the files found wrong. Empty when both files are valid. */
     readonly errors: readonly ConfigError[];
 }
 
 export interface OpenSettingsOptions {
     files: SettingsFiles;
-    /** Every key the local file may have: the front end's (`backend_setting`) and the active backend's. */
-    specs: readonly SettingSpec[];
-    /**
-     * `ignore`: a local key not in `specs` is no error (reading `backend` before the backend,
-     * and so its keys, is known). Default `error`.
-     */
-    unknown_local?: "error" | "ignore";
+    /** The top level's keys: the front end's own (`backend_setting`). */
+    top?: readonly SettingSpec[];
+    /** The registered backends' ids: the top level may have a section, an object, for each. */
+    sections?: readonly string[];
+    /** The active backend, whose section the store reads and writes. Unset: no section is active. */
+    active?: ActiveSection;
     hooks?: SettingsHooks;
     /** The session the hooks get. Needed only when a hook runs. */
     session?: () => Session;
@@ -255,19 +335,26 @@ export interface OpenSettingsOptions {
 
 /** Read both files into a store. Never throws on what the files hold: see `errors`. */
 export function open_settings(options: OpenSettingsOptions): SettingsStore {
-    const { files, specs, hooks } = options;
+    const { files, hooks, active } = options;
+    const top = options.top ?? [];
+    const sections = [...options.sections ?? []];
+    if (active !== undefined && !sections.includes(active.id)) { sections.push(active.id); }
+    const shape: Shape = { top, sections, ...(active === undefined ? {} : { active }) };
+    const specs: readonly SettingSpec[] = [...top, ...active?.specs ?? []];
+
     let errors: ConfigError[] = [];
     const layers: Record<Scope, Layer> = {} as Record<Scope, Layer>;
 
     const reload = (): void => {
-        const found: ConfigError[] = [];
-        layers.local = read_layer("local", files, specs, found);
-        layers.global = read_layer("global", files, specs, found);
-        errors = options.unknown_local === "ignore" ? found.filter(error => error.kind !== "unknown") : found;
+        errors = [];
+        layers.local = read_layer("local", files, shape, errors);
+        layers.global = read_layer("global", files, shape, errors);
     };
     reload();
 
     const spec_of = (key: string): SettingSpec | undefined => specs.find(spec => spec.key === key);
+    /** Where a declared key is stored. */
+    const in_section = (key: string): boolean => !top.some(spec => spec.key === key);
     const session = (): Session => {
         if (options.session === undefined) { throw new Error("settings hooks need a session"); }
         return options.session();
@@ -275,30 +362,45 @@ export function open_settings(options: OpenSettingsOptions): SettingsStore {
 
     const effective = (key: string): Value | undefined => layers.local.values.get(key) ?? layers.global.values.get(key);
 
-    /** Write `patch` into the scope's file; an `undefined` value removes the key. */
+    /** Write `patch` into the scope's file; an `undefined` value removes the key. Section keys go in the active section. */
     const write = (scope: Scope, patch: Readonly<Record<string, Value | undefined>>): SettingWrite => {
         const layer = layers[scope];
         if (layer.unreadable !== undefined) { return { ok: false, message: layer.unreadable }; }
-        const merged: Record<string, unknown> = { ...layer.table };
+        const table: Record<string, unknown> = { ...layer.table };
+        const apply = (target: Record<string, unknown>, key: string, value: Value | undefined): void => {
+            if (value === undefined) { delete target[key]; } else { target[key] = value; }
+        };
+        const section_patch = Object.entries(patch).filter(([key]) => in_section(key));
+        if (section_patch.length > 0) {
+            if (active === undefined) { throw new Error(`no backend is active to write ${section_patch.map(([key]) => key).join(", ")}`); }
+            if (layer.bad_section !== undefined) { return { ok: false, message: layer.bad_section }; }
+            const current = layer.table[active.id];
+            const section: Record<string, unknown> = { ...is_object(current) ? current : {} };
+            for (const [key, value] of section_patch) { apply(section, key, value); }
+            // The section's declared keys in spec order, then the rest as they were, so the next read still reports them.
+            const written = ordered(section, active.specs.map(spec => spec.key));
+            if (Object.keys(written).length === 0) { delete table[active.id]; } else { table[active.id] = written; }
+        }
         for (const [key, value] of Object.entries(patch)) {
-            if (value === undefined) { delete merged[key]; } else { merged[key] = value; }
+            if (!in_section(key)) { apply(table, key, value); }
         }
-        // Declared keys in spec order, then the rest as they were, so the next read still reports them.
-        const ordered: Record<string, unknown> = {};
-        for (const spec of specs) {
-            if (merged[spec.key] !== undefined) { ordered[spec.key] = merged[spec.key]; }
-        }
-        for (const [key, value] of Object.entries(merged)) {
-            if (!(key in ordered)) { ordered[key] = value; }
-        }
+        // The top level's keys, then the sections in registry order, then the rest as they were.
+        const text = JSON.stringify(ordered(table, [...top.map(spec => spec.key), ...sections]), undefined, 2);
         try {
             fs.mkdirSync(path.dirname(layer.file), { recursive: true });
-            fs.writeFileSync(layer.file, `${JSON.stringify(ordered, undefined, 2)}\n`);
+            fs.writeFileSync(layer.file, `${text}\n`);
         } catch (error) {
             return { ok: false, message: `${display_path(layer.file, files.home)}: ${error instanceof Error ? error.message : String(error)}` };
         }
         reload();
         return { ok: true, file: layer.file };
+    };
+
+    /** Whether the scope's file holds `key` where the store reads it. */
+    const stored_in = (layer: Layer, key: string): boolean => {
+        if (!in_section(key)) { return key in layer.table; }
+        const section = active === undefined ? undefined : layer.table[active.id];
+        return is_object(section) && key in section;
     };
 
     /** A path as typed → what is stored, or why it is refused. A local relative path is the cwd's, stored absolute. */
@@ -343,9 +445,11 @@ export function open_settings(options: OpenSettingsOptions): SettingsStore {
         return spec.type === "path" ? stored_path(value, scope, spec) : value;
     };
 
+    const unknown_setting = (key: string): SettingWrite => ({ ok: false, message: `Unknown setting ${key}; valid keys are ${specs.map(s => s.key).join(", ")}.` });
+
     const set = async (key: string, value: Value, scope: Scope = "local"): Promise<SettingWrite> => {
         const spec = spec_of(key);
-        if (spec === undefined) { return { ok: false, message: `Unknown setting ${key}; valid keys are ${specs.map(s => s.key).join(", ")}.` }; }
+        if (spec === undefined) { return unknown_setting(key); }
         const checked = await check_value(spec, value, scope);
         if (typeof checked !== "string" && !Array.isArray(checked)) { return { ok: false, message: `${key}: ${(checked as { problem: string }).problem}` }; }
 
@@ -371,6 +475,7 @@ export function open_settings(options: OpenSettingsOptions): SettingsStore {
     return {
         files,
         specs,
+        section: active?.id,
         get errors() { return errors; },
         get(key) {
             const spec = spec_of(key);
@@ -397,10 +502,11 @@ export function open_settings(options: OpenSettingsOptions): SettingsStore {
         },
         set,
         reset(key, scope = "local") {
-            if (spec_of(key) === undefined) { return Promise.resolve({ ok: false, message: `Unknown setting ${key}; valid keys are ${specs.map(s => s.key).join(", ")}.` }); }
+            if (spec_of(key) === undefined) { return Promise.resolve(unknown_setting(key)); }
             const layer = layers[scope];
             // Nothing to remove: no file is created for it.
-            if (layer.unreadable === undefined && !(key in layer.table)) { return Promise.resolve({ ok: true, file: layer.file }); }
+            const blocked = layer.unreadable !== undefined || (in_section(key) && layer.bad_section !== undefined);
+            if (!blocked && !stored_in(layer, key)) { return Promise.resolve({ ok: true, file: layer.file }); }
             return Promise.resolve(write(scope, { [key]: undefined }));
         },
     };
@@ -420,8 +526,10 @@ if (import.meta.vitest) {
     });
     afterEach(() => { fs.rmSync(base, { recursive: true, force: true }); });
 
+    const IDS = ["fake", "other"];
+    const TOP: readonly SettingSpec[] = [backend_setting(IDS)];
+    /** The `fake` section's keys. */
     const SPECS: readonly SettingSpec[] = [
-        backend_setting(["fake", "other"]),
         { key: "tree", category: "Sources", description: "A tree", type: "path", required: true, must_exist: true, hint: "Set tree." },
         { key: "modules", category: "Sources", description: "Modules", type: "path_list", required: false },
         { key: "syntax", category: "Output", description: "Syntax", type: "string", options: ["a", "b"], required: false, default: "a" },
@@ -431,6 +539,13 @@ if (import.meta.vitest) {
         { key: "jobs", category: "Output", description: "Jobs", type: "numeric", required: false },
         { key: "workfile", category: "Workfile", description: "Workfile", type: "path", required: false, default: "workfile.json" },
     ];
+    /** The `other` section's keys. */
+    const OTHER: readonly SettingSpec[] = [
+        { key: "workfile", category: "Workfile", description: "Other's workfile", type: "path", required: false },
+        { key: "capi", category: "Sources", description: "Capi", type: "string", required: false },
+    ];
+    const LOCAL = "~/work/project/.analog-attach/config.json";
+    const GLOBAL = "~/.config/analog-attach/config.json";
 
     const write_json = (file: string, value: unknown): void => {
         fs.mkdirSync(path.dirname(file), { recursive: true });
@@ -438,7 +553,9 @@ if (import.meta.vitest) {
     };
     const read_json = (file: string): unknown => JSON.parse(fs.readFileSync(file, "utf8"));
     const files_at = (cwd = project): SettingsFiles => settings_files({ cwd, home, xdg_config_home: path.join(home, ".config") });
-    const open = (cwd = project, extra: Partial<OpenSettingsOptions> = {}): SettingsStore => open_settings({ files: files_at(cwd), specs: SPECS, ...extra });
+    const open = (cwd = project, extra: Partial<OpenSettingsOptions> = {}): SettingsStore =>
+        open_settings({ files: files_at(cwd), top: TOP, sections: IDS, active: { id: "fake", specs: SPECS }, ...extra });
+    const open_other = (): SettingsStore => open(project, { active: { id: "other", specs: OTHER } });
 
     describe("find_project_root", () => {
         test("the nearest ancestor with .analog-attach/, the cwd included", () => {
@@ -476,79 +593,219 @@ if (import.meta.vitest) {
         expect(settings_files({ cwd: project, home }).local).toBe(path.join(project, ".analog-attach", "config.json"));
     });
 
-    test("layering - local wins over global, then the default", () => {
-        const files = files_at();
-        write_json(files.global, { syntax: "b", chip: "g" });
-        write_json(files.local, { chip: "l" });
-        const store = open();
-        expect(store.errors).toEqual([]);
-        expect(store.get("chip")).toBe("l");
-        expect(store.origin("chip")).toEqual({ scope: "local", file: files.local });
-        expect(store.get("syntax")).toBe("b");
-        expect(store.origin("syntax")).toEqual({ scope: "global", file: files.global });
-        expect(store.get("verbose")).toBe("false");
-        expect(store.origin("verbose")).toBe("default");
-        expect(store.get("jobs")).toBeUndefined();
-        expect(store.origin("jobs")).toBe("unset");
-        expect(store.get("nope")).toBeUndefined();
+    describe("layering", () => {
+        test("local wins over global, then the default, section by section", () => {
+            const files = files_at();
+            write_json(files.global, { backend: "other", fake: { syntax: "b", chip: "g" } });
+            write_json(files.local, { backend: "fake", fake: { chip: "l" } });
+            const store = open();
+            expect(store.errors).toEqual([]);
+            expect(store.section).toBe("fake");
+            expect(store.get(BACKEND_KEY)).toBe("fake");
+            expect(store.get("chip")).toBe("l");
+            expect(store.origin("chip")).toEqual({ scope: "local", file: files.local });
+            expect(store.get("syntax")).toBe("b");
+            expect(store.origin("syntax")).toEqual({ scope: "global", file: files.global });
+            expect(store.get("verbose")).toBe("false");
+            expect(store.origin("verbose")).toBe("default");
+            expect(store.get("jobs")).toBeUndefined();
+            expect(store.origin("jobs")).toBe("unset");
+            expect(store.get("nope")).toBeUndefined();
+        });
+
+        test("a key of one section never stands in for the same key of another", () => {
+            const files = files_at();
+            write_json(files.global, { fake: { workfile: "~/g-fake.json" }, other: { workfile: "~/g-other.json" } });
+            write_json(files.local, { other: { workfile: "l-other.json" } });
+            const fake = open();
+            expect(fake.get("workfile")).toBe(path.join(home, "g-fake.json"));
+            expect(fake.origin("workfile")).toMatchObject({ scope: "global" });
+            const other = open_other();
+            expect(other.get("workfile")).toBe(path.join(project, "l-other.json"));
+            expect(other.origin("workfile")).toMatchObject({ scope: "local" });
+            // A section the local file lacks is the global's whole.
+            write_json(files.local, {});
+            expect(open().get("workfile")).toBe(path.join(home, "g-fake.json"));
+        });
+
+        test("the top level's keys aren't read in a section, nor a section's at the top level", () => {
+            const files = files_at();
+            write_json(files.local, { chip: "top", fake: { backend: "fake" } });
+            const store = open();
+            expect(store.get("chip")).toBeUndefined();
+            expect(store.get(BACKEND_KEY)).toBeUndefined();
+            expect(store.errors.map(error => error.message)).toEqual([`${LOCAL}: unknown key chip`, `${LOCAL}: unknown key fake.backend`]);
+        });
+
+        test("with no active backend, no section is read", () => {
+            const files = files_at();
+            write_json(files.local, { backend: "fake", fake: { chip: 5, bogus: "x" }, other: { anything: true } });
+            const store = open(project, { active: undefined });
+            expect(store.errors).toEqual([]);
+            expect(store.section).toBeUndefined();
+            expect(store.specs.map(spec => spec.key)).toEqual([BACKEND_KEY]);
+            expect(store.get("chip")).toBeUndefined();
+        });
     });
 
-    test("strict parse - a file that isn't a JSON object names the file, and is never written over", async () => {
-        const files = files_at();
-        write_json(files.local, "{ not json");
-        write_json(files.global, "[1]");
-        const store = open();
-        expect(store.errors.map(error => error.message)).toEqual([
-            expect.stringMatching(/^~\/work\/project\/\.analog-attach\/config\.json: not JSON/),
-            "~/.config/analog-attach/config.json: not a JSON object",
-        ]);
-        const write = await store.set("chip", "x");
-        expect(write.ok).toBe(false);
-        expect(fs.readFileSync(files.local, "utf8")).toBe("{ not json");
+    describe("strict parse", () => {
+        test("a file that isn't a JSON object names the file, and is never written over", async () => {
+            const files = files_at();
+            write_json(files.local, "{ not json");
+            write_json(files.global, "[1]");
+            const store = open();
+            expect(store.errors.map(error => error.message)).toEqual([
+                expect.stringMatching(/^~\/work\/project\/\.analog-attach\/config\.json: not JSON/),
+                `${GLOBAL}: not a JSON object`,
+            ]);
+            const write = await store.set("chip", "x");
+            expect(write.ok).toBe(false);
+            expect(fs.readFileSync(files.local, "utf8")).toBe("{ not json");
+        });
+
+        test("bad value types and options are errors named with their section, and the value isn't effective", () => {
+            const files = files_at();
+            write_json(files.local, { backend: 5, fake: { chip: 5, syntax: "c", verbose: "yes", jobs: "x", modules: "a:b", workfile: "" } });
+            const store = open();
+            expect(store.errors.map(error => [error.field, error.kind])).toEqual([
+                ["backend", "invalid"],
+                ["fake.chip", "invalid"], ["fake.syntax", "invalid"], ["fake.verbose", "invalid"], ["fake.jobs", "invalid"], ["fake.modules", "invalid"], ["fake.workfile", "invalid"],
+            ]);
+            expect(store.errors[0]!.message).toBe(`${LOCAL}: backend: must be a string`);
+            expect(store.errors[2]).toMatchObject({ message: `${LOCAL}: fake.syntax: "c" is not one of a | b`, description: "Syntax" });
+            expect(store.get("syntax")).toBe("a");
+            expect(store.origin("syntax")).toBe("default");
+        });
+
+        test("an unknown key in the active section is an error in the local file, named with its section; the global's is kept", async () => {
+            const files = files_at();
+            write_json(files.local, { fake: { "other-key": "x" } });
+            write_json(files.global, { fake: { "noos-key": "y", chip: "g" } });
+            const store = open();
+            expect(store.errors).toEqual([{
+                field: "fake.other-key",
+                kind: "unknown",
+                message: `${LOCAL}: unknown key fake.other-key`,
+                hint: `Remove unknown keys from ${LOCAL}; valid keys in fake are tree, modules, syntax, board, chip, verbose, jobs, workfile.`,
+            }]);
+
+            expect(await store.set("syntax", "b", "global")).toMatchObject({ ok: true });
+            expect(read_json(files.global)).toEqual({ fake: { syntax: "b", chip: "g", "noos-key": "y" } });
+            expect(Object.keys((read_json(files.global) as { fake: object }).fake)).toEqual(["syntax", "chip", "noos-key"]);
+            // The local file keeps its unknown key too, so the next read still reports it.
+            expect(await store.set("chip", "l")).toMatchObject({ ok: true });
+            expect(read_json(files.local)).toEqual({ fake: { chip: "l", "other-key": "x" } });
+            expect(store.errors).toHaveLength(1);
+        });
+
+        test("an inactive section is neither read nor checked, and is kept as it is", async () => {
+            const files = files_at();
+            const other = { workfile: 5, "not-a-key": ["x"], capi: "" };
+            write_json(files.local, { backend: "fake", other });
+            const store = open();
+            expect(store.errors).toEqual([]);
+            expect(await store.set("chip", "c")).toMatchObject({ ok: true });
+            expect(read_json(files.local)).toEqual({ backend: "fake", fake: { chip: "c" }, other });
+            // Active, it is checked.
+            expect(open_other().errors.map(error => error.message)).toEqual([
+                `${LOCAL}: other.workfile: must be a string`,
+                `${LOCAL}: unknown key other.not-a-key`,
+                `${LOCAL}: other.capi: must not be empty`,
+            ]);
+        });
+
+        test("an unknown top-level key is an error in the local file; the global's is kept and ignored", async () => {
+            const files = files_at();
+            write_json(files.local, { backend: "fake", zephyr: {} });
+            write_json(files.global, { color: "blue" });
+            const store = open();
+            expect(store.errors).toEqual([{
+                field: "zephyr",
+                kind: "unknown",
+                message: `${LOCAL}: unknown key zephyr`,
+                hint: `Remove unknown keys from ${LOCAL}; valid top-level keys are backend and the backends' sections fake, other, each an object of that backend's settings.`,
+            }]);
+            expect(await store.set("chip", "g", "global")).toMatchObject({ ok: true });
+            expect(read_json(files.global)).toEqual({ fake: { chip: "g" }, color: "blue" });
+        });
+
+        test("a section that isn't an object is an error in either file, active or not; the active one is never written into", async () => {
+            const files = files_at();
+            write_json(files.local, { backend: "fake", fake: "~/tree", other: ["x"] });
+            write_json(files.global, { fake: [] });
+            const store = open();
+            expect(store.errors.map(error => [error.field, error.kind, error.message])).toEqual([
+                ["fake", "invalid", `${LOCAL}: fake: must be an object`],
+                ["other", "invalid", `${LOCAL}: other: must be an object`],
+                ["fake", "invalid", `${GLOBAL}: fake: must be an object`],
+            ]);
+            expect(store.errors[0]!.hint).toBe(`Make fake an object in ${LOCAL}; valid top-level keys are backend and the backends' sections fake, other, each an object of that backend's settings.`);
+            expect(await store.set("chip", "c")).toEqual({ ok: false, message: `${LOCAL}: fake: must be an object` });
+            expect(await store.reset("chip")).toEqual({ ok: false, message: `${LOCAL}: fake: must be an object` });
+            // The top level can still be written.
+            expect(await store.set(BACKEND_KEY, "other")).toMatchObject({ ok: true });
+            expect(read_json(files.local)).toEqual({ backend: "other", fake: "~/tree", other: ["x"] });
+        });
+
+        test("an old flat file fails with its keys at the top level", () => {
+            const files = files_at();
+            write_json(files.local, { backend: "fake", tree: "/t", chip: "c", syntax: "b" });
+            const store = open();
+            expect(store.errors.map(error => [error.field, error.kind, error.message])).toEqual([
+                ["tree", "unknown", `${LOCAL}: unknown key tree`],
+                ["chip", "unknown", `${LOCAL}: unknown key chip`],
+                ["syntax", "unknown", `${LOCAL}: unknown key syntax`],
+            ]);
+            expect(store.get("chip")).toBeUndefined();
+            expect(store.get(BACKEND_KEY)).toBe("fake");
+        });
     });
 
-    test("strict parse - bad value types and options are errors, and the value isn't effective", () => {
-        const files = files_at();
-        write_json(files.local, { chip: 5, syntax: "c", verbose: "yes", jobs: "x", modules: "a:b", workfile: "" });
-        const store = open();
-        expect(store.errors.map(error => [error.field, error.kind])).toEqual([
-            ["chip", "invalid"], ["syntax", "invalid"], ["verbose", "invalid"], ["jobs", "invalid"], ["modules", "invalid"], ["workfile", "invalid"],
-        ]);
-        expect(store.errors[1]!.message).toBe("~/work/project/.analog-attach/config.json: syntax: \"c\" is not one of a | b");
-        expect(store.get("syntax")).toBe("a");
-        expect(store.origin("syntax")).toBe("default");
-    });
+    describe("save", () => {
+        test("the top level's keys, then the sections in registry order, each section's keys in spec order", async () => {
+            const files = files_at();
+            write_json(files.local, { zeta: 1, other: { capi: "c" } });
+            const store = open();
+            await store.set("jobs", "4");
+            await store.set("chip", "c");
+            await store.set(BACKEND_KEY, "fake");
+            expect(fs.readFileSync(store.files.local, "utf8")).toBe(
+                `{\n  "backend": "fake",\n  "fake": {\n    "chip": "c",\n    "jobs": "4"\n  },\n  "other": {\n    "capi": "c"\n  },\n  "zeta": 1\n}\n`,
+            );
+        });
 
-    test("strict parse - a local unknown key is an error; a global one is ignored and kept on save", async () => {
-        const files = files_at();
-        write_json(files.local, { "other-key": "x" });
-        write_json(files.global, { "noos-key": "y", chip: "g" });
-        const store = open();
-        expect(store.errors).toHaveLength(1);
-        expect(store.errors[0]).toMatchObject({ field: "other-key", kind: "unknown" });
-        expect(store.errors[0]!.message).toBe("~/work/project/.analog-attach/config.json: unknown key other-key");
-        expect(open(project, { unknown_local: "ignore" }).errors).toEqual([]);
+        test("switching the backend keeps both sections, and each store sees only its own", async () => {
+            const files = files_at();
+            fs.mkdirSync(path.join(project, "t"));
+            const fake = open();
+            expect(await fake.set("tree", "t")).toMatchObject({ ok: true });
+            expect(await fake.set("workfile", "fake.json")).toMatchObject({ ok: true });
+            expect(await fake.set(BACKEND_KEY, "other")).toMatchObject({ ok: true });
+            const other = open_other();
+            expect(other.errors).toEqual([]);
+            expect(other.get("workfile")).toBeUndefined();
+            expect(await other.set("workfile", "other.json")).toMatchObject({ ok: true });
+            expect(await other.set(BACKEND_KEY, "fake")).toMatchObject({ ok: true });
+            expect(read_json(files.local)).toEqual({
+                backend: "fake",
+                fake: { tree: path.join(project, "t"), workfile: path.join(project, "fake.json") },
+                other: { workfile: path.join(project, "other.json") },
+            });
+            expect(open().get("workfile")).toBe(path.join(project, "fake.json"));
+        });
 
-        expect(await store.set("syntax", "b", "global")).toMatchObject({ ok: true });
-        expect(Object.keys(read_json(files.global) as object)).toEqual(["syntax", "chip", "noos-key"]);
-        // The local file keeps its unknown key too, so the next read still reports it.
-        expect(await store.set("chip", "l")).toMatchObject({ ok: true });
-        expect(read_json(files.local)).toEqual({ chip: "l", "other-key": "x" });
-        expect(store.errors).toHaveLength(1);
-    });
-
-    test("save - keys are written in spec order", async () => {
-        const store = open();
-        await store.set("jobs", "4");
-        await store.set("chip", "c");
-        await store.set(BACKEND_KEY, "fake");
-        expect(fs.readFileSync(store.files.local, "utf8")).toBe(`{\n  "backend": "fake",\n  "chip": "c",\n  "jobs": "4"\n}\n`);
+        test("resetting a section's last key removes the section", async () => {
+            const files = files_at();
+            write_json(files.local, { backend: "fake", fake: { chip: "c" } });
+            expect(await open().reset("chip")).toMatchObject({ ok: true });
+            expect(read_json(files.local)).toEqual({ backend: "fake" });
+        });
     });
 
     describe("paths", () => {
         test("a local relative path resolves against the project root, ~ against home", () => {
             const files = files_at();
-            write_json(files.local, { tree: "../tree", workfile: "~/w.json", modules: ["m1", "/abs/m2", "~"] });
+            write_json(files.local, { fake: { tree: "../tree", workfile: "~/w.json", modules: ["m1", "/abs/m2", "~"] } });
             const nested = path.join(project, "sub");
             fs.mkdirSync(nested);
             const store = open(nested);
@@ -566,16 +823,16 @@ if (import.meta.vitest) {
 
         test("a global relative path is an error on read, and refused on write", async () => {
             const files = files_at();
-            write_json(files.global, { workfile: "w.json", modules: ["/ok", "rel"] });
+            write_json(files.global, { fake: { workfile: "w.json", modules: ["/ok", "rel"] } });
             const store = open();
-            expect(store.errors.map(error => error.field)).toEqual(["workfile", "modules"]);
-            expect(store.errors[0]!.message).toContain("a global path must be absolute or start with ~");
+            expect(store.errors.map(error => error.field)).toEqual(["fake.workfile", "fake.modules"]);
+            expect(store.errors[0]!.message).toBe(`${GLOBAL}: fake.workfile: "w.json" is relative; a global path must be absolute or start with ~`);
             expect(store.get("workfile")).toBe(path.join(project, "workfile.json"));
 
             const refused = await store.set("workfile", "x.json", "global");
             expect(refused).toEqual({ ok: false, message: "workfile: \"x.json\" is relative; a global path must be absolute or start with ~" });
             expect(await store.set("workfile", "~/x.json", "global")).toMatchObject({ ok: true });
-            expect((read_json(files.global) as Record<string, unknown>)["workfile"]).toBe("~/x.json");
+            expect(read_json(files.global)).toEqual({ fake: { modules: ["/ok", "rel"], workfile: "~/x.json" } });
         });
 
         test("set - a local relative path is the cwd's, stored absolute; must_exist is checked", async () => {
@@ -589,6 +846,7 @@ if (import.meta.vitest) {
             expect(await store.set("modules", "one")).toEqual({ ok: false, message: "modules: takes a list of paths" });
             expect(await store.set("modules", ["a", "~/b"])).toMatchObject({ ok: true });
             expect(store.paths("modules")).toEqual([path.join(nested, "a"), path.join(home, "b")]);
+            expect(read_json(store.files.local)).toEqual({ fake: { tree: path.join(nested, "t"), modules: [path.join(nested, "a"), "~/b"] } });
         });
     });
 
@@ -609,7 +867,7 @@ if (import.meta.vitest) {
         expect(find_project_root(path.join(project), home)).toBe(project);
     });
 
-    test("set - dynamic options and the check hook's also, in one save", async () => {
+    test("set - dynamic options and the check hook's also, in one save into the active section", async () => {
         const calls: string[] = [];
         const hooks: SettingsHooks = {
             options: (key) => { calls.push(`options ${key}`); return Promise.resolve(["b1", "b2"]); },
@@ -621,13 +879,14 @@ if (import.meta.vitest) {
                 return Promise.resolve({ ok: true });
             },
         };
+        write_json(files_at().local, { backend: "fake", other: { capi: "x" } });
         const store = open(project, { hooks, session: () => ({}) as Session });
         expect(await store.set("board", "b3")).toEqual({ ok: false, message: "board: \"b3\" is not one of b1 | b2" });
         expect(await store.set("chip", "bad")).toEqual({ ok: false, message: "bad chip" });
         expect(await store.set("board", "b1")).toMatchObject({ ok: true });
-        expect(read_json(store.files.local)).toEqual({ board: "b1", chip: "c1" });
+        expect(read_json(store.files.local)).toEqual({ backend: "fake", fake: { board: "b1", chip: "c1" }, other: { capi: "x" } });
         expect(await store.set("board", "b2")).toMatchObject({ ok: true });
-        expect(read_json(store.files.local)).toEqual({ board: "b2" });
+        expect(read_json(store.files.local)).toEqual({ backend: "fake", fake: { board: "b2" }, other: { capi: "x" } });
         expect(store.get("chip")).toBeUndefined();
         expect(calls).toEqual(["options board", "check chip=bad", "options board", "check board=b1", "options board", "check board=b2"]);
     });
@@ -638,14 +897,17 @@ if (import.meta.vitest) {
         expect(await store.reset("chip")).toEqual({ ok: true, file: files.local });
         expect(fs.existsSync(files.local)).toBe(false);
 
-        write_json(files.global, { chip: "g", "noos-key": 1 });
-        write_json(files.local, { chip: "l", syntax: "b" });
+        write_json(files.global, { fake: { chip: "g", "noos-key": 1 }, other: { chip: "kept" } });
+        write_json(files.local, { fake: { chip: "l", syntax: "b" } });
         const loaded = open();
         expect(await loaded.reset("chip")).toMatchObject({ ok: true });
-        expect(read_json(files.local)).toEqual({ syntax: "b" });
+        expect(read_json(files.local)).toEqual({ fake: { syntax: "b" } });
         expect(loaded.get("chip")).toBe("g");
         expect(await loaded.reset("chip", "global")).toMatchObject({ ok: true });
-        expect(read_json(files.global)).toEqual({ "noos-key": 1 });
+        expect(read_json(files.global)).toEqual({ fake: { "noos-key": 1 }, other: { chip: "kept" } });
         expect(loaded.origin("chip")).toBe("unset");
+        // A key only another section has is nothing to remove.
+        expect(await loaded.reset("syntax", "global")).toMatchObject({ ok: true });
+        expect(read_json(files.global)).toEqual({ fake: { "noos-key": 1 }, other: { chip: "kept" } });
     });
 }

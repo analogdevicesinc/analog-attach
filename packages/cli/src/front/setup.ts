@@ -59,16 +59,25 @@ function unset_required(backend: Backend, front: FrontEnd): Outcome<SetupRespons
     return answer({ ok: true, message, severity: "warn", saved: [], ready: false }, text);
 }
 
+/** What the bare run can't save over: a settings file that isn't a JSON object, or an active section that isn't one. */
+function unwritable(front: FrontEnd): Outcome<never> | undefined {
+    const { settings } = front;
+    const errors = settings.errors.filter(error => error.field === CONFIG_FILE || (error.kind === "invalid" && error.field === settings.section));
+    return errors.length === 0 ? undefined : config_errors(errors, false);
+}
+
 /** The bare run. `reopen` reads the settings and loads the backend again, once `backend` is saved. */
 export async function bare_run(front: FrontEnd, reopen: () => Promise<FrontEnd>): Promise<Outcome<unknown>> {
-    // A settings file that isn't JSON stops it before anything is asked (exit 2); a bad key is saved over.
-    const unreadable = front.settings.errors.filter(error => error.field === CONFIG_FILE);
-    if (unreadable.length > 0) { return config_errors(unreadable, false); }
+    // These stop it before anything is asked (exit 2); a bad key is saved over.
+    const before = unwritable(front);
+    if (before !== undefined) { return before; }
     let current = front;
     if (current.backend === undefined) {
         const chosen = await choose_backend(current, reopen);
         if ("kind" in chosen) { return chosen; }
         current = chosen;
+        const after = unwritable(current);
+        if (after !== undefined) { return after; }
     }
     const backend = current.backend!;
     if (backend.setup === undefined) { return unset_required(backend, current); }

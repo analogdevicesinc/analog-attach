@@ -18,6 +18,8 @@
   },
   "scripts": {
     "build": "scripts/bundle-dt-schema.sh && tsc -p src/tsconfig.json && tsup --silent && rm -rf bundled/noos/templates && mkdir -p bundled/noos && cp -r ../attach-no-os-lib/src/codegen/templates bundled/noos/templates",
+    "dev-link": "yarn build && chmod +x dist/cli.js && mkdir -p \"$HOME/.local/bin\" && ln -sf \"$(pwd)/dist/cli.js\" \"$HOME/.local/bin/analog-attach\" && echo \"analog-attach linked to $HOME/.local/bin/analog-attach\"",
+    "dev-unlink": "rm -f \"$HOME/.local/bin/analog-attach\" && echo \"Removed $HOME/.local/bin/analog-attach\"",
     "clean": "rm -rf dist tsconfig.tsbuildinfo node_modules",
     "lint": "eslint src",
     "test": "vitest"
