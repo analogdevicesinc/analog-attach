@@ -38,7 +38,7 @@ function make_array(element: ArrayProperty['element'], value?: unknown): ArrayPr
     return { _t: "ArrayProperty", name: "test_prop", description: "", size: 4, element, value };
 }
 
-function make_union(members: IncludeProperty[], value?: Record<string, string>): UnionProperty {
+function make_union(members: IncludeProperty[], value?: Record<string, string | null>): UnionProperty {
     return { _t: "UnionProperty", name: "test_prop", description: "", members, value };
 }
 
@@ -163,6 +163,11 @@ describe('get_symbol_references', () => {
 
         test('an unset union references nothing', () => {
             expect(get_symbol_references(make_union([{ ...make_include(), name: "spi_init" }]))).toEqual([]);
+        });
+
+        // `update <node> <union> <member>` chooses the member before its value.
+        test('a member chosen with no value yet references nothing', () => {
+            expect(get_symbol_references(make_union([{ ...make_include(), name: "i2c_init" }], { i2c_init: null }))).toEqual([]);
         });
     });
 
