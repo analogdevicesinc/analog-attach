@@ -93,7 +93,9 @@ function flag_candidates(route: Route, committed: readonly string[]): Completion
     const candidates: Candidate[] = Object.entries(route.flags)
         .filter(([name, spec]) => spec.hidden !== true && (spec.kind === "values" || !used.has(`--${name}`)))
         .map(([name, spec]) => ({ value: `--${name}`, description: spec.brief }));
-    candidates.push({ value: "--help", description: "Print help information and exit" });
+    // --json is taken out of the words before parsing, so no route declares it, but it goes anywhere
+    // (complete_words drops it once it was typed).
+    candidates.push(GLOBAL_FLAGS[0]!, { value: "--help", description: "Print help information and exit" });
     return { candidates };
 }
 
@@ -149,11 +151,15 @@ export async function complete_words(front: FrontEnd, routes: readonly Route[], 
     const dequoted = words.map(word => shell_dequote(word));
     const prefix = dequoted.at(-1) ?? "";
     let committed = dequoted.slice(0, -1);
+    // --json counts wherever it was typed, before the command too: it isn't offered twice.
+    const json_given = committed.includes("--json");
+    const without_json = (completion: Completion): Completion =>
+        json_given ? { ...completion, candidates: completion.candidates.filter(candidate => candidate.value !== "--json") } : completion;
 
     // Global flags before the command are skipped (COMPL-020).
     const start = committed.findIndex(word => !word.startsWith("-"));
     if (start === -1) {
-        if (prefix.startsWith("-")) { return completion_lines({ candidates: [...GLOBAL_FLAGS] }, prefix); }
+        if (prefix.startsWith("-")) { return completion_lines(without_json({ candidates: [...GLOBAL_FLAGS] }), prefix); }
         return completion_lines({ candidates: [...next_segments(routes, []).map(({ name, brief }) => ({ value: name, description: brief })), { value: "help", description: "Print help for a command" }] }, prefix);
     }
     committed = committed.slice(start);
@@ -173,7 +179,7 @@ export async function complete_words(front: FrontEnd, routes: readonly Route[], 
         // The words after the route's last segment.
         let seen = 0;
         const after = committed.findIndex(word => !is_flag_word(word) && ++seen === found.used);
-        return completion_lines(await complete_route(front, found.route, committed.slice(after + 1), prefix, session), prefix);
+        return completion_lines(without_json(await complete_route(front, found.route, committed.slice(after + 1), prefix, session)), prefix);
     } catch {
         return [];
     }
