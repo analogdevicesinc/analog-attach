@@ -133,9 +133,8 @@ eco_checkout() {
 	refute_output --partial "Which board?"
 }
 
-# bats test_tags=req:SETUP-04, gap
+# bats test_tags=req:SETUP-04
 @test "without a terminal, the bare run says which required settings are missing" {
-	# Gap: it shows the help only, and doesn't name the missing capi-path and target.
 	drop_setting capi-path target
 	run timeout 30 node "$CLI_DIR/dist/cli.js" </dev/null
 	assert_success

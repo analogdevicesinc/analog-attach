@@ -120,6 +120,15 @@ export function driver_root(driver: string): Result<string> {
 	return ok(only);
 }
 
+/** What `--as` takes for a driver: each interface it can be added as, with the handle that adds it. */
+export function driver_interfaces(driver: string): Result<{ interface: string, root: string }[]> {
+	const roots = driver_roots(driver);
+	if (!roots.ok) {
+		return roots;
+	}
+	return ok(roots.value.flatMap(root => driver_interfaces_of(root).map(interface_ => ({ interface: interface_, root }))));
+}
+
 /** The root a driver is added through for one of the interfaces it provides: `add ad74413r --as dac`. */
 export function driver_root_for(driver: string, interface_: string): Result<string> {
 	const roots = driver_roots(driver);

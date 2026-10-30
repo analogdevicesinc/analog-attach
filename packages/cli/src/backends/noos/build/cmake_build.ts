@@ -152,37 +152,41 @@ function tool_version(command: string, arguments_: string[]): string | undefined
  * the tools, the capi checkout, and the platform toolchain's environment.
  */
 export function preflight(plan: BuildPlan, capi_path: string): Result<void> {
+	// Every problem at once, so one run says all there is to fix (BUILD-02).
+	const problems: { message: string, path: string }[] = [];
 	const cmake = tool_version("cmake", ["--version"]);
 	if (cmake === undefined) {
-		return error(`cmake was not found on PATH. Install CMake ${REQUIRED_CMAKE.join(".")} or newer.`, "cmake");
-	}
-	const version = /(\d+)\.(\d+)\.(\d+)/.exec(cmake);
-	if (version) {
-		const found = [Number(version[1]), Number(version[2]), Number(version[3])];
-		const as_number = (parts: readonly number[]) => (parts[0] ?? 0) * 1_000_000 + (parts[1] ?? 0) * 1000 + (parts[2] ?? 0);
-		if (as_number(found) < as_number(REQUIRED_CMAKE)) {
-			return error(`CMake ${found.join(".")} is too old; CAPI apps need ${REQUIRED_CMAKE.join(".")} or newer.`, "cmake");
+		problems.push({ message: `cmake was not found on PATH. Install CMake ${REQUIRED_CMAKE.join(".")} or newer.`, path: "cmake" });
+	} else {
+		const version = /(\d+)\.(\d+)\.(\d+)/.exec(cmake);
+		if (version) {
+			const found = [Number(version[1]), Number(version[2]), Number(version[3])];
+			const as_number = (parts: readonly number[]) => (parts[0] ?? 0) * 1_000_000 + (parts[1] ?? 0) * 1000 + (parts[2] ?? 0);
+			if (as_number(found) < as_number(REQUIRED_CMAKE)) {
+				problems.push({ message: `CMake ${found.join(".")} is too old; CAPI apps need ${REQUIRED_CMAKE.join(".")} or newer.`, path: "cmake" });
+			}
 		}
 	}
 
 	// The generated preset names Ninja as its generator.
 	if (tool_version("ninja", ["--version"]) === undefined) {
-		return error("ninja was not found on PATH, and the generated preset uses it as the generator. Install it (apt install ninja-build).", "ninja");
+		problems.push({ message: "ninja was not found on PATH, and the generated preset uses it as the generator. Install it (apt install ninja-build).", path: "ninja" });
 	}
 
 	if (!fs.existsSync(path.join(capi_path, SDK_ENTRY))) {
-		return error(`${capi_path} is not a capi checkout: it has no ${SDK_ENTRY}. Check the capi-path setting.`, "capi_path");
+		problems.push({ message: `${capi_path} is not a capi checkout: it has no ${SDK_ENTRY}. Check the capi-path setting.`, path: "capi_path" });
 	}
 
 	const required = PLATFORM_ENVIRONMENT[plan.platform];
 	if (required !== undefined) {
 		const value = plan.environment[required.variable];
 		if (value === undefined || !fs.existsSync(value)) {
-			return error(`${required.variable} is ${value === undefined ? "not set" : `'${value}', which does not exist`}. ${required.hint}`, required.variable);
+			problems.push({ message: `${required.variable} is ${value === undefined ? "not set" : `'${value}', which does not exist`}. ${required.hint}`, path: required.variable });
 		}
 	}
 
-	return ok();
+	const [first] = problems;
+	return first === undefined ? ok() : error(problems.map(problem => problem.message).join(" "), first.path);
 }
 
 export type CommandResult = { exit_code: number };

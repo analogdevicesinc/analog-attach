@@ -25,13 +25,11 @@ fake_flash() {
 	[ ! -e "$PROJECT/out" ]
 }
 
-# bats test_tags=req:DEPLOY-01, gap
+# bats test_tags=req:DEPLOY-01
 @test "deploy of a project that was never built says to build it first" {
 	aa generate >/dev/null
 	fake_flash
 	run_json deploy
-	# Gap: deploy doesn't check for a built image; it goes on to the flash step (here the
-	# deploy-command, which runs) without a word about building.
 	assert_json '.ok' false
 	assert_json '.message | test("build")' true
 	[ ! -e "$PROJECT/out/project/deployed.txt" ]
@@ -57,6 +55,9 @@ fake_flash() {
 @test "deploy accepts --probe openocd and --probe jlink" {
 	aa generate >/dev/null
 	fake_flash
+	# A build step of the user's own: deploy can't tell where it puts the image, so it doesn't
+	# ask for one (the project here is never built).
+	aa config build-command true >/dev/null
 	local probe
 	for probe in openocd jlink; do
 		rm -f "$PROJECT/out/project/deployed.txt"

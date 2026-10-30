@@ -106,7 +106,7 @@ export { attach_eval_board, bootstrap, pin_driver, referenced_nodes } from "./bo
 export { find_eval_board_module, list_eval_boards } from "./registry/eval_boards";
 export type { BootstrapOptions, BootstrapReport, BusWiring, ChipSelectDecision, FilledValue, FillSource, LinkedReference, OpenChoice } from "./bootstrap/bootstrap";
 export { format_number_in } from "./ruleset_parser/number_format";
-export { driver_roots, driver_root, driver_root_for, driver_iio_root, list_drivers, addable_drivers } from "./registry/roots";
+export { driver_roots, driver_root, driver_root_for, driver_iio_root, driver_interfaces, list_drivers, addable_drivers } from "./registry/roots";
 export { generate_project } from "./codegen/codegen";
 export type { CodegenInput, CodegenResult } from "./codegen/types";
 export {
