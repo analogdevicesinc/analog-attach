@@ -179,6 +179,11 @@ export interface SettingSpec {
     must_exist?: boolean;
     /** Printed when the setting is missing or invalid. */
     hint?: string;
+    /**
+     * Only the project's file may hold it (`backend`: the ecosystem belongs to the project). A
+     * global write is refused, and a global value is left out and reported.
+     */
+    project_only?: boolean;
 }
 
 /**
