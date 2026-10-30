@@ -249,7 +249,7 @@ directory`, `<directory>` absolute. The name is only saved (SETUP-030);
 ## 9. Where the backend is noos
 
 The setup walks the settings in the order they depend on each other:
-`capi-path`, `module-paths`, `board` (with `platform`), then the workfile.
+`capi-path`, `module-paths`, `target` (the board), then the workfile.
 A step whose setting is already set is shown and skipped, so a second run
 asks only what is still missing.
 
@@ -258,9 +258,8 @@ line, then run the steps of SETUP-510 to SETUP-540 in order.
 
 **SETUP-501** When a step writes a setting, the CLI shall write it to the
 `noos` section of the local settings file at once, through the checks of `config` (`config.md`
-§4, §9), and write `✓ <key> = <value>` (`<value>` a list joined with `, `),
-followed for `board` by ` (and platform = <chip>)`. When a step skips a
-setting that is set, it shall write `✓ <key>: <value>`.
+§4, §9), and write `✓ <key> = <value>` (`<value>` a list joined with `, `).
+When a step skips a setting that is set, it shall write `✓ <key>: <value>`.
 
 **SETUP-502** If a write is refused, then the CLI shall refuse with the
 refused value's message (COM-041) and stop. The settings written before it
@@ -306,17 +305,18 @@ directories as `module-paths`.
 repositories next to <capi-path>.` (yellow) and `  Set them later:
 analog-attach config module-paths <path> <path>...`, and go on.
 
-**SETUP-530** When `board` is set, the CLI shall skip the step. Otherwise,
+**SETUP-530** When `target` is set, the CLI shall skip the step. Otherwise,
 when the module repositories have boards, it shall ask the list question
 `Which board?`, one row per board, `<name>  <chip>  <kinds>`: the chip padded
 to nine characters (`?` when the board names none), and the peripheral kinds
 its `board.yml` declares joined with `, ` (dimmed; `no board.yml
 peripherals` when none), twelve rows at a time. It shall write the board as
-`board`, which writes `platform` too (`config.md` CONFIG-505).
+`target` (`config.md` CONFIG-505). A chip with no board is set with `config
+target <chip>`; the setup offers boards only.
 
 **SETUP-531** When there are no boards, the CLI shall write `No boards in the
 configured module repositories.` (yellow; or the scan's error), and `  Set
-one later: analog-attach config board <name>`, and skip the workfile step.
+one later: analog-attach config target <board or chip>`, and skip the workfile step.
 
 **SETUP-540** When a board is set, the CLI shall resolve `workfile`
 (`02-common.md` COM-512). When its file exists, the CLI shall write `✓

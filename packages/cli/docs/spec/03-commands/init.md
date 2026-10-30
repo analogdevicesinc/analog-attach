@@ -122,32 +122,32 @@ needs no workfile and, unless the target needs them, no other resource.
 workfile already exists at <path>.` and `Delete it, or point the 'workfile'
 setting somewhere else.`. The file is left as it is.
 
-**INIT-503** The target shall be the `board` setting when it is set, with
-the chip it carries as the platform; otherwise the `platform` setting, with
-no board.
+**INIT-503** The target shall be the `target` setting: when it names a
+board, that board, with the chip it carries as the platform; when it names a
+chip, that chip, with no board.
 
-**INIT-504** If neither `board` nor `platform` is set, then the CLI shall
-refuse with `No board or platform configured. Run: analog-attach config
-board <name>, or analog-attach for the guided setup` (JSON). In human mode it
-shall write instead `No board or platform configured.`, an empty line, the
-three rows `analog-attach config board <name>` (`a board settles the
-platform on its own`), `analog-attach config platform <name>` (`for a chip
-with no board of its own`) and `analog-attach` (`the guided setup, which
-asks for what is missing`), each two spaces in, then an empty line,
+**INIT-504** If `target` is not set, then the CLI shall refuse with `No
+target configured. Run: analog-attach config target <board or chip>, or
+analog-attach for the guided setup` (JSON). In human mode it shall write
+instead `No target configured.`, an empty line, the four rows
+`analog-attach config target <board>` (`a board brings its chip`),
+`analog-attach config target <chip>` (`for a chip with no board of its
+own`), `analog-attach list context` (`the boards and chips there are`) and
+`analog-attach` (`the guided setup, which asks for what is missing`), each
+two spaces in, then an empty line,
 `Available chips:`, an empty line, and for each chip of the module
 repositories its name two spaces in, its platform module and CPU (`<module>,
 <cpu>`, wrapped at 76 characters) six spaces in, and an empty line. When the
 chips can't be listed, their error replaces `Available chips:` and the list.
 (Open issue I-8.)
 
-**INIT-505** If `board` names a board no module repository has, or
-`platform` a chip none has, then the CLI shall refuse with the scan's
-message (`Unknown chip '<platform>'. Configured platforms support: <chips>`
-for a chip, `02-common.md` COM-512).
+**INIT-505** If `target` names neither a board nor a chip of the module
+repositories, then the CLI shall refuse with `Unknown target '<target>'. It
+can be a board or a chip: <names>`, the boards then the chips joined with
+`, ` (`config.md` CONFIG-501).
 
-**INIT-506** If `board` and `platform` are both set and the board carries
-another chip, then the CLI shall refuse with `Board '<board>' carries
-<chip>, not <platform>`.
+(INIT-506, a `board` that carries another chip than `platform`, is
+withdrawn: one setting can't disagree with itself.)
 
 **INIT-507** The CLI shall create the workfile's directory when it doesn't
 exist, and write the workfile `{ "platform": "<chip>", "board": "<board>",
@@ -212,12 +212,13 @@ $ analog-attach --json init
 ```
 
 ```
-$ analog-attach init            # neither board nor platform set
-No board or platform configured.
+$ analog-attach init            # target not set
+No target configured.
 
-  analog-attach config board <name>       a board settles the platform on its own
-  analog-attach config platform <name>    for a chip with no board of its own
-  analog-attach                           the guided setup, which asks for what is missing
+  analog-attach config target <board>    a board brings its chip
+  analog-attach config target <chip>     for a chip with no board of its own
+  analog-attach list context             the boards and chips there are
+  analog-attach                          the guided setup, which asks for what is missing
 
 Available chips:
 

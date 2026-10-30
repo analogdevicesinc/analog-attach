@@ -23,7 +23,7 @@
                 "type": "object",
                 "required": ["name", "vendor", "boards"],
                 "properties": {
-                  "name": { "type": "string", "description": "What the platform setting takes." },
+                  "name": { "type": "string", "description": "What the target setting takes, for a chip with no board." },
                   "vendor": { "type": "string" },
                   "description": { "type": "string" },
                   "boards": { "type": "array", "items": { "type": "string" } }
@@ -38,7 +38,7 @@
                 "type": "object",
                 "required": ["name"],
                 "properties": {
-                  "name": { "type": "string", "description": "What the board setting takes." },
+                  "name": { "type": "string", "description": "What the target setting takes." },
                   "platform": { "type": "string", "description": "The chip the board carries." },
                   "vendor": { "type": "string" },
                   "description": { "type": "string" }

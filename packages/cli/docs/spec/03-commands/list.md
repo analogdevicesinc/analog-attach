@@ -440,9 +440,9 @@ gives `0 boards on 0 chips`, not a refusal.
 
 **LIST-511** In human mode it shall write, per chip, `  <chip> (<vendor>)`,
 then `      <board>` per board, or `      no board: target the chip with
-'analog-attach config platform <chip>'` when none carries it, and an empty
-line; then `<n> board[s] on <m> chip[s].` and `Use: analog-attach config
-board <name>, then analog-attach init`.
+'analog-attach config target <chip>'` when none carries it, `<chip>` the
+chip's name, and an empty line; then `<n> board[s] on <m> chip[s].` and
+`Use: analog-attach config target <board>, then analog-attach init`.
 
 ### 10.3 `list property`
 
@@ -603,7 +603,7 @@ Where the backend is noos (the test fixture's capi, a workfile for
 ```
 $ analog-attach list context
   boardless (testvendor)
-      no board: target the chip with 'analog-attach config platform <chip>'
+      no board: target the chip with 'analog-attach config target boardless'
 
   othersoc (testvendor)
       otherboard
@@ -613,7 +613,7 @@ $ analog-attach list context
       testboard
 
 3 boards on 3 chips.
-Use: analog-attach config board <name>, then analog-attach init
+Use: analog-attach config target <board>, then analog-attach init
 
 $ analog-attach list devices test_spi
   capi-test:

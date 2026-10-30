@@ -107,9 +107,40 @@ async function config_entry(spec: SettingSpec, front: FrontEnd, session: Session
     /* eslint-enable unicorn/no-null */
 }
 
+const NOT_SET = "(not set)";
+
+/** A value on one line, for the messages of a write. */
 function shown_value(value: ConfigEntry["value"] | readonly string[] | undefined): string {
-    if (value === null || value === undefined) { return "(not set)"; }
+    if (value === null || value === undefined) { return NOT_SET; }
     return typeof value === "string" ? value : value.join(", ");
+}
+/** Where a line of `config`'s text is cut (the description, the options). */
+const TEXT_WIDTH = 80;
+
+/** The value as lines: a path_list one path per line, paths from the home directory as `~`. */
+function value_lines(entry: ConfigEntry, home: string): string[] {
+    const { value } = entry;
+    if (value === null) { return [NOT_SET]; }
+    const shown = (one: string): string => entry.type === "path" || entry.type === "path_list" ? display_path(one, home) : one;
+    if (typeof value === "string") { return [shown(value)]; }
+    return value.length === 0 ? [NOT_SET] : value.map(one => shown(one));
+}
+
+/** Words joined into lines of at most `width` characters (a longer word gets a line of its own). */
+function wrap(words: readonly string[], width: number, separator = " "): string[] {
+    const lines: string[] = [];
+    let line = "";
+    for (const word of words) {
+        const next = line === "" ? word : `${line}${separator}${word}`;
+        if (line !== "" && next.length > width) {
+            lines.push(`${line}${separator.trimEnd()}`);
+            line = word;
+        } else {
+            line = next;
+        }
+    }
+    if (line !== "") { lines.push(line); }
+    return lines;
 }
 
 /** The hint of a required setting that is unset; `backend` points to `config backend`. */
@@ -117,24 +148,33 @@ function hint_of(spec: SettingSpec, front: FrontEnd): string | undefined {
     return spec.key === BACKEND_KEY ? `Run '${front.program}' on a terminal, or ${backend_command(front)}.` : spec.hint;
 }
 
-/** Every setting: the files, then a table by category, then the hints of the required ones that are unset. */
-function format_table(entries: readonly ConfigEntry[], specs: readonly SettingSpec[], front: FrontEnd): string {
+/**
+ * Every setting: the files, then the settings by category, then the hints of the required ones
+ * that are unset. A setting is a row `* key  value  source`; a path_list's other paths go on
+ * the lines below, under the first.
+ */
+function format_table(entries: readonly ConfigEntry[], specs: readonly SettingSpec[], front: FrontEnd, style: Session["style"]): string {
     const { files } = front.settings;
     const { home } = front;
     const lines = [`Local:  ${display_path(files.local, home)}`, `Global: ${display_path(files.global, home)}`, ""];
     const name_width = Math.max(...entries.map(entry => entry.field_name.length)) + 2;
-    const value_width = Math.max(10, ...entries.map(entry => shown_value(entry.value).length)) + 2;
+    const shown = new Map(entries.map(entry => [entry, value_lines(entry, home)]));
+    const value_width = Math.max(10, ...[...shown.values()].flat().map(line => line.length)) + 2;
     const categories = [...new Set(entries.map(entry => entry.category))];
     for (const [index, category] of categories.entries()) {
         if (index > 0) { lines.push(""); }
-        lines.push(`  ${category}`);
+        lines.push(`  ${style.bold(category)}`);
         for (const entry of entries.filter(candidate => candidate.category === category)) {
             const mark = entry.required ? "*" : " ";
-            const source = entry.source === "unset" ? "" : entry.source;
-            lines.push(`  ${mark} ${entry.field_name.padEnd(name_width)}${shown_value(entry.value).padEnd(value_width)}${source}`.trimEnd());
+            const [first = NOT_SET, ...more] = shown.get(entry) ?? [];
+            const value = first === NOT_SET ? style.dim(first.padEnd(value_width)) : first.padEnd(value_width);
+            const source = entry.source === "unset" ? "" : style.dim(entry.source);
+            lines.push(`  ${mark} ${entry.field_name.padEnd(name_width)}${value}${source}`.trimEnd());
+            const indent = " ".repeat(4 + name_width);
+            lines.push(...more.map(line => `${indent}${line}`));
         }
     }
-    if (entries.some(entry => entry.required)) { lines.push("", "  * required"); }
+    if (entries.some(entry => entry.required)) { lines.push("", style.dim("  * required")); }
     const hints = unset_hints(entries, specs, front);
     if (hints.length > 0) { lines.push("", ...hints); }
     return lines.join("\n");
@@ -150,20 +190,33 @@ function unset_hints(entries: readonly ConfigEntry[], specs: readonly SettingSpe
     return [...new Set(hints)];
 }
 
-/** One setting, as attach-cli shows a field (CONFIG-013). */
-function format_one(entry: ConfigEntry, spec: SettingSpec, front: FrontEnd): string {
-    let shown = shown_value(entry.value);
-    if (entry.source === "default") {
-        shown += " (default)";
-    } else if (entry.source !== "unset") {
-        shown += ` (${entry.source})`;
+/**
+ * One setting (CONFIG-013): its key, then labelled lines as `read` shows a property's details:
+ * the value and where it comes from, the description and the options, wrapped.
+ */
+function format_one(entry: ConfigEntry, spec: SettingSpec, front: FrontEnd, style: Session["style"]): string {
+    const label = (name: string): string => `  ${`${name}:`.padEnd(LABEL_WIDTH)}`;
+    const indent = " ".repeat(2 + LABEL_WIDTH);
+    const under = (first: string, rest: readonly string[]): string[] => [first, ...rest.map(line => `${indent}${line}`)];
+    const width = TEXT_WIDTH - indent.length;
+
+    const lines = [`${style.bold(entry.field_name)}${entry.required ? style.dim("  (required)") : ""}`, ""];
+    const [value = NOT_SET, ...more] = value_lines(entry, front.home);
+    const source = entry.source === "unset" ? "" : style.dim(`  (${entry.source})`);
+    lines.push(...under(`${label("Value")}${value === NOT_SET ? style.dim(value) : value}${source}`, more));
+    const [description = "", ...wrapped] = wrap(entry.description.split(" "), width);
+    lines.push(...under(`${label("Description")}${description}`, wrapped));
+    if (typeof entry.type === "object") {
+        const [options = "", ...rest] = wrap(entry.type.options, width, ", ");
+        lines.push(...under(`${label("Options")}${options}`, rest));
     }
-    const options = typeof entry.type === "object" ? ` [${entry.type.options.join(" | ")}]` : "";
-    const lines = [`${entry.field_name}${entry.required ? " [required]" : ""}: ${shown}`, `  ${entry.description}${options}`];
     const hint = entry.required && entry.value === null ? hint_of(spec, front) : undefined;
     if (hint !== undefined) { lines.push("", hint); }
     return lines.join("\n");
 }
+
+/** The width of a label column of format_one, `Description:` and two spaces. */
+const LABEL_WIDTH = 14;
 
 /** Every setting, or `only` that one. */
 async function show(front: FrontEnd, session: Session, only?: SettingSpec): Promise<Outcome<ConfigResponse>> {
@@ -172,7 +225,8 @@ async function show(front: FrontEnd, session: Session, only?: SettingSpec): Prom
     const entries = await Promise.all(specs.map(spec => config_entry(spec, front, session)));
     const response: ConfigResponse = { ok: true, message: `${entries.length} config field(s)`, severity: "info", configs: entries };
     const [entry] = entries;
-    return answer(response, only === undefined || entry === undefined ? format_table(entries, specs, front) : format_one(entry, only, front));
+    const { style } = session;
+    return answer(response, only === undefined || entry === undefined ? format_table(entries, specs, front, style) : format_one(entry, only, front, style));
 }
 
 // =====================================================================================

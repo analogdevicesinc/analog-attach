@@ -438,7 +438,8 @@ export function open_settings(options: OpenSettingsOptions): SettingsStore {
         if (problem !== undefined) { return { problem }; }
         if (spec.options === "dynamic") {
             const allowed = hooks?.options === undefined ? undefined : await hooks.options(spec.key, session());
-            if (allowed !== undefined && !allowed.includes(value)) {
+            // None found is no list to check against (CONFIG-510): the backend's check says why.
+            if (allowed !== undefined && allowed.length > 0 && !allowed.includes(value)) {
                 return { problem: `${JSON.stringify(value)} is not one of ${allowed.join(" | ")}` };
             }
         }

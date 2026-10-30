@@ -5,8 +5,8 @@ backend's caches. `config` is the front end's: it works with no backend set
 (COM-013), and the settings it knows are `backend` and those of the
 backend's section of the settings files (`02-common.md` §8.1, COM-131). Where the backend is linux, setting `linux` also
 builds the binding caches. Where the backend is noos, writing a setting
-checks it against the checkouts on disk, and setting `board` or `platform`
-can write the other (§9).
+checks it against the checkouts on disk, and `target` against the boards
+and chips they have (§9).
 
 `config` replaces `config-get` and `config-set`, which are gone (an unknown
 command: GRM-004). Their requirements keep their numbers here:
@@ -95,17 +95,23 @@ CF-2.)
 write:
 
 ```
-<key>[ [required]]: <shown value>
-  <description>[ [<option> | <option>]]
+<key>[  (required)]
+
+  Value:        <value>[  (<source>)]
+  Description:  <description>
+[  Options:      <option>, <option>, …]
 ```
 
-`<shown value>` is `(not set)` for an unset setting, and otherwise the value
-followed by ` (default)`, ` (local)` or ` (global)`, its source. A
-`path_list` is its paths joined with `, `. The options follow the description
-for a setting that has them (`backend`, `overlay-syntax`; where the backend
-is noos, the booleans, `probe`, and `board` and `platform` as scanned,
-CONFIG-510). When the setting
-is required and unset, an empty line and its hint follow.
+The labels are padded to fourteen characters. `<value>` is `(not set)` for
+an unset setting; a path from the home directory is written with `~`, and a
+`path_list` has one path per line, the others under the first. `<source>` is
+`default`, `local` or `global`, left out when unset. The description and the
+options are wrapped at 80 characters, the continuation lines under the
+first. The options are there for a setting that has them (`backend`,
+`overlay-syntax`; where the backend is noos, the booleans, `probe`, and
+`target` as scanned, CONFIG-510). When the setting is required and unset, an
+empty line and its hint follow. On a terminal the key is bold and
+`(required)`, the source and `(not set)` dim.
 
 **CONFIG-016** While in human mode, when showing every setting, the CLI
 shall write `Local:  <file>` and `Global: <file>` (the settings files, the
@@ -114,10 +120,14 @@ home directory written `~`), an empty line, then for each category in order
 `Deploy`; where it is noos, `Sources`, `Target`, `Workfile`, `Project` and
 `Build`) the line `  <category>` and one line per setting: two spaces, `*`
 for a required setting or a space, a space, the key padded to the longest
-key plus two, the shown value (`(not set)` when unset) padded to the longest
-value plus two, and its source (none when unset), trailing spaces removed.
-Categories are separated by an empty line. When a setting is required, the
-CLI shall then write an empty line and `  * required`.
+key plus two, the value (`(not set)` when unset) padded to the longest
+value line plus two, and its source (none when unset), trailing spaces
+removed. Values are written as in CONFIG-013: a path from the home directory
+with `~`, a `path_list` one path per line, the others on the lines below,
+under the first. Categories are separated by an empty line. When a setting
+is required, the CLI shall then write an empty line and `  * required`. On a
+terminal the categories are bold, and the sources, `(not set)` and `*
+required` dim.
 
 **CONFIG-014** While in human mode, when a setting shown is required and
 unset, the CLI shall then write an empty line and its hint, one line per
@@ -309,11 +319,12 @@ refused value `<key>: "<value>" is not true or false`. If it is `probe` and
 `<value>` is neither `openocd` nor `jlink`, `probe: "<value>" is not one of
 openocd | jlink` (CONFIG-103).
 
-**CONFIG-501** If the setting is `board` or `platform` and `<value>` is not
-one of the boards, or chips, of CONFIG-510, then the CLI shall report the
-refused value `<key>: "<value>" is not one of <a> | <b> …`. With no board or
-chip found (no `capi-path`, no `module-paths`), the list is empty (open
-issue CF-11).
+**CONFIG-501** If the setting is `target` and `<value>` is none of the
+boards and chips of CONFIG-510, then the CLI shall report the refused value
+`target: "<value>" is not one of <a> | <b> …`. With no board or chip found
+(no `capi-path`, no `module-paths`), it shall report instead `Unknown target
+'<value>': the configured modules have no boards or chips. Check capi-path
+and module-paths`.
 
 **CONFIG-502** If the setting is `capi-path` or `module-paths` and a path,
 resolved against the CWD, names nothing, then the CLI shall report the
@@ -332,39 +343,27 @@ the CLI shall report the refused value `project-template: <problem>`:
 sets: capi, capi-iio` for a name, `Template set '<value>' has no
 'project_structure.json' (looked in '<value>')` for a directory.
 
-**CONFIG-505** When the setting is `board`, the CLI shall also write
-`platform` with the chip the board carries, to the same file and section
-(`noos`). When the setting is `platform` and `board` is set to a board that
-carries another chip, the CLI shall also remove `board` from the same file
-and section. The answer of
-CONFIG-111 then ends with ` (and <changes>)`, one entry per other setting
-whose effective value changed, joined with `, `: `platform = <chip>`, or
-`reset board`. A write that changes nothing else has no such ending.
+**CONFIG-505** `target` shall be the one setting for the board and its chip:
+a board, which brings the chip it carries, or a chip, for one used without
+a board (`init.md` INIT-503). Writing it writes nothing else. There is no
+`board` or `platform` setting (an unknown key, CONFIG-101).
 
-**CONFIG-506** If after the write the effective `board` and `platform`
-would disagree because one of them is set in the other settings file, then
-the CLI shall report the refused value `Board '<board>' carries <chip>, not
-<platform>, and <key> '<value>' is set in <file>, which this write does not
-change. Clear it there, or write the setting to that file instead.`, `<key>`
-and `<value>` naming the setting the other file holds and `<file>` that
-file's path.
-
-**CONFIG-507** Resetting `board` or `platform` shall remove that key only:
-`config board --reset` leaves `platform`.
+(CONFIG-506 and CONFIG-507, which kept a `board` and a `platform` setting in
+agreement, are withdrawn with them.)
 
 **CONFIG-508** With `--reload`, the CLI shall answer `Nothing to rebuild:
 the noos backend keeps no caches` (CONFIG-020).
 
-**CONFIG-510** The CLI shall take the options of `board` and `platform` from
-the module repositories of `module-paths`, read on every run: every board,
-and every chip of a platform backend. They are the type of the field
+**CONFIG-510** The CLI shall take the options of `target` from the module
+repositories of `module-paths`, read on every run: every board, then every
+chip of a platform backend. They are the type of the field
 (`{ "options": [...] }`, CONFIG-015) and the options shown after its
 description (CONFIG-013); with none found, the type is `"string"` and no
 options are shown. `bootstrap`, `interview` and `example` have the options
 `true` and `false`, `probe` `openocd` and `jlink`.
 
-**CONFIG-511** While in human mode, when `board` is shown required and
-unset, the hint shall be `Run 'analog-attach config board <name>'
+**CONFIG-511** While in human mode, when `target` is shown required and
+unset, the hint shall be `Run 'analog-attach config target <board or chip>'
 ('analog-attach list context' lists them).`; for `capi-path`, `Run
 'analog-attach config capi-path <path>', or 'analog-attach' on a terminal
 for the guided setup.` (COM-501, CONFIG-014).
@@ -408,12 +407,8 @@ in both modes, as text even under `--json` (not a `config-error` object),
 while CONFIG-122, CONFIG-123 and CONFIG-023 are refusals (`02-common.md`
 C-11).
 
-**CF-11. `board` can't be set before `capi-path`, and says so badly.** With
-`capi-path` unset there are no boards (CONFIG-510), so `config board
-testboard` refuses `board: "testboard" is not one of  — Board a new
-workfile targets; …` with an empty list, rather than saying that
-`capi-path` (or `module-paths`) is needed first. A fix would be to name the
-missing setting when the scan finds nothing.
+**CF-11. (Resolved.)** `target` set before `capi-path` refused with an empty
+list of options; it now names the settings to check (CONFIG-501).
 
 **CF-12. `capi-path` takes a module checkout the setup refuses.** `config
 capi-path` accepts any directory with a `module.yml` (CONFIG-503), while the
@@ -427,8 +422,12 @@ and not chosen in the setup.
 
 ```
 $ analog-attach config overlay-syntax
-overlay-syntax: fragment (default)
-  Output syntax for the overlay file: fragment (default) or label (&spi0 { … }) [fragment | label]
+overlay-syntax
+
+  Value:        fragment  (default)
+  Description:  Output syntax for the overlay file: fragment (default) or label
+                (&spi0 { … })
+  Options:      fragment, label
 ```
 
 ```
@@ -437,24 +436,25 @@ Local:  ~/work/.analog-attach/config.json
 Global: ~/.config/analog-attach/config.json
 
   General
-  * backend             linux                                                                       local
+  * backend             linux                                                    local
 
   Workspace
-  * linux               /home/u/linux_rpi                                                           local
-  * devicetree          /home/u/linux_rpi/arch/arm/boot/dts/broadcom/bcm2711-rpi-4-b.dts            local
-    workfile            /home/u/work/overlay.dtso                                                   local
-    overlay-syntax      fragment                                                                    default
+  * linux               ~/linux_rpi                                              local
+  * devicetree          ~/linux_rpi/arch/arm/boot/dts/broadcom/bcm2711-rpi-4-b.dts  local
+    workfile            ~/work/overlay.dtso                                      local
+    overlay-syntax      fragment                                                 default
     preprocess-command  cpp -nostdinc -undef -x assembler-with-cpp -P -I {linux}/include -o {output} {input}  default
 
   Deploy
     deploy-ip           (not set)
-    deploy-user         pi                                                                          global
+    deploy-user         pi                                                       global
     deploy-password     (not set)
 
   * required
 ```
 
-(The value column is as wide as the longest value plus two; shortened here.)
+(The value column is as wide as the longest value line plus two; shortened
+here.)
 
 ```
 $ analog-attach --json config deploy-user
@@ -530,8 +530,8 @@ Switching backends keeps both sections:
 ```
 $ analog-attach config backend noos
 Set backend = noos
-$ analog-attach config board testboard
-Set board = testboard (and platform = testsoc)
+$ analog-attach config target testboard
+Set target = testboard
 $ analog-attach config backend linux
 Set backend = linux
 $ cat .analog-attach/config.json
@@ -568,46 +568,45 @@ Where the backend is noos:
 
 ```
 $ analog-attach config
-Local:  /home/u/proj/.analog-attach/config.json
+Local:  ~/proj/.analog-attach/config.json
 Global: ~/.config/analog-attach/config.json
 
   General
-  * backend           noos                local
+  * backend           noos                    local
 
   Sources
-  * capi-path         /home/u/capi        local
-    module-paths      /home/u/capi-maxim  local
+  * capi-path         ~/capi                  local
+    module-paths      ~/capi-maxim            local
+                      ~/capi-noos
+                      ~/capi-util
 
   Target
-  * board             max32655fthr        local
-    platform          max32655            local
+  * target            max32655fthr            local
 
   Workfile
-  * workfile          /home/u/proj/workfile.json  default
-    bootstrap         true                default
-    interview         true                default
+  * workfile          ~/proj/workfile.json    default
+    bootstrap         true                    default
+    interview         true                    default
 
   Project
     project-name      (not set)
     project-path      (not set)
-    project-template  capi                default
-    example           true                default
+    project-template  capi                    default
+    example           true                    default
 
   Build
     build-command     (not set)
     deploy-command    (not set)
-    probe             openocd             default
+    probe             openocd                 default
 
   * required
 ```
 
-(Shortened: the value column is as wide as the longest value plus two.)
-
 ```
-$ analog-attach config board testboard
-Set board = testboard (and platform = testsoc)
-$ analog-attach config platform othersoc
-Set platform = othersoc (and reset board)
+$ analog-attach config target testboard
+Set target = testboard
+$ analog-attach config target othersoc
+Set target = othersoc
 $ analog-attach config bootstrap yes
 bootstrap: "yes" is not true or false — After 'add', fill in every value and node that leaves no room for choice (true/false)
                                                    (stderr, exit 2)
