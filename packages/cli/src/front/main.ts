@@ -16,7 +16,8 @@ import type { Backend, Prompter, Session } from "../interface/backend-interface"
 import { complete_words } from "./complete";
 import { EXIT_CRASH, EXIT_INPUT_ERROR, EXIT_OK, run_outcome, type OutputStreams } from "./output";
 import type { Registry } from "./registry";
-import { backend_command, build_application, build_routes, positional_record, type FrontEnd, type RunContext } from "./routes";
+import { did_you_mean } from "../interface/names";
+import { backend_command, build_application, build_routes, find_route, next_segments, positional_record, type FrontEnd, type Route, type RunContext } from "./routes";
 import { create_session } from "./session";
 import { BACKEND_KEY, backend_setting, open_settings, settings_files, type SettingsLocation, type SettingsStore } from "./settings-store";
 import { bare_run } from "./setup";
@@ -164,8 +165,28 @@ function exit_code(value: number | string | null | undefined): number {
     return code < 0 ? EXIT_CRASH : code;
 }
 
+/**
+ * `list nosuch`: a word under a group of commands (`list`, `skill`) that names none of them.
+ * stricli would only say no command is registered for it; this names the ones there are.
+ */
+function unknown_in_group(routes: readonly Route[], words: readonly string[]): string | undefined {
+    const plain = words.filter(word => !word.startsWith("-"));
+    if (plain.length < 2 || words.includes("--help") || words.includes("-h")) { return undefined; }
+    const [group, word] = plain as [string, string];
+    const children = next_segments(routes, [group]);
+    if (children.length === 0 || children.some(child => child.name === word) || find_route(routes, [group, word]) !== undefined) { return undefined; }
+    const names = children.map(child => child.name);
+    const what = group === "list" ? "kind" : `${group} command`;
+    return `Unknown ${what}: ${word}.${did_you_mean(word, names)} The ${what}s: ${names.join(", ")}.`;
+}
+
 async function run_words(front: FrontEnd, words: readonly string[], usage_to_stderr: boolean): Promise<number> {
     const routes = build_routes(front);
+    const unknown = unknown_in_group(routes, words);
+    if (unknown !== undefined) {
+        front.streams.stderr.write(`${unknown}\n`);
+        return EXIT_INPUT_ERROR;
+    }
     const application = build_application(routes, front);
     let code: number | undefined;
     const process_: { stdout: OutputStreams["stdout"]; stderr: OutputStreams["stderr"]; env: Environment; exitCode?: number | string | null } = {
@@ -187,6 +208,19 @@ async function run_words(front: FrontEnd, words: readonly string[], usage_to_std
     await run_stricli(application, words, context);
     if (usage_to_stderr) { return EXIT_INPUT_ERROR; }
     return code ?? exit_code(process_.exitCode);
+}
+
+/**
+ * After the usage of a bare run that can't ask: the required settings still unset, and how to
+ * set them (SETUP-04). Nothing when they are all set, or when there is no backend (the usage
+ * already says to choose one).
+ */
+function missing_settings_note(front: FrontEnd): string {
+    if (front.backend === undefined) { return ""; }
+    const missing = front.settings.specs.filter(spec => spec.required && spec.key !== BACKEND_KEY && front.settings.get(spec.key) === undefined);
+    if (missing.length === 0) { return ""; }
+    const keys = missing.map(spec => spec.key);
+    return `\nNot set yet: ${keys.join(", ")}. Run '${PROGRAM}' on a terminal for the guided setup, or '${PROGRAM} config ${keys[0]!} <value>'.\n`;
 }
 
 /** One run. Never throws: a crash is its message on stderr and exit 1. */
@@ -226,7 +260,9 @@ export async function main(argv: readonly string[], deps: MainDeps): Promise<num
         }
         // The usage: no command (off a terminal, or `--json` alone), or `--quiet` alone.
         if (words.length === 0 || (words.length === 1 && words[0] === "--quiet")) {
-            return await run_words(front, [], json);
+            const code = await run_words(front, [], json);
+            if (!json) { deps.streams.stdout.write(missing_settings_note(front)); }
+            return code;
         }
         const help = words[0] === "help" ? [...words.slice(1), "--help"] : words;
         return await run_words(front, help, false);

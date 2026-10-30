@@ -93,9 +93,8 @@ PY
 	assert_json '.message' "No workfile at '$PROJECT/workfile.json'. Create one with 'analog-attach init', or point the 'workfile' setting elsewhere."
 }
 
-# bats test_tags=req:ADD-02, gap
+# bats test_tags=req:ADD-02
 @test "an unknown key is refused, naming the closest keys" {
-	# Gap: the refusal is "Unknown schema 'testpar'. See: analog-attach list devices", naming no key.
 	aa init >/dev/null
 	cp "$PROJECT/workfile.json" "$BATS_TEST_TMPDIR/before.json"
 	run_json add testpar
@@ -341,9 +340,8 @@ PY
 	assert_line --regexp $'^--as\t'
 }
 
-# bats test_tags=req:ADD-13, gap
+# bats test_tags=req:ADD-13
 @test "add completes the values of --as" {
-	# Gap: `add dualpart --as <Tab>` offers nothing.
 	with_adc_drivers
 	run aa __complete -- add dualpart --as ""
 	assert_success

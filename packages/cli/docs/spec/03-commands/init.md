@@ -122,6 +122,11 @@ needs no workfile and, unless the target needs them, no other resource.
 workfile already exists at <path>.` and `Delete it, or point the 'workfile'
 setting somewhere else.`. The file is left as it is.
 
+**INIT-509** If `capi-path` is not set, then the CLI shall refuse, before
+looking at the target, with `Setting "capi-path" is not configured. Run:
+analog-attach config capi-path <value>, or analog-attach for the guided
+setup`: without it there are no boards or chips to find.
+
 **INIT-503** The target shall be the `target` setting: when it names a
 board, that board, with the chip it carries as the platform; when it names a
 chip, that chip, with no board.

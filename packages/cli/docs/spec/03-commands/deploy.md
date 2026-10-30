@@ -105,6 +105,14 @@ jlink` before anything else.
 **DEPLOY-501** The CLI shall refuse for the project directory as `build.md`
 BUILD-500 says.
 
+**DEPLOY-503** When `build-command` is unset (the project is built by the
+CLI's own step, so its image is where `build.md` BUILD-512 says) and that
+image doesn't exist, the CLI shall refuse with `<target> is not built for
+<board> (no <elf>). Build it first: analog-attach build`, before running
+`deploy-command` or flashing. Deploy doesn't build: it puts on the board what
+`build` made. With a `build-command` of the user's, the image is wherever
+that command puts it, and the CLI doesn't look for it.
+
 **DEPLOY-502** When `deploy-command` is set, the CLI shall run it with the
 shell in the project directory, after the progress line `Deploying <dir>
 with '<command>'`; `--board` and `--probe` change nothing in it (open issue

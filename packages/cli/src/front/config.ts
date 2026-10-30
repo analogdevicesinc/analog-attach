@@ -16,6 +16,7 @@ import {
     type Completion, type Outcome, type Session, type SettingSpec,
 } from "../interface/backend-interface";
 import type { CommonResponse } from "../interface/backend-responses";
+import { did_you_mean } from "../interface/names";
 import { BACKEND_KEY, display_path, type ConfigError, type SettingsStore } from "./settings-store";
 import { backend_command, type FrontEnd, type PositionalValues, type Route } from "./routes";
 
@@ -330,7 +331,8 @@ export async function run_config(front: FrontEnd, positionals: PositionalValues,
     const spec = specs.find(candidate => candidate.key === key);
     if (spec === undefined) {
         const first = front.backend === undefined ? ` Choose a backend first: ${backend_command(front)}.` : "";
-        return input_error(`Unknown config field: ${key}. Valid fields: ${specs.map(candidate => candidate.key).join(", ")}.${first}`);
+        const keys = specs.map(candidate => candidate.key);
+        return input_error(`Unknown config field: ${key}.${did_you_mean(key, keys)} Valid fields: ${keys.join(", ")}.${first}`);
     }
     if (flags.reset) {
         if (values.length > 0) { return input_error("--reset takes no value"); }

@@ -102,6 +102,12 @@ type ResolvedTarget =
 
 /** Which platform (and board) the new workfile targets: what the `target` setting names. */
 function workfile_target(program: string): ResolvedTarget {
+    // The boards and chips come from the modules: without capi-path there are none to find,
+    // so say how to set it rather than that the target is unknown.
+    const capi = get_effective_setting_value("capi-path");
+    if (!capi.ok || capi.value === undefined) {
+        return { ok: false, message: `Setting "capi-path" is not configured. Run: ${program} config capi-path <value>, or ${program} for the guided setup` };
+    }
     const configured = get_effective_setting_value(TARGET_SETTING);
     if (!configured.ok || configured.value === undefined) {
         return {

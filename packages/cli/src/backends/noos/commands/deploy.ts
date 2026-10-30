@@ -1,3 +1,4 @@
+import fs from "node:fs";
 import { DEFAULT_PROBE, PROBE_OPTIONS, get_effective_setting_value, get_setting_value } from "attach-no-os-lib";
 import {
     answer,
@@ -47,6 +48,21 @@ export const deploy = command<DeployArguments, CommonResponse, typeof DEPLOY_FLA
     }
 });
 
+/**
+ * Why there is nothing to deploy: no image where build puts it. Only when that place is known,
+ * the project built by the CLI's own step; with a build-command of the user's, the image is
+ * wherever that command puts it, so nothing is said.
+ */
+function not_built(target_path: string, board: string | undefined, program: string): string | undefined {
+    const own_build = get_effective_setting_value("build-command");
+    if (!own_build.ok || (own_build.value !== undefined && own_build.value !== "")) { return undefined; }
+    const capi = get_effective_setting_value("capi-path");
+    if (!capi.ok || capi.value === undefined) { return undefined; }
+    const plan = plan_build(target_path, capi.value, board, program);
+    if (!plan.ok || fs.existsSync(plan.value.elf_path)) { return undefined; }
+    return `${plan.value.target} is not built for ${plan.value.board} (no ${plan.value.elf_path}). Build it first: ${program} build`;
+}
+
 async function run_deploy(board: string | undefined, probe_flag: string | undefined, session: Session): Promise<Outcome<CommonResponse>> {
     // A probe that can't be is what was typed, whatever the project's state.
     if (probe_flag !== undefined && !PROBE_OPTIONS.includes(probe_flag)) {
@@ -58,6 +74,12 @@ async function run_deploy(board: string | undefined, probe_flag: string | undefi
         return project.outcome;
     }
     const target_path = project.path;
+
+    // Deploy puts what build made on the board: it doesn't build it itself (DEPLOY-01).
+    const unbuilt = not_built(target_path, board, session.program);
+    if (unbuilt !== undefined) {
+        return refuse(unbuilt);
+    }
 
     // An explicit deploy-command takes the step over completely.
     const override = get_effective_setting_value("deploy-command");

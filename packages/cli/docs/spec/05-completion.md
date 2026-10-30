@@ -470,7 +470,8 @@ directive (COMPL-012) and no candidate.
 | `deploy --probe` | `openocd`, `jlink` |
 | `generate --project-template` | the bundled template sets, sorted, after the directory directive (COMPL-012) |
 | `generate --output` | the directory directive only |
-| `add --as`, `add --name` | nothing |
+| `add --as` | the interfaces of the driver `<device>` names (or its eval board carries), each described by the handle that adds it |
+| `add --name` | nothing |
 
 **COMPL-530** The option values shall be those of the table.
 

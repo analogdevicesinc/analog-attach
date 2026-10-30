@@ -229,9 +229,8 @@ setup() {
 	assert_json '[.suggestions[].value] | join(",")' 'test_i2c_device'
 }
 
-# bats test_tags=req:LIST-11, gap
+# bats test_tags=req:LIST-11
 @test "an unknown list kind is refused, naming the kinds" {
-	# Gap: the CLI only says "No command registered for `nosuch`" (exit 2), naming no kind.
 	aa init >/dev/null
 	run aa list nosuch
 	assert_failure

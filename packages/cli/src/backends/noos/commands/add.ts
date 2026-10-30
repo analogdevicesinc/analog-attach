@@ -11,6 +11,7 @@ import {
     interview_enabled,
     list_available_structs,
     list_drivers,
+    list_eval_boards,
     load_resolved_ruleset_for_board,
     pin_driver,
     suggest_for_property,
@@ -28,6 +29,7 @@ import {
     type Outcome,
     type Session,
 } from "../../../interface/backend-interface";
+import { did_you_mean } from "../../../interface/names";
 import { common_ok, type AddResponse, type MissingProperty } from "../protocol/responses";
 import { describe_bootstrap, run_bootstrap, still_needed } from "./bootstrap_run";
 import { run_interview } from "./interview";
@@ -115,7 +117,9 @@ async function run_add(arguments_: AddArguments, as: readonly string[], session:
         }
         const is_driver = drivers.ok && drivers.value.some(candidate => candidate.name === driver);
         if (!is_driver) {
-            return refuse(`Unknown schema '${key}'. See: ${program} list devices`);
+            // The keys `list devices` gives: eval boards, drivers, schemas.
+            const keys = [...list_eval_boards(), ...(drivers.ok ? drivers.value.map(candidate => candidate.name) : []), ...available.value.all];
+            return refuse(`Unknown schema '${key}'.${did_you_mean(key, keys)} See: ${program} list devices`);
         }
         // Served over IIO (template capi-iio): the driver's IIO device is the root,
         // and it inits the part itself, so the generic handle is not added at all.
