@@ -1,8 +1,5 @@
 import {
-    Attach,
-    Result,
     DeviceTree,
-    extract_compatible,
     is_dt_flag,
     type DTLabel,
     type DTNode,
@@ -215,63 +212,86 @@ export function bigIntReplacer(_key: string, value: any): any {
     return typeof value === 'bigint' ? Number(value) : value;
 }
 
-export function get_all_file_paths(directory: string): string[] {
-    let results: string[] = [];
-    const list = fs.readdirSync(directory);
+const is_record = (value: unknown): value is Record<string, unknown> =>
+    typeof value === "object" && value !== null && !Array.isArray(value);
 
-    for (const file of list) {
-        const filePath = path.join(directory, file);
-        const stat = fs.statSync(filePath);
-
-        if (stat && stat.isDirectory()) {
-            results = [...results, ...get_all_file_paths(filePath)];
-        } else {
-            results.push(filePath);
+/**
+ * The compatible strings a processed `compatible` schema names, each with
+ * whether it can come first. An `items` list names the device in its first
+ * entry and the fallbacks after it; `contains` only says the list has it.
+ */
+function compatible_strings(schema: unknown, first: boolean, found: { name: string; first: boolean }[]): void {
+    if (Array.isArray(schema)) {
+        for (const entry of schema) { compatible_strings(entry, first, found); }
+        return;
+    }
+    if (!is_record(schema)) { return; }
+    const constant = schema["const"];
+    if (typeof constant === "string") { found.push({ name: constant, first }); }
+    const options = schema["enum"];
+    if (Array.isArray(options)) {
+        for (const option of options) {
+            if (typeof option === "string") { found.push({ name: option, first }); }
         }
     }
-
-    return results.sort(); // Sort to make hash order-independent
+    const items = schema["items"];
+    if (Array.isArray(items)) {
+        for (const [position, item] of items.entries()) { compatible_strings(item, first && position === 0, found); }
+    } else {
+        compatible_strings(items, first, found);
+    }
+    for (const key of ["oneOf", "anyOf", "allOf"]) { compatible_strings(schema[key], first, found); }
+    compatible_strings(schema["contains"], false, found);
 }
 
-export async function build_compat_index(
-    linux: string,
-    dtSchema: string,
-    on_progress?: (done: number, total: number) => void,
-): Promise<{ entries: Record<string, string>; files: number }> {
-    const bindings_folder = path.resolve(linux, "Documentation", "devicetree", "bindings");
-    const index: Record<string, string> = {};
+/**
+ * How strongly a binding claims a compatible: the binding named after it
+ * (`net/snps,dwmac.yaml` for `snps,dwmac`) wins; then one that names the
+ * device (first in its list); then one with its own `select` naming it (a
+ * naming convention such as `arm/qcom-soc.yaml` lists exceptions so); then
+ * one that only falls back to it.
+ */
+function claim(name: string, file: string, first: boolean, schema: Record<string, unknown>): number {
+    if (path.basename(file) === `${name}.yaml`) { return 4; }
+    if (!first) { return 1; }
+    return "select" in schema ? 2 : 3;
+}
 
-    if (!fs.existsSync(bindings_folder)) {
-        return { entries: index, files: 0 };
+/**
+ * The compat index from `validation.json` (the `dt-mk-schema -j` output): each
+ * compatible string a binding of the Linux tree lists, mapped to the binding
+ * YAML with the strongest claim to it (`claim`), the first by `$id` among
+ * equals. The dt-schema's own schemas are left out. `files` is the number of
+ * the tree's bindings.
+ */
+export function build_compat_index(processed: unknown, linux: string): { entries: Record<string, string>; files: number } {
+    const bindings_folder = path.resolve(linux, "Documentation", "devicetree", "bindings") + path.sep;
+    const entries: Record<string, string> = {};
+    const claims = new Map<string, number>();
+    let files = 0;
+
+    if (!is_record(processed)) {
+        return { entries, files };
     }
 
-    const all_files = get_all_file_paths(bindings_folder);
-    const yaml_files = all_files.filter(file => file.endsWith(".yaml"));
-
-    for (const [position, file] of yaml_files.entries()) {
-        on_progress?.(position + 1, yaml_files.length);
-        const binding = await Attach.parse(file, { linux, dt_schema: dtSchema });
-
-        if (Result.is_err(binding)) {
-            continue;
-        }
-
-        const compatible = extract_compatible(binding.value.parsed_binding);
-
-        if (compatible === undefined) {
-            continue;
-        }
-
-        for (const entry of compatible) {
-            // TODO fix why entry could be undefined
-            // arm/actions.yaml
-            if (entry !== undefined && !(entry in index)) {
-                index[entry] = file;
+    for (const schema of Object.values(processed)) {
+        if (!is_record(schema)) { continue; }
+        const file = schema["$filename"];
+        if (typeof file !== "string" || !file.startsWith(bindings_folder)) { continue; }
+        files += 1;
+        const properties = schema["properties"];
+        const found: { name: string; first: boolean }[] = [];
+        compatible_strings(is_record(properties) ? properties["compatible"] : undefined, true, found);
+        for (const { name, first } of found) {
+            const strength = claim(name, file, first, schema);
+            if (strength > (claims.get(name) ?? 0)) {
+                entries[name] = file;
+                claims.set(name, strength);
             }
         }
     }
 
-    return { entries: index, files: yaml_files.length };
+    return { entries, files };
 }
 
 /** @deprecated Use parse_node_path instead. Kept only for suggest callers pending Group B. */
@@ -368,6 +388,36 @@ if (import.meta.vitest) {
         if (typeof overlay === "string") { throw new TypeError(overlay); }
         return overlay;
     };
+
+    test("build_compat_index - the Linux tree's bindings only; its own file, then naming the device, a select, a fallback", () => {
+        const bindings = path.join("/linux", "Documentation", "devicetree", "bindings");
+        const schema = (file: string, compatible: unknown): Record<string, unknown> => ({ $filename: path.join(bindings, file), properties: { compatible } });
+        const index = build_compat_index({
+            "generated-types": { $id: "generated-types", properties: {} },
+            a: schema("arm/board-scu.yaml", { items: [{ const: "vendor,board-scu" }, { const: "syscon" }] }),
+            b: schema("ata/rockchip,ahci.yaml", { items: [{ enum: ["rockchip,rk3568-ahci"] }, { const: "snps,dwc-ahci" }] }),
+            c: schema("ata/dwc-ahci.yaml", { oneOf: [{ items: [{ const: "snps,dwc-ahci" }] }, { items: [{ const: "snps,spear-ahci" }] }] }),
+            d: schema("mfd/syscon.yaml", { anyOf: [{ items: [{ const: "vendor,other-scu" }, { const: "syscon" }] }] }),
+            naming: { ...schema("arm/vendor-soc.yaml", { oneOf: [{ items: [{ pattern: "^vendor,soc[0-9]+-.*$" }] }, { items: [{ enum: ["vendor,legacy-clk"] }] }] }), select: { properties: {} } },
+            clock: schema("clock/vendor,legacy-clk.yaml", { items: [{ const: "vendor,legacy-clk" }] }),
+            e: { $filename: path.join(bindings, "bus/no-compatible.yaml"), properties: {} },
+            core: { $filename: "/tmp/_MEI0/dtschema/schemas/simple-bus.yaml", properties: { compatible: { contains: { const: "simple-bus" } } } },
+        }, "/linux");
+        expect(index.files).toBe(7);
+        expect(index.entries).toEqual({
+            "vendor,board-scu": path.join(bindings, "arm/board-scu.yaml"),
+            syscon: path.join(bindings, "mfd/syscon.yaml"),
+            "rockchip,rk3568-ahci": path.join(bindings, "ata/rockchip,ahci.yaml"),
+            "snps,dwc-ahci": path.join(bindings, "ata/dwc-ahci.yaml"),
+            "snps,spear-ahci": path.join(bindings, "ata/dwc-ahci.yaml"),
+            "vendor,other-scu": path.join(bindings, "mfd/syscon.yaml"),
+            "vendor,legacy-clk": path.join(bindings, "clock/vendor,legacy-clk.yaml"),
+        });
+    });
+
+    test("build_compat_index - an output that isn't an object of schemas gives an empty index", () => {
+        expect(build_compat_index([], "/linux")).toEqual({ entries: {}, files: 0 });
+    });
 
     test("fragment_target reads a label target as the bare label", () => {
         const overlay = parse_overlay(`/dts-v1/; /plugin/; &spi0 { };`);

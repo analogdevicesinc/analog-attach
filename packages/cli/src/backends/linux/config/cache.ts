@@ -125,24 +125,29 @@ export function cache_warning(linux: string, dt_schema: string, state_directory:
     return reasons.some(reason => reason?.kind === "stale") ? `The binding caches are older than the bindings; ${rebuild_hint(program)}` : undefined;
 }
 
-export type BuildResult = { ok: true } | { ok: false; error: string };
+/** A built `validation.json`, with its content (the compat index is derived from it). */
+export type BuildResult = { ok: true; schemas: unknown } | { ok: false; error: string };
 
 /**
  * Run `dt-mk-schema -j` over the Linux bindings into `validation.json`, with
- * its stamp. The tool writes to a temporary file that is renamed on success,
- * so a failure or a parallel reader never sees a partial file (a previous
- * file stays). It writes to a file rather than a pipe so it never waits on a
- * busy event loop (the index builds in the same process meanwhile).
+ * its stamp. The tool writes to a temporary file that is renamed once it
+ * holds JSON, so a failure or a parallel reader never sees a partial file (a
+ * previous file stays).
  */
 export async function build_validation_schema(dt_mk_schema: string, linux: string, dt_schema: string, state_directory: string): Promise<BuildResult> {
     const bindings = path.join(linux, "Documentation", "devicetree", "bindings");
     const target = validation_schema_path(state_directory);
     const temporary = `${target}.${process.pid}.tmp`;
+    let schemas: unknown;
     fs.mkdirSync(path.dirname(target), { recursive: true });
     try {
         await promisify(execFile)(dt_mk_schema, ["-j", "-o", temporary, bindings], { maxBuffer: 16 * 1024 * 1024 });
         if (!fs.existsSync(temporary) || fs.statSync(temporary).size === 0) {
             return { ok: false, error: `${dt_mk_schema} produced no output` };
+        }
+        schemas = read_json<unknown>(temporary);
+        if (schemas === undefined) {
+            return { ok: false, error: `${dt_mk_schema} produced output that isn't JSON` };
         }
         fs.renameSync(temporary, target);
     } catch (error) {
@@ -152,7 +157,7 @@ export async function build_validation_schema(dt_mk_schema: string, linux: strin
         fs.rmSync(temporary, { force: true });
     }
     write_json(validation_stamp_path(state_directory), { generated_at: Date.now(), linux, dt_schema } satisfies CacheStamp);
-    return { ok: true };
+    return { ok: true, schemas };
 }
 
 if (import.meta.vitest) {
@@ -178,7 +183,7 @@ if (import.meta.vitest) {
             // dt-mk-schema -j -o <file> <bindings>
             const tool = fake_tool(directory, `echo '{"generated-types":{}}' > "$3"`);
             const linux = path.join(directory, "linux");
-            expect(await build_validation_schema(tool, linux, "/dt-schema", state_of(directory))).toEqual({ ok: true });
+            expect(await build_validation_schema(tool, linux, "/dt-schema", state_of(directory))).toEqual({ ok: true, schemas: { "generated-types": {} } });
             expect(fs.readFileSync(validation_schema_path(state_of(directory)), "utf8")).toContain("generated-types");
             expect(read_json<CacheStamp>(path.join(state_of(directory), "validation.stamp.json")))
                 .toMatchObject({ linux, dt_schema: "/dt-schema" });
@@ -209,6 +214,21 @@ if (import.meta.vitest) {
             const tool = fake_tool(directory, `: > "$3"`);
             const result = await build_validation_schema(tool, path.join(directory, "linux"), "/dt-schema", state_of(directory));
             expect(!result.ok && result.error).toContain("no output");
+            expect(fs.readFileSync(validation_schema_path(state_of(directory)), "utf8")).toBe("old");
+            expect(fs.readdirSync(state_of(directory))).toEqual(["validation.json"]);
+        } finally {
+            fs.rmSync(directory, { recursive: true });
+        }
+    });
+
+    test("build_validation_schema - output that isn't JSON is a failure and keeps the previous file", async () => {
+        const directory = workspace_with_bindings();
+        try {
+            fs.mkdirSync(state_of(directory), { recursive: true });
+            fs.writeFileSync(validation_schema_path(state_of(directory)), "old");
+            const tool = fake_tool(directory, `echo '{ partial' > "$3"`);
+            const result = await build_validation_schema(tool, path.join(directory, "linux"), "/dt-schema", state_of(directory));
+            expect(!result.ok && result.error).toContain("isn't JSON");
             expect(fs.readFileSync(validation_schema_path(state_of(directory)), "utf8")).toBe("old");
             expect(fs.readdirSync(state_of(directory))).toEqual(["validation.json"]);
         } finally {

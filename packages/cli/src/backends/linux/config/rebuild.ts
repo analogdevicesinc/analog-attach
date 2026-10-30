@@ -16,10 +16,10 @@ export interface RebuildResult {
 }
 
 /**
- * Build the compat index and `validation.json` from the Linux tree, both at
- * once (`dt-mk-schema` runs as a child process while the index parses in this
- * one). This is the only place the two caches are built: `config linux <path>`
- * and `config --reload` call it. The progress goes to stderr.
+ * Build `validation.json` from the Linux tree (`dt-mk-schema`), then the
+ * compat index from it. A failed compile builds neither, so the previous pair
+ * stays. This is the only place the two caches are built: `config linux
+ * <path>`, `config --reload` and the setup run call it. The progress goes to stderr.
  */
 export async function rebuild_caches(
     { linux, dt_schema }: { linux: string; dt_schema: string },
@@ -29,15 +29,13 @@ export async function rebuild_caches(
 ): Promise<RebuildResult> {
     const started = Date.now();
     const progress = start_progress("Indexing device bindings and compiling binding schemas...");
-    const [index, schema] = await Promise.all([
-        build_compat_index(linux, dt_schema, (done, total) => { progress.update(`${done}/${total}`); }),
-        build_validation_schema(dt_mk_schema, linux, dt_schema, state_directory),
-    ]);
-    save_compat_index(index.entries, linux, dt_schema, state_directory);
+    const schema = await build_validation_schema(dt_mk_schema, linux, dt_schema, state_directory);
     if (!schema.ok) {
         progress.done("Compiling binding schemas failed");
         return { ok: false, message: `Compiling binding schemas failed:\n${schema.error}` };
     }
+    const index = build_compat_index(schema.schemas, linux);
+    save_compat_index(index.entries, linux, dt_schema, state_directory);
     const message = `Indexed ${Object.keys(index.entries).length} compatibles from ${index.files} bindings and compiled binding schemas in ${format_duration(Date.now() - started)}`;
     progress.done(message);
     return { ok: true, message };
@@ -146,15 +144,26 @@ if (import.meta.vitest) {
         }
     });
 
-    test("rebuild_caches - builds the index and validation.json together", async () => {
-        const { directory, linux, tool } = workspace(`sleep 0.2; echo '{}' > "$3"`);
+    test("rebuild_caches - builds validation.json, then the index from it", async () => {
+        // The tool copies processed.json next to it: dt-mk-schema -j -o <file> <bindings>
+        const { directory, linux, tool } = workspace(`cat "$(dirname "$0")/processed.json" > "$3"`);
         const state = path.join(directory, "state");
+        const bindings = path.join(linux, "Documentation", "devicetree", "bindings");
+        const adc = path.join(bindings, "iio", "adc", "adi,ad7124.yaml");
+        fs.writeFileSync(path.join(directory, "processed.json"), JSON.stringify({
+            "generated-types": { $id: "generated-types", properties: {} },
+            "http://devicetree.org/schemas/iio/adc/adi,ad7124.yaml": {
+                $filename: adc,
+                properties: { compatible: { items: [{ enum: ["adi,ad7124-4", "adi,ad7124-8"] }], maxItems: 1, minItems: 1 } },
+            },
+            "http://devicetree.org/schemas/simple-bus.yaml": { $filename: "/tmp/_MEI0/dtschema/schemas/simple-bus.yaml", properties: { compatible: { contains: { const: "simple-bus" } } } },
+        }));
         try {
             const progress = capture();
             const result = await rebuild_caches({ linux, dt_schema: "/dt-schema" }, tool, state, progress.stream);
             expect(result.ok).toBe(true);
-            expect(result.message).toMatch(/^Indexed 0 compatibles from 0 bindings and compiled binding schemas in /);
-            expect(load_compat_index(state)).toMatchObject({ linux, dt_schema: "/dt-schema", entries: {} });
+            expect(result.message).toMatch(/^Indexed 2 compatibles from 1 bindings and compiled binding schemas in /);
+            expect(load_compat_index(state)).toMatchObject({ linux, dt_schema: "/dt-schema", entries: { "adi,ad7124-4": adc, "adi,ad7124-8": adc } });
             expect(fs.existsSync(validation_schema_path(state))).toBe(true);
             expect(progress.text()).toContain("Indexing device bindings and compiling binding schemas...");
         } finally {
@@ -162,16 +171,18 @@ if (import.meta.vitest) {
         }
     });
 
-    test("rebuild_caches - a failing dt-mk-schema is reported, the index is still saved", async () => {
+    test("rebuild_caches - a failing dt-mk-schema is reported, and both previous caches stay", async () => {
         const { directory, linux, tool } = workspace(`echo "bad binding" >&2; exit 1`);
         const state = path.join(directory, "state");
         try {
+            save_compat_index({ "adi,ad7124-8": "/old.yaml" }, linux, "/dt-schema", state);
+            fs.writeFileSync(validation_schema_path(state), "{}");
             const result = await rebuild_caches({ linux, dt_schema: "/dt-schema" }, tool, state, capture().stream);
             expect(result.ok).toBe(false);
             expect(result.message).toContain("Compiling binding schemas failed");
             expect(result.message).toContain("bad binding");
-            expect(load_compat_index(state)?.entries).toEqual({});
-            expect(fs.existsSync(validation_schema_path(state))).toBe(false);
+            expect(load_compat_index(state)?.entries).toEqual({ "adi,ad7124-8": "/old.yaml" });
+            expect(fs.readFileSync(validation_schema_path(state), "utf8")).toBe("{}");
         } finally {
             fs.rmSync(directory, { recursive: true });
         }

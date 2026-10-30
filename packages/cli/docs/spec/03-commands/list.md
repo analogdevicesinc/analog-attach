@@ -500,7 +500,8 @@ property, where GRM-030 would refuse it. The completion of `&spi0/` is the
 exception: it offers the base's children (`05-completion.md` CO-12).
 
 **L-2. `list devices` doesn't sort.** The names come in the compat index's
-order, the order its bindings were read in, not alphabetically.
+order, that of their bindings' `$id` in `validation.json` (COM-110), not
+alphabetically.
 
 **L-3. A multi-line description is indented on its first line only** in
 `list devices <compatible>`, and one that ends in a newline leaves an empty

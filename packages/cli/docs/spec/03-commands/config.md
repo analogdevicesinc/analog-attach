@@ -498,8 +498,8 @@ Run 'analog-attach' on a terminal, or 'analog-attach config linux <path>', to se
 ```
 $ analog-attach --json config linux ~/linux_rpi
 Indexing device bindings and compiling binding schemas...                       (stderr)
-Indexed 18052 compatibles from 5197 bindings and compiled binding schemas in 1m 14s   (stderr)
-{"ok":true,"message":"Set linux = /home/u/linux_rpi; Indexed 18052 compatibles from 5197 bindings and compiled binding schemas in 1m 14s","severity":"info"}
+Indexed 23309 compatibles from 5196 bindings and compiled binding schemas in 5.1s   (stderr)
+{"ok":true,"message":"Set linux = /home/u/linux_rpi; Indexed 23309 compatibles from 5196 bindings and compiled binding schemas in 5.1s","severity":"info"}
 ```
 
 ```
@@ -560,7 +560,7 @@ $ analog-attach --json config --reload          # linux not set
 ```
 $ analog-attach config --reload
 Indexing device bindings and compiling binding schemas...                       (stderr)
-Indexed 18052 compatibles from 5197 bindings and compiled binding schemas in 1m 18s   (stderr)
+Indexed 23309 compatibles from 5196 bindings and compiled binding schemas in 5.1s   (stderr)
 Rebuilt the binding index and validation.json.
 ```
 
