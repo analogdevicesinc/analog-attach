@@ -5,6 +5,7 @@ import type {
     BuildResponse as BaseBuildResponse,
     CommonResponse,
     InitResponse as BaseInitResponse,
+    PropertyConstraints,
     PropertySuggestions,
     PropertyType,
     PropertyValue,
@@ -14,7 +15,7 @@ import type {
 } from "../../../interface/backend-responses";
 import type { ListDevicesResponse, ListPropertyResponse } from "./descriptions";
 
-export type { CommonResponse, PropertySuggestions, PropertyValue, Severity, Suggestion, SuggestResponse } from "../../../interface/backend-responses";
+export type { CommonResponse, PropertyConstraints, PropertySuggestions, PropertyValue, Severity, Suggestion, SuggestResponse } from "../../../interface/backend-responses";
 
 export interface Config {
     field_name: string;
@@ -124,10 +125,17 @@ export interface OverlayNode extends Omit<Node, "children"> {
     origin: "overlay";
 }
 
-export type ReadResponse =
-    | ReadNode
-    | OverlayNode
-    | (ReadProperty & { description?: string; suggestions?: PropertySuggestions });
+/** One property read on its own: what the binding says of it, when the node has a binding. */
+export interface ReadPropertyDetails extends ReadProperty {
+    description?: string;
+    required?: boolean;
+    constraints?: PropertyConstraints;
+    /** The binding file the property's definition comes from (`adi,ad7124.yaml`). */
+    definition?: string;
+    suggestions?: PropertySuggestions;
+}
+
+export type ReadResponse = ReadNode | OverlayNode | ReadPropertyDetails;
 
 export interface DeletePreview extends CommonResponse {
     node_count: number;

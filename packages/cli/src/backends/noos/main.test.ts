@@ -110,6 +110,30 @@ describe("init and read", () => {
         const pin = await text(["read", "testpart_cs_gpio", "--quiet"]);
         expect(pin.split("\n")).toContain("number 4");
     });
+
+    test("--json read of a property: what the schema says of it, and who set it", async () => {
+        settings();
+        await sensor();
+        expect(await json(["read", "testpart_spi_dev", "max_speed_hz"])).toMatchObject({
+            key: "max_speed_hz",
+            value: 1_000_000,
+            description: expect.stringContaining("Maximum transfer speed") as unknown,
+            required: true,
+            source: expect.stringMatching(/^(user|bootstrap)$/) as unknown,
+            definition: "number",
+        });
+        await json(["update", "testpart_spi_dev", "max_speed_hz", "2000000"]);
+        expect(await json(["read", "testpart_spi_dev", "max_speed_hz"])).toMatchObject({ value: 2_000_000, source: "user" });
+        // An include of an enum reads as the enum it resolves to, as the text's Type line does.
+        expect(await json(["read", "testpart_spi_dev", "mode"])).toMatchObject({ required: false, definition: "enum" });
+
+        const node = await json(["read", "testpart_spi_dev"]) as { properties: { key: string; value: unknown; source?: string }[] };
+        const speed = node.properties.find(property => property.key === "max_speed_hz");
+        expect(speed).toMatchObject({ source: "user" });
+        for (const property of node.properties.filter(entry => entry.value === null)) {
+            expect(property).not.toHaveProperty("source");
+        }
+    });
 });
 
 describe("list", () => {
