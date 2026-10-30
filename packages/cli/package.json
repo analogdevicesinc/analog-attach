@@ -22,7 +22,8 @@
     "dev-unlink": "rm -f \"$HOME/.local/bin/analog-attach\" && echo \"Removed $HOME/.local/bin/analog-attach\"",
     "clean": "rm -rf dist tsconfig.tsbuildinfo node_modules",
     "lint": "eslint src",
-    "test": "vitest"
+    "test": "vitest",
+    "test:functional": "test/functional/run.sh"
   },
   "tsup": {
     "entry": [
@@ -61,6 +62,9 @@
     "ajv": "^8.17.1",
     "attach-lib": "*",
     "attach-no-os-lib": "workspace:*",
+    "bats": "1.13.0",
+    "bats-assert": "2.2.4",
+    "bats-support": "0.3.0",
     "eslint": "^9.31.0",
     "eslint-plugin-unicorn": "^60.0.0",
     "tsup": "^6.7.0",
