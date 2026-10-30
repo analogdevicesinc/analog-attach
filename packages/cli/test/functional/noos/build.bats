@@ -81,7 +81,7 @@ tree_sum() {
 	assert_json '.message | test("ninja was not found")' true
 }
 
-# bats test_tags=req:BUILD-02, gap
+# bats test_tags=req:BUILD-02
 @test "build reports every missing tool at once" {
 	with_sensor
 	aa generate >/dev/null
@@ -89,7 +89,6 @@ tree_sum() {
 	path=$(path_without cmake ninja)
 	PATH="$path" run_json build
 	assert_json '.ok' false
-	# Gap: build stops at the first missing prerequisite and names only cmake, not ninja.
 	assert_json '.message | test("cmake") and test("ninja")' true
 }
 

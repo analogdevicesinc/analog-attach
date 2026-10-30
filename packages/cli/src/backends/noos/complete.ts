@@ -6,6 +6,8 @@ import fs from "node:fs";
 import {
     PROBE_OPTIONS,
     addable_drivers,
+    driver_interfaces,
+    find_eval_board_module,
     get_workfile_path,
     import_minimal,
     list_available_structs,
@@ -116,8 +118,18 @@ function board_names(): string[] {
         .map(board => board.name);
 }
 
-function flag_candidates(flag: string): Completion {
+/** What `add <key> --as` takes: the interfaces of the driver the key names (or its eval board carries). */
+function interface_candidates(key: string | undefined): Completion {
+    if (key === undefined) { return NONE; }
+    const driver = find_eval_board_module(key)?.implements_driver ?? key;
+    const interfaces = driver_interfaces(driver);
+    if (!interfaces.ok) { return NONE; }
+    return { candidates: interfaces.value.map(({ interface: value, root }) => ({ value, description: root })) };
+}
+
+function flag_candidates(flag: string, prior: readonly string[]): Completion {
     switch (flag) {
+        case "as": { return interface_candidates(prior[0]); }
         case "board": { return values(board_names()); }
         case "probe": { return values(PROBE_OPTIONS); }
         case "project-template": { return { candidates: list_template_sets().map(value => ({ value })), fallback: "dirs" }; }
@@ -141,7 +153,7 @@ export function complete(slot: Slot, _partial: string, session: Session): Promis
         }
         case "device": { return Promise.resolve(values(schema_keys())); }
         case "source": { return Promise.resolve({ candidates: [], fallback: "files" }); }
-        case "flag": { return Promise.resolve(flag_candidates(slot.flag)); }
+        case "flag": { return Promise.resolve(flag_candidates(slot.flag, slot.prior)); }
         case "extra": { return Promise.resolve(NONE); }
     }
 }

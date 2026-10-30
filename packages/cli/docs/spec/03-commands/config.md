@@ -47,8 +47,9 @@ report `--reset needs a key: analog-attach config <key> --reset`, where
 report `--global needs a key: analog-attach config <key> <value> --global`.
 
 **CONFIG-101** If `<key>` is neither `backend` nor one of the backend's
-settings, then the CLI shall report `Unknown config field: <key>. Valid
-fields: <keys>.`, `<keys>` being `backend` and the backend's keys in order,
+settings, then the CLI shall report `Unknown config field: <key>.[ Did you
+mean <close>?] Valid fields: <keys>.`, `<close>` the keys a few edits from
+`<key>` (`02-common.md` COM-140), `<keys>` being `backend` and the backend's keys in order,
 joined with `, `, whatever else is given. With no backend set, `<keys>` is
 `backend` and the message ends with ` Choose a backend first: 'analog-attach
 config backend <ids>'.` (COM-014's `<ids>`).

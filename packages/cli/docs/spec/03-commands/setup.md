@@ -40,7 +40,11 @@ terminal run (COM-012), the CLI shall run the setup run.
 
 **SETUP-002** When argv is empty in a run that isn't a terminal run, or argv
 is the one element `--quiet`, the CLI shall write the usage as GRM-005 says,
-and ask nothing.
+and ask nothing. When a backend is set and some of its required settings
+have no value, the CLI shall then write, in human mode, an empty line and
+`Not set yet: <keys>. Run 'analog-attach' on a terminal for the guided
+setup, or 'analog-attach config <first key> <value>'.`, `<keys>` those
+settings joined with `, `.
 
 ## 4. The configuration
 

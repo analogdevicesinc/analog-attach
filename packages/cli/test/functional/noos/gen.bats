@@ -298,7 +298,7 @@ checksum() {
 	aa init >/dev/null
 	run_json add eval-testprt
 	assert_json '.ok' false
-	assert_json '.message' "Unknown schema 'eval-testprt'. See: analog-attach list devices"
+	assert_json '.message' "Unknown schema 'eval-testprt'. Did you mean eval-testpart? See: analog-attach list devices"
 }
 
 # bats test_tags=req:GEN-12
@@ -347,9 +347,8 @@ checksum() {
 	[ "$(checksum)" = "$before" ]
 }
 
-# bats test_tags=req:GEN-13, gap
+# bats test_tags=req:GEN-13
 @test "a missing capi-path stops init, saying how to set it" {
-	# Gap: init says "Unknown target 'otherboard': the configured modules have no boards or chips. Check capi-path and module-paths", not how to set capi-path.
 	aa config capi-path --reset >/dev/null
 	run_json init
 	assert_json '.ok' false
