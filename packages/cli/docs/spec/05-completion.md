@@ -109,7 +109,8 @@ source (§6.2), or offer nothing when it has none.
 **COMPL-032** When the current word starts with `-` but not `-` and a digit,
 and no `--` came before it, the CLI shall offer the command's long options
 that aren't among the committed words (one that may be given several times
-stays), then `--help` (`Print help information and exit`), each described by
+stays), then `--json` (`Output as JSON`) unless it is among the committed
+words, before the command too, then `--help` (`Print help information and exit`), each described by
 its help text.
 
 **COMPL-033** Otherwise the CLI shall complete the current word from the

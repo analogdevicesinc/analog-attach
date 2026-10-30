@@ -576,8 +576,8 @@ if (import.meta.vitest) {
             expect(top).toEqual(expect.arrayContaining(["config", "init", "add", "list", "move", "skill", "completion", "help"]));
             expect(top).not.toContain("deploy");
             expect(values(await complete(["list", ""]))).toEqual(["devices", "property", "value", "parent"]);
-            expect(values(await complete(["add", "--"]))).toEqual(["--name", "--quiet", "--parent", "--help"]);
-            expect(values(await complete(["--json", "add", "--"]))).toContain("--parent");
+            expect(values(await complete(["add", "--"]))).toEqual(["--name", "--quiet", "--parent", "--json", "--help"]);
+            expect(values(await complete(["--json", "add", "--"]))).toEqual(["--name", "--quiet", "--parent", "--help"]);
             write_local({ backend: "other" });
             expect(values(await complete([""]))).not.toContain("move");
         });

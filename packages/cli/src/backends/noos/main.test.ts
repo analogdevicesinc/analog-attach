@@ -296,4 +296,14 @@ describe("help and completion", () => {
         const properties = await run(["__complete", "read", "testpart_spi_dev", ""]);
         expect(properties.stdout).toContain("max_speed_hz");
     });
+
+    test("completion offers --json after the command, once", async () => {
+        settings();
+        await sensor();
+        const flags = await run(["__complete", "read", "testpart_spi_dev", "max_speed_hz", "--"]);
+        expect(flags.stdout).toContain("--quiet");
+        expect(flags.stdout.split("\n")).toContain("--json\tOutput as JSON");
+        const again = await run(["__complete", "read", "--json", "--"]);
+        expect(again.stdout).not.toContain("--json");
+    });
 });
