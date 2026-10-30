@@ -13,7 +13,7 @@ export type SettingType = "path" | "path_list" | "string" | "numeric" | "bool";
  * describing the setting, not here: settings must not import the scanners, because
  * codegen and the schema loaders import settings.
  */
-export type SettingEnumSource = "platform" | "board" | "template";
+export type SettingEnumSource = "target" | "template";
 
 /**
  * The question a setting answers, in the order someone sets things up: where CAPI comes
@@ -52,10 +52,8 @@ export interface SettingsFile {
 	"module-paths": Setting;
 	/** Which workfile the commands act on: they have no --workfile flag. */
 	workfile: Setting;
-	/** Board a new workfile is created for; also implies its platform. */
-	board: Setting;
-	/** Overrides the platform implied by `board`. */
-	platform: Setting;
+	/** What a new workfile is created for: a board (which names its chip), or a chip used without a board. */
+	target: Setting;
 	/** Name of the generated project. */
 	"project-name": Setting;
 	/** Directory of the generated project: `generate` writes it, `build`/`deploy` act on it. */

@@ -282,8 +282,7 @@ one):
 |---|---|---|---|---|---|
 | `capi-path` | Sources | path (directory with a `module.yml`) | yes | — | `Path to the root of the capi repository` |
 | `module-paths` | Sources | path_list (directories) | no | — | `Module repositories to load rulesets from (platform backends, driver collections)` |
-| `board` | Target | one of the boards of the module repositories | yes | — | `Board a new workfile targets; setting it also sets 'platform' to the chip it carries` |
-| `platform` | Target | one of the chips of the module repositories | no | — | `Chip a new workfile targets, for a chip with no board of its own; setting it clears a 'board' that carries another chip` |
+| `target` | Target | one of the boards, or chips, of the module repositories | yes | — | `What a new workfile is for: a board (which brings its chip), or a chip used without a board` |
 | `workfile` | Workfile | path | yes | `workfile.json` | `Workfile the commands act on, relative to the project root unless absolute` |
 | `bootstrap` | Workfile | `true` or `false` | no | `true` | `After 'add', fill in every value and node that leaves no room for choice (true/false)` |
 | `interview` | Workfile | `true` or `false` | no | `true` | `After 'add', on a terminal, ask for the choices and values bootstrap leaves to you (true/false)` |
@@ -299,12 +298,12 @@ one):
 those the module repositories of `module-paths` define, scanned on every run
 (`config.md` CONFIG-510); the bundled template sets are `capi` and
 `capi-iio`. Writing a setting checks more than its kind (`config.md`
-CONFIG-500 to CONFIG-506).
+CONFIG-500 to CONFIG-505).
 
 **COM-501** Where the backend is noos, `capi-path` shall have the hint `Run
 'analog-attach config capi-path <path>', or 'analog-attach' on a terminal for
-the guided setup.`, and `board` the hint `Run 'analog-attach config board
-<name>' ('analog-attach list context' lists them).`. The other fields have
+the guided setup.`, and `target` the hint `Run 'analog-attach config target
+<board or chip>' ('analog-attach list context' lists them).`. The other fields have
 none.
 
 **COM-120** The CLI shall find the project root by walking up from the CWD

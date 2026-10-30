@@ -74,7 +74,7 @@ export function create_noos_fixture(): NoosFixture {
                 noos: {
                     "capi-path": path.join(FIXTURES, "capi"),
                     "module-paths": [path.join(FIXTURES, "platform"), path.join(FIXTURES, "driver-collection")],
-                    "board": "otherboard",
+                    "target": "otherboard",
                     "interview": "false",
                     ...values,
                 },

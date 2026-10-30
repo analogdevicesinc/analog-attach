@@ -2,6 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import {
+    TARGET_SETTING,
     board_peripheral_kinds,
     get_workfile_path,
     list_boards,
@@ -151,16 +152,16 @@ async function ensure_module_paths(session: InteractiveSession, capi: string): P
 
 async function ensure_board(session: InteractiveSession): Promise<Step<string | undefined>> {
     const { settings, style, prompter } = session;
-    const current = settings.get("board");
+    const current = settings.get(TARGET_SETTING);
     if (current !== undefined) {
-        done(session, "board", current);
+        done(session, TARGET_SETTING, current);
         return { ok: true, value: current, saved: [] };
     }
 
     const boards = list_boards();
     if (!boards.ok || boards.value.length === 0) {
         session.say(style.yellow(boards.ok ? "No boards in the configured module repositories." : boards.error.message));
-        session.say(`  Set one later: ${session.program} config board <name>`);
+        session.say(`  Set one later: ${session.program} config target <board or chip>`);
         return { ok: true, value: undefined, saved: [] };
     }
 
@@ -178,11 +179,10 @@ async function ensure_board(session: InteractiveSession): Promise<Step<string | 
         })
     });
 
-    // A board and its platform are one choice: the write sets both, as `config board` does.
-    const written = await write(session, "board", board);
+    // The board brings its chip: target is the one setting for both.
+    const written = await write(session, TARGET_SETTING, board);
     if (!written.ok) { return written; }
-    const platform = settings.get("platform");
-    return { ok: true, value: board, saved: platform === undefined ? ["board"] : ["board", "platform"] };
+    return { ok: true, value: board, saved: [TARGET_SETTING] };
 }
 
 /** Whether to create the workfile: only asked when there is none yet. */
@@ -289,9 +289,7 @@ async function write(session: InteractiveSession, key: string, value: string | r
         return { ok: false, outcome: refuse(written.message) };
     }
     const shown = typeof value === "string" ? value : value.join(", ");
-    const platform = key === "board" ? session.settings.get("platform") : undefined;
-    const also = platform === undefined ? "" : ` (and platform = ${platform})`;
-    session.say(`${session.style.cyan("✓")} ${key} = ${shown}${also}`);
+    session.say(`${session.style.cyan("✓")} ${key} = ${shown}`);
     return { ok: true };
 }
 

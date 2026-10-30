@@ -3,11 +3,11 @@ import path from "node:path";
 import {
     create_workfile,
     export_minimal,
-    find_soc,
+    TARGET_SETTING,
     get_effective_setting_value,
     get_workfile_path,
     list_socs,
-    soc_for_board
+    resolve_target
 } from "attach-no-os-lib";
 import { answer, command, refuse, type InitArguments, type Session } from "../../../interface/backend-interface";
 import type { InitResponse } from "../protocol/responses";
@@ -16,8 +16,8 @@ import { install } from "../settings";
 /**
  * `init` - start a new workfile at the configured path.
  *
- * Every input is a setting: `workfile` says where, `board` (or `platform`, for the
- * platforms that have none) says what for. There are deliberately no per-run overrides: a
+ * Every input is a setting: `workfile` says where, `target` (a board, or a chip with no
+ * board of its own) says what for. There are deliberately no per-run overrides: a
  * workfile is created once and then read back by `generate` from the same settings, so a
  * target that lived only in one command's argv would be a target nothing else could see.
  */
@@ -25,9 +25,9 @@ export const init = command<InitArguments, InitResponse>({
     docs: {
         brief: "Create a new workfile at the configured path",
         full:
-            "Creates the workfile named by the 'workfile' setting, for the board named by the\n" +
-            "'board' setting (or the 'platform' setting, for platforms that have no boards).\n" +
-            "Set them with 'analog-attach config'. Refuses to overwrite a workfile that already exists."
+            "Creates the workfile named by the 'workfile' setting, for what the 'target' setting\n" +
+            "names: a board, or a chip with no board of its own. Set them with 'analog-attach config'.\n" +
+            "Refuses to overwrite a workfile that already exists."
     },
     run(_arguments, _flags, session) {
         const created = init_workfile(session);
@@ -44,7 +44,7 @@ export type InitResult =
     | { ok: false; message: string; text?: string };
 
 /**
- * Create the workfile the settings name, for the board (or platform) they name. Shared by
+ * Create the workfile the settings name, for the target (board or chip) they name. Shared by
  * `init` and the guided setup, so both refuse and report the same way.
  */
 export function init_workfile(session: Pick<Session, "settings" | "assets_dir" | "program">): InitResult {
@@ -64,7 +64,7 @@ export function init_workfile(session: Pick<Session, "settings" | "assets_dir" |
         };
     }
 
-    const resolved = resolve_target(session.program);
+    const resolved = workfile_target(session.program);
     if (!resolved.ok) {
         return resolved;
     }
@@ -100,64 +100,28 @@ type ResolvedTarget =
     | { ok: true; platform: string; board?: string }
     | { ok: false; message: string; text?: string };
 
-/**
- * Which platform (and board) the new workfile targets.
- *
- * The board is the primary axis — it names its own platform — so `platform` only has to be
- * set for the platforms that have no boards at all (linux, mbed) or to start a workfile
- * before the board is decided.
- */
-function resolve_target(program: string): ResolvedTarget {
-    const configured_board = setting("board");
-    const configured_platform = setting("platform");
-
-    if (configured_board === undefined) {
-        if (configured_platform === undefined) {
-            return {
-                ok: false,
-                message: `No board or platform configured. Run: ${program} config board <name>, or ${program} for the guided setup`,
-                text: format_no_target(program)
-            };
-        }
-        // No board: the platform setting names the chip directly, which is how a chip with no
-        // board module of its own is targeted.
-        const soc = find_soc(configured_platform);
-        if (!soc.ok) {
-            return { ok: false, message: soc.error.message };
-        }
-        return { ok: true, platform: configured_platform };
-    }
-
-    // A board names its own chip, so it settles the platform on its own.
-    const resolved = soc_for_board(configured_board);
-    if (!resolved.ok) {
-        return { ok: false, message: resolved.error.message };
-    }
-
-    // A configured platform that contradicts the board is a mistake worth reporting rather
-    // than quietly resolving in the board's favour.
-    if (configured_platform !== undefined && configured_platform !== resolved.value) {
+/** Which platform (and board) the new workfile targets: what the `target` setting names. */
+function workfile_target(program: string): ResolvedTarget {
+    const configured = get_effective_setting_value(TARGET_SETTING);
+    if (!configured.ok || configured.value === undefined) {
         return {
             ok: false,
-            message: `Board '${configured_board}' carries ${resolved.value}, not ${configured_platform}`
+            message: `No target configured. Run: ${program} config target <board or chip>, or ${program} for the guided setup`,
+            text: format_no_target(program)
         };
     }
-
-    return { ok: true, platform: resolved.value, board: configured_board };
-}
-
-function setting(key: "board" | "platform"): string | undefined {
-    const value = get_effective_setting_value(key);
-    return value.ok ? value.value : undefined;
+    const resolved = resolve_target(configured.value);
+    return resolved.ok ? { ok: true, ...resolved.value } : { ok: false, message: resolved.error.message };
 }
 
 // --- Formatters ---
 
 function format_no_target(program: string): string {
-    let out = "No board or platform configured.\n\n";
-    const width = `${program} config platform <name>`.length + 4;
-    out += `  ${`${program} config board <name>`.padEnd(width)}a board settles the platform on its own\n`;
-    out += `  ${`${program} config platform <name>`.padEnd(width)}for a chip with no board of its own\n`;
+    let out = "No target configured.\n\n";
+    const width = `${program} config target <board>`.length + 4;
+    out += `  ${`${program} config target <board>`.padEnd(width)}a board brings its chip\n`;
+    out += `  ${`${program} config target <chip>`.padEnd(width)}for a chip with no board of its own\n`;
+    out += `  ${`${program} list context`.padEnd(width)}the boards and chips there are\n`;
     out += `  ${program.padEnd(width)}the guided setup, which asks for what is missing\n\n`;
 
     const socs = list_socs();

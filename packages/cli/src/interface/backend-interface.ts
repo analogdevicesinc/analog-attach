@@ -221,9 +221,9 @@ export interface SettingsHooks {
     /** The options of a `dynamic` setting. */
     options?(key: string, session: Session): Promise<string[]>;
     /**
-     * Before a write. `also` are settings to change with it, in the same write (no-OS:
-     * setting `board` sets its `platform`); `null` resets one. `scope` is the file the
-     * write goes to, so a hook can tell which of the other settings it leaves in effect.
+     * Before a write. `also` are settings to change with it, in the same write (a setting
+     * another one follows from); `null` resets one. `scope` is the file the write goes to,
+     * so a hook can tell which of the other settings it leaves in effect.
      */
     check?(key: string, value: string, session: Session, scope: "local" | "global"): Promise<
         | { ok: true; also?: Readonly<Record<string, string | null>> }

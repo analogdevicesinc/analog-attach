@@ -72,28 +72,25 @@ describe("config --json", () => {
 });
 
 describe("the options hook", () => {
-    it("lists every configured board and chip as the setting's options", async () => {
+    it("lists every configured board, then every chip, as target's options", async () => {
         fixture.settings();
-        const board = await entry("board") as { type: { options: string[] } };
-        expect(board.type.options.toSorted()).toEqual(["otherboard", "testboard", "twobusboard"]);
-        const platform = await entry("platform") as { type: { options: string[] } };
-        expect(platform.type.options).toContain("testsoc");
+        const target = await entry("target") as { type: { options: string[] } };
+        expect(target.type.options).toEqual(expect.arrayContaining(["otherboard", "testboard", "twobusboard", "testsoc", "othersoc"]));
+        expect(target.type.options.indexOf("testboard")).toBeLessThan(target.type.options.indexOf("testsoc"));
         // A template set is a bundled name or a folder of your own: no closed list.
         expect(await entry("project-template")).toMatchObject({ type: "string" });
         expect(await entry("workfile")).toMatchObject({ type: "path" });
     });
 
-    it("with no modules to scan, board falls back to its plain type", async () => {
-        fixture.settings({ "module-paths": undefined, "board": undefined });
-        expect(await entry("board")).toMatchObject({ type: "string" });
+    it("with no modules to scan, target falls back to its plain type", async () => {
+        fixture.settings({ "module-paths": undefined, "target": undefined });
+        expect(await entry("target")).toMatchObject({ type: "string" });
     });
 
-    it("completes board and platform values", async () => {
+    it("completes target values: the boards and the chips", async () => {
         fixture.settings();
-        const boards = await fixture.run(["__complete", "config", "board", ""]);
-        expect(boards.stdout.split("\n")).toEqual(expect.arrayContaining(["otherboard", "testboard", "twobusboard"]));
-        const platforms = await fixture.run(["__complete", "config", "platform", ""]);
-        expect(platforms.stdout.split("\n")).toContain("testsoc");
+        const targets = await fixture.run(["__complete", "config", "target", ""]);
+        expect(targets.stdout.split("\n")).toEqual(expect.arrayContaining(["otherboard", "testboard", "twobusboard", "testsoc"]));
     });
 });
 
