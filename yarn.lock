@@ -15,6 +15,7 @@ __metadata:
     "@types/node": "npm:25.x"
     "@typescript-eslint/eslint-plugin": "npm:^8.72.1"
     "@typescript-eslint/parser": "npm:^8.72.1"
+    "@vitest/coverage-v8": "npm:^4.0.18"
     ajv: "npm:^8.17.1"
     attach-lib: "npm:*"
     attach-no-os-lib: "workspace:*"
