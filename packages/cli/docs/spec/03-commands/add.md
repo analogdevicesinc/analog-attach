@@ -579,8 +579,9 @@ list devices`. `<schema>` is literal.
 
 **ADD-502** The CLI shall then load the workfile (`02-common.md` COM-512).
 If `<device>` is neither a schema, an eval board nor a driver, then the CLI
-shall refuse with `Unknown schema '<device>'. See: analog-attach list
-devices`.
+shall refuse with `Unknown schema '<device>'.[ Did you mean <close>?] See:
+analog-attach list devices`, `<close>` the keys of `list devices` a few
+edits from `<device>` (`02-common.md` COM-140).
 
 **ADD-503** For a driver (or an eval board), the CLI shall add the driver's
 root: the generic handle the part is used through. Where `project-template`

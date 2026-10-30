@@ -227,6 +227,8 @@ field() {
 	with_sensor
 	aa generate >/dev/null
 	aa config deploy-command 'echo mine > deployed-by-me.txt'
+	# Never built here: a build step of the user's own too, so deploy doesn't look for the image.
+	aa config build-command true >/dev/null
 	run_json deploy
 	assert_success
 	assert_json '.ok' true

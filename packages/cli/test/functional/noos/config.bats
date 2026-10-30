@@ -256,9 +256,8 @@ global_setting() {
 
 # --- CONFIG-11: unknown setting ------------------------------------------------------------
 
-# bats test_tags=req:CONFIG-11, gap
+# bats test_tags=req:CONFIG-11
 @test "a mistyped setting is refused, naming the closest setting" {
-	# Gap: the message lists every valid setting; it doesn't single out the closest (target for targt).
 	run aa config targt testboard
 	assert_failure 2
 	assert_output --partial "Unknown config field: targt"

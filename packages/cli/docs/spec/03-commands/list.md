@@ -56,9 +56,12 @@ GRM-020 to GRM-024 (LIST-004).
 `list` now writes the group's usage, GRM-018, and `list --help` describes the
 kinds, LIST-008.)
 
-**LIST-002** *Withdrawn.* (An unknown kind was refused with `Unknown list
-kind: <kind>. …`. It is now an unknown command, GRM-004: ``No command
-registered for `<kind>` ``.)
+**LIST-002** If the word after `list` names no kind of the backend, then
+the CLI shall report the input error `Unknown kind: <kind>.[ Did you mean
+<close>?] The kinds: <kinds>.`, `<kinds>` the backend's kinds in the order
+the help lists them, joined with `, `, and `<close>` those a few edits from
+`<kind>` (COM-140). The same holds for `skill`: `Unknown skill command:
+<word>. … The skill commands: install, uninstall.`
 
 **LIST-003** *Withdrawn.* (The arguments after those of §1 were ignored. More
 are now GRM-004's `Too many arguments, …`, and the third of `list value` is

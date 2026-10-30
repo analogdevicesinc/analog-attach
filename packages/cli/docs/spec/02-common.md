@@ -102,6 +102,14 @@ build doesn't happen or fails (`config.md` CONFIG-122, CONFIG-123, CF-6), and
 the setup run keeps `linux`, `devicetree` and `workfile` saved when its cache
 build fails (`setup.md` SETUP-030, SETUP-033, S-3).
 
+**COM-140** When a refusal or an input error is about a name that isn't one
+of a known set (a setting, a kind, a device type), the message shall name the
+closest names of the set: ` Did you mean <a>, <b>?`, at most three, those a
+few edits away first (a third of the name's length, at least two: insertions,
+deletions, changes, swaps of two neighbours), then, for a name of three
+characters or more, those that contain it. With none close, the sentence is
+left out.
+
 ## 5. Success
 
 **COM-050** While in JSON mode, when a command succeeds, the CLI shall

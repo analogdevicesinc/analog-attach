@@ -120,7 +120,8 @@ kept under the tool's lines and rewritten as they come.
 The board is the preset's name, the target the `project()` name, and the
 ELF `<dir>/build/<target>.elf`.
 
-**BUILD-513** The CLI shall then check, and refuse with the first problem:
+**BUILD-513** The CLI shall then check, and refuse with every problem it
+finds, their messages joined with a space, in this order:
 `cmake was not found on PATH. Install CMake 3.27.0 or newer.`; `CMake
 <version> is too old; CAPI apps need 3.27.0 or newer.`; `ninja was not found
 on PATH, and the generated preset uses it as the generator. Install it (apt
