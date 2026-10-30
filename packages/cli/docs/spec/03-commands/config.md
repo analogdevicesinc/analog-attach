@@ -156,7 +156,12 @@ setting:
 
 `config <key> <value>` writes the local settings file, or the global one
 with `--global` (§8): `backend` at the top level, the backend's settings in
-its section (COM-129). It doesn't use workspace loading (COM-070): it is how
+its section (COM-129). `backend` is written to the local file only
+(`02-common.md` COM-136): `config --global backend <id>` is refused with
+`backend belongs to the project and can't be in the global settings: set it
+without --global, in the project's directory`, refused like a value (exit 2,
+the message on standard error).
+`config --global backend --reset` still removes it from the global file. It doesn't use workspace loading (COM-070): it is how
 a broken configuration gets fixed, so problems of COM-123, COM-132 and
 COM-133 in the files don't stop it.
 
