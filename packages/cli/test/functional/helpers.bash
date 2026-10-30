@@ -93,6 +93,15 @@ with_overlay() {
 	[ -f "$WORKFILE" ] || fail "no workfile after init"
 }
 
+# `with_sensor`: after `new_project noos`, a workfile with the fixture's eval board added:
+# testpart, testpart_cfg, testpart_ip, eval_testpart, testpart_spi_dev, testpart_cs_gpio,
+# wired on otherboard and valid.
+with_sensor() {
+	aa init >/dev/null || fail "init failed"
+	aa add eval-testpart >/dev/null || fail "add eval-testpart failed"
+	[ -f "$WORKFILE" ] || fail "no workfile after add"
+}
+
 # `tty_run <expect> <keys> [<expect> <keys>...] -- <words>`: runs the CLI on a pseudo-terminal
 # (stdin and stdout a terminal); each time the screen shows <expect>, after the previous one, it
 # types <keys> ($'\r' Enter, $'\x1b[B' down, $'\x03' Ctrl-C). Sets $status and $output (the
@@ -162,4 +171,18 @@ drop_setting() {
 		jq --arg key "$key" '.backend as $backend | del(.[$backend][$key])' "$file" >"$file.new" &&
 			mv "$file.new" "$file"
 	done
+}
+
+# `stored <jq filter>`: the filter on the workfile on disk ($WORKFILE).
+stored() {
+	jq -c "$1" "$WORKFILE"
+}
+
+# `real_project`: the project's settings for the real trees, or skip without them.
+real_project() {
+	[ -n "${AA_CAPI_PATH:-}" ] && [ -n "${AA_MODULE_PATHS:-}" ] || skip "needs AA_CAPI_PATH and AA_MODULE_PATHS"
+	need cmake ninja arm-none-eabi-gcc
+	jq -n --arg capi "$AA_CAPI_PATH" --arg modules "$AA_MODULE_PATHS" --arg target "${AA_TARGET:-max32655fthr}" \
+		'{ backend: "noos", noos: { "capi-path": $capi, "module-paths": ($modules | split(":")),
+			"target": $target, "interview": "false" } }' >"$PROJECT/.analog-attach/config.json"
 }
