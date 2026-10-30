@@ -74,6 +74,23 @@ describe("the Linux backend through main", () => {
         expect(JSON.parse(whole.stdout)).toMatchObject({ key: "/", origin: "overlay", children: [{ key: "adc@0", origin: "overlay" }] });
     });
 
+    test("--json read of a property: what its binding says of it, which --quiet leaves out", async () => {
+        configure();
+        const read_json = async (argv: readonly string[]): Promise<Record<string, unknown>> => {
+            const result = await run(["--json", "read", ...argv]);
+            return JSON.parse(result.stdout) as Record<string, unknown>;
+        };
+        const reg = await read_json(["adc", "reg"]);
+        expect(reg).toMatchObject({ key: "reg", source: "overlay", required: true, definition: "adi,ad7124.yaml" });
+        expect(reg).not.toHaveProperty("constraints");
+
+        await run(["update", "adc", "spi-max-frequency", "1000000"]);
+        expect(await read_json(["adc", "spi-max-frequency"])).toMatchObject({ required: false, constraints: { maximum: 5_000_000 }, definition: "adi,ad7124.yaml" });
+
+        const quiet = await read_json(["--quiet", "adc", "reg"]);
+        for (const key of ["required", "constraints", "definition", "description"]) { expect(quiet).not.toHaveProperty(key); }
+    });
+
     test("a refused rename: exit 0, the reason on stdout, ok: false under --json; the workfile is unchanged", async () => {
         write_settings({ linux, devicetree: path.join(base, "base.dts"), workfile: path.join(project, "overlay.dtso") });
         const text = await run(["rename", "spi0", "spi1"]);

@@ -80,9 +80,24 @@ export interface Node<P extends Property = Property> {
     alias?: string[];
 }
 
-/** One property read on its own. */
+/** What a definition says a value may be, when it says. */
+export interface PropertyConstraints {
+    default?: unknown;
+    minimum?: number | bigint;
+    maximum?: number | bigint;
+}
+
+/**
+ * One property read on its own. `source` and `definition` are in the backend's words, like
+ * a node's `origin`: Linux `base` / `overlay` and the binding file; no-OS `user` /
+ * `bootstrap` and the schema's property type.
+ */
 export interface ReadProperty extends Property {
     description?: string;
+    required?: boolean;
+    source?: string;
+    constraints?: PropertyConstraints;
+    definition?: string;
     suggestions?: PropertySuggestions;
 }
 

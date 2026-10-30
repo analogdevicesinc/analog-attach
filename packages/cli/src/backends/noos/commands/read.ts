@@ -17,8 +17,9 @@ import {
     load_context,
     root_key
 } from "./shared";
-import { include_target, node_origin, to_protocol_node, to_protocol_property, to_protocol_root } from "../protocol/convert";
-import type { ReadProperty, ReadResponse } from "../protocol/responses";
+import { include_target, node_origin, property_source, to_protocol_node, to_protocol_property, to_protocol_root } from "../protocol/convert";
+import type { Property as ProtocolProperty, ReadProperty, ReadResponse } from "../protocol/responses";
+import type { PropertyConstraints } from "../../../interface/backend-responses";
 
 /**
  * `read [node] [property]`: the tree, a node, or one property.
@@ -98,12 +99,36 @@ export function read_target(session: Session, quiet: boolean, node?: string, pro
     // The same lists the text shows under Suggestions and Can create.
     const response = (): ReadProperty => ({
         ...to_protocol_property(shown),
+        ...schema_details(shown),
         suggestions: {
             values: (details.values ?? []).map(value => ({ value })),
             can_create: (details.types ?? []).map(value => ({ value })),
         },
     });
     return answer(response, quiet ? quiet_value(shown) : format_property_details(shown, details, session.program));
+}
+
+/**
+ * What the text's details say beyond the value, for JSON: the description, whether it is
+ * required, who set it, its default and bounds, and its type in the schema.
+ */
+function schema_details(property: Property): Omit<ReadProperty, keyof ProtocolProperty | "suggestions"> {
+    const source = property_source(property);
+    const fallback = "default" in property ? property.default : undefined;
+    const minimum = property._t === "NumberProperty" ? property.minimum : undefined;
+    const maximum = property._t === "NumberProperty" ? property.maximum : undefined;
+    const constraints: PropertyConstraints = {
+        ...(fallback === undefined ? {} : { default: fallback }),
+        ...(minimum === undefined ? {} : { minimum }),
+        ...(maximum === undefined ? {} : { maximum }),
+    };
+    return {
+        ...(property.description ? { description: property.description } : {}),
+        required: property.required === true,
+        ...(source === undefined ? {} : { source }),
+        ...(Object.keys(constraints).length === 0 ? {} : { constraints }),
+        definition: format_property_type(property._t),
+    };
 }
 
 // ------- FORMATTERS --------

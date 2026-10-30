@@ -161,12 +161,16 @@ mark (`reg = <2>;`). (Open issue R-2.)
 
 **READ-035** While in JSON mode, the CLI shall respond with the property per
 READ-050, plus `source`, plus `description` when the binding describes it,
-plus `suggestions` when there are suggestions (READ-033, unfiltered) or
-providers to add (READ-036): `{ "values": [<suggestion>, …], "can_create":
-[<suggestion>, …] }`, `values` always there (empty when there are none),
-`can_create` only when it isn't empty (schema
-`read.schema.json#/$defs/read-property`). With `--quiet`, `description` and
-`suggestions` are left out.
+plus, when the node has a binding, `required` (whether the binding requires
+the property), `constraints` (`{ "default", "minimum", "maximum" }`, each
+when the binding gives it, left out when it gives none) and `definition`
+(the binding's file name, `adi,ad7124.yaml`), plus `suggestions` when there
+are suggestions (READ-033, unfiltered) or providers to add (READ-036): `{
+"values": [<suggestion>, …], "can_create": [<suggestion>, …] }`, `values`
+always there (empty when there are none), `can_create` only when it isn't
+empty (schema `read.schema.json#/$defs/read-property`). With `--quiet`,
+`description`, `required`, `constraints`, `definition` and `suggestions` are
+left out.
 
 **READ-036** The providers a user can add for a property instead of naming
 one the tree has are attach-lib's `creatable_providers`: `fixed-clock` for
@@ -221,19 +225,25 @@ order (READ-501). External nodes are not among the children.
 `origin` `internal` for a stored node or `external` for one the workfile
 only names (overview §4), `alias` `[]`, `children` `[]`, and as properties
 first `$compatible` (the schema, type `string`), then each property of its
-schema in the schema's order, with its type (READ-510) and its value (`null`
-when unset).
+schema in the schema's order, with its type (READ-510), its value (`null`
+when unset) and, when it has a value or the user cleared it, `source`:
+`user` for a value the user set or cleared, `bootstrap` for one bootstrap
+filled in.
 
 **READ-502** For an external node, the properties after `$compatible` shall
 be `$symbol` (the C symbol) and `$provides` (what it provides), both of type
 `string`.
 
 **READ-503** With `<node> <property>`, the response shall be the property as
-in READ-501, with its effective value (bootstrap's rules applied), and
-`suggestions`: `values`, each `{ "value": <v> }`, what `update` can set
-(`list.md` LIST-530 without the schemas), and `can_create`, each `{ "value":
-<schema> }`, the schemas the user could add to provide one; both `[]` when
-there are none.
+in READ-501, with its effective value (bootstrap's rules applied); what the
+schema says of it, as the overrides leave it: `description` when it has one,
+`required`, `constraints` (`{ "default", "minimum", "maximum" }`, each when
+the schema gives it, left out when it gives none) and `definition` (the
+schema's property type, as the text's `Type:` line: `number`, `include`,
+`driver_init_param`, …); `source` as in READ-501; and `suggestions`:
+`values`, each `{ "value": <v> }`, what `update` can set (`list.md` LIST-530
+without the schemas), and `can_create`, each `{ "value": <schema> }`, the
+schemas the user could add to provide one; both `[]` when there are none.
 
 **READ-504** When `<property>` names no property of the node but `$<property>`
 does, the CLI shall read `$<property>`: `read testpart init_param` reads
