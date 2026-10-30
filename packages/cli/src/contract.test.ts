@@ -586,7 +586,7 @@ const exported = async (fixture: NoosHarness): Promise<void> => {
 const NOOS_CASES: readonly Case<NoosHarness>[] = [
     { route: "init", argv: ["init"], shape: "answer" },
     { route: "init", argv: ["init"], shape: "refusal", prepare: initialised },
-    { route: "init", argv: ["init"], shape: "refusal", prepare: fixture => { fixture.noos.settings({ board: undefined }); } },
+    { route: "init", argv: ["init"], shape: "refusal", prepare: fixture => { fixture.noos.settings({ target: undefined }); } },
 
     { route: "import", argv: ["import", "../elsewhere.json"], shape: "answer", prepare: exported },
     { route: "import", argv: ["import", "../elsewhere.json"], shape: "refusal", prepare: async fixture => { await exported(fixture); await fixture.run(["init"]); } },
@@ -645,8 +645,8 @@ const NOOS_CASES: readonly Case<NoosHarness>[] = [
     { route: "generate", argv: ["generate"], shape: "refusal" },
 
     { route: "config", argv: ["config"], shape: "answer" },
-    { route: "config", argv: ["config", "board"], shape: "answer" },
-    { route: "config", argv: ["config", "board", "otherboard"], shape: "answer" },
+    { route: "config", argv: ["config", "target"], shape: "answer" },
+    { route: "config", argv: ["config", "target", "otherboard"], shape: "answer" },
     { route: "config", argv: ["config", "interview", "--reset"], shape: "answer" },
     { route: "config", argv: ["config"], shape: "config-error", prepare: broken_settings },
     { route: "config", argv: ["config"], shape: "config-error", prepare: unknown_settings },

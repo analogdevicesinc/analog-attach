@@ -55,8 +55,8 @@ export {
     get_workfile_path
 } from "./settings/settings";
 export type { SettingsSource } from "./settings/settings";
-export { target_writes, target_mismatch, is_target_setting } from "./settings/target";
-export type { TargetSetting, TargetState, TargetWrite } from "./settings/target";
+export { TARGET_SETTING, list_targets, resolve_target } from "./settings/target";
+export type { ResolvedTarget } from "./settings/target";
 export {
     SETTINGS_DEFAULTS,
     PATH_LIST_DELIMITER,

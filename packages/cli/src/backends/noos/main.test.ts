@@ -31,22 +31,30 @@ afterEach(() => {
 });
 
 describe("settings", () => {
-    test("config board sets its platform with it", async () => {
-        settings({ board: undefined });
-        const result = await run(["config", "board", "otherboard"]);
-        expect(result.code, result.stderr).toBe(0);
-        expect(result.stdout).toContain("platform");
-        expect(config()).toMatchObject({ board: "otherboard" });
-        expect(typeof config()["platform"]).toBe("string");
-        expect(await code(["config", "board", "testboard"])).toBe(0);
-        expect(config()).toMatchObject({ board: "testboard", platform: "testsoc" });
+    test("config target takes a board, or a chip with no board of its own", async () => {
+        settings({ target: undefined });
+        expect(await code(["config", "target", "otherboard"])).toBe(0);
+        expect(config()).toMatchObject({ target: "otherboard" });
+        expect(await code(["config", "target", "othersoc"])).toBe(0);
+        expect(config()).toMatchObject({ target: "othersoc" });
+        expect(config()).not.toHaveProperty("board");
+        expect(config()).not.toHaveProperty("platform");
     });
 
-    test("config board refuses a board no module has", async () => {
-        settings({ board: undefined });
-        const result = await run(["config", "board", "nonesuch"]);
-        expect(config()["board"]).toBeUndefined();
-        expect(`${result.stdout}${result.stderr}`).toContain("nonesuch");
+    test("config target refuses a name no module has, listing the boards and chips", async () => {
+        settings({ target: undefined });
+        const result = await run(["config", "target", "nonesuch"]);
+        expect(config()["target"]).toBeUndefined();
+        const said = `${result.stdout}${result.stderr}`;
+        expect(said).toContain("nonesuch");
+        expect(said).toContain("testboard");
+        expect(said).toContain("testsoc");
+    });
+
+    test("board and platform are not settings any more", async () => {
+        settings();
+        expect(await code(["config", "board", "testboard"])).not.toBe(0);
+        expect(await code(["config", "platform", "testsoc"])).not.toBe(0);
     });
 
     test("config capi-path refuses a folder that is not a capi checkout", async () => {
@@ -58,7 +66,7 @@ describe("settings", () => {
 });
 
 describe("init and read", () => {
-    test("init creates the workfile for the board, and refuses to overwrite it", async () => {
+    test("init creates the workfile for the target, and refuses to overwrite it", async () => {
         settings();
         const created = await json(["init"]);
         expect(created).toMatchObject({ ok: true, created: true, path: path.join(project, "workfile.json") });
@@ -66,12 +74,17 @@ describe("init and read", () => {
         expect(await json(["init"])).toMatchObject({ ok: false, message: expect.stringContaining("already exists") as unknown });
     });
 
-    test("init with no board or platform says how to set one", async () => {
-        settings({ board: undefined });
+    test("init with no target says how to set one", async () => {
+        settings({ target: undefined });
         const result = await run(["init"]);
         expect(result.code).toBe(0);
-        expect(result.stdout).toContain("No board or platform configured");
-        expect(result.stdout).toContain("analog-attach config board <name>");
+        expect(result.stdout).toContain("No target configured");
+        expect(result.stdout).toContain("analog-attach config target <board>");
+    });
+
+    test("init for a chip with no board: the workfile names the platform only", async () => {
+        settings({ target: "othersoc" });
+        expect(await json(["init"])).toMatchObject({ ok: true, message: "Created a workfile for platform othersoc" });
     });
 
     test("a command with no workfile refuses, naming init", async () => {
@@ -284,22 +297,22 @@ describe("on a terminal", () => {
         expect(result.stdout).toContain("Still yours to set");
     });
 
-    test("the bare run asks for the board, then runs init", async () => {
-        settings({ board: undefined });
+    test("the bare run asks for the board, saves it as target, then runs init", async () => {
+        settings({ target: undefined });
         const prompter = scripted(["otherboard", true]);
         const result = await run([], prompter);
         expect(result.code, result.stderr).toBe(0);
         expect(prompter.asked).toEqual(["Which board?", "Create workfile.json for otherboard?"]);
-        expect(config()).toMatchObject({ board: "otherboard" });
+        expect(config()).toMatchObject({ target: "otherboard" });
         expect(result.stdout).toContain("Created a workfile for board otherboard");
         expect(fs.existsSync(path.join(project, "workfile.json"))).toBe(true);
     });
 
     test("the bare run stopped at a prompt exits 130, what was answered saved", async () => {
-        settings({ board: undefined });
+        settings({ target: undefined });
         const result = await run([], scripted(["otherboard"]));
         expect(result.code).toBe(130);
-        expect(config()).toMatchObject({ board: "otherboard" });
+        expect(config()).toMatchObject({ target: "otherboard" });
         expect(fs.existsSync(path.join(project, "workfile.json"))).toBe(false);
     });
 });

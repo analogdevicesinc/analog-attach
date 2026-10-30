@@ -54,7 +54,7 @@ export const list_context = command<ListContextArguments, ListContextResponse>({
         brief: "List what a workfile can target: the chips, and the boards carrying them",
         full:
             "Lists every chip the configured platforms support, each with the boards that carry it.\n" +
-            "Pick one with 'config board <name>' (or 'config platform <chip>' for a chip with\n" +
+            "Pick one with 'config target <board>' (or 'config target <chip>' for a chip with\n" +
             "no board), then 'init'."
     },
     run(_arguments, _flags, session) {
@@ -89,11 +89,11 @@ export const list_context = command<ListContextArguments, ListContextResponse>({
             text += `  ${platform.name} (${platform.vendor})\n`;
             text += platform.boards.length > 0
                 ? platform.boards.map(board => `      ${board}\n`).join("")
-                : `      no board: target the chip with '${program} config platform <chip>'\n`;
+                : `      no board: target the chip with '${program} config target ${platform.name}'\n`;
             text += "\n";
         }
         const counted = `${plural(boards.length, "board")} on ${plural(platforms.length, "chip")}`;
-        text += `${counted}.\nUse: ${program} config board <name>, then ${program} init`;
+        text += `${counted}.\nUse: ${program} config target <board>, then ${program} init`;
 
         const response: ListContextResponse = { ...common_ok(counted), platforms, boards };
         return Promise.resolve(answer(response, text));

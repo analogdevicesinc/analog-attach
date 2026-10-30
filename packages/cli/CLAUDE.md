@@ -643,7 +643,7 @@ it to the interface.
 - **Settings injection** (`settings.ts`): `SETTINGS` is the lib's `SETTINGS_DEFAULTS` as
   `SettingSpec`s, by the lib's categories:
   - sources: `capi-path`, `module-paths`;
-  - target: `platform`, `board`;
+  - target: `target` (a board, or a chip with no board);
   - workfile: `workfile`;
   - project: `project-name`, `project-path`, `project-template`;
   - build: `build-command`, `deploy-command`, `probe`, and `bootstrap`, `interview`, `example`.
@@ -651,8 +651,8 @@ it to the interface.
   The lib reads settings and templates through module state. `install(session)` points it at the
   session before every call (`use_settings(session.settings)`, which sees the `noos` section, and
   `use_templates_root(<assets_dir>/templates)` when that exists). `noos_settings_hooks` gives
-  `check` (`capi-path` / `module-paths` must be module checkouts; `platform` / `board` are checked
-  against each other and the workfile) and `options` (the boards, chips and template sets).
+  `check` (`capi-path` / `module-paths` must be module checkouts; `target` must name a board or a
+  chip, `resolve_target`) and `options` (for `target`, the boards then the chips; the template sets).
 - **Workfile** (`commands/shared.ts`): `load_context` loads the workfile and registry,
   `save_workfile` writes it back. `get_project_path` gives `project-path`, else
   `out/<project-name>` under the project root.

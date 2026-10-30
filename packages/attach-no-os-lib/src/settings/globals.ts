@@ -60,18 +60,13 @@ export const SETTINGS_DEFAULTS: SettingsFile = {
 		default: DEFAULT_WORKFILE_NAME,
 		category: "workfile",
 	},
-	board: {
-		description: "Board a new workfile targets; setting it also sets 'platform' to the chip it carries",
+	// One setting for the board and the chip: a board carries one chip, so naming the board
+	// settles the platform, and a chip is named on its own only when it has no board.
+	target: {
+		description: "What a new workfile is for: a board (which brings its chip), or a chip used without a board",
 		required: true,
 		type: "string",
-		enum_of: "board",
-		category: "target",
-	},
-	platform: {
-		description: "Chip a new workfile targets, for a chip with no board of its own; setting it clears a 'board' that carries another chip",
-		required: false,
-		type: "string",
-		enum_of: "platform",
+		enum_of: "target",
 		category: "target",
 	},
 	"project-name": {

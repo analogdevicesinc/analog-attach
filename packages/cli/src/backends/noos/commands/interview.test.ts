@@ -42,7 +42,7 @@ describe("the interview", () => {
 
     it("re-runs bootstrap after each answer: picking the bus settles the chip-select too", async () => {
         // twobusboard has two wired SPI buses, so the controller is a choice bootstrap stops at.
-        fixture.settings({ interview: "true", board: "twobusboard" });
+        fixture.settings({ interview: "true", target: "twobusboard" });
         expect(await fixture.code(["init"])).toBe(0);
         const ask = interviewer({ select: options => options.find(option => option.includes("spi2")) ?? options[0] ?? "" });
         const result = await fixture.run(["add", "eval-testpart"], { prompter: ask });

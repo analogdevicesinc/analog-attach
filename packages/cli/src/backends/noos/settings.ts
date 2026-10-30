@@ -10,22 +10,18 @@ import YAML from "yaml";
 import {
     SETTINGS_DEFAULTS,
     SETTING_CATEGORIES,
-    is_target_setting,
-    list_boards,
-    list_socs,
+    TARGET_SETTING,
+    list_targets,
     list_template_sets,
+    resolve_target,
     resolve_template_set,
-    target_mismatch,
-    target_writes,
     use_settings,
     use_templates_root,
     type Setting,
     type SettingsFile,
-    type TargetSetting,
-    type TargetState,
 } from "attach-no-os-lib";
 
-import type { Session, SettingSpec, SettingsHooks, SettingsView } from "../../interface/backend-interface";
+import type { Session, SettingSpec, SettingsHooks } from "../../interface/backend-interface";
 
 /** The name hints use when no session is at hand (the specs' static hints): the front end's binary. */
 export const DEFAULT_PROGRAM = "analog-attach";
@@ -45,7 +41,7 @@ const MUST_EXIST = new Set<string>(["capi-path", "module-paths"]);
 /** The hint printed when a required setting is missing. */
 const HINTS: Readonly<Partial<Record<keyof SettingsFile, string>>> = {
     "capi-path": `Run '${DEFAULT_PROGRAM} config capi-path <path>', or '${DEFAULT_PROGRAM}' on a terminal for the guided setup.`,
-    "board": `Run '${DEFAULT_PROGRAM} config board <name>' ('${DEFAULT_PROGRAM} list context' lists them).`,
+    "target": `Run '${DEFAULT_PROGRAM} config target <board or chip>' ('${DEFAULT_PROGRAM} list context' lists them).`,
 };
 
 function spec_of(key: keyof SettingsFile, setting: Setting): SettingSpec {
@@ -123,85 +119,27 @@ export function read_module(directory: string): { name?: string; type?: string }
     }
 }
 
-type Scope = "local" | "global";
-
-/**
- * The board and platform in effect once `patch` is written to `scope`. A key set in the
- * other file stays as it is where the write can't reach it: a local value shadows a global
- * write, and a global value shows through a local reset. `from_other` names those keys.
- */
-function after_write(view: SettingsView, scope: Scope, patch: Partial<Record<TargetSetting, string | null>>): { state: TargetState; from_other: TargetSetting[] } {
-    const state: TargetState = {};
-    const from_other: TargetSetting[] = [];
-    for (const key of ["board", "platform"] as const) {
-        const origin = view.origin(key);
-        const other = typeof origin === "object" && origin.scope !== scope;
-        const current = view.get(key);
-        let value: string | undefined;
-        if (other && (scope === "global" || !(key in patch) || patch[key] === null)) {
-            value = current;
-            if (value !== undefined) { from_other.push(key); }
-        } else if (key in patch) {
-            value = patch[key] ?? undefined;
-        } else {
-            value = current;
-        }
-        if (value !== undefined) { state[key] = value; }
+function check(key: string, value: string, session: Session): Promise<{ ok: true } | { ok: false; message: string }> {
+    if (key === TARGET_SETTING) {
+        install(session);
+        const resolved = resolve_target(value);
+        if (!resolved.ok) { return Promise.resolve({ ok: false, message: resolved.error.message }); }
     }
-    return { state, from_other };
-}
-
-/** A board and its platform are one choice: writing either takes the other with it (`also`). */
-function check_target(key: TargetSetting, value: string, session: Session, scope: Scope): { ok: true; also: Readonly<Record<string, string | null>> } | { ok: false; message: string } {
-    install(session);
-    const view = session.settings;
-    const current: TargetState = {};
-    const board = view.get("board");
-    const platform = view.get("platform");
-    if (board !== undefined) { current.board = board; }
-    if (platform !== undefined) { current.platform = platform; }
-    const writes = target_writes(key, value, current);
-    if (!writes.ok) { return { ok: false, message: writes.error.message }; }
-
-    const { state, from_other } = after_write(view, scope, { [key]: value, ...writes.value.also });
-    const mismatch = target_mismatch(state);
-    if (mismatch !== undefined) {
-        const stuck = from_other[0];
-        const origin = stuck === undefined ? undefined : view.origin(stuck);
-        const file = typeof origin === "object" ? origin.file : `the ${scope === "local" ? "global" : "local"} settings`;
-        const named = stuck === undefined ? "" : `${stuck} '${state[stuck] ?? ""}'`;
-        return {
-            ok: false,
-            message: `${mismatch}, and ${named} is set in ${file}, which this write does not change. Clear it there, or write the setting to that file instead.`,
-        };
-    }
-    return { ok: true, also: writes.value.also };
-}
-
-async function check(key: string, value: string, session: Session, scope: Scope = "local"): Promise<{ ok: true; also?: Readonly<Record<string, string | null>> } | { ok: false; message: string }> {
-    if (is_target_setting(key)) { return check_target(key, value, session, scope); }
     if (key === "capi-path" && !is_module_checkout(value)) {
-        return { ok: false, message: `capi-path: ${value} is not a capi checkout (it has no module.yml)` };
+        return Promise.resolve({ ok: false, message: `capi-path: ${value} is not a capi checkout (it has no module.yml)` });
     }
     if (key === "project-template") {
         install(session);
         const resolved = resolve_template_set(value);
-        if (!resolved.ok) { return { ok: false, message: `project-template: ${resolved.error.message}` }; }
+        if (!resolved.ok) { return Promise.resolve({ ok: false, message: `project-template: ${resolved.error.message}` }); }
     }
-    return { ok: true };
+    return Promise.resolve({ ok: true });
 }
 
-/** The options of the scanned settings: every board, every chip. */
+/** The options of the scanned settings: for target, every board, then every chip. */
 function options(key: string, session: Session): Promise<string[]> {
     install(session);
-    if (key === "board") {
-        const boards = list_boards();
-        return Promise.resolve(boards.ok ? boards.value.map(board => board.name) : []);
-    }
-    if (key === "platform") {
-        const socs = list_socs();
-        return Promise.resolve(socs.ok ? socs.value.map(entry => entry.soc.name) : []);
-    }
+    if (key === TARGET_SETTING) { return Promise.resolve(list_targets()); }
     if (key === "project-template") { return Promise.resolve(list_template_sets()); }
     return Promise.resolve([]);
 }
@@ -211,14 +149,15 @@ export const noos_settings_hooks: SettingsHooks = { check, options };
 if (import.meta.vitest) {
     const { test, expect } = import.meta.vitest;
 
-    test("SETTINGS - every key of the lib, flat, by category, module-paths a path_list, board and platform scanned", () => {
+    test("SETTINGS - every key of the lib, flat, by category, module-paths a path_list, target scanned", () => {
         expect(SETTINGS.map(spec => spec.key).toSorted()).toEqual(Object.keys(SETTINGS_DEFAULTS).toSorted());
         const titles = [...new Set(SETTINGS.map(spec => spec.category))];
         expect(titles).toEqual(SETTING_CATEGORIES.map(category => CATEGORY_TITLES[category]));
         const by_key = new Map(SETTINGS.map(spec => [spec.key, spec]));
         expect(by_key.get("module-paths")).toMatchObject({ type: "path_list", category: "Sources", must_exist: true });
-        expect(by_key.get("board")).toMatchObject({ options: "dynamic", required: true });
-        expect(by_key.get("platform")).toMatchObject({ options: "dynamic" });
+        expect(by_key.get("target")).toMatchObject({ options: "dynamic", required: true, category: "Target" });
+        expect(by_key.has("board")).toBe(false);
+        expect(by_key.has("platform")).toBe(false);
         expect(by_key.get("project-template")).toMatchObject({ default: "capi" });
         expect(by_key.get("project-template")?.options).toBeUndefined();
         expect(by_key.get("probe")).toMatchObject({ options: ["openocd", "jlink"], default: "openocd" });

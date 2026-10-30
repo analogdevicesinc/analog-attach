@@ -1,75 +1,51 @@
 /**
- * The `board` and `platform` settings, kept in agreement.
+ * The `target` setting: what a new workfile is for.
  *
- * A board carries one chip, and the chip is the platform a workfile targets, so the two
- * settings are one choice seen twice. A write of either says what else has to change with
- * it: a board sets the platform it carries, and a platform the current board does not
- * carry clears the board. The caller writes them together (the CLI's settings `check`
- * hook returns them as `also`).
+ * A board carries one chip, and the chip is the platform a workfile targets, so the board
+ * and the platform are one choice. The setting names a board, which brings its chip, or a
+ * chip on its own, for a chip with no board of its own.
  */
 
 import type { Result } from "../ruleset_parser/result";
-import { ok } from "../ruleset_parser/result";
-import { find_soc, soc_for_board } from "../registry/platforms";
+import { error, ok } from "../ruleset_parser/result";
+import { find_soc, list_boards, list_socs, soc_for_board } from "../registry/platforms";
 
-export type TargetSetting = "board" | "platform";
+export const TARGET_SETTING = "target";
 
-export function is_target_setting(key: string): key is TargetSetting {
-	return key === "board" || key === "platform";
-}
-
-/** The board and platform in effect. */
-export interface TargetState {
+/** The platform (chip) a target names, and its board when it names one. */
+export interface ResolvedTarget {
+	platform: string;
 	board?: string;
-	platform?: string;
-}
-
-/** What a target write changes beside the key written. */
-export interface TargetWrite {
-	/** The other key, with its new value, or `null` for cleared. */
-	also: Partial<Record<TargetSetting, string | null>>;
-	/** Why it changed, for the message. */
-	reason?: string;
 }
 
 /**
- * What writing `key = value` takes with it, given the target in effect. An unknown board
- * or chip is refused, so nothing is written for it.
+ * What `target` names: a board and the chip it carries, or a chip. A board is looked for
+ * first, since that is what most projects target; a name that is neither is refused, with
+ * what the configured platforms have.
  */
-export function target_writes(key: TargetSetting, value: string, current: TargetState): Result<TargetWrite> {
-	if (key === "board") {
-		// The platform follows from the board, so a board whose chip cannot be found is
-		// refused here rather than left for init to fail on.
+export function resolve_target(value: string): Result<ResolvedTarget> {
+	const boards = list_boards();
+	if (boards.ok && boards.value.some(board => board.name === value)) {
 		const soc = soc_for_board(value);
-		if (!soc.ok) {
-			return soc;
-		}
-		return ok({ also: { platform: soc.value }, reason: `board '${value}' carries ${soc.value}` });
+		return soc.ok ? ok({ platform: soc.value, board: value }) : soc;
 	}
-
 	const soc = find_soc(value);
-	if (!soc.ok) {
-		return soc;
+	if (soc.ok) {
+		return ok({ platform: value });
 	}
-	// A board that carries another chip goes; one that cannot be resolved is left alone,
-	// for init to report as it always has.
-	const board = current.board;
-	if (board !== undefined) {
-		const carried = soc_for_board(board);
-		if (carried.ok && carried.value !== value) {
-			// eslint-disable-next-line unicorn/no-null
-			return ok({ also: { board: null }, reason: `board '${board}' carries ${carried.value}, not ${value}` });
-		}
+	const known = list_targets();
+	if (known.length === 0) {
+		return error(`Unknown target '${value}': the configured modules have no boards or chips. Check capi-path and module-paths`, value);
 	}
-	return ok({ also: {} });
+	return error(`Unknown target '${value}'. It can be a board or a chip: ${known.join(", ")}`, value);
 }
 
-/** Why a board and a platform disagree, or undefined when they agree (or either is unset or unknown). */
-export function target_mismatch(state: TargetState): string | undefined {
-	const { board, platform } = state;
-	if (board === undefined || platform === undefined) {
-		return undefined;
-	}
-	const carried = soc_for_board(board);
-	return carried.ok && carried.value !== platform ? `Board '${board}' carries ${carried.value}, not ${platform}` : undefined;
+/** Every name `target` takes: the boards, then the chips. */
+export function list_targets(): string[] {
+	const boards = list_boards();
+	const socs = list_socs();
+	return [
+		...(boards.ok ? boards.value.map(board => board.name) : []),
+		...(socs.ok ? socs.value.map(entry => entry.soc.name) : []),
+	];
 }

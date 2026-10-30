@@ -48,7 +48,7 @@ at a terminal. Set things with `config` instead.
   - `capi-path`: the capi checkout
   - `module-paths`: the module repositories next to it (platform, drivers, utilities), each
     a separate word after the key
-  - `board`: the target board; setting it also sets `platform`, its chip
+  - `target`: the board to build for (it brings its chip), or a chip with no board of its own
   - `workfile` (default `workfile.json`), `project-path` (default `out/<project-name>`),
     `project-template` (default `capi`), `bootstrap`, `interview` and `example` (all default
     `true`, set to `true` or `false`). `interview` makes `add` ask a person at a terminal for what is left; it never asks
@@ -79,10 +79,10 @@ at a terminal. Set things with `config` instead.
 ```bash
 analog-attach --json config backend noos             # pick the backend first
 analog-attach --json config                          # every setting, with its value and source
-analog-attach --json config board                    # one setting, with the values it can take
+analog-attach --json config target                   # one setting, with the values it can take
 analog-attach config capi-path ~/work/capi
 analog-attach config module-paths ~/work/capi-maxim ~/work/capi-noos ~/work/capi-util
-analog-attach config board max32655fthr              # also sets platform
+analog-attach config target max32655fthr             # a board, or a chip with no board
 analog-attach config --global capi-path ~/work/capi  # for every project
 analog-attach config project-name --reset
 analog-attach --json list context                    # the chips, and the boards carrying them
@@ -166,7 +166,7 @@ generated `main.c` runs each part's example; with `false`, it calls the user's `
 
 ## Recommended workflow
 
-1. `config` to check the settings; set `capi-path`, `module-paths` and `board` if missing
+1. `config` to check the settings; set `capi-path`, `module-paths` and `target` if missing
    (`list context` to pick the board with the user).
 2. `init` (or `import`).
 3. `list devices`, then `add` the eval board the user has.
