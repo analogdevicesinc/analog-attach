@@ -230,6 +230,16 @@ active one, and shall keep it as it is when it writes the file (COM-129).
 `config backend <id>` only changes which section is active
 (`config.md` CONFIG-112), so switching back finds the settings as they were.
 
+**COM-136** `backend` shall be the project's: only the local file holds it,
+so that projects on one machine can target different ecosystems. If the
+global file has a top-level `backend`, then reading shall leave it out and
+report `{ field: "backend", kind: "invalid", message: "<file>: backend
+belongs to the project and can't be in the global settings" }`, with the
+setting's description and the hint `Remove it: config --global backend
+--reset, then set it in the project.`. The global file's sections are
+read as before (COM-124): they are the defaults a project's backend starts
+from.
+
 A file of the earlier flat format, every key at the top level, is not
 converted: its keys are unknown top-level keys (COM-132), and where the
 backend is linux its `"linux": "<path>"` is a section that isn't an object

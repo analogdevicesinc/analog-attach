@@ -101,7 +101,14 @@ export function backend_setting(ids: readonly string[]): SettingSpec {
         type: "string",
         options: ids,
         required: true,
+        // Projects on one machine can target different ecosystems: never a global default.
+        project_only: true,
     };
+}
+
+/** Why the global settings can't hold `key`, a project_only setting. */
+function project_only_problem(key: string): string {
+    return `${key} belongs to the project and can't be in the global settings`;
 }
 
 function is_directory(file: string): boolean {
@@ -247,6 +254,10 @@ function read_layer(scope: Scope, files: SettingsFiles, shape: Shape, errors: Co
 
     /** A declared key's value, `name` being how messages write it (`linux.devicetree` in a section). */
     const read_value = (spec: SettingSpec, name: string, raw: unknown): void => {
+        if (spec.project_only === true && scope === "global") {
+            errors.push({ field: name, kind: "invalid", message: `${shown}: ${project_only_problem(name)}`, description: spec.description, hint: `Remove it: config --global ${spec.key} --reset, then set it in the project.` });
+            return;
+        }
         const value = parse_stored(spec, raw, scope, files);
         if (typeof value === "string" || Array.isArray(value)) {
             layer.values.set(spec.key, value);
@@ -451,6 +462,9 @@ export function open_settings(options: OpenSettingsOptions): SettingsStore {
     const set = async (key: string, value: Value, scope: Scope = "local"): Promise<SettingWrite> => {
         const spec = spec_of(key);
         if (spec === undefined) { return unknown_setting(key); }
+        if (spec.project_only === true && scope === "global") {
+            return { ok: false, message: `${project_only_problem(key)}: set it without --global, in the project's directory` };
+        }
         const checked = await check_value(spec, value, scope);
         if (typeof checked !== "string" && !Array.isArray(checked)) { return { ok: false, message: `${key}: ${(checked as { problem: string }).problem}` }; }
 
@@ -597,7 +611,7 @@ if (import.meta.vitest) {
     describe("layering", () => {
         test("local wins over global, then the default, section by section", () => {
             const files = files_at();
-            write_json(files.global, { backend: "other", fake: { syntax: "b", chip: "g" } });
+            write_json(files.global, { fake: { syntax: "b", chip: "g" } });
             write_json(files.local, { backend: "fake", fake: { chip: "l" } });
             const store = open();
             expect(store.errors).toEqual([]);
@@ -612,6 +626,19 @@ if (import.meta.vitest) {
             expect(store.get("jobs")).toBeUndefined();
             expect(store.origin("jobs")).toBe("unset");
             expect(store.get("nope")).toBeUndefined();
+        });
+
+        test("backend is the project's: a global one is refused, left out and reported, and can be reset", async () => {
+            const files = files_at();
+            write_json(files.global, { backend: "fake", fake: { syntax: "b" } });
+            const store = open();
+            expect(store.get(BACKEND_KEY)).toBeUndefined();
+            expect(store.errors).toEqual([expect.objectContaining({ field: BACKEND_KEY, kind: "invalid", message: expect.stringContaining("belongs to the project") as unknown })]);
+            expect(await store.set(BACKEND_KEY, "fake", "global")).toMatchObject({ ok: false, message: expect.stringContaining("without --global") as unknown });
+            expect(await store.reset(BACKEND_KEY, "global")).toMatchObject({ ok: true });
+            expect(read_json(files.global)).toEqual({ fake: { syntax: "b" } });
+            expect(await store.set(BACKEND_KEY, "fake")).toMatchObject({ ok: true });
+            expect(read_json(files.local)).toEqual({ backend: "fake" });
         });
 
         test("a key of one section never stands in for the same key of another", () => {
