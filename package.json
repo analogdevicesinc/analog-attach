@@ -197,6 +197,7 @@
     "test": "yarn workspace attach-lib test --run && yarn workspace @analog-attach/cli test --run && yarn workspace attach-no-os-lib test --run",
     "test:attach-no-os-lib": "yarn workspace attach-no-os-lib test",
     "test:cli": "yarn workspace @analog-attach/cli test",
+    "test:functional": "yarn workspace @analog-attach/cli test:functional",
     "clean": "yarn workspaces foreach -A run clean",
     "clean:all": "yarn run clean && rm -rf node_modules",
     "clean:attach-lib": "yarn workspace attach-lib run clean",

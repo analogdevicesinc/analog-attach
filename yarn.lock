@@ -18,6 +18,9 @@ __metadata:
     ajv: "npm:^8.17.1"
     attach-lib: "npm:*"
     attach-no-os-lib: "workspace:*"
+    bats: "npm:1.13.0"
+    bats-assert: "npm:2.2.4"
+    bats-support: "npm:0.3.0"
     eslint: "npm:^9.31.0"
     eslint-plugin-unicorn: "npm:^60.0.0"
     eta: "npm:^3.5.0"
@@ -3287,6 +3290,34 @@ __metadata:
   bin:
     baseline-browser-mapping: dist/cli.js
   checksum: 10c0/869bdbb2784f8b1bc49b52d54ea48bf9ea6da8309195e3a0b3f4625197b8187a9b557b1d02f1b6b6dd51f163840a87db259e2b791eed35f0c5fddf3110c4cf28
+  languageName: node
+  linkType: hard
+
+"bats-assert@npm:2.2.4":
+  version: 2.2.4
+  resolution: "bats-assert@npm:2.2.4"
+  peerDependencies:
+    bats: 0.4 || ^1
+    bats-support: ^0.3
+  checksum: 10c0/15d966c0cedc3398f9fd7b84da3a29e37c1340081e386db2e3342153fd1ebfd3006a09e780fd3e6ccacd23e34d684f9402c687d364ef46af2abe7dd597991570
+  languageName: node
+  linkType: hard
+
+"bats-support@npm:0.3.0":
+  version: 0.3.0
+  resolution: "bats-support@npm:0.3.0"
+  peerDependencies:
+    bats: 0.4 || ^1
+  checksum: 10c0/156539ac20d9e8dc1b9ef87c6da8fd4f9786994f64fc2d582a323a002db10826baf01667156599e86d8a2627caef76ea5166d4717213d85de5fb002d41ee65ee
+  languageName: node
+  linkType: hard
+
+"bats@npm:1.13.0":
+  version: 1.13.0
+  resolution: "bats@npm:1.13.0"
+  bin:
+    bats: bin/bats
+  checksum: 10c0/7f697d6305d80d328d620bd58c658f7830fbed57e28a43f18771d89fb6f941a131b440ab18d951fd15fdd23f3c687687d607d7fc03ac4c99f4725e64d2432832
   languageName: node
   linkType: hard
 
