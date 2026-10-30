@@ -48,18 +48,21 @@ export function get_symbol_references(property: Property): SymbolReference[] {
 			return [];
 		}
 		case "UnionProperty": {
-			const value = property.value as Record<string, string> | undefined;
+			const value = property.value as Record<string, string | null> | undefined;
 			if (!value) {
 				return [];
 			}
 			// Each member carries its own `pointer` flag (codegen already emits
 			// `{ .member = &ref }` vs `{ .member = ref }` from it), so classify per
 			// member rather than per union. No schema sets it on a member today, so
-			// every union reference is currently a value edge.
-			return Object.entries(value).map(([member_name, reference]) => ({
-				name: owner_of(reference),
-				kind: kind_of(property.members.find(m => m.name === member_name)?.pointer),
-			}));
+			// every union reference is currently a value edge. A member chosen with no
+			// value yet (`update <node> <union> <member>`) references nothing.
+			return Object.entries(value)
+				.filter((entry): entry is [string, string] => typeof entry[1] === "string")
+				.map(([member_name, reference]) => ({
+					name: owner_of(reference),
+					kind: kind_of(property.members.find(m => m.name === member_name)?.pointer),
+				}));
 		}
 		case "ArrayProperty": {
 			if (property.element._t === "IncludeProperty" && Array.isArray(property.value)) {
@@ -123,10 +126,12 @@ export function rename_symbol_references(workfile: Workfile, old_name: string, n
 					break;
 				}
 				case "UnionProperty": {
-					const value = property.value as Record<string, string> | undefined;
+					const value = property.value as Record<string, string | null> | undefined;
 					if (value) {
 						for (const [member, target] of Object.entries(value)) {
-							value[member] = rewrite_reference(target, old_name, new_name);
+							if (typeof target === "string") {
+								value[member] = rewrite_reference(target, old_name, new_name);
+							}
 						}
 					}
 					break;
