@@ -112,9 +112,12 @@ setup() {
 | `run_json <words>` | `run aa --json <words>`, stderr kept apart (`$stderr`) so `$output` is the JSON |
 | `assert_json <jq filter> <value>` | The filter on `$output` prints the value |
 | `need <tool>...` | Skips the test when a tool isn't installed (`need cmake arm-none-eabi-gcc`) |
+| `with_sensor` | After `new_project noos`: `init` and `add eval-testpart`, a valid workfile with testpart, testpart_cfg, testpart_ip, eval_testpart, testpart_spi_dev, testpart_cs_gpio |
 | `drop_setting <key>...` | Removes settings from the project's section of its backend, as if never set |
 | `snapshot`, `assert_unchanged` | The workfile on disk is as it was at `snapshot`: for refusals that must write nothing |
 | `tty_run <expect> <keys>... -- <words>` | Runs the CLI on a pseudo-terminal, typing `<keys>` each time the screen shows `<expect>` (`$'\r'` Enter, `$'\x1b[B'` down, `$'\x03'` Ctrl-C); sets `$status` and `$output`; gives up after `TTY_TIMEOUT` seconds (20). For the guided setup and the interview |
+| `stored <jq filter>` | The filter on the workfile on disk (`stored '.symbols.testpart_ip.comm_init'`) |
+| `real_project` | The project's settings for real CAPI trees (`AA_CAPI_PATH`, `AA_MODULE_PATHS`, `AA_TARGET`), or a skip without them and the toolchain |
 
 From bats and its libraries: `run` (sets `$status`, `$output`, `$lines`), `assert_success`,
 `assert_failure [<status>]`, `assert_output [--partial|--regexp] <text>`, `refute_output`,
@@ -136,6 +139,21 @@ CLI does instead, so the report shows where the code falls short:
 
 `run.sh --filter-tags '!gap'` runs everything else; `--filter-tags gap` only the gaps. Once
 the CLI is fixed, drop the tag.
+
+### Tests that need the real trees or a board
+
+Build and deploy can't run on the fixtures (their capi is not a real CAPI). Those tests start
+with `real_project` and skip unless these are set:
+
+```sh
+AA_CAPI_PATH=~/work/capi \
+AA_MODULE_PATHS=~/work/capi-maxim:~/work/capi-noos:~/work/capi-util \
+AA_TARGET=max32655fthr \
+test/functional/run.sh noos/build.bats
+```
+
+They also need cmake, ninja and arm-none-eabi-gcc (and `MAXIM_SDK_PATH` for a Maxim board).
+A test that would flash a board skips unless `AA_DEPLOY=1`.
 
 ### Tips
 
