@@ -23,7 +23,8 @@
     "clean": "rm -rf dist tsconfig.tsbuildinfo node_modules",
     "lint": "eslint src",
     "test": "vitest",
-    "test:functional": "test/functional/run.sh"
+    "test:functional": "test/functional/run.sh",
+    "coverage": "vitest run --coverage"
   },
   "tsup": {
     "entry": [
@@ -59,6 +60,7 @@
     "@types/node": "25.x",
     "@typescript-eslint/eslint-plugin": "^8.72.1",
     "@typescript-eslint/parser": "^8.72.1",
+    "@vitest/coverage-v8": "^4.0.18",
     "ajv": "^8.17.1",
     "attach-lib": "*",
     "attach-no-os-lib": "workspace:*",
