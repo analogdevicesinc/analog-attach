@@ -499,24 +499,32 @@ whose `entries` map each compatible string to the binding YAML that lists
 it; and `validation.json`, the output of `dt-mk-schema -j` over the Linux
 tree's bindings, with `validation.stamp.json` `{ generated_at, linux,
 dt_schema }` next to it. `generated_at` is in milliseconds since the epoch.
+The CLI shall derive `entries` from `validation.json`: the strings of each
+Linux tree binding's processed `compatible` property, the bundled
+dt-schema's own schemas left out. When several bindings list a string, the
+one named after it (`net/snps,dwmac.yaml` for `snps,dwmac`) wins; then one
+that names the device (lists it first); then one that has its own `select`
+and lists it first (a naming convention such as `arm/qcom-soc.yaml`); then
+one that only falls back to it. Among equals, the first by `$id` wins (open
+issue C-13).
 
 **COM-111** The CLI shall build the caches only in `config linux <path>`,
 `config --reload`, and the setup run (`setup.md`) when they aren't current
 (COM-116). Every other command only reads them.
 
-**COM-112** When it builds the caches, the CLI shall build both at once and
-write progress to standard error, in both modes: first `Indexing device
-bindings and compiling binding schemas...`; while standard error is a
-terminal, ` <done>/<total>` after it, rewritten in place as bindings are
-indexed; then the line `Indexed <n> compatibles from <m> bindings and compiled
-binding schemas in <duration>`, or `Compiling binding schemas failed`, which
-on a terminal replaces the first line. `<duration>` is `4.2s` under 10
-seconds, `48s` under a minute, then `1m 12s`.
+**COM-112** When it builds the caches, the CLI shall compile
+`validation.json`, then derive the compat index from it (COM-110), and write
+progress to standard error, in both modes: first `Indexing device bindings
+and compiling binding schemas...`; then the line `Indexed <n> compatibles from
+<m> bindings and compiled binding schemas in <duration>`, `<m>` being the
+Linux tree's bindings in `validation.json`, or `Compiling binding schemas
+failed`, which on a terminal replaces the first line. `<duration>` is `4.2s`
+under 10 seconds, `48s` under a minute, then `1m 12s`.
 
-**COM-113** The CLI shall write `compat-index.json` even when compiling the
-schemas fails. It shall replace `validation.json` only once `dt-mk-schema`
-has succeeded with a non-empty output, so a failed build leaves the previous
-file, and write the stamp after it.
+**COM-113** The CLI shall replace `validation.json` only once `dt-mk-schema`
+has succeeded with a non-empty JSON output, and write its stamp, then
+`compat-index.json`, after it. A failed build writes neither cache, so the
+previous pair stays.
 
 **COM-114** Before a build, the CLI shall check the `linux` field (COM-126 to
 COM-128), the bundled dt-schema and the bundled tools (COM-117), and report
@@ -677,3 +685,11 @@ a time and without the field's hint. `analog-attach --json read` with only
 '…/workfile.json'. …","severity":"error"}`, status 0. A fix would be to load
 the no-OS settings and workfile through the workspace loader, as the Linux
 backend does.
+
+**C-13. A generic fallback can map to an arbitrary binding.** A compatible
+that many bindings only fall back to goes to the first of them by `$id`
+(COM-110) when no binding is named after it (`simple-mfd`; `arm,primecell`,
+whose binding is `arm/primecell.yaml`) or when its own binding names it only
+in its `select` (`snps,dw-pcie`). A device that two bindings both name
+(`nxp,se97b`: `eeprom/at24.yaml` and `hwmon/jedec,jc42.yaml`) gets the
+first.

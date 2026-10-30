@@ -243,8 +243,14 @@ that gets them cannot fail because of the configuration.
   - `validation.json` is the `dt-mk-schema -j` output, with `validation.stamp.json` next to it.
     `build_validation_schema` writes a temp file and renames it, so a failed build leaves the old
     file.
-  - Commands never build the caches. `rebuild_caches` (`config/rebuild.ts`) builds both at once:
-    the index in this process while `dt-mk-schema` runs as a child.
+  - Commands never build the caches. `rebuild_caches` (`config/rebuild.ts`) runs `dt-mk-schema`,
+    then derives the index from its output (`build_compat_index`). A failed compile writes
+    neither cache, so the previous pair stays.
+  - `build_compat_index` (`utilities.ts`) reads each Linux tree binding's processed `compatible`
+    in `validation.json` and never parses a binding. When several list a compatible, `claim`
+    ranks them: the file named after it, then one that lists it first, then one with its own
+    `select` (naming conventions such as `arm/qcom-soc.yaml`), then a fallback. Check a change
+    to it against the whole tree (the old and new index of `~/linux_rpi`), not only the tests.
   - Only three paths call it: `config linux <path>`, `config --reload` (`reload_caches`, which
     checks the Linux tree, bundled dt-schema and tools first) and the setup run (`ensure_caches`,
     which skips the build when `caches_current` says both are current). Progress goes through
@@ -256,8 +262,7 @@ that gets them cannot fail because of the configuration.
     `generated-types` give the properties a binding leaves untyped the type another binding
     declares (`nvmem-cells`, `sound-dai`, `mux-controls`).
   - Commands pass the whole `Bindings` to `Attach.parse` (`resolve_node_binding`,
-    `child_unit_radix`, `add`, `list`). Only `find_binding` and the compat index build
-    (`build_compat_index`, which reads `compatible` only, both in `utilities.ts`) use `linux` and
+    `child_unit_radix`, `add`, `list`). Only `find_binding` (`utilities.ts`) uses `linux` and
     `dt_schema` alone.
 - The overlay index (`overlay-index.ts`, not cached) maps each overlay file in the Linux tree (RPi
   `*-overlay.dts`, every `*.dtso`) to two things: the compatibles of the devices it adds, and its root
@@ -362,8 +367,16 @@ The backend's `assets_dir` is `bundled/linux/`. It holds:
 
 `scripts/bundle-dt-schema.sh` builds them on demand. It clones dt-schema at a pinned commit into
 `dt-schema/` and dtc into `dtc/` (both gitignored, like `bundled/`), and runs as part of
-`yarn build`. `getBundledDtSchemaPath` / `getBundledToolsPath` (`commands/skill/utilities.ts`)
-resolve them from `assets_dir`.
+`yarn build`.
+- `dt-mk-schema` is built from `scripts/dt-mk-schema.py`. It runs dt-schema's per-file
+  `process_schema` on a process pool, then hands the results to the upstream loop, so the output
+  stays dt-schema's own.
+- The venv gets `ruamel.yaml.clib`: without the C loader, loading YAML is most of the run.
+- `tools/.recipe` holds a hash of the script and the entry point. Changing either rebuilds the
+  tools on the next `yarn build`; otherwise the script exits early.
+
+`getBundledDtSchemaPath` / `getBundledToolsPath` (`commands/skill/utilities.ts`) resolve them from
+`assets_dir`.
 
 ### Overlay syntax
 

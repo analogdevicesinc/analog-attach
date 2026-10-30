@@ -384,7 +384,7 @@ Step 1: Linux kernel source tree
 Saved linux, devicetree and workfile to .analog-attach/config.json.
 
 Indexing device bindings and compiling binding schemas...                  (stderr)
-Indexed 18052 compatibles from 5197 bindings and compiled binding schemas in 1m 14s   (stderr)
+Indexed 23309 compatibles from 5196 bindings and compiled binding schemas in 5.1s   (stderr)
 
 Workspace ready
 
