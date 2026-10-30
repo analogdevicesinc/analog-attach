@@ -7,6 +7,7 @@ import type {
     ListDevicesResponse as BaseListDevicesResponse,
     MissingProperty as BaseMissingProperty,
     Node as BaseNode,
+    Property as BaseProperty,
     ReadProperty as BaseReadProperty,
     Responses,
     Severity,
@@ -38,16 +39,30 @@ export type {
  */
 export type NodeOrigin = "internal" | "external";
 
+/** Who set a value: the user (cleared included), or bootstrap following the rules. */
+export type ValueSource = "user" | "bootstrap";
+
+/** A property of a node, with who set its value when it has one. */
+export interface NodeProperty extends BaseProperty {
+    source?: ValueSource;
+}
+
 /** Reading a node always returns its full subtree. */
-export interface Node extends BaseNode {
+export interface Node extends BaseNode<NodeProperty> {
     origin: NodeOrigin;
     children: Node[];
     /** Other names for the node. None yet: always empty. */
     alias: string[];
 }
 
-/** One property read on its own: the property, and what it can be set to. */
+/**
+ * One property read on its own: the property, what its schema says of it, and what it can
+ * be set to. `definition` is the schema's property type (`include`, `driver_init_param`).
+ */
 export interface ReadProperty extends BaseReadProperty {
+    required: boolean;
+    source?: ValueSource;
+    definition: string;
     suggestions: { values: Suggestion[]; can_create: Suggestion[] };
 }
 

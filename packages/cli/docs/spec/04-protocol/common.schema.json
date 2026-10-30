@@ -368,6 +368,34 @@
           "type": "string",
           "description": "The binding's description."
         },
+        "required": {
+          "type": "boolean",
+          "description": "Whether the definition requires a value."
+        },
+        "source": {
+          "type": "string",
+          "description": "Where the value comes from, in the backend's words: linux base or overlay, noos user or bootstrap."
+        },
+        "constraints": {
+          "description": "What the definition says the value may be, when it says.",
+          "type": "object",
+          "properties": {
+            "default": {
+              "description": "The value used when none is set."
+            },
+            "minimum": {
+              "type": "number"
+            },
+            "maximum": {
+              "type": "number"
+            }
+          },
+          "additionalProperties": false
+        },
+        "definition": {
+          "type": "string",
+          "description": "What defines the property, in the backend's words: linux the binding file, noos the schema's property type."
+        },
         "suggestions": {
           "$ref": "#/$defs/property-suggestions"
         }

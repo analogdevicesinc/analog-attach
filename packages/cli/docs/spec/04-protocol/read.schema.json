@@ -80,9 +80,16 @@
       ]
     },
     "noos-property-entry": {
-      "description": "Where the backend is noos: a property of a node. $compatible names the node's schema; an external node also has $symbol and $provides (READ-502).",
+      "description": "Where the backend is noos: a property of a node. $compatible names the node's schema; an external node also has $symbol and $provides (READ-502). source when the property has a value (READ-501).",
       "allOf": [{ "$ref": "common.schema.json#/$defs/property" }],
+      "properties": {
+        "source": { "$ref": "#/$defs/noos-source" }
+      },
       "unevaluatedProperties": false
+    },
+    "noos-source": {
+      "description": "Where the backend is noos: who set the value. user for a value the user set or cleared, bootstrap for one bootstrap filled in.",
+      "enum": ["user", "bootstrap"]
     },
     "noos-node": {
       "description": "Where the backend is noos: a node (READ-501). origin is internal for a node the workfile stores, external for a board or driver resource it only names; alias is always empty.",
@@ -109,10 +116,11 @@
       }
     },
     "noos-property": {
-      "description": "Where the backend is noos: one property (READ-503), with what it can be set to. suggestions.values are the values update takes; can_create the schemas the user could add instead, [] when none.",
+      "description": "Where the backend is noos: one property (READ-503), with its definition and what it can be set to. suggestions.values are the values update takes; can_create the schemas the user could add instead, [] when none.",
       "allOf": [{ "$ref": "common.schema.json#/$defs/read-property" }],
-      "required": ["suggestions"],
+      "required": ["suggestions", "required", "definition"],
       "properties": {
+        "source": { "$ref": "#/$defs/noos-source" },
         "suggestions": { "required": ["values", "can_create"] }
       },
       "unevaluatedProperties": false

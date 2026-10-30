@@ -7,7 +7,7 @@ import { load_workspace, optional_bindings, type Bindings } from "../../config/w
 import type { ConfigResult } from "../../config/settings";
 import { bigIntReplacer, resolve_node_identifier, not_found_message, parse_target } from "../../utilities";
 import { convert_node, convert_property } from "../../protocol/dt-to-protocol";
-import type { Node, OverlayNode, ReadNode, ReadResponse, Suggestion, Types, ValueSource } from "../../protocol/types";
+import type { Node, OverlayNode, PropertyConstraints, ReadNode, ReadResponse, Suggestion, Types, ValueSource } from "../../protocol/types";
 import { format_type, resolve_target_binding, type PropertyInfo } from "../list/suggest";
 import { node_missing_required, property_details } from "../../node-state";
 
@@ -70,6 +70,7 @@ export async function read_target(
         ...convert_property(property),
         source,
         ...(info?.description === undefined ? {} : { description: info.description }),
+        ...(info === undefined ? {} : { required: info.required, ...binding_constraints(info), definition: path.basename(info.binding_path) }),
         ...(suggestions.length === 0 && creatable.length === 0 ? {} : {
             suggestions: {
                 values: suggestions,
@@ -87,6 +88,17 @@ export async function read_target(
 
 function property_line(property: DTProperty): string {
     return is_dt_flag(property.value) ? `${property.name};` : print_property(property, "", 0).trim();
+}
+
+/** The binding's default, minimum and maximum as `constraints`, left out when it gives none. */
+function binding_constraints(info: PropertyInfo): { constraints?: PropertyConstraints } {
+    const { default: fallback, minimum, maximum } = info.constraints;
+    const constraints: PropertyConstraints = {
+        ...(fallback === undefined ? {} : { default: fallback }),
+        ...(minimum === undefined ? {} : { minimum }),
+        ...(maximum === undefined ? {} : { maximum }),
+    };
+    return Object.keys(constraints).length === 0 ? {} : { constraints };
 }
 
 const BASE_MARK = "   // base";

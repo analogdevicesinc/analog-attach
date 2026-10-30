@@ -13,9 +13,10 @@
  *    `[member, member_value]` — which is also what makes them completable, since a tuple
  *    position is a thing the CLI can ask for suggestions about.
  *
- *  - **`Property` is closed.** `{kind, key, type, value}` and nothing else: no
- *    description, no `required`, no default, no numeric bounds. Those reach the user
- *    through the human rendering and through `suggest`, not through `read`.
+ *  - **`Property` is closed.** `{kind, key, type, value}` and nothing else. What the
+ *    schema says of a property (description, `required`, default, numeric bounds) and who
+ *    set its value go with `read <node> <property>` (commands/read.ts) and `source`
+ *    with a node's properties (property_source), as the shared ReadProperty has them.
  */
 
 import {
@@ -34,9 +35,11 @@ import {
 import type {
     Node as ProtocolNode,
     NodeOrigin,
+    NodeProperty,
     Property as ProtocolProperty,
     PropertyType,
     PropertyValue,
+    ValueSource,
 } from "./responses";
 
 /**
@@ -301,6 +304,26 @@ export function to_protocol_property(property: Property): ProtocolProperty {
     };
 }
 
+/**
+ * Who set a property's value, as `source` gives it (property_owner says it for a person):
+ * the user, for a value or a clearing of theirs; bootstrap, for one it filled in following
+ * the rules. A property with no value has none.
+ */
+export function property_source(property: Property): ValueSource | undefined {
+    if (property.cleared === true) {
+        return "user";
+    }
+    if (property.value === undefined) {
+        return undefined;
+    }
+    return property.auto === true ? "bootstrap" : "user";
+}
+
+function node_property(property: Property): NodeProperty {
+    const source = property_source(property);
+    return { ...to_protocol_property(property), ...(source === undefined ? {} : { source }) };
+}
+
 function descriptive_property(key: string, value: string | undefined): ProtocolProperty {
     return {
         kind: "property",
@@ -319,7 +342,7 @@ function descriptive_property(key: string, value: string | undefined): ProtocolP
  * like `$compatible`.
  */
 export function to_protocol_node(name: string, ruleset: Ruleset, origin: NodeOrigin): ProtocolNode {
-    const properties: ProtocolProperty[] = [descriptive_property(COMPATIBLE_KEY, ruleset.$symbol)];
+    const properties: NodeProperty[] = [descriptive_property(COMPATIBLE_KEY, ruleset.$symbol)];
 
     if (ruleset._t === "RulesetExtern") {
         properties.push(
@@ -327,7 +350,7 @@ export function to_protocol_node(name: string, ruleset: Ruleset, origin: NodeOri
             descriptive_property("$provides", ruleset.$provides),
         );
     } else if (ruleset._t === "RulesetStruct" || ruleset._t === "RulesetDescriptor") {
-        properties.push(...ruleset.properties.map(property => to_protocol_property(property)));
+        properties.push(...ruleset.properties.map(property => node_property(property)));
     }
 
     return { kind: "node", key: name, properties, children: [], origin, alias: [] };
