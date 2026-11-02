@@ -279,17 +279,42 @@ function fixed_size_enum_list(object: any): AttachType | undefined {
  * A property of a matrix type (`reg`, `interrupts`, `clocks`: `<1 2>, <3 4>`): its rows are what its `items` describe
  * (`items` itself, or its first entry when it is a list), each row a list of cells.
  */
+/**
+ * The positions of a matrix row, one that only has the range of the matrix's type (`uint32-matrix`'s, which the `items`
+ * merge gives a position the binding only describes) left `any`: a row holds phandles and macros too (`msi-map`'s
+ * `<rid-base &msi msi-base length>`, `fsl,pins`). The positions the binding bounds (`maximum: 19`) are numbers. A row
+ * of one kind of cell is left as it is.
+ */
+function row_cells(row: List, type: string): List {
+    const range = cell_range(type);
+    const only_typed = (cell: Cell): boolean =>
+        cell._t === "number" && range !== undefined && cell.minimum === range.minimum && cell.maximum === range.maximum && cell.default === undefined;
+    const any: Cell = { _t: "any" };
+
+    if (!Array.isArray(row.item)) {
+        return row;
+    }
+
+    const cells = row.item.map(cell => only_typed(cell) ? any : cell);
+    if (cells.every(cell => cell._t === "any")) {
+        const { typeSize: _type_size, ...untyped } = row;
+        return { ...untyped, item: any };
+    }
+    return { ...row, item: cells };
+}
+
 function narrow_matrix(object: any, type: string): AttachType {
     const items = Array.isArray(object.items) ? object.items[0] : object.items;
-    // The description of the first row says nothing of the others
-    const { description: _description, ...row_schema } = typeof items === "object" && items !== null ? items : {} as Record<string, unknown>;
+    // The description of the first row says nothing of the others, nor does the row's type (see `row_cells`)
+    const { description: _description, [DT_TYPE]: _row_type, ...row_schema } = typeof items === "object" && items !== null ? items : {} as Record<string, unknown>;
+    const row = narrow_array_object({ ...row_schema, type: "array" });
 
     return described(object, {
         _t: "matrix",
         // one phandle is one row of one cell
         ...bounds(type === "phandle" ? { minItems: 1, maxItems: 1, ...object } : object),
         rows: [{
-            ...narrow_array_object({ ...row_schema, type: "array" }),
+            ...row_cells(row, type),
             ...(type === "phandle" ? { minItems: 1, maxItems: 1, ...bounds(row_schema) } : {}),
         }],
     });
@@ -307,6 +332,53 @@ function open_enum_union(object: any): unknown[] | undefined {
         for (const value of branch.items.enum) { union.add(value); }
     }
     return [...union];
+}
+
+const STRING_TYPES = new Set(["string", "string-array", "non-unique-string-array"]);
+
+/** `uint32-array`, `int8-array`: the size of its numbers, undefined for any other type. */
+function integer_array_size(dt_type: unknown): number | undefined {
+    if (typeof dt_type !== "string") { return undefined; }
+    const found = /^u?int(8|16|32|64)-array$/.exec(dt_type);
+    return found === null ? undefined : Number(found[1]);
+}
+
+/** The values of `branches` when each is a `const` or an `enum` (`oneOf: [{description, const: dbi}, …]`). */
+function const_union(branches: unknown): unknown[] | undefined {
+    if (!Array.isArray(branches) || branches.length === 0) { return undefined; }
+
+    const union: unknown[] = [];
+    for (const branch of branches) {
+        if (typeof branch !== "object" || branch === null) { return undefined; }
+        if ("const" in branch) { union.push(branch.const); }
+        else if (Array.isArray(branch.enum)) { union.push(...branch.enum); }
+        else { return undefined; }
+    }
+    return [...new Set(union)];
+}
+
+/** A number of the range of `dt_type` (`uint32-array`'s 0..0xFFFFFFFF), narrowed by what `schema` bounds it to. */
+function typed_number_cell(schema: any, dt_type: string, default_value?: unknown): Cell {
+    const range = cell_range(dt_type);
+    return number_cell(range === undefined ? schema : { minimum: range.minimum, maximum: range.maximum, ...schema }, default_value);
+}
+
+/**
+ * The cell of one position of an `items` list: what it allows (an `enum`, a `const`, a number schema), else what the
+ * property's `dtType` says it holds (a string of a `pattern`, a number of a `{description}`). Undefined when neither.
+ */
+function position_cell(definition: any, dt_type: unknown): Cell | undefined {
+    if (typeof definition !== "object" || definition === null) { return undefined; }
+    if ("enum" in definition) { return enum_cell(definition.enum); }
+    if ("const" in definition) { return enum_cell([definition.const], definition.const); }
+
+    if (typeof dt_type === "string" && integer_array_size(dt_type) !== undefined) {
+        return typed_number_cell(definition, dt_type);
+    }
+    if (is_number_schema(definition)) { return number_cell(definition); }
+    if (typeof dt_type === "string" && STRING_TYPES.has(dt_type)) { return { _t: "string" }; }
+
+    return undefined;
 }
 
 /**
@@ -352,15 +424,38 @@ function narrow_dt_scalar(object: any): AttachType | undefined {
 
     const found = /^u?int(8|16|32|64)$/.exec(dt_type);
     const range = cell_range(dt_type);
-    if (found === null || range === undefined || ["oneOf", "anyOf", "allOf", "const", "items", "type"].some(key => key in object)) {
+    // A `oneOf` of values `oneof_to_enum` leaves alone (one of them `deprecated`) is an enum all the same
+    const options = const_union(object.oneOf);
+    const says_more = ["anyOf", "allOf", "const", "items", "type", ...(options === undefined ? ["oneOf"] : [])];
+    if (found === null || range === undefined || says_more.some(key => key in object)) {
         return undefined;
     }
 
+    let cell: Cell = { _t: "number" as const, minimum: range.minimum, maximum: range.maximum };
+    if ("enum" in object) { cell = enum_cell(object.enum); }
+    else if (options !== undefined) { cell = enum_cell(options); }
+
     return described(object, {
         _t: "scalar" as const,
-        cell: "enum" in object ? enum_cell(object.enum) : { _t: "number" as const, minimum: range.minimum, maximum: range.maximum },
+        cell,
         typeSize: Number(found[1]),
     });
+}
+
+/**
+ * A property whose schema says nothing but its integer array type (`dtType: uint32-array`, `protected-clocks`) and
+ * maybe its count: a list of numbers of the type's range.
+ */
+function narrow_dt_array(object: any): AttachType | undefined {
+    if (typeof object !== "object" || object === null) { return undefined; }
+
+    const dt_type = object[DT_TYPE];
+    const size = integer_array_size(dt_type);
+    if (size === undefined || ["oneOf", "anyOf", "allOf", "const", "enum", "items"].some(key => key in object)) {
+        return undefined;
+    }
+
+    return described(object, { _t: "list" as const, item: typed_number_cell({}, dt_type), ...bounds(object), typeSize: size });
 }
 
 // TODO: handle objects
@@ -464,7 +559,7 @@ function narrow_object(object: any): AttachType {
         });
     }
 
-    return narrow_string_array(object) ?? narrow_dt_scalar(object) ?? described(object, { _t: "unknown" });
+    return narrow_string_array(object) ?? narrow_dt_scalar(object) ?? narrow_dt_array(object) ?? described(object, { _t: "unknown" });
 }
 
 function get_enum_type(options: unknown): AttachEnumType.STRING | AttachEnumType.NUMBER {
@@ -514,17 +609,16 @@ function narrow_array_object(object: any): AttachType & { _t: "list" } {
         const cells: Cell[] = [];
 
         for (const definition of items) {
-            if ("enum" in definition) {
-                cells.push(enum_cell(definition.enum));
-            } else if ("const" in definition) {
-                cells.push(enum_cell([definition.const], definition.const));
-            } else {
+            const cell = position_cell(definition, object[DT_TYPE]);
+            if (cell === undefined) {
                 // FAILSAFE
                 return list({ _t: "any" });
             }
+            cells.push(cell);
         }
 
-        return list(cells);
+        const size = integer_array_size(object[DT_TYPE]);
+        return list(cells, size === undefined ? {} : { typeSize: size });
     }
 
     if ("items" in object && !items_array && "enum" in items) {
@@ -571,6 +665,19 @@ function narrow_array_object(object: any): AttachType & { _t: "list" } {
     if (Array.isArray(object.oneOf)) {
         const enum_list = fixed_size_enum_list(object);
         if (enum_list?._t === "list" && !Array.isArray(enum_list.item) && enum_list.item._t === "enum" && enum_list.item.enum.length > 0) { return enum_list; }
+    }
+
+    // What the `dtType` says the entries are, when the schema says nothing we read of them (`items: {pattern}`,
+    // `contains`, a bare `$ref: uint32-array` with a count). An `items` `oneOf` of values gives the options.
+    const dt_type = object[DT_TYPE];
+    if (typeof dt_type === "string" && STRING_TYPES.has(dt_type)) {
+        const options = items_array ? undefined : const_union(items?.oneOf);
+        return list(options === undefined ? { _t: "string" } : enum_cell(options), unique);
+    }
+    const size = integer_array_size(dt_type);
+    if (size !== undefined) {
+        const item_schema = !items_array && typeof items === "object" && items !== null ? items : {};
+        return list(typed_number_cell(item_schema, dt_type, object.default), { typeSize: size });
     }
 
     // Array of whatever
@@ -701,9 +808,58 @@ if (import.meta.vitest) {
         // a const next to the $ref (`$ref: uint32` + `const: 28`) is a one-option enum, the const its default
         expect(translated({ cells: { type: "integer", typeSize: 32, minimum: 0, maximum: 0xFF_FF_FF_FF, const: 28, dtType: "uint32" } }).cells)
             .toStrictEqual({ _t: "scalar", cell: { _t: "enum", enum: [28n], enum_type: "number" }, typeSize: 32, default: 28n });
-        // arrays, and numbers a schema says more of, are not scalars
-        expect(translated({ foo: { dtType: "uint32-array" } }).foo).toStrictEqual({ _t: "unknown" });
+        // a `oneOf` of values `oneof_to_enum` leaves (one is deprecated) is an enum
+        expect(translated({ cells: { dtType: "uint32", oneOf: [{ const: 2 }, { const: 1, deprecated: true }] } }).cells)
+            .toStrictEqual({ _t: "scalar", cell: { _t: "enum", enum: [2n, 1n], enum_type: "number" }, typeSize: 32 });
+        // numbers a schema says more of are not scalars
         expect(translated({ foo: { dtType: "uint32", items: { minimum: 1 } } }).foo).toStrictEqual({ _t: "unknown" });
+    });
+
+    test("an integer array its schema says nothing more of is a list of numbers of its type, an items list one cell each", () => {
+        const { protected_clocks, rates, mask, range } = translated({
+            protected_clocks: { dtType: "uint32-array" },
+            rates: { dtType: "uint32-array", type: "array", minItems: 1, maxItems: 4 },
+            mask: { dtType: "uint32-array", type: "array", items: [{ minimum: 0, maximum: 0xFF_00, type: "integer" }, { const: 0 }, { description: "pin" }] },
+            range: { dtType: "uint8-array", type: "array", items: [{ maximum: 100 }, { minimum: 1 }] },
+        });
+        const uint32 = { _t: "number", minimum: 0n, maximum: 0xFF_FF_FF_FFn };
+
+        expect(protected_clocks).toStrictEqual({ _t: "list", item: uint32, typeSize: 32 });
+        expect(rates).toStrictEqual({ _t: "list", item: uint32, minItems: 1, maxItems: 4, typeSize: 32 });
+        expect(mask).toStrictEqual({
+            _t: "list",
+            item: [{ _t: "number", minimum: 0n, maximum: 0xFF_00n }, { _t: "enum", enum: [0n], enum_type: "number", default: 0n }, uint32],
+            typeSize: 32,
+        });
+        expect(range).toStrictEqual({ _t: "list", item: [{ _t: "number", minimum: 0n, maximum: 100n }, { _t: "number", minimum: 1n, maximum: 255n }], typeSize: 8 });
+    });
+
+    const matrix_of = (items: unknown[]) => ({ dtType: "uint32-matrix", type: "array", items: [{ dtType: "uint32-array", type: "array", items }] });
+
+    test("a matrix row is typed by what its schema bounds, not by its type: msi-map's rows hold a phandle", () => {
+        const uint32 = { type: "integer", typeSize: 32, minimum: 0, maximum: 0xFF_FF_FF_FF, dtType: "uint32" };
+        const { msi_map, channels } = translated({
+            // the `items` merge gives each position the `uint32` it references
+            msi_map: matrix_of(["rid-base", "msi-controller", "msi-base", "length"].map(description => ({ description, ...uint32 }))),
+            channels: matrix_of([{ ...uint32, maximum: 19 }, { ...uint32, maximum: 19 }]),
+        });
+
+        expect(msi_map).toMatchObject({ _t: "matrix", rows: [{ _t: "list", item: { _t: "any" } }] });
+        expect(channels).toMatchObject({ _t: "matrix", rows: [{ _t: "list", item: [{ _t: "number", maximum: 19n }, { _t: "number", maximum: 19n }] }] });
+    });
+
+    test("a string list whose items translate reads nothing of is a list of strings, an items oneOf of values its options", () => {
+        const { names, described_names, compatible, positions } = translated({
+            names: { dtType: "string-array", type: "array", items: { pattern: "^(rx|tx)[0-9]$" } },
+            described_names: { dtType: "string-array", type: "array", items: { oneOf: [{ description: "DBI", const: "dbi" }, { description: "other", enum: ["mstr", "slv"] }] } },
+            compatible: { dtType: "string-array", type: "array", contains: { const: "syscon" } },
+            positions: { dtType: "string-array", type: "array", items: [{ pattern: "^jedec,lpddr4-" }, { const: "jedec,lpddr4" }] },
+        });
+
+        expect(names).toStrictEqual({ _t: "list", item: { _t: "string" } });
+        expect(described_names).toStrictEqual({ _t: "list", item: { _t: "enum", enum: ["dbi", "mstr", "slv"], enum_type: "string" } });
+        expect(compatible).toStrictEqual({ _t: "list", item: { _t: "string" } });
+        expect(positions).toStrictEqual({ _t: "list", item: [{ _t: "string" }, { _t: "enum", enum: ["jedec,lpddr4"], enum_type: "string", default: "jedec,lpddr4" }] });
     });
 
     test("a oneOf of open lists of an enum is a list of the union of the enums", () => {
