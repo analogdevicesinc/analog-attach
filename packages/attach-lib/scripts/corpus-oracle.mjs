@@ -18,15 +18,16 @@
 //   type-mismatch     our shape is none of the types dt-schema gives
 //   two-types         dt-schema gives the name more than one type and the binding doesn't say which; ours is one
 //                     of them (not a disagreement: validation.json can't settle it either)
-//   count-mismatch    a list's or matrix's minItems/maxItems differ from the processed schema's; an unset minItems
-//                     is 1 on both sides
+//   count-mismatch    a list's or matrix's minItems/maxItems differ from the ones dt-validate holds it to: the
+//                     tightest of the schemas it checks the node against (the binding's and the ones its `$ref` and
+//                     `allOf` name, theirs too); an unset minItems is 1 on both sides
 //   row-count-mismatch  the same for the rows of a matrix, where the processed schema sizes them
 //   duplicate-key     a node lists a property twice
 //   impossible-bound  minItems > maxItems, or minimum > maximum
 //
-// Limits: the processed schema has no descriptions or examples, and sizes only the properties a binding lists itself
-// (an inherited one stays behind its `$ref`), so an inherited property is checked against the type dt-schema gives its
-// name and its counts not at all.
+// Limits: the processed schema has no descriptions or examples. A property the binding gets from no schema it names
+// (dt-core's, a bus's through `select`) is checked against the type dt-schema gives its name, its counts not at all;
+// nor are those of an `if` / `then` branch.
 //
 // Reads dist/ (unless --dumps): `yarn build` first. Like corpus/bindings.json, the baseline is only comparable on the
 // commits and processed schema it records.
@@ -80,34 +81,99 @@ const generated_patterns = Object.entries(generated_pattern_types).flatMap(([pat
   try { return [{ regex: new RegExp(pattern), types }]; } catch { return []; }
 });
 const schema_by_file = new Map();
+const schema_by_id = new Map();
 for (const schema of Object.values(processed)) {
   if (typeof schema?.$filename === "string" && schema.$filename.startsWith(bindings_dir)) {
     schema_by_file.set(relative(bindings_dir, schema.$filename), schema);
   }
+  if (typeof schema?.$id === "string") schema_by_id.set(schema.$id.replace(/#$/, ""), schema);
 }
 
 const is_object = (value) => typeof value === "object" && value !== null && !Array.isArray(value);
 
+/** What a `$ref` of `document` names: the schema, in the document it is in. */
+function resolve_reference(reference, document) {
+  let url;
+  try { url = new URL(reference, document.$id); } catch { return undefined; }
+  const pointer = decodeURIComponent(url.hash.slice(1));
+  url.hash = "";
+  const target = url.href === document.$id.replace(/#$/, "") ? document : schema_by_id.get(url.href);
+  let schema = target;
+  for (const key of pointer.split("/").slice(1).map((key) => key.replaceAll("~1", "/").replaceAll("~0", "~"))) {
+    schema = is_object(schema) || Array.isArray(schema) ? schema[key] : undefined;
+  }
+  return schema === undefined ? undefined : { schema, document: target };
+}
+
+/**
+ * The schemas dt-validate checks a node against, nearest first, each with the document it is in: the node's own, the
+ * one its `$ref` names and its `allOf` entries (not an `if` / `then`, which applies only sometimes), and theirs.
+ */
+function node_schemas(schema, document, seen = new Set()) {
+  if (!is_object(schema) || seen.has(schema)) return [];
+  seen.add(schema);
+  const found = [{ schema, document }];
+  if (typeof schema.$ref === "string") {
+    const target = resolve_reference(schema.$ref, document);
+    if (target) found.push(...node_schemas(target.schema, target.document, seen));
+  }
+  for (const entry of Array.isArray(schema.allOf) ? schema.allOf : []) {
+    if (is_object(entry) && !("if" in entry)) found.push(...node_schemas(entry, document, seen));
+  }
+  return found;
+}
+
+/** The schemas `table` (`properties` or `patternProperties`) of each of `nodes` gives `key`, nearest first. */
+const entries_of = (nodes, table, key) => nodes.map(({ schema, document }) => ({ schema: is_object(schema[table]) ? schema[table][key] : undefined, document })).filter(({ schema }) => is_object(schema));
+
+/**
+ * The bounds that hold of all of `schemas`: the highest minItems, the lowest maxItems, a `oneOf` / `anyOf` bounding
+ * by its loosest branch (when every branch bounds that side).
+ */
+function bounds_of(schemas) {
+  const lows = [];
+  const highs = [];
+  const collect = (schema) => {
+    if (typeof schema.minItems === "number") lows.push(schema.minItems);
+    if (typeof schema.maxItems === "number") highs.push(schema.maxItems);
+    for (const entry of Array.isArray(schema.allOf) ? schema.allOf : []) if (is_object(entry)) collect(entry);
+    for (const key of ["oneOf", "anyOf"]) {
+      const branches = (Array.isArray(schema[key]) ? schema[key] : []).filter(is_object).map((branch) => bounds_of([branch]));
+      if (branches.length === 0) continue;
+      if (branches.every(({ minItems }) => minItems !== undefined)) lows.push(Math.min(...branches.map(({ minItems }) => minItems)));
+      if (branches.every(({ maxItems }) => maxItems !== undefined)) highs.push(Math.max(...branches.map(({ maxItems }) => maxItems)));
+    }
+  };
+  for (const schema of schemas) collect(schema);
+  return { minItems: lows.length === 0 ? undefined : Math.max(...lows), maxItems: highs.length === 0 ? undefined : Math.min(...highs) };
+}
+
 /** dt-schema's type names of a generated-types entry, without `node`. */
 const type_names = (entries) => [...new Set((entries ?? []).map((entry) => entry.type).filter((type) => typeof type === "string" && type !== "node"))].sort();
 
-/** The types.yaml types a schema names itself, through `$ref` and its `allOf` / `oneOf` / `anyOf`. */
+/**
+ * The types.yaml types a schema names itself, through `$ref` and its `allOf` / `oneOf` / `anyOf`; a `oneOf` / `anyOf`
+ * only when each branch names one (`ranges: {oneOf: [{type: boolean}, {items: …}]}` says nothing of the second).
+ */
 function own_types(schema) {
   if (!is_object(schema)) return [];
   const found = [];
   const reference = /types\.yaml#\/definitions\/([\w-]+)$/.exec(schema.$ref ?? "");
   if (reference) found.push(reference[1]);
   if (schema.type === "boolean") found.push("flag");
-  for (const key of ["allOf", "oneOf", "anyOf"]) {
-    for (const branch of Array.isArray(schema[key]) ? schema[key] : []) found.push(...own_types(branch));
+  for (const branch of Array.isArray(schema.allOf) ? schema.allOf : []) found.push(...own_types(branch));
+  for (const key of ["oneOf", "anyOf"]) {
+    const branches = (Array.isArray(schema[key]) ? schema[key] : []).map(own_types);
+    if (branches.every((types) => types.length > 0)) found.push(...branches.flat());
   }
   return [...new Set(found)].sort();
 }
 
-/** The types dt-schema gives a property: its schema's own, else its name's, else the first pattern's that matches. */
-function dt_types(name, schema, pattern) {
-  const own = own_types(schema);
-  if (own.length > 0) return { types: own, own: true };
+/** The types dt-schema gives a property: the nearest of its schemas that names one, else its name's, else the first
+ * pattern's that matches. */
+function dt_types(name, schemas, pattern) {
+  const own = schemas.map(own_types).find((types) => types.length > 0);
+  if (own !== undefined) return { types: own, own: true };
   if (pattern !== undefined) return { types: type_names(generated_pattern_types[pattern]), own: false };
   const entries = generated_types[name] ?? generated_patterns.find(({ regex }) => regex.test(name))?.types;
   return { types: type_names(entries), own: false };
@@ -153,6 +219,17 @@ function shape(value) {
 const count = (bound) => bound ?? "unset";
 const counts_of = (min, max) => `(${count(min)}, ${count(max)})`;
 const same_counts = (a, b) => (a.minItems ?? 1) === (b.minItems ?? 1) && a.maxItems === b.maxItems;
+
+/**
+ * How many values a list of ours holds. An enum whose options are whole lists (`reset-names: oneOf: [const: pipe,
+ * items: [pwr, pipe]]`, a compatible with its fallback) is one item that holds an option's length.
+ */
+function value_counts(value) {
+  const options = value._t === "list" && !Array.isArray(value.item) && value.item._t === "enum" ? value.item.enum : [];
+  if (value.maxItems !== 1 || !options.some((option) => Array.isArray(option))) return value;
+  const lengths = options.map((option) => (Array.isArray(option) ? option.length : 1));
+  return { minItems: Math.min(...lengths), maxItems: Math.max(...lengths) };
+}
 const big = (bound) => (typeof bound === "string" ? BigInt(bound.slice(0, -1)) : bound);
 
 /** The bounds of `value` that can't hold: a minimum above its maximum, of the items or of a number cell. */
@@ -195,14 +272,15 @@ function check(name, binding) {
   const cases = Object.fromEntries(CATEGORIES.map((category) => [category, []]));
   const own_schema = schema_by_file.get(name);
 
-  const check_property = (where, key, value, schema, pattern) => {
+  // `schemas`: what the processed schemas say of the property, nearest first
+  const check_property = (where, key, value, schemas, pattern) => {
     const at = `${name}:${where}${key}`;
     if (!is_object(value)) return;
 
     for (const bound of impossible_bounds(value)) cases["impossible-bound"].push(`${at} ${bound}`);
     if (value._t === "node") return;
 
-    const { types, own } = dt_types(key, schema, pattern);
+    const { types, own } = dt_types(key, schemas, pattern);
     if (types.length > 0) {
       const fits = types.map((type) => fit(value, type));
       const said = `ours ${shape(value)}, dt-schema ${types.join("|")}`;
@@ -213,12 +291,14 @@ function check(name, binding) {
       }
     }
 
-    if (!is_object(schema) || (value._t !== "list" && value._t !== "matrix")) return;
-    if ((schema.minItems !== undefined || schema.maxItems !== undefined) && !same_counts(value, schema)) {
-      cases["count-mismatch"].push(`${at} ours ${counts_of(value.minItems, value.maxItems)}, dt-schema ${counts_of(schema.minItems, schema.maxItems)}`);
+    if (value._t !== "list" && value._t !== "matrix") return;
+    const theirs = bounds_of(schemas);
+    const ours = value_counts(value);
+    if ((theirs.minItems !== undefined || theirs.maxItems !== undefined) && !same_counts(ours, theirs)) {
+      cases["count-mismatch"].push(`${at} ours ${counts_of(ours.minItems, ours.maxItems)}, dt-schema ${counts_of(theirs.minItems, theirs.maxItems)}`);
     }
 
-    const rows = value._t === "matrix" ? row_schemas(schema) : undefined;
+    const rows = value._t === "matrix" ? schemas.map(row_schemas).find((rows) => rows !== undefined) : undefined;
     if (rows === undefined) return;
     if (Array.isArray(rows) && rows.length !== value.rows.length && value.rows.length > 1) {
       cases["row-count-mismatch"].push(`${at} ours ${value.rows.length} rows, dt-schema ${rows.length}`);
@@ -231,7 +311,8 @@ function check(name, binding) {
     });
   };
 
-  const check_node = (where, properties, schema) => {
+  // `nodes`: the schemas of the node (`node_schemas`)
+  const check_node = (where, properties, nodes) => {
     const seen = new Map();
     for (const { key } of properties) seen.set(key, (seen.get(key) ?? 0) + 1);
     for (const [key, times] of seen) {
@@ -242,19 +323,20 @@ function check(name, binding) {
     for (const { key, value } of properties) {
       if (checked.has(key)) continue;
       checked.add(key);
-      const property_schema = is_object(schema?.properties) ? schema.properties[key] : undefined;
-      check_property(where, key, value, property_schema);
-      if (value?._t === "node") check_node(`${where}${key}/`, value.properties, is_object(property_schema) ? property_schema : undefined);
+      const entries = entries_of(nodes, "properties", key);
+      check_property(where, key, value, entries.map(({ schema }) => schema));
+      if (value?._t === "node") check_node(`${where}${key}/`, value.properties, entries.flatMap(({ schema, document }) => node_schemas(schema, document)));
     }
   };
 
-  const patterns = is_object(own_schema?.patternProperties) ? own_schema.patternProperties : {};
-  check_node("", binding.properties, own_schema);
+  const root_schemas = own_schema === undefined ? [] : node_schemas(own_schema, own_schema);
+  check_node("", binding.properties, root_schemas);
   for (const rule of binding.pattern_properties ?? []) {
-    check_node(`${rule.pattern}/`, rule.properties, is_object(patterns[rule.pattern]) ? patterns[rule.pattern] : undefined);
+    const entries = entries_of(root_schemas, "patternProperties", rule.pattern);
+    check_node(`${rule.pattern}/`, rule.properties, entries.flatMap(({ schema, document }) => node_schemas(schema, document)));
   }
   for (const rule of binding.property_patterns ?? []) {
-    check_property("", rule.pattern, rule.value, patterns[rule.pattern], rule.pattern);
+    check_property("", rule.pattern, rule.value, entries_of(root_schemas, "patternProperties", rule.pattern).map(({ schema }) => schema), rule.pattern);
   }
   return cases;
 }
