@@ -21,19 +21,14 @@ const GENERATE_FLAGS = {
         brief: "Template set to render with (default: the 'project-template' setting)",
         placeholder: "template",
     },
-    "board": {
-        kind: "value",
-        brief: "Board preset to build for (default: the workfile board, else the only board for its platform)",
-        placeholder: "board",
-    },
 } as const satisfies FlagSpecs;
 
 /**
  * `generate`: render the workfile into a CAPI project.
  *
- * Everything it needs is configuration: the project name, where to write it, which board and
- * which template set. The flags stay as human overrides, but nothing is required on the
- * command line, so a tool can call it with no arguments at all.
+ * Everything it needs is configuration: the project name, where to write it and which template
+ * set, and the board comes from the workfile. The flags stay as human overrides, but nothing is
+ * required on the command line, so a tool can call it with no arguments at all.
  */
 export const generate: ExtraCommand<typeof GENERATE_FLAGS, CommonResponse> = {
     docs: {
@@ -67,13 +62,10 @@ function run_generate(flags: FlagValues<typeof GENERATE_FLAGS>, session: Session
         return refuse("Platform vendor not found in workfile");
     }
 
-    // The generated project names one board, so it is settled here rather than left
-    // to the templates: the flag wins, then the workfile, then the chip if exactly one
-    // board carries it.
-    const board = resolve_board(
-        context.value.minimal.platform,
-        flags.board ?? context.value.minimal.board,
-    );
+    // The generated project names one board, so it is settled here rather than left to
+    // the templates: the workfile's (what `target` named at init), else the chip's only one.
+    // There is no per-run override: build and deploy act on the board generated for.
+    const board = resolve_board(context.value.minimal.platform, context.value.minimal.board);
     if (!board.ok) {
         return refuse(board.error.message);
     }

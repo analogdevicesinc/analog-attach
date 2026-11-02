@@ -8,14 +8,13 @@ it (flashes the generated project to the board through a debug probe).
 
 ```
 analog-attach [--json] deploy
-analog-attach [--json] deploy [--board <board>] [--probe <probe>]     # where the backend is noos
+analog-attach [--json] deploy [--probe <probe>]     # where the backend is noos
 ```
 
 Grammar: rule `deploy` in `01-grammar.abnf`.
 
 | Option (noos) | Meaning | Default |
 |---|---|---|
-| `--board <board>` | The board preset of the project to flash. | the project's only preset |
 | `--probe <probe>` | The debug probe: `openocd` or `jlink`. | the `probe` setting, else `openocd` |
 
 Where the backend is linux, the command takes no arguments or options. Its
@@ -115,8 +114,7 @@ that command puts it, and the CLI doesn't look for it.
 
 **DEPLOY-502** When `deploy-command` is set, the CLI shall run it with the
 shell in the project directory, after the progress line `Deploying <dir>
-with '<command>'`; `--board` and `--probe` change nothing in it (open issue
-D-7). If it exits with a non-zero status, then the CLI shall refuse with
+with '<command>'`; `--probe` changes nothing in it (open issue D-7). If it exits with a non-zero status, then the CLI shall refuse with
 `Deploy failed with exit code <n>`; otherwise the JSON message is `Deployed
 <dir> with '<command>'`.
 
@@ -173,8 +171,8 @@ system's TCP timeout.
 `remote_path` are given but not the copied file, and `remote_path` is the
 directory.
 
-**D-7. `--board` and `--probe` are ignored with `deploy-command`.** The
-command runs as it is; `--probe` is still checked (DEPLOY-500).
+**D-7. `--probe` is ignored with `deploy-command`.** The command runs as it
+is; `--probe` is still checked (DEPLOY-500).
 
 ## 7. Examples
 

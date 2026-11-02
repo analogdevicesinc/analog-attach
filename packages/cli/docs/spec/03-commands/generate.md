@@ -8,7 +8,7 @@ command, COM-015).
 ## 1. Synopsis
 
 ```
-analog-attach [--json] generate [--output <directory>] [--project-template <template>] [--board <board>]
+analog-attach [--json] generate [--output <directory>] [--project-template <template>]
 ```
 
 Grammar: rule `generate` in `01-grammar.abnf`. It takes no positionals.
@@ -17,7 +17,6 @@ Grammar: rule `generate` in `01-grammar.abnf`. It takes no positionals.
 |---|---|---|
 | `--output <directory>` | The project directory, resolved against the CWD. | the `project-path` setting, else `out/<project-name>` (GENERATE-010) |
 | `--project-template <template>` | The template set: a bundled set's name (`capi`, `capi-iio`) or a directory. | the `project-template` setting, else `capi` |
-| `--board <board>` | The board the project is for. | the workfile's board, else the only board carrying its chip |
 
 ## 2. Terms
 
@@ -34,19 +33,18 @@ Grammar: rule `generate` in `01-grammar.abnf`. It takes no positionals.
 and refuse as it says. If the workfile's platform has no vendor, then it
 shall refuse with `Platform vendor not found in workfile`.
 
-**GENERATE-002** The CLI shall resolve the board from `--board`, else the
-workfile's board, else the one board carrying the workfile's chip, and
-refuse with the first problem:
+**GENERATE-002** The CLI shall resolve the board from the workfile's board
+(what the `target` setting named when `init` created it), else the one board
+carrying the workfile's chip, and refuse with the first problem. There is no
+per-run choice: `build` and `deploy` act on the board the project was
+generated for.
 
 | Problem | Message |
 |---|---|
 | A board no module repository has | `Unknown board '<board>'. Configured platforms support: <boards>` |
 | A board carrying another chip | `Board '<board>' carries <chip>, but this workfile targets <workfile chip>` |
-| No board given, none carries the chip | `No board carries <chip>, so one cannot be chosen for you` |
-| No board given, several carry it | `More than one board carries <chip>: <boards>. Pick one.`, the boards sorted |
-
-The board only names the project in the response; the files are rendered
-for the workfile's board (open issue GE-3).
+| The workfile names no board, and none carries the chip | `No board carries <chip>, so one cannot be chosen for you` |
+| The workfile names no board, and several carry it | `More than one board carries <chip>: <boards>. Pick one.`, the boards sorted (open issue GE-3) |
 
 **GENERATE-003** The CLI shall resolve the template set from
 `--project-template`, else the `project-template` setting, else `capi`. A
@@ -128,15 +126,13 @@ first and write them once all have rendered.
 for (a required value left empty, a missing chip select) is generated
 without a word, and the error comes from the compiler, if at all.
 
-**GE-3. `--board` only names the project.** The templates take the board
-from the workfile: `generate --board twobusboard` with a workfile for
-`otherboard` says `board: twobusboard`, and `CMakePresets.json`,
-`module.yml` and `src/bsp/parameters.h` are for `otherboard`. A workfile
-that targets only a chip can't be generated at all: `--board` gives `A CAPI
-application is built for a board, and the workfile names none`, and without
-it, `More than one board carries othersoc: otherboard, twobusboard. Pick
-one.` asks for a choice that can't be made. A fix would be to pass the
-resolved board to the templates.
+**GE-3. A workfile for a chip with several boards can't be generated.** A
+workfile `init` made for a chip (`target` a chip) names no board, and the
+templates need one: with one board carrying the chip it is taken, with
+several `More than one board carries othersoc: otherboard, twobusboard. Pick
+one.` asks for a choice nothing can make. Setting `target` to a board and
+creating the workfile again is the way out today; a fix would let `generate`
+take a board of the chip from the `target` setting.
 
 **GE-4. "Files created" lists replaced files.** A second `generate` lists the
 files it rewrote as created (`8 files created`, `src/app.c` being kept).
@@ -171,7 +167,3 @@ $ analog-attach --json generate --project-template nope
 {"ok":false,"message":"Template set 'nope' not found at '<installation>/bundled/noos/templates/nope'. Available sets: capi, capi-iio","severity":"error"}
 ```
 
-```
-$ analog-attach --json generate --board otherboard
-{"ok":false,"message":"Board 'otherboard' carries othersoc, but this workfile targets testsoc","severity":"error"}
-```

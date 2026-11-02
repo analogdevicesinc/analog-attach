@@ -80,7 +80,7 @@ interface Backend<R extends Responses = Responses> {
 }
 
 interface CommandImpl<A, R, S extends FlagSpecs = FlagSpecs> {
-    readonly flags?: S;                       // flags only this backend adds (add --parent, build --board)
+    readonly flags?: S;                       // flags only this backend adds (add --parent, deploy --probe)
     readonly docs?: CommandDocumentation;
     run(args: A, flags: FlagValues<S>, session: Session): Promise<Outcome<R>>;
 }

@@ -21,7 +21,6 @@ import { common_ok, type BuildResponse } from "../protocol/responses";
 import { get_project_path } from "./shared";
 
 const BUILD_FLAGS = {
-    board: { kind: "value", brief: "Build for this board instead of the one the project was generated for", placeholder: "board" },
     clean: { kind: "boolean", brief: "Delete the build directory first, forcing a fresh configure" },
 } as const satisfies FlagSpecs;
 
@@ -41,7 +40,7 @@ export const build = command<BuildArguments, BuildResponse, typeof BUILD_FLAGS>(
             "out/<project-name> when it is unset.\n\nExamples:\n  $ analog-attach build\n  $ analog-attach build --clean\n  $ analog-attach config build-dir build-debug\n  $ analog-attach --json build"
     },
     run(_arguments, flags, session) {
-        return run_build(flags.board, flags.clean === true, session);
+        return run_build(flags.clean === true, session);
     }
 });
 
@@ -61,7 +60,7 @@ export function project_directory(session: Session): { ok: true; path: string } 
     return { ok: true, path: target_path };
 }
 
-async function run_build(board: string | undefined, clean: boolean, session: Session): Promise<Outcome<BuildResponse>> {
+async function run_build(clean: boolean, session: Session): Promise<Outcome<BuildResponse>> {
     const project = project_directory(session);
     if (!project.ok) {
         return project.outcome;
@@ -87,7 +86,7 @@ async function run_build(board: string | undefined, clean: boolean, session: Ses
         // The command is the user's, but a generated project still puts its ELF where the
         // plan says: report it when it is there.
         const capi = get_effective_setting_value("capi-path");
-        const planned = capi.ok && capi.value !== undefined ? plan_build(target_path, capi.value, board, session.program) : undefined;
+        const planned = capi.ok && capi.value !== undefined ? plan_build(target_path, capi.value, session.program) : undefined;
         const artifact = planned?.ok === true && fs.existsSync(planned.value.elf_path) ? planned.value.elf_path : undefined;
 
         const message = `Built ${target_path} with '${override.value}'`;
@@ -100,7 +99,7 @@ async function run_build(board: string | undefined, clean: boolean, session: Ses
         return refuse(`capi-path is not configured. Run: ${session.program} config capi-path <path>`);
     }
 
-    const plan = plan_build(target_path, capi_path.value, board, session.program);
+    const plan = plan_build(target_path, capi_path.value, session.program);
     if (!plan.ok) {
         return refuse(plan.error.message);
     }
