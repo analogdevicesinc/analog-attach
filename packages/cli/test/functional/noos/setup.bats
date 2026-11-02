@@ -185,23 +185,22 @@ eco_checkout() {
 	refute_output --partial "Which board?"
 }
 
-# Gap: it exits 2 with the help on standard error, no JSON result, and doesn't name the
-# missing settings.
 # Description: with --json, analog-attach alone on a terminal asks nothing and gives one JSON
 # result naming the required settings still missing.
 # Steps:
 #   1. Remove the target setting.
 #   2. Run analog-attach --json on a terminal.
 #   3. Check it succeeds and doesn't ask for the board.
-#   4. Check the output is a JSON result that names target.
-# bats test_tags=req:SETUP-04, req:GEN-07, gap, id:N0240
+#   4. Check the output is a JSON result with the usage, naming target as missing.
+# bats test_tags=req:SETUP-04, req:GEN-07, id:N0240
 @test "with --json, on a terminal, the bare run asks nothing and shows the help" {
 	drop_setting target
 	tty_run -- --json
 	assert_success
 	refute_output --partial "Which board?"
-	jq -e 'type == "object"' <<<"$output" >/dev/null || fail "not a JSON result: $output"
-	assert_output --partial "target"
+	assert_json '.ok' true
+	assert_json '.usage | contains("USAGE")' true
+	assert_json '.missing | join(",")' target
 }
 
 # Description: without a terminal, analog-attach alone shows the help and names the required
