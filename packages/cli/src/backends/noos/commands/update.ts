@@ -1,4 +1,4 @@
-import { referenced_nodes, set_value } from "attach-no-os-lib";
+import { referenced_nodes, set_value, validate_property_value } from "attach-no-os-lib";
 import {
     answer,
     command,
@@ -49,7 +49,7 @@ export const update = command<UpdateArguments, CommonResponse | ReadResponse | S
             "Sets <property> on <node> to <value>. With no <value>, reads the property instead;\n" +
             "with --suggest, lists what it can be set to (for a union, after the member).\n" +
             `A union takes '<member> <value>' (or '<member>${ELEMENT_SEPARATOR}<value>'), an array a comma-separated list.\n` +
-            `A property whose name starts with '${RESERVED_PREFIX}' can be written without it: init_param means ${RESERVED_PREFIX}init_param.`
+            `A property whose name starts with '${RESERVED_PREFIX}' can be written without it: init_param means ${RESERVED_PREFIX}init_param.\n\nExamples:\n  $ analog-attach update adxl355_spi_dev max_speed_hz 2000000\n  $ analog-attach update adxl355_spi_dev cs_gpio cs_pin\n  $ analog-attach update adxl355_ip comm_init spi_dev adxl355_spi_dev\n  $ analog-attach update --suggest adxl355_spi_dev mode`
     },
     run(arguments_, flags, session) {
         return Promise.resolve(run_update(arguments_, flags.suggest === true, session));
@@ -119,15 +119,24 @@ function run_update(arguments_: UpdateArguments, suggest: boolean, session: Sess
     // Two words for a union ('<member> <value>') fold into the one string the parser expects.
     const raw = union_value === undefined ? value : `${value}${ELEMENT_SEPARATOR}${union_value}`;
 
+    // A value that doesn't parse for the property is refused, as one it doesn't allow is:
+    // the command ran, the value is wrong (GEN-09).
     const parsed = parse_property_value(raw, lookup.value.property);
     if (!parsed.ok) {
-        return input_error(parsed.error.message);
+        return refuse(parsed.error.message);
     }
 
     const referenced_before = referenced_nodes(context.value.workfile);
     const updated = set_value(context.value.workfile, node, resolved, parsed.value);
     if (!updated.ok) {
         return refuse(updated.error.message);
+    }
+    // What the definition doesn't allow for the value itself (a bound, an option, an array's
+    // elements) is refused here rather than left for validate (UPDATE-02); the workfile on
+    // disk is untouched, as nothing is saved.
+    const problems = validate_property_value(context.value.workfile, node, resolved);
+    if (problems.length > 0) {
+        return refuse(problems.map(problem => problem.message).join("; "));
     }
     const message = `Set ${node}.${resolved} = ${format_property_value(lookup.value.property)}`;
 

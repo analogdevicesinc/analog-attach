@@ -40,7 +40,7 @@ field() {
 # bats test_tags=req:SET-01
 @test "the backend can't be a user setting" {
 	run aa config backend linux --global
-	assert_failure 2
+	assert_success  # a refused value: the command ran (GEN-09)
 	assert_output --partial "backend belongs to the project and can't be in the global settings"
 	[ ! -e "$HOME/.config/analog-attach/config.json" ] || [ "$(jq -r '.backend // "none"' "$HOME/.config/analog-attach/config.json")" = none ]
 }
@@ -150,7 +150,7 @@ field() {
 	assert_json '.ok' false
 	assert_output --partial "The capi-iio template set serves IIO devices"
 	run aa config project-template nosuchset
-	assert_failure 2
+	assert_success  # a refused value: the command ran (GEN-09)
 	assert_output --partial "Template set 'nosuchset' not found"
 	assert_output --partial "Available sets: capi, capi-iio"
 }
@@ -163,7 +163,7 @@ field() {
 	assert_json '.ok' true
 	[ "$(field example .value)" = false ]
 	run aa config example maybe
-	assert_failure 2
+	assert_success  # a refused value: the command ran (GEN-09)
 	assert_output --partial 'example: "maybe" is not true or false'
 }
 
@@ -237,9 +237,11 @@ field() {
 
 # --- SET-11: build folder ------------------------------------------------------------------
 
-# bats test_tags=req:SET-11, gap
-@test "build-dir names the folder build writes to" {
-	# Gap: there is no build-dir setting ("Unknown config field: build-dir", exit 2).
+# bats test_tags=req:SET-11
+@test "build-dir names the folder build writes to, build by default" {
+	run_json config build-dir
+	assert_json '.configs[0].value' build
+	assert_json '.configs[0].source' default
 	run aa config build-dir "$BATS_TEST_TMPDIR/build-a"
 	assert_success
 	run_json config build-dir
@@ -255,6 +257,6 @@ field() {
 	aa config probe jlink
 	[ "$(field probe .value)" = jlink ]
 	run aa config probe stlink
-	assert_failure 2
+	assert_success  # a refused value: the command ran (GEN-09)
 	assert_output --partial 'probe: "stlink" is not one of openocd | jlink'
 }

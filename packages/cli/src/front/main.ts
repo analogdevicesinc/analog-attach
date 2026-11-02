@@ -504,9 +504,10 @@ if (import.meta.vitest) {
             expect(read_json(local_file())).toEqual({ backend: "fake", fake: { chip: "c" } });
         });
 
-        test("a bad value or an unknown key: exit 2", async () => {
+        test("a bad value is a refusal (exit 0, ok: false); an unknown key a usage error (exit 2)", async () => {
             write_local({ backend: "fake" });
-            expect(await code_of(["config", "syntax", "nope"])).toBe(2);
+            expect(await code_of(["config", "syntax", "nope"])).toBe(0);
+            expect(JSON.parse(await stdout_of(["--json", "config", "syntax", "nope"]))).toMatchObject({ ok: false, severity: "error" });
             const unknown = await run(["config", "nope", "1"]);
             expect(unknown.code).toBe(2);
             expect(unknown.stderr).toContain("Unknown config field: nope");
@@ -663,11 +664,12 @@ if (import.meta.vitest) {
             expect(await code_of(["skill", "install", "fake-skill", "--force"], { registry })).toBe(0);
         });
 
-        test("install refuses without Claude Code; uninstall removes it; an unknown name is an input error", async () => {
+        test("install refuses without Claude Code; uninstall removes it; an unknown name is refused", async () => {
             write_local({ backend: "fake" });
             const registry = with_skill();
             expect(await stdout_of(["skill", "install", "fake-skill"], { registry, claude: false })).toContain("Claude Code is not installed.");
-            expect(await code_of(["skill", "install", "nope"], { registry })).toBe(2);
+            expect(await code_of(["skill", "install", "nope"], { registry })).toBe(0);
+            expect(await stdout_of(["skill", "install", "nope"], { registry })).toContain("Unknown skill: nope");
             await run(["skill", "install", "fake-skill"], { registry });
             expect(await code_of(["skill", "uninstall", "fake-skill"], { registry })).toBe(0);
             expect(fs.existsSync(installed())).toBe(false);

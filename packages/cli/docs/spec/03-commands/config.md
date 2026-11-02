@@ -160,14 +160,16 @@ with `--global` (§8): `backend` at the top level, the backend's settings in
 its section (COM-129). `backend` is written to the local file only
 (`02-common.md` COM-136): `config --global backend <id>` is refused with
 `backend belongs to the project and can't be in the global settings: set it
-without --global, in the project's directory`, refused like a value (exit 2,
-the message on standard error).
+without --global, in the project's directory`, refused like a value
+(COM-043).
 `config --global backend --reset` still removes it from the global file. It doesn't use workspace loading (COM-070): it is how
 a broken configuration gets fixed, so problems of COM-123, COM-132 and
 COM-133 in the files don't stop it.
 
-The checks apply in this order; the first that fails is an input error
-(COM-031) and nothing is written. A refused value is written as
+The checks apply in this order; the first that fails is refused and nothing
+is written: a refusal for a value the setting can't take (`02-common.md`
+COM-043), an input error (COM-031) for a file that can't be written. A
+refused value is written as
 `<problem> — <description>`, followed by an empty line and the setting's hint
 when it has one.
 
@@ -317,7 +319,7 @@ home directory.
 
 `config` lists the settings of `02-common.md` COM-500 in five categories.
 Writing one (§4) checks, after CONFIG-107, in this order; the first that
-fails is a refused value (an input error, COM-031) and nothing is written.
+fails is a refused value (a refusal, `02-common.md` COM-043) and nothing is written.
 
 **CONFIG-500** If the setting is `bootstrap`, `interview` or `example` and
 `<value>` is neither `true` nor `false`, then the CLI shall report the
@@ -407,11 +409,12 @@ or 'analog-attach config linux <path>', to set up a workspace.` and the same
 for `devicetree`), where a command's configuration errors merge them into one
 (`02-common.md` §8.1).
 
-**CF-10. A refused value and an unreadable file are input errors, a refused
-`linux` build a refusal.** CONFIG-102 to CONFIG-106 exit 2 on standard error
-in both modes, as text even under `--json` (not a `config-error` object),
-while CONFIG-122, CONFIG-123 and CONFIG-023 are refusals (`02-common.md`
-C-11).
+**CF-10. An unreadable file is an input error, a refused value a refusal.**
+A file that can't be read or written (CONFIG-102) exits 2 on standard error
+in both modes, as text even under `--json` (not a `config-error` object). A
+value the setting can't take (CONFIG-103 to CONFIG-106) is a refusal since
+COM-043: status 0, `ok: false` under `--json`, as CONFIG-122, CONFIG-123 and
+CONFIG-023 are (`02-common.md` C-11).
 
 **CF-11. (Resolved.)** `target` set before `capi-path` refused with an empty
 list of options; it now names the settings to check (CONFIG-501).

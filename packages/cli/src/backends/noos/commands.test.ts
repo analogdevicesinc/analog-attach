@@ -149,7 +149,7 @@ describe("skill", () => {
 
     it("names the skills there are for one it does not have", async () => {
         const result = await fixture.run(["skill", "install", "linux"], { claude_installed: true });
-        expect(result.code).toBe(2);
-        expect(result.stderr).toContain("Unknown skill: linux. Skills of the noos backend: analog-attach-noos");
+        expect(result.code).toBe(0);
+        expect(result.stdout).toContain("Unknown skill: linux. Skills of the noos backend: analog-attach-noos");
     });
 });

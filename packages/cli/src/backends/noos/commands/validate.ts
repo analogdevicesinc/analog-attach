@@ -13,7 +13,7 @@ import type { ValidationFinding, ValidationResponse } from "../protocol/response
 export const validate = command<ValidateArguments, ValidationResponse>({
     docs: {
         brief: "Validate the workfile",
-        full: "Checks every node against its schema and reports what is missing or inconsistent."
+        full: "Checks every node against its schema and reports what is missing or inconsistent.\n\nExamples:\n  $ analog-attach validate\n  $ analog-attach --json validate"
     },
     run(_arguments, _flags, session) {
         const context = load_context(session);

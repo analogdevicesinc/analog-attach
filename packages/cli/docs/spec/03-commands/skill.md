@@ -38,8 +38,9 @@ work in any directory with a backend set (COM-014).
 
 **SKILL-021** The CLI shall look `<name>` up among the backend's skills. When
 the backend has none, it shall report the input error `The <backend> backend
-has no skills`; when none has the name, the input error `Unknown skill:
-<name>. Skills of the <backend> backend: <names>`, `<names>` joined with `, `.
+has no skills`; when none has the name, it shall refuse (`02-common.md`
+COM-043) with `Unknown skill: <name>. Skills of the <backend> backend:
+<names>`, `<names>` joined with `, `.
 A missing `<name>` is stricli's `Expected argument for name` (GRM-004).
 
 ## 5. skill install

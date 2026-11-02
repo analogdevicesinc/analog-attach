@@ -27,7 +27,7 @@ export const init = command<InitArguments, InitResponse>({
         full:
             "Creates the workfile named by the 'workfile' setting, for what the 'target' setting\n" +
             "names: a board, or a chip with no board of its own. Set them with 'analog-attach config'.\n" +
-            "Refuses to overwrite a workfile that already exists."
+            "Refuses to overwrite a workfile that already exists.\n\nExamples:\n  $ analog-attach config target max32655fthr\n  $ analog-attach init\n  $ analog-attach --json init"
     },
     run(_arguments, _flags, session) {
         const created = init_workfile(session);

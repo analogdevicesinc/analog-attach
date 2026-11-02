@@ -117,8 +117,11 @@ kept under the tool's lines and rewritten as they come.
 | No `CMakeLists.txt` | `No CMakeLists.txt in <dir>` |
 | No `project(<target>)` in it | `<file> declares no project()` |
 
-The board is the preset's name, the target the `project()` name, and the
-ELF `<dir>/build/<target>.elf`.
+The board is the preset's name, the target the `project()` name, the build
+folder `<build>` the `build-dir` setting resolved against `<dir>` (`build`
+when unset; `02-common.md` §8.1), and the ELF `<build>/<target>.elf`.
+Several build folders can sit side by side in one project (`build-debug`,
+`build-release`).
 
 **BUILD-513** The CLI shall then check, and refuse with every problem it
 finds, their messages joined with a space, in this order:
@@ -132,11 +135,11 @@ for a preset whose `PLATFORM` is `maxim`, `MAXIM_SDK_PATH is not set.` or
 MAXIM_SDK_PATH to the MaximSDK install (the directory holding Libraries/ and
 Tools/).`
 
-**BUILD-514** With `--clean`, the CLI shall delete `<dir>/build` before it
+**BUILD-514** With `--clean`, the CLI shall delete `<build>` before it
 configures.
 
 **BUILD-515** The CLI shall write the progress line `Building <target> for
-<board>`, then run `cmake --preset <board>` and `cmake --build <dir>/build`
+<board>`, then run `cmake --preset <board> -B <build>` and `cmake --build <build>`
 in the project directory, with `CAPI_DIR` set to `capi-path` in their
 environment. If the first exits with a non-zero status, then the CLI shall
 refuse with `CMake configure failed with exit code <n>`; if the second
