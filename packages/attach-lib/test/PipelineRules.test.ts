@@ -270,6 +270,28 @@ properties:
         expect(counts(property(parsed_binding, 'adi,regs'))).toStrictEqual([3, 3]);
     });
 
+    test('a string the binding gives a property is one value, whatever count the allOf entry that defines it again allows', async () => {
+        const { parsed_binding } = await parsed('redefined-string', `
+allOf:
+  - properties:
+      adi,names:
+        minItems: 1
+        maxItems: 8
+        contains:
+          enum: [a, b]
+properties:
+  compatible:
+    const: x,y
+  adi,names:
+    const: a
+  adi,modes:
+    enum: [c, d]
+    maxItems: 2
+`);
+        expect(counts(property(parsed_binding, 'adi,names'))).toStrictEqual([1, 1]);
+        expect(counts(property(parsed_binding, 'adi,modes'))).toStrictEqual([1, 2]);
+    });
+
     test('every definition of a property is merged into one, the nearest one\'s keywords winning and the tighter bounds', async () => {
         const { parsed_binding } = await parsed('redefined-thrice', `
 allOf:
