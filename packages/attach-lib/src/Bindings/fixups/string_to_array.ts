@@ -3,7 +3,7 @@ import { FixupContext, PropertySchema } from "../FixupWalker.js";
 const SINGLE_VALUE_KEYWORDS = ["const", "enum", "pattern", "minimum", "maximum", "multipleOf"];
 
 /** dt-schema `lib.py:_is_string_schema`: a `const`, `enum` or `pattern` of strings. */
-function is_string_schema(schema: Record<string, unknown>): boolean {
+export function is_string_schema(schema: Record<string, unknown>): boolean {
     return ["const", "enum", "pattern"].some(keyword => {
         if (!(keyword in schema)) { return false; }
         const value = schema[keyword];
