@@ -64,10 +64,10 @@ bash_complete() {
 # bats test_tags=req:COMPLETION-01
 @test "completion refuses a shell it has no script for" {
 	run aa completion tcsh
-	assert_failure 2
+	assert_success  # a refused value: the command ran (GEN-09)
 	assert_output --partial "Unknown shell: tcsh. Supported: bash, fish, zsh"
 	SHELL=/bin/sh run aa completion
-	assert_failure 2
+	assert_success  # a refused value: the command ran (GEN-09)
 	assert_output --partial "Name one: bash, fish, zsh"
 }
 

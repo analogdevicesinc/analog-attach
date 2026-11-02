@@ -28,20 +28,23 @@ setup() {
 	[ "$(stored '.symbols.holder.modes')" = '["TEST_SPI_MODE_0","TEST_SPI_MODE_3"]' ]
 }
 
-# bats test_tags=req:UPDATE-01, gap
-@test "update takes a value spread over several arguments" {
-	# Gap: more than two value arguments are refused ("Too many values for holder.modes").
+# bats test_tags=req:UPDATE-01-CAPI
+@test "update takes one value argument, or two for a union; more are refused" {
 	aa add test_array_holder --name holder >/dev/null
+	aa update holder modes TEST_SPI_MODE_0,TEST_SPI_MODE_3 >/dev/null
+	[ "$(stored '.symbols.holder.modes')" = '["TEST_SPI_MODE_0","TEST_SPI_MODE_3"]' ]
+	snapshot
 	run aa update holder modes TEST_SPI_MODE_0 TEST_SPI_MODE_3 TEST_SPI_MODE_0
-	assert_success
-	[ "$(stored '.symbols.holder.modes')" = '["TEST_SPI_MODE_0","TEST_SPI_MODE_3","TEST_SPI_MODE_0"]' ]
+	assert_failure 2
+	assert_output --partial "Too many values for holder.modes"
+	assert_unchanged
 }
 
 # bats test_tags=req:UPDATE-02
 @test "update refuses a value that is not a number for a number" {
 	snapshot
 	run aa update testpart_spi_dev max_speed_hz banana
-	assert_failure
+	assert_success  # a refused value: the command ran (GEN-09)
 	assert_output --partial "'banana' is not a number"
 	assert_unchanged
 }
@@ -50,7 +53,7 @@ setup() {
 @test "update refuses a value that is not one of an enum's options" {
 	snapshot
 	run aa update testpart_ip comm_type BOGUS
-	assert_failure
+	assert_success  # a refused value: the command ran (GEN-09)
 	assert_output --partial "'BOGUS' is not one of: TESTPART_SPI, TESTPART_I2C, TESTPART_NONE"
 	assert_unchanged
 }
@@ -59,7 +62,7 @@ setup() {
 @test "update refuses a union member the union does not have" {
 	snapshot
 	run aa update testpart_ip comm_init foo,bar
-	assert_failure
+	assert_success  # a refused value: the command ran (GEN-09)
 	assert_output --partial "'foo' is not a member of 'comm_init'. Available: spi_dev, i2c_dev"
 	assert_unchanged
 }
@@ -69,7 +72,7 @@ setup() {
 	aa add test_array_holder --name holder >/dev/null
 	snapshot
 	run aa update holder modes TEST_SPI_MODE_0,TEST_SPI_MODE_0,TEST_SPI_MODE_0,TEST_SPI_MODE_0
-	assert_failure
+	assert_success  # a refused value: the command ran (GEN-09)
 	assert_output --partial "'modes' holds at most 3 elements, got 4"
 	assert_unchanged
 }
@@ -83,24 +86,24 @@ setup() {
 	assert_unchanged
 }
 
-# bats test_tags=req:UPDATE-02, gap
+# bats test_tags=req:UPDATE-02
 @test "update refuses a number above the maximum" {
-	# Gap: 20000000 is set although the maximum is 10000000; only validate reports it.
 	snapshot
-	run aa update testpart_spi_dev max_speed_hz 20000000
-	assert_failure
-	assert_output --partial 10000000
+	run_json update testpart_spi_dev max_speed_hz 20000000
+	assert_success
+	assert_json '.ok' false
+	assert_json '.message | test("10000000")' true
 	assert_unchanged
 }
 
-# bats test_tags=req:UPDATE-02, gap
+# bats test_tags=req:UPDATE-02
 @test "update refuses an array element that is not one of its enum's options" {
-	# Gap: holder.modes is set to BAD,TEST_SPI_MODE_0; only validate reports the element.
 	aa add test_array_holder --name holder >/dev/null
 	snapshot
-	run aa update holder modes BAD,TEST_SPI_MODE_0
-	assert_failure
-	assert_output --partial "'BAD'"
+	run_json update holder modes BAD,TEST_SPI_MODE_0
+	assert_success
+	assert_json '.ok' false
+	assert_json '.message | test("'"'"'BAD'"'"'")' true
 	assert_unchanged
 }
 

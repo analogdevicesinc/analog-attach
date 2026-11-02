@@ -38,7 +38,7 @@ export const build = command<BuildArguments, BuildResponse, typeof BUILD_FLAGS>(
         brief: "Build the generated CAPI project",
         full:
             "Builds the project 'generate' writes: the 'project-path' setting, or\n" +
-            "out/<project-name> when it is unset."
+            "out/<project-name> when it is unset.\n\nExamples:\n  $ analog-attach build\n  $ analog-attach build --clean\n  $ analog-attach config build-dir build-debug\n  $ analog-attach --json build"
     },
     run(_arguments, flags, session) {
         return run_build(flags.board, flags.clean === true, session);

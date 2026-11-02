@@ -62,6 +62,7 @@ export {
     PATH_LIST_DELIMITER,
     DEFAULT_TEMPLATE_SET,
     IIO_TEMPLATE_SET,
+    DEFAULT_BUILD_DIR,
     DEFAULT_PROBE,
     PROBE_OPTIONS,
     DEFAULT_WORKFILE_NAME
@@ -100,7 +101,7 @@ export { find_eval_board, describe_board_pin, land, resolve_bus } from "./regist
 export type { Wire, PinSignal, BoardPin, Landing, ChipSelect, BusResolution, ResolveBusOptions } from "./registry/wiring";
 export type { ConnectionGraph, SymbolReference, ReferenceKind } from "./validator/types";
 export { get_connected_symbols } from "./validator/connection_graph";
-export { validate_workfile } from "./validator/validator";
+export { validate_property_value, validate_workfile } from "./validator/validator";
 export type { ValidationResult, ValidationError } from "./validator/types";
 export { attach_eval_board, bootstrap, pin_driver, referenced_nodes } from "./bootstrap/bootstrap";
 export { find_eval_board_module, list_eval_boards } from "./registry/eval_boards";

@@ -18,7 +18,7 @@ export const import_command = command<ImportArguments, ImportResponse>({
         brief: "Start from an existing workfile",
         full:
             "Copies <source> to the workfile the 'workfile' setting names, after checking that it loads\n" +
-            "with the configured modules. Refuses to overwrite a workfile that already exists."
+            "with the configured modules. Refuses to overwrite a workfile that already exists.\n\nExamples:\n  $ analog-attach import ../other-project/workfile.json\n  $ analog-attach import ~/designs/adxl355.json"
     },
     run({ source: source_argument }, _flags, session) {
         install(session);

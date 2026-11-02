@@ -18,7 +18,8 @@ import fs from "node:fs";
 import path from "node:path";
 import type { Readable } from "node:stream";
 
-import { error, ok } from "attach-no-os-lib";
+import os from "node:os";
+import { DEFAULT_BUILD_DIR, error, get_effective_setting_value, ok } from "attach-no-os-lib";
 import type { Result } from "attach-no-os-lib";
 
 /** What the capi reference apps declare (`cmake_minimum_required(VERSION 3.27)`). */
@@ -27,7 +28,6 @@ const REQUIRED_CMAKE = [3, 27, 0] as const;
 const PRESETS_FILENAME = "CMakePresets.json";
 
 /** Where the generated presets configure into (`"binaryDir": "${sourceDir}/build"`). */
-const BUILD_DIRECTORY = "build";
 
 /** The capi SDK file a CAPI app's CMakeLists.txt includes first. */
 const SDK_ENTRY = path.join("sdk", "cmake", "capi_create_application.cmake");
@@ -127,7 +127,7 @@ export function plan_build(project_path: string, capi_path: string, board_overri
 		return target;
 	}
 
-	const binary_directory = path.join(project_path, BUILD_DIRECTORY);
+	const binary_directory = build_directory(project_path);
 	return ok({
 		target: target.value,
 		board: preset.name,
@@ -137,6 +137,17 @@ export function plan_build(project_path: string, capi_path: string, board_overri
 		elf_path: path.join(binary_directory, `${target.value}.elf`),
 		environment: { ...process.env, CAPI_DIR: capi_path },
 	});
+}
+
+/**
+ * Where the project is built: the `build-dir` setting, relative to the project unless absolute
+ * (`~` the home directory), else `build`. Several can sit side by side (SET-11).
+ */
+function build_directory(project_path: string): string {
+	const setting = get_effective_setting_value("build-dir");
+	const configured = setting.ok && setting.value !== undefined && setting.value !== "" ? setting.value : DEFAULT_BUILD_DIR;
+	const expanded = configured === "~" || configured.startsWith("~/") ? path.join(os.homedir(), configured.slice(1)) : configured;
+	return path.resolve(project_path, expanded);
 }
 
 function tool_version(command: string, arguments_: string[]): string | undefined {
@@ -245,8 +256,9 @@ function watch(child: ChildProcessByStdio<null, Readable, Readable>, sink: Outpu
 	});
 }
 
+/** The board's preset, configured into the build directory (`-B` overrides the preset's binaryDir). */
 export function configure_arguments(plan: BuildPlan, extra: string[] = []): string[] {
-	return ["--preset", plan.board, ...extra];
+	return ["--preset", plan.board, "-B", plan.binary_directory, ...extra];
 }
 
 export function build_arguments(plan: BuildPlan, target?: string): string[] {

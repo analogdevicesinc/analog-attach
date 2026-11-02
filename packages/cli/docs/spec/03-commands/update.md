@@ -386,7 +386,7 @@ be added: its properties are fixed by its schema (<schema>). Available:
 <names>`.
 
 **UPDATE-510** The CLI shall parse the value by the property's kind, and
-report a value it can't parse as an input error (COM-031):
+refuse a value it can't parse (`02-common.md` COM-043):
 
 | Kind | Accepted | Message when not |
 |---|---|---|
@@ -403,6 +403,15 @@ union member given alone is set with no value.
 **UPDATE-511** The CLI shall not check that a value naming a node (an
 include, a union member's value) names one: `validate` reports it
 (`Target symbol '<name>' not found`, VALIDATE-500; open issue U-16).
+
+**UPDATE-512** If the parsed value is one the property's definition doesn't
+allow, as the rules on its node leave it (a number outside its minimum or
+maximum, or not an integer for an integer type; an enum value, or an enum
+element of an array, not among the options; more elements than the array
+holds), then the CLI shall refuse with the validator's messages (VALIDATE-5xx,
+joined with `; `), and write nothing: `Value 20000000 is above the maximum
+10000000`. A reference, a rule about other properties and a required value
+are left to `validate`, as UPDATE-511 says.
 
 **UPDATE-520** The CLI shall set the value as the user's (bootstrap no longer
 changes it), run bootstrap (`add.md` ADD-520) with the nodes that were

@@ -66,19 +66,17 @@ setup() {
 # bats test_tags=req:SKILL-03
 @test "the noos ecosystem has its own skill, named on the command line" {
 	run aa skill install nosuch
-	assert_failure 2
+	assert_success  # a refused value: the command ran (GEN-09)
 	assert_output --partial "Unknown skill: nosuch. Skills of the noos backend: $SKILL"
 	run aa __complete -- skill install ''
 	assert_line --partial "$SKILL"
 	[ ! -e "$HOME/.claude" ]
 }
 
-# bats test_tags=req:SKILL-03, gap
-@test "the linux ecosystem's skill can be named on the command line too" {
-	run_json skill install analog-attach-linux
-	# Gap: only the configured backend's skills can be named; with backend noos,
-	# analog-attach-linux is an unknown skill (exit 2).
-	assert_success
-	assert_json '.ok' true
-	diff "$CLI_DIR/skills/linux/SKILL.md" "$HOME/.claude/skills/analog-attach-linux/SKILL.md"
+# bats test_tags=req:SKILL-03
+@test "another ecosystem's skill is refused, naming the selected one's" {
+	run aa skill install analog-attach-linux
+	assert_success  # a refused value: the command ran (GEN-09)
+	assert_output --partial "analog-attach-noos"
+	[ ! -e "$HOME/.claude/skills/analog-attach-linux" ]
 }

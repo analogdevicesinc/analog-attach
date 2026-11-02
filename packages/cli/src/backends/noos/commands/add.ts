@@ -67,7 +67,7 @@ export const add = command<AddArguments, AddResponse, typeof ADD_FLAGS>({
             "With the 'bootstrap' setting on (the default), everything below the new node that\n" +
             "leaves no room for choice is then filled in, and what is left is shown. With the\n" +
             "'interview' setting on (the default), on a terminal, what is left is then asked for;\n" +
-            "--quiet lists it instead.",
+            "--quiet lists it instead.\n\nExamples:\n  $ analog-attach add eval-adxl355-pmdz\n  $ analog-attach add adxl355\n  $ analog-attach add capi_gpio_pin --name cs_pin\n  $ analog-attach add ad74413r --as adc,dac",
         placeholders: { device: "schema" },
     },
     run(arguments_, flags, session) {
