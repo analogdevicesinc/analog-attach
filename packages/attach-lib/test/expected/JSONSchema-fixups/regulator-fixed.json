@@ -134,6 +134,28 @@
                     "description": "Regulators with which the regulator is coupled. The linkage is 2-way - all coupled regulators should be linked with each other. A regulator should not be coupled with its supplier.",
                     "dtType": "phandle-array",
                     "items": {
+                        "additionalItems": {
+                            "dtType": "uint32",
+                            "maximum": 4294967295,
+                            "minimum": 0,
+                            "type": "integer",
+                            "typeSize": 32
+                        },
+                        "items": [
+                            {
+                                "oneOf": [
+                                    {
+                                        "maximum": 4294967295,
+                                        "minimum": 1,
+                                        "type": "integer"
+                                    },
+                                    {
+                                        "const": 0,
+                                        "type": "integer"
+                                    }
+                                ]
+                            }
+                        ],
                         "maxItems": 1,
                         "minItems": 1,
                         "type": "array"
