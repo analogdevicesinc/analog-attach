@@ -24,6 +24,8 @@ test/functional/run.sh noos/config.bats             # one file
 test/functional/run.sh --filter-tags req:CONFIG-04  # the tests of one requirement
 test/functional/run.sh --filter-tags eco:linux      # one ecosystem
 test/functional/run.sh --filter "reset"             # tests whose name matches
+test/functional/run.sh --filter-tags id:N0012       # one test, by its ID
+test/functional/run.sh --require-steps              # fail on a test with no description, steps or preconditions
 ```
 
 Needs: bash, node, git, `jq` and `python3`. bats and its assertion libraries come with
@@ -32,7 +34,8 @@ Yarn can't run bats itself (it runs a package's bin with node), so `run.sh` call
 bash.
 
 The exit status is non-zero when a test fails, when a test names a requirement that doesn't
-exist, or when bats stops before the last test it was to run (a full disk, say: the tests it
+exist, when a test's ID is missing, malformed, of the other ecosystem or another test's, or
+when bats stops before the last test it was to run (a full disk, say: the tests it
 didn't get to are missing from its results, as if filtered out).
 
 ### The Linux tree
@@ -57,10 +60,10 @@ side):
 
 | File | What |
 |---|---|
-| `requirements.csv` | One row per requirement: its status in `linux` and in `noos` (`-` where it doesn't apply), and how many tests check it |
-| `tests.csv` | One row per test: file, name, ecosystem, requirements, status, whether it is a known gap, time, the first line of a failure |
-| `summary.md` | The counts, per ecosystem too, and the requirements that fail, are known gaps, or have no test in any ecosystem they apply to (CI puts it on the run's page) |
-| `report.xlsx` | The two tables as sheets, coloured by status, when `openpyxl` is installed (`pip install openpyxl`) |
+| `requirements.csv` | One row per requirement: its status in `linux` and in `noos` (`-` where it doesn't apply), how many tests check it (of those that ran), the IDs of its tests (`Test IDs`, all of them, run or not), and the IDs of those that fail or are known gaps (`Failing/gap IDs`) |
+| `tests.csv` | One row per test: ID, file, name, description, preconditions, steps (`1. ...`, one per line), ecosystem, requirements, status, whether it is a known gap, time, the first line of a failure |
+| `summary.md` | The counts, per ecosystem too, and the requirements that fail, are known gaps (with the IDs of the tests that fail or are gaps), or have no test in any ecosystem they apply to (CI puts it on the run's page) |
+| `report.xlsx` | The two tables as sheets, coloured by status, the description, preconditions and steps wrapped, when `openpyxl` is installed (`pip install openpyxl`) |
 | `report.xml` | bats' JUnit output |
 
 A test's status is `pass`, `fail`, `skipped` or `not run` (a filter left it out), and `gap`
@@ -73,7 +76,11 @@ is a known gap, else `pass` if one passed, else `skipped`; `not tested` when non
 ran.
 
 The report also prints a warning for each test with no requirement, a note for each known gap
-that now passes, and an error for each requirement ID that `docs/requirements.csv` doesn't have.
+that now passes, an error for each requirement ID that `docs/requirements.csv` doesn't have,
+and an error for each test ID that is missing, malformed, of the other ecosystem's prefix or
+used twice. Tests with no description, steps or preconditions get one warning with their
+count (`report.py --verbose` lists them); with `--require-steps` (to `run.sh` or `report.py`)
+each is an error and the run fails.
 
 ## In CI
 
@@ -81,13 +88,15 @@ that now passes, and an error for each requirement ID that `docs/requirements.cs
 tests: it builds the CLI (`yarn build:cli`), then runs
 
 ```sh
-yarn test:functional --jobs 4 --fail-unless-gap
+yarn test:functional --jobs 4 --fail-unless-gap --require-steps
 ```
 
 and, whatever the result, writes `summary.md` to the run's summary and uploads `out/` as the
 `functional-tests-report` artifact (the workbook among it). With `--fail-unless-gap` the run
-fails only on a test that fails and isn't a known gap (or a run that stopped early); without it, as locally by default, a
-known gap fails the run too. The tests that need real CAPI trees or a board skip in CI.
+fails only on a test that fails and isn't a known gap (or a run that stopped early); without
+it, as locally by default, a known gap fails the run too. `--require-steps` also fails it on a
+test without its Description, Steps or Preconditions. The tests that need real CAPI trees or a
+board skip in CI.
 
 ## Writing a test
 
@@ -98,12 +107,20 @@ One `.bats` file per command, in the folder of its ecosystem (`noos/`, `linux/`)
 
 # bats file_tags=eco:noos
 
+# Preconditions: a noos project on attach-no-os-lib's test fixtures, target otherboard, no
+# workfile yet.
 setup() {
 	load ../helpers
 	new_project noos
 }
 
-# bats test_tags=req:CONFIG-04
+# Description: --reset drops a setting the project set, so it is back to its default.
+# Steps:
+#   1. Set the probe to jlink.
+#   2. Reset the probe.
+#   3. Check it succeeds, and the probe's source is the default again, not the
+#      project's settings.
+# bats test_tags=req:CONFIG-04, id:N0042
 @test "config --reset returns a setting to its default" {
 	aa config probe jlink
 	run aa config probe --reset
@@ -113,9 +130,31 @@ setup() {
 }
 ```
 
-- **Requirements:** `# bats test_tags=req:<ID>` on the line above `@test`, the IDs of
-  `docs/requirements.csv` (several: `req:INIT-01, req:INIT-02`). Every test names at least
-  one. A requirement whose Ecosystems is `All` gets a test in both folders.
+- **ID:** `id:N0042` among the tags above `@test` (`id:L0042` in `linux/`): `N` for noos,
+  `L` for linux, and 4 digits. Every test has one, and no two tests the same. An ID names
+  the test in the reports, the workbook and anything that cites it, so it is **never reused
+  or renumbered**: a moved, renamed or rewritten test keeps its ID, a deleted test's ID isn't
+  given to another, and a new test takes the next free one, which `next-id.sh noos` (or
+  `linux`) prints: the highest ID of that prefix in the `.bats` files, plus one. A test with no
+  requirement has the ID alone: `# bats test_tags=id:L0123`.
+- **Requirements:** `req:<ID>` among the tags, the IDs of `docs/requirements.csv` (several:
+  `req:INIT-01, req:INIT-02, id:N0042`). Every test names at least one. A requirement whose
+  Ecosystems is `All` gets a test in both folders.
+- **Description, steps, preconditions:** every test has a `# Description:` and `# Steps:`
+  comment above its tags, and every file a `# Preconditions:` comment before its first test
+  (above `setup()`), which applies to all its tests. They are mandatory: they are what the
+  report's `Description`, `Steps` and `Preconditions` columns show to someone who doesn't read
+  bash. Without `--require-steps` the report only warns about a missing one; with it (as in
+  CI) a missing one is an error and fails the run.
+  - A field's text runs on over the plain `# text` comment lines after it, joined with a
+    space, up to the next field, the tags line, a blank or non-comment line, or another note
+    (one word and a colon, such as `# Gap:`). So other comments can come above them or
+    between them, but not inside a field.
+  - Steps are numbered, `#   1. text`, one per line; a step that wraps goes on in an indented
+    comment line. The report keeps them numbered as written.
+  - Only the comments after the previous test belong to a test.
+  - Write the description as what the test shows, and the steps as what it does and checks,
+    in words: `Add the test_gpio_pin schema, with --json`, not the command line.
 - **Ecosystem:** `# bats file_tags=eco:noos` (or `eco:linux`) once per file. Without it the
   folder name is used.
 - **Isolation:** `helpers.bash` gives each test its own `$HOME` (so its own global settings)

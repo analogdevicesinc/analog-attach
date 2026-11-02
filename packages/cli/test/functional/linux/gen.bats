@@ -2,6 +2,8 @@
 
 # bats file_tags=eco:linux
 
+# Preconditions: a linux project on the Linux tree with the RPi 4 base devicetree and its binding
+# caches, the workfile overlay.dtso not created yet.
 setup() {
 	load ../helpers
 	new_project linux
@@ -22,7 +24,15 @@ checksum() {
 
 # --- GEN-01, GEN-02: one tool, the same commands -------------------------------------------
 
-# bats test_tags=req:GEN-01
+# Description: the ecosystem is a project setting: the same tool shows the linux backend here
+# and the noos backend in a project set to noos.
+# Steps:
+#   1. Read the backend setting, with --json.
+#   2. Check it is linux, from the local settings.
+#   3. Run --help and check it names analog-attach and the linux backend.
+#   4. Make a second project whose settings name noos, and run --help there.
+#   5. Check it succeeds and names the noos backend.
+# bats test_tags=req:GEN-01, id:L0120
 @test "one tool: the ecosystem is a setting of the project" {
 	run_json config backend
 	assert_success
@@ -41,7 +51,12 @@ checksum() {
 	assert_output --partial "Backend: noos"
 }
 
-# bats test_tags=req:GEN-02
+# Description: the help lists the shared commands under their usual names.
+# Steps:
+#   1. Run --help.
+#   2. Check it succeeds and lists config, init, import, add, read, update, delete, rename, list,
+#      validate, build, deploy, completion and skill, each with a description.
+# bats test_tags=req:GEN-02, id:L0121
 @test "the shared commands are there under the same names" {
 	run aa --help
 	assert_success
@@ -51,7 +66,11 @@ checksum() {
 	done
 }
 
-# bats test_tags=req:GEN-02
+# Description: config, a shared command, sets a setting and answers with ok and a message.
+# Steps:
+#   1. Set deploy-user to pi with config, with --json.
+#   2. Check it succeeds (.ok true) and the message says deploy-user was set to pi.
+# bats test_tags=req:GEN-02, id:L0122
 @test "a shared command answers in the same form: config sets a setting" {
 	run_json config deploy-user pi
 	assert_success
@@ -61,7 +80,12 @@ checksum() {
 
 # --- GEN-03: only the selected ecosystem's commands, flags and settings --------------------
 
-# bats test_tags=req:GEN-03
+# Description: the help lists the commands of the linux backend and none of noos.
+# Steps:
+#   1. Run --help.
+#   2. Check it succeeds and does not list generate.
+#   3. Check it lists move, enable and disable.
+# bats test_tags=req:GEN-03, id:L0123
 @test "help leaves out the commands of the noos backend" {
 	run aa --help
 	assert_success
@@ -71,7 +95,15 @@ checksum() {
 	assert_output --regexp $'\n  disable '
 }
 
-# bats test_tags=req:GEN-03
+# Description: completion offers the commands, settings and flags of linux, and none of noos.
+# Steps:
+#   1. Complete an empty command word.
+#   2. Check move is offered and generate is not.
+#   3. Complete the setting name of config.
+#   4. Check devicetree and overlay-syntax are offered, and no noos setting (capi-path,
+#      module-paths, target, probe, bootstrap, project-name).
+#   5. Complete the flags of build and check --board and --clean are not offered.
+# bats test_tags=req:GEN-03, id:L0124
 @test "completion offers only the commands and settings of linux" {
 	run aa __complete -- ""
 	assert_success
@@ -86,7 +118,14 @@ checksum() {
 	refute_line --regexp $'^--(board|clean)\t'
 }
 
-# bats test_tags=req:GEN-03
+# Description: a noos setting is unknown here: reading it is a usage error, and config does not
+# list it.
+# Steps:
+#   1. Read the capi-path setting with config.
+#   2. Check it fails with a usage error (exit 2) saying the field is unknown.
+#   3. List the settings with config, with --json.
+#   4. Check it succeeds and target is not among them.
+# bats test_tags=req:GEN-03, id:L0125
 @test "a setting of the noos backend is not a setting here" {
 	run aa config capi-path
 	assert_failure 2
@@ -96,7 +135,12 @@ checksum() {
 	assert_json '[.configs[].field_name] | index("target")' null
 }
 
-# bats test_tags=req:GEN-03
+# Description: a noos command or flag is a usage error here.
+# Steps:
+#   1. Make an overlay with an ADXL345 on i2c1.
+#   2. Run generate and check it fails with a usage error (exit 2).
+#   3. Run build --clean and check it fails with a usage error (exit 2).
+# bats test_tags=req:GEN-03, id:L0126
 @test "a command of the noos backend is refused" {
 	with_accel
 	run aa generate
@@ -107,7 +151,17 @@ checksum() {
 
 # --- GEN-04, GEN-05, GEN-06: questions --------------------------------------------------
 
-# bats test_tags=req:GEN-04
+# Description: a whole session, from init to deploy and delete, runs with no terminal and asks
+# nothing.
+# Steps:
+#   1. Put a stand-in sshpass on PATH that only logs its arguments.
+#   2. Run, each with --json and stdin from /dev/null: init, list devices, list parent, add an
+#      ADXL345 on i2c1, list value, update interrupt-parent and interrupts, rename, read,
+#      enable and disable spi0, move to i2c3, validate, build, the deploy settings, deploy and
+#      delete --force.
+#   3. Check each one exits 0 within 60 s and none is refused (.ok not false).
+#   4. Check build made overlay.dtbo and deploy called sshpass.
+# bats test_tags=req:GEN-04, id:L0127
 @test "a whole session runs without a question, with no terminal" {
 	# The deploy step through a stand-in sshpass, which only logs.
 	mkdir -p "$BATS_TEST_TMPDIR/bin"
@@ -129,7 +183,15 @@ checksum() {
 	[ -s "$BATS_TEST_TMPDIR/sshpass.log" ]
 }
 
-# bats test_tags=req:GEN-05
+# Description: with no terminal, add asks no question and says which parent it took and what is
+# still missing.
+# Steps:
+#   1. Create the overlay with init.
+#   2. Add adi,adxl345 with no --parent, stdin from /dev/null.
+#   3. Check it succeeds and shows neither the parent question nor the property questions.
+#   4. Check it says the parent is spi (and --parent chooses another) and that interrupt-parent
+#      and interrupts are missing.
+# bats test_tags=req:GEN-05, id:L0128
 @test "with no terminal, add asks nothing and reports what it would have asked" {
 	with_overlay
 	run timeout 30 node "$CLI_DIR/dist/cli.js" add adi,adxl345 </dev/null
@@ -140,7 +202,14 @@ checksum() {
 	assert_output --partial "Missing required: interrupt-parent, interrupts"
 }
 
-# bats test_tags=req:GEN-05
+# Description: with --json, add asks nothing and lists the missing required properties, with
+# suggestions, in the result.
+# Steps:
+#   1. Create the overlay with init.
+#   2. Add adi,adxl345 --parent i2c1, with --json.
+#   3. Check it succeeds and missing_required lists interrupt-parent and interrupts.
+#   4. Check gpio is among the suggestions for interrupt-parent.
+# bats test_tags=req:GEN-05, id:L0129
 @test "with --json, add asks nothing and reports what is left in the result" {
 	with_overlay
 	run_json add adi,adxl345 --parent i2c1
@@ -149,7 +218,12 @@ checksum() {
 	assert_json '.missing_required[0].suggestions | map(.value) | index("gpio") != null' true
 }
 
-# bats test_tags=req:GEN-05
+# Description: on a terminal, --json still keeps add from asking questions.
+# Steps:
+#   1. Create the overlay with init.
+#   2. Add adi,adxl345 with --json, on a terminal.
+#   3. Check it succeeds, shows no parent question and prints missing_required.
+# bats test_tags=req:GEN-05, id:L0130
 @test "on a terminal, --json still asks nothing" {
 	with_overlay
 	tty_run -- --json add adi,adxl345
@@ -158,7 +232,15 @@ checksum() {
 	assert_output --partial '"missing_required"'
 }
 
-# bats test_tags=req:GEN-05
+# Description: on a terminal, add asks for the parent first, then for the missing required
+# properties.
+# Steps:
+#   1. Create the overlay with init.
+#   2. Add adi,adxl345 on a terminal: pick i2c1 (i) for the parent, then Ctrl+C at the
+#      interrupt-parent question.
+#   3. Check the parent question was shown, with i2c1 as option i.
+#   4. Check the first property question, for interrupt-parent, was shown.
+# bats test_tags=req:GEN-05, id:L0131
 @test "on a terminal, add asks for the parent, then for what is left" {
 	with_overlay
 	tty_run "parent [a]:" $'i\r' "interrupt-parent [a]:" $'\x03' -- add adi,adxl345
@@ -167,7 +249,16 @@ checksum() {
 	assert_output --partial "[1/2] interrupt-parent"
 }
 
-# bats test_tags=req:GEN-06
+# Description: Ctrl+C in the middle of the questions ends add; the answers given before it are
+# kept.
+# Steps:
+#   1. Create the overlay with init.
+#   2. Add adi,adxl345 on a terminal: pick i2c1, take the default interrupt-parent with Enter,
+#      then Ctrl+C at the first interrupts question.
+#   3. Check the command ended (no timeout).
+#   4. Read interrupt-parent with --json and check it is &gicv2.
+#   5. Read interrupts with --json and check it is not set.
+# bats test_tags=req:GEN-06, id:L0132
 @test "stopping a question with Ctrl+C ends the command and keeps the answers given" {
 	with_overlay
 	tty_run "parent [a]:" $'i\r' "interrupt-parent [a]:" $'\r' "interrupts 1/3" $'\x03' -- add adi,adxl345
@@ -178,7 +269,13 @@ checksum() {
 	assert_json '.value' null
 }
 
-# bats test_tags=req:GEN-06
+# Description: Ctrl+C at the first question ends add with nothing added.
+# Steps:
+#   1. Create the overlay with init and snapshot the workfile.
+#   2. Add adi,adxl345 on a terminal and press Ctrl+C at the parent question.
+#   3. Check it exits 130 and says nothing was added.
+#   4. Check the workfile is unchanged.
+# bats test_tags=req:GEN-06, id:L0133
 @test "stopping the first question with Ctrl+C ends add, adding nothing" {
 	with_overlay
 	snapshot
@@ -190,7 +287,13 @@ checksum() {
 
 # --- GEN-07, GEN-08, GEN-17: JSON results ------------------------------------------------
 
-# bats test_tags=req:GEN-07
+# Description: --json works at any position on the command line.
+# Steps:
+#   1. Make an overlay with an ADXL345 on i2c1.
+#   2. Run config overlay-syntax, read adxl345 and list devices with --json before, in the middle
+#      of and after the other words.
+#   3. Check each exits 0 and prints exactly one line holding a JSON object.
+# bats test_tags=req:GEN-07, id:L0134
 @test "--json is taken anywhere on the command line" {
 	with_accel
 	local words
@@ -204,7 +307,13 @@ checksum() {
 	done
 }
 
-# bats test_tags=req:GEN-07
+# Description: every command prints exactly one JSON object with --json.
+# Steps:
+#   1. Make an overlay with an ADXL345 on i2c1.
+#   2. Run, with --json: init, config, add, update, read, rename, each list kind, enable,
+#      disable, move, validate, build, delete, import and completion.
+#   3. Check each exits 0 and prints exactly one line holding a JSON object.
+# bats test_tags=req:GEN-07, id:L0135
 @test "every command prints one JSON result with --json" {
 	with_accel
 	local words
@@ -224,7 +333,13 @@ checksum() {
 # Gap: a result longer than 64 KiB is cut short when standard output is a pipe (the process
 # exits before the pipe has taken it all): `--json list devices` gives 65536 or 131072 bytes of
 # its 1 MB.
-# bats test_tags=req:GEN-07, gap
+# Description: a result longer than 64 KiB reaches a pipe whole, in JSON and as text.
+# Steps:
+#   1. Create the overlay with init.
+#   2. Pipe list devices, with --json, to jq.
+#   3. Check it parses and has more than 1000 devices.
+#   4. Pipe list devices, as text, to wc -l and check it gives more than 1000 lines.
+# bats test_tags=req:GEN-07, gap, id:L0136
 @test "a long JSON result reaches a pipe whole" {
 	with_overlay
 	run bash -c "node '$CLI_DIR/dist/cli.js' --json list devices | jq -e '.devices | length > 1000'"
@@ -233,7 +348,16 @@ checksum() {
 	[ "$output" -gt 1000 ] || fail "list devices gave $output lines"
 }
 
-# bats test_tags=req:GEN-08
+# Description: a JSON result has ok, severity and a message, for a success, a refusal and a
+# warning alike.
+# Steps:
+#   1. Make an overlay with an ADXL345 on i2c1.
+#   2. Update its interrupt-parent to gpio, with --json; check .ok true, severity info and a
+#      message.
+#   3. Read a node that does not exist, with --json; check it succeeds with .ok false, severity
+#      error and a message.
+#   4. Run delete with no target, with --json; check .ok true and severity warn.
+# bats test_tags=req:GEN-08, id:L0137
 @test "a JSON result says ok, with a message and a severity" {
 	with_accel
 	run_json update adxl345 interrupt-parent gpio
@@ -254,7 +378,14 @@ checksum() {
 
 # Gap: read, update when it reads, and validate answer the node, the property or the
 # diagnostics alone, with no ok, message or severity (02-common.md C-7).
-# bats test_tags=req:GEN-08, gap
+# Description: read, update when it only reads, and validate also answer with ok, message and
+# severity.
+# Steps:
+#   1. Make an overlay with an ADXL345 on i2c1.
+#   2. Run read, read adxl345, read adxl345 compatible, update adxl345 compatible and validate,
+#      each with --json.
+#   3. Check each result has ok, message and severity.
+# bats test_tags=req:GEN-08, gap, id:L0138
 @test "reading and validating say ok, with a message and a severity, too" {
 	with_accel
 	local words
@@ -266,7 +397,12 @@ checksum() {
 	done
 }
 
-# bats test_tags=req:GEN-17, gap
+# Description: a refusal carries an error type.
+# Steps:
+#   1. Make an overlay with an ADXL345 on i2c1.
+#   2. Add an unknown compatible, with --json.
+#   3. Check it is refused (.ok false) and the result has a non-empty error type.
+# bats test_tags=req:GEN-17, gap, id:L0139
 @test "an error carries a type from the fixed list" {
 	# Gap: a refusal has ok, message and severity only; there is no error type field.
 	with_accel
@@ -277,7 +413,14 @@ checksum() {
 
 # --- GEN-09: exit status -----------------------------------------------------------------
 
-# bats test_tags=req:GEN-09
+# Description: a refusal exits 0 and the outcome is in the result.
+# Steps:
+#   1. Make an overlay with an ADXL345 on i2c1.
+#   2. Read a node that does not exist, with --json; check it exits 0 with .ok false.
+#   3. Add an unknown compatible; check it exits 0.
+#   4. Delete a node that does not exist with --force, with --json; check it exits 0 with .ok
+#      false.
+# bats test_tags=req:GEN-09, id:L0140
 @test "a refusal exits 0, the outcome in the result" {
 	with_accel
 	run_json read nosuchnode
@@ -290,7 +433,12 @@ checksum() {
 	assert_json '.ok' false
 }
 
-# bats test_tags=req:GEN-09
+# Description: a usage error exits non-zero.
+# Steps:
+#   1. Run an unknown command, config with an unknown flag, read with an unknown flag, and move
+#      with no destination.
+#   2. Check each fails with a usage error (exit 2).
+# bats test_tags=req:GEN-09, id:L0141
 @test "a usage error exits non-zero" {
 	run aa nosuchcommand
 	assert_failure 2
@@ -303,7 +451,13 @@ checksum() {
 }
 
 # Gap: a refused value exits 2, the reason as text on stderr, with no JSON.
-# bats test_tags=req:GEN-09, gap
+# Description: a setting value that is refused exits 0, with .ok false in the result.
+# Steps:
+#   1. Set overlay-syntax to braces, with --json.
+#   2. Check it is refused (exit 0, .ok false).
+#   3. Set linux to a folder that is not a Linux tree, with --json.
+#   4. Check it is refused (exit 0, .ok false).
+# bats test_tags=req:GEN-09, gap, id:L0142
 @test "a refused setting value exits 0 with ok false" {
 	run_json config overlay-syntax braces
 	assert_success
@@ -315,7 +469,13 @@ checksum() {
 
 # An unknown setting is a usage error: the one case, with a bad argument, where the exit status
 # isn't 0.
-# bats test_tags=req:GEN-09
+# Description: an unknown setting is a usage error even with --json: exit 2, nothing on
+# standard output, the reason on standard error.
+# Steps:
+#   1. Read the setting nosuchkey with config, with --json.
+#   2. Check it fails with a usage error (exit 2).
+#   3. Check standard output is empty and standard error says the field is unknown.
+# bats test_tags=req:GEN-09, id:L0143
 @test "an unknown setting is a usage error: non-zero, the reason on stderr" {
 	run_json config nosuchkey
 	assert_failure 2
@@ -325,7 +485,13 @@ checksum() {
 
 # Gap: under --json a missing setting is a config-error object on standard error with exit 2
 # (02-common.md C-11); in human mode it exits 0. noos answers {"ok": false, …} with exit 0.
-# bats test_tags=req:GEN-09, gap
+# Description: a missing setting exits 0, with and without --json, and the result names it.
+# Steps:
+#   1. Remove the linux setting.
+#   2. Run read and check it exits 0.
+#   3. Run read with --json and check it is refused (exit 0, .ok false), the message naming
+#      linux.
+# bats test_tags=req:GEN-09, gap, id:L0144
 @test "a missing setting exits 0 with and without --json, the outcome in the result" {
 	drop_setting linux
 	run aa read
@@ -338,7 +504,12 @@ checksum() {
 
 # --- GEN-10, GEN-11: help and version ----------------------------------------------------
 
-# bats test_tags=req:GEN-10
+# Description: --help lists the commands.
+# Steps:
+#   1. Run --help.
+#   2. Check it succeeds and has a COMMANDS section listing add, move and config with their
+#      descriptions.
+# bats test_tags=req:GEN-10, id:L0145
 @test "--help lists the commands" {
 	run aa --help
 	assert_success
@@ -348,7 +519,12 @@ checksum() {
 	assert_output --regexp $'\n  config +Show'
 }
 
-# bats test_tags=req:GEN-10
+# Description: a command's help shows its usage, arguments and flags.
+# Steps:
+#   1. Run add --help.
+#   2. Check it succeeds and shows the usage, ARGUMENTS and FLAGS, with --parent and --template.
+#   3. Run list parent --help and check it shows the usage with <compatible>.
+# bats test_tags=req:GEN-10, id:L0146
 @test "<command> --help describes the command, its arguments and flags" {
 	run aa add --help
 	assert_success
@@ -363,7 +539,12 @@ checksum() {
 }
 
 # Gap: the help of validate, build and deploy has no examples.
-# bats test_tags=req:GEN-10, gap
+# Description: the help of every command has examples.
+# Steps:
+#   1. Run --help of each command: config, init, import, add, read, update, delete, rename, list,
+#      move, enable, disable, validate, build, deploy, completion and skill.
+#   2. Check each one has an Examples section.
+# bats test_tags=req:GEN-10, gap, id:L0147
 @test "every command's help has examples" {
 	local command missing=()
 	for command in config init import add read update delete rename list move enable disable validate build \
@@ -373,7 +554,11 @@ checksum() {
 	[ ${#missing[@]} -eq 0 ] || fail "no examples in the help of: ${missing[*]}"
 }
 
-# bats test_tags=req:GEN-11
+# Description: --version prints the version of the CLI package.
+# Steps:
+#   1. Run --version.
+#   2. Check it succeeds and prints a version number equal to the one in package.json.
+# bats test_tags=req:GEN-11, id:L0148
 @test "--version prints the version" {
 	run aa --version
 	assert_success
@@ -384,7 +569,13 @@ checksum() {
 # --- GEN-12, GEN-13: explaining ----------------------------------------------------------
 
 # Gap: an unknown compatible gives only `Failed to find binding for adi,adxl34`.
-# bats test_tags=req:GEN-12, gap
+# Description: an unknown compatible is refused with the closest compatibles and a pointer to
+# list devices.
+# Steps:
+#   1. Create the overlay with init.
+#   2. Add adi,adxl34, with --json.
+#   3. Check it is refused (.ok false) and the message names adi,adxl345 and list devices.
+# bats test_tags=req:GEN-12, gap, id:L0149
 @test "an unknown device points to list devices" {
 	with_overlay
 	run_json add adi,adxl34
@@ -395,7 +586,12 @@ checksum() {
 
 # Gap: an unknown node under a known one gives only `Not found: i2c_arm/adi,adxl345@1 (the
 # property is a separate argument: <path> <property>)`, naming none of the nodes there.
-# bats test_tags=req:GEN-12, gap
+# Description: an unknown node under a known one is refused, naming the nodes that are there.
+# Steps:
+#   1. Make an overlay with an ADXL345 on i2c1.
+#   2. Read i2c_arm/adi,adxl345@1, with --json.
+#   3. Check it is refused (.ok false), saying it was not found and naming adi,adxl345@0.
+# bats test_tags=req:GEN-12, gap, id:L0150
 @test "an unknown node names the nodes there are" {
 	with_accel
 	run_json read i2c_arm/adi,adxl345@1
@@ -404,7 +600,11 @@ checksum() {
 	assert_output --partial "adi,adxl345@0"
 }
 
-# bats test_tags=req:GEN-12
+# Description: a mistyped command is a usage error that names the closest command.
+# Steps:
+#   1. Run confg; check it fails with a usage error (exit 2) suggesting config.
+#   2. Run mvoe; check it fails with a usage error (exit 2) suggesting move.
+# bats test_tags=req:GEN-12, id:L0151
 @test "a mistyped command names the closest one" {
 	run aa confg
 	assert_failure 2
@@ -414,14 +614,25 @@ checksum() {
 	assert_output --partial "did you mean \`move\`"
 }
 
-# bats test_tags=req:GEN-12
+# Description: a command with no workfile says the workfile does not exist and how to create it.
+# Steps:
+#   1. Run read before any init.
+#   2. Check the message says the workfile does not exist and to run init.
+# bats test_tags=req:GEN-12, id:L0152
 @test "a missing workfile says how to create it" {
 	run aa read
 	assert_output --partial "$WORKFILE does not exist"
 	assert_output --partial "Run 'analog-attach init' to create it"
 }
 
-# bats test_tags=req:GEN-13
+# Description: init with no linux setting stops, naming the setting and how to set it, and
+# creates no workfile.
+# Steps:
+#   1. Remove the linux setting.
+#   2. Run init.
+#   3. Check the message says the linux setting is missing and shows config linux <path>.
+#   4. Check no workfile was created.
+# bats test_tags=req:GEN-13, id:L0153
 @test "a missing Linux tree stops init, naming the setting and how to set it" {
 	drop_setting linux
 	run aa init
@@ -430,7 +641,15 @@ checksum() {
 	[ ! -e "$WORKFILE" ]
 }
 
-# bats test_tags=req:GEN-13
+# Description: a command with no devicetree setting stops, naming the setting and how to set it,
+# and changes no file.
+# Steps:
+#   1. Make an overlay with an ADXL345 on i2c1 and remove the devicetree setting.
+#   2. Take a checksum of the workfile and the settings files.
+#   3. Update adxl345 interrupt-parent to gpio.
+#   4. Check the message says devicetree is missing and shows config devicetree.
+#   5. Check no file changed.
+# bats test_tags=req:GEN-13, id:L0154
 @test "a missing devicetree stops a command, naming the setting and how to set it" {
 	with_accel
 	drop_setting devicetree
@@ -442,7 +661,13 @@ checksum() {
 	[ "$(checksum)" = "$before" ]
 }
 
-# bats test_tags=req:GEN-13
+# Description: add with no workfile setting stops, saying how to set it, and creates no workfile.
+# Steps:
+#   1. Remove the workfile setting.
+#   2. Add adi,adxl345 --parent i2c1.
+#   3. Check the message says workfile is missing and points to config workfile <name> and init.
+#   4. Check no workfile was created.
+# bats test_tags=req:GEN-13, id:L0155
 @test "a missing workfile setting stops add, saying how to set it" {
 	drop_setting workfile
 	run aa add adi,adxl345 --parent i2c1
@@ -454,7 +679,15 @@ checksum() {
 
 # --- GEN-14: naming a device ---------------------------------------------------------------
 
-# bats test_tags=req:GEN-14, req:GEN-14-LNX
+# Description: a node can be named by its label, its absolute path, or a label followed by a path,
+# for overlay and base nodes.
+# Steps:
+#   1. Make an overlay with an ADXL345 on i2c1.
+#   2. Read it, with --json, as adxl345, i2c1/adi,adxl345@0, i2c_arm/adi,adxl345@0 and
+#      /soc/i2c@7e804000/adi,adxl345@0.
+#   3. Check each gives the node adi,adxl345@0 with the label adxl345.
+#   4. Read spi0 and /soc/spi@7e204000, with --json, and check both give spi@7e204000.
+# bats test_tags=req:GEN-14, req:GEN-14-LNX, id:L0156
 @test "a node is taken by its label, its absolute path, or a label followed by a path" {
 	with_accel
 	local path
@@ -470,7 +703,16 @@ checksum() {
 	assert_json '.key' "spi@7e204000"
 }
 
-# bats test_tags=req:GEN-14, req:GEN-14-LNX
+# Description: update, rename and delete find the node by its absolute path, a label with a
+# path, and its label.
+# Steps:
+#   1. Make an overlay with an ADXL345 on i2c1.
+#   2. Update interrupt-parent to gpio by the absolute path; check .ok true and that read gives
+#      &gpio.
+#   3. Rename it to accel@0 by i2c1/adi,adxl345@0; check .ok true and that i2c_arm/accel@0
+#      reads.
+#   4. Delete it by the label with --force; check .ok true and that read is refused.
+# bats test_tags=req:GEN-14, req:GEN-14-LNX, id:L0157
 @test "update, rename and delete take the node by each form of target" {
 	with_accel
 	run_json update /soc/i2c@7e804000/adi,adxl345@0 interrupt-parent gpio
@@ -489,7 +731,13 @@ checksum() {
 
 # --- GEN-15: saving --------------------------------------------------------------------------
 
-# bats test_tags=req:GEN-15
+# Description: each edit is written to the workfile by the time the command returns.
+# Steps:
+#   1. Make an overlay with an ADXL345 on i2c1.
+#   2. Update interrupt-parent to gpio and check the workfile has it.
+#   3. Rename the node to accel@0 and check the workfile has the new name with the label.
+#   4. Delete it with --force and check the workfile no longer has accel@0.
+# bats test_tags=req:GEN-15, id:L0158
 @test "an edit is in the workfile when the command returns" {
 	with_accel
 	aa update adxl345 interrupt-parent gpio
@@ -501,7 +749,14 @@ checksum() {
 	assert_output 0
 }
 
-# bats test_tags=req:GEN-15
+# Description: commands that only show something change neither the workfile nor the settings.
+# Steps:
+#   1. Make an overlay with an ADXL345 on i2c1 and set a global deploy-user.
+#   2. Take a checksum of the workfile and both settings files.
+#   3. Run read, list, validate, config reads, update with no value, delete with no target,
+#      --help and --version, each as text and with --json.
+#   4. Check the checksum is unchanged after each.
+# bats test_tags=req:GEN-15, id:L0159
 @test "commands that only show change neither the workfile nor the settings" {
 	with_accel
 	aa config deploy-user pi --global

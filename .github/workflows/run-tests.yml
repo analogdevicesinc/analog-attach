@@ -95,10 +95,11 @@ jobs:
         run: yarn build:cli
 
       # Every test, the known gaps too (tagged gap): they are reported, but only a test that
-      # fails and isn't a known gap fails the job. The build and deploy tests that need real
-      # CAPI trees and a toolchain skip here.
+      # fails and isn't a known gap fails the job, and so does a test without its ID,
+      # Description, Steps or Preconditions (--require-steps). The build and deploy tests that
+      # need real CAPI trees and a toolchain skip here.
       - name: Run the functional tests
-        run: yarn test:functional --jobs 4 --fail-unless-gap
+        run: yarn test:functional --jobs 4 --fail-unless-gap --require-steps
 
       - name: Write the requirements report to the run's summary
         if: always()
