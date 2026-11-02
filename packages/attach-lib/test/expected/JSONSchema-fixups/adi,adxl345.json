@@ -400,6 +400,8 @@
     "properties": {
         "compatible": {
             "dtType": "string-array",
+            "maxItems": 2,
+            "minItems": 1,
             "oneOf": [
                 {
                     "items": [

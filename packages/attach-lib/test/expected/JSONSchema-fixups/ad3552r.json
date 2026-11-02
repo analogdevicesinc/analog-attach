@@ -408,6 +408,8 @@
                         "properties": {
                             "adi,output-range-microvolt": {
                                 "description": "Voltage output range of the channel as <minimum, maximum>\nRequired connections:\n  Rfb1x for: 0 to 2.5 V; 0 to 3V; 0 to 5 V;\n  Rfb2x for: 0 to 10 V; -2.5 to 7.5V; -5 to 5 V;\n",
+                                "maxItems": 1,
+                                "minItems": 1,
                                 "oneOf": [
                                     {
                                         "items": [
@@ -512,6 +514,8 @@
                         "properties": {
                             "adi,output-range-microvolt": {
                                 "description": "Voltage output range of the channel as <minimum, maximum>\nRequired connections:\n  Rfb1x for: 0 to 2.5 V; 0 to 5 V;\n  Rfb2x for: 0 to 10 V; -5 to 5 V;\n  Rfb4x for: -10 to 10V\n",
+                                "maxItems": 1,
+                                "minItems": 1,
                                 "oneOf": [
                                     {
                                         "items": [
