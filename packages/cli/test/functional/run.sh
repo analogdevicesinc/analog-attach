@@ -5,9 +5,12 @@
 #   run.sh noos/config.bats             one file (or folder), relative to this folder
 #   run.sh --filter-tags req:CONFIG-04  the tests of one requirement (or eco:noos, ...)
 #   run.sh --jobs 4                     in parallel (needs GNU parallel)
+#   run.sh --fail-unless-gap            the known gaps don't fail the run (CI)
 #
-# Any bats option goes through. The report is in out/ either way; the exit status is bats'
-# (non-zero when a test failed) or the report's (a test naming an unknown requirement).
+# Any other bats option goes through. The report is in out/ either way. The exit status is
+# bats' (non-zero when a test failed, a known gap too) or the report's (a test naming an
+# unknown requirement); with --fail-unless-gap it is the report's alone, which fails only on
+# a test that fails and isn't a known gap.
 set -uo pipefail
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -28,8 +31,15 @@ done
 # The tests to run: the arguments that name a file or folder here, else every test.
 targets=()
 options=()
+report_options=()
 for argument in "$@"; do
-	if [ -e "$here/$argument" ]; then targets+=("$argument"); else options+=("$argument"); fi
+	if [ "$argument" = --fail-unless-gap ]; then
+		report_options+=(--fail-unless-gap)
+	elif [ -e "$here/$argument" ]; then
+		targets+=("$argument")
+	else
+		options+=("$argument")
+	fi
 done
 # Relative to this folder, as the report names the files.
 [ ${#targets[@]} -eq 0 ] && targets=(noos linux)
@@ -47,8 +57,11 @@ cd "$here" || exit 2
 bash "$bats" --recursive --timing --report-formatter junit --output "$out" "${options[@]}" "${targets[@]}"
 status=$?
 
-if ! python3 "$here/report.py" --junit "$out/report.xml" --tests "$here" \
-	--requirements "$cli/docs/requirements.csv" --out "$out" "${targets[@]}"; then
-	[ "$status" -eq 0 ] && status=1
-fi
+python3 "$here/report.py" --junit "$out/report.xml" --tests "$here" \
+	--requirements "$cli/docs/requirements.csv" --out "$out" "${report_options[@]}" "${targets[@]}"
+report=$?
+
+# With --fail-unless-gap the report decides: the known gaps fail bats, not the run.
+if [ ${#report_options[@]} -gt 0 ]; then exit "$report"; fi
+[ "$report" -ne 0 ] && [ "$status" -eq 0 ] && status=1
 exit "$status"

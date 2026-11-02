@@ -1,12 +1,23 @@
 name: Run Application Tests
 
-on: [push, pull_request]
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
 
+# A newer push to the same branch or pull request cancels the run still going.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# Two jobs that share nothing, side by side: the unit tests of every package, and the
+# functional tests of the CLI (packages/cli/test/functional) with their requirements report.
 jobs:
-  build-and-test:
+  unit:
+    name: Unit tests
     runs-on: ubuntu-latest
     steps:
       - name: Check out
@@ -40,3 +51,65 @@ jobs:
 
       - name: Test
         run: xvfb-run --auto-servernum yarn test-clean
+
+  functional:
+    name: Functional tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GH_TOKEN }}
+
+      # flex, bison and python3-venv for the CLI's build (its bundled dt-schema tools); jq for
+      # the tests; GNU parallel for bats --jobs.
+      - name: Install the tools of the build and the tests
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y device-tree-compiler flex bison python3-venv jq parallel
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: yarn
+
+      # The report's workbook (report.xlsx) needs openpyxl; the CSVs don't.
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install openpyxl
+        run: python -m pip install openpyxl
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Install dependencies
+        run: yarn install --immutable
+
+      # The CLI and the two libraries it bundles; the tests run dist/cli.js.
+      - name: Build the CLI
+        run: yarn build:cli
+
+      # Every test, the known gaps too (tagged gap): they are reported, but only a test that
+      # fails and isn't a known gap fails the job. The build and deploy tests that need real
+      # CAPI trees and a toolchain skip here.
+      - name: Run the functional tests
+        run: yarn test:functional --jobs 4 --fail-unless-gap
+
+      - name: Write the requirements report to the run's summary
+        if: always()
+        run: |
+          summary=packages/cli/test/functional/out/summary.md
+          if [ -f "$summary" ]; then cat "$summary" >> "$GITHUB_STEP_SUMMARY"; fi
+
+      - name: Upload the requirements report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: functional-tests-report
+          path: packages/cli/test/functional/out/
+          if-no-files-found: warn
