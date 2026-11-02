@@ -25,8 +25,10 @@ It writes, in the output directory:
   - report.xlsx       the two tables as sheets, when openpyxl is installed.
 
 It exits 1 when a test names a requirement that doesn't exist, so a renamed requirement
-can't leave a stale test behind; with --fail-unless-gap also when a test fails that isn't a
-known gap (CI: the known gaps don't fail the run). A test with no requirement is only listed.
+can't leave a stale test behind, and when bats ran fewer tests than --expected (the count
+bats --count gives for the same run): a run that stopped early, a full disk say, isn't a
+pass. With --fail-unless-gap it also exits 1 when a test fails that isn't a known gap (CI:
+the known gaps don't fail the run). A test with no requirement is only listed.
 
     report.py --junit out/report.xml --tests test/functional --requirements docs/requirements.csv --out out noos linux
 """
@@ -192,6 +194,7 @@ def main():
     parser.add_argument("--requirements", required=True, type=pathlib.Path)
     parser.add_argument("--out", required=True, type=pathlib.Path)
     parser.add_argument("--fail-unless-gap", action="store_true", help="exit 1 when a test fails that isn't a known gap")
+    parser.add_argument("--expected", type=int, help="how many tests bats was to run; exit 1 when it ran fewer")
     parser.add_argument("targets", nargs="*", type=pathlib.Path, help="the files and folders bats ran, relative to --tests")
     args = parser.parse_args()
 
@@ -240,7 +243,11 @@ def main():
     tested = sum(1 for row in requirement_rows if any(status not in ("-", "not tested") for status in row[5:7]))
     counts = {status: statuses.count(status) for status in ("pass", "fail", "gap", "skipped", "not run")}
     counts.update(tested=tested, requirements=len(requirement_rows))
-    notes = [f"unknown requirement: {line}" for line in unknown] + [f"{FIXED_NOTE}: {line}" for line in fixed]
+    # bats stopping early leaves the tests it didn't get to out of the JUnit, as if filtered out.
+    incomplete = args.expected is not None and len(results) < args.expected
+    stopped = f"bats ran {len(results)} of the {args.expected} tests it was to run: the run stopped early"
+    notes = ([f"error: {stopped}"] if incomplete else []) \
+        + [f"unknown requirement: {line}" for line in unknown] + [f"{FIXED_NOTE}: {line}" for line in fixed]
     write_summary(args.out / "summary.md", counts, requirement_rows, notes)
 
     print(f"tests: {counts['pass']} passed, {counts['fail']} failed, {plural(counts['gap'], 'known gap')}, {counts['skipped']} skipped"
@@ -255,8 +262,10 @@ def main():
         print(f"note: a known gap passes, {FIXED_NOTE}: {line}", file=sys.stderr)
     for line in unknown:
         print(f"error: unknown requirement: {line}", file=sys.stderr)
+    if incomplete:
+        print(f"error: {stopped}", file=sys.stderr)
     failed = args.fail_unless_gap and counts["fail"] > 0
-    return 1 if unknown or failed else 0
+    return 1 if unknown or incomplete or failed else 0
 
 
 if __name__ == "__main__":
