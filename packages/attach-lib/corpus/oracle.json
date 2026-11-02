@@ -167,13 +167,7 @@
       "sound/audio-graph-port.yaml:^endpoint(@[0-9a-f]+)?/frame-master ours unknown, dt-schema flag|phandle",
       "sound/snps,designware-i2s.yaml:dma-maxburst ours list(any), dt-schema uint32"
     ],
-    "type-mismatch": [
-      "iio/frequency/ad916x.yaml:^($clock-names-)?clock-scales ours scalar(number), dt-schema uint32-array",
-      "iio/frequency/ad916x.yaml:adi,full-scale-current-microamp ours scalar(number), dt-schema uint32-array",
-      "iio/frequency/adf4371.yaml:clock-scales ours scalar(number), dt-schema uint32-array",
-      "iio/frequency/adi,adl5960.yaml:lo_in-clock-scales ours scalar(number), dt-schema uint32-array",
-      "mfd/samsung,s5m8767.yaml:s5m8767,pmic-buck-default-dvs-idx ours scalar(number), dt-schema uint32-array"
-    ],
+    "type-mismatch": [],
     "two-types": [
       "arm/arm,cci-400.yaml:ranges ours flag, dt-schema flag|uint32-matrix",
       "arm/arm,juno-fpga-apb-regs.yaml:ranges ours flag, dt-schema flag|uint32-matrix",
