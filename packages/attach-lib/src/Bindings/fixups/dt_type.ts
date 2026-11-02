@@ -13,7 +13,9 @@ function is_node_schema(schema: PropertySchema): boolean {
 /**
  * dt-schema: `validator.py:property_get_type`. A property that doesn't say what type it is (no `$ref` to
  * `types.yaml`, so no `dtType`) gets the one dt-schema's own schemas declare for its name. `reg: {maxItems: 1}`
- * is an `address`, `interrupts: {maxItems: 1}` a `uint32-matrix`. A `true` property becomes `{ dtType }`.
+ * is an `address`, `interrupts: {maxItems: 1}` a `uint32-matrix`. A `true` property becomes `{ dtType }`. A name
+ * that is a flag or another type gets the other when the schema counts its items: `ranges: {maxItems: 1}` is a
+ * `uint32-matrix`, `ranges: true` a `flag`.
  */
 export function fixup_dt_type(types: PropertyTypes): PropertyFixup {
     return (schema, { path, name }) => {
@@ -21,7 +23,8 @@ export function fixup_dt_type(types: PropertyTypes): PropertyFixup {
             return schema;
         }
 
-        const type = property_type(types, name);
+        const counts = typeof schema === "object" && ["minItems", "maxItems", "items"].some(key => key in schema);
+        const type = (counts ? types.counted?.get(name) : undefined) ?? property_type(types, name);
 
         if (type === undefined || schema === false || is_node_schema(schema)) { return schema; }
         if (schema === true) { return { [DT_TYPE]: type }; }
@@ -37,8 +40,9 @@ if (import.meta.vitest) {
     const { test, expect } = import.meta.vitest;
 
     const types: PropertyTypes = {
-        names: new Map([["reg", "address"], ["interrupts", "uint32-matrix"]]),
+        names: new Map([["reg", "address"], ["interrupts", "uint32-matrix"], ["ranges", "flag"]]),
         patterns: [{ pattern: /-gpios?$/, type: "phandle-array" }],
+        counted: new Map([["ranges", "uint32-matrix"]]),
     };
     const tagged = (schema: Record<string, unknown> | boolean, name: string, path = ["properties", name]) => fixup_dt_type(types)(schema, { path, name });
 
@@ -46,6 +50,13 @@ if (import.meta.vitest) {
         expect(tagged({ maxItems: 1 }, "reg")).toStrictEqual({ maxItems: 1, dtType: "address" });
         expect(tagged({ minItems: 1 }, "interrupts")).toStrictEqual({ minItems: 1, dtType: "uint32-matrix" });
         expect(tagged({ maxItems: 1 }, "reset-gpios")).toStrictEqual({ maxItems: 1, dtType: "phandle-array" });
+    });
+
+    test("a name that is a flag or another type is the other when the schema counts its items", () => {
+        expect(tagged({ maxItems: 1 }, "ranges")).toStrictEqual({ maxItems: 1, dtType: "uint32-matrix" });
+        expect(tagged({ items: [{ description: "x" }] }, "ranges")).toStrictEqual({ items: [{ description: "x" }], dtType: "uint32-matrix" });
+        expect(tagged({ description: "d" }, "ranges")).toStrictEqual({ description: "d", dtType: "flag" });
+        expect(tagged(true, "ranges")).toStrictEqual({ dtType: "flag" });
     });
 
     test("a true property becomes its type", () => {
