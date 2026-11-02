@@ -12,7 +12,8 @@ set -uo pipefail
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cli="$(cd "$here/../.." && pwd)"
-out="$here/out"
+# Where the report goes: out/, or FUNCTIONAL_OUT (runs side by side each need their own).
+out="${FUNCTIONAL_OUT:-$here/out}"
 
 if [ ! -f "$cli/dist/cli.js" ]; then
 	echo "No build: run 'yarn workspace @analog-attach/cli build' first." >&2
@@ -32,6 +33,13 @@ for argument in "$@"; do
 done
 # Relative to this folder, as the report names the files.
 [ ${#targets[@]} -eq 0 ] && targets=(noos linux)
+
+# The linux tests' Linux tree and its caches (linux-tree.sh), when they run.
+for target in "${targets[@]}"; do
+	case "$target" in
+		linux | linux/*) "$here/linux-tree.sh" >/dev/null || exit 2; break ;;
+	esac
+done
 
 rm -rf "$out"
 mkdir -p "$out"

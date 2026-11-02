@@ -26,7 +26,7 @@ test/functional/run.sh --filter-tags eco:linux      # one ecosystem
 test/functional/run.sh --filter "reset"             # tests whose name matches
 ```
 
-Needs: bash, node, `jq` and `python3`. bats and its assertion libraries come with
+Needs: bash, node, git, `jq` and `python3`. bats and its assertion libraries come with
 `yarn install` (`bats`, `bats-support`, `bats-assert`, dev dependencies of this package).
 Yarn can't run bats itself (it runs a package's bin with node), so `run.sh` calls it with
 bash.
@@ -34,9 +34,25 @@ bash.
 The exit status is non-zero when a test fails, or when a test names a requirement that
 doesn't exist.
 
+### The Linux tree
+
+The linux tests run on a real Linux tree: analogdevicesinc/linux at a pinned commit of
+`rpi-6.12.y`, with the Raspberry Pi 4 (`bcm2711-rpi-4-b.dts`) as the base devicetree.
+`linux-tree.sh` clones it on first use into `packages/cli/linux-adi/` (shallow, blobless and
+sparse: the bindings, the `dt-bindings` headers and the arm/arm64 broadcom device trees with
+the RPi overlays, about 90 MB in 15 s), then builds its binding caches once with the CLI
+(`config linux`) into `packages/cli/linux-adi-caches/`. Both are ignored by git. `run.sh` calls
+it before the linux tests; it does nothing when both are there and current, and rebuilds the
+caches when the tree or the bundled tools change. Each test copies the caches into its project.
+
+To move to a newer commit, change `COMMIT` in `linux-tree.sh` (the next run clones it again).
+`AA_LINUX=<checkout>` uses a tree of your own instead of the clone; the tests expect
+`rpi-6.12.y`'s content.
+
 ## The report
 
-Every run writes `out/` (ignored by git):
+Every run writes `out/` (ignored by git), or the folder `FUNCTIONAL_OUT` names (for runs side by
+side):
 
 | File | What |
 |---|---|
@@ -90,16 +106,36 @@ setup() {
 |---|---|
 | `aa <words>` | Runs the built CLI |
 | `new_project noos [key=value...]` | A project with the noos backend on attach-no-os-lib's test fixtures (a capi, a platform with `testboard`, `otherboard`, `twobusboard`, drivers); target `otherboard`. `key=value` changes a setting: `new_project noos target=testboard` |
-| `new_project linux [key=value...]` | A project with the linux backend and no Linux tree |
+| `new_project linux [key=value...]` | A project with the linux backend on the Linux tree (`$LINUX_TREE`), base `$LINUX_BASE` (the RPi 4), workfile `overlay.dtso` (not created), and the binding caches |
+| `$WORKFILE` | The workfile's path, set by `new_project`: `workfile.json` (noos), `overlay.dtso` (linux) |
+| `with_overlay` | After `new_project linux`: `init`, an empty overlay at `$WORKFILE` |
 | `run_json <words>` | `run aa --json <words>`, stderr kept apart (`$stderr`) so `$output` is the JSON |
 | `assert_json <jq filter> <value>` | The filter on `$output` prints the value |
 | `need <tool>...` | Skips the test when a tool isn't installed (`need cmake arm-none-eabi-gcc`) |
+| `drop_setting <key>...` | Removes settings from the project's section of its backend, as if never set |
+| `snapshot`, `assert_unchanged` | The workfile on disk is as it was at `snapshot`: for refusals that must write nothing |
+| `tty_run <expect> <keys>... -- <words>` | Runs the CLI on a pseudo-terminal, typing `<keys>` each time the screen shows `<expect>` (`$'\r'` Enter, `$'\x1b[B'` down, `$'\x03'` Ctrl-C); sets `$status` and `$output`; gives up after `TTY_TIMEOUT` seconds (20). For the guided setup and the interview |
 
 From bats and its libraries: `run` (sets `$status`, `$output`, `$lines`), `assert_success`,
 `assert_failure [<status>]`, `assert_output [--partial|--regexp] <text>`, `refute_output`,
 `assert_line`, `skip "<why>"`. See the docs of
 [bats-core](https://bats-core.readthedocs.io/) and
 [bats-assert](https://github.com/bats-core/bats-assert).
+
+### Gaps
+
+A test is written to its requirement, not to what the CLI does today. When the CLI doesn't
+meet the requirement yet, the test fails: tag it `gap` too, with a comment saying what the
+CLI does instead, so the report shows where the code falls short:
+
+```bash
+# Gap: a refused value exits 2 on stderr, with no JSON.
+# bats test_tags=req:GEN-09, gap
+@test "a refused setting value exits 0 with ok false" { ... }
+```
+
+`run.sh --filter-tags '!gap'` runs everything else; `--filter-tags gap` only the gaps. Once
+the CLI is fixed, drop the tag.
 
 ### Tips
 

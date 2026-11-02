@@ -8,5 +8,10 @@ dt-schema/
 dtc/
 bundled/
 
+# The Linux tree of the linux functional tests (test/functional/linux-tree.sh)
+linux-adi/
+linux-adi-caches/
+linux-adi.lock
+
 # The workspace of demo/typical-flow.sh
 demo/workspace/
