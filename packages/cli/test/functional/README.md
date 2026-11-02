@@ -56,17 +56,37 @@ side):
 
 | File | What |
 |---|---|
-| `requirements.csv` | One row per requirement: its status in `linux` and in `noos` (`pass`, `fail`, `skipped`, `not tested`; `-` where it doesn't apply), and how many tests check it |
-| `tests.csv` | One row per test: file, name, ecosystem, requirements, status, time, the first line of a failure |
-| `report.xlsx` | Both, as sheets, coloured by status, when `openpyxl` is installed (`pip install openpyxl`) |
-| `report.xml` | bats' JUnit output, for CI |
+| `requirements.csv` | One row per requirement: its status in `linux` and in `noos` (`-` where it doesn't apply), and how many tests check it |
+| `tests.csv` | One row per test: file, name, ecosystem, requirements, status, whether it is a known gap, time, the first line of a failure |
+| `summary.md` | The counts, per ecosystem too, and the requirements that fail, are known gaps, or have no test in any ecosystem they apply to (CI puts it on the run's page) |
+| `report.xlsx` | The two tables as sheets, coloured by status, when `openpyxl` is installed (`pip install openpyxl`) |
+| `report.xml` | bats' JUnit output |
 
-A requirement's status in an ecosystem is `fail` if any of its tests failed, else `pass` if
-any passed, else `skipped`. A test that a filter left out counts as `not run`, and the
-requirements only it checks as `not tested`.
+A test's status is `pass`, `fail`, `skipped` or `not run` (a filter left it out), and `gap`
+for a known gap that fails (tagged `gap`, see Gaps below): a known issue, listed in its own
+colour so it isn't forgotten, but not a failure. A known gap that passes is a `pass`, noted
+`fixed: drop the gap tag`.
 
-The report also prints a warning for each test with no requirement, and an error for each
-requirement ID that `docs/requirements.csv` doesn't have.
+A requirement's status in an ecosystem is `fail` if one of its tests failed, else `gap` if one
+is a known gap, else `pass` if one passed, else `skipped`; `not tested` when none of its tests
+ran.
+
+The report also prints a warning for each test with no requirement, a note for each known gap
+that now passes, and an error for each requirement ID that `docs/requirements.csv` doesn't have.
+
+## In CI
+
+`.github/workflows/run-tests.yml` runs the functional tests in their own job, beside the unit
+tests: it builds the CLI (`yarn build:cli`), then runs
+
+```sh
+yarn test:functional --jobs 4 --fail-unless-gap
+```
+
+and, whatever the result, writes `summary.md` to the run's summary and uploads `out/` as the
+`functional-tests-report` artifact (the workbook among it). With `--fail-unless-gap` the run
+fails only on a test that fails and isn't a known gap; without it, as locally by default, a
+known gap fails the run too. The tests that need real CAPI trees or a board skip in CI.
 
 ## Writing a test
 
