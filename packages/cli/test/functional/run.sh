@@ -6,12 +6,14 @@
 #   run.sh --filter-tags req:CONFIG-04  the tests of one requirement (or eco:noos, ...)
 #   run.sh --jobs 4                     in parallel (needs GNU parallel)
 #   run.sh --fail-unless-gap            the known gaps don't fail the run (CI)
+#   run.sh --require-steps              a test with no description, steps or preconditions
+#                                       fails the report
 #
 # Any other bats option goes through. The report is in out/ either way. The exit status is
 # bats' (non-zero when a test failed, a known gap too) or the report's (a test naming an
-# unknown requirement, or a run that stopped before its last test); with --fail-unless-gap it
-# is the report's alone, which fails only on those and on a test that fails and isn't a known
-# gap.
+# unknown requirement, a missing, malformed or duplicate test ID, or a run that stopped before
+# its last test); with --fail-unless-gap it is the report's alone, which fails only on those
+# and on a test that fails and isn't a known gap.
 set -uo pipefail
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -38,6 +40,8 @@ for argument in "$@"; do
 	if [ "$argument" = --fail-unless-gap ]; then
 		report_options+=(--fail-unless-gap)
 		fail_unless_gap=yes
+	elif [ "$argument" = --require-steps ]; then
+		report_options+=(--require-steps)
 	elif [ -e "$here/$argument" ]; then
 		targets+=("$argument")
 	else

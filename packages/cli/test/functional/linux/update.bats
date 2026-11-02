@@ -2,6 +2,9 @@
 
 # bats file_tags=eco:linux
 
+# Preconditions: a linux project on the Linux tree with the RPi 4 base devicetree, no workfile
+# yet. with_adc makes an overlay with an AD7124-8 on spi0 (label ad7124_8); with_channel adds
+# its child channel@0.
 setup() {
 	load ../helpers
 	new_project linux
@@ -19,7 +22,13 @@ with_channel() {
 	aa update ad7124_8 channel@0 >/dev/null 2>&1 || fail "update ad7124_8 channel@0 failed"
 }
 
-# bats test_tags=req:UPDATE-01
+# Description: update with a property and a value sets that property on the node.
+# Steps:
+#   1. Make the overlay with the AD7124-8 (with_adc).
+#   2. Run update ad7124_8 spi-max-frequency 1000000, with --json.
+#   3. Check it succeeds (.ok true) and the message says spi-max-frequency was set on ad7124_8.
+#   4. Check the overlay has spi-max-frequency = <1000000>.
+# bats test_tags=req:UPDATE-01, id:L0307
 @test "update sets a property to the value given" {
 	with_adc
 	run_json update ad7124_8 spi-max-frequency 1000000
@@ -30,7 +39,14 @@ with_channel() {
 	assert_output --partial 'spi-max-frequency = <1000000>;'
 }
 
-# bats test_tags=req:UPDATE-01
+# Description: updating a property that is already set replaces its value where it is, keeping
+# one copy of it and the order of the properties.
+# Steps:
+#   1. Make the overlay with the AD7124-8 and set spi-max-frequency 1000000, then rdy-gpios.
+#   2. Run update ad7124_8 spi-max-frequency 2000000.
+#   3. Check it succeeds.
+#   4. Check the overlay has spi-max-frequency once, now <2000000>, still followed by rdy-gpios.
+# bats test_tags=req:UPDATE-01, id:L0308
 @test "update replaces a value in place" {
 	with_adc
 	aa update ad7124_8 spi-max-frequency 1000000 >/dev/null
@@ -44,7 +60,15 @@ with_channel() {
 	assert_output --partial 'rdy-gpios'
 }
 
-# bats test_tags=req:UPDATE-01
+# Description: updating a node of the base devicetree writes the change into the overlay, aimed
+# at that node, and leaves the base file as it was.
+# Steps:
+#   1. Create the overlay with init and take a checksum of the base devicetree.
+#   2. Run update spi0 status okay.
+#   3. Check it succeeds and says status was set on spi0.
+#   4. Check the overlay targets &spi0 with status = "okay".
+#   5. Check the base devicetree's checksum is unchanged.
+# bats test_tags=req:UPDATE-01, id:L0309
 @test "update of a base node writes the value into the overlay, not the base" {
 	with_overlay
 	local before
@@ -58,7 +82,15 @@ with_channel() {
 	[ "$(cksum <"$LINUX_BASE")" = "$before" ] || fail "the base changed"
 }
 
-# bats test_tags=req:UPDATE-02
+# Description: a value word that is neither a number, a known macro nor a label is refused, and
+# the workfile is left alone.
+# Steps:
+#   1. Make the overlay with the AD7124-8 and snapshot it.
+#   2. Run update ad7124_8 interrupts foo, with --json.
+#   3. Check it is refused (exit 0, .ok false), the message saying 'foo' is not a number, macro
+#      or label.
+#   4. Check the workfile is unchanged.
+# bats test_tags=req:UPDATE-02, id:L0310
 @test "update refuses a word that is not a number, a macro or a label" {
 	with_adc
 	snapshot
@@ -69,7 +101,13 @@ with_channel() {
 	assert_unchanged
 }
 
-# bats test_tags=req:UPDATE-02
+# Description: giving a value to a property that is a flag in the binding is refused.
+# Steps:
+#   1. Make the overlay with the AD7124-8 and channel@0, and snapshot it.
+#   2. Run update ad7124_8/channel@0 bipolar 1, with --json.
+#   3. Check it is refused (exit 0, .ok false), the message saying bipolar is a flag.
+#   4. Check the workfile is unchanged.
+# bats test_tags=req:UPDATE-02, id:L0311
 @test "update refuses a value for a flag" {
 	with_channel
 	snapshot
@@ -82,7 +120,13 @@ with_channel() {
 
 # Gap: a property the binding doesn't define is written, with only a diagnostic on standard error
 # (`Property nosuch-prop not defined by adi,ad7124-8 binding; written without schema validation`).
-# bats test_tags=req:UPDATE-02, gap
+# Description: setting a property the node's binding does not define is refused.
+# Steps:
+#   1. Make the overlay with the AD7124-8 and snapshot it.
+#   2. Run update ad7124_8 nosuch-prop 5, with --json.
+#   3. Check it is refused (exit 0, .ok false).
+#   4. Check the workfile is unchanged.
+# bats test_tags=req:UPDATE-02, gap, id:L0312
 @test "update refuses a property the binding does not have" {
 	with_adc
 	snapshot
@@ -94,7 +138,13 @@ with_channel() {
 
 # Gap: the binding gives only a shape hint: a value outside the enum (adi,reference-select is one
 # of 0, 1, 3) is written.
-# bats test_tags=req:UPDATE-02, gap
+# Description: a value outside the options of an enum property is refused.
+# Steps:
+#   1. Make the overlay with the AD7124-8 and channel@0, and snapshot it.
+#   2. Run update ad7124_8/channel@0 adi,reference-select 2 (not one of 0, 1, 3), with --json.
+#   3. Check it is refused (exit 0, .ok false).
+#   4. Check the workfile is unchanged.
+# bats test_tags=req:UPDATE-02, gap, id:L0313
 @test "update refuses a value that is not one of an enum's options" {
 	with_channel
 	snapshot
@@ -105,7 +155,13 @@ with_channel() {
 }
 
 # Gap: a channel's reg above the binding's maximum (15) is written, and the node renamed channel@20.
-# bats test_tags=req:UPDATE-02, gap
+# Description: a number above the binding's maximum is refused.
+# Steps:
+#   1. Make the overlay with the AD7124-8 and channel@0, and snapshot it.
+#   2. Run update ad7124_8/channel@0 reg 20 (the maximum is 15), with --json.
+#   3. Check it is refused (exit 0, .ok false).
+#   4. Check the workfile is unchanged.
+# bats test_tags=req:UPDATE-02, gap, id:L0314
 @test "update refuses a number above the maximum" {
 	with_channel
 	snapshot
@@ -117,7 +173,13 @@ with_channel() {
 
 # Gap: an array longer than the binding allows is written, with `warning: diff-channels takes 2
 # values, got 3` on standard error.
-# bats test_tags=req:UPDATE-02, gap
+# Description: an array with more values than the binding allows is refused.
+# Steps:
+#   1. Make the overlay with the AD7124-8 and channel@0, and snapshot it.
+#   2. Run update ad7124_8/channel@0 diff-channels 1 2 3 (it takes 2), with --json.
+#   3. Check it is refused (exit 0, .ok false).
+#   4. Check the workfile is unchanged.
+# bats test_tags=req:UPDATE-02, gap, id:L0315
 @test "update refuses an array longer than its size" {
 	with_channel
 	snapshot
@@ -127,7 +189,14 @@ with_channel() {
 	assert_unchanged
 }
 
-# bats test_tags=req:UPDATE-03
+# Description: update with a property and no value shows the property exactly as read does, in
+# text and in JSON.
+# Steps:
+#   1. Make the overlay with the AD7124-8 and set spi-max-frequency 1000000.
+#   2. Run read ad7124_8 spi-max-frequency, then update ad7124_8 spi-max-frequency.
+#   3. Check update succeeds with the same output as read, its first line the property's value.
+#   4. Run the same read and update with --json and check their outputs are the same.
+# bats test_tags=req:UPDATE-03, id:L0316
 @test "update without a value shows the property as read does" {
 	with_adc
 	aa update ad7124_8 spi-max-frequency 1000000 >/dev/null
@@ -143,7 +212,13 @@ with_channel() {
 	assert_output "$read_json"
 }
 
-# bats test_tags=req:UPDATE-03
+# Description: update with a property and no value, on a property that has a value, leaves the
+# workfile as it was.
+# Steps:
+#   1. Make the overlay with the AD7124-8, set spi-max-frequency 1000000 and snapshot the workfile.
+#   2. Run update ad7124_8 spi-max-frequency.
+#   3. Check it succeeds and the workfile is unchanged.
+# bats test_tags=req:UPDATE-03, id:L0317
 @test "update without a value changes nothing when it reads" {
 	with_adc
 	aa update ad7124_8 spi-max-frequency 1000000 >/dev/null
@@ -153,7 +228,13 @@ with_channel() {
 	assert_unchanged
 }
 
-# bats test_tags=req:UPDATE-03-LNX
+# Description: update with no value on a property the binding defines as a flag sets the flag.
+# Steps:
+#   1. Make the overlay with the AD7124-8 and channel@0.
+#   2. Run update ad7124_8/channel@0 bipolar.
+#   3. Check it succeeds and says the flag bipolar was set on ad7124_8/channel@0.
+#   4. Check the overlay has a line bipolar; on its own.
+# bats test_tags=req:UPDATE-03-LNX, id:L0318
 @test "update without a value sets a flag the binding defines" {
 	with_channel
 	run aa update ad7124_8/channel@0 bipolar
@@ -163,7 +244,14 @@ with_channel() {
 	assert_success
 }
 
-# bats test_tags=req:UPDATE-03-LNX
+# Description: update with no value on a property the node does not have, and the binding does
+# not define, sets it as a flag.
+# Steps:
+#   1. Make the overlay with the AD7124-8.
+#   2. Run update ad7124_8 adi,some-flag, with --json.
+#   3. Check it succeeds and the message says the flag adi,some-flag was set on ad7124_8.
+#   4. Check the overlay has a line adi,some-flag; on its own.
+# bats test_tags=req:UPDATE-03-LNX, id:L0319
 @test "update without a value sets a property the node does not have as a flag" {
 	with_adc
 	run_json update ad7124_8 adi,some-flag
@@ -174,7 +262,13 @@ with_channel() {
 }
 
 # Gap: --suggest is a flag of the noos backend only: `No flag registered for --suggest`, exit 2.
-# bats test_tags=req:UPDATE-04, gap
+# Description: update --suggest lists the values a property can take instead of setting it.
+# Steps:
+#   1. Make the overlay with the AD7124-8 and snapshot it.
+#   2. Run update ad7124_8 interrupt-parent --suggest, with --json.
+#   3. Check it succeeds and the suggested values include gpio.
+#   4. Check the workfile is unchanged.
+# bats test_tags=req:UPDATE-04, gap, id:L0320
 @test "update --suggest lists the values instead of setting the property" {
 	with_adc
 	snapshot
@@ -184,7 +278,12 @@ with_channel() {
 	assert_unchanged
 }
 
-# bats test_tags=req:UPDATE-05
+# Description: update --quiet with a property and no value prints the property's value alone.
+# Steps:
+#   1. Make the overlay with the AD7124-8 and set spi-max-frequency 1000000.
+#   2. Run update --quiet ad7124_8 spi-max-frequency.
+#   3. Check it succeeds and prints only spi-max-frequency = <1000000>.
+# bats test_tags=req:UPDATE-05, id:L0321
 @test "update --quiet without a value prints only the value" {
 	with_adc
 	aa update ad7124_8 spi-max-frequency 1000000 >/dev/null
@@ -193,7 +292,15 @@ with_channel() {
 	assert_output 'spi-max-frequency = <1000000>;'
 }
 
-# bats test_tags=req:UPDATE-05
+# Description: update --quiet that creates a child node on a terminal does not ask for its
+# required properties; it lists the missing ones and how to set them.
+# Steps:
+#   1. Make the overlay with the AD7124-8.
+#   2. Run update --quiet ad7124_8 channel@0 on a terminal, typing nothing.
+#   3. Check it succeeds without asking for any required property.
+#   4. Check it says channel@0 was added, that diff-channels is missing, and the update command
+#      that sets it.
+# bats test_tags=req:UPDATE-05, id:L0322
 @test "update --quiet that creates a child on a terminal asks nothing and lists what is missing" {
 	with_adc
 	tty_run -- update --quiet ad7124_8 channel@0
@@ -204,7 +311,15 @@ with_channel() {
 	assert_output --partial 'Set them with: update ad7124_8/channel@0 <property> <value>'
 }
 
-# bats test_tags=req:UPDATE-07
+# Description: update takes decimal and hexadecimal numbers and devicetree macros, writing
+# macros as their numbers and keeping hexadecimal as given.
+# Steps:
+#   1. Make the overlay with the AD7124-8 and channel@0, and set interrupt-parent gpio.
+#   2. Run update ad7124_8 interrupts 25 IRQ_TYPE_EDGE_FALLING and check it succeeds.
+#   3. Set rdy-gpios gpio 26 GPIO_ACTIVE_LOW, and diff-channels 0x2 3 on channel@0.
+#   4. Check the overlay has interrupts = <25 2>, rdy-gpios = <&gpio 26 1> and
+#      diff-channels = <0x2 3>.
+# bats test_tags=req:UPDATE-07, id:L0323
 @test "update takes numbers, hexadecimal numbers and macros" {
 	with_channel
 	aa update ad7124_8 interrupt-parent gpio >/dev/null
@@ -218,7 +333,12 @@ with_channel() {
 	assert_output --partial 'diff-channels = <0x2 3>;'
 }
 
-# bats test_tags=req:UPDATE-07
+# Description: a reference to another node can be given as its label, with or without the &.
+# Steps:
+#   1. Make the overlay with the AD7124-8.
+#   2. Set interrupt-parent gpio, and rdy-gpios '&gpio' 25 0.
+#   3. Check the overlay has interrupt-parent = <&gpio> and rdy-gpios = <&gpio 25 0>.
+# bats test_tags=req:UPDATE-07, id:L0324
 @test "update takes a reference as a label, with or without &" {
 	with_adc
 	aa update ad7124_8 interrupt-parent gpio >/dev/null
@@ -228,7 +348,12 @@ with_channel() {
 	assert_output --partial 'rdy-gpios = <&gpio 25 0>;'
 }
 
-# bats test_tags=req:UPDATE-07
+# Description: a word is written as a string, and several words as a list of strings.
+# Steps:
+#   1. Make the overlay with the AD7124-8.
+#   2. Set clock-names mclk, and adi,names one two.
+#   3. Check the overlay has clock-names = "mclk" and adi,names = "one", "two".
+# bats test_tags=req:UPDATE-07, id:L0325
 @test "update takes strings, several words giving a string list" {
 	with_adc
 	aa update ad7124_8 clock-names mclk >/dev/null
@@ -238,7 +363,14 @@ with_channel() {
 	assert_output --partial 'adi,names = "one", "two";'
 }
 
-# bats test_tags=req:UPDATE-07
+# Description: several number tokens make an array, and a comma between them starts a new row of
+# a matrix.
+# Steps:
+#   1. Make the overlay with the AD7124-8 and channel@0.
+#   2. Set diff-channels 0 1 on channel@0.
+#   3. Set rdy-gpios gpio 25 GPIO_ACTIVE_LOW, gpio 26 0 on ad7124_8.
+#   4. Check the overlay has diff-channels = <0 1> and rdy-gpios = <&gpio 25 1>, <&gpio 26 0>.
+# bats test_tags=req:UPDATE-07, id:L0326
 @test "update takes an array as several tokens and a matrix with rows separated by commas" {
 	with_channel
 	aa update ad7124_8/channel@0 diff-channels 0 1 >/dev/null
@@ -248,7 +380,15 @@ with_channel() {
 	assert_output --partial 'rdy-gpios = <&gpio 25 1>, <&gpio 26 0>;'
 }
 
-# bats test_tags=req:UPDATE-08
+# Description: update naming a child node that does not exist creates it, with its reg and
+# address cells, and lists its missing required properties.
+# Steps:
+#   1. Make the overlay with the AD7124-8.
+#   2. Run update ad7124_8 channel@1.
+#   3. Check it succeeds, says channel@1 was added to ad7124_8 and that diff-channels is missing.
+#   4. Check the overlay has a channel@1 node with reg = <1>, and #address-cells = <1> and
+#      #size-cells = <0>.
+# bats test_tags=req:UPDATE-08, id:L0327
 @test "naming a child that does not exist creates the child node" {
 	with_adc
 	run aa update ad7124_8 channel@1
@@ -262,7 +402,15 @@ with_channel() {
 	assert_output --partial '#size-cells = <0>;'
 }
 
-# bats test_tags=req:UPDATE-08
+# Description: in JSON, creating a child node reports its path and its missing required
+# properties.
+# Steps:
+#   1. Make the overlay with the AD7124-8.
+#   2. Run update ad7124_8 channel@2, with --json.
+#   3. Check it succeeds and the message says channel@2 was added to ad7124_8.
+#   4. Check .path is the full path of the new node under spi@7e204000.
+#   5. Check .missing_required lists diff-channels.
+# bats test_tags=req:UPDATE-08, id:L0328
 @test "a new child's missing required properties are listed in JSON" {
 	with_adc
 	run_json update ad7124_8 channel@2
@@ -272,7 +420,16 @@ with_channel() {
 	assert_json '[.missing_required[].property] | join(",")' diff-channels
 }
 
-# bats test_tags=req:UPDATE-08
+# Description: on a terminal, creating a child node asks for each of its missing required
+# properties, and writes the answers.
+# Steps:
+#   1. Make the overlay with the AD7124-8.
+#   2. Run update ad7124_8 channel@0 on a terminal, answering 0 and 1 to the two diff-channels
+#      prompts.
+#   3. Check it succeeds, said 1 required property was to set, asked for diff-channels and
+#      ended with all required properties set.
+#   4. Check the overlay has diff-channels = <0 1>.
+# bats test_tags=req:UPDATE-08, id:L0329
 @test "on a terminal, a new child's missing required properties are asked for" {
 	with_adc
 	tty_run 'diff-channels 1/2 (number)' $'0\r' 'diff-channels 2/2 (number)' $'1\r' -- update ad7124_8 channel@0
@@ -284,7 +441,15 @@ with_channel() {
 	assert_output --partial 'diff-channels = <0 1>;'
 }
 
-# bats test_tags=req:UPDATE-08
+# Description: a value given for the name of a child node is refused, pointing to the path form
+# that sets the child's properties.
+# Steps:
+#   1. Make the overlay with the AD7124-8 and channel@0, and snapshot it.
+#   2. Run update ad7124_8 channel@0 5, with --json.
+#   3. Check it is refused (exit 0, .ok false), the message saying channel@0 is a child node and
+#      giving the update ad7124_8/channel@0 command.
+#   4. Check the workfile is unchanged.
+# bats test_tags=req:UPDATE-08, id:L0330
 @test "a value given for a child node is refused" {
 	with_channel
 	snapshot
@@ -295,7 +460,14 @@ with_channel() {
 	assert_unchanged
 }
 
-# bats test_tags=req:UPDATE-09
+# Description: changing a node's reg renames the node, its unit address the new reg in
+# hexadecimal.
+# Steps:
+#   1. Make the overlay with the AD7124-8.
+#   2. Run update ad7124_8 reg 10.
+#   3. Check it succeeds and says the node was renamed to adi,ad7124-8@a.
+#   4. Check the overlay has the node adi,ad7124-8@a, label kept, with reg = <10>.
+# bats test_tags=req:UPDATE-09, id:L0331
 @test "changing reg changes the node's unit address, in hexadecimal" {
 	with_adc
 	run aa update ad7124_8 reg 10
@@ -306,7 +478,14 @@ with_channel() {
 	assert_output --partial 'reg = <10>;'
 }
 
-# bats test_tags=req:UPDATE-09
+# Description: changing a channel's reg renames it with the reg in decimal, as its binding
+# names channels.
+# Steps:
+#   1. Make the overlay with the AD7124-8 and channel@0.
+#   2. Run update ad7124_8/channel@0 reg 12.
+#   3. Check it succeeds and says the node was renamed to channel@12.
+#   4. Check the overlay has channel@12 and no longer channel@0.
+# bats test_tags=req:UPDATE-09, id:L0332
 @test "a channel's unit address follows reg in decimal, as its binding names it" {
 	with_channel
 	run aa update ad7124_8/channel@0 reg 12
@@ -317,7 +496,13 @@ with_channel() {
 	refute_output --partial 'channel@0 {'
 }
 
-# bats test_tags=req:UPDATE-09
+# Description: a reg change that would give a node the name of a sibling is refused.
+# Steps:
+#   1. Make the overlay with the AD7124-8 and channel@0, add channel@6, and snapshot it.
+#   2. Run update ad7124_8/channel@6 reg 0, with --json.
+#   3. Check it is refused (exit 0, .ok false), the message naming a naming conflict.
+#   4. Check the workfile is unchanged.
+# bats test_tags=req:UPDATE-09, id:L0333
 @test "a reg that would give the name of a sibling is refused" {
 	with_channel
 	aa update ad7124_8 channel@6 >/dev/null
@@ -329,6 +514,16 @@ with_channel() {
 	assert_unchanged
 }
 
+# Description: setting interrupts on a node with no interrupt-parent writes the one it inherits,
+# and warns when that controller's cell count differs from the value's.
+# Steps:
+#   1. Make the overlay with the AD7124-8.
+#   2. Run update ad7124_8 interrupts 25 IRQ_TYPE_EDGE_FALLING, with --json.
+#   3. Check it succeeds with severity warn, the message saying interrupt-parent = <&gicv2> was
+#      set, inherited from /.
+#   4. Check standard error warns that gicv2 takes 3 interrupt cells but interrupts has 2.
+#   5. Check the overlay has interrupt-parent = <&gicv2>.
+# bats test_tags=id:L0334
 @test "setting interrupts writes the inherited interrupt-parent, warning when its cells differ" {
 	with_adc
 	run_json update ad7124_8 interrupts 25 IRQ_TYPE_EDGE_FALLING

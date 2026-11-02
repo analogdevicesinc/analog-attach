@@ -3,6 +3,8 @@
 
 # bats file_tags=eco:linux
 
+# Preconditions: a linux project on the Linux tree with the RPi 4 base devicetree and its binding
+# caches, the workfile overlay.dtso not created yet.
 setup() {
 	load ../helpers
 	new_project linux
@@ -18,7 +20,12 @@ with_adc() {
 
 # Gap: piped, the output stops at 64 KB (about 3400 of the tree's compatibles, or JSON cut
 # mid-string): the CLI exits before standard output drains.
-# bats test_tags=req:LIST-01, gap
+# Description: list devices lists every compatible of the Linux tree, in JSON and as text.
+# Steps:
+#   1. Count the entries of the compat index cache.
+#   2. Run list devices, with --json; check it succeeds with that many devices.
+#   3. Run list devices as text; check it succeeds with that many lines.
+# bats test_tags=req:LIST-01, gap, id:L0187
 @test "list devices lists every compatible of the Linux tree" {
 	local count
 	count=$(jq '.entries | length' "$PROJECT/.analog-attach/linux/compat-index.json")
@@ -32,7 +39,13 @@ with_adc() {
 	[ "${#lines[@]}" -eq "$count" ] || fail "list devices: $count lines expected, got ${#lines[@]}"
 }
 
-# bats test_tags=req:LIST-01
+# Description: the keys list devices gives are compatibles that add takes.
+# Steps:
+#   1. List the devices matching adxl34, with --json.
+#   2. Check it succeeds with the keys adi,adxl345 and adi,adxl346.
+#   3. Create the overlay with init.
+#   4. Add adi,adxl346 and adi,adxl345 on i2c1, with --json; check each succeeds (.ok true).
+# bats test_tags=req:LIST-01, id:L0188
 @test "list devices gives each device the key add takes" {
 	run_json list devices adxl34
 	assert_success
@@ -46,7 +59,12 @@ with_adc() {
 	assert_json '.ok' true
 }
 
-# bats test_tags=req:LIST-01
+# Description: list devices works before any workfile exists.
+# Steps:
+#   1. Check there is no workfile.
+#   2. List the devices matching adxl34, with --json.
+#   3. Check it succeeds with 2 devices.
+# bats test_tags=req:LIST-01, id:L0189
 @test "list devices needs no workfile" {
 	[ ! -e "$WORKFILE" ]
 	run_json list devices adxl34
@@ -54,7 +72,11 @@ with_adc() {
 	assert_json '.devices | length' 2
 }
 
-# bats test_tags=req:LIST-02
+# Description: a filter keeps only the compatibles that contain it.
+# Steps:
+#   1. List the devices matching adxl34, with --json; check it succeeds and says 2 were found.
+#   2. List them as text; check it succeeds with exactly the lines adi,adxl345 and adi,adxl346.
+# bats test_tags=req:LIST-02, id:L0190
 @test "list devices with a filter keeps the compatibles that contain it" {
 	run_json list devices adxl34
 	assert_success
@@ -66,7 +88,11 @@ with_adc() {
 	[ "${#lines[@]}" -eq 2 ]
 }
 
-# bats test_tags=req:LIST-02
+# Description: a filter that matches nothing is no refusal, just an empty list.
+# Steps:
+#   1. List the devices matching zzz-no-such-part, with --json.
+#   2. Check it succeeds (.ok true), says 0 were found and has no devices.
+# bats test_tags=req:LIST-02, id:L0191
 @test "list devices with a filter that matches nothing is no refusal" {
 	run_json list devices zzz-no-such-part
 	assert_success
@@ -75,7 +101,14 @@ with_adc() {
 	assert_json '.devices | length' 0
 }
 
-# bats test_tags=req:LIST-02
+# Description: when the filter matches a single compatible, list devices describes that device:
+# its binding, properties and child node patterns.
+# Steps:
+#   1. List the devices matching ad7124-8, with --json.
+#   2. Check it succeeds and gives the device adi,ad7124-8 with its binding adi,ad7124.yaml.
+#   3. List them as text; check it shows the compatible, the binding path, and the count of
+#      properties and child node patterns.
+# bats test_tags=req:LIST-02, id:L0192
 @test "list devices with a filter only one compatible has describes that device" {
 	run_json list devices ad7124-8
 	assert_success
@@ -90,7 +123,12 @@ with_adc() {
 
 # Gap: the compatibles come one per line in the compat index's order, with no category (the
 # binding's folder, iio/adc, iio/accel), as text and in JSON.
-# bats test_tags=req:LIST-04-LNX, gap
+# Description: list devices gives each compatible's category, the binding's folder.
+# Steps:
+#   1. List the devices matching adxl34, with --json.
+#   2. Check it succeeds and every device has the category iio/accel.
+#   3. List the devices matching adi,ad7124 as text; check it succeeds and shows iio/adc.
+# bats test_tags=req:LIST-04-LNX, gap, id:L0193
 @test "list devices groups the compatibles by category" {
 	run_json list devices adxl34
 	assert_success
@@ -103,7 +141,11 @@ with_adc() {
 # --- list context ---
 
 # Gap: `list context is not supported by the linux backend`, exit 2.
-# bats test_tags=req:LIST-05, req:LIST-05-LNX, gap
+# Description: list context lists the .dts files of the Linux tree.
+# Steps:
+#   1. Run list context, with --json.
+#   2. Check it succeeds (.ok true) and names broadcom/bcm2711-rpi-4-b.dts.
+# bats test_tags=req:LIST-05, req:LIST-05-LNX, gap, id:L0194
 @test "list context lists the .dts files of the Linux tree" {
 	run_json list context
 	assert_success
@@ -112,7 +154,12 @@ with_adc() {
 }
 
 # Gap: as above, list context is not supported.
-# bats test_tags=req:LIST-05-LNX, gap
+# Description: a target that list context names is accepted by the devicetree setting.
+# Steps:
+#   1. Run list context, with --json, and take the first .dts it names.
+#   2. Set devicetree to it with config.
+#   3. Check it succeeds.
+# bats test_tags=req:LIST-05-LNX, gap, id:L0195
 @test "every target list context names is one the devicetree setting takes" {
 	run_json list context
 	assert_success
@@ -124,7 +171,11 @@ with_adc() {
 }
 
 # Gap: as above, list context is not supported.
-# bats test_tags=req:LIST-06, gap
+# Description: list context says how to select a target.
+# Steps:
+#   1. Run list context.
+#   2. Check it succeeds and points to config devicetree.
+# bats test_tags=req:LIST-06, gap, id:L0196
 @test "list context says how to select a target" {
 	run aa list context
 	assert_success
@@ -134,7 +185,12 @@ with_adc() {
 # --- list property ---
 
 # Gap: the path is required: `Missing: path (list property <path> [property])`, exit 2.
-# bats test_tags=req:LIST-07, gap
+# Description: list property with no node lists the nodes of the overlay.
+# Steps:
+#   1. Make an overlay with an AD7124-8 on spi1.
+#   2. Run list property with no node, with --json.
+#   3. Check it succeeds (.ok true) and names adi,ad7124-8@0.
+# bats test_tags=req:LIST-07, gap, id:L0197
 @test "list property with no node lists the overlay's nodes" {
 	with_adc
 	run_json list property
@@ -143,7 +199,15 @@ with_adc() {
 	assert_output --partial "adi,ad7124-8@0"
 }
 
-# bats test_tags=req:LIST-07
+# Description: list property of a node marks each property required, set, both or neither, and
+# the marks follow updates.
+# Steps:
+#   1. Make an overlay with an AD7124-8 on spi1.
+#   2. Run list property ad7124_8.
+#   3. Check compatible and reg are set and required, interrupts required, avdd-supply unmarked.
+#   4. Update avdd-supply to vdd_3v3_reg and list again.
+#   5. Check avdd-supply is marked set.
+# bats test_tags=req:LIST-07, id:L0198
 @test "list property of a node marks what is required and what is set" {
 	with_adc
 	run aa list property ad7124_8
@@ -157,7 +221,16 @@ with_adc() {
 	assert_line "avdd-supply (set)"
 }
 
-# bats test_tags=req:LIST-07
+# Description: list property of a node shows its child node patterns as the names they match,
+# with the children present.
+# Steps:
+#   1. Make an overlay with an AD7124-8 on spi1.
+#   2. Run list property ad7124_8; check it succeeds and shows channel@0 to channel@15, none
+#      present.
+#   3. Add the child channel@0 with update and list again.
+#   4. Check the pattern shows channel@0 as present.
+#   5. List with --json and check the pattern is among the names.
+# bats test_tags=req:LIST-07, id:L0199
 @test "list property of a node lists its child node patterns by the names they match" {
 	with_adc
 	run aa list property ad7124_8
@@ -172,7 +245,12 @@ with_adc() {
 
 # Gap: a node's listing gives each property's name and marks, not its type; the type is only in
 # `list property <path> <property>`.
-# bats test_tags=req:LIST-07, gap
+# Description: list property of a node gives the type of each property.
+# Steps:
+#   1. Make an overlay with an AD7124-8 on spi1.
+#   2. Run list property ad7124_8; check it succeeds and the reg line gives a number type.
+#   3. Run it with --json; check reg is shown as number[].
+# bats test_tags=req:LIST-07, gap, id:L0200
 @test "list property of a node gives each property's type" {
 	with_adc
 	run aa list property ad7124_8
@@ -182,7 +260,12 @@ with_adc() {
 	assert_json '.properties[] | select(.name == "reg") | .display' "number[]"
 }
 
-# bats test_tags=req:LIST-07
+# Description: list property of a node of the base lists the properties of its binding.
+# Steps:
+#   1. Create the overlay with init.
+#   2. Run list property spi0, with --json; check it succeeds and cs-gpios is among the names.
+#   3. Run it as text; check compatible is marked set and required.
+# bats test_tags=req:LIST-07, id:L0201
 @test "list property of a base node lists its binding's properties" {
 	with_overlay
 	run_json list property spi0
@@ -192,7 +275,15 @@ with_adc() {
 	assert_line "compatible (set, required)"
 }
 
-# bats test_tags=req:LIST-07
+# Description: list property of one property gives its type, whether it is required and whether
+# it is set, and its description.
+# Steps:
+#   1. Make an overlay with an AD7124-8 on spi1.
+#   2. Run list property ad7124_8 reg, with --json.
+#   3. Check it succeeds and gives reg as number[], required and set.
+#   4. Run it as text; check the first line gives the name, required and the type, the second
+#      its description.
+# bats test_tags=req:LIST-07, id:L0202
 @test "list property <node> <property> gives its type, whether it is required and set" {
 	with_adc
 	run_json list property ad7124_8 reg
@@ -206,7 +297,13 @@ with_adc() {
 	assert_line --index 1 "  SPI chip select number for the device"
 }
 
-# bats test_tags=req:LIST-07
+# Description: list property of a node that is in neither the base nor the overlay is refused.
+# Steps:
+#   1. Create the overlay with init.
+#   2. Run list property no_such_node, with --json.
+#   3. Check it is refused (exit 0, .ok false) with a message saying the node is not found.
+#   4. Run it as text; check it says the node is not found.
+# bats test_tags=req:LIST-07, id:L0203
 @test "list property of a node the tree doesn't have is refused" {
 	with_overlay
 	run_json list property no_such_node
@@ -219,7 +316,12 @@ with_adc() {
 
 # --- list value ---
 
-# bats test_tags=req:LIST-08
+# Description: list value gives the options of an enum property.
+# Steps:
+#   1. Make an overlay with an AD7124-8 on spi1.
+#   2. Run list value ad7124_8 spi-rx-bus-width; check it succeeds and lists 0 and 8.
+#   3. Run it with --json; check the suggestions are 0 1 2 4 8.
+# bats test_tags=req:LIST-08, id:L0204
 @test "list value gives the options of an enum" {
 	with_adc
 	run aa list value ad7124_8 spi-rx-bus-width
@@ -230,7 +332,15 @@ with_adc() {
 	assert_json '[.suggestions[].value] | join(" ")' "0 1 2 4 8"
 }
 
-# bats test_tags=req:LIST-08
+# Description: list value puts the default of an enum first and marks it as the binding's
+# default.
+# Steps:
+#   1. Make an overlay with an AD7124-8 on spi1 and add its child channel@0.
+#   2. Add adi,ad4130 on spi0 and its child channel@0.
+#   3. Run list value ad4130/channel@0 adi,reference-select, with --json.
+#   4. Check it succeeds with the suggestions 0 1 2 3, the first marked as the binding's
+#      default.
+# bats test_tags=req:LIST-08, id:L0205
 @test "list value gives the default of an enum first" {
 	with_adc
 	aa update ad7124_8 channel@0 >/dev/null 2>&1
@@ -242,7 +352,13 @@ with_adc() {
 	assert_json '.suggestions[0].display_string' "0 — the binding's default"
 }
 
-# bats test_tags=req:LIST-08
+# Description: list value of a phandle property gives the nodes it can name.
+# Steps:
+#   1. Make an overlay with an AD7124-8 on spi1.
+#   2. Run list value ad7124_8 avdd-supply, with --json; check vdd_3v3_reg is suggested.
+#   3. Run list value ad7124_8 interrupt-parent, with --json; check the suggestions are gicv2
+#      and gpio, the first marked as inherited from /.
+# bats test_tags=req:LIST-08, id:L0206
 @test "list value gives the nodes a phandle can name" {
 	with_adc
 	run_json list value ad7124_8 avdd-supply
@@ -253,7 +369,13 @@ with_adc() {
 	assert_json '.suggestions[0].display_string | contains("inherited from /")' true
 }
 
-# bats test_tags=req:LIST-08
+# Description: for a supply, list value puts the regulators the overlay adds first.
+# Steps:
+#   1. Make an overlay with an AD7124-8 on spi1.
+#   2. Add a regulator-fixed named vref.
+#   3. Run list value ad7124_8 avdd-supply, with --json.
+#   4. Check it succeeds and the first suggestion is the label of the new regulator.
+# bats test_tags=req:LIST-08, id:L0207
 @test "list value puts the regulators the overlay adds first for a supply" {
 	with_adc
 	aa add regulator-fixed --name vref >/dev/null 2>&1
@@ -267,7 +389,12 @@ with_adc() {
 
 # Gap: list value gives the values the tree has, never the providers a user can add
 # (regulator-fixed for a supply), which read gives as `can_create`.
-# bats test_tags=req:LIST-08, gap
+# Description: list value of a supply says a new regulator-fixed can be added to fill it.
+# Steps:
+#   1. Make an overlay with an AD7124-8 on spi1.
+#   2. Run list value ad7124_8 avdd-supply, with --json.
+#   3. Check it succeeds and can_create offers regulator-fixed.
+# bats test_tags=req:LIST-08, gap, id:L0208
 @test "list value says a new regulator can be added to fill a supply" {
 	with_adc
 	run_json list value ad7124_8 avdd-supply
@@ -275,7 +402,12 @@ with_adc() {
 	assert_json '[.can_create[].value] | join(" ")' regulator-fixed
 }
 
-# bats test_tags=req:LIST-08
+# Description: list value of a property with no values is no refusal, just an empty list.
+# Steps:
+#   1. Make an overlay with an AD7124-8 on spi1.
+#   2. Run list value ad7124_8 no-such-property, with --json.
+#   3. Check it succeeds (.ok true), says there are no values and has no suggestions.
+# bats test_tags=req:LIST-08, id:L0209
 @test "list value of a property with no values is no refusal" {
 	with_adc
 	run_json list value ad7124_8 no-such-property
@@ -287,7 +419,14 @@ with_adc() {
 
 # --- list parent ---
 
-# bats test_tags=req:LIST-09
+# Description: list parent lists the SPI buses of the base, then the I2C buses.
+# Steps:
+#   1. Run list parent adi,adxl345, with --json.
+#   2. Check it succeeds, the first suggestion is spi (/soc/spi@7e204000), and i2c1 comes after
+#      spi6.
+#   3. Run it as text; check the first line is spi with its path, and i2c1 is listed with its
+#      path.
+# bats test_tags=req:LIST-09, id:L0210
 @test "list parent lists the SPI buses, then the I2C buses, of the base" {
 	run_json list parent adi,adxl345
 	assert_success
@@ -299,21 +438,34 @@ with_adc() {
 	assert_line "i2c1  /soc/i2c@7e804000"
 }
 
-# bats test_tags=req:LIST-09
+# Description: list parent of a device that only has SPI lists only SPI buses.
+# Steps:
+#   1. Run list parent adi,ad7124-8, with --json.
+#   2. Check it succeeds and every suggestion is an SPI bus.
+# bats test_tags=req:LIST-09, id:L0211
 @test "list parent of an SPI-only device lists only SPI buses" {
 	run_json list parent adi,ad7124-8
 	assert_success
 	assert_json '[.suggestions[].display_string | test("/spi@")] | all' true
 }
 
-# bats test_tags=req:LIST-09
+# Description: the only parent of a fixed regulator is the root node.
+# Steps:
+#   1. Run list parent regulator-fixed, with --json.
+#   2. Check it succeeds with the single suggestion /.
+# bats test_tags=req:LIST-09, id:L0212
 @test "list parent of a fixed regulator is the root" {
 	run_json list parent regulator-fixed
 	assert_success
 	assert_json '[.suggestions[].value] | join(" ")' /
 }
 
-# bats test_tags=req:LIST-09
+# Description: list parent of a compatible with no binding says no binding was found.
+# Steps:
+#   1. Run list parent adi,no-such-part, with --json.
+#   2. Check it succeeds, says no binding was found and has no suggestions.
+#   3. Run it as text; check it says it failed to find a binding.
+# bats test_tags=req:LIST-09, id:L0213
 @test "list parent of a compatible no binding has says so" {
 	run_json list parent adi,no-such-part
 	assert_success
@@ -325,7 +477,14 @@ with_adc() {
 
 # --- list overlay ---
 
-# bats test_tags=req:LIST-10
+# Description: list overlay lists the overlays of the Linux tree that have the device, with
+# their path and whether they fit the board, and why.
+# Steps:
+#   1. Run list overlay adi,adxl345, with --json.
+#   2. Check it succeeds and rpi-adxl345-overlay.dts is there, compatible, with its path in the
+#      tree and the reason (the brcm,bcm2835 family, raspberrypi).
+#   3. Run it as text; check the line gives the overlay, compatible and the reason.
+# bats test_tags=req:LIST-10, id:L0214
 @test "list overlay lists the Linux tree's overlays that have the device, and their fit" {
 	run_json list overlay adi,adxl345
 	assert_success
@@ -338,7 +497,14 @@ with_adc() {
 	assert_line --regexp '^rpi-adxl345-overlay\.dts +compatible \(family: brcm,bcm2835 → raspberrypi\)$'
 }
 
-# bats test_tags=req:LIST-10
+# Description: list overlay also lists, last, the overlays that have another compatible of the
+# same binding, naming that compatible.
+# Steps:
+#   1. Run list overlay adi,adxl345, with --json.
+#   2. Check it succeeds, the last overlay is rpi-adxl375-overlay.dts matched by adi,adxl375,
+#      and rpi-adxl345-overlay.dts has no matched field.
+#   3. Run it as text; check the rpi-adxl375 line says it is via adi,adxl375.
+# bats test_tags=req:LIST-10, id:L0215
 @test "list overlay also lists the overlays of another compatible of the binding, after" {
 	run_json list overlay adi,adxl345
 	assert_success
@@ -349,7 +515,14 @@ with_adc() {
 	assert_line --regexp '^rpi-adxl375-overlay\.dts .*  via adi,adxl375$'
 }
 
-# bats test_tags=req:LIST-10
+# Description: list overlay orders the overlays by fit: those that fit the board first, then
+# unknown, then incompatible.
+# Steps:
+#   1. Run list overlay pwm-backlight, with --json.
+#   2. Check it succeeds with overlays of all three fits, sorted compatible, unknown,
+#      incompatible.
+#   3. Check pivision-overlay.dts gives as reason its compatible and the base's compatibles.
+# bats test_tags=req:LIST-10, id:L0216
 @test "list overlay puts the overlays that fit the board first" {
 	run_json list overlay pwm-backlight
 	assert_success
@@ -359,7 +532,11 @@ with_adc() {
 		"overlay: brcm,bcm2712; base: raspberrypi,4-model-b, brcm,bcm2711"
 }
 
-# bats test_tags=req:LIST-10
+# Description: list overlay of a device no overlay has says so.
+# Steps:
+#   1. Run list overlay adi,no-such-part, with --json; check it succeeds with no overlays.
+#   2. Run it as text; check it says no overlay in the Linux tree has the device.
+# bats test_tags=req:LIST-10, id:L0217
 @test "list overlay of a device no overlay has says so" {
 	run_json list overlay adi,no-such-part
 	assert_success
@@ -371,7 +548,13 @@ with_adc() {
 # --- kinds ---
 
 # Gap: an unknown kind gives "No command registered for `nosuch`", naming no kind.
-# bats test_tags=req:LIST-11-LNX, gap
+# Description: an unknown list kind is a usage error that names the kinds, parent and overlay
+# among them.
+# Steps:
+#   1. Run list nosuch.
+#   2. Check it fails with a usage error (exit 2) saying the kind is unknown.
+#   3. Check the list of kinds names parent and overlay.
+# bats test_tags=req:LIST-11-LNX, gap, id:L0218
 @test "an unknown list kind is refused, naming parent and overlay among the kinds" {
 	run aa list nosuch
 	assert_failure 2
@@ -382,7 +565,13 @@ with_adc() {
 
 # Gap: an unknown kind gives "No command registered for `nosuch`", naming no kind (and the
 # linux backend has no context).
-# bats test_tags=req:LIST-11, gap
+# Description: an unknown list kind is a usage error that names the kinds devices, context,
+# property and value.
+# Steps:
+#   1. Run list nosuch.
+#   2. Check it fails with a usage error (exit 2) saying the kind is unknown.
+#   3. Check the list of kinds names devices, context, property and value.
+# bats test_tags=req:LIST-11, gap, id:L0219
 @test "an unknown list kind is refused, naming devices, context, property and value" {
 	run aa list nosuch
 	assert_failure 2
@@ -393,7 +582,11 @@ with_adc() {
 	done
 }
 
-# bats test_tags=req:LIST-11
+# Description: a mistyped list kind is a usage error that names the closest kind.
+# Steps:
+#   1. Run list devics.
+#   2. Check it fails with a usage error (exit 2) suggesting devices.
+# bats test_tags=req:LIST-11, id:L0220
 @test "a mistyped list kind names the closest one" {
 	run aa list devics
 	assert_failure 2

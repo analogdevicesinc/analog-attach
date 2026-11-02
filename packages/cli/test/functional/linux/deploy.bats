@@ -7,6 +7,8 @@
 
 # bats file_tags=eco:linux
 
+# Preconditions: a linux project on the Linux tree with the RPi 4 base, deploy-ip 10.0.0.5,
+# deploy-user pi and deploy-password secret, and an empty overlay created with init (not built).
 setup() {
 	load ../helpers
 	new_project linux deploy-ip=10.0.0.5 deploy-user=pi deploy-password=secret
@@ -52,7 +54,15 @@ path_with_only() {
 	echo "$dir"
 }
 
-# bats test_tags=req:DEPLOY-01
+# Description: deploy of an overlay that was never built fails with a configuration error saying
+# to build it first, and copies nothing.
+# Steps:
+#   1. Put the sshpass and scp stand-ins on PATH.
+#   2. Run deploy, with --json; check it fails with exit 2, the error is on workfile and says the
+#      .dtbo is not found, and the hint says to run build first.
+#   3. Check the stand-ins were not called.
+#   4. Run deploy in human mode; check it gives the same message and hint.
+# bats test_tags=req:DEPLOY-01, id:L0102
 @test "deploy of an overlay that was never built says to build it first" {
 	stand_ins
 	PATH="$STAND_INS" run_config_error deploy
@@ -65,7 +75,15 @@ path_with_only() {
 	assert_output --partial "Run 'build' first."
 }
 
-# bats test_tags=req:DEPLOY-01, req:DEPLOY-03, req:SET-10-LNX
+# Description: deploy copies the built .dtbo to the device's /boot/overlays/ with scp through
+# sshpass, then reboots the device over ssh.
+# Steps:
+#   1. Build the overlay and put the stand-ins on PATH.
+#   2. Run deploy, with --json; check it succeeds (.ok true), says deployed and rebooted, with
+#      host 10.0.0.5 and remote path /boot/overlays/.
+#   3. Check the first call is scp of overlay.dtbo to pi@10.0.0.5:/boot/overlays/ and the second
+#      ssh pi@10.0.0.5 sudo reboot, both with host key checks off and SSHPASS set.
+# bats test_tags=req:DEPLOY-01, req:DEPLOY-03, req:SET-10-LNX, id:L0103
 @test "deploy copies the .dtbo to the device's overlay directory, then reboots it" {
 	aa build >/dev/null
 	stand_ins
@@ -80,7 +98,14 @@ path_with_only() {
 	assert_line --index 1 "-e ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null pi@10.0.0.5 sudo reboot SSHPASS=secret"
 }
 
-# bats test_tags=req:DEPLOY-03
+# Description: in human mode, deploy says which file it copied to which device and directory,
+# and that it rebooted.
+# Steps:
+#   1. Build the overlay and put the stand-ins on PATH.
+#   2. Run deploy.
+#   3. Check it succeeds and the output names the .dtbo, pi@10.0.0.5:/boot/overlays/ and the
+#      reboot.
+# bats test_tags=req:DEPLOY-03, id:L0104
 @test "deploy in human mode says what it copied where" {
 	aa build >/dev/null
 	stand_ins
@@ -89,7 +114,14 @@ path_with_only() {
 	assert_output "Deployed $PROJECT/overlay.dtbo to pi@10.0.0.5:/boot/overlays/ and rebooted"
 }
 
-# bats test_tags=req:DEPLOY-03, req:SET-10-LNX
+# Description: deploy passes the password to sshpass in the environment, never on the command
+# line.
+# Steps:
+#   1. Build the overlay and put the stand-ins on PATH.
+#   2. Run deploy, with --json; check it succeeds (.ok true).
+#   3. Check the password shows in both recorded calls, and only as the SSHPASS value, not among
+#      the arguments.
+# bats test_tags=req:DEPLOY-03, req:SET-10-LNX, id:L0105
 @test "deploy passes the password in the environment, not on the command line" {
 	aa build >/dev/null
 	stand_ins
@@ -102,7 +134,12 @@ path_with_only() {
 	assert_output 0
 }
 
-# bats test_tags=req:DEPLOY-03, req:SET-10-LNX
+# Description: deploy uses the deploy settings as they are set at the time.
+# Steps:
+#   1. Build the overlay and set deploy-ip board.local, deploy-user root, deploy-password other.
+#   2. Put the stand-ins on PATH and run deploy, with --json.
+#   3. Check the host is board.local and the copy goes to root@board.local with SSHPASS other.
+# bats test_tags=req:DEPLOY-03, req:SET-10-LNX, id:L0106
 @test "deploy uses the deploy settings as they are set" {
 	aa build >/dev/null
 	aa config deploy-ip board.local >/dev/null
@@ -115,7 +152,15 @@ path_with_only() {
 	assert_line --index 0 --partial "root@board.local:/boot/overlays/ SSHPASS=other"
 }
 
-# bats test_tags=req:DEPLOY-03
+# Description: a failed copy shows scp's messages, says the deploy failed, and does not reboot
+# the device.
+# Steps:
+#   1. Build the overlay and put on PATH stand-ins whose scp fails.
+#   2. Run deploy; check it is refused (exit 0) and the output starts with Deploy failed (scp)
+#      and shows scp's message.
+#   3. Run deploy, with --json; check .ok is false and the message holds scp's message.
+#   4. Check no reboot was run.
+# bats test_tags=req:DEPLOY-03, id:L0107
 @test "a failed copy shows scp's messages, says the deploy failed and doesn't reboot" {
 	aa build >/dev/null
 	stand_ins 1
@@ -131,7 +176,14 @@ path_with_only() {
 	assert_output 0
 }
 
-# bats test_tags=req:DEPLOY-03
+# Description: deploy fails with a configuration error naming the missing tools when scp or
+# sshpass is not on PATH.
+# Steps:
+#   1. Build the overlay.
+#   2. Run deploy, with --json, on a PATH with neither scp nor sshpass; check it fails with
+#      exit 2 and the error, on deploy, names both tools.
+#   3. Run it again on a PATH with scp only; check the error names sshpass alone.
+# bats test_tags=req:DEPLOY-03, id:L0108
 @test "deploy reports scp and sshpass missing" {
 	aa build >/dev/null
 	local path
@@ -148,7 +200,15 @@ path_with_only() {
 	assert_json '.errors[0].message' 'sshpass not found on PATH (needed to deploy)'
 }
 
-# bats test_tags=req:GEN-13, req:SET-10-LNX
+# Description: deploy with no device address or password fails with a configuration error naming
+# the missing settings, and copies nothing.
+# Steps:
+#   1. Build the overlay and drop the deploy-ip and deploy-password settings.
+#   2. Put the stand-ins on PATH and run deploy, with --json; check it fails with exit 2 and the
+#      errors name deploy-ip and deploy-password.
+#   3. Check the stand-ins were not called.
+#   4. Run deploy in human mode; check it says both settings are missing.
+# bats test_tags=req:GEN-13, req:SET-10-LNX, id:L0109
 @test "deploy with no device set names the settings, and copies nothing" {
 	aa build >/dev/null
 	drop_setting deploy-ip deploy-password
@@ -162,7 +222,13 @@ path_with_only() {
 	assert_output --partial "Missing config field deploy-password"
 }
 
-# bats test_tags=req:DEPLOY-01
+# Description: deploy changes no file of the project.
+# Steps:
+#   1. Build the overlay and put the stand-ins on PATH.
+#   2. Take the checksums of every file in the project.
+#   3. Run deploy, with --json; check it succeeds (.ok true).
+#   4. Check every file's checksum is the same.
+# bats test_tags=req:DEPLOY-01, id:L0110
 @test "deploy changes no file of the project" {
 	aa build >/dev/null
 	stand_ins
@@ -173,7 +239,15 @@ path_with_only() {
 	[ "$(cd "$PROJECT" && find . -type f -print0 | sort -z | xargs -0 sha256sum)" = "$before" ]
 }
 
-# bats test_tags=req:DEPLOY-01, req:DEPLOY-03, needs:board
+# Description: deploy puts the built overlay on a real device and reboots it; skipped unless
+# AA_DEPLOY_IP is set.
+# Steps:
+#   1. Skip without AA_DEPLOY_IP, or without scp and sshpass.
+#   2. Set deploy-ip, deploy-user and deploy-password from the environment, and build the overlay.
+#   3. Run deploy.
+#   4. Check it succeeds and says it deployed the .dtbo to the device's /boot/overlays/ and
+#      rebooted it.
+# bats test_tags=req:DEPLOY-01, req:DEPLOY-03, needs:board, id:L0111
 @test "deploy puts the built overlay on a real device and reboots it" {
 	[ -n "${AA_DEPLOY_IP:-}" ] || skip "copies to a device and reboots it (set AA_DEPLOY_IP, AA_DEPLOY_USER, AA_DEPLOY_PASSWORD)"
 	need scp sshpass

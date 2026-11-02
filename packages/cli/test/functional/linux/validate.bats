@@ -3,6 +3,8 @@
 
 # bats file_tags=eco:linux
 
+# Preconditions: a linux project on the Linux tree with the RPi 4 base, and an empty overlay
+# created with init.
 setup() {
 	load ../helpers
 	new_project linux
@@ -28,7 +30,12 @@ bad_channel() {
 	aa update ad7124_8/channel@0 adi,reference-select 2 >/dev/null
 }
 
-# bats test_tags=req:VALIDATE-01
+# Description: validate of a valid overlay reports no errors and no warnings.
+# Steps:
+#   1. Add a complete ADXL345 under i2c1 and set its reg to 0x53.
+#   2. Run validate, with --json; check it succeeds with no errors and no warnings.
+#   3. Run validate in human mode; check it succeeds and prints only No errors!.
+# bats test_tags=req:VALIDATE-01, id:L0335
 @test "validate finds no problem in a valid overlay" {
 	complete_adxl --parent i2c1
 	aa update adxl345 reg 0x53 >/dev/null 2>&1
@@ -41,7 +48,15 @@ bad_channel() {
 	assert_output "No errors!"
 }
 
-# bats test_tags=req:VALIDATE-01
+# Description: validate reports a binding problem with the device's node and the property it
+# concerns.
+# Steps:
+#   1. Add an AD7124-8 on spi1 whose channel@0 has an adi,reference-select of 2, which the
+#      binding does not allow.
+#   2. Run validate, with --json; check it succeeds with one error, whose path holds the device
+#      node and ends in channel@0/adi,reference-select, and whose message lists the allowed values.
+#   3. Run validate in human mode; check it prints the device under spi1 and the error line.
+# bats test_tags=req:VALIDATE-01, id:L0336
 @test "validate reports a problem with the device and the property it concerns" {
 	bad_channel
 	run_json validate
@@ -55,7 +70,13 @@ bad_channel() {
 	assert_line "  error: channel@0/adi,reference-select: 2 is not one of [0, 1, 3]"
 }
 
-# bats test_tags=req:VALIDATE-01
+# Description: validate reports a required property a device lacks.
+# Steps:
+#   1. Add adi,adxl345 under i2c1, without interrupts.
+#   2. Run validate, with --json; check it succeeds and the first error is on adi,adxl345@0 and
+#      says interrupts is a required property.
+#   3. Run validate in human mode; check it prints the device under i2c_arm and the same message.
+# bats test_tags=req:VALIDATE-01, id:L0337
 @test "validate reports a required property a device lacks" {
 	aa add adi,adxl345 --parent i2c1 >/dev/null 2>&1
 	run_json validate
@@ -67,7 +88,12 @@ bad_channel() {
 	assert_output --partial "'interrupts' is a required property"
 }
 
-# bats test_tags=req:VALIDATE-01
+# Description: validate reports the problems of every node of the overlay, not only the first.
+# Steps:
+#   1. Add the AD7124-8 with the bad channel on spi1, and an incomplete ADXL345 under i2c1.
+#   2. Run validate, with --json; check it succeeds and the errors concern both devices.
+#   3. Run validate in human mode; check it prints a heading for each device.
+# bats test_tags=req:VALIDATE-01, id:L0338
 @test "validate checks every node of the overlay, not only the first with a problem" {
 	bad_channel
 	aa add adi,adxl345 --parent i2c1 >/dev/null 2>&1
@@ -80,7 +106,12 @@ bad_channel() {
 	assert_line "i2c_arm/adi,adxl345@0:"
 }
 
-# bats test_tags=req:VALIDATE-01
+# Description: validate does not change the overlay.
+# Steps:
+#   1. Add the AD7124-8 with the bad channel on spi1.
+#   2. Snapshot the workfile.
+#   3. Run validate; check it succeeds and the workfile is unchanged.
+# bats test_tags=req:VALIDATE-01, id:L0339
 @test "validate changes nothing in the overlay" {
 	bad_channel
 	snapshot
@@ -89,7 +120,14 @@ bad_channel() {
 	assert_unchanged
 }
 
-# bats test_tags=req:VALIDATE-02
+# Description: a warning alone leaves the result without errors, and the summary counts the
+# warning.
+# Steps:
+#   1. Add a complete ADXL345 under spi0, which lands on chip select 2 with no cs-gpios entry.
+#   2. Run validate, with --json; check it succeeds with no errors and one warning.
+#   3. Run validate in human mode; check it prints the chip select warning and No errors! with
+#      1 warning.
+# bats test_tags=req:VALIDATE-02, id:L0340
 @test "a warning alone leaves the result without errors" {
 	# Chip select 2 of spi0, which has cs-gpios for 0 and 1 only: a warning.
 	complete_adxl --parent spi0
@@ -102,7 +140,14 @@ bad_channel() {
 	assert_line "No errors! (1 warning(s))"
 }
 
-# bats test_tags=req:VALIDATE-02
+# Description: validate keeps errors and warnings apart, and prints the errors first.
+# Steps:
+#   1. Add adi,adxl345 under spi0, without interrupts (an error) and on chip select 2 (a warning).
+#   2. Run validate, with --json; check it succeeds with one error and one warning, the warning
+#      on reg.
+#   3. Run validate in human mode; check it does not say No errors!.
+#   4. Check the first error line comes before the first warning line.
+# bats test_tags=req:VALIDATE-02, id:L0341
 @test "errors and warnings are kept apart, errors first" {
 	# No interrupts (an error), on chip select 2 of spi0 (a warning).
 	aa add adi,adxl345 --parent spi0 >/dev/null 2>&1
@@ -121,7 +166,13 @@ bad_channel() {
 
 # Gap: with errors there is no summary line (open issue V-8): the output ends with the last
 # diagnostic.
-# bats test_tags=req:VALIDATE-02, gap
+# Description: with errors, validate ends its output with a line saying how many errors there
+# are.
+# Steps:
+#   1. Add adi,adxl345 under spi0, without interrupts.
+#   2. Run validate in human mode; check it succeeds.
+#   3. Check the last line is an unindented summary with a count of errors.
+# bats test_tags=req:VALIDATE-02, gap, id:L0342
 @test "with errors, the result ends saying how many there are" {
 	aa add adi,adxl345 --parent spi0 >/dev/null 2>&1
 	run aa validate
@@ -129,7 +180,14 @@ bad_channel() {
 	[[ "${lines[-1]}" =~ ^[^\ ].*[0-9]+\ error ]] || fail "no summary: ${lines[-1]}"
 }
 
-# bats test_tags=req:VALIDATE-03-LNX
+# Description: validate decodes the overlay's references with the cells of the base's nodes:
+# interrupts on the base's gpio take two cells.
+# Steps:
+#   1. Add a complete ADXL345 under i2c1, with two interrupt cells.
+#   2. Run validate, with --json; check there are no errors.
+#   3. Update interrupts of adxl345 to three cells.
+#   4. Run validate, with --json; check the first error is on interrupts and says it is too long.
+# bats test_tags=req:VALIDATE-03-LNX, id:L0343
 @test "validate decodes the overlay's references with the base's cells" {
 	# gpio of the base has #interrupt-cells = <2>: two cells are right, three too many.
 	complete_adxl --parent i2c1
@@ -143,7 +201,11 @@ bad_channel() {
 
 # Gap: only the nodes the overlay adds are checked (open issue V-9): a property it sets on a
 # base node (status on spi0) isn't, and the run says `No errors!`.
-# bats test_tags=req:VALIDATE-03-LNX, gap
+# Description: validate also checks the properties the overlay sets on a base node.
+# Steps:
+#   1. Update status of spi0 to bogus.
+#   2. Run validate, with --json; check it succeeds and reports at least one error on status.
+# bats test_tags=req:VALIDATE-03-LNX, gap, id:L0344
 @test "validate checks what the overlay sets on a base node" {
 	aa update spi0 status bogus >/dev/null 2>&1
 	run_json validate
@@ -152,7 +214,15 @@ bad_channel() {
 	assert_json '[.errors[].path[-1]] | index("status") != null' true
 }
 
-# bats test_tags=req:VALIDATE-03-LNX
+# Description: validate warns about a chip select a base node already uses, and says how to free
+# it.
+# Steps:
+#   1. Add a complete ADXL345 under spi0 named adi,adxl345@0, on chip select 0, which spidev@0
+#      of the base uses.
+#   2. Run validate, with --json; check it succeeds and the first warning is on reg, naming
+#      spidev@0 and the base node to disable.
+#   3. Run validate in human mode; check it prints the device, the warning and the note.
+# bats test_tags=req:VALIDATE-03-LNX, id:L0345
 @test "validate reports a chip select a base node already uses, and how to free it" {
 	complete_adxl --parent spi0 --name adi,adxl345@0
 	run_json validate
@@ -166,7 +236,12 @@ bad_channel() {
 	assert_line "    note: If adi,adxl345@0 replaces it: disable /soc/spi@7e204000/spidev@0"
 }
 
-# bats test_tags=req:VALIDATE-03-LNX
+# Description: a base node the overlay disables no longer clashes on its chip select.
+# Steps:
+#   1. Add a complete ADXL345 under spi0 named adi,adxl345@0.
+#   2. Disable spidev0.
+#   3. Run validate, with --json; check it succeeds with no warnings and no errors.
+# bats test_tags=req:VALIDATE-03-LNX, id:L0346
 @test "a base node the overlay disables no longer clashes" {
 	complete_adxl --parent spi0 --name adi,adxl345@0
 	aa disable spidev0 >/dev/null
@@ -176,7 +251,15 @@ bad_channel() {
 	assert_json '.errors | length' 0
 }
 
-# bats test_tags=req:VALIDATE-03-LNX
+# Description: validate warns about two overlay nodes at the same I2C address, without a hint to
+# disable either.
+# Steps:
+#   1. Add a complete ADXL345 under i2c1 with reg 0x53.
+#   2. Add an ADXL346 under i2c1 and set its reg to 0x53 too.
+#   3. Run validate, with --json; check it succeeds and the only warning says 0x53 is already
+#      used by adi,adxl345@53.
+#   4. Run validate in human mode; check it prints the warning and no hint to disable.
+# bats test_tags=req:VALIDATE-03-LNX, id:L0347
 @test "validate reports two nodes of the overlay at one I2C address" {
 	complete_adxl --parent i2c1
 	aa update adxl345 reg 0x53 >/dev/null 2>&1
@@ -191,7 +274,12 @@ bad_channel() {
 	refute_output --partial "disable"
 }
 
-# bats test_tags=req:VALIDATE-03-LNX
+# Description: validate warns about a chip select with no cs-gpios entry, and says how to fix it.
+# Steps:
+#   1. Add a complete ADXL345 under spi0, which lands on chip select 2.
+#   2. Run validate, with --json; check it succeeds and the first warning gives the chip selects
+#      the controller has, and says to use one of them or add a GPIO to its cs-gpios.
+# bats test_tags=req:VALIDATE-03-LNX, id:L0348
 @test "validate reports a chip select with no cs-gpios entry" {
 	complete_adxl --parent spi0
 	run_json validate
@@ -200,7 +288,11 @@ bad_channel() {
 		"chip select 2 has no cs-gpios entry: spi@7e204000 has chip selects 0-1; Use one of those, or add a GPIO for it to cs-gpios of /soc/spi@7e204000"
 }
 
-# bats test_tags=req:VALIDATE-03-LNX
+# Description: validate does not report problems in the base's own nodes.
+# Steps:
+#   1. Run validate on the empty overlay, with --json.
+#   2. Check it succeeds with no errors and no warnings.
+# bats test_tags=req:VALIDATE-03-LNX, id:L0349
 @test "validate leaves out the base's own nodes" {
 	# The base alone: nothing of it is reported, whatever its bindings say.
 	run_json validate

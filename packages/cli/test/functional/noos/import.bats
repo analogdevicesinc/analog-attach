@@ -2,6 +2,8 @@
 
 # bats file_tags=eco:noos
 
+# Preconditions: a noos project on attach-no-os-lib's test fixtures (a capi, a platform with
+# testboard, otherboard and twobusboard, drivers), target otherboard, no workfile yet.
 setup() {
 	load ../helpers
 	new_project noos
@@ -14,7 +16,15 @@ sensor_design() {
 	mv "$PROJECT/workfile.json" "$1"
 }
 
-# bats test_tags=req:IMPORT-01, req:IMPORT-05
+# Description: import copies a workfile to the configured workfile path and reports the source,
+# the destination, and what it holds.
+# Steps:
+#   1. Make a valid eval-testpart workfile and move it out of the workfile path (design.json).
+#   2. Import design.json, with --json.
+#   3. Check it succeeds, with the workfile path, the source path, and a message naming the board,
+#      platform, 6 nodes and that it is valid.
+#   4. Check the workfile is a copy of design.json.
+# bats test_tags=req:IMPORT-01, req:IMPORT-05, id:N0145
 @test "import copies a workfile to the configured workfile path" {
 	sensor_design "$BATS_TEST_TMPDIR/design.json"
 	run_json import "$BATS_TEST_TMPDIR/design.json"
@@ -26,7 +36,13 @@ sensor_design() {
 	cmp "$BATS_TEST_TMPDIR/design.json" "$PROJECT/workfile.json"
 }
 
-# bats test_tags=req:IMPORT-01
+# Description: in human mode, import says what it imported, then the source and destination paths.
+# Steps:
+#   1. Make a valid eval-testpart workfile and move it to design.json.
+#   2. Import design.json, without --json.
+#   3. Check it succeeds, the first line describing the workfile, the second the source and
+#      destination paths.
+# bats test_tags=req:IMPORT-01, id:N0146
 @test "import in human mode says what it copied where" {
 	sensor_design "$PROJECT/design.json"
 	run aa import design.json
@@ -35,7 +51,15 @@ sensor_design() {
 	assert_line --index 1 "  $PROJECT/design.json -> $PROJECT/workfile.json"
 }
 
-# bats test_tags=req:IMPORT-05
+# Description: import makes the workfile's directories, and keeps the source's board without
+# changing the target setting.
+# Steps:
+#   1. Set up the project with workfile=designs/now/w.json.
+#   2. Write an empty workfile for testboard (platform testsoc) to other.json.
+#   3. Import other.json, with --json.
+#   4. Check it succeeds, naming testboard, and designs/now/w.json is a copy of other.json.
+#   5. Check the target setting is still otherboard.
+# bats test_tags=req:IMPORT-05, id:N0147
 @test "import creates the workfile's directory and keeps the source's board" {
 	new_project noos workfile=designs/now/w.json
 	jq -n '{platform: "testsoc", board: "testboard", symbols: {}}' >"$PROJECT/other.json"
@@ -47,7 +71,16 @@ sensor_design() {
 	assert_json '.configs[0].value' otherboard
 }
 
-# bats test_tags=req:IMPORT-01
+# Description: import refuses to replace an existing workfile and leaves it as it was.
+# Steps:
+#   1. Make a valid eval-testpart workfile at design.json, then create a new workfile with init.
+#   2. Keep a copy of the workfile.
+#   3. Import design.json, with --json.
+#   4. Check it is refused (.ok false), saying a workfile already exists, and the workfile didn't
+#      change.
+#   5. Import again without --json, and check it suggests deleting it or changing the workfile
+#      setting.
+# bats test_tags=req:IMPORT-01, id:N0148
 @test "import refuses to overwrite an existing workfile" {
 	sensor_design "$PROJECT/design.json"
 	aa init >/dev/null
@@ -60,7 +93,14 @@ sensor_design() {
 	assert_output --partial "Delete it, or point the 'workfile' setting somewhere else."
 }
 
-# bats test_tags=req:IMPORT-01
+# Description: import refuses the workfile itself as source, and a source path with no file.
+# Steps:
+#   1. Create a workfile with the eval-testpart board (with_sensor).
+#   2. Import workfile.json, with --json, and check it is refused, saying it is already the
+#      workfile.
+#   3. Remove the workfile, import nofile.json, with --json, and check it is refused, saying
+#      there is no workfile at that path.
+# bats test_tags=req:IMPORT-01, id:N0149
 @test "import refuses the workfile itself and a path with no file" {
 	with_sensor
 	run_json import workfile.json
@@ -72,7 +112,13 @@ sensor_design() {
 	assert_json '.message' "No workfile at '$PROJECT/nofile.json'"
 }
 
-# bats test_tags=req:IMPORT-05
+# Description: import refuses a file that isn't valid JSON and writes no workfile.
+# Steps:
+#   1. Write a broken JSON file, junk.json.
+#   2. Import junk.json, with --json.
+#   3. Check it is refused (.ok false), saying it cannot import it because it doesn't parse.
+#   4. Check no workfile was made.
+# bats test_tags=req:IMPORT-05, id:N0150
 @test "import refuses a file that is not a workfile, writing nothing" {
 	echo '{' >"$PROJECT/junk.json"
 	run_json import junk.json
@@ -81,7 +127,15 @@ sensor_design() {
 	[ ! -e "$PROJECT/workfile.json" ]
 }
 
-# bats test_tags=req:IMPORT-05
+# Description: import refuses a workfile with a node of a schema the configured modules don't
+# have, and writes no workfile.
+# Steps:
+#   1. Make a valid eval-testpart workfile, and add to a copy (bad.json) a node of schema
+#      nosuchschema.
+#   2. Import bad.json, with --json.
+#   3. Check it is refused (.ok false), saying it cannot import it, naming the unknown schema.
+#   4. Check no workfile was made.
+# bats test_tags=req:IMPORT-05, id:N0151
 @test "import refuses a workfile that does not load with the configured modules" {
 	sensor_design "$BATS_TEST_TMPDIR/design.json"
 	jq '.symbols.extra = {"$compatible": "nosuchschema"}' "$BATS_TEST_TMPDIR/design.json" >"$PROJECT/bad.json"
@@ -91,7 +145,14 @@ sensor_design() {
 	[ ! -e "$PROJECT/workfile.json" ]
 }
 
-# bats test_tags=req:IMPORT-05
+# Description: import refuses a workfile for a platform the configured modules don't have, and
+# writes no workfile.
+# Steps:
+#   1. Write a workfile for platform nosuchsoc to alien.json.
+#   2. Import alien.json, with --json.
+#   3. Check it is refused (.ok false), saying it cannot import it and naming nosuchsoc.
+#   4. Check no workfile was made.
+# bats test_tags=req:IMPORT-05, id:N0152
 @test "import refuses a workfile for a chip the modules don't have" {
 	jq -n '{platform: "nosuchsoc", symbols: {}}' >"$PROJECT/alien.json"
 	run_json import alien.json
@@ -101,7 +162,14 @@ sensor_design() {
 	[ ! -e "$PROJECT/workfile.json" ]
 }
 
-# bats test_tags=req:IMPORT-05
+# Description: a workfile with problems is still imported, and the message counts the problems
+# left and points to validate.
+# Steps:
+#   1. Create a workfile with init, add test_gpio_pin, and move it to half.json.
+#   2. Import half.json, with --json.
+#   3. Check it succeeds, the message saying 1 node, 1 problem left, and to run validate.
+#   4. Check the workfile is a copy of half.json.
+# bats test_tags=req:IMPORT-05, id:N0153
 @test "import of a workfile with problems copies it and says how many are left" {
 	aa init >/dev/null
 	aa add test_gpio_pin >/dev/null
