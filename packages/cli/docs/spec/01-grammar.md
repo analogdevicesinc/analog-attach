@@ -293,9 +293,9 @@ marked *noos* where it is noos.
 | `move` (linux) | `<path> <destination>` | |
 | `enable`, `disable` (linux) | `[path]` | |
 | `validate` | | |
-| `build` | | noos: `--board <board>`, `--clean` |
-| `deploy` | | noos: `--board <board>`, `--probe <probe>` |
-| `generate` (noos) | | `--output <directory>`, `--project-template <template>`, `--board <board>` |
+| `build` | | noos: `--clean` |
+| `deploy` | | noos: `--probe <probe>` |
+| `generate` (noos) | | `--output <directory>`, `--project-template <template>` |
 | `completion` | `[shell]` | `--install`, `--uninstall` |
 | `skill install` | `<name>` | `--force` |
 | `skill uninstall` | `<name>` | |

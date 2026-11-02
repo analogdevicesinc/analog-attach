@@ -92,11 +92,9 @@ list-kind       = %s"devices" [ B element ]                   ; [filter]
 
 validate        = %s"validate"
 build           = %s"build" *( B build-option )
-build-option    = %s"--board" B element         ; noos
-                / %s"--clean"                   ; noos
+build-option    = %s"--clean"                   ; noos
 deploy          = %s"deploy" *( B deploy-option )
-deploy-option   = %s"--board" B element         ; noos
-                / %s"--probe" B element         ; noos: openocd / jlink (DEPLOY-500)
+deploy-option   = %s"--probe" B element         ; noos: openocd / jlink (DEPLOY-500)
 
 init            = %s"init"
 
@@ -112,7 +110,6 @@ disable         = %s"disable" [ B node-path ]
 generate        = %s"generate" *( B generate-option )
 generate-option = %s"--output" B element                 ; a directory
                 / %s"--project-template" B element       ; a set's name or a directory
-                / %s"--board" B element
 
 ; --- Front-end commands ----------------------------------------------
 

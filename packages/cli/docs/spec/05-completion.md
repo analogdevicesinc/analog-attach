@@ -466,7 +466,6 @@ directive (COMPL-012) and no candidate.
 
 | Option | Source |
 |---|---|
-| `build --board`, `deploy --board`, `generate --board` | the boards carrying the workfile's chip, or every board when there is no workfile, in the repositories' order (COMPL-530) |
 | `deploy --probe` | `openocd`, `jlink` |
 | `generate --project-template` | the bundled template sets, sorted, after the directory directive (COMPL-012) |
 | `generate --output` | the directory directive only |

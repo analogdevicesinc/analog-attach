@@ -8,7 +8,7 @@ project, built with CMake or the `build-command` setting).
 
 ```
 analog-attach [--json] build
-analog-attach [--json] build [--board <board>] [--clean]     # where the backend is noos
+analog-attach [--json] build [--clean]     # where the backend is noos
 ```
 
 Grammar: rule `build` in `01-grammar.abnf`. Where the backend is linux, the
@@ -16,7 +16,6 @@ command takes no arguments or options.
 
 | Option (noos) | Meaning | Default |
 |---|---|---|
-| `--board <board>` | The board preset of the project to build. | the project's only preset |
 | `--clean` | Delete the project's build directory first, so CMake configures afresh. | off |
 
 ## 2. Terms
@@ -84,8 +83,7 @@ generate`; if it isn't a directory, with `Project path is not a directory:
 
 **BUILD-501** When `build-command` is set, the CLI shall run it with the
 shell in the project directory, after the progress line `Building <dir>
-with '<command>'`. `--board` and `--clean` change nothing in it (open issue
-B-3). If it exits with a non-zero status, then the CLI shall refuse with
+with '<command>'`. `--clean` changes nothing in it (open issue B-3). If it exits with a non-zero status, then the CLI shall refuse with
 `Build failed with exit code <n>`.
 
 **BUILD-502** When it succeeds, the artifact shall be the ELF CMake would
@@ -112,8 +110,7 @@ kept under the tool's lines and rewritten as they come.
 | No presets file | `No CMakePresets.json in <dir>. Is this a generated project? Run: analog-attach generate` |
 | Not JSON | `<file> is not valid JSON` |
 | No `configurePresets` | `<file> has no configurePresets` |
-| No `--board`, and not exactly one preset that isn't hidden | `The project has <n> board presets (<names>); pass --board to pick one`, `<names>` `none` when there is none |
-| `--board` names no preset | `The project has no preset for board '<board>'. It has: <names>. Regenerate it for that board.` |
+| Not exactly one preset that isn't hidden (a generated project has one, for the board it was generated for) | `The project has <n> board presets (<names>), not the one a generated project has. Generate it again: analog-attach generate`, `<names>` `none` when there is none |
 | No `CMakeLists.txt` | `No CMakeLists.txt in <dir>` |
 | No `project(<target>)` in it | `<file> declares no project()` |
 
@@ -171,10 +168,8 @@ workfile not at all.
 **B-2. `build` doesn't validate.** An overlay that `validate` reports errors
 for still compiles. It is up to the user to run `validate` first.
 
-**B-3. `--board` and `--clean` are ignored with `build-command`.** The
-command runs as it is, without a word: `build --clean` doesn't delete the
-build directory, and `--board` only picks the preset the artifact is looked
-up by (BUILD-502).
+**B-3. `--clean` is ignored with `build-command`.** The command runs as it
+is, without a word: `build --clean` doesn't delete the build directory.
 
 **B-4. Two wordings for an unset `capi-path`.** `build` and `deploy` say
 `capi-path is not configured. Run: analog-attach config capi-path <path>`,
@@ -209,10 +204,6 @@ Build completed successfully
   /work/out/work/build/p_app.elf
 ```
 
-```
-$ analog-attach --json build --board nope
-{"ok":false,"message":"The project has no preset for board 'nope'. It has: testboard. Regenerate it for that board.","severity":"error"}
-```
 
 ```
 $ analog-attach --json build
