@@ -65,13 +65,15 @@ fake_flash() {
 # Steps:
 #   1. Generate, and set deploy-command to a stand-in that records it ran (fake_flash).
 #   2. Deploy --probe nope.
-#   3. Check it is refused (exit 0), and the stand-in flash step didn't run.
+#   3. Check it is refused (exit 0), naming the probes it supports.
+#   4. Check the stand-in flash step didn't run.
 # bats test_tags=req:DEPLOY-02, id:N0091
 @test "deploy refuses an unknown --probe before anything else" {
 	aa generate >/dev/null
 	fake_flash
 	run aa deploy --probe nope
 	assert_success  # a refused value: the command ran (GEN-09)
+	assert_output --partial "Unknown probe 'nope'. Supported: openocd, jlink"
 	[ ! -e "$PROJECT/out/project/deployed.txt" ]
 }
 

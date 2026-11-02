@@ -65,20 +65,25 @@ field() {
 	[ ! -e "$HOME/.config/analog-attach/config.json" ] || [ "$(jq -r '.backend // "none"' "$HOME/.config/analog-attach/config.json")" = none ]
 }
 
-# Description: switching the backend away and back keeps the noos settings.
+# Description: switching the backend away and back keeps the settings of each ecosystem.
 # Steps:
 #   1. Run config backend linux.
 #   2. Check config probe, with --json, fails with a usage error (exit 2): a noos setting.
-#   3. Run config backend noos.
-#   4. Check config target, with --json, still gives otherboard.
+#   3. Run config deploy-ip 192.0.2.7, a linux setting.
+#   4. Run config backend noos; check config target, with --json, still gives otherboard.
+#   5. Run config backend linux; check config deploy-ip, with --json, still gives 192.0.2.7.
 # bats test_tags=req:SET-01, id:N0213
 @test "switching the backend keeps each ecosystem's settings" {
 	aa config backend linux
 	run_json config probe
 	assert_failure 2
+	aa config deploy-ip 192.0.2.7 >/dev/null
 	aa config backend noos
 	run_json config target
 	assert_json '.configs[0].value' otherboard
+	aa config backend linux
+	run_json config deploy-ip
+	assert_json '.configs[0].value' 192.0.2.7
 }
 
 # --- SET-05: sources -----------------------------------------------------------------------
@@ -362,21 +367,29 @@ field() {
 
 # --- SET-11: build folder ------------------------------------------------------------------
 
-# Description: build-dir is build by default, and takes another folder.
+# Description: build-dir is build by default, takes another folder, and deploy looks for the
+# build there. (Building into it needs the toolchain: N0037.)
 # Steps:
 #   1. Run config build-dir, with --json.
 #   2. Check the value is build, by default.
-#   3. Run config build-dir with a folder of the test, and check it succeeds.
-#   4. Check config build-dir, with --json, now gives that folder.
+#   3. Run config build-dir mybuild, and check config build-dir, with --json, now gives it.
+#   4. Create the workfile, add the eval-testpart board, generate.
+#   5. Deploy, with --json, with nothing built.
+#   6. Check it is refused, naming the image it looked for in out/project/mybuild.
 # bats test_tags=req:SET-11, id:N0230
 @test "build-dir names the folder build writes to, build by default" {
 	run_json config build-dir
 	assert_json '.configs[0].value' build
 	assert_json '.configs[0].source' default
-	run aa config build-dir "$BATS_TEST_TMPDIR/build-a"
+	run aa config build-dir mybuild
 	assert_success
 	run_json config build-dir
-	assert_json '.configs[0].value' "$BATS_TEST_TMPDIR/build-a"
+	assert_json '.configs[0].value' mybuild
+	with_sensor
+	aa generate >/dev/null
+	run_json deploy
+	assert_json '.ok' false
+	assert_json '.message | contains("out/project/mybuild/project_app.elf")' true
 }
 
 # --- SET-10-CAPI: probe --------------------------------------------------------------------

@@ -161,7 +161,8 @@ setup() {
 #   1. Remove the target setting.
 #   2. Run init on a pseudo-terminal (script), with no input and a 20 s timeout.
 #   3. Check it didn't time out waiting for input, and the output has no question mark.
-#   4. Check no workfile was made.
+#   4. Check it is refused (exit 0), saying no target is configured.
+#   5. Check no workfile was made.
 # bats test_tags=req:INIT-04, id:N0163
 @test "init on a terminal with no target refuses without asking" {
 	need script
@@ -170,6 +171,8 @@ setup() {
 	# timeout exits 124 when init waits for an answer.
 	[ "$status" -ne 124 ] || fail "init waited for input: $output"
 	refute_output --partial "?"
+	assert_success
+	assert_output --partial "No target configured."
 	[ ! -e "$PROJECT/workfile.json" ]
 }
 
