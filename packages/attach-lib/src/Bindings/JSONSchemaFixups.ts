@@ -98,4 +98,14 @@ if (import.meta.vitest) {
         expect(bounds(properties["clock-names"])).toStrictEqual([2, 3]);
         expect(bounds(properties["hback-porch"])).toStrictEqual([undefined, 3]);
     });
+
+    test("an integer array's own minimum bounds its values and leaves it an array", () => {
+        // adi,adl5960.yaml's `lo_in-clock-scales: {$ref: uint32-array, minimum: 1}`, dereferenced
+        const uint32 = { type: "integer", typeSize: 32, minimum: 0, maximum: 0xFF_FF_FF_FF, dtType: "uint32" };
+        const { "lo_in-clock-scales": scales } = fixuped({
+            "lo_in-clock-scales": { type: "array", minItems: 1, items: uint32, dtType: "uint32-array", minimum: 1 },
+        });
+        expect(scales?.["type"]).toBe("array");
+        expect(scales?.["items"]).toStrictEqual({ ...uint32, minimum: 1 });
+    });
 }
