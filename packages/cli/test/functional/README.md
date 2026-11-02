@@ -31,8 +31,9 @@ Needs: bash, node, git, `jq` and `python3`. bats and its assertion libraries com
 Yarn can't run bats itself (it runs a package's bin with node), so `run.sh` calls it with
 bash.
 
-The exit status is non-zero when a test fails, or when a test names a requirement that
-doesn't exist.
+The exit status is non-zero when a test fails, when a test names a requirement that doesn't
+exist, or when bats stops before the last test it was to run (a full disk, say: the tests it
+didn't get to are missing from its results, as if filtered out).
 
 ### The Linux tree
 
@@ -85,7 +86,7 @@ yarn test:functional --jobs 4 --fail-unless-gap
 
 and, whatever the result, writes `summary.md` to the run's summary and uploads `out/` as the
 `functional-tests-report` artifact (the workbook among it). With `--fail-unless-gap` the run
-fails only on a test that fails and isn't a known gap; without it, as locally by default, a
+fails only on a test that fails and isn't a known gap (or a run that stopped early); without it, as locally by default, a
 known gap fails the run too. The tests that need real CAPI trees or a board skip in CI.
 
 ## Writing a test
