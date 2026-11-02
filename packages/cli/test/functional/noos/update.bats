@@ -43,24 +43,31 @@ setup() {
 	[ "$(stored '.symbols.holder.modes')" = '["TEST_SPI_MODE_0","TEST_SPI_MODE_3"]' ]
 }
 
-# Description: update takes an array as one comma-separated argument, and refuses three value
-# arguments.
+# Description: update takes one value argument (an array as one comma-separated argument), or two
+# for a union's member and its value; more are refused.
 # Steps:
 #   1. Add test_array_holder --name holder.
 #   2. Run update holder modes TEST_SPI_MODE_0,TEST_SPI_MODE_3 and check both are stored.
-#   3. Snapshot the workfile.
-#   4. Run update holder modes with three separate values.
-#   5. Check it fails with a usage error (exit 2), saying there are too many values.
-#   6. Check the workfile is unchanged.
+#   3. Run update testpart_ip comm_init spi_dev testpart_spi_dev and check the union is stored.
+#   4. Snapshot the workfile.
+#   5. Run update holder modes with three separate values, then update testpart_ip comm_init with
+#      three.
+#   6. Check each fails with a usage error (exit 2), saying there are too many values.
+#   7. Check the workfile is unchanged.
 # bats test_tags=req:UPDATE-01-CAPI, id:N0251
 @test "update takes one value argument, or two for a union; more are refused" {
 	aa add test_array_holder --name holder >/dev/null
 	aa update holder modes TEST_SPI_MODE_0,TEST_SPI_MODE_3 >/dev/null
 	[ "$(stored '.symbols.holder.modes')" = '["TEST_SPI_MODE_0","TEST_SPI_MODE_3"]' ]
+	aa update testpart_ip comm_init spi_dev testpart_spi_dev >/dev/null
+	[ "$(stored '.symbols.testpart_ip.comm_init')" = '{"spi_dev":"testpart_spi_dev"}' ]
 	snapshot
 	run aa update holder modes TEST_SPI_MODE_0 TEST_SPI_MODE_3 TEST_SPI_MODE_0
 	assert_failure 2
 	assert_output --partial "Too many values for holder.modes"
+	run aa update testpart_ip comm_init spi_dev testpart_spi_dev extra
+	assert_failure 2
+	assert_output --partial "Too many values for testpart_ip.comm_init"
 	assert_unchanged
 }
 

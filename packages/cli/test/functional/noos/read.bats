@@ -250,15 +250,15 @@ testpart_cs_gpio"
 	assert_output testpart_cfg
 }
 
-# Description: read --json gives a node of the workfile as internal, with a list of its other
-# names.
+# Description: read --json gives a node of the workfile as internal, with its list of other
+# names, empty: a noos node has only its own name.
 # Steps:
 #   1. Run read testpart_spi_dev, with --json.
 #   2. Check it succeeds, with origin internal and an empty alias list.
 #   3. Run read, with --json.
 #   4. Check every node is internal and each has an alias list.
 # bats test_tags=req:READ-07, id:N0203
-@test "read --json says a stored node is internal and lists its other names" {
+@test "read --json says a stored node is internal and lists its other names, none in noos" {
 	run_json read testpart_spi_dev
 	assert_success
 	assert_json '.origin' internal
