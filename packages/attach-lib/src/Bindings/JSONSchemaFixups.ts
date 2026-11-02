@@ -19,10 +19,12 @@ import { fixup_remove_invalid_keys } from "./fixups/remove_invalid_keys.js";
 /**
  * The fixups that work on one node's or one property's schema, in the order they run. They walk the schema
  * once, the way dt-schema's `fixups.py` does (see `FixupWalker.ts`); each names its counterpart there.
+ * `fixup_names` comes after `fixup_items_size`: dt-core's `minItems: 1` is a schema of its own in dt-schema, and
+ * doesn't keep `items: [a, b]` from fixing the count to two.
  */
 const fixups = (types: PropertyTypes): Fixups => ({
     node: [fixup_remove_invalid_keys, fixup_interrupts],
-    property: [fixup_string_to_array, fixup_names, fixup_reg, fixup_unit_suffix, fixup_items_size, fixup_dt_type(types)],
+    property: [fixup_string_to_array, fixup_reg, fixup_unit_suffix, fixup_items_size, fixup_names, fixup_dt_type(types)],
 });
 
 /**
@@ -59,6 +61,7 @@ if (import.meta.vitest) {
 
     const fixuped = (properties: Record<string, unknown>) =>
         (apply_JSONSchema_fixups({ $id: "id", $schema: "s", title: "t", maintainers: [], properties } as unknown as DtBindingSchema).properties as Record<string, Record<string, unknown>>);
+    const bounds = (schema: Record<string, unknown> | undefined) => [schema?.["minItems"], schema?.["maxItems"]];
 
     test("a property that is a oneOf of consts is an enum, a string one still a list of them", () => {
         const { compatible, "nvidia,pull": pull } = fixuped({
@@ -70,5 +73,17 @@ if (import.meta.vitest) {
         expect(compatible["items"]).toStrictEqual([{ enum: ["snps,dwc-ahci", "snps,spear-ahci"] }]);
         expect(pull["oneOf"]).toBeUndefined();
         expect(pull["enum"]).toStrictEqual([0, 1]);
+    });
+
+    test("the count a property gives is its own, not the minItems: 1 dt-core gives every -names", () => {
+        const properties = fixuped({
+            "clock-names": { items: [{ const: "a" }, { const: "b" }] },
+            "dma-names": { items: [{ const: "rx" }, { const: "tx" }], minItems: 1 },
+            "reset-names": { description: "d" },
+        });
+
+        expect(bounds(properties["clock-names"])).toStrictEqual([2, 2]);
+        expect(bounds(properties["dma-names"])).toStrictEqual([1, 2]);
+        expect(bounds(properties["reset-names"])).toStrictEqual([1, undefined]);
     });
 }

@@ -63,9 +63,14 @@ export function fixup_collapse_allOf(binding: DtBindingSchema): DtBindingSchema 
 
     const to_collapse = properties.filter((property) => {
 
+        // Not one in `items`: it chooses what a cell is (a phandle or 0), the merge copies it as it is
         const has_other_combinator = find_entry_in_object(
             property.value,
-            (_path, key, _value) => {
+            (path, key, _value) => {
+                if (path.includes('items')) {
+                    return false;
+                }
+
                 if (key === 'oneOf' || key === 'anyOf' || key === 'not') {
                     return true;
                 }
@@ -229,6 +234,26 @@ if (import.meta.vitest) {
 
         expect(fixup.patternProperties["^channel@[0-9]$"]?.properties["adi,divider"]).toStrictEqual({ $ref: "uint32", minimum: 1, maximum: 4095, maxItems: 1 });
         expect(fixup.allOf).toStrictEqual(binding.allOf);
+    });
+
+    test("a node whose allOf holds a phandle (a oneOf in its cells) is collapsed, one with a oneOf of its own is not", () => {
+
+        const phandle = { type: "array", items: { type: "array", items: [{ oneOf: [{ minimum: 1 }, { const: 0 }] }] } };
+        const binding = {
+            $id: "test_id",
+            $schema: "test_schema",
+            title: "test_binding",
+            maintainers: ["test"],
+            properties: {
+                endpoint: { type: "object", allOf: [{ properties: { "remote-endpoint": phandle } }], properties: { "bus-width": { maximum: 32 } } },
+                mode: { allOf: [{ maximum: 3 }], oneOf: [{ const: 1 }, { const: 2 }] },
+            },
+        } as unknown as DtBindingSchema;
+
+        const fixup = fixup_collapse_allOf(binding) as unknown as { properties: Record<string, unknown> };
+
+        expect(fixup.properties["endpoint"]).toStrictEqual({ type: "object", properties: { "remote-endpoint": phandle, "bus-width": { maximum: 32 } } });
+        expect(fixup.properties["mode"]).toStrictEqual(binding.properties?.["mode"]);
     });
 
     test("a property's own keywords beat the ones of its allOf, and the properties of a node are joined", () => {
