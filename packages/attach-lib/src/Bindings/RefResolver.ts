@@ -1,9 +1,12 @@
 /* eslint-disable unicorn/prevent-abbreviations */
-import { FileInfo, JSONSchema, ResolverError } from "@apidevtools/json-schema-ref-parser";
+import { FileInfo, getJsonSchemaRefParserDefaultOptions, JSONSchema, Plugin, ResolverError } from "@apidevtools/json-schema-ref-parser";
 import { Result } from "../result.js";
 import { SchemaContext, SearchPath } from "./Context.js";
 import { DtBindingSchema, isDtBindingSchema } from "./Schema.js";
 import { RefResolvedBinding } from "./UtilityTypes.js";
+import { walk_node_schema } from "./FixupWalker.js";
+import { fixup_own_counts } from "./fixups/items_size.js";
+import { restore_references, stash_references } from "./ReferenceSiblings.js";
 
 import * as fs from "node:fs";
 import path from "node:path";
@@ -32,6 +35,8 @@ export async function resolve_references(
     for (const item of Object.keys(ctx.parser.$refs._$refs)) {
         const value = ctx.parser.$refs._$refs[item].value;
         if (isDtBindingSchema(value)) {
+            // Dereferenced where the binding reaches into it, and given its keywords back
+            restore_references(value);
             references.push(value);
         }
     }
@@ -39,22 +44,35 @@ export async function resolve_references(
     return Result.Ok({ root_binding: binding.value as DtBindingSchema, refs: references });
 }
 
-/** Replaces every `$ref` of `source` (a path or a schema) with its target. Fails on circular references. */
-export function dereference(ctx: SchemaContext, source: string | JSONSchema): Promise<Result<JSONSchema, string>> {
-    return run(() => ctx.parser.dereference(source, {
+/**
+ * Replaces every `$ref` of `source` (a path or a schema) with its target, the keywords beside it on top
+ * (`restore_references`). Fails on circular references.
+ */
+export async function dereference(ctx: SchemaContext, source: string | JSONSchema): Promise<Result<JSONSchema, string>> {
+    if (typeof source !== "string") { stash_references(source); }
+
+    const dereferenced = await run(() => ctx.parser.dereference(source, {
         resolve: { my: schema_resolver(ctx.search_paths) },
+        parse: { yaml: schema_parser },
         dereference: {
             circular: false,
             mergeKeys: false,
         },
     }));
+
+    if (Result.is_ok(dereferenced)) { restore_references(dereferenced.value); }
+    return dereferenced;
 }
 
 /** Like `dereference`, but circular references stay as `$ref`s. */
-export function bundle(ctx: SchemaContext, source: string | JSONSchema): Promise<Result<JSONSchema, string>> {
-    return run(() => ctx.parser.bundle(source, {
+export async function bundle(ctx: SchemaContext, source: string | JSONSchema): Promise<Result<JSONSchema, string>> {
+    const bundled = await run(() => ctx.parser.bundle(source, {
         resolve: { my: schema_resolver(ctx.search_paths) },
+        parse: { yaml: schema_parser },
     }));
+
+    if (Result.is_ok(bundled)) { restore_references(bundled.value); }
+    return bundled;
 }
 
 async function run(resolve: () => Promise<JSONSchema>): Promise<Result<JSONSchema, string>> {
@@ -64,6 +82,31 @@ async function run(resolve: () => Promise<JSONSchema>): Promise<Result<JSONSchem
         return Result.Err(error instanceof Error ? error.message : "Failed to resolve");
     }
 }
+
+const default_yaml = getJsonSchemaRefParserDefaultOptions().parse.yaml;
+const YAML_PARSER: Partial<Plugin> = typeof default_yaml === "object" ? default_yaml : {};
+
+/**
+ * ref-parser's YAML parser, then the count fixup (`fixup_own_counts`) on every property of the schema: dt-schema
+ * fixes a file's own counts before its `$ref`s are resolved, and the dereferencing merges them into the property
+ * (`{$ref: uint32-array, maxItems: 4}` would take the definition's `minItems: 1`). `types.yaml` is no binding.
+ * Then each `$ref` with keywords beside it is set aside (`stash_references`) until `dereference` merges the two.
+ * Every file is read by it, the binding itself and the ones it refers to by a relative path included.
+ */
+const schema_parser = {
+    ...YAML_PARSER,
+    async parse(file: FileInfo): Promise<unknown> {
+        const parse = YAML_PARSER.parse;
+        const document: unknown = typeof parse === "function" ? await parse(file) : parse;
+
+        if (path.basename(file.url) !== "types.yaml") {
+            walk_node_schema(document, { node: [], property: [fixup_own_counts] });
+        }
+        stash_references(document);
+
+        return document;
+    },
+};
 
 function is_readable(file: string): boolean {
     try {

@@ -56,9 +56,13 @@ const DT_TYPE_KEYWORD: KeywordDefinition = { keyword: DT_TYPE, schemaType: "stri
 /**
  * An AJV instance that knows the `typeSize` keyword, mirroring dt-schema's
  * `validator.py:typeSize`: the instance's `size` (default 32) must equal the schema's.
+ *
+ * Without AJV's strict schema checks: it only narrows the `if/then` branches here, so it takes what dt-schema's
+ * validator takes. A name that a pattern matches too (graph.yaml's `endpoint`), an `additionalItems` beside one
+ * `items` schema and an unknown keyword are valid JSON Schema, which strict mode refuses to compile.
  */
 export function create_ajv(): Ajv2019 {
-    const ajv = new Ajv2019({ allErrors: true, logger: false });
+    const ajv = new Ajv2019({ allErrors: true, logger: false, strictSchema: false });
     ajv.addKeyword(TYPE_SIZE);
     ajv.addKeyword(DT_TYPE_KEYWORD);
     return ajv;
@@ -220,4 +224,21 @@ export function translate_ajv_errors(errors: readonly ErrorObject[]): BindingErr
     }
 
     return translated;
+}
+
+if (import.meta.vitest) {
+
+    const { test, expect } = import.meta.vitest;
+
+    test("a schema that AJV's strict mode refuses but dt-schema takes compiles", () => {
+        const schema = {
+            properties: {
+                endpoint: { type: "object" },
+                cells: { type: "array", items: { type: "integer" }, additionalItems: false, $title: "a typo of a binding's" },
+            },
+            patternProperties: { "^endpoint(@[0-9a-f]+)?$": { type: "object" } },
+        } as unknown as DtBindingSchema;
+
+        expect(compile_targets(schema).root.validator({ endpoint: 1 })).toBe(false);
+    });
 }

@@ -30,6 +30,13 @@
                     }
                 },
                 {
+                    "key": "bipolar",
+                    "value": {
+                        "_t": "flag",
+                        "description": "If provided, the channel is to be used in bipolar mode."
+                    }
+                },
+                {
                     "key": "diff-channels",
                     "value": {
                         "_t": "list",
@@ -41,6 +48,58 @@
                         },
                         "maxItems": 2,
                         "minItems": 2,
+                        "typeSize": 32
+                    }
+                },
+                {
+                    "key": "single-channel",
+                    "value": {
+                        "_t": "scalar",
+                        "cell": {
+                            "_t": "number",
+                            "maximum": "4294967295n",
+                            "minimum": "0n"
+                        },
+                        "description": "When devices combine single-ended and differential channels, allow the channel for a single element to be specified, independent of reg (as for differential channels). If this and diff-channels are not present reg shall be used instead.",
+                        "typeSize": 32
+                    }
+                },
+                {
+                    "key": "common-mode-channel",
+                    "value": {
+                        "_t": "scalar",
+                        "cell": {
+                            "_t": "number",
+                            "maximum": "4294967295n",
+                            "minimum": "0n"
+                        },
+                        "description": "Some ADCs have differential input pins that can be used to measure single-ended or pseudo-differential inputs. This property can be used in addition to single-channel to signal software that this channel is not differential but still specify two inputs.\nThe input pair is specified by setting single-channel to the positive input pin and common-mode-channel to the negative pin.",
+                        "typeSize": 32
+                    }
+                },
+                {
+                    "key": "settling-time-us",
+                    "value": {
+                        "_t": "list",
+                        "description": "Time between enabling the channel and first stable readings.",
+                        "item": {
+                            "_t": "number",
+                            "maximum": "4294967295n",
+                            "minimum": "0n"
+                        },
+                        "minItems": 1
+                    }
+                },
+                {
+                    "key": "oversampling-ratio",
+                    "value": {
+                        "_t": "scalar",
+                        "cell": {
+                            "_t": "number",
+                            "maximum": "4294967295n",
+                            "minimum": "0n"
+                        },
+                        "description": "Oversampling is used as replacement of or addition to the low-pass filter. In some cases, the desired filtering characteristics are a function the device design and can interact with other characteristics such as settling time.",
                         "typeSize": 32
                     }
                 },
@@ -484,7 +543,8 @@
                     "minimum": "0n"
                 },
                 "maxItems": 16,
-                "minItems": 1
+                "minItems": 1,
+                "typeSize": 32
             }
         },
         {

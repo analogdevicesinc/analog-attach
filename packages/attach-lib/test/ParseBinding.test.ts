@@ -12,9 +12,10 @@ test.each(BINDINGS)('$name', async ({ name, path: file }) => {
     await expect(snapshot(parsed.value.parsed_binding)).toMatchFileSnapshot(`expected/binding-parser/${name}.json`);
 });
 
-test('a binding that is not a valid schema (`$title` for `title`) is rejected', async () => {
+// dt-mk-schema takes it, and dt-validate checks a node against it
+test('a binding with a keyword JSON Schema doesn\'t know (`$title` for `title`) is parsed', async () => {
     const parsed = await Attach.parse(binding('iio/amplifiers/adi,adl5580.yaml'), schema_paths);
-    if (Result.is_ok(parsed)) { expect.fail('expected the parse to fail'); }
+    if (Result.is_err(parsed)) { expect.fail(parsed.error.message); }
 
-    expect(parsed.error).toMatchObject({ stage: 'validation', message: expect.stringContaining('$title') });
+    expect(parsed.value.parsed_binding.properties.map(p => p.key)).toContain('compatible');
 });
