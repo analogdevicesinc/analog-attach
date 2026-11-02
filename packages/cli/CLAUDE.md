@@ -769,7 +769,7 @@ explicitly. Run attach-lib's tests with `--exclude test/BindingParserCompletion.
 
 ### Corpus
 
-The Raspberry Pi overlay corpus is attach-lib's (`packages/attach-lib/corpus/overlays/`, `yarn workspace attach-lib corpus:overlays:diff`); it doesn't show property-type changes (the processed schema's), so check those with its `repros/processed-types.mjs <binding> <property>`.
+The Raspberry Pi overlay corpus is attach-lib's (`packages/attach-lib/corpus/overlays/`, `yarn workspace attach-lib corpus:overlays:diff`); it doesn't show property-type changes (the processed schema's), so check those with its `repros/processed-types.mjs <binding> <property>`, and the binding types as a whole against dt-schema's with `yarn workspace attach-lib corpus:oracle:diff`.
 
 ### Plans and notes
 

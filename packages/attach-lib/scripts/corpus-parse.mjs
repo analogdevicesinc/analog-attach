@@ -18,10 +18,10 @@
 // Reads dist/: `yarn build` first. The baseline is only comparable on the Linux and
 // dt-schema commits and the processed schema it records; the script warns when they differ.
 import { createHash } from "node:crypto";
-import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { corpus_meta, walk, warn_meta } from "./corpus-common.mjs";
 import { processed_schema_of } from "./processed-schema.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -48,19 +48,6 @@ for (const [what, path] of [["Linux bindings", bindings_dir], ["dt-schema", dt_s
   }
 }
 const { Attach, Result } = await import(join(root, "dist/index.js"));
-
-function commit_of(directory) {
-  const result = spawnSync("git", ["rev-parse", "HEAD"], { cwd: directory, encoding: "utf8" });
-  return result.status === 0 ? result.stdout.trim() : "unknown";
-}
-
-function* walk(directory) {
-  for (const entry of readdirSync(directory, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
-    const path = join(directory, entry.name);
-    if (entry.isDirectory()) yield* walk(path);
-    else if (entry.isFile() && entry.name.endsWith(".yaml")) yield path;
-  }
-}
 
 // bigints (enum options) are not JSON
 const replacer = (_key, value) => (typeof value === "bigint" ? `${value}n` : value);
@@ -96,23 +83,14 @@ function write_baseline(meta, entries) {
   writeFileSync(baseline_file, text);
 }
 
-// The processed schema is generated, so the baseline records which one it was made with
-const meta = {
-  linux: commit_of(linux),
-  dt_schema: commit_of(dt_schema),
-  processed_schema: processed_schema === undefined ? "none" : createHash("sha1").update(readFileSync(processed_schema)).digest("hex").slice(0, 12),
-};
+const meta = corpus_meta(linux, dt_schema, processed_schema);
 const files = [...walk(bindings_dir)].map((path) => relative(bindings_dir, path)).filter((name) => name.includes(filter));
 const base_cache = join(cache, "base");
 
 if (mode === "run") rmSync(base_cache, { recursive: true, force: true });
 
 const baseline = mode === "diff" ? JSON.parse(readFileSync(baseline_file, "utf8")) : undefined;
-if (baseline) {
-  for (const key of ["linux", "dt_schema", "processed_schema"]) {
-    if (baseline[key] !== meta[key]) console.error(`warning: ${key} is at ${meta[key]}, the baseline was made at ${baseline[key]}`);
-  }
-}
+if (baseline) warn_meta(baseline, meta);
 const diff_cache = join(cache, "diff");
 if (mode === "diff") rmSync(diff_cache, { recursive: true, force: true });
 
