@@ -329,7 +329,7 @@ export type Slot =
     | { kind: "device"; command: string }
     /** `import`'s source. */
     | { kind: "source" }
-    /** A flag's value, on a shared command or an extra one (`add --parent`, `build --board`). */
+    /** A flag's value, on a shared command or an extra one (`add --parent`, `deploy --probe`). */
     | { kind: "flag"; command: string; flag: string; prior: readonly string[] }
     /** A positional of an extra command, named by the command (`move`'s destination). */
     | { kind: "extra"; command: string; id: string; prior: readonly string[] };
@@ -388,8 +388,8 @@ export interface CommandDocumentation {
 
 /**
  * A backend's implementation of a shared command. `S` are the flags it adds to the
- * command (Linux: `add --parent --label --template`; no-OS: `add --as`, `build --board
- * --clean`). The front end shows only the active backend's.
+ * command (Linux: `add --parent --label --template`; no-OS: `add --as`, `build --clean`,
+ * `deploy --probe`). The front end shows only the active backend's.
  *
  * `run` is a method, so a `CommandImpl` with specific flags fits the `FlagSpecs` slot in
  * `Commands`; `command()` infers `S` from the specs.

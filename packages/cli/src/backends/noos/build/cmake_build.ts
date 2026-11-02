@@ -97,29 +97,19 @@ function project_target(project_path: string): Result<string> {
 }
 
 /**
- * What to build: the project's board preset (the only one, or the one named), its target,
- * and the environment with CAPI_DIR set.
+ * What to build: the project's board preset (a generated project has one, for the board it was
+ * generated for), its target, and the environment with CAPI_DIR set.
  */
-export function plan_build(project_path: string, capi_path: string, board_override: string | undefined, program: string): Result<BuildPlan> {
+export function plan_build(project_path: string, capi_path: string, program: string): Result<BuildPlan> {
 	const presets = read_presets(project_path, program);
 	if (!presets.ok) {
 		return presets;
 	}
 
-	let preset: Preset | undefined;
-	if (board_override === undefined) {
-		const [only, ...more] = presets.value;
-		if (only === undefined || more.length > 0) {
-			const names = presets.value.map(entry => entry.name).join(", ") || "none";
-			return error(`The project has ${String(presets.value.length)} board presets (${names}); pass --board to pick one`, PRESETS_FILENAME);
-		}
-		preset = only;
-	} else {
-		preset = presets.value.find(entry => entry.name === board_override);
-		if (preset === undefined) {
-			const names = presets.value.map(entry => entry.name).join(", ");
-			return error(`The project has no preset for board '${board_override}'. It has: ${names}. Regenerate it for that board.`, PRESETS_FILENAME);
-		}
+	const [preset, ...more] = presets.value;
+	if (preset === undefined || more.length > 0) {
+		const names = presets.value.map(entry => entry.name).join(", ") || "none";
+		return error(`The project has ${String(presets.value.length)} board presets (${names}), not the one a generated project has. Generate it again: ${program} generate`, PRESETS_FILENAME);
 	}
 
 	const target = project_target(project_path);
