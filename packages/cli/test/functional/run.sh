@@ -9,8 +9,9 @@
 #
 # Any other bats option goes through. The report is in out/ either way. The exit status is
 # bats' (non-zero when a test failed, a known gap too) or the report's (a test naming an
-# unknown requirement); with --fail-unless-gap it is the report's alone, which fails only on
-# a test that fails and isn't a known gap.
+# unknown requirement, or a run that stopped before its last test); with --fail-unless-gap it
+# is the report's alone, which fails only on those and on a test that fails and isn't a known
+# gap.
 set -uo pipefail
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -32,9 +33,11 @@ done
 targets=()
 options=()
 report_options=()
+fail_unless_gap=no
 for argument in "$@"; do
 	if [ "$argument" = --fail-unless-gap ]; then
 		report_options+=(--fail-unless-gap)
+		fail_unless_gap=yes
 	elif [ -e "$here/$argument" ]; then
 		targets+=("$argument")
 	else
@@ -54,6 +57,9 @@ done
 rm -rf "$out"
 mkdir -p "$out"
 cd "$here" || exit 2
+# How many tests this run is to run, filters applied: the report fails a run that ran fewer.
+expected=$(bash "$bats" --count --recursive "${options[@]}" "${targets[@]}" 2>/dev/null) &&
+	report_options+=(--expected "$expected")
 bash "$bats" --recursive --timing --report-formatter junit --output "$out" "${options[@]}" "${targets[@]}"
 status=$?
 
@@ -62,6 +68,6 @@ python3 "$here/report.py" --junit "$out/report.xml" --tests "$here" \
 report=$?
 
 # With --fail-unless-gap the report decides: the known gaps fail bats, not the run.
-if [ ${#report_options[@]} -gt 0 ]; then exit "$report"; fi
+if [ "$fail_unless_gap" = yes ]; then exit "$report"; fi
 [ "$report" -ne 0 ] && [ "$status" -eq 0 ] && status=1
 exit "$status"
