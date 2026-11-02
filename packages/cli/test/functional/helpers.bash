@@ -9,6 +9,10 @@ FUNCTIONAL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CLI_DIR="$(cd "$FUNCTIONAL_DIR/../.." && pwd)"
 REPO_DIR="$(cd "$CLI_DIR/../.." && pwd)"
 NOOS_FIXTURES="$REPO_DIR/packages/attach-no-os-lib/test/fixtures"
+# The Linux tree of the linux tests (linux-tree.sh clones it and builds its caches) and its RPi 4 base.
+LINUX_TREE="${AA_LINUX:-$CLI_DIR/linux-adi}"
+LINUX_CACHES="$CLI_DIR/linux-adi-caches"
+LINUX_BASE="$LINUX_TREE/arch/arm/boot/dts/broadcom/bcm2711-rpi-4-b.dts"
 
 # The assertion libraries, from the repo's node_modules (yarn installs them).
 load "$REPO_DIR/node_modules/bats-support/load"
@@ -17,6 +21,7 @@ load "$REPO_DIR/node_modules/bats-assert/load"
 # A fresh home and project per test: the global settings are $HOME/.config/analog-attach.
 export HOME="$BATS_TEST_TMPDIR/home"
 export XDG_CONFIG_HOME="$HOME/.config"
+export XDG_DATA_HOME="$HOME/.local/share"
 export NO_COLOR=1
 PROJECT="$BATS_TEST_TMPDIR/project"
 mkdir -p "$HOME" "$PROJECT"
@@ -39,9 +44,11 @@ assert_json() {
 	[ "$actual" = "$2" ] || fail "$1: expected '$2', got '$actual'"$'\n'"output: $output"
 }
 
-# `new_project noos|linux [key=value...]`: the project's settings file, for that backend.
-# noos uses attach-no-os-lib's test fixtures (a capi, a platform with boards, drivers);
-# key=value pairs replace or add settings of the backend's section.
+# `new_project noos|linux [key=value...]`: the project's settings file, for that backend, and
+# $WORKFILE, the workfile's path (not created yet).
+# noos uses attach-no-os-lib's test fixtures (a capi, a platform with boards, drivers); linux the
+# Linux tree of linux-tree.sh with the RPi 4 base, and its binding caches in the project's state
+# directory. key=value pairs replace or add settings of the backend's section.
 new_project() {
 	local backend=$1
 	shift
@@ -51,8 +58,16 @@ new_project() {
 			section=$(jq -n --arg capi "$NOOS_FIXTURES/capi" \
 				--arg platform "$NOOS_FIXTURES/platform" --arg drivers "$NOOS_FIXTURES/driver-collection" \
 				'{ "capi-path": $capi, "module-paths": [$platform, $drivers], "target": "otherboard", "interview": "false" }')
+			WORKFILE="$PROJECT/workfile.json"
 			;;
-		linux) ;;
+		linux)
+			[ -f "$LINUX_CACHES/.stamp" ] || fail "no Linux tree: run test/functional/linux-tree.sh (run.sh does)"
+			WORKFILE="$PROJECT/overlay.dtso"
+			section=$(jq -n --arg linux "$LINUX_TREE" --arg base "$LINUX_BASE" --arg workfile "$WORKFILE" \
+				'{ "linux": $linux, "devicetree": $base, "workfile": $workfile }')
+			mkdir -p "$PROJECT/.analog-attach/linux"
+			cp "$LINUX_CACHES/"*.json "$PROJECT/.analog-attach/linux/"
+			;;
 		*) fail "new_project: unknown backend $backend" ;;
 	esac
 	local pair
@@ -69,5 +84,82 @@ need() {
 	local tool
 	for tool in "$@"; do
 		command -v "$tool" >/dev/null 2>&1 || skip "needs $tool"
+	done
+}
+
+# `with_overlay`: after `new_project linux`, `init`: an empty overlay at $WORKFILE.
+with_overlay() {
+	aa init >/dev/null || fail "init failed"
+	[ -f "$WORKFILE" ] || fail "no workfile after init"
+}
+
+# `tty_run <expect> <keys> [<expect> <keys>...] -- <words>`: runs the CLI on a pseudo-terminal
+# (stdin and stdout a terminal); each time the screen shows <expect>, after the previous one, it
+# types <keys> ($'\r' Enter, $'\x1b[B' down, $'\x03' Ctrl-C). Sets $status and $output (the
+# screen, escape codes removed). Gives up after $TTY_TIMEOUT s, 20 by default (status 124).
+tty_run() {
+	cat >"$BATS_TEST_TMPDIR/ttydrive.py" <<'PY'
+import os, pty, re, select, sys, time
+args = sys.argv[1:]
+cut = args.index('--')
+steps, words = args[:cut], args[cut + 1:]
+pid, fd = pty.fork()
+if pid == 0:
+    os.execvp('node', ['node', os.environ['AA_CLI']] + words)
+deadline = time.time() + float(os.environ.get('TTY_TIMEOUT') or 20)
+raw = b''
+def screen():
+    return re.sub(r'\x1b\[[0-9;?]*[A-Za-z]|\r', '', raw.decode('utf-8', 'replace'))
+def pump(wait):
+    global raw
+    ready, _, _ = select.select([fd], [], [], wait)
+    if not ready:
+        return True
+    try:
+        data = os.read(fd, 65536)
+    except OSError:
+        return False
+    raw += data
+    return bool(data)
+alive, seen = True, 0
+for expect, keys in zip(steps[0::2], steps[1::2]):
+    while alive and expect not in screen()[seen:] and time.time() < deadline:
+        alive = pump(0.1)
+    if expect not in screen()[seen:]:
+        print(screen() + '\n[tty_run: never saw %r]' % expect)
+        os.kill(pid, 9)
+        sys.exit(124)
+    seen = screen().index(expect, seen) + len(expect)
+    time.sleep(0.2)
+    for key in re.findall(r'\x1b\[[A-D]|.', keys, re.S):
+        os.write(fd, key.encode())
+        time.sleep(0.05)
+while alive and time.time() < deadline:
+    alive = pump(0.1)
+if alive:
+    os.kill(pid, 9)
+_, status = os.waitpid(pid, 0)
+sys.stdout.write(screen())
+sys.exit(124 if alive else os.waitstatus_to_exitcode(status))
+PY
+	AA_CLI="$CLI_DIR/dist/cli.js" run python3 -I "$BATS_TEST_TMPDIR/ttydrive.py" "$@"
+}
+
+# `snapshot`, then `assert_unchanged`: the workfile on disk ($WORKFILE) is as it was.
+snapshot() {
+	cp "$WORKFILE" "$BATS_TEST_TMPDIR/before"
+}
+
+assert_unchanged() {
+	cmp -s "$BATS_TEST_TMPDIR/before" "$WORKFILE" ||
+		fail "the workfile changed: $(diff "$BATS_TEST_TMPDIR/before" "$WORKFILE")"
+}
+
+# `drop_setting <key>...`: removes settings from the project's section of its backend.
+drop_setting() {
+	local file="$PROJECT/.analog-attach/config.json" key
+	for key in "$@"; do
+		jq --arg key "$key" '.backend as $backend | del(.[$backend][$key])' "$file" >"$file.new" &&
+			mv "$file.new" "$file"
 	done
 }
