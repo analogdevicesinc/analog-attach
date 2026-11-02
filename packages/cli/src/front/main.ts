@@ -5,16 +5,17 @@
 //   - `__complete -- <words>`: the completion lines (complete.ts), nothing on stderr, exit 0.
 //   - `--json` is taken out of the words wherever it is (before a `--`), then stricli parses them.
 //   - The bare run (no words, not `--json`, on a terminal): setup.ts. Off a terminal, or with
-//     `--quiet` alone, the usage (on stderr and exit 2 under `--json`).
+//     `--quiet` alone, the usage; under `--json`, one JSON result with the usage and the
+//     required settings still missing.
 //   - `help [<command>...]` is `<command>... --help`.
 
 import * as fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { run as run_stricli } from "@stricli/core";
-import type { Backend, Prompter, Session } from "../interface/backend-interface";
+import { answer, type Backend, type Prompter, type Session } from "../interface/backend-interface";
 import { complete_words } from "./complete";
-import { EXIT_CRASH, EXIT_INPUT_ERROR, EXIT_OK, run_outcome, type OutputStreams } from "./output";
+import { capture_stream, EXIT_CRASH, EXIT_INPUT_ERROR, EXIT_OK, run_outcome, type OutputStreams } from "./output";
 import type { Registry } from "./registry";
 import { did_you_mean } from "../interface/names";
 import { backend_command, build_application, build_routes, find_route, next_segments, positional_record, type FrontEnd, type Route, type RunContext } from "./routes";
@@ -210,17 +211,48 @@ async function run_words(front: FrontEnd, words: readonly string[], usage_to_std
     return code ?? exit_code(process_.exitCode);
 }
 
+/** The backend's required settings that have no value. None when there is no backend. */
+function missing_settings(front: FrontEnd): string[] {
+    if (front.backend === undefined) { return []; }
+    return front.settings.specs
+        .filter(spec => spec.required && spec.key !== BACKEND_KEY && front.settings.get(spec.key) === undefined)
+        .map(spec => spec.key);
+}
+
+/** `Not set yet: <keys>. Run ...`: how to set the required settings still missing (SETUP-04). */
+function missing_settings_message(keys: readonly string[]): string {
+    return `Not set yet: ${keys.join(", ")}. Run '${PROGRAM}' on a terminal for the guided setup, or '${PROGRAM} config ${keys[0]!} <value>'.`;
+}
+
 /**
  * After the usage of a bare run that can't ask: the required settings still unset, and how to
  * set them (SETUP-04). Nothing when they are all set, or when there is no backend (the usage
  * already says to choose one).
  */
 function missing_settings_note(front: FrontEnd): string {
-    if (front.backend === undefined) { return ""; }
-    const missing = front.settings.specs.filter(spec => spec.required && spec.key !== BACKEND_KEY && front.settings.get(spec.key) === undefined);
-    if (missing.length === 0) { return ""; }
-    const keys = missing.map(spec => spec.key);
-    return `\nNot set yet: ${keys.join(", ")}. Run '${PROGRAM}' on a terminal for the guided setup, or '${PROGRAM} config ${keys[0]!} <value>'.\n`;
+    const keys = missing_settings(front);
+    return keys.length === 0 ? "" : `\n${missing_settings_message(keys)}\n`;
+}
+
+/**
+ * The bare run under `--json` (SETUP-04, GEN-07): one result, `ok: true`, with the usage as
+ * text in `usage` and the required settings still unset in `missing` (`backend` when none is
+ * set); the message says how to set them, or that nothing is missing.
+ */
+async function bare_json(front: FrontEnd): Promise<number> {
+    const usage = capture_stream(false);
+    await run_words({ ...front, json: false, streams: { ...front.streams, stdout: usage } }, [], false);
+    let missing = [BACKEND_KEY];
+    let message = front.backend_problem ?? `No backend is set. Run '${backend_command(front)}'.`;
+    if (front.backend !== undefined) {
+        missing = missing_settings(front);
+        message = missing.length === 0 ? "Every required setting is set." : missing_settings_message(missing);
+    }
+    const session = await front.session("json", false);
+    return run_outcome(
+        () => Promise.resolve(answer({ ok: true, message, severity: "info", usage: usage.text, missing }, message)),
+        { json: true, style: session.style, streams: front.streams },
+    );
 }
 
 /** One run. Never throws: a crash is its message on stderr and exit 1. */
@@ -260,8 +292,9 @@ export async function main(argv: readonly string[], deps: MainDeps): Promise<num
         }
         // The usage: no command (off a terminal, or `--json` alone), or `--quiet` alone.
         if (words.length === 0 || (words.length === 1 && words[0] === "--quiet")) {
-            const code = await run_words(front, [], json);
-            if (!json) { deps.streams.stdout.write(missing_settings_note(front)); }
+            if (json) { return await bare_json(front); }
+            const code = await run_words(front, [], false);
+            deps.streams.stdout.write(missing_settings_note(front));
             return code;
         }
         const help = words[0] === "help" ? [...words.slice(1), "--help"] : words;
@@ -414,15 +447,25 @@ if (import.meta.vitest) {
             expect(await stdout_of(["list", "devices", "--help"])).toContain("[<prefix>]");
         });
 
-        test("off a terminal, the bare run and --quiet alone are the usage; under --json on stderr, exit 2", async () => {
+        test("off a terminal, the bare run and --quiet alone are the usage; under --json one result with it", async () => {
             write_local({ backend: "fake" });
             const bare = await run([]);
             expect(bare.code).toBe(0);
             expect(bare.stdout).toContain("USAGE");
             expect(await stdout_of(["--quiet"])).toContain("USAGE");
             const json = await run(["--json"]);
-            expect(json).toMatchObject({ code: 2, stdout: "" });
-            expect(json.stderr).toContain("USAGE");
+            expect(json).toMatchObject({ code: 0, stderr: "" });
+            const result = JSON.parse(json.stdout) as { ok: boolean; usage: string; missing: string[] };
+            expect(result).toMatchObject({ ok: true, severity: "info" });
+            expect(result.usage).toContain("USAGE");
+            expect(Array.isArray(result.missing)).toBe(true);
+            expect(JSON.parse(await stdout_of(["--json", "--quiet"]))).toMatchObject({ ok: true });
+        });
+
+        test("the bare run under --json names the backend when none is set", async () => {
+            const json = await run(["--json"]);
+            expect(json.code).toBe(0);
+            expect(JSON.parse(json.stdout)).toMatchObject({ ok: true, missing: ["backend"] });
         });
     });
 

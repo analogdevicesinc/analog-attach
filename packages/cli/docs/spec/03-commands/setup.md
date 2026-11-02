@@ -44,7 +44,10 @@ and ask nothing. When a backend is set and some of its required settings
 have no value, the CLI shall then write, in human mode, an empty line and
 `Not set yet: <keys>. Run 'analog-attach' on a terminal for the guided
 setup, or 'analog-attach config <first key> <value>'.`, `<keys>` those
-settings joined with `, `.
+settings joined with `, `. In JSON mode, on a terminal or not, that sentence
+is the result's `message` and the keys its `missing` (GRM-005); with nothing
+missing the message is `Every required setting is set.`, and with no backend
+it is COM-014's and `missing` is `["backend"]`.
 
 ## 4. The configuration
 
