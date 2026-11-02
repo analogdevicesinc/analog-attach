@@ -1574,7 +1574,6 @@
       "watchdog/xlnx,xps-timebase-wdt.yaml:clock-frequency ours scalar(number), dt-schema uint32|uint64"
     ],
     "count-mismatch": [
-      "eeprom/at24.yaml:compatible ours (unset, unset), dt-schema (1, 2)",
       "usb/cypress,hx3.yaml:compatible ours (1, 2), dt-schema (1, 1)"
     ],
     "row-count-mismatch": [],
