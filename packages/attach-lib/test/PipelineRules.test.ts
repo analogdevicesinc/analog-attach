@@ -198,6 +198,24 @@ patternProperties:
         expect(property(parsed_binding, 'spi-max-frequency')).toStrictEqual(spi_max_frequency);
     });
 
+    test('a `true` property its node\'s allOf defines takes that definition, not a child node\'s of the same name', async () => {
+        // spi-controller's devices have a `reg` of their own (one entry of a chip select)
+        const { parsed_binding } = await parsed('placeholder-in-node', `
+allOf:
+  - $ref: /schemas/spi/spi-controller.yaml#
+  - properties:
+      reg:
+        minItems: 2
+        maxItems: 2
+properties:
+  compatible:
+    const: x,y
+  reg: true
+`);
+        expect(counts(property(parsed_binding, 'reg'))).toStrictEqual([2, 2]);
+        expect(property(parsed_binding, 'reg')).not.toHaveProperty('description');
+    });
+
     test('a `true` property no referenced schema defines stays unknown', async () => {
         const { parsed_binding } = await parsed('placeholder-alone', `
 properties:
