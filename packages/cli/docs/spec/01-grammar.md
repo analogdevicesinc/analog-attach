@@ -56,7 +56,10 @@ parser (stricli) words it:
 **GRM-005** When argv is empty and the run isn't a terminal run, or argv is
 the one element `--quiet`, the CLI shall write the program's usage to
 standard output and exit with status 0. In JSON mode (`analog-attach
---json`), it shall write the usage to standard error and exit with status 2.
+--json`, on a terminal or not), it shall instead print one result (COM-040)
+with `ok: true`, `usage` the program's usage as text, and `missing` the
+required settings still unset (SETUP-002, `["backend"]` when no backend is
+set), and exit with status 0.
 
 **GRM-009** The help of every command (`<command> --help`) and of every group
 of commands (`list --help`, `skill --help`) shall end its description with
@@ -332,5 +335,5 @@ same reason.
 
 **G-4. A group alone answers usage even under `--json`.** `analog-attach
 --json list` writes the text usage on standard output with status 0
-(GRM-018), while the program's usage under `--json` goes to standard error
-with status 2 (GRM-005).
+(GRM-018), while the program's usage under `--json` is one JSON result with
+the usage in its `usage` field (GRM-005).
