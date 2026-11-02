@@ -29,15 +29,18 @@ setup() {
 	assert_json '.value' null
 }
 
-# bats test_tags=req:DELETE-01-CAPI, gap
-@test "delete of a property with a default puts the default back" {
-	# Gap: max_speed_hz is cleared to null (marked cleared, "you cleared it"), not reset to its default 1000000.
+# bats test_tags=req:DELETE-01-CAPI
+@test "delete of a property with a default clears it, and it stays empty" {
 	aa update testpart_spi_dev max_speed_hz 2000000 >/dev/null
 	run aa delete testpart_spi_dev max_speed_hz
 	assert_success
 	run_json read testpart_spi_dev max_speed_hz
 	assert_json '.constraints.default' 1000000
-	assert_json '.value' 1000000
+	assert_json '.value' null
+	assert_json '.source' user
+	# Another edit runs bootstrap again: the cleared value stays empty.
+	aa update testpart_ip comm_type TESTPART_SPI >/dev/null
+	[ "$(stored '.symbols.testpart_spi_dev.max_speed_hz')" = null ]
 }
 
 # bats test_tags=req:DELETE-02

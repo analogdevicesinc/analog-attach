@@ -376,7 +376,7 @@ export function open_settings(options: OpenSettingsOptions): SettingsStore {
     /** Write `patch` into the scope's file; an `undefined` value removes the key. Section keys go in the active section. */
     const write = (scope: Scope, patch: Readonly<Record<string, Value | undefined>>): SettingWrite => {
         const layer = layers[scope];
-        if (layer.unreadable !== undefined) { return { ok: false, message: layer.unreadable }; }
+        if (layer.unreadable !== undefined) { return { ok: false, message: layer.unreadable, broken_file: true }; }
         const table: Record<string, unknown> = { ...layer.table };
         const apply = (target: Record<string, unknown>, key: string, value: Value | undefined): void => {
             if (value === undefined) { delete target[key]; } else { target[key] = value; }
@@ -384,7 +384,7 @@ export function open_settings(options: OpenSettingsOptions): SettingsStore {
         const section_patch = Object.entries(patch).filter(([key]) => in_section(key));
         if (section_patch.length > 0) {
             if (active === undefined) { throw new Error(`no backend is active to write ${section_patch.map(([key]) => key).join(", ")}`); }
-            if (layer.bad_section !== undefined) { return { ok: false, message: layer.bad_section }; }
+            if (layer.bad_section !== undefined) { return { ok: false, message: layer.bad_section, broken_file: true }; }
             const current = layer.table[active.id];
             const section: Record<string, unknown> = { ...is_object(current) ? current : {} };
             for (const [key, value] of section_patch) { apply(section, key, value); }
@@ -768,8 +768,8 @@ if (import.meta.vitest) {
                 ["fake", "invalid", `${GLOBAL}: fake: must be an object`],
             ]);
             expect(store.errors[0]!.hint).toBe(`Make fake an object in ${LOCAL}; valid top-level keys are backend and the backends' sections fake, other, each an object of that backend's settings.`);
-            expect(await store.set("chip", "c")).toEqual({ ok: false, message: `${LOCAL}: fake: must be an object` });
-            expect(await store.reset("chip")).toEqual({ ok: false, message: `${LOCAL}: fake: must be an object` });
+            expect(await store.set("chip", "c")).toEqual({ ok: false, message: `${LOCAL}: fake: must be an object`, broken_file: true });
+            expect(await store.reset("chip")).toEqual({ ok: false, message: `${LOCAL}: fake: must be an object`, broken_file: true });
             // The top level can still be written.
             expect(await store.set(BACKEND_KEY, "other")).toMatchObject({ ok: true });
             expect(read_json(files.local)).toEqual({ backend: "other", fake: "~/tree", other: ["x"] });

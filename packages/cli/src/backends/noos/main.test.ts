@@ -219,13 +219,14 @@ describe("add, update, delete, rename", () => {
         expect(as_schema.code).toBe(2);
     });
 
-    test("update sets a value; a value the property can't take is an input error", async () => {
+    test("update sets a value; a value the property can't take is refused", async () => {
         settings();
         await sensor();
         expect(await json(["update", "testpart_spi_dev", "max_speed_hz", "2000000"])).toMatchObject({ ok: true });
         expect(stored()["testpart_spi_dev"]?.["max_speed_hz"]).toBe(2_000_000);
         const bad = await run(["update", "testpart_spi_dev", "max_speed_hz", "fast"]);
-        expect(bad.code).toBe(2);
+        expect(bad.code).toBe(0);
+        expect(bad.stdout).toContain("'fast' is not a number");
         expect(await json(["update", "testpart_spi_dev", "nonsense", "1"])).toMatchObject({ ok: false });
         expect(await code(["update"])).toBe(2);
     });

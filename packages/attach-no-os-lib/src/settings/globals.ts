@@ -16,6 +16,9 @@ export const IIO_TEMPLATE_SET = "capi-iio";
  */
 export const PATH_LIST_DELIMITER = path.delimiter;
 
+/** Where `build` builds the generated project when `build-dir` is unset, relative to it. */
+export const DEFAULT_BUILD_DIR = "build";
+
 /** Debug probe `deploy` drives when `probe` is unset. */
 export const DEFAULT_PROBE = "openocd";
 export const PROBE_OPTIONS = ["openocd", "jlink"];
@@ -111,6 +114,15 @@ export const SETTINGS_DEFAULTS: SettingsFile = {
 		type: "string",
 		default: DEFAULT_PROBE,
 		options: PROBE_OPTIONS,
+		category: "build",
+	},
+	// A string, not a path: it is relative to the generated project (build-debug,
+	// build-release side by side), not to the project root a path setting resolves against.
+	"build-dir": {
+		description: "Folder 'build' builds the generated project in and 'deploy' flashes from, relative to the project unless absolute",
+		required: false,
+		type: "string",
+		default: DEFAULT_BUILD_DIR,
 		category: "build",
 	},
 	// A setting rather than a flag, like `workfile`. `required: false` with a default keeps

@@ -289,9 +289,9 @@ JSON mode it shall write `{ ok: true, message: "<shell> completion script",
 severity: "info", script }` instead, `script` being the script without the
 empty line (`04-protocol/completion.schema.json`).
 
-**COMPL-101** If `<shell>` is anything else, then the CLI shall report the
-input error `Unknown shell: <shell>. Supported: bash, fish, zsh` (COM-031),
-and change nothing.
+**COMPL-101** If `<shell>` is anything else, then the CLI shall refuse with
+`Unknown shell: <shell>. Supported: bash, fish, zsh` (COM-043), and change
+nothing.
 
 **COMPL-102** *Withdrawn.* (`<shell>` was required; without it commander
 reported a missing argument. COMPL-103 now picks the shell.)
@@ -299,8 +299,8 @@ reported a missing argument. COMPL-103 now picks the shell.)
 **COMPL-103** When `<shell>` is left out, the shell shall be the base name of
 the `SHELL` environment variable (`/usr/bin/zsh` → `zsh`). If that isn't
 `bash`, `fish` or `zsh`, then the CLI shall write `Cannot tell the shell from
-$SHELL (<value>). Name one: bash, fish, zsh` to standard error, `<value>`
-being `not set` when `SHELL` is unset, as an input error too (COM-031).
+$SHELL (<value>). Name one: bash, fish, zsh`, `<value>` being `not set`
+when `SHELL` is unset, refused too (COM-043).
 
 ### 10.1 What every stub does
 

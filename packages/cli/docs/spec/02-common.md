@@ -54,7 +54,7 @@ Exceptions:
 |---|---|---|---|
 | `read`, and `update` when it reads | COM-050 | its response is the node or property itself, with no `ok`, `message` or `severity` (`read.md` READ-011, READ-024, READ-035; `update.md` UPDATE-112) | C-7 |
 | `validate` | COM-020, COM-050 | its response has no `ok`, `message` or `severity` | `validate.md` V-4 |
-| `config` | COM-040, COM-072 | a problem with a settings file, or a value it can't store, is an input error on standard error with status 2, not a refusal (`config.md` CONFIG-102, CONFIG-118) | — |
+| `config` | COM-040, COM-072 | a problem with a settings file is an input error on standard error with status 2, not a refusal (`config.md` CONFIG-102, CONFIG-118); a value it can't store is a refusal (COM-043) | — |
 
 ## 3. Input errors
 
@@ -62,9 +62,9 @@ An input error is a malformed command line: what the argument parser rejects
 (GRM-004, GRM-013), and the CLI's own checks: GRM-020 to GRM-023, GRM-030,
 GRM-060, a required path or property left out (`Missing: path` from
 `update`, `enable` and `disable`, `Missing: property name` from `update`;
-`update.md` UPDATE-001, `enable-disable.md` ENABLE-001), a `completion`
-shell the CLI doesn't know (`05-completion.md` COMPL-101), COM-014 and
-COM-015.
+`update.md` UPDATE-001, `enable-disable.md` ENABLE-001), COM-014 and
+COM-015. A value the command line gives that is well formed but can't be
+taken is not one: it is refused (COM-043).
 
 **COM-030** When the command line has an input error, the CLI shall do
 nothing else: it shall not load the workspace or write a file. Exception:
@@ -101,6 +101,15 @@ linux <path>` saves `linux` before it builds the caches and refuses when the
 build doesn't happen or fails (`config.md` CONFIG-122, CONFIG-123, CF-6), and
 the setup run keeps `linux`, `devicetree` and `workfile` saved when its cache
 build fails (`setup.md` SETUP-030, SETUP-033, S-3).
+
+**COM-043** When a command is given a value it can't take (a setting value
+that isn't one of its options, or names no file; a property value that
+doesn't parse for its kind or that its definition doesn't allow; a flag's or
+positional's value outside its choices, such as `deploy --probe`, a skill
+name, a completion shell), the CLI shall refuse (COM-040): status 0, `ok:
+false` with the reason under `--json`. The command ran; the value was wrong.
+Input errors (§3, status 2) are for a command line that can't be run at all:
+an unknown command, flag or setting key, a missing or extra argument.
 
 **COM-140** When a refusal or an input error is about a name that isn't one
 of a known set (a setting, a kind, a device type), the message shall name the
@@ -311,6 +320,7 @@ one):
 | `build-command` | Build | string | no | — | `Override the 'build' step with this command, run at the base of the project (unset: drive CMake directly)` |
 | `deploy-command` | Build | string | no | — | `Override the 'deploy' step with this command, run at the base of the project (unset: build the CMake flash target)` |
 | `probe` | Build | one of `openocd`, `jlink` | no | `openocd` | `Debug probe 'deploy' flashes through` |
+| `build-dir` | Build | string: a folder, relative to the generated project unless absolute (`~` the home directory) | no | `build` | `Folder 'build' builds the generated project in and 'deploy' flashes from, relative to the project unless absolute` |
 
 `<project-name>` in the descriptions is literal. The boards and chips are
 those the module repositories of `module-paths` define, scanned on every run

@@ -38,7 +38,7 @@ fake_flash() {
 # bats test_tags=req:DEPLOY-02
 @test "deploy refuses an unknown --probe, naming openocd and jlink" {
 	run aa deploy --probe nope
-	assert_failure 2
+	assert_success  # a refused value: the command ran (GEN-09)
 	assert_output --partial "Unknown probe 'nope'. Supported: openocd, jlink"
 }
 
@@ -47,7 +47,7 @@ fake_flash() {
 	aa generate >/dev/null
 	fake_flash
 	run aa deploy --probe nope
-	assert_failure 2
+	assert_success  # a refused value: the command ran (GEN-09)
 	[ ! -e "$PROJECT/out/project/deployed.txt" ]
 }
 
@@ -72,7 +72,7 @@ fake_flash() {
 	run aa config probe jlink
 	assert_success
 	run aa config probe nope
-	assert_failure 2
+	assert_success  # a refused value: the command ran (GEN-09)
 	run_json config probe
 	assert_json '.configs[0].value' jlink
 }

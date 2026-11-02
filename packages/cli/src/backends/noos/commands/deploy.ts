@@ -41,7 +41,7 @@ export const deploy = command<DeployArguments, CommonResponse, typeof DEPLOY_FLA
         brief: "Flash the generated CAPI project to the board",
         full:
             "Flashes the project 'generate' writes: the 'project-path' setting, or\n" +
-            "out/<project-name> when it is unset."
+            "out/<project-name> when it is unset.\n\nExamples:\n  $ analog-attach deploy\n  $ analog-attach deploy --probe jlink\n  $ analog-attach config probe jlink"
     },
     run(_arguments, flags, session) {
         return run_deploy(flags.board, flags.probe, session);
@@ -66,7 +66,7 @@ function not_built(target_path: string, board: string | undefined, program: stri
 async function run_deploy(board: string | undefined, probe_flag: string | undefined, session: Session): Promise<Outcome<CommonResponse>> {
     // A probe that can't be is what was typed, whatever the project's state.
     if (probe_flag !== undefined && !PROBE_OPTIONS.includes(probe_flag)) {
-        return input_error(`Unknown probe '${probe_flag}'. Supported: ${PROBE_OPTIONS.join(", ")}`);
+        return refuse(`Unknown probe '${probe_flag}'. Supported: ${PROBE_OPTIONS.join(", ")}`);
     }
 
     const project = project_directory(session);

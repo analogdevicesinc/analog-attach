@@ -55,7 +55,7 @@ export const list_context = command<ListContextArguments, ListContextResponse>({
         full:
             "Lists every chip the configured platforms support, each with the boards that carry it.\n" +
             "Pick one with 'config target <board>' (or 'config target <chip>' for a chip with\n" +
-            "no board), then 'init'."
+            "no board), then 'init'.\n\nExamples:\n  $ analog-attach list context\n  $ analog-attach --json list context"
     },
     run(_arguments, _flags, session) {
         install(session);
@@ -121,7 +121,7 @@ export const list_property = command<ListPropertyArguments, ListPropertyResponse
         brief: "List the nodes, or the properties of one node",
         full:
             "With no <node>, lists the nodes of the workfile. With <node>, lists its properties,\n" +
-            "with their type and whether they are required and set."
+            "with their type and whether they are required and set.\n\nExamples:\n  $ analog-attach list property\n  $ analog-attach list property adxl355_spi_dev"
     },
     run({ path: node, property }, _flags, session) {
         if (property !== undefined) {
@@ -219,7 +219,7 @@ export const list_value = command<ListValueArguments, SuggestResponse>({
         brief: "List the values a property can take",
         full:
             "Lists the values <property> of <node> can take, and the nodes that could be created\n" +
-            "for it. For a union, name the member to list the values of that member."
+            "for it. For a union, name the member to list the values of that member.\n\nExamples:\n  $ analog-attach list value adxl355_spi_dev mode\n  $ analog-attach list value adxl355_spi_dev cs_gpio\n  $ analog-attach list value adxl355_ip comm_init spi_dev"
     },
     run({ path: node, property, member }, _flags, session) {
         return Promise.resolve(value_suggestions(session, node, property, member));

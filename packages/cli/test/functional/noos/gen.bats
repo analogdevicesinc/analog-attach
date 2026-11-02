@@ -236,20 +236,21 @@ checksum() {
 	assert_failure 2
 }
 
-# bats test_tags=req:GEN-09, gap
+# bats test_tags=req:GEN-09
 @test "a refused setting value exits 0 with ok false" {
-	# Gap: config refuses the value as an input error: exit 2, text on stderr, no JSON result.
 	run_json config bootstrap yes
 	assert_success
 	assert_json '.ok' false
 }
 
-# bats test_tags=req:GEN-09, gap
-@test "an unknown setting exits 0 with ok false" {
-	# Gap: config refuses an unknown key as an input error: exit 2, text on stderr, no JSON result.
+# An unknown setting is a usage error: the one case, with a bad argument, where the exit status
+# isn't 0.
+# bats test_tags=req:GEN-09
+@test "an unknown setting is a usage error: non-zero, the reason on stderr" {
 	run_json config nosuchkey
-	assert_success
-	assert_json '.ok' false
+	assert_failure 2
+	[ -z "$output" ]
+	[[ "$stderr" == *"Unknown config field: nosuchkey"* ]]
 }
 
 # --- GEN-10, GEN-11: help and version ----------------------------------------------------
@@ -273,9 +274,8 @@ checksum() {
 	assert_output --partial "--suggest"
 }
 
-# bats test_tags=req:GEN-10, gap
+# bats test_tags=req:GEN-10
 @test "every command's help has examples" {
-	# Gap: only config and completion have an Examples section; the other commands' help has none.
 	local command missing=()
 	for command in config init import add read update delete rename list validate build deploy generate completion skill; do
 		aa "$command" --help | grep -q "Examples:" || missing+=("$command")

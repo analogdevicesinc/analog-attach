@@ -41,7 +41,7 @@ function find_skill(front: FrontEnd, name: string | undefined): SkillSpec | Outc
     const names = backend.skills.map(skill => skill.name);
     if (names.length === 0) { return input_error(`The ${backend.id} backend has no skills`); }
     const skill = backend.skills.find(candidate => candidate.name === name);
-    return skill ?? input_error(`Unknown skill: ${name ?? ""}. Skills of the ${backend.id} backend: ${names.join(", ")}`);
+    return skill ?? refuse(`Unknown skill: ${name ?? ""}. Skills of the ${backend.id} backend: ${names.join(", ")}`);
 }
 
 export function install_skill(front: FrontEnd, name: string | undefined, force: boolean): Outcome<SkillResponse> {
@@ -88,13 +88,15 @@ export function skill_routes(front: FrontEnd): Route[] {
     const skills = front.backend?.skills ?? [];
     const listed = skills.length === 0 ? "" : `\n\nSkills: ${skills.map(skill => `${skill.name} (${skill.about})`).join(", ")}.`;
     const name_positional = { name: "name", placeholder: "name", brief: "The skill" };
+    const example = skills[0]?.name ?? "<name>";
+    const examples = (verb: string, extra = ""): string => `\n\nExamples:\n  $ ${front.program} skill ${verb} ${example}${extra}`;
     const complete = (index: number): Promise<{ candidates: { value: string; description: string }[] } | undefined> =>
         Promise.resolve(index === 0 ? { candidates: skills.map(skill => ({ value: skill.name, description: skill.about })) } : undefined);
     return [
         {
             path: ["skill", "install"],
             brief: "Install a Claude Code skill of the backend",
-            full: `Install a Claude Code skill of the backend into ~/.claude/skills/<name>/.${listed}`,
+            full: `Install a Claude Code skill of the backend into ~/.claude/skills/<name>/.${listed}${examples("install")}\n  $ ${front.program} skill install ${example} --force`,
             group: "tooling",
             positionals: [name_positional],
             flags: { force: { kind: "boolean", brief: "Install over an installed copy" } },
@@ -106,7 +108,7 @@ export function skill_routes(front: FrontEnd): Route[] {
         {
             path: ["skill", "uninstall"],
             brief: "Remove an installed Claude Code skill",
-            full: `Remove a skill of the backend from ~/.claude/skills/<name>/.${listed}`,
+            full: `Remove a skill of the backend from ~/.claude/skills/<name>/.${listed}${examples("uninstall")}`,
             group: "tooling",
             positionals: [name_positional],
             flags: {},
