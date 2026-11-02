@@ -6,16 +6,27 @@ function is_schema(value: unknown): value is Schema {
     return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-/** What every one of `branches` keeps to: the lowest `minItems` and the highest `maxItems`, each when all of them give it. */
+/** The `keyword` bound a branch holds a value to: its own, and those of its `allOf` entries, the tightest by `pick`. */
+function own_bound(branch: Schema, keyword: string, pick: (...bounds: number[]) => number): number | undefined {
+    const entries = Array.isArray(branch["allOf"]) ? branch["allOf"].filter(entry => is_schema(entry)) : [];
+    const bounds = [branch, ...entries].map(schema => schema[keyword]).filter(bound => typeof bound === "number");
+    return bounds.length === 0 ? undefined : pick(...bounds);
+}
+
+/**
+ * What every one of `branches` keeps to: the lowest `minItems` and the highest `maxItems`, each when all of them give
+ * it. A branch gives the bounds of its `allOf` too: at24's `compatible: {oneOf: [{allOf: [{minItems: 1, maxItems: 2,
+ * items: [...]}, ...]}, ...]}`.
+ */
 function branch_bounds(branches: unknown[]): { minItems?: number, maxItems?: number } {
     // A `true` branch takes any value
     if (branches.length === 0 || !branches.every(branch => is_schema(branch))) { return {}; }
 
-    const side = (keyword: string, pick: (...bounds: number[]) => number): number | undefined => {
-        const bounds = branches.map(branch => branch[keyword]);
-        return bounds.every(bound => typeof bound === "number") ? pick(...bounds) : undefined;
+    const side = (keyword: string, tightest: (...bounds: number[]) => number, loosest: (...bounds: number[]) => number): number | undefined => {
+        const bounds = branches.map(branch => own_bound(branch, keyword, tightest));
+        return bounds.every(bound => bound !== undefined) ? loosest(...bounds) : undefined;
     };
-    return { minItems: side("minItems", Math.min), maxItems: side("maxItems", Math.max) };
+    return { minItems: side("minItems", Math.max, Math.min), maxItems: side("maxItems", Math.min, Math.max) };
 }
 
 /**
@@ -62,6 +73,13 @@ if (import.meta.vitest) {
     test("the property's own bounds are tightened by them, not loosened", () => {
         expect(counted({ minItems: 1, maxItems: 8, oneOf: [sized(2, 2), sized(4, 4)] })).toStrictEqual([2, 4]);
         expect(counted({ minItems: 3, maxItems: 3, oneOf: [sized(2, 2), sized(4, 4)] })).toStrictEqual([3, 3]);
+    });
+
+    test("a branch is bounded by its allOf too, the tightest of them", () => {
+        // at24.yaml's `compatible`: a vendor model with its atmel fallback, or one of the special cases
+        const allOf = { allOf: [sized(1, 2), { oneOf: [{ type: "array", items: { pattern: "c00$" } }] }] };
+        expect(counted({ oneOf: [allOf, sized(2, 2), sized(2, 2)] })).toStrictEqual([1, 2]);
+        expect(counted({ oneOf: [{ ...sized(1, 4), allOf: [sized(2, 8)] }, sized(3, 3)] })).toStrictEqual([2, 4]);
     });
 
     test("a side some branch doesn't bound, or a branch that takes anything, bounds nothing", () => {
