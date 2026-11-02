@@ -12,6 +12,11 @@ export type PropertyType = string;
 export type PropertyTypes = {
     names: Map<string, PropertyType>;
     patterns: { pattern: RegExp, type: PropertyType }[];
+    /**
+     * For a name declared a `flag` or one other type (`ranges: {oneOf: [flag, uint32-matrix]}`), the other: the type of
+     * a value the binding counts, as a flag has no items.
+     */
+    counted?: Map<string, PropertyType>;
 };
 
 export const NO_PROPERTY_TYPES: PropertyTypes = { names: new Map(), patterns: [] };
@@ -50,6 +55,26 @@ export function declared_type(schema: unknown): PropertyType | undefined {
     return undefined;
 }
 
+/**
+ * The type other than `flag` of a schema that is a flag or one other type (reg.yaml's `ranges` and `dma-ranges`: an
+ * empty value, or a `uint32-matrix`); undefined for any other schema.
+ */
+export function counted_type(schema: unknown): PropertyType | undefined {
+    if (!is_schema(schema)) { return undefined; }
+
+    for (const key of ["oneOf", "anyOf"]) {
+        const branches = schema[key];
+        if (!Array.isArray(branches)) { continue; }
+
+        const types = new Set(branches.map(branch => declared_type(branch)));
+        if (types.size === 2 && types.has("flag") && !types.has(undefined)) {
+            return [...types].find(type => type !== "flag");
+        }
+    }
+
+    return undefined;
+}
+
 function* schema_files(directory: string): Generator<string> {
     for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
         const entry_path = path.join(directory, entry.name);
@@ -74,6 +99,11 @@ function collect(schema: unknown, types: PropertyTypes): void {
     for (const [name, property] of Object.entries(is_schema(schema["properties"]) ? schema["properties"] : {})) {
         const type = declared_type(property);
         if (type !== undefined && !types.names.has(name)) { types.names.set(name, type); }
+
+        // Whichever schema gives it: pci-bus-common.yaml's `ranges` is a boolean or an untyped list, reg.yaml's a flag
+        // or a `uint32-matrix`
+        const counted = counted_type(property);
+        if (counted !== undefined && types.names.get(name) === "flag" && !types.counted?.has(name)) { types.counted?.set(name, counted); }
     }
 
     for (const [pattern, property] of Object.entries(is_schema(schema["patternProperties"]) ? schema["patternProperties"] : {})) {
@@ -108,7 +138,7 @@ export function load_property_types(dt_schema: string): PropertyTypes {
     const cached = loaded.get(directory);
     if (cached !== undefined) { return cached; }
 
-    const types: PropertyTypes = { names: new Map(), patterns: [] };
+    const types: PropertyTypes = { names: new Map(), patterns: [], counted: new Map() };
 
     if (fs.existsSync(directory)) {
         for (const file of schema_files(directory)) {
@@ -153,7 +183,7 @@ export function load_processed_property_types(file: string, base: PropertyTypes)
     const cached = loaded_processed.get(file);
     if (cached?.modified === modified && cached.base === base) { return cached.types; }
 
-    const types: PropertyTypes = { names: new Map(base.names), patterns: [...base.patterns] };
+    const types: PropertyTypes = { names: new Map(base.names), patterns: [...base.patterns], ...(base.counted === undefined ? {} : { counted: base.counted }) };
 
     try {
         const processed = JSON.parse(fs.readFileSync(file, "utf8")) as Record<string, GeneratedTypes | undefined>;
@@ -217,6 +247,41 @@ if (import.meta.vitest) {
         expect(declared_type({ type: "boolean" })).toBe("flag");
         expect(declared_type({ maxItems: 1 })).toBeUndefined();
         expect(declared_type(true)).toBeUndefined();
+    });
+
+    test("a name declared a flag or one other type has the other for a value it counts", () => {
+        expect(counted_type({ oneOf: [{ $ref: "types.yaml#/definitions/flag" }, { $ref: "types.yaml#/definitions/uint32-matrix" }] })).toBe("uint32-matrix");
+        expect(counted_type({ anyOf: [{ type: "boolean" }, { $ref: "types.yaml#/definitions/uint32" }] })).toBe("uint32");
+        expect(counted_type({ oneOf: [{ $ref: "types.yaml#/definitions/phandle" }, { $ref: "types.yaml#/definitions/phandle-array" }] })).toBeUndefined();
+        expect(counted_type({ oneOf: [{ $ref: "types.yaml#/definitions/flag" }, { maxItems: 1 }] })).toBeUndefined();
+        expect(counted_type({ $ref: "types.yaml#/definitions/flag" })).toBeUndefined();
+
+        const directory = fs.mkdtempSync(path.join(tmpdir(), "attach-dt-schema-"));
+        try {
+            fs.mkdirSync(path.join(directory, "dtschema/schemas"), { recursive: true });
+            fs.mkdirSync(path.join(directory, "dtschema/schemas/pci"));
+            fs.writeFileSync(path.join(directory, "dtschema/schemas/pci/pci-bus-common.yaml"), [
+                "properties:",
+                "  ranges:",
+                "    oneOf:",
+                "      - type: boolean",
+                "      - maxItems: 32",
+            ].join("\n"));
+            fs.writeFileSync(path.join(directory, "dtschema/schemas/reg.yaml"), [
+                "properties:",
+                "  ranges:",
+                "    oneOf:",
+                "      - $ref: types.yaml#/definitions/flag",
+                "      - $ref: types.yaml#/definitions/uint32-matrix",
+                "  reg:",
+                "    $ref: types.yaml#/definitions/address",
+            ].join("\n"));
+            const types = load_property_types(directory);
+            expect(types.names.get("ranges")).toBe("flag");
+            expect([...types.counted ?? []]).toStrictEqual([["ranges", "uint32-matrix"]]);
+        } finally {
+            fs.rmSync(directory, { recursive: true });
+        }
     });
 
     test("a matrix type and the range of its cells", () => {
