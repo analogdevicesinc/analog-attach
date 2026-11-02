@@ -122,12 +122,13 @@ checksum() {
 # Steps:
 #   1. Create the workfile and add the eval-testpart board.
 #   2. Run move testpart_cs_gpio testpart.
-#   3. Check it fails with a usage error (exit 2).
+#   3. Check it fails with a usage error (exit 2), saying there is no command move.
 # bats test_tags=req:GEN-03, id:N0103
 @test "a command of the linux backend is refused" {
 	with_sensor
 	run aa move testpart_cs_gpio testpart
 	assert_failure 2
+	assert_output --partial 'No command registered for `move`'
 }
 
 # --- GEN-04, GEN-05, GEN-06: questions --------------------------------------------------
@@ -253,18 +254,21 @@ checksum() {
 	done
 }
 
-# Description: every command prints a single JSON result with --json.
+# Description: every command prints a single JSON result with --json, a refusal too.
 # Steps:
-#   1. Create the workfile and add the eval-testpart board.
-#   2. Run, with --json: init, config, config --reload, add, update, rename, delete --force,
-#      list devices, list context, validate, generate and completion bash.
-#   3. Check each exits 0 and prints one line, a JSON object.
+#   1. Run, with --json, in a project with no workfile: init (creating it), then add
+#      eval-testpart, add, read, update (set and show), rename, delete --force, list devices,
+#      context, property and value, validate, config, config --reload, generate, build and deploy
+#      (both refused on the fixtures), skill install and uninstall, and completion bash.
+#   2. Check each exits 0 and prints one line, a JSON object.
 # bats test_tags=req:GEN-07, id:N0111
 @test "every command prints one JSON result with --json" {
-	with_sensor
 	local words
-	for words in "init" "config" "config --reload" "add testpart --name tp2" "update testpart_spi_dev max_speed_hz 2000000" \
-		"rename tp2 tp3" "delete tp3 --force" "list devices" "list context" "validate" "generate" "completion bash"; do
+	for words in "init" "add eval-testpart" "add testpart --name tp2" "read" "read testpart_ip" \
+		"update testpart_spi_dev max_speed_hz 2000000" "update testpart_spi_dev max_speed_hz" "rename tp2 tp3" \
+		"delete tp3 --force" "list devices" "list context" "list property testpart_ip" \
+		"list value testpart_ip comm_init" "validate" "config" "config --reload" "generate" "build" "deploy" \
+		"skill install analog-attach-noos" "skill uninstall analog-attach-noos" "completion bash"; do
 		# shellcheck disable=SC2086
 		run --separate-stderr aa --json $words
 		[ "$status" -eq 0 ] || fail "$words: exit $status: $stderr"

@@ -65,13 +65,14 @@ bash_complete() {
 # Description: completion without a shell prints the script of the shell in $SHELL.
 # Steps:
 #   1. Run completion with SHELL=/usr/bin/zsh; check it succeeds with the zsh script.
-#   2. Run completion with SHELL=/bin/bash; check it prints the bash script.
+#   2. Run completion with SHELL=/bin/bash; check it succeeds with the bash script.
 # bats test_tags=req:COMPLETION-01, id:N0039
 @test "completion without a shell prints the script of the user's shell" {
 	SHELL=/usr/bin/zsh run aa completion
 	assert_success
 	assert_line --index 0 "#compdef analog-attach"
 	SHELL=/bin/bash run aa completion
+	assert_success
 	assert_line "complete -F _analog_attach_complete analog-attach"
 }
 
