@@ -1,7 +1,7 @@
 import { describe, test, expect, beforeEach, afterEach } from 'vitest';
 import path from 'node:path';
 import fs from 'node:fs';
-import { validate_workfile } from '../../src/validator/validator';
+import { validate_property_value, validate_workfile } from '../../src/validator/validator';
 import { parse_ruleset } from '../../src/ruleset_parser/ruleset_parser';
 import { expectOk, setup_test_config, teardown_test_config } from '../test_utilities';
 import {
@@ -1377,5 +1377,36 @@ describe('validate_workfile', () => {
 
             expect(cycle_errors(result).map(error => error.path).sort()).toEqual(["child", "parent"]);
         });
+    });
+});
+
+// What `update` refuses before writing: the value alone, not the rest of the workfile.
+describe('validate_property_value', () => {
+    beforeEach(() => { setup_test_config(); });
+    afterEach(() => { teardown_test_config(); });
+
+    test('a number outside its bounds, or an enum value not among the options', () => {
+        const workfile = make_workfile({
+            my_struct: make_struct("test", [
+                make_number("count", { value: 150, maximum: 100 }),
+                make_enum("mode", ["A", "B"], { value: "C" }),
+            ])
+        });
+        expect(validate_property_value(workfile, "my_struct", "count").map(error => error.message)).toEqual([expect.stringContaining("above")]);
+        expect(validate_property_value(workfile, "my_struct", "mode")).toHaveLength(1);
+    });
+
+    test('a value the definition allows, a reference to a missing node, and an empty required value are none of its business', () => {
+        const workfile = make_workfile({
+            my_struct: make_struct("test", [
+                make_number("count", { value: 50, maximum: 100 }),
+                make_include("bus", "test_spi_device", { value: "no_such_node" }),
+                make_number("needed", { required: true }),
+            ])
+        });
+        expect(validate_property_value(workfile, "my_struct", "count")).toEqual([]);
+        expect(validate_property_value(workfile, "my_struct", "bus")).toEqual([]);
+        expect(validate_property_value(workfile, "my_struct", "needed")).toEqual([]);
+        expect(validate_workfile(workfile).valid).toBe(false);
     });
 });

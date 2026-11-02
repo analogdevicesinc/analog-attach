@@ -55,7 +55,7 @@ global_setting() {
 	run_json config
 	assert_success
 	assert_json '[.configs[].field_name] | join(",")' \
-		"backend,capi-path,module-paths,target,workfile,bootstrap,interview,project-name,project-path,project-template,example,build-command,deploy-command,probe"
+		"backend,capi-path,module-paths,target,workfile,bootstrap,interview,project-name,project-path,project-template,example,build-command,deploy-command,probe,build-dir"
 	assert_json '[.configs[].category] | unique | sort | join(",")' "Build,General,Project,Sources,Target,Workfile"
 	assert_json '.configs[] | select(.field_name == "capi-path") | .required' true
 	assert_json '.configs[] | select(.field_name == "probe") | .required' false
@@ -115,13 +115,13 @@ global_setting() {
 	local before
 	before=$(cat "$PROJECT/.analog-attach/config.json")
 	run aa config probe stlink
-	assert_failure 2
+	assert_success  # a refused value: the command ran (GEN-09)
 	assert_output --partial 'probe: "stlink" is not one of openocd | jlink'
 	run aa config bootstrap yes
-	assert_failure 2
+	assert_success  # a refused value: the command ran (GEN-09)
 	assert_output --partial 'bootstrap: "yes" is not true or false'
 	run aa config target nosuchboard
-	assert_failure 2
+	assert_success  # a refused value: the command ran (GEN-09)
 	assert_output --partial 'target: "nosuchboard" is not one of testboard | otherboard'
 	[ "$(cat "$PROJECT/.analog-attach/config.json")" = "$before" ]
 }
@@ -129,10 +129,10 @@ global_setting() {
 # bats test_tags=req:CONFIG-03
 @test "a path that does not exist is refused with the reason" {
 	run aa config capi-path "$BATS_TEST_TMPDIR/nowhere"
-	assert_failure 2
+	assert_success  # a refused value: the command ran (GEN-09)
 	assert_output --partial "capi-path: $BATS_TEST_TMPDIR/nowhere does not exist"
 	run aa config module-paths "$NOOS_FIXTURES/platform" "$BATS_TEST_TMPDIR/nowhere"
-	assert_failure 2
+	assert_success  # a refused value: the command ran (GEN-09)
 	assert_output --partial "module-paths: $BATS_TEST_TMPDIR/nowhere does not exist"
 	[ "$(local_setting capi-path)" = "\"$NOOS_FIXTURES/capi\"" ]
 }
@@ -140,7 +140,7 @@ global_setting() {
 # bats test_tags=req:CONFIG-03
 @test "a directory that is not a capi checkout is refused as capi-path" {
 	run aa config capi-path "$BATS_TEST_TMPDIR"
-	assert_failure 2
+	assert_success  # a refused value: the command ran (GEN-09)
 	assert_output --partial "is not a capi checkout (it has no module.yml)"
 }
 
@@ -202,12 +202,11 @@ global_setting() {
 	[ "$(local_setting probe)" = null ]
 }
 
-# bats test_tags=req:CONFIG-06, gap
-@test "with --local a change goes to the project settings, created in the current directory" {
-	# Gap: there is no --local flag ("No flag registered for --local, did you mean --global?", exit 2).
+# bats test_tags=req:CONFIG-06
+@test "with no project settings, a change creates them in the current directory" {
 	mkdir -p "$BATS_TEST_TMPDIR/elsewhere"
 	cd "$BATS_TEST_TMPDIR/elsewhere"
-	run aa config backend noos --local
+	run aa config backend noos
 	assert_success
 	[ "$(jq -r .backend "$BATS_TEST_TMPDIR/elsewhere/.analog-attach/config.json")" = noos ]
 }

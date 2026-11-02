@@ -179,3 +179,19 @@ tree_sum() {
 	assert_output --partial "Build failed with exit code"
 	[ ! -e "$PROJECT/out/project/build/project_app.elf" ]
 }
+
+# bats test_tags=req:SET-11, needs:toolchain
+@test "build builds in the build-dir folder, and two can sit side by side" {
+	real_sensor
+	aa config build-dir build-a >/dev/null
+	run_json build
+	assert_json '.ok' true
+	assert_json '.path' "$PROJECT/out/project/build-a/project_app.elf"
+	aa config build-dir build-b >/dev/null
+	run_json build
+	assert_json '.path' "$PROJECT/out/project/build-b/project_app.elf"
+	[ -f "$PROJECT/out/project/build-a/project_app.elf" ]
+	[ -f "$PROJECT/out/project/build-b/project_app.elf" ]
+	[ ! -e "$PROJECT/out/project/build" ]
+}
+

@@ -34,7 +34,7 @@ export const read = command<ReadArguments, ReadResponse>({
             "With no arguments, prints the whole workfile.\n" +
             "With <node>, prints that node's properties. With <node> <property>, prints one property.\n" +
             "--quiet prints only the values: the node names, a node's 'property value' lines, or the\n" +
-            "property's value alone."
+            "property's value alone.\n\nExamples:\n  $ analog-attach read\n  $ analog-attach read adxl355_spi_dev\n  $ analog-attach read adxl355_spi_dev max_speed_hz\n  $ analog-attach read --quiet adxl355_spi_dev max_speed_hz"
     },
     run(arguments_, _flags, session) {
         return Promise.resolve(read_target(session, arguments_.quiet, arguments_.path, arguments_.property));

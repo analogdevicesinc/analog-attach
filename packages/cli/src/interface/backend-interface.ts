@@ -216,7 +216,11 @@ export interface SettingsView {
     reset(key: string, scope?: "local" | "global"): Promise<SettingWrite>;
 }
 
-export type SettingWrite = { ok: true; file: string } | { ok: false; message: string };
+/**
+ * A write's result. `broken_file`: refused because the file itself can't be written (not JSON,
+ * the section not an object), not because of the value: a configuration error (COM-071).
+ */
+export type SettingWrite = { ok: true; file: string } | { ok: false; message: string; broken_file?: true };
 
 /**
  * Optional hooks into `analog-attach config`. Without them a setting is checked only against its

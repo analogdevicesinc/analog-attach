@@ -14,7 +14,7 @@ import { common_ok, type CommonResponse } from "../protocol/responses";
 export const rename = command<RenameArguments, CommonResponse>({
     docs: {
         brief: "Rename a node",
-        full: "Renames <node> to <name>, rewriting every reference to it."
+        full: "Renames <node> to <name>, rewriting every reference to it.\n\nExamples:\n  $ analog-attach rename adxl355 accel\n  $ analog-attach rename cs_pin accel_cs"
     },
     run({ path: node, name }, _flags, session) {
         const context = load_context(session);

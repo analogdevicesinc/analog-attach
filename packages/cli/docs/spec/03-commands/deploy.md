@@ -99,8 +99,8 @@ mode it shall respond per `04-protocol/deploy.schema.json`: `{ "ok": true,
 The project is the one `build` builds (`build.md` §5).
 
 **DEPLOY-500** If `--probe` is neither `openocd` nor `jlink`, then the CLI
-shall report the input error `Unknown probe '<probe>'. Supported: openocd,
-jlink` before anything else.
+shall refuse with `Unknown probe '<probe>'. Supported: openocd, jlink`
+(`02-common.md` COM-043) before anything else.
 
 **DEPLOY-501** The CLI shall refuse for the project directory as `build.md`
 BUILD-500 says.
@@ -130,8 +130,9 @@ BUILD-512 and BUILD-513 say.
 in both modes (`02-common.md` COM-514). With `deploy-command`, the progress
 line is DEPLOY-502's.
 
-**DEPLOY-512** The CLI shall run `cmake --preset <board> -DPROBE=<probe>`
-and `cmake --build <dir>/build --target flash` in the project directory,
+**DEPLOY-512** The CLI shall run `cmake --preset <board> -B <build>
+-DPROBE=<probe>` and `cmake --build <build> --target flash` in the project
+directory (`<build>` as `build.md` BUILD-512 says),
 with `CAPI_DIR` set to `capi-path`. If the first exits with a non-zero
 status, then the CLI shall refuse with `CMake configure failed with exit
 code <n>`; if the second does, with `Deploy failed with exit code <n>`. It

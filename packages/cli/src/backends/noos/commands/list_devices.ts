@@ -18,7 +18,7 @@ export const list_devices = command<ListDevicesArguments, ListDevicesResponse>({
         brief: "List the devices that can be added: eval boards, drivers, schemas",
         full:
             "Lists every schema available to the current workfile, grouped by kind.\n" +
-            "The key of each entry is what 'add <key>' takes. A filter keeps the keys that contain it."
+            "The key of each entry is what 'add <key>' takes. A filter keeps the keys that contain it.\n\nExamples:\n  $ analog-attach list devices\n  $ analog-attach list devices adxl\n  $ analog-attach --json list devices"
     },
     run({ filter }, _flags, session) {
         const context = load_context(session);

@@ -2,8 +2,27 @@ import type { Workfile } from "../workfile_handler/types";
 import type { ValidationError, ValidationResult } from "./types";
 import type { ParseContext } from "../ruleset_parser/validators";
 import { validate_chip_selects } from "./chip_select";
-import { validate_property } from "./property_validator";
+import { validate_property, validate_value } from "./property_validator";
 import { child_names, collect_child_overrides, create_connections_graph, describe_cycle, topo_sorted_symbols } from "./connection_graph";
+
+/**
+ * The problems of one property's value, with the rules on its node applied: what the
+ * definition doesn't allow for the value itself (validate_value). An unknown node or property
+ * has none here; the caller looks them up first.
+ */
+export function validate_property_value(workfile: Workfile, symbol_name: string, property_name: string): ValidationError[] {
+	const ruleset = workfile.symbols[symbol_name];
+	if (ruleset === undefined || (ruleset._t !== "RulesetStruct" && ruleset._t !== "RulesetDescriptor")) {
+		return [];
+	}
+	const property = ruleset.properties.find(candidate => candidate.name === property_name);
+	if (property === undefined) {
+		return [];
+	}
+	const child_overrides = collect_child_overrides(symbol_name, workfile, create_connections_graph(workfile));
+	const context: ParseContext = { path: symbol_name, document: {} };
+	return validate_value(property, child_overrides, symbol_name, workfile, context).filter(problem => problem.severity === "error");
+}
 
 export function validate_workfile(workfile: Workfile): ValidationResult {
 	const errors: ValidationError[] = [];

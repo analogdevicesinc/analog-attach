@@ -40,7 +40,7 @@ export const generate: ExtraCommand<typeof GENERATE_FLAGS, CommonResponse> = {
         brief: "Generate a CAPI project from the workfile",
         full:
             "Renders the workfile into the project directory: the 'project-path' setting, or\n" +
-            "out/<project-name> when it is unset. --output overrides it for this run."
+            "out/<project-name> when it is unset. --output overrides it for this run.\n\nExamples:\n  $ analog-attach generate\n  $ analog-attach generate --output ~/work/accel_demo\n  $ analog-attach generate --project-template capi-iio"
     },
     positionals: [],
     flags: GENERATE_FLAGS,

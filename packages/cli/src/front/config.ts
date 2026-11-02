@@ -12,7 +12,7 @@
 // `backend` and the active backend's section (settings-store.ts).
 
 import {
-    answer, input_error,
+    answer, input_error, refuse,
     type Completion, type Outcome, type Session, type SettingSpec,
 } from "../interface/backend-interface";
 import type { CommonResponse } from "../interface/backend-responses";
@@ -244,10 +244,14 @@ function changed_keys(before: Map<string, string>, settings: SettingsStore): str
     return settings.specs.map(spec => spec.key).filter(key => before.get(key) !== after.get(key));
 }
 
-/** A refused write: the store's message, then the setting's description and hint (CONFIG-103). */
+/**
+ * A refused write: the store's message, then the setting's description and hint (CONFIG-103).
+ * A refusal, not an input error: the command ran and the value is what it can't take (GEN-09).
+ */
 function refused_write(message: string, spec: SettingSpec, front: FrontEnd): Outcome<never> {
     const hint = hint_of(spec, front);
-    return input_error(`${message} — ${spec.description}${hint === undefined ? "" : `\n\n${hint}`}`);
+    const reason = `${message} — ${spec.description}`;
+    return refuse(reason, { text: `${reason}${hint === undefined ? "" : `\n\n${hint}`}` });
 }
 
 /** What else a write changed: ` (and chip = chip-a, reset port)`. */
@@ -275,7 +279,10 @@ async function set(front: FrontEnd, spec: SettingSpec, values: readonly string[]
     const before = snapshot(settings);
     const scope = global ? "global" : "local";
     const write = await settings.set(spec.key, spec.type === "path_list" ? values : values[0]!, scope);
-    if (!write.ok) { return refused_write(write.message, spec, front); }
+    if (!write.ok) {
+        // A file that can't be written is the configuration's problem (COM-071), not the value's.
+        return write.broken_file === true ? input_error(`${write.message} — ${spec.description}`) : refused_write(write.message, spec, front);
+    }
     const keys = changed_keys(before, settings);
     const also = keys.filter(key => key !== spec.key);
     const message = `Set ${spec.key} = ${values.join(" ")}${global ? " (global)" : ""}${also_text(also, front)}`;

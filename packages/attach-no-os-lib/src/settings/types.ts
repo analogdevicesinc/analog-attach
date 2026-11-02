@@ -63,6 +63,8 @@ export interface SettingsFile {
 	"deploy-command": Setting;
 	/** Debug probe `deploy` flashes through. */
 	probe: Setting;
+	/** Where `build` builds the generated project, relative to it: several can sit side by side. */
+	"build-dir": Setting;
 	/** Whether `add` fills in everything that leaves no room for choice (see bootstrap/). */
 	bootstrap: Setting;
 	/** Whether `add`, on a terminal, asks for what bootstrap leaves to the user. */

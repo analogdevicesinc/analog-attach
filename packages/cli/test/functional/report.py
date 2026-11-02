@@ -57,7 +57,11 @@ def read_tests(root):
                 pending = []
                 eco = next((tag[4:] for tag in all_tags if tag.startswith("eco:")), file.parent.name)
                 reqs = [tag[4:] for tag in all_tags if tag.startswith("req:")]
-                tests[(relative, test.group(2))] = {"eco": eco, "reqs": reqs}
+                # The name as bats reports it: a double-quoted name has its shell escapes undone.
+                name = test.group(2)
+                if test.group(1) == '"':
+                    name = re.sub(r'\\([$`"\\])', r"\1", name)
+                tests[(relative, name)] = {"eco": eco, "reqs": reqs}
     return tests
 
 

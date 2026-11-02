@@ -518,7 +518,27 @@ function route_map(tree: Tree, name: string | undefined, front: FrontEnd): Route
         }
     }
     const brief = name === undefined ? "Configure device trees and no-OS projects for peripherals" : ROUTE_MAP_BRIEFS[name] ?? name;
-    return buildRouteMap({ routes, docs: { brief, fullDescription: name === undefined ? root_description(front) : undefined, hideRoute: hidden } });
+    const fullDescription = name === undefined ? root_description(front) : group_description(name, brief, tree, front);
+    return buildRouteMap({ routes, docs: { brief, fullDescription, hideRoute: hidden } });
+}
+
+/**
+ * A group's help (`list --help`): its brief, then an example of each command it holds, with the
+ * backend's words for the placeholders (GEN-10).
+ */
+function group_description(name: string, brief: string, tree: Tree, front: FrontEnd): string {
+    const words = { ...DEFAULT_WORDS, ...front.backend?.words };
+    const examples = [...tree.children].filter(([, child]) => child.route !== undefined && child.route.hidden !== true).map(([segment, child]) => {
+        const required = child.route!.positionals.filter(positional => positional.optional !== true);
+        const shown = required.map(positional => `<${placeholder_word(positional.placeholder ?? positional.name, words)}>`);
+        return `  $ ${front.program} ${name} ${[segment, ...shown].join(" ")}`;
+    });
+    return examples.length === 0 ? brief : `${brief}\n\nExamples:\n${examples.join("\n")}`;
+}
+
+/** A placeholder in the backend's words: `path` is `node` for noos. */
+function placeholder_word(placeholder: string, words: Words): string {
+    return placeholder in words ? words[placeholder as keyof Words] : placeholder;
 }
 
 /** ` Another: 'analog-attach config backend noos'.` (several: `<a|b>`), naming the registered backends but the active one; empty when there is none. */

@@ -45,7 +45,7 @@ export const delete_command = command<DeleteArguments, DeleteResponse>({
         full:
             "With <node> <property>, clears that property's value.\n" +
             "With <node>, removes the node; --force is required if anything references it.\n" +
-            "With no arguments, removes every node; --force is required."
+            "With no arguments, removes every node; --force is required.\n\nExamples:\n  $ analog-attach delete adxl355_spi_dev max_speed_hz\n  $ analog-attach delete cs_pin\n  $ analog-attach delete cs_pin --force\n  $ analog-attach delete --force"
     },
     run({ path: node, property, force }, _flags, session) {
         const context = load_context(session);

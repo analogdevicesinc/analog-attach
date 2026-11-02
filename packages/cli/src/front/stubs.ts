@@ -9,7 +9,7 @@
 
 import * as fs from "node:fs";
 import path from "node:path";
-import { answer, input_error, type Outcome } from "../interface/backend-interface";
+import { answer, input_error, refuse, type Outcome } from "../interface/backend-interface";
 import type { CommonResponse } from "../interface/backend-responses";
 import type { FrontEnd, Route } from "./routes";
 
@@ -340,9 +340,9 @@ export function run_completion(shell: string | undefined, options: { install: bo
     if (options.install && options.uninstall) { return input_error("option '--install' cannot be used with option '--uninstall'"); }
     const chosen = shell ?? shell_from_environment(place.environment);
     if (chosen === undefined) {
-        return input_error(`Cannot tell the shell from $SHELL (${place.environment["SHELL"] ?? "not set"}). Name one: ${SHELLS.join(", ")}`);
+        return refuse(`Cannot tell the shell from $SHELL (${place.environment["SHELL"] ?? "not set"}). Name one: ${SHELLS.join(", ")}`);
     }
-    if (!is_shell(chosen)) { return input_error(`Unknown shell: ${chosen}. Supported: ${SHELLS.join(", ")}`); }
+    if (!is_shell(chosen)) { return refuse(`Unknown shell: ${chosen}. Supported: ${SHELLS.join(", ")}`); }
     if (options.install || options.uninstall) {
         const lines = options.install ? install_completion(chosen, place) : uninstall_completion(chosen, place);
         return answer({ ok: true, message: lines.join("\n"), severity: "info" }, lines.join("\n"));
@@ -430,10 +430,10 @@ if (import.meta.vitest) {
         }
     });
 
-    test("run_completion - an unknown shell or an unreadable $SHELL is an input error", () => {
+    test("run_completion - an unknown shell or an unreadable $SHELL is refused; --install with --uninstall an input error", () => {
         const place = { program: "analog-attach", home: "/nonexistent", environment: { SHELL: "/bin/sh" } };
-        expect(run_completion("tcsh", { install: false, uninstall: false }, place)).toEqual({ kind: "input-error", message: "Unknown shell: tcsh. Supported: bash, fish, zsh" });
-        expect(run_completion(undefined, { install: false, uninstall: false }, place)).toEqual({ kind: "input-error", message: "Cannot tell the shell from $SHELL (/bin/sh). Name one: bash, fish, zsh" });
+        expect(run_completion("tcsh", { install: false, uninstall: false }, place)).toMatchObject({ kind: "refused", response: { ok: false, message: "Unknown shell: tcsh. Supported: bash, fish, zsh" } });
+        expect(run_completion(undefined, { install: false, uninstall: false }, place)).toMatchObject({ kind: "refused", response: { message: "Cannot tell the shell from $SHELL (/bin/sh). Name one: bash, fish, zsh" } });
         expect(run_completion("zsh", { install: true, uninstall: true }, place).kind).toBe("input-error");
         expect(run_completion(undefined, { install: false, uninstall: false }, { ...place, environment: { SHELL: "/bin/zsh" } }).kind).toBe("answer");
     });

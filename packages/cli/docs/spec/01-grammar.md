@@ -58,6 +58,13 @@ the one element `--quiet`, the CLI shall write the program's usage to
 standard output and exit with status 0. In JSON mode (`analog-attach
 --json`), it shall write the usage to standard error and exit with status 2.
 
+**GRM-009** The help of every command (`<command> --help`) and of every group
+of commands (`list --help`, `skill --help`) shall end its description with
+`Examples:` and two to four lines `  $ analog-attach <words>`, commands as a
+user types them. A group's examples are one per command it holds, its
+required positionals in the backend's words (`<node>` where the backend is
+noos).
+
 **GRM-008** The usage and the help of the program shall list the commands of
 the backend: the shared ones it provides and its own (COM-015), each in its
 group, then the line `Backend: <id> (<title>).`, followed by ` Another:

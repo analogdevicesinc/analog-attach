@@ -154,6 +154,81 @@ export function validate_property(
 	}
 }
 
+/** Whether an include names an enum, so its value is one of the enum's options, not a node. */
+function includes_enum(match: IncludeMatch): boolean {
+	if (match.include === undefined) {
+		return false;
+	}
+	const resolved = load_resolved_ruleset(match.include);
+	return resolved.ok && resolved.value._t === "RulesetEnum";
+}
+
+/**
+ * The problems of a property's value alone, as its definition and the rules on it leave it:
+ * a number's type and bounds, a boolean, a string, an enum's options (an include of an enum
+ * too), an array's size and the options of its enum elements, a union's member. What `update`
+ * refuses before writing (UPDATE-02). A reference to another node, a rule about other
+ * properties and a required value left empty are the whole workfile's to report: `validate`.
+ */
+export function validate_value(
+	property: Property,
+	child_overrides: CollectedRule[],
+	symbol_name: string,
+	workfile: Workfile,
+	context: ParseContext
+): ValidationError[] {
+	const property_context = at(context, property.name);
+	const { effective } = apply_overrides(property, child_overrides, symbol_name, workfile);
+	if (effective.value === undefined || effective.value === null || effective.disabled === true || effective.readonly === true) {
+		return [];
+	}
+	switch (effective._t) {
+		case "NumberProperty": {
+			return validate_number(effective, property_context);
+		}
+		case "BooleanProperty": {
+			return validate_boolean(effective, property_context);
+		}
+		case "StringProperty": {
+			return validate_string(effective, property_context);
+		}
+		case "EnumProperty": {
+			return validate_enum(effective, property_context);
+		}
+		case "IncludeProperty": {
+			return includes_enum(effective) ? validate_include(effective.value as string, effective, workfile, property_context) : [];
+		}
+		case "ArrayProperty": {
+			const value = effective.value as unknown;
+			if (!Array.isArray(value)) {
+				return [];
+			}
+			if (value.length > effective.size) {
+				return [{
+					path: property_context.path,
+					message: `Array exceeds maximum size of ${effective.size.toString()}, got ${value.length.toString()}`,
+					severity: "error"
+				}];
+			}
+			const element = effective.element;
+			if (element._t !== "IncludeProperty" || !includes_enum(element)) {
+				return [];
+			}
+			return (value as string[]).flatMap((entry, index) => validate_include(entry, element, workfile, at(property_context, index)));
+		}
+		case "UnionProperty": {
+			const [member] = Object.keys(effective.value);
+			if (member === undefined || effective.members.some(candidate => candidate.name === member)) {
+				return [];
+			}
+			return [{ path: at(property_context, member).path, message: `Unknown union member '${member}'`, severity: "error" }];
+		}
+		default: {
+			return [];
+		}
+	}
+}
+
 /**
  * Check a driver-backed value: the symbol exists, is the right kind of node, and comes from
  * a module that declares the interface the property asked for.
