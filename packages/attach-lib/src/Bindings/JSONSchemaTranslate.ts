@@ -74,7 +74,7 @@ function collect_properties(properties: Record<string, unknown> | undefined): Re
             continue;
         }
 
-        collected.push({ key: name, value: narrow_object(value) });
+        collected.push({ key: name, value: narrow_object(value, name) });
     }
 
     return collected;
@@ -212,19 +212,26 @@ function described<T extends object>(schema: any, type: T): T & { description?: 
 /** The most options of a `compatible` we list; a larger product is left to what `dtType` says. */
 const MAX_ENUM_OPTIONS = 512;
 
+/** A bound of `schema` (`minItems` / `maxItems`), or `fallback` when it gives none. */
+const bound_of = (schema: any, keyword: "minItems" | "maxItems", fallback: number): number =>
+    typeof schema[keyword] === "number" ? schema[keyword] : fallback;
+
 /**
  * A `oneOf` of lists whose entries are each an `enum` / `const` (the values a `compatible` can take, the fallback
- * lists among them) is one list of one such value. The whole list of a branch is an option, also when the branch
- * admits a shorter one (`minItems` below `maxItems`): the schema keeps that rule, the option is what to suggest.
+ * lists among them; `clock-names: [clkin1, s_axi_aclk]` or `[clkin1, clkin2, s_axi_aclk]`) is one list of one such
+ * value, each option a whole list. Each list a branch admits is an option, from its `minItems` up to all of its
+ * entries, that the property's own bounds allow too: `interconnect-names: {maxItems: 2}` beside `[mdp0-mem, mdp1-mem,
+ * cpu-cfg]` with `minItems: 2` is `[mdp0-mem, mdp1-mem]`. Not for a `compatible` (`whole_lists`), whose shorter lists
+ * drop the fallbacks it is written with: only the whole list of a branch is one, as the option is what to suggest.
  * An `enum` position gives one option per value (the first position varies slowest). Undefined when a position is
- * neither an `enum` nor a `const` (a `pattern`), or when there are more than `MAX_ENUM_OPTIONS` options: a partial
- * list would mislead the suggestions.
+ * neither an `enum` nor a `const` (a `pattern`), when no list fits, or when there are more than `MAX_ENUM_OPTIONS`
+ * options: a partial list would mislead the suggestions.
  */
-function fixed_size_enum_list(object: any): AttachType | undefined {
+function fixed_size_enum_list(object: any, whole_lists: boolean): AttachType | undefined {
     const oneOf: any[] = object.oneOf;
 
-    // The values each position of each branch can take
-    const branches: unknown[][][] = [];
+    // The values each position of each branch can take, and the lengths of the lists it admits, longest first
+    const branches: { positions: unknown[][], lengths: number[] }[] = [];
 
     for (const value of oneOf) {
         if (!("items" in value)) { return undefined; }
@@ -243,29 +250,42 @@ function fixed_size_enum_list(object: any): AttachType | undefined {
                 return undefined;
             }
         }
-        branches.push(positions);
+
+        const lengths: number[] = [];
+        if (whole_lists) {
+            lengths.push(positions.length);
+        } else {
+            const shortest = Math.max(bound_of(value, "minItems", positions.length), bound_of(object, "minItems", 1));
+            const longest = Math.min(positions.length, bound_of(value, "maxItems", positions.length), bound_of(object, "maxItems", positions.length));
+            for (let length = longest; length >= shortest; length--) { lengths.push(length); }
+        }
+        branches.push({ positions, lengths });
     }
 
     const options = new Map<string, unknown>();
 
-    for (const positions of branches) {
-        // Count before expanding, a few positions of a dozen values are already a large product
-        let count = 1;
-        for (const values of positions) { count *= values.length; }
-        if (count > MAX_ENUM_OPTIONS) { return undefined; }
+    for (const { positions, lengths } of branches) {
+        for (const length of lengths) {
+            // Count before expanding, a few positions of a dozen values are already a large product
+            let count = 1;
+            for (const values of positions.slice(0, length)) { count *= values.length; }
+            if (count > MAX_ENUM_OPTIONS) { return undefined; }
 
-        let lists: unknown[][] = [[]];
-        for (const values of positions) {
-            lists = lists.flatMap(prefix => values.map(entry => [...prefix, entry]));
-        }
+            let lists: unknown[][] = [[]];
+            for (const values of positions.slice(0, length)) {
+                lists = lists.flatMap(prefix => values.map(entry => [...prefix, entry]));
+            }
 
-        for (const list of lists) {
-            // One entry is one string, not a list of one
-            const option = list.length === 1 ? list[0] : list;
-            options.set(JSON.stringify(option), option);
+            for (const list of lists) {
+                // One entry is one string, not a list of one
+                const option = list.length === 1 ? list[0] : list;
+                options.set(JSON.stringify(option), option);
+            }
+            if (options.size > MAX_ENUM_OPTIONS) { return undefined; }
         }
-        if (options.size > MAX_ENUM_OPTIONS) { return undefined; }
     }
+
+    if (options.size === 0) { return undefined; }
 
     return described(object, {
         _t: "list" as const,
@@ -459,7 +479,8 @@ function narrow_dt_array(object: any): AttachType | undefined {
 }
 
 // TODO: handle objects
-function narrow_object(object: any): AttachType {
+/** `name`: the property's, when the schema is one's (a `compatible` reads its `oneOf` of lists apart). */
+function narrow_object(object: any, name?: string): AttachType {
 
     if (typeof object === 'object' && object !== null && is_matrix_type(object[DT_TYPE])) {
         return narrow_matrix(object, object[DT_TYPE]);
@@ -479,7 +500,7 @@ function narrow_object(object: any): AttachType {
                         });
                     }
 
-                    return narrow_array_object(object);
+                    return narrow_array_object(object, name);
                 }
             case "string": {
                 const unique = find_entry_in_object(object, (_path: string[], key: string) => key === 'uniqueItems');
@@ -530,7 +551,7 @@ function narrow_object(object: any): AttachType {
     }
 
     if (typeof object === 'object' && Array.isArray(object.oneOf)) {
-        const enum_list = fixed_size_enum_list(object);
+        const enum_list = fixed_size_enum_list(object, name === "compatible");
         if (enum_list !== undefined) { return enum_list; }
     }
 
@@ -586,7 +607,7 @@ function get_enum_type(options: unknown): AttachEnumType.STRING | AttachEnumType
     return AttachEnumType.STRING;
 };
 
-function narrow_array_object(object: any): AttachType & { _t: "list" } {
+function narrow_array_object(object: any, name?: string): AttachType & { _t: "list" } {
 
     const list = (item: Cell | Cell[], extra: Partial<List> = {}): AttachType & { _t: "list" } =>
         described(object, { _t: "list", item, ...bounds(object), ...extra });
@@ -651,6 +672,13 @@ function narrow_array_object(object: any): AttachType & { _t: "list" } {
 
     const unique = object.uniqueItems === true ? { unique: true } : {};
 
+    // A `oneOf` of fixed lists of values says more than the string `items` of the type beside it: a `compatible` with a
+    // `pattern`, `clock-names: {$ref: string-array, oneOf: [{items: [a, b]}, {items: [a, c, b]}]}`
+    if (Array.isArray(object.oneOf)) {
+        const enum_list = fixed_size_enum_list(object, name === "compatible");
+        if (enum_list?._t === "list" && !Array.isArray(enum_list.item) && enum_list.item._t === "enum" && enum_list.item.enum.length > 0) { return enum_list; }
+    }
+
     // String array with type inside items object
     if ("items" in object && !items_array && "type" in items && items.type === "string") {
         return list({ _t: "string" }, unique);
@@ -659,12 +687,6 @@ function narrow_array_object(object: any): AttachType & { _t: "list" } {
     // String array with type inside items array
     if (items_array && items.length === 1 && "type" in items[0] && items[0].type === "string") {
         return list({ _t: "string" }, unique);
-    }
-
-    // A `compatible` with a `pattern` is an array by now; its `oneOf` of fixed lists says more.
-    if (Array.isArray(object.oneOf)) {
-        const enum_list = fixed_size_enum_list(object);
-        if (enum_list?._t === "list" && !Array.isArray(enum_list.item) && enum_list.item._t === "enum" && enum_list.item.enum.length > 0) { return enum_list; }
     }
 
     // What the `dtType` says the entries are, when the schema says nothing we read of them (`items: {pattern}`,
@@ -860,6 +882,61 @@ if (import.meta.vitest) {
         expect(described_names).toStrictEqual({ _t: "list", item: { _t: "enum", enum: ["dbi", "mstr", "slv"], enum_type: "string" } });
         expect(compatible).toStrictEqual({ _t: "list", item: { _t: "string" } });
         expect(positions).toStrictEqual({ _t: "list", item: [{ _t: "string" }, { _t: "enum", enum: ["jedec,lpddr4"], enum_type: "string", default: "jedec,lpddr4" }] });
+    });
+
+    test("a oneOf of fixed lists of names beside the type's string items gives the lists as options", () => {
+        // adi,axi-clkgen.yaml's `clock-names`, as the fixups leave it
+        const { "clock-names": names } = translated({
+            "clock-names": {
+                dtType: "string-array", type: "array", items: { type: "string" }, minItems: 2, maxItems: 3,
+                oneOf: [
+                    { type: "array", items: [{ const: "clkin1" }, { const: "s_axi_aclk" }], minItems: 2, maxItems: 2 },
+                    { type: "array", items: [{ const: "clkin1" }, { const: "clkin2" }, { const: "s_axi_aclk" }], minItems: 3, maxItems: 3 },
+                ],
+            },
+        });
+        expect(names).toStrictEqual({
+            _t: "list",
+            item: { _t: "enum", enum: [["clkin1", "s_axi_aclk"], ["clkin1", "clkin2", "s_axi_aclk"]], enum_type: "string" },
+            minItems: 1,
+            maxItems: 1,
+        });
+    });
+
+    test("each list a branch of names admits is an option, as far as the property's own bounds allow", () => {
+        // qcom,sdm670-mdss.yaml's `interconnect-names`, as the fixups leave it
+        const { "interconnect-names": names } = translated({
+            "interconnect-names": {
+                dtType: "string-array", type: "array", items: { type: "string" }, minItems: 2, maxItems: 2,
+                oneOf: [
+                    { type: "array", items: [{ const: "mdp0-mem" }, { const: "cpu-cfg" }], minItems: 2, maxItems: 2 },
+                    { type: "array", items: [{ const: "mdp0-mem" }, { const: "mdp1-mem" }, { const: "cpu-cfg" }], minItems: 2, maxItems: 3 },
+                ],
+            },
+        });
+        expect(names).toStrictEqual({
+            _t: "list",
+            item: { _t: "enum", enum: [["mdp0-mem", "cpu-cfg"], ["mdp0-mem", "mdp1-mem"]], enum_type: "string" },
+            minItems: 1,
+            maxItems: 1,
+        });
+
+        // a list of one name is the name, and a branch no list of which fits gives none
+        const { "reset-names": one } = translated({
+            "reset-names": {
+                dtType: "string-array", type: "array", items: { type: "string" }, minItems: 1, maxItems: 2,
+                oneOf: [
+                    { type: "array", items: [{ const: "core" }, { const: "ahb" }], minItems: 1, maxItems: 2 },
+                    { type: "array", items: [{ const: "a" }, { const: "b" }, { const: "c" }], minItems: 3, maxItems: 3 },
+                ],
+            },
+        });
+        expect(one).toStrictEqual({
+            _t: "list",
+            item: { _t: "enum", enum: [["core", "ahb"], "core"], enum_type: "string" },
+            minItems: 1,
+            maxItems: 1,
+        });
     });
 
     test("a oneOf of open lists of an enum is a list of the union of the enums", () => {
