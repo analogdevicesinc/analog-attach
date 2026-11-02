@@ -5,6 +5,9 @@
 
 # bats file_tags=eco:linux
 
+# Preconditions: a linux project on the Linux tree with the RPi 4 base: the tree, base and
+# workfile settings all set, the binding caches built, no workfile yet. "The setup" is
+# analog-attach run alone on a terminal (tty_run with no words).
 setup() {
 	load ../helpers
 	new_project linux
@@ -30,7 +33,17 @@ tree_skeleton() {
 # back.
 PICKED_BASE=$'❯ broadcom/bcm2711-rpi-4-b.dts\n  ← back to the architectures'
 
-# bats test_tags=req:SETUP-01, req:SETUP-03, req:SETUP-05
+# Description: with no settings file, the setup asks the ecosystem, the Linux tree, the base and
+# the workfile name, saves them, creates the workfile and shows the next steps.
+# Steps:
+#   1. Remove the project's settings file.
+#   2. Run the setup: pick linux, type the tree's path, search the tree for the base, filter on
+#      bcm2711-rpi-4-b and pick it, and take the default overlay name.
+#   3. Check it succeeds and the ecosystems, the search and the count of .dts files were offered.
+#   4. Check the backend, linux, devicetree and workfile settings are saved.
+#   5. Check the workfile exists and the screen says it was created.
+#   6. Check the next steps show list devices and add <compatible>.
+# bats test_tags=req:SETUP-01, req:SETUP-03, req:SETUP-05, id:L0283
 @test "with nothing set, the setup asks the ecosystem, then the Linux tree, the base and the workfile, then creates it" {
 	rm "$PROJECT/.analog-attach/config.json"
 	tty_run "What does this project target?" $'\r' \
@@ -63,7 +76,13 @@ PICKED_BASE=$'❯ broadcom/bcm2711-rpi-4-b.dts\n  ← back to the architectures'
 }
 
 # Gap: the Linux setup runs init at once, without offering to: the workfile is always created.
-# bats test_tags=req:SETUP-01, gap
+# Description: the setup offers to create the workfile; declining creates none and points to
+# init.
+# Steps:
+#   1. Run the setup, keep the tree and base with Enter, and answer n to creating the workfile.
+#   2. Check it succeeds and the output mentions analog-attach init.
+#   3. Check no workfile was created.
+# bats test_tags=req:SETUP-01, gap, id:L0284
 @test "the setup offers to create the workfile, and declining creates none" {
 	tty_run "Linux source tree" $'\r' "Choose how to select" $'\r' "Overlay:" $'\r' "(Y/n)" $'n\r' --
 	assert_success
@@ -71,7 +90,14 @@ PICKED_BASE=$'❯ broadcom/bcm2711-rpi-4-b.dts\n  ← back to the architectures'
 	[ ! -e "$WORKFILE" ]
 }
 
-# bats test_tags=req:SETUP-01
+# Description: the setup can name a new workfile, and refuses a name whose file already exists.
+# Steps:
+#   1. Create the overlay with init.
+#   2. Run the setup, keep the tree and base, decline the current overlay, and type overlay as
+#      the name.
+#   3. When it says the file already exists, change the name to other.
+#   4. Check it succeeds, the workfile setting is other.dtso, and both files exist.
+# bats test_tags=req:SETUP-01, id:L0285
 @test "the setup can name a new workfile, refusing a name whose file exists" {
 	with_overlay
 	tty_run "Linux source tree" $'\r' "Choose how to select" $'\r' \
@@ -86,7 +112,15 @@ PICKED_BASE=$'❯ broadcom/bcm2711-rpi-4-b.dts\n  ← back to the architectures'
 
 # Gap: every step is asked again, with the configured value as the Enter default (the tree
 # question comes first, so this waits until TTY_TIMEOUT).
-# bats test_tags=req:SETUP-02, gap
+# Description: the setup asks only for the settings that have no value: with only devicetree
+# missing, it starts at the base.
+# Steps:
+#   1. Drop the devicetree setting.
+#   2. Run the setup with a 5 s timeout: choose to type the base's path, type it, and take the
+#      default overlay name.
+#   3. Check it succeeds and never asked for the Linux tree.
+#   4. Check devicetree is the RPi 4 base and the tree setting is kept.
+# bats test_tags=req:SETUP-02, gap, id:L0286
 @test "the setup asks only for the settings that have no value" {
 	drop_setting devicetree
 	TTY_TIMEOUT=5 tty_run "Choose how to select" $'\x1b[B\r' \
@@ -99,7 +133,13 @@ PICKED_BASE=$'❯ broadcom/bcm2711-rpi-4-b.dts\n  ← back to the architectures'
 }
 
 # Gap: with everything set, the setup asks all three steps again.
-# bats test_tags=req:SETUP-02, gap
+# Description: with every setting set and the workfile created, the setup asks nothing and says
+# the workspace is ready.
+# Steps:
+#   1. Create the overlay with init.
+#   2. Run the setup, stopping it with Ctrl+C if it asks for the Linux tree.
+#   3. Check it did not ask for the tree and says the workspace is ready.
+# bats test_tags=req:SETUP-02, gap, id:L0287
 @test "a setup with everything set asks nothing" {
 	with_overlay
 	# Stops the setup if it asks for the tree.
@@ -108,7 +148,13 @@ PICKED_BASE=$'❯ broadcom/bcm2711-rpi-4-b.dts\n  ← back to the architectures'
 	assert_output --partial "Workspace ready"
 }
 
-# bats test_tags=req:SETUP-02
+# Description: keeping the configured workfile with Enter leaves its content as it was.
+# Steps:
+#   1. Create the overlay with init and add adi,adxl345 under spi0.
+#   2. Snapshot the workfile.
+#   3. Run the setup, pressing Enter at the tree, the base and the overlay.
+#   4. Check it succeeds, the screen says the overlay was kept, and the workfile is unchanged.
+# bats test_tags=req:SETUP-02, id:L0288
 @test "a configured workfile is kept with Enter, its content as it was" {
 	with_overlay
 	aa add adi,adxl345 --parent spi0 >/dev/null 2>&1
@@ -121,7 +167,14 @@ PICKED_BASE=$'❯ broadcom/bcm2711-rpi-4-b.dts\n  ← back to the architectures'
 
 # Gap: a stopped setup saves nothing (`Setup cancelled.`): the settings are written only
 # after the last question.
-# bats test_tags=req:SETUP-02, req:GEN-06, gap
+# Description: a setup stopped part way keeps the answers given so far, and the next run goes on
+# from the first unanswered question.
+# Steps:
+#   1. Drop the linux, devicetree and workfile settings.
+#   2. Run the setup, type the tree's path, and stop it with Ctrl+C at the base.
+#   3. Check the tree setting is saved.
+#   4. Run the setup again, stopping at the base, and check it did not ask for the tree.
+# bats test_tags=req:SETUP-02, req:GEN-06, gap, id:L0289
 @test "a stopped setup keeps each answer, and the next run goes on from there" {
 	drop_setting linux devicetree workfile
 	tty_run "Linux source tree" $'\x1b[B\r' \
@@ -133,7 +186,12 @@ PICKED_BASE=$'❯ broadcom/bcm2711-rpi-4-b.dts\n  ← back to the architectures'
 	refute_output --partial "? Linux source tree"
 }
 
-# bats test_tags=req:GEN-06
+# Description: stopping the setup with Ctrl+C ends it with status 130 and creates no workfile.
+# Steps:
+#   1. Run the setup and press Ctrl+C at the Linux tree question.
+#   2. Check it fails with status 130 and says the setup was cancelled.
+#   3. Check no workfile was created.
+# bats test_tags=req:GEN-06, id:L0290
 @test "stopping the setup with Ctrl+C ends it with status 130" {
 	tty_run "Linux source tree" $'\x03' --
 	assert_failure 130
@@ -141,7 +199,16 @@ PICKED_BASE=$'❯ broadcom/bcm2711-rpi-4-b.dts\n  ← back to the architectures'
 	[ ! -e "$WORKFILE" ]
 }
 
-# bats test_tags=req:SETUP-03
+# Description: the setup offers the Linux trees it finds under the home directory, and only
+# directories that look like a tree.
+# Steps:
+#   1. Drop the linux setting.
+#   2. Make two tree skeletons under the home directory, and a directory with bindings but no
+#      include/.
+#   3. Run the setup and stop it at the Linux tree question.
+#   4. Check both trees are offered, the directory without include/ is not, and typing a path is
+#      offered.
+# bats test_tags=req:SETUP-03, id:L0291
 @test "the setup offers the Linux trees found under the home directory" {
 	drop_setting linux
 	tree_skeleton "$HOME/src/linux-a"
@@ -154,14 +221,27 @@ PICKED_BASE=$'❯ broadcom/bcm2711-rpi-4-b.dts\n  ← back to the architectures'
 	assert_output --partial "Type a path"
 }
 
-# bats test_tags=req:SETUP-03
+# Description: the setup offers the configured Linux tree first, marked current.
+# Steps:
+#   1. Make a tree skeleton under the home directory.
+#   2. Run the setup and stop it at the Linux tree question.
+#   3. Check the first, highlighted choice is the configured tree, marked (current).
+# bats test_tags=req:SETUP-03, id:L0292
 @test "the setup offers the configured tree first, marked current" {
 	tree_skeleton "$HOME/src/linux-a"
 	tty_run "Linux source tree" $'\x03' --
 	[[ "$(screen)" == *"❯ $LINUX_TREE (current)"* ]] || fail "the configured tree is not first: $output"
 }
 
-# bats test_tags=req:SETUP-03
+# Description: the setup offers the base devicetrees of the Linux tree, by architecture, to pick
+# from.
+# Steps:
+#   1. Drop the devicetree setting.
+#   2. Run the setup, keep the tree, search the tree, take the first architecture, filter on
+#      bcm2711, and stop when the list shows the boards.
+#   3. Check arm64 was offered as an architecture.
+#   4. Check the RPi 4 B and RPi 400 base files are listed.
+# bats test_tags=req:SETUP-03, id:L0293
 @test "the setup offers the base device trees of the Linux tree to pick from" {
 	drop_setting devicetree
 	tty_run "Linux source tree" $'\r' \
@@ -174,7 +254,12 @@ PICKED_BASE=$'❯ broadcom/bcm2711-rpi-4-b.dts\n  ← back to the architectures'
 	assert_output --partial "broadcom/bcm2711-rpi-400.dts"
 }
 
-# bats test_tags=req:SETUP-04
+# Description: without a terminal, the bare run asks nothing and shows the help.
+# Steps:
+#   1. Run analog-attach alone with stdin from /dev/null.
+#   2. Check it succeeds and shows the help's usage and commands.
+#   3. Check it does not mention analog-attach setup.
+# bats test_tags=req:SETUP-04, id:L0294
 @test "without a terminal, the bare run asks nothing and shows the help" {
 	run timeout 30 node "$CLI_DIR/dist/cli.js" </dev/null
 	assert_success
@@ -184,7 +269,14 @@ PICKED_BASE=$'❯ broadcom/bcm2711-rpi-4-b.dts\n  ← back to the architectures'
 }
 
 # Gap: the bare run shows the help alone, naming no missing setting.
-# bats test_tags=req:SETUP-04, gap
+# Description: without a terminal, the bare run shows the help and names the required settings
+# that are missing, and how to set them.
+# Steps:
+#   1. Drop the devicetree setting.
+#   2. Run analog-attach alone with stdin from /dev/null.
+#   3. Check it succeeds and shows the help.
+#   4. Check it says devicetree is not set yet and points to the guided setup and config.
+# bats test_tags=req:SETUP-04, gap, id:L0295
 @test "without a terminal, the bare run says which required settings are missing" {
 	drop_setting devicetree
 	run timeout 30 node "$CLI_DIR/dist/cli.js" </dev/null
@@ -194,7 +286,14 @@ PICKED_BASE=$'❯ broadcom/bcm2711-rpi-4-b.dts\n  ← back to the architectures'
 }
 
 # Gap: the bare run shows the help alone, naming no missing setting.
-# bats test_tags=req:SETUP-04, gap
+# Description: with --quiet on a terminal, the bare run asks nothing, shows the help and names the
+# missing settings.
+# Steps:
+#   1. Drop the devicetree setting.
+#   2. Run analog-attach --quiet on a terminal.
+#   3. Check it succeeds, shows the help and says devicetree is not set yet.
+#   4. Check it does not ask for the Linux tree.
+# bats test_tags=req:SETUP-04, gap, id:L0296
 @test "with --quiet, on a terminal, the bare run asks nothing and shows the help" {
 	drop_setting devicetree
 	tty_run -- --quiet
@@ -204,7 +303,12 @@ PICKED_BASE=$'❯ broadcom/bcm2711-rpi-4-b.dts\n  ← back to the architectures'
 	refute_output --partial "Linux source tree"
 }
 
-# bats test_tags=req:SETUP-04
+# Description: with --json on a terminal, the bare run asks nothing and shows the help.
+# Steps:
+#   1. Drop the devicetree setting.
+#   2. Run analog-attach --json on a terminal.
+#   3. Check it shows the help and does not ask for the Linux tree.
+# bats test_tags=req:SETUP-04, id:L0297
 @test "with --json, on a terminal, the bare run asks nothing and shows the help" {
 	drop_setting devicetree
 	tty_run -- --json
@@ -213,7 +317,12 @@ PICKED_BASE=$'❯ broadcom/bcm2711-rpi-4-b.dts\n  ← back to the architectures'
 }
 
 # Gap: with --json the bare run shows the help only; the `Not set yet` line is human mode's.
-# bats test_tags=req:SETUP-04, gap
+# Description: with --json, the bare run names the required settings that are missing.
+# Steps:
+#   1. Drop the devicetree setting.
+#   2. Run analog-attach --json with stdin from /dev/null.
+#   3. Check the output shows the help and mentions devicetree.
+# bats test_tags=req:SETUP-04, gap, id:L0298
 @test "with --json, the bare run says which required settings are missing" {
 	drop_setting devicetree
 	run timeout 30 node "$CLI_DIR/dist/cli.js" --json </dev/null
@@ -221,7 +330,15 @@ PICKED_BASE=$'❯ broadcom/bcm2711-rpi-4-b.dts\n  ← back to the architectures'
 	assert_output --partial "devicetree"
 }
 
-# bats test_tags=req:CONFIG-08
+# Description: when the binding caches are not built, the setup builds them, saying it takes
+# time, before creating the workfile.
+# Steps:
+#   1. Remove the project's binding caches.
+#   2. Run the setup, pressing Enter at the tree, the base and the overlay.
+#   3. Check it succeeds and says it is indexing the bindings, then how many compatibles it
+#      indexed.
+#   4. Check compat-index.json and validation.json exist and the workfile was created.
+# bats test_tags=req:CONFIG-08, id:L0299
 @test "the setup builds the binding caches when they aren't built, saying that it takes time" {
 	rm "$PROJECT/.analog-attach/linux/"*.json
 	tty_run "Linux source tree" $'\r' "Choose how to select" $'\r' "Overlay:" $'\r' --

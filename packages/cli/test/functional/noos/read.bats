@@ -2,13 +2,24 @@
 
 # bats file_tags=eco:noos
 
+# Preconditions: a noos project on attach-no-os-lib's test fixtures, target otherboard, with a
+# workfile holding the eval-testpart board (testpart, testpart_cfg, testpart_ip, eval_testpart,
+# testpart_spi_dev, testpart_cs_gpio), wired and valid.
 setup() {
 	load ../helpers
 	new_project noos
 	with_sensor
 }
 
-# bats test_tags=req:READ-01
+# Description: read with no arguments gives the whole workfile: its platform and board, and every
+# node with its properties.
+# Steps:
+#   1. Run read, with --json.
+#   2. Check it succeeds and gives the workfile node, with platform othersoc and board
+#      otherboard.
+#   3. Check its children are the six nodes of the board, in order.
+#   4. Check testpart_cs_gpio comes with its properties (number 4).
+# bats test_tags=req:READ-01, id:N0189
 @test "read with no arguments shows the whole workfile" {
 	run_json read
 	assert_success
@@ -21,7 +32,12 @@ setup() {
 	assert_json '.children[] | select(.key == "testpart_cs_gpio") | .properties[] | select(.key == "number") | .value' 4
 }
 
-# bats test_tags=req:READ-01
+# Description: read with no arguments, in text, shows the platform, the board and a line per node.
+# Steps:
+#   1. Run read.
+#   2. Check it succeeds and shows platform othersoc and board otherboard.
+#   3. Check there is a line for each of the six nodes.
+# bats test_tags=req:READ-01, id:N0190
 @test "read with no arguments lists every node in text" {
 	run aa read
 	assert_success
@@ -33,7 +49,12 @@ setup() {
 	done
 }
 
-# bats test_tags=req:READ-02
+# Description: read of a node gives the node with its properties and their values.
+# Steps:
+#   1. Run read testpart_spi_dev, with --json.
+#   2. Check it succeeds and gives the node testpart_spi_dev, with its seven properties in order.
+#   3. Check $compatible is test_spi_device, max_speed_hz 1000000 and native_cs has no value.
+# bats test_tags=req:READ-02, id:N0191
 @test "read <node> shows the node with its properties" {
 	run_json read testpart_spi_dev
 	assert_success
@@ -46,7 +67,13 @@ setup() {
 	assert_json '.properties[] | select(.key == "native_cs") | .value' null
 }
 
-# bats test_tags=req:READ-02
+# Description: read of a node marks a required property that has no value.
+# Steps:
+#   1. Delete testpart_spi_dev max_speed_hz.
+#   2. Run read testpart_spi_dev.
+#   3. Check it succeeds and shows max_speed_hz marked required, with no value.
+#   4. Check it explains the * mark as required.
+# bats test_tags=req:READ-02, id:N0192
 @test "read <node> shows a required property the node still lacks" {
 	aa delete testpart_spi_dev max_speed_hz >/dev/null
 	run aa read testpart_spi_dev
@@ -56,7 +83,15 @@ setup() {
 	assert_line --partial "* = required"
 }
 
-# bats test_tags=req:READ-03
+# Description: read of a property gives its value, description, type, default, bounds, whether
+# it is required, and who set it.
+# Steps:
+#   1. Run read testpart_spi_dev max_speed_hz, with --json.
+#   2. Check it succeeds and gives the property max_speed_hz with value 1000000.
+#   3. Check the description, the type number, required, the default 1000000 and the maximum
+#      10000000.
+#   4. Check the value was set by bootstrap.
+# bats test_tags=req:READ-03, id:N0193
 @test "read <node> <property> gives value, purpose, type, default, bounds and who set it" {
 	run_json read testpart_spi_dev max_speed_hz
 	assert_success
@@ -72,7 +107,12 @@ setup() {
 	assert_json '.source' bootstrap
 }
 
-# bats test_tags=req:READ-03
+# Description: read of an enum property gives its options and default.
+# Steps:
+#   1. Run read testpart_ip comm_type, with --json.
+#   2. Check it succeeds, with type enum and the three options in order.
+#   3. Check the default is TESTPART_SPI.
+# bats test_tags=req:READ-03, id:N0194
 @test "read <node> <property> gives the allowed values of an enum" {
 	run_json read testpart_ip comm_type
 	assert_success
@@ -81,7 +121,13 @@ setup() {
 	assert_json '.constraints.default' TESTPART_SPI
 }
 
-# bats test_tags=req:READ-03
+# Description: read of a property the user set says so, in JSON and in text.
+# Steps:
+#   1. Run update testpart_spi_dev max_speed_hz 2000000.
+#   2. Run read testpart_spi_dev max_speed_hz, with --json, and check value 2000000 from the user.
+#   3. Run read testpart_spi_dev max_speed_hz.
+#   4. Check it succeeds and shows it set by you, with its description, default and type.
+# bats test_tags=req:READ-03, id:N0195
 @test "read <node> <property> says when the user set the value" {
 	aa update testpart_spi_dev max_speed_hz 2000000 >/dev/null
 	run_json read testpart_spi_dev max_speed_hz
@@ -95,14 +141,27 @@ setup() {
 	assert_line --regexp '^  Type: +number$'
 }
 
-# bats test_tags=req:READ-03
+# Description: read of a property bootstrap set says so.
+# Steps:
+#   1. Run read testpart_spi_dev max_speed_hz.
+#   2. Check it succeeds and shows it set by bootstrap.
+# bats test_tags=req:READ-03, id:N0196
 @test "read <node> <property> says when the system set the value" {
 	run aa read testpart_spi_dev max_speed_hz
 	assert_success
 	assert_line --regexp '^  Set by: +bootstrap '
 }
 
-# bats test_tags=req:READ-04
+# Description: read of a reference property gives the nodes suggested for it and the schemas it
+# can create.
+# Steps:
+#   1. Run read testpart init_param, with --json.
+#   2. Check it succeeds and gives $init_param, suggesting testpart_cfg and able to create
+#      test_sensor_config.
+#   3. Run read testpart init_param.
+#   4. Check it succeeds and lists testpart_cfg under Suggestions and test_sensor_config under
+#      Can create.
+# bats test_tags=req:READ-04, id:N0197
 @test "read <node> <property> gives the suggested values and what can be created" {
 	run_json read testpart init_param
 	assert_success
@@ -117,7 +176,11 @@ setup() {
 	assert_line --regexp '^ +\+ test_sensor_config$'
 }
 
-# bats test_tags=req:READ-04
+# Description: read of a property with nothing to suggest gives empty suggestion lists.
+# Steps:
+#   1. Run read testpart_spi_dev native_cs, with --json.
+#   2. Check it succeeds with no suggested values and nothing to create.
+# bats test_tags=req:READ-04, id:N0198
 @test "read <node> <property> gives empty suggestions when there are none" {
 	run_json read testpart_spi_dev native_cs
 	assert_success
@@ -125,7 +188,13 @@ setup() {
 	assert_json '.suggestions.can_create | length' 0
 }
 
-# bats test_tags=req:READ-05
+# Description: read --quiet of a property prints the value alone, and nothing when it has none.
+# Steps:
+#   1. Run read --quiet testpart_spi_dev max_speed_hz.
+#   2. Check it succeeds and prints only 1000000.
+#   3. Run read --quiet testpart_spi_dev native_cs.
+#   4. Check it succeeds and prints nothing.
+# bats test_tags=req:READ-05, id:N0199
 @test "read --quiet <node> <property> prints the value alone" {
 	run aa read --quiet testpart_spi_dev max_speed_hz
 	assert_success
@@ -135,7 +204,13 @@ setup() {
 	assert_output ""
 }
 
-# bats test_tags=req:READ-05
+# Description: read --quiet of a node prints a line per property, the name and the value, with
+# nothing else.
+# Steps:
+#   1. Run read --quiet testpart_spi_dev.
+#   2. Check it succeeds and prints exactly the six properties with their values, native_cs
+#      with none.
+# bats test_tags=req:READ-05, id:N0200
 @test "read --quiet <node> prints property and value per line, no descriptions" {
 	run aa read --quiet testpart_spi_dev
 	assert_success
@@ -147,7 +222,11 @@ cs_gpio testpart_cs_gpio
 cs_gpio_num 1"
 }
 
-# bats test_tags=req:READ-05
+# Description: read --quiet with no node prints the names of the nodes, one per line.
+# Steps:
+#   1. Run read --quiet.
+#   2. Check it succeeds and prints exactly the six node names, in order.
+# bats test_tags=req:READ-05, id:N0201
 @test "read --quiet with no node prints the node names" {
 	run aa read --quiet
 	assert_success
@@ -159,14 +238,26 @@ testpart_spi_dev
 testpart_cs_gpio"
 }
 
-# bats test_tags=req:READ-05
+# Description: read --quiet of a property with suggestions prints the value alone, not the
+# suggestions.
+# Steps:
+#   1. Run read --quiet testpart init_param.
+#   2. Check it succeeds and prints only testpart_cfg.
+# bats test_tags=req:READ-05, id:N0202
 @test "read --quiet leaves out suggestions" {
 	run aa read --quiet testpart init_param
 	assert_success
 	assert_output testpart_cfg
 }
 
-# bats test_tags=req:READ-07
+# Description: read --json gives a node of the workfile as internal, with a list of its other
+# names.
+# Steps:
+#   1. Run read testpart_spi_dev, with --json.
+#   2. Check it succeeds, with origin internal and an empty alias list.
+#   3. Run read, with --json.
+#   4. Check every node is internal and each has an alias list.
+# bats test_tags=req:READ-07, id:N0203
 @test "read --json says a stored node is internal and lists its other names" {
 	run_json read testpart_spi_dev
 	assert_success
@@ -178,7 +269,12 @@ testpart_cs_gpio"
 	assert_json '[.children[] | (.alias | type)] | unique | join(" ")' array
 }
 
-# bats test_tags=req:READ-07
+# Description: read --json gives a node of the target, not of the workfile, as external.
+# Steps:
+#   1. Run read testpart_ops, with --json.
+#   2. Check it succeeds, with origin external and an alias list.
+#   3. Check its $provides is test_sensor_ops.
+# bats test_tags=req:READ-07, id:N0204
 @test "read --json says a node from the target is external" {
 	run_json read testpart_ops
 	assert_success

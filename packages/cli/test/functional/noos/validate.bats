@@ -2,6 +2,9 @@
 
 # bats file_tags=eco:noos
 
+# Preconditions: a noos project on attach-no-os-lib's test fixtures (a capi, a platform with
+# testboard, otherboard and twobusboard, drivers), target otherboard, no workfile yet. Most tests
+# then add the eval-testpart board (with_sensor) and break it by editing the workfile.
 setup() {
 	load ../helpers
 	new_project noos
@@ -29,7 +32,13 @@ with_raw_required() {
 	with_sensor
 }
 
-# bats test_tags=req:VALIDATE-01
+# Description: a valid workfile has no errors and no warnings, and validate says it is valid.
+# Steps:
+#   1. Create a workfile with the eval-testpart board (with_sensor).
+#   2. Validate, with --json.
+#   3. Check it succeeds with no errors and no warnings.
+#   4. Validate without --json, and check it says the workfile is valid.
+# bats test_tags=req:VALIDATE-01, id:N0269
 @test "validate finds no problem in a valid workfile" {
 	with_sensor
 	run_json validate
@@ -40,7 +49,15 @@ with_raw_required() {
 	assert_output --partial "Workfile is valid"
 }
 
-# bats test_tags=req:VALIDATE-01
+# Description: each problem is reported with the node and property it concerns, and a message.
+# Steps:
+#   1. Create the workfile with init, and add the testpart chip alone.
+#   2. Validate, with --json, and check it succeeds.
+#   3. Check the errors all concern testpart_spi_dev: controller, cs_gpio and native_cs, each with a
+#      message.
+#   4. Validate without --json, and check it names testpart_spi_dev, the controller with no value
+#      and the cs_gpio choice.
+# bats test_tags=req:VALIDATE-01, id:N0270
 @test "validate reports each problem with the device and the property it concerns" {
 	aa init
 	aa add testpart
@@ -56,7 +73,13 @@ with_raw_required() {
 	assert_line --partial "cs_gpio: needs one of"
 }
 
-# bats test_tags=req:VALIDATE-01
+# Description: validate reports the problems of every node, not only the first one found.
+# Steps:
+#   1. Create a workfile with the eval-testpart board (with_sensor).
+#   2. Edit the workfile: set testpart_spi_dev.mode to BOGUS and remove testpart_cs_gpio.number.
+#   3. Validate, with --json.
+#   4. Check the errors are testpart_cs_gpio.number and testpart_spi_dev.mode.
+# bats test_tags=req:VALIDATE-01, id:N0271
 @test "validate checks every node of the workfile, not only the first with a problem" {
 	with_sensor
 	edit_workfile testpart_spi_dev '.symbols.testpart_spi_dev.mode = "BOGUS"'
@@ -65,7 +88,16 @@ with_raw_required() {
 	assert_json '[.errors[].path | join(".")] | sort | join(",")' testpart_cs_gpio.number,testpart_spi_dev.mode
 }
 
-# bats test_tags=req:VALIDATE-02
+# Description: a required raw value left empty is a warning, not an error, and the summary says
+# there are warnings and no errors.
+# Steps:
+#   1. Add a required raw property calib, with no default, to testpart's init param, and create
+#      the eval-testpart workfile.
+#   2. Validate, with --json, and check it succeeds with no errors and one warning on
+#      testpart_ip.calib.
+#   3. Validate without --json, and check it says the workfile has warnings, 0 errors and 1
+#      warning, and not that it has errors.
+# bats test_tags=req:VALIDATE-02, id:N0272
 @test "a required raw value left empty is a warning, and the result says there are no errors" {
 	with_raw_required
 	run_json validate
@@ -79,7 +111,15 @@ with_raw_required() {
 	refute_output --partial "Workfile has errors"
 }
 
-# bats test_tags=req:VALIDATE-02
+# Description: errors and warnings are reported apart, and with any error the summary says the
+# workfile has errors.
+# Steps:
+#   1. Add the required raw property calib, as in N0272, and create the eval-testpart workfile.
+#   2. Edit the workfile: set testpart_spi_dev.mode to BOGUS.
+#   3. Validate, with --json, and check the error is testpart_spi_dev.mode and the warning
+#      testpart_ip.calib.
+#   4. Validate without --json, and check it says the workfile has errors, 1 error and 1 warning.
+# bats test_tags=req:VALIDATE-02, id:N0273
 @test "errors and warnings are kept apart, and the result says there are errors" {
 	with_raw_required
 	edit_workfile testpart_spi_dev '.symbols.testpart_spi_dev.mode = "BOGUS"'
@@ -91,7 +131,14 @@ with_raw_required() {
 	assert_line --partial "1 error, 1 warning"
 }
 
-# bats test_tags=req:VALIDATE-03-CAPI
+# Description: a required value left empty is reported as an error.
+# Steps:
+#   1. Create a workfile with the eval-testpart board (with_sensor).
+#   2. Edit the workfile: remove testpart_cs_gpio.number.
+#   3. Validate, with --json.
+#   4. Check there is one error, on testpart_cs_gpio.number, saying the required property has no
+#      value.
+# bats test_tags=req:VALIDATE-03-CAPI, id:N0274
 @test "validate reports a required value left empty" {
 	with_sensor
 	edit_workfile testpart_cs_gpio 'del(.symbols.testpart_cs_gpio.number)'
@@ -101,7 +148,14 @@ with_raw_required() {
 	assert_json '.errors[0].message' "Required property has no value"
 }
 
-# bats test_tags=req:VALIDATE-03-CAPI
+# Description: a value outside the definition's allowed values is reported as an error.
+# Steps:
+#   1. Create a workfile with the eval-testpart board (with_sensor).
+#   2. Edit the workfile: set testpart_spi_dev.mode to BOGUS.
+#   3. Validate, with --json.
+#   4. Check there is one error, on testpart_spi_dev.mode, naming BOGUS and an allowed value
+#      (TEST_SPI_MODE_0).
+# bats test_tags=req:VALIDATE-03-CAPI, id:N0275
 @test "validate reports a value the definition doesn't allow" {
 	with_sensor
 	edit_workfile testpart_spi_dev '.symbols.testpart_spi_dev.mode = "BOGUS"'
@@ -111,7 +165,13 @@ with_raw_required() {
 	assert_json '.errors[0].message | test("BOGUS") and test("TEST_SPI_MODE_0")' true
 }
 
-# bats test_tags=req:VALIDATE-03-CAPI
+# Description: a number above the definition's maximum is reported as an error.
+# Steps:
+#   1. Create a workfile with the eval-testpart board (with_sensor).
+#   2. Edit the workfile: set testpart_spi_dev.max_speed_hz to 99999999.
+#   3. Validate, with --json.
+#   4. Check there is one error, on testpart_spi_dev.max_speed_hz, mentioning the maximum.
+# bats test_tags=req:VALIDATE-03-CAPI, id:N0276
 @test "validate reports a number out of the definition's range" {
 	with_sensor
 	edit_workfile testpart_spi_dev '.symbols.testpart_spi_dev.max_speed_hz = 99999999'
@@ -121,7 +181,13 @@ with_raw_required() {
 	assert_json '.errors[0].message | test("maximum")' true
 }
 
-# bats test_tags=req:VALIDATE-03-CAPI
+# Description: a reference to a node the workfile doesn't have is reported as an error.
+# Steps:
+#   1. Create a workfile with the eval-testpart board (with_sensor).
+#   2. Edit the workfile: set testpart_spi_dev.cs_gpio to nosuchnode.
+#   3. Validate, with --json.
+#   4. Check the first error is on testpart_spi_dev.cs_gpio and names nosuchnode.
+# bats test_tags=req:VALIDATE-03-CAPI, id:N0277
 @test "validate reports a reference to a device the workfile doesn't have" {
 	with_sensor
 	edit_workfile testpart_spi_dev '.symbols.testpart_spi_dev.cs_gpio = "nosuchnode"'
@@ -130,7 +196,14 @@ with_raw_required() {
 	assert_json '.errors[0].message | test("nosuchnode")' true
 }
 
-# bats test_tags=req:VALIDATE-03-CAPI
+# Description: a reference to a node of the wrong schema is reported as an error.
+# Steps:
+#   1. Create a workfile with the eval-testpart board (with_sensor).
+#   2. Edit the workfile: point testpart_spi_dev.cs_gpio at testpart_cfg.
+#   3. Validate, with --json.
+#   4. Check there is one error, on testpart_spi_dev.cs_gpio, naming the expected schema
+#      test_gpio_pin.
+# bats test_tags=req:VALIDATE-03-CAPI, id:N0278
 @test "validate reports a reference to a device of the wrong type" {
 	with_sensor
 	edit_workfile testpart_spi_dev '.symbols.testpart_spi_dev.cs_gpio = "testpart_cfg"'

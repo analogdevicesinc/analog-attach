@@ -2,6 +2,10 @@
 
 # bats file_tags=eco:linux
 
+# Preconditions: a linux project on the Linux tree with the RPi 4 base devicetree, no workfile
+# yet, and BASH_FILE, FISH_FILE and ZSH_FILE the places in the test's home where --install
+# writes each shell's script. with_devices makes an overlay with an ADXL345 on i2c1 and an
+# AD7124-8 on spi0.
 setup() {
 	load ../helpers
 	new_project linux
@@ -47,7 +51,12 @@ bash_complete() {
 
 # --- The script -----------------------------------------------------------------------------
 
-# bats test_tags=req:COMPLETION-01
+# Description: completion prints the completion script for bash, fish and zsh.
+# Steps:
+#   1. Run completion bash and check it succeeds with the bash complete -F line.
+#   2. Run completion fish and check it succeeds with a complete -c analog-attach line.
+#   3. Run completion zsh and check it succeeds, starting with #compdef analog-attach.
+# bats test_tags=req:COMPLETION-01, id:L0041
 @test "completion prints the script for bash, fish and zsh" {
 	run aa completion bash
 	assert_success
@@ -60,7 +69,11 @@ bash_complete() {
 	assert_line --index 0 "#compdef analog-attach"
 }
 
-# bats test_tags=req:COMPLETION-01
+# Description: completion without a shell prints the script for the shell in $SHELL.
+# Steps:
+#   1. Run completion with SHELL zsh and check it succeeds with the zsh script.
+#   2. Run completion with SHELL bash and check it prints the bash script.
+# bats test_tags=req:COMPLETION-01, id:L0042
 @test "completion without a shell prints the script of the user's shell" {
 	SHELL=/usr/bin/zsh run aa completion
 	assert_success
@@ -69,7 +82,12 @@ bash_complete() {
 	assert_line "complete -F _analog_attach_complete analog-attach"
 }
 
-# bats test_tags=req:COMPLETION-01
+# Description: completion refuses a shell it has no script for, whether named or taken from
+# $SHELL, listing the supported shells.
+# Steps:
+#   1. Run completion tcsh and check the message says tcsh is unknown and lists bash, fish, zsh.
+#   2. Run completion with SHELL sh and check the message asks to name one of bash, fish, zsh.
+# bats test_tags=req:COMPLETION-01, id:L0043
 @test "completion refuses a shell it has no script for" {
 	run aa completion tcsh
 	assert_output --partial "Unknown shell: tcsh. Supported: bash, fish, zsh"
@@ -77,7 +95,11 @@ bash_complete() {
 	assert_output --partial "Name one: bash, fish, zsh"
 }
 
-# bats test_tags=req:COMPLETION-01
+# Description: completion with --json gives the script in a JSON field.
+# Steps:
+#   1. Run completion bash, with --json.
+#   2. Check it succeeds (.ok true) and .script holds the bash complete -F line.
+# bats test_tags=req:COMPLETION-01, id:L0044
 @test "completion --json gives the script" {
 	run_json completion bash
 	assert_success
@@ -87,7 +109,13 @@ bash_complete() {
 
 # --- Installing -----------------------------------------------------------------------------
 
-# bats test_tags=req:COMPLETION-02
+# Description: completion --install writes each shell's script to the folder that shell loads
+# completions from by itself, and names the file.
+# Steps:
+#   1. For bash, fish and zsh, run completion <shell> --install.
+#   2. Check each succeeds, the file exists at its place and the output names it.
+#   3. Check each file is the script completion <shell> prints.
+# bats test_tags=req:COMPLETION-02, id:L0045
 @test "completion --install puts each shell's script where the shell loads it by itself" {
 	local shell file
 	for shell in bash fish zsh; do
@@ -105,7 +133,12 @@ bash_complete() {
 	done
 }
 
-# bats test_tags=req:COMPLETION-02
+# Description: completion --install replaces a script installed earlier.
+# Steps:
+#   1. Write an old script at the bash completion file's place.
+#   2. Run completion bash --install and check it succeeds.
+#   3. Check the old content is gone and the file is the current bash script.
+# bats test_tags=req:COMPLETION-02, id:L0046
 @test "completion --install replaces an earlier script" {
 	mkdir -p "$(dirname "$BASH_FILE")"
 	echo "an old script" >"$BASH_FILE"
@@ -116,7 +149,15 @@ bash_complete() {
 	diff <(aa completion bash) "$BASH_FILE"
 }
 
-# bats test_tags=req:COMPLETION-02
+# Description: completion --install leaves the shells' startup files alone and writes nothing but
+# the three scripts in the home.
+# Steps:
+#   1. Write a .bashrc and a .zshrc in the home.
+#   2. Run completion --install for bash, fish and zsh.
+#   3. Check .bashrc and .zshrc are unchanged, and no .profile, .bash_profile or fish config.fish
+#      was created.
+#   4. Check the only files in the home are the two startup files and the three scripts.
+# bats test_tags=req:COMPLETION-02, id:L0047
 @test "completion --install edits no shell startup file" {
 	echo "# my bashrc" >"$HOME/.bashrc"
 	echo "# my zshrc" >"$HOME/.zshrc"
@@ -138,7 +179,13 @@ bash_complete() {
 		sort)"
 }
 
-# bats test_tags=req:COMPLETION-03
+# Description: completion --uninstall removes the script --install wrote, and names it.
+# Steps:
+#   1. For bash, fish and zsh, run completion <shell> --install, then completion <shell>
+#      --uninstall.
+#   2. Check each uninstall succeeds and says it removed the file.
+#   3. Check the file is gone.
+# bats test_tags=req:COMPLETION-03, id:L0048
 @test "completion --uninstall removes the installed script" {
 	local shell file
 	for shell in bash fish zsh; do
@@ -155,7 +202,11 @@ bash_complete() {
 	done
 }
 
-# bats test_tags=req:COMPLETION-03
+# Description: completion --uninstall with no script installed says it is not installed.
+# Steps:
+#   1. Run completion bash --uninstall, with --json.
+#   2. Check it succeeds and the message says it is not installed.
+# bats test_tags=req:COMPLETION-03, id:L0049
 @test "completion --uninstall with nothing installed says so" {
 	run_json completion bash --uninstall
 	assert_success
@@ -164,7 +215,13 @@ bash_complete() {
 
 # --- What it completes ----------------------------------------------------------------------
 
-# bats test_tags=req:COMPLETION-04
+# Description: completion of the first word offers the commands of linux, and completes a prefix
+# to its command.
+# Steps:
+#   1. Ask the completion engine for the first word.
+#   2. Check it offers validate, move, enable, disable, build and deploy, and not generate.
+#   3. Ask for the word mo and check it offers only move.
+# bats test_tags=req:COMPLETION-04, id:L0050
 @test "completion offers the commands" {
 	run candidates ''
 	assert_line validate
@@ -178,7 +235,14 @@ bash_complete() {
 	assert_output move
 }
 
-# bats test_tags=req:COMPLETION-04
+# Description: completion offers a command's flags after --, and list's subcommands.
+# Steps:
+#   1. Ask the engine for add --, and check it offers --name, --parent, --label, --template and
+#      --quiet.
+#   2. Ask for delete -- and check it offers --force.
+#   3. Ask for the word after list and check it offers exactly devices, property, value, parent
+#      and overlay, in that order.
+# bats test_tags=req:COMPLETION-04, id:L0051
 @test "completion offers a command's flags" {
 	run candidates add --
 	assert_line --name
@@ -192,7 +256,13 @@ bash_complete() {
 	assert_output "$(printf 'devices\nproperty\nvalue\nparent\noverlay')"
 }
 
-# bats test_tags=req:COMPLETION-04
+# Description: completion offers the setting names config lists, and a setting's options as its
+# values.
+# Steps:
+#   1. Ask the engine for the word after config and check it is the settings config --json lists.
+#   2. Ask for the value of overlay-syntax and check it offers fragment and label.
+#   3. Ask for the value of backend and check it offers linux and noos.
+# bats test_tags=req:COMPLETION-04, id:L0052
 @test "completion offers the setting names and their values, as config has them" {
 	run candidates config ''
 	assert_output "$(aa --json config | jq -r '.configs[].field_name')"
@@ -202,7 +272,14 @@ bash_complete() {
 	assert_output "$(printf 'linux\nnoos')"
 }
 
-# bats test_tags=req:COMPLETION-04
+# Description: completion of add's device type offers the device types list devices lists, and
+# completes a prefix.
+# Steps:
+#   1. Create the overlay with init.
+#   2. Write list devices, with --json, and the engine's offers for add to files.
+#   3. Check list devices lists more than 1000 types and the offers are the same list.
+#   4. Ask for add adi,ad7124 and check it offers adi,ad7124-4 and adi,ad7124-8.
+# bats test_tags=req:COMPLETION-04, id:L0053
 @test "completion offers the device types list devices lists" {
 	with_overlay
 	# To files: both are longer than a pipe takes at once.
@@ -217,7 +294,15 @@ bash_complete() {
 	assert_output "$(printf 'adi,ad7124-4\nadi,ad7124-8')"
 }
 
-# bats test_tags=req:COMPLETION-04
+# Description: completion offers the values of add's flags: --parent the parents list parent
+# gives, and --template the templates of the device.
+# Steps:
+#   1. Create the overlay with init.
+#   2. Ask the engine for add adi,adxl345 --parent and check it offers the list parent
+#      suggestions, each followed by /.
+#   3. Ask for add adi,adxl345 --template and check it offers required, example:1 and
+#      overlay:rpi-adxl345-overlay.dts.
+# bats test_tags=req:COMPLETION-04, id:L0054
 @test "completion offers the values of add's flags: the parents list parent gives, and the templates" {
 	with_overlay
 	run candidates add adi,adxl345 --parent ''
@@ -228,7 +313,15 @@ bash_complete() {
 	assert_line overlay:rpi-adxl345-overlay.dts
 }
 
-# bats test_tags=req:COMPLETION-04
+# Description: completion of a node path offers the overlay's nodes one path segment at a time,
+# for every command that takes a node.
+# Steps:
+#   1. Make the overlay with the ADXL345 and the AD7124-8 (with_devices).
+#   2. For read, update, delete, rename, move, enable and disable, ask the engine for the node
+#      word, and check it offers i2c_arm/ and spi0/ with no space after.
+#   3. Ask for read i2c_arm/ and check it offers i2c_arm/adi,adxl345@0.
+#   4. Ask for a full path prefix /soc/i2c@7e804000/adi,adxl and check it completes the node.
+# bats test_tags=req:COMPLETION-04, id:L0055
 @test "completion offers the overlay's nodes, one path segment at a time" {
 	with_devices
 	local command
@@ -244,7 +337,16 @@ bash_complete() {
 	assert_output /soc/i2c@7e804000/adi,adxl345@0
 }
 
-# bats test_tags=req:COMPLETION-04
+# Description: completion of a property offers the node's properties as list property lists
+# them, set ones grouped first, and the child nodes its binding names.
+# Steps:
+#   1. Make the overlay with the ADXL345 and the AD7124-8.
+#   2. Ask the engine for the property of read i2c_arm/adi,adxl345@0 and check it is the list
+#      property --json names.
+#   3. Ask for the property of update adxl345 and check the groups set (first) and not set,
+#      compatible offered, and interrupts marked required.
+#   4. Ask for update ad7124_8 channel@1 and check it offers channel@1 and channel@15.
+# bats test_tags=req:COMPLETION-04, id:L0056
 @test "completion offers a node's properties as list property lists them, set ones first" {
 	with_devices
 	run candidates read i2c_arm/adi,adxl345@0 ''
@@ -260,7 +362,12 @@ bash_complete() {
 	assert_line channel@15
 }
 
-# bats test_tags=req:COMPLETION-04
+# Description: completion of a property's value offers the values list value lists for it.
+# Steps:
+#   1. Make the overlay with the ADXL345 and the AD7124-8.
+#   2. Ask the engine for the value of update adxl345 interrupt-parent.
+#   3. Check the offers are the list value --json suggestions, among them gpio.
+# bats test_tags=req:COMPLETION-04, id:L0057
 @test "completion offers a property's values as list value lists them" {
 	with_devices
 	run candidates update adxl345 interrupt-parent ''
@@ -268,7 +375,15 @@ bash_complete() {
 	assert_line gpio
 }
 
-# bats test_tags=req:COMPLETION-04
+# Description: the bash script, run as bash runs it on Tab, completes commands, nodes, properties,
+# values and settings through the CLI.
+# Steps:
+#   1. Make the overlay with the ADXL345 and the AD7124-8.
+#   2. Complete analog-attach mo with the bash script and check it gives move.
+#   3. Check read i2c_arm/ gives i2c_arm/adi,adxl345@0.
+#   4. Check update adxl345 interrupt-p gives interrupt-parent, and its value gp gives gpio.
+#   5. Check config overlay-syntax l gives label.
+# bats test_tags=req:COMPLETION-04, id:L0058
 @test "the bash script completes through the CLI, as bash calls it on Tab" {
 	with_devices
 	run bash_complete "analog-attach mo"
