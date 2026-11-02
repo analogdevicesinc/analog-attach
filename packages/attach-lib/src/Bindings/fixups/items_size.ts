@@ -1,4 +1,5 @@
 import { FixupContext, PropertySchema } from "../FixupWalker.js";
+import { is_string_schema } from "./string_to_array.js";
 
 type Schema = Record<string, unknown>;
 
@@ -40,7 +41,11 @@ function size(schema: Schema, path: string[]): void {
 function count(schema: Schema, path: string[]): void {
     const items = schema["items"];
 
-    if ("items" in schema) {
+    // dt-schema makes a string schema a list of one first (`_fixup_string_to_array`): `{const: a}` is `{items: [{const: a}]}`
+    if (!("items" in schema) && path.at(-1) !== "items" && is_string_schema(schema)) {
+        schema["minItems"] ??= 1;
+        schema["maxItems"] ??= 1;
+    } else if ("items" in schema) {
         if (Array.isArray(items)) {
             schema["minItems"] ??= items.length;
             schema["maxItems"] ??= items.length;
@@ -63,8 +68,10 @@ function count(schema: Schema, path: string[]): void {
  * its `$ref`s are resolved. dt-schema sizes each schema that way and checks what a `$ref` names (the `minItems: 1`
  * of a `types.yaml` array, a common binding's `reg`) as a schema of its own; we merge them into the property, so
  * its own count is fixed first: `{$ref: string-array, items: [a, b]}` takes two, `{$ref: uint32-array, maxItems: 4}`
- * four. An `items` list fixes the count to its length, a lone bound to that bound (dt-schema does so for any schema,
- * a number's included); a `then` / `else` branch keeps its bounds as they are.
+ * four. An `items` list fixes the count to its length, a string schema (`const`, `enum` or `pattern` of strings) to one,
+ * a lone bound to that bound (dt-schema does so for any schema, a number's included); a `then` / `else` branch keeps
+ * its lone bounds as they are. So `clock-names: {const: stmmaceth}` takes one name whatever the schema it extends
+ * allows (snps,dwmac.yaml's eight).
  */
 export function fixup_own_counts(schema: PropertySchema, { path }: FixupContext): PropertySchema {
     if (typeof schema !== "boolean") { count(schema, path); }
