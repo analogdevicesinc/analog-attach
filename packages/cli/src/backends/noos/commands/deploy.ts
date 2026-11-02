@@ -25,7 +25,6 @@ import { project_directory } from "./build";
 const FLASH_TARGET = "flash";
 
 const DEPLOY_FLAGS = {
-    board: { kind: "value", brief: "Deploy to this board instead of the one the project was generated for", placeholder: "board" },
     probe: { kind: "value", brief: `Debug probe used to flash: ${PROBE_OPTIONS.join(" or ")} (default: the 'probe' setting)`, placeholder: "probe" },
 } as const satisfies FlagSpecs;
 
@@ -44,7 +43,7 @@ export const deploy = command<DeployArguments, CommonResponse, typeof DEPLOY_FLA
             "out/<project-name> when it is unset.\n\nExamples:\n  $ analog-attach deploy\n  $ analog-attach deploy --probe jlink\n  $ analog-attach config probe jlink"
     },
     run(_arguments, flags, session) {
-        return run_deploy(flags.board, flags.probe, session);
+        return run_deploy(flags.probe, session);
     }
 });
 
@@ -53,17 +52,17 @@ export const deploy = command<DeployArguments, CommonResponse, typeof DEPLOY_FLA
  * the project built by the CLI's own step; with a build-command of the user's, the image is
  * wherever that command puts it, so nothing is said.
  */
-function not_built(target_path: string, board: string | undefined, program: string): string | undefined {
+function not_built(target_path: string, program: string): string | undefined {
     const own_build = get_effective_setting_value("build-command");
     if (!own_build.ok || (own_build.value !== undefined && own_build.value !== "")) { return undefined; }
     const capi = get_effective_setting_value("capi-path");
     if (!capi.ok || capi.value === undefined) { return undefined; }
-    const plan = plan_build(target_path, capi.value, board, program);
+    const plan = plan_build(target_path, capi.value, program);
     if (!plan.ok || fs.existsSync(plan.value.elf_path)) { return undefined; }
     return `${plan.value.target} is not built for ${plan.value.board} (no ${plan.value.elf_path}). Build it first: ${program} build`;
 }
 
-async function run_deploy(board: string | undefined, probe_flag: string | undefined, session: Session): Promise<Outcome<CommonResponse>> {
+async function run_deploy(probe_flag: string | undefined, session: Session): Promise<Outcome<CommonResponse>> {
     // A probe that can't be is what was typed, whatever the project's state.
     if (probe_flag !== undefined && !PROBE_OPTIONS.includes(probe_flag)) {
         return refuse(`Unknown probe '${probe_flag}'. Supported: ${PROBE_OPTIONS.join(", ")}`);
@@ -76,7 +75,7 @@ async function run_deploy(board: string | undefined, probe_flag: string | undefi
     const target_path = project.path;
 
     // Deploy puts what build made on the board: it doesn't build it itself (DEPLOY-01).
-    const unbuilt = not_built(target_path, board, session.program);
+    const unbuilt = not_built(target_path, session.program);
     if (unbuilt !== undefined) {
         return refuse(unbuilt);
     }
@@ -114,7 +113,7 @@ async function run_deploy(board: string | undefined, probe_flag: string | undefi
         return refuse(`capi-path is not configured. Run: ${session.program} config capi-path <path>`);
     }
 
-    const plan = plan_build(target_path, capi_path.value, board, session.program);
+    const plan = plan_build(target_path, capi_path.value, session.program);
     if (!plan.ok) {
         return refuse(plan.error.message);
     }

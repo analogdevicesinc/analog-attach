@@ -11,7 +11,6 @@ import {
     get_workfile_path,
     import_minimal,
     list_available_structs,
-    list_boards,
     list_eval_boards,
     list_template_sets,
     suggest_for_property,
@@ -102,22 +101,6 @@ function schema_keys(): string[] {
     return [...list_eval_boards(), ...(drivers.ok ? drivers.value : []), ...available.value.all];
 }
 
-/**
- * Board names for a command acting on an existing workfile (`generate --board`, `build`,
- * `deploy`). Narrowed to the boards carrying the workfile's chip when there is a workfile
- * to read, since generating for another chip cannot work; the full list otherwise.
- */
-function board_names(): string[] {
-    const boards = list_boards();
-    if (!boards.ok) {
-        return [];
-    }
-    const platform = minimal_workfile()?.platform;
-    return boards.value
-        .filter(board => platform === undefined || board.soc === platform)
-        .map(board => board.name);
-}
-
 /** What `add <key> --as` takes: the interfaces of the driver the key names (or its eval board carries). */
 function interface_candidates(key: string | undefined): Completion {
     if (key === undefined) { return NONE; }
@@ -130,7 +113,6 @@ function interface_candidates(key: string | undefined): Completion {
 function flag_candidates(flag: string, prior: readonly string[]): Completion {
     switch (flag) {
         case "as": { return interface_candidates(prior[0]); }
-        case "board": { return values(board_names()); }
         case "probe": { return values(PROBE_OPTIONS); }
         case "project-template": { return { candidates: list_template_sets().map(value => ({ value })), fallback: "dirs" }; }
         case "output": { return { candidates: [], fallback: "dirs" }; }

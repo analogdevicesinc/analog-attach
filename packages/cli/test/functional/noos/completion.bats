@@ -173,8 +173,8 @@ bash_complete() {
 # bats test_tags=req:COMPLETION-04
 @test "completion offers a command's flags" {
 	run candidates build --
-	assert_line --board
 	assert_line --clean
+	refute_line --board
 	run candidates generate --
 	assert_line --output
 	assert_line --project-template
