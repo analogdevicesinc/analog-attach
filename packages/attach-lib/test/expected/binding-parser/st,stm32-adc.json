@@ -190,9 +190,18 @@
                         "rows": [
                             {
                                 "_t": "list",
-                                "item": {
-                                    "_t": "any"
-                                },
+                                "item": [
+                                    {
+                                        "_t": "number",
+                                        "maximum": "19n",
+                                        "minimum": "0n"
+                                    },
+                                    {
+                                        "_t": "number",
+                                        "maximum": "19n",
+                                        "minimum": "0n"
+                                    }
+                                ],
                                 "maxItems": 2,
                                 "minItems": 2
                             }

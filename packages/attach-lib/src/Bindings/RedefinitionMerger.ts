@@ -27,7 +27,7 @@ const TIGHTER: Record<string, (...bounds: number[]) => number> = {
  * then those of an entry nested in one; entries as deep as each other in their order. Not the properties of an
  * `if` / `then` branch, which only add to a property, nor those of a child node.
  */
-function definitions_by_name(node: Schema): Map<string, unknown[]> {
+export function definitions_by_name(node: Schema): Map<string, unknown[]> {
     const tables: { depth: number, properties: Schema }[] = [];
 
     const collect = (schema: Schema, depth: number): void => {
