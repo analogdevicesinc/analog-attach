@@ -31,6 +31,10 @@ async function parsed(name: string, body: string): Promise<Attach> {
 const property = (binding: ParsedBinding, key: string): ResolvedProperty['value'] | undefined =>
     binding.properties.find(p => p.key === key)?.value;
 
+/** A list's or a matrix's `[minItems, maxItems]`. */
+const counts = (type: ResolvedProperty['value'] | undefined) =>
+    type?._t === 'list' || type?._t === 'matrix' ? [type.minItems, type.maxItems] : undefined;
+
 const spi_max_frequency = {
     _t: 'scalar',
     cell: { _t: 'number', minimum: 0n, maximum: 0xFF_FF_FF_FFn },
@@ -76,6 +80,93 @@ properties:
         const uint32 = { _t: 'number', minimum: 0n, maximum: 0xFF_FF_FF_FFn };
         expect(property(parsed_binding, 'adi,matrix')).toStrictEqual({ _t: 'matrix', minItems: 1, rows: [{ _t: 'list', item: uint32, minItems: 1, typeSize: 32 }] });
         expect(property(parsed_binding, 'adi,array')).toStrictEqual({ _t: 'list', item: uint32, minItems: 1, typeSize: 32 });
+    });
+
+    test('a property\'s own count is fixed before the types.yaml type it references adds its minItems: 1', async () => {
+        const { parsed_binding } = await parsed('counted', `
+properties:
+  compatible:
+    const: x,y
+  adi,names:
+    $ref: /schemas/types.yaml#/definitions/string-array
+    items:
+      - const: a
+      - const: b
+  adi,table:
+    $ref: /schemas/types.yaml#/definitions/uint8-array
+    maxItems: 4
+  adi,range:
+    $ref: /schemas/types.yaml#/definitions/int32-array
+    minItems: 2
+    maxItems: 4
+  adi,open:
+    $ref: /schemas/types.yaml#/definitions/uint32-array
+`);
+        expect(counts(property(parsed_binding, 'adi,names'))).toStrictEqual([2, 2]);
+        expect(counts(property(parsed_binding, 'adi,table'))).toStrictEqual([4, 4]);
+        expect(counts(property(parsed_binding, 'adi,range'))).toStrictEqual([2, 4]);
+        expect(counts(property(parsed_binding, 'adi,open'))).toStrictEqual([1, undefined]);
+    });
+
+    test('a property keeps its own keywords beside a $ref that a property before it already resolved', async () => {
+        const { parsed_binding } = await parsed('referenced-again', `
+properties:
+  compatible:
+    const: x,y
+  adi,first:
+    $ref: /schemas/types.yaml#/definitions/uint32
+  adi,pin:
+    description: d
+    minimum: 1
+    maximum: 6
+    $ref: /schemas/types.yaml#/definitions/uint32
+  adi,table:
+    $ref: /schemas/types.yaml#/definitions/uint32-array
+  adi,channels:
+    minItems: 8
+    maxItems: 12
+    $ref: /schemas/types.yaml#/definitions/uint32-array
+`);
+        expect(property(parsed_binding, 'adi,pin')).toMatchObject({ _t: 'scalar', cell: { _t: 'number', minimum: 1n, maximum: 6n } });
+        expect(counts(property(parsed_binding, 'adi,channels'))).toStrictEqual([8, 12]);
+    });
+
+    test('the items a property gives are merged into those of the types.yaml type it references', async () => {
+        const { parsed_binding } = await parsed('merged-items', `
+properties:
+  compatible:
+    const: x,y
+  adi,channels:
+    $ref: /schemas/types.yaml#/definitions/uint32-array
+    maxItems: 4
+    items:
+      default: 0
+`);
+        expect(property(parsed_binding, 'adi,channels')).toMatchObject({
+            _t: 'list', item: { _t: 'number', minimum: 0n, maximum: 0xFF_FF_FF_FFn }, typeSize: 32,
+        });
+    });
+
+    test('a node that references a schema has its properties and its own, but only its own when additionalProperties is false', async () => {
+        const channel = async (name: string, closing: string) => {
+            const { parsed_binding } = await parsed(name, `
+properties:
+  compatible:
+    const: x,y
+patternProperties:
+  "^channel@[0-7]$":
+    $ref: /schemas/iio/adc/adc.yaml
+    type: object
+    ${closing}
+    properties:
+      reg:
+        maximum: 7
+`);
+            return parsed_binding.pattern_properties?.find(rule => rule.pattern === '^channel@[0-7]$')?.properties.map(p => p.key);
+        };
+
+        expect(await channel('merged-node', 'unevaluatedProperties: false')).toEqual(expect.arrayContaining(['reg', 'bipolar', 'diff-channels']));
+        expect(await channel('closed-node', 'additionalProperties: false')).toStrictEqual(['reg']);
     });
 
     test('a schema that references itself (i2c-controller\'s i2c-bus) still resolves, the inner node empty', async () => {
@@ -138,6 +229,118 @@ properties:
             cell: { _t: 'number', minimum: 0n, maximum: 4n },
             typeSize: 32,
             description: 'from the allOf',
+        });
+    });
+
+    test('the binding\'s own count wins over the bounds of the allOf entry that defines the property again', async () => {
+        const { parsed_binding } = await parsed('redefined-count', `
+allOf:
+  - properties:
+      adi,regs:
+        $ref: /schemas/types.yaml#/definitions/uint32-array
+        minItems: 2
+        maxItems: 7
+properties:
+  compatible:
+    const: x,y
+  adi,regs:
+    items:
+      - const: 1
+      - const: 2
+      - const: 3
+`);
+        expect(counts(property(parsed_binding, 'adi,regs'))).toStrictEqual([3, 3]);
+    });
+
+    test('every definition of a property is merged into one, the nearest one\'s keywords winning and the tighter bounds', async () => {
+        const { parsed_binding } = await parsed('redefined-thrice', `
+allOf:
+  - properties:
+      adi,gain:
+        description: from the allOf
+        $ref: /schemas/types.yaml#/definitions/uint32
+        maximum: 10
+      adi,regs:
+        $ref: /schemas/types.yaml#/definitions/uint32-array
+        minItems: 2
+        maxItems: 7
+    allOf:
+      - properties:
+          adi,gain:
+            description: from the nested allOf
+            minimum: 2
+properties:
+  compatible:
+    const: x,y
+  adi,gain:
+    maximum: 4
+  adi,regs:
+    minItems: 1
+    maxItems: 4
+`);
+        expect(parsed_binding.properties.filter(p => p.key === 'adi,gain')).toHaveLength(1);
+        expect(property(parsed_binding, 'adi,gain')).toMatchObject({
+            _t: 'scalar',
+            cell: { _t: 'number', minimum: 2n, maximum: 4n },
+            description: 'from the allOf',
+        });
+        expect(counts(property(parsed_binding, 'adi,regs'))).toStrictEqual([2, 4]);
+    });
+
+    test('a property only allOf entries define is merged too, and so is one of a child node', async () => {
+        const { parsed_binding } = await parsed('redefined-in-allOf', `
+allOf:
+  - properties:
+      adi,mode:
+        description: near
+        $ref: /schemas/types.yaml#/definitions/uint32
+    allOf:
+      - properties:
+          adi,mode:
+            description: far
+            maximum: 3
+properties:
+  compatible:
+    const: x,y
+patternProperties:
+  "^part@[0-9]$":
+    type: object
+    allOf:
+      - properties:
+          reg:
+            maximum: 9
+    properties:
+      reg:
+        description: of the part
+`);
+        expect(parsed_binding.properties.filter(p => p.key === 'adi,mode')).toHaveLength(1);
+        expect(property(parsed_binding, 'adi,mode')).toMatchObject({ cell: { _t: 'number', maximum: 3n }, description: 'near' });
+
+        const part = parsed_binding.pattern_properties?.find(rule => rule.pattern === '^part@[0-9]$')?.properties ?? [];
+        expect(part.filter(p => p.key === 'reg')).toHaveLength(1);
+        expect(part.find(p => p.key === 'reg')?.value).toMatchObject({ description: 'of the part' });
+    });
+
+    test('a property of a child node an allOf entry describes is not a redefinition of the node\'s own', async () => {
+        const { parsed_binding } = await parsed('redefined-child', `
+allOf:
+  - patternProperties:
+      "^part@[0-9]$":
+        type: object
+        properties:
+          adi,gain:
+            description: of a child node
+            maximum: 10
+properties:
+  compatible:
+    const: x,y
+  adi,gain:
+    $ref: /schemas/types.yaml#/definitions/uint32
+`);
+        expect(property(parsed_binding, 'adi,gain')).toStrictEqual({
+            _t: 'scalar',
+            cell: { _t: 'number', minimum: 0n, maximum: 0xFF_FF_FF_FFn },
+            typeSize: 32,
         });
     });
 });

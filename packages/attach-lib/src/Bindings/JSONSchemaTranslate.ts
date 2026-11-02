@@ -50,9 +50,14 @@ export function translate_JSONSchema(fixuped: DtBindingSchema): ParsedBinding {
     };
 }
 
-/** The properties a node schema declares itself, followed by the ones its `allOf` entries bring. */
+/**
+ * The properties a node schema declares itself, followed by the ones its `allOf` entries bring, each name once. The
+ * redefinitions are merged into the node's own (`RedefinitionMerger.ts`); what is left twice is what the fixups add to
+ * every schema alike (`interrupt-parent` next to `interrupts`).
+ */
 function translate_node_schema(schema: DtBindingSchema | undefined): ResolvedProperty[] {
-    return [...collect_properties(schema?.properties), ...translate_JSONSchema_allOf(schema?.allOf)];
+    const properties = [...collect_properties(schema?.properties), ...translate_JSONSchema_allOf(schema?.allOf)];
+    return properties.filter((property, index) => properties.findIndex(other => other.key === property.key) === index);
 }
 
 function collect_properties(properties: Record<string, unknown> | undefined): ResolvedProperty[] {

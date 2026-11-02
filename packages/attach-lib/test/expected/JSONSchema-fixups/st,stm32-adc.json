@@ -801,18 +801,23 @@
                     "description": "List of differential channels muxed for this ADC. Some channels can\nbe configured as differential instead of single-ended on stm32h7 and\non stm32mp1. Positive and negative inputs pairs are listed:\n<vinp vinn>, <vinp vinn>,... vinp and vinn are numbered from 0 to 19.\n\nNote: At least one of \"st,adc-channels\" or \"st,adc-diff-channels\" is\nrequired if no adc generic channel is defined. These legacy channel\nproperties are exclusive with adc generic channel bindings.\nBoth properties can be used together. Some channels can be\nused as single-ended and some other ones as differential (mixed). But\nchannels can't be configured both as single-ended and differential.\n",
                     "dtType": "uint32-matrix",
                     "items": {
+                        "dtType": "uint32-array",
                         "items": [
                             {
                                 "description": "\"vinp\" indicates positive input number\n",
+                                "dtType": "uint32",
                                 "maximum": 19,
                                 "minimum": 0,
-                                "type": "integer"
+                                "type": "integer",
+                                "typeSize": 32
                             },
                             {
                                 "description": "\"vinn\" indicates negative input number\n",
+                                "dtType": "uint32",
                                 "maximum": 19,
                                 "minimum": 0,
-                                "type": "integer"
+                                "type": "integer",
+                                "typeSize": 32
                             }
                         ],
                         "maxItems": 2,

@@ -417,6 +417,18 @@
             ],
             "description": "A few properties are defined in a common way ADC channels.",
             "properties": {
+                "$nodename": {
+                    "description": "A channel index should match reg.",
+                    "dtType": "string",
+                    "items": [
+                        {
+                            "pattern": "^channel(@[0-9a-f]+)?$"
+                        }
+                    ],
+                    "maxItems": 1,
+                    "minItems": 1,
+                    "type": "array"
+                },
                 "adi,buffered-negative": {
                     "description": "Enable buffered mode for negative input.",
                     "type": "boolean"
@@ -520,6 +532,27 @@
                     "type": "integer",
                     "typeSize": 32
                 },
+                "bipolar": {
+                    "description": "If provided, the channel is to be used in bipolar mode.",
+                    "dtType": "flag",
+                    "oneOf": [
+                        {
+                            "const": true,
+                            "type": "boolean"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "common-mode-channel": {
+                    "description": "Some ADCs have differential input pins that can be used to measure single-ended or pseudo-differential inputs. This property can be used in addition to single-channel to signal software that this channel is not differential but still specify two inputs.\nThe input pair is specified by setting single-channel to the positive input pin and common-mode-channel to the negative pin.",
+                    "dtType": "uint32",
+                    "maximum": 4294967295,
+                    "minimum": 0,
+                    "type": "integer",
+                    "typeSize": 32
+                },
                 "diff-channels": {
                     "description": "Besides the analog inputs available, internal inputs can be used.\n16: Internal temperature sensor.\n17: AVSS\n18: Internal reference\n19: DGND\n20: (AVDD − AVSS)/6+\n21: (AVDD − AVSS)/6-\n22: (IOVDD − DGND)/6+\n23: (IOVDD − DGND)/6-\n24: (ALDO − AVSS)/6+\n25: (ALDO − AVSS)/6-\n26: (DLDO − DGND)/6+\n27: (DLDO − DGND)/6-\n28: V_MV_P\n29: V_MV_M\n",
                     "dtType": "uint32-array",
@@ -533,6 +566,18 @@
                     "maxItems": 2,
                     "minItems": 2,
                     "type": "array"
+                },
+                "label": {
+                    "description": "Unique name to identify which channel this is.",
+                    "dtType": "string"
+                },
+                "oversampling-ratio": {
+                    "description": "Oversampling is used as replacement of or addition to the low-pass filter. In some cases, the desired filtering characteristics are a function the device design and can interact with other characteristics such as settling time.",
+                    "dtType": "uint32",
+                    "maximum": 4294967295,
+                    "minimum": 0,
+                    "type": "integer",
+                    "typeSize": 32
                 },
                 "reg": {
                     "description": "The channel number.",
@@ -554,6 +599,24 @@
                     "maxItems": 1,
                     "minItems": 1,
                     "type": "array"
+                },
+                "settling-time-us": {
+                    "description": "Time between enabling the channel and first stable readings.",
+                    "dtType": "uint32-array",
+                    "items": {
+                        "maximum": 4294967295,
+                        "minimum": 0
+                    },
+                    "minItems": 1,
+                    "type": "array"
+                },
+                "single-channel": {
+                    "description": "When devices combine single-ended and differential channels, allow the channel for a single element to be specified, independent of reg (as for differential channels). If this and diff-channels are not present reg shall be used instead.",
+                    "dtType": "uint32",
+                    "maximum": 4294967295,
+                    "minimum": 0,
+                    "type": "integer",
+                    "typeSize": 32
                 }
             },
             "required": [
@@ -609,9 +672,11 @@
             "description": "Analog inputs to apply a voltage bias of (AVDD − AVSS) / 2 to.",
             "dtType": "uint32-array",
             "items": {
+                "dtType": "uint32",
                 "maximum": 15,
                 "minimum": 0,
-                "type": "integer"
+                "type": "integer",
+                "typeSize": 32
             },
             "maxItems": 16,
             "minItems": 1,
