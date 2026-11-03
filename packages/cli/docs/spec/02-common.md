@@ -128,6 +128,16 @@ respond with an object whose `ok` is `true`, and exit with status 0. Its
 `list parent` for a compatible with no binding; where the backend is noos,
 the `delete` preview and a `build` that left no ELF. (Exceptions in §2.)
 
+**COM-051** While in JSON mode, a refusal (COM-040), a success whose
+`severity` is `"warn"` (COM-050), and each finding of `validate` shall carry
+`error_type`: one of the fixed list of error types (GEN-17; the Error types
+tab of the requirements workbook, `src/interface/error-types.ts`), the same
+in every ecosystem, so that scripts and the UI can tell the cases apart; the
+message says which case it is. Where the backend is linux, the field is
+optional until its backend sets it; where it is noos, and for the front end's
+own commands (`config`, `skill`, `completion`, the setup run), it is always
+there. Input errors (§3) don't carry it yet: they are text on standard error.
+
 ## 6. Cancellation
 
 **COM-060** When the user stops a question (Ctrl-C or end of input) before

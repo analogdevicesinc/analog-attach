@@ -5,7 +5,7 @@ import {
     type PropertySuggestions,
     type Ruleset
 } from "attach-no-os-lib";
-import { answer, command, refuse, type Outcome, type ReadArguments, type Session } from "../../../interface/backend-interface";
+import { answer, command, type Outcome, type ReadArguments, type Session } from "../../../interface/backend-interface";
 import {
     column_width,
     format_node_list,
@@ -15,7 +15,8 @@ import {
     get_any_node,
     get_node_property,
     load_context,
-    root_key
+    refuse_error,
+    root_key,
 } from "./shared";
 import { include_target, node_origin, property_source, to_protocol_node, to_protocol_property, to_protocol_root } from "../protocol/convert";
 import type { Property as ProtocolProperty, ReadProperty, ReadResponse } from "../protocol/responses";
@@ -48,7 +49,7 @@ export const read = command<ReadArguments, ReadResponse>({
 export function read_target(session: Session, quiet: boolean, node?: string, property?: string): Outcome<ReadResponse> {
     const context = load_context(session);
     if (!context.ok) {
-        return refuse(context.error.message);
+        return refuse_error(context.error);
     }
 
     const root = root_key(context.value);
@@ -66,7 +67,7 @@ export function read_target(session: Session, quiet: boolean, node?: string, pro
     if (property === undefined || property === "") {
         const found = get_any_node(context.value, node);
         if (!found.ok) {
-            return refuse(found.error.message);
+            return refuse_error(found.error);
         }
 
         const text = quiet ? format_node_values(found.value) : format_node_summary(node, found.value);
@@ -77,7 +78,7 @@ export function read_target(session: Session, quiet: boolean, node?: string, pro
     // read <node> <property>
     const lookup = get_node_property(context.value, node, property);
     if (!lookup.ok) {
-        return refuse(lookup.error.message);
+        return refuse_error(lookup.error);
     }
 
     // The lookup's own name, not what was typed: the lib only knows the workfile's

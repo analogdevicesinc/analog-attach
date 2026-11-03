@@ -1,6 +1,6 @@
 import { rename_symbol } from "attach-no-os-lib";
-import { answer, command, refuse, type RenameArguments } from "../../../interface/backend-interface";
-import { load_context, save_workfile } from "./shared";
+import { answer, command, type RenameArguments } from "../../../interface/backend-interface";
+import { load_context, refuse_error, save_workfile } from "./shared";
 import { common_ok, type CommonResponse } from "../protocol/responses";
 
 /**
@@ -19,19 +19,19 @@ export const rename = command<RenameArguments, CommonResponse>({
     run({ path: node, name }, _flags, session) {
         const context = load_context(session);
         if (!context.ok) {
-            return Promise.resolve(refuse(context.error.message));
+            return Promise.resolve(refuse_error(context.error));
         }
 
         const renamed = rename_symbol(context.value.workfile, node, name);
         if (!renamed.ok) {
-            return Promise.resolve(refuse(renamed.error.message));
+            return Promise.resolve(refuse_error(renamed.error));
         }
 
         context.value.workfile = renamed.value;
 
         const saved = save_workfile(context.value);
         if (!saved.ok) {
-            return Promise.resolve(refuse(saved.error.message));
+            return Promise.resolve(refuse_error(saved.error));
         }
 
         const message = `Renamed '${node}' to '${name}'`;

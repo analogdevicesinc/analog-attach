@@ -71,7 +71,7 @@ describe("init and read", () => {
         const created = await json(["init"]);
         expect(created).toMatchObject({ ok: true, created: true, path: path.join(project, "workfile.json") });
         expect(fs.existsSync(path.join(project, "workfile.json"))).toBe(true);
-        expect(await json(["init"])).toMatchObject({ ok: false, message: expect.stringContaining("already exists") as unknown });
+        expect(await json(["init"])).toMatchObject({ ok: false, error_type: "workfile-exists", message: expect.stringContaining("already exists") as unknown });
     });
 
     test("init with no target says how to set one", async () => {
@@ -89,7 +89,7 @@ describe("init and read", () => {
 
     test("a command with no workfile refuses, naming init", async () => {
         settings();
-        expect(await json(["read"])).toMatchObject({ ok: false, message: expect.stringContaining("analog-attach init") as unknown });
+        expect(await json(["read"])).toMatchObject({ ok: false, error_type: "workfile-missing", message: expect.stringContaining("analog-attach init") as unknown });
         expect(await json(["validate"])).toMatchObject({ ok: false });
     });
 
@@ -184,7 +184,7 @@ describe("list", () => {
         expect(listed).toMatchObject({ suggestions: expect.arrayContaining([{ value: "TEST_SPI_MODE_0" }]) as unknown });
         expect(await json(["update", "testpart_spi_dev", "mode", "--suggest"])).toEqual(listed);
         expect(stored()).toEqual(before);
-        expect(await json(["list", "value", "testpart_spi_dev", "nonsense"])).toMatchObject({ ok: false, message: expect.stringContaining("has no property 'nonsense'") as unknown });
+        expect(await json(["list", "value", "testpart_spi_dev", "nonsense"])).toMatchObject({ ok: false, error_type: "not-found", message: expect.stringContaining("has no property 'nonsense'") as unknown });
     });
 });
 
@@ -211,7 +211,7 @@ describe("add, update, delete, rename", () => {
     test("add refuses an unknown schema, and needs one (exit 2)", async () => {
         settings();
         await run(["init"]);
-        expect(await json(["add", "nonesuch"])).toMatchObject({ ok: false, message: expect.stringContaining("Unknown schema 'nonesuch'") as unknown });
+        expect(await json(["add", "nonesuch"])).toMatchObject({ ok: false, error_type: "unknown-device-type", message: expect.stringContaining("Unknown schema 'nonesuch'") as unknown });
         const bare = await run(["add", "--name", "x"]);
         expect(bare.code).toBe(2);
         expect(bare.stderr).toContain("without a schema");
@@ -235,7 +235,7 @@ describe("add, update, delete, rename", () => {
         settings();
         await sensor();
         const preview = await json(["delete", "testpart_cs_gpio"]) as { ok: boolean; node_count: number; severity: string };
-        expect(preview).toMatchObject({ ok: true, node_count: 1, severity: "warn" });
+        expect(preview).toMatchObject({ ok: true, node_count: 1, severity: "warn", error_type: "needs-force" });
         expect(stored()["testpart_cs_gpio"]).toBeDefined();
         expect(await json(["delete", "testpart_cs_gpio", "--force"])).toMatchObject({ ok: true });
         expect(stored()["testpart_cs_gpio"]).toBeUndefined();

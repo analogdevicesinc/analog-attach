@@ -61,8 +61,8 @@ export function validate_chip_selects(workfile: Workfile): ValidationError[] {
 					const message = (with_: string) =>
 						`shares its GPIO chip-select (${pin.shown}) with '${with_}': both would be selected on every transfer`;
 					errors.push(
-						{ path: `${name}.${binding.gpio_list}`, message: message(other_name), severity: "error" },
-						{ path: `${other_name}.${binding.gpio_list}`, message: message(name), severity: "error" },
+						{ path: `${name}.${binding.gpio_list}`, message: message(other_name), severity: "error", type: "resource-conflict" },
+						{ path: `${other_name}.${binding.gpio_list}`, message: message(name), severity: "error", type: "resource-conflict" },
 					);
 				}
 			}
@@ -75,8 +75,8 @@ export function validate_chip_selects(workfile: Workfile): ValidationError[] {
 				const message = (with_: string) =>
 					`shares a native chip-select line on ${bus} with '${with_}': both would be selected on every transfer`;
 				errors.push(
-					{ path: `${name}.${binding.native_mask}`, message: message(other_name), severity: "error" },
-					{ path: `${other_name}.${binding.native_mask}`, message: message(name), severity: "error" },
+					{ path: `${name}.${binding.native_mask}`, message: message(other_name), severity: "error", type: "resource-conflict" },
+					{ path: `${other_name}.${binding.native_mask}`, message: message(name), severity: "error", type: "resource-conflict" },
 				);
 			}
 		}

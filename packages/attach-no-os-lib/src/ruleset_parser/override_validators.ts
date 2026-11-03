@@ -32,7 +32,7 @@ function require_property(context: ParseContext, name: string, scope: OverrideSc
 	const property = context.document.properties?.find(p => p.name === name);
 	if (!property) {
 		const known = context.document.properties?.map(p => p.name).join(", ") ?? "none";
-		return error(`Unknown property '${name}'. Known: ${known}`, at(context, name).path);
+		return error(`Unknown property '${name}'. Known: ${known}`, "definition-error", at(context, name).path);
 	}
 	return ok(property);
 }
@@ -102,7 +102,7 @@ function describe_member(property: string, predicate: OverridePredicate): string
 // error lands on the ones still missing. Both holding is fine: this is a lower bound only.
 function lower_any_of(value: unknown, context: ParseContext, target: MemberTarget): Result<Rule> {
 	if (!Array.isArray(value)) {
-		return error("$any_of must be an array of property names or {property: condition} entries", context.path);
+		return error("$any_of must be an array of property names or {property: condition} entries", "parse-error", context.path);
 	}
 
 	const members: { property: string, holds: OverridePredicate }[] = [];
@@ -120,7 +120,7 @@ function lower_any_of(value: unknown, context: ParseContext, target: MemberTarge
 		if (!object.ok) { return object; }
 		const [entry, ...extra] = Object.entries(object.value);
 		if (entry === undefined || extra.length > 0) {
-			return error("An $any_of entry must name exactly one property", item_context.path);
+			return error("An $any_of entry must name exactly one property", "parse-error", item_context.path);
 		}
 
 		const [property, condition] = entry;
@@ -136,7 +136,7 @@ function lower_any_of(value: unknown, context: ParseContext, target: MemberTarge
 	}
 
 	if (members.length < 2) {
-		return error("$any_of must have at least 2 entries", context.path);
+		return error("$any_of must have at least 2 entries", "parse-error", context.path);
 	}
 
 	const reason = `needs one of: ${members.map(member => describe_member(member.property, member.holds)).join(", ")}`;
@@ -233,10 +233,10 @@ function lower_node_effects(
 ): Result<LoweredBody> {
 	const key_context = at(at(context, key), NODE_KEY);
 	if (scope === "$parent") {
-		return error(`'${key}.${NODE_KEY}' cannot be used under $parent: an included node is reached from the node that declares the rule`, key_context.path);
+		return error(`'${key}.${NODE_KEY}' cannot be used under $parent: an included node is reached from the node that declares the rule`, "definition-error", key_context.path);
 	}
 	if (property._t !== "IncludeProperty" || property.count !== undefined) {
-		return error(`'${NODE_KEY}' needs '${key}' to be a single include, the node it points at; it is a ${property._t}${property._t === "IncludeProperty" ? " list" : ""}`, key_context.path);
+		return error(`'${NODE_KEY}' needs '${key}' to be a single include, the node it points at; it is a ${property._t}${property._t === "IncludeProperty" ? " list" : ""}`, "definition-error", key_context.path);
 	}
 	return lower_included_body([key], value, key_context);
 }
@@ -267,6 +267,7 @@ function lower_included_effects(
 	if (scope === "$parent") {
 		return error(
 			`'${key}' cannot be used under $parent: an included node is reached from the node that declares the rule`,
+			"definition-error",
 			key_context.path
 		);
 	}
@@ -276,6 +277,7 @@ function lower_included_effects(
 	if (property_name === undefined || member_name === undefined || rest.length > 0) {
 		return error(
 			`'${key}' must name a union property and one of its members, e.g. 'comm_init.spi_dev'`,
+			"parse-error",
 			key_context.path
 		);
 	}
@@ -286,13 +288,14 @@ function lower_included_effects(
 	if (target_property.value._t !== "UnionProperty") {
 		return error(
 			`Property '${property_name}' is a ${target_property.value._t}, not a union, so '${key}' has no member to reach through`,
+			"definition-error",
 			key_context.path
 		);
 	}
 
 	if (!target_property.value.members.some(member => member.name === member_name)) {
 		const known = target_property.value.members.map(member => member.name).join(", ");
-		return error(`Union '${property_name}' has no member '${member_name}'. Known: ${known}`, key_context.path);
+		return error(`Union '${property_name}' has no member '${member_name}'. Known: ${known}`, "definition-error", key_context.path);
 	}
 
 	return lower_included_body(via, value, key_context);
@@ -366,7 +369,7 @@ function lower_condition_body(
 	}
 
 	if (predicates.length === 0) {
-		return error("Condition must specify at least one property", context.path);
+		return error("Condition must specify at least one property", "parse-error", context.path);
 	}
 	if (predicates.length === 1) {
 		return ok(predicates[0]);
@@ -439,6 +442,7 @@ function lower_switch(object: Record<string, unknown>, context: ParseContext, sc
 		if (case_name !== "_" && enum_values && !enum_values.includes(case_value)) {
 			return error(
 				`Invalid case '${case_name}'. Valid values: ${enum_values.join(", ")}`,
+				"definition-error",
 				at(cases_context, case_name).path
 			);
 		}
@@ -472,14 +476,14 @@ function lower_switch(object: Record<string, unknown>, context: ParseContext, sc
 function lower_mutex(object: Record<string, unknown>, context: ParseContext, scope: OverrideScope): Result<Rule[]> {
 	const $mutex = object.$mutex;
 	if (!Array.isArray($mutex)) {
-		return error("$mutex must be an array of property names", at(context, "$mutex").path);
+		return error("$mutex must be an array of property names", "parse-error", at(context, "$mutex").path);
 	}
 
 	const mutex_context = at(context, "$mutex");
 	const names: string[] = [];
 	for (const [index, item] of $mutex.entries()) {
 		if (typeof item !== "string") {
-			return error(`Expected string, got ${typeof item}`, at(mutex_context, index).path);
+			return error(`Expected string, got ${typeof item}`, "parse-error", at(mutex_context, index).path);
 		}
 		const property = require_property(context, item, scope);
 		if (!property.ok) { return property; }
@@ -487,7 +491,7 @@ function lower_mutex(object: Record<string, unknown>, context: ParseContext, sco
 	}
 
 	if (names.length < 2) {
-		return error("$mutex must have at least 2 properties", mutex_context.path);
+		return error("$mutex must have at least 2 properties", "parse-error", mutex_context.path);
 	}
 
 	const node = scope_to_node(scope);
@@ -534,7 +538,7 @@ function lower_directive(value: unknown, context: ParseContext, scope: OverrideS
 
 function lower_override_array(value: unknown, context: ParseContext, scope: OverrideScope): Result<Rule[]> {
 	if (!Array.isArray(value)) {
-		return error("Expected array", context.path);
+		return error("Expected array", "parse-error", context.path);
 	}
 
 	const rules: Rule[] = [];
@@ -564,5 +568,5 @@ export function is_override(value: unknown, context: ParseContext): Result<Rule[
 		return lower_override_array(object.value.$this, at(context, "$this"), "$this");
 	}
 
-	return error("$override must be an array or object with $this/$parent", context.path);
+	return error("$override must be an array or object with $this/$parent", "parse-error", context.path);
 }

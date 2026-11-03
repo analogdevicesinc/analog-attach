@@ -94,26 +94,26 @@ function load_file_specs(templates_directory: string): Result<FileSpec[]> {
 	try {
 		parsed = JSON.parse(fs.readFileSync(structure_file, "utf8"));
 	} catch (error_) {
-		return error(`Could not read project structure '${structure_file}': ${String(error_)}`);
+		return error(`Could not read project structure '${structure_file}': ${String(error_)}`, "parse-error");
 	}
 
 	if (typeof parsed !== "object" || parsed === null || !Array.isArray((parsed as { files?: unknown }).files)) {
-		return error(`Project structure '${structure_file}' must be an object with a 'files' array`);
+		return error(`Project structure '${structure_file}' must be an object with a 'files' array`, "parse-error");
 	}
 
 	const extends_name = (parsed as { extends?: unknown }).extends;
 	if (extends_name !== undefined && typeof extends_name !== "string") {
-		return error(`Project structure '${structure_file}' has a non-string 'extends'`);
+		return error(`Project structure '${structure_file}' has a non-string 'extends'`, "parse-error");
 	}
 
 	let base_directory: string | undefined;
 	if (extends_name !== undefined) {
 		const base = resolve_template_set(extends_name);
 		if (!base.ok) {
-			return error(`Project structure '${structure_file}' extends an unusable set: ${base.error.message}`);
+			return error(`Project structure '${structure_file}' extends an unusable set: ${base.error.message}`, base.error.type);
 		}
 		if (path.resolve(base.value) === path.resolve(templates_directory)) {
-			return error(`Project structure '${structure_file}' extends itself`);
+			return error(`Project structure '${structure_file}' extends itself`, "definition-error");
 		}
 		base_directory = base.value;
 	}
@@ -122,22 +122,22 @@ function load_file_specs(templates_directory: string): Result<FileSpec[]> {
 	for (const [index, entry] of (parsed as { files: unknown[] }).files.entries()) {
 		const position = String(index);
 		if (typeof entry !== "object" || entry === null) {
-			return error(`Project structure entry #${position} is not an object`);
+			return error(`Project structure entry #${position} is not an object`, "parse-error");
 		}
 		const { template, output, protect } = entry as Record<string, unknown>;
 
 		if (typeof template !== "string" || typeof output !== "string") {
-			return error(`Project structure entry #${position} needs string 'template' and 'output'`);
+			return error(`Project structure entry #${position} needs string 'template' and 'output'`, "parse-error");
 		}
 		if (typeof protect !== "boolean") {
-			return error(`Project structure entry #${position} ('${output}') needs a boolean 'protect'`);
+			return error(`Project structure entry #${position} ('${output}') needs a boolean 'protect'`, "parse-error");
 		}
 
 		// The set itself wins; the base is only consulted for what the set omits.
 		let directory = templates_directory;
 		if (!fs.existsSync(path.join(directory, template))) {
 			if (base_directory === undefined || !fs.existsSync(path.join(base_directory, template))) {
-				return error(`Project structure entry '${output}' references missing template '${template}'`);
+				return error(`Project structure entry '${output}' references missing template '${template}'`, "definition-error");
 			}
 			directory = base_directory;
 		}
@@ -231,7 +231,7 @@ export function generate_project(input: CodegenInput): Result<CodegenResult> {
 			files_created.push(file_path);
 		}
 	} catch (error_) {
-		return error(error_ instanceof Error ? error_.message : String(error_));
+		return error(error_ instanceof Error ? error_.message : String(error_), "generate-failed");
 	}
 
 	return ok({ files_created });

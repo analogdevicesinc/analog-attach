@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "common.schema.json",
   "title": "CommonResponse",
-  "description": "The fields of a response (COM-040, COM-050), and the base shapes the command schemas build on (src/interface/backend-responses.ts). Most responses have the three fields; read, update when it reads, and validate don't (02-common.md §2, C-7). A refusal is exactly this object, with ok false and severity error. The base shapes are open, so that a backend's subtype can add fields (overview 2.1).",
+  "description": "The fields of a response (COM-040, COM-050), and the base shapes the command schemas build on (src/interface/backend-responses.ts). Most responses have the three fields; read, update when it reads, and validate don't (02-common.md \u00a72, C-7). A refusal is exactly this object, with ok false, severity error and its error_type (COM-051). The base shapes are open, so that a backend's subtype can add fields (overview 2.1).",
   "type": "object",
   "required": [
     "ok",
@@ -21,6 +21,10 @@
     "severity": {
       "$ref": "#/$defs/severity",
       "description": "error for a refusal; info or warn for a success (warn where the command's chapter says so, COM-050)."
+    },
+    "error_type": {
+      "$ref": "#/$defs/error-type",
+      "description": "Which kind of error or warning it is (COM-051): on a refusal and on a warn success. Optional where the backend is linux, until it sets it."
     }
   },
   "$defs": {
@@ -48,6 +52,9 @@
         },
         "severity": {
           "$ref": "#/$defs/severity"
+        },
+        "error_type": {
+          "$ref": "#/$defs/error-type"
         }
       }
     },
@@ -71,6 +78,9 @@
             "info",
             "warn"
           ]
+        },
+        "error_type": {
+          "$ref": "#/$defs/error-type"
         }
       },
       "additionalProperties": false
@@ -92,6 +102,9 @@
         },
         "severity": {
           "const": "error"
+        },
+        "error_type": {
+          "$ref": "#/$defs/error-type"
         }
       },
       "additionalProperties": false
@@ -533,6 +546,9 @@
         },
         "message": {
           "type": "string"
+        },
+        "error_type": {
+          "$ref": "#/$defs/error-type"
         }
       },
       "additionalProperties": false
@@ -578,6 +594,55 @@
           }
         }
       }
+    },
+    "error-type": {
+      "description": "The error types (GEN-17, COM-051): the fixed list, the same in every ecosystem (src/interface/error-types.ts).",
+      "enum": [
+        "unknown-command",
+        "unknown-flag",
+        "missing-argument",
+        "invalid-argument",
+        "conflicting-flags",
+        "missing-setting",
+        "unknown-setting",
+        "invalid-setting",
+        "settings-unreadable",
+        "invalid-source",
+        "cache-missing",
+        "cache-stale",
+        "tool-missing",
+        "tool-failed",
+        "install-incomplete",
+        "workfile-missing",
+        "workfile-exists",
+        "parse-error",
+        "workfile-invalid",
+        "write-failed",
+        "not-found",
+        "unknown-device-type",
+        "unknown-choice",
+        "ambiguous",
+        "name-taken",
+        "invalid-name",
+        "invalid-value",
+        "read-only",
+        "edit-refused",
+        "needs-force",
+        "unchecked",
+        "missing-required",
+        "out-of-range",
+        "bad-reference",
+        "rule-violation",
+        "resource-conflict",
+        "dependency-cycle",
+        "unresolved",
+        "not-generated",
+        "output-missing",
+        "generate-failed",
+        "definition-error",
+        "cancelled",
+        "internal-error"
+      ]
     }
   }
 }

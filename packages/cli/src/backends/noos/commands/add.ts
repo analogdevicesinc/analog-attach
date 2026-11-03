@@ -33,7 +33,7 @@ import { did_you_mean } from "../../../interface/names";
 import { common_ok, type AddResponse, type MissingProperty } from "../protocol/responses";
 import { describe_bootstrap, run_bootstrap, still_needed } from "./bootstrap_run";
 import { run_interview } from "./interview";
-import { load_context, save_workfile, type WorkfileContext } from "./shared";
+import { load_context, refuse_error, save_workfile, type WorkfileContext } from "./shared";
 
 const ADD_FLAGS = {
     as: {
@@ -89,12 +89,12 @@ async function run_add(arguments_: AddArguments, as: readonly string[], session:
 
     const context = load_context(session);
     if (!context.ok) {
-        return refuse(context.error.message);
+        return refuse_error(context.error);
     }
 
     const available = list_available_structs(context.value.workfile);
     if (!available.ok) {
-        return refuse(available.error.message);
+        return refuse_error(available.error);
     }
 
     // A schema wins over a driver of the same name; a driver is only the shorthand.
@@ -119,7 +119,7 @@ async function run_add(arguments_: AddArguments, as: readonly string[], session:
         if (!is_driver) {
             // The keys `list devices` gives: eval boards, drivers, schemas.
             const keys = [...list_eval_boards(), ...(drivers.ok ? drivers.value.map(candidate => candidate.name) : []), ...available.value.all];
-            return refuse(`Unknown schema '${key}'.${did_you_mean(key, keys)} See: ${program} list devices`);
+            return refuse(`Unknown schema '${key}'.${did_you_mean(key, keys)} See: ${program} list devices`, { type: "unknown-device-type" });
         }
         // Served over IIO (template capi-iio): the driver's IIO device is the root,
         // and it inits the part itself, so the generic handle is not added at all.
@@ -133,7 +133,7 @@ async function run_add(arguments_: AddArguments, as: readonly string[], session:
             root = first_interface === undefined ? driver_root(driver) : driver_root_for(driver, first_interface);
         }
         if (!root.ok) {
-            return refuse(root.error.message);
+            return refuse_error(root.error);
         }
         schema = root.value;
         // Named after the side too when one is picked, so ADC and DAC never collide.
@@ -147,19 +147,19 @@ async function run_add(arguments_: AddArguments, as: readonly string[], session:
         ? numbered_name(short_name(default_node_name), context.value)
         : unique_name(default_node_name, context.value));
     if (context.value.workfile.symbols[name] !== undefined) {
-        return refuse(`'${name}' already exists. Pass --name to choose another name.`);
+        return refuse(`'${name}' already exists. Pass --name to choose another name.`, { type: "name-taken" });
     }
 
     // The board is passed because `key` may name one of its own peripherals, which are
     // scoped to the selected board rather than globally unique.
     const ruleset = load_resolved_ruleset_for_board(schema, context.value.workfile.board);
     if (!ruleset.ok) {
-        return refuse(ruleset.error.message);
+        return refuse_error(ruleset.error);
     }
 
     const changed = add_symbol(context.value.workfile, name, ruleset.value);
     if (!changed.ok) {
-        return refuse(changed.error.message);
+        return refuse_error(changed.error);
     }
 
     context.value.workfile = changed.value;
@@ -169,7 +169,7 @@ async function run_add(arguments_: AddArguments, as: readonly string[], session:
     if (schema !== key) {
         const pinned = pin_driver(context.value.workfile, name, driver);
         if (!pinned.ok) {
-            return refuse(pinned.error.message);
+            return refuse_error(pinned.error);
         }
         pinned_links.push(...pinned.value);
     }
@@ -181,20 +181,20 @@ async function run_add(arguments_: AddArguments, as: readonly string[], session:
     for (const interface_ of interfaces.slice(1)) {
         const side = driver_root_for(driver, interface_);
         if (!side.ok) {
-            return refuse(side.error.message);
+            return refuse_error(side.error);
         }
         const side_name = unique_name(`${driver}_${interface_}`, context.value);
         const side_ruleset = load_resolved_ruleset_for_board(side.value, context.value.workfile.board);
         if (!side_ruleset.ok) {
-            return refuse(side_ruleset.error.message);
+            return refuse_error(side_ruleset.error);
         }
         const side_added = add_symbol(context.value.workfile, side_name, side_ruleset.value);
         if (!side_added.ok) {
-            return refuse(side_added.error.message);
+            return refuse_error(side_added.error);
         }
         const side_pinned = pin_driver(context.value.workfile, side_name, driver, chip);
         if (!side_pinned.ok) {
-            return refuse(side_pinned.error.message);
+            return refuse_error(side_pinned.error);
         }
         pinned_links.push(...side_pinned.value);
         sides.push(side_name);
@@ -205,21 +205,21 @@ async function run_add(arguments_: AddArguments, as: readonly string[], session:
     if (eval_board !== undefined) {
         const attached = attach_eval_board(context.value.workfile, eval_board, name);
         if (!attached.ok) {
-            return refuse(attached.error.message);
+            return refuse_error(attached.error);
         }
         eval_node = attached.value;
     }
 
     const ran = run_bootstrap(context.value.workfile);
     if (!ran.ok) {
-        return refuse(`Added '${name}', but bootstrap failed: ${ran.error.message}`);
+        return refuse(`Added '${name}', but bootstrap failed: ${ran.error.message}`, { type: ran.error.type });
     }
     // What add itself linked comes first: it is what the rest was built on.
     const report = ran.value === undefined ? undefined : { ...ran.value, linked: [...pinned_links, ...ran.value.linked] };
 
     const saved = save_workfile(context.value);
     if (!saved.ok) {
-        return refuse(saved.error.message);
+        return refuse_error(saved.error);
     }
 
     const validation = validate_workfile(context.value.workfile);

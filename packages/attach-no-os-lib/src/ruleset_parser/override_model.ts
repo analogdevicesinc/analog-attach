@@ -27,7 +27,7 @@ export function lower_effects(
 	]);
 	for (const key of Object.keys(object)) {
 		if (!known.has(key)) {
-			return error(`Unknown override field '${key}'`, at(context, key).path);
+			return error(`Unknown override field '${key}'`, "parse-error", at(context, key).path);
 		}
 	}
 
@@ -41,6 +41,7 @@ export function lower_effects(
 		if (property?._t === "EnumProperty" && !property.values.includes(object.default as EnumValue)) {
 			return error(
 				`Invalid default '${String(object.default)}'. Valid: ${property.values.join(", ")}`,
+				"definition-error",
 				at(context, "default").path
 			);
 		}
@@ -79,7 +80,7 @@ export function lower_effects(
 		}
 
 		if (property?._t === "NumberProperty" && property.minimum !== undefined && minimum.value < property.minimum) {
-			return error(`minimum ${String(minimum.value)} below type minimum ${String(property.minimum)}`, at(context, "minimum").path);
+			return error(`minimum ${String(minimum.value)} below type minimum ${String(property.minimum)}`, "definition-error", at(context, "minimum").path);
 		}
 
 		effects.push({ op: "setMin", reference, value: minimum.value });
@@ -92,7 +93,7 @@ export function lower_effects(
 		}
 
 		if (property?._t === "NumberProperty" && property.maximum !== undefined && maximum.value > property.maximum) {
-			return error(`maximum ${String(maximum.value)} above type maximum ${String(property.maximum)}`, at(context, "maximum").path);
+			return error(`maximum ${String(maximum.value)} above type maximum ${String(property.maximum)}`, "definition-error", at(context, "maximum").path);
 		}
 
 		effects.push({ op: "setMax", reference, value: maximum.value });
@@ -158,6 +159,7 @@ function lower_value_effect(
 			if (!names.includes(member.value)) {
 				return error(
 					`Invalid union member '${member.value}'. Valid: ${names.join(", ")}`,
+					"definition-error",
 					value_context.path
 				);
 			}
@@ -169,6 +171,7 @@ function lower_value_effect(
 			// exactly what the redesign removes. Author must use `values:`.
 			return error(
 				`Cannot use 'value:' on enum '${reference.property}'. Use 'values:' to restrict the selectable set.`,
+				"definition-error",
 				value_context.path
 			);
 		}
@@ -194,7 +197,7 @@ export function lower_condition(
 	const keys = Object.keys(condition_object);
 
 	if (keys.length === 0) {
-		return error("Condition must specify at least one operator", context.path);
+		return error("Condition must specify at least one operator", "parse-error", context.path);
 	}
 
 	const predicates: OverridePredicate[] = [];
@@ -235,6 +238,7 @@ export function lower_condition(
 			default: {
 				return error(
 					`Unknown condition operator '${key}'. Expected 'value' (whose operand may be '${ANY_VALUE}') or 'not'.`,
+					"parse-error",
 					operand_context.path
 				);
 			}

@@ -12,12 +12,13 @@ import {
     type Property,
     type PropertySuggestions,
     type Result,
+    type ResultError,
     type Ruleset,
     type RulesetDescriptor,
     type RulesetStruct,
     type Workfile,
 } from "attach-no-os-lib";
-import type { Session } from "../../../interface/backend-interface";
+import { refuse, type Outcome, type Session } from "../../../interface/backend-interface";
 import { RESERVED_PREFIX } from "../protocol/convert";
 import { install } from "../settings";
 
@@ -28,6 +29,13 @@ export type WorkfileContext = {
     minimal: MinimalWorkfile;
     workfile: Workfile;
 };
+
+// --- Refusals ---
+
+/** Refuses with a lib error's message, and its type as the response's `error_type` (GEN-17). */
+export function refuse_error(error: ResultError): Outcome<never> {
+    return refuse(error.message, { type: error.type });
+}
 
 // --- Workfile Loading ---
 
@@ -44,7 +52,7 @@ export function load_context(session: Pick<Session, "settings" | "assets_dir" | 
 
     const path = resolved.value;
     if (!fs.existsSync(path)) {
-        return error(`No workfile at '${path}'. Create one with '${session.program} init', or point the 'workfile' setting elsewhere.`);
+        return error(`No workfile at '${path}'. Create one with '${session.program} init', or point the 'workfile' setting elsewhere.`, "workfile-missing");
     }
 
     const minimal = load_minimal_workfile(path);
@@ -189,17 +197,17 @@ export function get_node_property(
 ): Result<NodePropertyResult> {
     const node = context.workfile.symbols[node_name];
     if (!node) {
-        return error(`Node '${node_name}' not found. Available: ${Object.keys(context.workfile.symbols).join(", ")}`);
+        return error(`Node '${node_name}' not found. Available: ${Object.keys(context.workfile.symbols).join(", ")}`, "not-found");
     }
 
     if (node._t !== "RulesetStruct" && node._t !== "RulesetDescriptor") {
-        return error(`Node '${node_name}' is not a struct or descriptor`);
+        return error(`Node '${node_name}' is not a struct or descriptor`, "not-found");
     }
 
     const resolved = resolve_property_name(node, property_name);
     const property = node.properties.find(p => p.name === resolved);
     if (!property) {
-        return error(`Property '${property_name}' not found. Available: ${node.properties.map(p => p.name).join(", ")}`);
+        return error(`Property '${property_name}' not found. Available: ${node.properties.map(p => p.name).join(", ")}`, "not-found");
     }
 
     return ok({ node, property });
@@ -213,7 +221,7 @@ export function get_node(context: WorkfileContext, node_name: string): Result<Ru
     }
 
     if (node.value._t !== "RulesetStruct" && node.value._t !== "RulesetDescriptor") {
-        return error(`Node '${node_name}' has no properties to configure`);
+        return error(`Node '${node_name}' has no properties to configure`, "not-found");
     }
 
     return ok(node.value);
@@ -224,7 +232,7 @@ export function get_node(context: WorkfileContext, node_name: string): Result<Ru
 export function get_any_node(context: WorkfileContext, node_name: string): Result<Ruleset> {
     const node = context.workfile.symbols[node_name];
     if (!node) {
-        return error(`Node '${node_name}' not found. Available: ${Object.keys(context.workfile.symbols).join(", ")}`);
+        return error(`Node '${node_name}' not found. Available: ${Object.keys(context.workfile.symbols).join(", ")}`, "not-found");
     }
 
     return ok(node);

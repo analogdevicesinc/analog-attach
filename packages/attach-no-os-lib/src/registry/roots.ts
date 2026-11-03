@@ -64,7 +64,7 @@ export function driver_roots(driver: string): Result<string[]> {
 
 	const module = drivers.value.find(candidate => candidate.name === driver);
 	if (module === undefined) {
-		return error(`No configured driver is called '${driver}'`, driver);
+		return error(`No configured driver is called '${driver}'`, "unknown-device-type", driver);
 	}
 
 	const provided = new Set(module.provides_interfaces ?? []);
@@ -107,14 +107,14 @@ export function driver_root(driver: string): Result<string> {
 		const drivers = list_drivers();
 		const module = drivers.ok ? drivers.value.find(candidate => candidate.name === driver) : undefined;
 		if (module?.rulesets_file === undefined) {
-			return error(`Driver '${driver}' has no analog-attach rulesets yet, so it cannot be added`, driver);
+			return error(`Driver '${driver}' has no analog-attach rulesets yet, so it cannot be added`, "unknown-device-type", driver);
 		}
-		return error(`Driver '${driver}' implements no interface that a generic handle is configured through, so there is nothing to add it by. Add its own structs instead (see: analog-attach list devices)`, driver);
+		return error(`Driver '${driver}' implements no interface that a generic handle is configured through, so there is nothing to add it by. Add its own structs instead (see: analog-attach list devices)`, "unknown-device-type", driver);
 	}
 	if (more.length > 0) {
 		const interfaces = roots.value.flatMap(root => driver_interfaces_of(root)).filter((interface_, index, all) => all.indexOf(interface_) === index);
 		const one_each = interfaces.map(interface_ => `--as ${interface_}`).join(" or ");
-		return error(`Driver '${driver}' can be added as ${interfaces.join(" or ")} (${roots.value.join(", ")}). Pass ${one_each}, or --as ${interfaces.join(",")} for all of them on one chip`, driver);
+		return error(`Driver '${driver}' can be added as ${interfaces.join(" or ")} (${roots.value.join(", ")}). Pass ${one_each}, or --as ${interfaces.join(",")} for all of them on one chip`, "ambiguous", driver);
 	}
 
 	return ok(only);
@@ -139,10 +139,10 @@ export function driver_root_for(driver: string, interface_: string): Result<stri
 	const [only, ...more] = matching;
 	if (only === undefined) {
 		const offered = roots.value.flatMap(root => driver_interfaces_of(root));
-		return error(`Driver '${driver}' cannot be added as '${interface_}'. It can be: ${[...new Set(offered)].join(", ") || "nothing"}`, interface_);
+		return error(`Driver '${driver}' cannot be added as '${interface_}'. It can be: ${[...new Set(offered)].join(", ") || "nothing"}`, "unknown-choice", interface_);
 	}
 	if (more.length > 0) {
-		return error(`Driver '${driver}' has more than one handle for '${interface_}': ${matching.join(", ")}`, interface_);
+		return error(`Driver '${driver}' has more than one handle for '${interface_}': ${matching.join(", ")}`, "definition-error", interface_);
 	}
 	return ok(only);
 }
@@ -159,7 +159,7 @@ export function driver_iio_root(driver: string): Result<string> {
 	}
 	const module = drivers.value.find(candidate => candidate.name === driver);
 	if (module === undefined) {
-		return error(`No configured driver is called '${driver}'`, driver);
+		return error(`No configured driver is called '${driver}'`, "unknown-device-type", driver);
 	}
 
 	const entries = all_symbols();
@@ -169,10 +169,10 @@ export function driver_iio_root(driver: string): Result<string> {
 	const [only, ...more] = entries.value.filter(entry => entry.$type === RulesetType.RT_DESCRIPTOR
 		&& entry.group === IIO_GROUP && entry.module.path === module.path);
 	if (only === undefined) {
-		return error(`Driver '${driver}' has no IIO device in its rulesets, so it cannot be served over IIO`, driver);
+		return error(`Driver '${driver}' has no IIO device in its rulesets, so it cannot be served over IIO`, "unknown-device-type", driver);
 	}
 	if (more.length > 0) {
-		return error(`Driver '${driver}' lists more than one IIO device: ${[only, ...more].map(entry => entry.$symbol).join(", ")}`, driver);
+		return error(`Driver '${driver}' lists more than one IIO device: ${[only, ...more].map(entry => entry.$symbol).join(", ")}`, "definition-error", driver);
 	}
 	return ok(only.$symbol);
 }

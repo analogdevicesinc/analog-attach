@@ -305,18 +305,38 @@ checksum() {
 	assert_json '.severity' warn
 }
 
-# Description: a refusal carries an error type from a fixed list (a known gap).
+# Description: every error and warning carries an error type from the fixed list: refusals,
+# a warning of a success, and each finding of validate.
 # Steps:
-#   1. Create the workfile and add the eval-testpart board.
-#   2. Add an unknown device, with --json.
-#   3. Check it is refused (.ok false) and has a non-empty error type field.
-# bats test_tags=req:GEN-17, gap, id:N0113
+#   1. Read, with --json, before any init; check the type is workfile-missing.
+#   2. Create the workfile and add the eval-testpart board.
+#   3. With --json: add an unknown device, read an unknown node, update a number with abc, set
+#      an unknown target, rename to an invalid name, install an unknown skill.
+#   4. Check each is refused with its type: unknown-device-type, not-found, invalid-value,
+#      invalid-setting, invalid-name, unknown-choice.
+#   5. Delete a referenced device without --force; check the warning's type is needs-force.
+#   6. Clear a required property and validate; check its finding's type is missing-required.
+# bats test_tags=req:GEN-17, id:N0113
 @test "an error carries a type from the fixed list" {
-	# Gap: a refusal has ok, message and severity only; there is no error type field.
+	run_json read
+	assert_json '.error_type' workfile-missing
 	with_sensor
-	run_json add nosuchdevice
-	assert_json '.ok' false
-	assert_json '(.type // .error_type // .kind // "") | length > 0' true
+	local pair words type
+	for pair in "add nosuchdevice=unknown-device-type" "read nosuch=not-found" \
+		"update testpart_spi_dev max_speed_hz abc=invalid-value" "config target nosuchboard=invalid-setting" \
+		"rename testpart_ip 1bad=invalid-name" "skill install nosuch=unknown-choice"; do
+		words=${pair%=*} type=${pair##*=}
+		# shellcheck disable=SC2086
+		run --separate-stderr aa --json $words
+		jq -e --arg type "$type" '.ok == false and .error_type == $type' <<<"$output" >/dev/null ||
+			fail "$words: expected a refusal of type $type, got: $output"
+	done
+	run_json delete testpart_spi_dev
+	assert_json '.severity' warn
+	assert_json '.error_type' needs-force
+	aa delete testpart_ip comm_init >/dev/null
+	run_json validate
+	assert_json '[.errors[] | .error_type] | unique | join(",")' missing-required
 }
 
 # --- GEN-09: exit status -----------------------------------------------------------------
