@@ -5,6 +5,7 @@
 // Binding pipeline, validation and structural types
 export { Attach, PARSE_STEPS, type ParseOptions, type BindingParseError } from './Attach/Attach.js';
 export { fixup_passes, type StepInfo, type FixupPass } from './Bindings/JSONSchemaFixups.js';
+export type { TraceEvent, PipelineTracer } from './Bindings/Trace.js';
 export { populate_binding, populate_properties, type PopulateOptions } from './Attach/Populate.js';
 export type { SchemaPaths } from './Bindings/Context.js';
 export { Result } from './result.js';
