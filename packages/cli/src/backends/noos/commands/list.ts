@@ -30,6 +30,7 @@ import {
     format_property_type,
     get_node,
     load_context,
+    refuse_error,
     resolve_property_name,
 } from "./shared";
 
@@ -61,11 +62,11 @@ export const list_context = command<ListContextArguments, ListContextResponse>({
         install(session);
         const socs = list_socs();
         if (!socs.ok) {
-            return Promise.resolve(refuse(socs.error.message));
+            return Promise.resolve(refuse_error(socs.error));
         }
         const found = list_boards();
         if (!found.ok) {
-            return Promise.resolve(refuse(found.error.message));
+            return Promise.resolve(refuse_error(found.error));
         }
 
         const boards: ListedBoard[] = found.value.map(board => ({
@@ -131,7 +132,7 @@ export const list_property = command<ListPropertyArguments, ListPropertyResponse
         }
         const context = load_context(session);
         if (!context.ok) {
-            return Promise.resolve(refuse(context.error.message));
+            return Promise.resolve(refuse_error(context.error));
         }
 
         if (node === undefined) {
@@ -147,7 +148,7 @@ export const list_property = command<ListPropertyArguments, ListPropertyResponse
 
         const owner = get_node(context.value, node);
         if (!owner.ok) {
-            return Promise.resolve(refuse(owner.error.message));
+            return Promise.resolve(refuse_error(owner.error));
         }
 
         const properties = owner.value.properties.filter(entry => entry.disabled !== true);
@@ -181,20 +182,20 @@ export const list_property = command<ListPropertyArguments, ListPropertyResponse
 export function value_suggestions(session: Session, node: string, property: string, member?: string): Outcome<SuggestResponse> {
     const context = load_context(session);
     if (!context.ok) {
-        return refuse(context.error.message);
+        return refuse_error(context.error);
     }
     const owner = get_node(context.value, node);
     if (!owner.ok) {
-        return refuse(owner.error.message);
+        return refuse_error(owner.error);
     }
     const resolved = resolve_property_name(owner.value, property);
     if (!owner.value.properties.some(candidate => candidate.name === resolved)) {
-        return refuse(`'${node}' has no property '${property}'`);
+        return refuse(`'${node}' has no property '${property}'`, { type: "not-found" });
     }
 
     const suggested = suggest_for_property(context.value.workfile, node, resolved, member);
     if (!suggested.ok) {
-        return refuse(suggested.error.message);
+        return refuse_error(suggested.error);
     }
     const values = suggested.value.values ?? [];
     const types = suggested.value.types ?? [];

@@ -89,7 +89,8 @@ export function validate_property(
 			return [{
 				path: property_context.path,
 				message: "Required property has no value; the driver may need it",
-				severity: "warning"
+				severity: "warning",
+				type: "missing-required"
 			}];
 		}
 
@@ -97,7 +98,8 @@ export function validate_property(
 			path: property_context.path,
 			// A rule that made this required may say what would satisfy it.
 			message: required_reason ?? "Required property has no value",
-			severity: "error"
+			severity: "error",
+			type: "missing-required"
 		}];
 	}
 
@@ -207,7 +209,8 @@ export function validate_value(
 				return [{
 					path: property_context.path,
 					message: `Array exceeds maximum size of ${effective.size.toString()}, got ${value.length.toString()}`,
-					severity: "error"
+					severity: "error",
+					type: "out-of-range"
 				}];
 			}
 			const element = effective.element;
@@ -221,7 +224,7 @@ export function validate_value(
 			if (member === undefined || effective.members.some(candidate => candidate.name === member)) {
 				return [];
 			}
-			return [{ path: at(property_context, member).path, message: `Unknown union member '${member}'`, severity: "error" }];
+			return [{ path: at(property_context, member).path, message: `Unknown union member '${member}'`, severity: "error", type: "out-of-range" }];
 		}
 		default: {
 			return [];
@@ -251,7 +254,8 @@ function validate_driver_backed(
 		return [{
 			path: context.path,
 			message: `Driver ${label} '${symbol_name}' is not a symbol in this workfile`,
-			severity: "error"
+			severity: "error",
+			type: "bad-reference"
 		}];
 	}
 
@@ -259,19 +263,21 @@ function validate_driver_backed(
 		return [{
 			path: context.path,
 			message: `Driver ${label} '${symbol_name}' must be a ${ruleset_type_token(expected)}, got ${ruleset_type_token(target.$type)}`,
-			severity: "error"
+			severity: "error",
+			type: "bad-reference"
 		}];
 	}
 
 	const provides = provides_interface(target.$symbol, property.interface);
 	if (!provides.ok) {
-		return [{ path: context.path, message: provides.error.message, severity: "error" }];
+		return [{ path: context.path, message: provides.error.message, severity: "error", type: provides.error.type }];
 	}
 	if (!provides.value) {
 		return [{
 			path: context.path,
 			message: `'${symbol_name}' does not come from a driver implementing '${property.interface}'`,
-			severity: "error"
+			severity: "error",
+			type: "bad-reference"
 		}];
 	}
 
@@ -286,7 +292,8 @@ function validate_driver_backed(
 			return [{
 				path: context.path,
 				message: `'${symbol_name}' (${target.$symbol}) is not a ${property.interface} init_param: its driver takes ${offered.map(candidate => candidate.$symbol).join(" or ") || "another struct"}`,
-				severity: "error"
+				severity: "error",
+				type: "bad-reference"
 			}];
 		}
 	}
@@ -295,7 +302,8 @@ function validate_driver_backed(
 		return [{
 			path: context.path,
 			message: `Driver ${label} '${symbol_name}' ($symbol: ${target.$symbol}) is not in the allowed list: ${property.allowed.join(", ")}`,
-			severity: "error"
+			severity: "error",
+			type: "bad-reference"
 		}];
 	}
 
@@ -315,7 +323,8 @@ function validate_platform_ops(
 		return [{
 			path: context.path,
 			message: `Platform ops '${symbol_name}' not found`,
-			severity: "error"
+			severity: "error",
+			type: "bad-reference"
 		}];
 	}
 
@@ -324,7 +333,8 @@ function validate_platform_ops(
 			return [{
 				path: context.path,
 				message: `Platform ops '${symbol_name}' ($symbol: ${ops.$symbol}) is not in the allowed list: ${property.allowed.join(", ")}`,
-				severity: "error"
+				severity: "error",
+				type: "bad-reference"
 			}];
 		}
 
@@ -332,7 +342,8 @@ function validate_platform_ops(
 			return [{
 				path: context.path,
 				message: `Capability mismatch: ops is '${ops.$capability ?? "none"}', expected '${property.capability?.join(", ") ?? ""}' (allowed by override)`,
-				severity: "warning"
+				severity: "warning",
+				type: "bad-reference"
 			}];
 		}
 
@@ -343,7 +354,8 @@ function validate_platform_ops(
 		return [{
 			path: context.path,
 			message: `Capability mismatch: ops is '${ops.$capability ?? "none"}', expected '${property.capability?.join(", ") ?? ""}'`,
-			severity: "error"
+			severity: "error",
+			type: "bad-reference"
 		}];
 	}
 
@@ -363,7 +375,8 @@ function validate_platform_extra(
 		return [{
 			path: context.path,
 			message: `Platform extra '${symbol_name}' not found`,
-			severity: "error"
+			severity: "error",
+			type: "bad-reference"
 		}];
 	}
 
@@ -371,7 +384,8 @@ function validate_platform_extra(
 		return [{
 			path: context.path,
 			message: `Expected type struct or device, got ${extra._t}`,
-			severity: "error"
+			severity: "error",
+			type: "bad-reference"
 		}];
 	}
 
@@ -380,7 +394,8 @@ function validate_platform_extra(
 			return [{
 				path: context.path,
 				message: `Platform extra '${symbol_name}' ($symbol: ${extra.$symbol}) is not in the allowed list: ${property.allowed.join(", ")}`,
-				severity: "error"
+				severity: "error",
+				type: "bad-reference"
 			}];
 		}
 
@@ -388,7 +403,8 @@ function validate_platform_extra(
 			return [{
 				path: context.path,
 				message: `Capability mismatch: extra is '${extra.$capability ?? "none"}', expected '${property.capability?.join(", ") ?? ""}' (allowed by override)`,
-				severity: "warning"
+				severity: "warning",
+				type: "bad-reference"
 			}];
 		}
 
@@ -399,7 +415,8 @@ function validate_platform_extra(
 		return [{
 			path: context.path,
 			message: `Capability mismatch: extra is '${extra.$capability ?? "none"}', expected '${property.capability?.join(", ") ?? ""}'`,
-			severity: "error"
+			severity: "error",
+			type: "bad-reference"
 		}];
 	}
 
@@ -417,7 +434,8 @@ function validate_number(property: NumberProperty, context: ParseContext): Valid
 		errors.push({
 			path: context.path,
 			message: `Expected number, got ${typeof value}`,
-			severity: "error"
+			severity: "error",
+			type: "out-of-range"
 		});
 		return errors; // No reason to continue
 	}
@@ -427,7 +445,8 @@ function validate_number(property: NumberProperty, context: ParseContext): Valid
 		errors.push({
 			path: context.path,
 			message: `Value ${value.toString()} is not a finite number`,
-			severity: "error"
+			severity: "error",
+			type: "out-of-range"
 		});
 		return errors; // Range checks below are meaningless for a non-finite value
 	}
@@ -438,7 +457,8 @@ function validate_number(property: NumberProperty, context: ParseContext): Valid
 		errors.push({
 			path: context.path,
 			message: `Value ${value.toString()} is not an integer, but '${property.type}' is an integer type`,
-			severity: "error"
+			severity: "error",
+			type: "out-of-range"
 		});
 	}
 
@@ -446,7 +466,8 @@ function validate_number(property: NumberProperty, context: ParseContext): Valid
 		errors.push({
 			path: context.path,
 			message: `Value ${shown(value)} is below the minimum ${shown(property.minimum)}`,
-			severity: "error"
+			severity: "error",
+			type: "out-of-range"
 		});
 	}
 
@@ -454,7 +475,8 @@ function validate_number(property: NumberProperty, context: ParseContext): Valid
 		errors.push({
 			path: context.path,
 			message: `Value ${shown(value)} is above the maximum ${shown(property.maximum)}`,
-			severity: "error"
+			severity: "error",
+			type: "out-of-range"
 		});
 	}
 
@@ -464,7 +486,8 @@ function validate_number(property: NumberProperty, context: ParseContext): Valid
 		errors.push({
 			path: context.path,
 			message: `Value ${shown(value)} is not one of: ${property.values.map(allowed => shown(allowed)).join(", ")}`,
-			severity: "error"
+			severity: "error",
+			type: "out-of-range"
 		});
 	}
 
@@ -476,7 +499,8 @@ function validate_boolean(property: BooleanProperty, context: ParseContext): Val
 		return [{
 			path: context.path,
 			message: `Expected boolean, got ${typeof property.value}`,
-			severity: "error"
+			severity: "error",
+			type: "out-of-range"
 		}];
 	}
 
@@ -488,7 +512,8 @@ function validate_string(property: StringProperty, context: ParseContext): Valid
 		return [{
 			path: context.path,
 			message: `Expected string, got ${typeof property.value}`,
-			severity: "error"
+			severity: "error",
+			type: "out-of-range"
 		}];
 	}
 
@@ -501,7 +526,8 @@ function validate_enum(property: EnumProperty, context: ParseContext): Validatio
 		return [{
 			path: context.path,
 			message: `Invalid value type '${typeof value}. Expected number or string'`,
-			severity: "error"
+			severity: "error",
+			type: "out-of-range"
 		}];
 	}
 
@@ -509,7 +535,8 @@ function validate_enum(property: EnumProperty, context: ParseContext): Validatio
         return [{
             path: context.path,
             message: `Invalid value '${value.toString()}'. Expected one of: ${property.values.join(", ")}`,
-            severity: "error"
+            severity: "error",
+            type: "out-of-range"
         }];
     }
     return [];
@@ -534,7 +561,8 @@ function validate_include(
             return [{
                 path: context.path,
                 message: `Invalid value '${value}'. Expected one of: ${valid_values.join(", ")}`,
-                severity: "error"
+                severity: "error",
+                type: "out-of-range"
             }];
         }
         return [];
@@ -549,7 +577,8 @@ function validate_include(
             message: value.includes(".")
                 ? `Reference '${value}' does not name a readonly member of an existing node`
                 : `Target symbol '${value}' not found`,
-            severity: "error"
+            severity: "error",
+            type: "bad-reference"
         }];
     }
 
@@ -557,7 +586,8 @@ function validate_include(
         return [{
             path: context.path,
             message: `Type mismatch: '${value}' is '${target.$id}', expected '${include_path}'`,
-            severity: "error"
+            severity: "error",
+            type: "bad-reference"
         }];
     }
 
@@ -577,7 +607,8 @@ function validate_include_type(
         return [{
             path: context.path,
             message: `Target symbol '${value}' not found`,
-            severity: "error"
+            severity: "error",
+            type: "bad-reference"
         }];
     }
 
@@ -585,7 +616,8 @@ function validate_include_type(
         return [{
             path: context.path,
             message: `Type mismatch: '${value}' is a ${ruleset_type_token(target.$type)}, expected any ${ruleset_type_token(include_type)}`,
-            severity: "error"
+            severity: "error",
+            type: "bad-reference"
         }];
     }
 
@@ -605,7 +637,8 @@ function validate_union(
         return [{
             path: context.path,
             message: `Union value must have exactly one key`,
-            severity: "error"
+            severity: "error",
+            type: "out-of-range"
         }];
     }
 
@@ -614,7 +647,8 @@ function validate_union(
         return [{
             path: at(context, selected_member_name).path,
             message: `Union member '${selected_member_name}' has no bound target`,
-            severity: "error"
+            severity: "error",
+            type: "missing-required"
         }];
     }
 
@@ -623,7 +657,8 @@ function validate_union(
         return [{
             path: at(context, selected_member_name).path,
             message: `Unknown union member '${selected_member_name}'`,
-            severity: "error"
+            severity: "error",
+            type: "out-of-range"
         }];
     }
 
@@ -648,7 +683,8 @@ function validate_array(
         return [{
             path: context.path,
             message: `Expected array, got ${typeof value}`,
-            severity: "error"
+            severity: "error",
+            type: "out-of-range"
         }];
     }
 
@@ -660,7 +696,8 @@ function validate_array(
         return [{
             path: context.path,
             message: `Array exceeds maximum size of ${property.size.toString()}, got ${value.length.toString()}`,
-            severity: "error"
+            severity: "error",
+            type: "out-of-range"
         }];
     }
 

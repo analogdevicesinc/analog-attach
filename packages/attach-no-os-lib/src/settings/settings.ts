@@ -95,7 +95,7 @@ export function get_settings(): Result<SettingsFile> {
 export function get_setting(key: keyof SettingsFile): Result<Setting> {
 	const defaults = defaults_of(key);
 	if (defaults === undefined) {
-		return error(`Cannot find key "${key}" in settings. Available options: "${Object.keys(SETTINGS_DEFAULTS).join(", ")}"`);
+		return error(`Cannot find key "${key}" in settings. Available options: "${Object.keys(SETTINGS_DEFAULTS).join(", ")}"`, "unknown-setting");
 	}
 	const value = read(key);
 	return ok(value === undefined ? { ...defaults } : { ...defaults, value });
@@ -109,7 +109,7 @@ export function get_setting_value(key: keyof SettingsFile): Result<string> {
 	}
 
 	if (setting.value.value === undefined) {
-		return error(`Setting "${key}" is not configured. Run: analog-attach config ${key} <value>`);
+		return error(`Setting "${key}" is not configured. Run: analog-attach config ${key} <value>`, "missing-setting");
 	}
 
 	return ok(setting.value.value);
@@ -185,7 +185,7 @@ export function get_workfile_path(): Result<string> {
 		return configured;
 	}
 	if (configured.value === undefined) {
-		return error("Setting \"workfile\" is not configured. Run: analog-attach config workfile <path>");
+		return error("Setting \"workfile\" is not configured. Run: analog-attach config workfile <path>", "missing-setting");
 	}
 
 	const resolved = path.resolve(configured.value);

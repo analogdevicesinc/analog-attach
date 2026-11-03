@@ -34,12 +34,12 @@ export function platform_ops_tables(platform: ModuleInfo): Result<RulesetPlatfor
 	try {
 		parsed = YAML.parse(fs.readFileSync(file, "utf8"));
 	} catch (error_) {
-		return error(`Failed to read ${file}: ${error_ instanceof Error ? error_.message : String(error_)}`, file);
+		return error(`Failed to read ${file}: ${error_ instanceof Error ? error_.message : String(error_)}`, "parse-error", file);
 	}
 
 	const interfaces = (parsed as { interfaces?: unknown } | null)?.interfaces;
 	if (!Array.isArray(interfaces)) {
-		return error(`${file} has no interfaces list`, file);
+		return error(`${file} has no interfaces list`, "parse-error", file);
 	}
 
 	return ok(interfaces.flatMap(entry => {

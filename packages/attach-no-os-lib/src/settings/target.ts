@@ -35,9 +35,9 @@ export function resolve_target(value: string): Result<ResolvedTarget> {
 	}
 	const known = list_targets();
 	if (known.length === 0) {
-		return error(`Unknown target '${value}': the configured modules have no boards or chips. Check capi-path and module-paths`, value);
+		return error(`Unknown target '${value}': the configured modules have no boards or chips. Check capi-path and module-paths`, "invalid-source", value);
 	}
-	return error(`Unknown target '${value}'. It can be a board or a chip: ${known.join(", ")}`, value);
+	return error(`Unknown target '${value}'. It can be a board or a chip: ${known.join(", ")}`, "invalid-setting", value);
 }
 
 /** Every name `target` takes: the boards, then the chips. */
