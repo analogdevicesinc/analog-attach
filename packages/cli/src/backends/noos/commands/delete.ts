@@ -13,9 +13,10 @@ import {
     get_any_node,
     get_node_property,
     load_context,
+    refuse_error,
     root_key,
     save_workfile,
-    type WorkfileContext
+    type WorkfileContext,
 } from "./shared";
 import { common_ok, type CommonResponse, type DeletePreview } from "../protocol/responses";
 
@@ -50,7 +51,7 @@ export const delete_command = command<DeleteArguments, DeleteResponse>({
     run({ path: node, property, force }, _flags, session) {
         const context = load_context(session);
         if (!context.ok) {
-            return Promise.resolve(refuse(context.error.message));
+            return Promise.resolve(refuse_error(context.error));
         }
         const { program } = session;
 
@@ -61,7 +62,7 @@ export const delete_command = command<DeleteArguments, DeleteResponse>({
 
         const found = get_any_node(context.value, node);
         if (!found.ok) {
-            return Promise.resolve(refuse(found.error.message));
+            return Promise.resolve(refuse_error(found.error));
         }
 
         // delete <node> <property>: clear one value
@@ -79,7 +80,7 @@ export const delete_command = command<DeleteArguments, DeleteResponse>({
 function reset_property(context: WorkfileContext, node: string, property: string, program: string): Outcome<DeleteResponse> {
     const lookup = get_node_property(context, node, property);
     if (!lookup.ok) {
-        return refuse(lookup.error.message);
+        return refuse_error(lookup.error);
     }
 
     // The lookup's own name, not what was typed: `delete <node> init_param` resolves to
@@ -90,7 +91,7 @@ function reset_property(context: WorkfileContext, node: string, property: string
     const referenced_before = referenced_nodes(context.workfile);
     const cleared = clear_value(context.workfile, node, resolved);
     if (!cleared.ok) {
-        return refuse(cleared.error.message);
+        return refuse_error(cleared.error);
     }
 
     const message = `Reset ${node}.${resolved}`;
@@ -124,14 +125,15 @@ function delete_node(context: WorkfileContext, node: string, force: boolean, pro
         if (!cleared.ok) {
             return refuse(
                 `Cannot delete '${node}': ${reference.owner}.${reference.property} references it and could not be `
-                + `cleared (${cleared.error.message}). Delete '${reference.owner}' instead.`
+                + `cleared (${cleared.error.message}). Delete '${reference.owner}' instead.`,
+                { type: "edit-refused" }
             );
         }
     }
 
     const removed = remove_symbol(context.workfile, node);
     if (!removed.ok) {
-        return refuse(removed.error.message);
+        return refuse_error(removed.error);
     }
 
     const message = references.length > 0
@@ -169,7 +171,7 @@ function delete_everything(context: WorkfileContext, force: boolean, program: st
     for (const name of names) {
         const removed = remove_symbol(context.workfile, name);
         if (!removed.ok) {
-            return refuse(removed.error.message);
+            return refuse_error(removed.error);
         }
     }
 
@@ -192,12 +194,12 @@ function delete_everything(context: WorkfileContext, force: boolean, program: st
 function write(context: WorkfileContext, message: string, program: string, referenced_before?: Set<string>): string[] | Outcome<never> {
     const ran = referenced_before === undefined ? undefined : run_bootstrap(context.workfile, referenced_before);
     if (ran?.ok === false) {
-        return refuse(`${message}, but bootstrap failed: ${ran.error.message}`);
+        return refuse(`${message}, but bootstrap failed: ${ran.error.message}`, { type: ran.error.type });
     }
 
     const saved = save_workfile(context);
     if (!saved.ok) {
-        return refuse(saved.error.message);
+        return refuse_error(saved.error);
     }
 
     return ran?.value === undefined ? [] : describe_bootstrap(ran.value, context.workfile, program);
@@ -214,7 +216,7 @@ function preview(
     counts: Pick<DeletePreview, "node_count" | "property_count" | "paths">,
     text: string
 ): Outcome<DeleteResponse> {
-    const response: DeletePreview = { ...common_ok(message, "warn"), ...counts };
+    const response: DeletePreview = { ...common_ok(message, "warn", "needs-force"), ...counts };
     return answer(response, text);
 }
 

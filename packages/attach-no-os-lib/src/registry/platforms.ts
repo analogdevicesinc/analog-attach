@@ -70,7 +70,7 @@ export function find_soc(soc_name: string): Result<{ soc: SocInfo, platform: Mod
 	const found = socs.value.find(entry => entry.soc.name === soc_name);
 	if (found === undefined) {
 		const known = socs.value.map(entry => entry.soc.name).sort().join(", ");
-		return error(`Unknown chip '${soc_name}'. Configured platforms support: ${known}`, soc_name);
+		return error(`Unknown chip '${soc_name}'. Configured platforms support: ${known}`, "not-found", soc_name);
 	}
 
 	return ok(found);
@@ -85,6 +85,7 @@ function boards_of(platform: ModuleInfo): Result<BoardInfo[]> {
 		if (!fs.existsSync(path.join(board_path, MODULE_FILENAME))) {
 			return error(
 				`Platform '${platform.name}' declares board '${name}', which has no ${MODULE_FILENAME} at ${board_path}`,
+				"definition-error",
 				platform.path
 			);
 		}
@@ -143,11 +144,11 @@ export function find_board(board_name: string): Result<BoardInfo> {
 	const matches = boards.value.filter(board => board.name === board_name);
 	if (matches.length === 0) {
 		const known = boards.value.map(board => board.name).sort().join(", ");
-		return error(`Unknown board '${board_name}'. Configured platforms support: ${known}`, board_name);
+		return error(`Unknown board '${board_name}'. Configured platforms support: ${known}`, "not-found", board_name);
 	}
 	if (matches.length > 1) {
 		const owners = matches.map(board => board.platform).join(", ");
-		return error(`Board '${board_name}' is declared by more than one platform: ${owners}`, board_name);
+		return error(`Board '${board_name}' is declared by more than one platform: ${owners}`, "definition-error", board_name);
 	}
 
 	return ok(matches[0]);
@@ -166,7 +167,7 @@ export function soc_for_board(board_name: string): Result<string> {
 	}
 
 	if (board.value.soc === undefined) {
-		return error(`Board '${board_name}' does not declare which chip it carries (metadata.mcu)`, board_name);
+		return error(`Board '${board_name}' does not declare which chip it carries (metadata.mcu)`, "definition-error", board_name);
 	}
 
 	return ok(board.value.soc);
@@ -187,7 +188,7 @@ export function resolve_board(soc_name: string, requested?: string): Result<Boar
 			return board;
 		}
 		if (board.value.soc !== undefined && board.value.soc !== soc_name) {
-			return error(`Board '${requested}' carries ${board.value.soc}, but this workfile targets ${soc_name}`, requested);
+			return error(`Board '${requested}' carries ${board.value.soc}, but this workfile targets ${soc_name}`, "invalid-setting", requested);
 		}
 		return board;
 	}
@@ -199,11 +200,11 @@ export function resolve_board(soc_name: string, requested?: string): Result<Boar
 
 	const candidates = boards.value.filter(board => board.soc === soc_name);
 	if (candidates.length === 0) {
-		return error(`No board carries ${soc_name}, so one cannot be chosen for you`, soc_name);
+		return error(`No board carries ${soc_name}, so one cannot be chosen for you`, "not-found", soc_name);
 	}
 	if (candidates.length > 1) {
 		const names = candidates.map(board => board.name).sort().join(", ");
-		return error(`More than one board carries ${soc_name}: ${names}. Pick one.`, soc_name);
+		return error(`More than one board carries ${soc_name}: ${names}. Pick one.`, "ambiguous", soc_name);
 	}
 
 	return ok(candidates[0]);
@@ -224,7 +225,7 @@ export function read_soc_descriptor(soc_name: string): Result<Record<string, unk
 
 	const { soc, platform } = found.value;
 	if (soc.descriptor === undefined) {
-		return error(`Chip '${soc_name}' declares no descriptor file`, soc_name);
+		return error(`Chip '${soc_name}' declares no descriptor file`, "definition-error", soc_name);
 	}
 
 	const file = path.join(platform.path, soc.descriptor);
@@ -232,7 +233,7 @@ export function read_soc_descriptor(soc_name: string): Result<Record<string, unk
 	try {
 		contents = fs.readFileSync(file, "utf8");
 	} catch {
-		return error(`Failed to read chip descriptor for '${soc_name}' at ${file}`, file);
+		return error(`Failed to read chip descriptor for '${soc_name}' at ${file}`, "parse-error", file);
 	}
 
 	let parsed: unknown;
@@ -240,11 +241,11 @@ export function read_soc_descriptor(soc_name: string): Result<Record<string, unk
 		parsed = YAML.parse(contents);
 	} catch (parse_error) {
 		const reason = parse_error instanceof Error ? parse_error.message : String(parse_error);
-		return error(`Failed to parse chip descriptor ${file}: ${reason}`, file);
+		return error(`Failed to parse chip descriptor ${file}: ${reason}`, "parse-error", file);
 	}
 
 	if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
-		return error(`Chip descriptor ${file} is not a YAML mapping`, file);
+		return error(`Chip descriptor ${file} is not a YAML mapping`, "parse-error", file);
 	}
 
 	return ok(parsed as Record<string, unknown>);

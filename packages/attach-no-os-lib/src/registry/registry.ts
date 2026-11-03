@@ -43,7 +43,7 @@ function read_header(file: string): Result<{ symbol: string, type: RulesetType }
 	try {
 		contents = fs.readFileSync(file, "utf8");
 	} catch {
-		return error(`Failed to read ruleset '${file}'`, file);
+		return error(`Failed to read ruleset '${file}'`, "parse-error", file);
 	}
 
 	let parsed: unknown;
@@ -51,28 +51,28 @@ function read_header(file: string): Result<{ symbol: string, type: RulesetType }
 		parsed = YAML.parse(contents);
 	} catch (parse_error) {
 		const reason = parse_error instanceof Error ? parse_error.message : String(parse_error);
-		return error(`Failed to parse ruleset '${file}': ${reason}`, file);
+		return error(`Failed to parse ruleset '${file}': ${reason}`, "parse-error", file);
 	}
 
 	if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
-		return error(`Ruleset '${file}' is not a YAML mapping`, file);
+		return error(`Ruleset '${file}' is not a YAML mapping`, "parse-error", file);
 	}
 
 	const header = parsed as Record<string, unknown>;
 
 	const symbol = header.$symbol;
 	if (typeof symbol !== "string" || symbol.length === 0) {
-		return error(`Ruleset '${file}' has no $symbol`, file);
+		return error(`Ruleset '${file}' has no $symbol`, "definition-error", file);
 	}
 
 	const token = header.$type;
 	if (typeof token !== "string") {
-		return error(`Ruleset '${file}' has no $type`, file);
+		return error(`Ruleset '${file}' has no $type`, "definition-error", file);
 	}
 
 	const type_ = ruleset_type_from_token(token);
 	if (type_ === undefined) {
-		return error(`Ruleset '${file}' has an invalid $type '${token}'`, file);
+		return error(`Ruleset '${file}' has an invalid $type '${token}'`, "definition-error", file);
 	}
 
 	return ok({ symbol, type: type_ });
@@ -104,6 +104,7 @@ function index_module(
 		if (existing !== undefined && existing !== type_) {
 			return error(
 				`Board peripheral kind '${kind}' is declared as both '${existing}' and '${type_}'`,
+				"definition-error",
 				index_file
 			);
 		}
@@ -118,7 +119,7 @@ function index_module(
 	if (example !== undefined) {
 		for (const file of [example.loop, ...(example.setup === undefined ? [] : [example.setup])]) {
 			if (!fs.existsSync(path.join(index_directory, file))) {
-				return error(`Ruleset index '${index_file}' names example '${file}', which does not exist`, index_file);
+				return error(`Ruleset index '${index_file}' names example '${file}', which does not exist`, "definition-error", index_file);
 			}
 		}
 		// On the module itself: every symbol entry of this module holds this very object.
@@ -133,7 +134,7 @@ function index_module(
 		for (const relative of files) {
 			const file = path.join(index_directory, relative);
 			if (!fs.existsSync(file)) {
-				return error(`Ruleset index '${index_file}' lists '${relative}', which does not exist`, index_file);
+				return error(`Ruleset index '${index_file}' lists '${relative}', which does not exist`, "definition-error", index_file);
 			}
 
 			const header = read_header(file);
@@ -148,6 +149,7 @@ function index_module(
 			if (existing !== undefined) {
 				return error(
 					`Symbol '${header.value.symbol}' is defined twice: '${existing.file}' and '${file}'`,
+					"definition-error",
 					file
 				);
 			}
@@ -262,7 +264,7 @@ export function build_registry(roots: string[]): Result<Registry> {
 			const declared = indexed.value;
 			if (declared !== undefined) {
 				if (chip_select !== undefined && JSON.stringify(chip_select) !== JSON.stringify(declared)) {
-					return error(`Two modules declare different chip_select bindings (second: ${module.name})`, module.path);
+					return error(`Two modules declare different chip_select bindings (second: ${module.name})`, "definition-error", module.path);
 				}
 				chip_select = declared;
 			}
@@ -320,7 +322,7 @@ export function resolve_entry(symbol: string): Result<RulesetEntry> {
 
 	const entry = registry.value.symbols.get(symbol);
 	if (entry === undefined) {
-		return error(`Unknown ruleset '${symbol}': no module in the configured roots defines it`, symbol);
+		return error(`Unknown ruleset '${symbol}': no module in the configured roots defines it`, "not-found", symbol);
 	}
 
 	return ok(entry);

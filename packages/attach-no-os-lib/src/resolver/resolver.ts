@@ -24,7 +24,7 @@ function load_ruleset(symbol: string): Result<Ruleset> {
 	try {
 		content = fs.readFileSync(entry.value.file, "utf8");
 	} catch {
-		return error(`Failed to read ruleset '${symbol}' at ${entry.value.file}`, symbol);
+		return error(`Failed to read ruleset '${symbol}' at ${entry.value.file}`, "parse-error", symbol);
 	}
 
 	return parse_ruleset(content);
@@ -34,7 +34,7 @@ function resolve_descriptor_ruleset(ruleset: RulesetDescriptor): Result<RulesetD
 	// NOTE: We just validate that the path is right and the included ruleset is a struct
 	const init_parameter_symbol = ruleset.properties[0].include;
 	if (init_parameter_symbol === undefined) {
-		return error(`A descriptor's $init_param must name a struct with 'include'`);
+		return error(`A descriptor's $init_param must name a struct with 'include'`, "definition-error");
 	}
 
 	const resolved_ruleset = load_ruleset(init_parameter_symbol);
@@ -43,7 +43,7 @@ function resolve_descriptor_ruleset(ruleset: RulesetDescriptor): Result<RulesetD
 	}
 
 	if (resolved_ruleset.value._t !== "RulesetStruct") {
-		return error(`Expected type "struct" to be included in the descriptor ruleset, got ${resolved_ruleset.value._t}`);
+		return error(`Expected type "struct" to be included in the descriptor ruleset, got ${resolved_ruleset.value._t}`, "definition-error");
 	}
 
 	return ok(ruleset);
@@ -98,6 +98,7 @@ function resolve_property(property: Property): Result<Property> {
 		if (default_ !== undefined && !values.includes(default_)) {
 			return error(
 				`Default '${String(default_)}' of '${property.name}' is not a value of ${property.include}. Valid: ${values.join(", ")}`,
+				"definition-error",
 				property.name
 			);
 		}
@@ -117,7 +118,7 @@ function resolve_property(property: Property): Result<Property> {
 
 	// A default only makes sense where the include lowers to an enum.
 	if (property.default !== undefined) {
-		return error(`'${property.name}' includes ${property.include}, which is not an enum, so it cannot have a default`, property.name);
+		return error(`'${property.name}' includes ${property.include}, which is not an enum, so it cannot have a default`, "definition-error", property.name);
 	}
 
 	return ok(property);
@@ -166,6 +167,7 @@ export function load_resolved_ruleset_for_board(symbol: string, board?: string):
 	if (extern.value === undefined) {
 		return error(
 			`Unknown ruleset '${symbol}': no configured module defines it, and board '${board}' declares no such peripheral`,
+			"unknown-device-type",
 			symbol
 		);
 	}

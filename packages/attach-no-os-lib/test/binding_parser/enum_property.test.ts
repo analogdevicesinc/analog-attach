@@ -71,6 +71,7 @@ describe('EnumProperty parsing', () => {
 			expectError(result);
 			expectErrorPath(result, 'default');
 			expectErrorContains(result, "not present in the 'values' field");
+			expect(result.ok ? undefined : result.error.type).toBe("definition-error");
 		});
 
 		test('rejects number default not in number values', () => {

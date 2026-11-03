@@ -1,9 +1,12 @@
+import type { ErrorType } from "../ruleset_parser/error_types";
 import type { Rule } from "../ruleset_parser/types";
 
 export interface ValidationError {
 	path: string;
 	message: string;
 	severity: "error" | "warning";
+	/** Which kind of finding it is (GEN-17): missing-required, out-of-range, bad-reference, ... */
+	type: ErrorType;
 };
 
 export interface ValidationResult {

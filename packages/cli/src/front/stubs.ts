@@ -340,9 +340,9 @@ export function run_completion(shell: string | undefined, options: { install: bo
     if (options.install && options.uninstall) { return input_error("option '--install' cannot be used with option '--uninstall'"); }
     const chosen = shell ?? shell_from_environment(place.environment);
     if (chosen === undefined) {
-        return refuse(`Cannot tell the shell from $SHELL (${place.environment["SHELL"] ?? "not set"}). Name one: ${SHELLS.join(", ")}`);
+        return refuse(`Cannot tell the shell from $SHELL (${place.environment["SHELL"] ?? "not set"}). Name one: ${SHELLS.join(", ")}`, { type: "missing-argument" });
     }
-    if (!is_shell(chosen)) { return refuse(`Unknown shell: ${chosen}. Supported: ${SHELLS.join(", ")}`); }
+    if (!is_shell(chosen)) { return refuse(`Unknown shell: ${chosen}. Supported: ${SHELLS.join(", ")}`, { type: "unknown-choice" }); }
     if (options.install || options.uninstall) {
         const lines = options.install ? install_completion(chosen, place) : uninstall_completion(chosen, place);
         return answer({ ok: true, message: lines.join("\n"), severity: "info" }, lines.join("\n"));

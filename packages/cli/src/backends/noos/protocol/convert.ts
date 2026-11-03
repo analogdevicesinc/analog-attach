@@ -194,7 +194,7 @@ export function parse_property_value(raw: string, property: Property): Result<un
         case "NumberProperty": {
             const parsed = Number(raw);
             if (Number.isNaN(parsed)) {
-                return error(`'${raw}' is not a number`);
+                return error(`'${raw}' is not a number`, "invalid-value");
             }
             return ok(parsed);
         }
@@ -207,7 +207,7 @@ export function parse_property_value(raw: string, property: Property): Result<un
             if (normalized === "false" || normalized === "0") {
                 return ok(false);
             }
-            return error(`'${raw}' is not a boolean (expected true or false)`);
+            return error(`'${raw}' is not a boolean (expected true or false)`, "invalid-value");
         }
 
         case "EnumProperty": {
@@ -219,7 +219,7 @@ export function parse_property_value(raw: string, property: Property): Result<un
                 return ok(as_number);
             }
             if (!property.values.includes(raw)) {
-                return error(`'${raw}' is not one of: ${property.values.join(", ")}`);
+                return error(`'${raw}' is not one of: ${property.values.join(", ")}`, "invalid-value");
             }
             return ok(raw);
         }
@@ -232,12 +232,14 @@ export function parse_property_value(raw: string, property: Property): Result<un
                 return error(
                     `'${member_name}' is not a member of '${property.name}'. Available: ` +
                     property.members.map(candidate => candidate.name).join(", "),
+                    "invalid-value",
                 );
             }
 
             if (parts.length > 2) {
                 return error(
                     `'${raw}' has ${parts.length} elements; a union takes <member> or <member>${ELEMENT_SEPARATOR}<value>`,
+                    "invalid-value",
                 );
             }
 
@@ -248,7 +250,7 @@ export function parse_property_value(raw: string, property: Property): Result<un
         case "ArrayProperty": {
             const parts = split_elements(raw);
             if (parts.length > property.size) {
-                return error(`'${property.name}' holds at most ${property.size} elements, got ${parts.length}`);
+                return error(`'${property.name}' holds at most ${property.size} elements, got ${parts.length}`, "invalid-value");
             }
 
             const values: unknown[] = [];
