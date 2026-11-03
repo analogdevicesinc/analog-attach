@@ -35,6 +35,7 @@
     "corpus:overlays": "node corpus/overlays/corpus.mjs run",
     "corpus:overlays:diff": "node corpus/overlays/corpus.mjs diff",
     "pipeline:view": "vite build --logLevel warn && node scripts/pipeline-view/build.mjs --open",
+    "docs:pipeline": "vite build --logLevel warn && node scripts/pipeline-doc/build.mjs",
     "coverage": "vitest run --coverage"
   },
   "dependencies": {
