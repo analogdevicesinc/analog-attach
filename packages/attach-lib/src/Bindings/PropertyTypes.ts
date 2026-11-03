@@ -159,12 +159,15 @@ type GeneratedTypes = { properties?: Record<string, { type?: string | null }[]> 
 const loaded_processed = new Map<string, { modified: number, base: PropertyTypes, types: PropertyTypes }>();
 
 /**
- * The one type a property has in `generated-types`; a name several schemas type differently (`flag` and `uint32`) has
- * none. A `phandle` and a `phandle-array` are a `phandle-array` (`usb-phy`), as one phandle is a row of one cell.
+ * The one type a property has in `generated-types`; a name several schemas type differently (`pins`, a `string-array` or
+ * a `uint32-array`) has none. A `phandle` and a `phandle-array` are a `phandle-array` (`usb-phy`), as one phandle is a
+ * row of one cell. A `flag` and one integer type are the flag (pincfg-node.yaml's `bias-pull-up`, the pull strength in
+ * Ohm), as `fixup_one_form` reads a property declared so.
  */
 function single_type(entries: { type?: string | null }[]): PropertyType | undefined {
     const types = new Set(entries.map(entry => entry.type).filter((type): type is string => typeof type === "string" && type !== "node"));
     if (types.size === 2 && types.has("phandle") && types.has("phandle-array")) { return "phandle-array"; }
+    if (types.size === 2 && types.has("flag") && [...types].some(type => /^u?int(8|16|32|64)$/.test(type))) { return "flag"; }
     return types.size === 1 ? [...types][0] : undefined;
 }
 
@@ -297,7 +300,7 @@ if (import.meta.vitest) {
         expect(cell_range("phandle-array")).toBeUndefined();
     });
 
-    test("the types of a processed schema fill in the names dt-schema doesn't know: one type per name, none for a name typed two ways or as a node, a phandle-array for a phandle and a phandle-array", () => {
+    test("the types of a processed schema fill in the names dt-schema doesn't know: one type per name, none for a name typed two ways or as a node, a phandle-array for a phandle and a phandle-array, a flag for a flag and a number", () => {
         const directory = fs.mkdtempSync(path.join(tmpdir(), "attach-processed-"));
         const file = path.join(directory, "processed-schema.json");
         try {
@@ -307,6 +310,8 @@ if (import.meta.vitest) {
                     "resets": [{ "type": "phandle" }, { "type": "phandle-array" }],
                     "usb-phy": [{ "type": "phandle-array" }, { "type": "phandle" }],
                     "drive-open-drain": [{ "type": "flag" }, { "type": "uint32" }],
+                    "bitclock-master": [{ "type": "flag" }, { "type": "phandle" }],
+                    "pins": [{ "type": "string-array" }, { "type": "uint32-array" }],
                     "port": [{ "type": "node" }],
                     "reg": [{ "type": null }, { "type": "address" }]
                 } },
@@ -315,7 +320,7 @@ if (import.meta.vitest) {
 
             const base: PropertyTypes = { names: new Map([["resets", "phandle-array"]]), patterns: [{ pattern: /-gpios$/, type: "phandle-array" }] };
             const types = load_processed_property_types(file, base);
-            expect([...types.names]).toStrictEqual([["resets", "phandle-array"], ["nvmem-cells", "phandle-array"], ["usb-phy", "phandle-array"], ["reg", "address"]]);
+            expect([...types.names]).toStrictEqual([["resets", "phandle-array"], ["nvmem-cells", "phandle-array"], ["usb-phy", "phandle-array"], ["drive-open-drain", "flag"], ["reg", "address"]]);
             expect(types.patterns.map(({ pattern, type }) => [pattern.source, type])).toStrictEqual([["-gpios$", "phandle-array"], ["^#.*-cells$", "uint32"]]);
             expect(load_processed_property_types(path.join(directory, "missing.json"), base)).toBe(base);
         } finally {
