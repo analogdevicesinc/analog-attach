@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { get_workfile_path, import_minimal, load_minimal_workfile, validate_workfile } from "attach-no-os-lib";
 import { answer, command, refuse, type ImportArguments } from "../../../interface/backend-interface";
+import { refuse_error } from "./shared";
 import { common_ok, type ImportResponse } from "../protocol/responses";
 import { install } from "../settings";
 
@@ -24,31 +25,31 @@ export const import_command = command<ImportArguments, ImportResponse>({
         install(session);
         const source = path.resolve(session.cwd, source_argument);
         if (!fs.existsSync(source) || !fs.statSync(source).isFile()) {
-            return Promise.resolve(refuse(`No workfile at '${source}'`));
+            return Promise.resolve(refuse(`No workfile at '${source}'`, { type: "not-found" }));
         }
 
         const target = get_workfile_path();
         if (!target.ok) {
-            return Promise.resolve(refuse(target.error.message));
+            return Promise.resolve(refuse_error(target.error));
         }
         if (source === target.value) {
-            return Promise.resolve(refuse(`'${source}' is already the workfile`));
+            return Promise.resolve(refuse(`'${source}' is already the workfile`, { type: "invalid-argument" }));
         }
         if (fs.existsSync(target.value)) {
             return Promise.resolve(refuse(
                 `A workfile already exists at ${target.value}`,
-                { text: `A workfile already exists at ${target.value}.\nDelete it, or point the 'workfile' setting somewhere else.` }
+                { text: `A workfile already exists at ${target.value}.\nDelete it, or point the 'workfile' setting somewhere else.`, type: "workfile-exists" }
             ));
         }
 
         // What it describes has to resolve here, or every command after would fail on it.
         const minimal = load_minimal_workfile(source);
         if (!minimal.ok) {
-            return Promise.resolve(refuse(`Cannot import '${source}': ${minimal.error.message}`));
+            return Promise.resolve(refuse(`Cannot import '${source}': ${minimal.error.message}`, { type: minimal.error.type }));
         }
         const workfile = import_minimal(minimal.value);
         if (!workfile.ok) {
-            return Promise.resolve(refuse(`Cannot import '${source}': ${workfile.error.message}`));
+            return Promise.resolve(refuse(`Cannot import '${source}': ${workfile.error.message}`, { type: workfile.error.type }));
         }
 
         fs.mkdirSync(path.dirname(target.value), { recursive: true });

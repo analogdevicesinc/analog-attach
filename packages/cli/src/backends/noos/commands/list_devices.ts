@@ -1,7 +1,7 @@
 import { addable_drivers, list_available_structs, list_eval_boards } from "attach-no-os-lib";
-import { answer, command, refuse, type ListDevicesArguments } from "../../../interface/backend-interface";
+import { answer, command, type ListDevicesArguments } from "../../../interface/backend-interface";
 import { common_ok, type Device, type ListDevicesResponse } from "../protocol/responses";
-import { load_context } from "./shared";
+import { load_context, refuse_error } from "./shared";
 
 /**
  * `list devices`: every schema a node can be created from.
@@ -23,12 +23,12 @@ export const list_devices = command<ListDevicesArguments, ListDevicesResponse>({
     run({ filter }, _flags, session) {
         const context = load_context(session);
         if (!context.ok) {
-            return Promise.resolve(refuse(context.error.message));
+            return Promise.resolve(refuse_error(context.error));
         }
 
         const available = list_available_structs(context.value.workfile);
         if (!available.ok) {
-            return Promise.resolve(refuse(available.error.message));
+            return Promise.resolve(refuse_error(available.error));
         }
 
         // Drivers first: `add <driver>` is the one-command way to bring a part in, and

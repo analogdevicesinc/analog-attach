@@ -251,7 +251,7 @@ function changed_keys(before: Map<string, string>, settings: SettingsStore): str
 function refused_write(message: string, spec: SettingSpec, front: FrontEnd): Outcome<never> {
     const hint = hint_of(spec, front);
     const reason = `${message} — ${spec.description}`;
-    return refuse(reason, { text: `${reason}${hint === undefined ? "" : `\n\n${hint}`}` });
+    return refuse(reason, { type: "invalid-setting", text: `${reason}${hint === undefined ? "" : `\n\n${hint}`}` });
 }
 
 /** What else a write changed: ` (and chip = chip-a, reset port)`. */

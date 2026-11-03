@@ -286,7 +286,7 @@ function is_directory(candidate: string): boolean {
 async function write(session: InteractiveSession, key: string, value: string | readonly string[]): Promise<{ ok: true } | { ok: false; outcome: Outcome<never> }> {
     const written = await session.settings.set(key, value);
     if (!written.ok) {
-        return { ok: false, outcome: refuse(written.message) };
+        return { ok: false, outcome: refuse(written.message, { type: written.broken_file === true ? "settings-unreadable" : "invalid-setting" }) };
     }
     const shown = typeof value === "string" ? value : value.join(", ");
     session.say(`${session.style.cyan("✓")} ${key} = ${shown}`);

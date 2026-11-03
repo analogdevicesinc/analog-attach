@@ -29,7 +29,7 @@ export function find_eval_board_module(name: string): ModuleInfo | undefined {
 export function eval_board_ruleset(name: string): Result<RulesetStruct> {
 	const module = find_eval_board_module(name);
 	if (module === undefined) {
-		return error(`No configured eval board is called '${name}'`, name);
+		return error(`No configured eval board is called '${name}'`, "not-found", name);
 	}
 	return ok({
 		_t: "RulesetStruct",

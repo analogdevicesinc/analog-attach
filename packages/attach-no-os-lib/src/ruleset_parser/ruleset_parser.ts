@@ -51,7 +51,7 @@ function is_ruleset_type(value: unknown, context: ParseContext): Result<RulesetT
 
 	const type_ = ruleset_type_from_token(s.value);
 	if (type_ === undefined) {
-		return error(`Invalid ruleset type '${s.value}'`, context.path);
+		return error(`Invalid ruleset type '${s.value}'`, "parse-error", context.path);
 	}
 
 	return ok(type_);
@@ -113,10 +113,10 @@ export function parse_property(name: string, value: unknown, context: ParseConte
 			return parse_raw_property(name, object.value, context);
 		}
 
-		return error(`Unknown property type '${type_}'`, at(context, type_).path);
+		return error(`Unknown property type '${type_}'`, "parse-error", at(context, type_).path);
 	}
 
-	return error(`Cannot determine the property type for '${context.path}'. Expected 'type' or 'include'.`, context.path);
+	return error(`Cannot determine the property type for '${context.path}'. Expected 'type' or 'include'.`, "parse-error", context.path);
 }
 
 function is_enum_property(value: unknown, context: ParseContext): Result<RulesetEnumValue[]> {
@@ -126,7 +126,7 @@ function is_enum_property(value: unknown, context: ParseContext): Result<Ruleset
 			if (typeof item === "string" || typeof item === "number") {
 				values.push({ name: item, description: undefined });
 			} else {
-				return error(`Expected string or number at index ${index.toString()}`, at(context, index).path);
+				return error(`Expected string or number at index ${index.toString()}`, "parse-error", at(context, index).path);
 			}
 		}
 		return ok(values);
@@ -151,7 +151,7 @@ function is_enum_property(value: unknown, context: ParseContext): Result<Ruleset
 				description: typeof description === "string" ? description : undefined
 			});
 		} else {
-			return error(`Invalid enum value format for '${name}'`, at(context, name).path);
+			return error(`Invalid enum value format for '${name}'`, "parse-error", at(context, name).path);
 		}
 	}
 
@@ -206,13 +206,13 @@ function parse_members(object: Record<string, unknown>, context: ParseContext): 
 		const path = at(context, member.name).path;
 		const counter = members.find(m => m.name === member.count);
 		if (counter === undefined) {
-			return error(`Property '${member.name}' declares count '${member.count}', which is not a field of this struct`, path);
+			return error(`Property '${member.name}' declares count '${member.count}', which is not a field of this struct`, "definition-error", path);
 		}
 		if (counter._t !== "NumberProperty" || !is_integer_symbol(counter.type)) {
-			return error(`Property '${member.name}' declares count '${member.count}', which must be an integer field`, path);
+			return error(`Property '${member.name}' declares count '${member.count}', which must be an integer field`, "definition-error", path);
 		}
 		if ((member.readonly === true) !== (counter.readonly === true)) {
-			return error(`Property '${member.name}' and its count '${member.count}' must both be readonly or neither`, path);
+			return error(`Property '${member.name}' and its count '${member.count}' must both be readonly or neither`, "definition-error", path);
 		}
 	}
 
@@ -285,7 +285,7 @@ function parse_ruleset_from_object(object: Record<string, unknown>, context: Par
 			if (default_.value !== undefined) {
 				const value_names = values.value.map(v => v.name);
 				if (!value_names.includes(default_.value)) {
-					return error(`Default value '${default_.value}' is not a valid enum value. Valid: ${value_names.join(", ")}`, at(context, "default").path);
+					return error(`Default value '${default_.value}' is not a valid enum value. Valid: ${value_names.join(", ")}`, "definition-error", at(context, "default").path);
 				}
 			}
 
@@ -418,7 +418,7 @@ export function parse_ruleset(contents: string): Result<Ruleset> {
 	try {
 		parsed = YAML.parse(contents);
 	} catch (_error) {
-		return error(`YAML parse error at: ${String(_error)}`, "");
+		return error(`YAML parse error at: ${String(_error)}`, "parse-error", "");
 	}
 
 	return parse_ruleset_from_object(parsed as Record<string, unknown>, { path: "", document: {} });

@@ -66,14 +66,14 @@ function read_yaml(file: string): Result<unknown> {
 	try {
 		contents = fs.readFileSync(file, "utf8");
 	} catch {
-		return error(`Failed to read ${file}`, file);
+		return error(`Failed to read ${file}`, "parse-error", file);
 	}
 
 	try {
 		return ok(YAML.parse(contents));
 	} catch (parse_error) {
 		const reason = parse_error instanceof Error ? parse_error.message : String(parse_error);
-		return error(`Failed to parse ${file}: ${reason}`, file);
+		return error(`Failed to parse ${file}: ${reason}`, "parse-error", file);
 	}
 }
 
@@ -116,7 +116,7 @@ export function read_module(root: string): Result<ModuleInfo> {
 	const file = path.join(module_path, MODULE_FILENAME);
 
 	if (!fs.existsSync(file)) {
-		return error(`No ${MODULE_FILENAME} at module root '${module_path}'`, module_path);
+		return error(`No ${MODULE_FILENAME} at module root '${module_path}'`, "invalid-source", module_path);
 	}
 
 	const parsed = read_yaml(file);
@@ -294,7 +294,7 @@ function parse_gpio(value: unknown, context: ParseContext): Result<GpioIdentity>
  */
 function parse_connectors(value: unknown, context: ParseContext): Result<ConnectorInfo[]> {
 	if (!Array.isArray(value)) {
-		return error(`Expected array, got ${typeof value}`, context.path);
+		return error(`Expected array, got ${typeof value}`, "parse-error", context.path);
 	}
 
 	const connectors: ConnectorInfo[] = [];
@@ -322,7 +322,7 @@ function parse_connectors(value: unknown, context: ParseContext): Result<Connect
 
 		const raw_pins = object.value.pins ?? [];
 		if (!Array.isArray(raw_pins)) {
-			return error(`Expected array, got ${typeof raw_pins}`, at(connector_context, "pins").path);
+			return error(`Expected array, got ${typeof raw_pins}`, "parse-error", at(connector_context, "pins").path);
 		}
 
 		const pins: PinInfo[] = [];
@@ -335,7 +335,7 @@ function parse_connectors(value: unknown, context: ParseContext): Result<Connect
 
 			const pin = pin_object.value.pin;
 			if (typeof pin !== "string" && typeof pin !== "number") {
-				return error(`Expected a pin number or name, got ${typeof pin}`, at(pin_context, "pin").path);
+				return error(`Expected a pin number or name, got ${typeof pin}`, "parse-error", at(pin_context, "pin").path);
 			}
 
 			const roles = optional(pin_object.value, "role", pin_context, parse_roles);
@@ -364,7 +364,7 @@ function parse_connectors(value: unknown, context: ParseContext): Result<Connect
 
 function parse_socs(value: unknown, context: ParseContext): Result<SocInfo[]> {
 	if (!Array.isArray(value)) {
-		return error(`Expected array, got ${typeof value}`, context.path);
+		return error(`Expected array, got ${typeof value}`, "parse-error", context.path);
 	}
 
 	const socs: SocInfo[] = [];
@@ -410,7 +410,7 @@ function parse_socs(value: unknown, context: ParseContext): Result<SocInfo[]> {
  */
 export function read_ruleset_index(index_file: string): Result<RulesetIndex> {
 	if (!fs.existsSync(index_file)) {
-		return error(`Ruleset index '${index_file}' does not exist`, index_file);
+		return error(`Ruleset index '${index_file}' does not exist`, "definition-error", index_file);
 	}
 
 	const parsed = read_yaml(index_file);

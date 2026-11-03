@@ -26,7 +26,7 @@ function interactive(session: Session): InteractiveSession {
 /** Ask which backend, save it, and reopen the front end with it. */
 async function choose_backend(front: FrontEnd, reopen: () => Promise<FrontEnd>): Promise<FrontEnd | Outcome<never>> {
     const loaded = await Promise.all(Object.entries(front.registry).map(async ([id, load]) => ({ id, backend: await load() })));
-    if (loaded.length === 0) { return refuse("No backend is registered in this build"); }
+    if (loaded.length === 0) { return refuse("No backend is registered in this build", { type: "install-incomplete" }); }
     const session = interactive(await front.session("text", true));
     const id = await session.prompter.select({
         message: "What does this project target?",
@@ -56,7 +56,7 @@ function unset_required(backend: Backend, front: FrontEnd): Outcome<SetupRespons
         "",
         ...hints,
     ].join("\n");
-    return answer({ ok: true, message, severity: "warn", saved: [], ready: false }, text);
+    return answer({ ok: true, message, severity: "warn", error_type: "missing-setting", saved: [], ready: false }, text);
 }
 
 /** What the bare run can't save over: a settings file that isn't a JSON object, or an active section that isn't one. */

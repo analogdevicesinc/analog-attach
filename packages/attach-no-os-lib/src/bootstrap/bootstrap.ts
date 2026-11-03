@@ -953,7 +953,7 @@ function apply_chip_select(
 		return ok({ filled: [filled_value(workfile, device, binding.native_mask, mask, "only value")], linked: [] });
 	}
 	if (resolved.kind !== "gpio" || resolved.port_extern === undefined) {
-		return error(`Chip-select for '${device}' is not one that can be applied`, device);
+		return error(`Chip-select for '${device}' is not one that can be applied`, "internal-error", device);
 	}
 
 	const device_node = workfile.symbols[device];
@@ -961,7 +961,7 @@ function apply_chip_select(
 		? device_node.properties.find((property): property is IncludeProperty => property.name === binding.gpio_list && property._t === "IncludeProperty")
 		: undefined;
 	if (list?.include === undefined) {
-		return error(`'${device}' has no ${binding.gpio_list} list of pins`, device);
+		return error(`'${device}' has no ${binding.gpio_list} list of pins`, "definition-error", device);
 	}
 
 	// The pin is a stored node: its number is a real field, and the user may change it.
@@ -979,14 +979,14 @@ function apply_chip_select(
 		? pin_ruleset.value.properties.find(property => property.name === binding.pin_port)
 		: undefined;
 	if (port_property?._t !== "IncludeProperty" || port_property.include === undefined) {
-		return error(`${list.include} has no ${binding.pin_port} port reference`, list.include);
+		return error(`${list.include} has no ${binding.pin_port} port reference`, "definition-error", list.include);
 	}
 
 	// The port is the handle wrapping the BSP's own port config - hidden, shared by every
 	// pin on that port.
 	const port_handle = hidden_candidates(port_property.include, externs).find(candidate => candidate.name === wrapper_name(resolved.port_extern ?? ""));
 	if (port_handle === undefined) {
-		return error(`No ${port_property.include} handle wraps ${resolved.port_extern}`, resolved.port_extern);
+		return error(`No ${port_property.include} handle wraps ${resolved.port_extern}`, "definition-error", resolved.port_extern);
 	}
 	const port = materialize_hidden(workfile, port_handle, externs);
 	if (!port.ok) {
@@ -1290,7 +1290,7 @@ export function pin_driver(workfile: Workfile, root: string, driver: string, chi
 	const linked: LinkedReference[] = [];
 	const node = workfile.symbols[root];
 	if (node?._t !== "RulesetDescriptor") {
-		return error(`'${root}' is not a handle to pin a driver to`, root);
+		return error(`'${root}' is not a handle to pin a driver to`, "internal-error", root);
 	}
 	const registry = get_registry();
 	if (!registry.ok) {
@@ -1298,7 +1298,7 @@ export function pin_driver(workfile: Workfile, root: string, driver: string, chi
 	}
 	const module = registry.value.modules.find(candidate => candidate.type === "driver" && candidate.name === driver);
 	if (module === undefined) {
-		return error(`No configured driver is called '${driver}'`, driver);
+		return error(`No configured driver is called '${driver}'`, "unknown-device-type", driver);
 	}
 
 	// The root's config: the struct its $init_param takes.
@@ -1354,7 +1354,7 @@ export function pin_driver(workfile: Workfile, root: string, driver: string, chi
 				return added;
 			}
 		} else if (workfile.symbols[name]?.$symbol !== own_config) {
-			return error(`'${name}' is not a ${own_config} to share`, name);
+			return error(`'${name}' is not a ${own_config} to share`, "bad-reference", name);
 		}
 		const set = set_owned(workfile, config, property.name, name);
 		if (!set.ok) {
@@ -1469,7 +1469,7 @@ export function bootstrap(workfile: Workfile, options: BootstrapOptions = {}): R
 			}
 			case "chip_select": {
 				if (binding === undefined) {
-					return error("A chip-select step ran without a chip_select binding. That is a bug.");
+					return error("A chip-select step ran without a chip_select binding. That is a bug.", "internal-error");
 				}
 				const applied = apply_chip_select(workfile, externs.value, step.device, step.resolved, binding);
 				if (!applied.ok) {
@@ -1493,6 +1493,7 @@ export function bootstrap(workfile: Workfile, options: BootstrapOptions = {}): R
 	}
 
 	return error(
-		`Bootstrap took more than ${String(STEP_CAP)} steps without settling. That is a bug: some step is not making progress.`
+		`Bootstrap took more than ${String(STEP_CAP)} steps without settling. That is a bug: some step is not making progress.`,
+		"internal-error"
 	);
 }

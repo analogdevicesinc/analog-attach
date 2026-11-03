@@ -52,6 +52,7 @@ export function validate_workfile(workfile: Workfile): ValidationResult {
 				path: name,
 				message: `Symbol '${name}' is part of a dependency cycle (${description}). Structs referenced by value must be defined first, so this cannot be generated.`,
 				severity: "error",
+				type: "dependency-cycle",
 			});
 		}
 	}
@@ -73,6 +74,7 @@ export function validate_workfile(workfile: Workfile): ValidationResult {
 				path: symbol_name,
 				message: `Symbol '${symbol_name}' references itself; self-references are not allowed.`,
 				severity: "error",
+				type: "dependency-cycle",
 			});
 		}
 

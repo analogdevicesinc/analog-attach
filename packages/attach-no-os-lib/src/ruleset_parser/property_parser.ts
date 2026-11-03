@@ -46,7 +46,7 @@ export function parse_number_property(name: string, object: Record<string, unkno
 	}
 
 	if (!is_primitive_symbols(type_.value)) {
-		return error(`Invalid number type '${type_.value}`, at(context, "type").path);
+		return error(`Invalid number type '${type_.value}`, "parse-error", at(context, "type").path);
 	}
 
 	// Integer primitives reject fractional bounds and defaults; float/double accept them.
@@ -88,12 +88,12 @@ export function parse_number_property(name: string, object: Record<string, unkno
 		return format;
 	}
 	if (format.value !== undefined && format.value !== "hex") {
-		return error(`Unknown number format '${format.value}'. Expected 'hex'.`, at(context, "format").path);
+		return error(`Unknown number format '${format.value}'. Expected 'hex'.`, "parse-error", at(context, "format").path);
 	}
 	// A hex float is not a thing anyone wants to read, and C's hex float literals mean
 	// something else entirely, so the key is integer-only.
 	if (format.value !== undefined && !is_integer_symbol(type_.value)) {
-		return error(`'format: ${format.value}' needs an integer type, but '${name}' is ${type_.value}`, at(context, "format").path);
+		return error(`'format: ${format.value}' needs an integer type, but '${name}' is ${type_.value}`, "definition-error", at(context, "format").path);
 	}
 
 	return ok({
@@ -196,7 +196,7 @@ export function parse_enum_property(name: string, object: Record<string, unknown
 	}
 
 	if (default_.value !== undefined && !values.value.includes(default_.value)) {
-		return error(`Default value '${default_.value.toString()}' is not present in the 'values' field (${JSON.stringify(values.value)})`, at(context, "default").path);
+		return error(`Default value '${default_.value.toString()}' is not present in the 'values' field (${JSON.stringify(values.value)})`, "definition-error", at(context, "default").path);
 	}
 
 	const capability = optional(object, "capability", context, capabilityArray);
@@ -236,7 +236,7 @@ export function parse_include_property(name: string, object: Record<string, unkn
 	const count = optional(object, "count", context, string_);
 	if (!count.ok) {return count;}
 	if (count.value !== undefined && !pointer.value) {
-		return error(`'count' names the length of a list, so it needs 'pointer: true'`, at(context, "count").path);
+		return error(`'count' names the length of a list, so it needs 'pointer: true'`, "definition-error", at(context, "count").path);
 	}
 
 	// Checked against the enum's values at resolution, the first point the enum is in hand.
@@ -263,7 +263,7 @@ function parse_include_match(object: Record<string, unknown>, context: ParseCont
 	const has_include_type = "include_type" in object;
 
 	if (has_include && has_include_type) {
-		return error(`'include' and 'include_type' are mutually exclusive`, context.path);
+		return error(`'include' and 'include_type' are mutually exclusive`, "parse-error", context.path);
 	}
 
 	if (has_include) {
@@ -278,13 +278,13 @@ function parse_include_match(object: Record<string, unknown>, context: ParseCont
 
 		const include_type = ruleset_type_from_token(token.value);
 		if (include_type === undefined) {
-			return error(`Invalid include_type '${token.value}'`, at(context, "include_type").path);
+			return error(`Invalid include_type '${token.value}'`, "parse-error", at(context, "include_type").path);
 		}
 
 		return ok({ include_type });
 	}
 
-	return error(`Missing required field 'include' (or 'include_type')`, context.path);
+	return error(`Missing required field 'include' (or 'include_type')`, "parse-error", context.path);
 }
 
 // `include_type` is only wired up for plain properties. Union members, array elements and
@@ -292,7 +292,7 @@ function parse_include_match(object: Record<string, unknown>, context: ParseCont
 // say so here instead of failing further down with a confusing message.
 export function reject_include_type(property: IncludeProperty, context: ParseContext): Result<IncludeProperty> {
 	if (property.include === undefined) {
-		return error(`'include_type' is not supported here, use 'include'`, context.path);
+		return error(`'include_type' is not supported here, use 'include'`, "parse-error", context.path);
 	}
 
 	return ok(property);
@@ -305,7 +305,7 @@ function parse_union_member(value: unknown, context: ParseContext): Result<Inclu
 	const keys = Object.keys(object.value);
 	const name = keys[0];
 	if (keys.length !== 1 || name === undefined) {
-		return error(`Union member must have exactly one key`, context.path);
+		return error(`Union member must have exactly one key`, "parse-error", context.path);
 	}
 
 	const inner = asObject(object.value[name], at(context, name));
@@ -322,7 +322,7 @@ function parse_union_member(value: unknown, context: ParseContext): Result<Inclu
 export function parse_union_property(name: string, object: Record<string, unknown>, context: ParseContext): Result<UnionProperty> {
 	const members = required(object, "members", context, (v, c) => {
 		if (!Array.isArray(v)) {
-			return error(`Expected array`, c.path);
+			return error(`Expected array`, "parse-error", c.path);
 		}
 
 		const result: IncludeProperty[] = [];
@@ -408,7 +408,7 @@ export function parse_array_property(name: string, object: Record<string, unknow
 		const type_ = element_object.value.type;
 
 		if (typeof type_ !== "string") {
-			return error("Type of 'type' should be string", at(element_context, "type").path);
+			return error("Type of 'type' should be string", "parse-error", at(element_context, "type").path);
 		}
 
 		if (type_ === "bool") {
@@ -430,10 +430,10 @@ export function parse_array_property(name: string, object: Record<string, unknow
 			}
 			element = number_property.value;
 		} else {
-			return error(`Invalid element type '${type_}'`, at(element_context, "type").path);
+			return error(`Invalid element type '${type_}'`, "parse-error", at(element_context, "type").path);
 		}
 	} else {
-		return error(`Element must have either 'type' or 'include'`, element_context.path);
+		return error(`Element must have either 'type' or 'include'`, "parse-error", element_context.path);
 	}
 
 	const capability = optional(object, "capability", context, capabilityArray);
@@ -552,7 +552,7 @@ export function parse_post_init(property: Property, object: Record<string, unkno
 		return ok(property);
 	}
 	if (property._t !== "IncludeProperty") {
-		return error(`'$post_init' needs '${property.name}' to bind a node (an include); it is a ${property._t}`, at(context, "$post_init").path);
+		return error(`'$post_init' needs '${property.name}' to bind a node (an include); it is a ${property._t}`, "definition-error", at(context, "$post_init").path);
 	}
 	return ok({ ...property, post_init: template.value });
 }
