@@ -179,9 +179,26 @@ function enum_cell(options: unknown, default_value?: unknown): Cell {
     };
 }
 
-function number_cell(schema: any, default_value?: unknown): Cell {
-    const minimum = to_bigint(schema.minimum);
-    const maximum = to_bigint(schema.maximum);
+/** The numbers a cell of `typeSize` bits can take, signed when its minimum is below zero (`int64`). */
+function size_range(schema: any): { minimum: bigint, maximum: bigint } | undefined {
+    if (![8, 16, 32, 64].includes(schema.typeSize)) { return undefined; }
+    const signed = (to_bigint(schema.minimum) ?? 0n) < 0n;
+    return cell_range(`${signed ? "" : "u"}int${String(schema.typeSize)}`);
+}
+
+/** A schema number a double can't hold exactly, past 2^53. */
+const rounded = (bound: unknown): boolean => typeof bound === "number" && !Number.isSafeInteger(bound);
+
+/**
+ * A number cell. A bound a double can't hold exactly is held to the range of its type (`range`, else its
+ * `typeSize`'s): a YAML number is one, and `uint64`'s `maximum: 0xffffffffffffffff` reads as 2^64, `int64`'s
+ * 2^63 - 1 as 2^63. Other bounds are the binding's, past its type or not (ad8460's `-microamp` from -1000000).
+ */
+function number_cell(schema: any, default_value?: unknown, range = size_range(schema)): Cell {
+    let minimum = to_bigint(schema.minimum);
+    let maximum = to_bigint(schema.maximum);
+    if (range !== undefined && rounded(schema.minimum) && minimum !== undefined && minimum < range.minimum) { minimum = range.minimum; }
+    if (range !== undefined && rounded(schema.maximum) && maximum !== undefined && maximum > range.maximum) { maximum = range.maximum; }
     const default_number = to_bigint(default_value);
     return {
         _t: "number",
@@ -380,7 +397,7 @@ function const_union(branches: unknown): unknown[] | undefined {
 /** A number of the range of `dt_type` (`uint32-array`'s 0..0xFFFFFFFF), narrowed by what `schema` bounds it to. */
 function typed_number_cell(schema: any, dt_type: string, default_value?: unknown): Cell {
     const range = cell_range(dt_type);
-    return number_cell(range === undefined ? schema : { minimum: range.minimum, maximum: range.maximum, ...schema }, default_value);
+    return number_cell(range === undefined ? schema : { minimum: range.minimum, maximum: range.maximum, ...schema }, default_value, range ?? size_range(schema));
 }
 
 /**
@@ -728,6 +745,22 @@ if (import.meta.vitest) {
         expect(translated({ "vref-supply": { dtType: "phandle" } })["vref-supply"]).toStrictEqual({
             _t: "matrix", minItems: 1, maxItems: 1, rows: [{ _t: "list", item: { _t: "any" }, minItems: 1, maxItems: 1 }],
         });
+    });
+
+    test("a 64-bit cell's bounds are its type's, not the double YAML reads them as", () => {
+        // types.yaml's `uint64` and `int64`, dereferenced: 0xffffffffffffffff reads as 2^64, 2^63 - 1 as 2^63
+        const uint64 = { type: "integer", typeSize: 64, minimum: 0, maximum: 2 ** 64 };
+        const int64 = { type: "integer", typeSize: 64, minimum: -(2 ** 63), maximum: 2 ** 63 };
+        const { sizes, offsets, "stacked-memories": stacked } = translated({
+            sizes: { dtType: "uint64-array", type: "array", minItems: 1, items: uint64 },
+            offsets: { dtType: "int64-array", type: "array", minItems: 1, items: int64 },
+            "stacked-memories": { dtType: "uint64-matrix", type: "array", minItems: 1, maxItems: 1, items: [{ type: "array", minItems: 2, maxItems: 4, items: uint64 }] },
+        });
+        expect(sizes).toStrictEqual({ _t: "list", item: { _t: "number", minimum: 0n, maximum: 0xFF_FF_FF_FF_FF_FF_FF_FFn }, minItems: 1, typeSize: 64 });
+        expect(offsets).toStrictEqual({ _t: "list", item: { _t: "number", minimum: -(2n ** 63n), maximum: 2n ** 63n - 1n }, minItems: 1, typeSize: 64 });
+        expect(stacked).toStrictEqual({ _t: "matrix", minItems: 1, maxItems: 1, rows: [
+            { _t: "list", item: { _t: "number", minimum: 0n, maximum: 0xFF_FF_FF_FF_FF_FF_FF_FFn }, minItems: 2, maxItems: 4, typeSize: 64 },
+        ] });
     });
 
     test("a list property keeps the default it gives for its number", () => {
