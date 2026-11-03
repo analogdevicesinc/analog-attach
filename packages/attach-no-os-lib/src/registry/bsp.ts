@@ -73,7 +73,7 @@ function read_peripherals(board_path: string): Result<Record<string, Record<stri
 	try {
 		contents = fs.readFileSync(file, "utf8");
 	} catch {
-		return error(`Failed to read ${file}`, file);
+		return error(`Failed to read ${file}`, "parse-error", file);
 	}
 
 	let parsed: unknown;
@@ -81,11 +81,11 @@ function read_peripherals(board_path: string): Result<Record<string, Record<stri
 		parsed = YAML.parse(contents);
 	} catch (parse_error) {
 		const reason = parse_error instanceof Error ? parse_error.message : String(parse_error);
-		return error(`Failed to parse ${file}: ${reason}`, file);
+		return error(`Failed to parse ${file}: ${reason}`, "parse-error", file);
 	}
 
 	if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
-		return error(`${file} is not a YAML mapping`, file);
+		return error(`${file} is not a YAML mapping`, "parse-error", file);
 	}
 
 	const peripherals = (parsed as Record<string, unknown>).peripherals;
@@ -93,13 +93,13 @@ function read_peripherals(board_path: string): Result<Record<string, Record<stri
 		return ok({});
 	}
 	if (typeof peripherals !== "object" || peripherals === null || Array.isArray(peripherals)) {
-		return error(`${file}: 'peripherals' must be a mapping of kind to symbols`, file);
+		return error(`${file}: 'peripherals' must be a mapping of kind to symbols`, "parse-error", file);
 	}
 
 	const by_kind: Record<string, Record<string, PeripheralEntry>> = {};
 	for (const [kind, entries] of Object.entries(peripherals as Record<string, unknown>)) {
 		if (typeof entries !== "object" || entries === null || Array.isArray(entries)) {
-			return error(`${file}: peripheral kind '${kind}' must be a mapping of symbol to entry`, file);
+			return error(`${file}: peripheral kind '${kind}' must be a mapping of symbol to entry`, "parse-error", file);
 		}
 		const typed: Record<string, PeripheralEntry> = {};
 		for (const [symbol, entry] of Object.entries(entries as Record<string, unknown>)) {

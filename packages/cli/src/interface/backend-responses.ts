@@ -17,6 +17,8 @@
 // attach-noos) answered with, that backend's subtype keeps the old field too, `deprecated`
 // in its schema, for one release.
 
+import type { ErrorType } from "./error-types";
+
 export type Severity = "info" | "warn" | "error";
 
 /** In every response except `read` and `validate`. `ok: false` is a refusal: the command ran and said no (exit 0, D-06). */
@@ -24,6 +26,12 @@ export interface CommonResponse {
     ok: boolean;
     message: string;
     severity: Severity;
+    /**
+     * Which kind of error or warning it is (GEN-17), from the fixed list of error-types.ts: on
+     * a refusal, and on a success whose severity is `warn`. Optional while the Linux backend
+     * doesn't set it yet; the noos backend and the front end always do.
+     */
+    error_type?: ErrorType;
 }
 
 export type PropertyValue = null | string | number | boolean | PropertyValue[];
@@ -215,6 +223,8 @@ export interface ValidationFinding {
     /** `[]`: the workfile as a whole. */
     path: string[];
     message: string;
+    /** Which kind of finding it is (GEN-17). Optional while the Linux backend doesn't set it. */
+    error_type?: ErrorType;
 }
 
 /** No `ok`: an empty `errors` is the success. */

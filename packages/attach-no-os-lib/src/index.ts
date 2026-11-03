@@ -11,6 +11,8 @@ export type {
 export { ruleset_type_token, is_float_symbol } from "./ruleset_parser/types";
 export { ok, error } from "./ruleset_parser/result";
 export type { Result, ResultError } from "./ruleset_parser/result";
+export { ERROR_TYPE_NAMES } from "./ruleset_parser/error_types";
+export type { ErrorType } from "./ruleset_parser/error_types";
 export {
     create_workfile,
     add_symbol,

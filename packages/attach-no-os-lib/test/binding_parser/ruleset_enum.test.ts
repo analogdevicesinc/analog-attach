@@ -51,6 +51,7 @@ describe('RulesetEnum parsing', () => {
 			expectError(result);
 			expectErrorPath(result, 'default');
 			expectErrorContains(result, 'not a valid enum value');
+			expect(result.ok ? undefined : result.error.type).toBe("definition-error");
 		});
 	});
 });

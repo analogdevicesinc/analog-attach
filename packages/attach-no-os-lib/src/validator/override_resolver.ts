@@ -120,6 +120,7 @@ function apply_effect(
 					path: `${symbol_name}.${effective.name}`,
 					message: `Cannot force a value on enum '${effective.name}' from another node. Use 'values:' to restrict the selectable set.`,
 					severity: "error",
+					type: "definition-error",
 				});
 				break;
 			}
@@ -171,6 +172,7 @@ function apply_effect(
 						path: `${symbol_name}.${effect.reference.property}`,
 						message: `Union member '${chosen}' contradicts the required member '${effect.member}'`,
 						severity: "error",
+						type: "rule-violation",
 					});
 				}
 			}
@@ -217,6 +219,7 @@ export function apply_overrides(
 				path: `${symbol_name}.${property.name}`,
 				message: `Case '${String(when.value)}' never matches '${property.name}'. Valid values: ${property.values.join(", ")}`,
 				severity: "warning",
+				type: "rule-violation",
 			});
 		}
 
@@ -255,6 +258,7 @@ export function apply_overrides(
 			path: `${symbol_name}.${property.name}`,
 			message: disable_reason ?? `Property '${property.name}' is disabled but has a value`,
 			severity: "error",
+			type: "rule-violation",
 		});
 	}
 

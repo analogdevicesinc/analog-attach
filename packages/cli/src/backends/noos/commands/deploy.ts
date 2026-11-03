@@ -10,6 +10,7 @@ import {
     type Outcome,
     type Session,
 } from "../../../interface/backend-interface";
+import { refuse_error } from "./shared";
 import {
     build_arguments,
     configure_arguments,
@@ -64,7 +65,7 @@ function not_built(target_path: string, program: string): string | undefined {
 async function run_deploy(probe_flag: string | undefined, session: Session): Promise<Outcome<CommonResponse>> {
     // A probe that can't be is what was typed, whatever the project's state.
     if (probe_flag !== undefined && !PROBE_OPTIONS.includes(probe_flag)) {
-        return refuse(`Unknown probe '${probe_flag}'. Supported: ${PROBE_OPTIONS.join(", ")}`);
+        return refuse(`Unknown probe '${probe_flag}'. Supported: ${PROBE_OPTIONS.join(", ")}`, { type: "unknown-choice" });
     }
 
     const project = project_directory(session);
@@ -76,13 +77,13 @@ async function run_deploy(probe_flag: string | undefined, session: Session): Pro
     // Deploy puts what build made on the board: it doesn't build it itself (DEPLOY-01).
     const unbuilt = not_built(target_path, session.program);
     if (unbuilt !== undefined) {
-        return refuse(unbuilt);
+        return refuse(unbuilt, { type: "not-generated" });
     }
 
     // An explicit deploy-command takes the step over completely.
     const override = get_effective_setting_value("deploy-command");
     if (!override.ok) {
-        return refuse(override.error.message);
+        return refuse_error(override.error);
     }
 
     if (override.value !== undefined && override.value !== "") {
@@ -90,7 +91,7 @@ async function run_deploy(probe_flag: string | undefined, session: Session): Pro
         const result = await run_shell(override.value, target_path, { line: text => { progress.line(text); }, signal: session.signal });
         progress.done();
         if (result.exit_code !== 0) {
-            return refuse(`Deploy failed with exit code ${String(result.exit_code)}`);
+            return refuse(`Deploy failed with exit code ${String(result.exit_code)}`, { type: "tool-failed" });
         }
 
         const message = `Deployed ${target_path} with '${override.value}'`;
@@ -99,27 +100,27 @@ async function run_deploy(probe_flag: string | undefined, session: Session): Pro
 
     const configured_probe = get_effective_setting_value("probe");
     if (!configured_probe.ok) {
-        return refuse(configured_probe.error.message);
+        return refuse_error(configured_probe.error);
     }
 
     const probe = probe_flag ?? configured_probe.value ?? DEFAULT_PROBE;
     if (!PROBE_OPTIONS.includes(probe)) {
-        return refuse(`Unknown probe '${probe}' in the 'probe' setting. Supported: ${PROBE_OPTIONS.join(", ")}`);
+        return refuse(`Unknown probe '${probe}' in the 'probe' setting. Supported: ${PROBE_OPTIONS.join(", ")}`, { type: "invalid-setting" });
     }
 
     const capi_path = get_setting_value("capi-path");
     if (!capi_path.ok) {
-        return refuse(`capi-path is not configured. Run: ${session.program} config capi-path <path>`);
+        return refuse(`capi-path is not configured. Run: ${session.program} config capi-path <path>`, { type: "missing-setting" });
     }
 
     const plan = plan_build(target_path, capi_path.value, session.program);
     if (!plan.ok) {
-        return refuse(plan.error.message);
+        return refuse_error(plan.error);
     }
 
     const checks = preflight(plan.value, capi_path.value);
     if (!checks.ok) {
-        return refuse(checks.error.message);
+        return refuse_error(checks.error);
     }
 
     const progress = session.progress(`Flashing ${plan.value.target} to ${plan.value.board} via ${probe}`);
@@ -131,13 +132,13 @@ async function run_deploy(probe_flag: string | undefined, session: Session): Pro
     const configure = await run("cmake", configure_arguments(plan.value, [`-DPROBE=${probe}`]), directory, sink, environment);
     if (configure.exit_code !== 0) {
         progress.done();
-        return refuse(`CMake configure failed with exit code ${String(configure.exit_code)}`);
+        return refuse(`CMake configure failed with exit code ${String(configure.exit_code)}`, { type: "tool-failed" });
     }
 
     const flash = await run("cmake", build_arguments(plan.value, FLASH_TARGET), directory, sink, environment);
     progress.done();
     if (flash.exit_code !== 0) {
-        return refuse(`Deploy failed with exit code ${String(flash.exit_code)}`);
+        return refuse(`Deploy failed with exit code ${String(flash.exit_code)}`, { type: "tool-failed" });
     }
 
     const message = `Flashed ${plan.value.target} to ${plan.value.board} via ${probe}`;

@@ -1,6 +1,6 @@
 import { validate_workfile, type ValidationError } from "attach-no-os-lib";
-import { answer, command, refuse, type ValidateArguments } from "../../../interface/backend-interface";
-import { load_context } from "./shared";
+import { answer, command, type ValidateArguments } from "../../../interface/backend-interface";
+import { load_context, refuse_error } from "./shared";
 import type { ValidationFinding, ValidationResponse } from "../protocol/responses";
 
 /**
@@ -18,7 +18,7 @@ export const validate = command<ValidateArguments, ValidationResponse>({
     run(_arguments, _flags, session) {
         const context = load_context(session);
         if (!context.ok) {
-            return Promise.resolve(refuse(context.error.message));
+            return Promise.resolve(refuse_error(context.error));
         }
 
         const result = validate_workfile(context.value.workfile);
@@ -51,7 +51,8 @@ function to_protocol_error(finding: ValidationError): ValidationFinding {
     return {
         kind: "generic",
         path: finding.path.split(".").filter(segment => segment.length > 0),
-        message: finding.message
+        message: finding.message,
+        error_type: finding.type
     };
 }
 

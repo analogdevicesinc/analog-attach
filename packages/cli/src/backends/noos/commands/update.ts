@@ -15,6 +15,7 @@ import {
     get_node,
     get_node_property,
     load_context,
+    refuse_error,
     resolve_property_name,
     save_workfile,
 } from "./shared";
@@ -86,16 +87,16 @@ function run_update(arguments_: UpdateArguments, suggest: boolean, session: Sess
 
     const context = load_context(session);
     if (!context.ok) {
-        return refuse(context.error.message);
+        return refuse_error(context.error);
     }
 
     if (READONLY_KEYS.has(property)) {
-        return refuse(`'${property}' describes the node rather than configuring it, and cannot be set`);
+        return refuse(`'${property}' describes the node rather than configuring it, and cannot be set`, { type: "read-only" });
     }
 
     const owner = get_node(context.value, node);
     if (!owner.ok) {
-        return refuse(owner.error.message);
+        return refuse_error(owner.error);
     }
 
     // What the user typed, spelled the way the workfile spells it: `init_param` for
@@ -107,13 +108,14 @@ function run_update(arguments_: UpdateArguments, suggest: boolean, session: Sess
         return refuse(
             `'${node}' has no property '${property}', and one cannot be added: its properties are ` +
             `fixed by its schema (${owner.value.$symbol}). Available: ` +
-            owner.value.properties.map(candidate => candidate.name).join(", ")
+            owner.value.properties.map(candidate => candidate.name).join(", "),
+            { type: "not-found" }
         );
     }
 
     const lookup = get_node_property(context.value, node, resolved);
     if (!lookup.ok) {
-        return refuse(lookup.error.message);
+        return refuse_error(lookup.error);
     }
 
     // Two words for a union ('<member> <value>') fold into the one string the parser expects.
@@ -123,32 +125,32 @@ function run_update(arguments_: UpdateArguments, suggest: boolean, session: Sess
     // the command ran, the value is wrong (GEN-09).
     const parsed = parse_property_value(raw, lookup.value.property);
     if (!parsed.ok) {
-        return refuse(parsed.error.message);
+        return refuse_error(parsed.error);
     }
 
     const referenced_before = referenced_nodes(context.value.workfile);
     const updated = set_value(context.value.workfile, node, resolved, parsed.value);
     if (!updated.ok) {
-        return refuse(updated.error.message);
+        return refuse_error(updated.error);
     }
     // What the definition doesn't allow for the value itself (a bound, an option, an array's
     // elements) is refused here rather than left for validate (UPDATE-02); the workfile on
     // disk is untouched, as nothing is saved.
     const problems = validate_property_value(context.value.workfile, node, resolved);
     if (problems.length > 0) {
-        return refuse(problems.map(problem => problem.message).join("; "));
+        return refuse(problems.map(problem => problem.message).join("; "), { type: "invalid-value" });
     }
     const message = `Set ${node}.${resolved} = ${format_property_value(lookup.value.property)}`;
 
     // The edit may leave what bootstrap built out of line with the rules, or unused.
     const ran = run_bootstrap(context.value.workfile, referenced_before);
     if (!ran.ok) {
-        return refuse(`${message}, but bootstrap failed: ${ran.error.message}`);
+        return refuse(`${message}, but bootstrap failed: ${ran.error.message}`, { type: ran.error.type });
     }
 
     const saved = save_workfile(context.value);
     if (!saved.ok) {
-        return refuse(saved.error.message);
+        return refuse_error(saved.error);
     }
 
     const text = [message, ...(ran.value === undefined ? [] : describe_bootstrap(ran.value, context.value.workfile, session.program))];

@@ -82,7 +82,7 @@ const AUTO_KEY = "$auto";
  */
 export function validate_c_name(name: string, label = "Symbol", field?: string): Result<void> {
     if (!C_NAME_REGEX.test(name)) {
-        return error(`${label} '${name}' is not a valid C name`, field);
+        return error(`${label} '${name}' is not a valid C name`, "invalid-name", field);
     }
     return ok();
 }
@@ -93,10 +93,10 @@ export function add_symbol(workfile: Workfile, name: string, ruleset: Ruleset): 
         return valid_name;
     }
     if (name in workfile.symbols) {
-        return error(`Symbol '${name}' already exists`, "name");
+        return error(`Symbol '${name}' already exists`, "name-taken", "name");
     }
     if (name in workfile.platform_ops) {
-        return error(`Symbol '${name}' conflicts with platform ops`, "name");
+        return error(`Symbol '${name}' conflicts with platform ops`, "name-taken", "name");
     }
     workfile.symbols[name] = ruleset;
     return ok(workfile);
@@ -104,14 +104,14 @@ export function add_symbol(workfile: Workfile, name: string, ruleset: Ruleset): 
 
 export function get_symbol(workfile: Workfile, name: string): Result<Ruleset> {
     if (!(name in workfile.symbols)) {
-        return error(`Symbol '${name}' does not exist`, "name");
+        return error(`Symbol '${name}' does not exist`, "not-found", "name");
     }
     return ok(workfile.symbols[name]);
 }
 
 export function remove_symbol(workfile: Workfile, name: string): Result<void> {
     if (!(name in workfile.symbols)) {
-        return error(`Symbol '${name}' not found`, "name");
+        return error(`Symbol '${name}' not found`, "not-found", "name");
     }
     delete workfile.symbols[name];
     if (workfile.hidden !== undefined) {
@@ -127,13 +127,13 @@ export function rename_symbol(workfile: Workfile, old_name: string, new_name: st
     }
     const symbol = workfile.symbols[old_name];
     if (!symbol) {
-        return error(`Symbol '${old_name}' not found`, "old_name");
+        return error(`Symbol '${old_name}' not found`, "not-found", "old_name");
     }
     if (new_name in workfile.symbols) {
-        return error(`Symbol '${new_name}' already exists`, "new_name");
+        return error(`Symbol '${new_name}' already exists`, "name-taken", "new_name");
     }
     if (new_name in workfile.platform_ops) {
-        return error(`Symbol '${new_name}' conflicts with platform ops`, "new_name");
+        return error(`Symbol '${new_name}' conflicts with platform ops`, "name-taken", "new_name");
     }
     workfile.symbols[new_name] = symbol;
     delete workfile.symbols[old_name];
@@ -160,24 +160,24 @@ export function find_any(workfile: Workfile, name: string): Ruleset | undefined 
 function settable_property(workfile: Workfile, symbol_name: string, property_name: string): Result<Property> {
     const ruleset = workfile.symbols[symbol_name];
     if (!ruleset) {
-        return error(`Symbol '${symbol_name}' not found`, "symbol_name");
+        return error(`Symbol '${symbol_name}' not found`, "not-found", "symbol_name");
     }
     // Descriptor nodes also carry properties (their `$init_param` include, plus their own members),
     // so their $init_param reference is settable through the same path.
     if (ruleset._t !== "RulesetStruct" && ruleset._t !== "RulesetDescriptor") {
-        return error(`Symbol '${symbol_name}' is not a struct or device`, "symbol_name");
+        return error(`Symbol '${symbol_name}' is not a struct or device`, "not-found", "symbol_name");
     }
 
     const property = ruleset.properties.find(p => p.name === property_name);
     if (!property) {
-        return error(`Property '${property_name}' not found in '${symbol_name}'`, "property_name");
+        return error(`Property '${property_name}' not found in '${symbol_name}'`, "not-found", "property_name");
     }
 
     // A readonly field is filled in by generated code — an init function for a descriptor
     // member, the target template for a derived struct field — so a user value would either
     // be overwritten or contradict what the code does.
     if (property.readonly === true) {
-        return error(`Property '${property_name}' of '${symbol_name}' is filled in by generated code and cannot be assigned`, "property_name");
+        return error(`Property '${property_name}' of '${symbol_name}' is filled in by generated code and cannot be assigned`, "read-only", "property_name");
     }
 
     return ok(property);
@@ -223,7 +223,7 @@ export function mark_auto(workfile: Workfile, symbol_name: string, property_name
         return property;
     }
     if (property.value.value === undefined) {
-        return error(`'${symbol_name}.${property_name}' has no value for bootstrap to own`, property_name);
+        return error(`'${symbol_name}.${property_name}' has no value for bootstrap to own`, "workfile-invalid", property_name);
     }
 
     property.value.auto = true;
@@ -233,12 +233,12 @@ export function mark_auto(workfile: Workfile, symbol_name: string, property_name
 export function get_value(workfile: Workfile, symbol_name: string, property_name: string): Result<unknown> {
     const ruleset = workfile.symbols[symbol_name];
     if (!ruleset || (ruleset._t !== "RulesetStruct" && ruleset._t !== "RulesetDescriptor")) {
-        return error(`Symbol '${symbol_name}' is not a struct or device`, "symbol_name");
+        return error(`Symbol '${symbol_name}' is not a struct or device`, "not-found", "symbol_name");
     }
 
     const property = ruleset.properties.find(p => p.name === property_name);
     if (property === undefined) {
-        return error(`Property '${property_name}' not found`, "property_name");
+        return error(`Property '${property_name}' not found`, "not-found", "property_name");
     }
     return ok(property.value);
 }
@@ -458,7 +458,7 @@ export function suggest_for_union(workfile: Workfile, union: UnionProperty, memb
 
     const member = union.members.find(m => m.name === member_name);
     if (!member) {
-        return error(`Unknown union member '${member_name}'`, member_name);
+        return error(`Unknown union member '${member_name}'`, "invalid-value", member_name);
     }
     return suggest_for_include(workfile, member, owner);
 }
@@ -581,16 +581,16 @@ export function suggest_platform_extra(workfile: Workfile, property: PlatformExt
 export function effective_property(workfile: Workfile, symbol_name: string, property_name: string): Result<Property> {
     const symbol = workfile.symbols[symbol_name];
     if (!symbol) {
-        return error(`Could not find symbol with name: "${symbol_name}" in [${Object.keys(workfile.symbols).join(", ")}]`, "");
+        return error(`Could not find symbol with name: "${symbol_name}" in [${Object.keys(workfile.symbols).join(", ")}]`, "not-found", "");
     }
 
     if (symbol._t !== "RulesetStruct" && symbol._t !== "RulesetDescriptor") {
-        return error(`Expected type RulesetStruct or RulesetDescriptor, got "${symbol._t}"`, "");
+        return error(`Expected type RulesetStruct or RulesetDescriptor, got "${symbol._t}"`, "not-found", "");
     }
 
     const property = symbol.properties.find(p => p.name === property_name);
     if (!property) {
-        return error(`Could not find property "${property_name}" in [${symbol.properties.map(p => p.name).join(", ")}]`, symbol_name);
+        return error(`Could not find property "${property_name}" in [${symbol.properties.map(p => p.name).join(", ")}]`, "not-found", symbol_name);
     }
 
     const graph = create_connections_graph(workfile);
@@ -633,14 +633,14 @@ export function suggest_for_property(workfile: Workfile, symbol_name: string, pr
         case "PlatformOpsProperty": {
             // Only structs carry platform_ops; a descriptor node never reaches here.
             if (symbol._t !== "RulesetStruct") {
-                return error(`Property '${property_name}' is not valid on a descriptor node`, symbol_name);
+                return error(`Property '${property_name}' is not valid on a descriptor node`, "internal-error", symbol_name);
             }
             return suggest_platform_ops(workfile, overridden);
         }
         case "PlatformExtraProperty": {
             // Only structs carry platform_extra; a descriptor node never reaches here.
             if (symbol._t !== "RulesetStruct") {
-                return error(`Property '${property_name}' is not valid on a descriptor node`, symbol_name);
+                return error(`Property '${property_name}' is not valid on a descriptor node`, "internal-error", symbol_name);
             }
             return suggest_platform_extra(workfile, overridden, symbol);
         }
@@ -654,7 +654,7 @@ export function suggest_for_property(workfile: Workfile, symbol_name: string, pr
             return ok({});
         }
         default: {
-            return error("unknown type");
+            return error("unknown type", "internal-error");
         }
     }
 }
@@ -743,7 +743,7 @@ function is_instantiable(type_: RulesetType) {
 
 export function export_minimal(workfile: Workfile): Result<MinimalWorkfile> {
     if (!workfile.platform) {
-        return error("No platform loaded", "platform");
+        return error("No platform loaded", "internal-error", "platform");
     }
 
     const symbols: MinimalWorkfile["symbols"] = {};
@@ -826,6 +826,7 @@ export function import_minimal(minimal: MinimalWorkfile): Result<Workfile> {
                 // command, so say which key to remove rather than only why it was refused.
                 return error(
                     `Workfile symbol '${name}' cannot be loaded: ${set_result.error.message}. Remove '${property_name}' from it.`,
+                    "workfile-invalid",
                     set_result.error.path
                 );
             }
@@ -835,12 +836,12 @@ export function import_minimal(minimal: MinimalWorkfile): Result<Workfile> {
         const auto = node[AUTO_KEY];
         if (auto !== undefined) {
             if (!Array.isArray(auto) || !auto.every(entry => typeof entry === "string")) {
-                return error(`Workfile symbol '${name}' cannot be loaded: '${AUTO_KEY}' must be a list of property names`, name);
+                return error(`Workfile symbol '${name}' cannot be loaded: '${AUTO_KEY}' must be a list of property names`, "workfile-invalid", name);
             }
             for (const property_name of auto) {
                 const marked = mark_auto(workfile, name, property_name);
                 if (!marked.ok) {
-                    return error(`Workfile symbol '${name}' cannot be loaded: ${marked.error.message}`, marked.error.path);
+                    return error(`Workfile symbol '${name}' cannot be loaded: ${marked.error.message}`, "workfile-invalid", marked.error.path);
                 }
             }
         }
@@ -857,25 +858,25 @@ export function import_minimal(minimal: MinimalWorkfile): Result<Workfile> {
 
 export function load_minimal_workfile(file_path: string): Result<MinimalWorkfile> {
     if (!fs.existsSync(file_path)) {
-        return error(`Workfile not found: ${file_path}`, file_path);
+        return error(`Workfile not found: ${file_path}`, "workfile-missing", file_path);
     }
 
     let content: string;
     try {
         content = fs.readFileSync(file_path, "utf8");
     } catch {
-        return error(`Failed to read workfile: ${file_path}`, file_path);
+        return error(`Failed to read workfile: ${file_path}`, "parse-error", file_path);
     }
 
     let parsed: unknown;
     try {
         parsed = JSON.parse(content);
     } catch {
-        return error(`Failed to parse workfile as JSON: ${file_path}`, file_path);
+        return error(`Failed to parse workfile as JSON: ${file_path}`, "parse-error", file_path);
     }
 
     if (!is_minimal_workfile(parsed)) {
-        return error(`Invalid workfile format: ${file_path}`, file_path);
+        return error(`Invalid workfile format: ${file_path}`, "parse-error", file_path);
     }
 
     return ok(parsed);
@@ -910,7 +911,7 @@ export function materialize_hidden(workfile: Workfile, candidate: HiddenCandidat
         if (is_hidden(workfile, candidate.name)) {
             return ok(candidate.name);
         }
-        return error(`'${candidate.name}' names a ${candidate.symbol} the board provides, but a node in the workfile already has that name`, candidate.name);
+        return error(`'${candidate.name}' names a ${candidate.symbol} the board provides, but a node in the workfile already has that name`, "workfile-invalid", candidate.name);
     }
 
     if (candidate.kind === "wrapper") {

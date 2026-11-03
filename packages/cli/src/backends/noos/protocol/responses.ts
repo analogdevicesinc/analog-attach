@@ -14,6 +14,7 @@ import type {
     Suggestion,
     SuggestResponse,
 } from "../../../interface/backend-responses";
+import type { ErrorType } from "../../../interface/error-types";
 
 export type {
     BuildResponse,
@@ -128,6 +129,7 @@ export interface NoosResponses extends Responses {
     "update": CommonResponse | ReadResponse | SuggestResponse;
 }
 
-export function common_ok(message: string, severity: Severity = "info"): CommonResponse {
-    return { ok: true, message, severity };
+/** A success; a warning carries its `error_type` (GEN-17). */
+export function common_ok(message: string, severity: Severity = "info", error_type?: ErrorType): CommonResponse {
+    return { ok: true, message, severity, ...(error_type === undefined ? {} : { error_type }) };
 }

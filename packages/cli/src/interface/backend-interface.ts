@@ -20,6 +20,7 @@
  */
 
 import type { CommonResponse, Responses, SetupResponse, Severity } from "./backend-responses";
+import type { ErrorType } from "./error-types";
 
 // =====================================================================================
 // Outcome: what a command returns
@@ -73,10 +74,15 @@ export function answer<R>(response: Lazy<R>, text: string | Render): Outcome<R> 
     return { kind: "answer", response, text: typeof text === "string" ? () => text : text };
 }
 
-/** The command ran and says no: `ok: false`, severity `error` unless told, the message as the text unless told. */
-export function refuse(message: string, options: { severity?: Severity; text?: string | Render } = {}): Outcome<never> {
-    const { severity = "error", text = message } = options;
-    return { kind: "refused", response: { ok: false, message, severity }, text: typeof text === "string" ? () => text : text };
+/**
+ * The command ran and says no: `ok: false`, severity `error` unless told, the message as the
+ * text unless told, and `type` as the response's `error_type` (GEN-17). `type` is optional
+ * while the Linux backend doesn't give one; the noos backend and the front end always do.
+ */
+export function refuse(message: string, options: { type?: ErrorType; severity?: Severity; text?: string | Render } = {}): Outcome<never> {
+    const { type, severity = "error", text = message } = options;
+    const response = { ok: false as const, message, severity, ...(type === undefined ? {} : { error_type: type }) };
+    return { kind: "refused", response, text: typeof text === "string" ? () => text : text };
 }
 
 export function input_error(message: string): Outcome<never> {

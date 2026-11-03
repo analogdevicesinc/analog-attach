@@ -92,7 +92,7 @@ function kconfig_symbols(module: ModuleInfo): Set<string> {
 
 export function capi_project(workfile: Workfile): Result<CapiProject> {
 	if (workfile.board === undefined) {
-		return error("A CAPI application is built for a board, and the workfile names none");
+		return error("A CAPI application is built for a board, and the workfile names none", "generate-failed");
 	}
 	const board = find_board(workfile.board);
 	if (!board.ok) {
@@ -106,7 +106,7 @@ export function capi_project(workfile: Workfile): Result<CapiProject> {
 
 	const platform = modules.find(module => module.type === "platform" && module.boards?.includes(board.value.name));
 	if (platform === undefined) {
-		return error(`No configured platform declares board '${board.value.name}'`);
+		return error(`No configured platform declares board '${board.value.name}'`, "definition-error");
 	}
 
 	// generate_presets.py: the board's mcu with its package/temperature suffix stripped.
@@ -147,7 +147,7 @@ export function capi_project(workfile: Workfile): Result<CapiProject> {
 		? []
 		: modules.filter(module => module.type === "middleware" && module.provides_interfaces?.includes("iio") === true);
 	if (iio_drivers.length > 0 && iio.length === 0) {
-		return error(`${iio_drivers.map(module => module.name).join(", ")} is served over IIO, which needs capi-iio: add it to module_paths`);
+		return error(`${iio_drivers.map(module => module.name).join(", ")} is served over IIO, which needs capi-iio: add it to module_paths`, "missing-setting");
 	}
 	const iio_kconfig = iio_drivers.flatMap(module => {
 		const symbol = module.build?.kconfig === undefined ? undefined : `${module.build.kconfig}_IIO`;

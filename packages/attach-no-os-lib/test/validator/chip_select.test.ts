@@ -27,7 +27,10 @@ function two_sensors(board: string, soc: string): Workfile {
 function chip_select_errors(workfile: Workfile): string[] {
     return validate_workfile(workfile).errors
         .filter(error => error.message.includes('both would be selected'))
-        .map(error => error.path ?? '');
+        .map(error => {
+            expect(error.type).toBe('resource-conflict');
+            return error.path ?? '';
+        });
 }
 
 describe('shared chip-selects', () => {

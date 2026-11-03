@@ -10,6 +10,7 @@ import {
     resolve_target
 } from "attach-no-os-lib";
 import { answer, command, refuse, type InitArguments, type Session } from "../../../interface/backend-interface";
+import type { ErrorType } from "../../../interface/error-types";
 import type { InitResponse } from "../protocol/responses";
 import { install } from "../settings";
 
@@ -32,7 +33,7 @@ export const init = command<InitArguments, InitResponse>({
     run(_arguments, _flags, session) {
         const created = init_workfile(session);
         if (!created.ok) {
-            return Promise.resolve(refuse(created.message, created.text === undefined ? {} : { text: created.text }));
+            return Promise.resolve(refuse(created.message, created.text === undefined ? { type: created.type } : { type: created.type, text: created.text }));
         }
         const response: InitResponse = { ok: true, message: created.message, severity: "info", path: created.path, created: true };
         return Promise.resolve(answer(response, `${created.message}\n  ${created.path}`));
@@ -41,7 +42,7 @@ export const init = command<InitArguments, InitResponse>({
 
 export type InitResult =
     | { ok: true; message: string; path: string }
-    | { ok: false; message: string; text?: string };
+    | { ok: false; message: string; type: ErrorType; text?: string };
 
 /**
  * Create the workfile the settings name, for the target (board or chip) they name. Shared by
@@ -51,7 +52,7 @@ export function init_workfile(session: Pick<Session, "settings" | "assets_dir" |
     install(session);
     const target = get_workfile_path();
     if (!target.ok) {
-        return { ok: false, message: target.error.message };
+        return { ok: false, message: target.error.message, type: target.error.type };
     }
 
     // Never silently: a workfile is the user's design, and this would replace it with an
@@ -60,7 +61,8 @@ export function init_workfile(session: Pick<Session, "settings" | "assets_dir" |
         return {
             ok: false,
             message: `A workfile already exists at ${target.value}`,
-            text: `A workfile already exists at ${target.value}.\nDelete it, or point the 'workfile' setting somewhere else.`
+            text: `A workfile already exists at ${target.value}.\nDelete it, or point the 'workfile' setting somewhere else.`,
+            type: "workfile-exists"
         };
     }
 
@@ -71,7 +73,7 @@ export function init_workfile(session: Pick<Session, "settings" | "assets_dir" |
 
     const workfile = create_workfile(resolved.platform);
     if (!workfile.ok) {
-        return { ok: false, message: workfile.error.message };
+        return { ok: false, message: workfile.error.message, type: workfile.error.type };
     }
 
     // Recorded so the board travels with the workfile: codegen reads it from there,
@@ -82,7 +84,7 @@ export function init_workfile(session: Pick<Session, "settings" | "assets_dir" |
 
     const minimal = export_minimal(workfile.value);
     if (!minimal.ok) {
-        return { ok: false, message: minimal.error.message };
+        return { ok: false, message: minimal.error.message, type: minimal.error.type };
     }
 
     fs.mkdirSync(path.dirname(target.value), { recursive: true });
@@ -98,7 +100,7 @@ export function init_workfile(session: Pick<Session, "settings" | "assets_dir" |
 
 type ResolvedTarget =
     | { ok: true; platform: string; board?: string }
-    | { ok: false; message: string; text?: string };
+    | { ok: false; message: string; type: ErrorType; text?: string };
 
 /** Which platform (and board) the new workfile targets: what the `target` setting names. */
 function workfile_target(program: string): ResolvedTarget {
@@ -106,18 +108,19 @@ function workfile_target(program: string): ResolvedTarget {
     // so say how to set it rather than that the target is unknown.
     const capi = get_effective_setting_value("capi-path");
     if (!capi.ok || capi.value === undefined) {
-        return { ok: false, message: `Setting "capi-path" is not configured. Run: ${program} config capi-path <value>, or ${program} for the guided setup` };
+        return { ok: false, message: `Setting "capi-path" is not configured. Run: ${program} config capi-path <value>, or ${program} for the guided setup`, type: "missing-setting" };
     }
     const configured = get_effective_setting_value(TARGET_SETTING);
     if (!configured.ok || configured.value === undefined) {
         return {
             ok: false,
             message: `No target configured. Run: ${program} config target <board or chip>, or ${program} for the guided setup`,
+            type: "missing-setting",
             text: format_no_target(program)
         };
     }
     const resolved = resolve_target(configured.value);
-    return resolved.ok ? { ok: true, ...resolved.value } : { ok: false, message: resolved.error.message };
+    return resolved.ok ? { ok: true, ...resolved.value } : { ok: false, message: resolved.error.message, type: resolved.error.type };
 }
 
 // --- Formatters ---

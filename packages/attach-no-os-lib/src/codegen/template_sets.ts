@@ -89,11 +89,11 @@ export function resolve_template_set(requested?: string): Result<string> {
 	if (!fs.existsSync(directory) || !fs.statSync(directory).isDirectory()) {
 		const available = list_template_sets();
 		const hint = available.length > 0 ? ` Available sets: ${available.join(", ")}` : "";
-		return error(`Template set '${name}' not found at '${directory}'.${hint}`);
+		return error(`Template set '${name}' not found at '${directory}'.${hint}`, "unknown-choice");
 	}
 
 	if (!fs.existsSync(path.join(directory, STRUCTURE_FILENAME))) {
-		return error(`Template set '${name}' has no '${STRUCTURE_FILENAME}' (looked in '${directory}')`);
+		return error(`Template set '${name}' has no '${STRUCTURE_FILENAME}' (looked in '${directory}')`, "definition-error");
 	}
 
 	return ok(directory);

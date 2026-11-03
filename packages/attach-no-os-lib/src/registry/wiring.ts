@@ -150,12 +150,12 @@ export function find_eval_board(driver: string): Result<ModuleInfo> {
 		module => module.type === MODULE_TYPE_EVAL_BOARD && module.implements_driver === driver
 	);
 	if (matches.length === 0) {
-		return error(`No eval board in the configured roots implements '${driver}'`, driver);
+		return error(`No eval board in the configured roots implements '${driver}'`, "unknown-device-type", driver);
 	}
 	if (matches.length > 1) {
 		// Several boards can carry one part. Which one is on the bench is the user's to say.
 		const names = matches.map(module => module.name).sort().join(", ");
-		return error(`More than one eval board implements '${driver}': ${names}`, driver);
+		return error(`More than one eval board implements '${driver}': ${names}`, "ambiguous", driver);
 	}
 
 	return ok(matches[0]);
@@ -165,12 +165,12 @@ function find_pin(connectors: ConnectorInfo[], at: PinReference, owner: string):
 	const connector = connectors.find(candidate => candidate.id === at.connector);
 	if (connector === undefined) {
 		const known = connectors.flatMap(candidate => candidate.id === undefined ? [] : [candidate.id]).join(", ");
-		return error(`${owner} has no connector '${at.connector}'. Known: ${known || "none with an id"}`, at.connector);
+		return error(`${owner} has no connector '${at.connector}'. Known: ${known || "none with an id"}`, "not-found", at.connector);
 	}
 
 	const pin = connector.pins.find(candidate => candidate.pin === at.pin);
 	if (pin === undefined) {
-		return error(`${owner} connector ${at.connector} has no pin '${at.pin}'`, at.pin);
+		return error(`${owner} connector ${at.connector} has no pin '${at.pin}'`, "not-found", at.pin);
 	}
 
 	return ok({ connector, pin });

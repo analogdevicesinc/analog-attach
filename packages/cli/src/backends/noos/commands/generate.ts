@@ -7,7 +7,7 @@ import {
     resolve_board,
 } from "attach-no-os-lib";
 import { answer, refuse, type ExtraCommand, type FlagSpecs, type FlagValues, type Outcome, type Session } from "../../../interface/backend-interface";
-import { get_project_name, get_project_path, load_context } from "./shared";
+import { get_project_name, get_project_path, load_context, refuse_error } from "./shared";
 import { common_ok, type CommonResponse } from "../protocol/responses";
 
 const GENERATE_FLAGS = {
@@ -49,17 +49,17 @@ export const generate: ExtraCommand<typeof GENERATE_FLAGS, CommonResponse> = {
 function run_generate(flags: FlagValues<typeof GENERATE_FLAGS>, session: Session): Outcome<CommonResponse> {
     const context = load_context(session);
     if (!context.ok) {
-        return refuse(context.error.message);
+        return refuse_error(context.error);
     }
 
     const capi_path = get_setting_value("capi-path");
     if (!capi_path.ok) {
-        return refuse(`capi-path is not configured. Run: ${session.program} config capi-path <path>`);
+        return refuse(`capi-path is not configured. Run: ${session.program} config capi-path <path>`, { type: "missing-setting" });
     }
 
     const platform_vendor = context.value.workfile.platform_vendor;
     if (platform_vendor === undefined || platform_vendor === "") {
-        return refuse("Platform vendor not found in workfile");
+        return refuse("Platform vendor not found in workfile", { type: "workfile-invalid" });
     }
 
     // The generated project names one board, so it is settled here rather than left to
@@ -67,18 +67,18 @@ function run_generate(flags: FlagValues<typeof GENERATE_FLAGS>, session: Session
     // There is no per-run override: build and deploy act on the board generated for.
     const board = resolve_board(context.value.minimal.platform, context.value.minimal.board);
     if (!board.ok) {
-        return refuse(board.error.message);
+        return refuse_error(board.error);
     }
 
     const project_name = get_project_name(context.value);
     if (!project_name.ok) {
-        return refuse(project_name.error.message);
+        return refuse_error(project_name.error);
     }
 
     // The same directory build and deploy act on, unless this run names another.
     const configured_project = get_project_path(session);
     if (!configured_project.ok) {
-        return refuse(configured_project.error.message);
+        return refuse_error(configured_project.error);
     }
     const project_path = flags.output === undefined
         ? configured_project.value
@@ -97,7 +97,7 @@ function run_generate(flags: FlagValues<typeof GENERATE_FLAGS>, session: Session
     });
 
     if (!result.ok) {
-        return refuse(result.error.message);
+        return refuse_error(result.error);
     }
 
     // Which template set produced the project is worth reporting now that it

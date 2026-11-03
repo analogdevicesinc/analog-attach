@@ -41,7 +41,7 @@ function find_skill(front: FrontEnd, name: string | undefined): SkillSpec | Outc
     const names = backend.skills.map(skill => skill.name);
     if (names.length === 0) { return input_error(`The ${backend.id} backend has no skills`); }
     const skill = backend.skills.find(candidate => candidate.name === name);
-    return skill ?? refuse(`Unknown skill: ${name ?? ""}. Skills of the ${backend.id} backend: ${names.join(", ")}`);
+    return skill ?? refuse(`Unknown skill: ${name ?? ""}. Skills of the ${backend.id} backend: ${names.join(", ")}`, { type: "unknown-choice" });
 }
 
 export function install_skill(front: FrontEnd, name: string | undefined, force: boolean): Outcome<SkillResponse> {
@@ -49,12 +49,14 @@ export function install_skill(front: FrontEnd, name: string | undefined, force: 
     if ("kind" in skill) { return skill; }
     if (!front.claude_installed()) {
         return refuse("Claude Code is not installed. Install it from: https://claude.ai/code", {
+            type: "tool-missing",
             text: "Claude Code is not installed.\nInstall it from: https://claude.ai/code",
         });
     }
     const directory = skill_directory(front.home, skill.name);
     if (installed(directory) && !force) {
         return refuse(`Skill ${skill.name} is already installed. Use --force to overwrite.`, {
+            type: "needs-force",
             text: `Skill ${skill.name} is already installed.\nUse --force to overwrite.`,
         });
     }
@@ -72,7 +74,7 @@ export function uninstall_skill(front: FrontEnd, name: string | undefined): Outc
     const skill = find_skill(front, name);
     if ("kind" in skill) { return skill; }
     const directory = skill_directory(front.home, skill.name);
-    if (!installed(directory)) { return refuse(`Skill ${skill.name} is not installed.`); }
+    if (!installed(directory)) { return refuse(`Skill ${skill.name} is not installed.`, { type: "not-found" }); }
     fs.rmSync(directory, { recursive: true });
     return answer(
         { ok: true, message: `Removed skill ${skill.name} from ${directory}`, severity: "info", path: directory },
