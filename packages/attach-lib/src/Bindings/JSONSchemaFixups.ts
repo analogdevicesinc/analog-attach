@@ -9,6 +9,7 @@ import { fixup_mark_integers } from "./fixups/mark_integers.js";
 import { fixup_matrix_rows } from "./fixups/matrix_rows.js";
 import { fixup_names } from "./fixups/names.js";
 import { fixup_oneof_to_enum } from "./fixups/oneof_to_enum.js";
+import { fixup_one_form } from "./fixups/one_form.js";
 import { fixup_string_to_array } from "./fixups/string_to_array.js";
 import { fixup_unit_cells } from "./fixups/unit_cells.js";
 import { fixup_unit_suffix } from "./fixups/unit_suffix.js";
@@ -22,11 +23,12 @@ import { fixup_remove_invalid_keys } from "./fixups/remove_invalid_keys.js";
  * once, the way dt-schema's `fixups.py` does (see `FixupWalker.ts`); each names its counterpart there.
  * `fixup_names` comes after `fixup_items_size`: dt-core's `minItems: 1` is a schema of its own in dt-schema, and
  * doesn't keep `items: [a, b]` from fixing the count to two. `fixup_branch_counts` (ours) bounds a property by its
- * `oneOf` / `anyOf`, whose branches the walk has sized by then.
+ * `oneOf` / `anyOf`, whose branches the walk has sized by then. `fixup_one_form` (ours) first reads a property of
+ * several forms as the one to write, so the others see that.
  */
 const fixups = (types: PropertyTypes): Fixups => ({
     node: [fixup_remove_invalid_keys, fixup_interrupts],
-    property: [fixup_string_to_array, fixup_reg, fixup_unit_suffix, fixup_items_size, fixup_branch_counts, fixup_names, fixup_dt_type(types)],
+    property: [fixup_one_form, fixup_string_to_array, fixup_reg, fixup_unit_suffix, fixup_items_size, fixup_branch_counts, fixup_names, fixup_dt_type(types)],
 });
 
 /**
@@ -107,5 +109,19 @@ if (import.meta.vitest) {
         });
         expect(scales?.["type"]).toBe("array");
         expect(scales?.["items"]).toStrictEqual({ ...uint32, minimum: 1 });
+    });
+
+    test("a property of several forms is the one to write: fixed-link the node, bias-pull-up the flag", () => {
+        const uint32 = { type: "integer", typeSize: 32, minimum: 0, maximum: 0xFF_FF_FF_FF, dtType: "uint32" };
+        const { "fixed-link": link, "bias-pull-up": pull } = fixuped({
+            "fixed-link": { oneOf: [
+                { type: "array", dtType: "uint32-array", deprecated: true, items: [{ minimum: 0, maximum: 31 }, { enum: [0, 1] }] },
+                { type: "object", properties: { speed: { ...uint32, enum: [10, 100] } } },
+            ] },
+            "bias-pull-up": { oneOf: [{ type: "boolean" }, uint32], description: "pull up the pin" },
+        });
+        expect(link?.["type"]).toBe("object");
+        expect(link?.["oneOf"]).toBeUndefined();
+        expect(pull).toStrictEqual({ type: "boolean", description: "pull up the pin" });
     });
 }
