@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>attach-lib binding pipeline</title>
+<style>
+/* STYLE */
+</style>
+</head>
+<body>
+<header>
+  <h1>Binding pipeline</h1>
+  <select id="binding" aria-label="Binding"></select>
+  <nav id="tabs" role="tablist">
+    <button role="tab" data-tab="steps" aria-selected="true">Steps</button>
+    <button role="tab" data-tab="overview" aria-selected="false">Overview</button>
+  </nav>
+  <span class="keys">← → step · ↑ ↓ property · / filter · t only changing · s before | after · o overview</span>
+</header>
+<div id="error" hidden></div>
+<main id="steps-tab">
+  <section id="properties">
+    <input id="filter" type="search" placeholder="Filter properties" aria-label="Filter properties">
+    <ul id="property-list" role="listbox" aria-label="Properties"></ul>
+  </section>
+  <section id="timeline">
+    <label class="touching"><input id="touching" type="checkbox" checked> only steps that change it</label>
+    <ol id="step-list" aria-label="Steps"></ol>
+  </section>
+  <section id="detail">
+    <div id="step-title"></div>
+    <p id="step-summary"></p>
+    <div id="step-extra"></div>
+    <div class="pane-head" id="changes-head">
+      <h2>What it changed</h2>
+    </div>
+    <div id="changes"></div>
+    <div class="pane-head">
+      <h2 id="schema-head">Schema after it</h2>
+      <label id="side-toggle"><input id="side-by-side" type="checkbox"> before | after</label>
+    </div>
+    <div id="schema"></div>
+    <h2>What the CLI gets (<code>ParsedBinding</code>)</h2>
+    <div id="result"></div>
+  </section>
+</main>
+<main id="overview-tab" hidden>
+  <p class="lead">The steps <code>Attach.parse</code> runs, in order. Each says which properties of this binding it changed: click a name to follow that property, or a step to see it.</p>
+  <div id="flow"></div>
+</main>
+<script type="module">
+/* SCRIPT */
+</script>
+</body>
+</html>
