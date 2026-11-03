@@ -12,7 +12,7 @@ import type { PipelineTracer } from "./Trace.js";
 export const PIPELINE_STAGES = [
     {
         id: "references",
-        summary: "Replaces every `$ref` with what it names, and tags each `types.yaml` definition with its name (`dtType`). dt-schema keeps the `$ref`s.",
+        summary: "Replaces every `$ref` with what it names, and tags each `types.yaml` definition with its name (`dtType`); dt-schema keeps the `$ref`s. Each file's own counts are fixed as it is read (`fixups.py:_fixup_items_size`), before its `$ref`s bring others.",
     },
     {
         id: "properties",
