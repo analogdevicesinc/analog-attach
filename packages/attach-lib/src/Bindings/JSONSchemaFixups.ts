@@ -17,6 +17,8 @@ import { fixup_reg } from "./fixups/reg.js";
 import { apply_fixups, NodeFixup, PropertyFixup } from "./FixupWalker.js";
 import { NO_PROPERTY_TYPES, PropertyTypes } from "./PropertyTypes.js";
 import { fixup_remove_invalid_keys } from "./fixups/remove_invalid_keys.js";
+import type { PipelineTracer } from "./Trace.js";
+import { isDeepStrictEqual } from "node:util";
 
 /** What a step of the pipeline is, for showing it: an id, what it does, and what it ports from dt-schema (none if ours). */
 export type StepInfo = {
@@ -138,20 +140,43 @@ export const fixup_passes = (types: PropertyTypes): FixupPass[] => [
     },
 ];
 
-function run_pass(binding: DtBindingSchema, pass: FixupPass): DtBindingSchema {
-    if (pass.kind === "binding") { return pass.run(binding); }
-
-    return apply_fixups(binding, {
-        node: pass.node.map(named => named.fixup),
-        property: pass.property.map(named => named.fixup),
-    });
+/** Reports what a fixup changed, if anything. Each changes its schema in place, so `before` is a copy taken first. */
+function report(trace: PipelineTracer, pass: string, fixup: string, target: "property" | "node", pointer: string[], before: unknown, after: unknown, name?: string): void {
+    if (isDeepStrictEqual(before, after)) { return; }
+    trace({ kind: "fixup", pass, fixup, target, pointer, ...(name === undefined ? {} : { name }), before, after: structuredClone(after) });
 }
 
-/** Runs the fixup passes over a binding (`fixup_passes`). */
-export function apply_JSONSchema_fixups(binding: DtBindingSchema, types: PropertyTypes = NO_PROPERTY_TYPES): DtBindingSchema {
+function traced_property(trace: PipelineTracer, pass: string, { id, fixup }: Named<PropertyFixup>): PropertyFixup {
+    return (schema, context) => {
+        const before = structuredClone(schema);
+        const after = fixup(schema, context);
+        report(trace, pass, id, "property", context.pointer ?? context.path, before, after, context.name);
+        return after;
+    };
+}
+
+function traced_node(trace: PipelineTracer, pass: string, { id, fixup }: Named<NodeFixup>): NodeFixup {
+    return (schema, path, pointer) => {
+        const before = structuredClone(schema);
+        fixup(schema, path, pointer);
+        report(trace, pass, id, "node", pointer ?? path, before, schema);
+    };
+}
+
+function run_pass(binding: DtBindingSchema, pass: FixupPass, trace?: PipelineTracer): DtBindingSchema {
+    if (pass.kind === "binding") { return pass.run(binding); }
+
+    return apply_fixups(binding, trace === undefined
+        ? { node: pass.node.map(named => named.fixup), property: pass.property.map(named => named.fixup) }
+        : { node: pass.node.map(named => traced_node(trace, pass.id, named)), property: pass.property.map(named => traced_property(trace, pass.id, named)) });
+}
+
+/** Runs the fixup passes over a binding (`fixup_passes`), reporting each pass and what each fixup of a walk changed to `trace`. */
+export function apply_JSONSchema_fixups(binding: DtBindingSchema, types: PropertyTypes = NO_PROPERTY_TYPES, trace?: PipelineTracer): DtBindingSchema {
     let fixuped = binding;
     for (const pass of fixup_passes(types)) {
-        fixuped = run_pass(fixuped, pass);
+        fixuped = run_pass(fixuped, pass, trace);
+        trace?.({ kind: "pass", pass: pass.id, schema: structuredClone(fixuped) });
     }
     return fixuped;
 }
