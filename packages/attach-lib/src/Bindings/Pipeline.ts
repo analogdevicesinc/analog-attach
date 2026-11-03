@@ -6,6 +6,7 @@ import { resolve_properties } from "./PropertyResolver.js";
 import { merge_redefinitions } from "./RedefinitionMerger.js";
 import { resolve_references } from "./RefResolver.js";
 import { DtBindingSchema } from "./Schema.js";
+import type { PipelineTracer } from "./Trace.js";
 
 /** The stages `process_binding` runs, in order. */
 export const PIPELINE_STAGES = [
@@ -41,11 +42,12 @@ export type PipelineError = {
 /**
  * Runs a binding through every schema stage, up to the schema that gets
  * validated and translated: references → properties → redefinitions →
- * canaries → fixups.
+ * canaries → fixups. `trace` gets the schema after each (`TraceEvent`).
  */
 export async function process_binding(
     binding_path: string,
     ctx: SchemaContext,
+    trace?: PipelineTracer,
 ): Promise<Result<DtBindingSchema, PipelineError>> {
 
     const reference_resolved = await resolve_references(binding_path, ctx);
@@ -54,15 +56,30 @@ export async function process_binding(
         return Result.Err({ stage: "references", message: reference_resolved.error });
     }
 
+    trace?.({
+        kind: "stage", stage: "references", schema: structuredClone(reference_resolved.value.root_binding),
+        refs: reference_resolved.value.refs.map(reference => reference.$id),
+    });
+
     const property_resolved = await resolve_properties(reference_resolved.value, ctx);
 
     if (Result.is_err(property_resolved)) {
         return Result.Err({ stage: "properties", message: property_resolved.error });
     }
 
+    trace?.({ kind: "stage", stage: "properties", schema: structuredClone(property_resolved.value) });
+
     const redefinition_merged = await merge_redefinitions(property_resolved.value, reference_resolved.value.refs, ctx);
+
+    trace?.({ kind: "stage", stage: "redefinitions", schema: structuredClone(redefinition_merged) });
 
     const canary_binding = insert_canaries(redefinition_merged);
 
-    return Result.Ok(apply_JSONSchema_fixups(canary_binding, ctx.property_types));
+    trace?.({ kind: "stage", stage: "canaries", schema: structuredClone(canary_binding) });
+
+    const fixuped = apply_JSONSchema_fixups(canary_binding, ctx.property_types, trace);
+
+    trace?.({ kind: "stage", stage: "fixups", schema: structuredClone(fixuped) });
+
+    return Result.Ok(fixuped);
 }

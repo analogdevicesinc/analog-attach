@@ -5,12 +5,15 @@ import { create_context, SchemaPaths } from '../Bindings/Context.js';
 import { translate_JSONSchema } from '../Bindings/JSONSchemaTranslate.js';
 import { PIPELINE_STAGES, PipelineStage, process_binding } from '../Bindings/Pipeline.js';
 import type { StepInfo } from '../Bindings/JSONSchemaFixups.js';
+import type { PipelineTracer } from '../Bindings/Trace.js';
 import { Result } from '../result.js';
 import { filter_vendor_peripheral_properties, type ControllerContext } from '../Bindings/VendorPeripheralFilter.js';
 import { compile_targets, narrow, ValidationTarget } from './Validation.js';
 
 export type ParseOptions = {
     controller?: ControllerContext;
+    /** Gets the binding after each step of `PARSE_STEPS`, and what each fixup changed (`TraceEvent`). */
+    trace?: PipelineTracer;
 };
 
 export type BindingParseError = {
@@ -51,13 +54,17 @@ export class Attach {
         options?: ParseOptions,
     ): Promise<Result<Attach, BindingParseError>> {
 
-        const processed = await process_binding(binding_path, create_context(paths));
+        const trace = options?.trace;
+        const processed = await process_binding(binding_path, create_context(paths), trace);
 
         if (Result.is_err(processed)) {
             return processed;
         }
 
-        const parsed_binding = filter_vendor_peripheral_properties(translate_JSONSchema(processed.value), options?.controller);
+        const translated = translate_JSONSchema(processed.value);
+        trace?.({ kind: "translated", step: "translate", binding: structuredClone(translated) });
+        const parsed_binding = filter_vendor_peripheral_properties(translated, options?.controller);
+        trace?.({ kind: "translated", step: "vendor-filter", binding: structuredClone(parsed_binding) });
 
         try {
             const targets = compile_targets(processed.value);
