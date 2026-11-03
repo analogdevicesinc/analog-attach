@@ -3,7 +3,8 @@ import { ParsedBinding } from '../Bindings/ParsedBinding.js';
 
 import { create_context, SchemaPaths } from '../Bindings/Context.js';
 import { translate_JSONSchema } from '../Bindings/JSONSchemaTranslate.js';
-import { PipelineStage, process_binding } from '../Bindings/Pipeline.js';
+import { PIPELINE_STAGES, PipelineStage, process_binding } from '../Bindings/Pipeline.js';
+import type { StepInfo } from '../Bindings/JSONSchemaFixups.js';
 import { Result } from '../result.js';
 import { filter_vendor_peripheral_properties, type ControllerContext } from '../Bindings/VendorPeripheralFilter.js';
 import { compile_targets, narrow, ValidationTarget } from './Validation.js';
@@ -16,6 +17,19 @@ export type BindingParseError = {
     stage: PipelineStage | "validation";
     message: string;
 };
+
+/** What `Attach.parse` runs, in order: the pipeline's stages, then the translation to a `ParsedBinding`. */
+export const PARSE_STEPS: readonly StepInfo[] = [
+    ...PIPELINE_STAGES,
+    {
+        id: "translate",
+        summary: "Builds the `ParsedBinding`: each property's `AttachType`, the child-node patterns and the property patterns.",
+    },
+    {
+        id: "vendor-filter",
+        summary: "Drops the vendor-specific SPI peripheral properties (`pl022,`, `nvidia,`) of a controller that isn't the node's, when the controller is given.",
+    },
+];
 
 /** A binding processed down to a `ParsedBinding`, with the validators that narrow it as the node's data changes. */
 export class Attach {

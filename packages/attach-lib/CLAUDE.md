@@ -67,5 +67,5 @@ Suggestions for configuring a peripheral, organised as layers of context (bindin
 
 - No `any` without justification.
 - The `__canary__` property name (`CANARY`, exported by `CanaryInserter`) is a protocol between `CanaryInserter` and the AJV validation step (`Validation.ts`); do not reuse it for other purposes.
-- Fixups take a schema and return one; the walker clones the binding once. A new per-property fixup goes in `Bindings/fixups/` with a comment naming its dt-schema counterpart and is added to `FIXUPS` in `JSONSchemaFixups.ts`.
+- Fixups take a schema and return one; the walker clones the binding once. A new per-property fixup goes in `Bindings/fixups/` with a comment naming its dt-schema counterpart and is added to a walk of `fixup_passes` in `JSONSchemaFixups.ts`, with its `id`, a one-line `summary` and the `counterpart` (none if ours). The stages' own list is `PIPELINE_STAGES` (`Pipeline.ts`), and `PARSE_STEPS` (`Attach.ts`) adds translate and the vendor filter.
 - Commit messages: short imperative present tense, prefixed with `attach-lib:` (e.g. `attach-lib: handle negative scalars in property values`).

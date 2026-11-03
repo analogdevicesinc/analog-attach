@@ -1,13 +1,37 @@
 import { Result } from "../result.js";
 import { insert_canaries } from "./CanaryInserter.js";
 import { SchemaContext } from "./Context.js";
-import { apply_JSONSchema_fixups } from "./JSONSchemaFixups.js";
+import { apply_JSONSchema_fixups, StepInfo } from "./JSONSchemaFixups.js";
 import { resolve_properties } from "./PropertyResolver.js";
 import { merge_redefinitions } from "./RedefinitionMerger.js";
 import { resolve_references } from "./RefResolver.js";
 import { DtBindingSchema } from "./Schema.js";
 
-export type PipelineStage = "references" | "properties" | "redefinitions" | "canaries" | "fixups";
+/** The stages `process_binding` runs, in order. */
+export const PIPELINE_STAGES = [
+    {
+        id: "references",
+        summary: "Replaces every `$ref` with what it names, and tags each `types.yaml` definition with its name (`dtType`). dt-schema keeps the `$ref`s.",
+    },
+    {
+        id: "properties",
+        summary: "Fills each `property: true` placeholder with its definition from the files the binding references.",
+    },
+    {
+        id: "redefinitions",
+        summary: "Merges the `allOf` re-definitions of a property into its root definition.",
+    },
+    {
+        id: "canaries",
+        summary: "Puts the `__canary__` property in each `allOf` `then` / `else`, so that validation tells which branches apply.",
+    },
+    {
+        id: "fixups", counterpart: "fixups.py",
+        summary: "Patches the schema the way dt-schema's fixups do, and guesses the types dt-schema reads from the `$ref`s (`fixup_passes`).",
+    },
+] as const satisfies readonly StepInfo[];
+
+export type PipelineStage = typeof PIPELINE_STAGES[number]["id"];
 
 export type PipelineError = {
     stage: PipelineStage;

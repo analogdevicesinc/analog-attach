@@ -14,49 +14,146 @@ import { fixup_string_to_array } from "./fixups/string_to_array.js";
 import { fixup_unit_cells } from "./fixups/unit_cells.js";
 import { fixup_unit_suffix } from "./fixups/unit_suffix.js";
 import { fixup_reg } from "./fixups/reg.js";
-import { apply_fixups, Fixups } from "./FixupWalker.js";
+import { apply_fixups, NodeFixup, PropertyFixup } from "./FixupWalker.js";
 import { NO_PROPERTY_TYPES, PropertyTypes } from "./PropertyTypes.js";
 import { fixup_remove_invalid_keys } from "./fixups/remove_invalid_keys.js";
 
-/**
- * The fixups that work on one node's or one property's schema, in the order they run. They walk the schema
- * once, the way dt-schema's `fixups.py` does (see `FixupWalker.ts`); each names its counterpart there.
- * `fixup_names` comes after `fixup_items_size`: dt-core's `minItems: 1` is a schema of its own in dt-schema, and
- * doesn't keep `items: [a, b]` from fixing the count to two. `fixup_branch_counts` (ours) bounds a property by its
- * `oneOf` / `anyOf`, whose branches the walk has sized by then. `fixup_one_form` (ours) first reads a property of
- * several forms as the one to write, so the others see that.
- */
-const fixups = (types: PropertyTypes): Fixups => ({
-    node: [fixup_remove_invalid_keys, fixup_interrupts],
-    property: [fixup_one_form, fixup_string_to_array, fixup_reg, fixup_unit_suffix, fixup_items_size, fixup_branch_counts, fixup_names, fixup_dt_type(types)],
-});
+/** What a step of the pipeline is, for showing it: an id, what it does, and what it ports from dt-schema (none if ours). */
+export type StepInfo = {
+    id: string;
+    summary: string;
+    counterpart?: string;
+};
+
+export type Named<F> = StepInfo & { fixup: F };
 
 /**
- * Our fixups run before and after the walk. dt-schema has nothing like them because it keeps the
- * `$ref`s to `types.yaml` and gets what a property is (an integer, a matrix, a phandle array) from
- * there (`validator.py:_extract_prop_type`); we dereference, and have to guess it from the shape:
- *
- * - `collapse_allOf` flattens the `allOf` the dereferencing leaves in a property into one schema.
- * - `fixup_ifs` makes an `allOf` branch's `if` require the properties it tests (and be an object), so
- *   that a condition whose properties are absent doesn't match.
- * - `fixup_mark_integers` types a schema with `minimum` / `maximum` as an integer.
- * - `fixup_matrix_rows` gives a matrix property (`reg`, `interrupts`, `clocks`) that doesn't describe its rows some.
- * - `fixup_unit_cells` gives the numbers of a unit property (`-ns`, `-hz`) the bounds of their type.
+ * A pass over the whole binding: either a function of it, or a walk applying node and property fixups to each node
+ * schema and property (`FixupWalker.ts`), in the order given.
  */
+export type FixupPass = StepInfo & (
+    | { kind: "binding"; run: (binding: DtBindingSchema) => DtBindingSchema }
+    | { kind: "walk"; node: Named<NodeFixup>[]; property: Named<PropertyFixup>[] }
+);
+
+/**
+ * The fixup passes, in the order they run. The walks are dt-schema's `fixups.py`; the passes around them are ours.
+ * dt-schema has nothing like those because it keeps the `$ref`s to `types.yaml` and gets what a property is (an
+ * integer, a matrix, a phandle array) from there (`validator.py:_extract_prop_type`); we dereference, and have to
+ * guess it from the shape.
+ */
+export const fixup_passes = (types: PropertyTypes): FixupPass[] => [
+    {
+        id: "collapse_allOf", kind: "binding", run: fixup_collapse_allOf,
+        summary: "Flattens the `allOf` the dereferencing leaves in a property into one schema.",
+    },
+    {
+        // A pass of its own: the walk fixes the branches of a `oneOf` before the property, and `string_to_array` would
+        // turn each `const` into a list by then. dt-schema runs `_fixup_oneOf_to_enum` first on the property.
+        id: "oneof_to_enum", kind: "walk", node: [],
+        summary: "A walk of its own, before the others turn each `const` of a `oneOf` into a list.",
+        property: [{
+            id: "oneof_to_enum", fixup: fixup_oneof_to_enum, counterpart: "fixups.py:_fixup_oneOf_to_enum",
+            summary: "A `oneOf` / `anyOf` of nothing but `const`s is an `enum`.",
+        }],
+    },
+    {
+        id: "walk", kind: "walk",
+        summary: "The fixups of each node schema and property, as dt-schema's `fixups.py:fixup_sub_schema` walks them.",
+        node: [
+            {
+                id: "remove_invalid_keys", fixup: fixup_remove_invalid_keys, counterpart: "fixups.py:fixup_schema",
+                summary: "Drops what validation doesn't need (`maintainers`, `$schema`, `select`) from every node schema.",
+            },
+            {
+                id: "interrupts", fixup: fixup_interrupts, counterpart: "fixups.py:fixup_interrupts",
+                summary: "A node with `interrupts` can have an `interrupt-parent`, one phandle.",
+            },
+        ],
+        // `one_form` first, so the others see the form; `branch_counts` after `items_size`, which has sized the
+        // branches by then; `names` after `items_size`: dt-core's `minItems: 1` is a schema of its own in dt-schema,
+        // and doesn't keep `items: [a, b]` from fixing the count to two.
+        property: [
+            {
+                id: "one_form", fixup: fixup_one_form,
+                summary: "A property a `oneOf` / `anyOf` gives several forms of is the one to write: the one not deprecated, the flag rather than the number.",
+            },
+            {
+                id: "string_to_array", fixup: fixup_string_to_array, counterpart: "fixups.py:_fixup_string_to_array",
+                summary: "A string property is a list of strings: `{enum: [a, b]}` constrains its first item.",
+            },
+            {
+                id: "reg", fixup: fixup_reg, counterpart: "fixups.py:_fixup_reg_schema",
+                summary: "A `reg` whose values are bounded as numbers is a one-cell entry with those bounds.",
+            },
+            {
+                id: "unit_suffix", fixup: fixup_unit_suffix, counterpart: "fixups.py:_fixup_unit_suffix_props",
+                summary: "A property with a unit suffix (`-ns`, `-hz`) is a list or a matrix of numbers; its constraints move to where that type has them.",
+            },
+            {
+                id: "items_size", fixup: fixup_items_size, counterpart: "fixups.py:_fixup_items_size",
+                summary: "An array gets its type, and a fixed count when its `items` is a list or only one of `minItems` / `maxItems` is given.",
+            },
+            {
+                id: "branch_counts", fixup: fixup_branch_counts,
+                summary: "A property is bounded by what all the branches of its `oneOf` / `anyOf` keep to.",
+            },
+            {
+                id: "names", fixup: fixup_names, counterpart: "schemas/dt-core.yaml",
+                summary: "A `-names` property is a list of strings, at least one.",
+            },
+            {
+                id: "dt_type", fixup: fixup_dt_type(types), counterpart: "validator.py:property_get_type",
+                summary: "A property that doesn't say its type gets the one dt-schema gives its name (`reg` an address, `-gpios` a phandle-array).",
+            },
+        ],
+    },
+    {
+        id: "ifs", kind: "binding", run: fixup_ifs,
+        summary: "An `allOf` branch's `if` requires the properties it tests, so that a condition whose properties are absent doesn't match.",
+    },
+    {
+        id: "mark_integers", kind: "binding", run: fixup_mark_integers, counterpart: "lib.py:_is_int_schema",
+        summary: "A schema with `minimum` / `maximum` is an integer.",
+    },
+    {
+        // After the integers: the cells it adds are numbers only when they are, a label or a macro is not an integer
+        id: "cells", kind: "walk", node: [],
+        summary: "After `mark_integers`: the cells these add can be labels or macros, not integers.",
+        property: [
+            {
+                id: "matrix_rows", fixup: fixup_matrix_rows,
+                summary: "A matrix property (`reg`, `interrupts`, `clocks`) that doesn't describe its rows gets them, each an array.",
+            },
+            {
+                id: "unit_cells", fixup: fixup_unit_cells,
+                summary: "The numbers of a unit property get the bounds of the type its suffix gives.",
+            },
+        ],
+    },
+    {
+        id: "object", kind: "binding", counterpart: "validator.py:process_schema",
+        run: binding => ({ ...binding, type: "object" }) as DtBindingSchema,
+        summary: "The binding is an object schema.",
+    },
+];
+
+function run_pass(binding: DtBindingSchema, pass: FixupPass): DtBindingSchema {
+    if (pass.kind === "binding") { return pass.run(binding); }
+
+    return apply_fixups(binding, {
+        node: pass.node.map(named => named.fixup),
+        property: pass.property.map(named => named.fixup),
+    });
+}
+
+/** Runs the fixup passes over a binding (`fixup_passes`). */
 export function apply_JSONSchema_fixups(binding: DtBindingSchema, types: PropertyTypes = NO_PROPERTY_TYPES): DtBindingSchema {
-
-    const collapsed = fixup_collapse_allOf(binding);
-    // A pass of its own: the walk fixes the branches of a `oneOf` before the property, and `string_to_array` would
-    // turn each `const` into a list by then. dt-schema runs `_fixup_oneOf_to_enum` first on the property.
-    const enumerated = apply_fixups(collapsed, { node: [], property: [fixup_oneof_to_enum] });
-    const fixuped_properties = apply_fixups(enumerated, fixups(types));
-    const fixuped_ifs = fixup_ifs(fixuped_properties);
-    const fixuped_marked_integers = fixup_mark_integers(fixuped_ifs);
-    // After the integers: the cells it adds are numbers only when they are, a label or a macro is not an integer
-    const fixuped_matrix_rows = apply_fixups(fixuped_marked_integers, { node: [], property: [fixup_matrix_rows, fixup_unit_cells] });
-
-    // dt-schema: `validator.py:process_schema`
-    return { ...fixuped_matrix_rows, type: "object" } as DtBindingSchema;
+    let fixuped = binding;
+    for (const pass of fixup_passes(types)) {
+        fixuped = run_pass(fixuped, pass);
+    }
+    return fixuped;
 }
 
 if (import.meta.vitest) {
