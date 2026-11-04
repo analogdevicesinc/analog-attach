@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Run the functional tests and write the requirements report (README.md).
+# Run the functional tests and write the test specification and the test report (README.md).
+# report.py --spec-only writes the specification alone, without running anything.
 #
 #   run.sh                              every test
 #   run.sh noos/config.bats             one file (or folder), relative to this folder
@@ -61,6 +62,10 @@ done
 rm -rf "$out"
 mkdir -p "$out"
 cd "$here" || exit 2
+# For the report's Run sheet: when the run started, how it was asked for, and with what.
+started=$(date -u +%Y-%m-%dT%H:%M:%S+00:00)
+report_options+=(--started "$started" --command "run.sh $*"
+	--cli-version "$(node "$cli/dist/cli.js" --version 2>/dev/null)" --node-version "$(node --version)")
 # How many tests this run is to run, filters applied: the report fails a run that ran fewer.
 expected=$(bash "$bats" --count --recursive "${options[@]}" "${targets[@]}" 2>/dev/null) &&
 	report_options+=(--expected "$expected")
