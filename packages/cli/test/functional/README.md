@@ -103,7 +103,7 @@ e426d3e043b0)`. Two copies of one number with different content have different f
   ID**, so its history and its requirements stay.
 
 ```yaml
-- id: N0279                     # next-id.sh noos: one ID sequence with the automated tests
+- id: N0123                     # next-id.sh noos: one ID sequence with the automated tests
   kind: manual                  # manual or planned
   ecosystem: noos
   requirements: [DEPLOY-02]     # may be []
@@ -121,7 +121,7 @@ Whoever runs a manual test records how it went in `manual-results.csv`, one row 
 
 ```csv
 ID,Date,Tester,Result,Commit,Notes
-N0279,2026-11-03,afpop,pass,5c7d8f1,blinks at 2 Hz
+N0123,2026-11-03,afpop,pass,5c7d8f1,blinks at 2 Hz
 ```
 
 Result is `pass`, `fail` or `blocked`. The latest date counts, and a later row on the same day.
@@ -262,6 +262,32 @@ CLI does instead, so the report shows where the code falls short:
 
 `run.sh --filter-tags '!gap'` runs everything else; `--filter-tags gap` only the gaps. Once
 the CLI is fixed, drop the tag.
+
+### End-to-end tests
+
+`e2e/` holds the end-to-end tests: one user's story through many commands, on the real trees,
+checked against a workfile fixture. They have the `e2e` tag (in the spec, kind `e2e`), an ID
+like any test, a description and steps, and no requirement for now. `run.sh` runs only
+`noos/` and `linux/` by default, so they don't run in CI: run them by name.
+
+```sh
+AA_CAPI_PATH=~/aurel/capi \
+AA_MODULE_PATHS=~/aurel/capi-maxim:~/aurel/capi-noos:~/aurel/capi-util \
+test/functional/run.sh e2e
+```
+
+They skip without the trees and the toolchain (`real_project`). The first one,
+`e2e/noos-adxl355-max32655fthr.bats` (N0279), takes an ADXL355 eval board on a MAX32655FTHR from
+an empty project to a built image:
+- list devices, add, validate, read, list value, update, rename;
+- the workfile compared with `e2e/fixtures/adxl355-max32655fthr.workfile.json`;
+- generate and build, and deploy through a stand-in `deploy-command`, or on the board with
+  `AA_DEPLOY=1`;
+- then the fixture imported in a new project, generated and built again.
+
+When the definitions change on purpose (a new default, a renamed node), `AA_E2E_UPDATE=1`
+rewrites the fixture from the run. Review its diff before committing it: it is what the test
+checks against.
 
 ### Tests that need the real trees or a board
 
