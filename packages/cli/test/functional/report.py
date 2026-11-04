@@ -36,16 +36,19 @@ The report says when and how it was run (CI or local, by whom, on which commit) 
 version it ran.
 
 It writes, in the output directory:
-  - test-spec.xlsx    the specification: About (the version), Tests (ID, kind, ecosystem,
+  - test-spec.xlsx    the specification: About (the version), Chapters (each chapter's tests
+                      by kind), Tests (ID, chapter, kind, ecosystem,
                       requirements, description, preconditions, steps), Coverage (each
                       requirement's automated, manual and planned tests); and test-spec.csv;
-  - test-report.xlsx  the report: Run (when, how, what), Requirements (each one's status per
+  - test-report.xlsx  the report: Run (when, how, what), Chapters (each chapter's tests by
+                      status), Requirements (each one's status per
                       ecosystem, its tests and those failing), Tests (each test's status);
                       and tests.csv, requirements.csv;
   - summary.md        the run, the counts, and the requirements that fail, are known gaps or
                       aren't tested, in Markdown (a CI run's summary).
 The workbooks need openpyxl, and manual-tests.yaml PyYAML; without openpyxl only the CSVs are
-written. With --spec-only it writes the specification alone, and needs no test run.
+written. With --spec-only it writes the specification alone, and needs no test run. Both list the
+tests by chapter (CHAPTER_ORDER), then by ID.
 
 It exits 1 when a test names a requirement that doesn't exist, so a renamed requirement can't
 leave a stale test behind; when a test has no ID, a malformed one, one of the other ecosystem's
@@ -87,11 +90,20 @@ CONFORMITY_TAG, BOTH = "conformity", "all"
 MANUAL_RESULTS = ("pass", "fail", "blocked")
 # A requirement's status from its tests', the first of these they have.
 PRECEDENCE = ("fail", "gap", "pass", "skipped", "blocked", "manual", "planned")
+# The chapters the tests are sorted into, in the order of a project's life: a test's chapter is
+# its file's name (noos/add.bats and linux/add.bats share add), a conformity test's that name
+# with -conformity, an end-to-end test's "end to end", a manual or planned test's its `chapter`
+# field or "manual"; a `chapter:<name>` tag in a file overrides it. Unlisted chapters come last.
+LIFECYCLE = ["setup", "config", "settings", "init", "import", "list", "add", "read", "update", "delete", "rename", "move",
+             "enable-disable", "validate", "generate", "build", "deploy", "completion", "skill", "general"]
+CHAPTER_ORDER = LIFECYCLE + [f"{name}-conformity" for name in LIFECYCLE] + ["end to end", "manual"]
+# File names that aren't their chapter's name.
+CHAPTER_NAMES = {"gen": "general", "enable": "enable-disable"}
 # The spec's own files, next to report.py.
 MANUAL_TESTS, MANUAL_RESULTS_FILE, SPEC_VERSION = "manual-tests.yaml", "manual-results.csv", "spec-version"
 # The workbook columns whose text wraps, and their widths (in characters).
 WIDE = {"Description": 50, "Preconditions": 40, "Steps": 70, "Test IDs": 30, "Failing/gap IDs": 20,
-        "Automated": 30, "End to end": 20, "Conformity": 20, "Manual": 20, "Planned": 20, "Message": 50, "Value": 70}
+        "Chapter": 18, "Automated": 30, "End to end": 20, "Conformity": 20, "Manual": 20, "Planned": 20, "Message": 50, "Value": 70}
 FIXED_NOTE = "fixed: drop the gap tag"
 
 TAGS_LINE = re.compile(r"^\s*#\s*bats\s+(test_tags|file_tags)\s*=\s*(.*)$")
@@ -108,6 +120,23 @@ FIELD_LINE = re.compile(r"^(Description|Steps|Preconditions):\s*(.*)$")
 NOTE_LINE = re.compile(r"^[A-Z][\w-]*:(\s|$)")
 STEP_LINE = re.compile(r"^\s*([0-9]+)\.\s+(.*)$")
 DATE_LINE = re.compile(r"^[0-9]{4}-[0-9]{2}-[0-9]{2}$")
+
+
+def chapter_of(relative, tags):
+    """A .bats file's chapter (CHAPTER_ORDER): its `chapter:` tag, or its name, by its folder."""
+    tagged = next((tag[8:] for tag in tags if tag.startswith("chapter:")), None)
+    if tagged:
+        return tagged
+    path = pathlib.PurePosixPath(relative)
+    name = CHAPTER_NAMES.get(path.stem, path.stem)
+    if path.parts[0] == "conformity":
+        return f"{name}-conformity"
+    return "end to end" if path.parts[0] == "e2e" else name
+
+
+def chapter_rank(chapter):
+    """Where a chapter sorts: its place in CHAPTER_ORDER, unlisted ones after, by name."""
+    return (CHAPTER_ORDER.index(chapter), "") if chapter in CHAPTER_ORDER else (len(CHAPTER_ORDER), chapter)
 
 
 def split_tags(text):
@@ -170,9 +199,10 @@ def read_tests(root):
                 if test.group(1) == '"':
                     name = re.sub(r'\\([$`"\\])', r"\1", name)
                 tests[(relative, name)] = new_test(
-                    next((tag for tag in (E2E_TAG, CONFORMITY_TAG) if tag in all_tags), "automated"), relative, name, eco, " ".join(tag[3:] for tag in all_tags if tag.startswith("id:")),
+                    next((tag for tag in (E2E_TAG, CONFORMITY_TAG) if tag in all_tags), "automated"), relative, name, eco,
+                    " ".join(tag[3:] for tag in all_tags if tag.startswith("id:")),
                     [tag[4:] for tag in all_tags if tag.startswith("req:")], fields["Description"], fields["Steps"],
-                    gap=GAP_TAG in all_tags)
+                    gap=GAP_TAG in all_tags, chapter=chapter_of(relative, file_tags))
                 fields = {"Description": "", "Steps": []}
         # The file's preconditions apply to all its tests, wherever they were written.
         for (test_file_name, _), test in tests.items():
@@ -181,18 +211,19 @@ def read_tests(root):
     return tests
 
 
-def new_test(kind, file, name, eco, test_id, reqs, description, steps, preconditions="", gap=False):
-    """A test of the specification, whatever its source: kind (automated, e2e, manual, planned), the
-    file it is in, its name, ecosystem, ID, requirements, description, steps, preconditions, and
-    whether it is a known gap."""
+def new_test(kind, file, name, eco, test_id, reqs, description, steps, preconditions="", gap=False, chapter="manual"):
+    """A test of the specification, whatever its source: kind (automated, e2e, conformity, manual,
+    planned), the file it is in, its name, ecosystem, ID, requirements, description, steps,
+    preconditions, whether it is a known gap, and its chapter."""
     return {"kind": kind, "file": file, "name": name, "eco": eco, "id": test_id, "reqs": reqs, "description": description,
-            "steps": steps, "preconditions": preconditions, "gap": gap}
+            "steps": steps, "preconditions": preconditions, "gap": gap, "chapter": chapter}
 
 
 def read_manual_tests(path):
     """The manual and planned tests of manual-tests.yaml, keyed like read_tests' by (file,
     name), and what is wrong with its entries. Each entry: id, kind (manual or planned),
-    ecosystem, requirements, title, description, preconditions, steps (a list)."""
+    ecosystem, requirements, title, description, preconditions, steps (a list), and optionally its
+    chapter (CHAPTER_ORDER; "manual" when left out)."""
     if not path.exists():
         return {}, []
     try:
@@ -211,7 +242,7 @@ def read_manual_tests(path):
         if not isinstance(entry, dict):
             errors.append(f"{where}: not a mapping")
             continue
-        unknown = sorted(set(entry) - {"id", "kind", "ecosystem", "requirements", "title", "description", "preconditions", "steps"})
+        unknown = sorted(set(entry) - {"id", "kind", "ecosystem", "requirements", "title", "description", "preconditions", "steps", "chapter"})
         problems = [f"unknown field {key}" for key in unknown]
         if entry.get("kind") not in ("manual", "planned"):
             problems.append("kind is manual or planned")
@@ -225,6 +256,8 @@ def read_manual_tests(path):
             problems.append("steps is a list of texts")
         if not isinstance(reqs, list) or not all(isinstance(req, str) for req in reqs):
             problems.append("requirements is a list of requirement IDs")
+        if not isinstance(entry.get("chapter", "manual"), str) or not entry.get("chapter", "manual").strip():
+            problems.append("chapter is a text")
         if problems:
             errors.append(f"{where}: {'; '.join(problems)}")
             continue
@@ -232,7 +265,7 @@ def read_manual_tests(path):
         tests[(path.name, name)] = new_test(
             entry["kind"], path.name, name, entry["ecosystem"], str(entry.get("id") or ""), reqs,
             " ".join(entry["description"].split()), [f"{number}. {' '.join(step.split())}" for number, step in enumerate(steps, start=1)],
-            " ".join(entry["preconditions"].split()))
+            " ".join(entry["preconditions"].split()), chapter=entry.get("chapter", "manual").strip())
     return tests, errors
 
 
@@ -380,7 +413,7 @@ def plural(count, word):
     return f"{count} {word}" + ("" if count == 1 else "s")
 
 
-def write_summary(path, run, counts, requirement_rows, ids_by_status, notes):
+def write_summary(path, run, counts, chapter_rows, requirement_rows, ids_by_status, notes):
     """summary.md: the run, the counts, per ecosystem too, then the requirements a reader should
     look at: those failing, with the IDs of their failing tests, those with a known gap, with
     the IDs of those, and those no ecosystem they apply to tests yet. ids_by_status:
@@ -396,7 +429,8 @@ def write_summary(path, run, counts, requirement_rows, ids_by_status, notes):
         tested = sum(1 for status in column if status not in ("not tested", "manual", "planned"))
         lines.append(f"| {eco} | {len(column)} | {tested} | {column.count('pass')} | {column.count('fail')} | {column.count('gap')} | "
                      f"{column.count('skipped') + column.count('blocked')} | {column.count('manual')} | {column.count('planned')} |")
-    lines.append("")
+    lines += ["", "| Chapter | Tests | Pass | Fail | Known gaps | Skipped | Not run | Manual | Planned |",
+              "|---|---|---|---|---|---|---|---|---|", *("| " + " | ".join(str(cell) for cell in row) + " |" for row in chapter_rows), ""]
     # Each section's requirements, and the status of their tests it lists the IDs of.
     sections = (
         ("Failing", lambda statuses: "fail" in statuses, "fail", "Failing tests"),
@@ -497,11 +531,17 @@ def main():
             undescribed.append(f"{', no '.join(missing)}: {test['id'] or '-'} {file}: {name}")
         unknown += [f"{file}: {name}: {req}" for req in test["reqs"] if req not in known]
 
-    # The specification: every test, by ID, and each requirement's tests by kind.
-    ordered = sorted(tests.values(), key=lambda test: (test["id"] or "~", test["file"], test["name"]))
-    spec_header = ["ID", "Kind", "Ecosystem", "Requirements", "Test", "File", "Description", "Preconditions", "Steps"]
-    spec_rows = [[test["id"], test["kind"], test["eco"], " ".join(test["reqs"]), test["name"], test["file"], test["description"],
-                  test["preconditions"], "\n".join(test["steps"])] for test in ordered]
+    # The specification: every test, by chapter then ID, each chapter's tests by kind, and each
+    # requirement's tests by kind.
+    ordered = sorted(tests.values(), key=lambda test: (chapter_rank(test["chapter"]), test["id"] or "~", test["file"], test["name"]))
+    chapters = list(dict.fromkeys(test["chapter"] for test in ordered))
+    spec_header = ["ID", "Chapter", "Kind", "Ecosystem", "Requirements", "Test", "File", "Description", "Preconditions", "Steps"]
+    spec_rows = [[test["id"], test["chapter"], test["kind"], test["eco"], " ".join(test["reqs"]), test["name"], test["file"],
+                  test["description"], test["preconditions"], "\n".join(test["steps"])] for test in ordered]
+    spec_chapter_header = ["Chapter", "Tests", "Automated", "End to end", "Conformity", "Manual", "Planned"]
+    spec_chapter_rows = [[chapter, sum(1 for test in ordered if test["chapter"] == chapter),
+                          *(sum(1 for test in ordered if test["chapter"] == chapter and test["kind"] == kind) for kind in KINDS)]
+                         for chapter in chapters]
     version = spec_version(args.tests, spec_rows)
     by_kind = {}  # requirement -> {kind: [test ID]}
     for test in ordered:
@@ -518,8 +558,8 @@ def main():
              ("Generated", datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds"))]
     args.out.mkdir(parents=True, exist_ok=True)
     write_csv(args.out / "test-spec.csv", spec_header, spec_rows)
-    spec_xlsx = write_xlsx(args.out / "test-spec.xlsx", [("About", ["Field", "Value"], about), ("Tests", spec_header, spec_rows),
-                                                         ("Coverage", coverage_header, coverage_rows)])
+    spec_xlsx = write_xlsx(args.out / "test-spec.xlsx", [("About", ["Field", "Value"], about), ("Chapters", spec_chapter_header, spec_chapter_rows),
+                                                         ("Tests", spec_header, spec_rows), ("Coverage", coverage_header, coverage_rows)])
     errors = [f"unknown requirement: {line}" for line in unknown] + bad_ids + source_errors
 
     if args.spec_only:
@@ -552,8 +592,8 @@ def main():
                     note = f"{note} (on {result['Commit']})".strip()
         else:
             status = "planned"
-        test_rows.append([test["id"], test["kind"], test["file"], test["name"], test["eco"], " ".join(test["reqs"]), status,
-                          "yes" if test["gap"] else "", seconds, date, tester, note])
+        test_rows.append([test["id"], test["chapter"], test["kind"], test["file"], test["name"], test["eco"], " ".join(test["reqs"]),
+                          status, "yes" if test["gap"] else "", seconds, date, tester, note])
         for req in test["reqs"]:
             ids_by_status.setdefault(req, {}).setdefault("all", []).append(test["id"])
             ids_by_status[req].setdefault(status, []).append(test["id"])
@@ -576,15 +616,25 @@ def main():
     started = args.started or datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds")
     finished = datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds")
     run = run_info(args.tests, args, started, finished) + [("Spec version", version["text"])]
-    test_header = ["ID", "Kind", "File", "Test", "Ecosystem", "Requirements", "Status", "Known gap", "Seconds", "Date", "Tester", "Message"]
+    test_header = ["ID", "Chapter", "Kind", "File", "Test", "Ecosystem", "Requirements", "Status", "Known gap", "Seconds", "Date",
+                   "Tester", "Message"]
+    # Each chapter's tests by status: pass, fail, gap, skipped (blocked too), not run, manual, planned.
+    chapter_header = ["Chapter", "Tests", "Pass", "Fail", "Known gaps", "Skipped", "Not run", "Manual", "Planned"]
+    chapter_rows = []
+    for chapter in chapters:
+        of_chapter = [row[7] for row in test_rows if row[1] == chapter]
+        chapter_rows.append([chapter, len(of_chapter), of_chapter.count("pass"), of_chapter.count("fail"), of_chapter.count("gap"),
+                             of_chapter.count("skipped") + of_chapter.count("blocked"), of_chapter.count("not run"),
+                             of_chapter.count("manual"), of_chapter.count("planned")])
     requirement_header = ["ID", "Command", "Name", "Ecosystems", "Basis", *ECOSYSTEMS, "Tests", "Test IDs", "Failing/gap IDs"]
     write_csv(args.out / "tests.csv", test_header, test_rows)
     write_csv(args.out / "requirements.csv", requirement_header, requirement_rows)
     report_xlsx = write_xlsx(args.out / "test-report.xlsx", [("Run", ["Field", "Value"], run),
+                                                             ("Chapters", chapter_header, chapter_rows),
                                                              ("Requirements", requirement_header, requirement_rows),
                                                              ("Tests", test_header, test_rows)])
 
-    statuses = [(row[1], row[6]) for row in test_rows]
+    statuses = [(row[2], row[7]) for row in test_rows]
     automated = [status for kind, status in statuses if kind in ("automated", E2E_TAG, CONFORMITY_TAG)]
     counts = {status: automated.count(status) for status in ("pass", "fail", "gap", "skipped", "not run")}
     counts.update({"manual pass": statuses.count(("manual", "pass")), "manual fail": statuses.count(("manual", "fail")),
@@ -595,7 +645,7 @@ def main():
     if args.expected is not None and len(results) < args.expected:
         errors.insert(0, f"bats ran {len(results)} of the {args.expected} tests it was to run: the run stopped early")
     notes = [f"error: {line}" for line in errors] + [f"{FIXED_NOTE}: {line}" for line in fixed]
-    write_summary(args.out / "summary.md", run, counts, requirement_rows, ids_by_status, notes)
+    write_summary(args.out / "summary.md", run, counts, chapter_rows, requirement_rows, ids_by_status, notes)
 
     print(f"tests: {counts['pass']} passed, {counts['fail']} failed, {plural(counts['gap'], 'known gap')}, {counts['skipped']} skipped"
           + (f", {counts['not run']} not run" if counts["not run"] else "")
