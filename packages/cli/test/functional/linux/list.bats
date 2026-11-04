@@ -153,6 +153,10 @@ with_adc() {
 	assert_json "[.. | strings | select(endswith(\"broadcom/bcm2711-rpi-4-b.dts\"))] | length > 0" true
 }
 
+# To be discussed: how we handle validating the parser for testing purposes. As written, the
+# config step can't fail (a refused value exits 0, so assert_success holds either way), and only
+# the first .dts is tried while the name says every one; the pinned tree has 2344, too many to
+# set one by one, and a sample proves little.
 # Gap: as above, list context is not supported.
 # Description: a target that list context names is accepted by the devicetree setting.
 # Steps:
@@ -332,24 +336,67 @@ with_adc() {
 	assert_json '[.suggestions[].value] | join(" ")' "0 1 2 4 8"
 }
 
+# Gap: the suggestions keep the enum's order (vref vref2 refout-avss avdd) and none is marked
+# as the default, though the processed schema has default refout-avss (the integer enums of
+# L0352 and ad4130's reference-select do get theirs first).
 # Description: list value puts the default of an enum first and marks it as the binding's
-# default.
+# default, when the default is not the enum's first option.
 # Steps:
-#   1. Make an overlay with an AD7124-8 on spi1 and add its child channel@0.
-#   2. Add adi,ad4130 on spi0 and its child channel@0.
-#   3. Run list value ad4130/channel@0 adi,reference-select, with --json.
-#   4. Check it succeeds with the suggestions 0 1 2 3, the first marked as the binding's
-#      default.
-# bats test_tags=req:LIST-08, id:L0205
+#   1. Make an overlay, add adi,ad7173-8 on spi0 and its child channel@0.
+#   2. Run list value ad7173_8/channel@0 adi,reference-select, with --json.
+#   3. Check it succeeds and offers vref, vref2, refout-avss and avdd.
+#   4. Check the first is refout-avss, marked as the binding's default.
+# bats test_tags=req:LIST-08, gap, id:L0205
 @test "list value gives the default of an enum first" {
-	with_adc
-	aa update ad7124_8 channel@0 >/dev/null 2>&1
-	aa add adi,ad4130 --parent spi0 >/dev/null 2>&1
-	aa update ad4130 channel@0 >/dev/null 2>&1
-	run_json list value ad4130/channel@0 adi,reference-select
+	with_overlay
+	aa add adi,ad7173-8 --parent spi0 >/dev/null 2>&1 || fail "add adi,ad7173-8 failed"
+	aa update ad7173_8 channel@0 >/dev/null 2>&1 || fail "update channel@0 failed"
+	run_json list value ad7173_8/channel@0 adi,reference-select
 	assert_success
-	assert_json '[.suggestions[].value] | join(" ")' "0 1 2 3"
-	assert_json '.suggestions[0].display_string' "0 — the binding's default"
+	assert_json '[.suggestions[].value] | sort | join(" ")' "avdd refout-avss vref vref2"
+	# The gap: last, so the checks above hold while it is open.
+	assert_json '.suggestions[0].value' refout-avss
+	assert_json ".suggestions[0].display_string | test(\"the binding's default\")" true
+}
+
+# Gap: "No values for adi,internal-ref-microvolt": a -microvolt property is a matrix in the
+# processed schema, its enum two levels down, and the binding layer doesn't reach it.
+# Description: list value offers the options of an enum that the processed schema nests in a
+# matrix (a -microvolt property), the binding's default first.
+# Steps:
+#   1. Make an overlay and add adi,ad7949 on spi0.
+#   2. Run list value ad7949 adi,internal-ref-microvolt, with --json.
+#   3. Check it succeeds and offers 4096000 then 2500000, the first marked as the binding's
+#      default.
+# bats test_tags=req:LIST-08, gap, id:L0351
+@test "list value offers the enum of a -microvolt property" {
+	with_overlay
+	aa add adi,ad7949 --parent spi0 >/dev/null 2>&1 || fail "add adi,ad7949 failed"
+	run_json list value ad7949 adi,internal-ref-microvolt
+	assert_success
+	assert_json '[.suggestions[].value] | join(" ")' "4096000 2500000"
+	assert_json ".suggestions[0].display_string | test(\"the binding's default\")" true
+}
+
+# Description: list value follows the binding's variants: an AD4000 may not have adi,gain-milli
+# and gets no values, an ADAQ4003 gets its enum, the default first.
+# Steps:
+#   1. Make an overlay, add adi,ad4000 on spi0 and adi,adaq4003 on spi1.
+#   2. Run list value ad4000 adi,gain-milli, with --json; check it succeeds with no suggestions.
+#   3. Run list value adaq4003 adi,gain-milli, with --json; check it succeeds with 1000 454 909
+#      1900, the first marked as the binding's default.
+# bats test_tags=req:LIST-08, id:L0352
+@test "list value of a property only some variants have offers values to those only" {
+	with_overlay
+	aa add adi,ad4000 --parent spi0 >/dev/null 2>&1 || fail "add adi,ad4000 failed"
+	aa add adi,adaq4003 --parent spi1 >/dev/null 2>&1 || fail "add adi,adaq4003 failed"
+	run_json list value ad4000 adi,gain-milli
+	assert_success
+	assert_json '.suggestions | length' 0
+	run_json list value adaq4003 adi,gain-milli
+	assert_success
+	assert_json '[.suggestions[].value] | join(" ")' "1000 454 909 1900"
+	assert_json '.suggestions[0].display_string' "1000 — the binding's default"
 }
 
 # Description: list value of a phandle property gives the nodes it can name.
@@ -441,11 +488,12 @@ with_adc() {
 # Description: list parent of a device that only has SPI lists only SPI buses.
 # Steps:
 #   1. Run list parent adi,ad7124-8, with --json.
-#   2. Check it succeeds and every suggestion is an SPI bus.
+#   2. Check it succeeds, there are suggestions, and every one is an SPI bus.
 # bats test_tags=req:LIST-09, id:L0211
 @test "list parent of an SPI-only device lists only SPI buses" {
 	run_json list parent adi,ad7124-8
 	assert_success
+	assert_json '.suggestions | length > 0' true
 	assert_json '[.suggestions[].display_string | test("/spi@")] | all' true
 }
 
@@ -547,14 +595,13 @@ with_adc() {
 
 # --- kinds ---
 
-# Gap: an unknown kind gives "No command registered for `nosuch`", naming no kind.
 # Description: an unknown list kind is a usage error that names the kinds, parent and overlay
 # among them.
 # Steps:
 #   1. Run list nosuch.
 #   2. Check it fails with a usage error (exit 2) saying the kind is unknown.
 #   3. Check the list of kinds names parent and overlay.
-# bats test_tags=req:LIST-11-LNX, gap, id:L0218
+# bats test_tags=req:LIST-11-LNX, id:L0218
 @test "an unknown list kind is refused, naming parent and overlay among the kinds" {
 	run aa list nosuch
 	assert_failure 2

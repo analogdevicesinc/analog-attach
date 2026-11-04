@@ -441,13 +441,12 @@ no_caches() {
 	assert_output --partial "overlay-syntax"
 }
 
-# Gap: an unknown key lists every valid one, and names no closest setting.
 # Description: a mistyped setting is refused, the message suggesting the closest valid setting.
 # Steps:
 #   1. Run config overlay-sintax label.
 #   2. Check it fails with a usage error (exit 2) naming the unknown setting.
 #   3. Check the message asks whether overlay-syntax was meant.
-# bats test_tags=req:CONFIG-11, gap, id:L0082
+# bats test_tags=req:CONFIG-11, id:L0082
 @test "a mistyped setting is refused, naming the closest setting" {
 	run aa config overlay-sintax label
 	assert_failure 2
