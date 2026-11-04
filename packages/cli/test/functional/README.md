@@ -53,34 +53,96 @@ To move to a newer commit, change `COMMIT` in `linux-tree.sh` (the next run clon
 `AA_LINUX=<checkout>` uses a tree of your own instead of the clone; the tests expect
 `rpi-6.12.y`'s content.
 
-## The report
+## The specification and the report
 
-Every run writes `out/` (ignored by git), or the folder `FUNCTIONAL_OUT` names (for runs side by
-side):
+Every run writes two workbooks to `out/` (ignored by git), or to the folder `FUNCTIONAL_OUT`
+names (for runs side by side):
+
+- **The test specification** (`test-spec.xlsx`): what is tested, and how. It is the same for
+  every run of a commit, and needs no run: `report.py --spec-only --tests test/functional
+  --requirements docs/requirements.csv --out <folder>` writes it alone.
+- **The test report** (`test-report.xlsx`): how this run went. It names the tests by ID; their
+  steps are in the specification, under the same ID.
 
 | File | What |
 |---|---|
-| `requirements.csv` | One row per requirement: its status in `linux` and in `noos` (`-` where it doesn't apply), how many tests check it (of those that ran), the IDs of its tests (`Test IDs`, all of them, run or not), and the IDs of those that fail or are known gaps (`Failing/gap IDs`) |
-| `tests.csv` | One row per test: ID, file, name, description, preconditions, steps (`1. ...`, one per line), ecosystem, requirements, status, whether it is a known gap, time, the first line of a failure |
-| `summary.md` | The counts, per ecosystem too, and the requirements that fail, are known gaps (with the IDs of the tests that fail or are gaps), or have no test in any ecosystem they apply to (CI puts it on the run's page) |
-| `report.xlsx` | The two tables as sheets, coloured by status, the description, preconditions and steps wrapped, when `openpyxl` is installed (`pip install openpyxl`) |
+| `test-spec.xlsx` | **About**: the spec's version (below) and its test counts. **Tests**: one row per test, automated, manual and planned: ID, kind, ecosystem, requirements, name, file, description, preconditions, steps (`1. ...`, one per line). **Coverage**: one row per requirement, with the IDs of its automated, manual and planned tests |
+| `test-spec.csv` | The Tests sheet |
+| `test-report.xlsx` | **Run**: when (start, end, duration), how (`CI` with the GitHub run's link, workflow, event and who triggered it, or `local` with the git user and host), what (commit, with uncommitted changes or not, branch, CLI and node versions, OS, the command, whether the real CAPI trees and a board were there) and the spec version it ran. **Requirements** and **Tests**: the two CSVs below |
+| `requirements.csv` | One row per requirement: its status in `linux` and in `noos` (`-` where it doesn't apply), how many tests that ran check it, the IDs of its tests (`Test IDs`, all of them, run or not), and the IDs of those that fail or are known gaps (`Failing/gap IDs`) |
+| `tests.csv` | One row per test: ID, kind, file, name, ecosystem, requirements, status, whether it is a known gap, time, and for a manual test the date and tester of its last result; the first line of a failure, or the manual result's notes |
+| `summary.md` | The run, the counts, per ecosystem too, and the requirements that fail, are known gaps (with the IDs of the tests concerned), or have no test in any ecosystem they apply to (CI puts it on the run's page) |
 | `report.xml` | bats' JUnit output |
 
-A test's status is `pass`, `fail`, `skipped` or `not run` (a filter left it out), and `gap`
-for a known gap that fails (tagged `gap`, see Gaps below): a known issue, listed in its own
-colour so it isn't forgotten, but not a failure. A known gap that passes is a `pass`, noted
-`fixed: drop the gap tag`.
+The workbooks need `openpyxl`, and `manual-tests.yaml` needs PyYAML (`pip install openpyxl
+pyyaml`); without openpyxl only the CSVs are written.
 
-A requirement's status in an ecosystem is `fail` if one of its tests failed, else `gap` if one
-is a known gap, else `pass` if one passed, else `skipped`; `not tested` when none of its tests
-ran.
+An automated test's status is `pass`, `fail`, `skipped` or `not run` (a filter left it out),
+and `gap` for a known gap that fails (tagged `gap`, see Gaps below): a known issue, listed in
+its own colour so it isn't forgotten, but not a failure. A known gap that passes is a `pass`,
+noted `fixed: drop the gap tag`. A manual test's status is its last recorded result (`pass`,
+`fail` or `blocked`), or `manual` when none is recorded; a planned test's is `planned`.
 
-The report also prints a warning for each test with no requirement, a note for each known gap
-that now passes, an error for each requirement ID that `docs/requirements.csv` doesn't have,
-and an error for each test ID that is missing, malformed, of the other ecosystem's prefix or
-used twice. Tests with no description, steps or preconditions get one warning with their
-count (`report.py --verbose` lists them); with `--require-steps` (to `run.sh` or `report.py`)
-each is an error and the run fails.
+A requirement's status in an ecosystem is the first of `fail`, `gap`, `pass`, `skipped` (or
+`blocked`), `manual`, `planned` its tests have, and `not tested` when it has none.
+
+### The spec's version
+
+`spec-version` holds the specification's number (`0.1`): raise it when the specification is
+handed out. The workbooks add, automatically, the last commit that changed a spec source (a
+`.bats` file, `manual-tests.yaml`, `spec-version`) with its date, and a fingerprint of the
+spec's content (12 hex digits of a SHA-256 of the Tests sheet): `0.1 (5c7d8f1 2026-11-03,
+e426d3e043b0)`. Two copies of one number with different content have different fingerprints.
+
+### Manual and planned tests
+
+`manual-tests.yaml` lists the tests that aren't automated:
+
+- **manual**: done by a person, because they need hardware or a look at the screen;
+- **planned**: still to be automated. When it is, move it into a `.bats` file **with the same
+  ID**, so its history and its requirements stay.
+
+```yaml
+- id: N0279                     # next-id.sh noos: one ID sequence with the automated tests
+  kind: manual                  # manual or planned
+  ecosystem: noos
+  requirements: [DEPLOY-02]     # may be []
+  title: deploy through a J-Link probe runs the new firmware on the board
+  description: deploy --probe jlink flashes the built image, and the board runs it.
+  preconditions: a MAX32655FTHR on a J-Link probe, a project built for it.
+  steps:
+    - Run deploy --probe jlink.
+    - Check the board runs the new firmware (its LED blinks at the new rate).
+```
+
+Every field is required, as for an automated test.
+
+Whoever runs a manual test records how it went in `manual-results.csv`, one row per run:
+
+```csv
+ID,Date,Tester,Result,Commit,Notes
+N0279,2026-11-03,afpop,pass,5c7d8f1,blinks at 2 Hz
+```
+
+Result is `pass`, `fail` or `blocked`. The latest date counts, and a later row on the same day.
+Commit is the commit tested, shown in the report next to the notes. A manual result is in the
+report and in the requirements' statuses, but doesn't fail a run: `--fail-unless-gap` looks at
+the automated tests only.
+
+### Errors
+
+The report prints:
+- a warning for each test with no requirement, and a note for each known gap that now passes;
+- an error for each requirement ID that `docs/requirements.csv` doesn't have;
+- an error for each test ID that is missing, malformed, of the other ecosystem's prefix, or used
+  twice, across the `.bats` files and `manual-tests.yaml`;
+- an error for each entry of `manual-tests.yaml` or `manual-results.csv` it can't take: an
+  unknown field, a missing one, a result for a test that isn't manual, a date not in
+  `YYYY-MM-DD`.
+
+Tests with no description, steps or preconditions get one warning with their count
+(`report.py --verbose` lists them); with `--require-steps` (to `run.sh` or `report.py`) each is
+an error and the run fails.
 
 ## In CI
 
@@ -91,8 +153,9 @@ tests: it builds the CLI (`yarn build:cli`), then runs
 yarn test:functional --jobs 4 --fail-unless-gap --require-steps
 ```
 
-and, whatever the result, writes `summary.md` to the run's summary and uploads `out/` as the
-`functional-tests-report` artifact (the workbook among it). With `--fail-unless-gap` the run
+and, whatever the result, writes `summary.md` to the run's summary and uploads two artifacts:
+`functional-test-spec` (`test-spec.xlsx` and its CSV) and `functional-test-report`
+(`test-report.xlsx`, the CSVs, the summary and bats' JUnit). With `--fail-unless-gap` the run
 fails only on a test that fails and isn't a known gap (or a run that stopped early); without
 it, as locally by default, a known gap fails the run too. `--require-steps` also fails it on a
 test without its Description, Steps or Preconditions. The tests that need real CAPI trees or a
