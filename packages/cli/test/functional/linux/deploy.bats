@@ -200,15 +200,19 @@ path_with_only() {
 	assert_json '.errors[0].message' 'sshpass not found on PATH (needed to deploy)'
 }
 
+# Gap: the errors name the deploy settings but not how to set them (setting_hint gives no
+# deploy-* a hint).
 # Description: deploy with no device address or password fails with a configuration error naming
-# the missing settings, and copies nothing.
+# the missing settings and how to set them, and copies nothing.
 # Steps:
 #   1. Build the overlay and drop the deploy-ip and deploy-password settings.
 #   2. Put the stand-ins on PATH and run deploy, with --json; check it fails with exit 2 and the
 #      errors name deploy-ip and deploy-password.
 #   3. Check the stand-ins were not called.
 #   4. Run deploy in human mode; check it says both settings are missing.
-# bats test_tags=req:GEN-13, req:SET-10-LNX, id:L0109
+#   5. Check both runs say how to set them with config: the first JSON error's hint, and the
+#      human output for each.
+# bats test_tags=req:GEN-13, req:SET-10-LNX, gap, id:L0109
 @test "deploy with no device set names the settings, and copies nothing" {
 	aa build >/dev/null
 	drop_setting deploy-ip deploy-password
@@ -216,10 +220,16 @@ path_with_only() {
 	PATH="$STAND_INS" run_config_error deploy
 	assert_json '[.errors[].field] | join(",")' 'deploy-ip,deploy-password'
 	assert_json '.errors[0].message' 'Missing config field deploy-ip'
+	local json=$output
 	[ ! -e "$CALLS" ]
 	PATH="$STAND_INS" run aa deploy
 	assert_output --partial "Missing config field deploy-ip"
 	assert_output --partial "Missing config field deploy-password"
+	# The gap: last, so the checks above hold while it is open.
+	jq -e '.errors[0].hint // "" | test("analog-attach config deploy-ip")' <<<"$json" >/dev/null ||
+		fail "no hint saying how to set deploy-ip in: $json"
+	assert_output --partial "analog-attach config deploy-ip"
+	assert_output --partial "analog-attach config deploy-password"
 }
 
 # Description: deploy changes no file of the project.

@@ -268,7 +268,6 @@ PICKED_BASE=$'❯ broadcom/bcm2711-rpi-4-b.dts\n  ← back to the architectures'
 	refute_output --partial "analog-attach setup"
 }
 
-# Gap: the bare run shows the help alone, naming no missing setting.
 # Description: without a terminal, the bare run shows the help and names the required settings
 # that are missing, and how to set them.
 # Steps:
@@ -276,7 +275,7 @@ PICKED_BASE=$'❯ broadcom/bcm2711-rpi-4-b.dts\n  ← back to the architectures'
 #   2. Run analog-attach alone with stdin from /dev/null.
 #   3. Check it succeeds and shows the help.
 #   4. Check it says devicetree is not set yet and points to the guided setup and config.
-# bats test_tags=req:SETUP-04, gap, id:L0295
+# bats test_tags=req:SETUP-04, id:L0295
 @test "without a terminal, the bare run says which required settings are missing" {
 	drop_setting devicetree
 	run timeout 30 node "$CLI_DIR/dist/cli.js" </dev/null
@@ -285,7 +284,6 @@ PICKED_BASE=$'❯ broadcom/bcm2711-rpi-4-b.dts\n  ← back to the architectures'
 	assert_output --partial "Not set yet: devicetree. Run 'analog-attach' on a terminal for the guided setup, or 'analog-attach config devicetree <value>'."
 }
 
-# Gap: the bare run shows the help alone, naming no missing setting.
 # Description: with --quiet on a terminal, the bare run asks nothing, shows the help and names the
 # missing settings.
 # Steps:
@@ -293,7 +291,7 @@ PICKED_BASE=$'❯ broadcom/bcm2711-rpi-4-b.dts\n  ← back to the architectures'
 #   2. Run analog-attach --quiet on a terminal.
 #   3. Check it succeeds, shows the help and says devicetree is not set yet.
 #   4. Check it does not ask for the Linux tree.
-# bats test_tags=req:SETUP-04, gap, id:L0296
+# bats test_tags=req:SETUP-04, id:L0296
 @test "with --quiet, on a terminal, the bare run asks nothing and shows the help" {
 	drop_setting devicetree
 	tty_run -- --quiet
@@ -303,31 +301,38 @@ PICKED_BASE=$'❯ broadcom/bcm2711-rpi-4-b.dts\n  ← back to the architectures'
 	refute_output --partial "Linux source tree"
 }
 
-# Description: with --json on a terminal, the bare run asks nothing and shows the help.
+# Description: with --json on a terminal, the bare run asks nothing and gives one JSON result
+# naming the missing settings.
 # Steps:
 #   1. Drop the devicetree setting.
 #   2. Run analog-attach --json on a terminal.
-#   3. Check it shows the help and does not ask for the Linux tree.
+#   3. Check it exits 0 with ok true and devicetree as the only missing setting.
+#   4. Check it does not ask for the Linux tree.
 # bats test_tags=req:SETUP-04, id:L0297
-@test "with --json, on a terminal, the bare run asks nothing and shows the help" {
+@test "with --json, on a terminal, the bare run asks nothing and gives one JSON result" {
 	drop_setting devicetree
 	tty_run -- --json
-	assert_output --partial "USAGE"
+	assert_success
+	# The terminal merges the streams: the compact JSON, as text.
+	assert_output --partial '"ok":true'
+	assert_output --partial '"missing":["devicetree"]'
 	refute_output --partial "Linux source tree"
 }
 
-# Gap: with --json the bare run shows the help only; the `Not set yet` line is human mode's.
 # Description: with --json, the bare run names the required settings that are missing.
 # Steps:
 #   1. Drop the devicetree setting.
 #   2. Run analog-attach --json with stdin from /dev/null.
-#   3. Check the output shows the help and mentions devicetree.
-# bats test_tags=req:SETUP-04, gap, id:L0298
+#   3. Check it exits 0 with one JSON result: ok true, the usage, and devicetree as the only
+#      missing setting.
+# bats test_tags=req:SETUP-04, id:L0298
 @test "with --json, the bare run says which required settings are missing" {
 	drop_setting devicetree
-	run timeout 30 node "$CLI_DIR/dist/cli.js" --json </dev/null
-	assert_output --partial "USAGE"
-	assert_output --partial "devicetree"
+	run --separate-stderr timeout 30 node "$CLI_DIR/dist/cli.js" --json </dev/null
+	assert_success
+	assert_json '.ok' true
+	assert_json '.missing | join(",")' devicetree
+	assert_json '.usage | contains("USAGE")' true
 }
 
 # Description: when the binding caches are not built, the setup builds them, saying it takes

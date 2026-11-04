@@ -64,6 +64,7 @@ setup() {
 # Steps:
 #   1. Disable /memory@0, with --json; check it succeeds (.ok true).
 #   2. Check the workfile has one fragment with target-path /memory@0.
+#   3. Read status of /memory@0, with --json; check it is disabled and comes from the overlay.
 # bats test_tags=req:ENABLE-01, id:L0115
 @test "a base node with no label gets a fragment by its path" {
 	run_json disable /memory@0
@@ -71,6 +72,9 @@ setup() {
 	assert_json '.ok' true
 	run grep -c 'target-path = "/memory@0";' "$WORKFILE"
 	assert_output 1
+	run_json read /memory@0 status
+	assert_json '.value' disabled
+	assert_json '.source' overlay
 }
 
 # Description: enable and disable switch a node the overlay adds, replacing its one status.
@@ -100,14 +104,19 @@ setup() {
 # Description: enable and disable never change the base devicetree file.
 # Steps:
 #   1. Take a checksum of the base devicetree.
-#   2. Enable spi1 and disable spi0/spidev@0.
+#   2. Enable spi1 and disable spi0/spidev@0, with --json; check both succeed (.ok true) and the
+#      workfile has a fragment for each.
 #   3. Check the base's checksum is the same.
 # bats test_tags=req:ENABLE-01, id:L0117
 @test "enable and disable never change the base device tree" {
 	local before
 	before=$(sha1sum "$LINUX_BASE")
-	aa enable spi1 >/dev/null
-	aa disable spi0/spidev@0 >/dev/null
+	run_json enable spi1
+	assert_json '.ok' true
+	run_json disable spi0/spidev@0
+	assert_json '.ok' true
+	grep -q 'target = <&spi1>;' "$WORKFILE" || fail "no fragment for spi1"
+	grep -q 'target = <&spidev0>;' "$WORKFILE" || fail "no fragment for spidev0"
 	[ "$(sha1sum "$LINUX_BASE")" = "$before" ] || fail "the base changed"
 }
 

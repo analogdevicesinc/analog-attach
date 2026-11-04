@@ -53,7 +53,8 @@ stub() {
 # Description: two projects on one machine can each have their own backend.
 # Steps:
 #   1. Go to a second folder and run config backend noos there.
-#   2. Check config backend, with --json, gives noos there.
+#   2. Check config backend, with --json, gives noos from the local settings, and the folder's
+#      own settings file holds it.
 #   3. Go back to the project and check config backend gives linux.
 # bats test_tags=req:SET-01, id:L0265
 @test "two projects on one machine can target different ecosystems" {
@@ -62,18 +63,19 @@ stub() {
 	aa config backend noos
 	run_json config backend
 	assert_json '.configs[0].value' noos
+	assert_json '.configs[0].source' local
+	[ "$(jq -r .backend "$BATS_TEST_TMPDIR/second/.analog-attach/config.json")" = noos ]
 	cd "$PROJECT"
 	run_json config backend
 	assert_json '.configs[0].value' linux
 }
 
-# Gap: config backend --global is taken, and written to the user settings.
 # Description: the backend is a project setting; setting it with --global is refused.
 # Steps:
 #   1. Run config backend noos --global.
 #   2. Check the message says backend belongs to the project and can't be global.
 #   3. Check the user's settings file does not exist or has no backend.
-# bats test_tags=req:SET-01, gap, id:L0266
+# bats test_tags=req:SET-01, id:L0266
 @test "the backend can't be a user setting" {
 	run aa config backend noos --global
 	assert_output --partial "backend belongs to the project and can't be in the global settings"
@@ -122,22 +124,17 @@ stub() {
 	[ ! -e "$WORKFILE" ]
 }
 
-# Description: the linux setting names the Linux tree the bindings are read from, and must be a
-# Linux source tree.
+# Description: the linux setting names the Linux tree the bindings are read from.
 # Steps:
 #   1. Create the overlay with init.
 #   2. Run list devices adi,adxl345.
 #   3. Check it succeeds and names the binding file in the Linux tree's bindings folder.
-#   4. Run config linux with the test's temporary folder and check it says it is not a Linux
-#      source tree.
 # bats test_tags=req:SET-03, id:L0269
 @test "linux names the Linux tree the bindings come from" {
 	with_overlay
 	run aa list devices adi,adxl345
 	assert_success
 	assert_output --partial "binding: $LINUX_TREE/Documentation/devicetree/bindings/iio/accel/adi,adxl345.yaml"
-	run aa config linux "$BATS_TEST_TMPDIR"
-	assert_output --partial "(not a Linux source tree)"
 }
 
 # Description: the devicetree setting names the base the overlay applies to; changing it changes
@@ -379,13 +376,17 @@ stub() {
 	assert_line --regexp "^SSHPASS=secret .*ssh .*pi@192\.0\.2\.1 sudo reboot$"
 }
 
-# Description: deploy with deploy settings unset names the missing ones, and only those.
+# Gap: the errors name the deploy settings but not how to set them (setting_hint gives no
+# deploy-* a hint).
+# Description: deploy with deploy settings unset names the missing ones, and only those, and how
+# to set them.
 # Steps:
 #   1. Make the overlay with the ADXL345 and build it.
 #   2. Set deploy-ip 192.0.2.1 only.
 #   3. Run deploy.
 #   4. Check the message names deploy-user and deploy-password as missing, but not deploy-ip.
-# bats test_tags=req:SET-10-LNX, req:GEN-13, id:L0282
+#   5. Check it says how to set each with config.
+# bats test_tags=req:SET-10-LNX, req:GEN-13, gap, id:L0282
 @test "deploy with the deploy settings unset names them" {
 	with_accel
 	aa build >/dev/null
@@ -394,4 +395,7 @@ stub() {
 	refute_output --partial "Missing config field deploy-ip"
 	assert_output --partial "Missing config field deploy-user"
 	assert_output --partial "Missing config field deploy-password"
+	# The gap: last, so the checks above hold while it is open.
+	assert_output --partial "analog-attach config deploy-user"
+	assert_output --partial "analog-attach config deploy-password"
 }

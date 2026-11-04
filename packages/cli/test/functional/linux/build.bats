@@ -61,19 +61,30 @@ duplicate_labels() {
 	assert_output --partial 'spi0 = "/fragment@0:target:0";'
 }
 
-# Description: build replaces an earlier .dtbo.
+# Description: build replaces an earlier .dtbo with one compiled from the overlay as it is now.
 # Steps:
-#   1. Create the overlay with init and write overlay.dtbo holding old.
-#   2. Run build, with --json; check it succeeds (.ok true).
-#   3. Check overlay.dtbo no longer holds old.
+#   1. Create the overlay with init and build it, with --json; check it succeeds (.ok true) and
+#      keep a copy of the .dtbo.
+#   2. Add adi,adxl345 under spi0 and build again, with --json; check it succeeds (.ok true).
+#   3. Check overlay.dtbo differs from the copy and starts with the flattened devicetree magic
+#      d00dfeed.
+#   4. Decompile it with the bundled dtc; check it has the adxl345 compatible.
 # bats test_tags=req:BUILD-01-LNX, id:L0034
 @test "build replaces an earlier .dtbo" {
 	with_overlay
-	echo old >"$PROJECT/overlay.dtbo"
+	local dtbo="$PROJECT/overlay.dtbo"
 	run_json build
+	assert_success
 	assert_json '.ok' true
-	run cat "$PROJECT/overlay.dtbo"
-	refute_output old
+	cp "$dtbo" "$BATS_TEST_TMPDIR/first.dtbo"
+	aa add adi,adxl345 --parent spi0 >/dev/null 2>&1 || fail "add adi,adxl345 failed"
+	run_json build
+	assert_success
+	assert_json '.ok' true
+	! cmp -s "$dtbo" "$BATS_TEST_TMPDIR/first.dtbo" || fail "overlay.dtbo is the first build's"
+	[ "$(head -c 4 "$dtbo" | od -An -tx1 | tr -d ' ')" = d00dfeed ]
+	run "$CLI_DIR/bundled/linux/tools/dtc" -I dtb -O dts "$dtbo"
+	assert_output --partial 'compatible = "adi,adxl345";'
 }
 
 # Description: build with no workfile fails with a configuration error saying how to create it,

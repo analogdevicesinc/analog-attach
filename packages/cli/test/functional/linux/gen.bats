@@ -102,7 +102,8 @@ checksum() {
 #   3. Complete the setting name of config.
 #   4. Check devicetree and overlay-syntax are offered, and no noos setting (capi-path,
 #      module-paths, target, probe, bootstrap, project-name).
-#   5. Complete the flags of build and check --board and --clean are not offered.
+#   5. Complete the flags of build and deploy; check --json is offered, and noos's --clean
+#      (build) and --probe (deploy) are not.
 # bats test_tags=req:GEN-03, id:L0124
 @test "completion offers only the commands and settings of linux" {
 	run aa __complete -- ""
@@ -115,7 +116,13 @@ checksum() {
 	assert_line --regexp $'^overlay-syntax\t'
 	refute_line --regexp $'^(capi-path|module-paths|target|probe|bootstrap|project-name)\t'
 	run aa __complete -- build --
-	refute_line --regexp $'^--(board|clean)\t'
+	assert_success
+	assert_line --regexp $'^--json\t'
+	refute_line --regexp $'^--clean\t'
+	run aa __complete -- deploy --
+	assert_success
+	assert_line --regexp $'^--json\t'
+	refute_line --regexp $'^--probe\t'
 }
 
 # Description: a noos setting is unknown here: reading it is a usage error, and config does not
@@ -237,13 +244,14 @@ checksum() {
 # Steps:
 #   1. Create the overlay with init.
 #   2. Add adi,adxl345 on a terminal: pick i2c1 (i) for the parent, then Ctrl+C at the
-#      interrupt-parent question.
+#      interrupt-parent question; check it ends with exit 0.
 #   3. Check the parent question was shown, with i2c1 as option i.
 #   4. Check the first property question, for interrupt-parent, was shown.
 # bats test_tags=req:GEN-05, id:L0131
 @test "on a terminal, add asks for the parent, then for what is left" {
 	with_overlay
 	tty_run "parent [a]:" $'i\r' "interrupt-parent [a]:" $'\x03' -- add adi,adxl345
+	assert_success
 	assert_output --partial "Where does adi,adxl345 go?"
 	assert_output --regexp "i\) i2c1 +/soc/i2c@7e804000"
 	assert_output --partial "[1/2] interrupt-parent"
@@ -450,14 +458,13 @@ checksum() {
 	assert_failure 2
 }
 
-# Gap: a refused value exits 2, the reason as text on stderr, with no JSON.
 # Description: a setting value that is refused exits 0, with .ok false in the result.
 # Steps:
 #   1. Set overlay-syntax to braces, with --json.
 #   2. Check it is refused (exit 0, .ok false).
 #   3. Set linux to a folder that is not a Linux tree, with --json.
 #   4. Check it is refused (exit 0, .ok false).
-# bats test_tags=req:GEN-09, gap, id:L0142
+# bats test_tags=req:GEN-09, id:L0142
 @test "a refused setting value exits 0 with ok false" {
 	run_json config overlay-syntax braces
 	assert_success
