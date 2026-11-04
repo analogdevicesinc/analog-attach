@@ -5,6 +5,7 @@
 #
 #   next-id.sh noos     N0042
 #   next-id.sh linux    L0108
+#   next-id.sh conformity  C0003
 set -euo pipefail
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -12,7 +13,8 @@ here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 case "${1:-}" in
 	noos) prefix=N ;;
 	linux) prefix=L ;;
-	*) echo "Usage: next-id.sh noos|linux" >&2; exit 2 ;;
+	conformity) prefix=C ;;
+	*) echo "Usage: next-id.sh noos|linux|conformity" >&2; exit 2 ;;
 esac
 
 # Every id:<prefix>NNNN tag in a .bats file under here, and every `id: <prefix>NNNN` of the
