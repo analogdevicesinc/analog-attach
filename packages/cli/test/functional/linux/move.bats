@@ -101,7 +101,7 @@ with_devices() {
 # Steps:
 #   1. Move ad7124_8 to spi1.
 #   2. Move adxl345 to ad7124_8, with --json; check it succeeds (.ok true).
-#   3. Read compatible of ad7124_8/adi,adxl345@0, with --json; check it succeeds.
+#   3. Read compatible of ad7124_8/adi,adxl345@0, with --json; check it is adi,adxl345.
 # bats test_tags=req:MOVE-01, id:L0224
 @test "move puts a node under another node of the overlay" {
 	aa move ad7124_8 spi1 >/dev/null
@@ -109,7 +109,7 @@ with_devices() {
 	assert_success
 	assert_json '.ok' true
 	run_json read ad7124_8/adi,adxl345@0 compatible
-	assert_success
+	assert_json '.value | if type == "array" then join(" ") else . end' adi,adxl345
 }
 
 # Description: move refuses a node of the base devicetree.

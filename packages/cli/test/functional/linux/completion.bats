@@ -109,28 +109,48 @@ bash_complete() {
 
 # --- Installing -----------------------------------------------------------------------------
 
-# Description: completion --install writes each shell's script to the folder that shell loads
-# completions from by itself, and names the file.
+# Description: completion --install writes the bash and fish scripts to the folder each shell
+# loads completions from by itself, and names the file.
 # Steps:
-#   1. For bash, fish and zsh, run completion <shell> --install.
+#   1. For bash and fish, run completion <shell> --install.
 #   2. Check each succeeds, the file exists at its place and the output names it.
 #   3. Check each file is the script completion <shell> prints.
 # bats test_tags=req:COMPLETION-02, id:L0045
-@test "completion --install puts each shell's script where the shell loads it by itself" {
+@test "completion --install puts the bash and fish scripts where the shell loads them by itself" {
 	local shell file
-	for shell in bash fish zsh; do
+	for shell in bash fish; do
 		run aa completion "$shell" --install
 		assert_success
 		case $shell in
 			bash) file=$BASH_FILE ;;
 			fish) file=$FISH_FILE ;;
-			zsh) file=$ZSH_FILE ;;
 		esac
 		[ -f "$file" ] || fail "$shell: no $file"
 		assert_output --partial "$file"
 		# The file is the script the command prints.
 		diff <(aa completion "$shell") "$file"
 	done
+}
+
+# Gap: zsh has no folder of the user's that it loads by itself; the script goes to
+# $XDG_DATA_HOME/zsh/site-functions and the CLI asks for an fpath line in ~/.zshrc, which it
+# doesn't write (COMPLETION-02 forbids editing a startup file).
+# Description: completion zsh --install writes the zsh script where zsh loads it by itself, with
+# nothing left for the user to add to a startup file.
+# Steps:
+#   1. Run completion zsh --install.
+#   2. Check it succeeds, the file exists at its place and the output names it.
+#   3. Check the file is the script completion zsh prints.
+#   4. Check the output asks for no fpath line in ~/.zshrc.
+# bats test_tags=req:COMPLETION-02, gap, id:L0350
+@test "completion --install puts the zsh script where zsh loads it by itself" {
+	run aa completion zsh --install
+	assert_success
+	[ -f "$ZSH_FILE" ] || fail "zsh: no $ZSH_FILE"
+	assert_output --partial "$ZSH_FILE"
+	diff <(aa completion zsh) "$ZSH_FILE"
+	# The gap: last, so the checks above hold while it is open.
+	refute_output --partial "fpath"
 }
 
 # Description: completion --install replaces a script installed earlier.
@@ -219,18 +239,15 @@ bash_complete() {
 # to its command.
 # Steps:
 #   1. Ask the completion engine for the first word.
-#   2. Check it offers validate, move, enable, disable, build and deploy, and not generate.
+#   2. Check it offers exactly the linux commands, in order: config, init, import, add, read,
+#      update, delete, rename, list, move, enable, disable, validate, build, deploy, completion,
+#      skill and help (so not generate).
 #   3. Ask for the word mo and check it offers only move.
 # bats test_tags=req:COMPLETION-04, id:L0050
 @test "completion offers the commands" {
 	run candidates ''
-	assert_line validate
-	assert_line move
-	assert_line enable
-	assert_line disable
-	assert_line build
-	assert_line deploy
-	refute_line generate
+	assert_output "$(printf '%s\n' config init import add read update delete rename list move \
+		enable disable validate build deploy completion skill help)"
 	run candidates mo
 	assert_output move
 }
@@ -343,8 +360,8 @@ bash_complete() {
 #   1. Make the overlay with the ADXL345 and the AD7124-8.
 #   2. Ask the engine for the property of read i2c_arm/adi,adxl345@0 and check it is the list
 #      property --json names.
-#   3. Ask for the property of update adxl345 and check the groups set (first) and not set,
-#      compatible offered, and interrupts marked required.
+#   3. Ask for the property of update adxl345; check the set group comes first with compatible
+#      in it, and interrupts, marked required, is in the not set group.
 #   4. Ask for update ad7124_8 channel@1 and check it offers channel@1 and channel@15.
 # bats test_tags=req:COMPLETION-04, id:L0056
 @test "completion offers a node's properties as list property lists them, set ones first" {
@@ -356,6 +373,12 @@ bash_complete() {
 	assert_line $'__ANALOG_ATTACH_COMPLETE_GROUP__\tnot set'
 	assert_line --regexp $'^compatible\t'
 	assert_line --regexp $'^interrupts\trequired$'
+	local not_set compatible interrupts
+	not_set=$(grep -nxF $'__ANALOG_ATTACH_COMPLETE_GROUP__\tnot set' <<<"$output" | cut -d: -f1)
+	compatible=$(grep -n $'^compatible\t' <<<"$output" | cut -d: -f1)
+	interrupts=$(grep -nxF $'interrupts\trequired' <<<"$output" | cut -d: -f1)
+	[ "$compatible" -lt "$not_set" ] || fail "compatible is not in the set group"
+	[ "$interrupts" -gt "$not_set" ] || fail "interrupts is not in the not set group"
 	# The child nodes a binding's pattern names.
 	run candidates update ad7124_8 channel@1
 	assert_line channel@1
