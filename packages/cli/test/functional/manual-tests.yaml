@@ -7,7 +7,7 @@
 # IDs come from the same sequence as the automated tests: test/functional/next-id.sh noos|linux.
 # Every field is required, and requirements may be empty ([]).
 #
-# - id: N0279
+# - id: N0123                 # next-id.sh noos gives the real one
 #   kind: manual
 #   ecosystem: noos
 #   requirements: [DEPLOY-02]
