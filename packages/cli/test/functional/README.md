@@ -18,8 +18,9 @@ yarn test:functional                      # from the repo root: every test, then
 to this folder:
 
 ```sh
-test/functional/run.sh                              # every test
+test/functional/run.sh                              # noos/, linux/ and conformity/ (not e2e/)
 test/functional/run.sh noos                         # one folder
+test/functional/run.sh conformity                   # the conformity tests
 test/functional/run.sh noos/config.bats             # one file
 test/functional/run.sh --filter-tags req:CONFIG-04  # the tests of one requirement
 test/functional/run.sh --filter-tags eco:linux      # one ecosystem
@@ -262,6 +263,45 @@ CLI does instead, so the report shows where the code falls short:
 
 `run.sh --filter-tags '!gap'` runs everything else; `--filter-tags gap` only the gaps. Once
 the CLI is fixed, drop the tag.
+
+### Conformity tests
+
+`conformity/` holds the conformity tests: one case run on **both** backends, checking that
+they answer alike (GEN-02, GEN-08). One file per command (`conformity/config.bats`, ...),
+tagged `eco:all, conformity`; their IDs have their own prefix, `C0001`... (`next-id.sh
+conformity`), and the report counts their result for both ecosystems. They run by default,
+in CI too, and need the Linux tree like the linux tests.
+
+They compare only what both backends share: the exit status, the shape of the common fields
+(keys and their JSON types, from the base types of `src/interface/backend-responses.ts`), and
+a few values that must match (`ok`, `severity`, `error_type`), never the message text. A
+field only one backend has is fine. They cover the cases that already answer alike; a case
+that differs on purpose, or that isn't aligned yet, isn't a conformity test.
+
+```bash
+setup() {
+	load ../helpers
+	conformity_projects             # $NOOS_PROJECT and $LINUX_PROJECT, no workfile yet
+}
+
+@test "an unknown device type is refused the same way on both backends" {
+	on noos init                    # a step before the case, in one backend's project
+	on linux init
+	conform add nosuchdevice -- add adi,nosuchdevice    # noos words -- linux words, with --json
+	assert_same_status 0
+	assert_same '{ok, severity}' '{"ok":false,"severity":"error"}'
+	assert_same '.message | type' '"string"'
+}
+```
+
+| Helper | What it does |
+|---|---|
+| `conformity_projects` | A noos project (fixtures) and a linux one (Linux tree), side by side, no workfile |
+| `with_conformity_devices` | After `conformity_projects`: `init` on both, and a device on each: noos `test_gpio_pin` as `pin` (property `number`), linux `adi,adxl345` under i2c1, label `adxl345` (property `reg`) |
+| `on noos\|linux <words>` | Runs the CLI in that backend's project, for the steps before the case; a failure fails the test |
+| `conform <noos words> -- <linux words>` | Runs the case on each backend, with `--json`; sets `$noos_status`, `$noos_output`, `$linux_status`, `$linux_output` |
+| `assert_same_status [<status>]` | Both exited the same (and with that status) |
+| `assert_same <jq filter> [<value>]` | The filter gives the same on both results (and that value); `shape` in the filter turns a value into its JSON types |
 
 ### End-to-end tests
 
