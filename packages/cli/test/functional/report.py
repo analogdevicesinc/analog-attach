@@ -9,6 +9,9 @@ The tests come from two places:
     folder, noos/ or linux/, and `gap` for a known gap: a requirement the CLI doesn't meet yet)
     and their comments (`# Description:` and `# Steps:` above a test, `# Preconditions:` once
     per file, before its first test);
+    A test tagged `e2e` (under e2e/) is an end-to-end test: one user's story across many
+    commands, on the real trees; it needs no requirement, and run.sh runs it only when asked
+    (run.sh e2e);
   - the manual and planned tests, in manual-tests.yaml: a manual test is done by a person
     (hardware, a look at the screen), a planned one is still to be automated. When it is, it
     moves into a .bats file with the same ID.
@@ -76,7 +79,8 @@ ECOSYSTEMS = ["linux", "noos"]
 # The Ecosystems column of the requirements, as the ecosystems a requirement applies to.
 APPLIES = {"All": ECOSYSTEMS, "Linux": ["linux"], "CAPI": ["noos"]}
 GAP_TAG = "gap"
-KINDS = ("automated", "manual", "planned")
+KINDS = ("automated", "e2e", "manual", "planned")
+E2E_TAG = "e2e"
 MANUAL_RESULTS = ("pass", "fail", "blocked")
 # A requirement's status from its tests', the first of these they have.
 PRECEDENCE = ("fail", "gap", "pass", "skipped", "blocked", "manual", "planned")
@@ -84,7 +88,7 @@ PRECEDENCE = ("fail", "gap", "pass", "skipped", "blocked", "manual", "planned")
 MANUAL_TESTS, MANUAL_RESULTS_FILE, SPEC_VERSION = "manual-tests.yaml", "manual-results.csv", "spec-version"
 # The workbook columns whose text wraps, and their widths (in characters).
 WIDE = {"Description": 50, "Preconditions": 40, "Steps": 70, "Test IDs": 30, "Failing/gap IDs": 20,
-        "Automated": 30, "Manual": 20, "Planned": 20, "Message": 50, "Value": 70}
+        "Automated": 30, "End to end": 20, "Manual": 20, "Planned": 20, "Message": 50, "Value": 70}
 FIXED_NOTE = "fixed: drop the gap tag"
 
 TAGS_LINE = re.compile(r"^\s*#\s*bats\s+(test_tags|file_tags)\s*=\s*(.*)$")
@@ -163,7 +167,7 @@ def read_tests(root):
                 if test.group(1) == '"':
                     name = re.sub(r'\\([$`"\\])', r"\1", name)
                 tests[(relative, name)] = new_test(
-                    "automated", relative, name, eco, " ".join(tag[3:] for tag in all_tags if tag.startswith("id:")),
+                    E2E_TAG if E2E_TAG in all_tags else "automated", relative, name, eco, " ".join(tag[3:] for tag in all_tags if tag.startswith("id:")),
                     [tag[4:] for tag in all_tags if tag.startswith("req:")], fields["Description"], fields["Steps"],
                     gap=GAP_TAG in all_tags)
                 fields = {"Description": "", "Steps": []}
@@ -175,7 +179,7 @@ def read_tests(root):
 
 
 def new_test(kind, file, name, eco, test_id, reqs, description, steps, preconditions="", gap=False):
-    """A test of the specification, whatever its source: kind (automated, manual, planned), the
+    """A test of the specification, whatever its source: kind (automated, e2e, manual, planned), the
     file it is in, its name, ecosystem, ID, requirements, description, steps, preconditions, and
     whether it is a known gap."""
     return {"kind": kind, "file": file, "name": name, "eco": eco, "id": test_id, "reqs": reqs, "description": description,
@@ -481,7 +485,8 @@ def main():
 
     unknown, untagged, undescribed = [], [], []
     for (file, name), test in tests.items():
-        if not test["reqs"]:
+        # An end-to-end test needs no requirement: it follows a user's story across many.
+        if not test["reqs"] and test["kind"] != E2E_TAG:
             untagged.append(f"{file}: {name}")
         missing = [what for what, text in (("description", test["description"]), ("steps", test["steps"]),
                                            ("preconditions", test["preconditions"])) if not text]
@@ -499,13 +504,14 @@ def main():
     for test in ordered:
         for req in test["reqs"]:
             by_kind.setdefault(req, {}).setdefault(test["kind"], []).append(test["id"])
-    coverage_header = ["ID", "Command", "Name", "Ecosystems", "Automated", "Manual", "Planned"]
+    coverage_header = ["ID", "Command", "Name", "Ecosystems", "Automated", "End to end", "Manual", "Planned"]
     coverage_rows = [[row["ID"], row["Command"], row["Name"], row["Ecosystems"],
                       *(" ".join(by_kind.get(row["ID"], {}).get(kind, [])) for kind in KINDS)] for row in requirements]
     kind_counts = {kind: sum(1 for test in ordered if test["kind"] == kind) for kind in KINDS}
     about = [("Spec version", version["number"]), ("Last changed", f"{version['commit']} {version['date']}".strip()),
              ("Fingerprint", version["fingerprint"]),
-             ("Tests", f"{len(ordered)}: {kind_counts['automated']} automated, {kind_counts['manual']} manual, {kind_counts['planned']} planned"),
+             ("Tests", f"{len(ordered)}: {kind_counts['automated']} automated, {kind_counts['e2e']} end to end, "
+                       f"{kind_counts['manual']} manual, {kind_counts['planned']} planned"),
              ("Generated", datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds"))]
     args.out.mkdir(parents=True, exist_ok=True)
     write_csv(args.out / "test-spec.csv", spec_header, spec_rows)
@@ -526,7 +532,7 @@ def main():
     fixed = []
     for test in ordered:
         note, seconds, date, tester = "", "", "", ""
-        if test["kind"] == "automated":
+        if test["kind"] in ("automated", E2E_TAG):
             raw, message, seconds = results.get((test["file"], test["name"]), ("not run", "", ""))
             status = test_status(raw, test["gap"])
             note = message.splitlines()[0] if message else ""
@@ -572,7 +578,7 @@ def main():
                                                              ("Tests", test_header, test_rows)])
 
     statuses = [(row[1], row[6]) for row in test_rows]
-    automated = [status for kind, status in statuses if kind == "automated"]
+    automated = [status for kind, status in statuses if kind in ("automated", E2E_TAG)]
     counts = {status: automated.count(status) for status in ("pass", "fail", "gap", "skipped", "not run")}
     counts.update({"manual pass": statuses.count(("manual", "pass")), "manual fail": statuses.count(("manual", "fail")),
                    "manual": statuses.count(("manual", "manual")), "planned": statuses.count(("planned", "planned"))})
