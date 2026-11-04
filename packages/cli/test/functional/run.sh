@@ -50,12 +50,12 @@ for argument in "$@"; do
 	fi
 done
 # Relative to this folder, as the report names the files.
-[ ${#targets[@]} -eq 0 ] && targets=(noos linux)
+[ ${#targets[@]} -eq 0 ] && targets=(noos linux conformity)
 
-# The linux tests' Linux tree and its caches (linux-tree.sh), when they run.
+# The Linux tree and its caches (linux-tree.sh), when the linux or conformity tests run.
 for target in "${targets[@]}"; do
 	case "$target" in
-		linux | linux/*) "$here/linux-tree.sh" >/dev/null || exit 2; break ;;
+		linux | linux/* | conformity | conformity/*) "$here/linux-tree.sh" >/dev/null || exit 2; break ;;
 	esac
 done
 

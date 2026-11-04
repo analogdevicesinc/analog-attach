@@ -186,3 +186,69 @@ real_project() {
 		'{ backend: "noos", noos: { "capi-path": $capi, "module-paths": ($modules | split(":")),
 			"target": $target, "interview": "false" } }' >"$PROJECT/.analog-attach/config.json"
 }
+
+# --- Conformity: the same case on both backends -----------------------------------------------
+
+# `conformity_projects`: a noos project ($NOOS_PROJECT, on the fixtures) and a linux one
+# ($LINUX_PROJECT, on the Linux tree), side by side in the test's folder, neither with a workfile.
+conformity_projects() {
+	local eco
+	for eco in noos linux; do
+		PROJECT="$BATS_TEST_TMPDIR/$eco"
+		mkdir -p "$PROJECT"
+		new_project "$eco"
+	done
+	NOOS_PROJECT="$BATS_TEST_TMPDIR/noos" LINUX_PROJECT="$BATS_TEST_TMPDIR/linux"
+	cd "$BATS_TEST_TMPDIR" || return 1
+}
+
+# `on <noos|linux> <words>`: runs the CLI in that backend's project (for the steps before the
+# case: init, add); its output is thrown away, and a failure fails the test.
+on() {
+	local eco=$1 dir
+	shift
+	dir=$([ "$eco" = noos ] && echo "$NOOS_PROJECT" || echo "$LINUX_PROJECT")
+	(cd "$dir" && aa "$@") >/dev/null || fail "$eco: $* failed"
+}
+
+# `conform <noos words> -- <linux words>`: runs the case on each backend, with --json, in its
+# project. Sets $noos_status, $noos_output, $linux_status and $linux_output (stdout only).
+conform() {
+	local noos=() linux=()
+	while [ $# -gt 0 ] && [ "$1" != -- ]; do noos+=("$1"); shift; done
+	shift
+	linux=("$@")
+	run --separate-stderr bash -c 'cd "$1" && shift && node "$0" --json "$@"' "$CLI_DIR/dist/cli.js" "$NOOS_PROJECT" "${noos[@]}"
+	noos_status=$status noos_output=$output
+	run --separate-stderr bash -c 'cd "$1" && shift && node "$0" --json "$@"' "$CLI_DIR/dist/cli.js" "$LINUX_PROJECT" "${linux[@]}"
+	linux_status=$status linux_output=$output
+}
+
+# `assert_same_status [<status>]`: both exited the same, and with <status> when given.
+assert_same_status() {
+	[ "$noos_status" = "$linux_status" ] || fail "noos exited $noos_status, linux $linux_status"$'\n'"noos: $noos_output"$'\n'"linux: $linux_output"
+	[ $# -eq 0 ] || [ "$noos_status" = "$1" ] || fail "both exited $noos_status, not $1"
+}
+
+# `assert_same <jq filter> [<expected>]`: the filter gives the same on both results (and
+# <expected> when given). Typical filters: '.ok', '[.configs[0] | keys]', '.devices[0] | shape'.
+# `shape` (defined here for the filter) turns a value into its JSON types: {"a": 1} is
+# {"a": "number"}, an array its first element's shape.
+assert_same() {
+	local shape='def shape: if type == "object" then with_entries(.value |= shape) elif type == "array" then (if length > 0 then [.[0] | shape] else [] end) else type end;'
+	local noos linux
+	noos=$(jq -c "$shape $1" <<<"$noos_output") || fail "noos: not JSON: $noos_output"
+	linux=$(jq -c "$shape $1" <<<"$linux_output") || fail "linux: not JSON: $linux_output"
+	[ "$noos" = "$linux" ] || fail "$1 differs: noos $noos, linux $linux"
+	[ $# -lt 2 ] || [ "$noos" = "$2" ] || fail "$1: both $noos, not $2"
+}
+
+# `with_conformity_devices`: after `conformity_projects`, `init` on both, and a device added on each: on noos
+# `test_gpio_pin` named `pin` (a property: `number`), on linux `adi,adxl345` under i2c1, labelled
+# `adxl345` (a property: `reg`).
+with_conformity_devices() {
+	on noos init
+	on linux init
+	on noos add test_gpio_pin --name pin
+	on linux add adi,adxl345 --parent i2c1
+}
