@@ -75,14 +75,15 @@ jobs:
           node-version: 20
           cache: yarn
 
-      # The report's workbook (report.xlsx) needs openpyxl; the CSVs don't.
+      # The workbooks (test-spec.xlsx, test-report.xlsx) need openpyxl, and the manual and planned
+      # tests (manual-tests.yaml) PyYAML; the CSVs need neither.
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
-      - name: Install openpyxl
-        run: python -m pip install openpyxl
+      - name: Install openpyxl and PyYAML
+        run: python -m pip install openpyxl pyyaml
 
       - name: Enable Corepack
         run: corepack enable
@@ -107,10 +108,24 @@ jobs:
           summary=packages/cli/test/functional/out/summary.md
           if [ -f "$summary" ]; then cat "$summary" >> "$GITHUB_STEP_SUMMARY"; fi
 
-      - name: Upload the requirements report
+      # Two artifacts: the specification (what is tested, and how; the same for every run of a
+      # commit) and the report of this run, with its CSVs, summary and bats' JUnit.
+      - name: Upload the test specification
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: functional-tests-report
-          path: packages/cli/test/functional/out/
+          name: functional-test-spec
+          path: |
+            packages/cli/test/functional/out/test-spec.xlsx
+            packages/cli/test/functional/out/test-spec.csv
+          if-no-files-found: warn
+
+      - name: Upload the test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: functional-test-report
+          path: |
+            packages/cli/test/functional/out/
+            !packages/cli/test/functional/out/test-spec.*
           if-no-files-found: warn

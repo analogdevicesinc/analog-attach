@@ -1,0 +1,21 @@
+# The manual and planned tests of the specification (README.md, "Manual and planned tests").
+#
+# manual:  done by a person (hardware, a look at the screen); record each run in
+#          manual-results.csv.
+# planned: still to be automated. When it is, move it into a .bats file with the same ID.
+#
+# IDs come from the same sequence as the automated tests: test/functional/next-id.sh noos|linux.
+# Every field is required, and requirements may be empty ([]).
+#
+# - id: N0279
+#   kind: manual
+#   ecosystem: noos
+#   requirements: [DEPLOY-02]
+#   title: deploy through a J-Link probe runs the new firmware on the board
+#   description: deploy --probe jlink flashes the built image, and the board runs it.
+#   preconditions: a MAX32655FTHR on a J-Link probe, a project built for it.
+#   steps:
+#     - Run deploy --probe jlink.
+#     - Check it succeeds, naming the probe.
+#     - Check the board runs the new firmware (its LED blinks at the new rate).
+[]
