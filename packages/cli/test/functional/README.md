@@ -67,11 +67,11 @@ names (for runs side by side):
 
 | File | What |
 |---|---|
-| `test-spec.xlsx` | **About**: the spec's version (below) and its test counts. **Tests**: one row per test, automated, manual and planned: ID, kind, ecosystem, requirements, name, file, description, preconditions, steps (`1. ...`, one per line). **Coverage**: one row per requirement, with the IDs of its automated, manual and planned tests |
+| `test-spec.xlsx` | **About**: the spec's version (below) and its test counts. **Chapters**: each chapter's tests by kind. **Tests**: one row per test, automated, manual and planned, by chapter: ID, chapter, kind, ecosystem, requirements, name, file, description, preconditions, steps (`1. ...`, one per line). **Coverage**: one row per requirement, with the IDs of its automated, manual and planned tests |
 | `test-spec.csv` | The Tests sheet |
-| `test-report.xlsx` | **Run**: when (start, end, duration), how (`CI` with the GitHub run's link, workflow, event and who triggered it, or `local` with the git user and host), what (commit, with uncommitted changes or not, branch, CLI and node versions, OS, the command, whether the real CAPI trees and a board were there) and the spec version it ran. **Requirements** and **Tests**: the two CSVs below |
+| `test-report.xlsx` | **Run**: when (start, end, duration), how (`CI` with the GitHub run's link, workflow, event and who triggered it, or `local` with the git user and host), what (commit, with uncommitted changes or not, branch, CLI and node versions, OS, the command, whether the real CAPI trees and a board were there) and the spec version it ran. **Chapters**: each chapter's tests by status. **Requirements** and **Tests**: the two CSVs below |
 | `requirements.csv` | One row per requirement: its status in `linux` and in `noos` (`-` where it doesn't apply), how many tests that ran check it, the IDs of its tests (`Test IDs`, all of them, run or not), and the IDs of those that fail or are known gaps (`Failing/gap IDs`) |
-| `tests.csv` | One row per test: ID, kind, file, name, ecosystem, requirements, status, whether it is a known gap, time, and for a manual test the date and tester of its last result; the first line of a failure, or the manual result's notes |
+| `tests.csv` | One row per test, by chapter: ID, chapter, kind, file, name, ecosystem, requirements, status, whether it is a known gap, time, and for a manual test the date and tester of its last result; the first line of a failure, or the manual result's notes |
 | `summary.md` | The run, the counts, per ecosystem too, and the requirements that fail, are known gaps (with the IDs of the tests concerned), or have no test in any ecosystem they apply to (CI puts it on the run's page) |
 | `report.xml` | bats' JUnit output |
 
@@ -86,6 +86,24 @@ noted `fixed: drop the gap tag`. A manual test's status is its last recorded res
 
 A requirement's status in an ecosystem is the first of `fail`, `gap`, `pass`, `skipped` (or
 `blocked`), `manual`, `planned` its tests have, and `not tested` when it has none.
+
+### Chapters
+
+Both workbooks sort the tests into chapters, in the order of a project's life:
+
+setup, config, settings, init, import, list, add, read, update, delete, rename, move,
+enable-disable, validate, generate, build, deploy, completion, skill, general; then the
+conformity chapters in the same order (`add-conformity`, `read-conformity`, ...); then
+`end to end` and `manual`.
+
+A test's chapter comes from its file's name: `noos/add.bats` and `linux/add.bats` share **add**,
+`conformity/read.bats` is **read-conformity**, a file under `e2e/` is **end to end**. Two file
+names aren't their chapter's: `gen.bats` is **general**, `enable.bats` **enable-disable**
+(`CHAPTER_NAMES` in `report.py`). A file whose tests belong elsewhere says so in its file tags,
+`# bats file_tags=eco:noos, chapter:deploy`; a manual or planned test with its `chapter` field
+(**manual** when left out). A chapter not in the list sorts after the others. The Chapter
+column, the **Chapters** sheet of each workbook (the spec's: each chapter's tests by kind; the
+report's: by status) and a table in `summary.md` show them.
 
 ### The spec's version
 
@@ -116,7 +134,7 @@ e426d3e043b0)`. Two copies of one number with different content have different f
     - Check the board runs the new firmware (its LED blinks at the new rate).
 ```
 
-Every field is required, as for an automated test.
+Every field is required, as for an automated test, except `chapter` (see Chapters).
 
 Whoever runs a manual test records how it went in `manual-results.csv`, one row per run:
 
