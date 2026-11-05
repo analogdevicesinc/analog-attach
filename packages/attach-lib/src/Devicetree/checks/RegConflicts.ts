@@ -3,7 +3,7 @@ import { DeviceTreeOverlay } from "../DeviceTreeOverlay.js";
 import { number_property } from "../nodes/Access.js";
 import { type CellArrayElement, type DTNode, type DTProperty, is_dt_flag } from "../syntax/AST.js";
 import { PropertyBuilder } from "../build/PropertyBuilder.js";
-import { address_cells_of } from "../nodes/UnitAddress.js";
+import { address_cells_of } from "../AddressCells.js";
 
 /** Two enabled siblings whose `reg` claims the same address. */
 export interface RegConflict {
