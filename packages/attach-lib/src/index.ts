@@ -11,7 +11,7 @@ export type { SchemaPaths } from './Bindings/Context.js';
 export { Result } from './result.js';
 export { type ControllerContext, filter_peripheral_properties, load_spi_peripherals, type SpiPeripherals } from './Bindings/VendorPeripheralFilter.js';
 export type { ResolvedProperty, PatternPropertyRule, PropertyPatternRule, ParsedBinding } from './Bindings/ParsedBinding.js';
-export { expand_pattern, type PatternExpansion } from './RegexExpansion.js';
+export { expand_pattern, type PatternExpansion } from './Bindings/PatternExpansion.js';
 export { references_to, unresolved_references, unresolved_targets, type ReferenceTo, type UnresolvedReference, type UnresolvedTarget } from './Devicetree/References.js';
 export {
     AttachEnumType,

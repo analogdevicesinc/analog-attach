@@ -53,7 +53,7 @@ Turns a raw YAML binding schema into a UI-ready `ParsedBinding`. Dependencies ru
 
 A property's type is an `AttachType` (`Bindings/StructuralTypes.ts`): `flag`, `scalar` (one `Cell`), `list` (`item` one `Cell` for every value, or one per position, with optional `minItems` / `maxItems` / `typeSize` / `unique`), `matrix` (`rows` of lists), `node` (child properties) or `unknown`. A `Cell` is a `number` (optional range), an `enum` (`enum_type` says whether its options are numbers, strings, macros or phandle names; an option may be a whole list of strings, the fallback `compatible`s), a `string`, or `any` (a number, label or macro expression). A const is a one-option enum that is also the default. `is_list`, `is_open_list` (its cells `any`, or whole `uint32`s: reg.yaml's `reg`), `is_open` (an open list, or a matrix of open lists: the binding gives only the counts) and `list_cell` narrow them.
 
-`src/RegexExpansion.ts`'s `expand_pattern(pattern, cap = 32)` turns a binding pattern into the names it matches (`^channel@([0-9]|1[0-5])$` → channel@0 … channel@15), or into the literal stem when it is unbounded or larger than the cap (`^fan-[0-9]+$` → "fan-"). The CLI uses it for completion and `list property`.
+`src/Bindings/PatternExpansion.ts`'s `expand_pattern(pattern, cap = 32)` turns a binding pattern into the names it matches (`^channel@([0-9]|1[0-5])$` → channel@0 … channel@15), or into the literal stem when it is unbounded or larger than the cap (`^fan-[0-9]+$` → "fan-"). The CLI uses it for completion and `list property`.
 
 The output is a `ParsedBinding`; AJV compiles `process_binding`'s schema only to narrow its `if/then` branches (`Attach`).
 
