@@ -1,7 +1,8 @@
 // The questions of the setup run (the bare `analog-attach` on a terminal), asked
-// through the session's prompter. Each step takes the current value of the setting,
-// when there is one, as its Enter default. What a step says between its questions
-// goes to `session.say`, styled with `session.style`.
+// through the session's prompter. A step is only asked for a setting that is unset or
+// not valid (commands/setup/command.ts decides); it gives the answer, which the caller
+// saves. What a step says between its questions goes to `session.say`, styled with
+// `session.style`.
 
 import * as fs from "node:fs";
 import path from "node:path";
@@ -9,7 +10,7 @@ import * as os from "node:os";
 
 import type { Choice, InteractiveSession, Style } from "../../interface/backend-interface";
 import { linux_tree_problem } from "./config/workspace";
-import { next_workfile_name, workfile_filename, workfile_problem, type OverlayChoice } from "./workfile";
+import { next_workfile_name, workfile_filename, workfile_problem } from "./workfile";
 
 /** Where the setup run resolves what is typed (the session's directory) and looks for Linux trees (the home directory). */
 export interface SetupPlace {
@@ -145,7 +146,7 @@ export function find_linux_trees(root = os.homedir()): string[] {
 /** The choice that asks for a path instead of a listed one. */
 const TYPE_PATH = Symbol("type a path");
 
-export async function step_linux(session: InteractiveSession, place: SetupPlace, current?: string): Promise<string> {
+export async function step_linux(session: InteractiveSession, place: SetupPlace): Promise<string> {
     const { bold, dim } = session.style;
     const say = (line: string): void => { session.say(line); };
     say(bold("Step 1: Linux kernel source tree"));
@@ -155,29 +156,23 @@ export async function step_linux(session: InteractiveSession, place: SetupPlace,
     say("");
 
     say("Searching for Linux source trees under ~...");
-    const found = find_linux_trees(place.home);
+    const trees = find_linux_trees(place.home);
     say("");
 
-    // The configured tree comes first: Enter keeps it.
-    const trees = current === undefined ? found : [current, ...found.filter(tree => tree !== current)];
-    let selected: string;
     if (trees.length === 0) {
         say("No Linux source trees found under ~.");
         say("");
         say(dim("Tab-complete available. Path must contain Documentation/devicetree/bindings/ and include/."));
-        selected = await ask_path(session, place, "Linux source path", answer => check_linux(answer, place));
-    } else {
-        const choices: Choice<string | typeof TYPE_PATH>[] = [
-            ...trees.map(tree => ({ name: `${tree}${tree === current ? dim(" (current)") : ""}`, value: tree })),
-            { name: "Type a path", value: TYPE_PATH },
-        ];
-        const picked = await session.prompter.select({ message: "Linux source tree", choices, default: trees[0] });
-        selected = picked === TYPE_PATH
-            ? await ask_path(session, place, "Linux source path", answer => check_linux(answer, place))
-            : picked;
+        return ask_path(session, place, "Linux source path", answer => check_linux(answer, place));
     }
-    say(`Selected: ${selected}`);
-    return selected;
+    const choices: Choice<string | typeof TYPE_PATH>[] = [
+        ...trees.map(tree => ({ name: tree, value: tree })),
+        { name: "Type a path", value: TYPE_PATH },
+    ];
+    const picked = await session.prompter.select({ message: "Linux source tree", choices, default: trees[0] });
+    return picked === TYPE_PATH
+        ? ask_path(session, place, "Linux source path", answer => check_linux(answer, place))
+        : picked;
 }
 
 // ---------------------------------------------------------------------------
@@ -264,35 +259,28 @@ async function search_dts(session: InteractiveSession, place: SetupPlace, linux_
             source: term => Promise.resolve(dts_choices(files, term, session.style)),
         });
         if (picked === BACK) { continue; }
-        const selected = path.join(linux_path, "arch", arch, "boot", "dts", picked);
-        say(`Selected: ${selected}`);
-        return selected;
+        return path.join(linux_path, "arch", arch, "boot", "dts", picked);
     }
 }
 
 async function manual_dts(session: InteractiveSession, place: SetupPlace): Promise<string> {
     session.say(session.style.dim("Tab-complete available."));
-    const selected = await ask_path(session, place, "Path to .dts file", answer => check_dts(answer, place));
-    session.say(`Selected: ${selected}`);
-    return selected;
+    return ask_path(session, place, "Path to .dts file", answer => check_dts(answer, place));
 }
 
-type ContextChoice = "keep" | "search" | "manual" | "remote";
+type ContextChoice = "search" | "manual" | "remote";
 
-export async function step_context(session: InteractiveSession, place: SetupPlace, linux_path: string, current?: string): Promise<string> {
+export async function step_context(session: InteractiveSession, place: SetupPlace, linux_path: string): Promise<string> {
     const { bold, dim } = session.style;
     session.say(bold("Step 2: Base device tree (context)"));
     session.say("");
-    // With a configured base tree, the first choice keeps it and Enter takes it.
     const choices: Choice<ContextChoice>[] = [
-        ...(current === undefined ? [] : [{ name: `Keep ${current}`, value: "keep" as const }]),
         { name: "Search in the Linux tree", value: "search" },
         { name: "Enter path manually", value: "manual" },
         { name: `Export from remote device ${dim("(coming soon)")}`, value: "remote", disabled: "Not yet available" },
     ];
     const picked = await session.prompter.select({ message: "Choose how to select the base .dts file", choices });
     switch (picked) {
-        case "keep": { return current ?? manual_dts(session, place); }
         case "search": { return search_dts(session, place, linux_path); }
         // `remote` is disabled; a scripted prompter that picks it gets the manual path.
         case "manual":
@@ -320,34 +308,13 @@ async function ask_workfile_name(session: InteractiveSession, place: SetupPlace)
     return filename;
 }
 
-/** An answer to "keep or new": Enter, `k` or `keep` keeps; `n` or `new` names a new one. */
-export function keep_or_new(answer: string): "keep" | "new" | undefined {
-    const lower = answer.trim().toLowerCase();
-    if (lower === "" || lower === "k" || lower === "keep") { return "keep"; }
-    if (lower === "n" || lower === "new") { return "new"; }
-    return undefined;
-}
-
-/**
- * The overlay workfile: keep the configured one (Enter) or name a new one,
- * which `init` creates. `configured` is the configured workfile, whether its
- * file exists or not.
- */
-export async function step_overlay(session: InteractiveSession, place: SetupPlace, configured?: string): Promise<OverlayChoice> {
+/** The overlay workfile, when none is configured: the name of a new one, which `init` creates. */
+export async function step_overlay(session: InteractiveSession, place: SetupPlace): Promise<string> {
     session.say(session.style.bold("Step 3: Overlay workfile"));
     session.say("");
     session.say("The workfile is the overlay file your changes are written to.");
     session.say("");
-
-    if (configured !== undefined) {
-        const answer = await session.prompter.input({
-            message: `Overlay: [k]eep ${configured} / [n]ew`,
-            default: "k",
-            validate: typed => keep_or_new(typed) === undefined ? "Please enter k to keep it or n for a new one." : true,
-        });
-        if (keep_or_new(answer) !== "new") { return { kind: "keep", path: configured }; }
-    }
-    return { kind: "create", filename: await ask_workfile_name(session, place) };
+    return ask_workfile_name(session, place);
 }
 
 if (import.meta.vitest) {
@@ -429,11 +396,5 @@ if (import.meta.vitest) {
         expect(dts_choices(files, "", style).map(choice => choice.value)).toEqual([BACK, ...files]);
         expect(dts_choices(files, "RPI", style).map(choice => choice.value)).toEqual([files[0], files[1], BACK]);
         expect(dts_choices(files, "nothing", style).map(choice => choice.value)).toEqual([BACK]);
-    });
-
-    test("keep_or_new — Enter and k keep, n names a new one, anything else is asked again", () => {
-        expect(["", "k", "Keep", " K "].map(answer => keep_or_new(answer))).toEqual(["keep", "keep", "keep", "keep"]);
-        expect(["n", "NEW"].map(answer => keep_or_new(answer))).toEqual(["new", "new"]);
-        expect(keep_or_new("x")).toBeUndefined();
     });
 }

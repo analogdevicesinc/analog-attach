@@ -99,8 +99,8 @@ settings files as they were. Scratch files under the state directory (§8)
 may have been rewritten. Where the backend is linux, exceptions: `config
 linux <path>` saves `linux` before it builds the caches and refuses when the
 build doesn't happen or fails (`config.md` CONFIG-122, CONFIG-123, CF-6), and
-the setup run keeps `linux`, `devicetree` and `workfile` saved when its cache
-build fails (`setup.md` SETUP-030, SETUP-033, S-3).
+the setup run keeps the settings its steps saved when its cache build fails
+(`setup.md` SETUP-030, SETUP-033, SETUP-035).
 
 **COM-043** When a command is given a value it can't take (a setting value
 that isn't one of its options, or names no file; a property value that
