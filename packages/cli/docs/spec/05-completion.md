@@ -546,9 +546,8 @@ base's children only, where every `list` path with `&` is not found
 (resolve the label-first path to an absolute one first). (This was
 `__list.md` IL-3.)
 
-**CO-13. A property can be offered twice.** `read spi1 <Tab>` (an RPi 4 base)
-lists `#address-cells` twice in the `set` group: the narrowed binding names it
-twice (`list.md` L-7), and the candidates of COMPL-060 aren't made unique.
+**CO-13.** *Closed.* `read spi1 <Tab>` (an RPi 4 base) listed `#address-cells`
+twice; the narrowed binding no longer names it twice (`list.md` L-7).
 
 **CO-14. A group alone completes no flag.** `list -<Tab>` and `skill
 -<Tab>` offer nothing (COMPL-034), though `--help` applies.
