@@ -1,11 +1,8 @@
 import { AttachType } from "./AttachType.js";
-import type { ValueSuggestion } from "../../Intelligence/layers/types.js";
 
 export type ResolvedProperty = {
     key: string,
     value: AttachType,
-    /** Concrete candidate values contributed by intelligence layers. */
-    suggestions?: ValueSuggestion[],
     /** For a `*-gpios` property: how many rows (controller + cells) it takes, as the binding sizes it (set by the devicetree layer). */
     gpio_rows?: { min_rows: number; max_rows?: number },
 }

@@ -60,12 +60,12 @@ if (import.meta.vitest) {
     test("populate_binding — pattern properties do not receive the parent placement", () => {
         const dt = DeviceTree.new_from_string("/dts-v1/;\n/ {\n};\n");
         if (typeof dt === "string") { throw new TypeError(dt); }
-        // Suggests the placement's reg for `reg`, and nothing without a placement.
+        // Describes `reg` with the placement's address, and leaves it as it is without a placement.
         const layer: IntelligenceLayer = {
             name: "placement",
             refine_properties: (properties, context) => properties.map(property =>
                 property.key === "reg" && context.placement?.reg !== undefined
-                    ? { ...property, suggestions: [{ rows: [[context.placement.reg]], display: "reg", source: "placement" }] }
+                    ? { ...property, value: { ...property.value, description: `at ${context.placement.reg}` } }
                     : property),
         };
 
@@ -92,10 +92,10 @@ if (import.meta.vitest) {
         const populated = populate_binding(binding, dt, "{}", { layers: [layer], placement });
 
         const top_reg = populated.properties.find(p => p.key === "reg");
-        expect(top_reg?.suggestions?.length).toBeGreaterThan(0);
+        expect(top_reg?.value.description).toBe("at 0");
 
         const pattern_reg = populated.pattern_properties?.[0]?.properties.find(p => p.key === "reg");
-        expect(pattern_reg?.suggestions ?? []).toStrictEqual([]);
+        expect(pattern_reg?.value.description).toBeUndefined();
     });
 
     test("populate_binding — a pattern's reg is read with the node's own cells, not its parent's", () => {

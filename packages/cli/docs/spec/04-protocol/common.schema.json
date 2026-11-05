@@ -535,12 +535,6 @@
         },
         "default": {
           "$ref": "#/$defs/property-value"
-        },
-        "suggestions": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/suggestion"
-          }
         }
       },
       "additionalProperties": false

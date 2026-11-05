@@ -314,7 +314,6 @@ if (import.meta.vitest) {
         required: false,
         binding_path: "/linux/Documentation/devicetree/bindings/iio/adc/adi,ad7124.yaml",
         constraints: { maximum: 5_000_000n },
-        suggestions: [],
     };
 
     test("format_details — description with the binding file, range and suggestions", () => {
