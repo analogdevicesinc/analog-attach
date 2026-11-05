@@ -43,6 +43,7 @@
             "key": "clocks",
             "value": {
                 "_t": "matrix",
+                "description": "List of phandle and clock specifier pairs, one pair\nfor each clock input to the device.  Note: if the\nclock provider specifies '0' for #clock-cells, then\nonly the phandle portion of the pair will appear.\n",
                 "maxItems": 1,
                 "minItems": 1,
                 "rows": [
@@ -70,6 +71,7 @@
             "key": "clock-names",
             "value": {
                 "_t": "list",
+                "description": "List of clock input name strings sorted in the same order as the clocks property.  Consumers drivers will use clock-names to match clock input names with clocks specifiers.",
                 "item": {
                     "_t": "enum",
                     "default": "sys_clk",
@@ -205,8 +207,10 @@
                 "_t": "scalar",
                 "cell": {
                     "_t": "number",
-                    "maximum": "1000000n"
-                }
+                    "maximum": "1000000n",
+                    "minimum": "0n"
+                },
+                "typeSize": 32
             }
         },
         {
@@ -217,6 +221,7 @@
             "key": "reset-gpios",
             "value": {
                 "_t": "list",
+                "description": "GPIO (or GPIOs for power sequence) connected to the device reset pin (e.g. RESET or RESETN).",
                 "item": {
                     "_t": "enum",
                     "enum": [

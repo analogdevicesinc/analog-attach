@@ -1,7 +1,55 @@
 {
-    "description": "Analog Devices ADIS16475 and similar IMUs\nhttps://www.analog.com/media/en/technical-documentation/data-sheets/ADIS16475.pdf\n",
+    "description": "Analog Devices AD7292 10-Bit Monitor and Control System with ADC, DACs,\nTemperature Sensor, and GPIOs\n\nSpecifications about the part can be found at:\n  https://www.analog.com/media/en/technical-documentation/data-sheets/ad7292.pdf\n",
     "examples": [
-        "#include <dt-bindings/interrupt-controller/irq.h>\nspi {\n    #address-cells = <1>;\n    #size-cells = <0>;\n\n    adis16475: adis16475-3@0 {\n        compatible = \"adi,adis16475-3\";\n        reg = <0>;\n        spi-cpha;\n        spi-cpol;\n        spi-max-frequency = <2000000>;\n        interrupts = <4 IRQ_TYPE_EDGE_RISING>;\n        interrupt-parent = <&gpio>;\n    };\n};\n"
+        "spi {\n  #address-cells = <1>;\n  #size-cells = <0>;\n\n  ad7292: adc@0 {\n    compatible = \"adi,ad7292\";\n    reg = <0>;\n    spi-max-frequency = <25000000>;\n    vref-supply = <&adc_vref>;\n    spi-cpha;\n\n    #address-cells = <1>;\n    #size-cells = <0>;\n\n    channel@0 {\n      reg = <0>;\n      diff-channels = <0 1>;\n    };\n    channel@2 {\n      reg = <2>;\n    };\n    channel@3 {\n      reg = <3>;\n    };\n    channel@4 {\n      reg = <4>;\n    };\n    channel@5 {\n      reg = <5>;\n    };\n    channel@6 {\n      reg = <6>;\n    };\n    channel@7 {\n      reg = <7>;\n    };\n  };\n};\n"
+    ],
+    "pattern_properties": [
+        {
+            "description": "Represents the external channels which are connected to the ADC.\n",
+            "pattern": "^channel@[0-7]$",
+            "properties": [
+                {
+                    "key": "reg",
+                    "value": {
+                        "_t": "matrix",
+                        "description": "The channel number. It can have up to 8 channels numbered from 0 to 7.\n",
+                        "maxItems": 1,
+                        "minItems": 1,
+                        "rows": [
+                            {
+                                "_t": "list",
+                                "item": {
+                                    "_t": "number",
+                                    "maximum": "7n",
+                                    "minimum": "0n"
+                                },
+                                "maxItems": 1,
+                                "minItems": 1,
+                                "typeSize": 32
+                            }
+                        ]
+                    }
+                },
+                {
+                    "key": "diff-channels",
+                    "value": {
+                        "_t": "list",
+                        "description": "Many ADCs have dual Muxes to allow different input pins to be routed to both the positive and negative inputs of a differential ADC. The first value specifies the positive input pin, the second specifies the negative input pin.",
+                        "item": {
+                            "_t": "number",
+                            "maximum": "4294967295n",
+                            "minimum": "0n"
+                        },
+                        "maxItems": 2,
+                        "minItems": 2,
+                        "typeSize": 32
+                    }
+                }
+            ],
+            "required": [
+                "reg"
+            ]
+        }
     ],
     "properties": [
         {
@@ -11,33 +59,7 @@
                 "item": {
                     "_t": "enum",
                     "enum": [
-                        "adi,adis16475-1",
-                        "adi,adis16475-2",
-                        "adi,adis16475-3",
-                        "adi,adis16477-1",
-                        "adi,adis16477-2",
-                        "adi,adis16477-3",
-                        "adi,adis16470",
-                        "adi,adis16465-1",
-                        "adi,adis16465-2",
-                        "adi,adis16465-3",
-                        "adi,adis16467-1",
-                        "adi,adis16467-2",
-                        "adi,adis16467-3",
-                        "adi,adis16500",
-                        "adi,adis16501",
-                        "adi,adis16505-1",
-                        "adi,adis16505-2",
-                        "adi,adis16505-3",
-                        "adi,adis16507-1",
-                        "adi,adis16507-2",
-                        "adi,adis16507-3",
-                        "adi,adis16575-2",
-                        "adi,adis16575-3",
-                        "adi,adis16576-2",
-                        "adi,adis16576-3",
-                        "adi,adis16577-2",
-                        "adi,adis16577-3"
+                        "adi,ad7292"
                     ],
                     "enum_type": "string"
                 },
@@ -61,62 +83,10 @@
                             "minimum": "0n"
                         },
                         "maxItems": 1,
-                        "minItems": 1
+                        "minItems": 1,
+                        "typeSize": 32
                     }
                 ]
-            }
-        },
-        {
-            "key": "interrupts",
-            "value": {
-                "_t": "matrix",
-                "maxItems": 1,
-                "minItems": 1,
-                "rows": [
-                    {
-                        "_t": "list",
-                        "item": [
-                            {
-                                "_t": "number"
-                            },
-                            {
-                                "_t": "number"
-                            },
-                            {
-                                "_t": "enum",
-                                "enum": [
-                                    "IRQ_TYPE_NONE",
-                                    "IRQ_TYPE_EDGE_RISING",
-                                    "IRQ_TYPE_EDGE_FALLING",
-                                    "IRQ_TYPE_EDGE_BOTH",
-                                    "IRQ_TYPE_LEVEL_HIGH",
-                                    "IRQ_TYPE_LEVEL_LOW"
-                                ],
-                                "enum_type": "macro"
-                            }
-                        ],
-                        "maxItems": 3,
-                        "minItems": 3
-                    }
-                ]
-            }
-        },
-        {
-            "key": "interrupt-parent",
-            "value": {
-                "_t": "list",
-                "item": {
-                    "_t": "enum",
-                    "default": "gicv2",
-                    "enum": [
-                        "gpio",
-                        "gicv2",
-                        "aon_intr"
-                    ],
-                    "enum_type": "phandle"
-                },
-                "maxItems": 1,
-                "minItems": 1
             }
         },
         {
@@ -126,80 +96,18 @@
             }
         },
         {
-            "key": "spi-cpol",
-            "value": {
-                "_t": "flag"
-            }
-        },
-        {
-            "key": "spi-max-frequency",
-            "value": {
-                "_t": "scalar",
-                "cell": {
-                    "_t": "number",
-                    "maximum": "2000000n",
-                    "minimum": "0n"
-                },
-                "description": "Maximum SPI clocking speed of the device in Hz.",
-                "typeSize": 32
-            }
-        },
-        {
-            "key": "spi-cs-inactive-delay-ns",
+            "key": "vref-supply",
             "value": {
                 "_t": "list",
-                "description": "Delay in nanoseconds to be introduced by the controller after CS is de-asserted.",
-                "item": {
-                    "_t": "number",
-                    "default": "16000n",
-                    "maximum": "4294967295n",
-                    "minimum": "16000n"
-                },
-                "maxItems": 1,
-                "minItems": 1
-            }
-        },
-        {
-            "key": "clocks",
-            "value": {
-                "_t": "matrix",
-                "maxItems": 1,
-                "minItems": 1,
-                "rows": [
-                    {
-                        "_t": "list",
-                        "item": [
-                            {
-                                "_t": "enum",
-                                "enum": [
-                                    "clk_osc",
-                                    "clk_usb",
-                                    "clk_27MHz",
-                                    "clk_108MHz"
-                                ],
-                                "enum_type": "phandle"
-                            }
-                        ],
-                        "maxItems": 1,
-                        "minItems": 1
-                    }
-                ]
-            }
-        },
-        {
-            "gpio_rows": {
-                "max_rows": 1,
-                "min_rows": 1
-            },
-            "key": "reset-gpios",
-            "value": {
-                "_t": "list",
-                "description": "Must be the device tree identifier of the RESET pin. If specified, it will be asserted during driver probe. As the line is active low, it should be marked GPIO_ACTIVE_LOW.",
+                "description": "The regulator supply for ADC and DAC reference voltage.\n",
                 "item": {
                     "_t": "enum",
                     "enum": [
-                        "gpio",
-                        "expgpio"
+                        "cam1_reg",
+                        "cam_dummy_reg",
+                        "sd_vcc_reg",
+                        "vdd_3v3_reg",
+                        "vdd_5v0_reg"
                     ],
                     "enum_type": "phandle"
                 },
@@ -208,15 +116,32 @@
             }
         },
         {
-            "key": "adi,sync-mode",
+            "key": "#address-cells",
             "value": {
                 "_t": "scalar",
                 "cell": {
-                    "_t": "number",
-                    "maximum": "3n",
-                    "minimum": "0n"
+                    "_t": "enum",
+                    "enum": [
+                        "1n"
+                    ],
+                    "enum_type": "number"
                 },
-                "description": "Configures the device SYNC pin. The following modes are supported 0 - output_sync 1 - direct_sync 2 - scaled_sync 3 - pulse_sync",
+                "default": "1n",
+                "typeSize": 32
+            }
+        },
+        {
+            "key": "#size-cells",
+            "value": {
+                "_t": "scalar",
+                "cell": {
+                    "_t": "enum",
+                    "enum": [
+                        "0n"
+                    ],
+                    "enum_type": "number"
+                },
+                "default": "0n",
                 "typeSize": 32
             }
         },
@@ -232,6 +157,19 @@
             "value": {
                 "_t": "flag",
                 "description": "The device requires the LSB first mode."
+            }
+        },
+        {
+            "key": "spi-max-frequency",
+            "value": {
+                "_t": "scalar",
+                "cell": {
+                    "_t": "number",
+                    "maximum": "4294967295n",
+                    "minimum": "0n"
+                },
+                "description": "Maximum SPI clocking speed of the device in Hz.",
+                "typeSize": 32
             }
         },
         {
@@ -252,6 +190,19 @@
             "value": {
                 "_t": "list",
                 "description": "Delay in nanoseconds to be introduced by the controller before CS is de-asserted.",
+                "item": {
+                    "_t": "number",
+                    "maximum": "4294967295n",
+                    "minimum": "0n"
+                },
+                "minItems": 1
+            }
+        },
+        {
+            "key": "spi-cs-inactive-delay-ns",
+            "value": {
+                "_t": "list",
+                "description": "Delay in nanoseconds to be introduced by the controller after CS is de-asserted.",
                 "item": {
                     "_t": "number",
                     "maximum": "4294967295n",
@@ -636,9 +587,7 @@
     "required_properties": [
         "compatible",
         "reg",
-        "interrupts",
-        "spi-cpha",
-        "spi-cpol"
+        "spi-cpha"
     ],
-    "title": "Analog Devices ADIS16475 and similar IMUs"
+    "title": "Analog Devices AD7292 10-Bit Monitor and Control System"
 }

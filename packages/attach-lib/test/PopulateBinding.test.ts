@@ -17,5 +17,5 @@ test.each(BINDINGS)('$name', async ({ name, path: file }) => {
 
     const populated = populate_binding(parsed.value.parsed_binding, rpi, '{}', { parent_name: 'spi@7e204000' });
 
-    await expect(snapshot(populated)).toMatchFileSnapshot(`expected/insert-known-structures/${name}.json`);
+    await expect(snapshot(populated)).toMatchFileSnapshot(`expected/populate-binding/${name}.json`);
 });

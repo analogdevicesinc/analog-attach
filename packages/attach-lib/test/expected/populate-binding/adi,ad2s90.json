@@ -1,8 +1,7 @@
 {
-    "description": "Analog Devices ADXL345/ADXL375 3-Axis Digital Accelerometers that supports\nboth I2C & SPI interfaces.\n  https://www.analog.com/en/products/mems/accelerometers/adxl345.html\n  https://www.analog.com/en/products/sensors-mems/accelerometers/adxl375.html\n",
+    "description": "Datasheet: https://www.analog.com/en/products/ad2s90.html\n",
     "examples": [
-        "#include <dt-bindings/gpio/gpio.h>\n#include <dt-bindings/interrupt-controller/irq.h>\ni2c {\n    #address-cells = <1>;\n    #size-cells = <0>;\n\n    /* Example for a I2C device node */\n    accelerometer@2a {\n        compatible = \"adi,adxl345\";\n        reg = <0x2a>;\n        interrupt-parent = <&gpio0>;\n        interrupts = <0 IRQ_TYPE_LEVEL_HIGH>;\n    };\n};\n",
-        "#include <dt-bindings/gpio/gpio.h>\n#include <dt-bindings/interrupt-controller/irq.h>\nspi {\n    #address-cells = <1>;\n    #size-cells = <0>;\n\n    /* Example for a SPI device node */\n    accelerometer@0 {\n        compatible = \"adi,adxl345\";\n        reg = <0>;\n        spi-max-frequency = <5000000>;\n        spi-cpol;\n        spi-cpha;\n        interrupt-parent = <&gpio0>;\n        interrupts = <0 IRQ_TYPE_LEVEL_HIGH>;\n    };\n};\n"
+        "spi {\n    #address-cells = <1>;\n    #size-cells = <0>;\n\n    resolver@0 {\n        compatible = \"adi,ad2s90\";\n        reg = <0>;\n        spi-max-frequency = <830000>;\n        spi-cpol;\n        spi-cpha;\n    };\n};\n"
     ],
     "properties": [
         {
@@ -11,13 +10,9 @@
                 "_t": "list",
                 "item": {
                     "_t": "enum",
+                    "default": "adi,ad2s90",
                     "enum": [
-                        [
-                            "adi,adxl346",
-                            "adi,adxl345"
-                        ],
-                        "adi,adxl345",
-                        "adi,adxl375"
+                        "adi,ad2s90"
                     ],
                     "enum_type": "string"
                 },
@@ -41,68 +36,23 @@
                             "minimum": "0n"
                         },
                         "maxItems": 1,
-                        "minItems": 1
+                        "minItems": 1,
+                        "typeSize": 32
                     }
                 ]
             }
         },
         {
-            "key": "interrupts",
+            "key": "spi-max-frequency",
             "value": {
-                "_t": "matrix",
-                "maxItems": 1,
-                "minItems": 1,
-                "rows": [
-                    {
-                        "_t": "list",
-                        "item": [
-                            {
-                                "_t": "number"
-                            },
-                            {
-                                "_t": "number"
-                            },
-                            {
-                                "_t": "enum",
-                                "enum": [
-                                    "IRQ_TYPE_NONE",
-                                    "IRQ_TYPE_EDGE_RISING",
-                                    "IRQ_TYPE_EDGE_FALLING",
-                                    "IRQ_TYPE_EDGE_BOTH",
-                                    "IRQ_TYPE_LEVEL_HIGH",
-                                    "IRQ_TYPE_LEVEL_LOW"
-                                ],
-                                "enum_type": "macro"
-                            }
-                        ],
-                        "maxItems": 3,
-                        "minItems": 3
-                    }
-                ]
-            }
-        },
-        {
-            "key": "interrupt-parent",
-            "value": {
-                "_t": "list",
-                "item": {
-                    "_t": "enum",
-                    "default": "gicv2",
-                    "enum": [
-                        "gpio",
-                        "gicv2",
-                        "aon_intr"
-                    ],
-                    "enum_type": "phandle"
+                "_t": "scalar",
+                "cell": {
+                    "_t": "number",
+                    "maximum": "830000n",
+                    "minimum": "0n"
                 },
-                "maxItems": 1,
-                "minItems": 1
-            }
-        },
-        {
-            "key": "spi-cpha",
-            "value": {
-                "_t": "flag"
+                "description": "Chip's max frequency, as specified in its datasheet, is 2Mhz. But a 600ns\ndelay is expected between the application of a logic LO to CS and the\napplication of SCLK, as also specified. And since the delay is not\nimplemented in the spi code, to satisfy it, SCLK's period should be at\nmost 2 * 600ns, so the max frequency should be 1 / (2 * 6e-7), which gives\nroughly 830000Hz.\n",
+                "typeSize": 32
             }
         },
         {
@@ -112,7 +62,7 @@
             }
         },
         {
-            "key": "spi-3wire",
+            "key": "spi-cpha",
             "value": {
                 "_t": "flag"
             }
@@ -129,19 +79,6 @@
             "value": {
                 "_t": "flag",
                 "description": "The device requires the LSB first mode."
-            }
-        },
-        {
-            "key": "spi-max-frequency",
-            "value": {
-                "_t": "scalar",
-                "cell": {
-                    "_t": "number",
-                    "maximum": "4294967295n",
-                    "minimum": "0n"
-                },
-                "description": "Maximum SPI clocking speed of the device in Hz.",
-                "typeSize": 32
             }
         },
         {
@@ -558,8 +495,7 @@
     ],
     "required_properties": [
         "compatible",
-        "reg",
-        "interrupts"
+        "reg"
     ],
-    "title": "Analog Devices ADXL345/ADXL375 3-Axis Digital Accelerometers"
+    "title": "Analog Devices AD2S90 Resolver-to-Digital Converter"
 }

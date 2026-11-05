@@ -71,7 +71,6 @@ if (import.meta.vitest) {
 
     const properties: ResolvedProperty[] = [
         { key: "reg", value: { _t: "list", item: { _t: "any" }, minItems: 1, maxItems: 1 } },
-        { key: "mount-matrix", value: { _t: "list", item: { _t: "string" } } },
         { key: "sample-rate-hz", value: { _t: "list", item: { _t: "any" }, minItems: 1, maxItems: 1 } },
         { key: "interrupt-parent", value: { _t: "unknown" } },
         { key: "interrupts", value: { _t: "list", item: { _t: "any" }, minItems: 1, maxItems: 1 } },
@@ -81,13 +80,12 @@ if (import.meta.vitest) {
 
     const phandle = (label: string) => ({ _t: "enum", enum: [label], enum_type: "phandle" });
 
-    test("IntelligenceStack.default — the binding layer's shapes, refined by the devicetree", () => {
+    test("IntelligenceStack.default — the binding's shapes, refined by the devicetree", () => {
         const data = JSON.stringify({ "interrupt-parent": "gpio", "reset-gpios": ["gpio"] });
         const refined = IntelligenceStack.default().refine_properties(properties, { devicetree, data });
         const value = (key: string) => refined.find(p => p.key === key)?.value;
 
-        // binding layer: the known shape of mount-matrix; an unknown property is left as it is, and so is reg with no parent to read it with
-        expect(value("mount-matrix")).toMatchObject({ _t: "list", minItems: 9, maxItems: 9 });
+        // a property the devicetree says nothing of is left as it is, and so is reg with no parent to read it with
         expect(value("reg")).toStrictEqual(properties.find(p => p.key === "reg")!.value);
         expect(value("sample-rate-hz")).toStrictEqual(properties.find(p => p.key === "sample-rate-hz")!.value);
         // devicetree layer: the tree's controllers and regulators, and rows shaped by the chosen controller's cells

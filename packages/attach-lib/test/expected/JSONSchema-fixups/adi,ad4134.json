@@ -55,17 +55,58 @@
             "type": "array"
         },
         "clock-names": {
+            "description": "List of clock input name strings sorted in the same order as the clocks property.  Consumers drivers will use clock-names to match clock input names with clocks specifiers.",
             "dtType": "string-array",
             "items": [
                 {
-                    "const": "sys_clk"
+                    "const": "sys_clk",
+                    "type": "string"
                 }
             ],
             "maxItems": 1,
             "minItems": 1,
-            "type": "array"
+            "type": "array",
+            "uniqueItems": true
         },
         "clocks": {
+            "anyOf": [
+                {
+                    "type": "object"
+                },
+                {
+                    "dtType": "phandle-array",
+                    "items": {
+                        "additionalItems": {
+                            "dtType": "uint32",
+                            "maximum": 4294967295,
+                            "minimum": 0,
+                            "type": "integer",
+                            "typeSize": 32
+                        },
+                        "items": [
+                            {
+                                "oneOf": [
+                                    {
+                                        "maximum": 4294967295,
+                                        "minimum": 1,
+                                        "type": "integer"
+                                    },
+                                    {
+                                        "const": 0,
+                                        "type": "integer"
+                                    }
+                                ]
+                            }
+                        ],
+                        "maxItems": 1024,
+                        "minItems": 1,
+                        "type": "array"
+                    },
+                    "minItems": 1,
+                    "type": "array"
+                }
+            ],
+            "description": "List of phandle and clock specifier pairs, one pair\nfor each clock input to the device.  Note: if the\nclock provider specifies '0' for #clock-cells, then\nonly the phandle portion of the pair will appear.\n",
             "dtType": "phandle-array",
             "items": {
                 "type": "array"
@@ -80,18 +121,41 @@
                 {
                     "enum": [
                         "adi,ad4134"
-                    ]
+                    ],
+                    "pattern": "^[a-zA-Z0-9][a-zA-Z0-9,+\\-._/]+$"
                 }
             ],
             "maxItems": 1,
             "minItems": 1,
-            "type": "array"
+            "type": "array",
+            "uniqueItems": true
         },
         "dma-names": {
+            "anyOf": [
+                {
+                    "items": {
+                        "type": "string"
+                    },
+                    "minItems": 1,
+                    "type": "array",
+                    "uniqueItems": true
+                },
+                {
+                    "items": {
+                        "enum": [
+                            "rx",
+                            "tx"
+                        ]
+                    },
+                    "minItems": 1,
+                    "type": "array"
+                }
+            ],
             "dtType": "string-array",
             "items": [
                 {
-                    "const": "rx"
+                    "const": "rx",
+                    "type": "string"
                 }
             ],
             "maxItems": 1,
@@ -101,6 +165,30 @@
         "dmas": {
             "dtType": "phandle-array",
             "items": {
+                "additionalItems": {
+                    "dtType": "uint32",
+                    "maximum": 4294967295,
+                    "minimum": 0,
+                    "type": "integer",
+                    "typeSize": 32
+                },
+                "items": [
+                    {
+                        "oneOf": [
+                            {
+                                "maximum": 4294967295,
+                                "minimum": 1,
+                                "type": "integer"
+                            },
+                            {
+                                "const": 0,
+                                "type": "integer"
+                            }
+                        ]
+                    }
+                ],
+                "maxItems": 1024,
+                "minItems": 1,
                 "type": "array"
             },
             "maxItems": 1,
@@ -118,16 +206,42 @@
             "dtType": "string-array",
             "items": [
                 {
-                    "const": "odr_pwm"
+                    "const": "odr_pwm",
+                    "type": "string"
                 }
             ],
             "maxItems": 1,
             "minItems": 1,
-            "type": "array"
+            "type": "array",
+            "uniqueItems": true
         },
         "pwms": {
             "dtType": "phandle-array",
             "items": {
+                "additionalItems": {
+                    "dtType": "uint32",
+                    "maximum": 4294967295,
+                    "minimum": 0,
+                    "type": "integer",
+                    "typeSize": 32
+                },
+                "items": [
+                    {
+                        "oneOf": [
+                            {
+                                "maximum": 4294967295,
+                                "minimum": 1,
+                                "type": "integer"
+                            },
+                            {
+                                "const": 0,
+                                "type": "integer"
+                            }
+                        ]
+                    }
+                ],
+                "maxItems": 1024,
+                "minItems": 1,
                 "type": "array"
             },
             "maxItems": 1,
@@ -144,6 +258,16 @@
         "reg": {
             "dtType": "address",
             "items": {
+                "dtType": "uint32-array",
+                "items": {
+                    "dtType": "uint32",
+                    "maximum": 4294967295,
+                    "minimum": 0,
+                    "type": "integer",
+                    "typeSize": 32
+                },
+                "maxItems": 5,
+                "minItems": 1,
                 "type": "array"
             },
             "maxItems": 1,
@@ -151,6 +275,7 @@
             "type": "array"
         },
         "reset-gpios": {
+            "description": "GPIO (or GPIOs for power sequence) connected to the device reset pin (e.g. RESET or RESETN).",
             "dtType": "phandle-array",
             "items": {
                 "type": "array"

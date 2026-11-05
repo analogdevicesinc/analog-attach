@@ -622,17 +622,27 @@
                         },
                         "label": {
                             "description": "Unique name to identify which channel this is.\nReserved label names \"vddcore\", \"vddcpu\", \"vddq_ddr\", \"vrefint\" and \"vbat\"\nare used to identify internal channels with matching names.\n",
-                            "dtType": "string"
+                            "dtType": "string",
+                            "items": {
+                                "type": "string"
+                            },
+                            "maxItems": 1,
+                            "minItems": 1,
+                            "type": "array",
+                            "uniqueItems": true
                         },
                         "reg": {
                             "dtType": "address",
                             "items": [
                                 {
+                                    "dtType": "uint32-array",
                                     "items": [
                                         {
+                                            "dtType": "uint32",
                                             "maximum": 19,
                                             "minimum": 0,
-                                            "type": "integer"
+                                            "type": "integer",
+                                            "typeSize": 32
                                         }
                                     ],
                                     "maxItems": 1,
@@ -665,15 +675,20 @@
             "properties": {
                 "#address-cells": {
                     "const": 1,
-                    "dtType": "uint32"
+                    "dtType": "uint32",
+                    "maximum": 3,
+                    "type": "integer"
                 },
                 "#io-channel-cells": {
                     "const": 1,
+                    "description": "Number of cells in an IIO specifier; Typically 0 for nodes with a single IIO output and 1 for nodes with multiple IIO outputs. A few unusual devices have a 2 level mapping.\n",
                     "dtType": "uint32"
                 },
                 "#size-cells": {
                     "const": 0,
-                    "dtType": "uint32"
+                    "dtType": "uint32",
+                    "maximum": 2,
+                    "type": "integer"
                 },
                 "assigned-resolution-bits": {
                     "description": "Resolution (bits) to use for conversions:\n  - can be 6, 8, 10 or 12 on stm32f4 and stm32mp13\n  - can be 8, 10, 12, 14 or 16 on stm32h7 and stm32mp1\n",
@@ -686,6 +701,43 @@
                     "type": "array"
                 },
                 "clocks": {
+                    "anyOf": [
+                        {
+                            "type": "object"
+                        },
+                        {
+                            "dtType": "phandle-array",
+                            "items": {
+                                "additionalItems": {
+                                    "dtType": "uint32",
+                                    "maximum": 4294967295,
+                                    "minimum": 0,
+                                    "type": "integer",
+                                    "typeSize": 32
+                                },
+                                "items": [
+                                    {
+                                        "oneOf": [
+                                            {
+                                                "maximum": 4294967295,
+                                                "minimum": 1,
+                                                "type": "integer"
+                                            },
+                                            {
+                                                "const": 0,
+                                                "type": "integer"
+                                            }
+                                        ]
+                                    }
+                                ],
+                                "maxItems": 1024,
+                                "minItems": 1,
+                                "type": "array"
+                            },
+                            "minItems": 1,
+                            "type": "array"
+                        }
+                    ],
                     "description": "Input clock private to this ADC instance. It's required only on stm32f4, that has per instance clock input for registers access.",
                     "dtType": "phandle-array",
                     "items": {
@@ -704,18 +756,41 @@
                                 "st,stm32h7-adc",
                                 "st,stm32mp1-adc",
                                 "st,stm32mp13-adc"
-                            ]
+                            ],
+                            "pattern": "^[a-zA-Z0-9][a-zA-Z0-9,+\\-._/]+$"
                         }
                     ],
                     "maxItems": 1,
                     "minItems": 1,
-                    "type": "array"
+                    "type": "array",
+                    "uniqueItems": true
                 },
                 "dma-names": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "minItems": 1,
+                            "type": "array",
+                            "uniqueItems": true
+                        },
+                        {
+                            "items": {
+                                "enum": [
+                                    "rx",
+                                    "tx"
+                                ]
+                            },
+                            "minItems": 1,
+                            "type": "array"
+                        }
+                    ],
                     "dtType": "string-array",
                     "items": [
                         {
-                            "const": "rx"
+                            "const": "rx",
+                            "type": "string"
                         }
                     ],
                     "maxItems": 1,
@@ -726,6 +801,30 @@
                     "description": "RX DMA Channel",
                     "dtType": "phandle-array",
                     "items": {
+                        "additionalItems": {
+                            "dtType": "uint32",
+                            "maximum": 4294967295,
+                            "minimum": 0,
+                            "type": "integer",
+                            "typeSize": 32
+                        },
+                        "items": [
+                            {
+                                "oneOf": [
+                                    {
+                                        "maximum": 4294967295,
+                                        "minimum": 1,
+                                        "type": "integer"
+                                    },
+                                    {
+                                        "const": 0,
+                                        "type": "integer"
+                                    }
+                                ]
+                            }
+                        ],
+                        "maxItems": 1024,
+                        "minItems": 1,
                         "type": "array"
                     },
                     "maxItems": 1,
@@ -735,6 +834,30 @@
                 "interrupt-parent": {
                     "dtType": "phandle",
                     "items": {
+                        "additionalItems": {
+                            "dtType": "uint32",
+                            "maximum": 4294967295,
+                            "minimum": 0,
+                            "type": "integer",
+                            "typeSize": 32
+                        },
+                        "items": [
+                            {
+                                "oneOf": [
+                                    {
+                                        "maximum": 4294967295,
+                                        "minimum": 1,
+                                        "type": "integer"
+                                    },
+                                    {
+                                        "const": 0,
+                                        "type": "integer"
+                                    }
+                                ]
+                            }
+                        ],
+                        "maxItems": 1,
+                        "minItems": 1,
                         "type": "array"
                     },
                     "maxItems": 1,
@@ -745,6 +868,15 @@
                     "description": "IRQ Line for the ADC instance. Valid values are:\n  - 0 for adc@0 (single adc for stm32mp13)\n  - 1 for adc@100\n  - 2 for adc@200 (stm32f4 only)\n",
                     "dtType": "uint32-matrix",
                     "items": {
+                        "dtType": "uint32-array",
+                        "items": {
+                            "dtType": "uint32",
+                            "maximum": 4294967295,
+                            "minimum": 0,
+                            "type": "integer",
+                            "typeSize": 32
+                        },
+                        "minItems": 1,
                         "type": "array"
                     },
                     "maxItems": 1,
@@ -752,10 +884,12 @@
                     "type": "array"
                 },
                 "nvmem-cell-names": {
+                    "description": "Names for each nvmem-cells specified.",
                     "dtType": "string-array",
                     "items": [
                         {
-                            "const": "vrefint"
+                            "const": "vrefint",
+                            "type": "string"
                         }
                     ],
                     "maxItems": 1,
@@ -763,10 +897,36 @@
                     "type": "array"
                 },
                 "nvmem-cells": {
+                    "description": "List of phandle to the nvmem data cells.",
                     "dtType": "phandle-array",
                     "items": [
                         {
-                            "description": "Phandle to the calibration vrefint data provided by otp"
+                            "additionalItems": {
+                                "dtType": "uint32",
+                                "maximum": 4294967295,
+                                "minimum": 0,
+                                "type": "integer",
+                                "typeSize": 32
+                            },
+                            "description": "Phandle to the calibration vrefint data provided by otp",
+                            "items": [
+                                {
+                                    "oneOf": [
+                                        {
+                                            "maximum": 4294967295,
+                                            "minimum": 1,
+                                            "type": "integer"
+                                        },
+                                        {
+                                            "const": 0,
+                                            "type": "integer"
+                                        }
+                                    ]
+                                }
+                            ],
+                            "maxItems": 1024,
+                            "minItems": 1,
+                            "type": "array"
                         }
                     ],
                     "maxItems": 1,
@@ -777,6 +937,16 @@
                     "description": "Offset of ADC instance in ADC block. Valid values are:\n  - 0x0:   ADC1\n  - 0x100: ADC2\n  - 0x200: ADC3 (stm32f4 only)\n",
                     "dtType": "address",
                     "items": {
+                        "dtType": "uint32-array",
+                        "items": {
+                            "dtType": "uint32",
+                            "maximum": 4294967295,
+                            "minimum": 0,
+                            "type": "integer",
+                            "typeSize": 32
+                        },
+                        "maxItems": 5,
+                        "minItems": 1,
                         "type": "array"
                     },
                     "maxItems": 1,
@@ -855,7 +1025,9 @@
     "properties": {
         "#address-cells": {
             "const": 1,
-            "dtType": "uint32"
+            "dtType": "uint32",
+            "maximum": 3,
+            "type": "integer"
         },
         "#interrupt-cells": {
             "const": 1,
@@ -863,11 +1035,38 @@
         },
         "#size-cells": {
             "const": 0,
-            "dtType": "uint32"
+            "dtType": "uint32",
+            "maximum": 2,
+            "type": "integer"
         },
         "access-controllers": {
+            "description": "A list of access controller specifiers, as defined by the bindings of the access-controllers provider.",
             "dtType": "phandle-array",
             "items": {
+                "additionalItems": {
+                    "dtType": "uint32",
+                    "maximum": 4294967295,
+                    "minimum": 0,
+                    "type": "integer",
+                    "typeSize": 32
+                },
+                "items": [
+                    {
+                        "oneOf": [
+                            {
+                                "maximum": 4294967295,
+                                "minimum": 1,
+                                "type": "integer"
+                            },
+                            {
+                                "const": 0,
+                                "type": "integer"
+                            }
+                        ]
+                    }
+                ],
+                "maxItems": 1024,
+                "minItems": 1,
                 "type": "array"
             },
             "maxItems": 2,
@@ -883,15 +1082,54 @@
             "type": "array"
         },
         "clock-names": {
+            "description": "List of clock input name strings sorted in the same order as the clocks property.  Consumers drivers will use clock-names to match clock input names with clocks specifiers.",
             "dtType": "string-array",
             "items": {
                 "type": "string"
             },
             "maxItems": 2,
             "minItems": 1,
-            "type": "array"
+            "type": "array",
+            "uniqueItems": true
         },
         "clocks": {
+            "anyOf": [
+                {
+                    "type": "object"
+                },
+                {
+                    "dtType": "phandle-array",
+                    "items": {
+                        "additionalItems": {
+                            "dtType": "uint32",
+                            "maximum": 4294967295,
+                            "minimum": 0,
+                            "type": "integer",
+                            "typeSize": 32
+                        },
+                        "items": [
+                            {
+                                "oneOf": [
+                                    {
+                                        "maximum": 4294967295,
+                                        "minimum": 1,
+                                        "type": "integer"
+                                    },
+                                    {
+                                        "const": 0,
+                                        "type": "integer"
+                                    }
+                                ]
+                            }
+                        ],
+                        "maxItems": 1024,
+                        "minItems": 1,
+                        "type": "array"
+                    },
+                    "minItems": 1,
+                    "type": "array"
+                }
+            ],
             "description": "Core can use up to two clocks, depending on part used:\n  - \"adc\" clock: for the analog circuitry, common to all ADCs.\n    It's required on stm32f4.\n    It's optional on stm32h7 and stm32mp1.\n  - \"bus\" clock: for registers access, common to all ADCs.\n    It's not present on stm32f4.\n    It's required on stm32h7 and stm32mp1.\n",
             "dtType": "phandle-array",
             "items": {
@@ -910,12 +1148,14 @@
                         "st,stm32h7-adc-core",
                         "st,stm32mp1-adc-core",
                         "st,stm32mp13-adc-core"
-                    ]
+                    ],
+                    "pattern": "^[a-zA-Z0-9][a-zA-Z0-9,+\\-._/]+$"
                 }
             ],
             "maxItems": 1,
             "minItems": 1,
-            "type": "array"
+            "type": "array",
+            "uniqueItems": true
         },
         "interrupt-controller": {
             "dtType": "flag"
@@ -923,6 +1163,30 @@
         "interrupt-parent": {
             "dtType": "phandle",
             "items": {
+                "additionalItems": {
+                    "dtType": "uint32",
+                    "maximum": 4294967295,
+                    "minimum": 0,
+                    "type": "integer",
+                    "typeSize": 32
+                },
+                "items": [
+                    {
+                        "oneOf": [
+                            {
+                                "maximum": 4294967295,
+                                "minimum": 1,
+                                "type": "integer"
+                            },
+                            {
+                                "const": 0,
+                                "type": "integer"
+                            }
+                        ]
+                    }
+                ],
+                "maxItems": 1,
+                "minItems": 1,
                 "type": "array"
             },
             "maxItems": 1,
@@ -933,6 +1197,15 @@
             "description": "One or more interrupts for ADC block, depending on part used:\n  - stm32f4 and stm32h7 share a common ADC interrupt line.\n  - stm32mp1 has two separate interrupt lines, one for each ADC within\n    ADC block.\n  - stm32mp13 has an interrupt line per ADC block.\n",
             "dtType": "uint32-matrix",
             "items": {
+                "dtType": "uint32-array",
+                "items": {
+                    "dtType": "uint32",
+                    "maximum": 4294967295,
+                    "minimum": 0,
+                    "type": "integer",
+                    "typeSize": 32
+                },
+                "minItems": 1,
                 "type": "array"
             },
             "maxItems": 2,
@@ -942,6 +1215,16 @@
         "reg": {
             "dtType": "address",
             "items": {
+                "dtType": "uint32-array",
+                "items": {
+                    "dtType": "uint32",
+                    "maximum": 4294967295,
+                    "minimum": 0,
+                    "type": "integer",
+                    "typeSize": 32
+                },
+                "maxItems": 5,
+                "minItems": 1,
                 "type": "array"
             },
             "maxItems": 1,

@@ -35,8 +35,6 @@ export {
     type PathAndLabel,
 } from "./parents.js";
 
-export { insert_known_structures } from "./known_properties.js";
-
 // Layered intelligence: binding → devicetree → …
 export type {
     IntelligenceLayer,

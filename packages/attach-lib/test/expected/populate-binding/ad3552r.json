@@ -1,7 +1,129 @@
 {
-    "description": "Analog Devices AD7768 8-/4-Channel, 24-Bit, Simultaneous Sampling ADCs\n\nhttps://www.analog.com/media/en/technical-documentation/data-sheets/ad7768-7768-4.pdf\n",
+    "description": "Bindings for the Analog Devices AD3552R DAC device and similar.\nDatasheet can be found here:\n  https://www.analog.com/media/en/technical-documentation/data-sheets/ad3541r.pdf\n  https://www.analog.com/media/en/technical-documentation/data-sheets/ad3542r.pdf\n  https://www.analog.com/media/en/technical-documentation/data-sheets/ad3551r.pdf\n  https://www.analog.com/media/en/technical-documentation/data-sheets/ad3552r.pdf\n",
     "examples": [
-        "#include <dt-bindings/gpio/gpio.h>\n\nspi {\n    status = \"okay\";\n    #address-cells = <1>;\n    #size-cells = <0>;\n\n    adc@0 {\n        compatible = \"adi,ad7768\";\n        reg = <0>;\n        spi-max-frequency = <1000000>;\n\n        dmas = <&rx_dma 0>;\n        dma-names = \"rx\";\n\n        vref-supply = <&vref>;\n        clocks = <&adc_clk>;\n        clock-names = \"mclk\";\n        reset-gpios = <&gpio0 0 GPIO_ACTIVE_LOW>;\n\n        adi,data-lines = <1>;\n    };\n};\n"
+        "spi {\n    #address-cells = <1>;\n    #size-cells = <0>;\n    ad3552r@0 {\n        compatible = \"adi,ad3552r\";\n        reg = <0>;\n        spi-max-frequency = <20000000>;\n        #address-cells = <1>;\n        #size-cells = <0>;\n        channel@0 {\n            reg = <0>;\n            adi,output-range-microvolt = <0 10000000>;\n        };\n        channel@1 {\n            reg = <1>;\n            custom-output-range-config {\n                adi,gain-offset = <5>;\n                adi,gain-scaling-p = <1>;\n                adi,gain-scaling-n = <2>;\n                adi,rfb-ohms = <1>;\n            };\n        };\n    };\n};\n"
+    ],
+    "pattern_properties": [
+        {
+            "description": "Configurations of the DAC Channels",
+            "pattern": "^channel@([0-1])$",
+            "properties": [
+                {
+                    "key": "reg",
+                    "value": {
+                        "_t": "matrix",
+                        "description": "Channel number",
+                        "maxItems": 1,
+                        "minItems": 1,
+                        "rows": [
+                            {
+                                "_t": "list",
+                                "item": {
+                                    "_t": "enum",
+                                    "enum": [
+                                        "0n",
+                                        "1n"
+                                    ],
+                                    "enum_type": "number"
+                                },
+                                "maxItems": 1,
+                                "minItems": 1
+                            }
+                        ]
+                    }
+                },
+                {
+                    "key": "adi,output-range-microvolt",
+                    "value": {
+                        "_t": "matrix",
+                        "rows": [
+                            {
+                                "_t": "list",
+                                "item": {
+                                    "_t": "number",
+                                    "maximum": "2147483647n",
+                                    "minimum": "-2147483648n"
+                                }
+                            }
+                        ]
+                    }
+                },
+                {
+                    "key": "custom-output-range-config",
+                    "value": {
+                        "_t": "node",
+                        "description": "Configuration of custom range when adi,output-range-microvolt is not present. The formulas for calculation the output voltages are Vout_fs = 2.5 + [(GainN + Offset/1024) * 2.5 * Rfbx * 1.03] Vout_zs = 2.5 - [(GainP + Offset/1024) * 2.5 * Rfbx * 1.03]",
+                        "properties": [
+                            {
+                                "key": "adi,gain-offset",
+                                "value": {
+                                    "_t": "scalar",
+                                    "cell": {
+                                        "_t": "number",
+                                        "maximum": "511n",
+                                        "minimum": "-511n"
+                                    },
+                                    "description": "Gain offset used in the above formula",
+                                    "typeSize": 32
+                                }
+                            },
+                            {
+                                "key": "adi,gain-scaling-p",
+                                "value": {
+                                    "_t": "scalar",
+                                    "cell": {
+                                        "_t": "enum",
+                                        "enum": [
+                                            "0n",
+                                            "1n",
+                                            "2n",
+                                            "3n"
+                                        ],
+                                        "enum_type": "number"
+                                    },
+                                    "description": "GainP = 1 / ( 2 ^ adi,gain-scaling-p)",
+                                    "typeSize": 32
+                                }
+                            },
+                            {
+                                "key": "adi,gain-scaling-n",
+                                "value": {
+                                    "_t": "scalar",
+                                    "cell": {
+                                        "_t": "enum",
+                                        "enum": [
+                                            "0n",
+                                            "1n",
+                                            "2n",
+                                            "3n"
+                                        ],
+                                        "enum_type": "number"
+                                    },
+                                    "description": "GainN = 1 / ( 2 ^ adi,gain-scaling-n)",
+                                    "typeSize": 32
+                                }
+                            },
+                            {
+                                "key": "adi,rfb-ohms",
+                                "value": {
+                                    "_t": "list",
+                                    "description": "Feedback Resistor",
+                                    "item": {
+                                        "_t": "number",
+                                        "maximum": "4294967295n",
+                                        "minimum": "0n"
+                                    },
+                                    "minItems": 1
+                                }
+                            }
+                        ]
+                    }
+                }
+            ],
+            "required": [
+                "reg"
+            ]
+        }
     ],
     "properties": [
         {
@@ -11,8 +133,10 @@
                 "item": {
                     "_t": "enum",
                     "enum": [
-                        "adi,ad7768",
-                        "adi,ad7768-4"
+                        "adi,ad3541r",
+                        "adi,ad3542r",
+                        "adi,ad3551r",
+                        "adi,ad3552r"
                     ],
                     "enum_type": "string"
                 },
@@ -36,94 +160,23 @@
                             "minimum": "0n"
                         },
                         "maxItems": 1,
-                        "minItems": 1
+                        "minItems": 1,
+                        "typeSize": 32
                     }
                 ]
             }
         },
         {
-            "key": "clocks",
+            "key": "spi-max-frequency",
             "value": {
-                "_t": "matrix",
-                "description": "Master clock",
-                "maxItems": 1,
-                "minItems": 1,
-                "rows": [
-                    {
-                        "_t": "list",
-                        "item": [
-                            {
-                                "_t": "enum",
-                                "enum": [
-                                    "clk_osc",
-                                    "clk_usb",
-                                    "clk_27MHz",
-                                    "clk_108MHz"
-                                ],
-                                "enum_type": "phandle"
-                            }
-                        ],
-                        "maxItems": 1,
-                        "minItems": 1
-                    }
-                ]
-            }
-        },
-        {
-            "key": "clock-names",
-            "value": {
-                "_t": "list",
-                "item": {
-                    "_t": "enum",
-                    "default": "mclk",
-                    "enum": [
-                        "mclk"
-                    ],
-                    "enum_type": "string"
+                "_t": "scalar",
+                "cell": {
+                    "_t": "number",
+                    "maximum": "66000000n",
+                    "minimum": "0n"
                 },
-                "maxItems": 1,
-                "minItems": 1
-            }
-        },
-        {
-            "key": "dmas",
-            "value": {
-                "_t": "matrix",
-                "maxItems": 1,
-                "minItems": 1,
-                "rows": [
-                    {
-                        "_t": "list",
-                        "item": [
-                            {
-                                "_t": "enum",
-                                "enum": [
-                                    "dma",
-                                    "dma40"
-                                ],
-                                "enum_type": "phandle"
-                            }
-                        ],
-                        "maxItems": 1,
-                        "minItems": 1
-                    }
-                ]
-            }
-        },
-        {
-            "key": "dma-names",
-            "value": {
-                "_t": "list",
-                "item": {
-                    "_t": "enum",
-                    "default": "rx",
-                    "enum": [
-                        "rx"
-                    ],
-                    "enum_type": "string"
-                },
-                "maxItems": 1,
-                "minItems": 1
+                "description": "Maximum SPI clocking speed of the device in Hz.",
+                "typeSize": 32
             }
         },
         {
@@ -134,6 +187,7 @@
             "key": "reset-gpios",
             "value": {
                 "_t": "list",
+                "description": "GPIO (or GPIOs for power sequence) connected to the device reset pin (e.g. RESET or RESETN).",
                 "item": {
                     "_t": "enum",
                     "enum": [
@@ -147,23 +201,31 @@
             }
         },
         {
-            "key": "spi-max-frequency",
+            "gpio_rows": {
+                "max_rows": 1,
+                "min_rows": 1
+            },
+            "key": "ldac-gpios",
             "value": {
-                "_t": "scalar",
-                "cell": {
-                    "_t": "number",
-                    "maximum": "1000000n",
-                    "minimum": "0n"
+                "_t": "list",
+                "description": "LDAC pin to be used as a hardware trigger to update the DAC channels.\n",
+                "item": {
+                    "_t": "enum",
+                    "enum": [
+                        "gpio",
+                        "expgpio"
+                    ],
+                    "enum_type": "phandle"
                 },
-                "description": "Maximum SPI clocking speed of the device in Hz.",
-                "typeSize": 32
+                "maxItems": 1,
+                "minItems": 1
             }
         },
         {
             "key": "vref-supply",
             "value": {
                 "_t": "list",
-                "description": "Reference voltage - difference voltage between the REFx+ and REFx- pins.",
+                "description": "The regulator to use as an external reference. If it does not exists the internal reference will be used. External reference must be 2.5V",
                 "item": {
                     "_t": "enum",
                     "enum": [
@@ -180,21 +242,76 @@
             }
         },
         {
-            "key": "adi,data-lines",
+            "key": "adi,vref-out-en",
+            "value": {
+                "_t": "flag",
+                "description": "Vref I/O driven by internal vref to 2.5V. If not set, Vref pin will be floating."
+            }
+        },
+        {
+            "key": "adi,sdo-drive-strength",
             "value": {
                 "_t": "scalar",
                 "cell": {
                     "_t": "enum",
                     "enum": [
+                        "0n",
                         "1n",
                         "2n",
-                        "4n",
-                        "8n"
+                        "3n"
+                    ],
+                    "enum_type": "number"
+                },
+                "description": "Configure SDIO0 and SDIO1 strength levels:\n  - 0: low SDO drive strength.\n  - 1: medium low SDO drive strength.\n  - 2: medium high SDO drive strength.\n  - 3: high SDO drive strength\n",
+                "typeSize": 32
+            }
+        },
+        {
+            "key": "io-backends",
+            "value": {
+                "_t": "matrix",
+                "description": "The iio backend reference. Device can be optionally connected to the \"axi-ad3552r IP\" fpga-based QSPI + DDR (Double Data Rate) controller to reach high speed transfers.",
+                "maxItems": 1,
+                "minItems": 1,
+                "rows": [
+                    {
+                        "_t": "list",
+                        "item": {
+                            "_t": "any"
+                        },
+                        "maxItems": 1024,
+                        "minItems": 1
+                    }
+                ]
+            }
+        },
+        {
+            "key": "#address-cells",
+            "value": {
+                "_t": "scalar",
+                "cell": {
+                    "_t": "enum",
+                    "enum": [
+                        "1n"
                     ],
                     "enum_type": "number"
                 },
                 "default": "1n",
-                "description": "Number of DOUTx pins channels data is output on.",
+                "typeSize": 32
+            }
+        },
+        {
+            "key": "#size-cells",
+            "value": {
+                "_t": "scalar",
+                "cell": {
+                    "_t": "enum",
+                    "enum": [
+                        "0n"
+                    ],
+                    "enum_type": "number"
+                },
+                "default": "0n",
                 "typeSize": 32
             }
         },
@@ -627,10 +744,7 @@
     "required_properties": [
         "compatible",
         "reg",
-        "clocks",
-        "clock-names",
-        "dmas",
-        "dma-names"
+        "spi-max-frequency"
     ],
-    "title": "Analog Devices AD7768 ADC family device driver"
+    "title": "Analog Devices AD2552R DAC device driver"
 }

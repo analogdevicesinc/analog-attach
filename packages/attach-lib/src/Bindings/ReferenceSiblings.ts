@@ -53,13 +53,15 @@ function merge_named(base: Schema, own: Schema, closed: boolean): Schema {
  * except the ones that describe parts of the value, which are merged with those of `base`: `items`
  * (`{$ref: uint32-array, items: {default: 0}}` keeps the `uint32` items), the properties of a node by name
  * (`{$ref: video-interfaces.yaml#, properties: {bus-width}}` keeps `remote-endpoint`, unless `additionalProperties:
- * false` closes the node to the names it lists), and `required` joined.
+ * false` closes the node to the names it lists), and `required` joined. A `const` of `own` is the one value of an
+ * `enum` of `base` too (`reg-io-width: {const: 1}` over `{enum: [1, 4]}`).
  */
 export function merge_schema(base: unknown, own: unknown): unknown {
     if (!is_schema(base) || !is_schema(own)) { return own; }
 
     const closed = own["additionalProperties"] === false;
     const merged: Schema = { ...base };
+    if ("const" in own) { delete merged["enum"]; }
 
     for (const key of ["properties", "patternProperties"]) {
         const before = base[key];
@@ -155,6 +157,8 @@ if (import.meta.vitest) {
         });
         expect(target).toStrictEqual({ type: "array", minItems: 1, items: uint32 });
         expect(uint32).toStrictEqual({ type: "integer", minimum: 0, maximum: 9 });
+        // a const is the one value of the target's enum
+        expect(merge_schema({ type: "integer", enum: [1, 4] }, { const: 1 })).toStrictEqual({ type: "integer", const: 1 });
     });
 
     test("a node's own properties are merged by name with its target's, and required joined", () => {

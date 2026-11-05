@@ -63,7 +63,8 @@
                                         "maximum": "511n",
                                         "minimum": "-511n"
                                     },
-                                    "description": "Gain offset used in the above formula"
+                                    "description": "Gain offset used in the above formula",
+                                    "typeSize": 32
                                 }
                             },
                             {
@@ -159,7 +160,8 @@
                             "minimum": "0n"
                         },
                         "maxItems": 1,
-                        "minItems": 1
+                        "minItems": 1,
+                        "typeSize": 32
                     }
                 ]
             }
@@ -181,6 +183,7 @@
             "key": "reset-gpios",
             "value": {
                 "_t": "matrix",
+                "description": "GPIO (or GPIOs for power sequence) connected to the device reset pin (e.g. RESET or RESETN).",
                 "maxItems": 1,
                 "minItems": 1,
                 "rows": [
@@ -266,7 +269,9 @@
                         "_t": "list",
                         "item": {
                             "_t": "any"
-                        }
+                        },
+                        "maxItems": 1024,
+                        "minItems": 1
                     }
                 ]
             }
@@ -282,7 +287,8 @@
                     ],
                     "enum_type": "number"
                 },
-                "default": "1n"
+                "default": "1n",
+                "typeSize": 32
             }
         },
         {
@@ -296,7 +302,8 @@
                     ],
                     "enum_type": "number"
                 },
-                "default": "0n"
+                "default": "0n",
+                "typeSize": 32
             }
         },
         {

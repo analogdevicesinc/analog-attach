@@ -399,11 +399,15 @@
     "properties": {
         "#address-cells": {
             "const": 1,
-            "dtType": "uint32"
+            "dtType": "uint32",
+            "maximum": 3,
+            "type": "integer"
         },
         "#size-cells": {
             "const": 0,
-            "dtType": "uint32"
+            "dtType": "uint32",
+            "maximum": 2,
+            "type": "integer"
         },
         "adi,range-double": {
             "description": "Sets the analog input range from 0 to 2xVREF.",
@@ -412,6 +416,9 @@
         },
         "compatible": {
             "dtType": "string-array",
+            "items": {
+                "pattern": "^[a-zA-Z0-9][a-zA-Z0-9,+\\-._/]+$"
+            },
             "maxItems": 2,
             "minItems": 1,
             "oneOf": [
@@ -469,7 +476,9 @@
                     "minItems": 2,
                     "type": "array"
                 }
-            ]
+            ],
+            "type": "array",
+            "uniqueItems": true
         },
         "refin-supply": {
             "description": "The regulator supply for ADC reference voltage.\n",
@@ -483,11 +492,14 @@
             "description": "Chip select used by the device.",
             "dtType": "address",
             "items": {
+                "dtType": "uint32-array",
                 "items": [
                     {
+                        "dtType": "uint32",
                         "maximum": 256,
                         "minimum": 0,
-                        "type": "integer"
+                        "type": "integer",
+                        "typeSize": 32
                     }
                 ],
                 "maxItems": 1,

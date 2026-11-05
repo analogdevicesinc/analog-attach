@@ -1,7 +1,8 @@
 {
-    "description": "Analog Devices AD7904, AD7914, AD7923, AD7924 4 Channel ADCs, and AD7908,\n AD7918, AD7927, AD7928 8 Channels ADCs.\n\nSpecifications about the part can be found at:\n  https://www.analog.com/media/en/technical-documentation/data-sheets/AD7923.pdf\n  https://www.analog.com/media/en/technical-documentation/data-sheets/AD7904_7914_7924.pdf\n  https://www.analog.com/media/en/technical-documentation/data-sheets/AD7908_7918_7928.pdf\n",
+    "description": "Analog Devices ADXL355 and ADXL359 3-Axis, Low noise MEMS Accelerometers that\nsupport both I2C & SPI interfaces\n  https://www.analog.com/en/products/adxl355.html\n  https://www.analog.com/en/products/adxl359.html\n",
     "examples": [
-        "spi {\n  #address-cells = <1>;\n  #size-cells = <0>;\n\n  ad7928: adc@0 {\n    compatible = \"adi,ad7928\";\n    reg = <0>;\n    spi-max-frequency = <25000000>;\n    refin-supply = <&adc_vref>;\n\n    #address-cells = <1>;\n    #size-cells = <0>;\n  };\n};\n"
+        "#include <dt-bindings/gpio/gpio.h>\n#include <dt-bindings/interrupt-controller/irq.h>\ni2c {\n    #address-cells = <1>;\n    #size-cells = <0>;\n\n    /* Example for a I2C device node */\n    accelerometer@1d {\n        compatible = \"adi,adxl355\";\n        reg = <0x1d>;\n        interrupt-parent = <&gpio>;\n        interrupts = <25 IRQ_TYPE_EDGE_RISING>;\n        interrupt-names = \"DRDY\";\n    };\n};\n",
+        "#include <dt-bindings/gpio/gpio.h>\n#include <dt-bindings/interrupt-controller/irq.h>\nspi {\n    #address-cells = <1>;\n    #size-cells = <0>;\n\n    accelerometer@0 {\n        compatible = \"adi,adxl355\";\n        reg = <0>;\n        spi-max-frequency = <1000000>;\n        interrupt-parent = <&gpio>;\n        interrupts = <25 IRQ_TYPE_EDGE_RISING>;\n        interrupt-names = \"DRDY\";\n    };\n};\n"
     ],
     "properties": [
         {
@@ -11,21 +12,8 @@
                 "item": {
                     "_t": "enum",
                     "enum": [
-                        "adi,ad7904",
-                        "adi,ad7908",
-                        "adi,ad7914",
-                        "adi,ad7918",
-                        "adi,ad7923",
-                        "adi,ad7928",
-                        "adi,ad7924",
-                        [
-                            "adi,ad7924",
-                            "adi,ad7923"
-                        ],
-                        [
-                            "adi,ad7927",
-                            "adi,ad7928"
-                        ]
+                        "adi,adxl355",
+                        "adi,adxl359"
                     ],
                     "enum_type": "string"
                 },
@@ -49,16 +37,89 @@
                             "minimum": "0n"
                         },
                         "maxItems": 1,
-                        "minItems": 1
+                        "minItems": 1,
+                        "typeSize": 32
                     }
                 ]
             }
         },
         {
-            "key": "refin-supply",
+            "key": "interrupts",
+            "value": {
+                "_t": "matrix",
+                "description": "Type for DRDY should be IRQ_TYPE_EDGE_RISING.\nThree configurable interrupt lines exist.\n",
+                "maxItems": 3,
+                "minItems": 1,
+                "rows": [
+                    {
+                        "_t": "list",
+                        "item": [
+                            {
+                                "_t": "number"
+                            },
+                            {
+                                "_t": "number"
+                            },
+                            {
+                                "_t": "enum",
+                                "enum": [
+                                    "IRQ_TYPE_NONE",
+                                    "IRQ_TYPE_EDGE_RISING",
+                                    "IRQ_TYPE_EDGE_FALLING",
+                                    "IRQ_TYPE_EDGE_BOTH",
+                                    "IRQ_TYPE_LEVEL_HIGH",
+                                    "IRQ_TYPE_LEVEL_LOW"
+                                ],
+                                "enum_type": "macro"
+                            }
+                        ],
+                        "maxItems": 3,
+                        "minItems": 3
+                    }
+                ]
+            }
+        },
+        {
+            "key": "interrupt-parent",
             "value": {
                 "_t": "list",
-                "description": "The regulator supply for ADC reference voltage.\n",
+                "item": {
+                    "_t": "enum",
+                    "default": "gicv2",
+                    "enum": [
+                        "gpio",
+                        "gicv2",
+                        "aon_intr"
+                    ],
+                    "enum_type": "phandle"
+                },
+                "maxItems": 1,
+                "minItems": 1
+            }
+        },
+        {
+            "key": "interrupt-names",
+            "value": {
+                "_t": "list",
+                "description": "Specify which interrupt line is in use.",
+                "item": {
+                    "_t": "enum",
+                    "enum": [
+                        "INT1",
+                        "INT2",
+                        "DRDY"
+                    ],
+                    "enum_type": "string"
+                },
+                "maxItems": 3,
+                "minItems": 1
+            }
+        },
+        {
+            "key": "vdd-supply",
+            "value": {
+                "_t": "list",
+                "description": "Regulator that provides power to the sensor",
                 "item": {
                     "_t": "enum",
                     "enum": [
@@ -75,38 +136,23 @@
             }
         },
         {
-            "key": "adi,range-double",
+            "key": "vddio-supply",
             "value": {
-                "_t": "flag",
-                "description": "Sets the analog input range from 0 to 2xVREF."
-            }
-        },
-        {
-            "key": "#address-cells",
-            "value": {
-                "_t": "scalar",
-                "cell": {
+                "_t": "list",
+                "description": "Regulator that provides power to the bus",
+                "item": {
                     "_t": "enum",
                     "enum": [
-                        "1n"
+                        "cam1_reg",
+                        "cam_dummy_reg",
+                        "sd_vcc_reg",
+                        "vdd_3v3_reg",
+                        "vdd_5v0_reg"
                     ],
-                    "enum_type": "number"
+                    "enum_type": "phandle"
                 },
-                "default": "1n"
-            }
-        },
-        {
-            "key": "#size-cells",
-            "value": {
-                "_t": "scalar",
-                "cell": {
-                    "_t": "enum",
-                    "enum": [
-                        "0n"
-                    ],
-                    "enum_type": "number"
-                },
-                "default": "0n"
+                "maxItems": 1,
+                "minItems": 1
             }
         },
         {
@@ -552,5 +598,5 @@
         "compatible",
         "reg"
     ],
-    "title": "Analog Devices AD7923 and similars with 4 and 8 Channel ADCs."
+    "title": "Analog Devices ADXL355 and ADXL359 3-Axis, Low noise MEMS Accelerometers"
 }

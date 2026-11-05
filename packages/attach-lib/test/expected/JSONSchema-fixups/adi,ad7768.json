@@ -460,17 +460,57 @@
             "typeSize": 32
         },
         "clock-names": {
+            "description": "List of clock input name strings sorted in the same order as the clocks property.  Consumers drivers will use clock-names to match clock input names with clocks specifiers.",
             "dtType": "string-array",
             "items": [
                 {
-                    "const": "mclk"
+                    "const": "mclk",
+                    "type": "string"
                 }
             ],
             "maxItems": 1,
             "minItems": 1,
-            "type": "array"
+            "type": "array",
+            "uniqueItems": true
         },
         "clocks": {
+            "anyOf": [
+                {
+                    "type": "object"
+                },
+                {
+                    "dtType": "phandle-array",
+                    "items": {
+                        "additionalItems": {
+                            "dtType": "uint32",
+                            "maximum": 4294967295,
+                            "minimum": 0,
+                            "type": "integer",
+                            "typeSize": 32
+                        },
+                        "items": [
+                            {
+                                "oneOf": [
+                                    {
+                                        "maximum": 4294967295,
+                                        "minimum": 1,
+                                        "type": "integer"
+                                    },
+                                    {
+                                        "const": 0,
+                                        "type": "integer"
+                                    }
+                                ]
+                            }
+                        ],
+                        "maxItems": 1024,
+                        "minItems": 1,
+                        "type": "array"
+                    },
+                    "minItems": 1,
+                    "type": "array"
+                }
+            ],
             "description": "Master clock",
             "dtType": "phandle-array",
             "items": {
@@ -485,18 +525,41 @@
                     "enum": [
                         "adi,ad7768",
                         "adi,ad7768-4"
-                    ]
+                    ],
+                    "pattern": "^[a-zA-Z0-9][a-zA-Z0-9,+\\-._/]+$"
                 }
             ],
             "maxItems": 1,
             "minItems": 1,
-            "type": "array"
+            "type": "array",
+            "uniqueItems": true
         },
         "dma-names": {
+            "anyOf": [
+                {
+                    "items": {
+                        "type": "string"
+                    },
+                    "minItems": 1,
+                    "type": "array",
+                    "uniqueItems": true
+                },
+                {
+                    "items": {
+                        "enum": [
+                            "rx",
+                            "tx"
+                        ]
+                    },
+                    "minItems": 1,
+                    "type": "array"
+                }
+            ],
             "dtType": "string-array",
             "items": [
                 {
-                    "const": "rx"
+                    "const": "rx",
+                    "type": "string"
                 }
             ],
             "maxItems": 1,
@@ -506,6 +569,30 @@
         "dmas": {
             "dtType": "phandle-array",
             "items": {
+                "additionalItems": {
+                    "dtType": "uint32",
+                    "maximum": 4294967295,
+                    "minimum": 0,
+                    "type": "integer",
+                    "typeSize": 32
+                },
+                "items": [
+                    {
+                        "oneOf": [
+                            {
+                                "maximum": 4294967295,
+                                "minimum": 1,
+                                "type": "integer"
+                            },
+                            {
+                                "const": 0,
+                                "type": "integer"
+                            }
+                        ]
+                    }
+                ],
+                "maxItems": 1024,
+                "minItems": 1,
                 "type": "array"
             },
             "maxItems": 1,
@@ -516,11 +603,14 @@
             "description": "Chip select used by the device.",
             "dtType": "address",
             "items": {
+                "dtType": "uint32-array",
                 "items": [
                     {
+                        "dtType": "uint32",
                         "maximum": 256,
                         "minimum": 0,
-                        "type": "integer"
+                        "type": "integer",
+                        "typeSize": 32
                     }
                 ],
                 "maxItems": 1,
@@ -532,6 +622,7 @@
             "type": "array"
         },
         "reset-gpios": {
+            "description": "GPIO (or GPIOs for power sequence) connected to the device reset pin (e.g. RESET or RESETN).",
             "dtType": "phandle-array",
             "items": {
                 "type": "array"

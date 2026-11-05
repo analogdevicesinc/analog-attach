@@ -541,13 +541,15 @@ function narrow_object(object: any, name?: string): AttachType {
             }
             case "integer":
                 {
-                    const typeSize = object.typeSize;
+                    // A number the type dt-schema gives its name sizes (reg.yaml's `#address-cells: {maximum: 3}`, a `uint32`)
+                    const scalar_type = typeof object[DT_TYPE] === "string" && /^u?int(8|16|32|64)$/.exec(object[DT_TYPE]);
+                    const typeSize = object.typeSize ?? (scalar_type ? Number(scalar_type[1]) : undefined);
                     // A const next to the $ref (`$ref: uint32` + `const: 28`) is the one value, so also the default.
                     const constant = "const" in object ? to_option(object.const) : undefined;
                     const single = constant === undefined || Array.isArray(constant) ? undefined : constant;
                     const default_value = single ?? to_default(object.default);
 
-                    let cell: Cell = number_cell(object);
+                    let cell: Cell = scalar_type ? typed_number_cell(object, object[DT_TYPE]) : number_cell(object);
                     if ("enum" in object) { cell = enum_cell(object.enum); }
                     else if (single !== undefined) { cell = enum_cell([single]); }
 
@@ -707,9 +709,11 @@ function narrow_array_object(object: any, name?: string): AttachType & { _t: "li
         if (enum_list?._t === "list" && !Array.isArray(enum_list.item) && enum_list.item._t === "enum" && enum_list.item.enum.length > 0) { return enum_list; }
     }
 
-    // String array with type inside items object
+    // String array with type inside items object, an `items` `oneOf` of values its options (clock.yaml's string
+    // `clock-names` items over the binding's)
     if ("items" in object && !items_array && "type" in items && items.type === "string") {
-        return list({ _t: "string" }, unique);
+        const options = const_union(items.oneOf);
+        return list(options === undefined ? { _t: "string" } : enum_cell(options), unique);
     }
 
     // String array with type inside items array
@@ -718,10 +722,11 @@ function narrow_array_object(object: any, name?: string): AttachType & { _t: "li
     }
 
     // What the `dtType` says the entries are, when the schema says nothing we read of them (`items: {pattern}`,
-    // `contains`, a bare `$ref: uint32-array` with a count). An `items` `oneOf` of values gives the options.
+    // `contains`, a bare `$ref: uint32-array` with a count). An `items` `oneOf` of values gives the options, and so do
+    // branches that are all open `enum` lists (beside dt-core's `compatible` pattern).
     const dt_type = object[DT_TYPE];
     if (typeof dt_type === "string" && STRING_TYPES.has(dt_type)) {
-        const options = items_array ? undefined : const_union(items?.oneOf);
+        const options = (items_array ? undefined : const_union(items?.oneOf)) ?? open_enum_union(object);
         return list(options === undefined ? { _t: "string" } : enum_cell(options), unique);
     }
     const size = integer_array_size(dt_type);
@@ -913,6 +918,9 @@ if (import.meta.vitest) {
         expect(small).toStrictEqual({ _t: "scalar", cell: { _t: "number", minimum: 0n, maximum: 255n }, typeSize: 8 });
         expect(signed).toStrictEqual({ _t: "scalar", cell: { _t: "number", minimum: -32_768n, maximum: 32_767n }, typeSize: 16 });
         expect(translated({ cells: { dtType: "uint32", enum: [0, 1] } }).cells).toMatchObject({ _t: "scalar", cell: { _t: "enum", enum_type: "number" }, typeSize: 32 });
+        // a bound the binding gives narrows the type's range
+        expect(translated({ cells: { dtType: "uint32", type: "integer", maximum: 3 } }).cells)
+            .toStrictEqual({ _t: "scalar", cell: { _t: "number", minimum: 0n, maximum: 3n }, typeSize: 32 });
         // a const next to the $ref (`$ref: uint32` + `const: 28`) is a one-option enum, the const its default
         expect(translated({ cells: { type: "integer", typeSize: 32, minimum: 0, maximum: 0xFF_FF_FF_FF, const: 28, dtType: "uint32" } }).cells)
             .toStrictEqual({ _t: "scalar", cell: { _t: "enum", enum: [28n], enum_type: "number" }, typeSize: 32, default: 28n });
@@ -957,15 +965,21 @@ if (import.meta.vitest) {
     });
 
     test("a string list whose items translate reads nothing of is a list of strings, an items oneOf of values its options", () => {
-        const { names, described_names, compatible, positions } = translated({
+        const { names, described_names, typed_names, compatible, positions } = translated({
             names: { dtType: "string-array", type: "array", items: { pattern: "^(rx|tx)[0-9]$" } },
             described_names: { dtType: "string-array", type: "array", items: { oneOf: [{ description: "DBI", const: "dbi" }, { description: "other", enum: ["mstr", "slv"] }] } },
+            typed_names: { type: "array", items: { type: "string", oneOf: [{ description: "DBI", const: "dbi" }, { description: "other", enum: ["mstr", "slv"] }] } },
             compatible: { dtType: "string-array", type: "array", contains: { const: "syscon" } },
             positions: { dtType: "string-array", type: "array", items: [{ pattern: "^jedec,lpddr4-" }, { const: "jedec,lpddr4" }] },
         });
 
         expect(names).toStrictEqual({ _t: "list", item: { _t: "string" } });
         expect(described_names).toStrictEqual({ _t: "list", item: { _t: "enum", enum: ["dbi", "mstr", "slv"], enum_type: "string" } });
+        expect(typed_names).toStrictEqual(described_names);
+        // dt-core's `compatible` beside open enum lists
+        expect(translated({ compatible: { dtType: "string-array", type: "array", items: { pattern: "^[a-z]" },
+            oneOf: [{ type: "array", items: { enum: ["a", "b"] } }, { type: "array", items: { enum: ["c"] } }] } }).compatible)
+            .toStrictEqual({ _t: "list", item: { _t: "enum", enum: ["a", "b", "c"], enum_type: "string" } });
         expect(compatible).toStrictEqual({ _t: "list", item: { _t: "string" } });
         expect(positions).toStrictEqual({ _t: "list", item: [{ _t: "string" }, { _t: "enum", enum: ["jedec,lpddr4"], enum_type: "string", default: "jedec,lpddr4" }] });
     });

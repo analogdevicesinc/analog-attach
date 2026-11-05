@@ -36,7 +36,8 @@
                             "minimum": "0n"
                         },
                         "maxItems": 1,
-                        "minItems": 1
+                        "minItems": 1,
+                        "typeSize": 32
                     }
                 ]
             }
@@ -60,6 +61,7 @@
             "key": "clock-names",
             "value": {
                 "_t": "list",
+                "description": "List of clock input name strings sorted in the same order as the clocks property.  Consumers drivers will use clock-names to match clock input names with clocks specifiers.",
                 "item": {
                     "_t": "enum",
                     "default": "mclk",
@@ -83,7 +85,9 @@
                         "_t": "list",
                         "item": {
                             "_t": "any"
-                        }
+                        },
+                        "maxItems": 1024,
+                        "minItems": 1
                     }
                 ]
             }
@@ -108,6 +112,7 @@
             "key": "reset-gpios",
             "value": {
                 "_t": "matrix",
+                "description": "GPIO (or GPIOs for power sequence) connected to the device reset pin (e.g. RESET or RESETN).",
                 "maxItems": 1,
                 "minItems": 1,
                 "rows": [
