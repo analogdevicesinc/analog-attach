@@ -56,22 +56,22 @@ function resolve_token(
     is_label: (name: string) => boolean,
 ): ResolvedToken {
     if (typeof token === "bigint") {
-        return PropertyBuilder.tag_number(token);
+        return PropertyBuilder.number(token);
     }
 
     // A hex literal keeps its radix: `0x2a` is written as typed.
     if (HEX_LITERAL.test(token)) {
-        return PropertyBuilder.tag_number(BigInt(token), "hex");
+        return PropertyBuilder.number(BigInt(token), "hex");
     }
 
     const macro = ALL_MACROS.find(m => m.name === token);
     if (macro !== undefined) {
-        return PropertyBuilder.tag_number(BigInt(macro.value));
+        return PropertyBuilder.number(BigInt(macro.value));
     }
 
     const bare = token.startsWith("&") ? token.slice(1) : token;
     if (is_label(bare)) {
-        return PropertyBuilder.tag_label(bare);
+        return PropertyBuilder.label(bare);
     }
 
     return { error: `'${token}' is not a number, a known macro, or a label in the base tree/overlay` };
@@ -107,7 +107,7 @@ export function build_raw_property(
     // No hint: infer from the tokens.
     if (typeof parsed === "bigint") {
         return PropertyBuilder.build_cell_array()
-            .with_tagged_values(PropertyBuilder.tag_number(parsed))
+            .with_cells(parsed)
             .with_name(name)
             .build();
     }
@@ -122,7 +122,7 @@ export function build_raw_property(
                 .build();
         }
         return PropertyBuilder.build_cell_array()
-            .with_tagged_values(resolved)
+            .with_cells(resolved)
             .with_name(name)
             .build();
     }
@@ -190,7 +190,7 @@ function build_cells_from_parsed(
 
     if (typeof parsed === "bigint") {
         return PropertyBuilder.build_cell_array(bits)
-            .with_tagged_values(PropertyBuilder.tag_number(parsed))
+            .with_cells(parsed)
             .with_name(name)
             .build();
     }
@@ -199,7 +199,7 @@ function build_cells_from_parsed(
         const resolved = resolve(parsed);
         if ("error" in resolved) { return resolved; }
         return PropertyBuilder.build_cell_array(bits)
-            .with_tagged_values(resolved)
+            .with_cells(resolved)
             .with_name(name)
             .build();
     }
@@ -216,7 +216,7 @@ function build_cells_from_parsed(
             rows.push(cells);
         }
         return PropertyBuilder.build_cell_array(bits)
-            .with_tagged_values(...(rows as [CellValue[], ...CellValue[][]]))
+            .with_rows(...rows)
             .with_name(name)
             .build();
     }
@@ -229,7 +229,7 @@ function build_cells_from_parsed(
         cells.push(resolved);
     }
     return PropertyBuilder.build_cell_array(bits)
-        .with_tagged_values(cells)
+        .with_cells(...cells)
         .with_name(name)
         .build();
 }

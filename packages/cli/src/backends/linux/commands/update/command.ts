@@ -409,7 +409,7 @@ export function implicit_interrupt_parent(
     }
 
     const ip_built = PropertyBuilder.build_cell_array()
-        .with_tagged_values(PropertyBuilder.tag_label(inherited.label))
+        .with_cells(PropertyBuilder.label(inherited.label))
         .with_name("interrupt-parent")
         .build();
 
