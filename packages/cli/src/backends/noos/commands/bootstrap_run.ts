@@ -1,5 +1,6 @@
 import { bootstrap, bootstrap_enabled, describe_board_pin, format_number_in, ok, validate_workfile } from "attach-no-os-lib";
-import type { BootstrapReport, FilledValue, Property, Result, Workfile } from "attach-no-os-lib";
+import type { BootstrapReport, FilledValue, PinReference, Property, Result, Workfile } from "attach-no-os-lib";
+import type { BoardPinAt, ChipSelectWiring, Wiring } from "../protocol/responses";
 import { format_property_type } from "./shared";
 
 /**
@@ -31,6 +32,55 @@ function board_pin(board: string | undefined, at: { connector: string, pin: stri
     const described = board === undefined ? undefined : describe_board_pin(board, at);
     const mnemonic = described?.ok === true ? described.value.pin.mnemonic : undefined;
     return mnemonic === undefined || mnemonic === at.pin ? position : `${position} (${mnemonic})`;
+}
+
+/** A board pin for JSON: its header position, and the chip pin name next to it when the pinout gives one. */
+function board_pin_at(board: string | undefined, at: PinReference): BoardPinAt {
+    const described = board === undefined ? undefined : describe_board_pin(board, at);
+    const mnemonic = described?.ok === true ? described.value.pin.mnemonic : undefined;
+    return { connector: at.connector, pin: at.pin, ...(mnemonic === undefined || mnemonic === at.pin ? {} : { chip_pin: mnemonic }) };
+}
+
+/**
+ * The wiring bootstrap worked out, for JSON: what `describe_bootstrap` prints as `Wire ... to
+ * ...` and `Chip-select for ...`, as data, so a tool needs no text to relay it.
+ */
+export function describe_wiring(report: BootstrapReport, workfile: Workfile): { wiring: Wiring[], chip_selects: ChipSelectWiring[] } {
+    const board = workfile.board;
+    const wiring = report.wiring.map((bus): Wiring => ({
+        part: bus.part,
+        device: bus.device,
+        interface: bus.interface,
+        ...(bus.peripheral === undefined ? {} : { peripheral: bus.peripheral }),
+        connections: bus.connections.map(connection => ({
+            role: connection.role,
+            from: { connector: connection.from.connector, pin: connection.from.pin },
+            to: board_pin_at(board, connection.to),
+        })),
+        problems: bus.problems,
+        ...(bus.board_pins === undefined || bus.board_pins.length === 0 ? {} : {
+            board_pins: bus.board_pins.map(pin => ({ signal: pin.signal, at: board_pin_at(board, pin.at) })),
+        }),
+        ...(bus.chip_select_options === undefined || bus.chip_select_options.length === 0 ? {} : {
+            chip_select_options: bus.chip_select_options.map(option => ({
+                at: board_pin_at(board, option.at),
+                ...(option.gpio === undefined ? {} : { gpio: { port: option.gpio.port, number: option.gpio.number } }),
+            })),
+        }),
+    }));
+    const chip_selects = report.chip_selects.map((decision): ChipSelectWiring => {
+        const chip_select = decision.chip_select;
+        if (chip_select.kind === "native") {
+            return { device: decision.device, kind: "native", peripheral: chip_select.peripheral, native_cs: chip_select.native_cs,
+                at: board_pin_at(board, chip_select.at) };
+        }
+        if (chip_select.kind === "gpio") {
+            return { device: decision.device, kind: "gpio", gpio: { port: chip_select.gpio.port, number: chip_select.gpio.number },
+                at: board_pin_at(board, chip_select.at), ...(decision.pin === undefined ? {} : { pin_node: decision.pin }) };
+        }
+        return { device: decision.device, kind: "unwired", reason: chip_select.reason };
+    });
+    return { wiring, chip_selects };
 }
 
 /** A required value still empty, which bootstrap had nothing to fill it from. */

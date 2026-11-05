@@ -718,6 +718,20 @@ if (import.meta.vitest) {
             expect(fs.existsSync(installed())).toBe(false);
             expect(await stdout_of(["skill", "uninstall", "fake-skill"], { registry })).toContain("is not installed");
         });
+
+        test("with no name, install and uninstall list the backend's skills and whether each is installed", async () => {
+            write_local({ backend: "fake" });
+            const registry = with_skill();
+            const before = await run(["skill", "install", "--json"], { registry });
+            expect(before.code).toBe(0);
+            expect(JSON.parse(before.stdout)).toMatchObject({ ok: true, skills: [{ name: "fake-skill", installed: false }] });
+            await run(["skill", "install", "fake-skill"], { registry });
+            expect(JSON.parse(await stdout_of(["skill", "uninstall", "--json"], { registry }))).toMatchObject({ skills: [{ name: "fake-skill", installed: true }] });
+            const text = await stdout_of(["skill", "install"], { registry });
+            expect(text).toContain("fake-skill");
+            expect(text).toContain("(installed)");
+            expect(text).toContain("Install one with: analog-attach skill install <name>");
+        });
     });
 
     describe("the bare run on a terminal", () => {

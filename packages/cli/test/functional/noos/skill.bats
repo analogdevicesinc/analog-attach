@@ -120,3 +120,28 @@ setup() {
 	assert_output --partial "analog-attach-noos"
 	[ ! -e "$HOME/.claude/skills/analog-attach-linux" ]
 }
+
+# Description: skill install and skill uninstall with no name list the backend's skills, each with
+# what it helps with and whether it is installed.
+# Steps:
+#   1. Run skill install, with --json, with no name.
+#   2. Check it succeeds, listing analog-attach-noos, not installed.
+#   3. Install analog-attach-noos.
+#   4. Run skill uninstall, with --json, with no name; check it lists analog-attach-noos as
+#      installed.
+#   5. Run skill install with no name in human mode; check it names the skill, marks it
+#      installed, and says how to install one.
+# bats test_tags=req:SKILL-01, req:SKILL-02, req:SKILL-03, id:N0281
+@test "skill install and uninstall with no name list the skills" {
+	run_json skill install
+	assert_success
+	assert_json '[.ok, (.skills | map("\(.name) \(.installed)") | join(","))] | map(tostring) | join(" ")' "true analog-attach-noos false"
+	aa skill install analog-attach-noos >/dev/null
+	run_json skill uninstall
+	assert_json '.skills[0] | "\(.name) \(.installed)"' "analog-attach-noos true"
+	run aa skill install
+	assert_success
+	assert_output --partial "analog-attach-noos"
+	assert_output --partial "(installed)"
+	assert_output --partial "Install one with: analog-attach skill install <name>"
+}

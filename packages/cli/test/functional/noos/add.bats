@@ -516,3 +516,30 @@ PY
 	assert_output --partial test_adc
 	assert_output --partial test_dac
 }
+
+# Description: add of an eval board gives its wiring in JSON too: each pin of the part to the
+# board pin it goes to, and how the chip-select is driven, as human mode prints them.
+# Steps:
+#   1. Create the workfile with init.
+#   2. Add eval-testpart, with --json.
+#   3. Check wiring has one SPI bus for testpart_spi_dev on bsp_test_spi_cfg, with four
+#      connections, the eval board's P1 pin 1 (spi_cs) going to the board's H1 pin 4 (O1_4).
+#   4. Check chip_selects gives testpart_spi_dev's chip-select as GPIO OTHER_GPIO1 pin 4, at H1 pin
+#      4, through the pin node testpart_cs_gpio.
+#   5. Add a schema with nothing to wire (test_gpio_pin), with --json; check wiring and
+#      chip_selects are empty.
+# bats test_tags=req:ADD-04, req:GEN-07, id:N0280
+@test "add gives the wiring in JSON too" {
+	aa init >/dev/null
+	run_json add eval-testpart
+	assert_success
+	assert_json '.wiring | length' 1
+	assert_json '.wiring[0] | [.device, .interface, .peripheral] | join(" ")' "testpart_spi_dev spi bsp_test_spi_cfg"
+	assert_json '.wiring[0].connections | length' 4
+	assert_json '.wiring[0].connections[] | select(.role == "spi_cs") | "\(.from.connector) \(.from.pin) -> \(.to.connector) \(.to.pin) (\(.to.chip_pin))"' \
+		"P1 1 -> H1 4 (O1_4)"
+	assert_json '.chip_selects[0] | [.device, .kind, .gpio.port, .gpio.number, .at.connector, .at.pin, .pin_node] | map(tostring) | join(" ")' \
+		"testpart_spi_dev gpio OTHER_GPIO1 4 H1 4 testpart_cs_gpio"
+	run_json add test_gpio_pin
+	assert_json '[.wiring, .chip_selects] | map(length) | join(",")' "0,0"
+}
