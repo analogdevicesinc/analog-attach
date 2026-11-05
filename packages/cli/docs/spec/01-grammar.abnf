@@ -76,7 +76,7 @@ read            = %s"read" [ B node-path [ B property-name ] ] *( B %s"--quiet" 
 update          = %s"update" [ B node-path [ B property-name *( B value-token ) ] ]
                   *( B update-option )
 update-option   = %s"--quiet"
-                / %s"--suggest"                 ; noos (UPDATE-530)
+                / %s"--suggest"                 ; UPDATE-130, UPDATE-530
 
 delete          = %s"delete" [ B node-path [ B property-name ] ] *( B %s"--force" )
 
@@ -86,7 +86,7 @@ list            = %s"list" [ B list-kind ]   ; no kind: the usage (LIST-001)
 list-kind       = %s"devices" [ B element ]                   ; [filter]
                 / %s"property" [ B node-path [ B property-name ] ]
                 / %s"value" B node-path B property-name [ B element ]
-                / %s"context" *( B element )  ; noos; not linux: COM-015
+                / %s"context" *( B element )
                 / %s"parent" B compatible                     ; linux
                 / %s"overlay" B compatible                    ; linux
 

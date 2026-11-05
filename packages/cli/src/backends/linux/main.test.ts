@@ -169,6 +169,23 @@ describe("the Linux backend through main", () => {
         expect(await run(["list", "devices", "ad7124"])).toEqual({ code: 0, stdout: "adi,ad7124-4  iio/adc\nadi,ad7124-8  iio/adc\n", stderr: "" });
     });
 
+    test("list context: the base devicetrees of the Linux tree, the overlays left out, the configured one marked; only linux is needed", async () => {
+        const dts = path.join(linux, "arch", "arm", "boot", "dts");
+        for (const file of ["broadcom/bcm2711-rpi-4-b.dts", "overlays/ad7124-overlay.dts"]) {
+            fs.mkdirSync(path.join(dts, path.dirname(file)), { recursive: true });
+            fs.writeFileSync(path.join(dts, file), "");
+        }
+        const rpi = path.join(dts, "broadcom", "bcm2711-rpi-4-b.dts");
+        fixture.write_settings({ linux, devicetree: rpi });
+        const listed = await run(["--json", "list", "context"]);
+        expect(JSON.parse(listed.stdout)).toEqual({
+            ok: true, message: "1 devicetree", severity: "info", devicetrees: [{ path: rpi, arch: "arm", name: "broadcom/bcm2711-rpi-4-b.dts", configured: true }],
+        });
+        expect(await run(["list", "context"])).toEqual({
+            code: 0, stdout: `${rpi} (configured)\n\n1 devicetree in ${linux}.\nUse: analog-attach config devicetree <path>\n`, stderr: "",
+        });
+    });
+
     test("--json list property: a node's properties marked set and required, with their types; one property's type; the overlay's nodes", async () => {
         configure();
         const names = await run(["--json", "list", "property", "adc"]);
@@ -185,6 +202,18 @@ describe("the Linux backend through main", () => {
         const nodes = await run(["--json", "list", "property"]);
         expect(nodes.code).toBe(0);
         expect(JSON.parse(nodes.stdout)).toMatchObject({ ok: true, message: expect.stringMatching(/^[0-9]+ nodes?$/), names: expect.arrayContaining(["adc"]) });
+    });
+
+    test("update --suggest: what list value answers, nothing written; a value is a member, an input error", async () => {
+        configure();
+        const before = fs.readFileSync(path.join(project, "overlay.dtso"), "utf8");
+        const suggested = await run(["--json", "update", "adc", "spi-max-frequency", "--suggest"]);
+        expect(suggested.code).toBe(0);
+        expect(suggested).toEqual(await run(["--json", "list", "value", "adc", "spi-max-frequency"]));
+        expect(fs.readFileSync(path.join(project, "overlay.dtso"), "utf8")).toBe(before);
+        expect(await run(["update", "adc", "spi-max-frequency", "1", "--suggest"])).toEqual({
+            code: 2, stdout: "", stderr: "A member is not supported by the linux backend: 1\n",
+        });
     });
 
     test("--json update: a value written; a warning on stderr makes the response a warn", async () => {

@@ -2,15 +2,16 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "update.schema.json",
   "title": "update response",
-  "description": "Standard output of update in JSON mode: a value or flag set (UPDATE-100), a read (UPDATE-112), an existing child node (UPDATE-120), a created child node (UPDATE-125), or a refusal (COM-040). $defs/base is UpdateResponse (overview 2.1).",
+  "description": "Standard output of update in JSON mode: a value or flag set (UPDATE-100), a read (UPDATE-112), an existing child node (UPDATE-120), a created child node (UPDATE-125), the values --suggest lists (UPDATE-130, UPDATE-530), or a refusal (COM-040). $defs/base is UpdateResponse (overview 2.1).",
   "anyOf": [{ "$ref": "#/$defs/linux" }, { "$ref": "#/$defs/noos" }],
   "$defs": {
     "base": {
-      "description": "UpdateResponse: a CommonResponse, a created child, or a ReadResponse.",
+      "description": "UpdateResponse: a CommonResponse, a created child, a ReadResponse, or a SuggestResponse.",
       "anyOf": [
         { "$ref": "common.schema.json#/$defs/common" },
         { "$ref": "#/$defs/base-child" },
-        { "$ref": "read.schema.json#/$defs/base" }
+        { "$ref": "read.schema.json#/$defs/base" },
+        { "$ref": "list-value.schema.json#/$defs/base" }
       ]
     },
     "base-child": {
@@ -27,9 +28,16 @@
         { "$ref": "read.schema.json#/$defs/read-property" },
         { "$ref": "read.schema.json#/$defs/read-node", "description": "An existing child, as read <path>/<child> gives it (UPDATE-120)." },
         { "$ref": "#/$defs/child-created" },
+        { "$ref": "#/$defs/linux-suggest" },
         { "$ref": "common.schema.json#/$defs/refusal" },
         { "$ref": "common.schema.json#/$defs/config-refusal" }
       ]
+    },
+    "linux-suggest": {
+      "description": "update --suggest (UPDATE-130): the values the property can take, as list value gives them.",
+      "allOf": [{ "$ref": "list-value.schema.json#/$defs/base" }],
+      "properties": { "ok": { "const": true }, "severity": { "enum": ["info", "warn"] } },
+      "unevaluatedProperties": false
     },
     "set": {
       "allOf": [{ "$ref": "common.schema.json#/$defs/done" }],

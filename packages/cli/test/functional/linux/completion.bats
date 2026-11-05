@@ -257,8 +257,8 @@ bash_complete() {
 #   1. Ask the engine for add --, and check it offers --name, --parent, --label, --template and
 #      --quiet.
 #   2. Ask for delete -- and check it offers --force.
-#   3. Ask for the word after list and check it offers exactly devices, property, value, parent
-#      and overlay, in that order.
+#   3. Ask for the word after list and check it offers exactly devices, context, property,
+#      value, parent and overlay, in that order.
 # bats test_tags=req:COMPLETION-04, id:L0051
 @test "completion offers a command's flags" {
 	run candidates add --
@@ -270,7 +270,7 @@ bash_complete() {
 	run candidates delete --
 	assert_line --force
 	run candidates list ''
-	assert_output "$(printf 'devices\nproperty\nvalue\nparent\noverlay')"
+	assert_output "$(printf 'devices\ncontext\nproperty\nvalue\nparent\noverlay')"
 }
 
 # Description: completion offers the setting names config lists, and a setting's options as its

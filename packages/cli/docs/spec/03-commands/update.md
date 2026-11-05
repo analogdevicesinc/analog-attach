@@ -1,15 +1,17 @@
 # update
 
 Sets a property of a node, sets a flag, reads a property, or creates a child
-node. A shared command: §2 to §8 as the linux backend does it, §9 as the
-noos backend does it (it sets, reads, or with `--suggest` lists the values
-of one property; there are no flags and no child nodes).
+node, or with `--suggest` lists the values a property can take. A shared
+command: §2 to §9 as the linux backend does it, §10 as the noos backend does
+it (it sets, reads, or lists the values of one property; there are no flags
+and no child nodes).
 
 ## 1. Synopsis
 
 ```
 analog-attach [--json] update <path> <property> [<value>...] [--quiet]
 analog-attach [--json] update <path> <child-name>            [--quiet]
+analog-attach [--json] update <path> <property> --suggest
 analog-attach [--json] update <node> <property> [<value> | <member> <value>] [--quiet]
 analog-attach [--json] update <node> <property> [<member>] --suggest     # noos
 ```
@@ -23,6 +25,7 @@ GRM-072).
 | `<property>` | The property name. A name with `@` may be a child node instead (§8). |
 | `<value>...` | The value tokens. Without any, `update` sets a flag or reads (§5). A value starting with `-` needs `--` before it (GRM-012): `update adc offset -- -5`. |
 | `--quiet` | When reading: as `read --quiet`, leave out what the binding says (description, suggestions, a child's missing required properties). When creating a child: list its missing required properties instead of asking. |
+| `--suggest` | List the values `<property>` can take instead of setting it (§9). |
 
 ## 2. Terms
 
@@ -348,7 +351,18 @@ required properties as `add` does (`add.md` §11) and:
   run the interview per ADD-115 to ADD-125. ADD-113 and ADD-114 (values from
   the binding's examples) don't apply.
 
-## 9. Where the backend is noos
+## 9. Suggesting
+
+**UPDATE-130** With `--suggest`, after UPDATE-001 and UPDATE-002, the CLI
+shall answer what `list value <path> <property>` answers (`list.md` LIST-070
+to LIST-077), in both modes: it loads what `list value` loads (bindings when
+they load), sets nothing and writes nothing. `--quiet` changes nothing.
+
+**UPDATE-131** If `--suggest` is given with a value, then the CLI shall report
+the input error `A member is not supported by the linux backend: <value>`, as
+`list value` does for a member (`list.md` LIST-009).
+
+## 10. Where the backend is noos
 
 A node's properties are its schema's, so `update` sets one of them and never
 adds one. `<node>` is a node name (GRM-080); GRM-070 to GRM-074 don't apply:
@@ -431,7 +445,7 @@ property`.
 **UPDATE-540** Without a value, the CLI shall read the property as `read
 <node> <property>` does (`read.md` READ-503, READ-513), `--quiet` included.
 
-## 10. Open issues
+## 11. Open issues
 
 **U-1.** *Fixed.* (`update` wrote its warnings to standard error and `add`
 to standard output in human mode. Every command now writes them to standard
@@ -518,7 +532,7 @@ only `validate` reports `Target symbol 'tp3_spi_dev' not found`
 bootstrap deletes the old member's node. A fix would be to refuse a name
 that is no node, listing the candidates of `list value`.
 
-## 11. Examples
+## 12. Examples
 
 ```
 $ analog-attach update adc spi-max-frequency 1000000

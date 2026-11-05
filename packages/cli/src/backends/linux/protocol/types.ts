@@ -13,7 +13,7 @@ import type {
     Suggestion,
     SuggestResponse,
 } from "../../../interface/backend-responses";
-import type { ListDevicesResponse, ListPropertyResponse } from "./descriptions";
+import type { ListContextResponse, ListDevicesResponse, ListPropertyResponse } from "./descriptions";
 
 export type { CommonResponse, PropertyConstraints, PropertySuggestions, PropertyValue, Severity, Suggestion, SuggestResponse } from "../../../interface/backend-responses";
 
@@ -62,8 +62,8 @@ export interface AddResponse extends CommonResponse {
 }
 
 /** `update <path> <child-name>` when it creates the child node. */
-/** `update`: a property set, a child node created (`UpdateChildResponse`), or a read (`ReadResponse`). */
-export type UpdateResponse = CommonResponse | UpdateChildResponse | ReadResponse;
+/** `update`: a property set, a child node created (`UpdateChildResponse`), a read (`ReadResponse`), or the values `--suggest` lists (`SuggestResponse`). */
+export type UpdateResponse = CommonResponse | UpdateChildResponse | ReadResponse | SuggestResponse;
 
 export interface UpdateChildResponse extends CommonResponse {
     path: string[];
@@ -225,6 +225,7 @@ export interface DeployResponse extends CommonResponse {
 export interface LinuxResponses extends Responses {
     "init": InitResponse;
     "list devices": ListDevicesResponse;
+    "list context": ListContextResponse;
     "list property": ListPropertyResponse;
     "list value": SuggestResponse;
     "add": AddResponse;

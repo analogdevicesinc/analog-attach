@@ -81,6 +81,8 @@ export interface DeployTarget {
 }
 
 export interface Resources {
+    /** The Linux tree, with its bindings and headers (`list context`). */
+    linux: string;
     bindings: Bindings;
     tools: Tools;
     base: BaseTree;
@@ -291,6 +293,7 @@ export function open_workspace<N extends Need>(settings: Settings, needs: readon
     const base = (): ConfigResult<BaseTree> => (base_result ??= parse_base(settings, linux, context));
 
     const parsers: { [K in Need]: () => ConfigResult<Resources[K]> } = {
+        linux,
         bindings: () => parse_bindings(settings, context, linux),
         tools: () => parse_tools(context),
         base,

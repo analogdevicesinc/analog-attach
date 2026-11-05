@@ -23,10 +23,11 @@ import {
 } from "attach-lib";
 import * as fs from "node:fs";
 
-import { answer, command, input_error, PromptCancelled, refuse, type InteractiveSession, type UpdateArguments } from "../../../../interface/backend-interface";
+import { answer, command, input_error, PromptCancelled, refuse, type FlagSpecs, type InteractiveSession, type UpdateArguments } from "../../../../interface/backend-interface";
 import { load_workspace, type Bindings, type Workfile } from "../../config/workspace";
 import { resolve_write_target, parse_node_path, not_found_message } from "../../utilities";
 import { child_unit_radix, find_property_definition, resolve_node_binding } from "../../binding-resolution";
+import { suggest_values } from "../list/value";
 import { read_target } from "../read/command";
 import { node_reg_warnings, reg_warning_lines } from "../../reg-conflicts";
 import { describe_missing, missing_lines, missing_required_of, type NewNode } from "../../missing-required";
@@ -92,7 +93,12 @@ export function decide_update(hint: ShapeHint, value_tokens: readonly string[], 
 const child_node_message = (identifier: string, name: string): string =>
     `${name} is a child node; set its properties with \`update ${identifier}/${name} <prop> <value>\``;
 
-export const update = command<UpdateArguments, UpdateResponse>({
+const UPDATE_FLAGS = {
+    suggest: { kind: "boolean", brief: "List what the property can be set to, instead of setting it" },
+} as const satisfies FlagSpecs;
+
+export const update = command<UpdateArguments, UpdateResponse, typeof UPDATE_FLAGS>({
+    flags: UPDATE_FLAGS,
     docs: {
         brief: "Update/insert a property",
         full: `Paths:
@@ -113,21 +119,29 @@ Special cases:
   Child name   'update <path> <child-name>' creates a child node and lists
                its missing required properties; an existing child is read
                (as 'read <path>/<child-name>' does)
-  reg          'update <path> reg <n>' also renames the node's unit address`,
+  reg          'update <path> reg <n>' also renames the node's unit address
+  --suggest    Lists what the property can be set to, as 'list value' does,
+               and sets nothing`,
         examples: [
             "update spi0/adi,ad7124-8@0 spi-max-frequency 1000000",
             "update spi0/adi,ad7124-8@0 reg 1",
             "update spi0/adi,ad7124-8@0 interrupts 25 IRQ_TYPE_EDGE_FALLING",
-            "update spi0/adi,ad7124-8@0 io-channels 0 1 , 2 3",
             "update spi0/adi,ad7124-8@0 channel@0",
+            "update --suggest spi0/adi,ad7124-8@0 interrupt-parent",
         ],
     },
-    async run({ path: path_argument, property: property_argument, values, quiet }, _flags, session) {
+    async run({ path: path_argument, property: property_argument, values, quiet }, flags, session) {
         if (path_argument === undefined) { return input_error("Missing: path"); }
         if (property_argument === undefined) { return input_error("Missing: property name"); }
         const parsed_path = parse_node_path(path_argument);
         if (!parsed_path.ok) { return input_error(parsed_path.error); }
         const node_identifier = parsed_path.value;
+
+        if (flags.suggest === true) {
+            const [member] = values;
+            if (member !== undefined) { return input_error(`A member is not supported by the linux backend: ${member}`); }
+            return suggest_values(session, node_identifier, property_argument);
+        }
 
         const loaded = load_workspace(session, ["bindings", "base", "overlay"]);
         if (!loaded.ok) { return loaded.outcome; }
