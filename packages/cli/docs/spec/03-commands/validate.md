@@ -141,7 +141,7 @@ of another form, or of a fragment with neither, is shown unchanged.
 
 **VALIDATE-026** When there are no errors, the CLI shall end with `No
 errors!`, or `No errors! (<n> warning(s))` when there are warnings. When there
-are errors, there is no summary line.
+are errors, it shall end with `<n> error(s), <m> warning(s)`.
 
 **VALIDATE-027** The exit status shall be 0 whatever the diagnostics.
 
@@ -322,7 +322,8 @@ unlike `build`. A workspace or installation path with a space breaks them.
 human mode and `add` and `rename` to standard output. All three use standard
 error now, VALIDATE-114.)
 
-**V-8. No summary line when there are errors** (VALIDATE-026).
+**V-8.** *Fixed.* (With errors there was no summary line. The output ends with
+`<n> error(s), <m> warning(s)` now, VALIDATE-026.)
 
 **V-9. Properties set on a fragment's target aren't validated.**
 VALIDATE-003 copies only the nodes of a body, not its own properties. With
@@ -371,6 +372,7 @@ spi0/adc@5:
     note: If foo@7e200000 replaces it: disable /soc/gpio@7e200000
 i2c_arm/temp@53:
   warning: reg: address 0x53 is already used by accel@53
+4 error(s), 3 warning(s)
 ```
 
 ```

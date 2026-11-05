@@ -67,6 +67,9 @@ export function setting_hint(key: SettingKey, program: string = DEFAULT_PROGRAM)
         case "linux":
         case "devicetree": { return setup_hint([key], program); }
         case "workfile": { return `Run '${program} init' to create it, or '${program} config workfile <name>' to use another.`; }
+        case "deploy-ip": { return `Run '${program} config deploy-ip <address>'.`; }
+        case "deploy-user": { return `Run '${program} config deploy-user <user>'.`; }
+        case "deploy-password": { return `Run '${program} config deploy-password <password>'.`; }
         default: { return undefined; }
     }
 }
@@ -212,6 +215,13 @@ if (import.meta.vitest) {
         expect(setup_hint(["linux"], "aa")).toBe("Run 'aa' on a terminal, or 'aa config linux <path>', to set up a workspace.");
         expect(setup_hint(["workfile", "linux"], "aa")).toBe("Run 'aa' on a terminal, or 'aa config linux <path>' and 'config workfile <name>', then 'aa init', to set up a workspace.");
         expect(setup_hint(["linux", "devicetree", "workfile"])).toContain("'analog-attach config linux <path>', 'config devicetree <path>' and 'config workfile <name>', then");
+    });
+
+    test("missing_hint — the deploy settings say their config command; the other optional ones have none", () => {
+        expect(missing_hint("deploy-ip", "aa")).toBe("Run 'aa config deploy-ip <address>'.");
+        expect(missing_hint("deploy-user", "aa")).toBe("Run 'aa config deploy-user <user>'.");
+        expect(missing_hint("deploy-password", "aa")).toBe("Run 'aa config deploy-password <password>'.");
+        expect(missing_hint("overlay-syntax", "aa")).toBeUndefined();
     });
 
     test("SETTINGS - keys are unique and each has a field; path settings say whether they must exist", () => {

@@ -48,6 +48,7 @@ export const validate = command<Record<never, never>, ValidationResponse>({
     docs: {
         brief: "Validate the overlay against its bindings",
         full: "Runs dt-validate on the overlay merged with the base device tree.",
+        examples: ["validate", "--json validate"],
     },
     async run(_arguments, _flags, session) {
         const loaded = load_workspace(session, ["bindings", "tools", "base", "overlay"]);
@@ -402,12 +403,12 @@ export function format_validation_report(diagnostics: DtValidateDiagnostic[], ta
     const error_count = errors.length + nodeless.filter(d => d.level !== 'warning').length;
     const warning_count = warnings.length + nodeless.filter(d => d.level === 'warning').length;
 
-    if (error_count === 0) {
-        if (warning_count > 0) {
-            lines.push(`No errors! (${warning_count} warning(s))`);
-        } else {
-            lines.push('No errors!');
-        }
+    if (error_count > 0) {
+        lines.push(`${error_count} error(s), ${warning_count} warning(s)`);
+    } else if (warning_count > 0) {
+        lines.push(`No errors! (${warning_count} warning(s))`);
+    } else {
+        lines.push('No errors!');
     }
 
     return lines;
@@ -599,6 +600,7 @@ if (import.meta.vitest) {
         expect(report[1]).toContain("error: reg: reg is required");
         expect(report[2]).toContain("warning: spi-max-frequency: missing recommended property");
         expect(report).not.toContain(expect.stringContaining("No errors!"));
+        expect(report.at(-1)).toBe("1 error(s), 1 warning(s)");
     });
 
     test("format_validation_report — warnings only", () => {

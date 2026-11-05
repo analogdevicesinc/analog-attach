@@ -161,8 +161,6 @@ duplicate_labels() {
 	assert_output --partial "$PROJECT/overlay.dtbo"
 }
 
-# Gap: Linux writes `Wrote <path>` on one line; noos writes `Build completed successfully`
-# and the path on the next line, two spaces in.
 # Description: build reports where its output is in the same form as the other ecosystems: a
 # success line, then the path on the next line.
 # Steps:
@@ -170,7 +168,7 @@ duplicate_labels() {
 #   2. Run build; check it succeeds.
 #   3. Check it prints Build completed successfully, and the .dtbo's path on a line indented by
 #      two spaces.
-# bats test_tags=req:BUILD-03, gap, id:L0039
+# bats test_tags=req:BUILD-03, id:L0039
 @test "build reports where the output is in the same form as the other ecosystems" {
 	with_overlay
 	run aa build

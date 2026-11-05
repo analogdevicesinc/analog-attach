@@ -11,8 +11,8 @@ import type { Candidate, Completion, Session, Slot } from "../../interface/backe
 import { load_workspace, optional_bindings, type Need, type Workspace } from "./config/workspace";
 import type { Suggestion } from "./protocol/types";
 import { template_suggestions } from "./commands/add/template-suggest";
+import { node_children } from "./utilities";
 import { device_keys, entry_points, load_binding, navigate, overlay_file_suggestions, overlay_property_suggestions, parent_suggestions, value_list } from "./commands/list/data";
-import { node_children } from "./commands/list/suggest";
 
 const NONE: Completion = { candidates: [] };
 

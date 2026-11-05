@@ -63,15 +63,13 @@ setup() {
 	[ ! -e "$WORKFILE" ] || fail "add created the workfile"
 }
 
-# Gap: an unknown compatible is refused with `Failed to find binding for <compatible>`, naming no
-# close compatible (adi,adxl345, adi,adxl346 for adi,adxl34).
 # Description: an unknown compatible is refused, naming the closest compatibles.
 # Steps:
 #   1. Create the overlay with init and snapshot the workfile.
 #   2. Add adi,adxl34, with --json.
 #   3. Check it is refused (exit 0, .ok false) and the message names adi,adxl345.
 #   4. Check the workfile is unchanged.
-# bats test_tags=req:ADD-02, gap, id:L0004
+# bats test_tags=req:ADD-02, id:L0004
 @test "an unknown compatible is refused, naming the closest ones" {
 	with_overlay
 	snapshot

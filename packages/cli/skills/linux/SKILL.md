@@ -218,7 +218,7 @@ analog-attach list parent adi,ad7124-8
 analog-attach list parent <compatible>
 ```
 
-**Output**: One parent per line: `label  /path`. `--json` gives `suggestions: [{ value, display_string }]` (the label, the path). A compatible without a binding is `ok: true`, severity `warn`, `No binding found for <compatible>`, with no suggestions.
+**Output**: One parent per line: `label  /path`. `--json` gives `suggestions: [{ value, display_string }]` (the label, the path). A compatible without a binding is `ok: true`, severity `warn`, `Unknown compatible '<compatible>'. Did you mean …? See: analog-attach list devices`, with no suggestions.
 
 **Strategy**: SPI devices → look for `spi` in label; I2C → look for `i2c`. If multiple, ask the user which physical bus. Always list ALL returned parents so users see every valid option.
 
@@ -486,7 +486,7 @@ analog-attach move imu1 spi1
 analog-attach validate
 ```
 
-Validates the overlay against device bindings using `dt-validate`, then checks enabled siblings for clashing `reg` (a taken SPI chip select or I2C address, overlapping MMIO ranges) and reports them as warnings on `reg`. Clashes only within the base tree are left out. Errors and warnings are grouped by fragment target in human mode. An empty result prints `No errors!`.
+Validates the overlay against device bindings using `dt-validate`, then checks enabled siblings for clashing `reg` (a taken SPI chip select or I2C address, overlapping MMIO ranges) and reports them as warnings on `reg`. Clashes only within the base tree are left out. Errors and warnings are grouped by fragment target in human mode. An empty result prints `No errors!`; otherwise the output ends with `<n> error(s), <m> warning(s)` (or `No errors! (<m> warning(s))`).
 
 ```bash
 analog-attach validate
@@ -726,7 +726,7 @@ node-name {
 | `No backend is set` | No `backend` in the settings | `config backend linux` |
 | `devicetree: <path> does not exist` | A configured file/directory doesn't exist | Verify path with user, then `config <key> <path>` |
 | `Failed to parse dts` | Invalid device tree syntax | Check for syntax errors in `.dts` file |
-| `Failed to find binding for <compatible>` | Compatible string not found | Use `list devices` to find valid strings |
+| `Unknown compatible '<compatible>'. Did you mean …?` | Compatible string not found | Pick one of the suggestions, or use `list devices` to find valid strings |
 | `missing_required` error | Required property not set | Use `update` to add the property |
 | `number_limit` error | Value outside valid range | Use `update` with a value within schema bounds |
 | `interrupts` size error | Wrong number of cells | Set `interrupt-parent` first: `update <path> interrupt-parent gpio` |

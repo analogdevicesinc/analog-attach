@@ -503,7 +503,7 @@ if (import.meta.vitest) {
         const no_bindings: ConfigResult<Bindings> = { ok: false, errors: [] };
         const missing = await read_target(json_session, overlay, no_bindings, "spi9", undefined, { quiet: false });
         expect(missing.kind).toBe("refused");
-        expect(await outcome_json(missing)).toEqual({ ok: false, message: "Not found: spi9", severity: "error" });
+        expect(await outcome_json(missing)).toEqual({ ok: false, message: "Not found: spi9. Did you mean spi0?", severity: "error" });
         expect(outcome_text(await read_target(text_session, overlay, no_bindings, "spi0", "reg", { quiet: false }))).toBe("Not found: reg on spi0");
     });
 }

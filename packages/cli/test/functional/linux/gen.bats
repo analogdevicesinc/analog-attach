@@ -545,13 +545,12 @@ checksum() {
 	assert_output --partial "analog-attach list parent <compatible>"
 }
 
-# Gap: the help of validate, build and deploy has no examples.
 # Description: the help of every command has examples.
 # Steps:
 #   1. Run --help of each command: config, init, import, add, read, update, delete, rename, list,
 #      move, enable, disable, validate, build, deploy, completion and skill.
 #   2. Check each one has an Examples section.
-# bats test_tags=req:GEN-10, gap, id:L0147
+# bats test_tags=req:GEN-10, id:L0147
 @test "every command's help has examples" {
 	local command missing=()
 	for command in config init import add read update delete rename list move enable disable validate build \
@@ -575,14 +574,13 @@ checksum() {
 
 # --- GEN-12, GEN-13: explaining ----------------------------------------------------------
 
-# Gap: an unknown compatible gives only `Failed to find binding for adi,adxl34`.
 # Description: an unknown compatible is refused with the closest compatibles and a pointer to
 # list devices.
 # Steps:
 #   1. Create the overlay with init.
 #   2. Add adi,adxl34, with --json.
 #   3. Check it is refused (.ok false) and the message names adi,adxl345 and list devices.
-# bats test_tags=req:GEN-12, gap, id:L0149
+# bats test_tags=req:GEN-12, id:L0149
 @test "an unknown device points to list devices" {
 	with_overlay
 	run_json add adi,adxl34
@@ -591,14 +589,12 @@ checksum() {
 	assert_json '.message | test("analog-attach list devices")' true
 }
 
-# Gap: an unknown node under a known one gives only `Not found: i2c_arm/adi,adxl345@1 (the
-# property is a separate argument: <path> <property>)`, naming none of the nodes there.
 # Description: an unknown node under a known one is refused, naming the nodes that are there.
 # Steps:
 #   1. Make an overlay with an ADXL345 on i2c1.
 #   2. Read i2c_arm/adi,adxl345@1, with --json.
 #   3. Check it is refused (.ok false), saying it was not found and naming adi,adxl345@0.
-# bats test_tags=req:GEN-12, gap, id:L0150
+# bats test_tags=req:GEN-12, id:L0150
 @test "an unknown node names the nodes there are" {
 	with_accel
 	run_json read i2c_arm/adi,adxl345@1

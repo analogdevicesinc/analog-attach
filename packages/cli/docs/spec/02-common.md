@@ -299,7 +299,9 @@ config linux <path>' and 'config workfile <name>'`), and `<then>` is there
 when `workfile` is one of them. So a hint names only the fields that are
 unset or wrong. For an invalid `workfile` (its file missing or not parsing)
 the hint is `Run 'analog-attach init' to create it, or 'analog-attach config
-workfile <name>' to use another.`. The other fields have none.
+workfile <name>' to use another.`. For `deploy-ip`, `deploy-user` and
+`deploy-password` it is `Run 'analog-attach config <key> <value>'.`, `<value>`
+being `<address>`, `<user>` and `<password>`. The other fields have none.
 
 **COM-500** Where the backend is noos, its settings shall be these, in the
 order the CLI writes them and `config` lists them (by category, then within
