@@ -525,3 +525,63 @@ allOf:
         expect(maximum('x,b')).toBe(3n);
     });
 });
+
+describe('branch narrowing takes what dt-schema takes', () => {
+    test('two child-node patterns that are the same schema both narrow', async () => {
+        // s2mpu02's `^LDO..$` and `^BUCK[1-7]$`, both regulator.yaml
+        const attach = await parsed('same-pattern-schema', `
+patternProperties:
+  "^LDO[0-9]$":
+    type: object
+    $ref: /schemas/regulator/regulator.yaml#
+  "^BUCK[0-9]$":
+    type: object
+    $ref: /schemas/regulator/regulator.yaml#
+`);
+        expect(attach.patterns).toStrictEqual(['^LDO[0-9]$', '^BUCK[0-9]$']);
+        expect(attach.narrow_pattern_binding('^BUCK[0-9]$', '{}')).toBeDefined();
+    });
+
+    test('a pattern is read as Python reads it: an escaped dash, and {,n} for {0,n}', async () => {
+        const attach = await parsed('python-pattern', `
+properties:
+  compatible:
+    const: x,y
+  x,label:
+    $ref: /schemas/types.yaml#/definitions/string
+    pattern: '^a\\-b(-c){,1}$'
+  x,mode:
+    $ref: /schemas/types.yaml#/definitions/uint32
+    maximum: 7
+allOf:
+  - if:
+      properties:
+        x,label:
+          pattern: '^a\\-b(-c){,1}$'
+    then:
+      properties:
+        x,mode:
+          maximum: 3
+`);
+        const maximum = (label: string) => {
+            const narrowed = attach.narrow_binding(JSON.stringify({ compatible: ['x,y'], 'x,label': [label] }));
+            const mode = narrowed === undefined ? undefined : property(narrowed, 'x,mode');
+            return mode?._t === 'scalar' && mode.cell._t === 'number' ? mode.cell.maximum : undefined;
+        };
+        expect(maximum('a-b-c')).toBe(3n);
+        expect(maximum('a-b-c-c')).toBe(7n);
+    });
+
+    test('a property whose description is left empty is still offered', async () => {
+        // emc2305's `emcs205,max-state`
+        const { parsed_binding } = await parsed('empty-description', `
+properties:
+  compatible:
+    const: x,y
+  x,max-state:
+    description:
+    maxItems: 1
+`);
+        expect(parsed_binding.properties.map(p => p.key)).toContain('x,max-state');
+    });
+});
