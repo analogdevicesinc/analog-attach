@@ -1,6 +1,6 @@
-import { DtBindingSchema } from "./Schema";
+import { DtBindingSchema } from "./Schema.js";
 import { fixup_branch_counts } from "./fixups/branch_counts.js";
-import { fixup_collapse_allOf } from "./fixups/collapse_allOf";
+import { fixup_collapse_allOf } from "./fixups/collapse_allOf.js";
 import { fixup_dt_type } from "./fixups/dt_type.js";
 import { fixup_interrupts } from "./fixups/interrupts.js";
 import { fixup_items_size } from "./fixups/items_size.js";

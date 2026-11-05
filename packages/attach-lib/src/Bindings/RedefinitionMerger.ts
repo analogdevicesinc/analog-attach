@@ -1,5 +1,5 @@
 import { JSONSchema } from "@apidevtools/json-schema-ref-parser/dist/lib/types";
-import { DtBindingSchema } from "./Schema";
+import { DtBindingSchema } from "./Schema.js";
 import { SchemaContext } from "./Context.js";
 import { dereference } from "./RefResolver.js";
 import { deep_merge, find_entry_in_object, is_plain_object, overwrite_object_with_path_value } from "./ObjectUtilities.js";

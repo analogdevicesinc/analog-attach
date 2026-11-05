@@ -1,5 +1,5 @@
 /* eslint-disable unicorn/prevent-abbreviations */
-import { DtBindingSchema } from "./Schema";
+import { DtBindingSchema } from "./Schema.js";
 import { SchemaContext } from "./Context.js";
 import { dereference } from "./RefResolver.js";
 import { PathValue, RefResolvedBinding } from "./UtilityTypes.js";

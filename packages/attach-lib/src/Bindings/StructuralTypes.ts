@@ -1,4 +1,4 @@
-import { ResolvedProperty } from "./ParsedBinding";
+import { ResolvedProperty } from "./ParsedBinding.js";
 
 export enum AttachEnumType {
     PHANDLE = "phandle",
