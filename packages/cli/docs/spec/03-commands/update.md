@@ -156,9 +156,21 @@ several cells here: `adi,ad7124-8` with no shape hint is written
 | `IRQ_TYPE_NONE`, `IRQ_TYPE_EDGE_RISING`, `IRQ_TYPE_EDGE_FALLING`, `IRQ_TYPE_EDGE_BOTH`, `IRQ_TYPE_LEVEL_HIGH`, `IRQ_TYPE_LEVEL_LOW` | 0, 1, 2, 3, 4, 8 |
 | `GPIO_ACTIVE_HIGH`, `GPIO_ACTIVE_LOW`, `GPIO_PUSH_PULL`, `GPIO_SINGLE_ENDED`, `GPIO_LINE_OPEN_SOURCE`, `GPIO_LINE_OPEN_DRAIN`, `GPIO_OPEN_DRAIN`, `GPIO_OPEN_SOURCE`, `GPIO_PERSISTENT`, `GPIO_TRANSITORY`, `GPIO_PULL_UP`, `GPIO_PULL_DOWN`, `GPIO_PULL_DISABLE` | 0, 1, 0, 2, 0, 4, 6, 2, 0, 8, 16, 32, 64 |
 
-The CLI doesn't check that a number fits a 32-bit cell (Open issue U-7). A
+The CLI doesn't check that a number fits its cell (Open issue U-7). A
 word in step 4 may be a label or a path, but `&{/path}` doesn't resolve, and a
 path is written as `&/path`, which the reparse check refuses (Open issue U-6).
+
+**UPDATE-035** Where the shape hint is `cells` and the definition gives its
+cells a size other than 32 bits (dt-schema's `typeSize`: a `uint64`, an
+`int64-matrix`'s rows, a `uint8-array`), the CLI shall write each row of
+UPDATE-032 with that size: `/bits/ <size> <…>`, several as `/bits/ <size>
+<…>, /bits/ <size> <…>` (`update adf4371/channel@0 adi,power-up-frequency
+8000000000` writes `/bits/ 64 <8000000000>`). A matrix's size is the one its
+rows give. If a cell resolves to a reference (UPDATE-034 step 4), then the
+CLI shall refuse with `'<cell>' is a label, and <property> holds <size>-bit
+cells: dtc only takes a reference in a 32-bit cell`. Without a definition, or
+with one that gives no size, cells are 32 bits, written `<…>`. The add
+interview and `list value`'s check (LIST-073) write a value the same way.
 
 ### 6.3 Value count
 

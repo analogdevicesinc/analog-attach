@@ -1,4 +1,4 @@
-import { DTProperty, is_dt_flag } from "./Parser";
+import { Bits, DTProperty, is_dt_flag } from "./Parser";
 import { print_property } from "./Parser";
 import {
     CellArray,
@@ -68,7 +68,7 @@ export class PropertyBuilder implements
         value: [],
     };
 
-    private constructor() {
+    private constructor(private readonly bit_width: Bits = Bits.b32) {
     }
 
     static build_flag(): IFlagPropertyBuilder {
@@ -83,8 +83,9 @@ export class PropertyBuilder implements
         return new PropertyBuilder;
     }
 
-    static build_cell_array(): ICellArrayPropertyBuilder {
-        return new PropertyBuilder;
+    /** Cells of `bits` bits: a binding's `typeSize` (`uint64` is `/bits/ 64 <…>`), 32 by default. */
+    static build_cell_array(bits: 8 | 16 | 32 | 64 = 32): ICellArrayPropertyBuilder {
+        return new PropertyBuilder(bits as Bits);
     }
 
     set_flag(): IPropertyNameBuilder {
@@ -152,7 +153,7 @@ export class PropertyBuilder implements
                 return accumulator;
             });
 
-            this.property.value = [make_cell_array(merged)];
+            this.property.value = [make_cell_array(merged, this.bit_width)];
         }
 
         if (arguments_.every((entry) => is_cell_array_or_cell_matrix(entry) === true)) {
@@ -163,7 +164,7 @@ export class PropertyBuilder implements
                     entry.map((row) => upcast_to_LabeledTaggedCellValue_LabeledArray(row))
             );
 
-            this.property.value = upcast.flat().map((entry) => make_cell_array(entry));
+            this.property.value = upcast.flat().map((entry) => make_cell_array(entry, this.bit_width));
         }
 
         return this;
@@ -269,6 +270,13 @@ if (import.meta.vitest !== undefined) {
             () => PropertyBuilder.build_cell_array().with_tagged_values(matrix(0), pair(1), matrix(2)).with_name("cells").build(),
             "cells = <0 &gpio0>, <&{/soc/gpio0} (1+1)>, <1 &gpio1>, <2 &gpio2>, <&{/soc/gpio2} (1+1)>;",
         ],
+        ["64-bit cells", () => PropertyBuilder.build_cell_array(64).with_tagged_values(number(0x1_00_00_00_00), number(1)).with_name("cells").build(), "cells = /bits/ 64 <4294967296 1>;"],
+        [
+            "64-bit rows, each its own /bits/",
+            () => PropertyBuilder.build_cell_array(64).with_tagged_values([number(1), number(2)], [number(3), number(4)]).with_name("cells").build(),
+            "cells = /bits/ 64 <1 2>, /bits/ 64 <3 4>;",
+        ],
+        ["8-bit cells", () => PropertyBuilder.build_cell_array(8).with_tagged_values(number(255)).with_name("cells").build(), "cells = /bits/ 8 <255>;"],
     ])("%s", (_name, build, printed) => {
         expect(PropertyBuilder.to_string(build())).toBe(`${printed}\n`);
     });
