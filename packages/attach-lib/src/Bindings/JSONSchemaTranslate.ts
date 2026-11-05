@@ -1,5 +1,5 @@
 import { ParsedBinding, ResolvedProperty, PatternPropertyRule, PropertyPatternRule } from "./ParsedBinding.js";
-import { DtBindingSchema, Schema } from "./Schema.js";
+import { DtBindingSchema, is_schema, Schema } from "./Schema.js";
 import { AttachType, AttachEnumType, Cell, EnumOption, List } from "./StructuralTypes.js";
 import { is_node_pattern } from "./PatternKind.js";
 import { cell_range, is_matrix_type } from "./PropertyTypes.js";
@@ -114,20 +114,23 @@ function order_properties(properties: ResolvedProperty[], required: string[] | u
     return ordered;
 }
 
-function translate_JSONSchema_allOf(allOf: any[] | undefined): ResolvedProperty[] {
+/** The properties of the `allOf` entries that are other files (an `$id`), and of theirs. */
+function translate_JSONSchema_allOf(allOf: unknown[] | undefined): ResolvedProperty[] {
 
     let properties: ResolvedProperty[] = [];
 
     for (const item of allOf ?? []) {
-        if (!("$id" in item)) {
+        if (!is_schema(item) || !("$id" in item) || item["properties"] === undefined) {
             continue;
         }
 
-        if (item.properties === undefined) {
-            continue;
-        }
-
-        properties = [...properties, ...collect_properties(item.properties), ...translate_JSONSchema_allOf(item.allOf)];
+        const own = item["properties"];
+        const nested = item["allOf"];
+        properties = [
+            ...properties,
+            ...collect_properties(is_schema(own) ? own : undefined),
+            ...translate_JSONSchema_allOf(Array.isArray(nested) ? nested : undefined),
+        ];
     }
 
     return properties;
@@ -145,10 +148,11 @@ function nearest_keyword(schema: unknown, key: string): unknown {
 }
 
 /** The row schema of an array of one-cell arrays (`items: {type: array, items: [x]}`, the `items` itself or wrapped in a one-element array). */
-function matrix_row(object: any): any {
-    const row = Array.isArray(object.items) ? (object.items.length === 1 ? object.items[0] : undefined) : object.items;
+function matrix_row(object: Schema): Schema | undefined {
+    const items = object["items"];
+    const row: unknown = Array.isArray(items) ? (items.length === 1 ? items[0] : undefined) : items;
 
-    if (typeof row === 'object' && row !== null && row.type === "array" && Array.isArray(row.items) && row.items.length === 1) {
+    if (is_schema(row) && row["type"] === "array" && Array.isArray(row["items"]) && row["items"].length === 1) {
         return row;
     }
 
@@ -195,10 +199,11 @@ function enum_cell(options: unknown, default_value?: unknown): Cell {
 }
 
 /** The numbers a cell of `typeSize` bits can take, signed when its minimum is below zero (`int64`). */
-function size_range(schema: any): { minimum: bigint, maximum: bigint } | undefined {
-    if (![8, 16, 32, 64].includes(schema.typeSize)) { return undefined; }
-    const signed = (to_bigint(schema.minimum) ?? 0n) < 0n;
-    return cell_range(`${signed ? "" : "u"}int${String(schema.typeSize)}`);
+function size_range(schema: Schema): { minimum: bigint, maximum: bigint } | undefined {
+    const size = schema["typeSize"];
+    if (typeof size !== "number" || ![8, 16, 32, 64].includes(size)) { return undefined; }
+    const signed = (to_bigint(schema["minimum"]) ?? 0n) < 0n;
+    return cell_range(`${signed ? "" : "u"}int${String(size)}`);
 }
 
 /** A schema number a double can't hold exactly, past 2^53. */
@@ -209,11 +214,11 @@ const rounded = (bound: unknown): boolean => typeof bound === "number" && !Numbe
  * `typeSize`'s): a YAML number is one, and `uint64`'s `maximum: 0xffffffffffffffff` reads as 2^64, `int64`'s
  * 2^63 - 1 as 2^63. Other bounds are the binding's, past its type or not (ad8460's `-microamp` from -1000000).
  */
-function number_cell(schema: any, default_value?: unknown, range = size_range(schema)): Cell {
-    let minimum = to_bigint(schema.minimum);
-    let maximum = to_bigint(schema.maximum);
-    if (range !== undefined && rounded(schema.minimum) && minimum !== undefined && minimum < range.minimum) { minimum = range.minimum; }
-    if (range !== undefined && rounded(schema.maximum) && maximum !== undefined && maximum > range.maximum) { maximum = range.maximum; }
+function number_cell(schema: Schema, default_value?: unknown, range = size_range(schema)): Cell {
+    let minimum = to_bigint(schema["minimum"]);
+    let maximum = to_bigint(schema["maximum"]);
+    if (range !== undefined && rounded(schema["minimum"]) && minimum !== undefined && minimum < range.minimum) { minimum = range.minimum; }
+    if (range !== undefined && rounded(schema["maximum"]) && maximum !== undefined && maximum > range.maximum) { maximum = range.maximum; }
     const default_number = to_bigint(default_value);
     return {
         _t: "number",
@@ -224,29 +229,45 @@ function number_cell(schema: any, default_value?: unknown, range = size_range(sc
 }
 
 /** A schema of a number: an integer, or bounded (`mark_integers` types them, a unit property's cells come after it). */
-function is_number_schema(schema: any): boolean {
-    return typeof schema === "object" && schema !== null && !("enum" in schema || "const" in schema) &&
-        (schema.type === "integer" || "minimum" in schema || "maximum" in schema);
+function is_number_schema(schema: unknown): schema is Schema {
+    return is_schema(schema) && !("enum" in schema || "const" in schema) &&
+        (schema["type"] === "integer" || "minimum" in schema || "maximum" in schema);
+}
+
+/** A number `schema` gives under `keyword` (`typeSize`, `minItems`), undefined when it gives none. */
+function number_of(schema: Schema, keyword: string): number | undefined {
+    const value = schema[keyword];
+    return typeof value === "number" ? value : undefined;
+}
+
+/** The `typeSize` of `schema`, as an `extra` of `narrow_array_object`'s `list`: nothing when it has none. */
+function type_size(schema: Schema): Pick<List, "typeSize"> {
+    const size = number_of(schema, "typeSize");
+    return size === undefined ? {} : { typeSize: size };
 }
 
 /** The bounds a schema gives, left out of the type when it doesn't. */
-function bounds(schema: any): Pick<List, "minItems" | "maxItems"> {
+function bounds(schema: Schema): Pick<List, "minItems" | "maxItems"> {
+    const minimum = number_of(schema, "minItems");
+    const maximum = number_of(schema, "maxItems");
     return {
-        ...(schema.minItems === undefined ? {} : { minItems: schema.minItems }),
-        ...(schema.maxItems === undefined ? {} : { maxItems: schema.maxItems }),
+        ...(minimum === undefined ? {} : { minItems: minimum }),
+        ...(maximum === undefined ? {} : { maxItems: maximum }),
     };
 }
 
-function described<T extends object>(schema: any, type: T): T & { description?: string } {
-    return schema.description === undefined ? type : { ...type, description: schema.description };
+/** `type` with the description of `schema`, when it has one. */
+function described<T extends object>(schema: Schema, type: T): T & { description?: string } {
+    const description = schema["description"];
+    return typeof description === "string" ? { ...type, description } : type;
 }
 
 /** The most options of a `compatible` we list; a larger product is left to what `dtType` says. */
 const MAX_ENUM_OPTIONS = 512;
 
 /** A bound of `schema` (`minItems` / `maxItems`), or `fallback` when it gives none. */
-const bound_of = (schema: any, keyword: "minItems" | "maxItems", fallback: number): number =>
-    typeof schema[keyword] === "number" ? schema[keyword] : fallback;
+const bound_of = (schema: Schema, keyword: "minItems" | "maxItems", fallback: number): number =>
+    number_of(schema, keyword) ?? fallback;
 
 /**
  * A `oneOf` of lists whose entries are each an `enum` / `const` (the values a `compatible` can take, the fallback
@@ -259,25 +280,26 @@ const bound_of = (schema: any, keyword: "minItems" | "maxItems", fallback: numbe
  * neither an `enum` nor a `const` (a `pattern`), when no list fits, or when there are more than `MAX_ENUM_OPTIONS`
  * options: a partial list would mislead the suggestions.
  */
-function fixed_size_enum_list(object: any, whole_lists: boolean): AttachType | undefined {
-    const oneOf: any[] = object.oneOf;
+function fixed_size_enum_list(object: Schema, whole_lists: boolean): AttachType | undefined {
+    const oneOf = object["oneOf"];
+    if (!Array.isArray(oneOf)) { return undefined; }
 
     // The values each position of each branch can take, and the lengths of the lists it admits, longest first
     const branches: { positions: unknown[][], lengths: number[] }[] = [];
 
     for (const value of oneOf) {
-        if (!("items" in value)) { return undefined; }
-        if (value.type !== "array") { return undefined; }
-        if (!Array.isArray(value.items)) { return undefined; }
+        if (!is_schema(value) || value["type"] !== "array") { return undefined; }
+        const items = value["items"];
+        if (!Array.isArray(items)) { return undefined; }
 
         const positions: unknown[][] = [];
-        for (const element of value.items) {
-            if (typeof element !== "object" || element === null) {
+        for (const element of items) {
+            if (!is_schema(element)) {
                 return undefined;
             } else if ("const" in element) {
-                positions.push([element.const]);
-            } else if (Array.isArray(element.enum)) {
-                positions.push(element.enum);
+                positions.push([element["const"]]);
+            } else if (Array.isArray(element["enum"])) {
+                positions.push(element["enum"]);
             } else {
                 return undefined;
             }
@@ -357,13 +379,14 @@ function row_cells(row: List, type: string): List {
     return { ...row, item: cells };
 }
 
-function narrow_matrix(object: any, type: string): AttachType {
-    const items = Array.isArray(object.items) ? object.items[0] : object.items;
+function narrow_matrix(object: Schema, type: string): AttachType {
+    const items = object["items"];
+    const first: unknown = Array.isArray(items) ? items[0] : items;
     // The description of the first row says nothing of the others, nor does the row's type (see `row_cells`)
-    const { description: _description, [DT_TYPE]: _row_type, ...row_schema } = typeof items === "object" && items !== null ? items : {} as Schema;
+    const { description: _description, [DT_TYPE]: _row_type, ...row_schema } = is_schema(first) ? first : {};
     // The default of a matrix of one cell (`-microvolt`'s `default: 4096000`) is that cell's
-    const one_cell = object.maxItems === 1 && row_schema.maxItems === 1 && "default" in object;
-    const row = narrow_array_object({ ...row_schema, type: "array", ...(one_cell ? { default: object.default } : {}) });
+    const one_cell = object["maxItems"] === 1 && row_schema["maxItems"] === 1 && "default" in object;
+    const row = narrow_array_object({ ...row_schema, type: "array", ...(one_cell ? { default: object["default"] } : {}) });
 
     return described(object, {
         _t: "matrix",
@@ -377,15 +400,16 @@ function narrow_matrix(object: any, type: string): AttachType {
 }
 
 /** The values of a `oneOf` whose branches are all open lists of an `enum` (`items: {enum}`), undefined for any other. */
-function open_enum_union(object: any): unknown[] | undefined {
-    if (!Array.isArray(object.oneOf) || object.oneOf.length === 0) { return undefined; }
+function open_enum_union(object: Schema): unknown[] | undefined {
+    const oneOf = object["oneOf"];
+    if (!Array.isArray(oneOf) || oneOf.length === 0) { return undefined; }
 
     const union = new Set<unknown>();
-    for (const branch of object.oneOf) {
-        if (branch.type !== "array" || typeof branch.items !== "object" || branch.items === null || !Array.isArray(branch.items.enum)) {
-            return undefined;
-        }
-        for (const value of branch.items.enum) { union.add(value); }
+    for (const branch of oneOf) {
+        const items: unknown = is_schema(branch) && branch["type"] === "array" ? branch["items"] : undefined;
+        const values = is_schema(items) ? items["enum"] : undefined;
+        if (!Array.isArray(values)) { return undefined; }
+        for (const value of values) { union.add(value); }
     }
     return [...union];
 }
@@ -414,7 +438,7 @@ function const_union(branches: unknown): unknown[] | undefined {
 }
 
 /** A number of the range of `dt_type` (`uint32-array`'s 0..0xFFFFFFFF), narrowed by what `schema` bounds it to. */
-function typed_number_cell(schema: any, dt_type: string, default_value?: unknown): Cell {
+function typed_number_cell(schema: Schema, dt_type: string, default_value?: unknown): Cell {
     const range = cell_range(dt_type);
     return number_cell(range === undefined ? schema : { minimum: range.minimum, maximum: range.maximum, ...schema }, default_value, range ?? size_range(schema));
 }
@@ -423,10 +447,10 @@ function typed_number_cell(schema: any, dt_type: string, default_value?: unknown
  * The cell of one position of an `items` list: what it allows (an `enum`, a `const`, a number schema), else what the
  * property's `dtType` says it holds (a string of a `pattern`, a number of a `{description}`). Undefined when neither.
  */
-function position_cell(definition: any, dt_type: unknown): Cell | undefined {
-    if (typeof definition !== "object" || definition === null) { return undefined; }
-    if ("enum" in definition) { return enum_cell(definition.enum); }
-    if ("const" in definition) { return enum_cell([definition.const], definition.const); }
+function position_cell(definition: unknown, dt_type: unknown): Cell | undefined {
+    if (!is_schema(definition)) { return undefined; }
+    if ("enum" in definition) { return enum_cell(definition["enum"]); }
+    if ("const" in definition) { return enum_cell([definition["const"]], definition["const"]); }
 
     if (typeof dt_type === "string" && integer_array_size(dt_type) !== undefined) {
         return typed_number_cell(definition, dt_type);
@@ -443,9 +467,7 @@ function position_cell(definition: any, dt_type: unknown): Cell | undefined {
  * `contains` never matches. Branches that are all open `enum` lists give the union of the enums as its options; any
  * other the strings alone.
  */
-function narrow_string_array(object: any): AttachType | undefined {
-    if (typeof object !== "object" || object === null) { return undefined; }
-
+function narrow_string_array(object: Schema): AttachType | undefined {
     const dt_type = object[DT_TYPE];
 
     if (dt_type === "string") {
@@ -468,9 +490,7 @@ function narrow_string_array(object: any): AttachType | undefined {
  * a `uint32` as every `#*-cells`) is what the type says: a flag, or a number of the type's range, or of its `enum`. A
  * schema with anything else to say (`oneOf`, `items`) is left to the readers of those.
  */
-function narrow_dt_scalar(object: any): AttachType | undefined {
-    if (typeof object !== "object" || object === null) { return undefined; }
-
+function narrow_dt_scalar(object: Schema): AttachType | undefined {
     const dt_type = object[DT_TYPE];
     if (typeof dt_type !== "string") { return undefined; }
 
@@ -481,14 +501,14 @@ function narrow_dt_scalar(object: any): AttachType | undefined {
     const found = /^u?int(8|16|32|64)$/.exec(dt_type);
     const range = cell_range(dt_type);
     // A `oneOf` of values `oneof_to_enum` leaves alone (one of them `deprecated`) is an enum all the same
-    const options = const_union(object.oneOf);
+    const options = const_union(object["oneOf"]);
     const says_more = ["anyOf", "allOf", "const", "items", "type", ...(options === undefined ? ["oneOf"] : [])];
     if (found === null || range === undefined || says_more.some(key => key in object)) {
         return undefined;
     }
 
     let cell: Cell = { _t: "number" as const, minimum: range.minimum, maximum: range.maximum };
-    if ("enum" in object) { cell = enum_cell(object.enum); }
+    if ("enum" in object) { cell = enum_cell(object["enum"]); }
     else if (options !== undefined) { cell = enum_cell(options); }
 
     return described(object, {
@@ -502,12 +522,10 @@ function narrow_dt_scalar(object: any): AttachType | undefined {
  * A property whose schema says nothing but its integer array type (`dtType: uint32-array`, `protected-clocks`) and
  * maybe its count: a list of numbers of the type's range.
  */
-function narrow_dt_array(object: any): AttachType | undefined {
-    if (typeof object !== "object" || object === null) { return undefined; }
-
+function narrow_dt_array(object: Schema): AttachType | undefined {
     const dt_type = object[DT_TYPE];
     const size = integer_array_size(dt_type);
-    if (size === undefined || ["oneOf", "anyOf", "allOf", "const", "enum", "items"].some(key => key in object)) {
+    if (typeof dt_type !== "string" || size === undefined || ["oneOf", "anyOf", "allOf", "const", "enum", "items"].some(key => key in object)) {
         return undefined;
     }
 
@@ -516,88 +534,83 @@ function narrow_dt_array(object: any): AttachType | undefined {
 
 // TODO: handle objects
 /** `name`: the property's, when the schema is one's (a `compatible` reads its `oneOf` of lists apart). */
-function narrow_object(object: any, name?: string): AttachType {
-
-    if (typeof object === 'object' && object !== null && is_matrix_type(object[DT_TYPE])) {
-        return narrow_matrix(object, object[DT_TYPE]);
+function narrow_object(object: unknown, name?: string): AttachType {
+    // `true`, a list or a value: nothing to read
+    if (!is_schema(object)) {
+        return { _t: "unknown" };
     }
 
-    if (typeof object === 'object' && "type" in object) {
-        switch (object.type) {
-            case "array":
-                {
-                    const row = matrix_row(object);
+    const dt_type = object[DT_TYPE];
+    if (typeof dt_type === "string" && is_matrix_type(dt_type)) {
+        return narrow_matrix(object, dt_type);
+    }
 
-                    if (row !== undefined) {
-                        return described(object, {
-                            _t: "matrix",
-                            ...bounds(object),
-                            rows: [narrow_array_object(row)]
-                        });
-                    }
+    switch (object["type"]) {
+        case "array": {
+            const row = matrix_row(object);
 
-                    return narrow_array_object(object, name);
-                }
-            case "string": {
-                const unique_items = nearest_keyword(object, "uniqueItems") === true;
-
+            if (row !== undefined) {
                 return described(object, {
-                    _t: "list",
-                    item: { _t: "string" },
+                    _t: "matrix",
                     ...bounds(object),
-                    ...(unique_items ? { unique: true } : {}),
+                    rows: [narrow_array_object(row)]
                 });
             }
-            case "integer":
-                {
-                    // A number the type dt-schema gives its name sizes (reg.yaml's `#address-cells: {maximum: 3}`, a `uint32`)
-                    const scalar_type = typeof object[DT_TYPE] === "string" && /^u?int(8|16|32|64)$/.exec(object[DT_TYPE]);
-                    const typeSize = object.typeSize ?? (scalar_type ? Number(scalar_type[1]) : undefined);
-                    // A const next to the $ref (`$ref: uint32` + `const: 28`) is the one value, so also the default.
-                    const constant = "const" in object ? to_option(object.const) : undefined;
-                    const single = constant === undefined || Array.isArray(constant) ? undefined : constant;
-                    const default_value = single ?? to_default(object.default);
 
-                    let cell: Cell = scalar_type ? typed_number_cell(object, object[DT_TYPE]) : number_cell(object);
-                    if ("enum" in object) { cell = enum_cell(object.enum); }
-                    else if (single !== undefined) { cell = enum_cell([single]); }
+            return narrow_array_object(object, name);
+        }
+        case "string": {
+            const unique_items = nearest_keyword(object, "uniqueItems") === true;
 
-                    return described(object, {
-                        _t: "scalar",
-                        cell,
-                        ...(typeSize === undefined ? {} : { typeSize }),
-                        ...(default_value === undefined ? {} : { default: default_value }),
-                    });
-                }
-            case "boolean": {
-                return described(object, { _t: "flag" });
-            }
+            return described(object, {
+                _t: "list",
+                item: { _t: "string" },
+                ...bounds(object),
+                ...(unique_items ? { unique: true } : {}),
+            });
+        }
+        case "integer": {
+            // A number the type dt-schema gives its name sizes (reg.yaml's `#address-cells: {maximum: 3}`, a `uint32`)
+            const scalar_type = typeof dt_type === "string" ? /^u?int(8|16|32|64)$/.exec(dt_type) ?? undefined : undefined;
+            const typeSize = number_of(object, "typeSize") ?? (scalar_type === undefined ? undefined : Number(scalar_type[1]));
+            // A const next to the $ref (`$ref: uint32` + `const: 28`) is the one value, so also the default.
+            const constant = "const" in object ? to_option(object["const"]) : undefined;
+            const single = constant === undefined || Array.isArray(constant) ? undefined : constant;
+            const default_value = single ?? to_default(object["default"]);
+
+            let cell: Cell = scalar_type !== undefined && typeof dt_type === "string" ? typed_number_cell(object, dt_type) : number_cell(object);
+            if ("enum" in object) { cell = enum_cell(object["enum"]); }
+            else if (single !== undefined) { cell = enum_cell([single]); }
+
+            return described(object, {
+                _t: "scalar",
+                cell,
+                ...(typeSize === undefined ? {} : { typeSize }),
+                ...(default_value === undefined ? {} : { default: default_value }),
+            });
+        }
+        case "boolean": {
+            return described(object, { _t: "flag" });
         }
     }
 
-    if (
-        typeof object === 'object' &&
-        "oneOf" in object &&
-        Array.isArray(object.oneOf) &&
-        object.oneOf.length === 2 &&
-        object.oneOf[0].type === "boolean" &&
-        object.oneOf[0].const === true &&
-        object.oneOf[1].type === 'null'
-    ) {
-        return described(object, { _t: "flag" });
+    const oneOf = object["oneOf"];
+
+    // A flag written `oneOf: [{type: boolean, const: true}, {type: null}]`
+    if (Array.isArray(oneOf) && oneOf.length === 2) {
+        const [present, absent]: unknown[] = oneOf;
+        if (is_schema(present) && present["type"] === "boolean" && present["const"] === true && is_schema(absent) && absent["type"] === "null") {
+            return described(object, { _t: "flag" });
+        }
     }
 
-    if (typeof object === 'object' && Array.isArray(object.oneOf)) {
+    if (Array.isArray(oneOf)) {
         const enum_list = fixed_size_enum_list(object, name === "compatible");
         if (enum_list !== undefined) { return enum_list; }
     }
 
-    if (
-        typeof object === 'object' &&
-        "const" in object &&
-        object.const !== undefined
-    ) {
-        const option = to_option(object.const);
+    if (object["const"] !== undefined) {
+        const option = to_option(object["const"]);
         if (option !== undefined && !Array.isArray(option)) {
             return described(object, { _t: "scalar", cell: enum_cell([option]), default: option });
         }
@@ -605,15 +618,11 @@ function narrow_object(object: any, name?: string): AttachType {
 
     // dt-schema's `_extract_prop_type`: a `type: object`, or one of these keys (a `$ref` to a node schema without
     // `type`, once dereferenced, has them), makes the property a node
-    if (
-        typeof object === 'object' &&
-        object !== null &&
-        (("type" in object && object.type === "object") ||
-            ["properties", "patternProperties", "additionalProperties"].some((key) => key in object))
-    ) {
+    if (object["type"] === "object" || ["properties", "patternProperties", "additionalProperties"].some((key) => key in object)) {
         return described(object, {
             _t: "node",
-            properties: translate_JSONSchema(object).properties
+            // A node schema reads as a binding does
+            properties: translate_JSONSchema(object as DtBindingSchema).properties
         });
     }
 
@@ -644,29 +653,33 @@ function get_enum_type(options: unknown): AttachEnumType.STRING | AttachEnumType
     return AttachEnumType.STRING;
 };
 
-function narrow_array_object(object: any, name?: string): AttachType & { _t: "list" } {
+function narrow_array_object(object: Schema, name?: string): AttachType & { _t: "list" } {
 
     const list = (item: Cell | Cell[], extra: Partial<List> = {}): AttachType & { _t: "list" } =>
         described(object, { _t: "list", item, ...bounds(object), ...extra });
 
-    const items = object.items;
-    const items_array = Array.isArray(items);
+    const items = object["items"];
+    // `items` as a list of positions, or as the schema of every entry
+    const positions = Array.isArray(items) ? items : undefined;
+    const item = !Array.isArray(items) && is_schema(items) ? items : undefined;
+    // The one position of a list of one
+    const only = positions?.length === 1 && is_schema(positions[0]) ? positions[0] : undefined;
 
     // Ex. simple compatible definition
-    if (items_array && items.length === 1 && "enum" in items[0]) {
-        return list(enum_cell(items[0].enum, object.default));
+    if (only !== undefined && "enum" in only) {
+        return list(enum_cell(only["enum"], object["default"]));
     }
 
     // Ex. simple compatible definition with only one value
-    if (items_array && items.length === 1 && "const" in items[0]) {
-        return list(enum_cell([items[0].const], items[0].const));
+    if (only !== undefined && "const" in only) {
+        return list(enum_cell([only["const"]], only["const"]));
     }
 
-    if (items_array && items.length > 1) {
+    if (positions !== undefined && positions.length > 1) {
 
         const cells: Cell[] = [];
 
-        for (const definition of items) {
+        for (const definition of positions) {
             const cell = position_cell(definition, object[DT_TYPE]);
             if (cell === undefined) {
                 // FAILSAFE
@@ -675,58 +688,59 @@ function narrow_array_object(object: any, name?: string): AttachType & { _t: "li
             cells.push(cell);
         }
 
-        // a matrix row has no `dtType` left (`narrow_matrix`): the size its positions share
-        const sizes = new Set(items.map((definition: any) => definition.typeSize));
-        const size = integer_array_size(object[DT_TYPE]) ?? (sizes.size === 1 ? items[0].typeSize : undefined);
+        // a matrix row has no `dtType` left (`narrow_matrix`): the size its positions share. Each position is a
+        // schema: `position_cell` has read it
+        const sizes = new Set(positions.map(definition => number_of(definition as Schema, "typeSize")));
+        const size = integer_array_size(object[DT_TYPE]) ?? (sizes.size === 1 ? [...sizes][0] : undefined);
         return list(cells, size === undefined ? {} : { typeSize: size });
     }
 
-    if ("items" in object && !items_array && "enum" in items) {
-        return list(enum_cell(items.enum, object.default));
+    if (item !== undefined && "enum" in item) {
+        return list(enum_cell(item["enum"], object["default"]));
     }
 
-    if ("items" in object && !items_array && "const" in items) {
-        return list(enum_cell([items.const], items.const));
+    if (item !== undefined && "const" in item) {
+        return list(enum_cell([item["const"]], item["const"]));
     }
 
     // object level enum with  $ref: /schemas/types.yaml#/definitions/string
-    if ("enum" in object && "items" in object && "type" in items && items.type === "string") {
-        return list(enum_cell(object.enum, object.default));
+    if ("enum" in object && item !== undefined && item["type"] === "string") {
+        return list(enum_cell(object["enum"], object["default"]));
     }
 
     // Integer array with definition in items
-    if ("items" in object && is_number_schema(items)) {
-        return list(number_cell(items, object.default), items.typeSize === undefined ? {} : { typeSize: items.typeSize });
+    if (is_number_schema(items)) {
+        return list(number_cell(items, object["default"]), type_size(items));
     }
 
     // Integer array with definition in items but items is an array
-    if (items_array && items.length === 1 && is_number_schema(items[0])) {
-        return list(number_cell(items[0], object.default), items[0].typeSize === undefined ? {} : { typeSize: items[0].typeSize });
+    if (is_number_schema(only)) {
+        return list(number_cell(only, object["default"]), type_size(only));
     }
 
     // Integer array with constraints outside items
     if (!("items" in object) && ("minimum" in object || "maximum" in object)) {
-        return list(number_cell(object, object.default), object.typeSize === undefined ? {} : { typeSize: object.typeSize });
+        return list(number_cell(object, object["default"]), type_size(object));
     }
 
-    const unique = object.uniqueItems === true ? { unique: true } : {};
+    const unique = object["uniqueItems"] === true ? { unique: true } : {};
 
     // A `oneOf` of fixed lists of values says more than the string `items` of the type beside it: a `compatible` with a
     // `pattern`, `clock-names: {$ref: string-array, oneOf: [{items: [a, b]}, {items: [a, c, b]}]}`
-    if (Array.isArray(object.oneOf)) {
+    if (Array.isArray(object["oneOf"])) {
         const enum_list = fixed_size_enum_list(object, name === "compatible");
         if (enum_list?._t === "list" && !Array.isArray(enum_list.item) && enum_list.item._t === "enum" && enum_list.item.enum.length > 0) { return enum_list; }
     }
 
     // String array with type inside items object, an `items` `oneOf` of values its options (clock.yaml's string
     // `clock-names` items over the binding's)
-    if ("items" in object && !items_array && "type" in items && items.type === "string") {
-        const options = const_union(items.oneOf);
+    if (item !== undefined && item["type"] === "string") {
+        const options = const_union(item["oneOf"]);
         return list(options === undefined ? { _t: "string" } : enum_cell(options), unique);
     }
 
     // String array with type inside items array
-    if (items_array && items.length === 1 && "type" in items[0] && items[0].type === "string") {
+    if (only !== undefined && only["type"] === "string") {
         return list({ _t: "string" }, unique);
     }
 
@@ -735,13 +749,12 @@ function narrow_array_object(object: any, name?: string): AttachType & { _t: "li
     // branches that are all open `enum` lists (beside dt-core's `compatible` pattern).
     const dt_type = object[DT_TYPE];
     if (typeof dt_type === "string" && STRING_TYPES.has(dt_type)) {
-        const options = (items_array ? undefined : const_union(items?.oneOf)) ?? open_enum_union(object);
+        const options = const_union(item?.["oneOf"]) ?? open_enum_union(object);
         return list(options === undefined ? { _t: "string" } : enum_cell(options), unique);
     }
     const size = integer_array_size(dt_type);
-    if (size !== undefined) {
-        const item_schema = !items_array && typeof items === "object" && items !== null ? items : {};
-        return list(typed_number_cell(item_schema, dt_type, object.default), { typeSize: size });
+    if (typeof dt_type === "string" && size !== undefined) {
+        return list(typed_number_cell(item ?? {}, dt_type, object["default"]), { typeSize: size });
     }
 
     // Array of whatever

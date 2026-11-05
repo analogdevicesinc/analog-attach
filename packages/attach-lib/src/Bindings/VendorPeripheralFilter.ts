@@ -3,6 +3,7 @@ import path from "node:path";
 import { parse } from "yaml";
 
 import type { ParsedBinding, ResolvedProperty } from "./ParsedBinding.js";
+import { is_schema, Schema, value_at } from "./Schema.js";
 
 /** The node a binding's node sits under: its parent, the bus controller when there is one. */
 export interface ControllerContext {
@@ -32,32 +33,35 @@ export function load_spi_peripherals(bindings: string): SpiPeripherals | undefin
 }
 
 function read_spi_peripherals(directory: string): SpiPeripherals | undefined {
-    const read = (file: string): any => {
+    const read = (file: string): Schema | undefined => {
         try {
-            return parse(fs.readFileSync(path.join(directory, file), "utf8"));
+            const document: unknown = parse(fs.readFileSync(path.join(directory, file), "utf8"));
+            return is_schema(document) ? document : undefined;
         } catch {
             return undefined;
         }
     };
     const peripheral = read("spi-peripheral-props.yaml");
     const controller = read("spi-controller.yaml");
-    const pattern: unknown = controller?.properties?.$nodename?.pattern;
-    if (peripheral === undefined || typeof pattern !== "string") { return undefined; }
+    const pattern = value_at(controller, ["properties", "$nodename", "pattern"]);
+    if (peripheral === undefined || controller === undefined || typeof pattern !== "string") { return undefined; }
 
     const names = new Set<string>();
     const add = (properties: unknown): void => {
-        if (typeof properties !== "object" || properties === null) { return; }
+        if (!is_schema(properties)) { return; }
         for (const name of Object.keys(properties)) {
             if (name !== "reg") { names.add(name); }
         }
     };
-    add(peripheral.properties);
+    add(peripheral["properties"]);
     // The vendor files beside it (`$ref: arm,pl022-peripheral-props.yaml#`)
-    for (const entry of Array.isArray(peripheral.allOf) ? peripheral.allOf : []) {
-        const reference: unknown = entry?.$ref;
-        if (typeof reference === "string" && !reference.startsWith("/")) { add(read(reference.split("#")[0]!)?.properties); }
+    const entries = peripheral["allOf"];
+    for (const entry of Array.isArray(entries) ? entries : []) {
+        const reference = is_schema(entry) ? entry["$ref"] : undefined;
+        if (typeof reference === "string" && !reference.startsWith("/")) { add(read(reference.split("#")[0]!)?.["properties"]); }
     }
-    for (const child of Object.values<any>(controller.patternProperties ?? {})) { add(child?.properties); }
+    const children = controller["patternProperties"];
+    for (const child of is_schema(children) ? Object.values(children) : []) { add(is_schema(child) ? child["properties"] : undefined); }
     return { properties: names, controller_name: new RegExp(pattern) };
 }
 
@@ -210,7 +214,7 @@ if (import.meta.vitest) {
     test("filter_peripheral_properties — undefined controller returns unchanged", () => {
         const binding: ParsedBinding = {
             required_properties: ["reg"],
-            properties: [{ key: "reg", value: {} as any }, { key: "pl022,interface", value: {} as any }],
+            properties: [{ key: "reg", value: { _t: "unknown" } }, { key: "pl022,interface", value: { _t: "unknown" } }],
             examples: [],
         };
         // eslint-disable-next-line unicorn/no-useless-undefined
@@ -221,14 +225,14 @@ if (import.meta.vitest) {
         const binding: ParsedBinding = {
             required_properties: ["reg"],
             properties: [
-                { key: "reg", value: {} as any },
-                { key: "spi-max-frequency", value: {} as any },
-                { key: "pl022,interface", value: {} as any },
-                { key: "cdns,read-delay", value: {} as any },
-                { key: "fsl,spi-cs-sck-delay", value: {} as any },
-                { key: "controller-data", value: {} as any },
-                { key: "nvidia,tx-clk-tap-delay", value: {} as any },
-                { key: "st,spi-midi-ns", value: {} as any },
+                { key: "reg", value: { _t: "unknown" } },
+                { key: "spi-max-frequency", value: { _t: "unknown" } },
+                { key: "pl022,interface", value: { _t: "unknown" } },
+                { key: "cdns,read-delay", value: { _t: "unknown" } },
+                { key: "fsl,spi-cs-sck-delay", value: { _t: "unknown" } },
+                { key: "controller-data", value: { _t: "unknown" } },
+                { key: "nvidia,tx-clk-tap-delay", value: { _t: "unknown" } },
+                { key: "st,spi-midi-ns", value: { _t: "unknown" } },
             ],
             examples: [],
         };
@@ -241,8 +245,8 @@ if (import.meta.vitest) {
         const binding: ParsedBinding = {
             required_properties: ["reg"],
             properties: [
-                { key: "reg", value: {} as any },
-                { key: "pl022,interface", value: {} as any },
+                { key: "reg", value: { _t: "unknown" } },
+                { key: "pl022,interface", value: { _t: "unknown" } },
             ],
             examples: [],
         };
