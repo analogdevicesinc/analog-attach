@@ -1,18 +1,18 @@
 {
-    "description": "Bindings for the Analog Devices AD7124 ADC device. Datasheet can be\nfound here:\n  https://www.analog.com/media/en/technical-documentation/data-sheets/AD7124-8.pdf\n",
+    "description": "Bindings for the Analog Devices AD4130 ADC. Datasheet can be found here:\n  https://www.analog.com/media/en/technical-documentation/data-sheets/AD4130-8.pdf\n",
     "examples": [
-        "#include <dt-bindings/gpio/gpio.h>\nspi {\n  #address-cells = <1>;\n  #size-cells = <0>;\n\n  adc@0 {\n    compatible = \"adi,ad7124-4\";\n    reg = <0>;\n    spi-max-frequency = <5000000>;\n    interrupts = <25 2>;\n    interrupt-parent = <&gpio>;\n    rdy-gpios = <&gpio 25 GPIO_ACTIVE_LOW>;\n    refin1-supply = <&adc_vref>;\n\n    #address-cells = <1>;\n    #size-cells = <0>;\n\n    channel@0 {\n      reg = <0>;\n      diff-channels = <0 1>;\n      adi,reference-select = <0>;\n      adi,buffered-positive;\n    };\n\n    channel@1 {\n      reg = <1>;\n      bipolar;\n      diff-channels = <2 3>;\n      adi,reference-select = <0>;\n      adi,buffered-positive;\n      adi,buffered-negative;\n    };\n\n    channel@2 {\n      reg = <2>;\n      diff-channels = <4 5>;\n    };\n\n    channel@3 {\n      reg = <3>;\n      diff-channels = <6 7>;\n    };\n  };\n};\n"
+        "#include <dt-bindings/interrupt-controller/irq.h>\n\nspi {\n  #address-cells = <1>;\n  #size-cells = <0>;\n\n  adc@0 {\n    compatible = \"adi,ad4130\";\n    reg = <0>;\n\n    #address-cells = <1>;\n    #size-cells = <0>;\n\n    spi-max-frequency = <5000000>;\n    interrupts = <27 IRQ_TYPE_EDGE_FALLING>;\n    interrupt-parent = <&gpio>;\n\n    channel@0 {\n      reg = <0>;\n\n      adi,reference-select = <2>;\n\n      /* AIN8, AIN9 */\n      diff-channels = <8 9>;\n    };\n\n    channel@1 {\n      reg = <1>;\n\n      adi,reference-select = <2>;\n\n      /* AIN10, AIN11 */\n      diff-channels = <10 11>;\n    };\n\n    channel@2 {\n      reg = <2>;\n\n      adi,reference-select = <2>;\n\n      /* Temperature Sensor, DGND */\n      diff-channels = <16 19>;\n    };\n\n    channel@3 {\n      reg = <3>;\n\n      adi,reference-select = <2>;\n\n      /* Internal reference, DGND */\n      diff-channels = <18 19>;\n    };\n\n    channel@4 {\n      reg = <4>;\n\n      adi,reference-select = <2>;\n\n      /* DGND, DGND */\n      diff-channels = <19 19>;\n    };\n  };\n};\n"
     ],
     "pattern_properties": [
         {
-            "description": "Represents the external channels which are connected to the ADC.\n",
-            "pattern": "^channel@([0-9]|1[0-5])$",
+            "description": "A few properties are defined in a common way ADC channels.",
+            "pattern": "^channel@([0-9a-f])$",
             "properties": [
                 {
                     "key": "reg",
                     "value": {
                         "_t": "matrix",
-                        "description": "The channel number. It can have up to 8 channels on ad7124-4\nand 16 channels on ad7124-8, numbered from 0 to 15.\n",
+                        "description": "The channel number.",
                         "maxItems": 1,
                         "minItems": 1,
                         "rows": [
@@ -24,9 +24,84 @@
                                     "minimum": "0n"
                                 },
                                 "maxItems": 1,
-                                "minItems": 1
+                                "minItems": 1,
+                                "typeSize": 32
                             }
                         ]
+                    }
+                },
+                {
+                    "key": "bipolar",
+                    "value": {
+                        "_t": "flag",
+                        "description": "If provided, the channel is to be used in bipolar mode."
+                    }
+                },
+                {
+                    "key": "diff-channels",
+                    "value": {
+                        "_t": "list",
+                        "description": "Besides the analog inputs available, internal inputs can be used.\n16: Internal temperature sensor.\n17: AVSS\n18: Internal reference\n19: DGND\n20: (AVDD − AVSS)/6+\n21: (AVDD − AVSS)/6-\n22: (IOVDD − DGND)/6+\n23: (IOVDD − DGND)/6-\n24: (ALDO − AVSS)/6+\n25: (ALDO − AVSS)/6-\n26: (DLDO − DGND)/6+\n27: (DLDO − DGND)/6-\n28: V_MV_P\n29: V_MV_M\n",
+                        "item": {
+                            "_t": "number",
+                            "maximum": "29n",
+                            "minimum": "0n"
+                        },
+                        "maxItems": 2,
+                        "minItems": 2,
+                        "typeSize": 32
+                    }
+                },
+                {
+                    "key": "single-channel",
+                    "value": {
+                        "_t": "scalar",
+                        "cell": {
+                            "_t": "number",
+                            "maximum": "4294967295n",
+                            "minimum": "0n"
+                        },
+                        "description": "When devices combine single-ended and differential channels, allow the channel for a single element to be specified, independent of reg (as for differential channels). If this and diff-channels are not present reg shall be used instead.",
+                        "typeSize": 32
+                    }
+                },
+                {
+                    "key": "common-mode-channel",
+                    "value": {
+                        "_t": "scalar",
+                        "cell": {
+                            "_t": "number",
+                            "maximum": "4294967295n",
+                            "minimum": "0n"
+                        },
+                        "description": "Some ADCs have differential input pins that can be used to measure single-ended or pseudo-differential inputs. This property can be used in addition to single-channel to signal software that this channel is not differential but still specify two inputs.\nThe input pair is specified by setting single-channel to the positive input pin and common-mode-channel to the negative pin.",
+                        "typeSize": 32
+                    }
+                },
+                {
+                    "key": "settling-time-us",
+                    "value": {
+                        "_t": "list",
+                        "description": "Time between enabling the channel and first stable readings.",
+                        "item": {
+                            "_t": "number",
+                            "maximum": "4294967295n",
+                            "minimum": "0n"
+                        },
+                        "minItems": 1
+                    }
+                },
+                {
+                    "key": "oversampling-ratio",
+                    "value": {
+                        "_t": "scalar",
+                        "cell": {
+                            "_t": "number",
+                            "maximum": "4294967295n",
+                            "minimum": "0n"
+                        },
+                        "description": "Oversampling is used as replacement of or addition to the low-pass filter. In some cases, the desired filtering characteristics are a function the device design and can interact with other characteristics such as settling time.",
+                        "typeSize": 32
                     }
                 },
                 {
@@ -38,34 +113,110 @@
                             "enum": [
                                 "0n",
                                 "1n",
+                                "2n",
                                 "3n"
                             ],
                             "enum_type": "number"
                         },
-                        "description": "Select the reference source to use when converting on\nthe specific channel. Valid values are:\n0: REFIN1(+)/REFIN1(−).\n1: REFIN2(+)/REFIN2(−).\n3: AVDD\nIf this field is left empty, internal reference is selected.\n",
+                        "default": "0n",
+                        "description": "Select the reference source to use when converting on the\nspecific channel. Valid values are:\n0: REFIN1(+)/REFIN1(−)\n1: REFIN2(+)/REFIN2(−)\n2: REFOUT/AVSS (Internal reference)\n3: AVDD/AVSS\nIf not specified, REFIN1 is used.\n",
                         "typeSize": 32
                     }
                 },
                 {
-                    "key": "diff-channels",
+                    "key": "adi,excitation-pin-0",
                     "value": {
-                        "_t": "list",
-                        "description": "Many ADCs have dual Muxes to allow different input pins to be routed to both the positive and negative inputs of a differential ADC. The first value specifies the positive input pin, the second specifies the negative input pin.",
-                        "item": {
+                        "_t": "scalar",
+                        "cell": {
                             "_t": "number",
-                            "maximum": "4294967295n",
+                            "maximum": "15n",
                             "minimum": "0n"
                         },
-                        "maxItems": 2,
-                        "minItems": 2,
+                        "default": "0n",
+                        "description": "Analog input to apply excitation current to while the channel\nis active.\n",
                         "typeSize": 32
                     }
                 },
                 {
-                    "key": "bipolar",
+                    "key": "adi,excitation-pin-1",
                     "value": {
-                        "_t": "flag",
-                        "description": "If provided, the channel is to be used in bipolar mode."
+                        "_t": "scalar",
+                        "cell": {
+                            "_t": "number",
+                            "maximum": "15n",
+                            "minimum": "0n"
+                        },
+                        "default": "0n",
+                        "description": "Analog input to apply excitation current to while this channel\nis active.\n",
+                        "typeSize": 32
+                    }
+                },
+                {
+                    "key": "adi,excitation-current-0-nanoamp",
+                    "value": {
+                        "_t": "list",
+                        "description": "Excitation current in nanoamps to be applied to pin specified in\nadi,excitation-pin-0 while this channel is active.\n",
+                        "item": {
+                            "_t": "enum",
+                            "default": "0n",
+                            "enum": [
+                                "0n",
+                                "100n",
+                                "10000n",
+                                "20000n",
+                                "50000n",
+                                "100000n",
+                                "150000n",
+                                "200000n"
+                            ],
+                            "enum_type": "number"
+                        },
+                        "maxItems": 1,
+                        "minItems": 1
+                    }
+                },
+                {
+                    "key": "adi,excitation-current-1-nanoamp",
+                    "value": {
+                        "_t": "list",
+                        "description": "Excitation current in nanoamps to be applied to pin specified in\nadi,excitation-pin-1 while this channel is active.\n",
+                        "item": {
+                            "_t": "enum",
+                            "default": "0n",
+                            "enum": [
+                                "0n",
+                                "100n",
+                                "10000n",
+                                "20000n",
+                                "50000n",
+                                "100000n",
+                                "150000n",
+                                "200000n"
+                            ],
+                            "enum_type": "number"
+                        },
+                        "maxItems": 1,
+                        "minItems": 1
+                    }
+                },
+                {
+                    "key": "adi,burnout-current-nanoamp",
+                    "value": {
+                        "_t": "list",
+                        "description": "Burnout current in nanoamps to be applied for this channel.\n",
+                        "item": {
+                            "_t": "enum",
+                            "default": "0n",
+                            "enum": [
+                                "0n",
+                                "500n",
+                                "2000n",
+                                "4000n"
+                            ],
+                            "enum_type": "number"
+                        },
+                        "maxItems": 1,
+                        "minItems": 1
                     }
                 },
                 {
@@ -97,8 +248,7 @@
                 "item": {
                     "_t": "enum",
                     "enum": [
-                        "adi,ad7124-4",
-                        "adi,ad7124-8"
+                        "adi,ad4130"
                     ],
                     "enum_type": "string"
                 },
@@ -110,7 +260,7 @@
             "key": "reg",
             "value": {
                 "_t": "matrix",
-                "description": "SPI chip select number for the device",
+                "description": "Chip select used by the device.",
                 "maxItems": 1,
                 "minItems": 1,
                 "rows": [
@@ -122,7 +272,8 @@
                             "minimum": "0n"
                         },
                         "maxItems": 1,
-                        "minItems": 1
+                        "minItems": 1,
+                        "typeSize": 32
                     }
                 ]
             }
@@ -131,7 +282,6 @@
             "key": "interrupts",
             "value": {
                 "_t": "matrix",
-                "description": "IRQ line for the ADC",
                 "maxItems": 1,
                 "minItems": 1,
                 "rows": [
@@ -182,10 +332,29 @@
             }
         },
         {
+            "key": "interrupt-names",
+            "value": {
+                "_t": "list",
+                "description": "Specify which interrupt pin should be configured as Data Ready / FIFO\ninterrupt.\nDefault if not supplied is int.\n",
+                "item": {
+                    "_t": "enum",
+                    "enum": [
+                        "int",
+                        "clk",
+                        "p2",
+                        "dout"
+                    ],
+                    "enum_type": "string"
+                },
+                "maxItems": 1,
+                "minItems": 1
+            }
+        },
+        {
             "key": "clocks",
             "value": {
                 "_t": "matrix",
-                "description": "Optional external clock connected to the CLK pin.",
+                "description": "phandle to the master clock (mclk)",
                 "maxItems": 1,
                 "minItems": 1,
                 "rows": [
@@ -210,6 +379,18 @@
             }
         },
         {
+            "key": "clock-output-names",
+            "value": {
+                "_t": "list",
+                "description": "Recommended to be a list of strings of clock output signal\nnames indexed by the first cell in the clock specifier.\nHowever, the meaning of clock-output-names is domain\nspecific to the clock provider, and is only provided to\nencourage using the same meaning for the majority of clock\nproviders.  This format may not work for clock providers\nusing a complex clock specifier format.  In those cases it\nis recommended to omit this property and create a binding\nspecific names property.\n\nClock consumer nodes must never directly reference\nthe provider\\'s clock-output-names property.\n",
+                "item": {
+                    "_t": "string"
+                },
+                "maxItems": 1,
+                "minItems": 1
+            }
+        },
+        {
             "key": "#clock-cells",
             "value": {
                 "_t": "scalar",
@@ -221,14 +402,14 @@
                     "enum_type": "number"
                 },
                 "default": "0n",
-                "description": "The CLK pin can be used as an output. When that is the case, include this property."
+                "description": "Number of cells in a clock specifier; Typically 0 for nodes with a single clock output and 1 for nodes with multiple clock outputs."
             }
         },
         {
             "key": "clock-names",
             "value": {
                 "_t": "list",
-                "description": "MCLK is an internal counter in the ADC. Do not use this property.",
+                "description": "List of clock input name strings sorted in the same order as the clocks property.  Consumers drivers will use clock-names to match clock input names with clocks specifiers.",
                 "item": {
                     "_t": "enum",
                     "default": "mclk",
@@ -236,27 +417,6 @@
                         "mclk"
                     ],
                     "enum_type": "string"
-                },
-                "maxItems": 1,
-                "minItems": 1
-            }
-        },
-        {
-            "gpio_rows": {
-                "max_rows": 1,
-                "min_rows": 1
-            },
-            "key": "rdy-gpios",
-            "value": {
-                "_t": "list",
-                "description": "GPIO reading the R̅D̅Y̅ line. Having such a GPIO is technically optional but highly recommended because DOUT/R̅D̅Y̅ toggles during SPI transfers (in its DOUT aka MISO role) and so usually triggers a spurious interrupt. The distinction between such a spurious event and a real one can only be done by reading such a GPIO. (There is a register telling the same information, but accessing that one needs a SPI transfer which then triggers another interrupt event.)",
-                "item": {
-                    "_t": "enum",
-                    "enum": [
-                        "gpio",
-                        "expgpio"
-                    ],
-                    "enum_type": "phandle"
                 },
                 "maxItems": 1,
                 "minItems": 1
@@ -273,7 +433,8 @@
                     ],
                     "enum_type": "number"
                 },
-                "default": "1n"
+                "default": "1n",
+                "typeSize": 32
             }
         },
         {
@@ -287,14 +448,15 @@
                     ],
                     "enum_type": "number"
                 },
-                "default": "0n"
+                "default": "0n",
+                "typeSize": 32
             }
         },
         {
             "key": "refin1-supply",
             "value": {
                 "_t": "list",
-                "description": "refin1 supply can be used as reference for conversion.",
+                "description": "refin1 supply. Can be used as reference for conversion.",
                 "item": {
                     "_t": "enum",
                     "enum": [
@@ -314,7 +476,7 @@
             "key": "refin2-supply",
             "value": {
                 "_t": "list",
-                "description": "refin2 supply can be used as reference for conversion.",
+                "description": "refin2 supply. Can be used as reference for conversion.",
                 "item": {
                     "_t": "enum",
                     "enum": [
@@ -334,7 +496,7 @@
             "key": "avdd-supply",
             "value": {
                 "_t": "list",
-                "description": "avdd supply can be used as reference for conversion.",
+                "description": "AVDD voltage supply. Can be used as reference for conversion.",
                 "item": {
                     "_t": "enum",
                     "enum": [
@@ -351,6 +513,86 @@
             }
         },
         {
+            "key": "iovdd-supply",
+            "value": {
+                "_t": "list",
+                "description": "IOVDD voltage supply. Used for the chip interface.",
+                "item": {
+                    "_t": "enum",
+                    "enum": [
+                        "cam1_reg",
+                        "cam_dummy_reg",
+                        "sd_vcc_reg",
+                        "vdd_3v3_reg",
+                        "vdd_5v0_reg"
+                    ],
+                    "enum_type": "phandle"
+                },
+                "maxItems": 1,
+                "minItems": 1
+            }
+        },
+        {
+            "key": "spi-max-frequency",
+            "value": {
+                "_t": "scalar",
+                "cell": {
+                    "_t": "number",
+                    "maximum": "5000000n",
+                    "minimum": "0n"
+                },
+                "description": "Maximum SPI clocking speed of the device in Hz.",
+                "typeSize": 32
+            }
+        },
+        {
+            "key": "adi,ext-clk-freq-hz",
+            "value": {
+                "_t": "matrix",
+                "description": "Specify the frequency of the external clock.",
+                "maxItems": 1,
+                "minItems": 1,
+                "rows": [
+                    {
+                        "_t": "list",
+                        "item": {
+                            "_t": "enum",
+                            "default": "76800n",
+                            "enum": [
+                                "76800n",
+                                "153600n"
+                            ],
+                            "enum_type": "number"
+                        },
+                        "maxItems": 1,
+                        "minItems": 1
+                    }
+                ]
+            }
+        },
+        {
+            "key": "adi,bipolar",
+            "value": {
+                "_t": "flag",
+                "description": "Specify if the device should be used in bipolar mode."
+            }
+        },
+        {
+            "key": "adi,vbias-pins",
+            "value": {
+                "_t": "list",
+                "description": "Analog inputs to apply a voltage bias of (AVDD − AVSS) / 2 to.",
+                "item": {
+                    "_t": "number",
+                    "maximum": "15n",
+                    "minimum": "0n"
+                },
+                "maxItems": 16,
+                "minItems": 1,
+                "typeSize": 32
+            }
+        },
+        {
             "key": "spi-cs-high",
             "value": {
                 "_t": "flag",
@@ -362,19 +604,6 @@
             "value": {
                 "_t": "flag",
                 "description": "The device requires the LSB first mode."
-            }
-        },
-        {
-            "key": "spi-max-frequency",
-            "value": {
-                "_t": "scalar",
-                "cell": {
-                    "_t": "number",
-                    "maximum": "4294967295n",
-                    "minimum": "0n"
-                },
-                "description": "Maximum SPI clocking speed of the device in Hz.",
-                "typeSize": 32
             }
         },
         {
@@ -794,5 +1023,5 @@
         "reg",
         "interrupts"
     ],
-    "title": "Analog Devices AD7124 ADC device driver"
+    "title": "Analog Devices AD4130 ADC device driver"
 }

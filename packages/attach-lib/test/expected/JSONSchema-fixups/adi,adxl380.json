@@ -405,12 +405,14 @@
                     "enum": [
                         "adi,adxl380",
                         "adi,adxl382"
-                    ]
+                    ],
+                    "pattern": "^[a-zA-Z0-9][a-zA-Z0-9,+\\-._/]+$"
                 }
             ],
             "maxItems": 1,
             "minItems": 1,
-            "type": "array"
+            "type": "array",
+            "uniqueItems": true
         },
         "interrupt-names": {
             "dtType": "string-array",
@@ -419,19 +421,46 @@
                     "enum": [
                         "INT0",
                         "INT1"
-                    ]
+                    ],
+                    "type": "string"
                 },
                 {
-                    "const": "INT1"
+                    "const": "INT1",
+                    "type": "string"
                 }
             ],
             "maxItems": 2,
             "minItems": 1,
-            "type": "array"
+            "type": "array",
+            "uniqueItems": true
         },
         "interrupt-parent": {
             "dtType": "phandle",
             "items": {
+                "additionalItems": {
+                    "dtType": "uint32",
+                    "maximum": 4294967295,
+                    "minimum": 0,
+                    "type": "integer",
+                    "typeSize": 32
+                },
+                "items": [
+                    {
+                        "oneOf": [
+                            {
+                                "maximum": 4294967295,
+                                "minimum": 1,
+                                "type": "integer"
+                            },
+                            {
+                                "const": 0,
+                                "type": "integer"
+                            }
+                        ]
+                    }
+                ],
+                "maxItems": 1,
+                "minItems": 1,
                 "type": "array"
             },
             "maxItems": 1,
@@ -441,6 +470,15 @@
         "interrupts": {
             "dtType": "uint32-matrix",
             "items": {
+                "dtType": "uint32-array",
+                "items": {
+                    "dtType": "uint32",
+                    "maximum": 4294967295,
+                    "minimum": 0,
+                    "type": "integer",
+                    "typeSize": 32
+                },
+                "minItems": 1,
                 "type": "array"
             },
             "maxItems": 2,
@@ -451,11 +489,14 @@
             "description": "Chip select used by the device.",
             "dtType": "address",
             "items": {
+                "dtType": "uint32-array",
                 "items": [
                     {
+                        "dtType": "uint32",
                         "maximum": 256,
                         "minimum": 0,
-                        "type": "integer"
+                        "type": "integer",
+                        "typeSize": 32
                     }
                 ],
                 "maxItems": 1,

@@ -444,11 +444,14 @@
                     "dtType": "address",
                     "items": [
                         {
+                            "dtType": "uint32-array",
                             "items": [
                                 {
+                                    "dtType": "uint32",
                                     "maximum": 7,
                                     "minimum": 0,
-                                    "type": "integer"
+                                    "type": "integer",
+                                    "typeSize": 32
                                 }
                             ],
                             "maxItems": 1,
@@ -471,11 +474,15 @@
     "properties": {
         "#address-cells": {
             "const": 1,
-            "dtType": "uint32"
+            "dtType": "uint32",
+            "maximum": 3,
+            "type": "integer"
         },
         "#size-cells": {
             "const": 0,
-            "dtType": "uint32"
+            "dtType": "uint32",
+            "maximum": 2,
+            "type": "integer"
         },
         "compatible": {
             "dtType": "string-array",
@@ -483,22 +490,27 @@
                 {
                     "enum": [
                         "adi,ad7292"
-                    ]
+                    ],
+                    "pattern": "^[a-zA-Z0-9][a-zA-Z0-9,+\\-._/]+$"
                 }
             ],
             "maxItems": 1,
             "minItems": 1,
-            "type": "array"
+            "type": "array",
+            "uniqueItems": true
         },
         "reg": {
             "description": "Chip select used by the device.",
             "dtType": "address",
             "items": {
+                "dtType": "uint32-array",
                 "items": [
                     {
+                        "dtType": "uint32",
                         "maximum": 256,
                         "minimum": 0,
-                        "type": "integer"
+                        "type": "integer",
+                        "typeSize": 32
                     }
                 ],
                 "maxItems": 1,

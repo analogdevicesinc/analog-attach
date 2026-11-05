@@ -61,7 +61,8 @@
                             "minimum": "0n"
                         },
                         "maxItems": 1,
-                        "minItems": 1
+                        "minItems": 1,
+                        "typeSize": 32
                     }
                 ]
             }
@@ -76,8 +77,12 @@
                     {
                         "_t": "list",
                         "item": {
-                            "_t": "any"
-                        }
+                            "_t": "number",
+                            "maximum": "4294967295n",
+                            "minimum": "0n"
+                        },
+                        "minItems": 1,
+                        "typeSize": 32
                     }
                 ]
             }
@@ -144,6 +149,7 @@
             "key": "clocks",
             "value": {
                 "_t": "matrix",
+                "description": "List of phandle and clock specifier pairs, one pair\nfor each clock input to the device.  Note: if the\nclock provider specifies '0' for #clock-cells, then\nonly the phandle portion of the pair will appear.\n",
                 "maxItems": 1,
                 "minItems": 1,
                 "rows": [

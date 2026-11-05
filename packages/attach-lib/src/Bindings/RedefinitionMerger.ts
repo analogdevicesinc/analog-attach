@@ -51,7 +51,7 @@ export function definitions_by_name(node: Schema): Map<string, unknown[]> {
  * The definitions of one property (nearest first) as one: the nearer one's keywords win (`merge_schema`), the bounds
  * are the tighter of all, and a `false` forbids it whatever the others say. A `true` says nothing next to another.
  */
-function merge_definitions(definitions: unknown[]): unknown {
+export function merge_definitions(definitions: unknown[]): unknown {
     if (definitions.includes(false)) { return false; }
 
     const schemas = definitions.filter(definition => is_plain_object(definition));

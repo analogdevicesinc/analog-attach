@@ -24,7 +24,8 @@
                                     "minimum": "0n"
                                 },
                                 "maxItems": 1,
-                                "minItems": 1
+                                "minItems": 1,
+                                "typeSize": 32
                             }
                         ]
                     }
@@ -122,7 +123,8 @@
                             "minimum": "0n"
                         },
                         "maxItems": 1,
-                        "minItems": 1
+                        "minItems": 1,
+                        "typeSize": 32
                     }
                 ]
             }
@@ -138,8 +140,12 @@
                     {
                         "_t": "list",
                         "item": {
-                            "_t": "any"
-                        }
+                            "_t": "number",
+                            "maximum": "4294967295n",
+                            "minimum": "0n"
+                        },
+                        "minItems": 1,
+                        "typeSize": 32
                     }
                 ]
             }
@@ -239,7 +245,8 @@
                     ],
                     "enum_type": "number"
                 },
-                "default": "1n"
+                "default": "1n",
+                "typeSize": 32
             }
         },
         {
@@ -253,7 +260,8 @@
                     ],
                     "enum_type": "number"
                 },
-                "default": "0n"
+                "default": "0n",
+                "typeSize": 32
             }
         },
         {

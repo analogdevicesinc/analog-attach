@@ -60,7 +60,8 @@
                             ],
                             "enum_type": "number"
                         },
-                        "default": "1n"
+                        "default": "1n",
+                        "description": "Number of cells in an IIO specifier; Typically 0 for nodes with a single IIO output and 1 for nodes with multiple IIO outputs. A few unusual devices have a 2 level mapping.\n"
                     }
                 },
                 {
@@ -74,7 +75,8 @@
                             ],
                             "enum_type": "number"
                         },
-                        "default": "1n"
+                        "default": "1n",
+                        "typeSize": 32
                     }
                 },
                 {
@@ -88,7 +90,8 @@
                             ],
                             "enum_type": "number"
                         },
-                        "default": "0n"
+                        "default": "0n",
+                        "typeSize": 32
                     }
                 },
                 {
@@ -270,6 +273,7 @@
                     "key": "nvmem-cells",
                     "value": {
                         "_t": "matrix",
+                        "description": "List of phandle to the nvmem data cells.",
                         "maxItems": 1,
                         "minItems": 1,
                         "rows": [
@@ -277,7 +281,9 @@
                                 "_t": "list",
                                 "item": {
                                     "_t": "any"
-                                }
+                                },
+                                "maxItems": 1024,
+                                "minItems": 1
                             }
                         ]
                     }
@@ -286,6 +292,7 @@
                     "key": "nvmem-cell-names",
                     "value": {
                         "_t": "list",
+                        "description": "Names for each nvmem-cells specified.",
                         "item": {
                             "_t": "enum",
                             "default": "vrefint",
@@ -470,11 +477,13 @@
             "key": "clock-names",
             "value": {
                 "_t": "list",
+                "description": "List of clock input name strings sorted in the same order as the clocks property.  Consumers drivers will use clock-names to match clock input names with clocks specifiers.",
                 "item": {
                     "_t": "string"
                 },
                 "maxItems": 2,
-                "minItems": 1
+                "minItems": 1,
+                "unique": true
             }
         },
         {
@@ -528,7 +537,8 @@
                     ],
                     "enum_type": "number"
                 },
-                "default": "1n"
+                "default": "1n",
+                "typeSize": 32
             }
         },
         {
@@ -542,7 +552,8 @@
                     ],
                     "enum_type": "number"
                 },
-                "default": "0n"
+                "default": "0n",
+                "typeSize": 32
             }
         },
         {
@@ -624,6 +635,7 @@
             "key": "access-controllers",
             "value": {
                 "_t": "matrix",
+                "description": "A list of access controller specifiers, as defined by the bindings of the access-controllers provider.",
                 "maxItems": 2,
                 "minItems": 1,
                 "rows": [
@@ -631,7 +643,9 @@
                         "_t": "list",
                         "item": {
                             "_t": "any"
-                        }
+                        },
+                        "maxItems": 1024,
+                        "minItems": 1
                     }
                 ]
             }

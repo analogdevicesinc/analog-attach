@@ -30,7 +30,8 @@
                     ],
                     "enum_type": "number"
                 },
-                "default": "0n"
+                "default": "0n",
+                "description": "Number of cells in a clock specifier; Typically 0 for nodes with a single clock output and 1 for nodes with multiple clock outputs."
             }
         },
         {
@@ -42,6 +43,7 @@
                     "maximum": "4294967295n",
                     "minimum": "0n"
                 },
+                "description": "Legacy property for single, fixed frequency clocks",
                 "typeSize": 32
             }
         },
@@ -62,6 +64,7 @@
             "key": "clock-output-names",
             "value": {
                 "_t": "list",
+                "description": "Recommended to be a list of strings of clock output signal\nnames indexed by the first cell in the clock specifier.\nHowever, the meaning of clock-output-names is domain\nspecific to the clock provider, and is only provided to\nencourage using the same meaning for the majority of clock\nproviders.  This format may not work for clock providers\nusing a complex clock specifier format.  In those cases it\nis recommended to omit this property and create a binding\nspecific names property.\n\nClock consumer nodes must never directly reference\nthe provider\\'s clock-output-names property.\n",
                 "item": {
                     "_t": "string"
                 },

@@ -734,12 +734,18 @@
                     "dtType": "address",
                     "items": [
                         {
+                            "dtType": "uint32-array",
                             "items": [
                                 {
+                                    "dtType": "uint32",
                                     "enum": [
                                         0,
                                         1
-                                    ]
+                                    ],
+                                    "maximum": 4294967295,
+                                    "minimum": 0,
+                                    "type": "integer",
+                                    "typeSize": 32
                                 }
                             ],
                             "maxItems": 1,
@@ -761,11 +767,15 @@
     "properties": {
         "#address-cells": {
             "const": 1,
-            "dtType": "uint32"
+            "dtType": "uint32",
+            "maximum": 3,
+            "type": "integer"
         },
         "#size-cells": {
             "const": 0,
-            "dtType": "uint32"
+            "dtType": "uint32",
+            "maximum": 2,
+            "type": "integer"
         },
         "adi,sdo-drive-strength": {
             "description": "Configure SDIO0 and SDIO1 strength levels:\n  - 0: low SDO drive strength.\n  - 1: medium low SDO drive strength.\n  - 2: medium high SDO drive strength.\n  - 3: high SDO drive strength\n",
@@ -795,17 +805,43 @@
                         "adi,ad3542r",
                         "adi,ad3551r",
                         "adi,ad3552r"
-                    ]
+                    ],
+                    "pattern": "^[a-zA-Z0-9][a-zA-Z0-9,+\\-._/]+$"
                 }
             ],
             "maxItems": 1,
             "minItems": 1,
-            "type": "array"
+            "type": "array",
+            "uniqueItems": true
         },
         "io-backends": {
             "description": "The iio backend reference. Device can be optionally connected to the \"axi-ad3552r IP\" fpga-based QSPI + DDR (Double Data Rate) controller to reach high speed transfers.",
             "dtType": "phandle-array",
             "items": {
+                "additionalItems": {
+                    "dtType": "uint32",
+                    "maximum": 4294967295,
+                    "minimum": 0,
+                    "type": "integer",
+                    "typeSize": 32
+                },
+                "items": [
+                    {
+                        "oneOf": [
+                            {
+                                "maximum": 4294967295,
+                                "minimum": 1,
+                                "type": "integer"
+                            },
+                            {
+                                "const": 0,
+                                "type": "integer"
+                            }
+                        ]
+                    }
+                ],
+                "maxItems": 1024,
+                "minItems": 1,
                 "type": "array"
             },
             "maxItems": 1,
@@ -826,11 +862,14 @@
             "description": "Chip select used by the device.",
             "dtType": "address",
             "items": {
+                "dtType": "uint32-array",
                 "items": [
                     {
+                        "dtType": "uint32",
                         "maximum": 256,
                         "minimum": 0,
-                        "type": "integer"
+                        "type": "integer",
+                        "typeSize": 32
                     }
                 ],
                 "maxItems": 1,
@@ -842,6 +881,7 @@
             "type": "array"
         },
         "reset-gpios": {
+            "description": "GPIO (or GPIOs for power sequence) connected to the device reset pin (e.g. RESET or RESETN).",
             "dtType": "phandle-array",
             "items": {
                 "type": "array"

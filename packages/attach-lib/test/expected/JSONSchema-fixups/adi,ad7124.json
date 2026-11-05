@@ -486,11 +486,14 @@
                     "dtType": "address",
                     "items": [
                         {
+                            "dtType": "uint32-array",
                             "items": [
                                 {
+                                    "dtType": "uint32",
                                     "maximum": 15,
                                     "minimum": 0,
-                                    "type": "integer"
+                                    "type": "integer",
+                                    "typeSize": 32
                                 }
                             ],
                             "maxItems": 1,
@@ -514,7 +517,9 @@
     "properties": {
         "#address-cells": {
             "const": 1,
-            "dtType": "uint32"
+            "dtType": "uint32",
+            "maximum": 3,
+            "type": "integer"
         },
         "#clock-cells": {
             "const": 0,
@@ -523,7 +528,9 @@
         },
         "#size-cells": {
             "const": 0,
-            "dtType": "uint32"
+            "dtType": "uint32",
+            "maximum": 2,
+            "type": "integer"
         },
         "avdd-supply": {
             "description": "avdd supply can be used as reference for conversion.",
@@ -539,14 +546,53 @@
             "dtType": "string-array",
             "items": [
                 {
-                    "const": "mclk"
+                    "const": "mclk",
+                    "type": "string"
                 }
             ],
             "maxItems": 1,
             "minItems": 1,
-            "type": "array"
+            "type": "array",
+            "uniqueItems": true
         },
         "clocks": {
+            "anyOf": [
+                {
+                    "type": "object"
+                },
+                {
+                    "dtType": "phandle-array",
+                    "items": {
+                        "additionalItems": {
+                            "dtType": "uint32",
+                            "maximum": 4294967295,
+                            "minimum": 0,
+                            "type": "integer",
+                            "typeSize": 32
+                        },
+                        "items": [
+                            {
+                                "oneOf": [
+                                    {
+                                        "maximum": 4294967295,
+                                        "minimum": 1,
+                                        "type": "integer"
+                                    },
+                                    {
+                                        "const": 0,
+                                        "type": "integer"
+                                    }
+                                ]
+                            }
+                        ],
+                        "maxItems": 1024,
+                        "minItems": 1,
+                        "type": "array"
+                    },
+                    "minItems": 1,
+                    "type": "array"
+                }
+            ],
             "description": "Optional external clock connected to the CLK pin.",
             "dtType": "phandle-array",
             "items": {
@@ -563,16 +609,42 @@
                     "enum": [
                         "adi,ad7124-4",
                         "adi,ad7124-8"
-                    ]
+                    ],
+                    "pattern": "^[a-zA-Z0-9][a-zA-Z0-9,+\\-._/]+$"
                 }
             ],
             "maxItems": 1,
             "minItems": 1,
-            "type": "array"
+            "type": "array",
+            "uniqueItems": true
         },
         "interrupt-parent": {
             "dtType": "phandle",
             "items": {
+                "additionalItems": {
+                    "dtType": "uint32",
+                    "maximum": 4294967295,
+                    "minimum": 0,
+                    "type": "integer",
+                    "typeSize": 32
+                },
+                "items": [
+                    {
+                        "oneOf": [
+                            {
+                                "maximum": 4294967295,
+                                "minimum": 1,
+                                "type": "integer"
+                            },
+                            {
+                                "const": 0,
+                                "type": "integer"
+                            }
+                        ]
+                    }
+                ],
+                "maxItems": 1,
+                "minItems": 1,
                 "type": "array"
             },
             "maxItems": 1,
@@ -583,6 +655,15 @@
             "description": "IRQ line for the ADC",
             "dtType": "uint32-matrix",
             "items": {
+                "dtType": "uint32-array",
+                "items": {
+                    "dtType": "uint32",
+                    "maximum": 4294967295,
+                    "minimum": 0,
+                    "type": "integer",
+                    "typeSize": 32
+                },
+                "minItems": 1,
                 "type": "array"
             },
             "maxItems": 1,
@@ -619,11 +700,14 @@
             "description": "SPI chip select number for the device",
             "dtType": "address",
             "items": {
+                "dtType": "uint32-array",
                 "items": [
                     {
+                        "dtType": "uint32",
                         "maximum": 256,
                         "minimum": 0,
-                        "type": "integer"
+                        "type": "integer",
+                        "typeSize": 32
                     }
                 ],
                 "maxItems": 1,
