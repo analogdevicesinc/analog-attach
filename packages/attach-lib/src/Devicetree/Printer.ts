@@ -15,7 +15,7 @@ import {
 import { stringify as stringify_as_yaml } from "yaml";
 import { DTS_METADATA_HEADER } from "./Parser/Constants.js";
 
-import { assert_never } from "../utilities.js";
+import { assert_never } from "./TypeUtilities.js";
 
 /**
  * Print a DtsDocument back to DTS text.
