@@ -448,7 +448,7 @@ if (import.meta.vitest) {
             property_patterns: [],
             binding_path: "/linux/spi/brcm,bcm2835-spi.yaml",
             origin: { kind: "compatible", compatible: "brcm,bcm2835-spi" },
-            narrow_and_populate: () => ({ properties: [], required_properties: [], errors: [] }),
+            narrow_and_populate: () => ({ properties: [], required_properties: [] }),
         };
         expect(navigate_candidates({ properties: ["compatible", "cs-gpios"], children: ["spidev@0"] }, binding)).toEqual([
             { value: "spidev@0", group: "set" },
@@ -484,7 +484,7 @@ if (import.meta.vitest) {
             property_patterns: [{ pattern: "^adi,pin(5|10)-function$", description: "", value }],
             binding_path: "/linux/hwmon/adt7475.yaml",
             origin: { kind: "compatible", compatible: "adi,adt7475" },
-            narrow_and_populate: () => ({ properties: [], required_properties: [], errors: [] }),
+            narrow_and_populate: () => ({ properties: [], required_properties: [] }),
         };
         const result = property_info(binding, { name: "hwmon", labels: [], properties: [], children: [] } as unknown as DTNode, "adi,pin5-function");
         expect(result.ok && result.info.description).toBe("Pin 5 function");
@@ -501,7 +501,7 @@ if (import.meta.vitest) {
             property_patterns: [],
             binding_path: "/linux/iio/dac/adi,ad5592r.yaml",
             origin: { kind: "compatible", compatible: "adi,ad5592r" },
-            narrow_and_populate: () => ({ properties: [{ key: "spi-cpol", value }], required_properties: ["compatible", "reg", "spi-cpol"], errors: [] }),
+            narrow_and_populate: () => ({ properties: [{ key: "spi-cpol", value }], required_properties: ["compatible", "reg", "spi-cpol"] }),
         };
         const result = property_info(binding, { name: "dac", labels: [], properties: [], children: [] } as unknown as DTNode, "spi-cpol");
         expect(result.ok && result.info.required).toBe(true);
@@ -516,7 +516,7 @@ if (import.meta.vitest) {
             property_patterns: [],
             binding_path: "/linux/iio/adc/adi,ad7124.yaml",
             origin: { kind: "compatible", compatible: "adi,ad7124-8" },
-            narrow_and_populate: () => ({ properties: [{ key: "interrupt-parent", value }], required_properties: [], errors: [] }),
+            narrow_and_populate: () => ({ properties: [{ key: "interrupt-parent", value }], required_properties: [] }),
         };
         const result = property_info(binding, { name: "adc", labels: [], properties: [], children: [] } as unknown as DTNode, "interrupt-parent");
         expect(result.ok && result.info.phandle_options).toEqual(["gpio", "gicv2", "aon_intr"]);
@@ -532,7 +532,7 @@ if (import.meta.vitest) {
             property_patterns: [],
             binding_path: "/linux/iio/amplifiers/adi,hmc425a.yaml",
             origin: { kind: "compatible", compatible: "adi,hmc425a" },
-            narrow_and_populate: () => ({ properties, required_properties: ["ctrl-gpios"], errors: [] }),
+            narrow_and_populate: () => ({ properties, required_properties: ["ctrl-gpios"] }),
         };
         const result = property_info(binding, { name: "att", labels: [], properties: [], children: [] } as unknown as DTNode, "ctrl-gpios");
         expect(result.ok && result.info.gpio_rows).toEqual({ min_rows: 6, max_rows: 6 });
@@ -560,7 +560,6 @@ if (import.meta.vitest) {
         narrow_and_populate: () => ({
             properties: [{ key: "compatible", value: { _t: "unknown" } }, { key: "spi-cpol", value: { _t: "flag" } }],
             required_properties: ["compatible", "spi-cpol"],
-            errors: [],
         }),
     });
 
