@@ -9,6 +9,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@analog-attach/cli@workspace:packages/cli"
   dependencies:
+    "@analog-attach/gui": "workspace:*"
     "@inquirer/core": "npm:^12.0.5"
     "@inquirer/prompts": "npm:8.7.3"
     "@stricli/core": "npm:^1.1.0"
@@ -53,6 +54,12 @@ __metadata:
     typescript: "npm:^5.7.2"
     webpack: "npm:^5.95.0"
     webpack-cli: "npm:^5.1.4"
+  languageName: unknown
+  linkType: soft
+
+"@analog-attach/gui@workspace:*, @analog-attach/gui@workspace:packages/gui":
+  version: 0.0.0-use.local
+  resolution: "@analog-attach/gui@workspace:packages/gui"
   languageName: unknown
   linkType: soft
 

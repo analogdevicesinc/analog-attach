@@ -36,7 +36,7 @@ process.
 | `01-grammar.abnf` | The command-line grammar (ABNF, RFC 5234 and RFC 7405) |
 | `01-grammar.md` | How to read the grammar; the token rules ABNF can't express |
 | `02-common.md` | What every command shares: modes, the backend, streams, input errors, refusals, exit status, settings, workspace loading; for the Linux backend the base, the workfile and the binding caches |
-| `03-commands/<command>.md` | One chapter per command. Front end: `config`, `skill`, `setup` (the bare `analog-attach`). Shared, the Linux backend first, then the no-OS backend: `add`, `build`, `delete`, `deploy`, `import`, `init`, `list`, `read`, `rename`, `update`, `validate`. The Linux backend's own: `enable-disable`, `move`, and `list parent`, `list overlay` in `list.md`. The no-OS backend's own: `generate`. Withdrawn: `__list`, `ui` |
+| `03-commands/<command>.md` | One chapter per command. Front end: `config`, `skill`, `setup` (the bare `analog-attach`), `gui` (experimental, noos projects for now). Shared, the Linux backend first, then the no-OS backend: `add`, `build`, `delete`, `deploy`, `import`, `init`, `list`, `read`, `rename`, `update`, `validate`. The Linux backend's own: `enable-disable`, `move`, and `list parent`, `list overlay` in `list.md`. The no-OS backend's own: `generate`. Withdrawn: `__list`, `ui` |
 | `04-protocol/*.schema.json` | JSON Schema (2020-12) of the `--json` responses (§2.1) |
 | `05-completion.md` | Shell completion: `__complete` and `completion [<shell>] [--install \| --uninstall]` |
 

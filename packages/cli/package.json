@@ -17,7 +17,7 @@
     "node": ">=20"
   },
   "scripts": {
-    "build": "scripts/bundle-dt-schema.sh && tsc -p src/tsconfig.json && tsup --silent && rm -rf bundled/noos/templates && mkdir -p bundled/noos && cp -r ../attach-no-os-lib/src/codegen/templates bundled/noos/templates",
+    "build": "scripts/bundle-dt-schema.sh && tsc -p src/tsconfig.json && tsup --silent && rm -rf bundled/noos/templates && mkdir -p bundled/noos && cp -r ../attach-no-os-lib/src/codegen/templates bundled/noos/templates && rm -rf bundled/gui && mkdir -p bundled/gui && cp ../gui/src/index.html bundled/gui/index.html",
     "dev-link": "yarn build && chmod +x dist/cli.js && mkdir -p \"$HOME/.local/bin\" && ln -sf \"$(pwd)/dist/cli.js\" \"$HOME/.local/bin/analog-attach\" && echo \"analog-attach linked to $HOME/.local/bin/analog-attach\"",
     "dev-unlink": "rm -f \"$HOME/.local/bin/analog-attach\" && echo \"Removed $HOME/.local/bin/analog-attach\"",
     "clean": "rm -rf dist tsconfig.tsbuildinfo node_modules",
@@ -37,6 +37,7 @@
     "clean": true,
     "splitting": true,
     "noExternal": [
+      "@analog-attach/gui",
       "attach-lib",
       "attach-no-os-lib"
     ],
@@ -50,6 +51,7 @@
     "treeshake": true
   },
   "dependencies": {
+    "@analog-attach/gui": "workspace:*",
     "@inquirer/core": "^12.0.5",
     "@inquirer/prompts": "8.7.3",
     "@stricli/core": "^1.1.0",

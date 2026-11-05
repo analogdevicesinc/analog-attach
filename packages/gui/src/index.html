@@ -1,0 +1,871 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Attach Studio</title>
+<style>
+	:root {
+		--bg: #f6f7f9; --panel: #ffffff; --panel-2: #f1f3f6; --line: #e2e5ea; --fg: #14171c;
+		--muted: #6b7280; --accent: #2563eb; --accent-soft: #dbeafe; --ok: #059669; --ok-soft: #d1fae5;
+		--err: #dc2626; --err-soft: #fee2e2; --warn: #b45309; --warn-soft: #fef3c7;
+		--console-bg: #0f1419; --console-fg: #d6dde6; --chip: #eef1f5;
+		--mono: ui-monospace, "JetBrains Mono", "Fira Code", Menlo, monospace;
+	}
+	@media (prefers-color-scheme: dark) {
+		:root:not([data-theme="light"]) {
+			--bg: #0d1117; --panel: #151a21; --panel-2: #1b222b; --line: #2a323d; --fg: #e6eaf0;
+			--muted: #8b95a3; --accent: #60a5fa; --accent-soft: #1e3a5f; --ok: #34d399; --ok-soft: #0f3a2c;
+			--err: #f87171; --err-soft: #3b1717; --warn: #fbbf24; --warn-soft: #3a2a0c;
+			--console-bg: #090c10; --console-fg: #cdd6e0; --chip: #222a35;
+		}
+	}
+	:root[data-theme="dark"] {
+		--bg: #0d1117; --panel: #151a21; --panel-2: #1b222b; --line: #2a323d; --fg: #e6eaf0;
+		--muted: #8b95a3; --accent: #60a5fa; --accent-soft: #1e3a5f; --ok: #34d399; --ok-soft: #0f3a2c;
+		--err: #f87171; --err-soft: #3b1717; --warn: #fbbf24; --warn-soft: #3a2a0c;
+		--console-bg: #090c10; --console-fg: #cdd6e0; --chip: #222a35;
+	}
+	* { box-sizing: border-box; }
+	html, body { margin: 0; height: 100%; }
+	body { background: var(--bg); color: var(--fg); font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; display: grid; grid-template-rows: auto 1fr auto; }
+	button, input, select { font: inherit; color: inherit; }
+	button { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 6px 12px; cursor: pointer; }
+	button:hover { border-color: var(--accent); }
+	button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+	button.danger { color: var(--err); }
+	button.ghost { background: transparent; border-color: transparent; padding: 4px 8px; color: var(--muted); }
+	button.ghost:hover { color: var(--fg); border-color: var(--line); }
+	button:disabled { opacity: .5; cursor: progress; }
+	input, select { background: var(--panel); border: 1px solid var(--line); border-radius: 7px; padding: 5px 8px; min-width: 0; }
+	input:focus, select:focus { outline: 2px solid var(--accent-soft); border-color: var(--accent); }
+	code, .mono { font-family: var(--mono); font-size: 12.5px; }
+
+	header { display: flex; align-items: center; gap: 12px; padding: 10px 16px; background: var(--panel); border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+	.brand { display: flex; align-items: center; gap: 8px; font-weight: 700; letter-spacing: -.01em; }
+	.brand .dot { width: 22px; height: 22px; border-radius: 6px; background: linear-gradient(135deg, var(--accent), #8b5cf6); }
+	.project { display: flex; gap: 6px; flex: 1; min-width: 260px; max-width: 640px; }
+	.project input { flex: 1; font-family: var(--mono); font-size: 12.5px; }
+	.chip { display: inline-flex; align-items: center; gap: 6px; background: var(--chip); border-radius: 999px; padding: 3px 10px; font-size: 12.5px; white-space: nowrap; }
+	.chip.ok { background: var(--ok-soft); color: var(--ok); }
+	.chip.err { background: var(--err-soft); color: var(--err); }
+	.chip.warn { background: var(--warn-soft); color: var(--warn); }
+	.spacer { flex: 1; }
+
+	main { display: grid; grid-template-columns: 220px 300px 1fr; min-height: 0; }
+	nav { background: var(--panel); border-right: 1px solid var(--line); padding: 12px 8px; display: flex; flex-direction: column; gap: 2px; }
+	nav button { text-align: left; border: none; background: transparent; padding: 8px 12px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; }
+	nav button.active { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+	nav .section { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .06em; padding: 12px 12px 4px; }
+	nav .count { font-size: 11.5px; color: var(--muted); }
+
+	.list { border-right: 1px solid var(--line); background: var(--panel-2); display: flex; flex-direction: column; min-height: 0; }
+	.list .tools { padding: 10px; display: flex; gap: 6px; border-bottom: 1px solid var(--line); }
+	.list .tools input { flex: 1; }
+	.list .items { overflow: auto; padding: 6px; }
+	.item { padding: 8px 10px; border-radius: 8px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+	.item:hover { background: var(--panel); }
+	.item.active { background: var(--panel); box-shadow: inset 3px 0 0 var(--accent); }
+	.item .name { font-family: var(--mono); font-size: 13px; overflow: hidden; text-overflow: ellipsis; }
+	.item .type { color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+	.item .badge { background: var(--err-soft); color: var(--err); border-radius: 999px; padding: 0 7px; font-size: 11.5px; font-weight: 600; }
+	.group-title { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .06em; padding: 10px 10px 4px; }
+
+	.content { overflow: auto; padding: 20px 24px; min-height: 0; }
+	.content.wide { grid-column: 2 / 4; }
+	.card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; margin-bottom: 16px; }
+	.card h2 { margin: 0; font-size: 18px; letter-spacing: -.01em; }
+	.card h3 { margin: 0 0 10px; font-size: 14px; }
+	.title-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 4px; }
+	.subtle { color: var(--muted); }
+	.empty { color: var(--muted); text-align: center; padding: 48px 16px; }
+	.empty h2 { color: var(--fg); }
+
+	table { width: 100%; border-collapse: collapse; }
+	th { text-align: left; font-weight: 600; color: var(--muted); font-size: 12px; padding: 6px 8px; border-bottom: 1px solid var(--line); }
+	td { padding: 7px 8px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+	tr:last-child td { border-bottom: none; }
+	td.key { font-family: var(--mono); font-size: 13px; white-space: nowrap; width: 1%; }
+	td.kind { color: var(--muted); font-size: 12px; white-space: nowrap; width: 1%; }
+	td.edit { width: 100%; }
+	td.actions { white-space: nowrap; width: 1%; text-align: right; }
+	tr.error td { background: var(--err-soft); }
+	.editor { display: flex; gap: 6px; align-items: center; }
+	.editor input, .editor select { flex: 1; max-width: 420px; }
+	.null { color: var(--muted); font-style: italic; }
+	.link { font-family: var(--mono); font-size: 12.5px; color: var(--accent); background: none; border: none; padding: 0 4px; cursor: pointer; }
+	.hidden-ref { font-size: 11.5px; color: var(--muted); }
+	.message { color: var(--err); font-size: 12.5px; margin-top: 3px; }
+	.detail { background: var(--panel-2); border-radius: 8px; padding: 10px 12px; white-space: pre-wrap; font-family: var(--mono); font-size: 12px; margin: 4px 0 2px; }
+	.switch { position: relative; width: 38px; height: 22px; display: inline-block; }
+	.switch input { display: none; }
+	.switch span { position: absolute; inset: 0; border-radius: 999px; background: var(--line); transition: .15s; cursor: pointer; }
+	.switch span::after { content: ""; position: absolute; width: 16px; height: 16px; border-radius: 50%; background: #fff; top: 3px; left: 3px; transition: .15s; }
+	.switch input:checked + span { background: var(--accent); }
+	.switch input:checked + span::after { left: 19px; }
+
+	.devices { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; }
+	.device { border: 1px solid var(--line); border-radius: 10px; padding: 12px; background: var(--panel); display: flex; flex-direction: column; gap: 8px; }
+	.device .k { font-family: var(--mono); font-weight: 600; font-size: 13px; word-break: break-all; }
+	.device .row { display: flex; gap: 6px; }
+	.device input { flex: 1; font-size: 12.5px; }
+	.form-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+	.actions-row { display: flex; gap: 8px; flex-wrap: wrap; }
+	.setting-row td.edit .editor input, .setting-row td.edit .editor select { max-width: 560px; }
+	.req { color: var(--err); }
+
+	#graph { overflow: auto; text-align: center; }
+	#graph svg { max-width: none; }
+
+	footer { background: var(--console-bg); color: var(--console-fg); border-top: 1px solid var(--line); display: flex; flex-direction: column; height: 220px; min-height: 36px; resize: vertical; overflow: hidden; }
+	footer.collapsed { height: 36px !important; }
+	.console-bar { display: flex; align-items: center; gap: 10px; padding: 6px 12px; border-bottom: 1px solid #1f2731; font-size: 12.5px; }
+	.console-bar button { background: transparent; color: var(--console-fg); border-color: #2a333e; padding: 2px 10px; font-size: 12px; }
+	#console { flex: 1; overflow: auto; padding: 8px 14px; font-family: var(--mono); font-size: 12.5px; white-space: pre-wrap; }
+	#console .cmd { color: #7dd3fc; }
+	#console .fail { color: #fca5a5; }
+	#console .okl { color: #86efac; }
+	.toast { position: fixed; right: 18px; bottom: 240px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; box-shadow: 0 6px 24px rgba(0,0,0,.18); max-width: 420px; display: none; z-index: 9; }
+	.toast.show { display: block; }
+	.toast.err { border-color: var(--err); }
+
+	@media (max-width: 900px) {
+		main { grid-template-columns: 1fr; }
+		nav { flex-direction: row; overflow-x: auto; border-right: none; border-bottom: 1px solid var(--line); }
+		nav .section { display: none; }
+		.list { border-right: none; max-height: 260px; }
+		.content.wide { grid-column: auto; }
+		.content { padding: 16px; }
+	}
+</style>
+</head>
+<body>
+<header>
+	<div class="brand"><div class="dot"></div>Attach Studio</div>
+	<div class="project">
+		<input id="project" spellcheck="false" title="Project folder: where .analog-attach/ and the workfile live">
+		<button id="open">Open</button>
+	</div>
+	<span id="board" class="chip">no board</span>
+	<span id="status" class="chip">…</span>
+	<div class="spacer"></div>
+	<button id="validate">Validate</button>
+	<button id="refresh" title="Reload everything">↻</button>
+	<button id="theme" class="ghost" title="Light / dark">◐</button>
+</header>
+
+<main id="main">
+	<nav id="nav">
+		<div class="section">Design</div>
+		<button data-view="workfile" class="active">Workfile <span class="count" id="count-nodes"></span></button>
+		<button data-view="add">Add devices</button>
+		<button data-view="graph">Graph</button>
+		<div class="section">Project</div>
+		<button data-view="build">Generate &amp; build</button>
+		<button data-view="settings">Settings</button>
+	</nav>
+	<section class="list" id="list"></section>
+	<section class="content" id="content"></section>
+</main>
+
+<footer id="footer">
+	<div class="console-bar">
+		<strong>Console</strong><span class="subtle" style="color:#8b95a3">every action is an analog-attach command</span>
+		<div class="spacer"></div>
+		<button id="clear-console">Clear</button>
+		<button id="toggle-console">Hide</button>
+	</div>
+	<div id="console"></div>
+</footer>
+<div id="toast" class="toast"></div>
+
+<script type="module">
+// --- state -----------------------------------------------------------------------------
+const state = {
+	project: null,
+	tree: null,          // read --json: { properties: [platform, board], children: [nodes] }
+	nodes: [],           // children of the tree
+	errors: [], warnings: [],
+	devices: null,
+	configs: null,
+	view: "workfile",
+	selected: null,
+	filter: "",
+	details: new Set(),  // "node.prop" rows with their details open
+	detail_text: {},
+	busy: false,
+};
+
+const $ = id => document.getElementById(id);
+const esc = text => String(text ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const shell_quote = arg => /^[\w@%+=:,./-]+$/.test(arg) ? arg : `'${arg.replace(/'/g, "'\\''")}'`;
+
+// --- the CLI ---------------------------------------------------------------------------
+function log(html) {
+	const out = $("console");
+	out.insertAdjacentHTML("beforeend", html);
+	out.scrollTop = out.scrollHeight;
+}
+
+/** Run `analog-attach ...args`. `quiet` keeps a JSON read out of the console. */
+async function cli(args, { quiet = false } = {}) {
+	if (!quiet) log(`<div class="cmd">$ analog-attach ${esc(args.map(shell_quote).join(" "))}</div>`);
+	const response = await fetch("/api/run", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ args }) });
+	const result = await response.json();
+	if (!quiet) {
+		const text = result.json?.message ?? `${result.stdout}${result.stderr}`.trimEnd();
+		log(`<div class="${result.code === 0 ? "" : "fail"}">${esc(text)}</div>`);
+	}
+	return result;
+}
+
+/** A board pin as the board shows it: `J9 pin 5 (P2_0)`. */
+const board_pin = at => `${at.connector} pin ${at.pin}${at.chip_pin ? ` (${at.chip_pin})` : ""}`;
+
+/** The wiring and what is left, from an add or update result: the console's lines. */
+function report_lines(json) {
+	const lines = [];
+	for (const bus of json.wiring ?? []) {
+		lines.push(`Wire ${bus.part} to the board over ${bus.interface.toUpperCase()}${bus.peripheral ? ` (${bus.peripheral})` : ""}:`);
+		for (const connection of bus.connections) {
+			lines.push(`  ${`${connection.from.connector} pin ${connection.from.pin} (${connection.role})`.padEnd(24)} -> ${board_pin(connection.to)}`);
+		}
+		for (const problem of bus.problems) lines.push(`  ! ${problem}`);
+		if ((bus.board_pins ?? []).length > 0) lines.push(`  Its bus is on: ${bus.board_pins.map(pin => `${pin.signal.toUpperCase()} ${board_pin(pin.at)}`).join(", ")}`);
+	}
+	for (const chip_select of json.chip_selects ?? []) {
+		const how = chip_select.kind === "gpio" ? `GPIO ${chip_select.gpio.port} pin ${chip_select.gpio.number}, at ${board_pin(chip_select.at)}`
+			: chip_select.kind === "native" ? `native line ${chip_select.native_cs} of ${chip_select.peripheral}` : `unwired: ${chip_select.reason}`;
+		lines.push(`Chip-select for ${chip_select.device}: ${how}`);
+	}
+	if ((json.missing_required ?? []).length > 0) {
+		lines.push("Still to set:");
+		for (const missing of json.missing_required) lines.push(`  ? ${missing.node}.${missing.property}${missing.suggestions?.length ? `  (${missing.suggestions.map(suggestion => suggestion.value).join(" | ")})` : ""}`);
+	}
+	return lines;
+}
+
+/** A command that changes the workfile: run it with --json, show what it said, then reload. */
+async function mutate(args) {
+	if (state.busy) return;
+	state.busy = true;
+	document.body.style.cursor = "progress";
+	try {
+		const result = await cli([...args, "--json"]);
+		const failed = result.code !== 0 || result.json?.ok === false;
+		if (result.json !== undefined) {
+			const lines = report_lines(result.json);
+			if (lines.length > 0) log(`<div>${esc(lines.join("\n"))}</div>`);
+		}
+		toast(failed ? first_line(result.json?.message ?? result.stderr ?? result.stdout) : first_line(result.json?.message ?? result.stdout), failed);
+		await refresh();
+		return result;
+	} finally {
+		state.busy = false;
+		document.body.style.cursor = "";
+	}
+}
+
+async function stream(args) {
+	log(`<div class="cmd">$ analog-attach ${esc(args.map(shell_quote).join(" "))}</div>`);
+	$("footer").classList.remove("collapsed");
+	const response = await fetch("/api/stream", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ args }) });
+	const reader = response.body.getReader();
+	const decoder = new TextDecoder();
+	const out = $("console");
+	const block = document.createElement("div");
+	out.append(block);
+	let text = "";
+	for (;;) {
+		const { value, done } = await reader.read();
+		if (done) break;
+		text += decoder.decode(value, { stream: true });
+		block.textContent = text.split("\u0000exit")[0];
+		out.scrollTop = out.scrollHeight;
+	}
+	const code = Number(text.split("\u0000exit ")[1] ?? -1);
+	log(`<div class="${code === 0 ? "okl" : "fail"}">${code === 0 ? "✔ done" : `✘ exited with ${code}`}</div>`);
+	toast(code === 0 ? `${args[0]} finished` : `${args[0]} failed (exit ${code})`, code !== 0);
+	return code;
+}
+
+function first_line(text) {
+	return (text ?? "").split("\n").find(line => line.trim() !== "")?.trim() ?? "Done";
+}
+
+let toast_timer;
+function toast(text, error = false) {
+	const box = $("toast");
+	box.textContent = text;
+	box.className = `toast show${error ? " err" : ""}`;
+	clearTimeout(toast_timer);
+	toast_timer = setTimeout(() => { box.className = "toast"; }, 3500);
+}
+
+// --- loading ---------------------------------------------------------------------------
+async function refresh() {
+	const project = await (await fetch("/api/project")).json();
+	state.project = project;
+	$("project").value = project.dir;
+	// The workfile is wherever the `workfile` setting says: ask the CLI rather than look.
+	const tree = project.backend === "noos" ? await cli(["read", "--json"], { quiet: true }) : undefined;
+	project.workfile = tree?.json !== undefined && tree.json.ok !== false;
+	if (project.workfile) {
+		const validation = await cli(["validate", "--json"], { quiet: true });
+		state.tree = tree.json;
+		state.nodes = state.tree?.children ?? [];
+		state.errors = validation.json?.errors ?? [];
+		state.warnings = validation.json?.warnings ?? [];
+	} else {
+		state.tree = null;
+		state.nodes = [];
+		state.errors = [];
+		state.warnings = [];
+	}
+	if (state.selected !== null && !state.nodes.some(node => node.key === state.selected)) state.selected = null;
+	state.detail_text = {};
+	render();
+}
+
+async function load_devices() {
+	if (state.devices !== null) return;
+	const result = await cli(["list", "devices", "--json"], { quiet: true });
+	state.devices = result.json?.devices ?? [];
+}
+
+async function load_configs() {
+	const result = await cli(["config", "--json"], { quiet: true });
+	state.configs = result.json?.configs ?? [];
+}
+
+// --- helpers on the tree ---------------------------------------------------------------
+const prop = (node, key) => node.properties.find(property => property.key === key);
+const type_of = node => prop(node, "$compatible")?.value ?? "";
+const node_names = () => new Set(state.nodes.map(node => node.key));
+const errors_of = name => state.errors.filter(error => error.path?.[0] === name);
+const workfile_prop = key => state.tree?.properties?.find(property => property.key === key)?.value;
+
+/** Names a value refers to: a node name, or a union [member, name]. */
+function references(value) {
+	if (typeof value === "string") return [value];
+	if (Array.isArray(value)) return value.filter(item => typeof item === "string");
+	return [];
+}
+
+// --- rendering -------------------------------------------------------------------------
+function render() {
+	const board = workfile_prop("board");
+	$("board").textContent = board ? `⌂ ${board}` : (state.project?.workfile ? "no board" : "no workfile");
+	const status = $("status");
+	if (!state.project?.workfile) {
+		status.className = "chip warn";
+		status.textContent = "no workfile";
+	} else if (state.errors.length > 0) {
+		status.className = "chip err";
+		status.textContent = `✗ ${state.errors.length} error${state.errors.length === 1 ? "" : "s"}`;
+	} else {
+		status.className = "chip ok";
+		status.textContent = state.warnings.length > 0 ? `✓ valid · ${state.warnings.length} warning(s)` : "✓ valid";
+	}
+	$("count-nodes").textContent = state.nodes.length > 0 ? String(state.nodes.length) : "";
+	for (const button of $("nav").querySelectorAll("button")) button.classList.toggle("active", button.dataset.view === state.view);
+
+	const wide = state.view !== "workfile";
+	$("list").style.display = wide ? "none" : "";
+	$("content").className = `content${wide ? " wide" : ""}`;
+
+	if (state.view === "workfile") render_workfile();
+	else if (state.view === "add") render_add();
+	else if (state.view === "settings") render_settings();
+	else if (state.view === "build") render_build();
+	else if (state.view === "graph") render_graph();
+}
+
+function no_workfile() {
+	if (state.project?.backend !== "noos") {
+		return `<div class="card empty">
+			<h2>${state.project?.backend ? `A ${esc(state.project.backend)} project` : "No project here yet"}</h2>
+			<p>This GUI handles noos (CAPI) projects for now. ${state.project?.backend ? "Open a noos project above." : "Set one up with <code>analog-attach config backend noos</code>, or open another folder above."}</p>
+			<div class="actions-row" style="justify-content:center"><button data-goto="settings">Check settings</button></div></div>`;
+	}
+	return `<div class="card empty">
+		<h2>No workfile here yet</h2>
+		<p>Create one for the configured target (<code>analog-attach init</code>), or open another folder above.</p>
+		<div class="actions-row" style="justify-content:center">
+			<button class="primary" data-act="init">Create workfile</button>
+			<button data-goto="settings">Check settings</button>
+		</div></div>`;
+}
+
+function render_workfile() {
+	const list = $("list");
+	const content = $("content");
+	if (!state.project?.workfile) {
+		list.innerHTML = "";
+		content.innerHTML = no_workfile();
+		return;
+	}
+	const filter = state.filter.toLowerCase();
+	const shown = state.nodes.filter(node => node.key.toLowerCase().includes(filter) || type_of(node).toLowerCase().includes(filter));
+	list.innerHTML = `
+		<div class="tools"><input id="filter" placeholder="Filter nodes…" value="${esc(state.filter)}"></div>
+		<div class="items">${shown.map(node => {
+			const count = errors_of(node.key).length;
+			return `<div class="item${node.key === state.selected ? " active" : ""}" data-node="${esc(node.key)}">
+				<div style="min-width:0"><div class="name">${esc(node.key)}</div><div class="type">${esc(type_of(node))}</div></div>
+				${count > 0 ? `<span class="badge">${count}</span>` : ""}
+			</div>`;
+		}).join("") || `<div class="empty">No nodes. <a href="#" data-goto="add">Add a device</a></div>`}</div>`;
+	const filter_input = $("filter");
+	filter_input.oninput = () => {
+		state.filter = filter_input.value;
+		const at = filter_input.selectionStart;
+		render_workfile();
+		$("filter").focus();
+		$("filter").setSelectionRange(at, at);
+	};
+
+	const node = state.nodes.find(candidate => candidate.key === state.selected);
+	if (node === undefined) {
+		content.innerHTML = overview();
+		return;
+	}
+	content.innerHTML = node_card(node);
+}
+
+function overview() {
+	const errors = state.errors.map(error => `<tr class="error"><td class="key"><button class="link" data-node="${esc(error.path?.[0])}">${esc((error.path ?? []).join("."))}</button></td><td>${esc(error.message)}</td></tr>`).join("");
+	const warnings = state.warnings.map(warning => `<tr><td class="key">${esc((warning.path ?? []).join("."))}</td><td>${esc(warning.message)}</td></tr>`).join("");
+	return `<div class="card">
+		<div class="title-row"><h2>Workfile</h2><span class="chip">${esc(workfile_prop("platform") ?? "?")}</span><span class="chip">${state.nodes.length} nodes</span></div>
+		<p class="subtle">Pick a node on the left to edit it, or add a device. Bootstrap fills in whatever leaves no room for choice after each change; its report shows in the console.</p>
+		<div class="actions-row"><button class="primary" data-goto="add">＋ Add device</button><button data-goto="graph">View graph</button><button data-goto="build">Generate &amp; build</button></div>
+	</div>
+	<div class="card"><h3>${state.errors.length === 0 ? "✓ No errors" : `Errors (${state.errors.length})`}</h3>
+		${state.errors.length === 0 ? `<p class="subtle">The workfile is valid.</p>` : `<table>${errors}</table>`}
+		${warnings ? `<h3 style="margin-top:14px">Warnings</h3><table>${warnings}</table>` : ""}
+	</div>`;
+}
+
+function node_card(node) {
+	const names = node_names();
+	const node_errors = errors_of(node.key);
+	const referenced_by = state.nodes.filter(other => other.properties.some(property => references(property.value).includes(node.key))).map(other => other.key);
+	const rows = node.properties.map(property => property_row(node, property, names, node_errors)).join("");
+	return `<div class="card">
+		<div class="title-row">
+			<h2 class="mono" style="font-size:17px">${esc(node.key)}</h2>
+			<span class="chip">${esc(type_of(node))}</span>
+			${node_errors.length > 0 ? `<span class="chip err">${node_errors.length} error${node_errors.length === 1 ? "" : "s"}</span>` : `<span class="chip ok">✓</span>`}
+			<div class="spacer"></div>
+			<button data-act="rename" data-node="${esc(node.key)}">Rename</button>
+			<button class="danger" data-act="delete-node" data-node="${esc(node.key)}">Delete</button>
+		</div>
+		<div class="subtle" style="font-size:12.5px">${referenced_by.length > 0 ? `Used by ${referenced_by.map(name => `<button class="link" data-node="${esc(name)}">${esc(name)}</button>`).join(" ")}` : "Not referenced by any node: a root"}</div>
+	</div>
+	<div class="card" style="padding:6px 10px">
+		<table><thead><tr><th>Property</th><th>Type</th><th>Value</th><th></th></tr></thead><tbody>${rows}</tbody></table>
+	</div>`;
+}
+
+function property_row(node, property, names, node_errors) {
+	const id = `${node.key}.${property.key}`;
+	const error = node_errors.find(candidate => candidate.path?.[1] === property.key);
+	const readonly = property.key === "$compatible";
+	const detail = state.details.has(id)
+		? `<tr><td colspan="4"><div class="detail">${esc(state.detail_text[id] ?? "Loading…")}</div></td></tr>` : "";
+	return `<tr class="${error ? "error" : ""}">
+		<td class="key">${esc(property.key)}</td>
+		<td class="kind">${esc(kind_label(property.type))}</td>
+		<td class="edit">${readonly ? `<span class="mono">${esc(property.value)}</span>` : editor(node, property, names)}
+			${error ? `<div class="message">${esc(error.message)}</div>` : ""}</td>
+		<td class="actions">
+			<button class="ghost" title="Details: description, who set it, constraints" data-act="details" data-node="${esc(node.key)}" data-prop="${esc(property.key)}">ⓘ</button>
+			${readonly ? "" : `<button class="ghost" title="Clear (analog-attach delete node property)" data-act="clear" data-node="${esc(node.key)}" data-prop="${esc(property.key)}">✕</button>`}
+		</td></tr>${detail}`;
+}
+
+function kind_label(type) {
+	if (!type) return "";
+	if (type.kind === "number") return type.subtype ?? "number";
+	if (type.kind === "tuple") return "union";
+	return type.kind;
+}
+
+function ref_link(value, names) {
+	if (typeof value !== "string" || value === "") return "";
+	if (names.has(value)) return `<button class="link" title="Open ${esc(value)}" data-node="${esc(value)}">→</button>`;
+	if (/_handle$|^bsp_|_ops$/.test(value)) return `<span class="hidden-ref" title="A board or driver resource: not stored in the workfile">~ hidden</span>`;
+	return "";
+}
+
+function editor(node, property, names) {
+	const type = property.type ?? {};
+	const value = property.value;
+	const data = `data-node="${esc(node.key)}" data-prop="${esc(property.key)}"`;
+	if (type.kind === "enum") {
+		const options = (type.options ?? []).map(option => `<option value="${esc(option.value)}"${option.value === value ? " selected" : ""}>${esc(option.display_string ?? option.value)}</option>`).join("");
+		return `<div class="editor"><select data-edit="enum" ${data}><option value=""${value == null ? " selected" : ""} disabled>— unset —</option>${options}</select></div>`;
+	}
+	if (type.kind === "bool") {
+		return `<div class="editor"><label class="switch"><input type="checkbox" data-edit="bool" ${data}${value === true ? " checked" : ""}><span></span></label>
+			${value == null ? `<span class="null">unset</span>` : ""}</div>`;
+	}
+	if (type.kind === "tuple") {
+		const [member_type] = type.items ?? [];
+		const [member, target] = Array.isArray(value) ? value : [undefined, undefined];
+		const members = (member_type?.options ?? []).map(option => `<option value="${esc(option.value)}"${option.value === member ? " selected" : ""}>${esc(option.display_string ?? option.value)}</option>`).join("");
+		return `<div class="editor">
+			<select data-edit="member" ${data}><option value=""${member === undefined ? " selected" : ""} disabled>— member —</option>${members}</select>
+			<input data-edit="union-value" ${data} data-member="${esc(member ?? "")}" value="${esc(target ?? "")}" placeholder="node" list="dl-${esc(node.key)}-${esc(property.key)}" spellcheck="false">
+			<datalist id="dl-${esc(node.key)}-${esc(property.key)}"></datalist>
+			${ref_link(target, names)}</div>`;
+	}
+	// Numbers stay text: the CLI takes hex (0x1D) and checks the value itself.
+	return `<div class="editor">
+		<input type="text"${type.kind === "number" ? ' inputmode="numeric"' : ""} data-edit="text" ${data} value="${esc(value ?? "")}" placeholder="${value === null ? "cleared" : "unset"}" list="dl-${esc(node.key)}-${esc(property.key)}" spellcheck="false">
+		<datalist id="dl-${esc(node.key)}-${esc(property.key)}"></datalist>
+		${ref_link(value, names)}</div>`;
+}
+
+async function render_add() {
+	const content = $("content");
+	if (!state.project?.workfile) {
+		content.innerHTML = no_workfile();
+		return;
+	}
+	content.innerHTML = `<div class="card"><p class="subtle">Loading the catalog…</p></div>`;
+	await load_devices();
+	const groups = new Map();
+	for (const device of state.devices) {
+		if (!groups.has(device.tag)) groups.set(device.tag, []);
+		groups.get(device.tag).push(device);
+	}
+	const filter = (state.add_filter ?? "").toLowerCase();
+	content.innerHTML = `<div class="card">
+		<div class="title-row"><h2>Add devices</h2><div class="spacer"></div><input id="add-filter" placeholder="Filter…" value="${esc(state.add_filter ?? "")}" style="max-width:260px"></div>
+		<p class="subtle">An eval board brings its part and its wiring; a driver adds the bare part; a schema adds one node. <b>Name</b> is optional; <b>as</b> picks the interface for a part with several (adc, dac, or adc,dac).</p>
+		<div class="form-row"><input id="add-key" placeholder="Any key or schema, e.g. capi_dac_chan" spellcheck="false" style="flex:1;max-width:320px"><input id="add-name" placeholder="name (optional)" spellcheck="false" style="max-width:200px"><input id="add-as" placeholder="as (optional)" spellcheck="false" style="max-width:140px"><button class="primary" data-act="add-free">Add</button></div>
+	</div>
+	${[...groups].map(([tag, devices]) => {
+		const shown = devices.filter(device => device.key.toLowerCase().includes(filter));
+		if (shown.length === 0) return "";
+		return `<div class="card"><h3 style="text-transform:capitalize">${esc(tag)} <span class="subtle">· ${shown.length}</span></h3><div class="devices">${shown.map(device => `
+			<div class="device"><div class="k">${esc(device.key)}</div>
+				<div class="row"><input placeholder="name" data-add-name="${esc(device.key)}" spellcheck="false"><input placeholder="as" data-add-as="${esc(device.key)}" spellcheck="false" style="max-width:70px"></div>
+				<button data-act="add" data-key="${esc(device.key)}">＋ Add</button></div>`).join("")}</div></div>`;
+	}).join("")}`;
+	const filter_input = $("add-filter");
+	filter_input.oninput = () => {
+		state.add_filter = filter_input.value;
+		const at = filter_input.selectionStart;
+		render_add().then(() => {
+			$("add-filter").focus();
+			$("add-filter").setSelectionRange(at, at);
+		});
+	};
+}
+
+async function render_settings() {
+	const content = $("content");
+	content.innerHTML = `<div class="card"><p class="subtle">Loading settings…</p></div>`;
+	await load_configs();
+	const groups = new Map();
+	for (const config of state.configs) {
+		if (!groups.has(config.category)) groups.set(config.category, []);
+		groups.get(config.category).push(config);
+	}
+	content.innerHTML = `<div class="card">
+		<div class="title-row"><h2>Settings</h2><div class="spacer"></div>
+			<label class="form-row subtle" title="Write to your user settings (~/.config/analog-attach) instead of this project's"><input type="checkbox" id="global"> save for all projects</label></div>
+		<p class="subtle">The same as <code>analog-attach config</code>. <span class="req">*</span> required. <b>target</b> is a board (which brings its chip), or a chip used without a board. A list (<b>module-paths</b>) is its paths separated by spaces.</p>
+	</div>
+	${[...groups].map(([category, configs]) => `<div class="card" style="padding:10px 14px"><h3 style="text-transform:capitalize">${esc(category)}</h3><table>${configs.map(config => {
+		const options = typeof config.type === "object" && Array.isArray(config.type?.options) ? config.type.options : null;
+		const value = Array.isArray(config.value) ? config.value.join(" ") : config.value ?? "";
+		const input = options
+			? `<select data-setting="${esc(config.field_name)}"><option value="">— ${config.default ? `default (${esc(config.default)})` : "unset"} —</option>${options.map(option => {
+				const v = typeof option === "string" ? option : option.value;
+				return `<option value="${esc(v)}"${v === value ? " selected" : ""}>${esc(typeof option === "string" ? option : (option.display_string ?? option.value))}</option>`;
+			}).join("")}</select>`
+			: `<input data-setting="${esc(config.field_name)}" value="${esc(value)}" placeholder="${esc(config.default ?? "unset")}" spellcheck="false">`;
+		return `<tr class="setting-row"><td class="key">${esc(config.field_name)}${config.required ? ` <span class="req">*</span>` : ""}</td>
+			<td class="edit"><div class="editor">${input}<button data-act="save-setting" data-key="${esc(config.field_name)}">Save</button><button class="ghost" title="Reset to default" data-act="reset-setting" data-key="${esc(config.field_name)}">↺</button></div>
+			<div class="subtle" style="font-size:12px;margin-top:3px">${esc(config.description)}</div></td></tr>`;
+	}).join("")}</table></div>`).join("")}`;
+}
+
+function render_build() {
+	$("content").innerHTML = `<div class="card">
+		<h2>Generate &amp; build</h2>
+		<p class="subtle">Generate writes the CAPI project from the workfile; build runs the platform toolchain; deploy flashes the board. Output streams into the console below.</p>
+		<div class="actions-row">
+			<button class="primary" data-act="generate">⚙ Generate</button>
+			<button data-act="build">▶ Build</button>
+			<button data-act="build-clean">Clean build</button>
+			<button data-act="deploy">⚡ Deploy</button>
+		</div>
+	</div>
+	<div class="card"><h3>Typical flow</h3>
+		<ol class="subtle" style="margin:0;padding-left:18px;line-height:1.9">
+			<li>Settings: capi, module repositories, target (the board)</li>
+			<li>Create the workfile, then add an eval board (e.g. <code>eval-adxl355-pmdz</code>)</li>
+			<li>Fix anything the status chip flags, in the Workfile view</li>
+			<li>Generate → Build → Deploy, and open the board's serial console</li>
+		</ol></div>`;
+}
+
+let mermaid;
+async function render_graph() {
+	const content = $("content");
+	if (!state.project?.workfile) {
+		content.innerHTML = no_workfile();
+		return;
+	}
+	content.innerHTML = `<div class="card"><div class="title-row"><h2>Graph</h2><span class="subtle">references between nodes · click a node to edit it</span></div><div id="graph">Rendering…</div></div>`;
+	mermaid ??= (await import("https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.esm.min.mjs")).default;
+	const dark = getComputedStyle(document.documentElement).getPropertyValue("--bg").trim().startsWith("#0");
+	mermaid.initialize({ startOnLoad: false, securityLevel: "loose", theme: dark ? "dark" : "default", flowchart: { htmlLabels: true } });
+	const id_of = new Map(state.nodes.map((node, index) => [node.key, `n${index}`]));
+	const hidden = new Map();
+	const lines = ["flowchart LR"];
+	for (const node of state.nodes) {
+		const bad = errors_of(node.key).length > 0;
+		lines.push(`  ${id_of.get(node.key)}["<b>${esc(node.key)}</b><br><small>${esc(type_of(node))}</small>"]${bad ? ":::bad" : ""}`);
+	}
+	for (const node of state.nodes) {
+		for (const property of node.properties) {
+			if (property.key === "$compatible") continue;
+			for (const target of references(property.value)) {
+				let to = id_of.get(target);
+				if (to === undefined && /_handle$|^bsp_|_ops$/.test(target)) {
+					if (!hidden.has(target)) {
+						hidden.set(target, `h${hidden.size}`);
+						lines.push(`  ${hidden.get(target)}(["~ ${esc(target)}"]):::hid`);
+					}
+					to = hidden.get(target);
+				}
+				if (to !== undefined) lines.push(`  ${id_of.get(node.key)} -->|${esc(property.key)}| ${to}`);
+			}
+		}
+	}
+	for (const [name, id] of id_of) lines.push(`  click ${id} call aaSelect("${name}")`);
+	lines.push("  classDef bad stroke:#dc2626,stroke-width:2px", "  classDef hid stroke-dasharray:4 3,opacity:.8");
+	try {
+		const { svg, bindFunctions } = await mermaid.render(`g${Date.now()}`, lines.join("\n"));
+		$("graph").innerHTML = svg;
+		bindFunctions?.($("graph"));
+	} catch (error) {
+		$("graph").textContent = `Could not render: ${error.message ?? error}`;
+	}
+}
+window.aaSelect = name => {
+	state.view = "workfile";
+	state.selected = name;
+	render();
+};
+
+// --- events ----------------------------------------------------------------------------
+document.addEventListener("click", async event => {
+	// A click into an editor is for editing: the `change` handler below acts on it. Treating
+	// it as "open this node" re-rendered the panel and threw the field away mid-click.
+	if (event.target.closest("input, select, textarea, .switch")) return;
+	const target = event.target.closest("[data-act], [data-node], [data-goto], nav button");
+	if (!target) return;
+
+	if (target.matches("nav button")) {
+		state.view = target.dataset.view;
+		render();
+		return;
+	}
+	if (target.dataset.goto) {
+		event.preventDefault();
+		state.view = target.dataset.goto;
+		render();
+		return;
+	}
+	const act = target.dataset.act;
+	const node = target.dataset.node;
+	const property = target.dataset.prop;
+	if (!act && node) {
+		state.view = "workfile";
+		state.selected = node;
+		render();
+		return;
+	}
+
+	switch (act) {
+	case "init":
+		await mutate(["init"]);
+		break;
+	case "rename": {
+		const to = prompt(`Rename ${node} to:`, node);
+		if (to && to !== node) {
+			const result = await mutate(["rename", node, to]);
+			if (result?.code === 0) state.selected = to;
+			render();
+		}
+		break;
+	}
+	case "delete-node": {
+		const used = state.nodes.some(other => other.properties.some(p => references(p.value).includes(node)));
+		if (confirm(`Delete ${node}?${used ? "\n\nOther nodes reference it: their references are cleared (--force)." : ""}`)) {
+			await mutate(["delete", node, ...(used ? ["--force"] : [])]);
+		}
+		break;
+	}
+	case "clear":
+		await mutate(["delete", node, property]);
+		break;
+	case "details": {
+		const id = `${node}.${property}`;
+		if (state.details.has(id)) {
+			state.details.delete(id);
+		} else {
+			state.details.add(id);
+			render();
+			const result = await cli(["read", node, property], { quiet: true });
+			state.detail_text[id] = (result.stdout || result.stderr).trim();
+		}
+		render();
+		break;
+	}
+	case "add": {
+		const key = target.dataset.key;
+		const name = document.querySelector(`[data-add-name="${CSS.escape(key)}"]`)?.value.trim();
+		const as = document.querySelector(`[data-add-as="${CSS.escape(key)}"]`)?.value.trim();
+		await mutate(["add", key, ...(name ? ["--name", name] : []), ...(as ? ["--as", as] : [])]);
+		break;
+	}
+	case "add-free": {
+		const key = $("add-key").value.trim();
+		if (!key) return;
+		const name = $("add-name").value.trim();
+		const as = $("add-as").value.trim();
+		await mutate(["add", key, ...(name ? ["--name", name] : []), ...(as ? ["--as", as] : [])]);
+		break;
+	}
+	case "save-setting": {
+		const key = target.dataset.key;
+		const input = document.querySelector(`[data-setting="${CSS.escape(key)}"]`);
+		const value = input.value.trim();
+		const scope = $("global")?.checked ? ["--global"] : [];
+		const config = state.configs?.find(candidate => candidate.field_name === key);
+		// A list setting takes each path as its own word.
+		const values = config?.type === "path_list" ? value.split(/\s+/).filter(word => word !== "") : [value];
+		await cli(value === "" ? ["config", key, "--reset", ...scope] : ["config", key, ...values, ...scope]);
+		state.devices = null;
+		await refresh();
+		break;
+	}
+	case "reset-setting": {
+		const scope = $("global")?.checked ? ["--global"] : [];
+		await cli(["config", target.dataset.key, "--reset", ...scope]);
+		state.devices = null;
+		await refresh();
+		break;
+	}
+	case "generate":
+		await cli(["generate"]);
+		break;
+	case "build":
+		await stream(["build"]);
+		break;
+	case "build-clean":
+		await stream(["build", "--clean"]);
+		break;
+	case "deploy":
+		await stream(["deploy"]);
+		break;
+	}
+});
+
+// Editing a value: an `update` per change.
+document.addEventListener("change", async event => {
+	const field = event.target;
+	const kind = field.dataset?.edit;
+	if (!kind) return;
+	const { node, prop: property } = field.dataset;
+	if (kind === "enum") await mutate(["update", node, property, field.value]);
+	else if (kind === "bool") await mutate(["update", node, property, field.checked ? "true" : "false"]);
+	else if (kind === "text") {
+		if (field.value.trim() === "") await mutate(["delete", node, property]);
+		else await mutate(["update", node, property, field.value.trim()]);
+	} else if (kind === "member") {
+		const value_input = field.parentElement.querySelector('[data-edit="union-value"]');
+		value_input.dataset.member = field.value;
+		value_input.value = "";
+		value_input.focus();
+		fill_suggestions(value_input);
+	} else if (kind === "union-value") {
+		const member = field.dataset.member;
+		if (member && field.value.trim() !== "") await mutate(["update", node, property, member, field.value.trim()]);
+	}
+});
+
+// Suggestions from the CLI, the first time a field gets focus.
+async function fill_suggestions(field) {
+	const list = field.list;
+	if (!list) return;
+	const { node, prop: property, member } = field.dataset;
+	const args = ["list", "value", node, property, ...(member ? [member] : []), "--json"];
+	const result = await cli(args, { quiet: true });
+	const suggestions = result.json?.suggestions ?? [];
+	list.innerHTML = suggestions.map(suggestion => `<option value="${esc(suggestion.value)}">${esc(suggestion.display_string ?? "")}</option>`).join("");
+}
+document.addEventListener("focusin", event => {
+	const field = event.target;
+	if (field.dataset?.edit === "text" || field.dataset?.edit === "union-value") {
+		if (!field.dataset.suggested || field.dataset.edit === "union-value") {
+			field.dataset.suggested = "1";
+			fill_suggestions(field);
+		}
+	}
+});
+document.addEventListener("keydown", event => {
+	if (event.key === "Enter" && event.target.matches?.('input[data-edit="text"], input[data-edit="union-value"]')) event.target.blur();
+	if (event.key === "Enter" && event.target.id === "project") $("open").click();
+	if (event.key === "Enter" && ["add-key", "add-name", "add-as"].includes(event.target.id)) document.querySelector('[data-act="add-free"]').click();
+});
+
+$("open").onclick = async () => {
+	const response = await fetch("/api/project", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ dir: $("project").value.trim() }) });
+	const result = await response.json();
+	if (!response.ok) {
+		toast(result.error, true);
+		return;
+	}
+	state.selected = null;
+	state.devices = null;
+	try { localStorage.setItem("aa-gui-project", result.dir); } catch {}
+	toast(`Opened ${result.dir}`);
+	await refresh();
+};
+$("validate").onclick = async () => {
+	await cli(["validate"]);
+	await refresh();
+};
+$("refresh").onclick = () => { state.devices = null; refresh(); };
+$("clear-console").onclick = () => { $("console").innerHTML = ""; };
+$("toggle-console").onclick = () => {
+	const footer = $("footer");
+	footer.classList.toggle("collapsed");
+	$("toggle-console").textContent = footer.classList.contains("collapsed") ? "Show" : "Hide";
+};
+$("theme").onclick = () => {
+	const root = document.documentElement;
+	const dark = getComputedStyle(root).getPropertyValue("--bg").trim().startsWith("#0");
+	root.dataset.theme = dark ? "light" : "dark";
+	try { localStorage.setItem("aa-gui-theme", root.dataset.theme); } catch {}
+	if (state.view === "graph") render_graph();
+};
+
+try {
+	const theme = localStorage.getItem("aa-gui-theme");
+	if (theme) document.documentElement.dataset.theme = theme;
+} catch {}
+log(`<div class="subtle" style="color:#8b95a3">Ready. Each action below shows the command it ran and what the CLI said.</div>`);
+refresh();
+</script>
+</body>
+</html>

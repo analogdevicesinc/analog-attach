@@ -1,0 +1,22 @@
+{
+  "name": "@analog-attach/gui",
+  "description": "A local GUI for analog-attach: a page that runs the CLI for you (analog-attach gui)",
+  "author": "AnalogDevices",
+  "license": "Apache-2.0",
+  "private": true,
+  "type": "module",
+  "version": "0.1.0",
+  "exports": {
+    "./server": {
+      "types": "./src/server.d.mts",
+      "default": "./src/server.mjs"
+    },
+    "./index.html": "./src/index.html"
+  },
+  "files": [
+    "src"
+  ],
+  "scripts": {
+    "start": "node src/server.mjs"
+  }
+}

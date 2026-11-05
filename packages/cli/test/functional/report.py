@@ -95,7 +95,7 @@ PRECEDENCE = ("fail", "gap", "pass", "skipped", "blocked", "manual", "planned")
 # with -conformity, an end-to-end test's "end to end", a manual or planned test's its `chapter`
 # field or "manual"; a `chapter:<name>` tag in a file overrides it. Unlisted chapters come last.
 LIFECYCLE = ["setup", "config", "settings", "init", "import", "list", "add", "read", "update", "delete", "rename", "move",
-             "enable-disable", "validate", "generate", "build", "deploy", "completion", "skill", "general"]
+             "enable-disable", "validate", "generate", "build", "deploy", "completion", "skill", "gui", "general"]
 CHAPTER_ORDER = LIFECYCLE + [f"{name}-conformity" for name in LIFECYCLE] + ["end to end", "manual"]
 # File names that aren't their chapter's name.
 CHAPTER_NAMES = {"gen": "general", "enable": "enable-disable"}

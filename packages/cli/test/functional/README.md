@@ -92,7 +92,7 @@ A requirement's status in an ecosystem is the first of `fail`, `gap`, `pass`, `s
 Both workbooks sort the tests into chapters, in the order of a project's life:
 
 setup, config, settings, init, import, list, add, read, update, delete, rename, move,
-enable-disable, validate, generate, build, deploy, completion, skill, general; then the
+enable-disable, validate, generate, build, deploy, completion, skill, gui, general; then the
 conformity chapters in the same order (`add-conformity`, `read-conformity`, ...); then
 `end to end` and `manual`.
 

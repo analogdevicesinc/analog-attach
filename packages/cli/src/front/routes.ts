@@ -28,6 +28,8 @@ import type { Environment } from "./stubs";
 import { config_route } from "./config";
 import { skill_routes } from "./skill";
 import { completion_route } from "./stubs";
+import { gui_route } from "./gui";
+import { find_package_root } from "./main";
 
 // =====================================================================================
 // What a run has
@@ -367,6 +369,7 @@ export function build_routes(front: FrontEnd): Route[] {
         ...SHARED.map(definition => shared_route(definition, front)),
         ...extra_routes(front),
         completion_route(front),
+        gui_route(front, () => find_package_root()),
         ...skill_routes(front),
     ];
     const names = new Set<string>();
