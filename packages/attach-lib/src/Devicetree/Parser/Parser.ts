@@ -112,7 +112,14 @@ export class Parser {
 
             // Overlay
 
-            const overlay_labels = this.parse_labels();
+            const r_labels = this.parse_reference_labels();
+            if (Result.is_err(r_labels)) { return r_labels; }
+            const overlay_labels = r_labels.value;
+
+            const after_labels = this.token_stream.done ? undefined : this.token_stream.current;
+            if (overlay_labels.length > 0 && after_labels?.kind === TokenKind.Char && after_labels.value === CharTokenKind.Slash) {
+                return Result.Err({ message: "Root node cannot have labels", found: after_labels });
+            }
 
             const r_target = this.find_node_by_current_reference(root);
             if (Result.is_err(r_target)) { return r_target; }
@@ -175,7 +182,9 @@ export class Parser {
                 continue;
             }
 
-            const labels = this.parse_labels();
+            const r_labels = this.parse_reference_labels();
+            if (Result.is_err(r_labels)) { return r_labels; }
+            const labels = r_labels.value;
 
             // A label defined earlier in the overlay itself is merged into, as dtc
             // does for plugins (`&frag0 { … }` after including cma-overlay.dts).
@@ -190,7 +199,16 @@ export class Parser {
                 }
             }
 
-            const r_fragment = this.parse_dto_reference_block(labels);
+            if (labels.length > 0 && reference.kind === TokenKind.Char && reference.value === CharTokenKind.Slash) {
+                return Result.Err({ message: "Root node cannot have labels", found: reference });
+            }
+
+            // dtc labels the target, so only a node of the overlay itself can take one.
+            if (labels.length > 0) {
+                return Result.Err({ message: "A label before a reference needs a node of the overlay itself", found: reference });
+            }
+
+            const r_fragment = this.parse_dto_reference_block();
             if (Result.is_err(r_fragment)) { return r_fragment; }
 
             while (children_map.has(`fragment@${next_fragment}`)) { ++next_fragment; }
@@ -308,7 +326,7 @@ export class Parser {
      * Parse one `&label { ... };` / `&{/path} { ... };` block into a fragment
      * body (target property + `__overlay__`); the caller names and numbers it.
      */
-    private parse_dto_reference_block(labels: Array<string>): Result<Omit<DeletableNode, "name" | "unit_addr">, ParseError> {
+    private parse_dto_reference_block(): Result<Omit<DeletableNode, "name" | "unit_addr">, ParseError> {
         const current = this.token_stream.current;
 
         let target_property: DeletableProperty;
@@ -461,7 +479,7 @@ export class Parser {
         if (Result.is_err(r_semi)) { return r_semi; }
 
         return Result.Ok({
-            labels,
+            labels: [],
             properties: [target_property],
             children: [{
                 labels: [],
@@ -1072,6 +1090,19 @@ export class Parser {
         }
 
         return Result.Ok(expression);
+    }
+
+    /** The labels before a top-level reference block (`a: &b { … };`): dtc takes one. */
+    private parse_reference_labels(): Result<Array<string>, ParseError> {
+        const labels = [];
+        while (!this.token_stream.done && this.token_stream.current.kind === TokenKind.Label) {
+            if (labels.length > 0) {
+                return Result.Err({ message: "Only one label can come before a reference", found: this.token_stream.current });
+            }
+            labels.push(this.token_stream.current.value);
+            this.token_stream.advance();
+        }
+        return Result.Ok(labels);
     }
 
     private parse_labels(): Array<string> {

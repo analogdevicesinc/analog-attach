@@ -266,6 +266,47 @@ describe("labeling", () => {
   });
 });
 
+// What dtc takes before a top-level block: one label on a reference in a base tree (it labels the target), in an
+// overlay only on a reference to a node of the overlay itself, none on `/`
+describe("labels before a block, as dtc takes them", () => {
+  const base = `/dts-v1/;\n/ { soc { a: dev@1 { }; }; };\n`;
+  const plugin = `/dts-v1/;\n/plugin/;\n`;
+  const local = `${plugin}/ { fragment@0 { target = <&b>; __overlay__ { a: dev@1 { }; }; }; };\n`;
+
+  test.each<[string, string]>([
+    ["a label on a reference", `${base}e: &a { x = <1>; };`],
+    ["a label on a path reference", `${base}e: &{/soc/dev@1} { x = <1>; };`],
+  ])("base tree, accepted — %s", (_name, source) => {
+    const parsed = parse_dts(source);
+    if (Result.is_err(parsed)) { expect.fail(format_parse_error(parsed.error)); }
+    expect(parsed.value.dts.root.children[0]?.children[0]?.labels).toEqual(["e", "a"]);
+  });
+
+  test.each<[string, string, string]>([
+    ["two labels on a reference", `${base}e: f: &a { x = <1>; };`, "Only one label can come before a reference: 'f' (line 3, column 4)"],
+    ["a label on a later root", `${base}e: / { };`, "Root node cannot have labels: '/' (line 3, column 4)"],
+  ])("base tree, rejected — %s", (_name, source, message) => {
+    const parsed = parse_dts(source);
+    expect(Result.is_err(parsed) && format_parse_error(parsed.error)).toBe(message);
+  });
+
+  test("overlay, accepted — a label on a reference to a node of the overlay", () => {
+    const parsed = parse_dto(`${local}e: &a { x = <1>; };`);
+    if (Result.is_err(parsed)) { expect.fail(format_parse_error(parsed.error)); }
+    expect(parsed.value.dto.root.children[0]?.children[0]?.children[0]?.labels).toEqual(["e", "a"]);
+  });
+
+  test.each<[string, string, string]>([
+    ["a label on a reference", `${plugin}e: &a { x = <1>; };`, "A label before a reference needs a node of the overlay itself: 'a' (line 3, column 4)"],
+    ["a label on a path reference", `${plugin}&b { };\ne: &{/soc} { };`, "A label before a reference needs a node of the overlay itself: '/soc' (line 4, column 4)"],
+    ["two labels on a reference to a node of the overlay", `${local}e: f: &a { };`, "Only one label can come before a reference: 'f' (line 4, column 4)"],
+    ["a label on a root", `${plugin}e: / { };`, "Root node cannot have labels: '/' (line 3, column 4)"],
+  ])("overlay, rejected — %s", (_name, source, message) => {
+    const parsed = parse_dto(source);
+    expect(Result.is_err(parsed) && format_parse_error(parsed.error)).toBe(message);
+  });
+});
+
 describe("bad tokens", () => {
 
   test("simple bad char", () => {
@@ -381,9 +422,9 @@ describe("overlays (DTOs)", () => {
   });
 
   test("a reference to a label outside the overlay still becomes a fragment", () => {
-    const dto = parse_inline_dto(`/ { fragment@0 { target = <&cma>; frag0: __overlay__ { }; }; };\nl: &spi0 { status = "okay"; };`);
+    const dto = parse_inline_dto(`/ { fragment@0 { target = <&cma>; frag0: __overlay__ { }; }; };\n&spi0 { status = "okay"; };`);
     expect(child_names(dto)).toStrictEqual(["fragment@0", "fragment@1"]);
-    expect(dto.root.children[1]?.labels).toStrictEqual(["l"]);
+    expect(dto.root.children[1]?.properties[0]?.value).toMatchObject([{ kind: "array", elements: [{ kind: "label", name: "spi0" }] }]);
   });
 
   test("a parse error names the token and its position", () => {
