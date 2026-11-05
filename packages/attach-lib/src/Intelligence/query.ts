@@ -1,5 +1,4 @@
-import { ResolvedProperty } from "../Bindings/model/ParsedBinding.js";
-import { AttachEnumType, is_open, list_cell, type Cell, type List } from "../Bindings/model/AttachType.js";
+import { ResolvedProperty, AttachEnumType, is_open, list_cell, type Cell, type List } from "../Bindings/index.js";
 import { DeviceTree, number_property } from "../Devicetree/index.js";
 import {
     is_clock,
