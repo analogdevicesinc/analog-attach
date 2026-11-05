@@ -4,8 +4,8 @@ import * as fs from 'node:fs';
 import { test, expect, describe } from 'vitest';
 import { Result } from '../src/result';
 
-import type { DTSParseResult, DTLabel, DTO, DTS } from "../src/Devicetree/Parser/index.js";
-import { parse_dto, parse_dts, print_dts, Bits, is_dt_flag, isDTMetadata, format_parse_error } from "../src/Devicetree/Parser/index.js";
+import type { DTSParseResult, DTLabel, DTO, DTS } from "../src/Devicetree/syntax/index.js";
+import { parse_dto, parse_dts, print_dts, Bits, is_dt_flag, isDTMetadata, format_parse_error } from "../src/Devicetree/syntax/index.js";
 
 import { stringify as stringify_as_yaml } from "yaml";
 

@@ -1,6 +1,6 @@
-import { DeviceTree } from "./Devicetree.js";
-import { DeviceTreeOverlay } from "./DevicetreeOverlay.js";
-import { type DTLabel, type DTNode, type DTPath, get_full_node_name, is_dt_flag } from "./Parser/AST.js";
+import { DeviceTree } from "../DeviceTree.js";
+import { DeviceTreeOverlay } from "../DeviceTreeOverlay.js";
+import { type DTLabel, type DTNode, type DTPath, get_full_node_name, is_dt_flag } from "../syntax/AST.js";
 
 /** A phandle or path reference in the overlay that names nothing in the base tree or the overlay. */
 export interface UnresolvedReference {

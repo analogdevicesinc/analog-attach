@@ -1,5 +1,5 @@
-import { INodeBuilderBase } from "./NodeBuilder.js";
-import { PropertyBuilder } from "./PropertyBuilder.js";
+import { INodeBuilderBase } from "./build/NodeBuilder.js";
+import { PropertyBuilder } from "./build/PropertyBuilder.js";
 
 import {
     print_dts,
@@ -11,12 +11,47 @@ import {
     get_full_node_name,
     DTProperty,
     format_parse_error,
-} from "./Parser/index.js";
+} from "./syntax/index.js";
 
 import { Result } from "../result.js";
-import { UnitAddr } from "./Types.js";
-import { Stream } from "./Stream.js";
-import { type LocatedNode, type NodeTarget, normalize_target, parent_path as access_parent_path, has_compatible, walk_nodes } from "./Access.js";
+import type { UnitAddr } from "./nodes/UnitAddress.js";
+import { type LocatedNode, type NodeTarget, normalize_target, parent_path as access_parent_path, has_compatible } from "./nodes/Access.js";
+
+export class Stream<T> implements Iterable<T> {
+    constructor(private iterable: Iterable<T>) { }
+
+    [Symbol.iterator]() {
+        return this.iterable[Symbol.iterator]();
+    }
+
+    filter(predicate: (value: T) => boolean): Stream<T> {
+        // eslint-disable-next-line unicorn/no-this-assignment
+        const self = this;
+
+        return new Stream<T>(
+            (function* () {
+                for (const item of self) {
+                    if (predicate(item)) {
+                        yield item;
+                    }
+                }
+            })()
+        );
+    }
+
+    toArray(): T[] {
+        return [...this];
+    }
+}
+
+/** Every node of the tree under `root` (at `path`) with its path, depth-first, `root` first. */
+export function* walk_nodes(root: DTNode, path: string): Generator<LocatedNode> {
+    yield { node: root, path };
+    for (const child of root.children) {
+        const name = get_full_node_name(child);
+        yield* walk_nodes(child, path === "/" ? `/${name}` : `${path}/${name}`);
+    }
+}
 
 function format_unit_addr_part(addr: UnitAddr): string {
     return addr.repr === "hex"
