@@ -35,9 +35,7 @@
     },
     "linux-suggest": {
       "description": "update --suggest (UPDATE-130): the values the property can take, as list value gives them.",
-      "allOf": [{ "$ref": "list-value.schema.json#/$defs/base" }],
-      "properties": { "ok": { "const": true }, "severity": { "enum": ["info", "warn"] } },
-      "unevaluatedProperties": false
+      "allOf": [{ "$ref": "list-value.schema.json#/$defs/linux-answer" }]
     },
     "set": {
       "allOf": [{ "$ref": "common.schema.json#/$defs/done" }],

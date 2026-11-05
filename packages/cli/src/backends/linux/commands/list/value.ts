@@ -1,9 +1,10 @@
+import { creatable_providers } from "attach-lib";
 import { answer, command, input_error, refuse, type ListValueArguments, type Outcome, type Session } from "../../../../interface/backend-interface";
 import { load_workspace, optional_bindings } from "../../config/workspace";
-import type { SuggestResponse } from "../../protocol/types";
+import type { ListValueResponse } from "../../protocol/types";
 import { value_list } from "./data";
 
-export const list_value = command<ListValueArguments, SuggestResponse>({
+export const list_value = command<ListValueArguments, ListValueResponse>({
     docs: {
         brief: "Suggest values for a property",
         full: `Paths:
@@ -25,7 +26,7 @@ bindings the values are listed unchecked.`,
 });
 
 /** What `list value <path> <property>` answers, and `update <path> <property> --suggest` too. */
-export async function suggest_values(session: Session, identifier: string, property: string): Promise<Outcome<SuggestResponse>> {
+export async function suggest_values(session: Session, identifier: string, property: string): Promise<Outcome<ListValueResponse>> {
     const loaded = load_workspace(session, ["base", "overlay"]);
     if (!loaded.ok) { return loaded.outcome; }
     const { workspace } = loaded;
@@ -33,8 +34,15 @@ export async function suggest_values(session: Session, identifier: string, prope
     const found = await value_list(identifier, property, workspace.overlay.tree, workspace.base.tree, optional_bindings(workspace));
     if (!found.ok) { return refuse(found.message, { text: found.text ?? found.message }); }
     const { message, suggestions } = found.value;
-    return answer<SuggestResponse>(
-        { ok: true, message, severity: "info", suggestions },
-        () => (suggestions.length === 0 ? message : suggestions.map(s => `${s.value}\t${s.display_string}`).join("\n")),
+    // The providers read offers too (READ-036): a node the user can add instead.
+    const creatable = creatable_providers(property);
+    const lines = suggestions.length === 0 ? [message] : suggestions.map(s => `${s.value}\t${s.display_string}`);
+    if (creatable.length > 0) { lines.push(`Or add your own: ${creatable.map(compatible => `${session.program} add ${compatible}`).join(", ")}`); }
+    return answer<ListValueResponse>(
+        {
+            ok: true, message, severity: "info", suggestions,
+            ...(creatable.length === 0 ? {} : { can_create: creatable.map(compatible => ({ value: compatible, display_string: `add ${compatible}` })) }),
+        },
+        () => lines.join("\n"),
     );
 }

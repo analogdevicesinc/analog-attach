@@ -505,6 +505,7 @@ const LINUX_CASES: readonly Case<LinuxHarness>[] = [
 
     { route: "list value", argv: ["list", "value", "adc", "compatible"], shape: "answer" },
     { route: "list value", argv: ["list", "value", "adc", "spi-max-frequency"], shape: "answer" },
+    { route: "list value", argv: ["list", "value", "adc", "vref-supply"], shape: "answer" },
     { route: "list value", argv: ["list", "value", "nope", "reg"], shape: "refusal" },
 
     { route: "validate", argv: ["validate"], shape: "answer", prepare: fixture => { fixture.tools(); } },
