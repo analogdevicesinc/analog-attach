@@ -238,8 +238,6 @@ stub() {
 
 # --- SET-08: interview ---------------------------------------------------------------------
 
-# Gap: linux has no interview setting (`Unknown config field: interview`, exit 2); add always
-# asks on a terminal.
 # Description: interview is on by default, and add then asks on a terminal for the required
 # properties left to set.
 # Steps:
@@ -248,7 +246,7 @@ stub() {
 #   3. Run add adi,adxl345 --parent i2c1 on a terminal, pressing Ctrl-C at the interrupt-parent
 #      prompt.
 #   4. Check it asked for interrupt-parent, the first of two.
-# bats test_tags=req:SET-08, gap, id:L0275
+# bats test_tags=req:SET-08, id:L0275
 @test "interview is on by default and asks, on a terminal, for what is left after add" {
 	[ "$(field interview '"\(.value) \(.source)"')" = "true default" ]
 	with_overlay
@@ -256,7 +254,6 @@ stub() {
 	assert_output --partial "[1/2] interrupt-parent"
 }
 
-# Gap: linux has no interview setting; `config interview false` exits 2.
 # Description: with interview off, add on a terminal asks nothing and lists the missing required
 # properties.
 # Steps:
@@ -264,7 +261,7 @@ stub() {
 #   2. Create the overlay with init.
 #   3. Run add adi,adxl345 --parent i2c1 on a terminal, typing nothing.
 #   4. Check it succeeds without a prompt, listing interrupt-parent and interrupts as missing.
-# bats test_tags=req:SET-08, gap, id:L0276
+# bats test_tags=req:SET-08, id:L0276
 @test "with interview off, add asks nothing on a terminal" {
 	run aa config interview false
 	assert_success
@@ -277,14 +274,13 @@ stub() {
 
 # --- SET-09: own build and deploy ----------------------------------------------------------
 
-# Gap: linux has no build-command setting (`Unknown config field: build-command`, exit 2).
 # Description: build-command replaces the build step with the user's command.
 # Steps:
 #   1. Make the overlay with the ADXL345.
 #   2. Run config build-command with a command writing built-by-me.txt, and check it succeeds.
 #   3. Run build, with --json, and check .ok is true.
-#   4. Check built-by-me.txt was written and no overlay.dtbo was built.
-# bats test_tags=req:SET-09, gap, id:L0277
+#   4. Check built-by-me.txt was written and no build/overlay.dtbo was built.
+# bats test_tags=req:SET-09, id:L0277
 @test "build-command replaces the build step" {
 	with_accel
 	run aa config build-command 'echo mine > built-by-me.txt'
@@ -292,17 +288,16 @@ stub() {
 	run_json build
 	assert_json '.ok' true
 	[ "$(cat "$PROJECT/built-by-me.txt")" = mine ]
-	[ ! -e "$PROJECT/overlay.dtbo" ]
+	[ ! -e "$PROJECT/build/overlay.dtbo" ]
 }
 
-# Gap: linux has no deploy-command setting (`Unknown config field: deploy-command`, exit 2).
 # Description: deploy-command replaces the deploy step with the user's command.
 # Steps:
 #   1. Make the overlay with the ADXL345 and build it.
 #   2. Run config deploy-command with a command writing deployed-by-me.txt, and check it succeeds.
 #   3. Run deploy, with --json, and check .ok is true.
 #   4. Check deployed-by-me.txt was written.
-# bats test_tags=req:SET-09, gap, id:L0278
+# bats test_tags=req:SET-09, id:L0278
 @test "deploy-command replaces the deploy step" {
 	with_accel
 	aa build >/dev/null
@@ -315,15 +310,13 @@ stub() {
 
 # --- SET-11: build folder ------------------------------------------------------------------
 
-# Gap: linux has no build-dir setting (`Unknown config field: build-dir`, exit 2); build writes
-# the .dtbo next to the workfile.
 # Description: build-dir names the folder build writes to, build by default.
 # Steps:
 #   1. Run config build-dir, with --json.
 #   2. Check it succeeds with the value build, from default.
 #   3. Set build-dir to a folder build-a, make the overlay with the ADXL345 and build it.
 #   4. Check overlay.dtbo is in build-a.
-# bats test_tags=req:SET-11, gap, id:L0279
+# bats test_tags=req:SET-11, id:L0279
 @test "build-dir names the folder build writes to, build by default" {
 	run_json config build-dir
 	assert_success
@@ -358,7 +351,7 @@ stub() {
 #   2. Make the overlay with the ADXL345 and build it.
 #   3. Set deploy-ip 192.0.2.1, deploy-user pi and deploy-password secret.
 #   4. Run deploy, with --json, and check .ok is true and .host is 192.0.2.1.
-#   5. Check the log has an scp of overlay.dtbo to pi@192.0.2.1:/boot/overlays/ and an ssh
+#   5. Check the log has an scp of build/overlay.dtbo to pi@192.0.2.1:/boot/overlays/ and an ssh
 #      sudo reboot, both with the password secret.
 # bats test_tags=req:SET-10-LNX, id:L0281
 @test "deploy reaches the device the deploy settings name, with their login" {
@@ -372,7 +365,7 @@ stub() {
 	assert_json '.ok' true
 	assert_json '.host' 192.0.2.1
 	run cat "$BATS_TEST_TMPDIR/sshpass.log"
-	assert_line --regexp "^SSHPASS=secret .*scp .*$PROJECT/overlay.dtbo\"? pi@192\.0\.2\.1:/boot/overlays/$"
+	assert_line --regexp "^SSHPASS=secret .*scp .*$PROJECT/build/overlay.dtbo\"? pi@192\.0\.2\.1:/boot/overlays/$"
 	assert_line --regexp "^SSHPASS=secret .*ssh .*pi@192\.0\.2\.1 sudo reboot$"
 }
 

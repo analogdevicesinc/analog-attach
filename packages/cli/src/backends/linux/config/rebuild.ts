@@ -109,7 +109,7 @@ if (import.meta.vitest) {
     test("reload_caches - without a configured Linux tree it reports the config, builds nothing", async () => {
         const directory = fs.mkdtempSync(path.join(os.tmpdir(), "attach-rebuild-"));
         try {
-            const result = await reload_caches({ overlay_syntax: "fragment", preprocess_command: "" }, context(directory), capture().stream);
+            const result = await reload_caches({ overlay_syntax: "fragment", preprocess_command: "", interview: true, build_dir: "/build" }, context(directory), capture().stream);
             expect(result.ok).toBe(false);
             expect(!result.ok && result.errors.map(error => error.field)).toContain("linux");
             expect(fs.existsSync(path.join(directory, "state"))).toBe(false);
@@ -137,7 +137,7 @@ if (import.meta.vitest) {
     test("ensure_caches - without a configured Linux tree it reports the config, builds nothing", async () => {
         const directory = fs.mkdtempSync(path.join(os.tmpdir(), "attach-rebuild-"));
         try {
-            const result = await ensure_caches({ overlay_syntax: "fragment", preprocess_command: "" }, context(directory), capture().stream);
+            const result = await ensure_caches({ overlay_syntax: "fragment", preprocess_command: "", interview: true, build_dir: "/build" }, context(directory), capture().stream);
             expect(!result.ok && result.errors.map(error => error.field)).toContain("linux");
         } finally {
             fs.rmSync(directory, { recursive: true });

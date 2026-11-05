@@ -14,9 +14,8 @@ import {
     configure_arguments,
     plan_build,
     preflight,
-    run,
-    run_shell,
 } from "../build/cmake_build";
+import { run, run_shell } from "../../shell";
 import { common_ok, type BuildResponse } from "../protocol/responses";
 import { get_project_path } from "./shared";
 
@@ -118,7 +117,8 @@ async function run_build(clean: boolean, session: Session): Promise<Outcome<Buil
 
     // Configure every time. CMake re-configures in moments when nothing changed, and
     // skipping it would miss an edited project.conf, the file a user is most likely to
-    // touch by hand.
+    // touch by hand. Its output is never swallowed: Kconfig reports an unsatisfied
+    // `depends on` as a warning there, the earliest sign that project.conf is missing a symbol.
     const { project_directory: directory, environment } = plan.value;
     const configure = await run("cmake", configure_arguments(plan.value), directory, sink, environment);
     if (configure.exit_code !== 0) {

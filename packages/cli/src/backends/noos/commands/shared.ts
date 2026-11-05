@@ -18,6 +18,7 @@ import {
     type Workfile,
 } from "attach-no-os-lib";
 import type { Session } from "../../../interface/backend-interface";
+import { project_root } from "../../shell";
 import { RESERVED_PREFIX } from "../protocol/convert";
 import { install } from "../settings";
 
@@ -92,10 +93,7 @@ export function get_project_name(context: WorkfileContext): Result<string> {
 /** Where projects go when `project-path` is unset: `out/<project-name>`. */
 export const DEFAULT_PROJECT_DIRECTORY = "out";
 
-/** The directory that holds `.analog-attach/`: the session's state directory is `<root>/.analog-attach/noos`. */
-export function project_root(session: Pick<Session, "state_dir">): string {
-    return path.dirname(path.dirname(session.state_dir));
-}
+export { project_root } from "../../shell";
 
 /**
  * Directory of the generated project: the one `generate` writes, and `build` and `deploy`

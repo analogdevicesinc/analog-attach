@@ -26,9 +26,19 @@ export interface Settings {
     deploy_ip?: string;
     deploy_user?: string;
     deploy_password?: string;
+    /** Whether `add` and a child's create ask on a terminal (`interview`). */
+    interview: boolean;
+    /** Replaces `build`'s dtc step (`build-command`). */
+    build_command?: string;
+    /** Replaces `deploy`'s copy and reboot (`deploy-command`). */
+    deploy_command?: string;
+    /** The folder `build` writes the `.dtbo` to and `deploy` takes it from, absolute. */
+    build_dir: string;
 }
 
-export type SettingKey = "linux" | "devicetree" | "workfile" | "overlay-syntax" | "preprocess-command" | "deploy-ip" | "deploy-user" | "deploy-password";
+export type SettingKey =
+    | "linux" | "devicetree" | "workfile" | "overlay-syntax" | "preprocess-command" | "interview"
+    | "build-command" | "build-dir" | "deploy-command" | "deploy-ip" | "deploy-user" | "deploy-password";
 
 /** The `Settings` field of each key. */
 export const SETTING_FIELDS: Readonly<Record<SettingKey, keyof Settings>> = {
@@ -37,6 +47,10 @@ export const SETTING_FIELDS: Readonly<Record<SettingKey, keyof Settings>> = {
     "workfile": "workfile",
     "overlay-syntax": "overlay_syntax",
     "preprocess-command": "preprocess_command",
+    "interview": "interview",
+    "build-command": "build_command",
+    "build-dir": "build_dir",
+    "deploy-command": "deploy_command",
     "deploy-ip": "deploy_ip",
     "deploy-user": "deploy_user",
     "deploy-password": "deploy_password",
@@ -80,7 +94,11 @@ export function missing_hint(key: SettingKey, program: string = DEFAULT_PROGRAM)
 }
 
 const WORKSPACE = "Workspace";
+const BUILD = "Build";
 const DEPLOY = "Deploy";
+
+/** Where `build` writes the `.dtbo` when `build-dir` is unset, relative to the project root (as the noos backend builds). */
+export const DEFAULT_BUILD_DIR = "build";
 
 /** The specs the front end stores, lists and checks. Their hints name `program`. */
 export function linux_settings(program: string = DEFAULT_PROGRAM): SettingSpec[] {
@@ -133,6 +151,37 @@ export function linux_settings(program: string = DEFAULT_PROGRAM): SettingSpec[]
             required: false,
             default: DEFAULT_PREPROCESS_COMMAND,
             description: "C preprocessor command to resolve macros in the base devicetree; {input}/{output}/{linux} are substituted",
+        },
+        {
+            key: "interview",
+            category: WORKSPACE,
+            type: "bool",
+            options: ["true", "false"],
+            required: false,
+            default: "true",
+            description: "On a terminal, ask for the parent of 'add' and for the required properties a new node lacks (true/false)",
+        },
+        {
+            key: "build-command",
+            category: BUILD,
+            type: "string",
+            required: false,
+            description: "Override the 'build' step with this command, run at the base of the project; {workfile}/{output} are substituted (unset: compile with the bundled dtc)",
+        },
+        {
+            key: "build-dir",
+            category: BUILD,
+            type: "string",
+            required: false,
+            default: DEFAULT_BUILD_DIR,
+            description: "Folder 'build' writes the .dtbo to and 'deploy' takes it from, relative to the project unless absolute",
+        },
+        {
+            key: "deploy-command",
+            category: DEPLOY,
+            type: "string",
+            required: false,
+            description: "Override the 'deploy' step with this command, run at the base of the project; {dtbo} is substituted (unset: copy over SSH and reboot)",
         },
         {
             key: "deploy-ip",
@@ -193,9 +242,11 @@ export function read_settings(view: Pick<SettingsView, "get">): Settings {
     const settings: Settings = {
         overlay_syntax: (view.get("overlay-syntax") ?? "fragment") as OverlaySyntax,
         preprocess_command: view.get("preprocess-command") ?? DEFAULT_PREPROCESS_COMMAND,
+        interview: view.get("interview") !== "false",
+        build_dir: view.get("build-dir") ?? DEFAULT_BUILD_DIR,
     };
     const values = settings as unknown as Record<string, string | undefined>;
-    for (const key of ["linux", "devicetree", "workfile", "deploy-ip", "deploy-user", "deploy-password"] as const) {
+    for (const key of ["linux", "devicetree", "workfile", "build-command", "deploy-command", "deploy-ip", "deploy-user", "deploy-password"] as const) {
         const value = view.get(key);
         if (value !== undefined) { values[SETTING_FIELDS[key]] = value; }
     }
@@ -235,6 +286,7 @@ if (import.meta.vitest) {
         const values: Record<string, string> = { linux: "/l", workfile: "/w/o.dtso" };
         expect(read_settings({ get: key => values[key] })).toEqual({
             linux: "/l", workfile: "/w/o.dtso", overlay_syntax: "fragment", preprocess_command: DEFAULT_PREPROCESS_COMMAND,
+            interview: true, build_dir: DEFAULT_BUILD_DIR,
         });
     });
 
