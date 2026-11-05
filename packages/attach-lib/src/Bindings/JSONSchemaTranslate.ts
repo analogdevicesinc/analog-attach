@@ -325,12 +325,14 @@ function fixed_size_enum_list(object: any, whole_lists: boolean): AttachType | u
  * The positions of a matrix row, one that only has the range of the matrix's type (`uint32-matrix`'s, which the `items`
  * merge gives a position the binding only describes) left `any`: a row holds phandles and macros too (`msi-map`'s
  * `<rid-base &msi msi-base length>`, `fsl,pins`). The positions the binding bounds (`maximum: 19`) are numbers. A row
- * of one kind of cell is left as it is.
+ * of one kind of cell is left as it is, and so is a row of another size than 32 bits: dtc puts a phandle only in a
+ * 32-bit cell (ltc2983's `adi,custom-rtd`, a `uint64-matrix`, keeps its numbers and its `typeSize`).
  */
 function row_cells(row: List, type: string): List {
     const range = cell_range(type);
+    if (range === undefined || range.maximum - range.minimum !== 0xFF_FF_FF_FFn) { return row; }
     const only_typed = (cell: Cell): boolean =>
-        cell._t === "number" && range !== undefined && cell.minimum === range.minimum && cell.maximum === range.maximum && cell.default === undefined;
+        cell._t === "number" && cell.minimum === range.minimum && cell.maximum === range.maximum && cell.default === undefined;
     const any: Cell = { _t: "any" };
 
     if (!Array.isArray(row.item)) {
@@ -662,7 +664,9 @@ function narrow_array_object(object: any, name?: string): AttachType & { _t: "li
             cells.push(cell);
         }
 
-        const size = integer_array_size(object[DT_TYPE]);
+        // a matrix row has no `dtType` left (`narrow_matrix`): the size its positions share
+        const sizes = new Set(items.map((definition: any) => definition.typeSize));
+        const size = integer_array_size(object[DT_TYPE]) ?? (sizes.size === 1 ? items[0].typeSize : undefined);
         return list(cells, size === undefined ? {} : { typeSize: size });
     }
 
@@ -768,6 +772,17 @@ if (import.meta.vitest) {
         expect(stacked).toStrictEqual({ _t: "matrix", minItems: 1, maxItems: 1, rows: [
             { _t: "list", item: { _t: "number", minimum: 0n, maximum: 0xFF_FF_FF_FF_FF_FF_FF_FFn }, minItems: 2, maxItems: 4, typeSize: 64 },
         ] });
+    });
+
+    test("a 64-bit matrix row the binding describes position by position keeps its numbers: no phandle fits a 64-bit cell", () => {
+        // ltc2983's `adi,custom-rtd`: `items: { items: [{ description }, { description }] }` over `uint64-matrix`
+        const uint64 = { type: "integer", typeSize: 64, minimum: 0, maximum: 2 ** 64, dtType: "uint64" };
+        const { rtd } = translated({
+            rtd: { dtType: "uint64-matrix", type: "array", minItems: 3, maxItems: 64, items: { dtType: "uint64-array", type: "array", minItems: 2, maxItems: 2,
+                items: [{ description: "Resistance point in uOhms.", ...uint64 }, { description: "Temperature point in uK.", ...uint64 }] } },
+        });
+        const cell = { _t: "number", minimum: 0n, maximum: 0xFF_FF_FF_FF_FF_FF_FF_FFn };
+        expect(rtd).toStrictEqual({ _t: "matrix", minItems: 3, maxItems: 64, rows: [{ _t: "list", item: [cell, cell], minItems: 2, maxItems: 2, typeSize: 64 }] });
     });
 
     test("a list property keeps the default it gives for its number", () => {
