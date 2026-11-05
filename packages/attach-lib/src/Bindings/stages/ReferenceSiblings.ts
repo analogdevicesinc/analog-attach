@@ -1,4 +1,4 @@
-import { is_schema, Schema } from "./Schema.js";
+import { is_schema, Schema } from "../schema/Schema.js";
 /**
  * Where the `$ref` of a schema that says more than its `$ref` waits while ref-parser dereferences it
  * (`stash_references`), to be merged with the schema after (`restore_references`).

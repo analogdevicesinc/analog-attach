@@ -288,7 +288,7 @@ that gets them cannot fail because of the configuration.
 
 ### Property patterns
 
-The lib (`Bindings/PatternKind.ts`) splits a binding's patternProperties in two:
+The lib (`Bindings/schema/PatternKind.ts`) splits a binding's patternProperties in two:
 - object schemas and patterns with an `@` are child nodes (`NodeBinding.child_nodes`, matched by
   `match_pattern_rule`);
 - the rest name properties (`NodeBinding.property_patterns`, e.g. `^adi,bypass-attenuator-in[0-4]$`),
@@ -650,7 +650,7 @@ inheritance walk.
 
 ### SPI vendor peripheral-props filtering
 
-`VendorPeripheralFilter.ts` in the lib removes vendor-specific SPI peripheral properties (pl022,
+`Bindings/stages/VendorFilter.ts` in the lib removes vendor-specific SPI peripheral properties (pl022,
 cdns, fsl, nvidia, st) unless they match the parent controller's compatible. Under a parent whose
 name isn't an SPI controller's (`spi-controller.yaml`'s `$nodename`), it also removes the SPI
 peripheral properties the binding doesn't require, as the Linux tree's `spi/` schemas name them

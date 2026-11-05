@@ -1,5 +1,5 @@
-import { FixupContext } from "../FixupWalker.js";
-import { Schema, PropertySchema } from "../Schema.js";
+import { FixupContext } from "./Walker.js";
+import { Schema, PropertySchema } from "../schema/Schema.js";
 
 // Keep in sync with dt-schema's `property-units.yaml`
 export const ARRAY_SUFFIX = /-(kBps|bits|percent|bp|db|mhz|sec|ms|us|ns|ps|mm|nanoamp|(micro-)?ohms|micro(amp|watt)(-hours)?|milliwatt|(femto|pico)farads|(milli)?celsius|kelvin|k?pascal)$/;

@@ -1,12 +1,12 @@
-import { ParsedBinding } from '../Bindings/ParsedBinding.js';
+import { ParsedBinding } from '../Bindings/model/ParsedBinding.js';
 
 import { bindings_directory, create_context, SchemaPaths } from '../Bindings/Context.js';
-import { translate_JSONSchema } from '../Bindings/JSONSchemaTranslate.js';
+import { translate_JSONSchema } from '../Bindings/stages/Translate.js';
 import { PIPELINE_STAGES, PipelineStage, process_binding } from '../Bindings/Pipeline.js';
-import type { StepInfo } from '../Bindings/JSONSchemaFixups.js';
+import type { StepInfo } from '../Bindings/fixups/Fixups.js';
 import type { PipelineTracer } from '../Bindings/Trace.js';
 import { Result } from '../result.js';
-import { filter_peripheral_properties, load_spi_peripherals, type ControllerContext } from '../Bindings/VendorPeripheralFilter.js';
+import { filter_peripheral_properties, load_spi_peripherals, type ControllerContext } from '../Bindings/stages/VendorFilter.js';
 import { compile_targets, narrow, NarrowingTarget } from './Narrowing.js';
 
 export type ParseOptions = {

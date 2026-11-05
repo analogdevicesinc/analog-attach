@@ -1,6 +1,6 @@
-import { FixupContext } from "../FixupWalker.js";
+import { FixupContext } from "./Walker.js";
 import { is_string_schema } from "./string_to_array.js";
-import { is_schema, Schema, PropertySchema } from "../Schema.js";
+import { is_schema, Schema, PropertySchema } from "../schema/Schema.js";
 
 function size(schema: Schema, path: string[]): void {
     // Ours: a schema that bounds or lists items, or looks for one, is an array even when it doesn't say so
@@ -59,7 +59,7 @@ function count(schema: Schema, path: string[]): void {
 }
 
 /**
- * dt-schema: `fixups.py:_fixup_items_size`, the counts alone, on a schema file as it is read (`RefResolver`), before
+ * dt-schema: `fixups.py:_fixup_items_size`, the counts alone, on a schema file as it is read (`stages/References.ts`), before
  * its `$ref`s are resolved. dt-schema sizes each schema that way and checks what a `$ref` names (the `minItems: 1`
  * of a `types.yaml` array, a common binding's `reg`) as a schema of its own; we merge them into the property, so
  * its own count is fixed first: `{$ref: string-array, items: [a, b]}` takes two, `{$ref: uint32-array, maxItems: 4}`

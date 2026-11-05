@@ -1,5 +1,5 @@
-import { AttachType } from "./StructuralTypes.js";
-import type { ValueSuggestion } from "../Intelligence/layers/types.js";
+import { AttachType } from "./AttachType.js";
+import type { ValueSuggestion } from "../../Intelligence/layers/types.js";
 
 export type ResolvedProperty = {
     key: string,

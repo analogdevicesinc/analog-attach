@@ -1,7 +1,7 @@
-import { PropertyFixup } from "../FixupWalker.js";
-import { DT_TYPE } from "../RefResolver.js";
-import { is_matrix_type } from "../PropertyTypes.js";
-import { PropertySchema } from "../Schema.js";
+import { PropertyFixup } from "./Walker.js";
+import { DT_TYPE } from "../stages/References.js";
+import { is_matrix_type } from "../schema/PropertyTypes.js";
+import { PropertySchema } from "../schema/Schema.js";
 
 const NOT_THE_DEFINITION = new Set(["if", "not", "select", "then", "else"]);
 

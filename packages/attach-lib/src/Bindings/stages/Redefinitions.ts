@@ -1,9 +1,9 @@
 import { JSONSchema } from "@apidevtools/json-schema-ref-parser/dist/lib/types";
-import { deep_merge, DtBindingSchema, entries_of, is_schema, map_entries, Schema } from "./Schema.js";
-import { SchemaContext } from "./Context.js";
-import { dereference } from "./RefResolver.js";
+import { deep_merge, DtBindingSchema, entries_of, is_schema, map_entries, Schema } from "../schema/Schema.js";
+import { SchemaContext } from "../Context.js";
+import { dereference } from "./References.js";
 import { merge_schema } from "./ReferenceSiblings.js";
-import { Result } from "../result.js";
+import { Result } from "../../result.js";
 
 /** dt-validate checks every definition of a property, so the tighter of their bounds applies. */
 const TIGHTER: Record<string, (...bounds: number[]) => number> = {

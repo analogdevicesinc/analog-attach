@@ -1,5 +1,5 @@
-import { DtBindingSchema, is_schema, Schema } from "../Schema.js";
-import { is_node_pattern } from "../PatternKind.js";
+import { DtBindingSchema, is_schema, Schema } from "../schema/Schema.js";
+import { is_node_pattern } from "../schema/PatternKind.js";
 
 /**
  * `over` on top of `base`. The properties of a node (`properties`, `patternProperties`) are merged by name and

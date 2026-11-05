@@ -1,7 +1,7 @@
-import { DT_TYPE } from "../RefResolver.js";
-import { PropertyFixup } from "../FixupWalker.js";
-import { property_type, PropertyTypes } from "../PropertyTypes.js";
-import { PropertySchema } from "../Schema.js";
+import { DT_TYPE } from "../stages/References.js";
+import { PropertyFixup } from "./Walker.js";
+import { property_type, PropertyTypes } from "../schema/PropertyTypes.js";
+import { PropertySchema } from "../schema/Schema.js";
 
 /** Places a schema describes the property's own value in; the rest (conditions, refinements) only say more about it. */
 const NOT_THE_DEFINITION = new Set(["if", "not", "select", "then", "else"]);
