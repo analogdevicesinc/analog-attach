@@ -9,7 +9,7 @@ import {
     type Session,
     type UpdateArguments,
 } from "../../../interface/backend-interface";
-import { describe_bootstrap, run_bootstrap } from "./bootstrap_run";
+import { describe_bootstrap, describe_wiring, run_bootstrap } from "./bootstrap_run";
 import {
     format_property_value,
     get_node,
@@ -20,7 +20,7 @@ import {
     save_workfile,
 } from "./shared";
 import { ELEMENT_SEPARATOR, READONLY_KEYS, RESERVED_PREFIX, parse_property_value } from "../protocol/convert";
-import { common_ok, type CommonResponse, type ReadResponse, type SuggestResponse } from "../protocol/responses";
+import { common_ok, type CommonResponse, type ReadResponse, type SuggestResponse, type UpdateSetResponse } from "../protocol/responses";
 import { value_suggestions } from "./list";
 import { read_target } from "./read";
 
@@ -154,5 +154,9 @@ function run_update(arguments_: UpdateArguments, suggest: boolean, session: Sess
     }
 
     const text = [message, ...(ran.value === undefined ? [] : describe_bootstrap(ran.value, context.value.workfile, session.program))];
-    return answer(common_ok(message), text.join("\n"));
+    // The wiring, when the change rewired a bus: as data, for a tool to relay.
+    const wired = ran.value === undefined ? undefined : describe_wiring(ran.value, context.value.workfile);
+    const rewired = wired !== undefined && (wired.wiring.length > 0 || wired.chip_selects.length > 0);
+    const response: UpdateSetResponse = { ...common_ok(message), ...(rewired ? wired : {}) };
+    return answer(response, text.join("\n"));
 }

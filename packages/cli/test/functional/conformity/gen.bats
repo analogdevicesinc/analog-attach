@@ -66,3 +66,17 @@ setup() {
 	assert_same_status 0
 	assert_same '{ok, error_type}' '{"ok":false,"error_type":"unknown-choice"}'
 }
+
+# Description: skill install with no name lists the backend's skills in the same form on both
+# backends.
+# Steps:
+#   1. Run skill install, with --json, with no name, on each backend.
+#   2. Check both succeed with one skill each, with the same fields, not installed.
+# bats test_tags=conformity, req:SKILL-01, req:SKILL-03, id:C0030
+@test "skill install with no name lists the skills alike on both backends" {
+	conform skill install -- skill install
+	assert_same_status 0
+	assert_same '.ok' true
+	assert_same '[.skills[] | keys]'
+	assert_same '[.skills[].installed]' '[false]'
+}
