@@ -52,8 +52,6 @@ export interface ListPropertyTypeResponse extends CommonResponse {
     type: Types;
     /** @deprecated `property.description`, kept for one release. */
     description?: string;
-    /** @deprecated `property.suggestions`, kept for one release. */
-    suggestions?: Suggestion[];
 }
 
 export type ListPropertyResponse = ListPropertyNamesResponse | ListPropertyTypeResponse;

@@ -234,7 +234,7 @@ if (import.meta.vitest) {
     const { test, expect } = import.meta.vitest;
 
     const info = (type: Types, extra: Partial<PropertyInfo> = {}): PropertyInfo =>
-        ({ type, description: "", required: true, binding_path: "/b.yaml", constraints: {}, suggestions: [], ...extra });
+        ({ type, description: "", required: true, binding_path: "/b.yaml", constraints: {}, ...extra });
     const number: Types = { kind: "number", subtype: "int" };
     const irq_types: Types = { kind: "enum", options: [{ value: "IRQ_TYPE_NONE" }, { value: "IRQ_TYPE_EDGE_RISING" }] };
 

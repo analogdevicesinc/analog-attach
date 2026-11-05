@@ -52,7 +52,7 @@
           "items": {
             "allOf": [{ "$ref": "common.schema.json#/$defs/property-description" }],
             "required": ["set"],
-            "properties": { "description": false, "default": false, "suggestions": false }
+            "properties": { "description": false, "default": false }
           }
         },
         "suggestions": {
@@ -73,8 +73,7 @@
         "message": { "type": "string", "pattern": "^Type of .+$" },
         "severity": { "const": "info" },
         "type": { "$ref": "common.schema.json#/$defs/property-type", "deprecated": true, "description": "property.type, kept for one release." },
-        "description": { "type": "string", "deprecated": true, "description": "property.description, kept for one release." },
-        "suggestions": { "type": "array", "items": { "$ref": "common.schema.json#/$defs/suggestion" }, "deprecated": true, "description": "property.suggestions, kept for one release." }
+        "description": { "type": "string", "deprecated": true, "description": "property.description, kept for one release." }
       },
       "unevaluatedProperties": false
     },

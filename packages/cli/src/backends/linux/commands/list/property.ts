@@ -17,7 +17,6 @@ export function property_type_lines(property: string, info: PropertyInfo): strin
     if (constraints.default !== undefined) { lines.push(`  default: ${JSON.stringify(constraints.default, bigIntReplacer)}`); }
     if (constraints.minimum !== undefined) { lines.push(`  min: ${constraints.minimum}`); }
     if (constraints.maximum !== undefined) { lines.push(`  max: ${constraints.maximum}`); }
-    for (const suggestion of info.suggestions) { lines.push(`  ${suggestion.value}\t${suggestion.display_string}`); }
     return lines;
 }
 
@@ -38,7 +37,6 @@ export function describe_node_property(property: string, info: PropertyInfo, set
         required: info.required,
         set,
         ...(default_value === undefined ? {} : { default: default_value }),
-        ...(info.suggestions.length === 0 ? {} : { suggestions: info.suggestions }),
     };
 }
 
@@ -96,7 +94,6 @@ values the binding offers.`,
                 property: describe_node_property(property, info, set),
                 type: info.type,
                 ...(info.description === undefined ? {} : { description: info.description }),
-                ...(info.suggestions.length > 0 ? { suggestions: info.suggestions } : {}),
             },
             () => property_type_lines(property, info).join("\n"),
         );
@@ -112,10 +109,9 @@ if (import.meta.vitest) {
         required: true,
         binding_path: "/linux/adi,ad7124.yaml",
         constraints: { minimum: 0n, maximum: 15n, default: 3n },
-        suggestions: [{ value: "0 1", display_string: "AIN0, AIN1" }],
     };
 
-    test("property_type_lines — the type, each description line trimmed, the constraints, the suggestions", () => {
+    test("property_type_lines — the type, each description line trimmed, the constraints", () => {
         expect(property_type_lines("diff-channels", info)).toEqual([
             "diff-channels (required): number[2]",
             "  Two inputs.",
@@ -123,9 +119,8 @@ if (import.meta.vitest) {
             "  default: 3",
             "  min: 0",
             "  max: 15",
-            "  0 1\tAIN0, AIN1",
         ]);
-        expect(property_type_lines("label", { ...info, type: { kind: "string" }, description: undefined, required: false, constraints: { const: "x" }, suggestions: [] }))
+        expect(property_type_lines("label", { ...info, type: { kind: "string" }, description: undefined, required: false, constraints: { const: "x" } }))
             .toEqual(["label: string", "  const: \"x\""]);
     });
 
@@ -138,9 +133,8 @@ if (import.meta.vitest) {
             required: true,
             set: false,
             default: 3,
-            suggestions: info.suggestions,
         });
-        expect(describe_node_property("label", { ...info, description: undefined, constraints: {}, suggestions: [] }, true))
+        expect(describe_node_property("label", { ...info, description: undefined, constraints: {} }, true))
             .not.toHaveProperty("default");
     });
 }
