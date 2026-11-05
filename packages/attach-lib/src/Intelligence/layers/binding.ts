@@ -1,5 +1,5 @@
 import { ResolvedProperty } from "../../Bindings/ParsedBinding.js";
-import { AttachEnumType, list_cell, type Cell } from "../../Bindings/StructuralTypes.js";
+import { AttachEnumType, list_cell, matrix_cell, type Cell } from "../../Bindings/StructuralTypes.js";
 import { DeviceTree } from "../../Devicetree/index.js";
 import { insert_known_structures } from "../known_properties.js";
 import { IntelligenceLayer, PropertyContext, ValueSuggestion } from "./types.js";
@@ -66,6 +66,14 @@ export function enum_options(definition: ResolvedProperty["value"]): EnumOption[
             fallback = cell.default;
             break;
         }
+        // One row of one cell: each option is the whole value (`adi,internal-ref-microvolt = <4096000>`)
+        case "matrix": {
+            const cell = matrix_cell(definition);
+            if (cell?._t !== "enum") { return []; }
+            options = cell.enum.flatMap(v => enum_value(v, cell.enum_type) ?? []);
+            fallback = cell.default;
+            break;
+        }
         default: { return []; }
     }
     const key = typeof fallback === "string" ? `"${fallback}"` : String(fallback);
@@ -115,10 +123,11 @@ if (import.meta.vitest) {
 
     const devicetree = DeviceTree.new_from_string("/dts-v1/;\n/ { };");
     if (typeof devicetree === "string") { throw new TypeError(devicetree); }
-    const enum_cell = (values: (bigint | string | string[])[], enum_type: AttachEnumType, default_value?: string): Cell =>
+    const enum_cell = (values: (bigint | string | string[])[], enum_type: AttachEnumType, default_value?: bigint | string): Cell =>
         ({ _t: "enum", enum: values, enum_type, ...(default_value === undefined ? {} : { default: default_value }) });
     const list_of = (item: Cell, minItems: number, maxItems: number): ResolvedProperty["value"] => ({ _t: "list", item, minItems, maxItems });
     const scalar_of = (cell: Cell, default_value?: bigint): ResolvedProperty["value"] => ({ _t: "scalar", cell, ...(default_value === undefined ? {} : { default: default_value }) });
+    const matrix_of = (cell: Cell, rows: number, cells: number): ResolvedProperty["value"] => ({ _t: "matrix", maxItems: rows, rows: [{ _t: "list", item: cell, minItems: 1, maxItems: cells }] });
     const binding: PropertyContext["binding"] = {
         required_properties: ["clock-names", "spi-cpol", "vref-supply"],
         properties: [
@@ -131,6 +140,8 @@ if (import.meta.vitest) {
             { key: "adi,mode-name", value: list_of(enum_cell(["fast", "slow"], AttachEnumType.STRING, "slow"), 1, 1) },
             { key: "adi,widths", value: list_of(enum_cell([1n, 4n], AttachEnumType.NUMBER), 1, 4) },
             { key: "adi,pair", value: list_of(enum_cell(["a", "b"], AttachEnumType.STRING), 2, 2) },
+            { key: "adi,ref-microvolt", value: matrix_of(enum_cell([2_500_000n, 4_096_000n], AttachEnumType.NUMBER, 4_096_000n), 1, 1) },
+            { key: "adi,refs-microvolt", value: matrix_of(enum_cell([2_500_000n, 4_096_000n], AttachEnumType.NUMBER), 1, 2) },
             { key: "adi,clock-names", value: list_of(enum_cell([["clkin1", "s_axi_aclk"], ["clkin1", "clkin2", "s_axi_aclk"]], AttachEnumType.STRING), 1, 1) },
             { key: "interrupt-parent", value: list_of(enum_cell(["gpio"], AttachEnumType.PHANDLE), 1, 1) },
             { key: "vref-supply", value: { _t: "unknown" } },
@@ -165,6 +176,15 @@ if (import.meta.vitest) {
             [["fast"], `"fast"`],
         ]);
         expect(values("adi,widths").map(s => s.rows)).toStrictEqual([[[1n]], [[4n]]]);
+    });
+
+    test("binding_layer — a matrix of one cell (a -microvolt property) offers its enum, the binding's default first", () => {
+        expect(values("adi,ref-microvolt")).toStrictEqual([
+            { rows: [[4_096_000n]], display: "4096000 — the binding's default", source: "binding" },
+            { rows: [[2_500_000n]], display: "2500000", source: "binding" },
+        ]);
+        // a row of several cells is no whole value
+        expect(values("adi,refs-microvolt")).toStrictEqual([]);
     });
 
     test("binding_layer — an option that is a whole list of strings is suggested as those strings", () => {

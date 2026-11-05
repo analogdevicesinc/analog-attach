@@ -162,15 +162,20 @@ function to_options(values: unknown): EnumOption[] {
     return (Array.isArray(values) ? values : [values]).map(value => to_option(value)).filter((option): option is EnumOption => option !== undefined);
 }
 
-/** The single default a cell can carry; a list-valued default (`[]`, `["gpio"]`) is reduced to its only entry. */
+/**
+ * The single default a cell can carry; a list-valued default (`[]`, `["gpio"]`) is reduced to its only entry, a
+ * matrix's (`[[4096000]]`) to its only cell.
+ */
 function to_default(value: unknown): bigint | string | undefined {
-    const single = Array.isArray(value) ? (value.length === 1 ? value[0] : undefined) : value;
-    return typeof single === "string" ? single : to_bigint(single);
+    if (Array.isArray(value)) { return value.length === 1 ? to_default(value[0]) : undefined; }
+    return typeof value === "string" ? value : to_bigint(value);
 }
 
+/** An enum cell, with the default when it is one of the options (a branch can narrow the enum past it). */
 function enum_cell(options: unknown, default_value?: unknown): Cell {
     const entries = to_options(options);
-    const default_option = to_default(default_value);
+    const fallback = to_default(default_value);
+    const default_option = entries.includes(fallback as EnumOption) ? fallback : undefined;
     return {
         _t: "enum",
         enum: entries,
@@ -344,7 +349,9 @@ function narrow_matrix(object: any, type: string): AttachType {
     const items = Array.isArray(object.items) ? object.items[0] : object.items;
     // The description of the first row says nothing of the others, nor does the row's type (see `row_cells`)
     const { description: _description, [DT_TYPE]: _row_type, ...row_schema } = typeof items === "object" && items !== null ? items : {} as Record<string, unknown>;
-    const row = narrow_array_object({ ...row_schema, type: "array" });
+    // The default of a matrix of one cell (`-microvolt`'s `default: 4096000`) is that cell's
+    const one_cell = object.maxItems === 1 && row_schema.maxItems === 1 && "default" in object;
+    const row = narrow_array_object({ ...row_schema, type: "array", ...(one_cell ? { default: object.default } : {}) });
 
     return described(object, {
         _t: "matrix",
@@ -634,7 +641,7 @@ function narrow_array_object(object: any, name?: string): AttachType & { _t: "li
 
     // Ex. simple compatible definition
     if (items_array && items.length === 1 && "enum" in items[0]) {
-        return list(enum_cell(items[0].enum));
+        return list(enum_cell(items[0].enum, object.default));
     }
 
     // Ex. simple compatible definition with only one value
@@ -660,7 +667,7 @@ function narrow_array_object(object: any, name?: string): AttachType & { _t: "li
     }
 
     if ("items" in object && !items_array && "enum" in items) {
-        return list(enum_cell(items.enum));
+        return list(enum_cell(items.enum, object.default));
     }
 
     if ("items" in object && !items_array && "const" in items) {
@@ -766,6 +773,37 @@ if (import.meta.vitest) {
     test("a list property keeps the default it gives for its number", () => {
         expect(translated({ "spi-cs-inactive-delay-ns": { type: "array", items: [{ minimum: 16_000, type: "integer" }], default: 16_000, minItems: 1, maxItems: 1 } })["spi-cs-inactive-delay-ns"])
             .toStrictEqual({ _t: "list", item: { _t: "number", minimum: 16_000n, default: 16_000n }, minItems: 1, maxItems: 1 });
+    });
+
+    // A one-value string property, after string_to_array (ad7173's `adi,reference-select`)
+    const enum_of = (items: unknown, default_value: unknown) =>
+        ({ type: "array", dtType: "string", minItems: 1, maxItems: 1, items, default: default_value });
+    // A one-cell `-microvolt` property, after unit_suffix (ad7949's `adi,internal-ref-microvolt`), and its cell
+    const microvolt = (default_value: unknown, cells = 1) => ({
+        dtType: "int32-matrix", type: "array", minItems: 1, maxItems: 1, default: default_value,
+        items: [{ type: "array", minItems: 1, maxItems: cells, items: [{ enum: [2_500_000, 4_096_000] }] }],
+    });
+    const microvolt_cell = (default_value?: bigint) => ({ _t: "enum", enum: [2_500_000n, 4_096_000n], enum_type: "number", ...(default_value === undefined ? {} : { default: default_value }) });
+
+    test("a string enum keeps its default, which string_to_array leaves beside the items it moves the enum to", () => {
+        const { listed, single, narrowed } = translated({
+            listed: enum_of([{ enum: ["vref", "refout-avss"] }], "refout-avss"),
+            single: enum_of({ enum: ["vref", "refout-avss"] }, "refout-avss"),
+            // a branch that narrows the enum past the default (ad7172-4 has no refout-avss)
+            narrowed: enum_of([{ enum: ["vref", "avdd"] }], "refout-avss"),
+        });
+        const cell = { _t: "enum", enum: ["vref", "refout-avss"], enum_type: "string", default: "refout-avss" };
+        expect(listed).toStrictEqual({ _t: "list", item: cell, minItems: 1, maxItems: 1 });
+        expect(single).toStrictEqual({ _t: "list", item: cell, minItems: 1, maxItems: 1 });
+        expect(narrowed).toStrictEqual({ _t: "list", item: { _t: "enum", enum: ["vref", "avdd"], enum_type: "string" }, minItems: 1, maxItems: 1 });
+    });
+
+    test("a matrix of one cell gives that cell the default, which unit_suffix leaves beside the rows", () => {
+        const { bare, rows, wide } = translated({ bare: microvolt(4_096_000), rows: microvolt([[4_096_000]]), wide: microvolt(4_096_000, 2) });
+        expect(bare).toStrictEqual({ _t: "matrix", minItems: 1, maxItems: 1, rows: [{ _t: "list", item: microvolt_cell(4_096_000n), minItems: 1, maxItems: 1 }] });
+        expect(rows).toStrictEqual(bare);
+        // a row of several cells has no one cell the default is
+        expect(wide).toStrictEqual({ _t: "matrix", minItems: 1, maxItems: 1, rows: [{ _t: "list", item: microvolt_cell(), minItems: 1, maxItems: 2 }] });
     });
 
     const compatible_options = (schema: Record<string, unknown>) => {
