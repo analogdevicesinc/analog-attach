@@ -29,9 +29,6 @@ export function existing_overlay(current: Settings | undefined): string | undefi
     return current?.workfile !== undefined && fs.statSync(current.workfile, { throwIfNoEntry: false })?.isFile() === true ? current.workfile : undefined;
 }
 
-/** What `init` does about the overlay (keep the configured file, or create one), and what the setup run names. */
-export type OverlayChoice = { kind: "keep"; path: string } | { kind: "create"; filename: string };
-
 /** A workfile name as the user typed it: `.dtso` is added when missing. */
 export function workfile_filename(name: string): string {
     return name.endsWith(".dtso") ? name : `${name}.dtso`;

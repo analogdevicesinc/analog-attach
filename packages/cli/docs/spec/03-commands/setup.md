@@ -3,8 +3,9 @@
 A bare `analog-attach` on a terminal sets up the project: it asks which
 backend the project targets when none is set, then runs the backend's setup.
 Where the backend is linux, that asks for the Linux tree, the base
-devicetree and the workfile's name, saves them, builds the binding caches,
-and then runs `init`, which creates the workfile (`init.md` INIT-018).
+devicetree and the workfile's name, each only when it isn't set and valid,
+saving each answer at once, builds the binding caches, and then runs `init`,
+which keeps or creates the workfile (`init.md` INIT-018).
 Where the backend is noos, it asks where capi is, which module repositories
 to use and which board, saving each answer at once, and offers to run
 `init` (§9). It isn't a command: it has no name, no options and no JSON mode.
@@ -25,7 +26,8 @@ Grammar: an empty `command-line` in `01-grammar.abnf` (GRM-003, GRM-005).
 | Term | Meaning |
 |---|---|
 | Checkbox question | A question with a list of choices, each checked or not: ↑ and ↓ move, Space checks, `a` checks all, `i` inverts, Enter submits. |
-| Plan | Where the backend is linux: the Linux tree, the devicetree and the workfile choice (*keep* the configured path, or a new file name) that the setup run sets up. |
+| Step | Where the backend is linux: the Linux tree, the devicetree or the workfile, asked for only when its setting is unset or not valid (SETUP-055). |
+| Ready | Where the backend is linux: the run ends with `init` (SETUP-034). |
 | Current settings | The effective values of the settings (COM-124), the invalid ones left out. |
 | List question | A question with a list of choices: ↑ and ↓ move the highlight, Enter picks it. The highlight starts on the first choice, or on the one named as the default. |
 | Line question | A question answered with a line of text, with an Enter default shown in parentheses when it has one; Tab completes file system paths. A refused answer is shown under the prompt, and the question stays. |
@@ -95,11 +97,14 @@ the CLI shall write `Cancelled.` to standard output and exit with status
 
 Where the backend is linux:
 
-**SETUP-030** The CLI shall first write `linux`, `devicetree` and `workfile`
-to the `linux` section of the local settings file (COM-129), `workfile` being the kept path or the
-new file name made absolute against the CWD, then write `Saved linux,
-devicetree and workfile to <file>.` and an empty line, `<file>` relative to
-the CWD when it is under it (`.analog-attach/config.json`), else absolute.
+**SETUP-030** When a step is answered, the CLI shall write the answer at once
+to the `linux` section of the local settings file (COM-129), through the
+checks of `config`, `workfile` being the new file name made absolute against
+the CWD, then write `✓ <key> = <value>` and an empty line. When a step is
+skipped (SETUP-055, SETUP-093), it shall write `✓ <key>: <value>`; a run of
+skipped steps is followed by an empty line before the next step's questions,
+or after the last step. If a write is refused, then the CLI shall report it
+as an input error (COM-041) and stop; what was written before stays.
 
 **SETUP-031** *Withdrawn.* (The settings were loaded again, strictly, after
 saving, and an unknown key refused. Unknown keys are now kept and ignored,
@@ -115,25 +120,25 @@ the workfile.`. `<reason>` is the configuration errors as COM-072 words them,
 or `Compiling binding schemas failed:` followed by a newline and the tool's
 error output.
 
-**SETUP-034** The CLI shall not itself create the workfile: when the
-workfile's file exists, or can be created (INIT-019), it shall run `init`
+**SETUP-034** The CLI shall not itself create the workfile. The run is ready
+when the workfile's file exists, when step 3 named a new one (SETUP-092), or
+when the user answered yes to SETUP-093's question; then it shall run `init`
 (SETUP-041), which keeps or creates it. Otherwise it shall create nothing.
 
-**SETUP-035** The CLI shall carry out SETUP-030 to SETUP-034 in that order
-and stop at the first failure. What was written before the failure stays: a
-failed cache build leaves `linux`, `devicetree` and `workfile` saved. (Open
-issue S-3.)
+**SETUP-035** The CLI shall run the steps (§8), then SETUP-032 to SETUP-034,
+in that order, and stop at the first failure. What was written before the
+failure stays: a failed cache build leaves the settings the steps saved.
 
 **SETUP-036** The setup run shall not change `overlay-syntax`,
 `preprocess-command` or the `deploy-*` fields, and shall not run `add`.
 
 ## 7. Result
 
-**SETUP-041** Where the backend is linux, when the workfile's file exists or
-can be created, the CLI shall write an empty line when it built the caches,
+**SETUP-041** Where the backend is linux, when the run is ready (SETUP-034),
+the CLI shall write an empty line when it built the caches,
 then run `init` (`init.md`) and end with its result: `init`'s summary
 (INIT-041), its `Overlay:` line ending in `(created)` or `(kept)`, and its
-exit status. When the file can't be created, the CLI shall instead write the
+exit status. When it isn't ready, the CLI shall instead write the
 summary with the heading `Workspace configured`, the `Overlay:` line ending
 in `(not created yet)`, the line `  Caches:      built now|current` after it,
 and next steps that start with `  1. Create the workfile:` and
@@ -149,21 +154,32 @@ Where the backend is linux:
 
 ### 8.1 The questions
 
-**SETUP-050** The CLI shall ask for the Linux tree (step 1), the devicetree
-(step 2) and the workfile (step 3), in that order.
+**SETUP-050** The CLI shall take the Linux tree (step 1), the devicetree
+(step 2) and the workfile (step 3), in that order, asking only for what
+SETUP-055 and SETUP-093 leave.
 
 **SETUP-051** Before the first question, the CLI shall write an empty line,
 `analog-attach setup`, a line of 19 `=`, an empty line, `This sets up the
 workspace: a Linux kernel source tree, a base device tree and the overlay
-file.` and an empty line. After each step it shall write an empty line.
+file.` and an empty line. The lines between the steps are SETUP-030's.
 
-**SETUP-052** In each step, the configured value is the Enter default.
+**SETUP-052** *Withdrawn.* (Each step was asked with the configured value
+as its Enter default; a step whose setting is set and valid is now skipped,
+SETUP-055.)
 
 **SETUP-053** At the line questions, Tab shall complete file system paths.
 
 **SETUP-054** When a question of the steps is stopped (Ctrl-C or Ctrl-D),
-the CLI shall write `Setup cancelled.` to standard output and exit with
-status 130, without writing anything (COM-060).
+the CLI shall write `Stopped. What was answered is saved; run analog-attach
+again to go on.` to standard output and exit with status 130, as the noos
+setup does (SETUP-503). The settings already written stay, so the next run
+starts at the first step still unset (open issue S-6).
+
+**SETUP-055** The CLI shall skip step 1 when `linux` is set and is a Linux
+tree (COM-128), and step 2 when `devicetree` is set and is a file. When the
+setting is set but isn't, the CLI shall write `<key> is <value>, which is not
+a Linux source tree.`, `…, which does not exist.` or `…, which is not a
+file.` (yellow) and an empty line, and ask the step.
 
 ### 8.2 Step 1: the Linux tree
 
@@ -180,17 +196,15 @@ the home directory and checks their subdirectories, so a tree is found up to
 when it has 10 trees or 5 seconds have passed, so the last directory read may
 take the count past 10.
 
-**SETUP-061** When trees are found or one is configured, the CLI shall ask
-the list question `Linux source tree`: the trees, the configured one first
-and marked ` (current)`, then `Type a path`. Enter takes the first. `Type a
+**SETUP-061** When trees are found, the CLI shall ask the list question
+`Linux source tree`: the trees, then `Type a path`. Enter takes the first. `Type a
 path` asks the line question `Linux source path`: an empty answer is refused
 with `Type a path`; the answer is expanded (a leading `~` or `~/` is the home
 directory) and made absolute against the CWD; when it doesn't exist it is
 refused with `Path does not exist: <path>`, and when it isn't a Linux tree
-(COM-128) with `no <dir>/ under <path> (not a Linux source tree)`. The choice
-is confirmed with `Selected: <path>`.
+(COM-128) with `no <dir>/ under <path> (not a Linux source tree)`.
 
-**SETUP-062** When no tree is found and none is configured, the CLI shall
+**SETUP-062** When no tree is found, the CLI shall
 write `No Linux source trees found under ~.`, an empty line, `Tab-complete
 available. Path must contain Documentation/devicetree/bindings/ and
 include/.`, and ask the line question `Linux source path` of SETUP-061.
@@ -199,7 +213,7 @@ include/.`, and ask the line question `Linux source path` of SETUP-061.
 
 **SETUP-070** The CLI shall write `Step 2: Base device tree (context)` and
 an empty line, and ask the list question `Choose how to select the base .dts
-file`: `Keep <current>` (when one is configured), `Search in the Linux tree`,
+file`: `Search in the Linux tree`,
 `Enter path manually`, and `Export from remote device (coming soon)`, which
 can't be picked (shown as `Not yet available`). Enter takes the first.
 
@@ -218,8 +232,8 @@ existing path ending in `.dts`: an empty answer is refused with `Type a
 path`, and the others with `Path does not exist: <path>` and `File must have
 a .dts extension.`. (Open issue S-2.)
 
-**SETUP-073** A file chosen by *Search* or *Enter path manually* is confirmed
-with `Selected: <path>`, `<path>` absolute. *Keep* writes no confirmation.
+**SETUP-073** *Withdrawn.* (A chosen file was confirmed with `Selected:
+<path>`; the confirmation is now SETUP-030's `✓ devicetree = <path>`.)
 
 ### 8.4 The `.dts` search
 
@@ -234,24 +248,29 @@ architecture question again (SETUP-071).
 
 ### 8.5 Step 3: the workfile
 
-**SETUP-090** The CLI shall write `Step 3: Overlay workfile`, an empty line,
+**SETUP-090** When `workfile` is unset, the CLI shall write `Step 3: Overlay workfile`, an empty line,
 `The workfile is the overlay file your changes are written to.` and an empty
 line.
 
-**SETUP-091** When a workfile is configured, whether its file exists or not,
-the CLI shall ask the line question `Overlay: [k]eep <path> / [n]ew`, Enter
-default `k`. `k` or `keep` (any case) keep it; `n` or `new` go on to
-SETUP-092; anything else is refused with `Please enter k to keep it or n for
-a new one.`.
+**SETUP-091** *Withdrawn.* (A configured workfile was kept or replaced with
+`Overlay: [k]eep <path> / [n]ew`; it is now kept, SETUP-093, and `config
+workfile` names another.)
 
-**SETUP-092** Otherwise, or after `n`, the CLI shall ask the line question
+**SETUP-092** After SETUP-090, the CLI shall ask the line question
 `Overlay file name`, Enter default the next free name of `init.md` INIT-018.
 The answer is a file name relative to the CWD, with `.dtso` appended unless it
 already ends with it. When that file exists, the answer is refused with
 `<file> already exists; use it with 'config workfile <file>' or pick another
 name`, and when its directory doesn't exist with `<directory> is not a
 directory`, `<directory>` absolute. The name is only saved (SETUP-030);
-`init` creates the file.
+`init` creates the file, and the run is ready.
+
+**SETUP-093** When `workfile` is set, the CLI shall skip step 3, writing `✓
+workfile: <path>`. When its file exists, the run is ready. When it doesn't
+and can be created (INIT-019), the CLI shall ask the confirmation `Create
+<file>?`, Enter default yes, `<file>` relative to the CWD when it is under
+it: yes makes the run ready, no doesn't. When it can't be created, the CLI
+shall ask nothing, and the run isn't ready.
 
 ## 9. Where the backend is noos
 
@@ -351,29 +370,28 @@ shall exit with status 0.
 
 **S-1. Problems of the settings files go unreported.** With an unknown key
 or an invalid value (COM-123, COM-132, COM-133), the setup run says nothing
-(SETUP-012): the unknown key stays in the file, and an invalid value has no
-Enter default. (The run used to refuse after saving, SETUP-031.)
+(SETUP-012): the unknown key stays in the file, and an invalid value is asked
+for as if unset. (The run used to refuse after saving, SETUP-031.)
 
 **S-2. The `.dts` checks differ by path.** `config devicetree` only checks
 that the path exists (`config.md` CONFIG-104), the configured value must be a
 file with any extension (COM-127), and the manual entry must end in `.dts` but
 may be a directory (SETUP-072).
 
-**S-3. A refusal after SETUP-030 doesn't say what was saved,** although
-`linux`, `devicetree` and `workfile` were written.
+**S-3.** *Fixed.* (A refusal after saving didn't say what was saved; each
+saved answer is now written `✓ <key> = <value>`, SETUP-030.)
 
 **S-4.** *Fixed.* (The line-based `.dts` filter for runs off a terminal was
 dead code; the search question replaced both filters.)
 
 **S-5. The two cancellations are worded differently.** Stopping the backend
-question writes `Cancelled.` (SETUP-023), stopping a question of the Linux
-steps `Setup cancelled.` (SETUP-054).
+question writes `Cancelled.` (SETUP-023), stopping a question of a backend's
+steps `Stopped. What was answered is saved; …` (SETUP-054, SETUP-503).
 
-**S-6. Stopping the no-OS setup exits 130 after saving.** SETUP-503 exits
-with status 130, which COM-060 keeps for a question stopped before anything
-was written, although the settings answered before stay written (`✓
-capi-path = …` was printed). The Linux setup saves nothing before its last
-question. A fix would be to exit 0 once something is saved, as the add
+**S-6. Stopping a setup exits 130 after saving.** SETUP-503 and SETUP-054
+exit with status 130, which COM-060 keeps for a question stopped before
+anything was written, although the settings answered before stay written
+(`✓ capi-path = …`, `✓ linux = …` was printed). A fix would be to exit 0 once something is saved, as the add
 interview does (`add.md` ADD-536).
 
 ## 11. Examples
@@ -388,7 +406,15 @@ This sets up the workspace: a Linux kernel source tree, a base device tree and t
 
 Step 1: Linux kernel source tree
 …
-Saved linux, devicetree and workfile to .analog-attach/config.json.
+✓ linux = /home/u/linux_rpi
+
+Step 2: Base device tree (context)
+…
+✓ devicetree = /home/u/linux_rpi/arch/arm/boot/dts/broadcom/bcm2711-rpi-4-b.dts
+
+Step 3: Overlay workfile
+…
+✓ workfile = /work/overlay.dtso
 
 Indexing device bindings and compiling binding schemas...                  (stderr)
 Indexed 23309 compatibles from 5196 bindings and compiled binding schemas in 5.1s   (stderr)

@@ -486,7 +486,8 @@ describe("the Linux backend through main", () => {
         const result = await run([], { prompter, registry: setup_registry });
         expect(result.code).toBe(0);
         expect(prompter.asked).toEqual(["Linux source tree", "Choose how to select the base .dts file", "Path to .dts file", "Overlay file name"]);
-        expect(result.stdout).toContain("Saved linux, devicetree and workfile to .analog-attach/config.json.\n");
+        expect(result.stdout).toContain(`✓ linux = ${linux}\n`);
+        expect(result.stdout).toContain(`✓ workfile = ${path.join(project, "board.dtso")}\n`);
         expect(result.stdout).toContain(`Overlay:     ${path.join(project, "board.dtso")} (created)`);
         expect(result.stdout).not.toContain("Create the workfile:");
         expect(fs.readFileSync(path.join(project, "board.dtso"), "utf8")).toContain("/plugin/;");
@@ -495,13 +496,13 @@ describe("the Linux backend through main", () => {
         });
     });
 
-    test("the bare run: Ctrl-C in the setup saves nothing, exit 130; a settings file that isn't JSON stops it before a question, exit 2", async () => {
+    test("the bare run: Ctrl-C in the setup keeps what was answered, exit 130; a settings file that isn't JSON stops it before a question, exit 2", async () => {
         write_settings({});
         const prompter = scripted([]);
         const setup_registry: Registry = { linux: () => import("./index").then(module => ({ ...module.backend, setup: create_setup({ home: base }) })) };
         const stopped = await run([], { prompter, registry: setup_registry });
         expect(stopped.code).toBe(130);
-        expect(stopped.stdout).toMatch(/Setup cancelled\.\n$/);
+        expect(stopped.stdout).toMatch(/Stopped\. What was answered is saved; run analog-attach again to go on\.\n$/);
         expect(JSON.parse(fs.readFileSync(path.join(project, ".analog-attach", "config.json"), "utf8"))).toEqual({ backend: "linux", linux: {} });
 
         fs.writeFileSync(path.join(project, ".analog-attach", "config.json"), "{ nope");
