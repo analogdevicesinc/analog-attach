@@ -9,6 +9,7 @@ import {
     matrix_cell,
     DeviceTree,
     DeviceTreeOverlay,
+    gpio_pick,
     IntelligenceStack,
     node_data_json,
     expand_pattern,
@@ -17,6 +18,7 @@ import {
     type AttachType,
     type Cell,
     type DTNode,
+    type List,
     type PatternPropertyRule,
     type PropertyPatternRule,
     type ValueSuggestion,
@@ -300,7 +302,7 @@ export interface PropertyInfo {
     constraints: { const?: unknown; default?: unknown; minimum?: number | bigint; maximum?: number | bigint };
     /** For a phandle, the labels of the nodes it can name, enabled or not: candidates, not a constraint. */
     phandle_options?: string[];
-    /** For a `*-gpios` property, the rows (controller + cells) the binding gives it: `max_rows` is open when the binding sets no upper bound. */
+    /** For a `*-gpios` property with no controller yet, the rows (controller + cells) its type takes (`gpio_pick`): `max_rows` is open when the binding sets no upper bound. */
     gpio_rows?: { min_rows: number; max_rows?: number };
 }
 
@@ -326,6 +328,9 @@ export function property_info(
     }
 
     const constraints = type_constraints(property_definition.value);
+    // A gpio property with no controller yet: the controllers are its options, whatever the rows its type has.
+    const pick = gpio_pick(property_definition);
+    const phandle_options = pick?.controllers ?? constraints.phandle_options;
     return {
         ok: true,
         info: {
@@ -339,8 +344,8 @@ export function property_info(
                 ...(constraints.minimum === undefined ? {} : { minimum: constraints.minimum }),
                 ...(constraints.maximum === undefined ? {} : { maximum: constraints.maximum }),
             },
-            ...(constraints.phandle_options === undefined ? {} : { phandle_options: constraints.phandle_options }),
-            ...(property_definition.gpio_rows === undefined ? {} : { gpio_rows: property_definition.gpio_rows }),
+            ...(phandle_options === undefined ? {} : { phandle_options }),
+            ...(pick === undefined ? {} : { gpio_rows: { min_rows: pick.min_rows, ...(pick.max_rows === undefined ? {} : { max_rows: pick.max_rows }) } }),
         },
     };
 }
@@ -519,9 +524,10 @@ if (import.meta.vitest) {
         expect(result.ok && result.info.phandle_options).toEqual(["gpio", "gicv2", "aon_intr"]);
     });
 
-    test("property_info — a gpio property carries the rows the binding gives it", () => {
-        const value: AttachType = { _t: "list", item: { _t: "enum", enum: ["gpio", "expgpio"], enum_type: AttachEnumType.PHANDLE }, minItems: 1, maxItems: 1, description: "" };
-        const properties = [{ key: "ctrl-gpios", value, gpio_rows: { min_rows: 6, max_rows: 6 } }];
+    test("property_info — a gpio property with no controller carries the rows its type has, and the controllers", () => {
+        const row: List = { _t: "list", item: [{ _t: "enum", enum: ["gpio", "expgpio"], enum_type: AttachEnumType.PHANDLE }], minItems: 1, maxItems: 1 };
+        const value: AttachType = { _t: "matrix", rows: [row], minItems: 6, maxItems: 6, description: "" };
+        const properties = [{ key: "ctrl-gpios", value }];
         const binding: NodeBinding = {
             properties,
             required_properties: ["ctrl-gpios"],

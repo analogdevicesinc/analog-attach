@@ -35,10 +35,6 @@
             }
         },
         {
-            "gpio_rows": {
-                "max_rows": 1,
-                "min_rows": 1
-            },
             "key": "gpio",
             "value": {
                 "_t": "list",
@@ -56,10 +52,6 @@
             }
         },
         {
-            "gpio_rows": {
-                "max_rows": 1,
-                "min_rows": 1
-            },
             "key": "gpios",
             "value": {
                 "_t": "list",

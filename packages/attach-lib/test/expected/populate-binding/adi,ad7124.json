@@ -255,10 +255,6 @@
             }
         },
         {
-            "gpio_rows": {
-                "max_rows": 1,
-                "min_rows": 1
-            },
             "key": "rdy-gpios",
             "value": {
                 "_t": "list",
