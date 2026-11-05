@@ -357,7 +357,7 @@ too. With `&gpio { pins { brcm,pins = <4>; }; };` followed by `&gpio { reg =
 fragment it gives `reg overlaps gpiomem at 0x7e200000; If gpio@7e200000
 replaces it: disable /soc/gpiomem`. Imported overlays often have several
 fragments for one node. A fix would be to read the node as all its overlay
-fragments together (`merged_overlay_node`), as `read` and `update` do.
+fragments together (`effective_node`), as `read` and `update` do.
 
 **V-12. The node count includes the external nodes.** `<n> nodes checked`
 (VALIDATE-502) counts every node the workfile has, external ones too, which
