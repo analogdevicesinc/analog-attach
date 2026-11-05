@@ -431,10 +431,12 @@
                 },
                 "adi,buffered-negative": {
                     "description": "Enable buffered mode for negative input.",
+                    "dtType": "flag",
                     "type": "boolean"
                 },
                 "adi,buffered-positive": {
                     "description": "Enable buffered mode for positive input.",
+                    "dtType": "flag",
                     "type": "boolean"
                 },
                 "adi,burnout-current-nanoamp": {
@@ -643,6 +645,7 @@
         },
         "adi,bipolar": {
             "description": "Specify if the device should be used in bipolar mode.",
+            "dtType": "flag",
             "type": "boolean"
         },
         "adi,ext-clk-freq-hz": {

@@ -427,8 +427,12 @@
             "minItems": 1,
             "type": "array"
         },
-        "spi-cpha": true,
-        "spi-cpol": true,
+        "spi-cpha": {
+            "dtType": "flag"
+        },
+        "spi-cpol": {
+            "dtType": "flag"
+        },
         "spi-max-frequency": {
             "description": "Chip's max frequency, as specified in its datasheet, is 2Mhz. But a 600ns\ndelay is expected between the application of a logic LO to CS and the\napplication of SCLK, as also specified. And since the delay is not\nimplemented in the spi code, to satisfy it, SCLK's period should be at\nmost 2 * 600ns, so the max frequency should be 1 / (2 * 6e-7), which gives\nroughly 830000Hz.\n",
             "dtType": "uint32",
