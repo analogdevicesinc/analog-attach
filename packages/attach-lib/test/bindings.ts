@@ -2,10 +2,14 @@ import path from 'node:path';
 
 import type { SchemaPaths } from 'attach-lib';
 
-/** The trees the bindings are resolved against: the `test/linux` and `test/dt-schema` checkouts. */
+/**
+ * The trees the bindings are resolved against: the `test/linux` and `test/dt-schema` checkouts, and the processed schema
+ * of the Linux tree that `vitest.globalSetup.ts` builds, as the CLI resolves them.
+ */
 export const schema_paths: SchemaPaths = {
     linux: path.resolve(__dirname, 'linux'),
     dt_schema: path.resolve(__dirname, 'dt-schema'),
+    processed_schema: path.resolve(__dirname, 'linux/Documentation/devicetree/bindings/processed-schema.json'),
 };
 
 /** The path of a binding in the Linux tree, from `Documentation/devicetree/bindings`. */

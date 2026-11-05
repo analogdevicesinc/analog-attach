@@ -468,9 +468,15 @@
             "minItems": 1,
             "type": "array"
         },
-        "spi-3wire": true,
-        "spi-cpha": true,
-        "spi-cpol": true
+        "spi-3wire": {
+            "dtType": "flag"
+        },
+        "spi-cpha": {
+            "dtType": "flag"
+        },
+        "spi-cpol": {
+            "dtType": "flag"
+        }
     },
     "required": [
         "compatible",

@@ -582,8 +582,12 @@
             "minItems": 1,
             "type": "array"
         },
-        "spi-cpha": true,
-        "spi-cpol": true,
+        "spi-cpha": {
+            "dtType": "flag"
+        },
+        "spi-cpol": {
+            "dtType": "flag"
+        },
         "spi-cs-inactive-delay-ns": {
             "default": 16000,
             "description": "Delay in nanoseconds to be introduced by the controller after CS is de-asserted.",

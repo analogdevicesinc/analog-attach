@@ -57,13 +57,13 @@
         {
             "key": "spi-cpol",
             "value": {
-                "_t": "unknown"
+                "_t": "flag"
             }
         },
         {
             "key": "spi-cpha",
             "value": {
-                "_t": "unknown"
+                "_t": "flag"
             }
         },
         {
