@@ -3,10 +3,9 @@ import { number_property } from "./nodes/Access.js";
 import { NodeBuilder } from "./build/NodeBuilder.js";
 import { PropertyBuilder } from "./build/PropertyBuilder.js";
 import { choose_label, is_valid_node_name, is_valid_unit_address } from "./nodes/Labels.js";
+import { address_cells_of, ensure_address_cells } from "./AddressCells.js";
 import {
-    address_cells_of,
     encode_reg_address,
-    ensure_address_cells,
     format_unit_address,
     next_free_unit_address,
     parse_unit_address,

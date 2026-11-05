@@ -8,6 +8,7 @@ export { DeviceTreeOverlay, type FoundNodeResult } from './DeviceTreeOverlay.js'
 export * from './nodes/UnitAddress.js';
 export * from './nodes/Labels.js';
 export * from './nodes/Access.js';
+export * from './AddressCells.js';
 export * from './AddNode.js';
 export * from './checks/RegConflicts.js';
 export * from './checks/References.js';
