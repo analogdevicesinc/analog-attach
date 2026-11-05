@@ -1,5 +1,5 @@
-import { INodeBuilderBase } from "./NodeBuilder";
-import { PropertyBuilder } from "./PropertyBuilder";
+import { INodeBuilderBase } from "./NodeBuilder.js";
+import { PropertyBuilder } from "./PropertyBuilder.js";
 
 import {
     print_dts,
@@ -11,11 +11,11 @@ import {
     get_full_node_name,
     DTProperty,
     format_parse_error,
-} from "./Parser";
+} from "./Parser/index.js";
 
-import { Result } from "../result";
-import { UnitAddr } from "./Types";
-import { Stream } from "./Stream";
+import { Result } from "../result.js";
+import { UnitAddr } from "./Types.js";
+import { Stream } from "./Stream.js";
 import { type LocatedNode, type NodeTarget, normalize_target, parent_path as access_parent_path, has_compatible, walk_nodes } from "./Access.js";
 
 function format_unit_addr_part(addr: UnitAddr): string {

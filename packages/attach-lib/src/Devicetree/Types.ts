@@ -1,5 +1,5 @@
-import { Bits, CellArrayElement, DTCellArray, DTNode } from "./Parser";
-import { assert_never } from "./TypeUtilities";
+import { Bits, CellArrayElement, DTCellArray, DTNode } from "./Parser/index.js";
+import { assert_never } from "./TypeUtilities.js";
 
 export type UnitAddr = { value: bigint; repr: "hex" | "dec" };
 
