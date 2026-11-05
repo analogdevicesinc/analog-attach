@@ -15,7 +15,6 @@ export default defineConfig({
         lib: {
             entry: {
                 index: "src/index.ts",
-                browser: "src/browser.ts",
             },
             name: "attach-lib",
             formats: ["es", "cjs"],
