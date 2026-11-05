@@ -649,8 +649,13 @@ inheritance walk.
 ### SPI vendor peripheral-props filtering
 
 `VendorPeripheralFilter.ts` in the lib removes vendor-specific SPI peripheral properties (pl022,
-cdns, fsl, nvidia, st) unless they match the parent controller's compatible. It is applied at
-binding parse time.
+cdns, fsl, nvidia, st) unless they match the parent controller's compatible. Under a parent whose
+name isn't an SPI controller's (`spi-controller.yaml`'s `$nodename`), it also removes the SPI
+peripheral properties the binding doesn't require, as the Linux tree's `spi/` schemas name them
+(`load_spi_peripherals`). It is applied at binding parse time and to every narrowed binding, when
+a controller is given: `resolve_target_binding` passes the parent's compatibles and full name
+(`WriteTarget.parent_full_name`). `update`'s own resolution passes none, so it writes a hidden
+property without a warning (spec LIST-038).
 
 ## no-OS backend
 

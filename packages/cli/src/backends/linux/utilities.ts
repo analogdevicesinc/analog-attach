@@ -382,6 +382,8 @@ export interface WriteTarget {
     binding_parent: DTNode | undefined;
     parent_name: string;
     parent_compatibles: string[];
+    /** The full name of the node `parent_compatibles` come from (`i2c@7e804000`), when there is one. */
+    parent_full_name: string | undefined;
 }
 
 export function resolve_write_target(
@@ -411,8 +413,12 @@ export function resolve_write_target(
     }
 
     const node_path = found?.node_path ?? (base_located === undefined ? "" : base_located.path);
-    const parent_compats = effective_parent_compatibles(binding_parent, node_path, base_dt);
-    return { target_reference, found, is_base_target, binding_node, binding_parent, parent_name, parent_compatibles: parent_compats };
+    const parent = effective_parent(binding_parent, node_path, base_dt);
+    return {
+        target_reference, found, is_base_target, binding_node, binding_parent, parent_name,
+        parent_compatibles: parent === undefined ? [] : node_compatibles(parent),
+        parent_full_name: parent === undefined ? undefined : get_full_node_name(parent),
+    };
 }
 
 if (import.meta.vitest) {
@@ -666,20 +672,27 @@ export function bus_kind(node: DTNode): BusKind | undefined {
     return undefined;
 }
 
+/**
+ * The parent that says what a node sits under: `parent_node` when it has a compatible, else the base node at the
+ * parent's path (a fragment's `__overlay__` stands for the node it targets).
+ */
+export function effective_parent(
+    parent_node: DTNode | undefined,
+    node_path: string,
+    base_dt: DeviceTree,
+): DTNode | undefined {
+    if (parent_node !== undefined && node_compatibles(parent_node).length > 0) { return parent_node; }
+    const parent_path = node_path.includes("/")
+        ? node_path.slice(0, node_path.lastIndexOf("/")) || "/"
+        : undefined;
+    return parent_path === undefined ? undefined : base_dt.node_at(parent_path);
+}
+
 export function effective_parent_compatibles(
     parent_node: DTNode | undefined,
     node_path: string,
     base_dt: DeviceTree,
 ): string[] {
-    if (parent_node !== undefined) {
-        const compatibles = node_compatibles(parent_node);
-        if (compatibles.length > 0) { return compatibles; }
-    }
-    const parent_path = node_path.includes("/")
-        ? node_path.slice(0, node_path.lastIndexOf("/")) || "/"
-        : undefined;
-    if (parent_path === undefined) { return []; }
-    const base_node = base_dt.node_at(parent_path);
-    if (base_node === undefined) { return []; }
-    return node_compatibles(base_node);
+    const parent = effective_parent(parent_node, node_path, base_dt);
+    return parent === undefined ? [] : node_compatibles(parent);
 }

@@ -232,6 +232,35 @@ with_adc() {
 	assert_json '.properties[] | select(.name == "avdd-supply") | [.set, .required] | tojson' '[true,false]'
 }
 
+# Description: list property of a node offers the SPI peripheral properties only under an SPI
+# controller, and under one only the vendor properties of that controller; so does completion.
+# Steps:
+#   1. Make an overlay, add an ADXL345 (I2C or SPI) on i2c1 and another on spi0, and update
+#      the first's interrupts so its binding is narrowed.
+#   2. Run list property adxl345 (the I2C one), with --json; check it names compatible and
+#      reg, and no spi-* nor vendor (pl022,*) property.
+#   3. Complete update adxl345 and check no spi-* property is offered.
+#   4. Run list property adxl345_1 (the SPI one), with --json; check it names spi-cpha and
+#      spi-max-frequency, and no pl022,* property (the base's controller is a bcm2835).
+# bats test_tags=req:LIST-07, req:COMPLETION-04, id:L0353
+@test "list property offers SPI peripheral properties only under an SPI controller" {
+	with_overlay
+	aa add adi,adxl345 --parent i2c1 >/dev/null 2>&1 || fail "add adi,adxl345 on i2c1 failed"
+	aa add adi,adxl345 --parent spi0 >/dev/null 2>&1 || fail "add adi,adxl345 on spi0 failed"
+	aa update adxl345 interrupts 25 1 >/dev/null 2>&1
+	run_json list property adxl345
+	assert_success
+	assert_json '[.names[] | select(. == "compatible" or . == "reg")] | length' 2
+	assert_json '[.names[] | select(test("^spi-|^pl022,"))] | join(" ")' ""
+	run aa __complete -- update adxl345 ''
+	assert_success
+	refute_line --regexp '^spi-'
+	run_json list property adxl345_1
+	assert_success
+	assert_json '[.names[] | select(. == "spi-cpha" or . == "spi-max-frequency")] | length' 2
+	assert_json '[.names[] | select(test("^pl022,"))] | join(" ")' ""
+}
+
 # Description: list property of a node shows its child node patterns as the names they match,
 # with the children present.
 # Steps:
