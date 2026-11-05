@@ -479,7 +479,7 @@ export class Parser {
     labels: Array<string>,
     target_node: DeletableNode
   ): Result<undefined, ParseError> {
-    target_node.labels = [...new Set([...labels, ...target_node.labels])];
+    target_node.labels = add_labels(target_node.labels, labels);
 
     const r_lbrace = this.consume_char_token_then_advance(CharTokenKind.LBrace);
     if (Result.is_err(r_lbrace)) { return r_lbrace; }
@@ -503,8 +503,8 @@ export class Parser {
           const [name, unit_addr] = split_node_identifier(r_ident.value);
           for (const child of target_node.children) {
             if (child.name === name && child.unit_addr === unit_addr) {
+              // The labels stay for a re-definition to order by; a deleted node's name nothing.
               child.deleted = true;
-              child.labels = [];
               child.properties = [];
               child.children = [];
               break;
@@ -576,12 +576,11 @@ export class Parser {
         if (existing_index === -1) {
           target_node.properties.push(property);
         } else {
+          const existing = target_node.properties[existing_index];
+          const labels = add_labels(existing.labels, property.labels);
           target_node.properties[existing_index] = {
             ...property,
-            labels: [...new Set([
-              ...property.labels,
-              ...target_node.properties[existing_index].labels
-            ])],
+            labels: existing.deleted ? labels.filter(label => property.labels.includes(label)) : labels,
           };
         }
 
@@ -618,8 +617,9 @@ export class Parser {
           // Re-definition of a deleted node: replace in-place to preserve ordering/phandle assignment.
           const r_node = this.parse_node_statement(labels);
           if (Result.is_err(r_node)) { return r_node; }
-          // TODO: can't say why it's needed to be reversed, need to investigate
-          r_node.value.labels.reverse();
+          // dtc revives the deleted node: a label it had keeps its place, a new one goes in front.
+          const deleted = target_node.children[deleted_child_index]!;
+          r_node.value.labels = add_labels(deleted.labels, labels).filter(label => labels.includes(label));
           target_node.children[deleted_child_index] = structuredClone(r_node.value);
         }
 
@@ -1238,7 +1238,21 @@ export function parse_dto(raw: string): Result<DTOParseResult, ParseError> {
 
 // Private utilities
 
+/** `existing` with `labels` added as dtc's add_label adds them: one already there keeps its place, a new one goes in front. */
+function add_labels(existing: string[], labels: string[]): string[] {
+  const result = [...existing];
+  for (const label of labels) {
+    if (!result.includes(label)) { result.unshift(label); }
+  }
+  return result;
+}
+
+/** The node with `label`; a deleted node's labels, and those below it, name nothing, as in dtc. */
 function find_node_by_label(root: DeletableNode, label: string): Option<DeletableNode> {
+  if (root.deleted) {
+    return Option.None();
+  }
+
   if (root.labels.includes(label)) {
     return Option.Some(root);
   }
