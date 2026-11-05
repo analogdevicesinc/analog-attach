@@ -1,16 +1,9 @@
 import { JSONSchema } from "@apidevtools/json-schema-ref-parser/dist/lib/types";
-import { DtBindingSchema, is_schema, Schema } from "./Schema.js";
+import { deep_merge, DtBindingSchema, entries_of, is_schema, map_entries, Schema } from "./Schema.js";
 import { SchemaContext } from "./Context.js";
 import { dereference } from "./RefResolver.js";
-import { deep_merge, find_entry_in_object, overwrite_object_with_path_value } from "./ObjectUtilities.js";
 import { merge_schema } from "./ReferenceSiblings.js";
-import { PathEntry, PathValue } from "./UtilityTypes.js";
 import { Result } from "../result.js";
-
-/** The entries of the schema's own `properties`. */
-function top_level_properties(schema: unknown): PathEntry[] {
-    return find_entry_in_object(schema, (path) => path.length === 1 && path[0] === "properties");
-}
 
 /** dt-validate checks every definition of a property, so the tighter of their bounds applies. */
 const TIGHTER: Record<string, (...bounds: number[]) => number> = {
@@ -119,29 +112,25 @@ function merge_node(node: Schema): Schema {
     return merge_children(result);
 }
 
+/** Whether the entry at `path` is a child-node pattern that is a whole schema of another file, by its `$id`. */
+function is_inherited_pattern(entry: unknown, path: string[]): entry is Schema & { $id: string } {
+    return path.at(-2) === "patternProperties" && is_schema(entry) && typeof entry["$id"] === "string";
+}
+
 /**
- * The properties of `base` that `extensions` define again, each merged over its
- * extension: `deep_merge(extension, base)`, so `base` wins where both say something.
+ * `pattern` with each of its properties that `parent` (the schema it is, dereferenced again) defines too merged over
+ * the parent's: `deep_merge(parent's, pattern's)`, so the pattern's wins where both say something.
  */
-function merge_redefined(base: PathEntry[], extensions: PathEntry[]): PathValue[] {
-    const base_keys = new Set(base.map(entry => entry.key));
-    const merged: PathValue[] = [];
+function extend_properties(pattern: Schema, parent: Schema): Schema {
+    const own = pattern["properties"];
+    const inherited = parent["properties"];
+    if (!is_schema(own) || !is_schema(inherited)) { return pattern; }
 
-    for (const { key } of extensions) {
-        if (!base_keys.has(key)) {
-            continue;
-        }
-
-        const base_entry = base.find(entry => entry.key === key)!;
-        const extension = extensions.find(entry => entry.key === key)!;
-
-        merged.push({
-            path: ["properties", key],
-            value: deep_merge(extension.value as Schema, base_entry.value as Schema),
-        });
+    const properties: Schema = { ...own };
+    for (const [name, definition] of Object.entries(inherited)) {
+        if (Object.hasOwn(own, name)) { properties[name] = deep_merge(definition, own[name]); }
     }
-
-    return merged;
+    return { ...pattern, properties };
 }
 
 export async function merge_redefinitions(
@@ -151,46 +140,20 @@ export async function merge_redefinitions(
 ): Promise<DtBindingSchema> {
     const merged = merge_node(binding as Schema) as DtBindingSchema;
 
-    const inherited_pattern_properties = find_entry_in_object(
-        merged,
-        (path) => path.at(-1) === "patternProperties"
-    ).filter(
-        // TODO: special case needs to be handled
-        (pattern) => typeof pattern.value !== "boolean" && "$id" in (pattern.value as object)
-    );
+    // TODO: special case needs to be handled (a pattern that is a boolean)
+    const parents = new Map<string, Schema>();
+    for (const [entry, path] of entries_of(merged)) {
+        if (!is_inherited_pattern(entry, path) || parents.has(entry.$id)) { continue; }
 
-    let extended_pattern_properties = merged;
-
-    for (const inherited_pattern_property of inherited_pattern_properties) {
-        const parent = references.find((schema) => schema.$id === (inherited_pattern_property.value as JSONSchema).$id);
-
-        if (parent === undefined) {
-            continue;
+        const parent = references.find(schema => schema.$id === entry.$id);
+        const dereferenced = parent === undefined ? undefined : await dereference(ctx, parent as JSONSchema);
+        if (dereferenced !== undefined && Result.is_ok(dereferenced) && is_schema(dereferenced.value)) {
+            parents.set(entry.$id, dereferenced.value);
         }
-
-        const reference_resolved_parent = await dereference(ctx, parent as JSONSchema);
-
-        if (Result.is_err(reference_resolved_parent)) {
-            continue;
-        }
-
-        const parent_extended_definitions = merge_redefined(
-            top_level_properties(inherited_pattern_property.value),
-            top_level_properties(reference_resolved_parent.value),
-        );
-
-        const extended_pattern_properties_binding = overwrite_object_with_path_value(
-            inherited_pattern_property.value as object,
-            parent_extended_definitions
-        );
-
-        extended_pattern_properties = overwrite_object_with_path_value(extended_pattern_properties, [
-            {
-                path: [...inherited_pattern_property.path, inherited_pattern_property.key],
-                value: extended_pattern_properties_binding,
-            },
-        ]);
     }
 
-    return extended_pattern_properties;
+    return map_entries(merged, (entry, path) => {
+        const parent = is_inherited_pattern(entry, path) ? parents.get(entry.$id) : undefined;
+        return parent === undefined ? entry : extend_properties(entry as Schema, parent);
+    });
 }

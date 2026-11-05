@@ -1,5 +1,4 @@
 import { DtBindingSchema, is_schema, Schema } from "../Schema.js";
-import { find_entry_in_object, overwrite_object_with_path_value } from "../ObjectUtilities.js";
 import { is_node_pattern } from "../PatternKind.js";
 
 /**
@@ -29,125 +28,79 @@ function merge_schemas(base: Schema, over: Schema): Schema {
     return result;
 }
 
+/** Whether `value` has one of `keys` at any depth, not looking under the keys of `skip`. */
+function has_key(value: unknown, keys: string[], skip: string[] = []): boolean {
+    if (typeof value !== "object" || value === null) { return false; }
+    return Object.entries(value).some(([key, entry]) => keys.includes(key) || (!skip.includes(key) && has_key(entry, keys, skip)));
+}
+
 /**
- * Whether `path` is the `properties` or `patternProperties` of the binding's node, or of a child node
- * (`patternProperties/^channel@/properties`). Not those of an `if` / `then` branch: they only add to a property.
+ * A property with an `allOf` and no other combinator (not one in `items`: it chooses what a cell is, a phandle or 0,
+ * and the merge copies it as it is).
  */
-function is_property_table(path: string[]): boolean {
-    return path.length % 2 === 1 && path.every((segment, index) => index % 2 === 1 || segment === 'properties' || segment === 'patternProperties');
+function is_collapsible(property: unknown): boolean {
+    return !has_key(property, ["oneOf", "anyOf", "not"], ["items"]) && has_key(property, ["allOf"]);
+}
+
+/**
+ * The properties of `node` with their `allOf` collapsed, and the patterns that name properties rather than child
+ * nodes; then the same for each child node. Not those of an `if` / `then` branch: they only add to a property.
+ */
+function collapse_properties(node: Schema): Schema {
+    let result: Schema | undefined;
+
+    for (const key of ["properties", "patternProperties"]) {
+        const table = node[key];
+        if (!is_schema(table)) { continue; }
+
+        const collapsed = Object.fromEntries(Object.entries(table).map(([name, property]) => {
+            if ((key === "properties" || !is_node_pattern(name, property)) && is_collapsible(property)) {
+                return [name, collapse_allOf(property)];
+            }
+            return [name, is_schema(property) ? collapse_properties(property) : property];
+        }));
+        if (Object.entries(collapsed).some(([name, property]) => property !== table[name])) {
+            (result ??= { ...node })[key] = collapsed;
+        }
+    }
+
+    return result ?? node;
 }
 
 export function fixup_collapse_allOf(binding: DtBindingSchema): DtBindingSchema {
-
-    const properties = find_entry_in_object(
-        binding,
-        (path, key, value) => {
-            if (!is_property_table(path)) {
-                return false;
-            }
-
-            // The properties, and the patterns that name properties rather than child nodes.
-            if (path.at(-1) === 'properties') {
-                return true;
-            }
-
-            return !is_node_pattern(key, value);
-        }
-    );
-
-    const to_collapse = properties.filter((property) => {
-
-        // Not one in `items`: it chooses what a cell is (a phandle or 0), the merge copies it as it is
-        const has_other_combinator = find_entry_in_object(
-            property.value,
-            (path, key, _value) => {
-                if (path.includes('items')) {
-                    return false;
-                }
-
-                if (key === 'oneOf' || key === 'anyOf' || key === 'not') {
-                    return true;
-                }
-
-                return false;
-            }
-        );
-
-        if (has_other_combinator.length > 0) {
-            return false;
-        }
-
-        const has_allOf = find_entry_in_object(
-            property.value,
-            (_path, key, _value) => {
-                if (key === 'allOf') {
-                    return true;
-                }
-
-                return false;
-            }
-        );
-
-        if (has_allOf.length > 0) {
-            return true;
-        }
-
-        return false;
-    });
-
-    const collapsed = to_collapse.map((property) => {
-        const new_value = collapse_allOf(property.value as Record<string, any>[]);
-
-
-        return {
-            path: [...property.path, property.key],
-            value: { ...new_value }
-        };
-    });
-
-    return overwrite_object_with_path_value(binding, collapsed);
+    return collapse_properties(binding) as DtBindingSchema;
 }
 
-
-export function collapse_allOf(input: Record<string, any>): Record<string, any> {
-    function recurse(value: any): any {
-        if (Array.isArray(value)) {
-            return value.map((element) => recurse(element));
-        }
-
-        if (value !== undefined && typeof value === "object") {
-            // What the allOf branches say first, then the schema's own keys: `$ref: string` beside `items: {enum}`
-            // dereferences to an allOf with `items: {type: string}`, which doesn't beat the `enum`.
-            let flattened_branches: Record<string, any> = {};
-            const own: Record<string, any> = {};
-
-            for (const [key, inner_value] of Object.entries(value)) {
-                if (key === "allOf" && Array.isArray(inner_value)) {
-                    for (const entry of inner_value) {
-                        const flattened = recurse(entry);
-
-                        if (
-                            flattened !== undefined &&
-                            typeof flattened === "object" &&
-                            !Array.isArray(flattened)
-                        ) {
-                            flattened_branches = merge_schemas(flattened_branches, flattened);
-                        }
-                    }
-                } else {
-                    own[key] = recurse(inner_value);
-                }
-            }
-
-            const result = merge_schemas(flattened_branches, own);
-
-            return result;
-        }
-
-        return value;
+/**
+ * `input` with each `allOf`, at any depth, merged into the schema it is in: what its branches say first, then the
+ * schema's own keys (`$ref: string` beside `items: {enum}` dereferences to an allOf with `items: {type: string}`,
+ * which doesn't beat the `enum`).
+ */
+function collapse_allOf(input: unknown): unknown {
+    if (Array.isArray(input)) {
+        return input.map(element => collapse_allOf(element));
+    }
+    if (!is_schema(input)) {
+        return input;
     }
 
-    return recurse(input);
+    let flattened_branches: Schema = {};
+    const own: Schema = {};
+
+    for (const [key, value] of Object.entries(input)) {
+        if (key === "allOf" && Array.isArray(value)) {
+            for (const entry of value) {
+                const flattened = collapse_allOf(entry);
+                if (is_schema(flattened)) {
+                    flattened_branches = merge_schemas(flattened_branches, flattened);
+                }
+            }
+        } else {
+            own[key] = collapse_allOf(value);
+        }
+    }
+
+    return merge_schemas(flattened_branches, own);
 }
 
 if (import.meta.vitest) {

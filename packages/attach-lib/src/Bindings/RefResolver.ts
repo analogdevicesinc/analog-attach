@@ -3,7 +3,6 @@ import { FileInfo, getJsonSchemaRefParserDefaultOptions, JSONSchema, Plugin, Res
 import { Result } from "../result.js";
 import { SchemaContext, SearchPath } from "./Context.js";
 import { DtBindingSchema, isDtBindingSchema, Schema } from "./Schema.js";
-import { RefResolvedBinding } from "./UtilityTypes.js";
 import { walk_node_schema } from "./FixupWalker.js";
 import { fixup_own_counts } from "./fixups/items_size.js";
 import { restore_references, stash_references } from "./ReferenceSiblings.js";
@@ -19,10 +18,16 @@ import { parse } from "yaml";
  */
 export const DT_TYPE = "dtType";
 
+/** A binding dereferenced, and the files it references (each dereferenced where the binding reaches into it). */
+export type ResolvedBinding = {
+    root_binding: DtBindingSchema,
+    refs: DtBindingSchema[],
+};
+
 export async function resolve_references(
     source_path: string,
     ctx: SchemaContext,
-): Promise<Result<RefResolvedBinding, string>> {
+): Promise<Result<ResolvedBinding, string>> {
 
     const binding = await dereference(ctx, source_path);
 
