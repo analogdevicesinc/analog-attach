@@ -2,7 +2,7 @@ import type { DTNode, DTProperty } from "./Parser/AST.js";
 import { number_property } from "./Access.js";
 import { NodeBuilder } from "./NodeBuilder.js";
 import { PropertyBuilder } from "./PropertyBuilder.js";
-import { choose_label } from "./Labels.js";
+import { choose_label, is_valid_node_name, is_valid_unit_address } from "./Labels.js";
 import {
     address_cells_of,
     encode_reg_address,
@@ -44,6 +44,7 @@ export type AddNodeResult =
     | { status: "added"; key: string; path: string; label: string; notes: AddNodeNote[] }
     | { status: "parent-not-found" }
     | { status: "empty-unit-address" }
+    | { status: "invalid-name"; name: string }
     | { status: "invalid-label"; label: string }
     | { status: "label-taken"; label: string; owner: string }
     | { status: "duplicate"; key: string };
@@ -64,6 +65,9 @@ export function add_node(overlay: DeviceTreeOverlay, request: AddNodeRequest): A
     const base_name = at === -1 ? request.name : request.name.slice(0, at);
     const explicit_unit = at === -1 ? undefined : request.name.slice(at + 1);
     if (explicit_unit === "") { return { status: "empty-unit-address" }; }
+    if (!is_valid_node_name(base_name) || (explicit_unit !== undefined && !is_valid_unit_address(explicit_unit))) {
+        return { status: "invalid-name", name: request.name };
+    }
 
     const parent_node = overlay.effective_node(parent_path);
     if (parent_node === undefined) { return { status: "parent-not-found" }; }
@@ -290,6 +294,15 @@ if (import.meta.vitest) {
 
     test("add_node — empty unit address refused", () => {
         expect(add_node(setup(), request({ name: "adc@" }))).toEqual({ status: "empty-unit-address" });
+    });
+
+    test("add_node — a name that isn't a node name is refused, nothing written", () => {
+        const overlay = setup();
+        const before = overlay.print();
+        expect(add_node(overlay, request({ name: "bad name" }))).toEqual({ status: "invalid-name", name: "bad name" });
+        expect(add_node(overlay, request({ name: "adc@1@2" }))).toEqual({ status: "invalid-name", name: "adc@1@2" });
+        expect(add_node(overlay, request({ name: "@2" }))).toEqual({ status: "invalid-name", name: "@2" });
+        expect(overlay.print()).toBe(before);
     });
 
     test("add_node — parent-not-found, no fragment created", () => {

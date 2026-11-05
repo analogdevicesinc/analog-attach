@@ -4,6 +4,23 @@ export function is_valid_label(label: string): boolean {
     return LABEL_RE.test(label);
 }
 
+// The characters both the lexer's identifier and dtc's node-name check accept: the lexer has `#`
+// and no `+`, dtc the reverse.
+const NODE_NAME_RE = /^[A-Za-z0-9_][A-Za-z0-9_,.-]*$/;
+const UNIT_ADDRESS_RE = /^[A-Za-z0-9_,.-]+$/;
+// What the lexer's number rule takes before an identifier: `12`, `1,a`, `0x1f…`.
+const NUMBER_PREFIX_RE = /^(0[xX][0-9a-fA-F]|[0-9]+(?![A-Za-z0-9_]))/;
+
+/** A node's name without its unit address (`adc`, `adi,ad7124-8`). */
+export function is_valid_node_name(name: string): boolean {
+    return NODE_NAME_RE.test(name) && !NUMBER_PREFIX_RE.test(name);
+}
+
+/** A node's unit address, the part after `@`. */
+export function is_valid_unit_address(unit: string): boolean {
+    return UNIT_ADDRESS_RE.test(unit);
+}
+
 export function label_from_compatible(compatible: string): string {
     const comma = compatible.indexOf(",");
     const base = comma === -1 ? compatible : compatible.slice(comma + 1);
@@ -61,6 +78,29 @@ if (import.meta.vitest) {
         expect(is_valid_label("")).toBe(false);
         expect(is_valid_label("has-dash")).toBe(false);
         expect(is_valid_label("has.dot")).toBe(false);
+    });
+
+    test("is_valid_node_name", () => {
+        expect(is_valid_node_name("adi,ad7124-8")).toBe(true);
+        expect(is_valid_node_name("_x.y")).toBe(true);
+        expect(is_valid_node_name("1wire")).toBe(true);
+        expect(is_valid_node_name("")).toBe(false);
+        expect(is_valid_node_name("bad name")).toBe(false);
+        expect(is_valid_node_name("foo/bar")).toBe(false);
+        expect(is_valid_node_name("#x")).toBe(false);
+        expect(is_valid_node_name("a+b")).toBe(false);
+        expect(is_valid_node_name("-x")).toBe(false);
+        expect(is_valid_node_name("12")).toBe(false);
+        expect(is_valid_node_name("1,a")).toBe(false);
+        expect(is_valid_node_name("0x1fg")).toBe(false);
+    });
+
+    test("is_valid_unit_address", () => {
+        expect(is_valid_unit_address("2")).toBe(true);
+        expect(is_valid_unit_address("1,0")).toBe(true);
+        expect(is_valid_unit_address("")).toBe(false);
+        expect(is_valid_unit_address("1@2")).toBe(false);
+        expect(is_valid_unit_address("a b")).toBe(false);
     });
 
     test("label_from_compatible derivation table", () => {
