@@ -7,7 +7,7 @@ import {
     populate_binding,
     populate_properties,
     unit_radix,
-    validator_input_json,
+    node_data_json,
 } from "attach-lib";
 import type {
     DTNode,
@@ -162,10 +162,10 @@ export async function resolve_node_binding(
             binding_path,
             origin: { kind: "compatible", compatible: compatible_value },
             narrow_and_populate(node: DTNode) {
-                const input_json = validator_input_json(node, initial.properties);
-                const narrowed = attach.value.update_binding_by_changes(input_json);
+                const data = node_data_json(node, initial.properties);
+                const narrowed = attach.value.narrow_binding(data);
                 if (narrowed === undefined) { return; }
-                const populated = populate_binding(narrowed, base_dt, input_json, populate_options);
+                const populated = populate_binding(narrowed, base_dt, data, populate_options);
                 return { properties: populated.properties, required_properties: narrowed.required_properties };
             },
         };
@@ -216,15 +216,15 @@ export async function resolve_node_binding(
         origin: { kind: "pattern", parent_compatible: parent_compatible_value, pattern: match.pattern },
         narrow_and_populate(node: DTNode) {
             const populated = populate_properties(
-                match.rule.properties, base_dt, validator_input_json(node, match.rule.properties), populate_options
+                match.rule.properties, base_dt, node_data_json(node, match.rule.properties), populate_options
             );
 
-            const input_json = validator_input_json(node, populated);
-            const narrowed = parent_attach.update_pattern_binding_by_changes(match.pattern, input_json);
+            const data = node_data_json(node, populated);
+            const narrowed = parent_attach.narrow_pattern_binding(match.pattern, data);
             if (narrowed === undefined) { return; }
 
             const populated_properties = populate_properties(
-                narrowed.properties, base_dt, input_json, populate_options
+                narrowed.properties, base_dt, data, populate_options
             );
 
             return { properties: populated_properties, required_properties: narrowed.required_properties };

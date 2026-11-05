@@ -21,7 +21,7 @@ export type NodePlacement = {
 export type PropertyContext = {
     /** Base device tree. */
     devicetree: DeviceTree;
-    /** Current node values as validator-input JSON (see `dt_to_validator_input`). */
+    /** Current node values as JSON (see `node_data_json`). */
     data: string;
     /** Same semantics as the `parent_name` argument of `query_devicetree`. */
     parent_name?: string;

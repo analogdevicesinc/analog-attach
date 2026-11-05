@@ -1,15 +1,15 @@
 import { DTNode, DTProperty, is_dt_flag, DTValue, DTNumber, DTLabel, DTPath, DTExpression } from "../Devicetree";
 import { ResolvedProperty } from "../Bindings/ParsedBinding";
 
-/** `dt_to_validator_input` as the JSON string the validator and the intelligence layers take; bigints become numbers. */
-export function validator_input_json(node: DTNode, properties: readonly ResolvedProperty[]): string {
+/** `node_data` as the JSON string branch narrowing and the intelligence layers take; bigints become numbers. */
+export function node_data_json(node: DTNode, properties: readonly ResolvedProperty[]): string {
     return JSON.stringify(
-        Object.fromEntries(dt_to_validator_input(node, properties)),
+        Object.fromEntries(node_data(node, properties)),
         (_key, value) => typeof value === 'bigint' ? Number(value) : value
     );
 }
 
-export function dt_to_validator_input(node: DTNode, properties: readonly ResolvedProperty[]): Map<string, unknown> {
+export function node_data(node: DTNode, properties: readonly ResolvedProperty[]): Map<string, unknown> {
     const map = new Map<string, unknown>();
     for (const property of node.properties) {
         if (property.name === "status") { continue; }

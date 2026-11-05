@@ -10,7 +10,7 @@ import {
     DeviceTree,
     DeviceTreeOverlay,
     IntelligenceStack,
-    validator_input_json,
+    node_data_json,
     expand_pattern,
     get_full_node_name,
     placement_from_overlay,
@@ -87,7 +87,7 @@ export function value_suggestions(
     // references (e.g. interrupt-parent → controller → #interrupt-cells).
     let data = "{}";
     if (target.binding_node !== undefined && resolved !== undefined) {
-        data = validator_input_json(target.binding_node, resolved.properties);
+        data = node_data_json(target.binding_node, resolved.properties);
     }
 
     // A property named by a pattern is offered to the stack under its own name.
