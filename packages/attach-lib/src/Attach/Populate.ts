@@ -1,7 +1,9 @@
 import { ParsedBinding, ResolvedProperty } from "../Bindings/ParsedBinding.js";
-import { DeviceTree, DTNode } from "../Devicetree/index.js";
+import { AttachEnumType } from "../Bindings/StructuralTypes.js";
+import { DeviceTree, DTNode, type AddressCells } from "../Devicetree/index.js";
 import { IntelligenceStack } from "../Intelligence/layers/stack.js";
 import { IntelligenceLayer, NodePlacement } from "../Intelligence/layers/types.js";
+import { own_cells } from "../Intelligence/reg.js";
 import { validator_input_json } from "./DTxBinding.js";
 
 // Extra intelligence for populate_*: layers appended on top of the default
@@ -10,6 +12,8 @@ export type PopulateOptions = {
     layers?: IntelligenceLayer[];
     placement?: NodePlacement;
     parent_name?: string;
+    /** The cells the properties' `reg` is read with, when they aren't the parent's in the tree (`PropertyContext.parent_cells`). */
+    parent_cells?: AddressCells;
 };
 
 export function populate_properties(
@@ -24,10 +28,14 @@ export function populate_properties(
         data,
         ...(options?.parent_name === undefined ? {} : { parent_name: options.parent_name }),
         ...(options?.placement === undefined ? {} : { placement: options.placement }),
+        ...(options?.parent_cells === undefined ? {} : { parent_cells: options.parent_cells }),
     });
 }
 
-/** Pattern (child node) properties get the layers but not the node's placement: it is the parent's, not theirs. */
+/**
+ * Pattern (child node) properties get the layers but not the node's placement: it is the parent's, not theirs. Their
+ * `reg` is read with the node's own `#address-cells` / `#size-cells`.
+ */
 export function populate_binding(
     binding: ParsedBinding,
     devicetree: DeviceTree,
@@ -36,7 +44,7 @@ export function populate_binding(
 ): ParsedBinding {
     const data_string = typeof data === 'string' ? data : validator_input_json(data, binding.properties);
 
-    const pattern_options: PopulateOptions = { layers: options?.layers, parent_name: options?.parent_name };
+    const pattern_options: PopulateOptions = { layers: options?.layers, parent_name: options?.parent_name, parent_cells: own_cells(binding.properties, data_string) };
     return {
         ...binding,
         properties: populate_properties(binding.properties, devicetree, data_string, options),
@@ -89,5 +97,23 @@ if (import.meta.vitest) {
 
         const pattern_reg = populated.pattern_properties?.[0]?.properties.find(p => p.key === "reg");
         expect(pattern_reg?.suggestions ?? []).toStrictEqual([]);
+    });
+
+    test("populate_binding — a pattern's reg is read with the node's own cells, not its parent's", () => {
+        const dt = DeviceTree.new_from_string("/dts-v1/;\n/ {\n\tsoc {\n\t\t#address-cells = <2>;\n\t\t#size-cells = <2>;\n\t};\n};\n");
+        if (typeof dt === "string") { throw new TypeError(dt); }
+        const pinned = (key: string, value: bigint): ResolvedProperty => ({ key, value: { _t: "scalar", cell: { _t: "enum", enum: [value], enum_type: AttachEnumType.NUMBER }, default: value } });
+        const open_reg: ResolvedProperty = { key: "reg", value: { _t: "matrix", rows: [{ _t: "list", item: { _t: "any" } }] } };
+        const binding: ParsedBinding = {
+            required_properties: [],
+            properties: [open_reg, pinned("#address-cells", 1n), pinned("#size-cells", 1n)],
+            pattern_properties: [{ pattern: "^region@", description: "", properties: [open_reg], required: [] }],
+            examples: [],
+        };
+
+        const populated = populate_binding(binding, dt, "{}", { parent_name: "soc" });
+        const cells = (value: ResolvedProperty["value"] | undefined) => value?._t === "matrix" ? value.rows[0]?.maxItems : undefined;
+        expect(cells(populated.properties.find(p => p.key === "reg")?.value)).toBe(4);
+        expect(cells(populated.pattern_properties?.[0]?.properties.find(p => p.key === "reg")?.value)).toBe(2);
     });
 }

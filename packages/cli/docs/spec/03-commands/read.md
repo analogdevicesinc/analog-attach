@@ -387,7 +387,9 @@ $ analog-attach read adc reg
 reg = <2>;
   SPI chip select number for the device   (adi,ad7124.yaml)
   Suggestions:
-    2 — matches the unit address of adi,ad7124-8@2
+    2 — matches the unit address of adi,ad7124-8@2 (no cs-gpios entry)
+    0 (in use by spidev@0)
+    1 (in use by spidev@1)
 ```
 
 ```

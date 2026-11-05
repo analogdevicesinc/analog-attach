@@ -1,7 +1,9 @@
 import {
+    address_cells_of,
     DeviceTree,
     DeviceTreeOverlay,
     extract_first_number,
+    occupied_address,
     is_enabled,
     parent_path as access_parent_path,
     type NodeTarget,
@@ -27,11 +29,12 @@ export function placement_from_overlay(overlay: DeviceTreeOverlay, target: NodeT
     const own_name = node_path.slice(node_path.lastIndexOf("/") + 1);
 
     const children = overlay.effective_children(parent_path);
+    const { address } = address_cells_of(overlay, parent_path);
 
     const siblings = [...children.entries()]
         .filter(([name, child]) => name !== own_name && is_enabled(child))
         .map(([name, child]) => {
-            const reg = first_reg(child);
+            const reg = occupied_address(child, address);
             return reg === undefined ? { name } : { name, reg };
         });
 
@@ -107,6 +110,28 @@ if (import.meta.vitest) {
 };`);
         const placement = placement_from_overlay(overlay, "adc");
         expect(placement?.siblings).toStrictEqual([{ name: "spidev@1", reg: 1n }]);
+    });
+
+    test("placement_from_overlay — a sibling occupies the address add's pick skips: reg read with the parent's cells, else its unit address", () => {
+        const overlay = overlay_of(`/dts-v1/;
+/plugin/;
+&spi0 {
+    adc: adc@3 {
+        reg = <3>;
+    };
+    dac@2 {
+        compatible = "adi,ad5686";
+    };
+    bad@4 {
+        reg = <&spi0>;
+    };
+};`);
+        expect(placement_from_overlay(overlay, "adc")?.siblings).toStrictEqual([
+            { name: "spidev@0", reg: 0n },
+            { name: "spidev@1", reg: 1n },
+            { name: "dac@2", reg: 2n },
+            { name: "bad@4" },
+        ]);
     });
 
     test("placement_from_overlay — falls back to the base tree for nodes the overlay does not touch", () => {

@@ -78,13 +78,17 @@ function warning(overlay: DeviceTreeOverlay, conflict: RegConflict, side: 0 | 1)
     };
 }
 
-function overflow_warning({ parent_path, node, chip_select, lines }: ChipSelectOverflow): RegWarning {
+/** Past `num-cs` the controller has no more; without it, past the `cs-gpios` entries a GPIO can be added. */
+function overflow_warning({ parent_path, node, chip_select, chip_selects }: ChipSelectOverflow): RegWarning {
     const controller = parent_path.slice(parent_path.lastIndexOf("/") + 1);
-    const range = lines === 1 ? "chip select 0" : `chip selects 0-${lines - 1}`;
+    const { count, bounded } = chip_selects;
+    const range = count === 1 ? "chip select 0" : `chip selects 0-${count - 1}`;
     return {
         path: parent_path === "/" ? `/${node}` : `${parent_path}/${node}`,
-        message: `chip select ${chip_select} has no cs-gpios entry: ${controller} has ${range}`,
-        hint: `Use one of those, or add a GPIO for it to cs-gpios of ${parent_path}`,
+        message: bounded
+            ? `chip select ${chip_select} is past the controller's chip selects: ${controller} has ${range}`
+            : `chip select ${chip_select} has no cs-gpios entry: ${controller} has ${range}`,
+        hint: bounded ? "Use one of those" : `Use one of those, or add a GPIO for it to cs-gpios of ${parent_path}`,
     };
 }
 
@@ -157,6 +161,14 @@ if (import.meta.vitest) {
             path: "/soc/spi@7e204000/adc@2",
             message: "chip select 2 has no cs-gpios entry: spi@7e204000 has chip selects 0-1",
             hint: "Use one of those, or add a GPIO for it to cs-gpios of /soc/spi@7e204000",
+        }]);
+    });
+
+    test("reg_warnings — a chip select past num-cs, which no GPIO can extend", () => {
+        expect(reg_warnings(setup("&spi0 {\n\tnum-cs = <3>;\n\tadc@2 { reg = <2>; };\n\tadc@3 { reg = <3>; };\n};"))).toEqual([{
+            path: "/soc/spi@7e204000/adc@3",
+            message: "chip select 3 is past the controller's chip selects: spi@7e204000 has chip selects 0-2",
+            hint: "Use one of those",
         }]);
     });
 

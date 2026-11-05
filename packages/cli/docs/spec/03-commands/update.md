@@ -227,8 +227,8 @@ target, the CLI shall write it, keep the name, and write `an overlay can't
 rename a base node; reg written but name unchanged` to standard error.
 
 **UPDATE-075** After writing `reg`, the CLI shall give the address warnings for
-the node: clashes with siblings at the same address, and a chip select its
-controller's `cs-gpios` lacks. Their wording is in `validate.md`.
+the node: clashes with siblings at the same address, and a chip select past its
+controller's (`num-cs`, `cs-gpios`). Their wording is in `validate.md`.
 
 ### 6.7 interrupts and interrupt-parent
 

@@ -379,7 +379,7 @@ to 4 to standard error (COM-021) and items 5 and 6 to standard output:
 2. the notes of the placement (ADD-044 to ADD-048) or of the copy (ADD-064 to
    ADD-067, ADD-072 to ADD-074);
 3. the address warnings for the new node: clashes with siblings at the same
-   address and a chip select that the controller's `cs-gpios` lacks
+   address and a chip select past the controller's (`num-cs`, `cs-gpios`)
    (`validate.md` §7, VALIDATE-113);
 4. for a copy template, the references in the new node that name no node of
    the merged tree (ADD-091);

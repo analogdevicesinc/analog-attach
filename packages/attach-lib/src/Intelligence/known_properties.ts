@@ -1,22 +1,4 @@
 import { ResolvedProperty } from "../Bindings/ParsedBinding.js";
-import { is_open, is_open_list, type AttachType, type List } from "../Bindings/StructuralTypes.js";
-
-function array_bounds(value: AttachType): { minItems: number; maxItems: number } {
-    if (is_open_list(value)) {
-        return { minItems: value.minItems ?? 1, maxItems: value.maxItems ?? 1 };
-    }
-    // The cells of a row, not the rows, are what an array_bounds user counts
-    if (value._t === "matrix" && is_open(value)) {
-        return { minItems: value.rows[0]?.minItems ?? 1, maxItems: value.rows[0]?.maxItems ?? 1 };
-    }
-    return { minItems: 1, maxItems: 1 };
-}
-
-type Bounds = { minItems: number; maxItems: number };
-
-const number_list = (bounds: Bounds, minimum: bigint, maximum: bigint): List => ({
-    _t: "list", item: { _t: "number", minimum, maximum }, ...bounds,
-});
 
 export function insert_known_structures(properties: ResolvedProperty[]): ResolvedProperty[] {
 
@@ -29,24 +11,12 @@ export function insert_known_structures(properties: ResolvedProperty[]): Resolve
             continue;
         }
 
-        switch (property.key) {
-            // iio.yaml's 9 items: dt-validate applies it to every node (`select: true`), the pipeline only to the ones that `$ref` it
-            case "mount-matrix": {
-                property.value = {
-                    _t: "list", item: { _t: "string" }, minItems: 9, maxItems: 9,
-                    description: property.value.description,
-                };
-                break;
-            }
-            case "reg": {
-                if (!is_open(property.value) || (property.value._t !== "list" && property.value._t !== "matrix")) { break; }
-                property.value = {
-                    _t: "matrix", minItems: property.value.minItems, maxItems: property.value.maxItems,
-                    description: property.value.description,
-                    rows: [number_list(property.value._t === "matrix" ? array_bounds(property.value) : { minItems: 1, maxItems: 1 }, 0n, 0xFF_FF_FF_FFn)],
-                };
-                break;
-            }
+        // iio.yaml's 9 items: dt-validate applies it to every node (`select: true`), the pipeline only to the ones that `$ref` it
+        if (property.key === "mount-matrix") {
+            property.value = {
+                _t: "list", item: { _t: "string" }, minItems: 9, maxItems: 9,
+                description: property.value.description,
+            };
         }
     }
 
@@ -58,10 +28,6 @@ if (import.meta.vitest) {
 
     const property = (key: string, value: ResolvedProperty["value"]): ResolvedProperty => ({ key, value });
     const run = (...properties: ResolvedProperty[]) => insert_known_structures(properties);
-    const open_list = (minItems: number, maxItems: number, description?: string): ResolvedProperty["value"] =>
-        ({ _t: "list", item: { _t: "any" }, minItems, maxItems, ...(description === undefined ? {} : { description }) });
-    const numbers = (minimum: bigint, maximum: bigint, bounds: { minItems?: number; maxItems?: number }, extra: object = {}): ResolvedProperty["value"] =>
-        ({ _t: "list", item: { _t: "number", minimum, maximum }, ...bounds, ...extra });
 
     test("mount-matrix becomes a 9-element string list", () => {
         const [result] = run(property("mount-matrix", { _t: "unknown", description: "e" }));
@@ -72,22 +38,6 @@ if (import.meta.vitest) {
             maxItems: 9,
             description: "e",
         });
-    });
-
-    test("reg array becomes matrix", () => {
-        const [result] = run(property("reg", open_list(1, 2, "h")));
-        expect(result!.value).toStrictEqual({
-            _t: "matrix",
-            minItems: 1,
-            maxItems: 2,
-            description: "h",
-            rows: [numbers(0n, 0xFF_FF_FF_FFn, { minItems: 1, maxItems: 1 })],
-        });
-    });
-
-    test("reg non-array is untouched", () => {
-        const [result] = run(property("reg", { _t: "unknown" }));
-        expect(result!.value._t).toBe("unknown");
     });
 
     test("node properties are recursed", () => {
