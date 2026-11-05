@@ -62,8 +62,13 @@ export interface AddResponse extends CommonResponse {
 }
 
 /** `update <path> <child-name>` when it creates the child node. */
-/** `update`: a property set, a child node created (`UpdateChildResponse`), a read (`ReadResponse`), or the values `--suggest` lists (`SuggestResponse`). */
-export type UpdateResponse = CommonResponse | UpdateChildResponse | ReadResponse | SuggestResponse;
+/** `update`: a property set, a child node created (`UpdateChildResponse`), a read (`ReadResponse`), or the values `--suggest` lists (`ListValueResponse`). */
+export type UpdateResponse = CommonResponse | UpdateChildResponse | ReadResponse | ListValueResponse;
+
+/** `list value` (and `update --suggest`): the values, then the providers the user can add instead, when there are any. */
+export interface ListValueResponse extends SuggestResponse {
+    can_create?: Suggestion[];
+}
 
 export interface UpdateChildResponse extends CommonResponse {
     path: string[];
@@ -229,7 +234,7 @@ export interface LinuxResponses extends Responses {
     "list devices": ListDevicesResponse;
     "list context": ListContextResponse;
     "list property": ListPropertyResponse;
-    "list value": SuggestResponse;
+    "list value": ListValueResponse;
     "add": AddResponse;
     "import": ImportResponse;
     "read": ReadResponse;

@@ -319,9 +319,10 @@ for those that aren't zero, joined by `; `, or `No values for <property>` when
 there are none. LIST-074 may add to it.
 
 **LIST-077** In human mode the CLI shall write one line per value,
-`<value>\t<display_string>`, or the message alone when there are none. In JSON
-mode it shall respond `{"ok": true, "message": <m>, "severity": "info",
-"suggestions": [...]}`, also when there are none
+`<value>\t<display_string>`, or the message alone when there are none, then
+the line of LIST-080 when there is one. In JSON mode it shall respond `{"ok":
+true, "message": <m>, "severity": "info", "suggestions": [...]}`, also when
+there are none, plus `can_create` per LIST-080
 (`04-protocol/list-value.schema.json`).
 
 **LIST-078** The CLI shall list only the stack's values. The other candidates
@@ -337,6 +338,13 @@ quotes). The check of LIST-073 then fails each of them and adds the note
 `Values for property compatible are <options>`, `<options>` being every
 option as JSON (`[["raspberrypi,400","brcm,bcm2711"],…]`). (Open issue
 L-10.)
+
+**LIST-080** When the property names a provider the user can add instead
+(`fixed-clock` for `clocks`, `regulator-fixed` for a `*-supply`, as `read`
+offers per READ-036), the CLI shall end the human output with `Or add your
+own: analog-attach add <compatible>` (`, ` between several), and add to the
+JSON response `"can_create": [{ "value": <compatible>, "display_string":
+"add <compatible>" }, …]`, left out when there is none.
 
 ## 8. `list parent <compatible>`
 
