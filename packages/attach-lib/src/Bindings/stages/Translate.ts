@@ -1,9 +1,9 @@
-import { ParsedBinding, ResolvedProperty, PatternPropertyRule, PropertyPatternRule } from "./ParsedBinding.js";
-import { DtBindingSchema, is_schema, Schema } from "./Schema.js";
-import { AttachType, AttachEnumType, Cell, EnumOption, List } from "./StructuralTypes.js";
-import { is_node_pattern } from "./PatternKind.js";
-import { cell_range, is_matrix_type } from "./PropertyTypes.js";
-import { DT_TYPE } from "./RefResolver.js";
+import { ParsedBinding, ResolvedProperty, PatternPropertyRule, PropertyPatternRule } from "../model/ParsedBinding.js";
+import { DtBindingSchema, is_schema, Schema } from "../schema/Schema.js";
+import { AttachType, AttachEnumType, Cell, EnumOption, List } from "../model/AttachType.js";
+import { is_node_pattern } from "../schema/PatternKind.js";
+import { cell_range, is_matrix_type } from "../schema/PropertyTypes.js";
+import { DT_TYPE } from "./References.js";
 
 export function translate_JSONSchema(fixuped: DtBindingSchema): ParsedBinding {
 
@@ -51,7 +51,7 @@ export function translate_JSONSchema(fixuped: DtBindingSchema): ParsedBinding {
 
 /**
  * The properties a node schema declares itself, followed by the ones its `allOf` entries bring, each name once. The
- * redefinitions are merged into the node's own (`RedefinitionMerger.ts`); what is left twice is what the fixups add to
+ * redefinitions are merged into the node's own (`Redefinitions.ts`); what is left twice is what the fixups add to
  * every schema alike (`interrupt-parent` next to `interrupts`).
  */
 function translate_node_schema(schema: DtBindingSchema | undefined): ResolvedProperty[] {

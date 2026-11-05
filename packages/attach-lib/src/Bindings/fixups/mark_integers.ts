@@ -1,5 +1,5 @@
-import { DtBindingSchema, is_schema, map_entries, Schema } from "../Schema.js";
-import { DT_TYPE } from "../RefResolver.js";
+import { DtBindingSchema, is_schema, map_entries, Schema } from "../schema/Schema.js";
+import { DT_TYPE } from "../stages/References.js";
 
 function bounds_numbers(value: unknown): value is Schema {
     return is_schema(value) && ("minimum" in value || "maximum" in value);

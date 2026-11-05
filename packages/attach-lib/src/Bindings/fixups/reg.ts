@@ -1,5 +1,5 @@
-import { FixupContext } from "../FixupWalker.js";
-import { is_schema, PropertySchema, Schema } from "../Schema.js";
+import { FixupContext } from "./Walker.js";
+import { is_schema, PropertySchema, Schema } from "../schema/Schema.js";
 
 // dt-schema: `fixups.py:_extract_single_schemas`
 const SINGLE_VALUE_KEYWORDS = new Set(["const", "enum", "pattern", "minimum", "maximum", "multipleOf"]);

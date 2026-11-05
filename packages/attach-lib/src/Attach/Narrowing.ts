@@ -1,11 +1,11 @@
 import Ajv2019, { type KeywordDefinition, type ValidateFunction } from "ajv/dist/2019.js";
 import type { DataValidateFunction } from "ajv/dist/types/index.js";
 
-import { CANARY } from "../Bindings/CanaryInserter.js";
-import { DT_TYPE } from "../Bindings/RefResolver.js";
-import { translate_JSONSchema } from "../Bindings/JSONSchemaTranslate.js";
-import { ParsedBinding } from "../Bindings/ParsedBinding.js";
-import { deep_merge, DtBindingSchema, is_schema, Schema, value_at } from "../Bindings/Schema.js";
+import { CANARY } from "../Bindings/stages/Canaries.js";
+import { DT_TYPE } from "../Bindings/stages/References.js";
+import { translate_JSONSchema } from "../Bindings/stages/Translate.js";
+import { ParsedBinding } from "../Bindings/model/ParsedBinding.js";
+import { deep_merge, DtBindingSchema, is_schema, Schema, value_at } from "../Bindings/schema/Schema.js";
 
 /** A schema, the AJV function compiled from it and the schema narrowed so far by the data it saw. */
 export type NarrowingTarget = {
@@ -48,7 +48,7 @@ const TYPE_SIZE: KeywordDefinition = {
     compile: validate_type_size,
 };
 
-/** `dtType` (see `RefResolver.ts`) only annotates: it says what the schema was before dereferencing. */
+/** `dtType` (see `Bindings/stages/References.ts`) only annotates: it says what the schema was before dereferencing. */
 const DT_TYPE_KEYWORD: KeywordDefinition = { keyword: DT_TYPE, schemaType: "string" };
 
 /**

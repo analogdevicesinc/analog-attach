@@ -1,5 +1,5 @@
-import { NodeFixup } from "../FixupWalker.js";
-import { Schema } from "../Schema.js";
+import { NodeFixup } from "./Walker.js";
+import { Schema } from "../schema/Schema.js";
 
 /** Conditions only match: what the fixup adds to a node must not become something they require. */
 const CONDITION_KEYS = new Set(["if", "not", "select"]);

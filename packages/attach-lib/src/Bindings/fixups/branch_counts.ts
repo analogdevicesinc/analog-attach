@@ -1,5 +1,5 @@
-import { FixupContext } from "../FixupWalker.js";
-import { is_schema, Schema, PropertySchema } from "../Schema.js";
+import { FixupContext } from "./Walker.js";
+import { is_schema, Schema, PropertySchema } from "../schema/Schema.js";
 
 /** The `keyword` bound a branch holds a value to: its own, and those of its `allOf` entries, the tightest by `pick`. */
 function own_bound(branch: Schema, keyword: string, pick: (...bounds: number[]) => number): number | undefined {

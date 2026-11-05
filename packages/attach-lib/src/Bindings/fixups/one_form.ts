@@ -1,6 +1,6 @@
-import { FixupContext } from "../FixupWalker.js";
-import { DT_TYPE } from "../RefResolver.js";
-import { is_schema, Schema, PropertySchema } from "../Schema.js";
+import { FixupContext } from "./Walker.js";
+import { DT_TYPE } from "../stages/References.js";
+import { is_schema, Schema, PropertySchema } from "../schema/Schema.js";
 
 const is_deprecated = (branch: Schema): boolean => branch["deprecated"] === true;
 

@@ -1,5 +1,5 @@
-import { FixupContext } from "../FixupWalker.js";
-import { PropertySchema, Schema } from "../Schema.js";
+import { FixupContext } from "./Walker.js";
+import { PropertySchema, Schema } from "../schema/Schema.js";
 
 /** Whether every branch is a `const`, with at most a `description` beside it. */
 function is_const_only(branches: unknown): branches is Schema[] {

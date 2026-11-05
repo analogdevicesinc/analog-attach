@@ -1,4 +1,4 @@
-import { NodeFixup } from "../FixupWalker.js";
+import { NodeFixup } from "./Walker.js";
 
 /**
  * dt-schema: `fixups.py:fixup_schema` drops the parts of a schema file that validation doesn't

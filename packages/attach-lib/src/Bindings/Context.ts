@@ -1,7 +1,7 @@
 import { $RefParser } from "@apidevtools/json-schema-ref-parser";
 import * as os from "node:os";
 import path from "node:path";
-import { load_processed_property_types, load_property_types, PropertyTypes } from "./PropertyTypes.js";
+import { load_processed_property_types, load_property_types, PropertyTypes } from "./schema/PropertyTypes.js";
 
 /** The two checkouts the binding schemas are read from. A leading `~` is expanded. */
 export type SchemaPaths = {

@@ -1,5 +1,5 @@
-import { ResolvedProperty } from "../Bindings/ParsedBinding.js";
-import { AttachEnumType, is_open, type Cell, type List } from "../Bindings/StructuralTypes.js";
+import { ResolvedProperty } from "../Bindings/model/ParsedBinding.js";
+import { AttachEnumType, is_open, type Cell, type List } from "../Bindings/model/AttachType.js";
 import { DeviceTree, DTNode, get_full_node_name, number_property, type AddressCells, type LocatedNode } from "../Devicetree/index.js";
 import { chip_selects_of, type ChipSelects } from "../Devicetree/RegConflicts.js";
 import { NodePlacement, PropertyContext, ValueSuggestion } from "./layers/types.js";

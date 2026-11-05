@@ -1,24 +1,24 @@
-import { DtBindingSchema, Schema } from "./Schema.js";
-import { fixup_branch_counts } from "./fixups/branch_counts.js";
-import { fixup_collapse_allOf } from "./fixups/collapse_allOf.js";
-import { fixup_dt_type } from "./fixups/dt_type.js";
-import { fixup_interrupts } from "./fixups/interrupts.js";
-import { fixup_items_size } from "./fixups/items_size.js";
-import { fixup_ifs } from "./fixups/mark_ifs_required_properties.js";
-import { fixup_mark_integers } from "./fixups/mark_integers.js";
-import { fixup_matrix_rows } from "./fixups/matrix_rows.js";
-import { fixup_names } from "./fixups/names.js";
-import { fixup_node_properties } from "./fixups/node_properties.js";
-import { fixup_oneof_to_enum } from "./fixups/oneof_to_enum.js";
-import { fixup_one_form } from "./fixups/one_form.js";
-import { fixup_string_to_array } from "./fixups/string_to_array.js";
-import { fixup_unit_cells } from "./fixups/unit_cells.js";
-import { fixup_unit_suffix } from "./fixups/unit_suffix.js";
-import { fixup_reg } from "./fixups/reg.js";
-import { apply_fixups, NodeFixup, PropertyFixup } from "./FixupWalker.js";
-import { NO_PROPERTY_TYPES, PropertyTypes } from "./PropertyTypes.js";
-import { fixup_remove_invalid_keys } from "./fixups/remove_invalid_keys.js";
-import type { PipelineTracer } from "./Trace.js";
+import { DtBindingSchema, Schema } from "../schema/Schema.js";
+import { fixup_branch_counts } from "./branch_counts.js";
+import { fixup_collapse_allOf } from "./collapse_allOf.js";
+import { fixup_dt_type } from "./dt_type.js";
+import { fixup_interrupts } from "./interrupts.js";
+import { fixup_items_size } from "./items_size.js";
+import { fixup_ifs } from "./mark_ifs_required_properties.js";
+import { fixup_mark_integers } from "./mark_integers.js";
+import { fixup_matrix_rows } from "./matrix_rows.js";
+import { fixup_names } from "./names.js";
+import { fixup_node_properties } from "./node_properties.js";
+import { fixup_oneof_to_enum } from "./oneof_to_enum.js";
+import { fixup_one_form } from "./one_form.js";
+import { fixup_string_to_array } from "./string_to_array.js";
+import { fixup_unit_cells } from "./unit_cells.js";
+import { fixup_unit_suffix } from "./unit_suffix.js";
+import { fixup_reg } from "./reg.js";
+import { apply_fixups, NodeFixup, PropertyFixup } from "./Walker.js";
+import { NO_PROPERTY_TYPES, PropertyTypes } from "../schema/PropertyTypes.js";
+import { fixup_remove_invalid_keys } from "./remove_invalid_keys.js";
+import type { PipelineTracer } from "../Trace.js";
 import { isDeepStrictEqual } from "node:util";
 
 /** What a step of the pipeline is, for showing it: an id, what it does, and what it ports from dt-schema (none if ours). */
@@ -32,7 +32,7 @@ export type Named<F> = StepInfo & { fixup: F };
 
 /**
  * A pass over the whole binding: either a function of it, or a walk applying node and property fixups to each node
- * schema and property (`FixupWalker.ts`), in the order given.
+ * schema and property (`Walker.ts`), in the order given.
  */
 export type FixupPass = StepInfo & (
     | { kind: "binding"; run: (binding: DtBindingSchema) => DtBindingSchema }

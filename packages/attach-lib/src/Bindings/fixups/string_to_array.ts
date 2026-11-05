@@ -1,5 +1,5 @@
-import { FixupContext } from "../FixupWalker.js";
-import { PropertySchema, Schema } from "../Schema.js";
+import { FixupContext } from "./Walker.js";
+import { PropertySchema, Schema } from "../schema/Schema.js";
 
 const SINGLE_VALUE_KEYWORDS = ["const", "enum", "pattern", "minimum", "maximum", "multipleOf"];
 

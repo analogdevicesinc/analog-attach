@@ -4,13 +4,13 @@
 
 // Binding pipeline, validation and structural types
 export { Attach, PARSE_STEPS, type ParseOptions, type BindingParseError } from './Attach/Attach.js';
-export { fixup_passes, type StepInfo, type FixupPass } from './Bindings/JSONSchemaFixups.js';
+export { fixup_passes, type StepInfo, type FixupPass } from './Bindings/fixups/Fixups.js';
 export type { TraceEvent, PipelineTracer } from './Bindings/Trace.js';
 export { populate_binding, populate_properties, type PopulateOptions } from './Attach/Populate.js';
 export type { SchemaPaths } from './Bindings/Context.js';
 export { Result } from './result.js';
-export { type ControllerContext, filter_peripheral_properties, load_spi_peripherals, type SpiPeripherals } from './Bindings/VendorPeripheralFilter.js';
-export type { ResolvedProperty, PatternPropertyRule, PropertyPatternRule, ParsedBinding } from './Bindings/ParsedBinding.js';
+export { type ControllerContext, filter_peripheral_properties, load_spi_peripherals, type SpiPeripherals } from './Bindings/stages/VendorFilter.js';
+export type { ResolvedProperty, PatternPropertyRule, PropertyPatternRule, ParsedBinding } from './Bindings/model/ParsedBinding.js';
 export { expand_pattern, type PatternExpansion } from './Bindings/PatternExpansion.js';
 export { references_to, unresolved_references, unresolved_targets, type ReferenceTo, type UnresolvedReference, type UnresolvedTarget } from './Devicetree/References.js';
 export {
@@ -24,7 +24,7 @@ export {
     type Cell,
     type EnumOption,
     type List,
-} from './Bindings/StructuralTypes.js';
+} from './Bindings/model/AttachType.js';
 export { node_data, node_data_json } from './Attach/NodeData.js';
 export { missing_required, PROPERTY_DEPENDENCIES } from './Attach/NodeState.js';
 

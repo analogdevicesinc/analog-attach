@@ -2,13 +2,13 @@ import { $RefParser } from "@apidevtools/json-schema-ref-parser";
 import * as fs from "node:fs";
 import path from "node:path";
 import { parse } from "yaml";
-import { Result } from "../result.js";
-import { SchemaContext } from "./Context.js";
-import { apply_JSONSchema_fixups } from "./JSONSchemaFixups.js";
-import { is_object_schema } from "./PatternKind.js";
-import { merge_definitions } from "./RedefinitionMerger.js";
-import { dereference, DT_TYPE } from "./RefResolver.js";
-import { DtBindingSchema, is_schema, Schema } from "./Schema.js";
+import { Result } from "../../result.js";
+import { SchemaContext } from "../Context.js";
+import { apply_JSONSchema_fixups } from "../fixups/Fixups.js";
+import { is_object_schema } from "../schema/PatternKind.js";
+import { merge_definitions } from "./Redefinitions.js";
+import { dereference, DT_TYPE } from "./References.js";
+import { DtBindingSchema, is_schema, Schema } from "../schema/Schema.js";
 
 /**
  * The definitions in the schemas dt-validate applies to every node, in the order of their files: by property name, and

@@ -1,12 +1,12 @@
 import { Result } from "../result.js";
-import { insert_canaries } from "./CanaryInserter.js";
+import { insert_canaries } from "./stages/Canaries.js";
 import { SchemaContext } from "./Context.js";
-import { apply_JSONSchema_fixups, StepInfo } from "./JSONSchemaFixups.js";
-import { resolve_properties } from "./PropertyResolver.js";
-import { merge_redefinitions } from "./RedefinitionMerger.js";
-import { resolve_references } from "./RefResolver.js";
-import { merge_selected, selected_definitions } from "./SelectedSchemas.js";
-import { DtBindingSchema } from "./Schema.js";
+import { apply_JSONSchema_fixups, StepInfo } from "./fixups/Fixups.js";
+import { resolve_properties } from "./stages/Properties.js";
+import { merge_redefinitions } from "./stages/Redefinitions.js";
+import { resolve_references } from "./stages/References.js";
+import { merge_selected, selected_definitions } from "./stages/Selected.js";
+import { DtBindingSchema } from "./schema/Schema.js";
 import type { PipelineTracer } from "./Trace.js";
 
 /** The stages `process_binding` runs, in order. */

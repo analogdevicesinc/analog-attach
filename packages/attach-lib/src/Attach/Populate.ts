@@ -1,5 +1,5 @@
-import { ParsedBinding, ResolvedProperty } from "../Bindings/ParsedBinding.js";
-import { AttachEnumType } from "../Bindings/StructuralTypes.js";
+import { ParsedBinding, ResolvedProperty } from "../Bindings/model/ParsedBinding.js";
+import { AttachEnumType } from "../Bindings/model/AttachType.js";
 import { DeviceTree, DTNode, type AddressCells } from "../Devicetree/index.js";
 import { IntelligenceStack } from "../Intelligence/layers/stack.js";
 import { IntelligenceLayer, NodePlacement } from "../Intelligence/layers/types.js";
