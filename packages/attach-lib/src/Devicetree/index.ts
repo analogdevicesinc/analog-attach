@@ -10,3 +10,5 @@ export * from './UnitAddress.js';
 export * from './Labels.js';
 export * from './AddNode.js';
 export * from './Access.js';
+export * from './RegConflicts.js';
+export * from './References.js';

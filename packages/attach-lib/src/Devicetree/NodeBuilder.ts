@@ -1,5 +1,5 @@
-import { DTNode, DTProperty } from "./Parser";
-import { AddCallOnce } from "./TypeUtilities";
+import { DTNode, DTProperty } from "./Parser/index.js";
+import { AddCallOnce } from "./TypeUtilities.js";
 
 interface INodeNameBuilder {
     with_name: (name: string) => INodeBuilder;
