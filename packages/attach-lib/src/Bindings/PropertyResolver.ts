@@ -1,16 +1,8 @@
-/* eslint-disable unicorn/prevent-abbreviations */
-import { DtBindingSchema, is_schema, Schema } from "./Schema.js";
+import { DtBindingSchema, entries_of, is_schema, value_at } from "./Schema.js";
 import { SchemaContext } from "./Context.js";
-import { dereference } from "./RefResolver.js";
-import { PathValue, RefResolvedBinding } from "./UtilityTypes.js";
-import { compare_arrays, find_entry_in_object, find_in_object, get_by_path, map_object } from "./ObjectUtilities.js";
+import { dereference, ResolvedBinding } from "./RefResolver.js";
 import { definitions_by_name } from "./RedefinitionMerger.js";
 import { Result } from "../result.js";
-
-type PathDefinition = {
-    path: string[],
-    definition: Schema,
-}
 
 /**
  * Whether the node of the `true` at `path` (`properties/reg`, `allOf/1/properties/reg`) defines the property elsewhere:
@@ -24,7 +16,7 @@ function defined_in_its_node(binding: unknown, path: string[]): boolean {
         node_path = node_path.slice(0, -2);
     }
 
-    const node = node_path.length === 0 ? binding : get_by_path(binding as object, node_path);
+    const node = node_path.length === 0 ? binding : value_at(binding, node_path);
     const name = path.at(-1);
     if (!is_schema(node) || name === undefined) {
         return false;
@@ -33,89 +25,67 @@ function defined_in_its_node(binding: unknown, path: string[]): boolean {
     return (definitions_by_name(node).get(name) ?? []).some(definition => is_schema(definition));
 }
 
-// TODO: handle recursive definitions
+/**
+ * The first definition of `name` in `schema`, depth first: one in a `properties` table, at any depth, and not in an
+ * `if` / `then` / `else`. Undefined when there is none.
+ */
+function first_definition(schema: unknown, name: string, in_properties = false): unknown {
+    if (typeof schema !== "object" || schema === null) { return undefined; }
+
+    const own = in_properties && Object.hasOwn(schema, name) ? (schema as Record<string, unknown>)[name] : undefined;
+    if (own !== undefined && typeof own !== "boolean") { return own; }
+
+    for (const [key, entry] of Object.entries(schema)) {
+        if (key === "if" || key === "then" || key === "else") { continue; }
+        const found = first_definition(entry, name, in_properties || key === "properties");
+        if (found !== undefined) { return found; }
+    }
+    return undefined;
+}
+
+/**
+ * A copy of `value` with the definitions of `definitions` (by `JSON.stringify` of their path) in place of the `true`s
+ * they stand for. A copy of each object at each place: the dereferencing shares the definitions a `$ref` names among
+ * the places that name it, and the stages after this one see a tree.
+ */
+function with_definitions(value: unknown, definitions: Map<string, unknown>, path: string[] = []): unknown {
+    if (Array.isArray(value)) {
+        return value.map((entry, index) => with_definitions(entry, definitions, [...path, String(index)]));
+    }
+    if (typeof value === "object" && value !== null) {
+        return Object.fromEntries(Object.entries(value).map(([key, entry]) => [key, with_definitions(entry, definitions, [...path, key])]));
+    }
+    return definitions.has(JSON.stringify(path)) ? definitions.get(JSON.stringify(path)) : value;
+}
+
+/**
+ * The binding with each `properties: { name: true }` its node doesn't define otherwise replaced by the first
+ * definition of the name in the files it references (in their order), dereferenced again.
+ * TODO: handle recursive definitions
+ */
 export async function resolve_properties(
-    ref_resolved: RefResolvedBinding,
+    reference_resolved: ResolvedBinding,
     ctx: SchemaContext,
 ): Promise<Result<DtBindingSchema, string>> {
+    const binding = reference_resolved.root_binding;
+    const definitions = new Map<string, unknown>();
 
-    /*
-        Searching for incomplete properties has the assumption that the form is like this:
-        ```
-            properties:
-                property: true
-        ```
-    */
-    const incomplete_properties: PathValue[] = find_in_object(
-        ref_resolved.root_binding,
-        (path, value) => path.at(-2) === "properties" && value === true
-    );
+    // The `true`s that stand for a property (`properties: { reg: true }`)
+    const placeholders = [...entries_of(binding)].filter(([entry, path]) => entry === true && path.at(-2) === "properties");
 
-    /*
-        We search for the definitions of the incomplete properties in the refs used to dereference the original binding
-        We assume we'll only find one definition and won't need to choose
-        We assume we'll find the definition in those refs
-    */
-    const properties_definitions: PathDefinition[] = [];
+    for (const [, path] of placeholders) {
+        const name = path.at(-1) ?? "";
+        if (defined_in_its_node(binding, path)) { continue; }
 
-    for (const unresolved_property of incomplete_properties) {
-        const unresolved = unresolved_property.path.at(-1);
+        const definition = reference_resolved.refs
+            .map(reference => first_definition(reference, name))
+            .find(found => found !== undefined);
+        if (definition === undefined) { continue; }
 
-        if (unresolved === undefined) {
-            return Result.Err("incomplete property has an empty path");
-        }
-
-        if (defined_in_its_node(ref_resolved.root_binding, unresolved_property.path)) {
-            continue;
-        }
-
-        for (const ref of ref_resolved.refs) {
-            const resolved_prop_defs = find_entry_in_object(
-                ref,
-                (path, key, value) => (
-                    key === unresolved &&
-                    typeof value !== "boolean" &&
-                    path.includes("properties") &&
-                    !path.includes("if") &&
-                    !path.includes("then") &&
-                    !path.includes("else")
-                )
-            );
-
-            if (resolved_prop_defs.length === 0) {
-                continue;
-            }
-
-            properties_definitions.push({
-                path: unresolved_property.path,
-                definition: resolved_prop_defs[0].value as Schema,
-            });
-        }
+        const resolved = await dereference(ctx, definition as object);
+        if (Result.is_err(resolved)) { return Result.Err(resolved.error); }
+        definitions.set(JSON.stringify(path), resolved.value);
     }
 
-    /*
-        Sometimes the found definitions need to be resolved again
-        We assume resolving won't break if there isn't anything to be resolved
-    */
-    const resolved_properties: PathValue[] = [];
-
-    for (const property_definition of properties_definitions) {
-        const resolved = await dereference(ctx, property_definition.definition);
-
-        if (Result.is_err(resolved)) {
-            return Result.Err(resolved.error);
-        }
-
-        resolved_properties.push({ path: property_definition.path, value: resolved.value });
-    }
-
-    const property_resolved_binding = map_object(
-        ref_resolved.root_binding,
-        (path, value) => {
-            const replace = resolved_properties.find(resolved => compare_arrays(resolved.path, path));
-            return replace === undefined ? value : replace.value;
-        }
-    );
-
-    return Result.Ok(property_resolved_binding as DtBindingSchema);
+    return Result.Ok(with_definitions(binding, definitions) as DtBindingSchema);
 }

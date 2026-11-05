@@ -1,6 +1,4 @@
-import { DtBindingSchema, is_schema, Schema } from "../Schema.js";
-import { find_entry_in_object, overwrite_object_with_path_value } from "../ObjectUtilities.js";
-import { PathValue } from "../UtilityTypes.js";
+import { DtBindingSchema, is_schema, map_entries, Schema } from "../Schema.js";
 import { DT_TYPE } from "../RefResolver.js";
 
 function bounds_numbers(value: unknown): value is Schema {
@@ -28,42 +26,22 @@ function tightened(cell: unknown, array: Schema): unknown {
  * An array whose `minimum` / `maximum` is its own (`lo_in-clock-scales: {$ref: uint32-array, minimum: 1}`, or in an
  * `allOf` beside the `$ref`) bounds each of its values, as the binding means: the bounds go to its cells. dt-schema
  * keeps them where they are, where they check nothing (a `minimum` is of a number), except for an array of one value
- * (`adi,full-scale-current-microamp: {maxItems: 1}`), whose `items` it gives them. A copy: the cells of a type are
- * shared by the dereferenced schemas.
+ * (`adi,full-scale-current-microamp: {maxItems: 1}`), whose `items` it gives them.
  */
 function bound_array_cells(binding: DtBindingSchema): DtBindingSchema {
-    const arrays = find_entry_in_object(binding, (_path, _key, value) => bounds_numbers(value) && is_array_schema(value) && "items" in value);
+    return map_entries(binding, entry => {
+        if (!bounds_numbers(entry) || !is_array_schema(entry) || !("items" in entry)) { return entry; }
 
-    return overwrite_object_with_path_value(binding, arrays.map(({ path, key, value }) => {
-        const { minimum: _minimum, maximum: _maximum, ...array } = value as Schema;
+        const { minimum: _minimum, maximum: _maximum, ...array } = entry;
         const items = array["items"];
-        return {
-            path: [...path, key],
-            value: { ...array, items: Array.isArray(items) ? items.map(cell => tightened(cell, value as Schema)) : tightened(items, value as Schema) },
-        };
-    }));
+        return { ...array, items: Array.isArray(items) ? items.map(cell => tightened(cell, entry)) : tightened(items, entry) };
+    });
 }
 
 /** Types a schema with `minimum` / `maximum` as an integer, unless it is an array: its bounds are its values' then. */
 export function fixup_mark_integers(binding: DtBindingSchema): DtBindingSchema {
-    const minimum_or_maximum = find_entry_in_object(
-        binding,
-        (_path, _key, value) => bounds_numbers(value) && !is_array_schema(value)
-    );
-
-    const marked_integers: PathValue[] = minimum_or_maximum.map(
-        (integer) => {
-            return {
-                path: [...integer.path, integer.key],
-                value: {
-                    ...integer.value as Object,
-                    type: "integer"
-                }
-            };
-        }
-    );
-
-    return bound_array_cells(overwrite_object_with_path_value(binding, marked_integers));
+    const marked = map_entries(binding, entry => bounds_numbers(entry) && !is_array_schema(entry) ? { ...entry, type: "integer" } : entry);
+    return bound_array_cells(marked);
 }
 
 if (import.meta.vitest) {

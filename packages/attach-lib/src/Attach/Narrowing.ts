@@ -4,9 +4,8 @@ import type { DataValidateFunction } from "ajv/dist/types/index.js";
 import { CANARY } from "../Bindings/CanaryInserter.js";
 import { DT_TYPE } from "../Bindings/RefResolver.js";
 import { translate_JSONSchema } from "../Bindings/JSONSchemaTranslate.js";
-import { deep_merge, delete_path, get_by_path } from "../Bindings/ObjectUtilities.js";
 import { ParsedBinding } from "../Bindings/ParsedBinding.js";
-import { DtBindingSchema } from "../Bindings/Schema.js";
+import { deep_merge, DtBindingSchema, is_schema, Schema, value_at } from "../Bindings/Schema.js";
 
 /** A schema, the AJV function compiled from it and the schema narrowed so far by the data it saw. */
 export type NarrowingTarget = {
@@ -119,10 +118,19 @@ export function compile_targets(schema: DtBindingSchema): NarrowingTargets {
  * `branch` merged into `schema`. What a branch requires adds to what the binding requires
  * (dt-schema validates both), where `deep_merge` would replace the list.
  */
-function merge_branch(schema: DtBindingSchema, branch: Record<string, unknown>): DtBindingSchema {
-    const merged = deep_merge(schema, branch);
+function merge_branch(schema: DtBindingSchema, branch: Schema): DtBindingSchema {
+    const merged = deep_merge(schema, branch) as DtBindingSchema;
     const required = [...new Set([...(schema.required ?? []), ...(Array.isArray(branch.required) ? branch.required as string[] : [])])];
     return required.length === 0 ? merged : { ...merged, required };
+}
+
+/** A branch the canary inserter tagged, without its `CANARY`. */
+function without_canary(branch: unknown): Schema {
+    if (!is_schema(branch)) { return {}; }
+    const properties = branch["properties"];
+    if (!is_schema(properties) || !(CANARY in properties)) { return branch; }
+    const { [CANARY]: _canary, ...others } = properties;
+    return { ...branch, properties: others };
 }
 
 /**
@@ -169,10 +177,7 @@ export function narrow(target: NarrowingTarget, data: string): ParsedBinding | u
         }
         const sub_schema_to_apply = schema_path.slice(0, branch_index + 1);
 
-        const sub_schema = get_by_path(target.original, sub_schema_to_apply) as Record<string, unknown>;
-        const strip_canaries = delete_path(sub_schema, [["properties", CANARY]]);
-
-        current = merge_branch(current, strip_canaries);
+        current = merge_branch(current, without_canary(value_at(target.original, sub_schema_to_apply)));
     }
 
     target.current = current;

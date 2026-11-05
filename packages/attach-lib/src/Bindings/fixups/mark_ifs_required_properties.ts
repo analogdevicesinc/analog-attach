@@ -1,56 +1,11 @@
-import { DtBindingSchema } from "../Schema.js";
-import { find_entry_in_object, overwrite_object_with_path_value } from "../ObjectUtilities.js";
-import { PathValue } from "../UtilityTypes.js";
+import { DtBindingSchema, is_schema, map_entries } from "../Schema.js";
 
+/** Each `if` of an `allOf` entry that tests properties requires them, so that it doesn't match a node without them. */
 export function fixup_ifs(binding: DtBindingSchema): DtBindingSchema {
-
-    const ifs = find_entry_in_object(
-        binding,
-        (path, key, _value) => {
-            if (key !== 'if') {
-                return false;
-            }
-
-            if (path.at(-1) === undefined || path.at(-2) !== 'allOf') {
-                return false;
-            }
-
-            return true;
-        }
-    );
-
-    const marked_properties_required_ifs: PathValue[] = (() => {
-
-        const accumulator: PathValue[] = [];
-
-        for (const entry of ifs) {
-            const if_condition = entry.value as Record<string, any>;
-            if (!("properties" in if_condition)) {
-                continue;
-            }
-
-            let properties: string[] = [];
-
-            for (const property of Object.entries(if_condition["properties"])) {
-                properties.push(property[0]);
-            }
-
-            accumulator.push(
-                {
-                    path: [...entry.path, entry.key],
-                    value: {
-                        ...if_condition,
-                        'required': properties,
-                        'type': "object"
-                    }
-                }
-            );
-        }
-
-        return accumulator;
-    })();
-
-    return overwrite_object_with_path_value(binding, marked_properties_required_ifs);
+    return map_entries(binding, (entry, path) => {
+        if (path.at(-1) !== "if" || path.at(-3) !== "allOf" || !is_schema(entry) || !is_schema(entry["properties"])) { return entry; }
+        return { ...entry, required: Object.keys(entry["properties"]), type: "object" };
+    });
 }
 
 if (import.meta.vitest) {

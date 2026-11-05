@@ -1,7 +1,6 @@
 import { ParsedBinding, ResolvedProperty, PatternPropertyRule, PropertyPatternRule } from "./ParsedBinding.js";
 import { DtBindingSchema, Schema } from "./Schema.js";
 import { AttachType, AttachEnumType, Cell, EnumOption, List } from "./StructuralTypes.js";
-import { find_entry_in_object } from "./ObjectUtilities.js";
 import { is_node_pattern } from "./PatternKind.js";
 import { cell_range, is_matrix_type } from "./PropertyTypes.js";
 import { DT_TYPE } from "./RefResolver.js";
@@ -132,6 +131,17 @@ function translate_JSONSchema_allOf(allOf: any[] | undefined): ResolvedProperty[
     }
 
     return properties;
+}
+
+/** The value of the nearest `key` in `schema`: its own, else the first one an entry has, depth first. */
+function nearest_keyword(schema: unknown, key: string): unknown {
+    if (typeof schema !== "object" || schema === null) { return undefined; }
+    if (Object.hasOwn(schema, key)) { return (schema as Schema)[key]; }
+    for (const entry of Object.values(schema)) {
+        const found = nearest_keyword(entry, key);
+        if (found !== undefined) { return found; }
+    }
+    return undefined;
 }
 
 /** The row schema of an array of one-cell arrays (`items: {type: array, items: [x]}`, the `items` itself or wrapped in a one-element array). */
@@ -529,8 +539,7 @@ function narrow_object(object: any, name?: string): AttachType {
                     return narrow_array_object(object, name);
                 }
             case "string": {
-                const unique = find_entry_in_object(object, (_path: string[], key: string) => key === 'uniqueItems');
-                const unique_items = unique.length > 0 && unique[0].value === true;
+                const unique_items = nearest_keyword(object, "uniqueItems") === true;
 
                 return described(object, {
                     _t: "list",
