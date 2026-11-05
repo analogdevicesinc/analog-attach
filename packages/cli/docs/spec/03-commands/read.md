@@ -66,7 +66,7 @@ in file order, every node directly inside every fragment's `__overlay__` body,
 converted per READ-050 and READ-051 with their own children. Properties set
 directly in an `__overlay__` body, fragment targets, `__dormant__` bodies and
 other root nodes (`__overrides__`) are left out. Their properties have no
-`source`; the root and every node have `origin` `"overlay"`. (Open issue
+`source`; the root and every node have `origin` `"internal"`. (Open issue
 R-1.)
 
 ## 6. A node
@@ -170,7 +170,8 @@ for a flag, and otherwise the property line of READ-023 without the `// base`
 mark (`reg = <2>;`). (Open issue R-2.)
 
 **READ-035** While in JSON mode, the CLI shall respond with the property per
-READ-050, plus `source`, plus `description` when the binding describes it,
+READ-050, its `type` the binding's when the binding defines the property
+(READ-053), plus `source`, plus `description` when the binding describes it,
 plus, when the node has a binding, `required` (whether the binding requires
 the property), `constraints` (`{ "default", "minimum", "maximum" }`, each
 when the binding gives it, left out when it gives none) and `definition`
@@ -180,7 +181,7 @@ are suggestions (READ-033, unfiltered) or providers to add (READ-036): `{
 always there (empty when there are none), `can_create` only when it isn't
 empty (schema `read.schema.json#/$defs/read-property`). With `--quiet`,
 `description`, `required`, `constraints`, `definition` and `suggestions` are
-left out.
+left out, and `type` is the value's (no binding is read).
 
 **READ-036** The providers a user can add for a property instead of naming
 one the tree has are attach-lib's `creatable_providers`: `fixed-clock` for
@@ -193,7 +194,7 @@ the binding.
 
 **READ-050** The CLI shall give a property as `{"kind": "property", "key":
 <name>, "type": <type>, "value": <value>}`, the type inferred from the value as
-written and not from the binding:
+written and not from the binding (except per READ-053):
 
 | Value as written | `type` | `value` |
 |---|---|---|
@@ -216,8 +217,20 @@ array of its labels (empty when it has none).
 
 **READ-052** For `read <path>`, the CLI shall give each property per READ-050
 with `source`, and each node per READ-051 with `origin`, its children
-recursively. A collapsed child (READ-022) has its key, labels and `origin`
-`"base"`, and no properties and no children.
+recursively. `origin` is `"internal"` for a node the overlay adds or changes
+(it has a fragment of its own) and `"external"` for one only the base has. A
+collapsed child (READ-022) has its key, labels and `origin` `"external"`, and
+no properties and no children.
+
+**READ-053** For `read <path> <property>` (READ-035), when the node's binding
+defines the property, the CLI shall give the type `list property <path>
+<property>` gives (an enum with its `options`, an array with its
+`min_items` / `max_items`), and the value as written (READ-050) with one
+change: a value that isn't an array under an array type is given as a
+one-item array (`reg = <0>` as `[0]`). The cells of a specifier list
+(`interrupts = <25 2>`, `rdy-gpios = <&gpio 25 1>`) stay flat, as the type's
+bounds count them and `update` takes them. A reference stays `&<label>`,
+where a phandle enum's options are bare labels.
 
 ## 9. Where the backend is noos
 
@@ -329,9 +342,11 @@ which node each one is added to, and properties the overlay sets on base nodes
 **R-2. `read --quiet <path> <property>` prints the whole line.** The help says
 "Print only the value", but the output is `reg = <2>;`, not `<2>`.
 
-**R-3. The JSON `type` of a read is the value's, not the binding's.** `reg =
-<2>` is a `number` even when the binding gives an array of addresses, and
-`interrupt-parent` is a `string`. `list property` has the binding's type.
+**R-3. The JSON `type` of a node's properties is the value's, not the
+binding's.** In `read <path>` (READ-052), `reg = <2>` is a `number` even when
+the binding gives an array of addresses, and `interrupt-parent` is a `string`.
+`read <path> <property>` (READ-053) and `list property` have the binding's
+type.
 
 **R-4. Large cells lose precision in JSON.** Cell values are converted to JSON
 numbers, so a 64-bit value above 2^53 is rounded.
@@ -390,7 +405,18 @@ compatible = "brcm,bcm2835-spi";   // base
 $ analog-attach --json read adc/channel@0
 {"kind":"node","key":"channel@0","properties":[{"kind":"property","key":"reg",
  "type":{"kind":"number","subtype":"int"},"value":0,"source":"overlay"}],
- "children":[],"alias":[],"origin":"overlay"}
+ "children":[],"alias":[],"origin":"internal"}
+```
+
+```
+$ analog-attach --json read --quiet adc/channel@0 adi,reference-select
+{"kind":"property","key":"adi,reference-select","type":{"kind":"number","subtype":"int"},
+ "value":0,"source":"overlay"}
+$ analog-attach --json read adc/channel@0 adi,reference-select
+{"kind":"property","key":"adi,reference-select","type":{"kind":"enum","options":[{"value":0},
+ {"value":1},{"value":3}]},"value":0,"source":"overlay","description":"Select the reference …",
+ "required":false,"definition":"adi,ad7124.yaml","suggestions":{"values":[{"value":"0",
+ "display_string":"0"},{"value":"1","display_string":"1"},{"value":"3","display_string":"3"}]}}
 ```
 
 (Wrapped here; the CLI writes one line.)

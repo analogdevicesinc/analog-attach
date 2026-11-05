@@ -1,9 +1,9 @@
-import { answer, command, input_error, refuse, type ListPropertyArguments } from "../../../../interface/backend-interface";
+import { answer, command, refuse, type ListPropertyArguments } from "../../../../interface/backend-interface";
 import { load_workspace } from "../../config/workspace";
 import type { PropertyDescription, ListPropertyResponse } from "../../protocol/descriptions";
 import type { PropertyValue } from "../../protocol/types";
 import { bigIntReplacer } from "../../utilities";
-import { node_properties, node_properties_message, node_property_entries, property_type } from "./data";
+import { node_properties, node_properties_message, node_property_entries, node_property_lines, overlay_nodes, property_type } from "./data";
 import { format_type, type PropertyInfo } from "./suggest";
 
 /** What `list property <path> <property>` prints: the type line, then what the binding says, one item a line. */
@@ -50,16 +50,26 @@ export const list_property = command<ListPropertyArguments, ListPropertyResponse
   Label-first:  spi0/adi,ad7124-8@0       (label then child segments)
   Absolute:     /soc/spi@7e204000          (full device tree path)
 
-Without a property: the binding's properties (marked set and required), its
-property patterns and child-node patterns. With one: its type, description,
-constraints and the values the binding offers.`,
+Without a path: the overlay's nodes. Without a property: the binding's
+properties (with their types, marked set and required), its property patterns
+and child-node patterns. With one: its type, description, constraints and the
+values the binding offers.`,
         examples: [
+            "list property                                    The overlay's nodes",
             "list property spi0/adi,ad7124-8@0                Properties for a node",
             "list property spi0/adi,ad7124-8@0/channel@0 reg  One property",
         ],
     },
     async run({ path: identifier, property }, _flags, session) {
-        if (identifier === undefined) { return input_error("Missing: path (list property <path> [property])"); }
+        if (identifier === undefined) {
+            const loaded = load_workspace(session, ["base", "overlay"]);
+            if (!loaded.ok) { return loaded.outcome; }
+            const nodes = overlay_nodes(loaded.workspace.overlay.tree);
+            return answer<ListPropertyResponse>(
+                { ok: true, message: `${nodes.length} node${nodes.length === 1 ? "" : "s"}`, severity: "info", names: nodes.map(node => node.value), suggestions: nodes },
+                () => nodes.map(node => node.value).join("\n"),
+            );
+        }
 
         const loaded = load_workspace(session, ["bindings", "base", "overlay"]);
         if (!loaded.ok) { return loaded.outcome; }
@@ -70,8 +80,8 @@ constraints and the values the binding offers.`,
             if (!found.ok) { return refuse(found.message, { text: found.text ?? found.message }); }
             const entries = node_property_entries(found.value);
             return answer<ListPropertyResponse>(
-                { ok: true, message: node_properties_message(found.value), severity: "info", names: entries.map(entry => entry.value), suggestions: entries },
-                () => entries.map(entry => entry.display_string ?? entry.value).join("\n"),
+                { ok: true, message: node_properties_message(found.value), severity: "info", names: entries.map(entry => entry.value), properties: found.value.properties, suggestions: entries },
+                () => node_property_lines(found.value).join("\n"),
             );
         }
 

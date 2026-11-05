@@ -20,7 +20,7 @@
       }
     },
     "linux": {
-      "oneOf": [{ "$ref": "#/$defs/linux-added" }, { "$ref": "common.schema.json#/$defs/refusal" }]
+      "oneOf": [{ "$ref": "#/$defs/linux-added" }, { "$ref": "common.schema.json#/$defs/refusal" }, { "$ref": "common.schema.json#/$defs/config-refusal" }]
     },
     "linux-added": {
       "allOf": [{ "$ref": "#/$defs/base" }],

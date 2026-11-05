@@ -139,9 +139,9 @@ standard output and exit with status 130. (`add` and the setup run,
 
 | Status | When |
 |---|---|
-| 0 | The command answered: a success, or a refusal (COM-040, COM-041). Also `--help`, `--version` and `__complete`. Human mode: a configuration error of a command (COM-072). |
+| 0 | The command answered: a success, or a refusal (COM-040, COM-041). Also `--help`, `--version` and `__complete`. A configuration error of a command (COM-071, COM-072). |
 | 1 | An error the CLI doesn't handle (COM-130), in both modes. |
-| 2 | Both modes: an input error (COM-031). JSON mode: a configuration error (COM-071). `config`: a settings file it can't read or a value it can't store, in both modes (`config.md`). |
+| 2 | Both modes: an input error (COM-031). `config`: a settings file it can't read or a value it can't store, in both modes (`config.md`). |
 | 130 | A question was stopped before anything was written (COM-060). |
 
 **COM-130** If a command throws an error, then the CLI shall write the
@@ -174,13 +174,15 @@ of them before doing anything, and collect every problem found across
 resources that don't depend on each other.
 
 **COM-071** While in JSON mode, if workspace loading finds problems, then the
-CLI shall write to standard error one line, a JSON object conforming to
-`04-protocol/config-error.schema.json`, write nothing to standard output, and
-exit with status 2.
+CLI shall refuse (COM-040) with status 0: one line on standard output
+conforming to `04-protocol/common.schema.json#/$defs/config-refusal`, with
+`ok` false, `message` the problems' messages joined by `; `, `severity`
+`error`, and `errors` and `hints`.
 
-The object's `errors` has one entry per problem, and `hints` has the distinct
-hints of those problems in the order the problems were found, the setup hints
-of several fields merged into one (§8.1).
+`errors` has one entry per problem (its `field`, `kind`, `message` and, when
+it has one, `description`), and `hints` has the distinct hints of those
+problems in the order the problems were found, the setup hints of several
+fields merged into one (§8.1).
 
 **COM-072** While in human mode, if workspace loading finds exactly one
 problem, then the CLI shall write `<message>` (or `<message> — <description>`
@@ -697,23 +699,20 @@ parses that old file as the base; one without it fails with the read error
 to report a missing output as `devicetree: preprocessing <devicetree> failed`.
 
 **C-11. A configuration error is an input error under one command and a
-refusal under another.** In human mode, a command's configuration errors are
-written to standard output with status 0 (COM-072), while `config` writes its
+refusal under another.** A command's configuration errors are a refusal on
+standard output with status 0 (COM-071, COM-072), while `config` writes its
 own (a settings file it can't read, a value it can't store) to standard error
-with status 2. In JSON mode the first are a `config-error` object on standard
-error and the second are text there, also with status 2
+with status 2, as a `config-error` object or as text under `--json`
 (`config.md` CONFIG-118).
 
-**C-12. No-OS configuration problems are refusals.** Where the backend is
-noos, an unset `capi-path`, a missing workfile or an unknown chip is a
-refusal with status 0 (COM-511), not a configuration error (COM-071,
-COM-072): under `--json` it is `{"ok": false, …}` on standard output rather
-than a `config-error` object on standard error with status 2, one problem at
-a time and without the field's hint. `analog-attach --json read` with only
-`backend` and `capi-path` set gives `{"ok":false,"message":"No workfile at
-'…/workfile.json'. …","severity":"error"}`, status 0. A fix would be to load
-the no-OS settings and workfile through the workspace loader, as the Linux
-backend does.
+**C-12. No-OS configuration problems come one at a time.** Where the backend
+is noos, an unset `capi-path`, a missing workfile or an unknown chip is a
+refusal (COM-511), as a Linux configuration error is (COM-071, COM-072), but
+only the first problem is reported, and without `errors`, `hints` or the
+field's hint. `analog-attach --json read` with only `backend` and `capi-path`
+set gives `{"ok":false,"message":"No workfile at '…/workfile.json'.
+…","severity":"error"}`. A fix would be to load the no-OS settings and
+workfile through the workspace loader, as the Linux backend does.
 
 **C-13. A generic fallback can map to an arbitrary binding.** A compatible
 that many bindings only fall back to goes to the first of them by `$id`

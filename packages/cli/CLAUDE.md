@@ -166,9 +166,11 @@ reads argv or a settings file, never writes to stdout or stderr, and never opens
   (`src/backends/linux/testing/fixture.ts`, `src/backends/noos/testing/fixture.ts`).
 
 The `--json` output is validated with Ajv (2020-12) against `docs/spec/04-protocol`: a shared
-command against `$defs/<id>` and the root, the others against their own schema, and a configuration
-error against `config-error.schema.json`. A new backend must be added to its `CHECKED` list with
-its cases. A new command needs cases there too.
+command against `$defs/<id>` and the root, the others against their own schema. A Linux
+configuration refusal (shape `config-refusal`) is also checked against
+`common.schema.json#/$defs/config-refusal`, and a settings-file error of `config` against
+`config-error.schema.json`. A new backend must be added to its `CHECKED` list with its cases. A
+new command needs cases there too.
 
 ### Spec layout
 
@@ -235,9 +237,10 @@ that gets them cannot fail because of the configuration.
   - `deploy`: the deploy fields plus the `.dtbo` from `derive_dtbo_path`.
 
   Errors from independent resources are collected and reported once (`format_config_errors`,
-  `config_errors_outcome`). Under `--json` that is JSON on stderr with exit 2
-  (`config-error.schema.json`). `parse_bindings` / `parse_overlay` / `optional_bindings` serve the
-  callers that make bindings optional (`list value`, completion).
+  `config_errors_outcome`) as a refusal, exit 0, in both modes. Under `--json` it also carries
+  `errors` and `hints` (`ConfigRefusal`, `$defs/config-refusal`). `parse_bindings` /
+  `parse_overlay` / `optional_bindings` serve the callers that make bindings optional (`list
+  value`, completion).
 - `config/cache.ts`: derived state in `session.state_dir` (`.analog-attach/linux/`), never a setting.
   - `compat-index.json` maps compatible → binding YAML.
   - `validation.json` is the `dt-mk-schema -j` output, with `validation.stamp.json` next to it.

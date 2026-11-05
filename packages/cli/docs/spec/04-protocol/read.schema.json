@@ -14,7 +14,8 @@
         { "$ref": "#/$defs/overlay" },
         { "$ref": "#/$defs/read-node" },
         { "$ref": "#/$defs/read-property" },
-        { "$ref": "common.schema.json#/$defs/refusal" }
+        { "$ref": "common.schema.json#/$defs/refusal" },
+        { "$ref": "common.schema.json#/$defs/config-refusal" }
       ]
     },
     "source": { "enum": ["base", "overlay"] },
@@ -24,12 +25,12 @@
       "unevaluatedProperties": false
     },
     "overlay-node": {
-      "description": "A node of the workfile as written (READ-051). Every node has origin overlay.",
+      "description": "A node of the workfile as written (READ-051). Every node has origin internal.",
       "allOf": [{ "$ref": "common.schema.json#/$defs/node" }],
       "properties": {
         "properties": { "type": "array", "items": { "$ref": "#/$defs/overlay-property" } },
         "children": { "type": "array", "items": { "$ref": "#/$defs/overlay-node" } },
-        "origin": { "const": "overlay" }
+        "origin": { "const": "internal" }
       },
       "unevaluatedProperties": false
     },
@@ -51,18 +52,18 @@
       "unevaluatedProperties": false
     },
     "read-node": {
-      "description": "A merged node (READ-022, READ-052). A collapsed child has origin base and no properties or children.",
+      "description": "A merged node (READ-022, READ-052). origin is internal for a node the overlay adds or changes, external for one only the base has. A collapsed child has origin external and no properties or children.",
       "allOf": [{ "$ref": "common.schema.json#/$defs/node" }],
       "required": ["alias"],
       "properties": {
         "properties": { "type": "array", "items": { "$ref": "#/$defs/read-property-entry" } },
         "children": { "type": "array", "items": { "$ref": "#/$defs/read-node" } },
-        "origin": { "enum": ["base", "overlay", "both"] }
+        "origin": { "enum": ["internal", "external"] }
       },
       "unevaluatedProperties": false
     },
     "read-property": {
-      "description": "One property of a merged node (READ-035), with the binding's description and the suggestions (READ-036).",
+      "description": "One property of a merged node (READ-035), with the binding's type when it defines the property (READ-050), its description and the suggestions (READ-036).",
       "allOf": [{ "$ref": "common.schema.json#/$defs/read-property" }],
       "required": ["source"],
       "properties": {

@@ -96,6 +96,71 @@
       },
       "additionalProperties": false
     },
+    "config-refusal": {
+      "description": "Where the backend is linux: the refusal of a command whose workspace doesn't load (02-common.md COM-071). message is the problems' messages joined by '; '.",
+      "type": "object",
+      "required": [
+        "ok",
+        "message",
+        "severity",
+        "errors",
+        "hints"
+      ],
+      "properties": {
+        "ok": {
+          "const": false
+        },
+        "message": {
+          "type": "string"
+        },
+        "severity": {
+          "const": "error"
+        },
+        "errors": {
+          "description": "One entry per problem, in the order they were found.",
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": [
+              "field",
+              "kind",
+              "message"
+            ],
+            "properties": {
+              "field": {
+                "type": "string",
+                "description": "The setting at fault (linux, devicetree, workfile, overlay-syntax, preprocess-command, deploy-ip, ...) or the resource: compat-index, validation.json, dt-schema, tools, deploy."
+              },
+              "kind": {
+                "enum": [
+                  "missing",
+                  "invalid",
+                  "unknown"
+                ]
+              },
+              "message": {
+                "type": "string"
+              },
+              "description": {
+                "type": "string",
+                "description": "What the setting is."
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "hints": {
+          "description": "What to do about the errors, each once, the setup hints of several fields merged into one (02-common.md §8.1).",
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        }
+      },
+      "additionalProperties": false
+    },
     "node-path": {
       "description": "A node path as segments without the root (overview 3.5): /soc/spi@7e204000 is [\"soc\", \"spi@7e204000\"], / is [].",
       "type": "array",
