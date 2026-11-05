@@ -5,7 +5,8 @@ import type { DtBindingSchema } from "./Schema.js";
 /**
  * What a binding looked like at a step of `Attach.parse`, for showing how it got to its `ParsedBinding`
  * (`ParseOptions.trace`). Every schema is a copy the tracer can keep: the pipeline goes on changing its own.
- * A copy keeps the objects the dereferencing shares (one `types.yaml` definition under many properties) shared.
+ * A copy keeps the objects the dereferencing shares (one `types.yaml` definition under many properties) shared; from
+ * `properties` on, the schema is a tree (`PropertyResolver.ts`).
  *
  * - `stage`: the whole schema after a stage of `PIPELINE_STAGES`; after `references`, the `$id`s it pulled in too.
  * - `pass`: the whole schema after a pass of `fixup_passes`, within the `fixups` stage.
