@@ -25,7 +25,7 @@ export {
     type EnumOption,
     type List,
 } from './Bindings/StructuralTypes.js';
-export { dt_to_validator_input, validator_input_json } from './Attach/DTxBinding.js';
+export { node_data, node_data_json } from './Attach/NodeData.js';
 export { missing_required, PROPERTY_DEPENDENCIES } from './Attach/NodeState.js';
 
 // DTS AST, printer and ergonomic wrappers

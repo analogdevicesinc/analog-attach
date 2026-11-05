@@ -8,17 +8,17 @@ import { deep_merge, delete_path, get_by_path } from "../Bindings/ObjectUtilitie
 import { ParsedBinding } from "../Bindings/ParsedBinding.js";
 import { DtBindingSchema } from "../Bindings/Schema.js";
 
-/** A schema, the validator compiled from it and the schema narrowed so far by the data it saw. */
-export type ValidationTarget = {
+/** A schema, the AJV function compiled from it and the schema narrowed so far by the data it saw. */
+export type NarrowingTarget = {
     original: DtBindingSchema;
     current: DtBindingSchema;
-    validator: ValidateFunction;
+    compiled: ValidateFunction;
 };
 
-export type ValidationTargets = {
-    root: ValidationTarget;
+export type NarrowingTargets = {
+    root: NarrowingTarget;
     /** Child-node pattern schemas that declare properties, by pattern. */
-    patterns: Map<string, ValidationTarget>;
+    patterns: Map<string, NarrowingTarget>;
 };
 
 const validate_type_size = (expected_size: number): DataValidateFunction => {
@@ -89,16 +89,16 @@ function without_nested_ids<T extends object>(schema: T): T {
 }
 
 /** Throws when AJV can't compile a schema. */
-export function compile_targets(schema: DtBindingSchema): ValidationTargets {
-    const root: ValidationTarget = {
+export function compile_targets(schema: DtBindingSchema): NarrowingTargets {
+    const root: NarrowingTarget = {
         original: schema,
         current: schema,
-        validator: create_ajv().compile(without_nested_ids(schema) as object),
+        compiled: create_ajv().compile(without_nested_ids(schema) as object),
     };
 
     // Kept apart from the root's instance, as a pattern schema may reuse its ids.
     const pattern_ajv = create_ajv();
-    const patterns = new Map<string, ValidationTarget>();
+    const patterns = new Map<string, NarrowingTarget>();
 
     for (const [pattern, pattern_schema] of Object.entries((schema.patternProperties ?? {}) as Record<string, DtBindingSchema | boolean>)) {
         if (typeof pattern_schema === "boolean" || !("properties" in pattern_schema)) {
@@ -108,7 +108,7 @@ export function compile_targets(schema: DtBindingSchema): ValidationTargets {
         patterns.set(pattern, {
             original: pattern_schema as DtBindingSchema,
             current: structuredClone(pattern_schema) as DtBindingSchema,
-            validator: pattern_ajv.compile(without_nested_ids(pattern_schema) as object),
+            compiled: pattern_ajv.compile(without_nested_ids(pattern_schema) as object),
         });
     }
 
@@ -126,12 +126,12 @@ function merge_branch(schema: DtBindingSchema, branch: Record<string, unknown>):
 }
 
 /**
- * Validates `data` (validator-input JSON) against the target and narrows the
+ * Runs `data` (`node_data_json`) through the target's compiled schema and narrows the
  * target's schema to the `if/then` branches that now apply. Only the canary
  * errors are read: dt-validate, not AJV, checks the devicetree. Undefined when
  * `data` isn't JSON or AJV gave no errors to read.
  */
-export function narrow(target: ValidationTarget, data: string): ParsedBinding | undefined {
+export function narrow(target: NarrowingTarget, data: string): ParsedBinding | undefined {
     let canary_data;
 
     try {
@@ -143,11 +143,11 @@ export function narrow(target: ValidationTarget, data: string): ParsedBinding | 
 
     canary_data[CANARY] = true;
 
-    if (target.validator(canary_data) === true) {
+    if (target.compiled(canary_data) === true) {
         return translate_JSONSchema(target.current);
     }
 
-    const ajv_errors = target.validator.errors;
+    const ajv_errors = target.compiled.errors;
 
     if (ajv_errors === undefined || ajv_errors === null) {
         return;
@@ -193,6 +193,6 @@ if (import.meta.vitest) {
             patternProperties: { "^endpoint(@[0-9a-f]+)?$": { type: "object" } },
         } as unknown as DtBindingSchema;
 
-        expect(compile_targets(schema).root.validator({ endpoint: 1 })).toBe(false);
+        expect(compile_targets(schema).root.compiled({ endpoint: 1 })).toBe(false);
     });
 }

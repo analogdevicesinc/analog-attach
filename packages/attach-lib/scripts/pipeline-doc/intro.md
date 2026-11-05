@@ -24,7 +24,7 @@ it in the table below. One without a dt-schema counterpart is ours.
 
 A binding's `allOf` entries hold `if` / `then` / `else` branches: a property that is required, or takes other
 values, only for some `compatible`. `canaries` puts a `__canary__: false` property in each `then` and `else`. When the
-CLI asks what applies to a node (`update_binding_by_changes`), the node's data goes to AJV with `__canary__: true`.
+CLI asks what applies to a node (`narrow_binding`), the node's data goes to AJV with `__canary__: true`.
 Each branch that applies fails on it, the error's schema path names the branch, and that branch is merged into the
 binding, which is translated again. That is all the CLI uses AJV for. What checks a devicetree is dt-validate.
 
