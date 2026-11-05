@@ -60,17 +60,15 @@ export { DeviceTreeOverlay, type FoundNodeResult } from './Devicetree/DeviceTree
 export {
     parse_unit_address,
     format_unit_address,
-    address_cells_of,
     encode_reg_address,
     decode_reg_address,
     next_free_unit_address,
-    ensure_address_cells,
     sync_unit_address_from_reg,
     unit_radix,
-    type AddressCells,
     type UnitRadix,
     type SyncResult,
 } from './Devicetree/nodes/UnitAddress.js';
+export { address_cells_of, ensure_address_cells, type AddressCells } from './Devicetree/AddressCells.js';
 export {
     is_valid_label,
     is_valid_node_name,
