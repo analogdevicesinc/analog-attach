@@ -96,8 +96,8 @@ shall leave `reg` as it is, without a note.
 **RENAME-041** The CLI shall give the address warnings for the renamed node
 per `validate.md` VALIDATE-113: clashes with its siblings (an equal address,
 or under a parent with `#size-cells` more than 0 an overlapping range,
-VALIDATE-100), and a chip select the controller's `cs-gpios` lacks
-(VALIDATE-103). Each warning is
+VALIDATE-100), and a chip select past the controller's (`num-cs`,
+`cs-gpios`, VALIDATE-103). Each warning is
 `warning: <message>`, followed by two spaces and its hint on the next line
 when it has one.
 

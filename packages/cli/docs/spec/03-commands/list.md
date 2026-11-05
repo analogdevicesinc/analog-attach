@@ -199,6 +199,17 @@ controller when there is one:
 dt-validate still accepts them where the binding does (an ADXL345 on I2C with
 `spi-cpha`); the CLI doesn't offer them there.
 
+**LIST-039** The populated type of `reg` shall follow the node's parent, the
+counts being the parent's `#address-cells` and `#size-cells` (1 and 0 when
+unset): where the binding leaves `reg` open (`number[]`), each entry is a row
+of address + size numbers of 0 to 4294967295 (`number[][]` under a parent of
+1 and 1 cells), with the binding's row counts. A child node bound by the
+node's pattern reads them from the node itself (its value, else the value the
+binding pins, else 1 and 0). Under an SPI controller with `num-cs` (and 1 and
+0 cells), each number is at most `num-cs` - 1, also where the binding types
+`reg`. A parent of 0 address cells, or no known parent, leaves `reg` as the
+binding gives it.
+
 **LIST-033** A property's entry shall be its name, followed by ` (<marks>)`
 when it has marks: `set` when the merged node has it, `required` when the
 narrowed binding requires it, joined by `, ` (`compatible (set, required)`).
@@ -362,6 +373,19 @@ offers per READ-036), the CLI shall end the human output with `Or add your
 own: analog-attach add <compatible>` (`, ` between several), and add to the
 JSON response `"can_create": [{ "value": <compatible>, "display_string":
 "add <compatible>" }, …]`, left out when there is none.
+
+**LIST-081** For `reg`, the stack's values shall be the node's unit address
+(`2 — matches the unit address of adi,ad7124-8@2`), then, under a parent of
+1 and 0 cells with `num-cs` or `cs-gpios` (an SPI controller), its chip
+selects 0 to `<n>` - 1 not taken by an enabled sibling, each displayed `<cs> —
+free chip select`, then the taken ones, `<cs>` noted `in use by <sibling>`;
+the unit address's chip select isn't repeated. `<n>` is the larger of `num-cs`
+and the number of `cs-gpios` entries (a `<0>` entry is a native chip select).
+The unit address's value is noted `in use by <sibling>` when a sibling takes
+it, otherwise, at `<n>` or above, `past the controller's <n> chip selects`
+when the controller has `num-cs`, else `no cs-gpios entry`: the chip selects
+`validate.md` VALIDATE-104 warns about. A sibling occupies the address `add`
+skips (ADD-047): its `reg`'s, else its hexadecimal unit address.
 
 ## 8. `list parent <compatible>`
 

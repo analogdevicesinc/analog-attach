@@ -117,6 +117,18 @@ export function decode_reg_address(reg: DTProperty, address_cells: number): bigi
     return result;
 }
 
+/**
+ * The address a child occupies on its parent's bus: the first address of its
+ * `reg`, read with the parent's `#address-cells`, or with no `reg`, its
+ * hexadecimal unit address. Undefined when its `reg` doesn't decode (it then
+ * occupies nothing, whatever its unit address) or it has neither.
+ */
+export function occupied_address(child: DTNode, address_cells: number): bigint | undefined {
+    const reg = child.properties.find(p => p.name === "reg");
+    if (reg !== undefined) { return decode_reg_address(reg, address_cells); }
+    return child.unit_addr === undefined ? undefined : parse_unit_address(child.unit_addr);
+}
+
 export function next_free_unit_address(
     effective_children: Map<string, DTNode>,
     address_cells: number,
@@ -126,19 +138,10 @@ export function next_free_unit_address(
 
     for (const [name, child] of effective_children) {
         if (!is_enabled(child)) { continue; }
-        const reg = child.properties.find(p => p.name === "reg");
-        if (reg !== undefined) {
-            const address = decode_reg_address(reg, address_cells);
-            if (address !== undefined) {
-                occupied.set(address, name);
-                all_occupants.push({ name, address });
-            }
-        } else if (child.unit_addr !== undefined) {
-            const address = parse_unit_address(child.unit_addr);
-            if (address !== undefined) {
-                occupied.set(address, name);
-                all_occupants.push({ name, address });
-            }
+        const address = occupied_address(child, address_cells);
+        if (address !== undefined) {
+            occupied.set(address, name);
+            all_occupants.push({ name, address });
         }
     }
 

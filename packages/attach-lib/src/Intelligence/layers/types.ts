@@ -1,5 +1,5 @@
 import { ParsedBinding, ResolvedProperty } from "../../Bindings/ParsedBinding.js";
-import { DeviceTree } from "../../Devicetree/index.js";
+import { DeviceTree, type AddressCells } from "../../Devicetree/index.js";
 import { PathAndLabel } from "../parents.js";
 
 // Where a node sits in the combined base tree + overlay, for layers that
@@ -11,7 +11,10 @@ export type NodePlacement = {
     parent_path: string;
     /** First cell of the node's `reg`, when it is a number. */
     reg?: bigint;
-    /** Other enabled children of the parent (base tree merged with the overlay). */
+    /**
+     * Other enabled children of the parent (base tree merged with the overlay), `reg` being the address each occupies
+     * (`occupied_address`, as `add` picks a free one).
+     */
     siblings: { name: string; reg?: bigint }[];
 };
 
@@ -23,6 +26,11 @@ export type PropertyContext = {
     /** Same semantics as the `parent_name` argument of `query_devicetree`. */
     parent_name?: string;
     placement?: NodePlacement;
+    /**
+     * The `#address-cells` / `#size-cells` the node's `reg` is read with, when the consumer knows them better than
+     * the tree: a child node's are its parent's, which is the node being configured.
+     */
+    parent_cells?: AddressCells;
     /** The node's resolved binding, when the consumer has one: lets the binding layer offer values it pins. */
     binding?: Pick<ParsedBinding, "required_properties" | "properties">;
 };
