@@ -4,12 +4,6 @@
  */
 export type PatternExpansion = { names: string[] } | { stem: string };
 
-/** The names a regex matches, all of them; empty when they are unbounded. */
-export function expand_regex(regex: RegExp): string[] {
-    const expansion = expand_pattern(regex.source, Number.POSITIVE_INFINITY);
-    return "names" in expansion ? expansion.names : [];
-}
-
 /**
  * Expand the regex subset bindings use (literals, escapes, character classes,
  * groups with alternation, `?`, `*`, `+`, `{n,m}`, anchors) into the names it
