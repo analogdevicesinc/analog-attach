@@ -36,7 +36,7 @@ process.
 | `01-grammar.abnf` | The command-line grammar (ABNF, RFC 5234 and RFC 7405) |
 | `01-grammar.md` | How to read the grammar; the token rules ABNF can't express |
 | `02-common.md` | What every command shares: modes, the backend, streams, input errors, refusals, exit status, settings, workspace loading; for the Linux backend the base, the workfile and the binding caches |
-| `03-commands/<command>.md` | One chapter per command. Front end: `config`, `skill`, `setup` (the bare `analog-attach`). Shared, the Linux backend first, then the no-OS backend: `add`, `build`, `delete`, `deploy`, `import`, `init`, `list`, `read`, `rename`, `update`, `validate`. The Linux backend's own: `enable-disable`, `move`, and `list parent`, `list overlay` in `list.md`. The no-OS backend's own: `generate`, and `list context` in `list.md`. Withdrawn: `__list`, `ui` |
+| `03-commands/<command>.md` | One chapter per command. Front end: `config`, `skill`, `setup` (the bare `analog-attach`). Shared, the Linux backend first, then the no-OS backend: `add`, `build`, `delete`, `deploy`, `import`, `init`, `list`, `read`, `rename`, `update`, `validate`. The Linux backend's own: `enable-disable`, `move`, and `list parent`, `list overlay` in `list.md`. The no-OS backend's own: `generate`. Withdrawn: `__list`, `ui` |
 | `04-protocol/*.schema.json` | JSON Schema (2020-12) of the `--json` responses (§2.1) |
 | `05-completion.md` | Shell completion: `__complete` and `completion [<shell>] [--install \| --uninstall]` |
 
@@ -62,9 +62,8 @@ A shared command's schema follows `src/interface/backend-responses.ts`:
 
 A client that knows its backend validates against that backend's
 definition: `read.schema.json#/$defs/linux`. A shared command that only one
-backend implements has only that backend's definition next to `base`:
-`list-context.schema.json` has `$defs/noos`, since the linux backend answers
-that `list context` is not supported (COM-015). The schemas of a backend's
+backend implements would have only that backend's definition next to `base`
+(none is, now that the linux backend has `list context`). The schemas of a backend's
 own commands (`move`, `enable-disable`, `list-parent`, `list-overlay`;
 `generate`) and of the front end's (`config`, `completion`, `skill`) have no
 `base` and are validated at the root.

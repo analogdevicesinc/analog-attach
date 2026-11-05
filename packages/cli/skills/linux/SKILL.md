@@ -55,6 +55,7 @@ Every command checks the configuration it needs up front: `linux` must be a kern
 - `config`: No prerequisites
 - `init`: Needs `linux` (and its caches), `devicetree`, `workfile` (the file may not exist yet)
 - `list devices`: Needs `linux` (and its caches)
+- `list context`: Needs `linux` only (no caches)
 - `list parent`, `list overlay`: Need `linux`, `devicetree`
 - `import`: Needs `linux`, `devicetree` (it creates the workfile and configures it)
 - `list property`: Needs `linux`, `devicetree`, `workfile`
@@ -143,7 +144,8 @@ analog-attach config --reload                 # rebuild the binding caches
 # Set up core paths (setting linux builds the binding caches, about a minute)
 analog-attach config backend linux
 analog-attach config linux ~/linux
-analog-attach config devicetree ~/rpi-4.dts
+analog-attach list context                       # the base .dts files of the Linux tree, by absolute path
+analog-attach config devicetree ~/linux/arch/arm/boot/dts/broadcom/bcm2711-rpi-4-b.dts
 
 # Rebuild the caches after the bindings changed
 analog-attach config --reload
@@ -166,6 +168,7 @@ analog-attach config overlay-syntax --reset
 ```bash
 analog-attach list --help                    # show available kinds
 analog-attach list devices [<filter>]        # compatible strings and their category (substring filter)
+analog-attach list context                   # base .dts files of the Linux tree (then: config devicetree <path>)
 analog-attach list property [<path> [<prop>]]  # the overlay's nodes; a node's properties; with prop: type details
 analog-attach list value <path> <prop>       # concrete values for a property
 analog-attach list parent <compatible>       # valid parent buses for a device
@@ -206,6 +209,7 @@ analog-attach list parent adi,ad7124-8
 ```
 
 **JSON**:
+- `list context` gives `devicetrees: [{ path, arch, name, configured? }]`, `path` what `config devicetree` takes.
 - `list devices` gives `devices: [{ key, tag }]`, `tag` the category (the binding's folder, `iio/adc`), by category then compatible; as text `<compatible>  <category>` a line; when the filter names a device exactly (or matches only one), also `device`, with its title, description, binding file and properties. `names` is deprecated.
 - `list property` gives the overlay's node paths in `names`; `list property <path>` gives `names` and `properties: [{ name, type, display, required, set }]`; with a property, `property: { name, description, type, display, required, set, default? }`. The other top-level fields are deprecated.
 - `list value <path> <prop>` takes no further argument: a third one exits 2 (`A member is not supported by the linux backend`).
@@ -556,6 +560,7 @@ interrupt-parent = <&gpio>;
 
 ```bash
 analog-attach update <path> <property> [value...] [--quiet]
+analog-attach update <path> <property> --suggest    # the values it can take, as list value; sets nothing
 ```
 
 **Behaviour with no value**:
@@ -611,7 +616,7 @@ analog-attach update adc '#address-cells' 1                # quote # properties
 
 ### 9. `list value` - Suggested Values
 
-Don't guess wiring: for `reg`, `interrupt-parent`, `interrupts`, `reset-gpios` and other `*-gpios`, run `list value <label> <prop>` and pick from the result, then `update <label> <prop> <value>`.
+Don't guess wiring: for `reg`, `interrupt-parent`, `interrupts`, `reset-gpios` and other `*-gpios`, run `list value <label> <prop>` (or `update <label> <prop> --suggest`, the same answer) and pick from the result, then `update <label> <prop> <value>`.
 
 How to read `list value`:
 - Values are pinned by the binding or taken from the base devicetree; a note means the value was checked against the binding and may be rejected by `validate`.

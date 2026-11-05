@@ -57,3 +57,20 @@ export interface ListPropertyTypeResponse extends CommonResponse {
 }
 
 export type ListPropertyResponse = ListPropertyNamesResponse | ListPropertyTypeResponse;
+
+/** A base devicetree of the Linux tree, as `list context` lists it. */
+export interface ListedDevicetree {
+    /** What `config devicetree` takes: the file, absolute. */
+    path: string;
+    /** The architecture, `arm64`. */
+    arch: string;
+    /** The file under `arch/<arch>/boot/dts`, `broadcom/bcm2711-rpi-4-b.dts`. */
+    name: string;
+    /** Set on the configured `devicetree`. */
+    configured?: true;
+}
+
+/** `list context`: the base devicetrees of the Linux tree. */
+export interface ListContextResponse extends CommonResponse {
+    devicetrees: ListedDevicetree[];
+}

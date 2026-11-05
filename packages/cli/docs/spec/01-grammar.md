@@ -284,13 +284,13 @@ marked *noos* where it is noos.
 | `import` | `<source>` | |
 | `add` | `[device]` (linux: `[compatible]`) | `--name <name>`, `--quiet`; linux: `--parent <path>`, `--label <label>`, `--template <template>`; noos: `--as <interface>` |
 | `read` | `[path] [property]` | `--quiet` |
-| `update` | `[path] [property] [value...]` | `--quiet`; noos: `--suggest` |
+| `update` | `[path] [property] [value...]` | `--quiet`, `--suggest` |
 | `delete` | `[path] [property]` | `--force` |
 | `rename` | `<path> <new-name>` | |
 | `list devices` | `[filter]` | |
 | `list property` | `[path] [property]` | |
 | `list value` | `<path> <property> [member]` | |
-| `list context` (noos) | | |
+| `list context` | | |
 | `list parent` (linux) | `<compatible>` | |
 | `list overlay` (linux) | `<compatible>` | |
 | `move` (linux) | `<path> <destination>` | |
@@ -309,8 +309,7 @@ without them is in its chapter: `read` with no path prints the workfile,
 compatible (add <compatible>)`, `enable`, `disable` and `update` report
 `Missing: path`. `list` alone, and `skill` alone, print their usage with
 status 0. Where the backend is linux, `list value` with a member reports the
-input error `A member is not supported by the linux backend: <member>`, and
-`list context` is not supported (COM-015). Where the backend is noos, `list
+input error `A member is not supported by the linux backend: <member>`. Where the backend is noos, `list
 property` with a property is the input error of `03-commands/list.md`
 LIST-522, and `update` with more than two values that of UPDATE-501.
 

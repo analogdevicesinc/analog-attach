@@ -461,6 +461,7 @@ const LINUX_CASES: readonly Case<LinuxHarness>[] = [
     { route: "update", argv: ["update", "adc", "interrupts", "25", "8"], shape: "answer" },
     { route: "update", argv: ["update", "adc", "reg"], shape: "answer" },
     { route: "update", argv: ["update", "adc", "channel@0"], shape: "answer" },
+    { route: "update", argv: ["update", "adc", "interrupt-parent", "--suggest"], shape: "answer" },
     { route: "update", argv: ["update", "spi0", "status", "disabled"], shape: "answer" },
     { route: "update", argv: ["update", "nope", "status", "okay"], shape: "refusal" },
 
@@ -483,6 +484,9 @@ const LINUX_CASES: readonly Case<LinuxHarness>[] = [
     { route: "list devices", argv: ["list", "devices", "ad7124"], shape: "answer" },
     { route: "list devices", argv: ["list", "devices", "adi,ad7124-8"], shape: "answer" },
     { route: "list devices", argv: ["list", "devices"], shape: "config-refusal", prepare: unconfigured },
+
+    { route: "list context", argv: ["list", "context"], shape: "answer" },
+    { route: "list context", argv: ["list", "context"], shape: "config-refusal", prepare: unconfigured },
 
     { route: "list property", argv: ["list", "property"], shape: "answer" },
     { route: "list property", argv: ["list", "property", "adc"], shape: "answer" },
