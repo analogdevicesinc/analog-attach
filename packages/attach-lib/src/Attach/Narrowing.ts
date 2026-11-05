@@ -1,11 +1,7 @@
 import Ajv2019, { type KeywordDefinition, type ValidateFunction } from "ajv/dist/2019.js";
 import type { DataValidateFunction } from "ajv/dist/types/index.js";
 
-import { CANARY } from "../Bindings/stages/Canaries.js";
-import { DT_TYPE } from "../Bindings/stages/References.js";
-import { translate_JSONSchema } from "../Bindings/stages/Translate.js";
-import { ParsedBinding } from "../Bindings/model/ParsedBinding.js";
-import { deep_merge, DtBindingSchema, is_schema, Schema, value_at } from "../Bindings/schema/Schema.js";
+import { CANARY, deep_merge, DT_TYPE, DtBindingSchema, is_schema, Schema, value_at } from "../Bindings/index.js";
 
 /** A schema, the AJV function compiled from it and the schema narrowed so far by the data it saw. */
 export type NarrowingTarget = {
@@ -83,7 +79,7 @@ export function create_ajv(): Ajv2019 {
 /**
  * A copy of `schema` without the `$id` of the schemas inlined into it. Dereferencing copies a
  * referenced schema, `$id` included, to every place that points at it, and AJV rejects an `$id`
- * that appears twice in one schema. (`translate_JSONSchema` still reads those `$id`s, so the
+ * that appears twice in one schema. (the translation still reads those `$id`s, so the
  * schema itself keeps them.)
  */
 function without_nested_ids<T extends object>(schema: T): T {
@@ -149,11 +145,11 @@ function without_canary(branch: unknown): Schema {
 
 /**
  * Runs `data` (`node_data_json`) through the target's compiled schema and narrows the
- * target's schema to the `if/then` branches that now apply. Only the canary
+ * target's schema to the `if/then` branches that now apply, returning it. Only the canary
  * errors are read: dt-validate, not AJV, checks the devicetree. Undefined when
  * `data` isn't JSON or AJV gave no errors to read.
  */
-export function narrow(target: NarrowingTarget, data: string): ParsedBinding | undefined {
+export function narrow(target: NarrowingTarget, data: string): DtBindingSchema | undefined {
     let canary_data;
 
     try {
@@ -166,7 +162,7 @@ export function narrow(target: NarrowingTarget, data: string): ParsedBinding | u
     canary_data[CANARY] = true;
 
     if (target.compiled(canary_data) === true) {
-        return translate_JSONSchema(target.current);
+        return target.current;
     }
 
     const ajv_errors = target.compiled.errors;
@@ -196,7 +192,7 @@ export function narrow(target: NarrowingTarget, data: string): ParsedBinding | u
 
     target.current = current;
 
-    return translate_JSONSchema(current);
+    return current;
 }
 
 if (import.meta.vitest) {

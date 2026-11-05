@@ -1,15 +1,18 @@
 import { Result } from "../result.js";
-import { insert_canaries } from "./stages/Canaries.js";
-import { SchemaContext } from "./Context.js";
+import { bindings_directory, create_context, SchemaContext, SchemaPaths } from "./Context.js";
 import { apply_JSONSchema_fixups, StepInfo } from "./fixups/Fixups.js";
+import type { ParsedBinding } from "./model/ParsedBinding.js";
+import { DtBindingSchema } from "./schema/Schema.js";
+import { insert_canaries } from "./stages/Canaries.js";
 import { resolve_properties } from "./stages/Properties.js";
 import { merge_redefinitions } from "./stages/Redefinitions.js";
 import { resolve_references } from "./stages/References.js";
 import { merge_selected, selected_definitions } from "./stages/Selected.js";
-import { DtBindingSchema } from "./schema/Schema.js";
+import { translate_JSONSchema } from "./stages/Translate.js";
+import { filter_peripheral_properties, load_spi_peripherals, type ControllerContext } from "./stages/VendorFilter.js";
 import type { PipelineTracer } from "./Trace.js";
 
-/** The stages `process_binding` runs, in order. */
+/** The schema stages `process_schema` runs, in order. */
 export const PIPELINE_STAGES = [
     {
         id: "references",
@@ -39,17 +42,76 @@ export const PIPELINE_STAGES = [
 
 export type PipelineStage = typeof PIPELINE_STAGES[number]["id"];
 
+/** What `parse_binding` runs, in order: the schema stages, then the translation to a `ParsedBinding`. */
+export const PARSE_STEPS = [
+    ...PIPELINE_STAGES,
+    {
+        id: "translate",
+        summary: "Builds the `ParsedBinding`: each property's `AttachType`, the child-node patterns and the property patterns.",
+    },
+    {
+        id: "vendor-filter",
+        summary: "Drops the vendor-specific SPI peripheral properties (`pl022,`, `nvidia,`) of a controller that isn't the node's, and under a controller that isn't an SPI one (named in `ControllerContext`) the SPI peripheral properties the binding doesn't require, when the controller is given.",
+    },
+] as const satisfies readonly StepInfo[];
+
 export type PipelineError = {
     stage: PipelineStage;
     message: string;
 };
 
+export type ParseOptions = {
+    /** The node's parent, for the vendor filter; without it no property is dropped. */
+    controller?: ControllerContext;
+    /** Gets the binding after each step of `PARSE_STEPS`, and what each fixup changed (`TraceEvent`). */
+    trace?: PipelineTracer;
+};
+
+/** A binding through every step of `PARSE_STEPS`. */
+export type ProcessedBinding = {
+    /** The schema after the schema stages, which the branch narrowing compiles. */
+    schema: DtBindingSchema;
+    /** `schema` translated and filtered. */
+    binding: ParsedBinding;
+    /** The translation and filter `binding` went through, for a narrowing of `schema`. */
+    to_binding: (schema: DtBindingSchema) => ParsedBinding;
+};
+
+/**
+ * The entry point of `Bindings`: the binding at `binding_path` (a YAML file) run through every step of
+ * `PARSE_STEPS`, resolved against `paths`. `options.trace` gets the binding after each step.
+ */
+export async function parse_binding(
+    binding_path: string,
+    paths: SchemaPaths,
+    options?: ParseOptions,
+): Promise<Result<ProcessedBinding, PipelineError>> {
+
+    const trace = options?.trace;
+    const processed = await process_schema(binding_path, create_context(paths), trace);
+
+    if (Result.is_err(processed)) {
+        return processed;
+    }
+
+    const translated = translate_JSONSchema(processed.value);
+    trace?.({ kind: "translated", step: "translate", binding: structuredClone(translated) });
+
+    const controller = options?.controller;
+    const spi = controller === undefined ? undefined : load_spi_peripherals(bindings_directory(paths));
+    const filter = (binding: ParsedBinding): ParsedBinding => filter_peripheral_properties(binding, controller, spi);
+    const binding = filter(translated);
+    trace?.({ kind: "translated", step: "vendor-filter", binding: structuredClone(binding) });
+
+    return Result.Ok({ schema: processed.value, binding, to_binding: schema => filter(translate_JSONSchema(schema)) });
+}
+
 /**
  * Runs a binding through every schema stage, up to the schema that gets
- * validated and translated: references → properties → redefinitions →
+ * narrowed and translated: references → properties → redefinitions →
  * canaries → fixups → selected. `trace` gets the schema after each (`TraceEvent`).
  */
-export async function process_binding(
+export async function process_schema(
     binding_path: string,
     ctx: SchemaContext,
     trace?: PipelineTracer,

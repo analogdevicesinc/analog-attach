@@ -1,5 +1,4 @@
-import { ParsedBinding } from "../Bindings/model/ParsedBinding.js";
-import { list_cell, type Cell } from "../Bindings/model/AttachType.js";
+import { ParsedBinding, list_cell, type Cell } from "../Bindings/index.js";
 import { DeviceTree, DTNode, has_property, type LocatedNode } from "../Devicetree/index.js";
 import { find_nodes, node_label } from "./providers.js";
 
