@@ -9,7 +9,7 @@ export type { TraceEvent, PipelineTracer } from './Bindings/Trace.js';
 export { populate_binding, populate_properties, type PopulateOptions } from './Attach/Populate.js';
 export type { SchemaPaths } from './Bindings/Context.js';
 export { Result } from './result.js';
-export { type ControllerContext, filter_vendor_peripheral_properties } from './Bindings/VendorPeripheralFilter.js';
+export { type ControllerContext, filter_peripheral_properties, load_spi_peripherals, type SpiPeripherals } from './Bindings/VendorPeripheralFilter.js';
 export type { ResolvedProperty, PatternPropertyRule, PropertyPatternRule, ParsedBinding } from './Bindings/ParsedBinding.js';
 export { expand_pattern, type PatternExpansion } from './RegexExpansion.js';
 export { references_to, unresolved_references, unresolved_targets, type ReferenceTo, type UnresolvedReference, type UnresolvedTarget } from './Devicetree/References.js';
