@@ -4,7 +4,7 @@ import { DeviceTree, DTNode, type AddressCells } from "../Devicetree/index.js";
 import { IntelligenceStack } from "../Intelligence/layers/stack.js";
 import { IntelligenceLayer, NodePlacement } from "../Intelligence/layers/types.js";
 import { own_cells } from "../Intelligence/reg.js";
-import { validator_input_json } from "./DTxBinding.js";
+import { node_data_json } from "./NodeData.js";
 
 // Extra intelligence for populate_*: layers appended on top of the default
 // binding + devicetree stack, and the node's placement for layers that need it.
@@ -42,7 +42,7 @@ export function populate_binding(
     data: string | DTNode,
     options?: PopulateOptions,
 ): ParsedBinding {
-    const data_string = typeof data === 'string' ? data : validator_input_json(data, binding.properties);
+    const data_string = typeof data === 'string' ? data : node_data_json(data, binding.properties);
 
     const pattern_options: PopulateOptions = { layers: options?.layers, parent_name: options?.parent_name, parent_cells: own_cells(binding.properties, data_string) };
     return {

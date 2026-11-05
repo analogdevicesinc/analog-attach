@@ -517,7 +517,7 @@ allOf:
           maximum: 3
 `);
         const maximum = (compatible: string) => {
-            const narrowed = attach.update_binding_by_changes(JSON.stringify({ compatible: [compatible] }));
+            const narrowed = attach.narrow_binding(JSON.stringify({ compatible: [compatible] }));
             const mode = narrowed === undefined ? undefined : property(narrowed, 'adi,mode');
             return mode?._t === 'scalar' && mode.cell._t === 'number' ? mode.cell.maximum : undefined;
         };

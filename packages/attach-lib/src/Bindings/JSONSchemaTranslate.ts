@@ -429,7 +429,7 @@ function position_cell(definition: any, dt_type: unknown): Cell | undefined {
 
 /**
  * A property dt-schema types as strings (`dtType`, tagged by the `dt_type` fixup) whose schema says nothing we can
- * read is still a list of strings: the validator input must keep a lone `compatible = "x"` an array, or an `if` of
+ * read is still a list of strings: the node data (`node_data`) must keep a lone `compatible = "x"` an array, or an `if` of
  * `contains` never matches. Branches that are all open `enum` lists give the union of the enums as its options; any
  * other the strings alone.
  */

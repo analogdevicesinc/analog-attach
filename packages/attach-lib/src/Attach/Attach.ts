@@ -7,7 +7,7 @@ import type { StepInfo } from '../Bindings/JSONSchemaFixups.js';
 import type { PipelineTracer } from '../Bindings/Trace.js';
 import { Result } from '../result.js';
 import { filter_peripheral_properties, load_spi_peripherals, type ControllerContext } from '../Bindings/VendorPeripheralFilter.js';
-import { compile_targets, narrow, ValidationTarget } from './Validation.js';
+import { compile_targets, narrow, NarrowingTarget } from './Narrowing.js';
 
 export type ParseOptions = {
     controller?: ControllerContext;
@@ -16,7 +16,7 @@ export type ParseOptions = {
 };
 
 export type BindingParseError = {
-    stage: PipelineStage | "validation";
+    stage: PipelineStage | "narrowing";
     message: string;
 };
 
@@ -42,8 +42,8 @@ export class Attach {
     }
 
     private constructor(
-        private readonly root: ValidationTarget,
-        private readonly pattern_targets: Map<string, ValidationTarget>,
+        private readonly root: NarrowingTarget,
+        private readonly pattern_targets: Map<string, NarrowingTarget>,
         public readonly parsed_binding: ParsedBinding,
         /** The peripheral filter of `parse`, which a narrowed binding goes through too: narrowing translates it again. */
         private readonly filter: (binding: ParsedBinding) => ParsedBinding,
@@ -74,15 +74,15 @@ export class Attach {
             const targets = compile_targets(processed.value);
             return Result.Ok(new Attach(targets.root, targets.patterns, parsed_binding, filter));
         } catch (error) {
-            return Result.Err({ stage: "validation", message: error instanceof Error ? error.message : "Failed to compile validation function" });
+            return Result.Err({ stage: "narrowing", message: error instanceof Error ? error.message : "AJV failed to compile the binding" });
         }
     }
 
-    public update_binding_by_changes(data: string): ParsedBinding | undefined {
+    public narrow_binding(data: string): ParsedBinding | undefined {
         return this.filtered(narrow(this.root, data));
     }
 
-    public update_pattern_binding_by_changes(pattern: string, data: string): ParsedBinding | undefined {
+    public narrow_pattern_binding(pattern: string, data: string): ParsedBinding | undefined {
         const target = this.pattern_targets.get(pattern);
 
         if (target === undefined) {

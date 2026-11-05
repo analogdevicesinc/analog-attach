@@ -52,7 +52,7 @@ function pinned_count(definition: ResolvedProperty | undefined): bigint | undefi
 
 /**
  * The `#address-cells` / `#size-cells` a node gives its children: the ones its
- * data (validator-input JSON) sets, else the ones its binding pins, else 1 and 0.
+ * data (`node_data_json`) sets, else the ones its binding pins, else 1 and 0.
  */
 export function own_cells(properties: ResolvedProperty[], data: string): AddressCells {
     const parsed: Record<string, unknown> = JSON.parse(data);

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-// Run nodes through update_binding_by_changes the way the CLI does (populate_binding, then
-// validator_input_json) and print the encoded data and the required properties after narrowing.
+// Run nodes through narrow_binding the way the CLI does (populate_binding, then
+// node_data_json) and print the encoded data and the required properties after narrowing.
 //   node scripts/repros/branch.mjs <binding path under Documentation/devicetree/bindings> '<node body>' ['<node body>' ...]
 // A node body is what goes between the braces of `n@0 { ... };`, e.g. 'compatible = "arm,psci";'.
 // Reads dist/ (yarn build first) and test/linux, test/dt-schema, and the processed schema of test/linux (scripts/processed-schema.mjs) if there is one.
@@ -9,7 +9,7 @@ import { fileURLToPath } from "node:url";
 import { schema_paths } from "../processed-schema.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
-const { Attach, DeviceTree, Result, populate_binding, validator_input_json } = await import(join(root, "dist/index.js"));
+const { Attach, DeviceTree, Result, populate_binding, node_data_json } = await import(join(root, "dist/index.js"));
 const [file, ...bodies] = process.argv.slice(2);
 if (bodies.length === 0) {
   console.error("usage: branch.mjs <binding> '<node body>' ...");
@@ -25,8 +25,8 @@ for (const body of bodies) {
   const tree = DeviceTree.new_from_string(`/dts-v1/;\n/ { n: n@0 { ${body} }; };`);
   if (typeof tree === "string") { throw new Error(tree); }
   const initial = populate_binding(attach.parsed_binding, tree, "{}", {});
-  const json = validator_input_json(tree.node_at("/n@0"), initial.properties);
-  const narrowed = attach.update_binding_by_changes(json);
+  const json = node_data_json(tree.node_at("/n@0"), initial.properties);
+  const narrowed = attach.narrow_binding(json);
   console.log(body);
   console.log(`  encoded:  ${json}`);
   console.log(`  required: ${JSON.stringify(narrowed?.required_properties)}`);
