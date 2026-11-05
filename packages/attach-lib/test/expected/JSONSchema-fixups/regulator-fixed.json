@@ -14,7 +14,50 @@
                 "^regulator-state-(standby|mem|disk)$": {
                     "additionalProperties": false,
                     "description": "sub-nodes for regulator state in Standby, Suspend-to-RAM, and Suspend-to-DISK modes. Equivalent with standby, mem, and disk Linux sleep states.",
+                    "patternProperties": {
+                        "^pinctrl-[0-9]+$": {
+                            "dtType": "phandle-array",
+                            "items": {
+                                "additionalItems": {
+                                    "dtType": "uint32",
+                                    "maximum": 4294967295,
+                                    "minimum": 0,
+                                    "type": "integer",
+                                    "typeSize": 32
+                                },
+                                "items": [
+                                    {
+                                        "oneOf": [
+                                            {
+                                                "maximum": 4294967295,
+                                                "minimum": 1,
+                                                "type": "integer"
+                                            },
+                                            {
+                                                "const": 0,
+                                                "type": "integer"
+                                            }
+                                        ]
+                                    }
+                                ],
+                                "maxItems": 1024,
+                                "minItems": 1,
+                                "type": "array"
+                            },
+                            "minItems": 1,
+                            "type": "array"
+                        }
+                    },
                     "properties": {
+                        "pinctrl-names": {
+                            "dtType": "string-array",
+                            "items": {
+                                "type": "string"
+                            },
+                            "minItems": 1,
+                            "type": "array",
+                            "uniqueItems": true
+                        },
                         "regulator-changeable-in-suspend": {
                             "description": "whether the default voltage and the regulator on/off in suspend can be changed in runtime.",
                             "dtType": "flag",
@@ -528,6 +571,40 @@
     "examples": [
         "reg_1v8: regulator-1v8 {\n  compatible = \"regulator-fixed\";\n  regulator-name = \"1v8\";\n  regulator-min-microvolt = <1800000>;\n  regulator-max-microvolt = <1800000>;\n  gpio = <&gpio1 16 0>;\n  startup-delay-us = <70000>;\n  enable-active-high;\n  regulator-boot-on;\n  gpio-open-drain;\n  vin-supply = <&parent_reg>;\n};\nreg_1v8_clk: regulator-1v8-clk {\n  compatible = \"regulator-fixed-clock\";\n  regulator-name = \"1v8\";\n  regulator-min-microvolt = <1800000>;\n  regulator-max-microvolt = <1800000>;\n  clocks = <&clock1>;\n  startup-delay-us = <70000>;\n  enable-active-high;\n  regulator-boot-on;\n  vin-supply = <&parent_reg>;\n};\nreg_1v8_domain: regulator-1v8-domain {\n  compatible = \"regulator-fixed-domain\";\n  regulator-name = \"1v8\";\n  regulator-min-microvolt = <1800000>;\n  regulator-max-microvolt = <1800000>;\n  power-domains = <&domain1>;\n  required-opps = <&domain1_state1>;\n  startup-delay-us = <70000>;\n  enable-active-high;\n  regulator-boot-on;\n  vin-supply = <&parent_reg>;\n};\n"
     ],
+    "patternProperties": {
+        "^pinctrl-[0-9]+$": {
+            "dtType": "phandle-array",
+            "items": {
+                "additionalItems": {
+                    "dtType": "uint32",
+                    "maximum": 4294967295,
+                    "minimum": 0,
+                    "type": "integer",
+                    "typeSize": 32
+                },
+                "items": [
+                    {
+                        "oneOf": [
+                            {
+                                "maximum": 4294967295,
+                                "minimum": 1,
+                                "type": "integer"
+                            },
+                            {
+                                "const": 0,
+                                "type": "integer"
+                            }
+                        ]
+                    }
+                ],
+                "maxItems": 1024,
+                "minItems": 1,
+                "type": "array"
+            },
+            "minItems": 1,
+            "type": "array"
+        }
+    },
     "properties": {
         "$nodename": {
             "anyOf": [
@@ -703,6 +780,15 @@
             },
             "minItems": 1,
             "type": "array"
+        },
+        "pinctrl-names": {
+            "dtType": "string-array",
+            "items": {
+                "type": "string"
+            },
+            "minItems": 1,
+            "type": "array",
+            "uniqueItems": true
         },
         "power-domains": {
             "deprecated": true,

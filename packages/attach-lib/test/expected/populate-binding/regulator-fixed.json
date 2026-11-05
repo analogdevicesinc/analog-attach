@@ -263,6 +263,17 @@
             }
         },
         {
+            "key": "pinctrl-names",
+            "value": {
+                "_t": "list",
+                "item": {
+                    "_t": "string"
+                },
+                "minItems": 1,
+                "unique": true
+            }
+        },
+        {
             "key": "regulator-min-microvolt",
             "value": {
                 "_t": "matrix",
@@ -756,6 +767,26 @@
                             "maximum": "2147483647n",
                             "minimum": "-2147483648n"
                         }
+                    }
+                ]
+            }
+        }
+    ],
+    "property_patterns": [
+        {
+            "description": "",
+            "pattern": "^pinctrl-[0-9]+$",
+            "value": {
+                "_t": "matrix",
+                "minItems": 1,
+                "rows": [
+                    {
+                        "_t": "list",
+                        "item": {
+                            "_t": "any"
+                        },
+                        "maxItems": 1024,
+                        "minItems": 1
                     }
                 ]
             }
