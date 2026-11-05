@@ -11,6 +11,13 @@ export interface UnresolvedReference {
     reference: string;
 }
 
+/** A property of the overlay that refers to a node (`references_to`). */
+export interface ReferenceTo {
+    /** Absolute path of the node holding the property. */
+    path: string;
+    property: string;
+}
+
 /** A fragment whose `target` / `target-path` names no node that exists before the fragment is applied. */
 export interface UnresolvedTarget {
     fragment: number;
@@ -24,23 +31,46 @@ export interface UnresolvedTarget {
  * tree order. With `under`, only nodes at or below that absolute path.
  */
 export function unresolved_references(overlay: DeviceTreeOverlay, under?: string): UnresolvedReference[] {
+    const found: UnresolvedReference[] = [];
+    each_reference(overlay, (path, property, reference, target) => {
+        if (target === undefined && is_at_or_below(path, under)) { found.push({ path, property, reference: written(reference) }); }
+    });
+    return found;
+}
+
+/**
+ * The properties of the overlay that refer to the node at `path` or a node
+ * below it, held by nodes outside it, in tree order, each property once.
+ */
+export function references_to(overlay: DeviceTreeOverlay, path: string): ReferenceTo[] {
+    const found: ReferenceTo[] = [];
+    each_reference(overlay, (holder, property, _reference, target) => {
+        if (target === undefined || !is_at_or_below(target, path) || is_at_or_below(holder, path)) { return; }
+        if (found.some(f => f.path === holder && f.property === property)) { return; }
+        found.push({ path: holder, property });
+    });
+    return found;
+}
+
+/**
+ * Each reference in the overlay's fragment bodies: the absolute path of the
+ * node holding it, its property, the reference, and the absolute path of the
+ * node it names in the base tree or the overlay (undefined when none).
+ */
+function each_reference(
+    overlay: DeviceTreeOverlay,
+    visit: (path: string, property: string, reference: DTLabel | DTPath, target: string | undefined) => void,
+): void {
     const labels = overlay.all_labels();
     const exists: Exists = path => overlay.effective_node(path) !== undefined;
-    const resolves = (value: DTLabel | DTPath): boolean =>
-        locate(labels, exists, value.kind === "label" ? strip_ampersand(value.name) : value.path) !== undefined;
-    const inside = (path: string): boolean => under === undefined || path === under || path.startsWith(`${under}/`);
-
-    const found: UnresolvedReference[] = [];
     const walk = (node: DTNode, path: string): void => {
-        if (inside(path)) {
-            for (const property of node.properties) {
-                if (is_dt_flag(property.value)) { continue; }
-                for (const value of property.value) {
-                    for (const element of value.kind === "array" ? value.elements : [value]) {
-                        if (is_reference(element) && !resolves(element)) {
-                            found.push({ path, property: property.name, reference: written(element) });
-                        }
-                    }
+        for (const property of node.properties) {
+            if (is_dt_flag(property.value)) { continue; }
+            for (const value of property.value) {
+                for (const element of value.kind === "array" ? value.elements : [value]) {
+                    if (!is_reference(element)) { continue; }
+                    const target = locate(labels, exists, element.kind === "label" ? strip_ampersand(element.name) : element.path);
+                    visit(path, property.name, element, target);
                 }
             }
         }
@@ -52,7 +82,11 @@ export function unresolved_references(overlay: DeviceTreeOverlay, under?: string
         if (body === undefined) { continue; }
         walk(body, target_root(labels, exists, fragment) ?? fragment_target_text(fragment) ?? "");
     }
-    return found;
+}
+
+/** Whether `path` is `under` or a node below it; any path when there is no `under`. */
+function is_at_or_below(path: string, under: string | undefined): boolean {
+    return under === undefined || path === under || path.startsWith(`${under}/`);
 }
 
 /**
@@ -190,6 +224,30 @@ if (import.meta.vitest) {
             { path: "/aliases", property: "adc0", reference: "&adc" },
             { path: "/aliases", property: "gone", reference: "&{/soc/nope}" },
         ]);
+    });
+
+    test("references_to — the properties outside the subtree that name it or a node below it", () => {
+        const overlay = setup(`&spi0 {
+    adc@0 {
+        refin1-supply = <&vref>;
+        clocks = <&vref>, <&vref>;
+        io-channels = <&dac_ch 0>;
+    };
+    vref: regulator@1 {
+        self = <&vref>;
+        dac_ch: channel@0 { };
+    };
+};
+&gpio {
+    spi = &{/soc/spi@7e204000/regulator@1};
+};`);
+        expect(references_to(overlay, "/soc/spi@7e204000/regulator@1")).toEqual([
+            { path: "/soc/spi@7e204000/adc@0", property: "refin1-supply" },
+            { path: "/soc/spi@7e204000/adc@0", property: "clocks" },
+            { path: "/soc/spi@7e204000/adc@0", property: "io-channels" },
+            { path: "/soc/gpio@7e200000", property: "spi" },
+        ]);
+        expect(references_to(overlay, "/soc/spi@7e204000/adc@0")).toEqual([]);
     });
 
     test("unresolved_references — only under a path", () => {

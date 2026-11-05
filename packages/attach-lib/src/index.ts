@@ -10,7 +10,7 @@ export { Result } from './result.js';
 export { type ControllerContext, filter_vendor_peripheral_properties } from './Bindings/VendorPeripheralFilter.js';
 export type { ResolvedProperty, PatternPropertyRule, PropertyPatternRule, ParsedBinding } from './Bindings/ParsedBinding.js';
 export { expand_pattern, type PatternExpansion } from './RegexExpansion.js';
-export { unresolved_references, unresolved_targets, type UnresolvedReference, type UnresolvedTarget } from './Devicetree/References.js';
+export { references_to, unresolved_references, unresolved_targets, type ReferenceTo, type UnresolvedReference, type UnresolvedTarget } from './Devicetree/References.js';
 export {
     AttachEnumType,
     is_list,
@@ -61,6 +61,8 @@ export {
 } from './Devicetree/UnitAddress.js';
 export {
     is_valid_label,
+    is_valid_node_name,
+    is_valid_unit_address,
     label_from_compatible,
     unique_label,
     choose_label,
