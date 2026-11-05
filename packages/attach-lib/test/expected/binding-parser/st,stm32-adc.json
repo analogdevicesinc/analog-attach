@@ -203,7 +203,8 @@
                                     }
                                 ],
                                 "maxItems": 2,
-                                "minItems": 2
+                                "minItems": 2,
+                                "typeSize": 32
                             }
                         ]
                     }
