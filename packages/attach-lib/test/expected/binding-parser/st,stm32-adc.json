@@ -290,6 +290,17 @@
                             }
                         ]
                     }
+                },
+                {
+                    "key": "pinctrl-names",
+                    "value": {
+                        "_t": "list",
+                        "item": {
+                            "_t": "string"
+                        },
+                        "minItems": 1,
+                        "unique": true
+                    }
                 }
             ],
             "required": [
@@ -576,6 +587,37 @@
                 "_t": "matrix",
                 "description": "A list of access controller specifiers, as defined by the bindings of the access-controllers provider.",
                 "maxItems": 2,
+                "minItems": 1,
+                "rows": [
+                    {
+                        "_t": "list",
+                        "item": {
+                            "_t": "any"
+                        },
+                        "maxItems": 1024,
+                        "minItems": 1
+                    }
+                ]
+            }
+        },
+        {
+            "key": "pinctrl-names",
+            "value": {
+                "_t": "list",
+                "item": {
+                    "_t": "string"
+                },
+                "minItems": 1,
+                "unique": true
+            }
+        }
+    ],
+    "property_patterns": [
+        {
+            "description": "",
+            "pattern": "^pinctrl-[0-9]+$",
+            "value": {
+                "_t": "matrix",
                 "minItems": 1,
                 "rows": [
                     {

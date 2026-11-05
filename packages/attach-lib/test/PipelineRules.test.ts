@@ -167,7 +167,7 @@ patternProperties:
         };
 
         expect(await channel('merged-node', 'unevaluatedProperties: false')).toEqual(expect.arrayContaining(['reg', 'bipolar', 'diff-channels']));
-        expect(await channel('closed-node', 'additionalProperties: false')).toStrictEqual(['reg']);
+        expect(await channel('closed-node', 'additionalProperties: false')).toStrictEqual(['reg', 'pinctrl-names']);
     });
 
     test('a schema that references itself (i2c-controller\'s i2c-bus) still resolves, the inner node empty', async () => {
@@ -456,7 +456,46 @@ properties:
             _t: 'scalar', cell: { _t: 'number', maximum: 0xFF_FF_FF_FFn }, typeSize: 32,
         });
     });
+
+    test('a node that forbids other properties has pinctrl-names and pinctrl-N, typed by pinctrl-consumer.yaml', async () => {
+        const { parsed_binding } = await parsed('selected-pinctrl', `
+properties:
+  compatible:
+    const: x,y
+unevaluatedProperties: false
+`);
+        expect(property(parsed_binding, 'pinctrl-names')).toMatchObject({ _t: 'list', item: { _t: 'string' } });
+        expect(parsed_binding.property_patterns?.find(rule => rule.pattern === '^pinctrl-[0-9]+$')?.value)
+            .toMatchObject({ _t: 'matrix', rows: [{ _t: 'list', minItems: 1, maxItems: 1024 }] });
+    });
+
+    test('a node that names a pinctrl-N, or allows any property, gets no pinctrl properties', async () => {
+        const pinctrl = async (name: string, body: string) => {
+            const { parsed_binding } = await parsed(name, `
+properties:
+  compatible:
+    const: x,y
+${body}
+`);
+            return [...keys_of(parsed_binding.properties), ...keys_of(parsed_binding.property_patterns ?? [])].filter(key => key.includes('pinctrl'));
+        };
+        expect(await pinctrl('own-pinctrl', '  pinctrl-0: true\nunevaluatedProperties: false')).toStrictEqual(['pinctrl-0']);
+        expect(await pinctrl('open-pinctrl', 'additionalProperties: true')).toStrictEqual([]);
+    });
+
+    test('a property pattern of a select: true schema types only the pattern of the same key', async () => {
+        const { parsed_binding } = await parsed('selected-pattern', `
+properties:
+  compatible:
+    const: x,y
+patternProperties:
+  "^pinctrl-[0-9]$": true
+`);
+        expect(parsed_binding.property_patterns?.find(rule => rule.pattern === '^pinctrl-[0-9]$')?.value).toMatchObject({ _t: 'unknown' });
+    });
 });
+
+const keys_of = (rules: ({ key: string } | { pattern: string })[]): string[] => rules.map(rule => 'key' in rule ? rule.key : rule.pattern);
 
 describe('if/then branches', () => {
     test('a then branch that only constrains a property narrows it when its condition holds', async () => {
