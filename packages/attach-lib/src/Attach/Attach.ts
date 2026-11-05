@@ -1,13 +1,13 @@
 import { BindingErrors } from './Errors.js';
 import { ParsedBinding } from '../Bindings/ParsedBinding.js';
 
-import { create_context, SchemaPaths } from '../Bindings/Context.js';
+import { bindings_directory, create_context, SchemaPaths } from '../Bindings/Context.js';
 import { translate_JSONSchema } from '../Bindings/JSONSchemaTranslate.js';
 import { PIPELINE_STAGES, PipelineStage, process_binding } from '../Bindings/Pipeline.js';
 import type { StepInfo } from '../Bindings/JSONSchemaFixups.js';
 import type { PipelineTracer } from '../Bindings/Trace.js';
 import { Result } from '../result.js';
-import { filter_vendor_peripheral_properties, type ControllerContext } from '../Bindings/VendorPeripheralFilter.js';
+import { filter_peripheral_properties, load_spi_peripherals, type ControllerContext } from '../Bindings/VendorPeripheralFilter.js';
 import { compile_targets, narrow, ValidationTarget } from './Validation.js';
 
 export type ParseOptions = {
@@ -30,7 +30,7 @@ export const PARSE_STEPS: readonly StepInfo[] = [
     },
     {
         id: "vendor-filter",
-        summary: "Drops the vendor-specific SPI peripheral properties (`pl022,`, `nvidia,`) of a controller that isn't the node's, when the controller is given.",
+        summary: "Drops the vendor-specific SPI peripheral properties (`pl022,`, `nvidia,`) of a controller that isn't the node's, and under a controller that isn't an SPI one (named in `ControllerContext`) the SPI peripheral properties the binding doesn't require, when the controller is given.",
     },
 ];
 
@@ -46,6 +46,8 @@ export class Attach {
         private readonly root: ValidationTarget,
         private readonly pattern_targets: Map<string, ValidationTarget>,
         public readonly parsed_binding: ParsedBinding,
+        /** The peripheral filter of `parse`, which a narrowed binding goes through too: narrowing translates it again. */
+        private readonly filter: (binding: ParsedBinding) => ParsedBinding,
     ) { }
 
     public static async parse(
@@ -63,19 +65,22 @@ export class Attach {
 
         const translated = translate_JSONSchema(processed.value);
         trace?.({ kind: "translated", step: "translate", binding: structuredClone(translated) });
-        const parsed_binding = filter_vendor_peripheral_properties(translated, options?.controller);
+        const controller = options?.controller;
+        const spi = controller === undefined ? undefined : load_spi_peripherals(bindings_directory(paths));
+        const filter = (binding: ParsedBinding): ParsedBinding => filter_peripheral_properties(binding, controller, spi);
+        const parsed_binding = filter(translated);
         trace?.({ kind: "translated", step: "vendor-filter", binding: structuredClone(parsed_binding) });
 
         try {
             const targets = compile_targets(processed.value);
-            return Result.Ok(new Attach(targets.root, targets.patterns, parsed_binding));
+            return Result.Ok(new Attach(targets.root, targets.patterns, parsed_binding, filter));
         } catch (error) {
             return Result.Err({ stage: "validation", message: error instanceof Error ? error.message : "Failed to compile validation function" });
         }
     }
 
     public update_binding_by_changes(data: string): { binding: ParsedBinding, errors: BindingErrors[] } | undefined {
-        return narrow(this.root, data);
+        return this.filtered(narrow(this.root, data));
     }
 
     public update_pattern_binding_by_changes(pattern: string, data: string): { binding: ParsedBinding, errors: BindingErrors[] } | undefined {
@@ -85,6 +90,10 @@ export class Attach {
             return;
         }
 
-        return narrow(target, data);
+        return this.filtered(narrow(target, data));
+    }
+
+    private filtered(update: ReturnType<typeof narrow>): ReturnType<typeof narrow> {
+        return update === undefined ? undefined : { ...update, binding: this.filter(update.binding) };
     }
 }
