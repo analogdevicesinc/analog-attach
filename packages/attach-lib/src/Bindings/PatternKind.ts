@@ -11,7 +11,8 @@ export function is_node_pattern(pattern: string, schema: unknown): boolean {
     return is_object_schema(schema);
 }
 
-function is_object_schema(schema: unknown): boolean {
+/** Whether a schema describes a node: an object schema, inline or in a `oneOf` / `anyOf` / `allOf` / `then` / `else`. */
+export function is_object_schema(schema: unknown): boolean {
     if (typeof schema !== 'object' || schema === null) {
         return false;
     }

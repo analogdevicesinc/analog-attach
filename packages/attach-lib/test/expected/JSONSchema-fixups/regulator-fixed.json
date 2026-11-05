@@ -550,6 +550,43 @@
             "dtType": "string"
         },
         "clocks": {
+            "anyOf": [
+                {
+                    "type": "object"
+                },
+                {
+                    "dtType": "phandle-array",
+                    "items": {
+                        "additionalItems": {
+                            "dtType": "uint32",
+                            "maximum": 4294967295,
+                            "minimum": 0,
+                            "type": "integer",
+                            "typeSize": 32
+                        },
+                        "items": [
+                            {
+                                "oneOf": [
+                                    {
+                                        "maximum": 4294967295,
+                                        "minimum": 1,
+                                        "type": "integer"
+                                    },
+                                    {
+                                        "const": 0,
+                                        "type": "integer"
+                                    }
+                                ]
+                            }
+                        ],
+                        "maxItems": 1024,
+                        "minItems": 1,
+                        "type": "array"
+                    },
+                    "minItems": 1,
+                    "type": "array"
+                }
+            ],
             "description": "clock to use for enable control. This binding is only available if the compatible is chosen to regulator-fixed-clock. The clock binding is mandatory if compatible is chosen to regulator-fixed-clock.",
             "dtType": "phandle-array",
             "items": {
@@ -567,12 +604,14 @@
                         "regulator-fixed",
                         "regulator-fixed-clock",
                         "regulator-fixed-domain"
-                    ]
+                    ],
+                    "pattern": "^[a-zA-Z0-9][a-zA-Z0-9,+\\-._/]+$"
                 }
             ],
             "maxItems": 1,
             "minItems": 1,
-            "type": "array"
+            "type": "array",
+            "uniqueItems": true
         },
         "enable-active-high": {
             "description": "Polarity of GPIO is Active high. If this property is missing, the default assumed is Active low.",
@@ -606,6 +645,30 @@
         "interrupt-parent": {
             "dtType": "phandle",
             "items": {
+                "additionalItems": {
+                    "dtType": "uint32",
+                    "maximum": 4294967295,
+                    "minimum": 0,
+                    "type": "integer",
+                    "typeSize": 32
+                },
+                "items": [
+                    {
+                        "oneOf": [
+                            {
+                                "maximum": 4294967295,
+                                "minimum": 1,
+                                "type": "integer"
+                            },
+                            {
+                                "const": 0,
+                                "type": "integer"
+                            }
+                        ]
+                    }
+                ],
+                "maxItems": 1,
+                "minItems": 1,
                 "type": "array"
             },
             "maxItems": 1,
@@ -616,6 +679,15 @@
             "description": "Interrupt signaling a critical under-voltage event.",
             "dtType": "uint32-matrix",
             "items": {
+                "dtType": "uint32-array",
+                "items": {
+                    "dtType": "uint32",
+                    "maximum": 4294967295,
+                    "minimum": 0,
+                    "type": "integer",
+                    "typeSize": 32
+                },
+                "minItems": 1,
                 "type": "array"
             },
             "maxItems": 1,
@@ -637,6 +709,30 @@
             "description": "Power domain to use for enable control. This binding is only available if the compatible is chosen to regulator-fixed-domain.",
             "dtType": "phandle-array",
             "items": {
+                "additionalItems": {
+                    "dtType": "uint32",
+                    "maximum": 4294967295,
+                    "minimum": 0,
+                    "type": "integer",
+                    "typeSize": 32
+                },
+                "items": [
+                    {
+                        "oneOf": [
+                            {
+                                "maximum": 4294967295,
+                                "minimum": 1,
+                                "type": "integer"
+                            },
+                            {
+                                "const": 0,
+                                "type": "integer"
+                            }
+                        ]
+                    }
+                ],
+                "maxItems": 1024,
+                "minItems": 1,
                 "type": "array"
             },
             "maxItems": 1,
@@ -659,6 +755,30 @@
             "description": "Performance state to use for enable control. This binding is only available if the compatible is chosen to regulator-fixed-domain. The power-domain binding is mandatory if compatible is chosen to regulator-fixed-domain.",
             "dtType": "phandle-array",
             "items": {
+                "additionalItems": {
+                    "dtType": "uint32",
+                    "maximum": 4294967295,
+                    "minimum": 0,
+                    "type": "integer",
+                    "typeSize": 32
+                },
+                "items": [
+                    {
+                        "oneOf": [
+                            {
+                                "maximum": 4294967295,
+                                "minimum": 1,
+                                "type": "integer"
+                            },
+                            {
+                                "const": 0,
+                                "type": "integer"
+                            }
+                        ]
+                    }
+                ],
+                "maxItems": 1024,
+                "minItems": 1,
                 "type": "array"
             },
             "maxItems": 1,

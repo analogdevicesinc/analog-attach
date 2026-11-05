@@ -1,54 +1,7 @@
 {
-    "description": "Analog Devices AD7292 10-Bit Monitor and Control System with ADC, DACs,\nTemperature Sensor, and GPIOs\n\nSpecifications about the part can be found at:\n  https://www.analog.com/media/en/technical-documentation/data-sheets/ad7292.pdf\n",
+    "description": "Analog Devices AD7904, AD7914, AD7923, AD7924 4 Channel ADCs, and AD7908,\n AD7918, AD7927, AD7928 8 Channels ADCs.\n\nSpecifications about the part can be found at:\n  https://www.analog.com/media/en/technical-documentation/data-sheets/AD7923.pdf\n  https://www.analog.com/media/en/technical-documentation/data-sheets/AD7904_7914_7924.pdf\n  https://www.analog.com/media/en/technical-documentation/data-sheets/AD7908_7918_7928.pdf\n",
     "examples": [
-        "spi {\n  #address-cells = <1>;\n  #size-cells = <0>;\n\n  ad7292: adc@0 {\n    compatible = \"adi,ad7292\";\n    reg = <0>;\n    spi-max-frequency = <25000000>;\n    vref-supply = <&adc_vref>;\n    spi-cpha;\n\n    #address-cells = <1>;\n    #size-cells = <0>;\n\n    channel@0 {\n      reg = <0>;\n      diff-channels = <0 1>;\n    };\n    channel@2 {\n      reg = <2>;\n    };\n    channel@3 {\n      reg = <3>;\n    };\n    channel@4 {\n      reg = <4>;\n    };\n    channel@5 {\n      reg = <5>;\n    };\n    channel@6 {\n      reg = <6>;\n    };\n    channel@7 {\n      reg = <7>;\n    };\n  };\n};\n"
-    ],
-    "pattern_properties": [
-        {
-            "description": "Represents the external channels which are connected to the ADC.\n",
-            "pattern": "^channel@[0-7]$",
-            "properties": [
-                {
-                    "key": "reg",
-                    "value": {
-                        "_t": "matrix",
-                        "description": "The channel number. It can have up to 8 channels numbered from 0 to 7.\n",
-                        "maxItems": 1,
-                        "minItems": 1,
-                        "rows": [
-                            {
-                                "_t": "list",
-                                "item": {
-                                    "_t": "number",
-                                    "maximum": "7n",
-                                    "minimum": "0n"
-                                },
-                                "maxItems": 1,
-                                "minItems": 1
-                            }
-                        ]
-                    }
-                },
-                {
-                    "key": "diff-channels",
-                    "value": {
-                        "_t": "list",
-                        "description": "Many ADCs have dual Muxes to allow different input pins to be routed to both the positive and negative inputs of a differential ADC. The first value specifies the positive input pin, the second specifies the negative input pin.",
-                        "item": {
-                            "_t": "number",
-                            "maximum": "4294967295n",
-                            "minimum": "0n"
-                        },
-                        "maxItems": 2,
-                        "minItems": 2,
-                        "typeSize": 32
-                    }
-                }
-            ],
-            "required": [
-                "reg"
-            ]
-        }
+        "spi {\n  #address-cells = <1>;\n  #size-cells = <0>;\n\n  ad7928: adc@0 {\n    compatible = \"adi,ad7928\";\n    reg = <0>;\n    spi-max-frequency = <25000000>;\n    refin-supply = <&adc_vref>;\n\n    #address-cells = <1>;\n    #size-cells = <0>;\n  };\n};\n"
     ],
     "properties": [
         {
@@ -58,7 +11,21 @@
                 "item": {
                     "_t": "enum",
                     "enum": [
-                        "adi,ad7292"
+                        "adi,ad7904",
+                        "adi,ad7908",
+                        "adi,ad7914",
+                        "adi,ad7918",
+                        "adi,ad7923",
+                        "adi,ad7928",
+                        "adi,ad7924",
+                        [
+                            "adi,ad7924",
+                            "adi,ad7923"
+                        ],
+                        [
+                            "adi,ad7927",
+                            "adi,ad7928"
+                        ]
                     ],
                     "enum_type": "string"
                 },
@@ -82,22 +49,17 @@
                             "minimum": "0n"
                         },
                         "maxItems": 1,
-                        "minItems": 1
+                        "minItems": 1,
+                        "typeSize": 32
                     }
                 ]
             }
         },
         {
-            "key": "spi-cpha",
-            "value": {
-                "_t": "flag"
-            }
-        },
-        {
-            "key": "vref-supply",
+            "key": "refin-supply",
             "value": {
                 "_t": "list",
-                "description": "The regulator supply for ADC and DAC reference voltage.\n",
+                "description": "The regulator supply for ADC reference voltage.\n",
                 "item": {
                     "_t": "enum",
                     "enum": [
@@ -114,6 +76,13 @@
             }
         },
         {
+            "key": "adi,range-double",
+            "value": {
+                "_t": "flag",
+                "description": "Sets the analog input range from 0 to 2xVREF."
+            }
+        },
+        {
             "key": "#address-cells",
             "value": {
                 "_t": "scalar",
@@ -124,7 +93,8 @@
                     ],
                     "enum_type": "number"
                 },
-                "default": "1n"
+                "default": "1n",
+                "typeSize": 32
             }
         },
         {
@@ -138,7 +108,8 @@
                     ],
                     "enum_type": "number"
                 },
-                "default": "0n"
+                "default": "0n",
+                "typeSize": 32
             }
         },
         {
@@ -582,8 +553,7 @@
     ],
     "required_properties": [
         "compatible",
-        "reg",
-        "spi-cpha"
+        "reg"
     ],
-    "title": "Analog Devices AD7292 10-Bit Monitor and Control System"
+    "title": "Analog Devices AD7923 and similars with 4 and 8 Channel ADCs."
 }

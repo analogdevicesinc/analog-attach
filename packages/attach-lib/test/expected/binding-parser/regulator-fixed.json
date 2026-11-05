@@ -96,7 +96,9 @@
                         "_t": "list",
                         "item": {
                             "_t": "any"
-                        }
+                        },
+                        "maxItems": 1024,
+                        "minItems": 1
                     }
                 ]
             }
@@ -113,7 +115,9 @@
                         "_t": "list",
                         "item": {
                             "_t": "any"
-                        }
+                        },
+                        "maxItems": 1024,
+                        "minItems": 1
                     }
                 ]
             }
@@ -188,8 +192,12 @@
                     {
                         "_t": "list",
                         "item": {
-                            "_t": "any"
-                        }
+                            "_t": "number",
+                            "maximum": "4294967295n",
+                            "minimum": "0n"
+                        },
+                        "minItems": 1,
+                        "typeSize": 32
                     }
                 ]
             }

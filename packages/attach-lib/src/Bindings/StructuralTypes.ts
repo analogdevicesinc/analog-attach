@@ -43,9 +43,14 @@ export function is_list(type: AttachType): type is Variant<"list"> {
     return type._t === "list";
 }
 
-/** A list of values nothing is known about: the shape of an untyped array. */
-export function is_open_list(type: AttachType): type is Variant<"list"> & { item: { _t: "any" } } {
-    return type._t === "list" && !Array.isArray(type.item) && type.item._t === "any";
+/**
+ * A list of values nothing is known about but what a cell holds: the shape of an untyped array, or of one whose every
+ * value is a whole `uint32` (reg.yaml's `reg` and interrupts.yaml's `interrupts`, `uint32-matrix` rows).
+ */
+export function is_open_list(type: AttachType): type is Variant<"list"> {
+    if (type._t !== "list" || Array.isArray(type.item)) { return false; }
+    const cell = type.item;
+    return cell._t === "any" || (cell._t === "number" && cell.minimum === 0n && cell.maximum === 0xFF_FF_FF_FFn && cell.default === undefined);
 }
 
 /** A property the binding says nothing about but how many values it has: an open list, or a matrix of open lists. */

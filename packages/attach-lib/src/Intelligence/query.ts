@@ -425,6 +425,12 @@ if (import.meta.vitest) {
         ...(maxItems === undefined ? {} : { maxItems }),
     });
 
+    /** interrupts.yaml's `uint32-matrix`: one row of `uint32`s, at most `maximum`. */
+    const uint32_rows = (maximum: bigint): ResolvedProperty["value"] => ({
+        _t: "matrix", minItems: 1, maxItems: 1,
+        rows: [{ _t: "list", item: { _t: "number", minimum: 0n, maximum }, minItems: 1, typeSize: 32 }],
+    });
+
     /** A list with one cell per position (a specifier row), or undefined for any other type. */
     const tuple_of = (value: ResolvedProperty["value"] | undefined) =>
         value?._t === "list" && Array.isArray(value.item) ? { cells: value.item, minItems: value.minItems, maxItems: value.maxItems } : undefined;
@@ -477,6 +483,20 @@ if (import.meta.vitest) {
         const result = query_devicetree(dt, properties, "{}", "gic");
         const interrupts = result.find(p => p.key === "interrupts");
         expect(interrupts?.value._t).toBe("matrix");
+    });
+
+    test("query_devicetree — interrupts of interrupts.yaml's uint32 rows are reshaped, a row the binding bounds is not", () => {
+        const dt = dts(`/dts-v1/;
+/ {
+    gic: interrupt-controller@ff841000 {
+        interrupt-controller;
+        #interrupt-cells = <2>;
+    };
+};`);
+        const refined = (maximum: bigint) => query_devicetree(dt, [{ key: "interrupts", value: uint32_rows(maximum) }], "{}", "gic")[0]?.value;
+
+        expect(refined(0xFF_FF_FF_FFn)).toMatchObject({ _t: "matrix", rows: [{ item: [{ _t: "number" }, { _t: "enum", enum_type: "macro" }] }] });
+        expect(refined(31n)).toStrictEqual(uint32_rows(31n));
     });
 
     test("query_devicetree — interrupts reshaped even without interrupt-parent in binding", () => {

@@ -7,6 +7,7 @@
     "properties": {
         "#clock-cells": {
             "const": 0,
+            "description": "Number of cells in a clock specifier; Typically 0 for nodes with a single clock output and 1 for nodes with multiple clock outputs.",
             "dtType": "uint32"
         },
         "$nodename": {
@@ -38,9 +39,11 @@
             "typeSize": 32
         },
         "clock-frequency": {
+            "description": "Legacy property for single, fixed frequency clocks",
             "dtType": "uint32"
         },
         "clock-output-names": {
+            "description": "Recommended to be a list of strings of clock output signal\nnames indexed by the first cell in the clock specifier.\nHowever, the meaning of clock-output-names is domain\nspecific to the clock provider, and is only provided to\nencourage using the same meaning for the majority of clock\nproviders.  This format may not work for clock providers\nusing a complex clock specifier format.  In those cases it\nis recommended to omit this property and create a binding\nspecific names property.\n\nClock consumer nodes must never directly reference\nthe provider\\'s clock-output-names property.\n",
             "dtType": "string-array",
             "items": {
                 "type": "string"
@@ -53,12 +56,14 @@
             "dtType": "string-array",
             "items": [
                 {
-                    "const": "fixed-clock"
+                    "const": "fixed-clock",
+                    "pattern": "^[a-zA-Z0-9][a-zA-Z0-9,+\\-._/]+$"
                 }
             ],
             "maxItems": 1,
             "minItems": 1,
-            "type": "array"
+            "type": "array",
+            "uniqueItems": true
         }
     },
     "required": [

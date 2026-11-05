@@ -6,8 +6,9 @@ import { Attach, Result, type ParsedBinding, type ResolvedProperty } from 'attac
 
 import { afterAll, describe, test, expect } from 'vitest';
 
-// The rules of the pipeline stages before the fixups (references, `true` placeholders, allOf
-// redefinitions, if/then canaries), each seen through what `Attach.parse` gives for a small binding.
+// The rules of the pipeline stages other than the fixups (references, `true` placeholders, allOf
+// redefinitions, if/then canaries, the `select: true` schemas), each seen through what `Attach.parse`
+// gives for a small binding.
 
 const linux_path = path.resolve(__dirname, 'linux');
 const dt_schema_path = path.resolve(__dirname, 'dt-schema');
@@ -381,6 +382,78 @@ properties:
             _t: 'scalar',
             cell: { _t: 'number', minimum: 0n, maximum: 0xFF_FF_FF_FFn },
             typeSize: 32,
+        });
+    });
+});
+
+describe('selected schemas', () => {
+    test('a property the binding names gets the counts the select: true schema that defines it gives, the binding\'s keywords winning', async () => {
+        const { parsed_binding } = await parsed('selected', `
+properties:
+  compatible:
+    const: x,y
+  mount-matrix:
+    description: of the part
+patternProperties:
+  "^part@[0-9]$":
+    type: object
+    properties:
+      mount-matrix: true
+`);
+        const nine_strings = { _t: 'list', item: { _t: 'string' }, minItems: 9, maxItems: 9 };
+        expect(property(parsed_binding, 'mount-matrix')).toStrictEqual({ ...nine_strings, description: 'of the part' });
+
+        const part = parsed_binding.pattern_properties?.find(rule => rule.pattern === '^part@[0-9]$')?.properties ?? [];
+        expect(part.find(p => p.key === 'mount-matrix')?.value).toMatchObject(nine_strings);
+    });
+
+    test('a child node named like a property of a select: true schema stays a node', async () => {
+        const { parsed_binding } = await parsed('selected-node', `
+properties:
+  compatible:
+    const: x,y
+  clocks:
+    type: object
+    properties:
+      compatible:
+        const: x,clocks
+`);
+        // clock.yaml's `clocks` is a phandle-array
+        expect(property(parsed_binding, 'clocks')).toMatchObject({ _t: 'node' });
+    });
+
+    test('a select: true schema adds no property the binding doesn\'t name', async () => {
+        const { parsed_binding } = await parsed('selected-unnamed', `
+properties:
+  compatible:
+    const: x,y
+`);
+        expect(parsed_binding.properties.map(p => p.key)).toStrictEqual(['compatible']);
+    });
+
+    test('the tighter bound of the binding\'s and the select: true schema\'s holds', async () => {
+        const { parsed_binding } = await parsed('selected-tighter', `
+properties:
+  compatible:
+    const: x,y
+  enable-gpios:
+    minItems: 1
+    maxItems: 2
+`);
+        // gpio-consumer-common.yaml: `enable-gpios: {maxItems: 1}`
+        expect(counts(property(parsed_binding, 'enable-gpios'))).toStrictEqual([1, 1]);
+    });
+
+    test('the one type a property has is kept when the select: true schema allows it among others', async () => {
+        const { parsed_binding } = await parsed('selected-typed', `
+properties:
+  compatible:
+    const: x,y
+  clock-frequency: true
+`);
+        // clock.yaml: `clock-frequency: {anyOf: [uint32, uint64]}`; `dt_type` gives the name the first
+        expect(property(parsed_binding, 'clock-frequency')).toMatchObject({
+            _t: 'scalar', cell: { _t: 'number', maximum: 0xFF_FF_FF_FFn }, typeSize: 32,
         });
     });
 });

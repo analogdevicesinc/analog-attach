@@ -1,7 +1,6 @@
 import { ResolvedProperty } from "../../Bindings/ParsedBinding.js";
 import { AttachEnumType, list_cell, matrix_cell, type Cell } from "../../Bindings/StructuralTypes.js";
 import { DeviceTree } from "../../Devicetree/index.js";
-import { insert_known_structures } from "../known_properties.js";
 import { IntelligenceLayer, PropertyContext, ValueSuggestion } from "./types.js";
 
 type PinnedValue = Pick<ValueSuggestion, "rows" | "strings" | "flag">;
@@ -13,8 +12,8 @@ function enum_value(value: unknown, enum_type: AttachEnumType): PinnedValue | un
         case AttachEnumType.NUMBER: {
             return typeof value === "bigint" || typeof value === "number" ? { rows: [[BigInt(value)]] } : undefined;
         }
-        // Phandle and macro enums are filled in from the devicetree / known
-        // structures, so a single option there is not a binding constraint.
+        // Phandle and macro enums are filled in from the devicetree, so a
+        // single option there is not a binding constraint.
         case AttachEnumType.PHANDLE:
         case AttachEnumType.MACRO: { return; }
     }
@@ -106,13 +105,10 @@ function suggest_from_binding(property: string, context: PropertyContext): Value
     return [{ ...pinned, display: `${describe_pinned(pinned)} — ${why}`, source: "binding" }];
 }
 
-// Layer 1: knowledge derived from the binding alone (well-known property
-// shapes, the values the binding pins, and the options of an enum).
+// Layer 1: knowledge derived from the binding alone (the values the binding
+// pins, and the options of an enum).
 export const binding_layer: IntelligenceLayer = {
     name: "binding",
-    refine_properties(properties) {
-        return insert_known_structures(properties);
-    },
     suggest_values(property, context, lower) {
         return [...lower, ...suggest_from_binding(property, context)];
     },

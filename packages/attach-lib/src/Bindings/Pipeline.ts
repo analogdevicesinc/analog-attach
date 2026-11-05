@@ -5,6 +5,7 @@ import { apply_JSONSchema_fixups, StepInfo } from "./JSONSchemaFixups.js";
 import { resolve_properties } from "./PropertyResolver.js";
 import { merge_redefinitions } from "./RedefinitionMerger.js";
 import { resolve_references } from "./RefResolver.js";
+import { merge_selected, selected_definitions } from "./SelectedSchemas.js";
 import { DtBindingSchema } from "./Schema.js";
 import type { PipelineTracer } from "./Trace.js";
 
@@ -30,6 +31,10 @@ export const PIPELINE_STAGES = [
         id: "fixups", counterpart: "fixups.py",
         summary: "Patches the schema the way dt-schema's fixups do, and guesses the types dt-schema reads from the `$ref`s (`fixup_passes`).",
     },
+    {
+        id: "selected", counterpart: "validator.py:DTValidator",
+        summary: "Merges into each property a node names its definitions in the schemas dt-validate checks every node against (`select: true`: iio.yaml's 9 `mount-matrix` items, reg.yaml's 1 to 5 `reg` cells), each fixed up on its own; the tighter bounds hold.",
+    },
 ] as const satisfies readonly StepInfo[];
 
 export type PipelineStage = typeof PIPELINE_STAGES[number]["id"];
@@ -42,7 +47,7 @@ export type PipelineError = {
 /**
  * Runs a binding through every schema stage, up to the schema that gets
  * validated and translated: references → properties → redefinitions →
- * canaries → fixups. `trace` gets the schema after each (`TraceEvent`).
+ * canaries → fixups → selected. `trace` gets the schema after each (`TraceEvent`).
  */
 export async function process_binding(
     binding_path: string,
@@ -81,5 +86,9 @@ export async function process_binding(
 
     trace?.({ kind: "stage", stage: "fixups", schema: structuredClone(fixuped) });
 
-    return Result.Ok(fixuped);
+    const selected = merge_selected(fixuped, await selected_definitions(ctx));
+
+    trace?.({ kind: "stage", stage: "selected", schema: structuredClone(selected) });
+
+    return Result.Ok(selected);
 }

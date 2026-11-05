@@ -260,6 +260,10 @@ if (import.meta.vitest) {
         expect(refined({ parent_name: "soc", placement: { node_path: "/soc/wide@1000/x@0", parent_path: "/soc/wide@1000", siblings: [] } })).toMatchObject({ rows: [row(4, 0xFF_FF_FF_FFn)] });
         // an SPI controller that doesn't count its chip selects: one uint32
         expect(refined({ parent_name: "spi@7e2150c0" })).toMatchObject({ rows: [row(1, 0xFF_FF_FF_FFn)] });
+        // reg.yaml's `reg`: rows of 1 to 5 whole uint32s
+        const uint32_reg: ResolvedProperty = { key: "reg", value: { _t: "matrix", minItems: 1, maxItems: 2,
+            rows: [{ _t: "list", item: { _t: "number", minimum: 0n, maximum: 0xFF_FF_FF_FFn }, minItems: 1, maxItems: 5, typeSize: 32 }] } };
+        expect(refined({ parent_name: "soc" }, uint32_reg)).toStrictEqual({ _t: "matrix", minItems: 1, maxItems: 2, rows: [row(2, 0xFF_FF_FF_FFn)] });
     });
 
     test("refine_regs — no parent, or one with no addresses, leaves reg as it is", () => {

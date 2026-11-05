@@ -24,7 +24,8 @@
                                     "minimum": "0n"
                                 },
                                 "maxItems": 1,
-                                "minItems": 1
+                                "minItems": 1,
+                                "typeSize": 32
                             }
                         ]
                     }
@@ -271,7 +272,8 @@
                             "minimum": "0n"
                         },
                         "maxItems": 1,
-                        "minItems": 1
+                        "minItems": 1,
+                        "typeSize": 32
                     }
                 ]
             }
@@ -286,8 +288,12 @@
                     {
                         "_t": "list",
                         "item": {
-                            "_t": "any"
-                        }
+                            "_t": "number",
+                            "maximum": "4294967295n",
+                            "minimum": "0n"
+                        },
+                        "minItems": 1,
+                        "typeSize": 32
                     }
                 ]
             }
@@ -350,6 +356,7 @@
             "key": "clock-output-names",
             "value": {
                 "_t": "list",
+                "description": "Recommended to be a list of strings of clock output signal\nnames indexed by the first cell in the clock specifier.\nHowever, the meaning of clock-output-names is domain\nspecific to the clock provider, and is only provided to\nencourage using the same meaning for the majority of clock\nproviders.  This format may not work for clock providers\nusing a complex clock specifier format.  In those cases it\nis recommended to omit this property and create a binding\nspecific names property.\n\nClock consumer nodes must never directly reference\nthe provider\\'s clock-output-names property.\n",
                 "item": {
                     "_t": "string"
                 },
@@ -368,13 +375,15 @@
                     ],
                     "enum_type": "number"
                 },
-                "default": "0n"
+                "default": "0n",
+                "description": "Number of cells in a clock specifier; Typically 0 for nodes with a single clock output and 1 for nodes with multiple clock outputs."
             }
         },
         {
             "key": "clock-names",
             "value": {
                 "_t": "list",
+                "description": "List of clock input name strings sorted in the same order as the clocks property.  Consumers drivers will use clock-names to match clock input names with clocks specifiers.",
                 "item": {
                     "_t": "enum",
                     "default": "mclk",
@@ -398,7 +407,8 @@
                     ],
                     "enum_type": "number"
                 },
-                "default": "1n"
+                "default": "1n",
+                "typeSize": 32
             }
         },
         {
@@ -412,7 +422,8 @@
                     ],
                     "enum_type": "number"
                 },
-                "default": "0n"
+                "default": "0n",
+                "typeSize": 32
             }
         },
         {

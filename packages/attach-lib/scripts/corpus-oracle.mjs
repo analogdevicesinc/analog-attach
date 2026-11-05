@@ -20,14 +20,15 @@
 //                     of them (not a disagreement: validation.json can't settle it either)
 //   count-mismatch    a list's or matrix's minItems/maxItems differ from the ones dt-validate holds it to: the
 //                     tightest of the schemas it checks the node against (the binding's and the ones its `$ref` and
-//                     `allOf` name, theirs too); an unset minItems is 1 on both sides
+//                     `allOf` name, theirs too, and the `select: true` ones, which it checks every node against); an
+//                     unset minItems is 1 on both sides
 //   row-count-mismatch  the same for the rows of a matrix, where the processed schema sizes them
 //   duplicate-key     a node lists a property twice
 //   impossible-bound  minItems > maxItems, or minimum > maximum
 //
-// Limits: the processed schema has no descriptions or examples. A property the binding gets from no schema it names
-// (dt-core's, a bus's through `select`) is checked against the type dt-schema gives its name, its counts not at all;
-// nor are those of an `if` / `then` branch.
+// Limits: the processed schema has no descriptions or examples. A property no schema the node is checked against
+// defines (a bus's, through its compatible's `select`) is checked against the type dt-schema gives its name, its
+// counts not at all; nor are those of an `if` / `then` branch.
 //
 // Reads dist/ (unless --dumps): `yarn build` first. Like corpus/bindings.json, the baseline is only comparable on the
 // commits and processed schema it records.
@@ -122,6 +123,14 @@ function node_schemas(schema, document, seen = new Set()) {
   }
   return found;
 }
+
+/** The schemas dt-validate checks every node against (`select: true`: dt-core.yaml, iio.yaml), after the node's own. */
+const selected_schemas = Object.values(processed)
+  .filter((schema) => schema?.select === true && typeof schema.$id === "string")
+  .flatMap((schema) => node_schemas(schema, schema));
+
+/** A node's schemas (`node_schemas` of each of `entries`), then the `select: true` ones. */
+const with_selected = (entries) => [...entries.flatMap(({ schema, document }) => node_schemas(schema, document)), ...selected_schemas];
 
 /** The schemas `table` (`properties` or `patternProperties`) of each of `nodes` gives `key`, nearest first. */
 const entries_of = (nodes, table, key) => nodes.map(({ schema, document }) => ({ schema: is_object(schema[table]) ? schema[table][key] : undefined, document })).filter(({ schema }) => is_object(schema));
@@ -325,15 +334,14 @@ function check(name, binding) {
       checked.add(key);
       const entries = entries_of(nodes, "properties", key);
       check_property(where, key, value, entries.map(({ schema }) => schema));
-      if (value?._t === "node") check_node(`${where}${key}/`, value.properties, entries.flatMap(({ schema, document }) => node_schemas(schema, document)));
+      if (value?._t === "node") check_node(`${where}${key}/`, value.properties, with_selected(entries));
     }
   };
 
-  const root_schemas = own_schema === undefined ? [] : node_schemas(own_schema, own_schema);
+  const root_schemas = with_selected(own_schema === undefined ? [] : [{ schema: own_schema, document: own_schema }]);
   check_node("", binding.properties, root_schemas);
   for (const rule of binding.pattern_properties ?? []) {
-    const entries = entries_of(root_schemas, "patternProperties", rule.pattern);
-    check_node(`${rule.pattern}/`, rule.properties, entries.flatMap(({ schema, document }) => node_schemas(schema, document)));
+    check_node(`${rule.pattern}/`, rule.properties, with_selected(entries_of(root_schemas, "patternProperties", rule.pattern)));
   }
   for (const rule of binding.property_patterns ?? []) {
     check_property("", rule.pattern, rule.value, entries_of(root_schemas, "patternProperties", rule.pattern).map(({ schema }) => schema), rule.pattern);
