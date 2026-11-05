@@ -400,7 +400,7 @@ The `overlay-syntax` setting picks the output format:
 - `label`: `&label { … }`.
 
 All overlay writes go through the `Workfile` from `load_workspace`. The printer lives in
-`attach-lib/src/Devicetree/Printer.ts`.
+`attach-lib/src/Devicetree/syntax/Printer.ts`.
 
 ### update value format
 
@@ -629,7 +629,7 @@ removes it from all.
 ### Reg clashes
 
 `reg-conflicts.ts` (`reg_warnings`) turns the lib's `reg_conflicts` / `sibling_reg_conflicts`
-(`Devicetree/RegConflicts.ts`) into warnings worded for the bus: chip select, I2C address,
+(`Devicetree/checks/RegConflicts.ts`) into warnings worded for the bus: chip select, I2C address,
 overlapping range. When the other node comes from the base tree, the warning adds a "disable <base
 node>" hint.
 - `validate` appends them to the dt-validate diagnostics, mapped to the `/nodeN` validation path so

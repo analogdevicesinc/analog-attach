@@ -1,5 +1,5 @@
-import { INodeBuilderBase, NodeBuilder } from "./NodeBuilder.js";
-import { PropertyBuilder } from "./PropertyBuilder.js";
+import { INodeBuilderBase, NodeBuilder } from "./build/NodeBuilder.js";
+import { PropertyBuilder } from "./build/PropertyBuilder.js";
 
 import {
     DTLabel,
@@ -12,13 +12,20 @@ import {
     parse_dto,
     print_dto,
     format_parse_error
-} from "./Parser/index.js";
+} from "./syntax/index.js";
 
 import { Result } from "../result.js";
-import { DeviceTree } from "./Devicetree.js";
-import { FoundNodeResult } from "./Types.js";
-import { Stream } from "./Stream.js";
-import { type LocatedNode, type NodeTarget, normalize_target, patch_node, parent_path as access_parent_path, walk_nodes } from "./Access.js";
+import { DeviceTree, Stream, walk_nodes } from "./DeviceTree.js";
+import { type LocatedNode, type NodeTarget, normalize_target, patch_node, parent_path as access_parent_path } from "./nodes/Access.js";
+
+export type FoundNodeResult = {
+    node: DTNode;
+    path: string;
+    node_path: string;
+    parent_node: DTNode | undefined;
+    fragment_root_path: string;
+    is_in_base: boolean;
+};
 
 /** The path `relative` names below the node at `root`. */
 function path_below(root: string, relative: string[]): string {
@@ -661,7 +668,7 @@ export class DeviceTreeOverlay {
         return labels;
     }
 
-    public print(options?: import("./Printer.js").DtoPrintOptions): string {
+    public print(options?: import("./syntax/Printer.js").DtoPrintOptions): string {
         return print_dto(this.overlay, undefined, options);
     }
 }

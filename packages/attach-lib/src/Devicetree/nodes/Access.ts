@@ -1,4 +1,4 @@
-import { type DTLabel, type DTNode, type DTPath, type DTProperty, is_dt_flag, get_full_node_name } from "./Parser/AST.js";
+import { type DTLabel, type DTNode, type DTPath, type DTProperty, is_dt_flag, get_full_node_name } from "../syntax/AST.js";
 
 export type LocatedNode = { node: DTNode; path: string };
 
@@ -116,15 +116,6 @@ export function node_name_of(path: string): string {
     return path.slice(path.lastIndexOf("/") + 1);
 }
 
-/** Every node of the tree under `root` (at `path`) with its path, depth-first, `root` first. */
-export function* walk_nodes(root: DTNode, path: string): Generator<LocatedNode> {
-    yield { node: root, path };
-    for (const child of root.children) {
-        const name = get_full_node_name(child);
-        yield* walk_nodes(child, path === "/" ? `/${name}` : `${path}/${name}`);
-    }
-}
-
 export function patch_node(base: DTNode, patch: DTNode): DTNode {
     return {
         ...base,
@@ -143,7 +134,7 @@ if (import.meta.vitest) {
     const { test, expect } = import.meta.vitest;
 
     const dts = async (source: string) => {
-        const { DeviceTree } = await import("./Devicetree.js");
+        const { DeviceTree } = await import("../DeviceTree.js");
         const dt = DeviceTree.new_from_string(source);
         if (typeof dt === "string") { throw new TypeError(dt); }
         return dt;

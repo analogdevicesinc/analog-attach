@@ -1,8 +1,8 @@
-import type { DTNode, DTProperty } from "./Parser/AST.js";
-import { number_property } from "./Access.js";
-import { NodeBuilder } from "./NodeBuilder.js";
-import { PropertyBuilder } from "./PropertyBuilder.js";
-import { choose_label, is_valid_node_name, is_valid_unit_address } from "./Labels.js";
+import type { DTNode, DTProperty } from "./syntax/AST.js";
+import { number_property } from "./nodes/Access.js";
+import { NodeBuilder } from "./build/NodeBuilder.js";
+import { PropertyBuilder } from "./build/PropertyBuilder.js";
+import { choose_label, is_valid_node_name, is_valid_unit_address } from "./nodes/Labels.js";
 import {
     address_cells_of,
     encode_reg_address,
@@ -10,9 +10,9 @@ import {
     format_unit_address,
     next_free_unit_address,
     parse_unit_address,
-} from "./UnitAddress.js";
-import { DeviceTree } from "./Devicetree.js";
-import { DeviceTreeOverlay } from "./DevicetreeOverlay.js";
+} from "./nodes/UnitAddress.js";
+import { DeviceTree } from "./DeviceTree.js";
+import { DeviceTreeOverlay } from "./DeviceTreeOverlay.js";
 
 export interface AddNodeRequest {
     /** Absolute path of the parent, in the base tree or the overlay. */
