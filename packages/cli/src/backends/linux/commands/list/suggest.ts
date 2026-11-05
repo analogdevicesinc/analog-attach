@@ -23,7 +23,7 @@ import {
 import type { Bindings } from "../../config/workspace";
 import type { ConfigResult } from "../../config/settings";
 import { format_suggestion, build_raw_property, shape_hint, parse_value } from "../../property-value";
-import { parse_property_reference, resolve_node_identifier, resolve_write_target, type WriteTarget } from "../../utilities";
+import { node_children, parse_property_reference, resolve_node_identifier, resolve_write_target, type WriteTarget } from "../../utilities";
 import { attach_type_to_protocol_type } from "../../protocol/dt-to-protocol";
 import { find_property_definition, narrowed_binding, resolve_node_binding, type NodeBinding } from "../../binding-resolution";
 import { check_value } from "../../value-check";
@@ -286,18 +286,6 @@ export function navigate_candidates(node: { properties: string[]; children: stri
         ...named.filter(s => s.group === "not set"),
         ...allowed,
     ];
-}
-
-/** Child node names of `node`, from the base tree and the overlay merged, in first-seen order. */
-export function node_children(base_dt: DeviceTree, overlay: DeviceTreeOverlay, identifier: string): string[] | undefined {
-    const in_overlay = overlay.find_node(resolve_node_identifier(identifier, overlay));
-    const base_identifier = base_dt.resolve_identifier(identifier);
-    const in_base = base_identifier === undefined ? undefined : base_dt.locate(base_identifier)?.node;
-    if (in_overlay === undefined && in_base === undefined) { return; }
-    return [...new Set([
-        ...(in_base?.children ?? []).map(child => get_full_node_name(child)),
-        ...(in_overlay?.node.children ?? []).map(child => get_full_node_name(child)),
-    ])];
 }
 
 /** What a node's binding says about one of its properties. */

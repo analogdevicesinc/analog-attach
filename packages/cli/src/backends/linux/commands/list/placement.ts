@@ -2,7 +2,7 @@ import { answer, refuse, type ExtraCommand } from "../../../../interface/backend
 import { load_workspace } from "../../config/workspace";
 import type { SuggestResponse } from "../../protocol/types";
 import { positional_word } from "../../utilities";
-import { load_binding, parent_suggestions } from "./data";
+import { load_binding, parent_suggestions, unknown_compatible_message } from "./data";
 
 /** `list parent <compatible>`: the nodes of the base a device can go under, as `add --parent` takes them. */
 export const list_parent: ExtraCommand<Record<never, never>, SuggestResponse> = {
@@ -25,9 +25,10 @@ export const list_parent: ExtraCommand<Record<never, never>, SuggestResponse> = 
 
         const binding = await load_binding(workspace.bindings, compatible);
         if (!binding.ok) {
-            if (binding.reason === "parse") { return refuse(binding.message, { text: binding.text }); }
+            if (binding.reason === "parse") { return refuse(binding.message); }
             // No binding: not a refusal, an empty list with a warning (as attach-linux had it).
-            return answer<SuggestResponse>({ ok: true, message: binding.message, severity: "warn", suggestions: [] }, binding.text);
+            const message = unknown_compatible_message(workspace.bindings, compatible, session.program);
+            return answer<SuggestResponse>({ ok: true, message, severity: "warn", suggestions: [] }, message);
         }
 
         const suggestions = parent_suggestions(workspace.base.tree, binding.binding);

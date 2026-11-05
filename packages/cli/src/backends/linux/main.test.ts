@@ -6,7 +6,9 @@ import path from "node:path";
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
 
 import type { Registry } from "../../front/registry";
+import { build_routes, type FrontEnd } from "../../front/routes";
 import { create_setup } from "./commands/setup/command";
+import { backend } from "./index";
 import { BASE_DTS, create_linux_fixture, IMPORTED, OVERLAY, scripted, type LinuxFixture, type RunOptions, type RunResult } from "./testing/fixture";
 
 /** The fixture's base with a second, empty SPI bus. */
@@ -396,7 +398,13 @@ describe("the Linux backend through main", () => {
         });
         expect(await run(["list", "parent", "adi,ad7124-8"])).toMatchObject({ stdout: "spi0  /soc/spi@7e204000\n" });
         const unknown = await run(["--json", "list", "parent", "adi,nope"]);
-        expect(JSON.parse(unknown.stdout)).toEqual({ ok: true, message: "No binding found for adi,nope", severity: "warn", suggestions: [] });
+        expect(JSON.parse(unknown.stdout)).toEqual({ ok: true, message: "Unknown compatible 'adi,nope'. See: analog-attach list devices", severity: "warn", suggestions: [] });
+        const close = await run(["--json", "add", "adi,ad7124-9"]);
+        expect(JSON.parse(close.stdout)).toEqual({
+            ok: false,
+            message: "Unknown compatible 'adi,ad7124-9'. Did you mean adi,ad7124-4, adi,ad7124-8? See: analog-attach list devices",
+            severity: "error",
+        });
     });
 
     test("--json list overlay: the overlays of the tree with the device, graded against the board", async () => {
@@ -454,5 +462,19 @@ describe("the Linux backend through main", () => {
         expect(refused.code).toBe(2);
         expect(flat.asked).toEqual([]);
         expect(refused.stderr).toContain(".analog-attach/config.json: linux: must be an object");
+    });
+
+    test("every command's help ends with examples (GRM-009)", async () => {
+        configure();
+        const routes = build_routes({ program: "analog-attach", backend, registry: {}, home: "/home/nobody", environment: {} } as unknown as FrontEnd)
+            .filter(route => route.hidden !== true);
+        const missing: string[] = [];
+        for (const route of routes) {
+            const name = route.path.join(" ");
+            const result = await run([...route.path, "--help"]);
+            expect(result, name).toMatchObject({ code: 0, stderr: "" });
+            if (!/\nExamples:\n {2}\$ analog-attach /.test(result.stdout)) { missing.push(name); }
+        }
+        expect(missing).toEqual([]);
     });
 });

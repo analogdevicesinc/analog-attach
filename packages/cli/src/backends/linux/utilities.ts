@@ -1,5 +1,6 @@
 import {
     DeviceTree,
+    get_full_node_name,
     is_dt_flag,
     type DTLabel,
     type DTNode,
@@ -16,6 +17,7 @@ import path from "node:path";
 import { load_compat_index, type CompatIndex } from "./config/cache";
 import type { Bindings } from "./config/workspace";
 import { input_error, type Outcome } from "../../interface/backend-interface";
+import { closest_names, did_you_mean } from "../../interface/names";
 
 // --- New shared path helpers (Group A) ---
 
@@ -57,18 +59,51 @@ export function invalid_node_name_message(name: string): string {
     return `Invalid node name: ${name} (use letters, digits and _ , . -, then an optional @<unit-address>)`;
 }
 
+/** Child node names of `node`, from the base tree and the overlay merged, in first-seen order. */
+export function node_children(base_dt: DeviceTree, overlay: DeviceTreeOverlay, identifier: string): string[] | undefined {
+    const in_overlay = overlay.find_node(resolve_node_identifier(identifier, overlay));
+    const base_identifier = base_dt.resolve_identifier(identifier);
+    const in_base = base_identifier === undefined ? undefined : base_dt.locate(base_identifier)?.node;
+    if (in_overlay === undefined && in_base === undefined) { return; }
+    return [...new Set([
+        ...(in_base?.children ?? []).map(child => get_full_node_name(child)),
+        ...(in_overlay?.node.children ?? []).map(child => get_full_node_name(child)),
+    ])];
+}
+
+/** How many children a not-found message names. */
+const SHOWN_CHILDREN = 10;
+
+/**
+ * Why `path_string` names nothing, and what is there: a property of the parent gets the hint to
+ * pass it on its own, a miss under a known node the children there (the closest first), and an
+ * unknown first segment the closest labels. A node only the base has (where the overlay's nodes
+ * are looked for) is just not found.
+ */
 export function not_found_message(path_string: string, overlay: DeviceTreeOverlay, base?: DeviceTree): string {
-    const split = split_property_reference(path_string);
-    if (split.property_name !== undefined) {
-        const parent = resolve_path(split.node_identifier, overlay, base);
-        if (parent.in_overlay !== undefined || parent.in_base !== undefined) {
-            return `Not found: ${path_string} (the property is a separate argument: <path> <property>)`;
-        }
+    const plain = `Not found: ${path_string}`;
+    const resolved = resolve_path(path_string, overlay, base);
+    if (resolved.in_overlay !== undefined || resolved.in_base !== undefined) { return plain; }
+
+    const segments = path_string.split("/");
+    for (let length = segments.length - 1; length > 0; length--) {
+        const prefix = length === 1 && segments[0] === "" ? "/" : segments.slice(0, length).join("/");
+        const parent = resolve_path(prefix, overlay, base);
+        const parent_path = parent.in_overlay?.node_path ?? parent.in_base?.path;
+        if (parent_path === undefined) { continue; }
+        const missing = segments[length] ?? "";
+        const is_property = length === segments.length - 1
+            && overlay.effective_node(parent_path)?.properties.some(p => p.name === missing) === true;
+        if (is_property) { return `${plain} (the property is a separate argument: <path> <property>)`; }
+        const children = base === undefined ? undefined : node_children(base, overlay, prefix);
+        if (children === undefined || children.length === 0) { return `${plain}. ${prefix} has no child nodes`; }
+        const close = closest_names(missing, children);
+        const ordered = [...close, ...children.filter(child => !close.includes(child))];
+        const more = ordered.length - SHOWN_CHILDREN;
+        return `${plain}. ${prefix} has: ${ordered.slice(0, SHOWN_CHILDREN).join(", ")}${more > 0 ? `, … (${more} more)` : ""}`;
     }
-    if (!path_string.startsWith("/") && path_string.includes("/")) {
-        return `Not found: ${path_string}`;
-    }
-    return `Not found: ${path_string}`;
+    const close = did_you_mean(segments[0] ?? "", [...overlay.all_labels().keys()]);
+    return close === "" ? plain : `${plain}.${close}`;
 }
 
 export type ParsedTarget =
@@ -524,6 +559,20 @@ if (import.meta.vitest) {
         if (typeof overlay === "string") { throw new TypeError(overlay); }
         const message = not_found_message("spi0/adc@0/reg", overlay, base);
         expect(message).toContain("the property is a separate argument");
+    });
+
+    test("not_found_message — the children where the miss is, the closest labels, or just not found", () => {
+        const base = DT.new_from_string(base_dts);
+        if (typeof base === "string") { throw new TypeError(base); }
+        const overlay = DTO.new_from_string(`/dts-v1/; /plugin/; &spi0 { adc: adc@0 { reg = <0>; channel@0 { reg = <0>; }; }; dac@1 { }; };`, base);
+        if (typeof overlay === "string") { throw new TypeError(overlay); }
+        expect(not_found_message("spi0/adc@1", overlay, base)).toBe("Not found: spi0/adc@1. spi0 has: adc@0, dac@1");
+        expect(not_found_message("spi0/dac@1/channel@0", overlay, base)).toBe("Not found: spi0/dac@1/channel@0. spi0/dac@1 has no child nodes");
+        expect(not_found_message("adc/nope@0/x", overlay, base)).toBe("Not found: adc/nope@0/x. adc has: channel@0");
+        expect(not_found_message("adx", overlay, base)).toBe("Not found: adx. Did you mean adc?");
+        expect(not_found_message("zzzzzz/adc@0", overlay, base)).toBe("Not found: zzzzzz/adc@0");
+        expect(not_found_message("/soc/nope", overlay, base)).toBe("Not found: /soc/nope. /soc has: spi@7e204000");
+        expect(not_found_message("spi0/adc@0", overlay, base)).toBe("Not found: spi0/adc@0");
     });
 
     test("effective_parent_compatibles — overlay __overlay__ parent resolves via base tree", () => {

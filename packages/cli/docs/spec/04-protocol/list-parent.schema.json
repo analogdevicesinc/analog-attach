@@ -8,7 +8,7 @@
       "allOf": [{ "$ref": "common.schema.json#/$defs/suggest-response" }],
       "properties": {
         "ok": { "const": true },
-        "message": { "type": "string", "description": "Found <n> valid parents, or No binding found for <compatible>." },
+        "message": { "type": "string", "description": "Found <n> valid parents, or Unknown compatible '<compatible>'.[ Did you mean <close>?] See: analog-attach list devices (LIST-090)." },
         "severity": { "enum": ["info", "warn"] },
         "suggestions": {
           "description": "Each parent: value its label (or its path when it has none), display_string its absolute path.",

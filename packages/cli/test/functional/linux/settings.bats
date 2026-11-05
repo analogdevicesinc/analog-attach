@@ -376,8 +376,6 @@ stub() {
 	assert_line --regexp "^SSHPASS=secret .*ssh .*pi@192\.0\.2\.1 sudo reboot$"
 }
 
-# Gap: the errors name the deploy settings but not how to set them (setting_hint gives no
-# deploy-* a hint).
 # Description: deploy with deploy settings unset names the missing ones, and only those, and how
 # to set them.
 # Steps:
@@ -386,7 +384,7 @@ stub() {
 #   3. Run deploy.
 #   4. Check the message names deploy-user and deploy-password as missing, but not deploy-ip.
 #   5. Check it says how to set each with config.
-# bats test_tags=req:SET-10-LNX, req:GEN-13, gap, id:L0282
+# bats test_tags=req:SET-10-LNX, req:GEN-13, id:L0282
 @test "deploy with the deploy settings unset names them" {
 	with_accel
 	aa build >/dev/null
@@ -395,7 +393,6 @@ stub() {
 	refute_output --partial "Missing config field deploy-ip"
 	assert_output --partial "Missing config field deploy-user"
 	assert_output --partial "Missing config field deploy-password"
-	# The gap: last, so the checks above hold while it is open.
 	assert_output --partial "analog-attach config deploy-user"
 	assert_output --partial "analog-attach config deploy-password"
 }
