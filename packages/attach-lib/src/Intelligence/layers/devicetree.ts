@@ -1,9 +1,10 @@
-import { DeviceTree, DTNode, string_property, number_property, get_full_node_name } from "../../Devicetree/index.js";
+import { DeviceTree, DTNode, string_property, number_property } from "../../Devicetree/index.js";
 import { is_clock, is_interrupt_controller, is_regulator } from "../predicates.js";
 import { query_devicetree } from "../query.js";
 import { parent_path_string, suggest_parents } from "../parents.js";
 import { effective_interrupt_parent, base_lookup } from "../interrupt_parent.js";
 import { labelled_providers } from "../providers.js";
+import { context_parent, own_cells, refine_regs, reg_bus, suggest_reg } from "../reg.js";
 import { IntelligenceLayer, PropertyContext, ValueSuggestion } from "./types.js";
 
 function format_frequency(hz: bigint): string {
@@ -104,51 +105,28 @@ export function creatable_providers(property: string): string[] {
     return PROVIDERS.filter(entry => entry.names(property)).map(entry => entry.compatible);
 }
 
-/**
- * `reg` matching the node's unit address (`channel@1` → `<1>`, `temp@48` →
- * `<0x48>`): by devicetree convention the first `reg` cell is the unit
- * address. Only single-cell unit addresses are handled.
- */
-function suggest_unit_address_reg(property: string, node_path: string | undefined): ValueSuggestion[] {
-    if (property !== "reg" || node_path === undefined) { return []; }
-    const name = node_path.slice(node_path.lastIndexOf("/") + 1);
-    const unit = /@([0-9a-fA-F]+)$/.exec(name)?.[1];
-    if (unit === undefined) { return []; }
-    const value = BigInt(`0x${unit}`);
-    return [{
-        rows: [[value]],
-        display: `${value < 10n ? value : `0x${unit}`} — matches the unit address of ${name}`,
-        source: "devicetree",
-    }];
-}
-
 function inherited_interrupt_label(context: PropertyContext): string | undefined {
     const dt = context.devicetree;
     const lookup = base_lookup(dt);
     if (context.placement?.node_path !== undefined) {
         return effective_interrupt_parent(lookup, context.placement.node_path, dt)?.label;
     }
-    if (context.parent_name !== undefined) {
-        const path_from_name = dt.as_stream()
-            .filter(({ node }) => get_full_node_name(node) === context.parent_name)
-            .toArray()[0]?.path;
-        if (path_from_name !== undefined) {
-            return effective_interrupt_parent(lookup, `${path_from_name}/child`, dt)?.label;
-        }
-    }
-    return undefined;
+    const parent = context_parent(context);
+    return parent === undefined ? undefined : effective_interrupt_parent(lookup, `${parent.path}/child`, dt)?.label;
 }
 
 // Layer 2: knowledge derived from the base device tree (controllers, buses, phandles).
 export const devicetree_layer: IntelligenceLayer = {
     name: "devicetree",
     refine_properties(properties, context) {
-        return query_devicetree(context.devicetree, properties, context.data, inherited_interrupt_label(context));
+        const refined = query_devicetree(context.devicetree, properties, context.data, inherited_interrupt_label(context));
+        refine_regs(refined, reg_bus(context), own_cells(refined, context.data));
+        return refined;
     },
     suggest_values(property, context, lower) {
         return [
             ...lower,
-            ...suggest_unit_address_reg(property, context.placement?.node_path),
+            ...suggest_reg(property, context),
             ...suggest_labelled_providers(property, context.devicetree),
             ...suggest_interrupt_parents(property, context.devicetree, context.placement?.node_path),
         ];

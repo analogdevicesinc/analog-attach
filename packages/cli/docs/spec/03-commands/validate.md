@@ -197,23 +197,31 @@ the other node `<other>` (both by name with unit address):
 warning shall have the hint `If <name> replaces it: disable <other path>`,
 `<other path>` being its absolute path.
 
-### 7.2 Chip selects without a `cs-gpios` entry
+### 7.2 Chip selects past the controller's
 
-**VALIDATE-103** A child of a controller with `cs-gpios` *overflows* when it
-is enabled and an address of its `reg` is at least the number of
-`cs-gpios` entries. An entry is a phandle followed by its provider's
-`#gpio-cells` cells, or a lone 0 (the controller's own chip select). The
-provider is the node the phandle names in the base, and its `#gpio-cells` is
-read from the merged tree. A controller without `cs-gpios`, or whose entries
-can't be counted, isn't checked: a phandle to a node the base doesn't have (a
-GPIO expander the overlay adds), a provider without `#gpio-cells`, or a
-number other than 0 where an entry starts. (Open issue V-10.)
+**VALIDATE-103** A child of a controller with `num-cs` or `cs-gpios`
+*overflows* when it is enabled and an address of its `reg` is at least the
+controller's chip-select count: the larger of `num-cs` and the number of
+`cs-gpios` entries, as Linux's SPI core counts them (with `num-cs = <4>` and
+one entry, chip selects 1 to 3 are the controller's own). An entry is a
+phandle followed by its provider's `#gpio-cells` cells, or a lone 0 (the
+controller's own chip select). The provider is the node the phandle names in
+the base, and its `#gpio-cells` is read from the merged tree. A controller
+with neither, or whose `cs-gpios` entries can't be counted, isn't checked: a
+phandle to a node the base doesn't have (a GPIO expander the overlay adds), a
+provider without `#gpio-cells`, or a number other than 0 where an entry
+starts. (Open issue V-10.)
 
 **VALIDATE-104** An overflow shall have the message `chip select <n> has no
 cs-gpios entry: <controller> has <range>` and the hint `Use one of those, or
-add a GPIO for it to cs-gpios of <controller path>`. `<n>` is the first such
-address, `<controller>` the controller's name with unit address, and
-`<range>` `chip select 0` for one entry or `chip selects 0-<k-1>` for `<k>`.
+add a GPIO for it to cs-gpios of <controller path>` when the controller has
+no `num-cs` (the driver may have more chip selects, but the tree names no
+line for it), and otherwise the message `chip select <n> is past the
+controller's chip selects: <controller> has <range>` and the hint `Use one of
+those`. `<n>` is the first such address, `<controller>` the controller's name
+with unit address, and `<range>` `chip select 0` for a count of one or `chip
+selects 0-<k-1>` for `<k>`. `list value` and `read` note the same chip
+selects (`list.md` LIST-081).
 
 ### 7.3 The overlay's nodes
 
