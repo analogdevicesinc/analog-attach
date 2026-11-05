@@ -64,12 +64,16 @@
     "noos": {
       "anyOf": [
         {
-          "description": "Where the backend is noos: a value set (UPDATE-520).",
-          "allOf": [{ "$ref": "common.schema.json#/$defs/done" }],
+          "description": "Where the backend is noos: a value set (UPDATE-520), with the wiring when bootstrap rewired a bus (add.md ADD-527).",
+          "allOf": [{ "$ref": "common.schema.json#/$defs/common" }],
           "properties": {
+            "ok": { "const": true },
             "message": { "type": "string", "pattern": "^Set [^ ]+\\.[^ ]+ = .*$", "description": "Set <node>.<property> = <value>; a union's value is <member> = <value>." },
-            "severity": { "const": "info" }
-          }
+            "severity": { "const": "info" },
+            "wiring": { "$ref": "add.schema.json#/$defs/noos-wiring" },
+            "chip_selects": { "$ref": "add.schema.json#/$defs/noos-chip-selects" }
+          },
+          "unevaluatedProperties": false
         },
         { "$ref": "read.schema.json#/$defs/noos-property", "description": "update <node> <property> with no value reads it (UPDATE-540)." },
         {

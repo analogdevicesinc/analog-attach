@@ -41,7 +41,14 @@ the backend has none, it shall report the input error `The <backend> backend
 has no skills`; when none has the name, it shall refuse (`02-common.md`
 COM-043) with `Unknown skill: <name>. Skills of the <backend> backend:
 <names>`, `<names>` joined with `, `.
-A missing `<name>` is stricli's `Expected argument for name` (GRM-004).
+**SKILL-022** With no `<name>`, `skill install` and `skill uninstall` shall list
+the backend's skills, and change nothing: in JSON `{ ok: true, message,
+severity: "info", skills }`, `message` being `Skills of the <backend> backend:
+<names>` and each skill `{ name, about, installed, path }`; in human mode a line
+per skill, its name, what it helps with and ` (installed)` when it is, then
+`Install one with: analog-attach skill install <name>` (`Remove` and
+`uninstall` for `skill uninstall`). With no backend set, it is COM-014's input
+error.
 
 ## 5. skill install
 

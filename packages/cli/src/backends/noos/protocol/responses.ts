@@ -116,8 +116,53 @@ export interface MissingProperty extends BaseMissingProperty {
     node: string;
 }
 
+/** A board pin: its header position (`J9`, `5`), and the chip pin name the board prints next to it (`P2_0`). */
+export interface BoardPinAt {
+    connector: string;
+    pin: string;
+    chip_pin?: string;
+}
+
+/**
+ * How one part is wired to the board over one bus, as bootstrap worked it out: each pin of the
+ * part (on its eval board) to the board pin it goes to. What `Wire <part> to <board> over <bus>:`
+ * prints in human mode.
+ */
+export interface Wiring {
+    /** The part, by its eval board (`eval-adxl355-pmdz`). */
+    part: string;
+    /** The bus device node (`adxl355_spi_dev`). */
+    device: string;
+    /** The bus, as the part's pin roles name it: spi, i2c. */
+    interface: string;
+    /** The board bus its lines land on (`bsp_spi1_cfg`), when they agree on one. */
+    peripheral?: string;
+    connections: { role: string, from: { connector: string, pin: string }, to: BoardPinAt }[];
+    /** Wiring that doesn't add up, or that the board alone can't decide. */
+    problems: string[];
+    /** A bare part (no eval board): the board pins of its bus, for the part's own pins to go to. */
+    board_pins?: { signal: string, at: BoardPinAt }[];
+    /** When the chip-select isn't settled: free board pins that could carry it. */
+    chip_select_options?: { at: BoardPinAt, gpio?: { port: string, number: number } }[];
+}
+
+/** How a SPI device's chip-select is driven: a native line of the bus, a GPIO, or not yet. */
+export type ChipSelectWiring =
+    | { device: string, kind: "native", peripheral: string, native_cs: number, at: BoardPinAt }
+    | { device: string, kind: "gpio", gpio: { port: string, number: number }, at: BoardPinAt, pin_node?: string }
+    | { device: string, kind: "unwired", reason: string };
+
 export interface AddResponse extends BaseAddResponse {
     missing_required: MissingProperty[];
+    /** The wiring bootstrap worked out for what was added; [] when it wired nothing. */
+    wiring: Wiring[];
+    chip_selects: ChipSelectWiring[];
+}
+
+/** update that set a value: the wiring when bootstrap rewired a bus (a comm_type change, say). */
+export interface UpdateSetResponse extends CommonResponse {
+    wiring?: Wiring[];
+    chip_selects?: ChipSelectWiring[];
 }
 
 export interface NoosResponses extends Responses {
@@ -126,7 +171,7 @@ export interface NoosResponses extends Responses {
     "list property": ListPropertyResponse;
     "add": AddResponse;
     "read": ReadResponse;
-    "update": CommonResponse | ReadResponse | SuggestResponse;
+    "update": UpdateSetResponse | ReadResponse | SuggestResponse;
 }
 
 /** A success; a warning carries its `error_type` (GEN-17). */
