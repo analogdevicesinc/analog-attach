@@ -261,20 +261,23 @@ with_channel() {
 	assert_success
 }
 
-# Gap: --suggest is a flag of the noos backend only: `No flag registered for --suggest`, exit 2.
 # Description: update --suggest lists the values a property can take instead of setting it.
 # Steps:
 #   1. Make the overlay with the AD7124-8 and snapshot it.
 #   2. Run update ad7124_8 interrupt-parent --suggest, with --json.
 #   3. Check it succeeds and the suggested values include gpio.
-#   4. Check the workfile is unchanged.
-# bats test_tags=req:UPDATE-04, gap, id:L0320
+#   4. Check it answers what list value ad7124_8 interrupt-parent answers.
+#   5. Check the workfile is unchanged.
+# bats test_tags=req:UPDATE-04, id:L0320
 @test "update --suggest lists the values instead of setting the property" {
 	with_adc
 	snapshot
 	run_json update ad7124_8 interrupt-parent --suggest
 	assert_success
-	assert_json '[.suggestions.values[].value] | index("gpio") != null' true
+	assert_json '[.suggestions[].value] | index("gpio") != null' true
+	local suggested=$output
+	run_json list value ad7124_8 interrupt-parent
+	assert_output "$suggested"
 	assert_unchanged
 }
 

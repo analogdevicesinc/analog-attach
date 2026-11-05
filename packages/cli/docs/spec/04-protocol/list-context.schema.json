@@ -2,10 +2,42 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "list-context.schema.json",
   "title": "list context response",
-  "description": "Standard output of list context in JSON mode, or a refusal. $defs/base is ListContextResponse, a CommonResponse: each backend says what it lists (overview 2.1). Only the noos backend implements it (LIST-510); the linux backend answers that it is not supported (COM-015), so there is no $defs/linux.",
-  "anyOf": [{ "$ref": "#/$defs/noos" }],
+  "description": "Standard output of list context in JSON mode, or a refusal. $defs/base is ListContextResponse, a CommonResponse: each backend says what it lists (overview 2.1): the base devicetrees where the backend is linux (LIST-130), the chips and boards where it is noos (LIST-510).",
+  "anyOf": [{ "$ref": "#/$defs/linux" }, { "$ref": "#/$defs/noos" }],
   "$defs": {
     "base": { "description": "ListContextResponse: a CommonResponse.", "$ref": "common.schema.json#/$defs/common" },
+    "linux": {
+      "oneOf": [
+        {
+          "description": "Where the backend is linux: the base devicetrees of the Linux tree (LIST-130, LIST-132). ListContextResponse in src/backends/linux/protocol/descriptions.ts.",
+          "allOf": [{ "$ref": "#/$defs/base" }],
+          "required": ["devicetrees"],
+          "properties": {
+            "ok": { "const": true },
+            "message": { "type": "string", "pattern": "^[0-9]+ devicetrees?$" },
+            "severity": { "const": "info" },
+            "devicetrees": {
+              "description": "By architecture, then name.",
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["path", "arch", "name"],
+                "properties": {
+                  "path": { "type": "string", "pattern": "^/.*\\.dts$", "description": "What config devicetree takes: the file, absolute." },
+                  "arch": { "type": "string", "minLength": 1, "description": "The architecture: arm, arm64." },
+                  "name": { "type": "string", "pattern": "\\.dts$", "description": "The file under arch/<arch>/boot/dts: broadcom/bcm2711-rpi-4-b.dts." },
+                  "configured": { "const": true, "description": "On the devicetree setting's file." }
+                },
+                "additionalProperties": false
+              }
+            }
+          },
+          "unevaluatedProperties": false
+        },
+        { "$ref": "common.schema.json#/$defs/refusal" },
+        { "$ref": "common.schema.json#/$defs/config-refusal" }
+      ]
+    },
     "noos": {
       "oneOf": [
         {

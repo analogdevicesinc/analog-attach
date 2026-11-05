@@ -226,6 +226,7 @@ that gets them cannot fail because of the configuration.
   - `changed` builds the caches after `config linux <path>`. `reload` is `config --reload`.
 - `config/workspace.ts`: `load_workspace(session, needs)` returns `{ ok, workspace }` or `{ ok:
   false, outcome }`. The resources it can parse:
+  - `linux`: the checked Linux tree alone (`list context`).
   - `bindings`: the Linux tree has `Documentation/devicetree/bindings/` and `include/`, and the
     bundled dt-schema exists.
   - `tools`: the bundled dtc and dt-* binaries.
@@ -416,8 +417,8 @@ in `item-count.ts`). The same bounds show in the type (`number[2]`, protocol `mi
 ### list
 
 The shared `list devices`, `list property` and `list value`, plus the backend's own `list parent`
-(`commands/list/placement.ts`) and `list overlay` (`commands/list/overlay.ts`). The front end's
-`list context` answers "not supported" here.
+(`commands/list/placement.ts`) and `list overlay` (`commands/list/overlay.ts`). `list context`
+(`commands/list/context.ts`) lists the base devicetrees of the Linux tree (`base_devicetrees`).
 
 `list overlay <compatible>` reads the overlay index and grades each overlay with `board_fit`
 (`board-fit.ts`):

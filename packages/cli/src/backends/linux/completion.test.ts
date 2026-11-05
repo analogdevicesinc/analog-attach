@@ -133,8 +133,7 @@ describe("every slot of the Linux routes reaches complete and is answered", () =
 
     test("the routes are the shared commands Linux implements and its extras", () => {
         const names = routes.map(route => route.path.join(" "));
-        expect(names).toEqual(expect.arrayContaining(["add", "read", "update", "delete", "rename", "import", "list devices", "list property", "list value", "move", "enable", "disable", "list parent", "list overlay"]));
-        expect(names).not.toContain("list context");
+        expect(names).toEqual(expect.arrayContaining(["add", "read", "update", "delete", "rename", "import", "list devices", "list context", "list property", "list value", "move", "enable", "disable", "list parent", "list overlay"]));
     });
 
     test("each positional with a slot, and each flag that takes a value", async () => {
@@ -235,7 +234,7 @@ describe("Linux completion", () => {
     });
 
     test("the extras: list's new kinds, and list parent's and list overlay's device", async () => {
-        expect(values(await complete(["list", ""]))).toEqual(["devices", "property", "value", "parent", "overlay"]);
+        expect(values(await complete(["list", ""]))).toEqual(["devices", "context", "property", "value", "parent", "overlay"]);
         expect(values(await complete(["list", "parent", "adi,ad7"]))).toEqual(["adi,ad7124-4", "adi,ad7124-8"]);
         expect(values(await complete(["list", "overlay", "adi,a"]))).toEqual(["adi,ad7124-4", "adi,ad7124-8", "adi,adxl000"]);
         expect(values(await complete([""]))).toEqual(expect.arrayContaining(["move", "enable", "disable"]));

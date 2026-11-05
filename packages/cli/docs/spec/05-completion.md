@@ -149,7 +149,8 @@ shall offer nothing.
 `init`, `build`, `validate` and `deploy` complete only their options.
 `move`, `enable`, `disable`, `list parent` and `list overlay` exist where the
 backend is linux. Where the backend is noos, the sources of the rows are
-§11's, and `generate` and `list context` complete only their options.
+§11's, and `generate` completes only its options. `list context` takes
+nothing to complete.
 
 ### 6.2 Option values
 

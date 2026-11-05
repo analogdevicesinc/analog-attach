@@ -144,12 +144,11 @@ with_adc() {
 
 # --- list context ---
 
-# Gap: `list context is not supported by the linux backend`, exit 2.
 # Description: list context lists the .dts files of the Linux tree.
 # Steps:
 #   1. Run list context, with --json.
 #   2. Check it succeeds (.ok true) and names broadcom/bcm2711-rpi-4-b.dts.
-# bats test_tags=req:LIST-05, req:LIST-05-LNX, gap, id:L0194
+# bats test_tags=req:LIST-05, req:LIST-05-LNX, id:L0194
 @test "list context lists the .dts files of the Linux tree" {
 	run_json list context
 	assert_success
@@ -161,13 +160,12 @@ with_adc() {
 # config step can't fail (a refused value exits 0, so assert_success holds either way), and only
 # the first .dts is tried while the name says every one; the pinned tree has 2344, too many to
 # set one by one, and a sample proves little.
-# Gap: as above, list context is not supported.
 # Description: a target that list context names is accepted by the devicetree setting.
 # Steps:
 #   1. Run list context, with --json, and take the first .dts it names.
 #   2. Set devicetree to it with config.
 #   3. Check it succeeds.
-# bats test_tags=req:LIST-05-LNX, gap, id:L0195
+# bats test_tags=req:LIST-05-LNX, id:L0195
 @test "every target list context names is one the devicetree setting takes" {
 	run_json list context
 	assert_success
@@ -178,12 +176,11 @@ with_adc() {
 	assert_success
 }
 
-# Gap: as above, list context is not supported.
 # Description: list context says how to select a target.
 # Steps:
 #   1. Run list context.
 #   2. Check it succeeds and points to config devicetree.
-# bats test_tags=req:LIST-06, gap, id:L0196
+# bats test_tags=req:LIST-06, id:L0196
 @test "list context says how to select a target" {
 	run aa list context
 	assert_success
@@ -621,15 +618,13 @@ with_adc() {
 	assert_output --regexp 'The kinds: .*overlay'
 }
 
-# Gap: an unknown kind gives "No command registered for `nosuch`", naming no kind (and the
-# linux backend has no context).
 # Description: an unknown list kind is a usage error that names the kinds devices, context,
 # property and value.
 # Steps:
 #   1. Run list nosuch.
 #   2. Check it fails with a usage error (exit 2) saying the kind is unknown.
 #   3. Check the list of kinds names devices, context, property and value.
-# bats test_tags=req:LIST-11, gap, id:L0219
+# bats test_tags=req:LIST-11, id:L0219
 @test "an unknown list kind is refused, naming devices, context, property and value" {
 	run aa list nosuch
 	assert_failure 2

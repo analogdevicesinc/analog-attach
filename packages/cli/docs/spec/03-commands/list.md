@@ -2,18 +2,17 @@
 
 Lists what the bindings, the base and the overlay (the workfile) offer:
 devices, a node's properties, the values for a property, the parents a device
-can go under, and the Linux tree's overlays that have a device. Nothing is
-written. `list devices`, `list property` and `list value` are shared
-commands: §4 to §7 as the linux backend does them, §10 as the noos backend
-does them. `list parent` and `list overlay` are the linux backend's own (§8,
-§9); `list context` is the noos backend's own (§10.2), which the linux
-backend doesn't provide (COM-015: `list context is not supported by the
-linux backend`).
+can go under, the Linux tree's overlays that have a device, and the targets a
+project can be set up for. Nothing is written. `list devices`, `list context`,
+`list property` and `list value` are shared commands: §4 to §7 and §10 as the
+linux backend does them, §11 as the noos backend does them. `list parent` and
+`list overlay` are the linux backend's own (§8, §9).
 
 ## 1. Synopsis
 
 ```
 analog-attach [--json] list devices [<filter>]
+analog-attach [--json] list context
 analog-attach [--json] list property [<path> [<property>]]
 analog-attach [--json] list value <path> <property> [<member>]
 analog-attach [--json] list parent <compatible>
@@ -28,8 +27,9 @@ Grammar: rule `list` in `01-grammar.abnf`. The `list-argument` elements per
 kind:
 
 ```
-list-args       = list-devices / list-property / list-value / list-parent / list-overlay
+list-args       = list-devices / list-context / list-property / list-value / list-parent / list-overlay
 list-devices    = %s"devices" [ B element ]                    ; filter
+list-context    = %s"context"
 list-property   = %s"property" [ B element [ B element ] ]    ; path, property
 list-value      = %s"value" B element B element [ B element ] ; path, property, member
 list-parent     = %s"parent" B compatible
@@ -89,6 +89,7 @@ and report problems with them per COM-071 and COM-072:
 | Kind | Needs |
 |---|---|
 | `devices` | bindings |
+| `context` | the Linux tree (LIST-130) |
 | `property` | bindings, base, overlay; base, overlay without a path (LIST-037) |
 | `value` | base, overlay; bindings when they load (LIST-074) |
 | `parent` | bindings, base |
@@ -422,13 +423,36 @@ name (what `import` and `add --template overlay:` take) and `path` absolute
 **LIST-115** A compatible no binding has, or no overlay adds, gives an empty
 list, not a refusal.
 
-## 10. Where the backend is noos
+## 10. `list context`
+
+**LIST-130** The CLI shall list the base devicetrees of the Linux tree: every
+`.dts` file under `arch/<arch>/boot/dts/` of each architecture that has that
+directory, the overlays (`*-overlay.dts` under `arch/arm/boot/dts/overlays/`,
+as `import` finds them) left out, by architecture and then by the file's path
+under that directory, both sorted. It shall need only the `linux` setting, a
+Linux tree with `Documentation/devicetree/bindings/` and `include/` (COM-071
+when it isn't): no caches, base or workfile. A tree with no `.dts` lists none,
+which isn't a refusal.
+
+**LIST-131** In human mode it shall write each file's absolute path, the form
+`config devicetree` takes, one a line, the configured `devicetree`'s followed
+by ` (configured)`; then an empty line (when there was a file), `<n>
+devicetree[s] in <linux>.` and `Use: analog-attach config devicetree <path>`.
+
+**LIST-132** In JSON mode it shall respond `{"ok": true, "message": "<n>
+devicetree[s]", "severity": "info", "devicetrees": [{ path, arch, name,
+configured? }…]}` (`04-protocol/list-context.schema.json`), `path` the
+absolute path, `arch` the architecture, `name` the path under
+`arch/<arch>/boot/dts/` (`broadcom/bcm2711-rpi-4-b.dts`) and `configured`
+true on the configured `devicetree`'s.
+
+## 11. Where the backend is noos
 
 Each kind loads the workfile first and refuses as `02-common.md` COM-512
 says (`list context` loads only the settings). A node is one node name
 (GRM-080); `list parent` and `list overlay` are unknown commands (COM-015).
 
-### 10.1 `list devices`
+### 11.1 `list devices`
 
 **LIST-500** The CLI shall list what `add` takes (`add.md` ADD-500), in this
 order: the eval boards (tag `eval boards`), the drivers (tag `drivers`), then
@@ -447,7 +471,7 @@ the tag, except `eval boards (the part on it, wired: add by name)`, `drivers
 (a bare part, wired by hand: add by name)`, and `platform (<platform>)` for
 a module named `platform`.
 
-### 10.2 `list context`
+### 11.2 `list context`
 
 **LIST-510** The CLI shall list the chips (platforms) and boards the module
 repositories of `module-paths` describe, without a workfile. If
@@ -468,7 +492,7 @@ then `      <board>` per board, or `      no board: target the chip with
 chip's name, and an empty line; then `<n> board[s] on <m> chip[s].` and
 `Use: analog-attach config target <board>, then analog-attach init`.
 
-### 10.3 `list property`
+### 11.3 `list property`
 
 **LIST-520** With no `<node>`, the CLI shall list the stored nodes, in the
 workfile's order (external nodes are left out). In JSON mode it shall
@@ -492,7 +516,7 @@ the columns padded.
 error `list property takes only a node: 'analog-attach read <node>
 <property>' describes one property` (open issue L-11).
 
-### 10.4 `list value`
+### 11.4 `list value`
 
 **LIST-530** The CLI shall answer the values `<property>` of `<node>` can
 take, then the schemas a node could be created from for it. If the node has
@@ -514,7 +538,7 @@ with the problem.
 empty line after any value) `Can create:` and `  <schema>` per schema; with
 neither, `No suggestions.`
 
-## 11. Open issues
+## 12. Open issues
 
 **L-1. `list` paths skip the path checks.** `list property &spi0` says `Node
 not found: &spi0` where every other command says `Use the bare form: spi0`
@@ -573,7 +597,7 @@ testpart x` says `'analog-attach read <node> x' describes one property`,
 `<node>` written as is, where it could give the command to run, `read
 testpart x` (LIST-522).
 
-## 12. Examples
+## 13. Examples
 
 ```
 $ analog-attach list parent adi,ad7124-8

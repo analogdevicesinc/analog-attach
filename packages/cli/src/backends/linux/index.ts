@@ -19,6 +19,7 @@ import { deploy } from "./commands/deploy/command";
 import { disable, enable } from "./commands/enable-disable/command";
 import { import_command } from "./commands/import/command";
 import { init } from "./commands/init/command";
+import { list_context } from "./commands/list/context";
 import { list_devices } from "./commands/list/device";
 import { list_overlay } from "./commands/list/overlay";
 import { list_parent } from "./commands/list/placement";
@@ -47,7 +48,7 @@ export const backend: Backend<LinuxResponses> = {
     settings_hooks: linux_settings_hooks,
     commands: {
         init,
-        list: { devices: list_devices, property: list_property, value: list_value },
+        list: { devices: list_devices, context: list_context, property: list_property, value: list_value },
         add,
         import: import_command,
         read,
