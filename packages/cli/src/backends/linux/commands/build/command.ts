@@ -27,7 +27,7 @@ Output path is derived from the overlay (e.g. overlay.dtso -> overlay.dtbo).`,
             const stderr: string = (error.stderr as Buffer | undefined)?.toString() ?? String(error);
             return Promise.resolve(refuse(`Build failed:\n${stderr}`));
         }
-        return Promise.resolve(answer({ ok: true, message: "Compiled overlay", severity: "info", path: output } satisfies BuildResponse, `Wrote ${output}`));
+        return Promise.resolve(answer({ ok: true, message: "Compiled overlay", severity: "info", path: output } satisfies BuildResponse, `Build completed successfully\n\n  ${output}`));
     },
 });
 

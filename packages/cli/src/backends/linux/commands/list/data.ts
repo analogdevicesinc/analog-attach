@@ -15,6 +15,7 @@ import {
     type ParsedBinding,
 } from "attach-lib";
 
+import { did_you_mean } from "../../../../interface/names";
 import type { Bindings } from "../../config/workspace";
 import type { ConfigResult } from "../../config/settings";
 import { overlay_files } from "../../overlay-index";
@@ -47,21 +48,26 @@ export function device_keys(bindings: IndexedBindings, filter?: string): string[
     return filter === undefined ? entries : entries.filter(entry => entry.includes(filter));
 }
 
+/** A compatible no binding has, with the closest ones and where to look (as noos words an unknown schema). */
+export function unknown_compatible_message(bindings: IndexedBindings, compatible: string, program: string): string {
+    return `Unknown compatible '${compatible}'.${did_you_mean(compatible, device_keys(bindings))} See: ${program} list devices`;
+}
+
+/** The binding, or why not: none (worded by the caller, `unknown_compatible_message`), or one that doesn't parse. */
 export type LoadedBinding =
     | { ok: true; path: string; binding: ParsedBinding }
-    | { ok: false; reason: "none"; message: string; text: string }
-    | { ok: false; reason: "parse"; message: string; text: string };
+    | { ok: false; reason: "none" }
+    | { ok: false; reason: "parse"; message: string };
 
 /** The parsed binding of a compatible, from the compat index. */
 export async function load_binding(bindings: Bindings, compatible: string): Promise<LoadedBinding> {
     const binding_path = await find_binding(bindings, compatible);
     if (binding_path === undefined) {
-        return { ok: false, reason: "none", message: `No binding found for ${compatible}`, text: `Failed to find binding for ${compatible}` };
+        return { ok: false, reason: "none" };
     }
     const parsed = await Attach.parse(binding_path, bindings);
     if (AttachResult.is_err(parsed)) {
-        const message = `Failed to parse binding ${binding_path}`;
-        return { ok: false, reason: "parse", message, text: message };
+        return { ok: false, reason: "parse", message: `Failed to parse binding ${binding_path}` };
     }
     return { ok: true, path: binding_path, binding: parsed.value.parsed_binding };
 }

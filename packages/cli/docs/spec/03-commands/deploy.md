@@ -48,7 +48,10 @@ base or the overlay's content.
 COM-072: that `deploy-ip`, `deploy-user`, `deploy-password` and `workfile`
 are set, each missing one being the problem `Missing config field <field>`
 with its description and hint (COM-126): `workfile` has the setup hint of
-02-common.md §8.3; the `deploy-*` fields have none. When all four are set, it then
+02-common.md §8.3; `deploy-ip`, `deploy-user` and `deploy-password` have
+`Run 'analog-attach config deploy-ip <address>'.`, `Run 'analog-attach config
+deploy-user <user>'.` and `Run 'analog-attach config deploy-password
+<password>'.`. When all four are set, it then
 checks that the compiled overlay exists, and when it does, that `scp` and
 `sshpass` are on `PATH`.
 
