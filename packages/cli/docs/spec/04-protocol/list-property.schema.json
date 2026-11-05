@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "list-property.schema.json",
   "title": "list property response",
-  "description": "Standard output of list property in JSON mode: the names a node's binding allows (LIST-036), one property's description (LIST-054), or a refusal. $defs/base is ListPropertyResponse (overview 2.1).",
+  "description": "Standard output of list property in JSON mode: the overlay's nodes (LIST-037), the names a node's binding allows (LIST-036), one property's description (LIST-054), or a refusal. $defs/base is ListPropertyResponse (overview 2.1).",
   "anyOf": [{ "$ref": "#/$defs/linux" }, { "$ref": "#/$defs/noos" }],
   "$defs": {
     "base": {
@@ -20,15 +20,41 @@
       "properties": { "property": { "$ref": "common.schema.json#/$defs/property-description" } }
     },
     "linux": {
-      "oneOf": [{ "$ref": "#/$defs/linux-names" }, { "$ref": "#/$defs/linux-property" }, { "$ref": "common.schema.json#/$defs/refusal" }]
+      "oneOf": [{ "$ref": "#/$defs/linux-nodes" }, { "$ref": "#/$defs/linux-names" }, { "$ref": "#/$defs/linux-property" }, { "$ref": "common.schema.json#/$defs/refusal" }, { "$ref": "common.schema.json#/$defs/config-refusal" }]
     },
-    "linux-names": {
-      "description": "list property <path> (LIST-036): each property's name, then the regex of each property pattern and child-node pattern.",
+    "linux-nodes": {
+      "description": "list property without a path (LIST-037): each node of the overlay's bodies by its label-first path.",
       "allOf": [{ "$ref": "#/$defs/base-names" }],
       "required": ["suggestions"],
       "properties": {
         "ok": { "const": true },
+        "message": { "type": "string", "pattern": "^[0-9]+ nodes?$" },
         "severity": { "const": "info" },
+        "suggestions": {
+          "deprecated": true,
+          "description": "The entries of names, each with a display_string, the node's first compatible, when it has one; kept for one release.",
+          "type": "array",
+          "items": { "$ref": "common.schema.json#/$defs/suggestion" }
+        }
+      },
+      "unevaluatedProperties": false
+    },
+    "linux-names": {
+      "description": "list property <path> (LIST-036): each property's name, then the regex of each property pattern and child-node pattern; the named properties with their types in properties.",
+      "allOf": [{ "$ref": "#/$defs/base-names" }],
+      "required": ["properties", "suggestions"],
+      "properties": {
+        "ok": { "const": true },
+        "message": { "type": "string", "pattern": "^Found [0-9]+ properties" },
+        "severity": { "const": "info" },
+        "properties": {
+          "type": "array",
+          "items": {
+            "allOf": [{ "$ref": "common.schema.json#/$defs/property-description" }],
+            "required": ["set"],
+            "properties": { "description": false, "default": false, "suggestions": false }
+          }
+        },
         "suggestions": {
           "deprecated": true,
           "description": "The same entries with their marks (compatible (set, required)), kept for one release.",

@@ -8,7 +8,8 @@
 //   - the `--json` output of each command, run through `main` in a fixture workspace,
 //     validates against the 04-protocol schemas: a shared command's against the backend's
 //     `$defs/<id>` and the root, an extra's and a front-end command's against its own
-//     schema, a configuration error on stderr against config-error.schema.json. Each shared
+//     schema, a configuration error on stderr against config-error.schema.json, and a Linux
+//     workspace that doesn't load also against common's `$defs/config-refusal`. Each shared
 //     and extra command has an answer and a refusal (or configuration error) among them.
 //
 // Neither backend needs a real checkout: Linux runs in the tiny Linux tree of
@@ -65,14 +66,15 @@ interface Harness {
 
 /**
  * One `--json` run. `shape` is what it must show: an answer (exit 0, `ok` true where the
- * response has one), a refusal (exit 0, `ok: false`), or a configuration error (exit 2, JSON
- * on stderr, nothing on stdout).
+ * response has one), a refusal (exit 0, `ok: false`), a refusal of a workspace that doesn't load
+ * (a refusal that also matches `$defs/config-refusal`, COM-071), or a configuration error (exit
+ * 2, JSON on stderr, nothing on stdout).
  */
 interface Case<F extends Harness> {
     /** The route it runs: `list devices`, `move`, `config`. */
     readonly route: string;
     readonly argv: readonly string[];
-    readonly shape: "answer" | "refusal" | "config-error";
+    readonly shape: "answer" | "refusal" | "config-refusal" | "config-error";
     readonly prepare?: (fixture: F) => void | Promise<void>;
 }
 
@@ -89,12 +91,15 @@ const schema_file = (route: string): string => `${route.replaceAll(" ", "-")}.sc
 /** The schema references a case's output must validate against. */
 function references(backend: Backend, kase: Case<Harness>): string[] {
     if (kase.shape === "config-error") { return ["config-error.schema.json"]; }
-    if (SHARED_ROUTES.includes(kase.route)) { return [`${schema_file(kase.route)}#/$defs/${backend.id}`, schema_file(kase.route)]; }
-    const extra = backend.extra?.[kase.route];
-    if (extra !== undefined) { return [extra.schema]; }
-    const front = FRONT_SCHEMAS[kase.route];
-    if (front !== undefined) { return [front]; }
-    throw new Error(`No schema for the route '${kase.route}'`);
+    const own = (): string[] => {
+        if (SHARED_ROUTES.includes(kase.route)) { return [`${schema_file(kase.route)}#/$defs/${backend.id}`, schema_file(kase.route)]; }
+        const extra = backend.extra?.[kase.route];
+        if (extra !== undefined) { return [extra.schema]; }
+        const front = FRONT_SCHEMAS[kase.route];
+        if (front !== undefined) { return [front]; }
+        throw new Error(`No schema for the route '${kase.route}'`);
+    };
+    return kase.shape === "config-refusal" ? [...own(), "common.schema.json#/$defs/config-refusal"] : own();
 }
 
 /** The backend's implementation of a shared route, if it has one. */
@@ -263,7 +268,7 @@ function check_contract<F extends Harness>(contract: Contract<F>): void {
             for (const name of routes) {
                 const shapes = new Set(contract.cases.filter(kase => kase.route === name).map(kase => kase.shape));
                 expect(shapes.has("answer"), `${name}: an answer`).toBe(true);
-                expect(shapes.has("refusal") || shapes.has("config-error"), `${name}: a refusal`).toBe(true);
+                expect(shapes.has("refusal") || shapes.has("config-refusal") || shapes.has("config-error"), `${name}: a refusal`).toBe(true);
             }
         });
 
@@ -283,7 +288,7 @@ function check_contract<F extends Harness>(contract: Contract<F>): void {
                         expect(result.code, label).toBe(0);
                         response = JSON.parse(result.stdout);
                         const ok = (response as { ok?: unknown }).ok;
-                        if (kase.shape === "refusal") { expect(ok, label).toBe(false); }
+                        if (kase.shape === "refusal" || kase.shape === "config-refusal") { expect(ok, label).toBe(false); }
                         if (kase.shape === "answer" && ok !== undefined) { expect(ok, label).toBe(true); }
                     }
                     for (const reference of references(backend, kase as Case<Harness>)) {
@@ -433,7 +438,7 @@ const LINUX_CASES: readonly Case<LinuxHarness>[] = [
             linux.write_settings({ linux: linux.linux, devicetree: path.join(linux.base, "base.dts"), workfile });
         },
     },
-    { route: "init", argv: ["init"], shape: "config-error", prepare: unconfigured },
+    { route: "init", argv: ["init"], shape: "config-refusal", prepare: unconfigured },
 
     { route: "import", argv: ["import", "extra-overlay.dts"], shape: "answer", prepare: fixture => { fs.writeFileSync(path.join(fixture.linux.project, "extra-overlay.dts"), IMPORTED); } },
     { route: "import", argv: ["import", "ad7124-overlay.dts"], shape: "answer", prepare: fixture => { fixture.overlays(); } },
@@ -450,7 +455,7 @@ const LINUX_CASES: readonly Case<LinuxHarness>[] = [
     { route: "read", argv: ["read", "adc", "reg"], shape: "answer" },
     { route: "read", argv: ["read", "adc", "spi-max-frequency"], shape: "refusal" },
     { route: "read", argv: ["read", "nope"], shape: "refusal" },
-    { route: "read", argv: ["read", "spi0"], shape: "config-error", prepare: unconfigured },
+    { route: "read", argv: ["read", "spi0"], shape: "config-refusal", prepare: unconfigured },
 
     { route: "update", argv: ["update", "adc", "spi-max-frequency", "1000000"], shape: "answer" },
     { route: "update", argv: ["update", "adc", "interrupts", "25", "8"], shape: "answer" },
@@ -477,8 +482,9 @@ const LINUX_CASES: readonly Case<LinuxHarness>[] = [
     { route: "list devices", argv: ["list", "devices"], shape: "answer" },
     { route: "list devices", argv: ["list", "devices", "ad7124"], shape: "answer" },
     { route: "list devices", argv: ["list", "devices", "adi,ad7124-8"], shape: "answer" },
-    { route: "list devices", argv: ["list", "devices"], shape: "config-error", prepare: unconfigured },
+    { route: "list devices", argv: ["list", "devices"], shape: "config-refusal", prepare: unconfigured },
 
+    { route: "list property", argv: ["list", "property"], shape: "answer" },
     { route: "list property", argv: ["list", "property", "adc"], shape: "answer" },
     { route: "list property", argv: ["list", "property", "adc", "reg"], shape: "answer" },
     { route: "list property", argv: ["list", "property", "nope"], shape: "refusal" },
@@ -490,15 +496,15 @@ const LINUX_CASES: readonly Case<LinuxHarness>[] = [
     { route: "validate", argv: ["validate"], shape: "answer", prepare: fixture => { fixture.tools(); } },
     { route: "validate", argv: ["validate"], shape: "answer", prepare: fixture => { fixture.tools({ diagnostics: DIAGNOSTIC }); } },
     { route: "validate", argv: ["validate"], shape: "answer", prepare: fixture => { fixture.tools({ fail: true }); } },
-    { route: "validate", argv: ["validate"], shape: "config-error" },
+    { route: "validate", argv: ["validate"], shape: "config-refusal" },
 
     { route: "build", argv: ["build"], shape: "answer", prepare: fixture => { fixture.tools(); } },
     { route: "build", argv: ["build"], shape: "refusal", prepare: fixture => { fixture.tools({ fail: true }); } },
-    { route: "build", argv: ["build"], shape: "config-error" },
+    { route: "build", argv: ["build"], shape: "config-refusal" },
 
     { route: "deploy", argv: ["deploy"], shape: "answer", prepare: fixture => { deploy_settings(fixture); fixture.sshpass(); } },
     { route: "deploy", argv: ["deploy"], shape: "refusal", prepare: fixture => { deploy_settings(fixture); fixture.sshpass({ fail: true }); } },
-    { route: "deploy", argv: ["deploy"], shape: "config-error" },
+    { route: "deploy", argv: ["deploy"], shape: "config-refusal" },
 
     { route: "move", argv: ["move", "adc", "spi1"], shape: "answer", prepare: with_spi1 },
     { route: "move", argv: ["move", "adc", "adc"], shape: "refusal" },
@@ -511,11 +517,11 @@ const LINUX_CASES: readonly Case<LinuxHarness>[] = [
 
     { route: "list parent", argv: ["list", "parent", "adi,ad7124-8"], shape: "answer" },
     { route: "list parent", argv: ["list", "parent", "adi,nope"], shape: "answer" },
-    { route: "list parent", argv: ["list", "parent", "adi,ad7124-8"], shape: "config-error", prepare: unconfigured },
+    { route: "list parent", argv: ["list", "parent", "adi,ad7124-8"], shape: "config-refusal", prepare: unconfigured },
 
     { route: "list overlay", argv: ["list", "overlay", "adi,ad7124-8"], shape: "answer", prepare: fixture => { fixture.overlays(); } },
     { route: "list overlay", argv: ["list", "overlay", "adi,adxl000"], shape: "answer" },
-    { route: "list overlay", argv: ["list", "overlay", "adi,ad7124-8"], shape: "config-error", prepare: unconfigured },
+    { route: "list overlay", argv: ["list", "overlay", "adi,ad7124-8"], shape: "config-refusal", prepare: unconfigured },
 
     { route: "config", argv: ["config"], shape: "answer" },
     { route: "config", argv: ["config", "workfile"], shape: "answer" },
@@ -526,6 +532,7 @@ const LINUX_CASES: readonly Case<LinuxHarness>[] = [
     { route: "config", argv: ["config", "--reload"], shape: "refusal", prepare: fixture => { fixture.tools({ fail: true }); } },
     { route: "config", argv: ["config"], shape: "config-error", prepare: broken_settings },
     { route: "config", argv: ["config"], shape: "config-error", prepare: unknown_settings },
+    { route: "config", argv: ["config", "--reload"], shape: "config-refusal", prepare: unconfigured },
     { route: "completion", argv: ["completion", "bash"], shape: "answer" },
     { route: "completion", argv: ["completion", "zsh", "--install"], shape: "answer" },
     { route: "skill install", argv: ["skill", "install", "analog-attach-linux"], shape: "refusal" },

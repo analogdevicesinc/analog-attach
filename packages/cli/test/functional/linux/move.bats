@@ -65,7 +65,7 @@ with_devices() {
 	run grep -c 'target = <&spi0>;' "$WORKFILE"
 	assert_output 0
 	run_json read spi1/adi,ad7124-8@2 reg
-	assert_json '.value' 2
+	assert_json '.value[0]' 2
 }
 
 # Description: in human mode, move says which node it moved, to which parent, in which workfile.

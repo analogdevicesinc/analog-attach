@@ -7,7 +7,7 @@ import { load_workspace, optional_bindings, type Bindings } from "../../config/w
 import type { ConfigResult } from "../../config/settings";
 import { bigIntReplacer, resolve_node_identifier, not_found_message, parse_target } from "../../utilities";
 import { convert_node, convert_property } from "../../protocol/dt-to-protocol";
-import type { Node, OverlayNode, PropertyConstraints, ReadNode, ReadResponse, Suggestion, Types, ValueSource } from "../../protocol/types";
+import type { Node, OverlayNode, Property, PropertyConstraints, ReadNode, ReadResponse, Suggestion, Types, ValueSource } from "../../protocol/types";
 import { format_type, resolve_target_binding, type PropertyInfo } from "../list/suggest";
 import { node_missing_required, property_details } from "../../node-state";
 
@@ -67,7 +67,7 @@ export async function read_target(
 
     const source = property_source(overlay, node_path, property.name);
     const response = (): ReadResponse => ({
-        ...convert_property(property),
+        ...with_binding_type(convert_property(property), info),
         source,
         ...(info?.description === undefined ? {} : { description: info.description }),
         ...(info === undefined ? {} : { required: info.required, ...binding_constraints(info), definition: path.basename(info.binding_path) }),
@@ -84,6 +84,19 @@ export async function read_target(
     const lines = [`${property_line(property)}${source === "base" ? BASE_MARK : ""}`, ...format_details(info, suggestions)];
     if (creatable.length > 0) { lines.push(`  Or add your own: ${creatable.map(compatible => `${session.program} add ${compatible}`).join(", ")}`); }
     return answer(response, lines.join("\n"));
+}
+
+/**
+ * The property with the binding's type, when the binding defines it (READ-050). The value stays
+ * as written, except that a single value under an array type becomes a one-item array. The cells
+ * of a specifier list (`interrupts`) stay flat, as the type's bounds count them and `update`
+ * takes them.
+ */
+export function with_binding_type(property: Property, info?: Pick<PropertyInfo, "type">): Property {
+    if (info === undefined) { return property; }
+    const { type } = info;
+    const { value } = property;
+    return { ...property, type, value: type.kind === "array" && !Array.isArray(value) && value !== null ? [value] : value };
 }
 
 function property_line(property: DTProperty): string {
@@ -127,17 +140,17 @@ function read_node(overlay: DeviceTreeOverlay, node_path: string): NodeRead {
     const roots = overlay.get_fragments().flatMap(fragment => overlay.get_fragment_root_path(fragment) ?? []);
     const touches = (path: string): boolean => overlay.overlay_nodes_at(path).length > 0;
     const reaches = (path: string): boolean => touches(path) || roots.some(root => root.startsWith(path === "/" ? "/" : `${path}/`));
-    const origin = (path: string): ReadNode["origin"] => {
-        if (overlay.get_base_dts()?.node_exists(path) !== true) { return "overlay"; }
-        return touches(path) ? "both" : "base";
-    };
+    // Internal: the overlay adds the node or changes it. External: the base has it, untouched.
+    const origin = (path: string): ReadNode["origin"] => (
+        overlay.get_base_dts()?.node_exists(path) === true && !touches(path) ? "external" : "internal"
+    );
 
     const read = (path: string): NodeRead => {
         const node = overlay.effective_node(path);
         const children = [...overlay.effective_children(path)].map(([name, child]): NodeRead => {
             const child_path = path === "/" ? `/${name}` : `${path}/${name}`;
             if (reaches(child_path)) { return read(child_path); }
-            return { key: name, labels: child.labels, origin: "base", collapsed: true, properties: [], children: [] };
+            return { key: name, labels: child.labels, origin: "external", collapsed: true, properties: [], children: [] };
         });
         return {
             key: node === undefined ? path : get_full_node_name(node),
@@ -249,7 +262,7 @@ export function format_missing(missing: string[]): string[] {
 /** `read` without a path: the fragments' content as written, every node the workfile's. */
 function overlay_root(overlay: DeviceTreeOverlay): OverlayNode {
     const children = overlay.get_fragments().flatMap(fragment => fragment.children.find(child => child.name === "__overlay__")?.children ?? []);
-    const with_origin = (node: Node): OverlayNode => ({ ...node, children: node.children.map(child => with_origin(child)), origin: "overlay" });
+    const with_origin = (node: Node): OverlayNode => ({ ...node, children: node.children.map(child => with_origin(child)), origin: "internal" });
     return with_origin({ kind: "node", key: "/", properties: [], children: children.map((child: DTNode) => convert_node(child)) });
 }
 
@@ -469,12 +482,29 @@ if (import.meta.vitest) {
         expect(responses[0]).toMatchObject({ key: "compatible", source: "base" });
         expect(responses[1]).toMatchObject({
             key: "i2c@7e804000",
-            origin: "both",
+            origin: "internal",
             properties: [{ key: "compatible", source: "base" }, { key: "status", source: "overlay" }],
-            children: [{ key: "rtc@51", origin: "base", properties: [], children: [] }, { key: "hwmon@2e", origin: "overlay" }],
+            children: [{ key: "rtc@51", origin: "external", properties: [], children: [] }, { key: "hwmon@2e", origin: "internal" }],
         });
         expect(responses[1]).not.toHaveProperty("children.0.collapsed");
         expect(responses[1]).not.toHaveProperty("missing_required");
+        expect(await outcome_json(await read_target(json_session, overlay, no_bindings, "spi0", undefined, { quiet: false }))).toMatchObject({ origin: "external" });
+    });
+
+    test("with_binding_type — the binding's type; the value as written, a single value made an array", () => {
+        const int: Types = { kind: "number", subtype: "int" };
+        const property = (value: Property["value"]): Property => ({ kind: "property", key: "p", type: int, value });
+        const enumeration: Types = { kind: "enum", options: [{ value: 0 }, { value: 1 }, { value: 3 }] };
+        expect(with_binding_type(property(0))).toEqual(property(0));
+        expect(with_binding_type(property(3), { type: enumeration })).toEqual({ kind: "property", key: "p", type: enumeration, value: 3 });
+        const array: Types = { kind: "array", items: int };
+        expect(with_binding_type(property(0), { type: array }).value).toEqual([0]);
+        expect(with_binding_type(property([0, 1]), { type: array }).value).toEqual([0, 1]);
+        // A specifier list's cells stay flat: its bounds count cells.
+        const rows: Types = { kind: "array", items: { kind: "tuple", items: [int, int] }, min_items: 2, max_items: 2 };
+        expect(with_binding_type(property([25, 2]), { type: rows }).value).toEqual([25, 2]);
+        const tuple: Types = { kind: "tuple", items: [{ kind: "string" }, int, int] };
+        expect(with_binding_type(property(["&gpio", 25, 1]), { type: tuple }).value).toEqual(["&gpio", 25, 1]);
     });
 
     test("read_target — a clock or a supply can be added instead of the values on offer, unless quiet", async () => {

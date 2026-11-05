@@ -75,7 +75,8 @@ with_adc() {
 # Description: a filter keeps only the compatibles that contain it.
 # Steps:
 #   1. List the devices matching adxl34, with --json; check it succeeds and says 2 were found.
-#   2. List them as text; check it succeeds with exactly the lines adi,adxl345 and adi,adxl346.
+#   2. List them as text; check it succeeds with exactly two lines, adi,adxl345 and adi,adxl346,
+#      each followed by its category.
 # bats test_tags=req:LIST-02, id:L0190
 @test "list devices with a filter keeps the compatibles that contain it" {
 	run_json list devices adxl34
@@ -83,8 +84,8 @@ with_adc() {
 	assert_json '.message' "Found 2 devices"
 	run aa list devices adxl34
 	assert_success
-	assert_line "adi,adxl345"
-	assert_line "adi,adxl346"
+	assert_line --regexp '^adi,adxl345 +iio/accel$'
+	assert_line --regexp '^adi,adxl346 +iio/accel$'
 	[ "${#lines[@]}" -eq 2 ]
 }
 
@@ -121,21 +122,24 @@ with_adc() {
 	assert_line --regexp '^  [0-9]+ properties, 1 child node patterns$'
 }
 
-# Gap: the compatibles come one per line in the compat index's order, with no category (the
-# binding's folder, iio/adc, iio/accel), as text and in JSON.
-# Description: list devices gives each compatible's category, the binding's folder.
+# Description: list devices gives each compatible's category, the binding's folder, and lists
+# them by category.
 # Steps:
 #   1. List the devices matching adxl34, with --json.
-#   2. Check it succeeds and every device has the category iio/accel.
+#   2. Check it succeeds and every device has the category (tag) iio/accel.
 #   3. List the devices matching adi,ad7124 as text; check it succeeds and shows iio/adc.
-# bats test_tags=req:LIST-04-LNX, gap, id:L0193
+#   4. List the devices matching adi, with --json; check the devices come sorted by category,
+#      then compatible.
+# bats test_tags=req:LIST-04-LNX, id:L0193
 @test "list devices groups the compatibles by category" {
 	run_json list devices adxl34
 	assert_success
-	assert_json '[.devices[] | .category] | unique | join(" ")' "iio/accel"
+	assert_json '[.devices[] | .tag] | unique | join(" ")' "iio/accel"
 	run aa list devices adi,ad7124
 	assert_success
 	assert_line --partial "iio/adc"
+	run_json list devices adi
+	assert_json '[.devices[] | [.tag, .key]] == ([.devices[] | [.tag, .key]] | sort)' true
 }
 
 # --- list context ---
@@ -188,19 +192,24 @@ with_adc() {
 
 # --- list property ---
 
-# Gap: the path is required: `Missing: path (list property <path> [property])`, exit 2.
 # Description: list property with no node lists the nodes of the overlay.
 # Steps:
 #   1. Make an overlay with an AD7124-8 on spi1.
 #   2. Run list property with no node, with --json.
-#   3. Check it succeeds (.ok true) and names adi,ad7124-8@0.
-# bats test_tags=req:LIST-07, gap, id:L0197
+#   3. Check it succeeds (.ok true), names the node by its label ad7124_8, and gives its
+#      compatible adi,ad7124-8.
+#   4. Run it as text; check the line ad7124_8.
+# bats test_tags=req:LIST-07, id:L0197
 @test "list property with no node lists the overlay's nodes" {
 	with_adc
 	run_json list property
 	assert_success
 	assert_json '.ok' true
-	assert_output --partial "adi,ad7124-8@0"
+	assert_json '.names | index("ad7124_8") != null' true
+	assert_json '.suggestions[] | select(.value == "ad7124_8") | .display_string' "adi,ad7124-8"
+	run aa list property
+	assert_success
+	assert_line "ad7124_8"
 }
 
 # Description: list property of a node marks each property required, set, both or neither, and
@@ -208,21 +217,24 @@ with_adc() {
 # Steps:
 #   1. Make an overlay with an AD7124-8 on spi1.
 #   2. Run list property ad7124_8.
-#   3. Check compatible and reg are set and required, interrupts required, avdd-supply unmarked.
+#   3. Check compatible and reg are set and required, interrupts required, avdd-supply unmarked
+#      (its name, then its type).
 #   4. Update avdd-supply to vdd_3v3_reg and list again.
-#   5. Check avdd-supply is marked set.
+#   5. Check avdd-supply is marked set, and with --json set and not required.
 # bats test_tags=req:LIST-07, id:L0198
 @test "list property of a node marks what is required and what is set" {
 	with_adc
 	run aa list property ad7124_8
 	assert_success
-	assert_line "compatible (set, required)"
-	assert_line "reg (set, required)"
-	assert_line "interrupts (required)"
-	assert_line "avdd-supply"
+	assert_line --regexp '^compatible +\(set, required\) '
+	assert_line --regexp '^reg +\(set, required\) '
+	assert_line --regexp '^interrupts +\(required\) '
+	assert_line --regexp '^avdd-supply +enum\('
 	aa update ad7124_8 avdd-supply vdd_3v3_reg >/dev/null
 	run aa list property ad7124_8
-	assert_line "avdd-supply (set)"
+	assert_line --regexp '^avdd-supply +\(set\) '
+	run_json list property ad7124_8
+	assert_json '.properties[] | select(.name == "avdd-supply") | [.set, .required] | tojson' '[true,false]'
 }
 
 # Description: list property of a node shows its child node patterns as the names they match,
@@ -247,14 +259,12 @@ with_adc() {
 	assert_json '.names | index("^channel@([0-9]|1[0-5])$") != null' true
 }
 
-# Gap: a node's listing gives each property's name and marks, not its type; the type is only in
-# `list property <path> <property>`.
 # Description: list property of a node gives the type of each property.
 # Steps:
 #   1. Make an overlay with an AD7124-8 on spi1.
 #   2. Run list property ad7124_8; check it succeeds and the reg line gives a number type.
 #   3. Run it with --json; check reg is shown as number[].
-# bats test_tags=req:LIST-07, gap, id:L0200
+# bats test_tags=req:LIST-07, id:L0200
 @test "list property of a node gives each property's type" {
 	with_adc
 	run aa list property ad7124_8
@@ -276,7 +286,7 @@ with_adc() {
 	assert_success
 	assert_json '.names | index("cs-gpios") != null' true
 	run aa list property spi0
-	assert_line "compatible (set, required)"
+	assert_line --regexp '^compatible +\(set, required\) '
 }
 
 # Description: list property of one property gives its type, whether it is required and whether

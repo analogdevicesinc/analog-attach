@@ -58,7 +58,7 @@ describe("the Linux backend through main", () => {
         expect(JSON.parse(result.stdout)).toMatchObject({
             kind: "node",
             key: "spi@7e204000",
-            origin: "both",
+            origin: "internal",
             alias: ["spi0"],
             properties: [
                 { key: "compatible", source: "base" },
@@ -66,14 +66,14 @@ describe("the Linux backend through main", () => {
                 { key: "#size-cells", source: "base" },
                 { key: "status", source: "overlay", value: "okay" },
             ],
-            children: [{ key: "adc@0", origin: "overlay" }],
+            children: [{ key: "adc@0", origin: "internal" }],
         });
 
         const text = await run(["read", "spi0", "status"]);
         expect(text).toEqual({ code: 0, stdout: `status = "okay";\n`, stderr: "" });
 
         const whole = await run(["--json", "read"]);
-        expect(JSON.parse(whole.stdout)).toMatchObject({ key: "/", origin: "overlay", children: [{ key: "adc@0", origin: "overlay" }] });
+        expect(JSON.parse(whole.stdout)).toMatchObject({ key: "/", origin: "internal", children: [{ key: "adc@0", origin: "internal" }] });
     });
 
     test("--json read of a property: what its binding says of it, which --quiet leaves out", async () => {
@@ -85,12 +85,16 @@ describe("the Linux backend through main", () => {
         const reg = await read_json(["adc", "reg"]);
         expect(reg).toMatchObject({ key: "reg", source: "overlay", required: true, definition: "adi,ad7124.yaml" });
         expect(reg).not.toHaveProperty("constraints");
+        // The binding's type; the single cell as written becomes a one-item array of it.
+        expect(reg).toMatchObject({ type: { kind: "array", items: { kind: "number" } }, value: [0] });
 
         await run(["update", "adc", "spi-max-frequency", "1000000"]);
         expect(await read_json(["adc", "spi-max-frequency"])).toMatchObject({ required: false, constraints: { maximum: 5_000_000 }, definition: "adi,ad7124.yaml" });
 
         const quiet = await read_json(["--quiet", "adc", "reg"]);
         for (const key of ["required", "constraints", "definition", "description"]) { expect(quiet).not.toHaveProperty(key); }
+        // --quiet reads no binding: the type is the value's.
+        expect(quiet).toMatchObject({ type: { kind: "number" }, value: 0 });
     });
 
     test("a refused rename: exit 0, the reason on stdout, ok: false under --json; the workfile is unchanged", async () => {
@@ -124,24 +128,30 @@ describe("the Linux backend through main", () => {
         expect(second.stdout).toContain("analog-attach list devices [filter]");
     });
 
-    test("a workspace that isn't configured: the setup hint, a refusal in text, exit 2 under --json", async () => {
+    test("a workspace that isn't configured: a refusal with the setup hint, under --json too, with its errors and hints", async () => {
         write_settings({});
         const text = await run(["read", "spi0"]);
         expect(text.code).toBe(0);
         expect(text.stdout).toContain("Missing config field devicetree");
         expect(text.stdout).toContain("Run 'analog-attach' on a terminal, or 'analog-attach config linux <path>', 'config devicetree <path>' and 'config workfile <name>', then 'analog-attach init', to set up a workspace.");
         const json = await run(["--json", "read", "spi0"]);
-        expect(json).toMatchObject({ code: 2, stdout: "" });
-        expect(JSON.parse(json.stderr)).toMatchObject({ errors: [{ field: "devicetree" }, { field: "linux" }, { field: "workfile" }] });
+        expect(json).toMatchObject({ code: 0, stderr: "" });
+        expect(JSON.parse(json.stdout)).toMatchObject({
+            ok: false,
+            message: "Missing config field devicetree; Missing config field linux; Missing config field workfile",
+            severity: "error",
+            errors: [{ field: "devicetree" }, { field: "linux" }, { field: "workfile" }],
+            hints: [expect.stringContaining("'analog-attach config linux <path>'")],
+        });
     });
-    test("--json list devices: the compatibles that contain the filter; the one it names described", async () => {
+    test("--json list devices: the compatibles that contain the filter, with their category; the one it names described", async () => {
         configure();
         const named = await run(["--json", "list", "devices", "adi,ad7124-8"]);
         expect(named.code).toBe(0);
         expect(JSON.parse(named.stdout)).toMatchObject({
             ok: true,
             message: "Device adi,ad7124-8",
-            devices: [{ key: "adi,ad7124-8" }],
+            devices: [{ key: "adi,ad7124-8", tag: "iio/adc" }],
             names: ["adi,ad7124-8"],
             device: {
                 key: "adi,ad7124-8",
@@ -154,12 +164,12 @@ describe("the Linux backend through main", () => {
 
         const both = await run(["--json", "list", "devices", "ad7124"]);
         const response = JSON.parse(both.stdout) as Record<string, unknown>;
-        expect(response).toMatchObject({ message: "Found 2 devices", devices: [{ key: "adi,ad7124-4" }, { key: "adi,ad7124-8" }] });
+        expect(response).toMatchObject({ message: "Found 2 devices", devices: [{ key: "adi,ad7124-4", tag: "iio/adc" }, { key: "adi,ad7124-8", tag: "iio/adc" }] });
         expect(response).not.toHaveProperty("device");
-        expect(await run(["list", "devices", "ad7124"])).toEqual({ code: 0, stdout: "adi,ad7124-4\nadi,ad7124-8\n", stderr: "" });
+        expect(await run(["list", "devices", "ad7124"])).toEqual({ code: 0, stdout: "adi,ad7124-4  iio/adc\nadi,ad7124-8  iio/adc\n", stderr: "" });
     });
 
-    test("--json list property: a node's properties marked set and required; one property's type", async () => {
+    test("--json list property: a node's properties marked set and required, with their types; one property's type; the overlay's nodes", async () => {
         configure();
         const names = await run(["--json", "list", "property", "adc"]);
         expect(names.code).toBe(0);
@@ -170,8 +180,11 @@ describe("the Linux backend through main", () => {
         const reg = await run(["--json", "list", "property", "adc", "reg"]);
         expect(JSON.parse(reg.stdout)).toMatchObject({ ok: true, message: "Type of reg", property: { name: "reg", required: true, set: true } });
 
-        const missing = await run(["--json", "list", "property"]);
-        expect(missing.code).toBe(2);
+        expect(JSON.parse(names.stdout)).toMatchObject({ properties: expect.arrayContaining([expect.objectContaining({ name: "reg", type: expect.objectContaining({ kind: "array" }), display: "number[]", required: true, set: true })]) });
+
+        const nodes = await run(["--json", "list", "property"]);
+        expect(nodes.code).toBe(0);
+        expect(JSON.parse(nodes.stdout)).toMatchObject({ ok: true, message: expect.stringMatching(/^[0-9]+ nodes?$/), names: expect.arrayContaining(["adc"]) });
     });
 
     test("--json update: a value written; a warning on stderr makes the response a warn", async () => {

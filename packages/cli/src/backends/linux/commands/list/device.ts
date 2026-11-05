@@ -2,7 +2,7 @@ import { answer, command, type ListDevicesArguments } from "../../../../interfac
 import { load_workspace } from "../../config/workspace";
 import { describe_device } from "../../protocol/binding-to-description";
 import type { DeviceDescription, ListDevicesResponse } from "../../protocol/descriptions";
-import { device_keys, load_binding } from "./data";
+import { device_entries, load_binding } from "./data";
 
 /** The description of a device, as `list devices <compatible>` prints it. */
 export function device_lines(device: DeviceDescription): string[] {
@@ -22,16 +22,23 @@ export function named_device(filter: string | undefined, keys: readonly string[]
     return keys.length === 1 ? keys[0] : undefined;
 }
 
+/** The compatibles one a line, each followed by its category in a column. */
+export function device_list_lines(devices: readonly { key: string; tag: string }[]): string[] {
+    const width = Math.max(0, ...devices.map(device => device.key.length)) + 2;
+    return devices.map(device => `${device.key.padEnd(width)}${device.tag}`);
+}
+
 /**
- * `list devices [filter]`: the compatibles that contain the filter. The one
+ * `list devices [filter]`: the compatibles that contain the filter, by category. The one
  * device the filter names is described too: the filter is a compatible, or
  * only one compatible contains it (and its binding parses).
  */
 export const list_devices = command<ListDevicesArguments, ListDevicesResponse>({
     docs: {
         brief: "List device bindings by compatible string, or describe one",
-        full: `Without a filter, every compatible of the Linux tree's bindings. With one,
-the compatibles that contain it; when it is a compatible itself, or only one
+        full: `Without a filter, every compatible of the Linux tree's bindings, with its
+category (the binding's folder, iio/adc), by category. With one, the
+compatibles that contain it; when it is a compatible itself, or only one
 compatible contains it, that device's binding is described.`,
         examples: [
             "list devices                  All known bindings",
@@ -44,7 +51,8 @@ compatible contains it, that device's binding is described.`,
         if (!loaded.ok) { return loaded.outcome; }
         const { bindings } = loaded.workspace;
 
-        const keys = device_keys(bindings, filter);
+        const devices = device_entries(bindings, filter);
+        const keys = devices.map(entry => entry.key);
         const named = named_device(filter, keys);
         const binding = named === undefined ? undefined : await load_binding(bindings, named);
         const device = named === undefined || binding?.ok !== true ? undefined : describe_device(binding.binding, named, binding.path);
@@ -53,11 +61,11 @@ compatible contains it, that device's binding is described.`,
             ok: true,
             message: device === undefined ? `Found ${keys.length} devices` : `Device ${device.compatible}`,
             severity: "info",
-            devices: keys.map(key => ({ key })),
+            devices,
             ...(device === undefined ? {} : { device }),
             names: keys,
         };
-        return answer(response, () => (device === undefined ? keys : device_lines(device)).join("\n"));
+        return answer(response, () => (device === undefined ? device_list_lines(devices) : device_lines(device)).join("\n"));
     },
 });
 
@@ -79,6 +87,12 @@ if (import.meta.vitest) {
             "  binding: /linux/adi,ad7124.yaml",
             "  1 properties, 0 child node patterns",
         ]);
+    });
+
+    test("device_list_lines — the compatible, then its category in a column", () => {
+        expect(device_list_lines([{ key: "adi,ad7124-8", tag: "iio/adc" }, { key: "adi,adxl345", tag: "iio/accel" }]))
+            .toEqual(["adi,ad7124-8  iio/adc", "adi,adxl345   iio/accel"]);
+        expect(device_list_lines([])).toEqual([]);
     });
 
     test("named_device — the filter when it is a compatible, else the only match", () => {

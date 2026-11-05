@@ -41,6 +41,9 @@
         },
         {
           "$ref": "common.schema.json#/$defs/refusal"
+        },
+        {
+          "$ref": "common.schema.json#/$defs/config-refusal"
         }
       ]
     },

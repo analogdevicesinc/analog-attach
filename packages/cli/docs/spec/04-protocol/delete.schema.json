@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "delete.schema.json",
   "title": "delete response",
-  "description": "Standard output of delete in JSON mode: a preview (DELETE-012, DELETE-024), a success (DELETE-013, DELETE-027, DELETE-032), or a refusal. $defs/base is DeleteResponse (overview 2.1).",
+  "description": "Standard output of delete in JSON mode: a preview (DELETE-012, DELETE-024, DELETE-028), a success (DELETE-013, DELETE-027, DELETE-032), or a refusal. $defs/base is DeleteResponse (overview 2.1).",
   "anyOf": [{ "$ref": "#/$defs/linux" }, { "$ref": "#/$defs/noos" }],
   "$defs": {
     "base": {
@@ -23,7 +23,8 @@
       "oneOf": [
         { "$ref": "#/$defs/linux-preview" },
         { "allOf": [{ "$ref": "common.schema.json#/$defs/done" }], "properties": { "severity": { "const": "info" } } },
-        { "$ref": "common.schema.json#/$defs/refusal" }
+        { "$ref": "common.schema.json#/$defs/refusal" },
+        { "$ref": "common.schema.json#/$defs/config-refusal" }
       ]
     },
     "linux-preview": {

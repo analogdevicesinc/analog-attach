@@ -15,7 +15,8 @@
             "severity": { "enum": ["info", "warn"], "description": "warn when an address warning was written to standard error." }
           }
         },
-        { "$ref": "common.schema.json#/$defs/refusal" }
+        { "$ref": "common.schema.json#/$defs/refusal" },
+        { "$ref": "common.schema.json#/$defs/config-refusal" }
       ]
     },
     "noos": {

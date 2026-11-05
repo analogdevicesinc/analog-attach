@@ -189,10 +189,10 @@ $ analog-attach --json init
 
 ```
 $ analog-attach --json init            # linux and devicetree set, workfile not
-{"errors":[{"field":"workfile","kind":"missing","message":"Missing config field workfile",
+{"ok":false,"message":"Missing config field workfile","severity":"error",
+ "errors":[{"field":"workfile","kind":"missing","message":"Missing config field workfile",
   "description":"Path to the working DTSO overlay file (workfile)"}],
  "hints":["Run 'analog-attach' on a terminal, or 'analog-attach config workfile <name>', then 'analog-attach init', to set up a workspace."]}
-                                      (stderr, exit 2)
 ```
 
 ```

@@ -45,8 +45,10 @@ process.
 Each schema is named after its command, spaces as `-`: `add.schema.json`,
 `list-devices.schema.json`, `list-parent.schema.json`. `enable` and `disable`
 share `enable-disable.schema.json`. `common.schema.json` has the shared
-shapes and `config-error.schema.json` the configuration errors written to
-standard error (`02-common.md` COM-071).
+shapes, among them `$defs/config-refusal`, the refusal of a Linux command
+whose workspace doesn't load (`02-common.md` COM-071), and
+`config-error.schema.json` the settings-file errors `config` writes to
+standard error (COM-121, COM-132 to COM-134).
 
 A shared command's schema follows `src/interface/backend-responses.ts`:
 
@@ -69,8 +71,9 @@ own commands (`move`, `enable-disable`, `list-parent`, `list-overlay`;
 
 `src/contract.test.ts` runs each command in a fixture workspace and
 validates its `--json` output this way: a shared command's against
-`$defs/<backend>` and the root, the others' against their own schema, and a
-configuration error on standard error against `config-error.schema.json`.
+`$defs/<backend>` and the root, the others' against their own schema, a
+configuration refusal also against `common.schema.json#/$defs/config-refusal`,
+and a configuration error on standard error against `config-error.schema.json`.
 
 ## 3. Conventions
 
