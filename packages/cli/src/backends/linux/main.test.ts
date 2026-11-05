@@ -248,6 +248,25 @@ describe("the Linux backend through main", () => {
         expect(JSON.parse(duplicate.stdout)).toMatchObject({ ok: false });
     });
 
+    test("move refuses a parent the binding doesn't allow, naming the ones it does", async () => {
+        configure();
+        fs.writeFileSync(path.join(base, "base.dts"), BASE_WITH_SPI1);
+        const workfile = path.join(project, "overlay.dtso");
+        const before = fs.readFileSync(workfile, "utf8");
+
+        const refused = await run(["--json", "move", "adc", "/soc"]);
+        expect(refused.code).toBe(0);
+        expect(JSON.parse(refused.stdout)).toEqual({
+            ok: false,
+            message: "Cannot move adc under /soc: adi,ad7124-8 goes under spi0, spi1 (see: analog-attach list parent adi,ad7124-8)",
+            severity: "error",
+        });
+        expect(fs.readFileSync(workfile, "utf8")).toBe(before);
+
+        const moved = await run(["--json", "move", "adc", "spi1"]);
+        expect(JSON.parse(moved.stdout)).toMatchObject({ ok: true });
+    });
+
     test("add off a terminal: nothing asked, the missing required properties listed", async () => {
         configure();
         const result = await run(["add", "adi,adxl000"]);

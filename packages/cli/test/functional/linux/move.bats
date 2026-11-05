@@ -97,19 +97,21 @@ with_devices() {
 	assert_json '[.children[].key] | index("adi,ad7124-8@2") != null' true
 }
 
-# Description: move can put a node under another node the overlay adds.
+# Description: move can put a node under another node the overlay adds. The node is a channel,
+# which has no compatible, so no binding limits its parent (MOVE-02).
 # Steps:
-#   1. Move ad7124_8 to spi1.
-#   2. Move adxl345 to ad7124_8, with --json; check it succeeds (.ok true).
-#   3. Read compatible of ad7124_8/adi,adxl345@0, with --json; check it is adi,adxl345.
+#   1. Move ad7124_8/channel@0 to adxl345, with --json; check it succeeds (.ok true).
+#   2. Read reg of adxl345/channel@0, with --json; check it is 0.
+#   3. Read ad7124_8, with --json; check it has no channel@0 any more.
 # bats test_tags=req:MOVE-01, id:L0224
 @test "move puts a node under another node of the overlay" {
-	aa move ad7124_8 spi1 >/dev/null
-	run_json move adxl345 ad7124_8
+	run_json move ad7124_8/channel@0 adxl345
 	assert_success
 	assert_json '.ok' true
-	run_json read ad7124_8/adi,adxl345@0 compatible
-	assert_json '.value | if type == "array" then join(" ") else . end' adi,adxl345
+	run_json read adxl345/channel@0 reg
+	assert_json '.value | if type == "array" then join(" ") else . end' 0
+	run_json read ad7124_8
+	assert_json '[.children[]?.key] | index("channel@0")' null
 }
 
 # Description: move refuses a node of the base devicetree.
@@ -175,23 +177,22 @@ with_devices() {
 	assert_output --partial "Expected argument for destination"
 }
 
-# Gap: the parent isn't checked against the binding: an SPI ADC is moved onto an I2C bus, or
-# under /memory@0, without a word (spec move.md M-1).
 # Description: move under a parent the node's binding does not allow is refused, and the message
 # names the valid kind of parent.
 # Steps:
 #   1. Snapshot the workfile.
-#   2. Move ad7124_8, an SPI device, to i2c1, with --json; check it is refused (exit 0,
-#      .ok false) and the message mentions spi.
+#   2. Move ad7124_8, an SPI device on spi0, to i2c1, with --json; check it is refused (exit 0,
+#      .ok false) and the message names spi1 among the valid parents (neither the node's bus
+#      nor the destination).
 #   3. Check the workfile is unchanged.
 #   4. Move ad7124_8 to /memory@0, with --json; check it is refused and the workfile unchanged.
-# bats test_tags=req:MOVE-02, gap, id:L0229
+# bats test_tags=req:MOVE-02, id:L0229
 @test "move under a parent the binding doesn't allow is refused, naming the valid parents" {
 	snapshot
 	run_json move ad7124_8 i2c1
 	assert_success
 	assert_json '.ok' false
-	assert_json '.message | test("spi")' true
+	assert_json '.message | test("goes under .*\\bspi1\\b")' true
 	assert_unchanged
 	run_json move ad7124_8 /memory@0
 	assert_json '.ok' false
