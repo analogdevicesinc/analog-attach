@@ -572,7 +572,8 @@ Filled without asking (on a terminal, before the questions, one line each, not c
 <path> <child>`) gets the pinned fill only.
 
 A required `*-gpios` is asked row by row (`question_entries`' GPIO branch, when
-`PropertyInfo.gpio_rows` and `phandle_options` are both there).
+`PropertyInfo.gpio_rows` and `phandle_options` are both there: `property_info` sets them from the
+lib's `gpio_pick` while no controller is set, the rows being the type's).
 - The controller entry comes first: enabled gpio-controllers, then the disabled ones marked via
   `other_candidates`. Enter takes the first enabled one, and on rows 2 and later the previous
   row's.

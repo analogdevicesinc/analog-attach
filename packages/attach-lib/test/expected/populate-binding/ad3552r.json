@@ -202,10 +202,6 @@
             }
         },
         {
-            "gpio_rows": {
-                "max_rows": 1,
-                "min_rows": 1
-            },
             "key": "reset-gpios",
             "value": {
                 "_t": "list",
@@ -223,10 +219,6 @@
             }
         },
         {
-            "gpio_rows": {
-                "max_rows": 1,
-                "min_rows": 1
-            },
             "key": "ldac-gpios",
             "value": {
                 "_t": "list",

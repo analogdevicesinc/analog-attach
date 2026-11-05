@@ -331,15 +331,19 @@ function refine_gpio(
 ): boolean {
     if (!is_gpio_property(property.key)) { return false; }
 
+    // The rows the binding gives, on the type before and after the controller is set: one row is the row itself.
     const { min_rows, max_rows } = gpio_row_bounds(property.value);
-    property.gpio_rows = { min_rows, ...(max_rows === undefined ? {} : { max_rows }) };
+    const rows = { minItems: min_rows, ...(max_rows === undefined ? {} : { maxItems: max_rows }) };
+    const one_row = max_rows !== undefined && max_rows <= 1;
 
     const set_controller = extract_gpio_controller(parsed_data[property.key]);
 
     if (set_controller === undefined) {
         // Every controller, enabled or not: the consumer marks the disabled ones.
         const controllers = find_nodes(devicetree, is_gpio_controller).map(located => phandle_name(located));
-        property.value = phandle_enum_array(controllers, property.value.description);
+        property.value = one_row
+            ? phandle_enum_array(controllers, property.value.description)
+            : phandle_matrix(controllers, rows, property.value.description);
         return true;
     }
 
@@ -360,20 +364,31 @@ function refine_gpio(
         description: property.value.description,
     });
 
-    // eslint-disable-next-line unicorn/prefer-ternary
-    if (max_rows !== undefined && max_rows <= 1) {
-        property.value = row;
-    } else {
-        property.value = {
-            _t: "matrix",
-            minItems: min_rows,
-            ...(max_rows === undefined ? {} : { maxItems: max_rows }),
-            description: property.value.description,
-            rows: [row],
-        };
-    }
+    property.value = one_row ? row : { _t: "matrix", ...rows, description: property.value.description, rows: [row] };
 
     return true;
+}
+
+/** The controllers a `*-gpios` property can name and the rows it takes, while its controller is still to be chosen. */
+export type GpioPick = { controllers: string[]; min_rows: number; max_rows?: number };
+
+/**
+ * What `refine_gpio` leaves on a `*-gpios` property with no controller set: the controller enum, alone or as the one
+ * cell of each row of a matrix whose counts are the binding's rows. Undefined for another property, or once a
+ * controller is set (its rows then have the controller's cells).
+ */
+export function gpio_pick(property: ResolvedProperty): GpioPick | undefined {
+    if (!is_gpio_property(property.key)) { return; }
+    const { value } = property;
+    const row = value._t === "matrix" ? (value.rows.length === 1 ? value.rows[0] : undefined) : value;
+    // The flat one has the enum as its `item`, a matrix row (`phandle_matrix`) as its one position.
+    const only = row?._t === "list" && row.maxItems === 1 ? row.item : undefined;
+    const cell = Array.isArray(only) ? (only.length === 1 ? only[0] : undefined) : only;
+    if (cell?._t !== "enum" || cell.enum_type !== AttachEnumType.PHANDLE) { return; }
+
+    const controllers = cell.enum.map(String);
+    if (value._t !== "matrix") { return { controllers, min_rows: 1, max_rows: 1 }; }
+    return { controllers, min_rows: value.minItems ?? 1, ...(value.maxItems === undefined ? {} : { max_rows: value.maxItems }) };
 }
 
 // --- Main entry ---
@@ -701,19 +716,23 @@ if (import.meta.vitest) {
         expect(gpio_row_cells(controllers_dt("// no cells"), "gpio")).toBeUndefined();
     });
 
-    test("query_devicetree — *-gpios: gpio_rows carries the bounds before and after a controller is set", () => {
-        const rows = (value: ResolvedProperty["value"], data: object) =>
-            query_devicetree(gpio_dt, [{ key: "ctrl-gpios", value }], JSON.stringify(data)).find(p => p.key === "ctrl-gpios")?.gpio_rows;
-        for (const data of [{}, { "ctrl-gpios": ["gpio"] }]) {
-            expect(rows(open_list(1, 1), data)).toStrictEqual({ min_rows: 1, max_rows: 1 });
-            expect(rows(open_list(1, 4), data)).toStrictEqual({ min_rows: 1, max_rows: 4 });
-            expect(rows(open_list(6, 6), data)).toStrictEqual({ min_rows: 6, max_rows: 6 });
-            // A lone minItems fixes the count; unsized is one row or more.
-            expect(rows(open_list(2), data)).toStrictEqual({ min_rows: 2, max_rows: 2 });
-            expect(rows({ _t: "unknown" }, data)).toStrictEqual({ min_rows: 1 });
-        }
-        // Not a gpio property: no bounds.
-        expect(query_devicetree(gpio_dt, [{ key: "vcc-supply", value: open_list(1, 1) }], "{}")[0]?.gpio_rows).toBeUndefined();
+    const refined = (value: ResolvedProperty["value"], data: object, key = "ctrl-gpios") =>
+        query_devicetree(gpio_dt, [{ key, value }], JSON.stringify(data)).find(p => p.key === key)!;
+
+    test("query_devicetree — *-gpios: the type has the binding's rows before a controller is set, gpio_pick reads them", () => {
+        const pick = (value: ResolvedProperty["value"]) => gpio_pick(refined(value, {}));
+        expect(pick(open_list(1, 1))).toStrictEqual({ controllers: ["gpio"], min_rows: 1, max_rows: 1 });
+        expect(pick(open_list(1, 4))).toStrictEqual({ controllers: ["gpio"], min_rows: 1, max_rows: 4 });
+        expect(pick(open_list(6, 6))).toStrictEqual({ controllers: ["gpio"], min_rows: 6, max_rows: 6 });
+        // A lone minItems fixes the count; unsized is one row or more.
+        expect(pick(open_list(2))).toStrictEqual({ controllers: ["gpio"], min_rows: 2, max_rows: 2 });
+        expect(pick({ _t: "unknown" })).toStrictEqual({ controllers: ["gpio"], min_rows: 1 });
+        // The rows are the matrix's.
+        const cs = refined(open_list(1, 4), {}).value;
+        expect(cs._t === "matrix" && [cs.minItems, cs.maxItems]).toStrictEqual([1, 4]);
+        // Once a controller is set, or for another property, there is nothing to pick.
+        expect(gpio_pick(refined(open_list(1, 4), { "ctrl-gpios": ["gpio"] }))).toBeUndefined();
+        expect(gpio_pick(refined(open_list(1, 1), {}, "vcc-supply"))).toBeUndefined();
     });
 
     test("query_devicetree — *-gpios without a controller: the enum names every gpio-controller, disabled ones too", () => {
