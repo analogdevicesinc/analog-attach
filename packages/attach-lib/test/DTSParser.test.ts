@@ -229,6 +229,41 @@ describe("labeling", () => {
     expect(node.labels.at(1)).toStrictEqual("b_label");
     expect(node.labels.at(2)).toStrictEqual("a_label");
   });
+
+  // The orders dtc -O dts prints: a merge adds each label in front (dtc's add_label), one the node
+  // already has, even deleted, keeps its place
+  const base = `/dts-v1/;\n/ {\n\tsoc {\n\t\ta: b: dev@1 { x = <1>; };\n\t\tother {};\n\t};\n};\n`;
+  test.each<[string, string, string[]]>([
+    ["merged into a node", `&{/soc} { c: d: dev@1 { }; };`, ["d", "c", "a", "b"]],
+    ["merged twice", `&{/soc} { c: d: dev@1 { }; };\n&{/soc} { e: f: dev@1 { }; };`, ["f", "e", "d", "c", "a", "b"]],
+    ["one the node has", `&{/soc} { c: b: dev@1 { }; };`, ["c", "a", "b"]],
+    ["redefined after a /delete-node/ in a block", `&{/soc} { /delete-node/ dev@1; };\n&{/soc} { c: d: dev@1 { }; };`, ["d", "c"]],
+    ["redefined after /delete-node/ &a", `/delete-node/ &a;\n&{/soc} { c: d: dev@1 { }; };`, ["d", "c"]],
+    ["a deleted one reused", `&{/soc} { /delete-node/ dev@1; };\n&{/soc} { c: a: dev@1 { }; };`, ["c", "a"]],
+  ])("label order — %s", (_name, source, labels) => {
+    const parsed = parse_dts(base + source);
+    if (Result.is_err(parsed)) { expect.fail(format_parse_error(parsed.error)); }
+    const soc = parsed.value.dts.root.children.find(c => c.name === "soc");
+    expect(soc?.children.map(c => c.name)).toEqual(["dev", "other"]);
+    expect(soc?.children[0]?.labels).toEqual(labels);
+  });
+
+  test("label order — merged into a property", () => {
+    const parsed = parse_dts(`/dts-v1/;\n/ {\n\tdev { a: b: x = <1>; };\n};\n&{/dev} { c: d: x = <2>; };`);
+    if (Result.is_err(parsed)) { expect.fail(format_parse_error(parsed.error)); }
+    expect(parsed.value.dts.root.children[0]?.properties[0]?.labels).toEqual(["d", "c", "a", "b"]);
+  });
+
+  test("label order — a deleted property redefined keeps only its new labels", () => {
+    const parsed = parse_dts(`/dts-v1/;\n/ {\n\tdev { a: b: x = <1>; };\n};\n&{/dev} { /delete-property/ x; };\n&{/dev} { c: b: x = <2>; };`);
+    if (Result.is_err(parsed)) { expect.fail(format_parse_error(parsed.error)); }
+    expect(parsed.value.dts.root.children[0]?.properties[0]?.labels).toEqual(["c", "b"]);
+  });
+
+  test("a deleted node's label names nothing, as in dtc", () => {
+    const parsed = parse_dts(`${base}/delete-node/ &a;\n&a { x = <2>; };`);
+    expect(Result.is_err(parsed) && format_parse_error(parsed.error)).toBe("Invalid reference: 'a' (line 9, column 1)");
+  });
 });
 
 describe("bad tokens", () => {
