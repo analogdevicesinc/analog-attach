@@ -266,7 +266,7 @@ if (import.meta.vitest) {
     const spi = (children: string): string => `\tsoc {\n\t\tspi0: spi@7e204000 {\n\t\t\t#address-cells = <1>;\n\t\t\t#size-cells = <0>;\n${children}\n\t\t};\n\t};`;
 
     const cells = (...values: bigint[]): DTProperty => PropertyBuilder.build_cell_array()
-        .with_tagged_values(...(values.map(v => PropertyBuilder.tag_number(v)) as [never, ...never[]]))
+        .with_cells(...values)
         .with_name("reg")
         .build();
 

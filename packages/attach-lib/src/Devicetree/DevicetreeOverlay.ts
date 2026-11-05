@@ -200,7 +200,7 @@ export class DeviceTreeOverlay {
 
         const targetProperty = normalized.kind === "label"
             ? PropertyBuilder.build_cell_array()
-                .with_tagged_values(PropertyBuilder.tag_label(normalized.name))
+                .with_cells(PropertyBuilder.label(normalized.name))
                 .with_name("target")
                 .build()
             : PropertyBuilder.build_string()
@@ -956,7 +956,7 @@ ${overlay_with_imu.replace("/dts-v1/;\n/plugin/;\n", "")}`);
     const two_labels = `/dts-v1/;\n/ {\n\tsoc {\n\t\ti2c_arm: i2c1: i2c@7e804000 {};\n\t};\n};`;
     const I2C = "/soc/i2c@7e804000";
     const frequency = (value: bigint): DTProperty => PropertyBuilder.build_cell_array()
-        .with_tagged_values(PropertyBuilder.tag_number(value))
+        .with_cells(value)
         .with_name("clock-frequency")
         .build();
 

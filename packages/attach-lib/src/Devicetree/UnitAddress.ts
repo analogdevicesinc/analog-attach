@@ -84,21 +84,21 @@ export function ensure_address_cells(overlay: DeviceTreeOverlay, parent_path: st
         .filter(([name]) => !has_property(node, name));
     for (const [name, value] of missing) {
         node.properties.push(
-            PropertyBuilder.build_cell_array().with_tagged_values(PropertyBuilder.tag_number(value)).with_name(name).build(),
+            PropertyBuilder.build_cell_array().with_cells(value).with_name(name).build(),
         );
     }
 }
 
 export function encode_reg_address(value: bigint, address_cells: number, size_cells: number): DTProperty {
-    const tags = [];
+    const tags: bigint[] = [];
     for (let index = address_cells - 1; index >= 0; index--) {
-        tags.push(PropertyBuilder.tag_number((value >> BigInt(index * 32)) & 0xFF_FF_FF_FFn));
+        tags.push((value >> BigInt(index * 32)) & 0xFF_FF_FF_FFn);
     }
     for (let index = 0; index < size_cells; index++) {
-        tags.push(PropertyBuilder.tag_number(0n));
+        tags.push(0n);
     }
     return PropertyBuilder.build_cell_array()
-        .with_tagged_values(...(tags as [any, ...any[]]))
+        .with_cells(...tags)
         .with_name("reg")
         .build();
 }
