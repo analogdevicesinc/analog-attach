@@ -1,35 +1,39 @@
+/** A JSON schema object, or any object of a binding read as one (`properties`, a table of schemas by name). */
+export type Schema = Record<string, unknown>;
+
+/** A property's schema; `true` / `false` are schemas too, and are left alone. */
+export type PropertySchema = Schema | boolean;
+
+export function is_schema(value: unknown): value is Schema {
+    return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
 export type DtBindingSchema = {
     $id: string,
     $schema: string,
     title: string,
     maintainers: string[],
     description?: string,
-    select?: any,
-    allOf?: any[],
-    anyOf?: any[],
-    oneOf?: any[],
-    properties?: any,
-    patternProperties?: any,
+    select?: PropertySchema,
+    allOf?: unknown[],
+    anyOf?: unknown[],
+    oneOf?: unknown[],
+    properties?: Record<string, PropertySchema>,
+    patternProperties?: Record<string, PropertySchema>,
     required?: string[],
-    additionalProperties?: boolean,
-    unevaluatedProperties?: boolean,
-    examples?: string[]
-}
+    additionalProperties?: PropertySchema,
+    unevaluatedProperties?: PropertySchema,
+    examples?: string[],
+};
 
-/*
-    Strictly speaking a schema needs only id, schema, title and maintainers to be valid
-    Such a schema does not provide any value, but it's the way it is
-    There are more properties that can be added ... TBD 
-*/
-export function isDtBindingSchema(object: any): object is DtBindingSchema {
-    const narrowed_object = object as DtBindingSchema;
-
-    if (narrowed_object === null) { return false; }
-    if (typeof narrowed_object !== "object") { return false; }
-    if (typeof narrowed_object.$id !== "string") { return false; }
-    if (typeof narrowed_object.$schema !== "string") { return false; }
-    if (typeof narrowed_object.title !== "string") { return false; }
-    if (!Array.isArray(narrowed_object.maintainers)) { return false; }
-
-    return true;
+/**
+ * Whether `object` is a binding. Strictly, a schema needs only an `$id`, a `$schema`, a `title` and `maintainers`;
+ * one with nothing more says nothing, but it is one.
+ */
+export function isDtBindingSchema(object: unknown): object is DtBindingSchema {
+    return is_schema(object)
+        && typeof object["$id"] === "string"
+        && typeof object["$schema"] === "string"
+        && typeof object["title"] === "string"
+        && Array.isArray(object["maintainers"]);
 }

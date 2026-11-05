@@ -1,18 +1,16 @@
 import { JSONSchema } from "@apidevtools/json-schema-ref-parser/dist/lib/types";
-import { DtBindingSchema } from "./Schema.js";
+import { DtBindingSchema, is_schema, Schema } from "./Schema.js";
 import { SchemaContext } from "./Context.js";
 import { dereference } from "./RefResolver.js";
-import { deep_merge, find_entry_in_object, is_plain_object, overwrite_object_with_path_value } from "./ObjectUtilities.js";
+import { deep_merge, find_entry_in_object, overwrite_object_with_path_value } from "./ObjectUtilities.js";
 import { merge_schema } from "./ReferenceSiblings.js";
-import { PathEntry, PathValue, PlainObject } from "./UtilityTypes.js";
+import { PathEntry, PathValue } from "./UtilityTypes.js";
 import { Result } from "../result.js";
 
 /** The entries of the schema's own `properties`. */
 function top_level_properties(schema: unknown): PathEntry[] {
     return find_entry_in_object(schema, (path) => path.length === 1 && path[0] === "properties");
 }
-
-type Schema = Record<string, unknown>;
 
 /** dt-validate checks every definition of a property, so the tighter of their bounds applies. */
 const TIGHTER: Record<string, (...bounds: number[]) => number> = {
@@ -31,9 +29,9 @@ export function definitions_by_name(node: Schema): Map<string, unknown[]> {
     const tables: { depth: number, properties: Schema }[] = [];
 
     const collect = (schema: Schema, depth: number): void => {
-        if (is_plain_object(schema["properties"])) { tables.push({ depth, properties: schema["properties"] }); }
+        if (is_schema(schema["properties"])) { tables.push({ depth, properties: schema["properties"] }); }
         for (const entry of Array.isArray(schema["allOf"]) ? schema["allOf"] : []) {
-            if (is_plain_object(entry)) { collect(entry, depth + 1); }
+            if (is_schema(entry)) { collect(entry, depth + 1); }
         }
     };
     collect(node, 0);
@@ -54,13 +52,13 @@ export function definitions_by_name(node: Schema): Map<string, unknown[]> {
 export function merge_definitions(definitions: unknown[]): unknown {
     if (definitions.includes(false)) { return false; }
 
-    const schemas = definitions.filter(definition => is_plain_object(definition));
+    const schemas = definitions.filter(definition => is_schema(definition));
     if (schemas.length === 0) { return definitions[0]; }
 
     // The farthest first, each nearer one on top
-    let merged: PlainObject = {};
+    let merged: Schema = {};
     for (let index = schemas.length - 1; index >= 0; index--) {
-        merged = merge_schema(merged, schemas[index]) as PlainObject;
+        merged = merge_schema(merged, schemas[index]) as Schema;
     }
     for (const [keyword, tighter] of Object.entries(TIGHTER)) {
         const bounds = schemas.map(schema => schema[keyword]).filter(bound => typeof bound === "number");
@@ -73,11 +71,11 @@ export function merge_definitions(definitions: unknown[]): unknown {
 function without(schema: Schema, names: Set<string>): Schema {
     const result: Schema = { ...schema };
 
-    if (is_plain_object(schema["properties"])) {
+    if (is_schema(schema["properties"])) {
         result["properties"] = Object.fromEntries(Object.entries(schema["properties"]).filter(([name]) => !names.has(name)));
     }
     if (Array.isArray(schema["allOf"])) {
-        result["allOf"] = schema["allOf"].map(entry => is_plain_object(entry) ? without(entry, names) : entry);
+        result["allOf"] = schema["allOf"].map(entry => is_schema(entry) ? without(entry, names) : entry);
     }
     return result;
 }
@@ -88,12 +86,12 @@ function merge_children(schema: Schema): Schema {
 
     for (const key of ["properties", "patternProperties"]) {
         const table = schema[key];
-        if (is_plain_object(table)) {
-            result[key] = Object.fromEntries(Object.entries(table).map(([name, child]) => [name, is_plain_object(child) ? merge_node(child) : child]));
+        if (is_schema(table)) {
+            result[key] = Object.fromEntries(Object.entries(table).map(([name, child]) => [name, is_schema(child) ? merge_node(child) : child]));
         }
     }
     if (Array.isArray(schema["allOf"])) {
-        result["allOf"] = schema["allOf"].map(entry => is_plain_object(entry) ? merge_children(entry) : entry);
+        result["allOf"] = schema["allOf"].map(entry => is_schema(entry) ? merge_children(entry) : entry);
     }
     return result;
 }
@@ -112,7 +110,7 @@ function merge_node(node: Schema): Schema {
     }
 
     const result = without(node, redefined);
-    const own: Schema = { ...(is_plain_object(node["properties"]) ? node["properties"] : {}) };
+    const own: Schema = { ...(is_schema(node["properties"]) ? node["properties"] : {}) };
     for (const name of redefined) {
         own[name] = merge_definitions(by_name.get(name) ?? []);
     }
@@ -139,7 +137,7 @@ function merge_redefined(base: PathEntry[], extensions: PathEntry[]): PathValue[
 
         merged.push({
             path: ["properties", key],
-            value: deep_merge(extension.value as PlainObject, base_entry.value as PlainObject),
+            value: deep_merge(extension.value as Schema, base_entry.value as Schema),
         });
     }
 

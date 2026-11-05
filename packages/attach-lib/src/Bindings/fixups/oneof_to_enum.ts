@@ -1,13 +1,14 @@
-import { FixupContext, PropertySchema } from "../FixupWalker.js";
+import { FixupContext } from "../FixupWalker.js";
+import { PropertySchema, Schema } from "../Schema.js";
 
 /** Whether every branch is a `const`, with at most a `description` beside it. */
-function is_const_only(branches: unknown): branches is Record<string, unknown>[] {
+function is_const_only(branches: unknown): branches is Schema[] {
     return Array.isArray(branches) && branches.length > 0 && branches.every(branch =>
         typeof branch === "object" && branch !== null && "const" in branch &&
         Object.keys(branch).every(key => key === "const" || key === "description"));
 }
 
-function to_enum(schema: Record<string, unknown>): void {
+function to_enum(schema: Schema): void {
     const key = "anyOf" in schema ? "anyOf" : "oneOf";
     const branches = schema[key];
 
@@ -26,7 +27,7 @@ export function fixup_oneof_to_enum(schema: PropertySchema, _context: FixupConte
 
     const items = schema["items"];
     if (typeof items === "object" && items !== null && !Array.isArray(items)) {
-        to_enum(items as Record<string, unknown>);
+        to_enum(items as Schema);
         return schema;
     }
 

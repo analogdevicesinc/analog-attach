@@ -1,6 +1,7 @@
 import { PropertyFixup } from "../FixupWalker.js";
 import { DT_TYPE } from "../RefResolver.js";
 import { is_matrix_type } from "../PropertyTypes.js";
+import { PropertySchema } from "../Schema.js";
 
 const NOT_THE_DEFINITION = new Set(["if", "not", "select", "then", "else"]);
 
@@ -29,7 +30,7 @@ if (import.meta.vitest) {
 
     const { test, expect } = import.meta.vitest;
 
-    const rows = (schema: Record<string, unknown> | boolean, name = "interrupts", path = ["properties", name]) => fixup_matrix_rows(schema, { path, name });
+    const rows = (schema: PropertySchema, name = "interrupts", path = ["properties", name]) => fixup_matrix_rows(schema, { path, name });
 
     test("a matrix property without rows gets rows", () => {
         expect(rows({ maxItems: 1, dtType: "uint32-matrix" })).toStrictEqual({ maxItems: 1, dtType: "uint32-matrix", type: "array", items: { type: "array" } });

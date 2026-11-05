@@ -1,12 +1,6 @@
-import { DtBindingSchema } from "../Schema.js";
+import { DtBindingSchema, is_schema, Schema } from "../Schema.js";
 import { find_entry_in_object, overwrite_object_with_path_value } from "../ObjectUtilities.js";
 import { is_node_pattern } from "../PatternKind.js";
-
-type Schema = Record<string, any>;
-
-function is_schema(value: unknown): value is Schema {
-    return typeof value === "object" && value !== null && !Array.isArray(value);
-}
 
 /**
  * `over` on top of `base`. The properties of a node (`properties`, `patternProperties`) are merged by name and
@@ -230,7 +224,7 @@ if (import.meta.vitest) {
             allOf: [{ if: { required: ["a"] }, then: { properties: { "adi,divider": divider } } }],
         } as unknown as DtBindingSchema;
 
-        const fixup = fixup_collapse_allOf(binding) as unknown as typeof binding & { patternProperties: Record<string, { properties: Record<string, unknown> }> };
+        const fixup = fixup_collapse_allOf(binding) as unknown as typeof binding & { patternProperties: Record<string, { properties: Schema }> };
 
         expect(fixup.patternProperties["^channel@[0-9]$"]?.properties["adi,divider"]).toStrictEqual({ $ref: "uint32", minimum: 1, maximum: 4095, maxItems: 1 });
         expect(fixup.allOf).toStrictEqual(binding.allOf);
@@ -250,7 +244,7 @@ if (import.meta.vitest) {
             },
         } as unknown as DtBindingSchema;
 
-        const fixup = fixup_collapse_allOf(binding) as unknown as { properties: Record<string, unknown> };
+        const fixup = fixup_collapse_allOf(binding) as unknown as { properties: Schema };
 
         expect(fixup.properties["endpoint"]).toStrictEqual({ type: "object", properties: { "remote-endpoint": phandle, "bus-width": { maximum: 32 } } });
         expect(fixup.properties["mode"]).toStrictEqual(binding.properties?.["mode"]);

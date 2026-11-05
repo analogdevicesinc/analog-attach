@@ -1,13 +1,7 @@
-import { DtBindingSchema } from "../Schema.js";
+import { DtBindingSchema, is_schema, Schema } from "../Schema.js";
 import { find_entry_in_object, overwrite_object_with_path_value } from "../ObjectUtilities.js";
 import { PathValue } from "../UtilityTypes.js";
 import { DT_TYPE } from "../RefResolver.js";
-
-type Schema = Record<string, unknown>;
-
-function is_schema(value: unknown): value is Schema {
-    return typeof value === "object" && value !== null && !Array.isArray(value);
-}
 
 function bounds_numbers(value: unknown): value is Schema {
     return is_schema(value) && ("minimum" in value || "maximum" in value);
@@ -88,7 +82,7 @@ if (import.meta.vitest) {
             },
         } as unknown as DtBindingSchema;
 
-        const properties = fixup_mark_integers(binding).properties as Record<string, unknown>;
+        const properties = fixup_mark_integers(binding).properties as Schema;
         expect(properties["lo_in-clock-scales"]).toStrictEqual({ type: "array", minItems: 1, items: { ...uint32, minimum: 1 }, dtType: "uint32-array" });
         expect(properties["adi,full-scale-current-microamp"]).toStrictEqual({ type: "array", minItems: 1, maxItems: 1, items: { ...uint32, minimum: 8000, maximum: 40_000 }, dtType: "uint32-array" });
         expect(properties["adi,pair"]).toStrictEqual({ type: "array", items: [{ minimum: 2, type: "integer", maximum: 9 }, { const: 0 }], dtType: "uint8-array" });

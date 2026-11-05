@@ -1,11 +1,6 @@
-import { FixupContext, PropertySchema } from "../FixupWalker.js";
+import { FixupContext } from "../FixupWalker.js";
 import { is_string_schema } from "./string_to_array.js";
-
-type Schema = Record<string, unknown>;
-
-function is_schema(value: unknown): value is Schema {
-    return typeof value === "object" && value !== null && !Array.isArray(value);
-}
+import { is_schema, Schema, PropertySchema } from "../Schema.js";
 
 function size(schema: Schema, path: string[]): void {
     // Ours: a schema that bounds or lists items, or looks for one, is an array even when it doesn't say so
