@@ -1,6 +1,6 @@
-import { DtBindingSchema } from "../Schema";
+import { DtBindingSchema } from "../Schema.js";
 import { find_entry_in_object, overwrite_object_with_path_value } from "../ObjectUtilities.js";
-import { PathValue } from "../UtilityTypes";
+import { PathValue } from "../UtilityTypes.js";
 import { DT_TYPE } from "../RefResolver.js";
 
 type Schema = Record<string, unknown>;

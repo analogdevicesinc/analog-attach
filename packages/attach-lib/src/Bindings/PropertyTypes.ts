@@ -31,7 +31,7 @@ function is_schema(value: unknown): value is Schema {
 const TYPE_NAME = /(address|flag|u?int(8|16|32|64)(-(array|matrix))?|string(-array)?|phandle(-array)?)/;
 
 /** The type a property schema is declared with, going by its `$ref` (dt-schema: `validator.py:_extract_prop_type`). */
-export function declared_type(schema: unknown): PropertyType | undefined {
+function declared_type(schema: unknown): PropertyType | undefined {
     if (!is_schema(schema)) { return undefined; }
 
     const reference = schema["$ref"];
@@ -59,7 +59,7 @@ export function declared_type(schema: unknown): PropertyType | undefined {
  * The type other than `flag` of a schema that is a flag or one other type (reg.yaml's `ranges` and `dma-ranges`: an
  * empty value, or a `uint32-matrix`); undefined for any other schema.
  */
-export function counted_type(schema: unknown): PropertyType | undefined {
+function counted_type(schema: unknown): PropertyType | undefined {
     if (!is_schema(schema)) { return undefined; }
 
     for (const key of ["oneOf", "anyOf"]) {

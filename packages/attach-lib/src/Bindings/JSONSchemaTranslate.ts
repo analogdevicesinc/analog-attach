@@ -1,7 +1,7 @@
-import { ParsedBinding, ResolvedProperty, PatternPropertyRule, PropertyPatternRule } from "./ParsedBinding";
-import { DtBindingSchema } from "./Schema";
-import { AttachType, AttachEnumType, Cell, EnumOption, List } from "./StructuralTypes";
-import { find_entry_in_object } from "./ObjectUtilities";
+import { ParsedBinding, ResolvedProperty, PatternPropertyRule, PropertyPatternRule } from "./ParsedBinding.js";
+import { DtBindingSchema } from "./Schema.js";
+import { AttachType, AttachEnumType, Cell, EnumOption, List } from "./StructuralTypes.js";
+import { find_entry_in_object } from "./ObjectUtilities.js";
 import { is_node_pattern } from "./PatternKind.js";
 import { cell_range, is_matrix_type } from "./PropertyTypes.js";
 import { DT_TYPE } from "./RefResolver.js";

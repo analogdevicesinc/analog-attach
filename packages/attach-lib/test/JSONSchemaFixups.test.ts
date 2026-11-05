@@ -1,4 +1,5 @@
-import { create_context, process_binding } from '../src/Bindings/index.js';
+import { create_context } from '../src/Bindings/Context.js';
+import { process_binding } from '../src/Bindings/Pipeline.js';
 import { Result } from '../src/result.js';
 
 import { BINDINGS, schema_paths, snapshot } from './bindings';

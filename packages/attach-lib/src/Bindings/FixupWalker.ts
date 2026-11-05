@@ -1,4 +1,4 @@
-import { DtBindingSchema } from "./Schema";
+import { DtBindingSchema } from "./Schema.js";
 import { is_node_pattern } from "./PatternKind.js";
 
 /** A property's schema; `true` / `false` are schemas too, and are left alone. */
@@ -82,7 +82,7 @@ export function walk_node_schema(schema: unknown, fixups: Fixups, path: string[]
  * Applies the fixups to one property's schema and, first, to the schemas of its
  * conditionals. Models `fixups.py:walk_properties` and `fixup_vals`.
  */
-export function walk_property(schema: PropertySchema, fixups: Fixups, path: string[], name: string, pointer: string[] = path): PropertySchema {
+function walk_property(schema: PropertySchema, fixups: Fixups, path: string[], name: string, pointer: string[] = path): PropertySchema {
     // `true` is a schema that says nothing yet (`properties: { clocks: true }`); the fixups may give it a type
     if (schema === false || (!is_schema(schema) && schema !== true)) { return schema; }
 
