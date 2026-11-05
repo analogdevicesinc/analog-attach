@@ -23,7 +23,7 @@ import { afterEach, beforeAll, describe, expect, test } from "vitest";
 import { BACKENDS, type Registry } from "./front/registry";
 import { build_routes, SHARED_ROUTES, type FrontEnd, type Route } from "./front/routes";
 import type { Backend, Commands, Completion, ExtraCommand, Slot } from "./interface/backend-interface";
-import { BASE_DTS, create_linux_fixture, IMPORTED, type LinuxFixture } from "./backends/linux/testing/fixture";
+import { BASE_DTS, create_linux_fixture, IMPORTED, OVERLAY, type LinuxFixture } from "./backends/linux/testing/fixture";
 import { create_noos_fixture, FIXTURES, type NoosFixture } from "./backends/noos/testing/fixture";
 
 const PROTOCOL = path.resolve(import.meta.dirname, "../docs/spec/04-protocol");
@@ -399,6 +399,11 @@ function create_linux_harness(): LinuxHarness {
 }
 
 const unconfigured = (fixture: LinuxHarness): void => { fixture.linux.write_settings({}); };
+/** An overlay whose adc refers to a regulator it adds (the reference preview of delete). */
+const with_reference = (fixture: LinuxHarness): void => {
+    fs.writeFileSync(path.join(fixture.linux.project, "overlay.dtso"), OVERLAY.replace("\t\treg = <0>;\n", "\t\treg = <0>;\n\t\trefin1-supply = <&vref>;\n")
+        + "\n&{/} {\n\tvref: vref {\n\t\tcompatible = \"regulator-fixed\";\n\t};\n};\n");
+};
 const with_spi1 = (fixture: LinuxHarness): void => { fs.writeFileSync(path.join(fixture.linux.base, "base.dts"), BASE_WITH_SPI1); };
 /** The deploy settings, and the .dtbo `build` would have written. */
 const deploy_settings = (fixture: LinuxHarness): void => {
@@ -460,6 +465,8 @@ const LINUX_CASES: readonly Case<LinuxHarness>[] = [
         route: "delete", argv: ["delete", "adc"], shape: "answer",
         prepare: async fixture => { await fixture.run(["update", "adc", "channel@0"]); },
     },
+    { route: "delete", argv: ["delete", "vref"], shape: "answer", prepare: with_reference },
+    { route: "delete", argv: ["delete", "vref", "--force"], shape: "answer", prepare: with_reference },
     { route: "delete", argv: ["delete", "spi0"], shape: "refusal" },
     { route: "delete", argv: ["delete", "adc", "nope"], shape: "refusal" },
 

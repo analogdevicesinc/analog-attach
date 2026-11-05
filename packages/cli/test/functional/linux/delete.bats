@@ -169,8 +169,6 @@ with_devices() {
 	assert_failure
 }
 
-# Gap: a node another node references is deleted at once, with no preview of the references it
-# affects.
 # Description: delete of a node another node references previews the change and removes nothing;
 # with --force it removes the node.
 # Steps:
@@ -179,7 +177,7 @@ with_devices() {
 #   3. Delete vref, with --json; check it is a warning whose paths include refin1-supply.
 #   4. Check the workfile is unchanged.
 #   5. Delete vref --force, with --json; check it succeeds (.ok true) and the vref node is gone.
-# bats test_tags=req:DELETE-02, gap, id:L0091
+# bats test_tags=req:DELETE-02, id:L0091
 @test "delete <path> of a referenced node shows what would change and removes nothing" {
 	aa add regulator-fixed --name vref --label vref >/dev/null 2>&1 || fail "add regulator-fixed failed"
 	aa update ad7124_8 refin1-supply vref >/dev/null 2>&1 || fail "update refin1-supply failed"
