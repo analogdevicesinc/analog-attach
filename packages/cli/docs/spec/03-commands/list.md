@@ -46,7 +46,7 @@ GRM-020 to GRM-024 (LIST-004).
 |---|---|
 | Compat index | `.analog-attach/linux/compat-index.json`: every compatible string of the Linux tree's bindings, mapped to its binding file (02-common.md §8.4). |
 | Node's binding | For a node with a `compatible`, the binding of its first compatible. For a node without one, the child-node pattern of its parent's binding that matches its name (`^channel@([0-9]|1[0-5])$`). |
-| Narrowed binding | The node's binding with the `if`/`then`/`else` branches the node's own data selects applied: its properties and required list (CLAUDE.md "If/then narrowing"). |
+| Narrowed binding | The node's binding with the `if`/`then`/`else` branches the node's own data selects applied: its properties and required list (CLAUDE.md "If/then narrowing"), without the peripheral properties that don't apply under the node's parent (LIST-038). |
 | Merged node | The node as the base and the overlay together have it (`effective_node`). |
 | Suggestion | `{ value, display_string?, note? }` (`04-protocol/common.schema.json#/$defs/suggestion`); `value` is ready to pass to `update` (GRM-070). |
 
@@ -181,6 +181,23 @@ with the reason:
 **LIST-032** The CLI shall list, in this order: the narrowed binding's
 properties in binding order; then the binding's property patterns; then its
 child-node patterns.
+
+**LIST-038** The node's binding, narrowed or not, shall leave out the
+peripheral properties that don't apply under the node's parent, the bus
+controller when there is one:
+1. the vendor SPI peripheral properties of another controller (`pl022,*`,
+   `cdns,*`, `fsl,*`, `nvidia,*`, `st,spi-midi-ns`, `controller-data`) (CLAUDE.md
+   "SPI vendor peripheral-props filtering");
+2. under a parent whose name doesn't match the `$nodename` pattern of the Linux
+   tree's `spi/spi-controller.yaml` (`spi@7e204000` does, `i2c@7e804000`
+   doesn't), the SPI peripheral properties: those of
+   `spi/spi-peripheral-props.yaml` but `reg`, of the vendor files its `allOf`
+   names, and of the child nodes of `spi-controller.yaml` (`spi-cpha`,
+   `spi-cpol`, `spi-3wire`), the binding's own definitions of them included. A
+   property the narrowed binding requires stays.
+
+dt-validate still accepts them where the binding does (an ADXL345 on I2C with
+`spi-cpha`); the CLI doesn't offer them there.
 
 **LIST-033** A property's entry shall be its name, followed by ` (<marks>)`
 when it has marks: `set` when the merged node has it, `required` when the
@@ -573,12 +590,9 @@ mode shows `const`, `min` and `max`; the JSON `property` has `required`,
 true` with severity `warn` (COM-050 says `info`), while `add` refuses the same
 compatible with the same message (ADD-013).
 
-**L-7. Vendor SPI properties come back after narrowing.** `list property` of
-a node under `brcm,bcm2835-spi` lists `pl022,*`, `cdns,*`, `fsl,*`,
-`nvidia,*`, `st,*` properties, and `list property spi0` lists
-`#address-cells` twice. Parsing removes the vendor properties (CLAUDE.md "SPI
-vendor peripheral-props filtering"), but the narrowed binding brings them
-back. Completion offers them too (`05-completion.md` COMPL-060).
+**L-7.** *Closed.* Vendor SPI properties came back after narrowing; the
+narrowed binding now leaves them out too (LIST-038). `list property spi0` no
+longer lists `#address-cells` twice.
 
 **L-8. `list value` and `add` disagree on phandle candidates.** `list value adc
 interrupt-parent` gives `gicv2` and `gpio`; `add`'s `missing_required` for

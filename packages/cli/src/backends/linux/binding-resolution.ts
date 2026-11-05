@@ -113,7 +113,8 @@ export async function resolve_node_binding(
     base_dt: DeviceTree,
     bindings: Bindings,
     options?: PopulateOptions,
-    parent_compatibles?: string[],
+    /** The node's parent (`WriteTarget`'s): its compatibles and full name tell which peripheral properties apply. */
+    parent?: { compatibles: string[]; full_name?: string },
 ): Promise<NodeBinding | { error: string }> {
     const populate_options: PopulateOptions = { ...options, parent_name };
     const compatible_property = found_node.properties.find(p => p.name === "compatible");
@@ -134,13 +135,17 @@ export async function resolve_node_binding(
         }
 
         let controller_context: ControllerContext | undefined;
-        if (parent_compatibles !== undefined && parent_compatibles.length > 0) {
+        if (parent !== undefined && parent.compatibles.length > 0) {
             let controller_binding_path: string | undefined;
-            for (const compat of parent_compatibles) {
+            for (const compat of parent.compatibles) {
                 controller_binding_path = await find_binding(bindings, compat);
                 if (controller_binding_path !== undefined) { break; }
             }
-            controller_context = { compatibles: parent_compatibles, binding_path: controller_binding_path };
+            controller_context = {
+                compatibles: parent.compatibles,
+                binding_path: controller_binding_path,
+                ...(parent.full_name === undefined ? {} : { name: parent.full_name }),
+            };
         }
         const parse_options: ParseOptions | undefined = controller_context === undefined ? undefined : { controller: controller_context };
         const attach = await Attach.parse(binding_path, bindings, parse_options);
