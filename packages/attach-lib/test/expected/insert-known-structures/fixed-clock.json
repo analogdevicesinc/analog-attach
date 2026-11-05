@@ -39,10 +39,10 @@
                 "_t": "scalar",
                 "cell": {
                     "_t": "number",
-                    "maximum": "18446744073709551615n",
+                    "maximum": "4294967295n",
                     "minimum": "0n"
                 },
-                "description": "Legacy property for single, fixed frequency clocks"
+                "typeSize": 32
             }
         },
         {

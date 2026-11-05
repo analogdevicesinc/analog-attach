@@ -30,40 +30,12 @@ export function insert_known_structures(properties: ResolvedProperty[]): Resolve
         }
 
         switch (property.key) {
-            case "spi-3wire":
-            case "spi-cpol":
-            case "spi-cpha": {
-                property.value = { _t: "flag", description: property.value.description };
-                break;
-            }
-            case "clock-frequency": {
-                property.value = {
-                    _t: "scalar",
-                    description: "Legacy property for single, fixed frequency clocks",
-                    cell: { _t: "number", minimum: 0n, maximum: 0xFF_FF_FF_FF_FF_FF_FF_FFn },
-                };
-                break;
-            }
-            case "opp-hz": {
-                const bounds = array_bounds(property.value);
-                property.value = {
-                    _t: "matrix", minItems: 1, maxItems: 1, description: property.value.description,
-                    rows: [number_list(bounds, 0n, 0xFF_FF_FF_FF_FF_FF_FF_FFn)],
-                };
-                break;
-            }
+            // iio.yaml's 9 items: dt-validate applies it to every node (`select: true`), the pipeline only to the ones that `$ref` it
             case "mount-matrix": {
                 property.value = {
                     _t: "list", item: { _t: "string" }, minItems: 9, maxItems: 9,
                     description: property.value.description,
                 };
-                break;
-            }
-            case "gpio-controller":
-            case "interrupt-controller": {
-                if (property.value._t === "unknown") {
-                    property.value = { _t: "flag", description: property.value.description };
-                }
                 break;
             }
             case "reg": {
@@ -91,48 +63,6 @@ if (import.meta.vitest) {
     const numbers = (minimum: bigint, maximum: bigint, bounds: { minItems?: number; maxItems?: number }, extra: object = {}): ResolvedProperty["value"] =>
         ({ _t: "list", item: { _t: "number", minimum, maximum }, ...bounds, ...extra });
 
-    test("spi-3wire / spi-cpol / spi-cpha become flag", () => {
-        const result = run(
-            property("spi-3wire", { _t: "unknown", description: "a" }),
-            property("spi-cpol", { _t: "unknown", description: "b" }),
-            property("spi-cpha", { _t: "unknown", description: "c" }),
-        );
-        for (const p of result) {
-            expect(p.value._t).toBe("flag");
-        }
-        expect((result[0]!.value as { description?: string }).description).toBe("a");
-    });
-
-    test("clock-frequency becomes uint64 scalar", () => {
-        const [result] = run(property("clock-frequency", { _t: "unknown" }));
-        expect(result!.value).toStrictEqual({
-            _t: "scalar",
-            description: "Legacy property for single, fixed frequency clocks",
-            cell: { _t: "number", minimum: 0n, maximum: 0xFF_FF_FF_FF_FF_FF_FF_FFn },
-        });
-    });
-
-    test("opp-hz becomes uint64 matrix, bounds from array", () => {
-        const [result] = run(property("opp-hz", open_list(2, 4, "d")));
-        expect(result!.value).toStrictEqual({
-            _t: "matrix",
-            minItems: 1,
-            maxItems: 1,
-            description: "d",
-            rows: [numbers(0n, 0xFF_FF_FF_FF_FF_FF_FF_FFn, { minItems: 2, maxItems: 4 })],
-        });
-    });
-
-    test("opp-hz defaults items to 1 when not array", () => {
-        const [result] = run(property("opp-hz", { _t: "unknown" }));
-        expect(result!.value._t).toBe("matrix");
-        if (result!.value._t === "matrix") {
-            const inner = result!.value.rows[0]!;
-            expect(inner.minItems).toBe(1);
-            expect(inner.maxItems).toBe(1);
-        }
-    });
-
     test("mount-matrix becomes a 9-element string list", () => {
         const [result] = run(property("mount-matrix", { _t: "unknown", description: "e" }));
         expect(result!.value).toStrictEqual({
@@ -142,20 +72,6 @@ if (import.meta.vitest) {
             maxItems: 9,
             description: "e",
         });
-    });
-
-    test("gpio-controller stays unchanged when not unknown", () => {
-        const [result] = run(property("gpio-controller", { _t: "flag" }));
-        expect(result!.value._t).toBe("flag");
-    });
-
-    test("gpio-controller / interrupt-controller become flag from unknown", () => {
-        const result = run(
-            property("gpio-controller", { _t: "unknown", description: "f" }),
-            property("interrupt-controller", { _t: "unknown", description: "g" }),
-        );
-        expect(result[0]!.value).toStrictEqual({ _t: "flag", description: "f" });
-        expect(result[1]!.value).toStrictEqual({ _t: "flag", description: "g" });
     });
 
     test("reg array becomes matrix", () => {
@@ -177,11 +93,11 @@ if (import.meta.vitest) {
     test("node properties are recursed", () => {
         const [result] = run(property("port", {
             _t: "node",
-            properties: [property("spi-3wire", { _t: "unknown" })],
+            properties: [property("mount-matrix", { _t: "list", item: { _t: "string" } })],
         }));
         expect(result!.value._t).toBe("node");
         if (result!.value._t === "node") {
-            expect(result!.value.properties[0]!.value._t).toBe("flag");
+            expect(result!.value.properties[0]!.value).toMatchObject({ minItems: 9, maxItems: 9 });
         }
     });
 }

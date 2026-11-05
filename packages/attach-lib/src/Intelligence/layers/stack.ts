@@ -71,7 +71,7 @@ if (import.meta.vitest) {
 
     const properties: ResolvedProperty[] = [
         { key: "reg", value: { _t: "list", item: { _t: "any" }, minItems: 1, maxItems: 1 } },
-        { key: "spi-cpol", value: { _t: "unknown" } },
+        { key: "mount-matrix", value: { _t: "list", item: { _t: "string" } } },
         { key: "sample-rate-hz", value: { _t: "list", item: { _t: "any" }, minItems: 1, maxItems: 1 } },
         { key: "interrupt-parent", value: { _t: "unknown" } },
         { key: "interrupts", value: { _t: "list", item: { _t: "any" }, minItems: 1, maxItems: 1 } },
@@ -86,9 +86,9 @@ if (import.meta.vitest) {
         const refined = IntelligenceStack.default().refine_properties(properties, { devicetree, data });
         const value = (key: string) => refined.find(p => p.key === key)?.value;
 
-        // binding layer: the known shapes of reg and spi-cpol; an unknown property is left as it is
+        // binding layer: the known shapes of reg and mount-matrix; an unknown property is left as it is
         expect(value("reg")).toMatchObject({ _t: "matrix", rows: [{ _t: "list", item: { _t: "number", maximum: 0xFF_FF_FF_FFn } }] });
-        expect(value("spi-cpol")).toEqual({ _t: "flag" });
+        expect(value("mount-matrix")).toMatchObject({ _t: "list", minItems: 9, maxItems: 9 });
         expect(value("sample-rate-hz")).toStrictEqual(properties.find(p => p.key === "sample-rate-hz")!.value);
         // devicetree layer: the tree's controllers and regulators, and rows shaped by the chosen controller's cells
         expect(value("interrupt-parent")).toMatchObject({ _t: "list", item: phandle("gpio") });
