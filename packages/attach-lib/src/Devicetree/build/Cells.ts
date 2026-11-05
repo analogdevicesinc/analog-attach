@@ -1,16 +1,5 @@
-import { Bits, CellArrayElement, DTCellArray, DTNode } from "./Parser/index.js";
-import { assert_never } from "./TypeUtilities.js";
-
-export type UnitAddr = { value: bigint; repr: "hex" | "dec" };
-
-export type FoundNodeResult = {
-    node: DTNode;
-    path: string;
-    node_path: string;
-    parent_node: DTNode | undefined;
-    fragment_root_path: string;
-    is_in_base: boolean;
-};
+import { Bits, CellArrayElement, DTCellArray } from "../syntax/index.js";
+import { assert_never } from "../../assert_never.js";
 
 type TagWith<T extends string | bigint, TAG extends "number" | "label" | "path" | "expression"> = {
     _tag: TAG,

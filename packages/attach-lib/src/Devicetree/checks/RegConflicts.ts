@@ -1,9 +1,9 @@
-import { DeviceTree } from "./Devicetree.js";
-import { DeviceTreeOverlay } from "./DevicetreeOverlay.js";
-import { number_property } from "./Access.js";
-import { type CellArrayElement, type DTNode, type DTProperty, is_dt_flag } from "./Parser/AST.js";
-import { PropertyBuilder } from "./PropertyBuilder.js";
-import { address_cells_of } from "./UnitAddress.js";
+import { DeviceTree } from "../DeviceTree.js";
+import { DeviceTreeOverlay } from "../DeviceTreeOverlay.js";
+import { number_property } from "../nodes/Access.js";
+import { type CellArrayElement, type DTNode, type DTProperty, is_dt_flag } from "../syntax/AST.js";
+import { PropertyBuilder } from "../build/PropertyBuilder.js";
+import { address_cells_of } from "../nodes/UnitAddress.js";
 
 /** Two enabled siblings whose `reg` claims the same address. */
 export interface RegConflict {

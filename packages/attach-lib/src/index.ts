@@ -33,7 +33,7 @@ export {
 } from './Bindings/index.js';
 export { populate_binding, populate_properties, type PopulateOptions } from './Attach/Populate.js';
 export { Result } from './result.js';
-export { references_to, unresolved_references, unresolved_targets, type ReferenceTo, type UnresolvedReference, type UnresolvedTarget } from './Devicetree/References.js';
+export { references_to, unresolved_references, unresolved_targets, type ReferenceTo, type UnresolvedReference, type UnresolvedTarget } from './Devicetree/checks/References.js';
 export { node_data, node_data_json } from './Attach/NodeData.js';
 export { missing_required, PROPERTY_DEPENDENCIES } from './Attach/NodeState.js';
 
@@ -47,14 +47,14 @@ export {
     type DTLabel,
     type DTPath,
     type CellArrayElement,
-} from './Devicetree/Parser/AST.js';
-export { is_enabled, cell_extract_first_value, type LocatedNode, type NodeTarget } from './Devicetree/Access.js';
-export { print_property, type OverlaySyntax, type DtoPrintOptions } from './Devicetree/Printer.js';
-export type { CellInput, CellValue, FoundNodeResult, NumberRepr } from './Devicetree/Types.js';
-export { NodeBuilder } from './Devicetree/NodeBuilder.js';
-export { PropertyBuilder } from './Devicetree/PropertyBuilder.js';
-export { DeviceTree } from './Devicetree/Devicetree.js';
-export { DeviceTreeOverlay } from './Devicetree/DevicetreeOverlay.js';
+} from './Devicetree/syntax/AST.js';
+export { is_enabled, cell_extract_first_value, type LocatedNode, type NodeTarget } from './Devicetree/nodes/Access.js';
+export { print_property, type OverlaySyntax, type DtoPrintOptions } from './Devicetree/syntax/Printer.js';
+export type { CellInput, CellValue, NumberRepr } from './Devicetree/build/Cells.js';
+export { NodeBuilder } from './Devicetree/build/NodeBuilder.js';
+export { PropertyBuilder } from './Devicetree/build/PropertyBuilder.js';
+export { DeviceTree } from './Devicetree/DeviceTree.js';
+export { DeviceTreeOverlay, type FoundNodeResult } from './Devicetree/DeviceTreeOverlay.js';
 
 // Unit address and label utilities (Group C)
 export {
@@ -70,7 +70,7 @@ export {
     type AddressCells,
     type UnitRadix,
     type SyncResult,
-} from './Devicetree/UnitAddress.js';
+} from './Devicetree/nodes/UnitAddress.js';
 export {
     is_valid_label,
     is_valid_node_name,
@@ -79,9 +79,9 @@ export {
     unique_label,
     choose_label,
     type LabelChoice,
-} from './Devicetree/Labels.js';
+} from './Devicetree/nodes/Labels.js';
 export { add_node, type AddNodeRequest, type AddNodeNote, type AddNodeResult } from './Devicetree/AddNode.js';
-export { reg_conflicts, sibling_reg_conflicts, chip_select_overflows, sibling_chip_select_overflows, reg_entries, is_active, type RegConflict, type ChipSelectOverflow, type ChipSelects, type RegEntry } from './Devicetree/RegConflicts.js';
+export { reg_conflicts, sibling_reg_conflicts, chip_select_overflows, sibling_chip_select_overflows, reg_entries, is_active, type RegConflict, type ChipSelectOverflow, type ChipSelects, type RegEntry } from './Devicetree/checks/RegConflicts.js';
 
 // Intelligence: queries, parent suggestions, layers, interrupt parent
 export * from './Intelligence/index.js';

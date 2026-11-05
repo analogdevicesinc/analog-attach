@@ -1,6 +1,6 @@
 import { ResolvedProperty, AttachEnumType, is_open, type Cell, type List } from "../Bindings/index.js";
 import { DeviceTree, DTNode, get_full_node_name, number_property, type AddressCells, type LocatedNode } from "../Devicetree/index.js";
-import { chip_selects_of, type ChipSelects } from "../Devicetree/RegConflicts.js";
+import { chip_selects_of, type ChipSelects } from "../Devicetree/checks/RegConflicts.js";
 import { NodePlacement, PropertyContext, ValueSuggestion } from "./layers/types.js";
 
 /** What a node's `reg` depends on: its parent's cells, and the chip selects of an SPI controller. */

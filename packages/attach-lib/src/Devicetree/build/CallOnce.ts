@@ -7,7 +7,3 @@ export type AddCallOnce<
     ? (...arguments_: A) => AddCallOnce<Base, CallOnce, Exclude<Remaining, K>>
     : never;
 };
-
-export function assert_never(_: never): never {
-    throw new Error("Didn't expect to get here");
-}

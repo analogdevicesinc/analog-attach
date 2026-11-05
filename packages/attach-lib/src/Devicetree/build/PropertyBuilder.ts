@@ -1,6 +1,6 @@
-import { Bits, DTProperty, is_dt_flag, print_property } from "./Parser/index.js";
-import { CellInput, CellValue, make_cell_array, NumberRepr } from "./Types.js";
-import { AddCallOnce } from "./TypeUtilities.js";
+import { Bits, DTProperty, is_dt_flag, print_property } from "../syntax/index.js";
+import { CellInput, CellValue, make_cell_array, NumberRepr } from "./Cells.js";
+import { AddCallOnce } from "./CallOnce.js";
 
 interface IFlagPropertyBuilder {
     set_flag(): IPropertyNameBuilder;

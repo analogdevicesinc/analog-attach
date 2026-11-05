@@ -1,7 +1,7 @@
-import { type DTNode, type DTProperty, is_dt_flag } from "./Parser/AST.js";
-import { PropertyBuilder } from "./PropertyBuilder.js";
+import { type DTNode, type DTProperty, is_dt_flag } from "../syntax/AST.js";
+import { PropertyBuilder } from "../build/PropertyBuilder.js";
 import { has_property, is_enabled, number_property } from "./Access.js";
-import type { DeviceTreeOverlay } from "./DevicetreeOverlay.js";
+import type { DeviceTreeOverlay } from "../DeviceTreeOverlay.js";
 
 /**
  * Unit addresses are hex by convention (and dtc requires it on SPI, I2C and
@@ -9,6 +9,9 @@ import type { DeviceTreeOverlay } from "./DevicetreeOverlay.js";
  * `^channel@([0-9]|1[0-5])$`.
  */
 export type UnitRadix = 10 | 16;
+
+/** A unit address and the radix it is written in. */
+export type UnitAddr = { value: bigint; repr: "hex" | "dec" };
 
 export function parse_unit_address(unit: string, radix: UnitRadix = 16): bigint | undefined {
     if (unit === "") { return undefined; }
