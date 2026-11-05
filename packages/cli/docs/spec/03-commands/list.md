@@ -278,7 +278,6 @@ compatible>`.
   default: <json>
   min: <n>
   max: <n>
-  <suggestion value>\t<suggestion display>
 ```
 
 Each line after the first only when the binding gives it. `(required)` follows
@@ -296,13 +295,12 @@ for a tuple. A phandle whose targets are known is an enum of their labels
 
 **LIST-054** In JSON mode the CLI shall respond `{"ok": true, "message":
 "Type of <property>", "severity": "info", "property": { name, description?,
-type, display, required, set, default?, suggestions? }, "type": <type>,
-"description"?: <description>, "suggestions"?: [...]}`
+type, display, required, set, default? }, "type": <type>,
+"description"?: <description>}`
 (`04-protocol/list-property.schema.json`). `display` is the type as LIST-053
-writes it, `required` follows the narrowed required list, `set` says whether
-the merged node has the property, and `suggestions` is there only when the
-binding's definition offers values. The top-level `type`, `description` and
-`suggestions` repeat those of `property` (deprecated). `type` has `min_items`
+writes it, `required` follows the narrowed required list, and `set` says whether
+the merged node has the property. The top-level `type` and `description`
+repeat those of `property` (deprecated). `type` has `min_items`
 / `max_items` per CLAUDE.md "update value format". The response doesn't give
 the property's const or range (open issue L-5).
 

@@ -298,8 +298,6 @@ export interface PropertyInfo {
     /** The binding YAML the definition comes from. */
     binding_path: string;
     constraints: { const?: unknown; default?: unknown; minimum?: number | bigint; maximum?: number | bigint };
-    /** Values the binding's definition offers, ready for `update`. */
-    suggestions: Suggestion[];
     /** For a phandle, the labels of the nodes it can name, enabled or not: candidates, not a constraint. */
     phandle_options?: string[];
     /** For a `*-gpios` property, the rows (controller + cells) the binding gives it: `max_rows` is open when the binding sets no upper bound. */
@@ -341,7 +339,6 @@ export function property_info(
                 ...(constraints.minimum === undefined ? {} : { minimum: constraints.minimum }),
                 ...(constraints.maximum === undefined ? {} : { maximum: constraints.maximum }),
             },
-            suggestions: (property_definition.suggestions ?? []).map((suggestion) => to_suggestion(suggestion)),
             ...(constraints.phandle_options === undefined ? {} : { phandle_options: constraints.phandle_options }),
             ...(property_definition.gpio_rows === undefined ? {} : { gpio_rows: property_definition.gpio_rows }),
         },

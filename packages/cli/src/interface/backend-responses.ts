@@ -168,7 +168,6 @@ export interface PropertyDescription {
     required: boolean;
     set?: boolean;
     default?: PropertyValue;
-    suggestions?: Suggestion[];
 }
 
 /**
