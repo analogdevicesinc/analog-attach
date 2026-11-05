@@ -53,12 +53,15 @@
     "noos-added": {
       "description": "Where the backend is noos: the node add made (ADD-523). key is what add was given (a schema, driver or eval board), path the new node's name; the nodes bootstrap made below it are not listed.",
       "allOf": [{ "$ref": "#/$defs/base" }],
+      "required": ["wiring", "chip_selects"],
       "properties": {
         "ok": { "const": true },
         "message": { "type": "string", "pattern": "^Added '[^']+' \\(.+\\) and [0-9]+ nodes? below it; (the workfile is valid|[0-9]+ problems? left - run: .+ validate)$" },
         "severity": { "const": "info" },
         "path": { "type": "array", "minItems": 1, "maxItems": 1, "items": { "type": "string", "minLength": 1 } },
-        "missing_required": { "type": "array", "items": { "$ref": "#/$defs/noos-missing" } }
+        "missing_required": { "type": "array", "items": { "$ref": "#/$defs/noos-missing" } },
+        "wiring": { "$ref": "#/$defs/noos-wiring" },
+        "chip_selects": { "$ref": "#/$defs/noos-chip-selects" }
       },
       "unevaluatedProperties": false
     },
@@ -68,6 +71,109 @@
       "required": ["node"],
       "properties": { "node": { "type": "string", "minLength": 1, "description": "The node it belongs to." } },
       "unevaluatedProperties": false
+    },
+    "noos-board-pin": {
+      "description": "A board pin: its header position, and the chip pin name the board prints next to it when the pinout gives one (J9, 5, P2_0).",
+      "type": "object",
+      "required": ["connector", "pin"],
+      "properties": { "connector": { "type": "string" }, "pin": { "type": "string" }, "chip_pin": { "type": "string" } },
+      "additionalProperties": false
+    },
+    "noos-gpio": {
+      "type": "object",
+      "required": ["port", "number"],
+      "properties": { "port": { "type": "string" }, "number": { "type": "integer" } },
+      "additionalProperties": false
+    },
+    "noos-wiring": {
+      "description": "The buses bootstrap wired (ADD-527): each pin of the part to the board pin it goes to.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["part", "device", "interface", "connections", "problems"],
+        "properties": {
+          "part": { "type": "string" },
+          "device": { "type": "string" },
+          "interface": { "type": "string" },
+          "peripheral": { "type": "string" },
+          "connections": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["role", "from", "to"],
+              "properties": {
+                "role": { "type": "string" },
+                "from": {
+                  "type": "object",
+                  "required": ["connector", "pin"],
+                  "properties": { "connector": { "type": "string" }, "pin": { "type": "string" } },
+                  "additionalProperties": false
+                },
+                "to": { "$ref": "#/$defs/noos-board-pin" }
+              },
+              "additionalProperties": false
+            }
+          },
+          "problems": { "type": "array", "items": { "type": "string" } },
+          "board_pins": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["signal", "at"],
+              "properties": { "signal": { "type": "string" }, "at": { "$ref": "#/$defs/noos-board-pin" } },
+              "additionalProperties": false
+            }
+          },
+          "chip_select_options": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["at"],
+              "properties": { "at": { "$ref": "#/$defs/noos-board-pin" }, "gpio": { "$ref": "#/$defs/noos-gpio" } },
+              "additionalProperties": false
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "noos-chip-selects": {
+      "description": "How each SPI device's chip-select is driven (ADD-527): a native line of the bus, a GPIO, or not yet.",
+      "type": "array",
+      "items": {
+        "oneOf": [
+          {
+            "type": "object",
+            "required": ["device", "kind", "peripheral", "native_cs", "at"],
+            "properties": {
+              "device": { "type": "string" },
+              "kind": { "const": "native" },
+              "peripheral": { "type": "string" },
+              "native_cs": { "type": "integer" },
+              "at": { "$ref": "#/$defs/noos-board-pin" }
+            },
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "required": ["device", "kind", "gpio", "at"],
+            "properties": {
+              "device": { "type": "string" },
+              "kind": { "const": "gpio" },
+              "gpio": { "$ref": "#/$defs/noos-gpio" },
+              "at": { "$ref": "#/$defs/noos-board-pin" },
+              "pin_node": { "type": "string" }
+            },
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "required": ["device", "kind", "reason"],
+            "properties": { "device": { "type": "string" }, "kind": { "const": "unwired" }, "reason": { "type": "string" } },
+            "additionalProperties": false
+          }
+        ]
+      }
     }
   }
 }

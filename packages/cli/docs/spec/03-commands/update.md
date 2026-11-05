@@ -440,7 +440,9 @@ are left to `validate`, as UPDATE-511 says.
 **UPDATE-520** The CLI shall set the value as the user's (bootstrap no longer
 changes it), run bootstrap (`add.md` ADD-520) with the nodes that were
 referenced before, so that a node the change left unused is deleted, and
-write the workfile. It shall answer `Set <node>.<property> = <value>`,
+write the workfile. Where the backend is noos and bootstrap rewired a bus (a
+`comm_type` change, say), the JSON answer also has `wiring` and `chip_selects`,
+as `add` gives them (`add.md` ADD-527). It shall answer `Set <node>.<property> = <value>`,
 `<property>` the property's full name (`$init_param`) and `<value>` as
 stored, a union's as `<member> = <value>`: in JSON mode with `severity`
 `info` (`update.schema.json#/$defs/noos`), in human mode followed by the

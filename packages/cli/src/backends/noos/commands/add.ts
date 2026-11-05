@@ -31,7 +31,7 @@ import {
 } from "../../../interface/backend-interface";
 import { did_you_mean } from "../../../interface/names";
 import { common_ok, type AddResponse, type MissingProperty } from "../protocol/responses";
-import { describe_bootstrap, run_bootstrap, still_needed } from "./bootstrap_run";
+import { describe_bootstrap, describe_wiring, run_bootstrap, still_needed } from "./bootstrap_run";
 import { run_interview } from "./interview";
 import { load_context, refuse_error, save_workfile, type WorkfileContext } from "./shared";
 
@@ -236,11 +236,13 @@ async function run_add(arguments_: AddArguments, as: readonly string[], session:
     // Built now, before an interview changes the workfile: it is the state the message describes.
     const made = new Set([name, ...sides, ...(eval_node === undefined ? [] : [eval_node]), ...(report?.linked ?? []).filter(link => link.created).map(link => link.target)]);
     const missing = report === undefined ? [] : missing_required(report, context.value.workfile).filter(entry => made.has(entry.node));
+    const wired = report === undefined ? { wiring: [], chip_selects: [] } : describe_wiring(report, context.value.workfile);
     const response = (): AddResponse => ({
         ...common_ok(message),
         key,
         path: [name],
         missing_required: missing,
+        ...wired,
     });
 
     const lines = [

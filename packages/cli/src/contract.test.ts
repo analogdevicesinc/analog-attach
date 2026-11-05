@@ -554,6 +554,8 @@ const LINUX_CASES: readonly Case<LinuxHarness>[] = [
     { route: "completion", argv: ["completion", "zsh", "--install"], shape: "answer" },
     { route: "skill install", argv: ["skill", "install", "analog-attach-linux"], shape: "refusal" },
     { route: "skill uninstall", argv: ["skill", "uninstall", "analog-attach-linux"], shape: "refusal" },
+    { route: "skill install", argv: ["skill", "install"], shape: "answer" },
+    { route: "skill uninstall", argv: ["skill", "uninstall"], shape: "answer" },
 ];
 
 check_contract<LinuxHarness>({
@@ -684,6 +686,8 @@ const NOOS_CASES: readonly Case<NoosHarness>[] = [
     { route: "completion", argv: ["completion", "bash"], shape: "answer" },
     { route: "skill install", argv: ["skill", "install", "analog-attach-noos"], shape: "refusal" },
     { route: "skill uninstall", argv: ["skill", "uninstall", "analog-attach-noos"], shape: "refusal" },
+    { route: "skill install", argv: ["skill", "install"], shape: "answer" },
+    { route: "skill uninstall", argv: ["skill", "uninstall"], shape: "answer" },
 ];
 
 check_contract<NoosHarness>({
