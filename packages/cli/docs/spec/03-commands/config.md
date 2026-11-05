@@ -272,7 +272,8 @@ the same key in another backend's section is not that setting.
 **CONFIG-202** The CLI shall then answer `Reset <key>`, then ` (global)`
 with `--global`, then what applies now: ` (still set in the <scope> config:
 <value>)` when the other file still sets it, else ` (default: <default>)` for
-a setting with a default (`overlay-syntax`, `preprocess-command`; where
+a setting with a default (`overlay-syntax`, `preprocess-command`,
+`interview`, `build-dir`; where
 the backend is noos, `workfile`, `bootstrap`, `interview`,
 `project-template`, `example`, `probe`), else `
 (not set)`: in JSON mode as a common object (`config.schema.json#/$defs/done`),
@@ -453,8 +454,14 @@ Global: ~/.config/analog-attach/config.json
     workfile            ~/work/overlay.dtso                                      local
     overlay-syntax      fragment                                                 default
     preprocess-command  cpp -nostdinc -undef -x assembler-with-cpp -P -I {linux}/include -o {output} {input}  default
+    interview           true                                                     default
+
+  Build
+    build-command       (not set)
+    build-dir           build                                                    default
 
   Deploy
+    deploy-command      (not set)
     deploy-ip           (not set)
     deploy-user         pi                                                       global
     deploy-password     (not set)
@@ -474,7 +481,7 @@ $ analog-attach --json config deploy-user
 
 ```
 $ analog-attach config nope
-Unknown config field: nope. Valid fields: backend, linux, devicetree, workfile, overlay-syntax, preprocess-command, deploy-ip, deploy-user, deploy-password.
+Unknown config field: nope. Valid fields: backend, linux, devicetree, workfile, overlay-syntax, preprocess-command, interview, build-command, build-dir, deploy-command, deploy-ip, deploy-user, deploy-password.
                                                    (stderr, exit 2)
 ```
 
@@ -514,8 +521,8 @@ Indexed 23309 compatibles from 5196 bindings and compiled binding schemas in 5.1
 ```
 $ analog-attach --json config            # the local file's linux section also has "bogus": "x"
 {"errors":[{"field":"linux.bogus","kind":"unknown","message":"~/work/.analog-attach/config.json: unknown key linux.bogus",
- "hint":"Remove unknown keys from ~/work/.analog-attach/config.json; valid keys in linux are linux, devicetree, workfile, overlay-syntax, preprocess-command, deploy-ip, deploy-user, deploy-password."}],
- "hints":["Remove unknown keys from ~/work/.analog-attach/config.json; valid keys in linux are linux, devicetree, workfile, overlay-syntax, preprocess-command, deploy-ip, deploy-user, deploy-password."]}
+ "hint":"Remove unknown keys from ~/work/.analog-attach/config.json; valid keys in linux are linux, devicetree, workfile, overlay-syntax, preprocess-command, interview, build-command, build-dir, deploy-command, deploy-ip, deploy-user, deploy-password."}],
+ "hints":["Remove unknown keys from ~/work/.analog-attach/config.json; valid keys in linux are linux, devicetree, workfile, overlay-syntax, preprocess-command, interview, build-command, build-dir, deploy-command, deploy-ip, deploy-user, deploy-password."]}
                                                    (stderr, exit 2)
 ```
 

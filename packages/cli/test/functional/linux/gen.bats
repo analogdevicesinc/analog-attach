@@ -186,7 +186,7 @@ checksum() {
 		[ "$status" -eq 0 ] || fail "$step: exit $status: $output $stderr"
 		[ "$(jq -r '.ok // "none"' <<<"$output")" != false ] || fail "$step refused: $output"
 	done
-	[ -f "$PROJECT/overlay.dtbo" ]
+	[ -f "$PROJECT/build/overlay.dtbo" ]
 	[ -s "$BATS_TEST_TMPDIR/sshpass.log" ]
 }
 

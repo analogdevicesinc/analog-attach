@@ -30,6 +30,9 @@ grammar, help, `--json`, exit statuses, the settings files, prompts, colours, sh
 skills and the bare run. A backend (`src/backends/<id>/`) is a library behind the interface
 (`src/interface/`): it gets parsed arguments and a `Session`, and returns an `Outcome`. It never
 reads argv or a settings file, never writes to stdout or stderr, and never opens a prompt itself.
+What both backends share sits in `src/backends/shell.ts`: `project_root(session)` (the directory
+that holds `.analog-attach/`) and `run` / `run_shell`, which pass a child's output on line by line
+(to `session.progress`).
 
 ### Interface
 
@@ -214,6 +217,9 @@ that gets them cannot fail because of the configuration.
 
 - `config/settings.ts`: `SETTINGS`, the backend's `SettingSpec`s:
   - `linux`, `devicetree`, `workfile` (the overlay), `overlay-syntax`, `preprocess-command`;
+  - `interview` (`false`: `add` and `update <path> <child>` ask nothing on a terminal, the
+    parent question included);
+  - `build-command`, `build-dir` (a string, `build` by default), `deploy-command`;
   - `deploy-ip`, `deploy-user`, `deploy-password`.
 
   The front end stores and checks them, in the `linux` section of the settings files. `read_settings` gives them from `session.settings`, with
@@ -225,7 +231,8 @@ that gets them cannot fail because of the configuration.
     creates it.
   - `changed` builds the caches after `config linux <path>`. `reload` is `config --reload`.
 - `config/workspace.ts`: `load_workspace(session, needs)` returns `{ ok, workspace }` or `{ ok:
-  false, outcome }`. The resources it can parse:
+  false, outcome }`. It resolves `build-dir` against `project_root` (`build_folder`). The resources
+  it can parse:
   - `linux`: the checked Linux tree alone (`list context`).
   - `bindings`: the Linux tree has `Documentation/devicetree/bindings/` and `include/`, and the
     bundled dt-schema exists.
@@ -235,7 +242,11 @@ that gets them cannot fail because of the configuration.
   - `overlay`: a `Workfile` parsed against the base, with `print()` / `save()` honouring
     `overlay-syntax`.
   - `overlay_path`: the configured workfile's path, whether its file exists or not (`init`).
-  - `deploy`: the deploy fields plus the `.dtbo` from `derive_dtbo_path`.
+  - `deploy`: the deploy fields plus the `.dtbo` from `derive_dtbo_path` (in the build folder,
+    named after the workfile).
+
+  `build` and `deploy` with `build-command` / `deploy-command` set load only `overlay_path` and run
+  the command with `run_shell` in the project root.
 
   Errors from independent resources are collected and reported once (`format_config_errors`,
   `config_errors_outcome`) as a refusal, exit 0, in both modes. Under `--json` it also carries
@@ -491,8 +502,9 @@ compatible, and refuses duplicates.
 
 Without `--parent`, `add` takes the parent itself (`commands/add/parent.ts`: `default_parent` /
 `pick_parent` / `parent_note`).
-- On a terminal (`--template required`, no `--quiet`), the parent is the first question
-  (`ask_parent` in `commands/add/interview.ts`): a lettered list of the `list parent` results.
+- On a terminal (`--template required`, no `--quiet`, `interview` on), the parent is the first
+  question (`ask_parent` in `commands/add/interview.ts`): a lettered list of the `list parent`
+  results.
   - It comes before the node exists and outside the `[1/N]` count.
   - Enter takes the first. A typed label or path is checked like `--parent`.
   - Tab completes segment by segment (`parent_completions`).
@@ -529,7 +541,8 @@ After the add, the node's missing required properties (`node-state.ts`) are eith
 listed.
 - They are asked for on a terminal: `missing-interview.ts` runs `commands/add/interview.ts`, which
   writes each answer through update's `apply_update`.
-- They are listed when piped, with `--quiet`, or as `AddResponse.missing_required` under `--json`.
+- They are listed when piped, with `--quiet` or `interview` off, or as
+  `AddResponse.missing_required` under `--json`.
 
 How a question is asked:
 - `question_entries` letters the options of an enum or phandle (`pick_code` / `code_index`: a…z,
@@ -676,7 +689,8 @@ it to the interface.
   workfile into the project with the template set. Its flags `--output`, `--project-template` and
   `--board` override the settings for one run.
 - **build / deploy** (`commands/build.ts`, `commands/deploy.ts`, `build/cmake_build.ts`): with
-  `build-command` / `deploy-command` set, the command runs in the project (`run_shell`). Otherwise
+  `build-command` / `deploy-command` set, the command runs in the project (`run_shell`, from
+  `src/backends/shell.ts`). Otherwise
   the backend does a CMake preset build (`plan_build`, `preflight`, `cmake --preset <board>`,
   `cmake --build build`, `--target flash` for deploy). The tool's output goes through
   `session.progress` on stderr, so stdout keeps only the result.

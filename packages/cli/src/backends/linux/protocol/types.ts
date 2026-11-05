@@ -212,13 +212,15 @@ export interface TypeResponse extends CommonResponse {
 }
 
 export interface BuildResponse extends BaseBuildResponse {
-    /** The compiled `.dtbo`, absolute. */
-    path: string;
+    /** The compiled `.dtbo`, absolute: always after dtc, after `build-command` only when it wrote one there. */
+    path?: string;
 }
 
 export interface DeployResponse extends CommonResponse {
-    host: string;
-    remote_path: string;
+    /** `deploy-ip`; absent when `deploy-command` deployed. */
+    host?: string;
+    /** `/boot/overlays/`; absent when `deploy-command` deployed. */
+    remote_path?: string;
 }
 
 /** The Linux backend's responses: the shared map, with the Linux subtypes of the commands ported so far. */

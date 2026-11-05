@@ -90,6 +90,9 @@ const, a flag such as spi-cpol), and what the binding's first example on the
 parent's bus has: spi-max-frequency on SPI, reg (the address, renaming the node)
 on I2C. Those are left out of the questions.
 
+With the interview setting false, a terminal run asks nothing either: the
+parent and the missing properties are as in a piped run.
+
 Use 'list devices' to find compatible strings, 'list parent' to find valid buses.`,
         examples: [
             "add adi,ad7124-8 --parent spi0",
@@ -125,8 +128,9 @@ Use 'list devices' to find compatible strings, 'list parent' to find valid buses
         const binding_path = await find_binding(workspace.bindings, compatible);
         if (binding_path === undefined) { return refuse(unknown_compatible_message(workspace.bindings, compatible, session.program)); }
 
-        // Only a run that may ask gets a prompter: not --json, --quiet or a run off a terminal.
-        const asking: InteractiveSession | undefined = quiet || session.prompter === undefined ? undefined : session as InteractiveSession;
+        // Only a run that may ask gets a prompter: not --json, --quiet, a run off a terminal or
+        // the interview setting off. The parent question is part of the interview.
+        const asking: InteractiveSession | undefined = quiet || session.prompter === undefined || !settings.interview ? undefined : session as InteractiveSession;
 
         let note: string | undefined;
         if (parent === undefined && !copies) {

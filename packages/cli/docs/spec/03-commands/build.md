@@ -1,8 +1,9 @@
 # build
 
 Compiles the overlay into a binary `.dtbo`. A shared command: §2 to §4 as
-the linux backend does it, §5 as the noos backend does it (the generated
-project, built with CMake or the `build-command` setting).
+the linux backend does it (with the bundled dtc or the `build-command`
+setting), §5 as the noos backend does it (the generated project, built with
+CMake or the `build-command` setting).
 
 ## 1. Synopsis
 
@@ -23,14 +24,16 @@ command takes no arguments or options.
 | Term | Meaning |
 |---|---|
 | Overlay file | The file the `workfile` setting names, as it is on disk. |
-| Output file | The overlay file's path with `.dtso` replaced by `.dtbo`, or with `.dtbo` appended when it doesn't end in `.dtso` (`overlay.dtso` → `overlay.dtbo`, `my.dts` → `my.dts.dtbo`). |
+| Build folder | The `build-dir` setting: `build` in the directory that holds `.analog-attach/` when unset, a relative value resolved the same way (02-common.md §8.1). |
+| Output file | In the build folder, the overlay file's name with `.dtso` replaced by `.dtbo`, or with `.dtbo` appended when it doesn't end in `.dtso` (`overlay.dtso` → `<build folder>/overlay.dtbo`, `my.dts` → `<build folder>/my.dts.dtbo`). |
 | Bundled dtc | The `dtc` binary in the installation's `bundled/tools/` (v1.8.1). |
 
 ## 3. Resources
 
 The command needs the bundled tools, the base and the overlay (COM-070;
 02-common.md §8.2 for the base, §8.3 for the overlay). The overlay has to
-parse against the base even though dtc compiles the file on its own.
+parse against the base even though dtc compiles the file on its own. With
+`build-command` set it needs only the `workfile` setting (BUILD-007).
 
 ## 4. Requirements
 
@@ -56,14 +59,32 @@ as it is. Human mode writes that, then a newline: dtc's own final newline
 leaves an empty line at the end. JSON mode gives it as `message`, including
 dtc's final newline.
 
-**BUILD-005** When dtc succeeds, the CLI shall leave the output file as dtc
-wrote it, replacing any earlier one. It writes `Wrote <output file>` in human
-mode. In JSON mode it responds per `04-protocol/build.schema.json`: `{ "ok":
+**BUILD-005** Before it runs dtc, the CLI shall create the build folder and
+its parents when they don't exist. When dtc succeeds, the CLI shall leave the output file as dtc
+wrote it, replacing any earlier one. In human mode it writes `Build completed
+successfully`, an empty line, then `  <output file>`, as the no-OS backend
+does. In JSON mode it responds per `04-protocol/build.schema.json`: `{ "ok":
 true, "message": "Compiled overlay", "severity": "info", "path": <output
 file> }`, `path` being absolute.
 
-**BUILD-006** The CLI shall change no file other than the output file and the
-scratch files of 02-common.md §8.2.
+**BUILD-006** The CLI shall change no file other than the output file, the
+build folder and the scratch files of 02-common.md §8.2.
+
+**BUILD-007** When `build-command` is set (and not empty), the CLI shall run
+it instead of BUILD-002 to BUILD-006, with the shell, in the directory that
+holds `.analog-attach/`, after the progress line `Building <overlay file>
+with '<command>'`. `{workfile}` in it is the overlay file and `{output}` the
+output file, each in double quotes. It needs only `workfile` to be set
+(BUILD-001 with its problem alone); the file needn't exist, and nothing is
+loaded or created. The command's standard output and standard error go to
+standard error, line by line, as with noos's CMake (BUILD-511).
+
+**BUILD-008** If the command exits with a non-zero status, then the CLI shall
+refuse with `Build failed with exit code <n>`. Otherwise it shall respond
+`{ "ok": true, "message": "Built <overlay file> with '<command>'",
+"severity": "info" }`, with `path` the output file when that exists, and
+write `Build completed successfully`, then an empty line and `  <output
+file>` when it exists, in human mode.
 
 ## 5. Where the backend is noos
 
@@ -180,7 +201,9 @@ analog-attach config capi-path <value>` (`02-common.md` COM-512).
 
 ```
 $ analog-attach build
-Wrote /work/ad7124-8.dtbo
+Build completed successfully
+
+  /work/build/ad7124-8.dtbo
 ```
 
 ```
