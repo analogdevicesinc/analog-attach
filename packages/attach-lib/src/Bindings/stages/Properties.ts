@@ -1,12 +1,12 @@
-import { DtBindingSchema, entries_of, is_schema, value_at } from "./Schema.js";
-import { SchemaContext } from "./Context.js";
-import { dereference, ResolvedBinding } from "./RefResolver.js";
-import { definitions_by_name } from "./RedefinitionMerger.js";
-import { Result } from "../result.js";
+import { DtBindingSchema, entries_of, is_schema, value_at } from "../schema/Schema.js";
+import { SchemaContext } from "../Context.js";
+import { dereference, ResolvedBinding } from "./References.js";
+import { definitions_by_name } from "./Redefinitions.js";
+import { Result } from "../../result.js";
 
 /**
  * Whether the node of the `true` at `path` (`properties/reg`, `allOf/1/properties/reg`) defines the property elsewhere:
- * in its own `properties` or in those of its `allOf` entries. The merger (`RedefinitionMerger.ts`) takes that one, which
+ * in its own `properties` or in those of its `allOf` entries. The merger (`Redefinitions.ts`) takes that one, which
  * is the property of this node; a definition of the same name found anywhere else may be a child node's (a PCI
  * device's `reg` for its bus's).
  */

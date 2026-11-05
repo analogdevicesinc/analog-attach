@@ -1,4 +1,4 @@
-import { DtBindingSchema, is_schema, map_entries } from "../Schema.js";
+import { DtBindingSchema, is_schema, map_entries } from "../schema/Schema.js";
 
 /** Each `if` of an `allOf` entry that tests properties requires them, so that it doesn't match a node without them. */
 export function fixup_ifs(binding: DtBindingSchema): DtBindingSchema {

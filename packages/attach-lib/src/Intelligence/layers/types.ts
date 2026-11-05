@@ -1,4 +1,4 @@
-import { ParsedBinding, ResolvedProperty } from "../../Bindings/ParsedBinding.js";
+import { ParsedBinding, ResolvedProperty } from "../../Bindings/model/ParsedBinding.js";
 import { DeviceTree, type AddressCells } from "../../Devicetree/index.js";
 import { PathAndLabel } from "../parents.js";
 

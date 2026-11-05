@@ -2,8 +2,8 @@ import * as fs from "node:fs";
 import path from "node:path";
 import { parse } from "yaml";
 
-import type { ParsedBinding, ResolvedProperty } from "./ParsedBinding.js";
-import { is_schema, Schema, value_at } from "./Schema.js";
+import type { ParsedBinding, ResolvedProperty } from "../model/ParsedBinding.js";
+import { is_schema, Schema, value_at } from "../schema/Schema.js";
 
 /** The node a binding's node sits under: its parent, the bus controller when there is one. */
 export interface ControllerContext {

@@ -1,10 +1,9 @@
-/* eslint-disable unicorn/prevent-abbreviations */
 import { FileInfo, getJsonSchemaRefParserDefaultOptions, JSONSchema, Plugin, ResolverError } from "@apidevtools/json-schema-ref-parser";
-import { Result } from "../result.js";
-import { SchemaContext, SearchPath } from "./Context.js";
-import { DtBindingSchema, isDtBindingSchema, Schema } from "./Schema.js";
-import { walk_node_schema } from "./FixupWalker.js";
-import { fixup_own_counts } from "./fixups/items_size.js";
+import { Result } from "../../result.js";
+import { SchemaContext, SearchPath } from "../Context.js";
+import { DtBindingSchema, isDtBindingSchema, Schema } from "../schema/Schema.js";
+import { walk_node_schema } from "../fixups/Walker.js";
+import { fixup_own_counts } from "../fixups/items_size.js";
 import { restore_references, stash_references } from "./ReferenceSiblings.js";
 
 import * as fs from "node:fs";

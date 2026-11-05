@@ -1,4 +1,4 @@
-import { DtBindingSchema, is_schema, map_entries } from "./Schema.js";
+import { DtBindingSchema, is_schema, map_entries } from "../schema/Schema.js";
 
 /** Property name that makes an implicit `if/then` branch detectable by AJV; see `Attach.narrow`. Not for any other use. */
 export const CANARY = "__canary__";

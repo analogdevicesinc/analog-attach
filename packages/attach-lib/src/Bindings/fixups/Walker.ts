@@ -1,5 +1,5 @@
-import { DtBindingSchema, is_schema, Schema, PropertySchema } from "./Schema.js";
-import { is_node_pattern } from "./PatternKind.js";
+import { DtBindingSchema, is_schema, Schema, PropertySchema } from "../schema/Schema.js";
+import { is_node_pattern } from "../schema/PatternKind.js";
 
 export type FixupContext = {
     /** Where the schema is: `["properties", "reg"]`, then `["then", ...]` and so on down into conditionals. */

@@ -1,8 +1,8 @@
-import { PropertyFixup } from "../FixupWalker.js";
-import { DT_TYPE } from "../RefResolver.js";
-import { cell_range } from "../PropertyTypes.js";
+import { PropertyFixup } from "./Walker.js";
+import { DT_TYPE } from "../stages/References.js";
+import { cell_range } from "../schema/PropertyTypes.js";
 import { ARRAY_SUFFIX, MATRIX_SUFFIX } from "./unit_suffix.js";
-import { is_schema, Schema } from "../Schema.js";
+import { is_schema, Schema } from "../schema/Schema.js";
 
 const NOT_THE_DEFINITION = new Set(["if", "not", "select", "then", "else"]);
 

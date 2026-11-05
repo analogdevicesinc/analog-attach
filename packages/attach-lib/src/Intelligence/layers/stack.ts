@@ -1,4 +1,4 @@
-import { ParsedBinding, ResolvedProperty } from "../../Bindings/ParsedBinding.js";
+import { ParsedBinding, ResolvedProperty } from "../../Bindings/model/ParsedBinding.js";
 import { DeviceTree } from "../../Devicetree/index.js";
 import { binding_layer } from "./binding.js";
 import { devicetree_layer } from "./devicetree.js";
