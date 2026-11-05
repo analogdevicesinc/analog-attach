@@ -16,7 +16,7 @@ Grammar: rule `delete` in `01-grammar.abnf`.
 |---|---|---|
 | `<path>` | The node. | none: the whole overlay (§5) |
 | `<property>` | A property the overlay sets on the node. | none: the node (§6) |
-| `--force` | Delete instead of previewing: without `<path>` the whole overlay, with `<path>` a node that has children. | off |
+| `--force` | Delete instead of previewing: without `<path>` the whole overlay, with `<path>` a node that has children or that other properties refer to. | off |
 
 ## 2. Terms
 
@@ -51,7 +51,7 @@ node: two spaces and its path from its fragment's target, segments joined by
 `/` (`adi,ad7124-8@2/channel@0`).
 
 **DELETE-012** While in JSON mode, the preview of DELETE-010 shall be a
-`DeletePreview` (`04-protocol/delete.schema.json#/$defs/linux-preview`): `ok` `true`, `severity`
+`DeletePreview` (`04-protocol/delete.schema.json#/$defs/linux-subtree-preview`): `ok` `true`, `severity`
 `"warn"`, `message` as in DELETE-011, `node_count`, `property_count`, and
 `paths`, an array of the counted nodes' paths from their fragment's target
 (`[["adi,ad7124-8@2"], ["adi,ad7124-8@2", "channel@0"]]`).
@@ -86,12 +86,36 @@ the base lacks (`target-path = "/nothere"`), then the CLI shall refuse with
 `Cannot delete the root node`, in both modes. The nodes in that body are added nodes
 and can be deleted (`delete /nothere/baz`).
 
-**DELETE-024** When the added node has children and `--force` isn't given,
+**DELETE-024** When the added node has children, nothing refers to it
+(DELETE-028), and `--force` isn't given,
 the CLI shall write nothing and answer with a preview of the node: in human
 mode the lines of DELETE-011, in JSON mode a `DeletePreview`
-(`04-protocol/delete.schema.json#/$defs/linux-preview`). It counts the node and its descendants
+(`04-protocol/delete.schema.json#/$defs/linux-subtree-preview`). It counts the node and its descendants
 (`node_count`) and their properties (`property_count`), and lists each of them
 from the node, starting with `<key>` (`paths`, starting with `[<key>]`).
+
+**DELETE-028** When a property of the overlay, held by a node outside the
+added node, refers to the node or to one of its descendants (`<&label …>`,
+`= &label`, `&{/path}`), and `--force` isn't given, the CLI shall write
+nothing and answer with a preview, as the noos backend does (DELETE-501):
+`severity` `warn`, `message` `'<path>' is referenced by <n> propert(y|ies);
+deleting it would clear (that reference|those references). Re-run with
+--force.`, `node_count` the node and its descendants, `property_count` `<n>`,
+and `paths` `[<path>]` followed by `[<owner>, <property>]` per referencing
+property, each once, in overlay order
+(`04-protocol/delete.schema.json#/$defs/linux-reference-preview`).
+`<owner>` is the holder's path, label-first where a label of the base or the
+overlay names it or an ancestor (`adc`, `spi0/adc@0`). In human mode it shall
+write `<path>: referenced by`, an empty line, `  <owner> <property>` per
+property, an empty line, and `Nothing was changed. Re-run with --force to
+delete the node and clear those references.`. This preview comes before
+DELETE-024's.
+
+**DELETE-029** When `--force` is given, the CLI shall first remove each
+property of DELETE-028 from every overlay node at its holder's path (as
+DELETE-030 does), so that no reference to a deleted node is left. A property
+that also refers to other nodes (`clocks = <&a>, <&vref>`) is removed
+whole.
 
 **DELETE-025** Otherwise, the CLI shall remove the added node with all its
 descendants and save the overlay.
@@ -102,7 +126,9 @@ remaining fragments `fragment@0`, `fragment@1`, … in order.
 
 **DELETE-027** On success, the CLI shall write `Deleted <path> from <overlay
 file>` in human mode, and respond `{"ok": true, "message": "Deleted <path>",
-"severity": "info"}` in JSON mode.
+"severity": "info"}` in JSON mode. When DELETE-029 removed properties, `<path>`
+is followed by ` and cleared <n> reference(s) to it` (`1 reference`, `2
+references`) in both.
 
 ## 7. A property
 
@@ -121,7 +147,7 @@ in <overlay file>` in human mode, and respond `{"ok": true, "message":
 
 ## 8. JSON responses
 
-`04-protocol/delete.schema.json`: a preview (DELETE-012, DELETE-024), a success
+`04-protocol/delete.schema.json`: a preview (DELETE-012, DELETE-024, DELETE-028), a success
 (`CommonResponse` with `ok` `true`, `severity` `"info"`) or a refusal.
 
 ## 9. Where the backend is noos
