@@ -24,7 +24,7 @@ export interface AddNodeRequest {
     label?: string;
     /**
      * Pick the lowest free unit address (and write `reg`) when `name` has none.
-     * Only done under indexed parents (`#size-cells = <0>`, e.g. SPI chip
+     * Only done under indexed parents (`#size-cells` 0 or unset, e.g. SPI chip
      * selects or channels); elsewhere `reg` is a memory-mapped address.
      */
     auto_address: boolean;
@@ -79,7 +79,7 @@ export function add_node(overlay: DeviceTreeOverlay, request: AddNodeRequest): A
     let unit = explicit_unit;
     let address: bigint | undefined;
     if (explicit_unit === undefined) {
-        if (request.auto_address && !is_indexed(overlay, parent_path, parent_node)) {
+        if (request.auto_address && cells.size > 0) {
             notes.push({ kind: "reg-needed" });
         } else if (request.auto_address) {
             const free = next_free_unit_address(effective, cells.address);
@@ -118,17 +118,6 @@ export function add_node(overlay: DeviceTreeOverlay, request: AddNodeRequest): A
 
     const path = `${parent_path === "/" ? "" : parent_path}/${key}`;
     return { status: "added", key, path, label: label.label, notes };
-}
-
-/**
- * Whether children of the parent are addressed by index, so the lowest free
- * address is a sensible pick: `#size-cells = <0>`, or an overlay-added parent
- * without cells, which `ensure_address_cells` gives `<0>`.
- */
-function is_indexed(overlay: DeviceTreeOverlay, parent_path: string, parent_node: DTNode): boolean {
-    const size_cells = number_property(parent_node, "#size-cells");
-    if (size_cells !== undefined) { return size_cells === 0n; }
-    return overlay.get_base_dts()?.node_at(parent_path) === undefined;
 }
 
 if (import.meta.vitest) {
@@ -226,11 +215,11 @@ if (import.meta.vitest) {
         expect(overlay.print()).not.toContain("-cells");
     });
 
-    test("add_node — no auto address under a root without #size-cells", () => {
+    test("add_node — a parent without #size-cells is indexed: its size is 0", () => {
         const overlay = setup();
         const result = add_node(overlay, request({ parent_path: "/" }));
-        expect(result).toMatchObject({ status: "added", key: "adi,ad7124-8", notes: [{ kind: "reg-needed" }] });
-        expect(overlay.print()).not.toContain("reg =");
+        expect(result).toMatchObject({ status: "added", key: "adi,ad7124-8@0", notes: [] });
+        expect(overlay.print()).toContain("reg = <0 0>;");
         expect(overlay.print()).not.toContain("-cells");
     });
 
