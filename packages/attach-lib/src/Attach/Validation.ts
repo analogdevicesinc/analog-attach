@@ -1,4 +1,4 @@
-import Ajv2019, { type ErrorObject, type KeywordDefinition, type ValidateFunction } from "ajv/dist/2019.js";
+import Ajv2019, { type KeywordDefinition, type ValidateFunction } from "ajv/dist/2019.js";
 import type { DataValidateFunction } from "ajv/dist/types/index.js";
 
 import { CANARY } from "../Bindings/CanaryInserter.js";
@@ -7,7 +7,6 @@ import { translate_JSONSchema } from "../Bindings/JSONSchemaTranslate.js";
 import { deep_merge, delete_path, get_by_path } from "../Bindings/ObjectUtilities.js";
 import { ParsedBinding } from "../Bindings/ParsedBinding.js";
 import { DtBindingSchema } from "../Bindings/Schema.js";
-import { BindingErrors } from "./Errors.js";
 
 /** A schema, the validator compiled from it and the schema narrowed so far by the data it saw. */
 export type ValidationTarget = {
@@ -128,10 +127,11 @@ function merge_branch(schema: DtBindingSchema, branch: Record<string, unknown>):
 
 /**
  * Validates `data` (validator-input JSON) against the target and narrows the
- * target's schema to the `if/then` branches that now apply. Undefined when
+ * target's schema to the `if/then` branches that now apply. Only the canary
+ * errors are read: dt-validate, not AJV, checks the devicetree. Undefined when
  * `data` isn't JSON or AJV gave no errors to read.
  */
-export function narrow(target: ValidationTarget, data: string): { binding: ParsedBinding, errors: BindingErrors[] } | undefined {
+export function narrow(target: ValidationTarget, data: string): ParsedBinding | undefined {
     let canary_data;
 
     try {
@@ -144,7 +144,7 @@ export function narrow(target: ValidationTarget, data: string): { binding: Parse
     canary_data[CANARY] = true;
 
     if (target.validator(canary_data) === true) {
-        return { binding: translate_JSONSchema(target.current), errors: [] };
+        return translate_JSONSchema(target.current);
     }
 
     const ajv_errors = target.validator.errors;
@@ -177,53 +177,7 @@ export function narrow(target: ValidationTarget, data: string): { binding: Parse
 
     target.current = current;
 
-    return { binding: translate_JSONSchema(current), errors: translate_ajv_errors(ajv_errors) };
-}
-
-/** The AJV errors that are real validation failures, as typed `BindingErrors`. Canary errors are not. */
-export function translate_ajv_errors(errors: readonly ErrorObject[]): BindingErrors[] {
-    const translated: BindingErrors[] = [];
-
-    for (const error of errors) {
-        if (error.instancePath.includes(CANARY)) {
-            continue;
-        }
-
-        if (error.keyword === "additionalProperties" && error.params["additionalProperty"] === CANARY) {
-            // The injected canary marker itself tripped additionalProperties:false on a
-            // schema with no allOf/then branch to narrow into (e.g. a patternProperties
-            // sub-schema) — not a real validation error, so it is dropped.
-        } else if (error.keyword === "required") {
-            translated.push({
-                _t: "missing_required",
-                missing_property: error.params["missingProperty"] as string,
-                instance: error.instancePath.split('/').slice(1),
-                msg: error.message
-            });
-        } else if (["maximum", "minimum", "exclusiveMaximum", "exclusiveMinimum"].includes(error.keyword)) {
-            translated.push({
-                _t: "number_limit",
-                failed_property: error.instancePath.split('/').slice(1),
-                limit: error.params["limit"] as number,
-                comparison: error.params["comparison"],
-                msg: error.message
-            });
-        } else if (error.keyword === "dependencies") {
-            translated.push({
-                _t: "failed_dependency",
-                dependent_property: error.params["property"] as string,
-                missing_property: error.params["missingProperty"] as string,
-            });
-        } else if (error.keyword !== "if") {
-            translated.push({
-                _t: "generic",
-                origin: decodeURIComponent(error.schemaPath),
-                msg: error.message
-            });
-        }
-    }
-
-    return translated;
+    return translate_JSONSchema(current);
 }
 
 if (import.meta.vitest) {

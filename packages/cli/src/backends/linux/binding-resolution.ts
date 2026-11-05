@@ -40,7 +40,7 @@ export type NodeBinding = {
     | { kind: "compatible"; compatible: string }
     | { kind: "pattern"; parent_compatible: string; pattern: string };
     /** The properties and required properties once the if/then branches the node's data selects apply (`required_properties` above is the unconditional list). */
-    narrow_and_populate(node: DTNode): { properties: ResolvedProperty[]; required_properties: string[]; errors: unknown[] } | undefined;
+    narrow_and_populate(node: DTNode): { properties: ResolvedProperty[]; required_properties: string[] } | undefined;
 };
 
 /**
@@ -163,10 +163,10 @@ export async function resolve_node_binding(
             origin: { kind: "compatible", compatible: compatible_value },
             narrow_and_populate(node: DTNode) {
                 const input_json = validator_input_json(node, initial.properties);
-                const update = attach.value.update_binding_by_changes(input_json);
-                if (update === undefined) { return; }
-                const populated = populate_binding(update.binding, base_dt, input_json, populate_options);
-                return { properties: populated.properties, required_properties: update.binding.required_properties, errors: update.errors as unknown[] };
+                const narrowed = attach.value.update_binding_by_changes(input_json);
+                if (narrowed === undefined) { return; }
+                const populated = populate_binding(narrowed, base_dt, input_json, populate_options);
+                return { properties: populated.properties, required_properties: narrowed.required_properties };
             },
         };
     }
@@ -220,14 +220,14 @@ export async function resolve_node_binding(
             );
 
             const input_json = validator_input_json(node, populated);
-            const update = parent_attach.update_pattern_binding_by_changes(match.pattern, input_json);
-            if (update === undefined) { return; }
+            const narrowed = parent_attach.update_pattern_binding_by_changes(match.pattern, input_json);
+            if (narrowed === undefined) { return; }
 
             const populated_properties = populate_properties(
-                update.binding.properties, base_dt, input_json, populate_options
+                narrowed.properties, base_dt, input_json, populate_options
             );
 
-            return { properties: populated_properties, required_properties: update.binding.required_properties, errors: update.errors as unknown[] };
+            return { properties: populated_properties, required_properties: narrowed.required_properties };
         },
     };
 }
@@ -298,7 +298,7 @@ if (import.meta.vitest) {
             property_patterns: [],
             binding_path: "/linux/iio/dac/adi,ad5592r.yaml",
             origin: { kind: "compatible", compatible: "adi,ad5592r" },
-            narrow_and_populate: () => ({ properties: [flag("spi-cpol")], required_properties: ["compatible", "spi-cpol"], errors: [] }),
+            narrow_and_populate: () => ({ properties: [flag("spi-cpol")], required_properties: ["compatible", "spi-cpol"] }),
         };
         const node = { name: "dac", labels: [], properties: [], children: [] } as unknown as DTNode;
         const narrowed = narrowed_binding(binding, node);

@@ -110,7 +110,7 @@ if (import.meta.vitest) {
             property_patterns: [],
             binding_path: "/linux/iio/dac/adi,ad5592r.yaml",
             origin: { kind: "compatible", compatible: "adi,ad5592r" },
-            narrow_and_populate: () => ({ properties, required_properties: required, errors: [] }),
+            narrow_and_populate: () => ({ properties, required_properties: required }),
         };
         const target: TargetBinding = { target: resolve_write_target("spi0/adc@0", overlay, base), binding };
         return (property: string) => pinned_value_of(target, overlay, base, "spi0/adc@0", property);

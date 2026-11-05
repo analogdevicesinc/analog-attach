@@ -106,7 +106,7 @@ if (import.meta.vitest) {
 
         const binding = {
             required_properties: ["compatible", "reg"],
-            narrow_and_populate: () => ({ properties: [], required_properties: ["compatible", "reg", "spi-cpol"], errors: [] }),
+            narrow_and_populate: () => ({ properties: [], required_properties: ["compatible", "reg", "spi-cpol"] }),
         };
         expect(node_missing_required(binding, overlay, "/spi@7e204000/adc@0")).toEqual(["spi-cpol"]);
         // A binding that can't be narrowed keeps its own list.

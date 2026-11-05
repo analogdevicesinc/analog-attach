@@ -1,4 +1,3 @@
-import { BindingErrors } from './Errors.js';
 import { ParsedBinding } from '../Bindings/ParsedBinding.js';
 
 import { bindings_directory, create_context, SchemaPaths } from '../Bindings/Context.js';
@@ -79,11 +78,11 @@ export class Attach {
         }
     }
 
-    public update_binding_by_changes(data: string): { binding: ParsedBinding, errors: BindingErrors[] } | undefined {
+    public update_binding_by_changes(data: string): ParsedBinding | undefined {
         return this.filtered(narrow(this.root, data));
     }
 
-    public update_pattern_binding_by_changes(pattern: string, data: string): { binding: ParsedBinding, errors: BindingErrors[] } | undefined {
+    public update_pattern_binding_by_changes(pattern: string, data: string): ParsedBinding | undefined {
         const target = this.pattern_targets.get(pattern);
 
         if (target === undefined) {
@@ -93,7 +92,7 @@ export class Attach {
         return this.filtered(narrow(target, data));
     }
 
-    private filtered(update: ReturnType<typeof narrow>): ReturnType<typeof narrow> {
-        return update === undefined ? undefined : { ...update, binding: this.filter(update.binding) };
+    private filtered(binding: ParsedBinding | undefined): ParsedBinding | undefined {
+        return binding === undefined ? undefined : this.filter(binding);
     }
 }

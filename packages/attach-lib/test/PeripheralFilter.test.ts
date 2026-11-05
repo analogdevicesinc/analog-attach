@@ -46,7 +46,7 @@ async function offered(body: string, controller?: ControllerContext): Promise<{ 
     const attach = await parsed('dual', body, controller);
     return {
         parsed: keys(attach.parsed_binding),
-        narrowed: keys(attach.update_binding_by_changes(JSON.stringify({ compatible: ['x,dual'], reg: [[0]] }))?.binding),
+        narrowed: keys(attach.update_binding_by_changes(JSON.stringify({ compatible: ['x,dual'], reg: [[0]] }))),
     };
 }
 

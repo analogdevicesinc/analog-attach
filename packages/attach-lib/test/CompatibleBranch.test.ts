@@ -19,7 +19,7 @@ async function narrowed(binding: string, body: string): Promise<ParsedBinding | 
     const node = tree.node_at('/n@0');
     if (node === undefined) { expect.fail('no node n@0'); }
 
-    return attach.update_binding_by_changes(validator_input_json(node, initial.properties))?.binding;
+    return attach.update_binding_by_changes(validator_input_json(node, initial.properties));
 }
 
 /** The `required_properties` of the binding after a node with this body is narrowed. */
