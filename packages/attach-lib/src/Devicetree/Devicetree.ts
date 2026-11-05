@@ -13,7 +13,6 @@ import {
     format_parse_error,
 } from "./Parser";
 
-import * as fs from 'node:fs';
 import { Result } from "../result";
 import { TraversalOrder, UnitAddr } from "./Types";
 import { Stream } from "./Stream";
@@ -44,15 +43,6 @@ export class DeviceTree {
             return new DeviceTree(dts.value.dts);
         } catch (error) {
             return error instanceof Error ? error.message : "Failed to parse!";
-        }
-    }
-
-    static new_from_file(file_path: string): DeviceTree | string {
-        try {
-            const content = fs.readFileSync(file_path, 'utf8');
-            return DeviceTree.new_from_string(content);
-        } catch (error) {
-            return error instanceof Error ? error.message : "Failed to read file!";
         }
     }
 

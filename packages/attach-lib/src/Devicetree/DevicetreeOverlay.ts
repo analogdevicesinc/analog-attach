@@ -14,7 +14,6 @@ import {
     format_parse_error
 } from "./Parser";
 
-import * as fs from 'node:fs';
 import { Result } from "../result";
 import { DeviceTree } from "./Devicetree";
 import { FoundNodeResult, TraversalOrder } from "./Types";
@@ -42,15 +41,6 @@ export class DeviceTreeOverlay {
             return new DeviceTreeOverlay(dto.value.dto, base_dts);
         } catch (error) {
             return error instanceof Error ? error.message : "Failed to parse overlay!";
-        }
-    }
-
-    static new_from_file(file_path: string, base_dts?: DeviceTree): DeviceTreeOverlay | string {
-        try {
-            const content = fs.readFileSync(file_path, 'utf8');
-            return DeviceTreeOverlay.new_from_string(content, base_dts);
-        } catch (error) {
-            return error instanceof Error ? error.message : "Failed to read file!";
         }
     }
 
