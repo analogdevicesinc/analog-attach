@@ -114,7 +114,7 @@ function stem_matches_controller(stem: string, controller: ControllerContext): b
     return false;
 }
 
-export function vendor_file_applies(property_name: string, controller: ControllerContext): boolean {
+function vendor_file_applies(property_name: string, controller: ControllerContext): boolean {
     const rule = find_vendor_rule(property_name);
     if (rule === undefined) { return true; }
     return rule.stems.some(stem => stem_matches_controller(stem, controller));

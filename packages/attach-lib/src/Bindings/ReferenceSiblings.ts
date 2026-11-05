@@ -4,7 +4,7 @@ type Schema = Record<string, unknown>;
  * Where the `$ref` of a schema that says more than its `$ref` waits while ref-parser dereferences it
  * (`stash_references`), to be merged with the schema after (`restore_references`).
  */
-export const STASHED_REF = "$stashed-ref";
+const STASHED_REF = "$stashed-ref";
 
 function is_schema(value: unknown): value is Schema {
     return typeof value === "object" && value !== null && !Array.isArray(value);

@@ -1,4 +1,4 @@
-import { DtBindingSchema } from "../Schema";
+import { DtBindingSchema } from "../Schema.js";
 import { find_entry_in_object, overwrite_object_with_path_value } from "../ObjectUtilities.js";
 import { is_node_pattern } from "../PatternKind.js";
 
