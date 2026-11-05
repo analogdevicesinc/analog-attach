@@ -183,8 +183,8 @@ and the parent is memory-mapped, the node shall have no unit address and no
 `reg`, and the CLI shall give the note `The parent is memory-mapped; set the
 address with: update <path> reg <address> <size>`, `<path>` being the new
 node's absolute path; `<address> <size>` is literal. A parent is
-memory-mapped when it has `#size-cells` other than 0, or has no
-`#size-cells` and is in the base.
+memory-mapped when its `#size-cells` (the overlay's node's, else the base's)
+is other than 0; an unset `#size-cells` is 0, as ADD-048 reads it.
 
 **ADD-047** Where the name has no unit address, the binding defines `reg`
 and the parent isn't memory-mapped, the CLI shall give the node the lowest
