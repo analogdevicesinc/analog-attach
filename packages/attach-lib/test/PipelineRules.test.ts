@@ -518,7 +518,7 @@ allOf:
 `);
         const maximum = (compatible: string) => {
             const narrowed = attach.update_binding_by_changes(JSON.stringify({ compatible: [compatible] }));
-            const mode = narrowed === undefined ? undefined : property(narrowed.binding, 'adi,mode');
+            const mode = narrowed === undefined ? undefined : property(narrowed, 'adi,mode');
             return mode?._t === 'scalar' && mode.cell._t === 'number' ? mode.cell.maximum : undefined;
         };
         expect(maximum('x,a')).toBe(7n);

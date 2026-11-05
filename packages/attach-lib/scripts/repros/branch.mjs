@@ -29,5 +29,5 @@ for (const body of bodies) {
   const narrowed = attach.update_binding_by_changes(json);
   console.log(body);
   console.log(`  encoded:  ${json}`);
-  console.log(`  required: ${JSON.stringify(narrowed?.binding.required_properties)}`);
+  console.log(`  required: ${JSON.stringify(narrowed?.required_properties)}`);
 }
