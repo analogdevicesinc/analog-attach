@@ -306,7 +306,7 @@ analog-attach init
 - It takes no options. A missing or broken `linux`, `devicetree` or `workfile` setting is reported as by every other command (exit code 2 with `--json`).
 - The configured workfile is kept when its file exists, and created when it doesn't. `init` never picks another name and never overwrites a file; a path whose directory is missing is refused (`ok: false`).
 - `--json` gives `{ path, created, linux, devicetree, overlay }`: `path` is the workfile, `created` says init made it; `overlay` is the same path, deprecated.
-- A bare `analog-attach` on a terminal is the interactive setup: it asks for the backend (when none is set), the Linux tree, the base `.dts` and the workfile name, saves them and builds the caches; `init` then creates the workfile. It is meant for a person, not for AI tools.
+- A bare `analog-attach` on a terminal is the interactive setup: it asks for the backend (when none is set), then the Linux tree, the base `.dts` and the workfile name, each only when it is unset or not valid, saving each answer at once (a stopped run keeps them), and builds the caches; `init` then creates the workfile (for a configured one not created yet it asks first). It is meant for a person, not for AI tools.
 
 **Output**: the new workfile is empty:
 ```dts
