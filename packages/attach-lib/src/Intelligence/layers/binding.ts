@@ -1,5 +1,4 @@
-import { ResolvedProperty } from "../../Bindings/model/ParsedBinding.js";
-import { AttachEnumType, list_cell, matrix_cell, type Cell } from "../../Bindings/model/AttachType.js";
+import { ResolvedProperty, AttachEnumType, list_cell, matrix_cell, type Cell } from "../../Bindings/index.js";
 import { DeviceTree } from "../../Devicetree/index.js";
 import { IntelligenceLayer, PropertyContext, ValueSuggestion } from "./types.js";
 

@@ -1,37 +1,11 @@
-import { ParsedBinding } from '../Bindings/model/ParsedBinding.js';
-
-import { bindings_directory, create_context, SchemaPaths } from '../Bindings/Context.js';
-import { translate_JSONSchema } from '../Bindings/stages/Translate.js';
-import { PIPELINE_STAGES, PipelineStage, process_binding } from '../Bindings/Pipeline.js';
-import type { StepInfo } from '../Bindings/fixups/Fixups.js';
-import type { PipelineTracer } from '../Bindings/Trace.js';
+import { parse_binding, type DtBindingSchema, type ParsedBinding, type ParseOptions, type PipelineStage, type SchemaPaths } from '../Bindings/index.js';
 import { Result } from '../result.js';
-import { filter_peripheral_properties, load_spi_peripherals, type ControllerContext } from '../Bindings/stages/VendorFilter.js';
 import { compile_targets, narrow, NarrowingTarget } from './Narrowing.js';
-
-export type ParseOptions = {
-    controller?: ControllerContext;
-    /** Gets the binding after each step of `PARSE_STEPS`, and what each fixup changed (`TraceEvent`). */
-    trace?: PipelineTracer;
-};
 
 export type BindingParseError = {
     stage: PipelineStage | "narrowing";
     message: string;
 };
-
-/** What `Attach.parse` runs, in order: the pipeline's stages, then the translation to a `ParsedBinding`. */
-export const PARSE_STEPS: readonly StepInfo[] = [
-    ...PIPELINE_STAGES,
-    {
-        id: "translate",
-        summary: "Builds the `ParsedBinding`: each property's `AttachType`, the child-node patterns and the property patterns.",
-    },
-    {
-        id: "vendor-filter",
-        summary: "Drops the vendor-specific SPI peripheral properties (`pl022,`, `nvidia,`) of a controller that isn't the node's, and under a controller that isn't an SPI one (named in `ControllerContext`) the SPI peripheral properties the binding doesn't require, when the controller is given.",
-    },
-];
 
 /** A binding processed down to a `ParsedBinding`, with the validators that narrow it as the node's data changes. */
 export class Attach {
@@ -45,8 +19,8 @@ export class Attach {
         private readonly root: NarrowingTarget,
         private readonly pattern_targets: Map<string, NarrowingTarget>,
         public readonly parsed_binding: ParsedBinding,
-        /** The peripheral filter of `parse`, which a narrowed binding goes through too: narrowing translates it again. */
-        private readonly filter: (binding: ParsedBinding) => ParsedBinding,
+        /** What a narrowed schema goes through to become a binding, as the parsed one did (`ProcessedBinding`). */
+        private readonly to_binding: (schema: DtBindingSchema) => ParsedBinding,
     ) { }
 
     public static async parse(
@@ -55,31 +29,22 @@ export class Attach {
         options?: ParseOptions,
     ): Promise<Result<Attach, BindingParseError>> {
 
-        const trace = options?.trace;
-        const processed = await process_binding(binding_path, create_context(paths), trace);
+        const parsed = await parse_binding(binding_path, paths, options);
 
-        if (Result.is_err(processed)) {
-            return processed;
+        if (Result.is_err(parsed)) {
+            return parsed;
         }
 
-        const translated = translate_JSONSchema(processed.value);
-        trace?.({ kind: "translated", step: "translate", binding: structuredClone(translated) });
-        const controller = options?.controller;
-        const spi = controller === undefined ? undefined : load_spi_peripherals(bindings_directory(paths));
-        const filter = (binding: ParsedBinding): ParsedBinding => filter_peripheral_properties(binding, controller, spi);
-        const parsed_binding = filter(translated);
-        trace?.({ kind: "translated", step: "vendor-filter", binding: structuredClone(parsed_binding) });
-
         try {
-            const targets = compile_targets(processed.value);
-            return Result.Ok(new Attach(targets.root, targets.patterns, parsed_binding, filter));
+            const targets = compile_targets(parsed.value.schema);
+            return Result.Ok(new Attach(targets.root, targets.patterns, parsed.value.binding, parsed.value.to_binding));
         } catch (error) {
             return Result.Err({ stage: "narrowing", message: error instanceof Error ? error.message : "AJV failed to compile the binding" });
         }
     }
 
     public narrow_binding(data: string): ParsedBinding | undefined {
-        return this.filtered(narrow(this.root, data));
+        return this.translated(narrow(this.root, data));
     }
 
     public narrow_pattern_binding(pattern: string, data: string): ParsedBinding | undefined {
@@ -89,10 +54,10 @@ export class Attach {
             return;
         }
 
-        return this.filtered(narrow(target, data));
+        return this.translated(narrow(target, data));
     }
 
-    private filtered(binding: ParsedBinding | undefined): ParsedBinding | undefined {
-        return binding === undefined ? undefined : this.filter(binding);
+    private translated(schema: DtBindingSchema | undefined): ParsedBinding | undefined {
+        return schema === undefined ? undefined : this.to_binding(schema);
     }
 }

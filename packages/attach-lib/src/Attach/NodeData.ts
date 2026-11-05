@@ -1,5 +1,5 @@
 import { DTNode, DTProperty, is_dt_flag, DTValue, DTNumber, DTLabel, DTPath, DTExpression } from "../Devicetree";
-import { ResolvedProperty } from "../Bindings/model/ParsedBinding";
+import { ResolvedProperty } from "../Bindings/index.js";
 
 /** `node_data` as the JSON string branch narrowing and the intelligence layers take; bigints become numbers. */
 export function node_data_json(node: DTNode, properties: readonly ResolvedProperty[]): string {
