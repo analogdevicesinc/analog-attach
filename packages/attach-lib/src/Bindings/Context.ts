@@ -37,11 +37,16 @@ function property_types(paths: SchemaPaths): PropertyTypes {
     return paths.processed_schema === undefined ? own : load_processed_property_types(expand_home(paths.processed_schema), own);
 }
 
+/** The Linux tree's bindings directory (`Documentation/devicetree/bindings`). */
+export function bindings_directory(paths: SchemaPaths): string {
+    return path.join(expand_home(paths.linux), "Documentation/devicetree/bindings");
+}
+
 export function create_context(paths: SchemaPaths): SchemaContext {
     return {
         parser: new $RefParser(),
         search_paths: [
-            { prefix: "/schemas", dir: path.join(expand_home(paths.linux), "Documentation/devicetree/bindings") },
+            { prefix: "/schemas", dir: bindings_directory(paths) },
             { prefix: "/schemas", dir: path.join(expand_home(paths.dt_schema), "dtschema/schemas") },
         ],
         property_types: property_types(paths),

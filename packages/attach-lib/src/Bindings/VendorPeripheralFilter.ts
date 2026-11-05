@@ -1,8 +1,64 @@
+import * as fs from "node:fs";
+import path from "node:path";
+import { parse } from "yaml";
+
 import type { ParsedBinding, ResolvedProperty } from "./ParsedBinding.js";
 
+/** The node a binding's node sits under: its parent, the bus controller when there is one. */
 export interface ControllerContext {
     compatibles: string[];
     binding_path?: string;
+    /** Its full name (`spi@7e204000`, `i2c@7e804000`). Without it, the SPI properties stay whatever the parent. */
+    name?: string;
+}
+
+/** What a Linux tree says of SPI peripherals, in `spi/spi-peripheral-props.yaml` and `spi/spi-controller.yaml`. */
+export interface SpiPeripherals {
+    /**
+     * The properties a node has for being on an SPI bus: spi-peripheral-props' (not `reg`) and its vendor files', and
+     * the ones spi-controller.yaml gives its child nodes (`spi-cpha`).
+     */
+    properties: ReadonlySet<string>;
+    /** spi-controller.yaml's `$nodename` pattern: the name of an SPI controller. */
+    controller_name: RegExp;
+}
+
+const loaded = new Map<string, SpiPeripherals | undefined>();
+
+/** The SPI peripheral schema of the bindings directory `bindings`, read once; undefined when the tree lacks it. */
+export function load_spi_peripherals(bindings: string): SpiPeripherals | undefined {
+    if (!loaded.has(bindings)) { loaded.set(bindings, read_spi_peripherals(path.join(bindings, "spi"))); }
+    return loaded.get(bindings);
+}
+
+function read_spi_peripherals(directory: string): SpiPeripherals | undefined {
+    const read = (file: string): any => {
+        try {
+            return parse(fs.readFileSync(path.join(directory, file), "utf8"));
+        } catch {
+            return undefined;
+        }
+    };
+    const peripheral = read("spi-peripheral-props.yaml");
+    const controller = read("spi-controller.yaml");
+    const pattern: unknown = controller?.properties?.$nodename?.pattern;
+    if (peripheral === undefined || typeof pattern !== "string") { return undefined; }
+
+    const names = new Set<string>();
+    const add = (properties: unknown): void => {
+        if (typeof properties !== "object" || properties === null) { return; }
+        for (const name of Object.keys(properties)) {
+            if (name !== "reg") { names.add(name); }
+        }
+    };
+    add(peripheral.properties);
+    // The vendor files beside it (`$ref: arm,pl022-peripheral-props.yaml#`)
+    for (const entry of Array.isArray(peripheral.allOf) ? peripheral.allOf : []) {
+        const reference: unknown = entry?.$ref;
+        if (typeof reference === "string" && !reference.startsWith("/")) { add(read(reference.split("#")[0]!)?.properties); }
+    }
+    for (const child of Object.values<any>(controller.patternProperties ?? {})) { add(child?.properties); }
+    return { properties: names, controller_name: new RegExp(pattern) };
 }
 
 interface VendorRule {
@@ -64,14 +120,25 @@ export function vendor_file_applies(property_name: string, controller: Controlle
     return rule.stems.some(stem => stem_matches_controller(stem, controller));
 }
 
-export function filter_vendor_peripheral_properties(
+/** Under a parent that isn't an SPI controller, an SPI property goes, unless the binding requires it. */
+function spi_property_applies(name: string, binding: ParsedBinding, controller: ControllerContext, spi: SpiPeripherals | undefined): boolean {
+    if (spi === undefined || controller.name === undefined || spi.controller_name.test(controller.name)) { return true; }
+    return !spi.properties.has(name) || binding.required_properties.includes(name);
+}
+
+/**
+ * The binding without the peripheral properties that don't apply under `controller`: another controller's vendor ones
+ * (`pl022,`), and the SPI ones (`spi` given) when it isn't an SPI controller.
+ */
+export function filter_peripheral_properties(
     binding: ParsedBinding,
     controller: ControllerContext | undefined,
+    spi?: SpiPeripherals,
 ): ParsedBinding {
     if (controller === undefined) { return binding; }
 
     const filtered_properties = binding.properties.filter(
-        (property: ResolvedProperty) => vendor_file_applies(property.key, controller),
+        (property: ResolvedProperty) => vendor_file_applies(property.key, controller) && spi_property_applies(property.key, binding, controller, spi),
     );
 
     if (filtered_properties.length === binding.properties.length) { return binding; }
@@ -140,17 +207,17 @@ if (import.meta.vitest) {
         expect(vendor_file_applies("st,spi-midi-ns", ctrl)).toBe(false);
     });
 
-    test("filter_vendor_peripheral_properties — undefined controller returns unchanged", () => {
+    test("filter_peripheral_properties — undefined controller returns unchanged", () => {
         const binding: ParsedBinding = {
             required_properties: ["reg"],
             properties: [{ key: "reg", value: {} as any }, { key: "pl022,interface", value: {} as any }],
             examples: [],
         };
         // eslint-disable-next-line unicorn/no-useless-undefined
-        expect(filter_vendor_peripheral_properties(binding, undefined)).toBe(binding);
+        expect(filter_peripheral_properties(binding, undefined)).toBe(binding);
     });
 
-    test("filter_vendor_peripheral_properties — bcm2835 removes all vendor props", () => {
+    test("filter_peripheral_properties — bcm2835 removes all vendor props", () => {
         const binding: ParsedBinding = {
             required_properties: ["reg"],
             properties: [
@@ -166,11 +233,11 @@ if (import.meta.vitest) {
             examples: [],
         };
         const ctrl: ControllerContext = { compatibles: ["brcm,bcm2835-spi"] };
-        const filtered = filter_vendor_peripheral_properties(binding, ctrl);
+        const filtered = filter_peripheral_properties(binding, ctrl);
         expect(filtered.properties.map(p => p.key)).toEqual(["reg", "spi-max-frequency"]);
     });
 
-    test("filter_vendor_peripheral_properties — input is not mutated", () => {
+    test("filter_peripheral_properties — input is not mutated", () => {
         const binding: ParsedBinding = {
             required_properties: ["reg"],
             properties: [
@@ -181,7 +248,7 @@ if (import.meta.vitest) {
         };
         const ctrl: ControllerContext = { compatibles: ["brcm,bcm2835-spi"] };
         const original_length = binding.properties.length;
-        filter_vendor_peripheral_properties(binding, ctrl);
+        filter_peripheral_properties(binding, ctrl);
         expect(binding.properties.length).toBe(original_length);
     });
 }
