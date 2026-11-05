@@ -18,14 +18,12 @@ with_adc() {
 
 # --- list devices ---
 
-# Gap: piped, the output stops at 64 KB (about 3400 of the tree's compatibles, or JSON cut
-# mid-string): the CLI exits before standard output drains.
 # Description: list devices lists every compatible of the Linux tree, in JSON and as text.
 # Steps:
 #   1. Count the entries of the compat index cache.
 #   2. Run list devices, with --json; check it succeeds with that many devices.
 #   3. Run list devices as text; check it succeeds with that many lines.
-# bats test_tags=req:LIST-01, gap, id:L0187
+# bats test_tags=req:LIST-01, id:L0187
 @test "list devices lists every compatible of the Linux tree" {
 	local count
 	count=$(jq '.entries | length' "$PROJECT/.analog-attach/linux/compat-index.json")
