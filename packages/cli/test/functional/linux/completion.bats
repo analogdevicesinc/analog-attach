@@ -360,15 +360,17 @@ bash_complete() {
 # Steps:
 #   1. Make the overlay with the ADXL345 and the AD7124-8.
 #   2. Ask the engine for the property of read i2c_arm/adi,adxl345@0 and check it is the list
-#      property --json names.
+#      property --json names, a pattern (^pinctrl-[0-9]+$) given by the regex its candidate is
+#      described with.
 #   3. Ask for the property of update adxl345; check the set group comes first with compatible
 #      in it, and interrupts, marked required, is in the not set group.
 #   4. Ask for update ad7124_8 channel@1 and check it offers channel@1 and channel@15.
 # bats test_tags=req:COMPLETION-04, id:L0056
 @test "completion offers a node's properties as list property lists them, set ones first" {
 	with_devices
-	run candidates read i2c_arm/adi,adxl345@0 ''
-	assert_output "$(aa --json list property i2c_arm/adi,adxl345@0 | jq -r '.names[]')"
+	run aa __complete -- read i2c_arm/adi,adxl345@0 ''
+	assert_equal "$(grep -v '^__ANALOG_ATTACH_COMPLETE_' <<<"$output" | awk -F'\t' '{ print ($2 ~ /^pattern / ? substr($2, 9) : $1) }')" \
+		"$(aa --json list property i2c_arm/adi,adxl345@0 | jq -r '.names[]')"
 	run aa __complete -- update adxl345 ''
 	assert_line --index 0 $'__ANALOG_ATTACH_COMPLETE_GROUP__\tset'
 	assert_line $'__ANALOG_ATTACH_COMPLETE_GROUP__\tnot set'

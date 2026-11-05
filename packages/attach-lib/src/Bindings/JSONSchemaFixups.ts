@@ -8,6 +8,7 @@ import { fixup_ifs } from "./fixups/mark_ifs_required_properties.js";
 import { fixup_mark_integers } from "./fixups/mark_integers.js";
 import { fixup_matrix_rows } from "./fixups/matrix_rows.js";
 import { fixup_names } from "./fixups/names.js";
+import { fixup_node_properties } from "./fixups/node_properties.js";
 import { fixup_oneof_to_enum } from "./fixups/oneof_to_enum.js";
 import { fixup_one_form } from "./fixups/one_form.js";
 import { fixup_string_to_array } from "./fixups/string_to_array.js";
@@ -70,6 +71,10 @@ export const fixup_passes = (types: PropertyTypes): FixupPass[] => [
             {
                 id: "interrupts", fixup: fixup_interrupts, counterpart: "fixups.py:fixup_interrupts",
                 summary: "A node with `interrupts` can have an `interrupt-parent`, one phandle.",
+            },
+            {
+                id: "node_properties", fixup: fixup_node_properties, counterpart: "fixups.py:fixup_node_props",
+                summary: "A node that forbids the properties it doesn't name still has `pinctrl-names` and `pinctrl-N` (`true`).",
             },
         ],
         // `one_form` first, so the others see the form; `branch_counts` after `items_size`, which has sized the

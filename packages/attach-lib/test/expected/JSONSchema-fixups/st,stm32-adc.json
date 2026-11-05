@@ -605,6 +605,40 @@
                         }
                     ],
                     "description": "Represents the external channels which are connected to the ADC.",
+                    "patternProperties": {
+                        "^pinctrl-[0-9]+$": {
+                            "dtType": "phandle-array",
+                            "items": {
+                                "additionalItems": {
+                                    "dtType": "uint32",
+                                    "maximum": 4294967295,
+                                    "minimum": 0,
+                                    "type": "integer",
+                                    "typeSize": 32
+                                },
+                                "items": [
+                                    {
+                                        "oneOf": [
+                                            {
+                                                "maximum": 4294967295,
+                                                "minimum": 1,
+                                                "type": "integer"
+                                            },
+                                            {
+                                                "const": 0,
+                                                "type": "integer"
+                                            }
+                                        ]
+                                    }
+                                ],
+                                "maxItems": 1024,
+                                "minItems": 1,
+                                "type": "array"
+                            },
+                            "minItems": 1,
+                            "type": "array"
+                        }
+                    },
                     "properties": {
                         "diff-channels": {
                             "description": "Many ADCs have dual Muxes to allow different input pins to be routed to both the positive and negative inputs of a differential ADC. The first value specifies the positive input pin, the second specifies the negative input pin.",
@@ -627,6 +661,15 @@
                                 "type": "string"
                             },
                             "maxItems": 1,
+                            "minItems": 1,
+                            "type": "array",
+                            "uniqueItems": true
+                        },
+                        "pinctrl-names": {
+                            "dtType": "string-array",
+                            "items": {
+                                "type": "string"
+                            },
                             "minItems": 1,
                             "type": "array",
                             "uniqueItems": true
@@ -670,6 +713,38 @@
                     ],
                     "title": "IIO Common Properties for ADC Channels",
                     "type": "object"
+                },
+                "^pinctrl-[0-9]+$": {
+                    "dtType": "phandle-array",
+                    "items": {
+                        "additionalItems": {
+                            "dtType": "uint32",
+                            "maximum": 4294967295,
+                            "minimum": 0,
+                            "type": "integer",
+                            "typeSize": 32
+                        },
+                        "items": [
+                            {
+                                "oneOf": [
+                                    {
+                                        "maximum": 4294967295,
+                                        "minimum": 1,
+                                        "type": "integer"
+                                    },
+                                    {
+                                        "const": 0,
+                                        "type": "integer"
+                                    }
+                                ]
+                            }
+                        ],
+                        "maxItems": 1024,
+                        "minItems": 1,
+                        "type": "array"
+                    },
+                    "minItems": 1,
+                    "type": "array"
                 }
             },
             "properties": {
@@ -933,6 +1008,15 @@
                     "minItems": 1,
                     "type": "array"
                 },
+                "pinctrl-names": {
+                    "dtType": "string-array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "minItems": 1,
+                    "type": "array",
+                    "uniqueItems": true
+                },
                 "reg": {
                     "description": "Offset of ADC instance in ADC block. Valid values are:\n  - 0x0:   ADC1\n  - 0x100: ADC2\n  - 0x200: ADC3 (stm32f4 only)\n",
                     "dtType": "address",
@@ -1020,6 +1104,38 @@
                 "#io-channel-cells"
             ],
             "type": "object"
+        },
+        "^pinctrl-[0-9]+$": {
+            "dtType": "phandle-array",
+            "items": {
+                "additionalItems": {
+                    "dtType": "uint32",
+                    "maximum": 4294967295,
+                    "minimum": 0,
+                    "type": "integer",
+                    "typeSize": 32
+                },
+                "items": [
+                    {
+                        "oneOf": [
+                            {
+                                "maximum": 4294967295,
+                                "minimum": 1,
+                                "type": "integer"
+                            },
+                            {
+                                "const": 0,
+                                "type": "integer"
+                            }
+                        ]
+                    }
+                ],
+                "maxItems": 1024,
+                "minItems": 1,
+                "type": "array"
+            },
+            "minItems": 1,
+            "type": "array"
         }
     },
     "properties": {
@@ -1211,6 +1327,15 @@
             "maxItems": 2,
             "minItems": 1,
             "type": "array"
+        },
+        "pinctrl-names": {
+            "dtType": "string-array",
+            "items": {
+                "type": "string"
+            },
+            "minItems": 1,
+            "type": "array",
+            "uniqueItems": true
         },
         "reg": {
             "dtType": "address",

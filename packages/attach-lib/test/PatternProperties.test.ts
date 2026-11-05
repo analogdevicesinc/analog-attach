@@ -21,11 +21,12 @@ describe('patternProperties without inline properties', () => {
         const binding = await parse('hwmon/adt7475.yaml');
         const patterns = binding.property_patterns ?? [];
         expect(patterns.map(p => p.pattern)).toEqual([
+            '^pinctrl-[0-9]+$',
             '^adi,bypass-attenuator-in[0-4]$',
             '^adi,pin(5|10)-function$',
             '^adi,pin(9|14)-function$',
         ]);
-        const bypass = patterns[0];
+        const bypass = patterns[1];
         expect(bypass?.description).toContain('bypassing the individual voltage input attenuator');
         expect(bypass?.value).toMatchObject({ _t: 'scalar', cell: { _t: 'enum', enum: [BigInt(0), BigInt(1)] } });
         // Property patterns are not child-node rules.
@@ -49,7 +50,7 @@ describe('patternProperties without inline properties', () => {
         const binding = await parse('display/tegra/nvidia,tegra186-display.yaml');
         expect(binding.pattern_properties?.find(p => p.pattern === '^display@[0-9a-f]+$'))
             .toEqual({ pattern: '^display@[0-9a-f]+$', description: '', properties: [], required: [] });
-        expect(binding.property_patterns ?? []).toEqual([]);
+        expect(binding.property_patterns?.map(p => p.pattern)).toEqual(['^pinctrl-[0-9]+$']);
     });
 
     test('a oneOf of object schemas is a child node', async () => {

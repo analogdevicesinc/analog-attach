@@ -33,7 +33,7 @@ export const PIPELINE_STAGES = [
     },
     {
         id: "selected", counterpart: "validator.py:DTValidator",
-        summary: "Merges into each property a node names its definitions in the schemas dt-validate checks every node against (`select: true`: iio.yaml's 9 `mount-matrix` items, reg.yaml's 1 to 5 `reg` cells), each fixed up on its own; the tighter bounds hold.",
+        summary: "Merges into each property a node names its definitions in the schemas dt-validate checks every node against (`select: true`: iio.yaml's 9 `mount-matrix` items, reg.yaml's 1 to 5 `reg` cells), and into each property pattern those of the same key (pinctrl-consumer.yaml's `^pinctrl-[0-9]+$`), each fixed up on its own; the tighter bounds hold.",
     },
 ] as const satisfies readonly StepInfo[];
 

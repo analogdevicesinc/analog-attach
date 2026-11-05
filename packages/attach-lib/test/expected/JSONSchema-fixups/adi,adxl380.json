@@ -176,7 +176,50 @@
                     "properties": {
                         "controller-data": {
                             "additionalProperties": false,
+                            "patternProperties": {
+                                "^pinctrl-[0-9]+$": {
+                                    "dtType": "phandle-array",
+                                    "items": {
+                                        "additionalItems": {
+                                            "dtType": "uint32",
+                                            "maximum": 4294967295,
+                                            "minimum": 0,
+                                            "type": "integer",
+                                            "typeSize": 32
+                                        },
+                                        "items": [
+                                            {
+                                                "oneOf": [
+                                                    {
+                                                        "maximum": 4294967295,
+                                                        "minimum": 1,
+                                                        "type": "integer"
+                                                    },
+                                                    {
+                                                        "const": 0,
+                                                        "type": "integer"
+                                                    }
+                                                ]
+                                            }
+                                        ],
+                                        "maxItems": 1024,
+                                        "minItems": 1,
+                                        "type": "array"
+                                    },
+                                    "minItems": 1,
+                                    "type": "array"
+                                }
+                            },
                             "properties": {
+                                "pinctrl-names": {
+                                    "dtType": "string-array",
+                                    "items": {
+                                        "type": "string"
+                                    },
+                                    "minItems": 1,
+                                    "type": "array",
+                                    "uniqueItems": true
+                                },
                                 "samsung,spi-feedback-delay": {
                                     "default": 0,
                                     "description": "The sampling phase shift to be applied on the miso line (to account\nfor any lag in the miso line). Valid values:\n - 0: No phase shift.\n - 1: 90 degree phase shift sampling.\n - 2: 180 degree phase shift sampling.\n - 3: 270 degree phase shift sampling.\n",
@@ -397,6 +440,40 @@
         "#include <dt-bindings/interrupt-controller/irq.h>\n\ni2c {\n  #address-cells = <1>;\n  #size-cells = <0>;\n\n  accelerometer@54 {\n    compatible = \"adi,adxl380\";\n    reg = <0x54>;\n    vddio-supply = <&vddio>;\n    vsupply-supply = <&vsupply>;\n    interrupt-parent = <&gpio>;\n    interrupts = <25 IRQ_TYPE_LEVEL_HIGH>;\n    interrupt-names = \"INT0\";\n  };\n};\n",
         "#include <dt-bindings/interrupt-controller/irq.h>\n\nspi {\n  #address-cells = <1>;\n  #size-cells = <0>;\n\n  accelerometer@0 {\n    compatible = \"adi,adxl380\";\n    reg = <0>;\n    spi-max-frequency = <8000000>;\n    vddio-supply = <&vddio>;\n    vsupply-supply = <&vsupply>;\n    interrupt-parent = <&gpio>;\n    interrupts = <25 IRQ_TYPE_LEVEL_HIGH>;\n    interrupt-names = \"INT0\";\n  };\n};\n"
     ],
+    "patternProperties": {
+        "^pinctrl-[0-9]+$": {
+            "dtType": "phandle-array",
+            "items": {
+                "additionalItems": {
+                    "dtType": "uint32",
+                    "maximum": 4294967295,
+                    "minimum": 0,
+                    "type": "integer",
+                    "typeSize": 32
+                },
+                "items": [
+                    {
+                        "oneOf": [
+                            {
+                                "maximum": 4294967295,
+                                "minimum": 1,
+                                "type": "integer"
+                            },
+                            {
+                                "const": 0,
+                                "type": "integer"
+                            }
+                        ]
+                    }
+                ],
+                "maxItems": 1024,
+                "minItems": 1,
+                "type": "array"
+            },
+            "minItems": 1,
+            "type": "array"
+        }
+    },
     "properties": {
         "compatible": {
             "dtType": "string-array",
@@ -484,6 +561,15 @@
             "maxItems": 2,
             "minItems": 1,
             "type": "array"
+        },
+        "pinctrl-names": {
+            "dtType": "string-array",
+            "items": {
+                "type": "string"
+            },
+            "minItems": 1,
+            "type": "array",
+            "uniqueItems": true
         },
         "reg": {
             "description": "Chip select used by the device.",
