@@ -153,15 +153,13 @@ setup() {
 	assert_unchanged
 }
 
-# Gap: a name that isn't a valid node name (`bad name`) is accepted and written as `bad name@0`,
-# after which the workfile no longer parses.
 # Description: a name that is not a valid node name is refused, and nothing is written.
 # Steps:
 #   1. Create the overlay with init and snapshot the workfile.
 #   2. Add adi,adxl345 --parent i2c1 --name 'bad name', with --json.
 #   3. Check it is refused (exit 0, .ok false).
 #   4. Check the workfile is unchanged.
-# bats test_tags=req:ADD-03, gap, id:L0009
+# bats test_tags=req:ADD-03, id:L0009
 @test "an invalid name is refused" {
 	with_overlay
 	snapshot

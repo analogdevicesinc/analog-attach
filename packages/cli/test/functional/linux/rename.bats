@@ -113,15 +113,13 @@ with_devices() {
 	assert_unchanged
 }
 
-# Gap: the name isn't checked: `foo/bar` and `a b` are written, and the overlay no longer
-# parses (spec rename.md N-1).
 # Description: rename refuses a name that is not a valid node name.
 # Steps:
 #   1. Snapshot the workfile.
 #   2. Rename adxl345 to foo/bar, with --json; check it is refused (exit 0, .ok false).
 #   3. Rename adxl345 to 'a b', with --json; check it is refused (.ok false).
 #   4. Check the workfile is unchanged.
-# bats test_tags=req:RENAME-01, gap, id:L0254
+# bats test_tags=req:RENAME-01, id:L0254
 @test "rename refuses a name that is not a valid node name" {
 	snapshot
 	run_json rename adxl345 foo/bar

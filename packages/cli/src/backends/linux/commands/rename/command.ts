@@ -6,6 +6,8 @@ import {
     encode_reg_address,
     decode_reg_address,
     is_dt_flag,
+    is_valid_node_name,
+    is_valid_unit_address,
     type UnitRadix,
 } from "attach-lib";
 
@@ -13,7 +15,7 @@ import { answer, command, refuse, type RenameArguments } from "../../../../inter
 import type { CommonResponse } from "../../protocol/types";
 import { load_workspace, optional_bindings } from "../../config/workspace";
 import { child_unit_radix } from "../../binding-resolution";
-import { resolve_node_identifier, not_found_message } from "../../utilities";
+import { resolve_node_identifier, not_found_message, invalid_node_name_message } from "../../utilities";
 import { node_reg_warnings, reg_warning_lines } from "../../reg-conflicts";
 
 export const rename = command<RenameArguments, CommonResponse>({
@@ -52,6 +54,7 @@ Paths:
                 return refuse(`${path_argument} is part of the base device tree (${devicetree}), not this overlay; rename only applies to overlay-added nodes`);
             }
             case "is-root": { return refuse("Cannot rename the root node"); }
+            case "invalid-name": { return refuse(invalid_node_name_message(new_name)); }
             case "conflict": { return refuse(`${new_name} already exists under the same parent`); }
             case "renamed": {
                 workspace.overlay.save();
@@ -72,7 +75,7 @@ Paths:
 
 type RenameResult =
     | { status: "renamed"; path: string; reg_message?: string }
-    | { status: "not-found" | "in-base" | "is-root" | "conflict" };
+    | { status: "not-found" | "in-base" | "is-root" | "invalid-name" | "conflict" };
 
 export function rename_overlay_node(
     overlay: DeviceTreeOverlay,
@@ -91,6 +94,9 @@ export function rename_overlay_node(
     const new_unit = at === -1
         ? found.node.unit_addr
         : (to.slice(at + 1) === "" ? undefined : to.slice(at + 1));
+    if (!is_valid_node_name(new_name) || (new_unit !== undefined && !is_valid_unit_address(new_unit))) {
+        return { status: "invalid-name" };
+    }
 
     // R2/R9: duplicate check against effective siblings
     const parent_path = found.node_path.split("/").slice(0, -1).join("/") || "/";
@@ -243,5 +249,18 @@ if (import.meta.vitest) {
         if (typeof overlay === "string") { throw new TypeError(overlay); }
 
         expect(rename_overlay_node(overlay, "spi0", "spi1").status).toBe("in-base");
+    });
+
+    test("rename_overlay_node — refuses a name that isn't a node name, node unchanged", () => {
+        const base = DeviceTree.new_from_string(base_dts);
+        if (typeof base === "string") { throw new TypeError(base); }
+        const overlay = DeviceTreeOverlay.new_from_string(overlay_with_imu, base);
+        if (typeof overlay === "string") { throw new TypeError(overlay); }
+
+        const before = overlay.print();
+        for (const name of ["foo/bar", "a b", "", "@2", "adc@1@2"]) {
+            expect(rename_overlay_node(overlay, "imu1", name).status).toBe("invalid-name");
+        }
+        expect(overlay.print()).toBe(before);
     });
 }
