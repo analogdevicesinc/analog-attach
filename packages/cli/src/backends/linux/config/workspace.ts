@@ -2,7 +2,8 @@ import * as fs from "node:fs";
 import path from "node:path";
 import { DeviceTree, DeviceTreeOverlay } from "attach-lib";
 
-import { input_error, refuse, type Outcome, type Session } from "../../../interface/backend-interface";
+import type { Outcome, Session } from "../../../interface/backend-interface";
+import type { ConfigRefusal } from "../protocol/types";
 import { getBundledDtSchemaPath, getBundledToolsPath } from "../commands/skill/utilities";
 import { cache_warning, load_compat_index, validation_schema_path } from "./cache";
 import { is_tool_available, run_preprocess } from "../utilities";
@@ -318,7 +319,7 @@ export function open_workspace<N extends Need>(settings: Settings, needs: readon
     return errors.length > 0 ? { ok: false, errors } : { ok: true, value: workspace as Workspace<N> };
 }
 
-export function format_config_errors(errors: readonly ConfigError[], program: string): { human: string; json: string } {
+export function format_config_errors(errors: readonly ConfigError[], program: string): { human: string; response: ConfigRefusal } {
     // The setup hints of several fields become one that names them all.
     const is_setup = (error: ConfigError): boolean => error.hint !== undefined && error.hint === setup_hint([error.field], program);
     const setup_fields = errors.filter(error => is_setup(error)).map(error => error.field);
@@ -326,20 +327,23 @@ export function format_config_errors(errors: readonly ConfigError[], program: st
     const lines = errors.map(error => (error.description === undefined ? error.message : `${error.message} — ${error.description}`));
     const body = lines.length === 1 ? lines[0]! : ["Configuration errors:", ...lines.map(line => `  ${line}`)].join("\n");
     const human = hints.length > 0 ? `${body}\n\n${hints.join("\n")}` : body;
-    const json = JSON.stringify({
-        errors: errors.map(({ field, kind, message, description }) => ({ field, kind, message, description })),
+    const response: ConfigRefusal = {
+        ok: false,
+        message: errors.map(error => error.message).join("; "),
+        severity: "error",
+        errors: errors.map(({ field, kind, message, description }) => ({ field, kind, message, ...(description === undefined ? {} : { description }) })),
         hints,
-    });
-    return { human, json };
+    };
+    return { human, response };
 }
 
 /**
- * How a command ends on configuration errors: under `--json` the errors as JSON on
- * stderr, exit 2 (an input error); otherwise a refusal with the merged hint.
+ * How a command ends on configuration errors: a refusal (COM-071, COM-072), the errors and
+ * hints in the response and the merged hint in the text.
  */
-export function config_errors_outcome(session: Pick<Session, "mode" | "program">, errors: readonly ConfigError[]): Outcome<never> {
-    const message = format_config_errors(errors, session.program);
-    return session.mode === "json" ? input_error(message.json) : refuse(message.human);
+export function config_errors_outcome(session: Pick<Session, "program">, errors: readonly ConfigError[]): Outcome<never> {
+    const { human, response } = format_config_errors(errors, session.program);
+    return { kind: "refused", response, text: () => human };
 }
 
 export type Loaded<N extends Need> = { ok: true; workspace: Workspace<N> } | { ok: false; outcome: Outcome<never> };
@@ -521,20 +525,33 @@ if (import.meta.vitest) {
         expect(message.human).toContain("Missing config field devicetree");
         expect(message.human.split("Run 'aa' on a terminal").length - 1).toBe(1);
         expect(message.human).toContain("'aa config linux <path>' and 'config devicetree <path>', to set up");
-        expect(JSON.parse(message.json).errors).toHaveLength(2);
+        expect(message.response.errors).toHaveLength(2);
     });
 
     test("format_config_errors - the setup hint names only the fields that are missing", () => {
         const result = open({ linux }, ["base", "overlay_path"]);
         if (result.ok) { throw new Error("expected errors"); }
         const message = format_config_errors(result.errors, "aa");
-        expect(JSON.parse(message.json).hints).toEqual([setup_hint(["devicetree", "workfile"], "aa")]);
+        expect(message.response.hints).toEqual([setup_hint(["devicetree", "workfile"], "aa")]);
         expect(message.human).not.toContain("config linux");
     });
 
-    test("config_errors_outcome - an input error under --json, a refusal otherwise", () => {
-        const errors: ConfigError[] = [{ field: "linux", kind: "missing", message: "Missing config field linux" }];
-        expect(config_errors_outcome({ mode: "json", program: "aa" }, errors).kind).toBe("input-error");
-        expect(config_errors_outcome({ mode: "text", program: "aa" }, errors).kind).toBe("refused");
+    test("config_errors_outcome - a refusal naming each problem, with the hints", () => {
+        const errors: ConfigError[] = [
+            { field: "linux", kind: "missing", message: "Missing config field linux", hint: "Run 'aa config linux <path>'." },
+            { field: "deploy-ip", kind: "missing", message: "Missing config field deploy-ip" },
+        ];
+        const outcome = config_errors_outcome({ program: "aa" }, errors);
+        if (outcome.kind !== "refused") { throw new Error(`expected a refusal, got ${outcome.kind}`); }
+        expect(outcome.response).toEqual({
+            ok: false,
+            message: "Missing config field linux; Missing config field deploy-ip",
+            severity: "error",
+            errors: [
+                { field: "linux", kind: "missing", message: "Missing config field linux" },
+                { field: "deploy-ip", kind: "missing", message: "Missing config field deploy-ip" },
+            ],
+            hints: ["Run 'aa config linux <path>'."],
+        });
     });
 }

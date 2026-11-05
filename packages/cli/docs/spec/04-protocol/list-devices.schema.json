@@ -15,21 +15,25 @@
       }
     },
     "linux": {
-      "oneOf": [{ "$ref": "#/$defs/linux-devices" }, { "$ref": "common.schema.json#/$defs/refusal" }]
+      "oneOf": [{ "$ref": "#/$defs/linux-devices" }, { "$ref": "common.schema.json#/$defs/refusal" }, { "$ref": "common.schema.json#/$defs/config-refusal" }]
     },
     "linux-devices": {
       "allOf": [{ "$ref": "#/$defs/base" }],
       "required": ["names"],
       "properties": {
         "ok": { "const": true },
-        "message": { "type": "string", "description": "Found <n> devices, or Device <compatible> when the filter names one (LIST-011)." },
+        "message": { "type": "string", "description": "Found <n> devices, or Device <compatible> when the filter names one (LIST-011). The devices come by tag, then key." },
         "severity": { "const": "info" },
         "devices": {
           "type": "array",
           "items": {
             "allOf": [{ "$ref": "common.schema.json#/$defs/device" }],
-            "properties": { "key": { "description": "A compatible." } },
-            "not": { "anyOf": [{ "required": ["tag"] }, { "required": ["title"] }] }
+            "required": ["tag"],
+            "properties": {
+              "key": { "description": "A compatible." },
+              "tag": { "type": "string", "minLength": 1, "description": "Its category: the binding's folder under Documentation/devicetree/bindings (iio/adc), or the binding's name for one at the top (trivial-devices) (LIST-011)." }
+            },
+            "not": { "required": ["title"] }
           }
         },
         "names": { "type": "array", "items": { "type": "string" }, "deprecated": true, "description": "The keys of devices, kept for one release." },

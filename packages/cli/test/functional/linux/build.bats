@@ -9,12 +9,13 @@ setup() {
 	new_project linux
 }
 
-# `run_config_error <words>`: run_json for a configuration error, which is JSON on standard
-# error (exit 2): $output is that JSON.
+# `run_config_error <words>`: run_json for a configuration error, a refusal with its errors and
+# hints (COM-071): exit 0, nothing on standard error, .ok false.
 run_config_error() {
 	run_json "$@"
-	assert_failure 2
-	output=$stderr
+	assert_success
+	[ -z "$stderr" ] || fail "standard error: $stderr"
+	assert_json '.ok' false
 }
 
 # `install_without_dtc`: a copy of the installation (dist, package.json, bundled dt-schema and
@@ -91,7 +92,7 @@ duplicate_labels() {
 # and compiles nothing.
 # Steps:
 #   1. Run build, with --json, before any init.
-#   2. Check it fails with exit 2, the error is on workfile and says it does not exist, and the
+#   2. Check it is refused, the error is on workfile and says it does not exist, and the
 #      hint points to init and config workfile.
 #   3. Check no .dtbo was written.
 #   4. Run build in human mode; check it points to init too.
@@ -111,7 +112,7 @@ duplicate_labels() {
 # Steps:
 #   1. Create the overlay with init.
 #   2. Copy the installation without the bundled dtc.
-#   3. Run that copy's build, with --json; check it fails with exit 2, the error is on tools and
+#   3. Run that copy's build, with --json; check it is refused, the error is on tools and
 #      names the missing dtc, and the hint says to rebuild the installation.
 #   4. Check no .dtbo was written.
 # bats test_tags=req:BUILD-02, id:L0036
@@ -120,8 +121,8 @@ duplicate_labels() {
 	local cli
 	cli=$(install_without_dtc)
 	run --separate-stderr node "$cli" --json build
-	assert_failure 2
-	output=$stderr
+	assert_success
+	assert_json '.ok' false
 	assert_json '.errors[0].field' tools
 	assert_json '.errors[0].message' "Bundled tools not found: $BATS_TEST_TMPDIR/install/bundled/linux/tools/dtc"
 	assert_json '.hints[0]' 'The analog-attach installation is incomplete; rebuild it (scripts/bundle-dt-schema.sh).'
@@ -133,7 +134,7 @@ duplicate_labels() {
 # Steps:
 #   1. Create the overlay with init.
 #   2. Set preprocess-command to a command that does not exist, no-such-cpp.
-#   3. Run build, with --json; check it fails with exit 2 and an error mentions no-such-cpp.
+#   3. Run build, with --json; check it is refused and an error mentions no-such-cpp.
 #   4. Check no .dtbo was written.
 # bats test_tags=req:BUILD-02, id:L0037
 @test "build reports a base devicetree the preprocessor can't read" {

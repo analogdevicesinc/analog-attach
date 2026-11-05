@@ -490,15 +490,13 @@ checksum() {
 	[[ "$stderr" == *"Unknown config field: nosuchkey"* ]]
 }
 
-# Gap: under --json a missing setting is a config-error object on standard error with exit 2
-# (02-common.md C-11); in human mode it exits 0. noos answers {"ok": false, …} with exit 0.
 # Description: a missing setting exits 0, with and without --json, and the result names it.
 # Steps:
 #   1. Remove the linux setting.
 #   2. Run read and check it exits 0.
 #   3. Run read with --json and check it is refused (exit 0, .ok false), the message naming
 #      linux.
-# bats test_tags=req:GEN-09, gap, id:L0144
+# bats test_tags=req:GEN-09, id:L0144
 @test "a missing setting exits 0 with and without --json, the outcome in the result" {
 	drop_setting linux
 	run aa read

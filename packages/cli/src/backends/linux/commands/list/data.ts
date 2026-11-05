@@ -8,8 +8,10 @@ import path from "node:path";
 import {
     Attach,
     Result as AttachResult,
+    get_full_node_name,
     parent_path_string,
     suggest_parents,
+    type DTNode,
     type DeviceTree,
     type DeviceTreeOverlay,
     type ParsedBinding,
@@ -20,12 +22,14 @@ import type { Bindings } from "../../config/workspace";
 import type { ConfigResult } from "../../config/settings";
 import { overlay_files } from "../../overlay-index";
 import { narrowed_binding } from "../../binding-resolution";
-import type { Suggestion } from "../../protocol/types";
-import { find_binding, fragment_target, get_compat_index, resolve_node_identifier, type IndexedBindings } from "../../utilities";
+import { attach_type_to_protocol_type } from "../../protocol/dt-to-protocol";
+import type { Suggestion, Types } from "../../protocol/types";
+import { find_binding, fragment_target, get_compat_index, node_compatibles, resolve_node_identifier, type IndexedBindings } from "../../utilities";
 import {
     describe_child_nodes,
     describe_property_pattern,
     effective_target_node,
+    format_type,
     navigate_candidates,
     navigate_node,
     property_info,
@@ -46,6 +50,24 @@ const node_not_found = (identifier: string): { ok: false; message: string; text:
 export function device_keys(bindings: IndexedBindings, filter?: string): string[] {
     const entries = Object.keys(get_compat_index(bindings).entries);
     return filter === undefined ? entries : entries.filter(entry => entry.includes(filter));
+}
+
+/** The category of a binding: its folder under `Documentation/devicetree/bindings` (`iio/adc`), or its name for one at the top (`trivial-devices`). */
+export function binding_category(linux: string, binding: string): string {
+    const relative = path.relative(path.join(linux, "Documentation", "devicetree", "bindings"), binding);
+    const folder = path.dirname(relative);
+    return folder === "." ? path.basename(relative, path.extname(relative)) : folder;
+}
+
+const compare = (a: string, b: string): number => Number(a > b) - Number(a < b);
+
+/** The compatibles of the compat index that contain `filter`, each with its category as the tag, by category and then compatible. */
+export function device_entries(bindings: IndexedBindings, filter?: string): { key: string; tag: string }[] {
+    const index = get_compat_index(bindings);
+    return Object.entries(index.entries)
+        .filter(([key]) => filter === undefined || key.includes(filter))
+        .map(([key, binding]) => ({ key, tag: binding_category(index.linux ?? bindings.linux, binding) }))
+        .sort((a, b) => compare(a.tag, b.tag) || compare(a.key, b.key));
 }
 
 /** A compatible no binding has, with the closest ones and where to look (as noos words an unknown schema). */
@@ -91,8 +113,8 @@ export function overlay_file_suggestions(linux: string, filter?: string): Sugges
 // ── a node's properties (`list property <path>`) ────────────────────────────
 
 export interface NodeProperties {
-    /** The narrowed binding's properties, in binding order, with whether the merged node has each and whether it is required. */
-    properties: { name: string; set: boolean; required: boolean }[];
+    /** The narrowed binding's properties, in binding order, with their type, whether the merged node has each and whether it is required. */
+    properties: { name: string; type: Types; display: string; set: boolean; required: boolean }[];
     /** The binding's property patterns (`describe_property_pattern`). */
     patterns: Suggestion[];
     /** The binding's child-node patterns (`describe_child_nodes`). */
@@ -113,22 +135,49 @@ export async function node_properties(identifier: string, overlay: DeviceTreeOve
     return {
         ok: true,
         value: {
-            properties: applicable.properties.map(p => ({ name: p.key, set: existing.has(p.key), required: required.has(p.key) })),
+            properties: applicable.properties.map(p => {
+                const type = attach_type_to_protocol_type(p.value);
+                return { name: p.key, type, display: format_type(type), set: existing.has(p.key), required: required.has(p.key) };
+            }),
             patterns: binding.property_patterns.map(rule => describe_property_pattern(rule, node)),
             children: binding.child_nodes.map(rule => describe_child_nodes(rule, node)),
         },
     };
 }
 
+/** A property's marks, `set, required`, `set`, `required` or nothing. */
+function marks_of({ set, required }: { set: boolean; required: boolean }): string {
+    return [...(set ? ["set"] : []), ...(required ? ["required"] : [])].join(", ");
+}
+
+/** The marks in brackets, `(set, required)`, or nothing. */
+function bracketed(property: { set: boolean; required: boolean }): string {
+    const marks = marks_of(property);
+    return marks ? `(${marks})` : "";
+}
+
 /** The entries of `node_properties`, one suggestion each: a property's name with its marks (`compatible (set, required)`), then the patterns. */
 export function node_property_entries({ properties, patterns, children }: NodeProperties): Suggestion[] {
     return [
-        ...properties.map(({ name, set, required }) => {
-            const marks = [...(set ? ["set"] : []), ...(required ? ["required"] : [])].join(", ");
-            return { value: name, ...(marks ? { display_string: `${name} (${marks})` } : {}) };
+        ...properties.map(property => {
+            const marks = marks_of(property);
+            return { value: property.name, ...(marks ? { display_string: `${property.name} (${marks})` } : {}) };
         }),
         ...patterns,
         ...children,
+    ];
+}
+
+/**
+ * The lines of `node_properties` in human mode: a property's name, marks and type in columns, the
+ * type last since an enum of phandles can be long; then the patterns.
+ */
+export function node_property_lines({ properties, patterns, children }: NodeProperties): string[] {
+    const width = Math.max(0, ...properties.map(p => p.name.length)) + 2;
+    const marks_width = Math.max(0, ...properties.map(p => bracketed(p).length)) + 2;
+    return [
+        ...properties.map(p => `${p.name.padEnd(width)}${bracketed(p).padEnd(marks_width)}${p.display}`),
+        ...[...patterns, ...children].map(entry => entry.display_string ?? entry.value),
     ];
 }
 
@@ -188,6 +237,28 @@ export async function value_list(
 
 // ── completion only ─────────────────────────────────────────────────────────
 
+/**
+ * The nodes of the overlay's bodies, depth first in file order, once each: the label-first path
+ * (its first label, else its parent's path and its name) and its compatible, when it has one.
+ */
+export function overlay_nodes(overlay: DeviceTreeOverlay): Suggestion[] {
+    const found = new Map<string, Suggestion>();
+    const walk = (node: DTNode, parent: string): void => {
+        const name = get_full_node_name(node);
+        const at = node.labels[0] ?? (parent.endsWith("/") ? `${parent}${name}` : `${parent}/${name}`);
+        const compatible = node_compatibles(node)[0];
+        if (!found.has(at)) { found.set(at, { value: at, ...(compatible === undefined ? {} : { display_string: compatible }) }); }
+        for (const child of node.children) { walk(child, at); }
+    };
+    for (const fragment of overlay.get_fragments()) {
+        const target = fragment_target(fragment);
+        const body = fragment.children.find(child => child.name === "__overlay__");
+        if (target === undefined || body === undefined) { continue; }
+        for (const child of body.children) { walk(child, target); }
+    }
+    return [...found.values()];
+}
+
 /** The overlay's entry points: each fragment's target, once. */
 export function entry_points(overlay: DeviceTreeOverlay): string[] {
     return [...new Set(overlay.get_fragments().map(fragment => fragment_target(fragment)).filter((target): target is string => target !== undefined))];
@@ -231,13 +302,28 @@ export function overlay_property_suggestions(identifier: string | undefined, ove
 
 if (import.meta.vitest) {
     const { test, expect } = import.meta.vitest;
+    const { DeviceTree: DT, DeviceTreeOverlay: DTO } = await import("attach-lib");
+
+    const string: Types = { kind: "string" };
+    const cells: Types = { kind: "array", items: { kind: "number", subtype: "int" } };
+    const flag: Types = { kind: "bool" };
+    const found: NodeProperties = {
+        properties: [
+            { name: "compatible", type: string, display: "string", set: true, required: true },
+            { name: "reg", type: cells, display: "number[]", set: false, required: true },
+            { name: "spi-cpol", type: flag, display: "bool", set: true, required: false },
+            { name: "label", type: string, display: "string", set: false, required: false },
+        ],
+        patterns: [{ value: "^adi,pin[0-1]$", display_string: "adi,pin0, adi,pin1 (pattern ^adi,pin[0-1]$)" }],
+        children: [],
+    };
+
+    test("binding_category — the folder under the bindings, or the name of a binding at the top", () => {
+        expect(binding_category("/linux", "/linux/Documentation/devicetree/bindings/iio/adc/adi,ad7124.yaml")).toBe("iio/adc");
+        expect(binding_category("/linux", "/linux/Documentation/devicetree/bindings/trivial-devices.yaml")).toBe("trivial-devices");
+    });
 
     test("node_property_entries / node_properties_message — the marks, then the patterns; the counts", () => {
-        const found: NodeProperties = {
-            properties: [{ name: "compatible", set: true, required: true }, { name: "reg", set: false, required: true }, { name: "spi-cpol", set: true, required: false }, { name: "label", set: false, required: false }],
-            patterns: [{ value: "^adi,pin[0-1]$", display_string: "adi,pin0, adi,pin1 (pattern ^adi,pin[0-1]$)" }],
-            children: [],
-        };
         expect(node_property_entries(found)).toEqual([
             { value: "compatible", display_string: "compatible (set, required)" },
             { value: "reg", display_string: "reg (required)" },
@@ -247,5 +333,28 @@ if (import.meta.vitest) {
         ]);
         expect(node_properties_message(found)).toBe("Found 4 properties, 1 property pattern(s)");
         expect(node_properties_message({ ...found, patterns: [], children: [{ value: "^channel@[0-3]$" }] })).toBe("Found 4 properties and 1 child node pattern(s)");
+    });
+
+    test("node_property_lines — name, marks and type in columns, then the patterns", () => {
+        expect(node_property_lines(found)).toEqual([
+            "compatible  (set, required)  string",
+            "reg         (required)       number[]",
+            "spi-cpol    (set)            bool",
+            "label                        string",
+            "adi,pin0, adi,pin1 (pattern ^adi,pin[0-1]$)",
+        ]);
+    });
+
+    test("overlay_nodes — every node of the bodies, label-first, with its compatible; a node of two fragments once", () => {
+        const base = DT.new_from_string(`/dts-v1/;\n/ {\n\tsoc {\n\t\tspi0: spi@7e204000 {\n\t\t};\n\t};\n};`);
+        if (typeof base === "string") { throw new TypeError(base); }
+        const overlay = DTO.new_from_string(`/dts-v1/;\n/plugin/;\n/ {\n\tfragment@0 {\n\t\ttarget = <&spi0>;\n\t\t__overlay__ {\n\t\t\tadc: adc@0 {\n\t\t\t\tcompatible = "adi,ad7124-8", "adi,ad7124";\n\t\t\t\tchannel@0 {\n\t\t\t\t};\n\t\t\t};\n\t\t\tdac@1 {\n\t\t\t};\n\t\t};\n\t};\n\tfragment@1 {\n\t\ttarget-path = "/";\n\t\t__overlay__ {\n\t\t\tvdd {\n\t\t\t\tcompatible = "regulator-fixed";\n\t\t\t};\n\t\t};\n\t};\n\tfragment@2 {\n\t\ttarget = <&spi0>;\n\t\t__overlay__ {\n\t\t\tdac@1 {\n\t\t\t};\n\t\t};\n\t};\n};`, base);
+        if (typeof overlay === "string") { throw new TypeError(overlay); }
+        expect(overlay_nodes(overlay)).toEqual([
+            { value: "adc", display_string: "adi,ad7124-8" },
+            { value: "adc/channel@0" },
+            { value: "spi0/dac@1" },
+            { value: "/vdd", display_string: "regulator-fixed" },
+        ]);
     });
 }

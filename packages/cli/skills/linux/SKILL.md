@@ -49,7 +49,7 @@ analog-attach --json init
 
 Setting `linux` also builds the binding caches (the compat index and `validation.json`) from its bindings, which takes about a minute for the kernel tree (progress on stderr). Commands never rebuild them: when the bindings change, run `analog-attach config --reload` (no key). Until then commands warn on stderr that the caches look out of date; with a cache missing they fail with that hint. The dt-schema bindings, dtc and validation tools are bundled with the CLI.
 
-Every command checks the configuration it needs up front: `linux` must be a kernel tree (with `Documentation/devicetree/bindings/` and `include/`) with its caches built, `devicetree` must preprocess and parse, and `workfile` must parse against it. Unknown or invalid keys in config.json are errors. Problems are reported together, with a hint on how to fix them: on stderr with exit code 2 under `--json`, as a refusal on stdout in text mode.
+Every command checks the configuration it needs up front: `linux` must be a kernel tree (with `Documentation/devicetree/bindings/` and `include/`) with its caches built, `devicetree` must preprocess and parse, and `workfile` must parse against it. Unknown or invalid keys in config.json are errors. Problems are reported together, with a hint on how to fix them, as a refusal on stdout (exit 0). Under `--json` it has `ok: false`, `errors` (one per problem, its `field` the setting or resource at fault) and `hints`.
 
 **Per-command config requirements**:
 - `config`: No prerequisites
@@ -76,7 +76,7 @@ Help users locate appropriate `.dts` files when needed — they're typically in 
 - Exit code 2 is an input error, its message on stderr, in both modes:
   - a malformed path or property (`empty segment in path: spi0//x`)
   - a missing argument (`Missing: path`) or an unknown flag
-  - a configuration problem under `--json`
+  - a settings file `config` can't read
 - Exit code 130: a prompt was cancelled (terminal only).
 
 ---
@@ -165,8 +165,8 @@ analog-attach config overlay-syntax --reset
 **Syntax**:
 ```bash
 analog-attach list --help                    # show available kinds
-analog-attach list devices [<filter>]        # compatible strings (substring filter)
-analog-attach list property <path> [<prop>]  # properties of a node; with prop: type details
+analog-attach list devices [<filter>]        # compatible strings and their category (substring filter)
+analog-attach list property [<path> [<prop>]]  # the overlay's nodes; a node's properties; with prop: type details
 analog-attach list value <path> <prop>       # concrete values for a property
 analog-attach list parent <compatible>       # valid parent buses for a device
 analog-attach list overlay <compatible>      # overlays in the Linux tree with the device (then: import <name>)
@@ -177,8 +177,12 @@ analog-attach list overlay <compatible>      # overlays in the Linux tree with t
 # Find devices matching "ad7124"
 analog-attach list devices ad7124
 
-# List all properties of a node (marks required/set)
+# List the overlay's nodes, label-first (ad7124_8, ad7124_8/channel@0)
+analog-attach list property
+
+# List all properties of a node: name, marks (set, required), type
 analog-attach list property spi0/adi,ad7124-8@0
+#   reg                       (set, required)  number[]
 # Properties and child nodes named by a binding pattern show the names it matches:
 #   adi,bypass-attenuator-in0 … adi,bypass-attenuator-in4 (pattern ^adi,bypass-attenuator-in[0-4]$; set: adi,bypass-attenuator-in1)
 #   channel@0 … channel@15 (child node ^channel@([0-9]|1[0-5])$; present: channel@0)
@@ -202,8 +206,8 @@ analog-attach list parent adi,ad7124-8
 ```
 
 **JSON**:
-- `list devices` gives `devices: [{ key }]`; when the filter names a device exactly (or matches only one), also `device`, with its title, description, binding file and properties. `names` is deprecated.
-- `list property <path>` gives `names`; with a property, `property: { name, description, type, display, required, set, default? }`. The other top-level fields are deprecated.
+- `list devices` gives `devices: [{ key, tag }]`, `tag` the category (the binding's folder, `iio/adc`), by category then compatible; as text `<compatible>  <category>` a line; when the filter names a device exactly (or matches only one), also `device`, with its title, description, binding file and properties. `names` is deprecated.
+- `list property` gives the overlay's node paths in `names`; `list property <path>` gives `names` and `properties: [{ name, type, display, required, set }]`; with a property, `property: { name, description, type, display, required, set, default? }`. The other top-level fields are deprecated.
 - `list value <path> <prop>` takes no further argument: a third one exits 2 (`A member is not supported by the linux backend`).
 
 **Strategy**: Ask the user which chip they have or, if they do not know for sure, start broad (e.g., `list devices adi` for Analog Devices), then narrow down based on user's specific chip.
@@ -523,7 +527,8 @@ analog-attach read [path] [property]
 - `clocks` and `*-supply` end with `Or add your own: analog-attach add fixed-clock` (or `regulator-fixed`): when none of the suggestions fits, add that node and point the property at its label
 - `--quiet`: only the value (`true` for a flag) or the node block, for scripts
 - Without bindings the extra lines are left out
-- `--json`: a property gets optional `description` and `suggestions: { values, can_create? }` (`can_create`: the compatibles to `add` instead, `fixed-clock` / `regulator-fixed`); a node gets no binding details (use `list property <path>` for what it still lacks)
+- `--json`: a property gets the binding's `type` (an enum with its `options`; a single cell under an array type is given as a one-item array, the cells of `interrupts` or `*-gpios` stay flat as `update` takes them), optional `description` and `suggestions: { values, can_create? }` (`can_create`: the compatibles to `add` instead, `fixed-clock` / `regulator-fixed`); a node gets no binding details (use `list property <path>` for what it still lacks), and its properties the type of their value as written
+- `origin` under `--json` is `internal` for a node the overlay adds or changes, `external` for one only the base has (collapsed children included)
 
 **Examples**:
 ```bash

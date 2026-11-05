@@ -27,7 +27,8 @@
         { "$ref": "read.schema.json#/$defs/read-property" },
         { "$ref": "read.schema.json#/$defs/read-node", "description": "An existing child, as read <path>/<child> gives it (UPDATE-120)." },
         { "$ref": "#/$defs/child-created" },
-        { "$ref": "common.schema.json#/$defs/refusal" }
+        { "$ref": "common.schema.json#/$defs/refusal" },
+        { "$ref": "common.schema.json#/$defs/config-refusal" }
       ]
     },
     "set": {
