@@ -216,6 +216,17 @@ describe("the Linux backend through main", () => {
         });
     });
 
+    test("list value of a supply: a regulator can be added instead, in both modes; other properties have none", async () => {
+        configure();
+        const json = await run(["--json", "list", "value", "adc", "vref-supply"]);
+        expect(json.code).toBe(0);
+        expect(JSON.parse(json.stdout)).toMatchObject({ ok: true, can_create: [{ value: "regulator-fixed", display_string: "add regulator-fixed" }] });
+        const text = await run(["list", "value", "adc", "vref-supply"]);
+        expect(text.stdout.trimEnd().split("\n").at(-1)).toBe("Or add your own: analog-attach add regulator-fixed");
+        const none = await run(["--json", "list", "value", "adc", "spi-max-frequency"]);
+        expect(JSON.parse(none.stdout)).not.toHaveProperty("can_create");
+    });
+
     test("--json update: a value written; a warning on stderr makes the response a warn", async () => {
         configure();
         const set = await run(["--json", "update", "adc", "spi-max-frequency", "1000000"]);
