@@ -441,14 +441,12 @@ with_adc() {
 	assert_json '.suggestions[0].value' "$label"
 }
 
-# Gap: list value gives the values the tree has, never the providers a user can add
-# (regulator-fixed for a supply), which read gives as `can_create`.
 # Description: list value of a supply says a new regulator-fixed can be added to fill it.
 # Steps:
 #   1. Make an overlay with an AD7124-8 on spi1.
 #   2. Run list value ad7124_8 avdd-supply, with --json.
 #   3. Check it succeeds and can_create offers regulator-fixed.
-# bats test_tags=req:LIST-08, gap, id:L0208
+# bats test_tags=req:LIST-08, id:L0208
 @test "list value says a new regulator can be added to fill a supply" {
 	with_adc
 	run_json list value ad7124_8 avdd-supply

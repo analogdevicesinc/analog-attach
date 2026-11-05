@@ -357,7 +357,7 @@ required properties as `add` does (`add.md` §11) and:
 
 **UPDATE-130** With `--suggest`, after UPDATE-001 and UPDATE-002, the CLI
 shall answer what `list value <path> <property>` answers (`list.md` LIST-070
-to LIST-077), in both modes: it loads what `list value` loads (bindings when
+to LIST-080), in both modes: it loads what `list value` loads (bindings when
 they load), sets nothing and writes nothing. `--quiet` changes nothing.
 
 **UPDATE-131** If `--suggest` is given with a value, then the CLI shall report

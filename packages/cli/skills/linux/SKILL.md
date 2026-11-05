@@ -627,6 +627,7 @@ How to read `list value`:
 - Values are pinned by the binding or taken from the base devicetree; a note means the value was checked against the binding and may be rejected by `validate`.
 - Interrupt trigger types and reset polarity depend on the peripheral; ask the user when unsure.
 - Phandle+cells properties can be set in one step: `update adc rdy-gpios gpio 21 GPIO_ACTIVE_LOW`.
+- For a supply or `clocks`, the last line (`can_create` under `--json`) names a provider to add when none fits: `add regulator-fixed`, then name its label.
 
 ---
 
