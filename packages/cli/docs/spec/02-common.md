@@ -48,6 +48,11 @@ them and must not parse them.
 standard output, and input errors (§3), notes, warnings (COM-021) and
 progress (COM-112) to standard error.
 
+**COM-023** The CLI shall exit only once standard output and standard error
+have been written out, so a pipe gets the whole output however long it is
+(`list devices`, `list context`). If the reader of either closes it first
+(`| head`), then the CLI shall stop without a message, with status 0.
+
 Exceptions:
 
 | Command | Differs from | How | Issue |
