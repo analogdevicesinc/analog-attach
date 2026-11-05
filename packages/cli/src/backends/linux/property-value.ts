@@ -39,6 +39,16 @@ export function shape_hint(definition: ResolvedProperty | undefined): ShapeHint 
     }
 }
 
+export type CellBits = 8 | 16 | 32 | 64;
+
+/** The width of a definition's cells: its `typeSize` (a matrix's, from its rows), 32 when it gives none. */
+export function cell_bits(definition?: ResolvedProperty): CellBits {
+    const type = definition?.value;
+    const row = type?._t === "matrix" ? type.rows[0] : type;
+    const size = row?._t === "list" || row?._t === "scalar" ? row.typeSize : undefined;
+    return size === 8 || size === 16 || size === 64 ? size : 32;
+}
+
 type ResolvedToken = CellValue | { error: string };
 
 function resolve_token(
@@ -67,11 +77,13 @@ function resolve_token(
     return { error: `'${token}' is not a number, a known macro, or a label in the base tree/overlay` };
 }
 
+/** `bits` is the width the binding gives the cells (`cell_bits`); only cells (`hint` `cells`) take it. */
 export function build_raw_property(
     raw: string,
     name: string,
     hint: ShapeHint,
     is_label: (name: string) => boolean,
+    bits: CellBits = 32,
 ): DTProperty | undefined | { error: string } {
     const parsed = parse_value(raw);
 
@@ -89,7 +101,7 @@ export function build_raw_property(
     }
 
     if (hint === "cells") {
-        return build_cells_from_parsed(parsed, name, is_label);
+        return build_cells_from_parsed(parsed, name, is_label, bits);
     }
 
     // No hint: infer from the tokens.
@@ -166,18 +178,27 @@ function build_cells_from_parsed(
     parsed: ParsedInputValue,
     name: string,
     is_label: (name: string) => boolean,
+    bits: CellBits = 32,
 ): DTProperty | { error: string } {
+    // dtc takes a reference only in 32-bit cells
+    const resolve = (token: bigint | string): ResolvedToken => {
+        const resolved = resolve_token(token, is_label);
+        return "_tag" in resolved && resolved._tag === "label" && bits !== 32
+            ? { error: `'${token}' is a label, and ${name} holds ${bits}-bit cells: dtc only takes a reference in a 32-bit cell` }
+            : resolved;
+    };
+
     if (typeof parsed === "bigint") {
-        return PropertyBuilder.build_cell_array()
+        return PropertyBuilder.build_cell_array(bits)
             .with_tagged_values(PropertyBuilder.tag_number(parsed))
             .with_name(name)
             .build();
     }
 
     if (typeof parsed === "string") {
-        const resolved = resolve_token(parsed, is_label);
+        const resolved = resolve(parsed);
         if ("error" in resolved) { return resolved; }
-        return PropertyBuilder.build_cell_array()
+        return PropertyBuilder.build_cell_array(bits)
             .with_tagged_values(resolved)
             .with_name(name)
             .build();
@@ -188,13 +209,13 @@ function build_cells_from_parsed(
         for (const row of parsed) {
             const cells: CellValue[] = [];
             for (const token of row) {
-                const resolved = resolve_token(token, is_label);
+                const resolved = resolve(token);
                 if ("error" in resolved) { return resolved; }
                 cells.push(resolved);
             }
             rows.push(cells);
         }
-        return PropertyBuilder.build_cell_array()
+        return PropertyBuilder.build_cell_array(bits)
             .with_tagged_values(...(rows as [CellValue[], ...CellValue[][]]))
             .with_name(name)
             .build();
@@ -203,11 +224,11 @@ function build_cells_from_parsed(
     // Flat array
     const cells: CellValue[] = [];
     for (const token of parsed) {
-        const resolved = resolve_token(token, is_label);
+        const resolved = resolve(token);
         if ("error" in resolved) { return resolved; }
         cells.push(resolved);
     }
-    return PropertyBuilder.build_cell_array()
+    return PropertyBuilder.build_cell_array(bits)
         .with_tagged_values(cells)
         .with_name(name)
         .build();
@@ -334,6 +355,23 @@ if (import.meta.vitest) {
         expect(result).not.toBeNull();
         expect("error" in result!).toBe(true);
         expect((result as { error: string }).error).toContain("bogus");
+    });
+
+    test("build_raw_property — cells of the binding's typeSize: /bits/ 64, a label refused", () => {
+        const built = build_raw_property("0x100000000 1, 2 3", "adi,custom-rtd", "cells", base_is_label, 64);
+        expect(PropertyBuilder.to_string(built as DTProperty)).toBe("adi,custom-rtd = /bits/ 64 <0x100000000 1>, /bits/ 64 <2 3>;\n");
+        expect(build_raw_property("gpio 1", "sizes", "cells", base_is_label, 64))
+            .toEqual({ error: "'gpio' is a label, and sizes holds 64-bit cells: dtc only takes a reference in a 32-bit cell" });
+        expect(PropertyBuilder.to_string(build_raw_property("gpio 1", "x", "cells", base_is_label) as DTProperty)).toBe("x = <&gpio 1>;\n");
+    });
+
+    test("cell_bits — the typeSize of a list, a scalar or a matrix's rows, else 32", () => {
+        const number = { _t: "number" } as const;
+        expect(cell_bits({ key: "a", value: { _t: "list", item: number, typeSize: 64 } })).toBe(64);
+        expect(cell_bits({ key: "a", value: { _t: "scalar", cell: number, typeSize: 8 } })).toBe(8);
+        expect(cell_bits({ key: "a", value: { _t: "matrix", rows: [{ _t: "list", item: number, typeSize: 16 }] } })).toBe(16);
+        expect(cell_bits({ key: "a", value: { _t: "list", item: number } })).toBe(32);
+        expect(cell_bits()).toBe(32);
     });
 
     test("build_raw_property — strings hint keeps 'gpio' as a string and adi,ad7124-8 intact", () => {

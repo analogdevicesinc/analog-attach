@@ -34,7 +34,7 @@ import { describe_missing, missing_lines, missing_required_of, type NewNode } fr
 import { ask_for_missing } from "../../missing-interview";
 import type { UpdateChildResponse, UpdateResponse } from "../../protocol/types";
 import { count_warning, value_count } from "../../item-count";
-import { build_raw_property, shape_hint, type ShapeHint } from "../../property-value";
+import { build_raw_property, cell_bits, shape_hint, type ShapeHint } from "../../property-value";
 
 /** Where a warning goes: `session.warn`, stderr in every mode. */
 export type Warn = (message: string) => void;
@@ -319,7 +319,7 @@ export async function apply_update(
         return overlay.find_node(name) !== undefined;
     };
 
-    const built = build_raw_property(with_value, property_name, hint, is_label);
+    const built = build_raw_property(with_value, property_name, hint, is_label, cell_bits(property_definition));
 
     if (built !== null && typeof built === "object" && "error" in built) {
         return { kind: "error", message: built.error };

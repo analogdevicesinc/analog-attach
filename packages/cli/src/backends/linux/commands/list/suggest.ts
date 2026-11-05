@@ -24,7 +24,7 @@ import {
 
 import type { Bindings } from "../../config/workspace";
 import type { ConfigResult } from "../../config/settings";
-import { format_suggestion, build_raw_property, shape_hint, parse_value } from "../../property-value";
+import { format_suggestion, build_raw_property, cell_bits, shape_hint, parse_value } from "../../property-value";
 import { node_children, parse_property_reference, resolve_node_identifier, resolve_write_target, type WriteTarget } from "../../utilities";
 import { attach_type_to_protocol_type } from "../../protocol/dt-to-protocol";
 import { find_property_definition, narrowed_binding, resolve_node_binding, type NodeBinding } from "../../binding-resolution";
@@ -142,13 +142,13 @@ export function annotate_suggestions(
         return overlay.find_node(name) !== undefined;
     };
 
+    const unnarrowed = find_property_definition(binding, binding.properties, property_name);
     for (const suggestion of suggestions) {
         const formatted = format_suggestion(suggestion);
         const preview_node = structuredClone(binding_node);
 
         // Build the property from the suggestion value and place it on the preview node
-        const hint = shape_hint(find_property_definition(binding, binding.properties, property_name));
-        const built = build_raw_property(formatted, property_name, hint, is_label);
+        const built = build_raw_property(formatted, property_name, shape_hint(unnarrowed), is_label, cell_bits(unnarrowed));
         if (built !== null && built !== undefined && !("error" in built)) {
             const existing_index = preview_node.properties.findIndex(p => p.name === property_name);
             if (existing_index === -1) {
