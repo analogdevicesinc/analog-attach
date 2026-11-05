@@ -1,5 +1,5 @@
-import { INodeBuilderBase, NodeBuilder } from "./NodeBuilder";
-import { PropertyBuilder } from "./PropertyBuilder";
+import { INodeBuilderBase, NodeBuilder } from "./NodeBuilder.js";
+import { PropertyBuilder } from "./PropertyBuilder.js";
 
 import {
     DTLabel,
@@ -12,13 +12,13 @@ import {
     parse_dto,
     print_dto,
     format_parse_error
-} from "./Parser";
+} from "./Parser/index.js";
 
-import { Result } from "../result";
-import { DeviceTree } from "./Devicetree";
-import { FoundNodeResult } from "./Types";
-import { Stream } from "./Stream";
-import { type LocatedNode, type NodeTarget, normalize_target, patch_node, parent_path as access_parent_path, walk_nodes } from "./Access";
+import { Result } from "../result.js";
+import { DeviceTree } from "./Devicetree.js";
+import { FoundNodeResult } from "./Types.js";
+import { Stream } from "./Stream.js";
+import { type LocatedNode, type NodeTarget, normalize_target, patch_node, parent_path as access_parent_path, walk_nodes } from "./Access.js";
 
 /** The path `relative` names below the node at `root`. */
 function path_below(root: string, relative: string[]): string {

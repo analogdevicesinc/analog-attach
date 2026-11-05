@@ -136,7 +136,6 @@ export function lex(content: string): Result<LexerResult, LexerError> {
       return raw_token;
     }
 
-    // TODO: ugly to use slicing to create objects
     const token: Token = { ...raw_token.value, ...start };
 
     if (token.kind === TokenKind.CommentBlock || token.kind === TokenKind.CommentLine) {

@@ -1,4 +1,3 @@
-// TODO: ok for now, unify with WIP Devicetree branch
 export type WithLabel = {
   labels: string[];
 }
