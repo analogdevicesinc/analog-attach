@@ -1,7 +1,10 @@
 import { execSync } from "node:child_process";
 
-import { answer, command, refuse } from "../../../../interface/backend-interface";
-import { load_workspace } from "../../config/workspace";
+import { answer, command, refuse, type Outcome, type Session } from "../../../../interface/backend-interface";
+import { project_root, run_shell } from "../../../shell";
+import { read_settings } from "../../config/settings";
+import { derive_dtbo_path, load_workspace } from "../../config/workspace";
+import { substitute_command } from "../../utilities";
 import type { DeployResponse } from "../../protocol/types";
 
 /** Remote directory device tree overlays are copied to. */
@@ -20,6 +23,20 @@ export function build_reboot_command(user: string, ip: string): string {
     return `sshpass -e ssh ${SSH_OPTS} ${user}@${ip} sudo reboot`;
 }
 
+/** `deploy-command` in place of scp and the reboot: run at the base of the project, its output on stderr. */
+async function run_deploy_command(template: string, session: Session): Promise<Outcome<DeployResponse>> {
+    const loaded = load_workspace(session, ["overlay_path"]);
+    if (!loaded.ok) { return loaded.outcome; }
+    const dtbo = derive_dtbo_path(loaded.workspace.overlay_path, loaded.workspace.settings.build_dir);
+    const progress = session.progress(`Deploying ${dtbo} with '${template}'`);
+    const result = await run_shell(substitute_command(template, { dtbo }), project_root(session), { line: text => { progress.line(text); }, signal: session.signal });
+    progress.done();
+    if (result.exit_code !== 0) {
+        return refuse(`Deploy failed with exit code ${String(result.exit_code)}`);
+    }
+    return answer<DeployResponse>({ ok: true, message: `Deployed ${dtbo} with '${template}'`, severity: "info" }, "Deploy completed successfully");
+}
+
 export const deploy = command<Record<never, never>, DeployResponse>({
     docs: {
         brief: "Deploy the compiled overlay to a remote device",
@@ -29,9 +46,15 @@ via scp, then reboots it. Requires scp and sshpass on PATH.
 Required settings (set with config <key> <value>):
   deploy-ip           IP address or hostname of the device
   deploy-user         SSH username
-  deploy-password     SSH password`,
+  deploy-password     SSH password
+
+With deploy-command set, runs that instead, at the base of the project, with
+{dtbo} the .dtbo's path.`,
+        examples: ["config deploy-ip 192.168.1.42", "deploy", "--json deploy", "config deploy-command 'cp {dtbo} /mnt/boot/overlays/'"],
     },
     run(_arguments, _flags, session) {
+        const template = read_settings(session.settings).deploy_command;
+        if (template !== undefined && template !== "") { return run_deploy_command(template, session); }
         const loaded = load_workspace(session, ["deploy"]);
         if (!loaded.ok) { return Promise.resolve(loaded.outcome); }
         const { dtbo, host: ip, user, password } = loaded.workspace.deploy;

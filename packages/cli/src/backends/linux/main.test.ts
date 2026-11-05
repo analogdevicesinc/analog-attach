@@ -377,6 +377,20 @@ describe("the Linux backend through main", () => {
         expect(fs.readFileSync(path.join(project, "overlay.dtso"), "utf8")).toContain("adi,mode = \"fast\";");
     });
 
+    test("add and update <path> <child> on a terminal with interview false: nothing asked, as off a terminal", async () => {
+        configure();
+        write_settings({ linux, devicetree: path.join(base, "base.dts"), workfile: path.join(project, "overlay.dtso"), interview: "false" });
+        const prompter = scripted([]);
+        const added = await run(["add", "adi,adxl000"], { prompter });
+        expect(prompter.asked).toEqual([]);
+        expect(added.code).toBe(0);
+        expect(added.stdout).toContain("Missing required: adi,mode, spi-max-frequency\n");
+        expect(added.stderr).toContain("Parent: spi0 (use --parent to choose another)\n");
+        const child = await run(["update", "adc", "channel@0"], { prompter });
+        expect(prompter.asked).toEqual([]);
+        expect(child.stdout).toMatch(/^Added channel@0 to adc\nMissing required: diff-channels\n/);
+    });
+
     test("update <path> <child> on a terminal: the child's missing required properties asked", async () => {
         configure();
         const prompter = scripted(["0 1"]);
@@ -504,6 +518,29 @@ describe("the Linux backend through main", () => {
         expect(refused.code).toBe(2);
         expect(flat.asked).toEqual([]);
         expect(refused.stderr).toContain(".analog-attach/config.json: linux: must be an object");
+    });
+
+    test("build: a success line, then the .dtbo's path two spaces in, as noos writes it", async () => {
+        configure();
+        const tools = path.join(fixture.package_root, "bundled", "linux", "tools");
+        fs.mkdirSync(tools, { recursive: true });
+        for (const name of ["dtc", "dt-mk-schema", "dt-validate"]) { fs.writeFileSync(path.join(tools, name), "#!/bin/sh\nexit 0\n", { mode: 0o755 }); }
+        const result = await run(["build"]);
+        expect(result).toEqual({ code: 0, stdout: `Build completed successfully\n\n  ${path.join(project, "build", "overlay.dtbo")}\n`, stderr: "" });
+    });
+
+    test("build-command and deploy-command: run at the base of the project, with the paths substituted", async () => {
+        configure();
+        write_settings({
+            linux, devicetree: path.join(base, "base.dts"), workfile: path.join(project, "overlay.dtso"),
+            "build-command": "echo {workfile} {output} > built.txt", "deploy-command": "echo {dtbo} > deployed.txt; exit 4",
+        });
+        const built = await run(["--json", "build"]);
+        expect(JSON.parse(built.stdout)).toEqual({ ok: true, message: `Built ${path.join(project, "overlay.dtso")} with 'echo {workfile} {output} > built.txt'`, severity: "info" });
+        expect(fs.readFileSync(path.join(project, "built.txt"), "utf8")).toBe(`${path.join(project, "overlay.dtso")} ${path.join(project, "build", "overlay.dtbo")}\n`);
+        const deployed = await run(["deploy"]);
+        expect(deployed).toMatchObject({ code: 0, stdout: "Deploy failed with exit code 4\n" });
+        expect(fs.readFileSync(path.join(project, "deployed.txt"), "utf8")).toBe(`${path.join(project, "build", "overlay.dtbo")}\n`);
     });
 
     test("every command's help ends with examples (GRM-009)", async () => {

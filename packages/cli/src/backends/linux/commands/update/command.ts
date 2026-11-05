@@ -193,7 +193,8 @@ Special cases:
                     path: child_path.split("/").filter(Boolean),
                     missing_required: await describe_missing(child, missing),
                 });
-                if (quiet || session.prompter === undefined) {
+                // Asked only on a terminal, without --quiet, with the interview setting on.
+                if (quiet || session.prompter === undefined || !workspace.settings.interview) {
                     return answer<UpdateResponse>(response, () => [message, ...missing_lines(child.identifier, missing)].join("\n"));
                 }
                 // On a terminal: fill the pinned values, then ask for the rest (no example values for a child).

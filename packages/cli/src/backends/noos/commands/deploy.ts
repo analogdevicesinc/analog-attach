@@ -15,9 +15,8 @@ import {
     configure_arguments,
     plan_build,
     preflight,
-    run,
-    run_shell,
 } from "../build/cmake_build";
+import { run, run_shell } from "../../shell";
 import { common_ok, type CommonResponse } from "../protocol/responses";
 import { project_directory } from "./build";
 

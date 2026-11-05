@@ -63,7 +63,8 @@ Every command checks the configuration it needs up front: `linux` must be a kern
 - `add`: Needs `linux`, `devicetree`, `workfile` (its file created by `init`)
 - `update`, `validate`: Need `linux`, `devicetree`, `workfile`
 - `read`, `delete`, `rename`, `move`, `enable`/`disable`, `build`: Need `devicetree`, `workfile`
-- `deploy`: Needs `deploy-ip`, `deploy-user`, `deploy-password`, and the `.dtbo` that `build` wrote next to the workfile
+- `deploy`: Needs `deploy-ip`, `deploy-user`, `deploy-password`, and the `.dtbo` that `build` wrote in `build-dir`; with `deploy-command` set, only `workfile`
+- `build` with `build-command` set: only `workfile`
 
 `move`, `enable`, `disable`, `list parent` and `list overlay` belong to the `linux` backend; the other commands are shared by every backend.
 
@@ -135,6 +136,10 @@ analog-attach config --reload                 # rebuild the binding caches
 | `workfile` | No | Path to the working `.dtso` overlay file; may name a file not created yet, which `init` creates (also set by `import`) |
 | `overlay-syntax` | No | Output syntax: `fragment` (default) or `label` (`&spi0 { }` style) |
 | `preprocess-command` | No | C preprocessor command that resolves `#include`s and macros in the base devicetree (default mirrors kbuild's `cpp` flags) |
+| `interview` | No | `true` (default) or `false`: whether `add`, and `update <path> <child>`, ask on a terminal (the parent and the missing required properties) |
+| `build-command` | No | Replaces `build`'s dtc step: run with the shell at the project root, `{workfile}` and `{output}` (the `.dtbo` path) substituted |
+| `build-dir` | No | Folder `build` writes the `.dtbo` to and `deploy` takes it from: `build` at the project root by default, relative to it unless absolute |
+| `deploy-command` | No | Replaces `deploy`'s scp and reboot: run with the shell at the project root, `{dtbo}` substituted |
 | `deploy-ip` | No | IP address or hostname of the remote device |
 | `deploy-user` | No | SSH username on the remote device |
 | `deploy-password` | No | SSH password on the remote device |
@@ -341,14 +346,14 @@ The node gets an automatic unit address and `reg` when the binding defines `reg`
 
 **Parent** (without `--parent`):
 - Piped runs, `--quiet`, `--json`: the node goes under the first entry of `list parent <compatible>`, and a note on stderr says so: `Parent: <bus> (use --parent to choose another)`. That is a guess, not a decision: the `list parent` order is the base tree's order, which says nothing about the bus the device is wired to. With several buses, ask the user which one and pass `--parent`.
-- On a terminal (`--template required`, no `--quiet`): the parent is the first question, a lettered list of the `list parent` results. Enter takes `a`, a letter picks, or type a label or path (Tab completes it); Ctrl-D or Ctrl-C adds nothing and exits 130.
+- On a terminal (`--template required`, no `--quiet`, the `interview` setting `true`): the parent is the first question, a lettered list of the `list parent` results. Enter takes `a`, a letter picks, or type a label or path (Tab completes it); Ctrl-D or Ctrl-C adds nothing and exits 130.
 - `--template example:<N>` never asks: it takes the first `list parent` bus of the example's kind (SPI or I2C), in the base tree's order: `Parent: <bus> (use --parent to choose another)`. A base without a bus of that kind falls back to the first entry: `Parent: <bus> (no I2C bus for example 1; use --parent to choose another)`. The same guess as above: ask the user and pass `--parent`.
 - A device with no parent but the root (`regulator-fixed`, `fixed-clock`) goes under `/`, with no note and no question.
 - Known limit: `adi,ad5593r` (I2C) shares ad5592r's binding, so `list parent` offers SPI buses for it; always pass `--parent` for it.
 
 **Missing required properties**: after the add, the required properties the node still lacks are listed in the order to set them, with `interrupt-parent` before `interrupts`:
 - `--json`: `missing_required: [{ property, description, suggestions }]` in the response. Ask the user for each one in that order, then use `update`.
-- Piped runs and `--quiet`: `Missing required: interrupt-parent, interrupts`.
+- Piped runs, `--quiet`, and `config interview false` (a terminal run then asks nothing, the parent included): `Missing required: interrupt-parent, interrupts`.
 - On a terminal, `add` asks for each one, showing the binding's description and suggestions. Enter takes the first suggestion (with none, it asks once more and a second Enter skips), `-` skips, Ctrl-D stops and keeps what was set. Options (an enum, the nodes a phandle can name) are lettered `a`, `b`, `c`, … (`aa`, `ab`, … past `z`) and picked by letter or by value (a number is always a value, never a pick; write `&ab` or `"a"` for a value that looks like a letter); a fixed-size array (`diff-channels`, `interrupts`) is asked one entry per line.
 - A question of several entries (a fixed-size array such as `diff-channels`, `interrupts` cell by cell, the rows of a `*-gpios`) is asked in place: each entry under the value so far (`ctrl-gpios = <&gpio 5 GPIO_ACTIVE_HIGH>, <&gpio 6>;  (1/6 rows)`), its options and retries erased once it is answered, so the next entry is asked on the same lines; what is left is the value line, then `Set …`.
 - A required `*-gpios` (`ctrl-gpios` of `adi,hmc425a`) is asked row by row: the controller first (a lettered list, the enabled gpio-controllers first, then the disabled ones marked; Enter takes the first, and on later rows the previous row's), then the cells its `#gpio-cells` gives: the line number, and the flags as a lettered pick of the `GPIO_*` macros (Enter = `GPIO_ACTIVE_HIGH`). `Rows: 6` says how many the binding fixes (all are asked); a range or an unsized property (`in-gpios` of `adi,one-bit-adc-dac`) asks one row, then `another row? (y adds one, Enter = done)` up to the maximum. The answer is written as one value, `gpio 40 GPIO_ACTIVE_HIGH, gpio 39 GPIO_ACTIVE_LOW` as `update` takes it. Optional `*-gpios` are not asked: set them with `update`.
@@ -572,7 +577,7 @@ analog-attach update <path> <property> --suggest    # the values it can take, as
 **Creating a child node**: its `reg` follows the unit address. The required properties it still lacks are then handled as after `add`:
 - `--json`: the response carries `path` and `missing_required: [{ property, description, suggestions }]`. Ask the user for each one, then `update <path>/<child> <property> <value>`.
 - Piped runs and `--quiet`: `Missing required: diff-channels`, then `Set them with: update adc/channel@0 <property> <value>`.
-- On a terminal, `update` asks for each one, as `add` does, after setting without asking the ones the binding pins to one value (no example fill: the example describes the device node). `--quiet` lists them instead: the one flag means "value only" when reading and "don't ask" when creating a child.
+- On a terminal, `update` asks for each one, as `add` does, after setting without asking the ones the binding pins to one value (no example fill: the example describes the device node). `--quiet` (or `interview` `false`) lists them instead: the one flag means "value only" when reading and "don't ask" when creating a child.
 
 **Flags**: set with no value, clear with `delete <path> <property>`. `true`/`false` are plain strings, not special.
 
@@ -649,7 +654,7 @@ Sets `status = "okay"` or `status = "disabled"`. Commands of the `linux` backend
 analog-attach build
 ```
 
-**Output**: Writes the `.dtbo` next to the workfile (`overlay.dtso` → `overlay.dtbo`), where `deploy` picks it up: `Wrote <path>` (`--json`: `path`). Fails with an input error when `workfile` is unset or its file is missing; a dtc failure is `Build failed:` followed by dtc's output.
+**Output**: Writes the `.dtbo` in the `build-dir` folder (`build` at the project root by default; `overlay.dtso` → `build/overlay.dtbo`), where `deploy` picks it up: `Build completed successfully`, then the path on its own line (`--json`: `path`). Fails with an input error when `workfile` is unset or its file is missing; a dtc failure is `Build failed:` followed by dtc's output. With `build-command` set, that command runs instead (at the project root, its output on stderr); a non-zero exit is `Build failed with exit code <n>`.
 
 ---
 
@@ -662,9 +667,9 @@ analog-attach build
 analog-attach deploy
 ```
 
-**Requirements**: the `deploy-ip`, `deploy-user` and `deploy-password` config fields, the `.dtbo` that `build` wrote next to the overlay, and `scp` and `sshpass` on PATH. Fails with an input error listing any unset field, a missing `.dtbo`, or a missing tool.
+**Requirements**: the `deploy-ip`, `deploy-user` and `deploy-password` config fields, the `.dtbo` that `build` wrote in `build-dir`, and `scp` and `sshpass` on PATH. Fails with an input error listing any unset field, a missing `.dtbo`, or a missing tool.
 
-**Behavior**: Copies the `.dtbo` to `/boot/overlays/` on the remote device, then always reboots it after a successful copy.
+**Behavior**: Copies the `.dtbo` to `/boot/overlays/` on the remote device, then always reboots it after a successful copy. With `deploy-command` set, that command runs instead (at the project root, `{dtbo}` the `.dtbo`'s path), and none of the deploy settings are needed; a non-zero exit is `Deploy failed with exit code <n>`.
 
 ---
 

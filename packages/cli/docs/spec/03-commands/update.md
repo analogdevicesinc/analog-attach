@@ -345,9 +345,11 @@ required properties as `add` does (`add.md` §11) and:
   `04-protocol/update.schema.json#/$defs/child-created`: `ok` true, `message`
   the report of UPDATE-123, `severity` `"info"`, `path` the child's path, and
   `missing_required` per ADD-110;
-- in a human-mode run that isn't a terminal run, or with `--quiet`, list them
-  per ADD-111, naming the child `<path>/<property>`;
-- in a terminal run without `--quiet`, fill the pinned values per ADD-112 and
+- in a human-mode run that isn't a terminal run, with `--quiet`, or with the
+  `interview` setting `false`, list them per ADD-111, naming the child
+  `<path>/<property>`;
+- in a terminal run without `--quiet`, with `interview` `true` (the default),
+  fill the pinned values per ADD-112 and
   run the interview per ADD-115 to ADD-125. ADD-113 and ADD-114 (values from
   the binding's examples) don't apply.
 

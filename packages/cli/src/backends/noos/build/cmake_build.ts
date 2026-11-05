@@ -13,10 +13,9 @@
  * plus whatever the platform's own toolchain needs (MAXIM_SDK_PATH for maxim).
  */
 
-import { execFileSync, spawn, type ChildProcessByStdio } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
-import type { Readable } from "node:stream";
 
 import os from "node:os";
 import { DEFAULT_BUILD_DIR, error, get_effective_setting_value, ok } from "attach-no-os-lib";
@@ -188,62 +187,6 @@ export function preflight(plan: BuildPlan, capi_path: string): Result<void> {
 
 	const [first] = problems;
 	return first === undefined ? ok() : error(problems.map(problem => problem.message).join(" "), first.path);
-}
-
-export type CommandResult = { exit_code: number };
-
-/** Where a child's output goes, line by line, and what stops it. */
-export interface OutputSink {
-	line(text: string): void;
-	readonly signal?: AbortSignal;
-}
-
-/**
- * Run a command, its output (stdout and stderr, as they come) passed on line by line.
- * Configure output is never swallowed on purpose: Kconfig reports an unsatisfied
- * `depends on` as a warning there, the earliest sign that project.conf is missing a symbol.
- */
-export function run(command: string, arguments_: string[], cwd: string, sink: OutputSink, environment?: NodeJS.ProcessEnv): Promise<CommandResult> {
-	return watch(spawn(command, arguments_, {
-		cwd,
-		stdio: ["ignore", "pipe", "pipe"],
-		...(environment === undefined ? {} : { env: environment }),
-		...(sink.signal === undefined ? {} : { signal: sink.signal }),
-	}), sink);
-}
-
-/** Run a shell string, for the `build-command`/`deploy-command` override. */
-export function run_shell(command: string, cwd: string, sink: OutputSink): Promise<CommandResult> {
-	return watch(spawn(command, [], {
-		cwd,
-		shell: true,
-		stdio: ["ignore", "pipe", "pipe"],
-		...(sink.signal === undefined ? {} : { signal: sink.signal }),
-	}), sink);
-}
-
-function watch(child: ChildProcessByStdio<null, Readable, Readable>, sink: OutputSink): Promise<CommandResult> {
-	return new Promise((resolve) => {
-		const pending = { stdout: "", stderr: "" };
-		const pass = (stream: "stdout" | "stderr") => (chunk: Buffer) => {
-			const lines = (pending[stream] + chunk.toString("utf8")).split(/\r?\n/);
-			pending[stream] = lines.pop() ?? "";
-			for (const line of lines) {
-				sink.line(line);
-			}
-		};
-		child.stdout.on("data", pass("stdout"));
-		child.stderr.on("data", pass("stderr"));
-		child.on("close", (code) => {
-			for (const rest of [pending.stdout, pending.stderr]) {
-				if (rest !== "") {
-					sink.line(rest);
-				}
-			}
-			resolve({ exit_code: code ?? 1 });
-		});
-		child.on("error", () => { resolve({ exit_code: 1 }); });
-	});
 }
 
 /** The board's preset, configured into the build directory (`-B` overrides the preset's binaryDir). */

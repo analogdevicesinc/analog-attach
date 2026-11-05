@@ -25,20 +25,22 @@ target comes from the settings (02-common.md §8.1):
 | `deploy-ip` | IP address or hostname of the device |
 | `deploy-user` | SSH user name |
 | `deploy-password` | SSH password, stored in plain text in the settings file |
-| `workfile` | The overlay. Its `.dtbo` (named as `build` names it, build.md §2) is what is copied. |
+| `workfile` | The overlay. Its `.dtbo` (named as `build` names it, in the build folder, build.md §2) is what is copied. |
+| `deploy-command` | When set, run instead of the copy and the reboot (DEPLOY-012). |
 
 ## 2. Terms
 
 | Term | Meaning |
 |---|---|
-| Compiled overlay | The `.dtbo` path derived from `workfile`, per `build`'s *Output file*. |
+| Compiled overlay | The `.dtbo` path derived from `workfile` and `build-dir`, per `build`'s *Output file*. |
 | Remote directory | `/boot/overlays/` on the device. |
 | SSH options | `-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null` |
 
 ## 3. Resources
 
 The command needs only the deploy resource. It doesn't load the bindings, the
-base or the overlay's content.
+base or the overlay's content. With `deploy-command` set it needs only the
+`workfile` setting (DEPLOY-012).
 
 ## 4. Requirements
 
@@ -79,6 +81,21 @@ refuse (COM-040, COM-041) with `Deploy failed (scp):`, a newline, and the
 command's standard error as it is (`\r\n` line ends from ssh included), and
 not reboot. Human mode writes that, then a newline: its own final newline
 leaves an empty line at the end. JSON mode gives it as `message`.
+
+**DEPLOY-012** When `deploy-command` is set (and not empty), the CLI shall
+run it instead of DEPLOY-001 to DEPLOY-022, with the shell, in the directory
+that holds `.analog-attach/`, after the progress line `Deploying <compiled
+overlay> with '<command>'`. `{dtbo}` in it is the compiled overlay, in double
+quotes. It needs only `workfile` to be set (DEPLOY-001 with that problem
+alone); the compiled overlay needn't exist, and the deploy settings and tools
+aren't checked. The command's standard output and standard error go to
+standard error, line by line.
+
+**DEPLOY-013** If the command exits with a non-zero status, then the CLI
+shall refuse with `Deploy failed with exit code <n>`. Otherwise it shall
+respond `{ "ok": true, "message": "Deployed <compiled overlay> with
+'<command>'", "severity": "info" }` and write `Deploy completed successfully`
+in human mode.
 
 ### 4.3 Reboot
 

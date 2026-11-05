@@ -68,11 +68,11 @@ path_with_only() {
 	stand_ins
 	PATH="$STAND_INS" run_config_error deploy
 	assert_json '.errors[0].field' workfile
-	assert_json '.errors[0].message' "Compiled overlay $PROJECT/overlay.dtbo not found"
+	assert_json '.errors[0].message' "Compiled overlay $PROJECT/build/overlay.dtbo not found"
 	assert_json '.hints[0]' "Run 'build' first."
 	[ ! -e "$CALLS" ]
 	PATH="$STAND_INS" run aa deploy
-	assert_output --partial "Compiled overlay $PROJECT/overlay.dtbo not found"
+	assert_output --partial "Compiled overlay $PROJECT/build/overlay.dtbo not found"
 	assert_output --partial "Run 'build' first."
 }
 
@@ -82,7 +82,7 @@ path_with_only() {
 #   1. Build the overlay and put the stand-ins on PATH.
 #   2. Run deploy, with --json; check it succeeds (.ok true), says deployed and rebooted, with
 #      host 10.0.0.5 and remote path /boot/overlays/.
-#   3. Check the first call is scp of overlay.dtbo to pi@10.0.0.5:/boot/overlays/ and the second
+#   3. Check the first call is scp of build/overlay.dtbo to pi@10.0.0.5:/boot/overlays/ and the second
 #      ssh pi@10.0.0.5 sudo reboot, both with host key checks off and SSHPASS set.
 # bats test_tags=req:DEPLOY-01, req:DEPLOY-03, req:SET-10-LNX, id:L0103
 @test "deploy copies the .dtbo to the device's overlay directory, then reboots it" {
@@ -95,7 +95,7 @@ path_with_only() {
 	assert_json '.host' 10.0.0.5
 	assert_json '.remote_path' /boot/overlays/
 	run cat "$CALLS"
-	assert_line --index 0 "-e scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null $PROJECT/overlay.dtbo pi@10.0.0.5:/boot/overlays/ SSHPASS=secret"
+	assert_line --index 0 "-e scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null $PROJECT/build/overlay.dtbo pi@10.0.0.5:/boot/overlays/ SSHPASS=secret"
 	assert_line --index 1 "-e ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null pi@10.0.0.5 sudo reboot SSHPASS=secret"
 }
 
@@ -112,7 +112,7 @@ path_with_only() {
 	stand_ins
 	PATH="$STAND_INS" run aa deploy
 	assert_success
-	assert_output "Deployed $PROJECT/overlay.dtbo to pi@10.0.0.5:/boot/overlays/ and rebooted"
+	assert_output "Deployed $PROJECT/build/overlay.dtbo to pi@10.0.0.5:/boot/overlays/ and rebooted"
 }
 
 # Description: deploy passes the password to sshpass in the environment, never on the command
@@ -264,5 +264,5 @@ path_with_only() {
 	aa build >/dev/null
 	run aa deploy
 	assert_success
-	assert_output "Deployed $PROJECT/overlay.dtbo to ${AA_DEPLOY_USER:-pi}@$AA_DEPLOY_IP:/boot/overlays/ and rebooted"
+	assert_output "Deployed $PROJECT/build/overlay.dtbo to ${AA_DEPLOY_USER:-pi}@$AA_DEPLOY_IP:/boot/overlays/ and rebooted"
 }

@@ -237,7 +237,7 @@ if (import.meta.vitest) {
         const cwd = path.join(root, "work");
         fs.mkdirSync(path.join(linux, "arch/arm/boot/dts/overlays"), { recursive: true });
         fs.mkdirSync(cwd);
-        return { linux, cwd, settings: { overlay_syntax: "fragment", preprocess_command: "cp {input} {output}" }, done: () => { fs.rmSync(root, { recursive: true }); } };
+        return { linux, cwd, settings: { overlay_syntax: "fragment", preprocess_command: "cp {input} {output}", interview: true, build_dir: "/build" }, done: () => { fs.rmSync(root, { recursive: true }); } };
     };
 
     test("load_overlay_template — the first node of the device, the others, the board, and where it goes", () => {
