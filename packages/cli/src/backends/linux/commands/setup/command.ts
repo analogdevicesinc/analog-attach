@@ -1,27 +1,22 @@
 // The Linux backend's `setup`: what the bare `analog-attach` on a terminal asks once the
-// backend is chosen. It asks for the Linux tree, the base devicetree and the workfile's
-// name, saves them and builds the binding caches when they aren't current. The workfile
-// itself is left to `init`, which the front end runs next when the response is `ready`.
+// backend is chosen. As the noos setup does, it walks the Linux tree, the base devicetree
+// and the workfile, skipping a setting that is set and valid, and saves each answer as it
+// is given, so a stopped run keeps what was answered. Then it builds the binding caches
+// when they aren't current. The workfile itself is left to `init`, which the front end
+// runs next when the response is `ready`.
 
 import * as fs from "node:fs";
 import * as os from "node:os";
 import path from "node:path";
 
-import { answer, cancelled, input_error, PromptCancelled, refuse, type InteractiveSession, type Outcome, type Session } from "../../../../interface/backend-interface";
+import { answer, cancelled, input_error, PromptCancelled, refuse, type InteractiveSession, type Outcome } from "../../../../interface/backend-interface";
 import type { SetupResponse } from "../../../../interface/backend-responses";
 import { ensure_caches, type EnsureResult, type StartProgress } from "../../config/rebuild";
 import { read_settings, type ConfigResult, type Settings } from "../../config/settings";
-import { format_config_errors, workspace_context, type WorkspaceContext } from "../../config/workspace";
+import { format_config_errors, linux_tree_problem, workspace_context, type WorkspaceContext } from "../../config/workspace";
 import { step_context, step_linux, step_overlay, type SetupPlace } from "../../setup";
-import { creation_problem, type OverlayChoice } from "../../workfile";
+import { creation_problem } from "../../workfile";
 import { format_summary, type Summary } from "../init/command";
-
-/** What the setup run is going to set up, every part checked. */
-export interface SetupPlan {
-    linux: string;
-    devicetree: string;
-    overlay: OverlayChoice;
-}
 
 export type Ensure = (settings: Settings, context: WorkspaceContext, start_progress: StartProgress) => Promise<ConfigResult<EnsureResult>>;
 
@@ -32,89 +27,146 @@ export interface SetupOptions {
     ensure?: Ensure;
 }
 
-/** The settings the setup run writes, in order. */
-const SAVED = ["linux", "devicetree", "workfile"] as const;
+/** Why a configured path can't be kept: the Linux tree, or the base devicetree file. */
+function tree_problem(linux: string): string | undefined {
+    return linux_tree_problem(linux) === undefined ? undefined : "which is not a Linux source tree";
+}
 
-/** `.analog-attach/config.json` when the file is under the session's directory, else its absolute path. */
-function shown_file(file: string, cwd: string): string {
-    const relative = path.relative(cwd, file);
-    return relative.startsWith("..") || path.isAbsolute(relative) ? file : relative;
+function file_problem(file: string): string | undefined {
+    const stat = fs.statSync(file, { throwIfNoEntry: false });
+    if (stat === undefined) { return "which does not exist"; }
+    return stat.isFile() ? undefined : "which is not a file";
+}
+
+/** The run's lines and what it saved: a skipped setting is one `✓` line, an asked one its step and then a blank line. */
+class SetupRun {
+    readonly saved: string[] = [];
+    private after_skip = false;
+
+    constructor(readonly session: InteractiveSession, readonly place: SetupPlace) {}
+
+    /**
+     * The setting `key`: kept when it is set and `problem` finds nothing, else asked
+     * with `ask` and saved at once. undefined when the save is refused.
+     */
+    async ensure(key: "linux" | "devicetree", current: string | undefined, problem: (value: string) => string | undefined, ask: () => Promise<string>): Promise<{ ok: true; value: string } | { ok: false; outcome: Outcome<never> }> {
+        const { style } = this.session;
+        const found = current === undefined ? undefined : problem(current);
+        if (current !== undefined && found === undefined) {
+            this.skip(key, current);
+            return { ok: true, value: current };
+        }
+        this.start_step();
+        if (current !== undefined) { this.session.say(style.yellow(`${key} is ${current}, ${found}.`)); this.session.say(""); }
+        const value = await ask();
+        return this.save(key, value);
+    }
+
+    /** One skipped setting: `✓ <key>: <value>`. */
+    skip(key: string, value: string): void {
+        this.session.say(`${this.session.style.cyan("✓")} ${key}: ${value}`);
+        this.after_skip = true;
+    }
+
+    /** Before the questions of a step: a blank line after skipped settings. */
+    start_step(): void {
+        if (this.after_skip) { this.session.say(""); }
+        this.after_skip = false;
+    }
+
+    /** Write the answer through the checks `config` makes, then `✓ <key> = <value>` and a blank line. */
+    async save(key: string, value: string): Promise<{ ok: true; value: string } | { ok: false; outcome: Outcome<never> }> {
+        const written = await this.session.settings.set(key, value);
+        if (!written.ok) { return { ok: false, outcome: input_error(written.message) }; }
+        this.saved.push(key);
+        this.session.say(`${this.session.style.cyan("✓")} ${key} = ${value}`);
+        this.session.say("");
+        return { ok: true, value };
+    }
+
+    /** After the last step: a blank line when it was skipped. */
+    end(): void { this.start_step(); }
+}
+
+/** The header, before the first step. */
+function say_header(session: InteractiveSession): void {
+    const title = `${session.program} setup`;
+    for (const line of ["", session.style.bold(title), "=".repeat(title.length), "", "This sets up the workspace: a Linux kernel source tree, a base device tree and the overlay file.", ""]) {
+        session.say(line);
+    }
+}
+
+/** The steps: what is set, and whether `init` should run (the workfile exists, or the user wants it created). */
+async function run_steps(run: SetupRun): Promise<{ ok: true; linux: string; devicetree: string; workfile: string; create: boolean } | { ok: false; outcome: Outcome<never> }> {
+    const { session, place } = run;
+    const current = read_settings(session.settings);
+
+    const linux = await run.ensure("linux", current.linux, tree_problem, () => step_linux(session, place));
+    if (!linux.ok) { return linux; }
+    const devicetree = await run.ensure("devicetree", current.devicetree, file_problem, () => step_context(session, place, linux.value));
+    if (!devicetree.ok) { return devicetree; }
+
+    if (current.workfile === undefined) {
+        // A new name: init creates it, nothing more to ask.
+        run.start_step();
+        const filename = await step_overlay(session, place);
+        const saved = await run.save("workfile", path.resolve(session.cwd, filename));
+        if (!saved.ok) { return saved; }
+        return { ok: true, linux: linux.value, devicetree: devicetree.value, workfile: saved.value, create: true };
+    }
+
+    const workfile = current.workfile;
+    const shown = path.relative(session.cwd, workfile).startsWith("..") ? workfile : path.relative(session.cwd, workfile);
+    run.skip("workfile", workfile);
+    const exists = fs.statSync(workfile, { throwIfNoEntry: false })?.isFile() === true;
+    // A file init can't create (its directory is gone) gets no question: the summary says what to do.
+    const create = exists || (creation_problem(workfile) === undefined
+        && await session.prompter.confirm({ message: `Create ${shown}?`, default: true }));
+    run.end();
+    return { ok: true, linux: linux.value, devicetree: devicetree.value, workfile, create };
 }
 
 /**
- * Save linux, devicetree and the workfile's name, then build the binding caches
- * when they are not current. The workfile itself is left to `init`. What was
- * saved stays when the build fails.
+ * `Backend.setup`: walk the steps, saving each answer, then build the caches.
+ * Stopping a question (Ctrl-C, Ctrl-D) keeps what was answered: exit 130.
  */
-export async function execute_setup(plan: SetupPlan, session: Session, ensure: Ensure = ensure_caches): Promise<Outcome<SetupResponse>> {
-    const workfile = plan.overlay.kind === "keep" ? plan.overlay.path : path.resolve(session.cwd, plan.overlay.filename);
-    const values: Record<typeof SAVED[number], string> = { linux: plan.linux, devicetree: plan.devicetree, workfile };
-    let file: string | undefined;
-    for (const key of SAVED) {
-        const written = await session.settings.set(key, values[key]);
-        if (!written.ok) { return input_error(written.message); }
-        file = written.file;
-    }
-    if (session.prompter !== undefined) {
-        session.say(`Saved ${SAVED.slice(0, -1).join(", ")} and ${SAVED.at(-1)!} to ${session.style.cyan(shown_file(file!, session.cwd))}.`);
-        session.say("");
-    }
-
-    const ensured = await ensure(read_settings(session.settings), workspace_context(session), label => session.progress(label));
-    if (!ensured.ok || !ensured.value.ok) {
-        const reason = ensured.ok ? ensured.value.message : format_config_errors(ensured.errors, session.program).human;
-        return refuse(`${reason}\nFix the problem, then run '${session.program} config --reload' to build the binding caches and '${session.program} init' to create the workfile.`);
-    }
-    const indexed = ensured.value.rebuilt;
-    // After the cache build's progress line.
-    if (indexed && session.prompter !== undefined) { session.say(""); }
-
-    const exists = fs.statSync(workfile, { throwIfNoEntry: false })?.isFile() === true;
-    // `init` keeps an existing workfile, or creates it where it can.
-    const ready = exists || creation_problem(workfile) === undefined;
-    const summary: Summary = { linux: plan.linux, devicetree: plan.devicetree, overlay: workfile, state: exists ? "kept" : "not created yet", indexed };
-    const response: SetupResponse = {
-        ok: true,
-        message: `Saved ${SAVED.join(", ")}; the binding caches are ${indexed ? "built" : "current"}`,
-        severity: "info",
-        saved: [...SAVED],
-        ready,
-    };
-    // When ready, `init` runs next and its summary ends the run.
-    return answer(response, ready ? "" : style => `${format_summary(summary, style, session.program).join("\n")}\n`);
-}
-
-/** The three steps, the current values as the Enter defaults. */
-async function ask_plan(session: InteractiveSession, place: SetupPlace): Promise<SetupPlan> {
-    const settings = read_settings(session.settings);
-    const say = (line: string): void => { session.say(line); };
-    const title = `${session.program} setup`;
-    say("");
-    say(session.style.bold(title));
-    say("=".repeat(title.length));
-    say("");
-    say("This sets up the workspace: a Linux kernel source tree, a base device tree and the overlay file.");
-    say("");
-    const linux = await step_linux(session, place, settings.linux);
-    say("");
-    const devicetree = await step_context(session, place, linux, settings.devicetree);
-    say("");
-    const overlay = await step_overlay(session, place, settings.workfile);
-    say("");
-    return { linux, devicetree, overlay };
-}
-
-/** `Backend.setup`: ask, save, build the caches. Stopping a question (Ctrl-C, Ctrl-D) saves nothing: exit 130. */
 export function create_setup(options: SetupOptions = {}): (session: InteractiveSession) => Promise<Outcome<SetupResponse>> {
     return async session => {
-        let plan: SetupPlan;
+        const run = new SetupRun(session, { cwd: session.cwd, home: options.home ?? os.homedir() });
+        say_header(session);
+        let steps: Awaited<ReturnType<typeof run_steps>>;
         try {
-            plan = await ask_plan(session, { cwd: session.cwd, home: options.home ?? os.homedir() });
+            steps = await run_steps(run);
         } catch (error) {
-            if (error instanceof PromptCancelled) { return cancelled("Setup cancelled."); }
+            if (error instanceof PromptCancelled) {
+                return cancelled(`Stopped. What was answered is saved; run ${session.program} again to go on.`);
+            }
             throw error;
         }
-        return execute_setup(plan, session, options.ensure);
+        if (!steps.ok) { return steps.outcome; }
+
+        const ensure = options.ensure ?? ensure_caches;
+        const ensured = await ensure(read_settings(session.settings), workspace_context(session), label => session.progress(label));
+        if (!ensured.ok || !ensured.value.ok) {
+            const reason = ensured.ok ? ensured.value.message : format_config_errors(ensured.errors, session.program).human;
+            return refuse(`${reason}\nFix the problem, then run '${session.program} config --reload' to build the binding caches and '${session.program} init' to create the workfile.`);
+        }
+        const indexed = ensured.value.rebuilt;
+        // After the cache build's progress line.
+        if (indexed) { session.say(""); }
+
+        const { saved } = run;
+        const response: SetupResponse = {
+            ok: true,
+            message: `${saved.length === 0 ? "Every setting was already set" : `Saved ${saved.join(", ")}`}; the binding caches are ${indexed ? "built" : "current"}`,
+            severity: "info",
+            saved,
+            ready: steps.create,
+        };
+        if (steps.create) { return answer(response, ""); }
+        // Not created: the summary makes `init` the first next step.
+        const summary: Summary = { linux: steps.linux, devicetree: steps.devicetree, overlay: steps.workfile, state: "not created yet", indexed };
+        return answer(response, style => `${format_summary(summary, style, session.program).join("\n")}\n`);
     };
 }
 
@@ -127,9 +179,10 @@ if (import.meta.vitest) {
     const { capture_stream } = await import("../../../../front/output");
     const { SETTINGS } = await import("../../config/settings");
     const { outcome_json, outcome_text } = await import("../../testing/outcome");
+    const { scripted } = await import("../../testing/fixture");
 
-    /** A directory with a Linux tree skeleton, a base .dts and a workspace directory, and a session there. */
-    const workspace = () => {
+    /** A directory with a Linux tree skeleton, a base .dts and a workspace directory, and a terminal session there answering `answers`. */
+    const workspace = (answers: (paths: { linux: string; root: string }) => unknown[] = () => []) => {
         const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "attach-setup-")));
         const linux = path.join(root, "linux");
         fs.mkdirSync(path.join(linux, "Documentation", "devicetree", "bindings"), { recursive: true });
@@ -140,19 +193,21 @@ if (import.meta.vitest) {
         fs.mkdirSync(work);
         const settings = open_settings({ files: settings_files({ cwd: work, home: path.join(root, "home") }), active: { id: "linux", specs: SETTINGS } });
         const stdout = capture_stream();
+        const prompter = scripted(answers({ linux, root }));
         const session = create_session({
             program: "aa", mode: "text", cwd: work, project_root: work, backend_id: "linux", assets_dir: path.join(root, "assets"), settings,
-            streams: { stdout, stderr: capture_stream() },
-        });
-        return { root, linux, dts, work, settings, session, done: () => { fs.rmSync(root, { recursive: true }); } };
+            streams: { stdout, stderr: capture_stream() }, prompter,
+        }) as InteractiveSession;
+        return { root, linux, dts, work, settings, session, prompter, stdout, done: () => { fs.rmSync(root, { recursive: true }); } };
     };
-    const build = (): Promise<ConfigResult<EnsureResult>> => Promise.resolve({ ok: true, value: { ok: true, rebuilt: true, message: "built" } });
-    const built: Ensure = build;
+    const built: Ensure = () => Promise.resolve({ ok: true, value: { ok: true, rebuilt: true, message: "built" } });
+    const current: Ensure = () => Promise.resolve({ ok: true, value: { ok: true, rebuilt: false, message: "current" } });
 
-    test("execute_setup — saves the settings with the workfile's name and builds the caches, creating no workfile", async () => {
-        const { linux, dts, work, settings, session, done } = workspace();
+    test("setup — with nothing set, asks the three steps and saves each answer; init then creates the workfile", async () => {
+        const { root, linux, dts, work, settings, session, prompter, done } = workspace(({ linux }) => [linux, "manual", "../base.dts", "mine"]);
         try {
-            const outcome = await execute_setup({ linux, devicetree: dts, overlay: { kind: "create", filename: "mine.dtso" } }, session, built);
+            const outcome = await create_setup({ home: root, ensure: built })(session);
+            expect(prompter.asked).toEqual(["Linux source tree", "Choose how to select the base .dts file", "Path to .dts file", "Overlay file name"]);
             expect(await outcome_json(outcome)).toEqual({
                 ok: true, message: "Saved linux, devicetree, workfile; the binding caches are built", severity: "info",
                 saved: ["linux", "devicetree", "workfile"], ready: true,
@@ -165,47 +220,72 @@ if (import.meta.vitest) {
         }
     });
 
-    test("execute_setup — keeping the workfile leaves the file, and current caches aren't rebuilt", async () => {
-        const { linux, dts, work, session, done } = workspace();
+    test("setup — a set and valid setting is skipped; an existing workfile asks nothing and is ready", async () => {
+        const { root, linux, dts, work, settings, session, prompter, stdout, done } = workspace();
         try {
             const kept = path.join(work, "overlay.dtso");
-            fs.writeFileSync(kept, "/dts-v1/;\n/plugin/;\n/ {\n};\n// mine\n");
-            const current: Ensure = () => Promise.resolve({ ok: true, value: { ok: true, rebuilt: false, message: "current" } });
-            const outcome = await execute_setup({ linux, devicetree: dts, overlay: { kind: "keep", path: kept } }, session, current);
-            expect(await outcome_json(outcome)).toMatchObject({ ready: true, message: "Saved linux, devicetree, workfile; the binding caches are current" });
-            expect(fs.readFileSync(kept, "utf8")).toContain("// mine");
+            fs.writeFileSync(kept, "/dts-v1/;\n/plugin/;\n/ {\n};\n");
+            for (const [key, value] of [["linux", linux], ["devicetree", dts], ["workfile", kept]] as const) { await settings.set(key, value); }
+            const outcome = await create_setup({ home: root, ensure: current })(session);
+            expect(prompter.asked).toEqual([]);
+            expect(await outcome_json(outcome)).toMatchObject({ saved: [], ready: true, message: "Every setting was already set; the binding caches are current" });
+            expect(stdout.text).toContain(`✓ linux: ${linux}\n✓ devicetree: ${dts}\n✓ workfile: ${kept}\n`);
         } finally {
             done();
         }
     });
 
-    test("execute_setup — a failed cache build refuses and keeps the saved settings", async () => {
-        const { linux, dts, work, settings, session, done } = workspace();
+    test("setup — a configured workfile not created yet: Create? asked, and no leaves it to init", async () => {
+        const { root, linux, dts, work, settings, session, prompter, done } = workspace(() => [false]);
+        try {
+            for (const [key, value] of [["linux", linux], ["devicetree", dts], ["workfile", path.join(work, "overlay.dtso")]] as const) { await settings.set(key, value); }
+            const outcome = await create_setup({ home: root, ensure: current })(session);
+            expect(prompter.asked).toEqual(["Create overlay.dtso?"]);
+            expect(await outcome_json(outcome)).toMatchObject({ ready: false });
+            expect(outcome_text(outcome)).toContain("Workspace configured");
+            expect(outcome_text(outcome)).toContain("aa init");
+            expect(fs.existsSync(path.join(work, "overlay.dtso"))).toBe(false);
+        } finally {
+            done();
+        }
+    });
+
+    test("setup — a configured tree that isn't one is named and asked again", async () => {
+        const { root, linux, dts, settings, session, prompter, stdout, done } = workspace(({ linux }) => [linux, false]);
+        try {
+            // The store checks only that the path exists; it is the setup that wants a Linux tree.
+            for (const [key, value] of [["linux", root], ["devicetree", dts], ["workfile", path.join(root, "work", "o.dtso")]] as const) { await settings.set(key, value); }
+            await create_setup({ home: root, ensure: current })(session);
+            expect(prompter.asked[0]).toBe("Linux source tree");
+            expect(stdout.text).toContain(`linux is ${root}, which is not a Linux source tree.`);
+            expect(settings.get("linux")).toBe(linux);
+        } finally {
+            done();
+        }
+    });
+
+    test("setup — stopped at the base, the tree is kept: exit 130", async () => {
+        const { root, linux, settings, session, done } = workspace(({ linux }) => [linux]);
+        try {
+            const outcome = await create_setup({ home: root, ensure: built })(session);
+            expect(outcome.kind).toBe("cancelled");
+            expect(outcome_text(outcome)).toBe("Stopped. What was answered is saved; run aa again to go on.");
+            expect(settings.get("linux")).toBe(linux);
+            expect(settings.get("devicetree")).toBeUndefined();
+        } finally {
+            done();
+        }
+    });
+
+    test("setup — a failed cache build refuses and keeps the saved settings", async () => {
+        const { root, linux, work, settings, session, done } = workspace(({ linux }) => [linux, "manual", "../base.dts", "overlay"]);
         try {
             const failing: Ensure = () => Promise.resolve({ ok: true, value: { ok: false, rebuilt: true, message: "Compiling binding schemas failed:\nbad binding" } });
-            const outcome = await execute_setup({ linux, devicetree: dts, overlay: { kind: "create", filename: "overlay.dtso" } }, session, failing);
+            const outcome = await create_setup({ home: root, ensure: failing })(session);
             expect(outcome.kind).toBe("refused");
             expect(outcome_text(outcome)).toBe("Compiling binding schemas failed:\nbad binding\nFix the problem, then run 'aa config --reload' to build the binding caches and 'aa init' to create the workfile.");
             expect(fs.existsSync(path.join(work, "overlay.dtso"))).toBe(false);
             expect(settings.get("workfile")).toBe(path.join(work, "overlay.dtso"));
-        } finally {
-            done();
-        }
-    });
-
-    test("execute_setup — a workfile init couldn't create is not ready: the summary says what to do", async () => {
-        const { linux, dts, session, done } = workspace();
-        try {
-            // A kept path whose directory is gone: the setting checks it, so the plan names a file in a directory that exists, then the directory goes.
-            const directory = path.join(path.dirname(dts), "gone");
-            fs.mkdirSync(directory);
-            const outcome = await execute_setup({ linux, devicetree: dts, overlay: { kind: "keep", path: path.join(directory, "x.dtso") } }, session, () => {
-                fs.rmSync(directory, { recursive: true });
-                return build();
-            });
-            expect(await outcome_json(outcome)).toMatchObject({ ready: false });
-            expect(outcome_text(outcome)).toContain("Workspace configured");
-            expect(outcome_text(outcome)).toContain("aa init");
         } finally {
             done();
         }

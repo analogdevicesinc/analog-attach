@@ -446,20 +446,26 @@ The hidden `__list` of attach-linux is withdrawn. `complete.ts` calls the data f
 
 The Linux `setup` (`commands/setup/command.ts`, spec `setup.md`) runs from the front end's bare run
 once the backend is linux.
-- It asks for the Linux tree, the base devicetree and the workfile's name (`ask_plan` with
-  `step_linux`, `step_context`, `step_overlay` in `setup.ts`, through `session.prompter`).
+- Like the noos setup, it walks the Linux tree, the base devicetree and the workfile (`run_steps`
+  with `step_linux`, `step_context`, `step_overlay` in `setup.ts`, through `session.prompter`).
+  - A setting that is set and valid is skipped (`✓ linux: <path>`); a set but invalid one is
+    named and asked again.
+  - Each answer is saved at once through `session.settings.set` (`SetupRun.save`, `✓ <key> =
+    <value>`), so a stopped run keeps what was answered.
 - `find_linux_trees` lists any directory under ~ with `Documentation/devicetree/bindings/` and
   `include/`, whatever its name.
-- The configured values are the Enter defaults. A configured workfile is kept (`k`) or replaced by
-  a new name (`n`, refused when the file exists).
 - The `.dts` search is the prompter's `search`.
-- It saves the three settings, then builds the binding caches unless they are current
-  (`ensure_caches`). It creates no file, and a failed build leaves the settings saved.
-- Its response is `ready` when `init` can keep or create the workfile, and the front end then runs
-  `init`. Otherwise it prints the summary (`format_summary` in `commands/init/command.ts`), which
-  says `Workspace configured` and makes `analog-attach init` the first next step.
-- Cancelling it (Ctrl-C/Ctrl-D) exits 130 (`cancelled`). Stopping the add interview exits 0,
-  since the node is added.
+- The workfile:
+  - unset: its name is asked (an existing file is refused), and `init` creates it;
+  - set: it is kept. When its file doesn't exist yet, `Create <file>?` is asked.
+- Then it builds the binding caches unless they are current (`ensure_caches`). It creates no
+  file, and a failed build leaves the settings saved.
+- Its response is `ready` when the file exists, was just named, or the user said yes, and the
+  front end then runs `init`. Otherwise it prints the summary (`format_summary` in
+  `commands/init/command.ts`), which says `Workspace configured` and makes `analog-attach init`
+  the first next step.
+- Cancelling it (Ctrl-C/Ctrl-D) exits 130 with `Stopped. What was answered is saved; …`
+  (`cancelled`). Stopping the add interview exits 0, since the node is added.
 
 `init` (`commands/init/command.ts`, spec `init.md`) takes no options, never asks, builds no cache
 and changes no setting.
