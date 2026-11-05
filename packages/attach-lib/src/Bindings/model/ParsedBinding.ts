@@ -3,8 +3,6 @@ import { AttachType } from "./AttachType.js";
 export type ResolvedProperty = {
     key: string,
     value: AttachType,
-    /** For a `*-gpios` property: how many rows (controller + cells) it takes, as the binding sizes it (set by the devicetree layer). */
-    gpio_rows?: { min_rows: number; max_rows?: number },
 }
 
 export type PatternPropertyRule = {
