@@ -407,6 +407,7 @@
         },
         "adi,range-double": {
             "description": "Sets the analog input range from 0 to 2xVREF.",
+            "dtType": "flag",
             "type": "boolean"
         },
         "compatible": {

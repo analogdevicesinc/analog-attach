@@ -17,6 +17,7 @@
                     "properties": {
                         "regulator-changeable-in-suspend": {
                             "description": "whether the default voltage and the regulator on/off in suspend can be changed in runtime.",
+                            "dtType": "flag",
                             "type": "boolean"
                         },
                         "regulator-mode": {
@@ -29,10 +30,12 @@
                         },
                         "regulator-off-in-suspend": {
                             "description": "regulator should be off in suspend state.",
+                            "dtType": "flag",
                             "type": "boolean"
                         },
                         "regulator-on-in-suspend": {
                             "description": "regulator should be on in suspend state.",
+                            "dtType": "flag",
                             "type": "boolean"
                         },
                         "regulator-suspend-max-microvolt": {
@@ -90,10 +93,12 @@
                 },
                 "regulator-allow-bypass": {
                     "description": "allow the regulator to go into bypass mode",
+                    "dtType": "flag",
                     "type": "boolean"
                 },
                 "regulator-allow-set-load": {
                     "description": "allow the regulator performance level to be configured",
+                    "dtType": "flag",
                     "type": "boolean"
                 },
                 "regulator-allowed-modes": {
@@ -111,10 +116,12 @@
                 },
                 "regulator-always-on": {
                     "description": "boolean, regulator should never be disabled",
+                    "dtType": "flag",
                     "type": "boolean"
                 },
                 "regulator-boot-on": {
                     "description": "bootloader/firmware enabled regulator. It's expected that this regulator was left on by the bootloader. If the bootloader didn't leave it on then OS should turn it on at boot but shouldn't prevent it from being turned off later. This property is intended to only be used for regulators where software cannot read the state of the regulator.",
+                    "dtType": "flag",
                     "type": "boolean"
                 },
                 "regulator-coupled-max-spread": {
@@ -321,10 +328,12 @@
                 },
                 "regulator-over-current-protection": {
                     "description": "Enable over current protection.",
+                    "dtType": "flag",
                     "type": "boolean"
                 },
                 "regulator-pull-down": {
                     "description": "Enable pull down resistor when the regulator is disabled.",
+                    "dtType": "flag",
                     "type": "boolean"
                 },
                 "regulator-ramp-delay": {
@@ -367,6 +376,7 @@
                 },
                 "regulator-soft-start": {
                     "description": "Enable soft start so that voltage ramps slowly",
+                    "dtType": "flag",
                     "type": "boolean"
                 },
                 "regulator-system-load": {
@@ -566,6 +576,7 @@
         },
         "enable-active-high": {
             "description": "Polarity of GPIO is Active high. If this property is missing, the default assumed is Active low.",
+            "dtType": "flag",
             "type": "boolean"
         },
         "gpio": {
@@ -580,6 +591,7 @@
         },
         "gpio-open-drain": {
             "description": "GPIO is open drain type. If this property is missing then default assumption is false.",
+            "dtType": "flag",
             "type": "boolean"
         },
         "gpios": {
@@ -665,6 +677,7 @@
         },
         "system-critical-regulator": {
             "description": "Set if the regulator is critical to system stability or functionality.",
+            "dtType": "flag",
             "type": "boolean"
         },
         "vin-supply": {

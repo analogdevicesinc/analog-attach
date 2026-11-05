@@ -763,6 +763,7 @@
                     "type": "array"
                 },
                 "nvmem-cells": {
+                    "dtType": "phandle-array",
                     "items": [
                         {
                             "description": "Phandle to the calibration vrefint data provided by otp"

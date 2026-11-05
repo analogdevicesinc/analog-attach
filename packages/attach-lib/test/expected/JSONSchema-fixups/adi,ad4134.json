@@ -160,6 +160,7 @@
             "type": "array"
         },
         "spi-max-frequency": {
+            "dtType": "uint32",
             "maximum": 1000000,
             "type": "integer"
         }

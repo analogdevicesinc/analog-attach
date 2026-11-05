@@ -433,10 +433,12 @@
             "properties": {
                 "adi,buffered-negative": {
                     "description": "Enable buffered mode for negative input.",
+                    "dtType": "flag",
                     "type": "boolean"
                 },
                 "adi,buffered-positive": {
                     "description": "Enable buffered mode for positive input.",
+                    "dtType": "flag",
                     "type": "boolean"
                 },
                 "adi,reference-select": {

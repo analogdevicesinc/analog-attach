@@ -225,12 +225,17 @@
                 {
                     "key": "nvmem-cells",
                     "value": {
-                        "_t": "list",
-                        "item": {
-                            "_t": "any"
-                        },
+                        "_t": "matrix",
                         "maxItems": 1,
-                        "minItems": 1
+                        "minItems": 1,
+                        "rows": [
+                            {
+                                "_t": "list",
+                                "item": {
+                                    "_t": "any"
+                                }
+                            }
+                        ]
                     }
                 },
                 {

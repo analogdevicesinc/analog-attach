@@ -783,6 +783,7 @@
         },
         "adi,vref-out-en": {
             "description": "Vref I/O driven by internal vref to 2.5V. If not set, Vref pin will be floating.",
+            "dtType": "flag",
             "type": "boolean"
         },
         "compatible": {
