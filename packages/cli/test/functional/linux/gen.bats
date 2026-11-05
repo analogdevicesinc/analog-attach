@@ -338,16 +338,13 @@ checksum() {
 	done
 }
 
-# Gap: a result longer than 64 KiB is cut short when standard output is a pipe (the process
-# exits before the pipe has taken it all): `--json list devices` gives 65536 or 131072 bytes of
-# its 1 MB.
 # Description: a result longer than 64 KiB reaches a pipe whole, in JSON and as text.
 # Steps:
 #   1. Create the overlay with init.
 #   2. Pipe list devices, with --json, to jq.
 #   3. Check it parses and has more than 1000 devices.
 #   4. Pipe list devices, as text, to wc -l and check it gives more than 1000 lines.
-# bats test_tags=req:GEN-07, gap, id:L0136
+# bats test_tags=req:GEN-07, id:L0136
 @test "a long JSON result reaches a pipe whole" {
 	with_overlay
 	run bash -c "node '$CLI_DIR/dist/cli.js' --json list devices | jq -e '.devices | length > 1000'"
